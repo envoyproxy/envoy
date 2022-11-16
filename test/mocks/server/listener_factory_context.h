@@ -39,7 +39,7 @@ public:
   MOCK_METHOD(Singleton::Manager&, singletonManager, ());
   MOCK_METHOD(OverloadManager&, overloadManager, ());
   MOCK_METHOD(ThreadLocal::Instance&, threadLocal, ());
-  MOCK_METHOD(Server::Admin&, admin, ());
+  MOCK_METHOD(OptRef<Server::Admin>, admin, ());
   MOCK_METHOD(Stats::Scope&, listenerScope, ());
   MOCK_METHOD(bool, isQuicListener, (), (const));
   MOCK_METHOD(const LocalInfo::LocalInfo&, localInfo, (), (const));

@@ -310,4 +310,3 @@ deprecated:
     :ref:`Route.typed_per_filter_config<envoy_v3_api_field_config.route.v3.Route.typed_per_filter_config>` or
     :ref:`WeightedCluster.ClusterWeight.typed_per_filter_config<envoy_v3_api_field_config.route.v3.WeightedCluster.ClusterWeight.typed_per_filter_config>`
     to configure the CORS HTTP filter by the type :ref:`CorsPolicy in filter <envoy_v3_api_msg_extensions.filters.http.cors.v3.CorsPolicy>`.
-

@@ -9,8 +9,6 @@
 #include "envoy/stats/store.h"
 #include "envoy/thread/thread.h"
 
-#include "source/server/hot_restart.pb.h"
-
 namespace Envoy {
 namespace Server {
 

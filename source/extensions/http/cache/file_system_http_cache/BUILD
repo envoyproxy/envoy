@@ -29,3 +29,13 @@ envoy_cc_library(
         "@com_google_absl//absl/strings",
     ],
 )
+
+envoy_cc_library(
+    name = "cache_file_fixed_block",
+    srcs = ["cache_file_fixed_block.cc"],
+    hdrs = ["cache_file_fixed_block.h"],
+    deps = [
+        "//envoy/buffer:buffer_interface",
+        "@com_google_absl//absl/strings",
+    ],
+)

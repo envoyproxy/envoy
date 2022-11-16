@@ -11,3 +11,11 @@ envoy_cc_test(
         "//source/extensions/http/cache/file_system_http_cache:cache_file_header_proto_util",
     ],
 )
+
+envoy_cc_test(
+    name = "cache_file_fixed_block_test",
+    srcs = ["cache_file_fixed_block_test.cc"],
+    deps = [
+        "//source/extensions/http/cache/file_system_http_cache:cache_file_fixed_block",
+    ],
+)

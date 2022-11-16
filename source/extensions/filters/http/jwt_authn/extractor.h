@@ -77,11 +77,11 @@ public:
   extract(const Http::RequestHeaderMap& headers) const PURE;
 
   /**
-   * Remove headers that configured to send JWT payloads.
+   * Remove headers that configured to send JWT payloads and JWT claims.
    *
    * @param headers is the HTTP request headers.
    */
-  virtual void sanitizePayloadHeaders(Http::HeaderMap& headers) const PURE;
+  virtual void sanitizeHeaders(Http::HeaderMap& headers) const PURE;
 
   /**
    * Create an instance of Extractor for a given config.

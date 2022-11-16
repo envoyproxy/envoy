@@ -37,7 +37,6 @@ public:
    * @param config_source supplies the extension configuration source for the filter configs.
    * @param filter_config_name the filter config resource name.
    * @param factory_context is the context to use for the filter config provider.
-   * @param stat_prefix supplies the stat_prefix to use for the provider stats.
    * @param last_filter_in_filter_chain indicates whether this filter is the last filter in the
    * configured chain
    * @param filter_chain_type is the filter chain type
@@ -48,8 +47,7 @@ public:
       const envoy::config::core::v3::ExtensionConfigSource& config_source,
       const std::string& filter_config_name,
       Server::Configuration::ServerFactoryContext& server_context, FactoryCtx& factory_context,
-      const std::string& stat_prefix, bool last_filter_in_filter_chain,
-      const std::string& filter_chain_type,
+      bool last_filter_in_filter_chain, const std::string& filter_chain_type,
       const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher) PURE;
 
   /**
