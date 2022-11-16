@@ -80,10 +80,6 @@ message RateLimitQuotaUsageReports {
 
     // Requests throttled.
     uint64 num_requests_denied = 4;
-
-    // An optional info for the list of Envoy instances that send the usage report ``BucketQuotaUsage``.
-    // This field should only be provided in the first report, the subsequent messages will have the same Envoy node inforamtion.
-    repeated config.core.v3.Node nodes = 5;
   }
 
   // All quota requests must specify the domain. This enables sharing the quota
@@ -98,6 +94,10 @@ message RateLimitQuotaUsageReports {
   // A list of quota usage reports. The list is processed by the RLQS server in the same order
   // it's provided by the client.
   repeated BucketQuotaUsage bucket_quota_usages = 2 [(validate.rules).repeated = {min_items: 1}];
+
+  // An optional info of the Envoy instance that sends the usage report ``BucketQuotaUsage``.
+  // This field should only be provided in the first report, the subsequent reports will have the same information.
+  config.core.v3.Node node = 3;
 }
 
 message RateLimitQuotaResponse {
