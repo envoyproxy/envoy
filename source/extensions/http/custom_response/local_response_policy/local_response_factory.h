@@ -16,8 +16,6 @@ class LocalResponseFactory
 public:
   ~LocalResponseFactory() override;
 
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override;
-
   Extensions::HttpFilters::CustomResponse::PolicySharedPtr
   createPolicy(const Protobuf::Message& config,
                Envoy::Server::Configuration::ServerFactoryContext& server,

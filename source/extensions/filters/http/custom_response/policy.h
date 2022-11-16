@@ -55,6 +55,8 @@ public:
     };
   }
 
+  std::string category() const override { return "envoy.http.custom_response"; }
+
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<PolicyConfig>();
   }

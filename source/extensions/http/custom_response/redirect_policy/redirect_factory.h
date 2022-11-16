@@ -15,8 +15,6 @@ class RedirectFactory
 public:
   ~RedirectFactory() override;
 
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override;
-
   Extensions::HttpFilters::CustomResponse::PolicySharedPtr
   createPolicy(const Protobuf::Message& config,
                Envoy::Server::Configuration::ServerFactoryContext& server,

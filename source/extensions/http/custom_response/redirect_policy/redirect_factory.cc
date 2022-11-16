@@ -14,10 +14,6 @@ namespace CustomResponse {
 using RedirectPolicyProto =
     envoy::extensions::http::custom_response::redirect_policy::v3::RedirectPolicy;
 
-ProtobufTypes::MessagePtr RedirectFactory::createEmptyConfigProto() {
-  return std::make_unique<RedirectPolicyProto>();
-}
-
 RedirectFactory::~RedirectFactory() = default;
 
 Extensions::HttpFilters::CustomResponse::PolicySharedPtr
