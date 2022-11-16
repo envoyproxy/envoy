@@ -64,6 +64,11 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
   // Allow extension lookup by name in the integration tests.
   config_helper_.addRuntimeOverride("envoy.reloadable_features.no_extension_lookup_by_name",
                                     "false");
+
+#ifndef ENVOY_ADMIN_FUNCTIONALITY
+  config_helper_.addConfigModifier(
+      [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void { bootstrap.clear_admin(); });
+#endif
 }
 
 BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
@@ -100,9 +105,11 @@ void BaseIntegrationTest::initialize() {
   createXdsUpstream();
   createEnvoy();
 
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
   if (!skip_tag_extraction_rule_check_) {
     checkForMissingTagExtractionRules();
   }
+#endif
 }
 
 Network::DownstreamTransportSocketFactoryPtr
@@ -390,15 +397,17 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
       }
     }
   }
-  const auto admin_addr =
-      test_server->server().admin().socket().connectionInfoProvider().localAddress();
-  if (admin_addr->type() == Network::Address::Type::Ip) {
-    registerPort("admin", admin_addr->ip()->port());
+  if (test_server->server().admin().has_value()) {
+    const auto admin_addr =
+        test_server->server().admin()->socket().connectionInfoProvider().localAddress();
+    if (admin_addr->type() == Network::Address::Type::Ip) {
+      registerPort("admin", admin_addr->ip()->port());
+    }
   }
 }
 
 std::string getListenerDetails(Envoy::Server::Instance& server) {
-  const auto& cbs_maps = server.admin().getConfigTracker().getCallbacksMap();
+  const auto& cbs_maps = server.admin()->getConfigTracker().getCallbacksMap();
   ProtobufTypes::MessagePtr details = cbs_maps.at("listeners")(Matchers::UniversalStringMatcher());
   auto listener_info = Protobuf::down_cast<envoy::admin::v3::ListenersConfigDump>(*details);
   return MessageUtil::getYamlStringFromMessage(listener_info.dynamic_listeners(0).error_state());

@@ -66,9 +66,9 @@ public:
   virtual const LocalInfo::LocalInfo& localInfo() const PURE;
 
   /**
-   * @return Server::Admin& the server's global admin HTTP endpoint.
+   * @return OptRef<Server::Admin> the global HTTP admin endpoint for the server.
    */
-  virtual Server::Admin& admin() PURE;
+  virtual OptRef<Server::Admin> admin() PURE;
 
   /**
    * @return Runtime::Loader& the singleton runtime loader for the server.

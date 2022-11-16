@@ -167,6 +167,12 @@ envoy::config::cluster::v3::Cluster HdsDelegate::createClusterConfig(
 
     // add all endpoints for this locality group to the config
     for (const auto& endpoint : locality_endpoints.endpoints()) {
+      if (endpoint.has_health_check_config() &&
+          endpoint.health_check_config().disable_active_health_check()) {
+        ENVOY_LOG(debug, "Skip adding the endpoint {} with optional disabled health check for HDS.",
+                  endpoint.DebugString());
+        continue;
+      }
       auto* new_endpoint = endpoints->add_lb_endpoints()->mutable_endpoint();
       new_endpoint->mutable_address()->MergeFrom(endpoint.address());
       new_endpoint->mutable_health_check_config()->MergeFrom(endpoint.health_check_config());
