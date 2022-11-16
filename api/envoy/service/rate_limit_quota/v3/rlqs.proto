@@ -62,7 +62,6 @@ message RateLimitQuotaUsageReports {
   // .. note::
   //   Note that the first report sent for a ``BucketId`` indicates to the RLQS server that
   //   the RLQS client is subscribing for the future assignments for this ``BucketId``.
-  //
   message BucketQuotaUsage {
     // ``BucketId`` for which request quota usage is reported.
     BucketId bucket_id = 1 [(validate.rules).message = {required: true}];

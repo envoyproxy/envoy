@@ -17,7 +17,7 @@ this filter periodically reports request rates to the RLQS, allowing the RLQS se
 individual load of each Envoy instance. When quota assignments change, the RLQS proactively pushes the new assignment to Envoy.
 
 The HTTP rate limit quota filter will call the rate limit quota service when it is configured in the HTTP connection manager filter chain. Filter configuration
-defines the RLQS service and definitions of quota buckets that will receive quota assignments from server. Qouta buckets are defined by a set of matchers that determine
+defines the RLQS service and definitions of quota buckets that will receive quota assignments from server. Quota buckets are defined by a set of matchers that determine
 if a request is subject to the rate limit quota assigned to that bucket. Each matcher can contain multiple buckets by the means of the
 :ref:`bucket_id_builder <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.bucket_id_builder>`. The bucket ID builder allows
 quota buckets to be generated either dynamically based on request attributes, such as request header value or statically based on the configuration.
@@ -162,7 +162,7 @@ are emitted to the normal cluster :ref:`dynamic HTTP statistics <config_cluster_
   assignments, Counter, Total rate limit assignments received from the rate limit quota service
   error, Counter, Total errors contacting the rate limit quota service
   over_limit, Counter, Total requests that exceeded assigned rate limit
-  no_assigment, Counter, "Total requests that were applied the
-  :ref:`no_assigment_behavior <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.no_assignment_behavior>`"
-  expired_assigment, Counter, "Total requests that were applied the
-  :ref:`expired_assignment_behavior <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.expired_assignment_behavior>`"
+  no_assigment, Counter, Total requests that were applied the
+  :ref:`no_assigment_behavior <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.no_assignment_behavior>`
+  expired_assigment, Counter, Total requests that were applied the
+  :ref:`expired_assignment_behavior <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.expired_assignment_behavior>`
