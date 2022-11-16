@@ -1148,6 +1148,13 @@ TEST_F(UdpProxyFilterIpv4Ipv6Test, NoSocketOptionIfUseOriginalSrcIpIsNotSet) {
     GTEST_SKIP();
   }
 
+  EXPECT_CALL(os_sys_calls_, getaddrinfo(_, _, _, _))
+      .WillRepeatedly(Invoke([&](const char* node, const char* service,
+                                 const struct addrinfo* hints, struct addrinfo** res) {
+        Api::OsSysCallsImpl real;
+        return real.getaddrinfo(node, service, hints, res);
+      }));
+
   InSequence s;
 
   setup(readConfig(R"EOF(
