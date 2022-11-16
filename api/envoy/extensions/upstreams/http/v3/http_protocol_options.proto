@@ -150,9 +150,8 @@ message HttpProtocolOptions {
     AutoHttpConfig auto_config = 5;
   }
 
-  // .. warning::
-  //   Upstream HTTP filters are not supported by default.
-  //   This warning will be removed as support moves beyond alpha.
+  // .. note::
+  //   Upstream HTTP filters are currently in alpha.
   //
   // Optional HTTP filters for the upstream filter chain.
   //

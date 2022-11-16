@@ -283,7 +283,7 @@ ClusterManagerImpl::ClusterManagerImpl(
     const envoy::config::bootstrap::v3::Bootstrap& bootstrap, ClusterManagerFactory& factory,
     Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
     const LocalInfo::LocalInfo& local_info, AccessLog::AccessLogManager& log_manager,
-    Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
+    Event::Dispatcher& main_thread_dispatcher, OptRef<Server::Admin> admin,
     ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
     Http::Context& http_context, Grpc::Context& grpc_context, Router::Context& router_context,
     const Server::Instance& server)
@@ -292,11 +292,6 @@ ClusterManagerImpl::ClusterManagerImpl(
       bind_config_(bootstrap.cluster_manager().upstream_bind_config()), local_info_(local_info),
       cm_stats_(generateStats(stats)),
       init_helper_(*this, [this](ClusterManagerCluster& cluster) { onClusterInit(cluster); }),
-      config_tracker_entry_(
-          admin.getConfigTracker().add("clusters",
-                                       [this](const Matchers::StringMatcher& name_matcher) {
-                                         return dumpClusterConfigs(name_matcher);
-                                       })),
       time_source_(main_thread_dispatcher.timeSource()), dispatcher_(main_thread_dispatcher),
       http_context_(http_context), router_context_(router_context),
       cluster_stat_names_(stats.symbolTable()),
@@ -307,6 +302,12 @@ ClusterManagerImpl::ClusterManagerImpl(
       cluster_circuit_breakers_stat_names_(stats.symbolTable()),
       cluster_request_response_size_stat_names_(stats.symbolTable()),
       cluster_timeout_budget_stat_names_(stats.symbolTable()) {
+  if (admin.has_value()) {
+    config_tracker_entry_ = admin->getConfigTracker().add(
+        "clusters", [this](const Matchers::StringMatcher& name_matcher) {
+          return dumpClusterConfigs(name_matcher);
+        });
+  }
   async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
       *this, tls, time_source_, api, grpc_context.statNames());
   const auto& cm_config = bootstrap.cluster_manager();

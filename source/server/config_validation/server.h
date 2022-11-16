@@ -24,7 +24,6 @@
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/secret/secret_manager_impl.h"
 #include "source/common/thread_local/thread_local_impl.h"
-#include "source/server/admin/admin.h"
 #include "source/server/config_validation/admin.h"
 #include "source/server/config_validation/api.h"
 #include "source/server/config_validation/cluster_manager.h"
@@ -71,7 +70,9 @@ public:
                      Filesystem::Instance& file_system);
 
   // Server::Instance
-  Admin& admin() override { return *admin_; }
+  OptRef<Admin> admin() override {
+    return makeOptRefFromPtr(static_cast<Envoy::Server::Admin*>(admin_.get()));
+  }
   Api::Api& api() override { return *api_; }
   Upstream::ClusterManager& clusterManager() override { return *config_.clusterManager(); }
   const Upstream::ClusterManager& clusterManager() const override {

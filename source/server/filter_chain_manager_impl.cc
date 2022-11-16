@@ -163,7 +163,7 @@ OverloadManager& PerFilterChainFactoryContextImpl::overloadManager() {
   return parent_context_.overloadManager();
 }
 
-Admin& PerFilterChainFactoryContextImpl::admin() { return parent_context_.admin(); }
+OptRef<Admin> PerFilterChainFactoryContextImpl::admin() { return parent_context_.admin(); }
 
 TimeSource& PerFilterChainFactoryContextImpl::timeSource() { return api().timeSource(); }
 
@@ -873,7 +873,7 @@ Stats::Scope& FactoryContextImpl::scope() { return global_scope_; }
 Singleton::Manager& FactoryContextImpl::singletonManager() { return server_.singletonManager(); }
 OverloadManager& FactoryContextImpl::overloadManager() { return server_.overloadManager(); }
 ThreadLocal::SlotAllocator& FactoryContextImpl::threadLocal() { return server_.threadLocal(); }
-Admin& FactoryContextImpl::admin() { return server_.admin(); }
+OptRef<Admin> FactoryContextImpl::admin() { return server_.admin(); }
 TimeSource& FactoryContextImpl::timeSource() { return server_.timeSource(); }
 ProtobufMessage::ValidationContext& FactoryContextImpl::messageValidationContext() {
   return server_.messageValidationContext();

@@ -18,6 +18,7 @@ load(
 load(":envoy_pch.bzl", _envoy_pch_library = "envoy_pch_library")
 load(
     ":envoy_select.bzl",
+    _envoy_select_admin_functionality = "envoy_select_admin_functionality",
     _envoy_select_admin_html = "envoy_select_admin_html",
     _envoy_select_admin_no_html = "envoy_select_admin_no_html",
     _envoy_select_boringssl = "envoy_select_boringssl",
@@ -52,8 +53,8 @@ load(
 )
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 
-def envoy_package():
-    native.package(default_visibility = ["//visibility:public"])
+def envoy_package(default_visibility = ["//visibility:public"]):
+    native.package(default_visibility = default_visibility)
 
 def envoy_extension_package(enabled_default = True, default_visibility = EXTENSION_PACKAGE_VISIBILITY):
     native.package(default_visibility = default_visibility)
@@ -216,6 +217,7 @@ def envoy_google_grpc_external_deps():
 # Select wrappers (from envoy_select.bzl)
 envoy_select_admin_html = _envoy_select_admin_html
 envoy_select_admin_no_html = _envoy_select_admin_no_html
+envoy_select_admin_functionality = _envoy_select_admin_functionality
 envoy_select_boringssl = _envoy_select_boringssl
 envoy_select_google_grpc = _envoy_select_google_grpc
 envoy_select_enable_http3 = _envoy_select_enable_http3
