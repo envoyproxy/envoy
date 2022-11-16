@@ -509,7 +509,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
           modify_headers(headers);
         },
         absl::nullopt, StreamInfo::ResponseCodeDetails::get().MaintenanceMode);
-    cluster_->stats().upstream_rq_maintenance_mode_.inc();
+    cluster_->trafficStats().upstream_rq_maintenance_mode_.inc();
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -754,7 +754,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
               "The request payload has at least {} bytes data which exceeds buffer limit {}. Give "
               "up on the retry/shadow.",
               getLength(callbacks_->decodingBuffer()) + data.length(), retry_shadow_buffer_limit_);
-    cluster_->stats().retry_or_shadow_abandoned_.inc();
+    cluster_->trafficStats().retry_or_shadow_abandoned_.inc();
     retry_state_.reset();
     buffering = false;
     active_shadow_policies_.clear();
@@ -956,7 +956,7 @@ void Filter::onResponseTimeout() {
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.do_not_await_headers_on_upstream_timeout_to_emit_stats") ||
         upstream_request->awaitingHeaders()) {
-      cluster_->stats().upstream_rq_timeout_.inc();
+      cluster_->trafficStats().upstream_rq_timeout_.inc();
       if (request_vcluster_) {
         request_vcluster_->stats().upstream_rq_timeout_.inc();
       }
@@ -1030,12 +1030,13 @@ void Filter::onSoftPerTryTimeout(UpstreamRequest& upstream_request) {
 }
 
 void Filter::onPerTryIdleTimeout(UpstreamRequest& upstream_request) {
-  onPerTryTimeoutCommon(upstream_request, cluster_->stats().upstream_rq_per_try_idle_timeout_,
+  onPerTryTimeoutCommon(upstream_request,
+                        cluster_->trafficStats().upstream_rq_per_try_idle_timeout_,
                         StreamInfo::ResponseCodeDetails::get().UpstreamPerTryIdleTimeout);
 }
 
 void Filter::onPerTryTimeout(UpstreamRequest& upstream_request) {
-  onPerTryTimeoutCommon(upstream_request, cluster_->stats().upstream_rq_per_try_timeout_,
+  onPerTryTimeoutCommon(upstream_request, cluster_->trafficStats().upstream_rq_per_try_timeout_,
                         StreamInfo::ResponseCodeDetails::get().UpstreamPerTryTimeout);
 }
 
@@ -1624,7 +1625,7 @@ bool Filter::setupRedirect(const Http::ResponseHeaderMap& headers) {
       convertRequestHeadersForInternalRedirect(*downstream_headers_, *location, status_code) &&
       callbacks_->recreateStream(&headers)) {
     ENVOY_STREAM_LOG(debug, "Internal redirect succeeded", *callbacks_);
-    cluster_->stats().upstream_internal_redirect_succeeded_total_.inc();
+    cluster_->trafficStats().upstream_internal_redirect_succeeded_total_.inc();
     return true;
   }
   // convertRequestHeadersForInternalRedirect logs failure reasons but log
@@ -1637,7 +1638,7 @@ bool Filter::setupRedirect(const Http::ResponseHeaderMap& headers) {
     ENVOY_STREAM_LOG(trace, "Internal redirect failed: missing location header", *callbacks_);
   }
 
-  cluster_->stats().upstream_internal_redirect_failed_total_.inc();
+  cluster_->trafficStats().upstream_internal_redirect_failed_total_.inc();
   return false;
 }
 

@@ -283,12 +283,14 @@ ListenerManagerImpl::ListenerManagerImpl(Instance& server,
                                          Quic::QuicStatNames& quic_stat_names)
     : server_(server), factory_(listener_factory),
       scope_(server.stats().createScope("listener_manager.")), stats_(generateStats(*scope_)),
-      config_tracker_entry_(server.admin().getConfigTracker().add(
-          "listeners",
-          [this](const Matchers::StringMatcher& name_matcher) {
-            return dumpListenerConfigs(name_matcher);
-          })),
       enable_dispatcher_stats_(enable_dispatcher_stats), quic_stat_names_(quic_stat_names) {
+  if (server.admin().has_value()) {
+    config_tracker_entry_ = server.admin()->getConfigTracker().add(
+        "listeners", [this](const Matchers::StringMatcher& name_matcher) {
+          return dumpListenerConfigs(name_matcher);
+        });
+  }
+
   for (uint32_t i = 0; i < server.options().concurrency(); i++) {
     workers_.emplace_back(
         worker_factory.createWorker(i, server.overloadManager(), absl::StrCat("worker_", i)));

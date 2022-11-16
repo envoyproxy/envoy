@@ -23,7 +23,7 @@ using HostPredicate = std::function<bool(const Host&)>;
 
 SubsetLoadBalancer::SubsetLoadBalancer(
     LoadBalancerType lb_type, PrioritySet& priority_set, const PrioritySet* local_priority_set,
-    ClusterStats& stats, Stats::Scope& scope, Runtime::Loader& runtime,
+    ClusterLbStats& stats, Stats::Scope& scope, Runtime::Loader& runtime,
     Random::RandomGenerator& random, const LoadBalancerSubsetInfo& subsets,
     const absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig>&
         lb_ring_hash_config,
@@ -466,9 +466,9 @@ void SubsetLoadBalancer::processSubsets(uint32_t priority, const HostVector& all
     }
   }
 
-  // This stat isn't added to `ClusterStats` because it wouldn't be used for nearly all clusters,
-  // and is only set during configuration updates, not in the data path, so performance of looking
-  // up the stat isn't critical.
+  // This stat isn't added to `ClusterTrafficStats` because it wouldn't be used for nearly all
+  // clusters, and is only set during configuration updates, not in the data path, so performance of
+  // looking up the stat isn't critical.
   if (single_duplicate_stat_ == nullptr) {
     Stats::StatNameManagedStorage name_storage("lb_subsets_single_host_per_subset_duplicate",
                                                scope_.symbolTable());
