@@ -139,8 +139,11 @@ TEST(NetworkUtility, ParseInternetAddress) {
   EXPECT_THROW(Utility::parseInternetAddress("0:0:0:0"), EnvoyException);
   EXPECT_THROW(Utility::parseInternetAddress("fffff::"), EnvoyException);
   EXPECT_THROW(Utility::parseInternetAddress("/foo"), EnvoyException);
+
+#ifndef WIN32
   EXPECT_THROW(Utility::parseInternetAddress("[::]"), EnvoyException);
   EXPECT_THROW(Utility::parseInternetAddress("[::1]:1"), EnvoyException);
+#endif
 
   EXPECT_EQ(nullptr, Utility::parseInternetAddressNoThrow(""));
   EXPECT_EQ(nullptr, Utility::parseInternetAddressNoThrow("1.2.3"));
@@ -150,8 +153,10 @@ TEST(NetworkUtility, ParseInternetAddress) {
   EXPECT_EQ(nullptr, Utility::parseInternetAddressNoThrow("0:0:0:0"));
   EXPECT_EQ(nullptr, Utility::parseInternetAddressNoThrow("fffff::"));
   EXPECT_EQ(nullptr, Utility::parseInternetAddressNoThrow("/foo"));
+#ifndef WIN32
   EXPECT_EQ(nullptr, Utility::parseInternetAddressNoThrow("[::]"));
   EXPECT_EQ(nullptr, Utility::parseInternetAddressNoThrow("[::1]:1"));
+#endif
   EXPECT_EQ(nullptr, Utility::parseInternetAddressNoThrow("fe80::1%"));
 
   EXPECT_EQ("1.2.3.4:0", Utility::parseInternetAddress("1.2.3.4")->asString());
@@ -223,7 +228,9 @@ TEST(NetworkUtility, ParseInternetAddressAndPort) {
   EXPECT_THROW(Utility::parseInternetAddressAndPort(""), EnvoyException);
   EXPECT_THROW(Utility::parseInternetAddressAndPort("::1"), EnvoyException);
   EXPECT_THROW(Utility::parseInternetAddressAndPort("::"), EnvoyException);
+#ifndef WIN32
   EXPECT_THROW(Utility::parseInternetAddressAndPort("[[::]]:1"), EnvoyException);
+#endif
   EXPECT_THROW(Utility::parseInternetAddressAndPort("[::]:1]:2"), EnvoyException);
   EXPECT_THROW(Utility::parseInternetAddressAndPort("]:[::1]:2"), EnvoyException);
   EXPECT_THROW(Utility::parseInternetAddressAndPort("[1.2.3.4:0"), EnvoyException);
@@ -236,7 +243,9 @@ TEST(NetworkUtility, ParseInternetAddressAndPort) {
   EXPECT_EQ(nullptr, Utility::parseInternetAddressAndPortNoThrow(""));
   EXPECT_EQ(nullptr, Utility::parseInternetAddressAndPortNoThrow("::1"));
   EXPECT_EQ(nullptr, Utility::parseInternetAddressAndPortNoThrow("::"));
+#ifndef WIN32
   EXPECT_EQ(nullptr, Utility::parseInternetAddressAndPortNoThrow("[[::]]:1"));
+#endif
   EXPECT_EQ(nullptr, Utility::parseInternetAddressAndPortNoThrow("[::]:1]:2"));
   EXPECT_EQ(nullptr, Utility::parseInternetAddressAndPortNoThrow("]:[::1]:2"));
   EXPECT_EQ(nullptr, Utility::parseInternetAddressAndPortNoThrow("[1.2.3.4:0"));
