@@ -82,6 +82,22 @@ void ValidationInstance::initialize(const Options& options,
   InstanceUtil::loadBootstrapConfig(bootstrap_, options,
                                     messageValidationContext().staticValidationVisitor(), *api_);
 
+  // Inject regex engine to singleton.
+  Regex::EnginePtr regex_engine;
+  if (bootstrap_.has_default_regex_engine()) {
+    const auto& default_regex_engine = bootstrap_.default_regex_engine();
+    Regex::EngineFactory& factory =
+        Config::Utility::getAndCheckFactory<Regex::EngineFactory>(default_regex_engine);
+    auto config = Config::Utility::translateAnyToFactoryConfig(
+        default_regex_engine.typed_config(), messageValidationContext().staticValidationVisitor(),
+        factory);
+    regex_engine = factory.createEngine(*config, serverFactoryContext());
+  } else {
+    regex_engine = std::make_shared<Regex::GoogleReEngine>();
+  }
+  Regex::EngineSingleton::clear();
+  Regex::EngineSingleton::initialize(regex_engine.get());
+
   Config::Utility::createTagProducer(bootstrap_, options_.statsTags());
   if (!bootstrap_.node().user_agent_build_version().has_version()) {
     *bootstrap_.mutable_node()->mutable_user_agent_build_version() = VersionInfo::buildVersion();
