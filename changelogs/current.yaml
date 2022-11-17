@@ -32,6 +32,9 @@ minor_behavior_changes:
 - area: rate_limit
   change: |
     add ``MONTH`` and ``YEAR`` to the unit of time for rate limit.
+- area: jwt_authn
+  change: |
+    adjust the refetch time for remote_jwks async_fetch feature, 1 second after a failed fetch, refetch 5 seconds before jwks cache duration for a good fetch.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
