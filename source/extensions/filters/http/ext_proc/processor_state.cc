@@ -147,8 +147,9 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
           filter_.sendBodyChunk(*this, all_data.data,
                                 ProcessorState::CallbackState::BufferedPartialBodyCallback, false);
         } else {
+          // Let data continue to flow, but don't resume yet -- we would like to hold
+          // the headers while we buffer the body up to the limit.
           clearWatermark();
-          continueIfNecessary();
         }
         return absl::OkStatus();
       }

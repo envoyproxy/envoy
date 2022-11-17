@@ -1007,9 +1007,8 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyOnRequestBody) {
 
 // Test the filter with body buffering enabled using
 // an ext_proc server that responds to the response_body message
-// by sending back an immediate_response message. Since this
-// happens after the response headers have been sent, as a result
-// Envoy should just reset the stream.
+// by sending back an immediate_response message. Since we
+// are in buffered mode, we should get the correct response code.
 TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyOnResponseBody) {
   proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::BUFFERED);
   initializeConfig();
@@ -1017,6 +1016,85 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyOnResponseBody) {
   auto response = sendDownstreamRequest(absl::nullopt);
   processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
   handleUpstreamRequest();
+  processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
+
+  processAndRespondImmediately(*grpc_upstreams_[0], false, [](ImmediateResponse& immediate) {
+    immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::Unauthorized);
+    immediate.set_body("{\"reason\": \"Not authorized\"}");
+    immediate.set_details("Failed because you are not authorized");
+  });
+
+  // Since we are stopping iteration on headers, and since the response is short,
+  // we actually get an error message here.
+  verifyDownstreamResponse(*response, 401);
+  EXPECT_EQ("{\"reason\": \"Not authorized\"}", response->body());
+}
+
+// Test the filter with body buffering enabled using
+// an ext_proc server that responds to the response_body message
+// by sending back an immediate_response message. Since we
+// are in buffered partial mode, we should get the correct response code.
+TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyOnResponseBodyBufferedPartial) {
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::BUFFERED_PARTIAL);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  handleUpstreamRequest();
+  processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
+
+  processAndRespondImmediately(*grpc_upstreams_[0], false, [](ImmediateResponse& immediate) {
+    immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::Unauthorized);
+    immediate.set_body("{\"reason\": \"Not authorized\"}");
+    immediate.set_details("Failed because you are not authorized");
+  });
+
+  // Since we are stopping iteration on headers, and since the response is short,
+  // we actually get an error message here.
+  verifyDownstreamResponse(*response, 401);
+  EXPECT_EQ("{\"reason\": \"Not authorized\"}", response->body());
+}
+
+// Test the filter with body buffering enabled using
+// an ext_proc server that responds to the response_body message
+// by sending back an immediate_response message. Since we
+// are in buffered mode, we should get the correct response code.
+TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyOnChunkedResponseBody) {
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::BUFFERED);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  Buffer::OwnedImpl full_response;
+  TestUtility::feedBufferWithRandomCharacters(full_response, 400);
+  handleUpstreamRequestWithResponse(full_response, 100);
+  processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
+
+  processAndRespondImmediately(*grpc_upstreams_[0], false, [](ImmediateResponse& immediate) {
+    immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::Unauthorized);
+    immediate.set_body("{\"reason\": \"Not authorized\"}");
+    immediate.set_details("Failed because you are not authorized");
+  });
+
+  // Since we are stopping iteration on headers, and since the response is short,
+  // we actually get an error message here.
+  verifyDownstreamResponse(*response, 401);
+  EXPECT_EQ("{\"reason\": \"Not authorized\"}", response->body());
+}
+
+// Test the filter with body buffering enabled using
+// an ext_proc server that responds to the response_body message
+// by sending back an immediate_response message. Since we
+// are in buffered partial mode, we should get the correct response code.
+TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyOnChunkedResponseBodyBufferedPartial) {
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::BUFFERED_PARTIAL);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  Buffer::OwnedImpl full_response;
+  TestUtility::feedBufferWithRandomCharacters(full_response, 400);
+  handleUpstreamRequestWithResponse(full_response, 100);
   processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
 
   processAndRespondImmediately(*grpc_upstreams_[0], false, [](ImmediateResponse& immediate) {

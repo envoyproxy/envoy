@@ -350,36 +350,31 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
       result = FilterDataStatus::StopIterationNoBuffer;
     } else if (end_stream || state.queueOverHighLimit()) {
       bool terminate;
-      std::tie(terminate, result) = sendStreamChunk(state, data, end_stream);
+      FilterDataStatus chunk_result;
+      std::tie(terminate, chunk_result) = sendStreamChunk(state, data, end_stream);
 
       if (terminate) {
-        return result;
+        return chunk_result;
       }
+      result = FilterDataStatus::StopIterationNoBuffer;
     } else {
       // Keep on running and buffering
       state.enqueueStreamingChunk(data, false, false);
 
-      if (Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams) &&
-          state.queueOverHighLimit()) {
-        // When we transition to queue over high limit, we read disable the
-        // stream. With deferred processing, this means new data will buffer in
-        // the receiving codec buffer (not reaching this filter) and data
-        // already queued in this filter hasn't yet been sent externally.
-        //
-        // The filter would send the queued data if it was invoked again, or if
-        // we explicitly kick it off. The former wouldn't happen with deferred
-        // processing since we would be buffering in the receiving codec buffer,
-        // so we opt for the latter, explicitly kicking it off.
+      if (state.queueOverHighLimit()) {
+        // The filter will send the queued data if it was invoked again, or if
+        // we explicitly kick it off. It might not happen right away, so we opt for the latter,
+        // explicitly kicking it off.
         bool terminate;
+        FilterDataStatus chunk_result;
         Buffer::OwnedImpl empty_buffer{};
-        std::tie(terminate, result) = sendStreamChunk(state, empty_buffer, false);
+        std::tie(terminate, chunk_result) = sendStreamChunk(state, empty_buffer, false);
 
         if (terminate) {
-          return result;
+          return chunk_result;
         }
-      } else {
-        result = FilterDataStatus::Continue;
       }
+      result = FilterDataStatus::StopIterationNoBuffer;
     }
     break;
   case ProcessingMode::NONE:
