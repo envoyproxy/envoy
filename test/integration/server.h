@@ -317,7 +317,7 @@ public:
     return IsolatedStoreImpl::iterate(fn);
   }
 
-  template<class StatType> StatFn<StatType> iterUnlocked(StatFn<StatType> f_stat) const {
+  template <class StatType> StatFn<StatType> iterUnlocked(StatFn<StatType> f_stat) const {
     return [this, f_stat](StatType& stat) ABSL_NO_THREAD_SAFETY_ANALYSIS {
       RefcountPtr<StatType> stat_shared_ptr(&stat);
       lock_.unlock();
