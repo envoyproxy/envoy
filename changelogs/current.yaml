@@ -20,6 +20,9 @@ behavior_changes:
 - area: build
   change: |
     moved the strict_dns, original_dst, logical_dns, static, and eds clusters to extensions. If you use these clusters and override extensions_build_config.bzl you will now need to include it explicitly.
+- area: http
+  change: |
+    Flip default value of ``envoy.reloadable_features.http1_use_balsa_parser`` runtime flag from false to true.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*

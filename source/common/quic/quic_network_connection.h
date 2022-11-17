@@ -12,13 +12,6 @@ namespace Quic {
 // Read ~32k bytes per connection by default, which is about the same as TCP.
 static const uint32_t DEFAULT_PACKETS_TO_READ_PER_CONNECTION = 32u;
 
-class QuicWriteEventCallback {
-public:
-  virtual ~QuicWriteEventCallback() = default;
-  // Called when QUIC finishes a write.
-  virtual void onWriteEventDone() PURE;
-};
-
 // A base class of both the client and server connections which keeps stats and
 // connection socket.
 class QuicNetworkConnection : protected Logger::Loggable<Logger::Id::connection> {
@@ -33,7 +26,7 @@ public:
   }
 
   // Called in session Initialize().
-  void setEnvoyConnection(Network::Connection& connection, QuicWriteEventCallback& write_callback);
+  void setEnvoyConnection(Network::Connection& connection) { envoy_connection_ = &connection; }
 
   const Network::ConnectionSocketPtr& connectionSocket() const {
     return connection_sockets_.back();
@@ -51,8 +44,6 @@ protected:
     connection_sockets_.push_back(std::move(connection_socket));
   }
 
-  void onWriteEventDone();
-
 private:
   // TODO(danzh): populate stats.
   std::unique_ptr<Network::Connection::ConnectionStats> connection_stats_;
@@ -63,7 +54,6 @@ private:
   std::vector<Network::ConnectionSocketPtr> connection_sockets_;
   // Points to an instance of EnvoyQuicServerSession or EnvoyQuicClientSession.
   Network::Connection* envoy_connection_{nullptr};
-  QuicWriteEventCallback* write_callback_{nullptr};
 };
 
 } // namespace Quic
