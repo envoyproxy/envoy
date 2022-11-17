@@ -287,10 +287,10 @@ void Http2Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, boo
   });
 
   if (config_.usePost()) {
-    headers->addReference(Http::Headers::get().Path, "/");
+    headers->addReference(Http::Headers::get().Path, config_.postPath());
     headers->addReference(Http::Headers::get().Scheme, scheme);
   } else if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_rfc_connect")) {
-    headers->addReference(Http::Headers::get().Path, "/");
+    headers->addReference(Http::Headers::get().Path, config_.postPath());
     headers->addReference(Http::Headers::get().Scheme, scheme);
     headers->addReference(Http::Headers::get().Protocol,
                           Http::Headers::get().ProtocolValues.Bytestream);
@@ -325,7 +325,7 @@ void Http1Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, boo
 
   if (config_.usePost()) {
     // Path is required for POST requests.
-    headers->addReference(Http::Headers::get().Path, "/");
+    headers->addReference(Http::Headers::get().Path, config_.postPath());
   }
 
   config_.headerEvaluator().evaluateHeaders(*headers,
