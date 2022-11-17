@@ -317,15 +317,6 @@ public:
     return IsolatedStoreImpl::iterate(fn);
   }
 
-  template <class StatType> StatFn<StatType> iterUnlocked(StatFn<StatType> f_stat) const {
-    return [this, f_stat](StatType& stat) ABSL_NO_THREAD_SAFETY_ANALYSIS {
-      RefcountPtr<StatType> stat_shared_ptr(&stat);
-      lock_.unlock();
-      f_stat(*stat_shared_ptr);
-      lock_.lock();
-    };
-  }
-
   void forEachCounter(Stats::SizeFn f_size, StatFn<Counter> f_stat) const override {
     Thread::LockGuard lock(lock_);
     IsolatedStoreImpl::forEachCounter(f_size, iterUnlocked(f_stat));
@@ -379,6 +370,15 @@ protected:
   }
 
 private:
+  template <class StatType> StatFn<StatType> iterUnlocked(StatFn<StatType> f_stat) const {
+    return [this, f_stat](StatType& stat) ABSL_NO_THREAD_SAFETY_ANALYSIS {
+      RefcountPtr<StatType> stat_shared_ptr(&stat);
+      lock_.unlock();
+      f_stat(*stat_shared_ptr);
+      lock_.lock();
+    };
+  }
+
   mutable Thread::MutexBasicLockable lock_;
   PostMergeCb merge_cb_;
 };
