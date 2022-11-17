@@ -1957,6 +1957,7 @@ TEST_F(SubsetLoadBalancerTest, EnabledLocalityWeightAwareness) {
       },
       host_set_, {1, 100});
 
+  common_config_.mutable_locality_weighted_lb_config();
   lb_ = std::make_shared<SubsetLoadBalancer>(lb_type_, priority_set_, nullptr, stats_, stats_store_,
                                              runtime_, random_, subset_info_, ring_hash_lb_config_,
                                              maglev_lb_config_, round_robin_lb_config_,
@@ -1993,6 +1994,7 @@ TEST_F(SubsetLoadBalancerTest, EnabledScaleLocalityWeights) {
       },
       host_set_, {50, 50});
 
+  common_config_.mutable_locality_weighted_lb_config();
   lb_ = std::make_shared<SubsetLoadBalancer>(lb_type_, priority_set_, nullptr, stats_, stats_store_,
                                              runtime_, random_, subset_info_, ring_hash_lb_config_,
                                              maglev_lb_config_, round_robin_lb_config_,
@@ -2039,6 +2041,7 @@ TEST_F(SubsetLoadBalancerTest, EnabledScaleLocalityWeightsRounding) {
       },
       host_set_, {2, 2});
 
+  common_config_.mutable_locality_weighted_lb_config();
   lb_ = std::make_shared<SubsetLoadBalancer>(lb_type_, priority_set_, nullptr, stats_, stats_store_,
                                              runtime_, random_, subset_info_, ring_hash_lb_config_,
                                              maglev_lb_config_, round_robin_lb_config_,
