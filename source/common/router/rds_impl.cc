@@ -219,7 +219,7 @@ void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
   });
 }
 
-RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(Server::Admin& admin)
+RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(OptRef<Server::Admin> admin)
     : manager_(admin, "routes", proto_traits_) {}
 
 Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::createRdsRouteConfigProvider(

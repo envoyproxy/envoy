@@ -7,6 +7,7 @@
 #include "source/common/common/matchers.h"
 #include "source/common/config/metadata.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/stream_info/filter_state_impl.h"
 
 #include "test/test_common/utility.h"
 
@@ -473,6 +474,59 @@ TEST(PathMatcher, MatchRegexPath) {
   EXPECT_FALSE(Matchers::PathMatcher(matcher).match("/regez"));
   EXPECT_FALSE(Matchers::PathMatcher(matcher).match("/regez?param=regex"));
   EXPECT_FALSE(Matchers::PathMatcher(matcher).match("/regez#regex"));
+}
+
+TEST(FilterStateMatcher, MatchAbsentFilterState) {
+  envoy::type::matcher::v3::FilterStateMatcher matcher;
+  matcher.set_key("test.key");
+  matcher.mutable_string_match()->set_exact("exact");
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+  EXPECT_FALSE(Matchers::FilterStateMatcher(matcher).match(filter_state));
+}
+
+class TestObject : public StreamInfo::FilterState::Object {
+public:
+  TestObject(absl::optional<std::string> value) : value_(value) {}
+  absl::optional<std::string> serializeAsString() const override { return value_; }
+
+private:
+  absl::optional<std::string> value_;
+};
+
+TEST(FilterStateMatcher, MatchFilterStateWithoutString) {
+  const std::string key = "test.key";
+  envoy::type::matcher::v3::FilterStateMatcher matcher;
+  matcher.set_key(key);
+  matcher.mutable_string_match()->set_exact("exact");
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+  filter_state.setData(key, std::make_shared<TestObject>(absl::nullopt),
+                       StreamInfo::FilterState::StateType::ReadOnly);
+  EXPECT_FALSE(Matchers::FilterStateMatcher(matcher).match(filter_state));
+}
+
+TEST(FilterStateMatcher, MatchFilterStateDifferentString) {
+  const std::string key = "test.key";
+  const std::string value = "exact_value";
+  envoy::type::matcher::v3::FilterStateMatcher matcher;
+  matcher.set_key(key);
+  matcher.mutable_string_match()->set_exact(value);
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+  filter_state.setData(key,
+                       std::make_shared<TestObject>(absl::make_optional<std::string>("different")),
+                       StreamInfo::FilterState::StateType::ReadOnly);
+  EXPECT_FALSE(Matchers::FilterStateMatcher(matcher).match(filter_state));
+}
+
+TEST(FilterStateMatcher, MatchFilterState) {
+  const std::string key = "test.key";
+  const std::string value = "exact_value";
+  envoy::type::matcher::v3::FilterStateMatcher matcher;
+  matcher.set_key(key);
+  matcher.mutable_string_match()->set_exact(value);
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+  filter_state.setData(key, std::make_shared<TestObject>(absl::make_optional<std::string>(value)),
+                       StreamInfo::FilterState::StateType::ReadOnly);
+  EXPECT_TRUE(Matchers::FilterStateMatcher(matcher).match(filter_state));
 }
 
 } // namespace
