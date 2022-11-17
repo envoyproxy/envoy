@@ -12,13 +12,13 @@ namespace JwtAuthn {
 namespace {
 
 // Default cache expiration time in 5 minutes.
-constexpr int DefaultCacheExpirationSec = 600;
+constexpr std::chrono::seconds DefaultCacheExpirationSec{600};
 
 // Number of seconds to refetch before a cached jwks is expired.
-constexpr int RefetchBeforeExpiredSec = 5;
+constexpr std::chrono::seconds RefetchBeforeExpiredSec{5};
 
 // Number of seconds to refetch after a failed fetch.
-constexpr int RefetchAfterFailedSec = 1;
+constexpr std::chrono::seconds RefetchAfterFailedSec{1};
 
 } // namespace
 
@@ -41,9 +41,8 @@ JwksAsyncFetcher::JwksAsyncFetcher(const RemoteJwks& remote_jwks,
   // and not need to block request processing but on-demand fetch is done in the worker
   // thread and block request processing.
   refetch_duration_ = getCacheDuration(remote_jwks);
-  std::chrono::seconds before_expire(RefetchBeforeExpiredSec);
-  if (refetch_duration_ > before_expire) {
-    refetch_duration_ = refetch_duration_ - before_expire;
+  if (refetch_duration_ > RefetchBeforeExpiredSec) {
+    refetch_duration_ = refetch_duration_ - RefetchBeforeExpiredSec;
   }
 
   refetch_timer_ = context_.mainThreadDispatcher().createTimer([this]() -> void { fetch(); });
@@ -63,7 +62,7 @@ std::chrono::seconds JwksAsyncFetcher::getCacheDuration(const RemoteJwks& remote
   if (remote_jwks.has_cache_duration()) {
     return std::chrono::seconds(DurationUtil::durationToSeconds(remote_jwks.cache_duration()));
   }
-  return std::chrono::seconds(DefaultCacheExpirationSec);
+  return DefaultCacheExpirationSec;
 }
 
 void JwksAsyncFetcher::fetch() {
@@ -102,7 +101,7 @@ void JwksAsyncFetcher::onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) {
 void JwksAsyncFetcher::onJwksError(Failure) {
   ENVOY_LOG(warn, "{}: failed", debug_name_);
   handleFetchDone();
-  refetch_timer_->enableTimer(std::chrono::seconds(RefetchAfterFailedSec));
+  refetch_timer_->enableTimer(RefetchAfterFailedSec);
   stats_.jwks_fetch_failed_.inc();
 
   // Note: not to free fetcher_ in this function. Please see comment at onJwksSuccess.
