@@ -17,8 +17,6 @@
 #include "absl/synchronization/mutex.h"
 #include "gtest/gtest.h"
 
-using testing::HasSubstr;
-
 namespace Envoy {
 namespace {
 
