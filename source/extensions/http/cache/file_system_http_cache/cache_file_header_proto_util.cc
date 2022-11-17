@@ -8,6 +8,14 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 namespace FileSystemHttpCache {
+namespace {
+template <typename KeyValue>
+Http::HeaderMap::Iterate copyToKeyValue(const Http::HeaderEntry& header, KeyValue* kv) {
+  kv->set_key(std::string{header.key().getStringView()});
+  kv->set_value(std::string{header.value().getStringView()});
+  return Http::HeaderMap::Iterate::Continue;
+}
+} // namespace
 
 CacheFileHeader mergeProtoWithHeadersAndMetadata(const CacheFileHeader& entry_headers,
                                                  const Http::ResponseHeaderMap& response_headers,
@@ -25,10 +33,7 @@ CacheFileHeader makeCacheFileHeaderProto(const Key& key,
   TimestampUtil::systemClockToTimestamp(metadata.response_time_,
                                         *file_header.mutable_metadata_response_time());
   response_headers.iterate([&file_header](const Http::HeaderEntry& header) {
-    CacheFileHeader::Header* h = file_header.add_headers();
-    h->set_key(std::string{header.key().getStringView()});
-    h->set_value(std::string{header.value().getStringView()});
-    return Http::HeaderMap::Iterate::Continue;
+    return copyToKeyValue(header, file_header.add_headers());
   });
   return file_header;
 }
@@ -36,10 +41,7 @@ CacheFileHeader makeCacheFileHeaderProto(const Key& key,
 CacheFileTrailer makeCacheFileTrailerProto(const Http::ResponseTrailerMap& response_trailers) {
   CacheFileTrailer file_trailer;
   response_trailers.iterate([&file_trailer](const Http::HeaderEntry& trailer) {
-    CacheFileTrailer::Trailer* t = file_trailer.add_trailers();
-    t->set_key(std::string{trailer.key().getStringView()});
-    t->set_value(std::string{trailer.value().getStringView()});
-    return Http::HeaderMap::Iterate::Continue;
+    return copyToKeyValue(trailer, file_trailer.add_trailers());
   });
   return file_trailer;
 }
@@ -47,12 +49,12 @@ CacheFileTrailer makeCacheFileTrailerProto(const Http::ResponseTrailerMap& respo
 size_t headerProtoSize(const CacheFileHeader& proto) { return proto.ByteSizeLong(); }
 
 Buffer::OwnedImpl bufferFromProto(const CacheFileHeader& proto) {
-  // TODO(ravenblack): consider proto.SerializeToOStream and an ostream impl to Buffer.
+  // TODO(ravenblack): consider proto.SerializeToZeroCopyStream with an impl to Buffer.
   return Buffer::OwnedImpl{proto.SerializeAsString()};
 }
 
 Buffer::OwnedImpl bufferFromProto(const CacheFileTrailer& proto) {
-  // TODO(ravenblack): consider proto.SerializeToOStream and an ostream impl to Buffer.
+  // TODO(ravenblack): consider proto.SerializeToZeroCopyStream with an impl to Buffer.
   return Buffer::OwnedImpl{proto.SerializeAsString()};
 }
 
