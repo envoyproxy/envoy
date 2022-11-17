@@ -200,7 +200,7 @@ public:
   }
   Http::Code request(absl::string_view path_and_query, absl::string_view method,
                      Http::ResponseHeaderMap& response_headers, std::string& body) override;
-  void closeSocket();
+  void closeSocket() override;
   void addListenerToHandler(Network::ConnectionHandler* handler) override;
 
   GenRequestFn createRequestFunction() const {

@@ -49,15 +49,16 @@ namespace Envoy {
 namespace Upstream {
 
 class ClusterFactoryContextImpl : public ClusterFactoryContext {
-
 public:
+  using LazyCreateDnsResolver = std::function<Network::DnsResolverSharedPtr()>;
+
   ClusterFactoryContextImpl(Server::Configuration::ServerFactoryContext& server_context,
                             ClusterManager& cluster_manager, Stats::Store& stats,
-                            Network::DnsResolverSharedPtr dns_resolver,
+                            LazyCreateDnsResolver dns_resolver_fn,
                             Ssl::ContextManager& ssl_context_manager,
                             Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api,
                             ProtobufMessage::ValidationVisitor& validation_visitor)
-      : stats_(stats), cluster_manager_(cluster_manager), dns_resolver_(std::move(dns_resolver)),
+      : stats_(stats), cluster_manager_(cluster_manager), dns_resolver_fn_(dns_resolver_fn),
         ssl_context_manager_(ssl_context_manager),
         outlier_event_logger_(std::move(outlier_event_logger)), added_via_api_(added_via_api),
         validation_visitor_(validation_visitor), server_context_(server_context) {}
@@ -71,12 +72,17 @@ public:
   AccessLog::AccessLogManager& logManager() override { return server_context_.accessLogManager(); }
   const LocalInfo::LocalInfo& localInfo() const override { return server_context_.localInfo(); }
   const Server::Options& options() override { return server_context_.options(); }
-  Server::Admin& admin() override { return server_context_.admin(); }
+  OptRef<Server::Admin> admin() override { return server_context_.admin(); }
   Api::Api& api() override { return server_context_.api(); }
   Singleton::Manager& singletonManager() override { return server_context_.singletonManager(); }
 
   Ssl::ContextManager& sslContextManager() override { return ssl_context_manager_; }
-  Network::DnsResolverSharedPtr dnsResolver() override { return dns_resolver_; }
+  Network::DnsResolverSharedPtr dnsResolver() override {
+    if (!dns_resolver_) {
+      dns_resolver_ = dns_resolver_fn_();
+    }
+    return dns_resolver_;
+  }
   Stats::Store& stats() override { return stats_; }
   Outlier::EventLoggerSharedPtr outlierEventLogger() override { return outlier_event_logger_; }
   bool addedViaApi() override { return added_via_api_; }
@@ -88,6 +94,7 @@ private:
   Stats::Store& stats_;
   ClusterManager& cluster_manager_;
   Network::DnsResolverSharedPtr dns_resolver_;
+  LazyCreateDnsResolver dns_resolver_fn_;
   Ssl::ContextManager& ssl_context_manager_;
   Outlier::EventLoggerSharedPtr outlier_event_logger_;
   const bool added_via_api_;
@@ -102,13 +109,14 @@ private:
  */
 class ClusterFactoryImplBase : public ClusterFactory {
 public:
+  using LazyCreateDnsResolver = std::function<Network::DnsResolverSharedPtr()>;
   /**
    * Static method to get the registered cluster factory and create an instance of cluster.
    */
   static std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
   create(Server::Configuration::ServerFactoryContext& server_context,
          const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cluster_manager,
-         Stats::Store& stats, Network::DnsResolverSharedPtr dns_resolver,
+         Stats::Store& stats, LazyCreateDnsResolver dns_resolver_fn,
          Ssl::ContextManager& ssl_context_manager,
          Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api,
          ProtobufMessage::ValidationVisitor& validation_visitor);

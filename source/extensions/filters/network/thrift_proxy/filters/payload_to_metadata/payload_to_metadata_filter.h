@@ -142,8 +142,6 @@ private:
   uint16_t steps_{0};
 };
 
-using TrieMatchHandlerPtr = std::unique_ptr<TrieMatchHandler>;
-
 const uint32_t MAX_PAYLOAD_VALUE_LEN = 8 * 1024;
 
 class PayloadToMetadataFilter : public MetadataHandler,
@@ -178,11 +176,8 @@ private:
 
   const ConfigSharedPtr config_;
   absl::flat_hash_set<uint16_t> matched_rule_ids_;
-  TrieMatchHandlerPtr handler_;
-  TransportPtr transport_;
-  ProtocolPtr protocol_;
-  DecoderPtr decoder_;
   StructMap structs_by_namespace_;
+  MessageMetadataSharedPtr metadata_;
 };
 
 } // namespace PayloadToMetadataFilter
