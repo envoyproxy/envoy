@@ -123,12 +123,12 @@ public:
   virtual ~ProxyFactory() = default;
 
   /**
-   * Create a custom read filter instance.
+   * Create a custom proxy instance.
    * @param filter_manager the filter manager of the network filter chain.
-   * @param filter_config supplies the filter config.
+   * @param filter_config supplies the read filter config.
    */
-  virtual void createFilter(Network::FilterManager& filter_manager,
-                            const FilterConfigSharedPtr& filter_config) const PURE;
+  virtual void createProxy(Network::FilterManager& filter_manager,
+                           const FilterConfigSharedPtr& filter_config) const PURE;
 };
 using ProxyFactoryPtr = std::unique_ptr<ProxyFactory>;
 

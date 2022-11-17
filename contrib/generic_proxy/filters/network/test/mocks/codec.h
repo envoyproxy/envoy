@@ -71,11 +71,11 @@ public:
   MOCK_METHOD(MessageCreatorPtr, messageCreator, (), (const));
 };
 
-class MockFilterFactory : public FilterFactory {
+class MockProxyFactory : public ProxyFactory {
 public:
-  MockFilterFactory();
+  MockProxyFactory();
 
-  MOCK_METHOD(void, createFilter, (Network::FilterManager&, const FilterConfigSharedPtr&), (const));
+  MOCK_METHOD(void, createProxy, (Network::FilterManager&, const FilterConfigSharedPtr&), (const));
 };
 
 class MockStreamCodecFactoryConfig : public CodecFactoryConfig {
@@ -84,7 +84,7 @@ public:
 
   MOCK_METHOD(CodecFactoryPtr, createCodecFactory,
               (const Protobuf::Message&, Envoy::Server::Configuration::FactoryContext&));
-  MOCK_METHOD(FilterFactoryPtr, createProxyFactory,
+  MOCK_METHOD(ProxyFactoryPtr, createProxyFactory,
               (const Protobuf::Message&, Envoy::Server::Configuration::FactoryContext&));
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

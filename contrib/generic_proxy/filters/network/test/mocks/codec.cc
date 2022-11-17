@@ -24,7 +24,7 @@ MockCodecFactory::MockCodecFactory() {
       .WillByDefault(Return(ByMove(std::make_unique<NiceMock<MockMessageCreator>>())));
 }
 
-MockFilterFactory::MockFilterFactory() = default;
+MockProxyFactory::MockProxyFactory() = default;
 
 MockStreamCodecFactoryConfig::MockStreamCodecFactoryConfig() = default;
 

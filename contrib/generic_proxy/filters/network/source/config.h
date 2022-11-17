@@ -23,7 +23,7 @@ public:
   createFilterFactoryFromProtoTyped(const ProxyConfig& proto_config,
                                     Envoy::Server::Configuration::FactoryContext& context) override;
 
-  static std::pair<CodecFactoryPtr, FilterFactoryPtr>
+  static std::pair<CodecFactoryPtr, ProxyFactoryPtr>
   factoriesFromProto(const envoy::config::core::v3::TypedExtensionConfig& codec_config,
                      Server::Configuration::FactoryContext& context);
 

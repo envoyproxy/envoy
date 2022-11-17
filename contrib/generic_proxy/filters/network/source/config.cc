@@ -10,7 +10,7 @@ namespace GenericProxy {
 
 SINGLETON_MANAGER_REGISTRATION(generic_route_config_provider_manager);
 
-std::pair<CodecFactoryPtr, FilterFactoryPtr>
+std::pair<CodecFactoryPtr, ProxyFactoryPtr>
 Factory::factoriesFromProto(const envoy::config::core::v3::TypedExtensionConfig& codec_config,
                             Envoy::Server::Configuration::FactoryContext& context) {
   auto& factory = Config::Utility::getAndCheckFactory<CodecFactoryConfig>(codec_config);
@@ -90,7 +90,7 @@ Factory::createFilterFactoryFromProtoTyped(const ProxyConfig& proto_config,
           [&context] { return std::make_shared<RouteConfigProviderManagerImpl>(context.admin()); });
 
   auto factories = factoriesFromProto(proto_config.codec_config(), context);
-  std::shared_ptr<FilterFactory> custom_filter_factory = std::move(factories.second);
+  std::shared_ptr<ProxyFactory> custom_proxy_factory = std::move(factories.second);
 
   const FilterConfigSharedPtr config = std::make_shared<FilterConfigImpl>(
       proto_config.stat_prefix(), std::move(factories.first),
@@ -98,10 +98,10 @@ Factory::createFilterFactoryFromProtoTyped(const ProxyConfig& proto_config,
       filtersFactoryFromProto(proto_config.filters(), proto_config.stat_prefix(), context));
 
   return [route_config_provider_manager, config,
-          custom_filter_factory](Envoy::Network::FilterManager& filter_manager) -> void {
+          custom_proxy_factory](Envoy::Network::FilterManager& filter_manager) -> void {
     // Create filter by the custom filter factory if the custom filter factory is not null.
-    if (custom_filter_factory != nullptr) {
-      custom_filter_factory->createFilter(filter_manager, config);
+    if (custom_proxy_factory != nullptr) {
+      custom_proxy_factory->createProxy(filter_manager, config);
       return;
     }
 

@@ -206,14 +206,14 @@ TEST(FactoryTest, CustomReadFilterFactory) {
 
   auto mock_codec_factory = std::make_unique<MockCodecFactory>();
 
-  auto mock_filter_factory = std::make_unique<MockFilterFactory>();
-  auto raw_mock_filter_factory = mock_filter_factory.get();
-  EXPECT_CALL(*raw_mock_filter_factory, createFilter(_, _));
+  auto mock_proxy_factory = std::make_unique<MockProxyFactory>();
+  auto raw_mock_proxy_factory = mock_proxy_factory.get();
+  EXPECT_CALL(*raw_mock_proxy_factory, createProxy(_, _));
 
   EXPECT_CALL(codec_factory_config, createCodecFactory(_, _))
       .WillOnce(Return(testing::ByMove(std::move(mock_codec_factory))));
-  EXPECT_CALL(codec_factory_config, filterFactory(_, _))
-      .WillOnce(Return(testing::ByMove(std::move(mock_filter_factory))));
+  EXPECT_CALL(codec_factory_config, createProxyFactory(_, _))
+      .WillOnce(Return(testing::ByMove(std::move(mock_proxy_factory))));
 
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, factory_context);
   EXPECT_NE(nullptr, cb);
