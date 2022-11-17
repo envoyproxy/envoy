@@ -21,7 +21,6 @@ const Http::LowerCaseString DefaultRequestDelayTrailer =
     Http::LowerCaseString("bandwidth-request-delay-ms");
 const Http::LowerCaseString DefaultResponseDelayTrailer =
     Http::LowerCaseString("bandwidth-response-delay-ms");
-const std::chrono::milliseconds ZeroMilliseconds = std::chrono::milliseconds(0);
 } // namespace
 
 FilterConfig::FilterConfig(const BandwidthLimit& config, Stats::Scope& scope,

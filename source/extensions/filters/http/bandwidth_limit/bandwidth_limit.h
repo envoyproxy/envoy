@@ -138,6 +138,7 @@ public:
 private:
   friend class FilterTest;
   const FilterConfig& getConfig() const;
+  const std::chrono::milliseconds ZeroMilliseconds = std::chrono::milliseconds(0);
 
   void updateStatsOnDecodeFinish();
   void updateStatsOnEncodeFinish();
@@ -149,8 +150,8 @@ private:
   std::unique_ptr<Envoy::Extensions::HttpFilters::Common::StreamRateLimiter> response_limiter_;
   Stats::TimespanPtr request_latency_;
   Stats::TimespanPtr response_latency_;
-  std::chrono::milliseconds request_delay_;
-  std::chrono::milliseconds response_delay_;
+  std::chrono::milliseconds request_delay_ = ZeroMilliseconds;
+  std::chrono::milliseconds response_delay_ = ZeroMilliseconds;
   Http::ResponseTrailerMap* trailers_;
 };
 
