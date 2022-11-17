@@ -840,11 +840,11 @@ public:
   // Http::FilterChainFactory
   bool createFilterChain(Http::FilterChainManager& manager,
                          bool only_create_if_configured) const override {
-    if (!only_create_if_configured || has_configured_http_filters_) {
-      Http::FilterChainUtility::createFilterChainForFactories(manager, http_filter_factories_);
-      return true;
+    if (!has_configured_http_filters_ && only_create_if_configured) {
+      return false;
     }
-    return false;
+    Http::FilterChainUtility::createFilterChainForFactories(manager, http_filter_factories_);
+    return true;
   }
   bool createUpgradeFilterChain(absl::string_view, const UpgradeMap*,
                                 Http::FilterChainManager&) const override {

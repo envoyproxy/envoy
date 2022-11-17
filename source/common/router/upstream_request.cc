@@ -130,7 +130,7 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
                                                       /*only_create_if_configured=*/true);
   if (!created) {
     // Attempt to create custom router-specified filter chain.
-    created = parent_.config().createFilterChain(*filter_manager_, false);
+    created = parent_.config().createFilterChain(*filter_manager_);
   }
   if (!created) {
     // Neither cluster nor router have a custom filter chain; add the default
