@@ -430,6 +430,15 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   redis_prefix.name_ = tag_names.REDIS_PREFIX;
   redis_prefix.value_ = "my_redis_prefix";
   regex_tester.testRegex("redis.my_redis_prefix.response", "redis.response", {redis_prefix});
+
+  // ExtAuthz Prefix
+  Tag ext_authz_prefix;
+  ext_authz_prefix.name_ = tag_names.EXT_AUTHZ_PREFIX;
+  ext_authz_prefix.value_ = "authpfx";
+  regex_tester.testRegex("http.http_prefix.ext_authz.authpfx.denied", "http.ext_authz.denied",
+                         {listener_http_prefix, ext_authz_prefix});
+  regex_tester.testRegex("cluster.grpc_cluster.ext_authz.authpfx.ok", "cluster.ext_authz.ok",
+                         {grpc_cluster, ext_authz_prefix});
 }
 
 TEST(TagExtractorTest, ExtractRegexPrefix) {

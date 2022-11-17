@@ -132,6 +132,11 @@ TagNameValues::TagNameValues() {
   // internal state of the regex which performs better.
   addRe2(HTTP_CONN_MANAGER_PREFIX, R"(^listener\..*?\.http\.((<TAG_VALUE>)\.))", ".http.");
 
+  // Extract ext_authz stat_prefix field
+  // cluster.[<cluster>.]ext_authz.[<ext_authz_prefix>.]*
+  // http.[<http_conn_mgr_prefix>.]ext_authz.[<ext_authz_prefix>.]*
+  addRe2(EXT_AUTHZ_PREFIX, R"(^(?:cluster|http)\.(?:[^\.]+\.)?ext_authz\.((<TAG_VALUE>)\.))");
+
   // http.(<stat_prefix>.)*
   addTokenized(HTTP_CONN_MANAGER_PREFIX, "http.$.**");
 
