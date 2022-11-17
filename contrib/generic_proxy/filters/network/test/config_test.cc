@@ -210,7 +210,7 @@ TEST(FactoryTest, CustomReadFilterFactory) {
   auto raw_mock_filter_factory = mock_filter_factory.get();
   EXPECT_CALL(*raw_mock_filter_factory, createFilter(_, _));
 
-  EXPECT_CALL(codec_factory_config, createFactory(_, _))
+  EXPECT_CALL(codec_factory_config, createCodecFactory(_, _))
       .WillOnce(Return(testing::ByMove(std::move(mock_codec_factory))));
   EXPECT_CALL(codec_factory_config, filterFactory(_, _))
       .WillOnce(Return(testing::ByMove(std::move(mock_filter_factory))));

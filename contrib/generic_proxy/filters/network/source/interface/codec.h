@@ -118,9 +118,9 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 /**
  * Custom read filter factory for generic proxy.
  */
-class FilterFactory {
+class ProxyFactory {
 public:
-  virtual ~FilterFactory() = default;
+  virtual ~ProxyFactory() = default;
 
   /**
    * Create a custom read filter instance.
@@ -130,7 +130,7 @@ public:
   virtual void createFilter(Network::FilterManager& filter_manager,
                             const FilterConfigSharedPtr& filter_config) const PURE;
 };
-using FilterFactoryPtr = std::unique_ptr<FilterFactory>;
+using ProxyFactoryPtr = std::unique_ptr<ProxyFactory>;
 
 /**
  * Factory config for codec factory. This class is used to register and create codec factories.
@@ -143,18 +143,20 @@ public:
    * @param context supplies the server context.
    * @return CodecFactoryPtr the codec factory.
    */
-  virtual CodecFactoryPtr createFactory(const Protobuf::Message& config,
-                                        Envoy::Server::Configuration::FactoryContext& context) PURE;
+  virtual CodecFactoryPtr createCodecFactory(const Protobuf::Message&,
+                                             Envoy::Server::Configuration::FactoryContext&) PURE;
 
   /**
-   * Create a optional custom filter factory.
+   * Create a optional custom proxy factory.
    * @param config supplies the config.
    * @param context supplies the server context.
-   * @return FilterFactoryPtr the filter factory.
+   * @return ProxyFactoryPtr the proxy factory to create generic proxy instance or nullptr if no
+   * custom proxy is needed and the default generic proxy will be used.
    */
-  virtual FilterFactoryPtr
-  filterFactory(const Protobuf::Message& config,
-                Envoy::Server::Configuration::FactoryContext& context) PURE;
+  virtual ProxyFactoryPtr createProxyFactory(const Protobuf::Message&,
+                                             Envoy::Server::Configuration::FactoryContext&) {
+    return nullptr;
+  }
 
   std::string category() const override { return "envoy.generic_proxy.codecs"; }
 };

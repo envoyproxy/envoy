@@ -82,9 +82,9 @@ class MockStreamCodecFactoryConfig : public CodecFactoryConfig {
 public:
   MockStreamCodecFactoryConfig();
 
-  MOCK_METHOD(CodecFactoryPtr, createFactory,
+  MOCK_METHOD(CodecFactoryPtr, createCodecFactory,
               (const Protobuf::Message&, Envoy::Server::Configuration::FactoryContext&));
-  MOCK_METHOD(FilterFactoryPtr, filterFactory,
+  MOCK_METHOD(FilterFactoryPtr, createProxyFactory,
               (const Protobuf::Message&, Envoy::Server::Configuration::FactoryContext&));
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

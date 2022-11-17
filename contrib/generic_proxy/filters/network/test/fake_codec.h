@@ -258,12 +258,9 @@ public:
 class FakeStreamCodecFactoryConfig : public CodecFactoryConfig {
 public:
   // CodecFactoryConfig
-  CodecFactoryPtr createFactory(const Protobuf::Message& config,
-                                Envoy::Server::Configuration::FactoryContext& context) override;
-  FilterFactoryPtr filterFactory(const Protobuf::Message&,
-                                 Server::Configuration::FactoryContext&) override {
-    return nullptr;
-  }
+  CodecFactoryPtr
+  createCodecFactory(const Protobuf::Message& config,
+                     Envoy::Server::Configuration::FactoryContext& context) override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<ProtobufWkt::Struct>();
   }
