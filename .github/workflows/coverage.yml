@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+    paths:
+    - 'mobile/**'
   pull_request:
 
 jobs:
@@ -21,7 +23,7 @@ jobs:
         with:
           submodules: true
       - name: Add safe directory
-        run: git config --global --add safe.directory /__w/envoy-mobile/envoy-mobile
+        run: git config --global --add safe.directory /__w/envoy/envoy
       - id: check_context
         name: 'Check whether to run'
         run: |
@@ -37,14 +39,14 @@ jobs:
         continue-on-error: true
         run: |
           echo "build --remote_header=\"Authorization=Bearer ${{ secrets.GITHUB_TOKEN }}\"" > ~/.bazelrc
-          BAZEL_BUILD_OPTIONS="--config=remote-ci-linux-coverage" \
+          cd mobile && BAZEL_BUILD_OPTIONS="--config=remote-ci-linux-coverage" \
             PATH=/opt/llvm/bin:${PATH} \
             COVERAGE_THRESHOLD=95 \
-            ./envoy/test/run_envoy_bazel_coverage.sh //test/common/...
+            ../test/run_envoy_bazel_coverage.sh //test/common/...
       - name: 'Package coverage'
         if: steps.check_context.outputs.run_coverage == 'true'
         run: |
-          tar -czvf coverage.tar.gz generated/coverage
+          tar -czvf coverage.tar.gz ../generated/coverage
       - name: 'Upload report'
         if: steps.check_context.outputs.run_coverage == 'true'
         uses: actions/upload-artifact@v2

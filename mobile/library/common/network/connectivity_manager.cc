@@ -275,7 +275,7 @@ void ConnectivityManagerImpl::refreshDns(envoy_netconf_t configuration_key,
 Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr ConnectivityManagerImpl::dnsCache() {
   auto cache = dns_cache_manager_->lookUpCacheByName(BaseDnsCache);
   if (!cache) {
-    ENVOY_LOG_EVENT(warn, "netconf_dns_cache_missing", BaseDnsCache);
+    ENVOY_LOG_EVENT(warn, "netconf_dns_cache_missing", std::string(BaseDnsCache));
   }
   return cache;
 }
