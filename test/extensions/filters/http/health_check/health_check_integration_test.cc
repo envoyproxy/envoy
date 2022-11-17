@@ -130,6 +130,7 @@ typed_config:
 }
 
 TEST_P(HealthCheckIntegrationTest, HealthCheck) {
+  DISABLE_IF_ADMIN_DISABLED;
   initialize();
 
   BufferingStreamDecoderPtr response;
@@ -143,6 +144,8 @@ TEST_P(HealthCheckIntegrationTest, HealthCheck) {
 }
 
 TEST_P(HealthCheckIntegrationTest, HealthCheckWithoutServerStats) {
+  DISABLE_IF_ADMIN_DISABLED;
+
   if (GetParam().http1_implementation == Http1Impl::BalsaParser) {
     // TODO(#21245): Re-enable this test for BalsaParser.
     return;
