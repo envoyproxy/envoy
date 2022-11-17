@@ -56,7 +56,7 @@ ProvisionalDispatcher::createSchedulableCallback(std::function<void()> cb) {
 bool ProvisionalDispatcher::isThreadSafe() const {
   // Doesn't require locking because if a thread has a stale view of drained_, then by definition
   // this wasn't a threadsafe call.
-  return TS_UNCHECKED_READ(drained_) && event_dispatcher_->isThreadSafe();
+  return ABSL_TS_UNCHECKED_READ(drained_) && event_dispatcher_->isThreadSafe();
 }
 
 void ProvisionalDispatcher::deferredDelete(DeferredDeletablePtr&& to_delete) {
