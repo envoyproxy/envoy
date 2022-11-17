@@ -12,6 +12,25 @@ namespace HttpFilters {
 namespace Cache {
 namespace {
 
+// Returns a Key with the vary header added to custom_fields.
+// It is an error to call this with headers that don't include vary.
+// Returns nullopt if the vary headers in the response are not
+// compatible with the VaryAllowList in the LookupRequest.
+absl::optional<Key> variedRequestKey(const LookupRequest& request,
+                                     const Http::ResponseHeaderMap& response_headers) {
+  absl::btree_set<absl::string_view> vary_header_values =
+      VaryHeaderUtils::getVaryValues(response_headers);
+  ASSERT(!vary_header_values.empty());
+  const absl::optional<std::string> vary_identifier = VaryHeaderUtils::createVaryIdentifier(
+      request.varyAllowList(), vary_header_values, request.requestHeaders());
+  if (!vary_identifier.has_value()) {
+    return absl::nullopt;
+  }
+  Key varied_request_key = request.key();
+  varied_request_key.add_custom_fields(vary_identifier.value());
+  return varied_request_key;
+}
+
 class SimpleLookupContext : public LookupContext {
 public:
   SimpleLookupContext(SimpleHttpCache& cache, LookupRequest&& request)
@@ -59,12 +78,15 @@ public:
         cache_(cache) {}
 
   void insertHeaders(const Http::ResponseHeaderMap& response_headers,
-                     const ResponseMetadata& metadata, bool end_stream) override {
+                     const ResponseMetadata& metadata, InsertCallback insert_success,
+                     bool end_stream) override {
     ASSERT(!committed_);
     response_headers_ = Http::createHeaderMap<Http::ResponseHeaderMapImpl>(response_headers);
     metadata_ = metadata;
     if (end_stream) {
-      commit();
+      insert_success(commit());
+    } else {
+      insert_success(true);
     }
   }
 
@@ -75,29 +97,31 @@ public:
 
     body_.add(chunk);
     if (end_stream) {
-      commit();
+      ready_for_next_chunk(commit());
     } else {
       ready_for_next_chunk(true);
     }
   }
 
-  void insertTrailers(const Http::ResponseTrailerMap& trailers) override {
+  void insertTrailers(const Http::ResponseTrailerMap& trailers,
+                      InsertCallback insert_complete) override {
     ASSERT(!committed_);
     trailers_ = Http::createHeaderMap<Http::ResponseTrailerMapImpl>(trailers);
-    commit();
+    insert_complete(commit());
   }
 
   void onDestroy() override {}
 
 private:
-  void commit() {
+  bool commit() {
     committed_ = true;
     if (VaryHeaderUtils::hasVary(*response_headers_)) {
-      cache_.varyInsert(key_, std::move(response_headers_), std::move(metadata_), body_.toString(),
-                        request_headers_, vary_allow_list_, std::move(trailers_));
+      return cache_.varyInsert(key_, std::move(response_headers_), std::move(metadata_),
+                               body_.toString(), request_headers_, vary_allow_list_,
+                               std::move(trailers_));
     } else {
-      cache_.insert(key_, std::move(response_headers_), std::move(metadata_), body_.toString(),
-                    std::move(trailers_));
+      return cache_.insert(key_, std::move(response_headers_), std::move(metadata_),
+                           body_.toString(), std::move(trailers_));
     }
   }
 
@@ -118,71 +142,36 @@ LookupContextPtr SimpleHttpCache::makeLookupContext(LookupRequest&& request,
   return std::make_unique<SimpleLookupContext>(*this, std::move(request));
 }
 
-const absl::flat_hash_set<Http::LowerCaseString> SimpleHttpCache::headersNotToUpdate() {
-  CONSTRUCT_ON_FIRST_USE(
-      absl::flat_hash_set<Http::LowerCaseString>,
-      // Content range should not be changed upon validation
-      Http::Headers::get().ContentRange,
-
-      // Headers that describe the body content should never be updated.
-      Http::Headers::get().ContentLength,
-
-      // It does not make sense for this level of the code to be updating the ETag, when
-      // presumably the cached_response_headers reflect this specific ETag.
-      Http::CustomHeaders::get().Etag,
-
-      // We don't update the cached response on a Vary; we just delete it
-      // entirely. So don't bother copying over the Vary header.
-      Http::CustomHeaders::get().Vary);
-}
-
 void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
                                     const Http::ResponseHeaderMap& response_headers,
-                                    const ResponseMetadata& metadata) {
+                                    const ResponseMetadata& metadata,
+                                    std::function<void(bool)> on_complete) {
   const auto& simple_lookup_context = static_cast<const SimpleLookupContext&>(lookup_context);
   const Key& key = simple_lookup_context.request().key();
   absl::WriterMutexLock lock(&mutex_);
-
   auto iter = map_.find(key);
   if (iter == map_.end() || !iter->second.response_headers_) {
+    on_complete(false);
     return;
   }
-  auto& entry = iter->second;
-
-  // TODO(tangsaidi) handle Vary header updates properly
-  if (VaryHeaderUtils::hasVary(*(entry.response_headers_))) {
-    return;
+  if (VaryHeaderUtils::hasVary(*iter->second.response_headers_)) {
+    absl::optional<Key> varied_key =
+        variedRequestKey(simple_lookup_context.request(), *iter->second.response_headers_);
+    if (!varied_key.has_value()) {
+      on_complete(false);
+      return;
+    }
+    iter = map_.find(varied_key.value());
+    if (iter == map_.end() || !iter->second.response_headers_) {
+      on_complete(false);
+      return;
+    }
   }
+  Entry& entry = iter->second;
 
-  // Assumptions:
-  // 1. The internet is fast, i.e. we get the result as soon as the server sends it.
-  //    Race conditions would not be possible because we are always processing up-to-date data.
-  // 2. No key collision for etag. Therefore, if etag matches it's the same resource.
-  // 3. Backend is correct. etag is being used as a unique identifier to the resource
-
-  // use other header fields provided in the new response to replace all instances
-  // of the corresponding header fields in the stored response
-
-  // `updatedHeaderFields` makes sure each field is only removed when we update the header
-  // field for the first time to handle the case where incoming headers have repeated values
-  absl::flat_hash_set<Http::LowerCaseString> updatedHeaderFields;
-  response_headers.iterate(
-      [&entry, &updatedHeaderFields](
-          const Http::HeaderEntry& incoming_response_header) -> Http::HeaderMap::Iterate {
-        Http::LowerCaseString lower_case_key{incoming_response_header.key().getStringView()};
-        absl::string_view incoming_value{incoming_response_header.value().getStringView()};
-        if (headersNotToUpdate().contains(lower_case_key)) {
-          return Http::HeaderMap::Iterate::Continue;
-        }
-        if (!updatedHeaderFields.contains(lower_case_key)) {
-          entry.response_headers_->setCopy(lower_case_key, incoming_value);
-          updatedHeaderFields.insert(lower_case_key);
-        } else {
-          entry.response_headers_->addCopy(lower_case_key, incoming_value);
-        }
-        return Http::HeaderMap::Iterate::Continue;
-      });
+  applyHeaderUpdate(response_headers, *entry.response_headers_);
   entry.metadata_ = metadata;
+  on_complete(true);
 }
 
 SimpleHttpCache::Entry SimpleHttpCache::lookup(const LookupRequest& request) {
@@ -206,12 +195,13 @@ SimpleHttpCache::Entry SimpleHttpCache::lookup(const LookupRequest& request) {
   }
 }
 
-void SimpleHttpCache::insert(const Key& key, Http::ResponseHeaderMapPtr&& response_headers,
+bool SimpleHttpCache::insert(const Key& key, Http::ResponseHeaderMapPtr&& response_headers,
                              ResponseMetadata&& metadata, std::string&& body,
                              Http::ResponseTrailerMapPtr&& trailers) {
   absl::WriterMutexLock lock(&mutex_);
   map_[key] = SimpleHttpCache::Entry{std::move(response_headers), std::move(metadata),
                                      std::move(body), std::move(trailers)};
+  return true;
 }
 
 SimpleHttpCache::Entry
@@ -220,19 +210,11 @@ SimpleHttpCache::varyLookup(const LookupRequest& request,
   // This method should be called from lookup, which holds the mutex for reading.
   mutex_.AssertReaderHeld();
 
-  absl::btree_set<absl::string_view> vary_header_values =
-      VaryHeaderUtils::getVaryValues(*response_headers);
-  ASSERT(!vary_header_values.empty());
-
-  Key varied_request_key = request.key();
-  const absl::optional<std::string> vary_identifier = VaryHeaderUtils::createVaryIdentifier(
-      request.varyAllowList(), vary_header_values, request.requestHeaders());
-  if (!vary_identifier.has_value()) {
-    // The vary allow list has changed and has made the vary header of this
-    // cached value not cacheable.
+  absl::optional<Key> varied_key = variedRequestKey(request, *response_headers);
+  if (!varied_key.has_value()) {
     return SimpleHttpCache::Entry{};
   }
-  varied_request_key.add_custom_fields(vary_identifier.value());
+  Key& varied_request_key = varied_key.value();
 
   auto iter = map_.find(varied_request_key);
   if (iter == map_.end()) {
@@ -249,7 +231,7 @@ SimpleHttpCache::varyLookup(const LookupRequest& request,
       iter->second.metadata_, iter->second.body_, std::move(trailers_map)};
 }
 
-void SimpleHttpCache::varyInsert(const Key& request_key,
+bool SimpleHttpCache::varyInsert(const Key& request_key,
                                  Http::ResponseHeaderMapPtr&& response_headers,
                                  ResponseMetadata&& metadata, std::string&& body,
                                  const Http::RequestHeaderMap& request_headers,
@@ -267,7 +249,7 @@ void SimpleHttpCache::varyInsert(const Key& request_key,
       VaryHeaderUtils::createVaryIdentifier(vary_allow_list, vary_header_values, request_headers);
   if (!vary_identifier.has_value()) {
     // Skip the insert if we are unable to create a vary key.
-    return;
+    return false;
   }
 
   varied_request_key.add_custom_fields(vary_identifier.value());
@@ -289,6 +271,7 @@ void SimpleHttpCache::varyInsert(const Key& request_key,
     map_[request_key] =
         SimpleHttpCache::Entry{std::move(vary_only_map), {}, std::move(entry_list), {}};
   }
+  return true;
 }
 
 InsertContextPtr SimpleHttpCache::makeInsertContext(LookupContextPtr&& lookup_context,

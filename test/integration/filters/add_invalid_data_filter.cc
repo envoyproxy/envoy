@@ -37,4 +37,7 @@ constexpr char AddInvalidDataFilter::name[];
 static Registry::RegisterFactory<SimpleFilterConfig<AddInvalidDataFilter>,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     encoder_register_;
+static Registry::RegisterFactory<SimpleFilterConfig<AddInvalidDataFilter>,
+                                 Server::Configuration::UpstreamHttpFilterConfigFactory>
+    encoder_register_upstream_;
 } // namespace Envoy

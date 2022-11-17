@@ -82,9 +82,9 @@ public:
     ON_CALL(error_4xx_counter_, value()).WillByDefault(Return((i + 1) * error_4xx_step));
     ON_CALL(retry_4xx_counter_, value()).WillByDefault(Return((i + 1) * error_4xx_retry_step));
     ON_CALL(success_counter_, value()).WillByDefault(Return((i + 1) * success_step));
-    cluster_info_->stats().upstream_rq_timeout_.add(timeout_step);
-    cluster_info_->stats().upstream_rq_per_try_timeout_.add(timeout_retry_step);
-    cluster_info_->stats().upstream_rq_pending_overflow_.add(rejected_step);
+    cluster_info_->trafficStats().upstream_rq_timeout_.add(timeout_step);
+    cluster_info_->trafficStats().upstream_rq_per_try_timeout_.add(timeout_retry_step);
+    cluster_info_->trafficStats().upstream_rq_pending_overflow_.add(rejected_step);
   }
 
   NiceMock<Upstream::MockClusterMockPrioritySet> cluster_;
@@ -507,7 +507,6 @@ TEST_F(HystrixSinkTest, HystrixEventStreamHandler) {
   sink_->registerConnection(&callbacks_);
 
   // This value doesn't matter in handlerHystrixEventStream
-  absl::string_view path_and_query;
 
   Http::TestResponseHeaderMapImpl response_headers;
 
@@ -520,14 +519,15 @@ TEST_F(HystrixSinkTest, HystrixEventStreamHandler) {
   ON_CALL(admin_stream_mock, getDecoderFilterCallbacks()).WillByDefault(ReturnRef(callbacks_));
   ON_CALL(admin_stream_mock, http1StreamEncoderOptions())
       .WillByDefault(Return(Http::Http1StreamEncoderOptionsOptRef(stream_encoder_options)));
-  ON_CALL(callbacks_, connection()).WillByDefault(Return(&connection_mock));
+  ON_CALL(callbacks_, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{connection_mock}));
   connection_mock.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       addr_instance_);
 
   EXPECT_CALL(stream_encoder_options, disableChunkEncoding());
-  ASSERT_EQ(sink_->handlerHystrixEventStream(path_and_query, response_headers,
-                                             cluster_stats_buffer_, admin_stream_mock),
-            Http::Code::OK);
+  ASSERT_EQ(
+      sink_->handlerHystrixEventStream(response_headers, cluster_stats_buffer_, admin_stream_mock),
+      Http::Code::OK);
 
   // Check that response_headers has been set correctly
   EXPECT_EQ(response_headers.ContentType()->value(), "text/event-stream");

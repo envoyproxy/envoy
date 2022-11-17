@@ -103,6 +103,7 @@ public:
   MOCK_METHOD(void, injectReadDataToFilterChain, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, upstreamHost, ());
   MOCK_METHOD(void, upstreamHost, (Upstream::HostDescriptionConstSharedPtr host));
+  MOCK_METHOD(bool, startUpstreamSecureTransport, ());
 
   testing::NiceMock<MockConnection> connection_;
   Upstream::HostDescriptionConstSharedPtr host_;
@@ -116,6 +117,7 @@ public:
   MOCK_METHOD(FilterStatus, onData, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(FilterStatus, onNewConnection, ());
   MOCK_METHOD(void, initializeReadFilterCallbacks, (ReadFilterCallbacks & callbacks));
+  MOCK_METHOD(bool, startUpstreamSecureTransport, ());
 
   ReadFilterCallbacks* callbacks_{};
 };
@@ -242,7 +244,8 @@ public:
   ~MockFilterChainManager() override;
 
   // Network::FilterChainManager
-  MOCK_METHOD(const FilterChain*, findFilterChain, (const ConnectionSocket& socket), (const));
+  MOCK_METHOD(const FilterChain*, findFilterChain,
+              (const ConnectionSocket& socket, const StreamInfo::StreamInfo& info), (const));
 };
 
 class MockFilterChainFactory : public FilterChainFactory {
@@ -426,7 +429,6 @@ public:
 
   MOCK_METHOD(FilterChainManager&, filterChainManager, ());
   MOCK_METHOD(FilterChainFactory&, filterChainFactory, ());
-  MOCK_METHOD(ListenSocketFactory&, listenSocketFactory, ());
   MOCK_METHOD(std::vector<ListenSocketFactoryPtr>&, listenSocketFactories, ());
   MOCK_METHOD(bool, bindToPort, (), (const));
   MOCK_METHOD(bool, handOffRestoredDestinationConnections, (), (const));

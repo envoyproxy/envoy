@@ -7,8 +7,6 @@ _required_extensions = {
     "envoy.http.original_ip_detection.xff": "//source/extensions/http/original_ip_detection/xff:config",
     "envoy.request_id.uuid": "//source/extensions/request_id/uuid:config",
     "envoy.transport_sockets.tls": "//source/extensions/transport_sockets/tls:config",
-    "envoy.network.dns_resolver.cares": "//source/extensions/network/dns_resolver/cares:config",
-    "envoy.network.dns_resolver.apple": "//source/extensions/network/dns_resolver/apple:config",
 }
 
 # Return the extension cc_library target after select
@@ -29,6 +27,7 @@ _core_extensions = [
     "envoy.access_loggers.stdout",
     "envoy.filters.http.router",
     "envoy.filters.http.health_check",
+    "envoy.filters.http.upstream_codec",
     "envoy.filters.network.http_connection_manager",
     "envoy.stat_sinks.statsd",
     "envoy.transport_sockets.raw_buffer",
@@ -44,11 +43,12 @@ def envoy_all_core_extensions():
     return {_selected_extension_target(v): True for k, v in all_extensions.items() if k in _core_extensions}.keys()
 
 _http_filter_prefix = "envoy.filters.http"
+_upstream_http_filter_prefix = "envoy.filters.http.upstream"
 
 def envoy_all_http_filters():
     all_extensions = dicts.add(_required_extensions, EXTENSIONS)
 
-    return {_selected_extension_target(v): True for k, v in all_extensions.items() if k.startswith(_http_filter_prefix)}.keys()
+    return {_selected_extension_target(v): True for k, v in all_extensions.items() if (k.startswith(_http_filter_prefix) or k.startswith(_upstream_http_filter_prefix))}.keys()
 
 # All network-layer filters are extensions with names that have the following prefix.
 _network_filter_prefix = "envoy.filters.network"

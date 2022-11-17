@@ -97,6 +97,7 @@ public:
   absl::optional<std::chrono::nanoseconds> firstDownstreamTxByteSent();
   absl::optional<std::chrono::nanoseconds> lastDownstreamTxByteSent();
   absl::optional<std::chrono::nanoseconds> lastDownstreamRxByteReceived();
+  absl::optional<std::chrono::nanoseconds> downstreamHandshakeComplete();
 
 private:
   const StreamInfo& stream_info_;

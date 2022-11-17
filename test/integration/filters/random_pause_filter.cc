@@ -36,7 +36,8 @@ public:
     // As long as we're doing horrible things let's do *all* the horrible things.
     // Assert the connection we have is a ConnectionImpl and const cast it so we
     // can force watermark changes.
-    auto conn_impl = dynamic_cast<const Network::ConnectionImpl*>(decoder_callbacks_->connection());
+    auto conn_impl =
+        dynamic_cast<const Network::ConnectionImpl*>(decoder_callbacks_->connection().ptr());
     return const_cast<Network::ConnectionImpl*>(conn_impl);
   }
 

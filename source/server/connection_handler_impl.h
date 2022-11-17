@@ -132,6 +132,12 @@ private:
   using ActiveListenerDetailsOptRef = absl::optional<std::reference_wrapper<ActiveListenerDetails>>;
   ActiveListenerDetailsOptRef findActiveListenerByTag(uint64_t listener_tag);
 
+  using PerAddressActiveListenerDetailsOptRef =
+      absl::optional<std::reference_wrapper<PerAddressActiveListenerDetails>>;
+  PerAddressActiveListenerDetailsOptRef
+  findPerAddressActiveListenerDetails(const ActiveListenerDetailsOptRef active_listener_details,
+                                      const Network::Address::Instance& address);
+
   // This has a value on worker threads, and no value on the main thread.
   const absl::optional<uint32_t> worker_index_;
   Event::Dispatcher& dispatcher_;

@@ -27,6 +27,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "quiche/quic/core/crypto/null_encrypter.h"
+#include "quiche/quic/core/deterministic_connection_id_generator.h"
 #include "quiche/quic/core/quic_crypto_server_stream.h"
 #include "quiche/quic/core/quic_utils.h"
 #include "quiche/quic/core/quic_versions.h"
@@ -147,16 +148,20 @@ public:
         quic_version_({[]() { return quic::CurrentSupportedHttp3Versions()[0]; }()}),
         quic_stat_names_(listener_config_.listenerScope().symbolTable()),
         quic_connection_(new MockEnvoyQuicServerConnection(
-            connection_helper_, alarm_factory_, writer_, quic_version_, *listener_config_.socket_)),
+            connection_helper_, alarm_factory_, writer_, quic_version_, *listener_config_.socket_,
+            connection_id_generator_)),
         crypto_config_(quic::QuicCryptoServerConfig::TESTING, quic::QuicRandom::GetInstance(),
                        std::make_unique<TestProofSource>(), quic::KeyExchangeSource::Default()),
-        envoy_quic_session_(quic_config_, quic_version_,
-                            std::unique_ptr<MockEnvoyQuicServerConnection>(quic_connection_),
-                            /*visitor=*/nullptr, &crypto_stream_helper_, &crypto_config_,
-                            &compressed_certs_cache_, *dispatcher_,
-                            /*send_buffer_limit*/ quic::kDefaultFlowControlSendWindow * 1.5,
-                            quic_stat_names_, listener_config_.listenerScope(),
-                            crypto_stream_factory_),
+        envoy_quic_session_(
+            quic_config_, quic_version_,
+            std::unique_ptr<MockEnvoyQuicServerConnection>(quic_connection_),
+            /*visitor=*/nullptr, &crypto_stream_helper_, &crypto_config_, &compressed_certs_cache_,
+            *dispatcher_,
+            /*send_buffer_limit*/ quic::kDefaultFlowControlSendWindow * 1.5, quic_stat_names_,
+            listener_config_.listenerScope(), crypto_stream_factory_,
+            std::make_unique<StreamInfo::StreamInfoImpl>(
+                dispatcher_->timeSource(),
+                quic_connection_->connectionSocket()->connectionInfoProviderSharedPtr())),
         stats_({ALL_HTTP3_CODEC_STATS(
             POOL_COUNTER_PREFIX(listener_config_.listenerScope(), "http3."),
             POOL_GAUGE_PREFIX(listener_config_.listenerScope(), "http3."))}) {
@@ -248,6 +253,8 @@ protected:
   testing::NiceMock<quic::test::MockPacketWriter> writer_;
   testing::NiceMock<Network::MockListenerConfig> listener_config_;
   QuicStatNames quic_stat_names_;
+  quic::DeterministicConnectionIdGenerator connection_id_generator_{
+      quic::kQuicDefaultConnectionIdLength};
   MockEnvoyQuicServerConnection* quic_connection_;
   quic::QuicConfig quic_config_;
   quic::QuicCryptoServerConfig crypto_config_;

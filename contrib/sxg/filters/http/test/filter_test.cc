@@ -367,17 +367,17 @@ TEST_F(FilterTest, SdsDynamicGenericSecret) {
   EXPECT_CALL(secret_context, api()).WillRepeatedly(ReturnRef(*api));
   EXPECT_CALL(secret_context, mainThreadDispatcher()).WillRepeatedly(ReturnRef(dispatcher));
   EXPECT_CALL(secret_context, stats()).WillRepeatedly(ReturnRef(stats));
-  EXPECT_CALL(secret_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
+  EXPECT_CALL(secret_context, initManager()).Times(0);
   EXPECT_CALL(init_manager, add(_))
       .WillRepeatedly(Invoke([&init_handle](const Init::Target& target) {
         init_handle = target.createHandle("test");
       }));
 
   auto certificate_secret_provider = secret_manager.findOrCreateGenericSecretProvider(
-      config_source, "certificate", secret_context);
+      config_source, "certificate", secret_context, init_manager);
   auto certificate_callback = secret_context.cluster_manager_.subscription_factory_.callbacks_;
   auto private_key_secret_provider = secret_manager.findOrCreateGenericSecretProvider(
-      config_source, "private_key", secret_context);
+      config_source, "private_key", secret_context, init_manager);
   auto private_key_callback = secret_context.cluster_manager_.subscription_factory_.callbacks_;
 
   SDSSecretReader secret_reader(certificate_secret_provider, private_key_secret_provider, *api);

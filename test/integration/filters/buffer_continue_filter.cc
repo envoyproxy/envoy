@@ -54,12 +54,13 @@ private:
   uint64_t data_total_{0};
 };
 
-class BufferContinueFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+class BufferContinueFilterConfig
+    : public Extensions::HttpFilters::Common::EmptyHttpDualFilterConfig {
 public:
-  BufferContinueFilterConfig() : EmptyHttpFilterConfig("buffer-continue-filter") {}
+  BufferContinueFilterConfig() : EmptyHttpDualFilterConfig("buffer-continue-filter") {}
 
-  Http::FilterFactoryCb createFilter(const std::string&,
-                                     Server::Configuration::FactoryContext&) override {
+  Http::FilterFactoryCb createDualFilter(const std::string&,
+                                         Server::Configuration::ServerFactoryContext&) override {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamFilter(std::make_shared<::Envoy::BufferContinueStreamFilter>());
     };
@@ -70,5 +71,8 @@ public:
 static Registry::RegisterFactory<BufferContinueFilterConfig,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
+static Registry::RegisterFactory<BufferContinueFilterConfig,
+                                 Server::Configuration::UpstreamHttpFilterConfigFactory>
+    register_upstream_;
 
 } // namespace Envoy

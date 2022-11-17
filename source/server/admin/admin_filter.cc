@@ -61,13 +61,32 @@ const Http::RequestHeaderMap& AdminFilter::getRequestHeaders() const {
   return *request_headers_;
 }
 
+Http::Utility::QueryParams AdminFilter::queryParams() const {
+  absl::string_view path = request_headers_->getPathValue();
+  Http::Utility::QueryParams query = Http::Utility::parseAndDecodeQueryString(path);
+  if (!query.empty()) {
+    return query;
+  }
+
+  // Check if the params are in the request's body.
+  if (request_headers_->getContentTypeValue() ==
+      Http::Headers::get().ContentTypeValues.FormUrlEncoded) {
+    const Buffer::Instance* body = getRequestBody();
+    if (body != nullptr) {
+      query = Http::Utility::parseFromBody(body->toString());
+    }
+  }
+
+  return query;
+}
+
 void AdminFilter::onComplete() {
-  const absl::string_view path = request_headers_->getPathValue();
+  absl::string_view path = request_headers_->getPathValue();
   ENVOY_STREAM_LOG(debug, "request complete: path: {}", *decoder_callbacks_, path);
 
   auto header_map = Http::ResponseHeaderMapImpl::create();
   RELEASE_ASSERT(request_headers_, "");
-  Admin::RequestPtr handler = admin_handler_fn_(path, *this);
+  Admin::RequestPtr handler = admin_handler_fn_(*this);
   Http::Code code = handler->start(*header_map);
   Utility::populateFallbackResponseHeaders(code, *header_map);
   decoder_callbacks_->encodeHeaders(std::move(header_map), false,

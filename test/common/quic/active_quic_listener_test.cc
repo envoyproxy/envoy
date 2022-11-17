@@ -92,9 +92,10 @@ protected:
     listen_socket_->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
     ASSERT_TRUE(Network::Socket::applyOptions(listen_socket_->options(), *listen_socket_,
                                               envoy::config::core::v3::SocketOption::STATE_BOUND));
-
-    ON_CALL(listener_config_, listenSocketFactory()).WillByDefault(ReturnRef(socket_factory_));
-    ON_CALL(socket_factory_, getListenSocket(_)).WillByDefault(Return(listen_socket_));
+    EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(
+                    listener_config_.socket_factories_[0].get()),
+                getListenSocket(_))
+        .WillRepeatedly(Return(listen_socket_));
 
     // Use UdpGsoBatchWriter to perform non-batched writes for the purpose of this test, if it is
     // supported.
@@ -121,7 +122,7 @@ protected:
     quic_listener_ =
         staticUniquePointerCast<ActiveQuicListener>(listener_factory_->createActiveUdpListener(
             scoped_runtime_.loader(), 0, connection_handler_,
-            listener_config_.listenSocketFactory().getListenSocket(0), *dispatcher_,
+            listener_config_.socket_factories_[0]->getListenSocket(0), *dispatcher_,
             listener_config_));
     quic_dispatcher_ = ActiveQuicListenerPeer::quicDispatcher(*quic_listener_);
     quic::QuicCryptoServerConfig& crypto_config =
@@ -144,12 +145,12 @@ protected:
   Network::ActiveUdpListenerFactoryPtr createQuicListenerFactory(const std::string& yaml) {
     envoy::config::listener::v3::QuicProtocolOptions options;
     TestUtility::loadFromYamlAndValidate(yaml, options);
-    return std::make_unique<ActiveQuicListenerFactory>(options, /*concurrency=*/1,
-                                                       quic_stat_names_);
+    return std::make_unique<ActiveQuicListenerFactory>(options, /*concurrency=*/1, quic_stat_names_,
+                                                       validation_visitor_);
   }
 
   void maybeConfigureMocks(int connection_count) {
-    EXPECT_CALL(filter_chain_manager_, findFilterChain(_))
+    EXPECT_CALL(filter_chain_manager_, findFilterChain(_, _))
         .Times(connection_count)
         .WillRepeatedly(Return(filter_chain_));
     EXPECT_CALL(listener_config_, filterChainFactory()).Times(connection_count);
@@ -352,6 +353,12 @@ TEST_P(ActiveQuicListenerTest, ReceiveCHLO) {
                                            ->config()
                                            ->max_time_before_crypto_handshake()
                                            .ToMilliseconds());
+#ifndef WIN32
+  EXPECT_EQ(
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.quic_defer_send_in_response_to_packet"),
+      static_cast<const EnvoyQuicServerConnection*>(session->connection())->actuallyDeferSend());
+#endif
   readFromClientSockets();
 }
 

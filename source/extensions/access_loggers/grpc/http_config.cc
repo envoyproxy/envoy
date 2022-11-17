@@ -20,6 +20,14 @@ namespace HttpGrpc {
 
 AccessLog::InstanceSharedPtr HttpGrpcAccessLogFactory::createAccessLogInstance(
     const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
+    Server::Configuration::ListenerAccessLogFactoryContext& context) {
+  return createAccessLogInstance(
+      config, std::move(filter),
+      static_cast<Server::Configuration::CommonFactoryContext&>(context));
+}
+
+AccessLog::InstanceSharedPtr HttpGrpcAccessLogFactory::createAccessLogInstance(
+    const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
     Server::Configuration::CommonFactoryContext& context) {
   GrpcCommon::validateProtoDescriptors();
 

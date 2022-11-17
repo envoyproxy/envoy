@@ -108,7 +108,7 @@ void TrafficRoutingAssistantHandler::complete(const TrafficRoutingAssistant::Res
             });
       }
 
-      // If the wrong reponse received, then try next affinity
+      // If the wrong response received, then try next affinity
       parent_.onResponseHandleForPendingList(
           message_type, item.first,
           [&](MessageMetadataSharedPtr metadata, DecoderEventHandler& decoder_event_handler) {
@@ -330,7 +330,6 @@ void ConnectionManager::onEvent(Network::ConnectionEvent event) {
 }
 
 DecoderEventHandler& ConnectionManager::newDecoderEventHandler(MessageMetadataSharedPtr metadata) {
-  stats_.request_active_.inc();
   stats_.counterFromElements(methodStr[metadata->methodType()], "request_received").inc();
 
   std::string&& k = std::string(metadata->transactionId().value());
@@ -546,14 +545,12 @@ ConnectionManager::ActiveTrans::upstreamData(MessageMetadataSharedPtr metadata) 
     return SipFilters::ResponseStatus::MoreData;
   } catch (const AppException& ex) {
     ENVOY_LOG(error, "sip response application error: {}", ex.what());
-    // parent_.stats_.response_decoding_error_.inc();
 
     sendLocalReply(ex, false);
     return SipFilters::ResponseStatus::Reset;
   } catch (const EnvoyException& ex) {
     ENVOY_CONN_LOG(error, "sip response error: {}", parent_.read_callbacks_->connection(),
                    ex.what());
-    // parent_.stats_.response_decoding_error_.inc();
 
     onError(ex.what());
     return SipFilters::ResponseStatus::Reset;

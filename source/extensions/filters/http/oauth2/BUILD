@@ -31,6 +31,7 @@ envoy_cc_library(
         ":oauth_response_cc_proto",
         "//envoy/http:async_client_interface",
         "//envoy/upstream:cluster_manager_interface",
+        "//source/common/common:base64_lib",
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf:message_validator_lib",

@@ -107,14 +107,12 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
   request_headers.removeTransferEncoding();
 
   // Sanitize referer field if exists.
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.sanitize_http_header_referer")) {
-    auto result = request_headers.get(Http::CustomHeaders::get().Referer);
-    if (!result.empty()) {
-      Utility::Url url;
-      if (result.size() > 1 || !url.initialize(result[0]->value().getStringView(), false)) {
-        // A request header shouldn't have multiple referer field.
-        request_headers.remove(Http::CustomHeaders::get().Referer);
-      }
+  auto result = request_headers.get(Http::CustomHeaders::get().Referer);
+  if (!result.empty()) {
+    Utility::Url url;
+    if (result.size() > 1 || !url.initialize(result[0]->value().getStringView(), false)) {
+      // A request header shouldn't have multiple referer field.
+      request_headers.remove(Http::CustomHeaders::get().Referer);
     }
   }
 
@@ -317,7 +315,7 @@ Tracing::Reason ConnectionManagerUtility::mutateTracingRequestHeader(
   if (!rid_extension->useRequestIdForTraceSampling()) {
     return Tracing::Reason::Sampling;
   }
-  const auto rid_to_integer = rid_extension->toInteger(request_headers);
+  const auto rid_to_integer = rid_extension->getInteger(request_headers);
   // Skip if request-id is corrupted, or non-existent
   if (!rid_to_integer.has_value()) {
     return final_reason;

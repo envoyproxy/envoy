@@ -28,6 +28,9 @@
 namespace Envoy {
 namespace Server {
 
+constexpr absl::string_view ENABLE_UPDATE_LISTENER_SOCKET_OPTIONS_RUNTIME_FLAG{
+    "envoy.reloadable_features.enable_update_listener_socket_options"};
+
 /**
  * All missing listener config stats. @see stats_macros.h
  */
@@ -42,6 +45,12 @@ struct MissingListenerConfigStats {
 
 class ListenerMessageUtil {
 public:
+  /**
+   * @return true if listener message lhs and rhs have the same socket options.
+   */
+  static bool socketOptionsEqual(const envoy::config::listener::v3::Listener& lhs,
+                                 const envoy::config::listener::v3::Listener& rhs);
+
   /**
    * @return true if listener message lhs and rhs are the same if ignoring filter_chains field.
    */
@@ -138,7 +147,7 @@ public:
   Singleton::Manager& singletonManager() override;
   OverloadManager& overloadManager() override;
   ThreadLocal::Instance& threadLocal() override;
-  Admin& admin() override;
+  OptRef<Admin> admin() override;
   const envoy::config::core::v3::Metadata& listenerMetadata() const override;
   const Envoy::Config::TypedMetadata& listenerTypedMetadata() const override;
   envoy::config::core::v3::TrafficDirection direction() const override;
@@ -215,7 +224,7 @@ public:
   Singleton::Manager& singletonManager() override;
   OverloadManager& overloadManager() override;
   ThreadLocal::Instance& threadLocal() override;
-  Admin& admin() override;
+  OptRef<Admin> admin() override;
   const envoy::config::core::v3::Metadata& listenerMetadata() const override;
   const Envoy::Config::TypedMetadata& listenerTypedMetadata() const override;
   envoy::config::core::v3::TrafficDirection direction() const override;
@@ -299,7 +308,6 @@ public:
     return addresses_;
   }
   const envoy::config::listener::v3::Listener& config() const { return config_; }
-  const Network::ListenSocketFactory& getSocketFactory() const { return *socket_factories_[0]; }
   const std::vector<Network::ListenSocketFactoryPtr>& getSocketFactories() const {
     return socket_factories_;
   }
@@ -314,8 +322,11 @@ public:
   const std::string& versionInfo() const { return version_info_; }
   bool reusePort() const { return reuse_port_; }
   static bool getReusePortOrDefault(Server::Instance& server,
-                                    const envoy::config::listener::v3::Listener& config);
+                                    const envoy::config::listener::v3::Listener& config,
+                                    Network::Socket::Type socket_type);
 
+  // Compare whether two listeners have different socket options.
+  bool socketOptionsEqual(const ListenerImpl& other) const;
   // Check whether a new listener can share sockets with this listener.
   bool hasCompatibleAddress(const ListenerImpl& other) const;
   // Check whether a new listener has duplicated listening address this listener.
@@ -324,7 +335,6 @@ public:
   // Network::ListenerConfig
   Network::FilterChainManager& filterChainManager() override { return *filter_chain_manager_; }
   Network::FilterChainFactory& filterChainFactory() override { return *this; }
-  Network::ListenSocketFactory& listenSocketFactory() override { return *socket_factories_[0]; }
   std::vector<Network::ListenSocketFactoryPtr>& listenSocketFactories() override {
     return socket_factories_;
   }

@@ -32,6 +32,7 @@
 #include "source/common/version/api_version.h"
 #include "source/common/version/api_version_struct.h"
 
+#include "absl/types/optional.h"
 #include "udpa/type/v1/typed_struct.pb.h"
 #include "xds/type/v3/typed_struct.pb.h"
 
@@ -188,6 +189,15 @@ public:
   static void checkApiConfigSourceSubscriptionBackingCluster(
       const Upstream::ClusterManager::ClusterSet& primary_clusters,
       const envoy::config::core::v3::ApiConfigSource& api_config_source);
+
+  /**
+   * Gets the gRPC control plane management server from the API config source. The result is either
+   * a cluster name or a host name.
+   * @param api_config_source the config source to validate.
+   * @return the gRPC control plane server, or absl::nullopt if it couldn't be extracted.
+   */
+  static absl::optional<std::string>
+  getGrpcControlPlane(const envoy::config::core::v3::ApiConfigSource& api_config_source);
 
   /**
    * Validate transport_api_version field in ApiConfigSource.

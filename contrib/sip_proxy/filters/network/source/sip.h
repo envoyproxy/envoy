@@ -102,6 +102,7 @@ private:
       {"Service-Route", HeaderType::SRoute},
       {"WWW-Authenticate", HeaderType::WAuth},
       {"Authorization", HeaderType::Auth},
+      {"TopLine", HeaderType::TopLine},
       {"P-Nokia-Cookie-IP-Mapping", HeaderType::PCookieIPMap}};
 };
 

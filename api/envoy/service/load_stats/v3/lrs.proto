@@ -17,7 +17,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/service/load_s
 option java_generic_services = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Load Reporting service (LRS)]
+// [#protodoc-title: Load reporting service (LRS)]
 
 // Load Reporting Service is an Envoy API to emit load reports. Envoy will initiate a bi-directional
 // stream with a management server. Upon connecting, the management server can send a

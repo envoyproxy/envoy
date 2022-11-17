@@ -46,9 +46,9 @@ public:
   MockInstance();
   ~MockInstance() override;
 
-  Secret::SecretManager& secretManager() override { return *(secret_manager_.get()); }
+  Secret::SecretManager& secretManager() override { return *(secret_manager_); }
 
-  MOCK_METHOD(Admin&, admin, ());
+  MOCK_METHOD(OptRef<Admin>, admin, ());
   MOCK_METHOD(Api::Api&, api, ());
   MOCK_METHOD(Upstream::ClusterManager&, clusterManager, ());
   MOCK_METHOD(const Upstream::ClusterManager&, clusterManager, (), (const));
@@ -59,7 +59,6 @@ public:
   MOCK_METHOD(DrainManager&, drainManager, ());
   MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, ());
   MOCK_METHOD(void, failHealthcheck, (bool fail));
-  MOCK_METHOD(void, exportStatsToChild, (envoy::HotRestartMessage::Reply::Stats*));
   MOCK_METHOD(bool, healthCheckFailed, ());
   MOCK_METHOD(HotRestart&, hotRestart, ());
   MOCK_METHOD(Init::Manager&, initManager, ());
@@ -161,7 +160,7 @@ public:
   MOCK_METHOD(Stats::Scope&, serverScope, ());
   MOCK_METHOD(Singleton::Manager&, singletonManager, ());
   MOCK_METHOD(ThreadLocal::Instance&, threadLocal, ());
-  MOCK_METHOD(Server::Admin&, admin, ());
+  MOCK_METHOD(OptRef<Server::Admin>, admin, ());
   MOCK_METHOD(TimeSource&, timeSource, ());
   Event::TestTimeSystem& timeSystem() { return time_system_; }
   MOCK_METHOD(ProtobufMessage::ValidationContext&, messageValidationContext, ());
@@ -196,6 +195,7 @@ public:
   Grpc::ContextImpl grpc_context_;
   Router::ContextImpl router_context_;
   envoy::config::bootstrap::v3::Bootstrap bootstrap_;
+  testing::NiceMock<MockOptions> options_;
 };
 
 } // namespace Configuration

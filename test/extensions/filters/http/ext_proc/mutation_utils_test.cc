@@ -69,6 +69,10 @@ TEST(MutationUtils, TestApplyMutations) {
   s->mutable_header()->set_key("x-append-this");
   s->mutable_header()->set_value("3");
   s = mutation.add_set_headers();
+  s->mutable_append()->set_value(true);
+  s->mutable_header()->set_key("x-remove-and-append-this");
+  s->mutable_header()->set_value("4");
+  s = mutation.add_set_headers();
   s->mutable_append()->set_value(false);
   s->mutable_header()->set_key("x-replace-this");
   s->mutable_header()->set_value("no");
@@ -84,6 +88,8 @@ TEST(MutationUtils, TestApplyMutations) {
   mutation.add_set_headers();
 
   mutation.add_remove_headers("x-remove-this");
+  // remove is applied before append, so the header entry will be in the final headers.
+  mutation.add_remove_headers("x-remove-and-append-this");
   // Attempts to remove ":" and "host" headers should be ignored
   mutation.add_remove_headers("host");
   mutation.add_remove_headers(":method");
@@ -138,6 +144,7 @@ TEST(MutationUtils, TestApplyMutations) {
       {"x-append-this", "1"},
       {"x-append-this", "2"},
       {"x-append-this", "3"},
+      {"x-remove-and-append-this", "4"},
       {"x-replace-this", "nope"},
       {"x-envoy-strange-thing", "No"},
   };

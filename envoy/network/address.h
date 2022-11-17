@@ -50,6 +50,11 @@ public:
   virtual absl::uint128 address() const PURE;
 
   /**
+   * @return the uint32_t scope/zone identifier of the IPv6 address.
+   */
+  virtual uint32_t scopeId() const PURE;
+
+  /**
    * @return true if address is Ipv6 and Ipv4 compatibility is disabled, false otherwise
    */
   virtual bool v6only() const PURE;
@@ -138,6 +143,11 @@ public:
    * internal listener, the address id is that listener name.
    */
   virtual const std::string& addressId() const PURE;
+
+  /**
+   * @return The optional endpoint id of the internal address.
+   */
+  virtual const std::string& endpointId() const PURE;
 };
 
 enum class Type { Ip, Pipe, EnvoyInternal };

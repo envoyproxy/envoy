@@ -86,17 +86,13 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestInvalidConfigs) {
   json_format:
     field: true
 )",
-      R"(
-  json_format:
-    field: 200
-)",
   };
   for (const auto& yaml : invalid_configs) {
     TestUtility::loadFromYaml(yaml, config_);
-    EXPECT_THROW_WITH_MESSAGE(
-        SubstitutionFormatStringUtils::fromProtoConfig(config_, context_), EnvoyException,
-        "Only string values, nested structs and list values are supported in structured access log "
-        "format.");
+    EXPECT_THROW_WITH_MESSAGE(SubstitutionFormatStringUtils::fromProtoConfig(config_, context_),
+                              EnvoyException,
+                              "Only string values, nested structs, list values and number values "
+                              "are supported in structured access log format.");
   }
 }
 

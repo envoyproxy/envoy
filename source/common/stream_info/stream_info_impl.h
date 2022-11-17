@@ -49,9 +49,16 @@ struct UpstreamInfoImpl : public UpstreamInfo {
   const Network::Address::InstanceConstSharedPtr& upstreamLocalAddress() const override {
     return upstream_local_address_;
   }
+  const Network::Address::InstanceConstSharedPtr& upstreamRemoteAddress() const override {
+    return upstream_remote_address_;
+  }
   void setUpstreamLocalAddress(
       const Network::Address::InstanceConstSharedPtr& upstream_local_address) override {
     upstream_local_address_ = upstream_local_address;
+  }
+  void setUpstreamRemoteAddress(
+      const Network::Address::InstanceConstSharedPtr& upstream_remote_address) override {
+    upstream_remote_address_ = upstream_remote_address;
   }
   void setUpstreamTransportFailureReason(absl::string_view failure_reason) override {
     upstream_transport_failure_reason_ = std::string(failure_reason);
@@ -84,6 +91,7 @@ struct UpstreamInfoImpl : public UpstreamInfo {
 
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
+  Network::Address::InstanceConstSharedPtr upstream_remote_address_;
   UpstreamTiming upstream_timing_;
   Ssl::ConnectionInfoConstSharedPtr upstream_ssl_info_;
   absl::optional<uint64_t> upstream_connection_id_;
@@ -249,18 +257,20 @@ struct StreamInfoImpl : public StreamInfo {
 
   const Http::RequestHeaderMap* getRequestHeaders() const override { return request_headers_; }
 
-  void setRequestIDProvider(const Http::RequestIdStreamInfoProviderSharedPtr& provider) override {
-    ASSERT(provider != nullptr);
-    request_id_provider_ = provider;
+  void setStreamIdProvider(StreamIdProviderSharedPtr provider) override {
+    stream_id_provider_ = std::move(provider);
   }
-  const Http::RequestIdStreamInfoProvider* getRequestIDProvider() const override {
-    return request_id_provider_.get();
+  OptRef<const StreamIdProvider> getStreamIdProvider() const override {
+    if (stream_id_provider_ == nullptr) {
+      return {};
+    }
+    return makeOptRef<const StreamIdProvider>(*stream_id_provider_);
   }
 
   void setTraceReason(Tracing::Reason reason) override { trace_reason_ = reason; }
   Tracing::Reason traceReason() const override { return trace_reason_; }
 
-  void dumpState(std::ostream& os, int indent_level = 0) const {
+  void dumpState(std::ostream& os, int indent_level = 0) const override {
     const char* spaces = spacesForLevel(indent_level);
     os << spaces << "StreamInfoImpl " << this << DUMP_OPTIONAL_MEMBER(protocol_)
        << DUMP_OPTIONAL_MEMBER(response_code_) << DUMP_OPTIONAL_MEMBER(response_code_details_)
@@ -326,6 +336,9 @@ struct StreamInfoImpl : public StreamInfo {
     start_time_monotonic_ = info.startTimeMonotonic();
   }
 
+  void setIsShadow(bool is_shadow) { is_shadow_ = is_shadow; }
+  bool isShadow() const override { return is_shadow_; }
+
   TimeSource& time_source_;
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
@@ -370,7 +383,7 @@ private:
   uint64_t bytes_sent_{};
   const Network::ConnectionInfoProviderSharedPtr downstream_connection_info_provider_;
   const Http::RequestHeaderMap* request_headers_{};
-  Http::RequestIdStreamInfoProviderSharedPtr request_id_provider_;
+  StreamIdProviderSharedPtr stream_id_provider_;
   absl::optional<DownstreamTiming> downstream_timing_;
   absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_;
   std::string filter_chain_name_;
@@ -378,6 +391,7 @@ private:
   // Default construct the object because upstream stream is not constructed in some cases.
   BytesMeterSharedPtr upstream_bytes_meter_{std::make_shared<BytesMeter>()};
   BytesMeterSharedPtr downstream_bytes_meter_;
+  bool is_shadow_{false};
 };
 
 } // namespace StreamInfo

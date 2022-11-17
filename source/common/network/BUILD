@@ -3,6 +3,10 @@ load(
     "envoy_cc_library",
     "envoy_package",
 )
+load(
+    "@envoy_build_config//:extensions_build_config.bzl",
+    "LEGACY_ALWAYSLINK",
+)
 
 licenses(["notice"])  # Apache 2
 
@@ -126,6 +130,7 @@ envoy_cc_library(
         ":connection_base_lib",
         ":connection_lib",
         ":multi_connection_base_impl_lib",
+        "//envoy/upstream:upstream_interface",
     ],
 )
 
@@ -156,6 +161,7 @@ envoy_cc_library(
         "//envoy/network:transport_socket_interface",
         "//envoy/registry",
     ],
+    alwayslink = LEGACY_ALWAYSLINK,
 )
 
 envoy_cc_library(
@@ -227,6 +233,7 @@ envoy_cc_library(
         "//envoy/registry",
         "//envoy/server:bootstrap_extension_config_interface",
     ],
+    alwayslink = LEGACY_ALWAYSLINK,
 )
 
 envoy_cc_library(
@@ -253,6 +260,7 @@ envoy_cc_library(
         "//source/common/event:dispatcher_includes",
         "@envoy_api//envoy/extensions/network/socket_interface/v3:pkg_cc_proto",
     ],
+    alwayslink = LEGACY_ALWAYSLINK,
 )
 
 envoy_cc_library(
@@ -364,7 +372,6 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         ":address_lib",
-        ":listen_socket_lib",
         "//envoy/api:os_sys_calls_interface",
         "//envoy/network:listen_socket_interface",
         "//source/common/api:os_sys_calls_lib",
@@ -434,6 +441,7 @@ envoy_cc_library(
         ":address_lib",
         ":default_socket_interface_lib",
         ":socket_lib",
+        ":socket_option_lib",
         "//envoy/network:connection_interface",
         "//envoy/network:listener_interface",
         "//envoy/stats:stats_interface",

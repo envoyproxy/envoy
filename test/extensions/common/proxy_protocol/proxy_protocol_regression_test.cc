@@ -67,7 +67,6 @@ public:
   // Network::ListenerConfig
   Network::FilterChainManager& filterChainManager() override { return *this; }
   Network::FilterChainFactory& filterChainFactory() override { return factory_; }
-  Network::ListenSocketFactory& listenSocketFactory() override { return *socket_factories_[0]; }
   std::vector<Network::ListenSocketFactoryPtr>& listenSocketFactories() override {
     return socket_factories_;
   }
@@ -100,7 +99,8 @@ public:
   bool ignoreGlobalConnLimit() const override { return false; }
 
   // Network::FilterChainManager
-  const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
+  const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&,
+                                              const StreamInfo::StreamInfo&) const override {
     return filter_chain_.get();
   }
 

@@ -19,7 +19,7 @@ quicAddressToEnvoyAddressInstance(const quic::QuicSocketAddress& quic_address) {
   return quic_address.IsInitialized()
              ? Network::Address::addressFromSockAddrOrDie(quic_address.generic_address(),
                                                           quic_address.host().address_family() ==
-                                                                  quic::IpAddressFamily::IP_V4
+                                                                  quiche::IpAddressFamily::IP_V4
                                                               ? sizeof(sockaddr_in)
                                                               : sizeof(sockaddr_in6),
                                                           -1, false)
@@ -54,8 +54,8 @@ quic::QuicSocketAddress envoyIpAddressToQuicSocketAddress(const Network::Address
   return quic::QuicSocketAddress(ss);
 }
 
-spdy::SpdyHeaderBlock envoyHeadersToSpdyHeaderBlock(const Http::HeaderMap& headers) {
-  spdy::SpdyHeaderBlock header_block;
+spdy::Http2HeaderBlock envoyHeadersToHttp2HeaderBlock(const Http::HeaderMap& headers) {
+  spdy::Http2HeaderBlock header_block;
   headers.iterate([&header_block](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
     // The key-value pairs are copied.
     header_block.AppendValueOrAddHeader(header.key().getStringView(),

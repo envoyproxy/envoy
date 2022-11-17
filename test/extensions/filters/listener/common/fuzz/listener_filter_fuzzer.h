@@ -48,7 +48,6 @@ public:
   // Network::ListenerConfig
   Network::FilterChainManager& filterChainManager() override { return *this; }
   Network::FilterChainFactory& filterChainFactory() override { return factory_; }
-  Network::ListenSocketFactory& listenSocketFactory() override { return *socket_factories_[0]; }
   std::vector<Network::ListenSocketFactoryPtr>& listenSocketFactories() override {
     return socket_factories_;
   }
@@ -81,22 +80,23 @@ public:
   bool ignoreGlobalConnLimit() const override { return false; }
 
   // Network::FilterChainManager
-  const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
+  const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&,
+                                              const StreamInfo::StreamInfo&) const override {
     return filter_chain_.get();
   }
-
-  void write(const std::string& s) {
-    Buffer::OwnedImpl buf(s);
-    conn_->write(buf, false);
-  }
-
-  void connect(Network::ListenerFilterPtr filter);
-  void disconnect();
 
   void fuzz(Network::ListenerFilterPtr filter,
             const test::extensions::filters::listener::FilterFuzzWithDataTestCase& input);
 
 private:
+  void write(const std::string& s) {
+    Buffer::OwnedImpl buf(s);
+    conn_->write(buf, false);
+  }
+
+  void connect();
+  void disconnect();
+
   testing::NiceMock<Runtime::MockLoader> runtime_;
   Stats::TestUtil::TestStore stats_store_;
   Api::ApiPtr api_;
@@ -106,6 +106,7 @@ private:
   std::vector<Network::ListenSocketFactoryPtr> socket_factories_;
   Network::NopConnectionBalancerImpl connection_balancer_;
   Network::ConnectionHandlerPtr connection_handler_;
+  Network::ListenerFilterPtr filter_{nullptr};
   Network::MockFilterChainFactory factory_;
   Network::ClientConnectionPtr conn_;
   NiceMock<Network::MockConnectionCallbacks> connection_callbacks_;

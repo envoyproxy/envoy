@@ -109,8 +109,8 @@ TEST_F(TsiFrameProtectorTest, Unprotect) {
 TEST_F(TsiFrameProtectorTest, UnprotectError) {
   const tsi_zero_copy_grpc_protector_vtable* vtable = raw_frame_protector_->vtable;
   tsi_zero_copy_grpc_protector_vtable mock_vtable = *raw_frame_protector_->vtable;
-  mock_vtable.unprotect = [](tsi_zero_copy_grpc_protector*, grpc_slice_buffer*,
-                             grpc_slice_buffer*) { return TSI_INTERNAL_ERROR; };
+  mock_vtable.unprotect = [](tsi_zero_copy_grpc_protector*, grpc_slice_buffer*, grpc_slice_buffer*,
+                             int*) { return TSI_INTERNAL_ERROR; };
   raw_frame_protector_->vtable = &mock_vtable;
 
   Buffer::OwnedImpl input, decrypted;

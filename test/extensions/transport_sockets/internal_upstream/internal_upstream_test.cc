@@ -194,8 +194,7 @@ TEST_F(ConfigTest, UnsupportedMetadata) {
       "@type": type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
   )EOF",
                             config_proto_);
-  EXPECT_THROW_WITH_MESSAGE(initialize(), EnvoyException,
-                            "metadata type is not supported: route {\n}\n");
+  EXPECT_THROW_WITH_REGEX(initialize(), EnvoyException, "metadata type is not supported: route");
 }
 
 TEST_F(ConfigTest, MissingState) {

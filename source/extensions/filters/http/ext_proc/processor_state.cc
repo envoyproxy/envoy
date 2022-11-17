@@ -30,9 +30,8 @@ void ProcessorState::onStartProcessorCall(Event::TimerCb cb, std::chrono::millis
 
 void ProcessorState::onFinishProcessorCall(Grpc::Status::GrpcStatus call_status,
                                            CallbackState next_state) {
-  if (message_timer_) {
-    message_timer_->disableTimer();
-  }
+  stopMessageTimer();
+
   if (call_start_time_.has_value()) {
     std::chrono::microseconds duration = std::chrono::duration_cast<std::chrono::microseconds>(
         filter_callbacks_->dispatcher().timeSource().monotonicTime() - call_start_time_.value());
@@ -41,6 +40,12 @@ void ProcessorState::onFinishProcessorCall(Grpc::Status::GrpcStatus call_status,
     call_start_time_ = absl::nullopt;
   }
   callback_state_ = next_state;
+}
+
+void ProcessorState::stopMessageTimer() {
+  if (message_timer_) {
+    message_timer_->disableTimer();
+  }
 }
 
 absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
@@ -58,7 +63,7 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
       }
     }
     if (common_response.clear_route_cache()) {
-      filter_callbacks_->clearRouteCache();
+      filter_callbacks_->downstreamCallbacks()->clearRouteCache();
     }
     onFinishProcessorCall(Grpc::Status::Ok);
 
@@ -264,7 +269,7 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
     }
 
     if (response.response().clear_route_cache()) {
-      filter_callbacks_->clearRouteCache();
+      filter_callbacks_->downstreamCallbacks()->clearRouteCache();
     }
     headers_ = nullptr;
 

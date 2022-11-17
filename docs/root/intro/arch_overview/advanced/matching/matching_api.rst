@@ -69,8 +69,8 @@ These input functions are available for matching TCP connections and HTTP reques
 * :ref:`DNS SAN <extension_envoy.matching.inputs.dns_san>`.
 * :ref:`Subject <extension_envoy.matching.inputs.subject>`.
 
-Common Input Functons
-*********************
+Common Input Functions
+**********************
 
 These input functions are available in any context:
 
@@ -85,6 +85,28 @@ are available in some contexts:
 .. _extension_envoy.matching.custom_matchers.trie_matcher:
 
 * :ref:`Trie-based IP matcher <envoy_v3_api_msg_.xds.type.matcher.v3.IPMatcher>` applies to network inputs.
+
+Matching actions
+################
+
+The action in the matcher framework typically refers to the selected resource by name.
+
+Network filter chain matching supports the following extensions:
+
+.. _extension_envoy.matching.actions.format_string:
+
+* :ref:`Format string action <envoy_v3_api_msg_config.core.v3.SubstitutionFormatString>` computes the filter chain name
+  from the connection dynamic metadata and its filter state. Example:
+
+.. validated-code-block:: yaml
+  :type-name: envoy.config.common.matcher.v3.Matcher.OnMatch
+
+  action:
+    name: foo
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.core.v3.SubstitutionFormatString
+      text_format_source:
+        inline_string: "%DYNAMIC_METADATA(com.test_filter:test_key)%"
 
 Filter Integration
 ##################

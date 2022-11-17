@@ -63,7 +63,7 @@ public:
   void testConfig(envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy& config) {
     Network::FilterFactoryCb cb;
     EXPECT_NO_THROW({ cb = factory_.createFilterFactoryFromProto(config, context_); });
-    EXPECT_TRUE(factory_.isTerminalFilterByProto(config, context_));
+    EXPECT_TRUE(factory_.isTerminalFilterByProto(config, context_.getServerFactoryContext()));
 
     Network::MockConnection connection;
     EXPECT_CALL(connection, addReadFilter(_));

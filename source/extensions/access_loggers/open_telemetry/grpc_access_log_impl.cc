@@ -49,7 +49,7 @@ void GrpcAccessLoggerImpl::initMessageRoot(
         config,
     const LocalInfo::LocalInfo& local_info) {
   auto* resource_logs = message_.add_resource_logs();
-  root_ = resource_logs->add_instrumentation_library_logs();
+  root_ = resource_logs->add_scope_logs();
   auto* resource = resource_logs->mutable_resource();
   *resource->add_attributes() = getStringKeyValue("log_name", config.common_config().log_name());
   *resource->add_attributes() = getStringKeyValue("zone_name", local_info.zoneName());

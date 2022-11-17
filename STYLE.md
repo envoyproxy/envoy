@@ -155,7 +155,8 @@ A few general notes on our error handling philosophy:
     debug-only builds) program invariants.
   - `ENVOY_BUG`: logs and increments a stat in release mode, fatal check in debug builds. These
     should be used where it may be useful to detect if an efficient condition is violated in
-    production (and fatal check in debug-only builds).
+    production (and fatal check in debug-only builds). This will also log a stack trace
+    of the previous calls leading up to `ENVOY_BUG`.
 
 * Sub-macros alias the macros above and can be used to annotate specific situations:
   - `ENVOY_BUG_ALPHA` (alias `ENVOY_BUG`): Used for alpha or rapidly changing protocols that need

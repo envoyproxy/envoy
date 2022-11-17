@@ -158,7 +158,7 @@ void deprecatedFieldHelper(Runtime::Loader* runtime, bool proto_annotated_as_dep
   const bool runtime_overridden = (warn_default == false && warn_only == true);
 
   std::string with_overridden = fmt::format(
-      error,
+      fmt::runtime(error),
       (runtime_overridden ? "runtime overrides to continue using now fatal-by-default " : ""));
 
   validation_visitor.onDeprecatedField("type " + message.GetTypeName() + " " + with_overridden,
@@ -562,6 +562,17 @@ void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Messag
   }
 }
 
+absl::Status MessageUtil::unpackToNoThrow(const ProtobufWkt::Any& any_message,
+                                          Protobuf::Message& message) {
+  if (!any_message.UnpackTo(&message)) {
+    return absl::InternalError(absl::StrCat("Unable to unpack as ",
+                                            message.GetDescriptor()->full_name(), ": ",
+                                            any_message.DebugString()));
+  }
+  // Ok Status is returned if `UnpackTo` succeeded.
+  return absl::OkStatus();
+}
+
 void MessageUtil::jsonConvert(const Protobuf::Message& source, ProtobufWkt::Struct& dest) {
   // Any proto3 message can be transformed to Struct, so there is no need to check for unknown
   // fields. There is one catch; Duration/Timestamp etc. which have non-object canonical JSON
@@ -908,22 +919,34 @@ ProtobufWkt::Value ValueUtil::listValue(const std::vector<ProtobufWkt::Value>& v
 
 namespace {
 
-void validateDuration(const ProtobufWkt::Duration& duration) {
+void validateDuration(const ProtobufWkt::Duration& duration, int64_t max_seconds_value) {
   if (duration.seconds() < 0 || duration.nanos() < 0) {
     throw DurationUtil::OutOfRangeException(
         fmt::format("Expected positive duration: {}", duration.DebugString()));
   }
-  if (duration.nanos() > 999999999 ||
-      duration.seconds() > Protobuf::util::TimeUtil::kDurationMaxSeconds) {
+  if (duration.nanos() > 999999999 || duration.seconds() > max_seconds_value) {
     throw DurationUtil::OutOfRangeException(
         fmt::format("Duration out-of-range: {}", duration.DebugString()));
   }
 }
 
+void validateDuration(const ProtobufWkt::Duration& duration) {
+  validateDuration(duration, Protobuf::util::TimeUtil::kDurationMaxSeconds);
+}
+
+void validateDurationAsMilliseconds(const ProtobufWkt::Duration& duration) {
+  // Apply stricter max boundary to the `seconds` value to avoid overflow.
+  // Note that protobuf internally converts to nanoseconds.
+  // The kMaxInt64Nanoseconds = 9223372036, which is about 300 years.
+  constexpr int64_t kMaxInt64Nanoseconds =
+      std::numeric_limits<int64_t>::max() / (1000 * 1000 * 1000);
+  validateDuration(duration, kMaxInt64Nanoseconds);
+}
+
 } // namespace
 
 uint64_t DurationUtil::durationToMilliseconds(const ProtobufWkt::Duration& duration) {
-  validateDuration(duration);
+  validateDurationAsMilliseconds(duration);
   return Protobuf::util::TimeUtil::DurationToMilliseconds(duration);
 }
 

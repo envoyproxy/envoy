@@ -1,6 +1,3 @@
-#include <utility>
-#include <vector>
-
 #include "test/mocks/server/factory_context.h"
 
 #include "contrib/hyperscan/matching/input_matchers/source/config.h"
@@ -12,39 +9,14 @@ namespace Matching {
 namespace InputMatchers {
 namespace Hyperscan {
 
-constexpr absl::string_view yaml_string = R"EOF(
-name: hyperscan
-typed_config:
-  "@type": type.googleapis.com/envoy.extensions.matching.input_matchers.hyperscan.v3alpha.Hyperscan
-  regexes:{}
-)EOF";
-
-constexpr absl::string_view regex_string = R"EOF(
-
-  - regex: {}{}
-)EOF";
-
-constexpr absl::string_view option_string = R"EOF(
-
-    {}: {}
-)EOF";
-
 class ConfigTest : public ::testing::Test {
 protected:
-  using Option = std::pair<const absl::string_view, const absl::string_view>;
-  using Regex = std::pair<const absl::string_view, const std::vector<Option>>;
-
-  void setup(const std::vector<Regex> setup_configs) {
-    std::string regex_strs;
-    for (auto& setup_config : setup_configs) {
-      std::string option_strs;
-      for (auto& option : setup_config.second) {
-        option_strs += fmt::format(std::string(option_string), option.first, option.second);
-      }
-      regex_strs += fmt::format(std::string(regex_string), setup_config.first, option_strs);
-    }
+  void setup(const std::string& yaml) {
     envoy::config::core::v3::TypedExtensionConfig config;
-    TestUtility::loadFromYaml(fmt::format(std::string(yaml_string), regex_strs), config);
+    config.set_name("hyperscan");
+    envoy::extensions::matching::input_matchers::hyperscan::v3alpha::Hyperscan hyperscan;
+    TestUtility::loadFromYaml(yaml, hyperscan);
+    config.mutable_typed_config()->PackFrom(hyperscan);
 
     Config factory;
     auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(
@@ -59,13 +31,19 @@ protected:
 #ifdef HYPERSCAN_DISABLED
 // Verify that incompatible architecture will cause a throw.
 TEST_F(ConfigTest, IncompatibleArchitecture) {
-  EXPECT_THROW_WITH_MESSAGE(setup({{"^/asdf/.+", {}}}), EnvoyException,
-                            "X86_64 architecture is required for Hyperscan.");
+  EXPECT_THROW_WITH_MESSAGE(setup(R"EOF(
+regexes:
+- regex: ^/asdf/.+
+)EOF"),
+                            EnvoyException, "X86_64 architecture is required for Hyperscan.");
 }
 #else
 // Verify that matching will be performed successfully.
 TEST_F(ConfigTest, Regex) {
-  setup({{"^/asdf/.+", {}}});
+  setup(R"EOF(
+regexes:
+- regex: ^/asdf/.+
+)EOF");
 
   EXPECT_TRUE(matcher_->match("/asdf/1"));
   EXPECT_FALSE(matcher_->match("/ASDF/1"));
@@ -75,7 +53,11 @@ TEST_F(ConfigTest, Regex) {
 
 // Verify that matching will be performed case-insensitively.
 TEST_F(ConfigTest, RegexWithCaseless) {
-  setup({{"^/asdf/.+", {{"caseless", "true"}}}});
+  setup(R"EOF(
+regexes:
+- regex: ^/asdf/.+
+  caseless: true
+)EOF");
 
   EXPECT_TRUE(matcher_->match("/asdf/1"));
   EXPECT_TRUE(matcher_->match("/ASDF/1"));
@@ -85,7 +67,11 @@ TEST_F(ConfigTest, RegexWithCaseless) {
 
 // Verify that matching a `.` will not exclude newlines.
 TEST_F(ConfigTest, RegexWithDotAll) {
-  setup({{"^/asdf/.+", {{"dot_all", "true"}}}});
+  setup(R"EOF(
+regexes:
+- regex: ^/asdf/.+
+  dot_all: true
+)EOF");
 
   EXPECT_TRUE(matcher_->match("/asdf/1"));
   EXPECT_FALSE(matcher_->match("/ASDF/1"));
@@ -95,7 +81,11 @@ TEST_F(ConfigTest, RegexWithDotAll) {
 
 // Verify that `^` and `$` anchors match any newlines in data.
 TEST_F(ConfigTest, RegexWithMultiline) {
-  setup({{"^/asdf/.+$", {{"multiline", "true"}}}});
+  setup(R"EOF(
+regexes:
+- regex: ^/asdf/.+
+  multiline: true
+)EOF");
 
   EXPECT_TRUE(matcher_->match("/asdf/1"));
   EXPECT_FALSE(matcher_->match("/ASDF/1"));
@@ -105,39 +95,53 @@ TEST_F(ConfigTest, RegexWithMultiline) {
 
 // Verify that expressions which can match against an empty string.
 TEST_F(ConfigTest, RegexWithAllowEmpty) {
-  setup({{".*", {{"allow_empty", "true"}}}});
+  setup(R"EOF(
+regexes:
+- regex: .*
+  allow_empty: true
+)EOF");
 
   EXPECT_TRUE(matcher_->match(""));
 }
 
 // Verify that treating the pattern as a sequence of UTF-8 characters.
 TEST_F(ConfigTest, RegexWithUTF8) {
-  setup({{"^.$", {{"utf8", "true"}}}});
+  setup(R"EOF(
+regexes:
+- regex: ^.$
+  utf8: true
+)EOF");
 
   EXPECT_TRUE(matcher_->match("😀"));
 }
 
 // Verify that using Unicode properties for character classes.
 TEST_F(ConfigTest, RegexWithUCP) {
-  setup({{"^\\w$", {{"utf8", "true"}, {"ucp", "true"}}}});
+  setup(R"EOF(
+regexes:
+- regex: ^\w$
+  utf8: true
+  ucp: true
+)EOF");
 
   EXPECT_TRUE(matcher_->match("Á"));
 }
 
 // Verify that using logical combination.
 TEST_F(ConfigTest, RegexWithCombination) {
-  setup({{"a", {{"id", "1"}, {"quiet", "true"}}},
-         {"b", {{"id", "2"}, {"quiet", "true"}}},
-         {"1 | 2", {{"combination", "true"}}}});
+  setup(R"EOF(
+regexes:
+- regex: a
+  id: 1
+  quiet: true
+- regex: b
+  id: 2
+  quiet: true
+- regex: 1 | 2
+  combination: true
+)EOF");
 
   EXPECT_TRUE(matcher_->match("a"));
-}
-
-// Verify that invalid expression will cause a throw.
-TEST_F(ConfigTest, InvalidRegex) {
-  EXPECT_THROW_WITH_MESSAGE(
-      setup({{"(", {}}}), EnvoyException,
-      "unable to compile pattern '(': Missing close parenthesis for group started at index 0.");
 }
 #endif
 

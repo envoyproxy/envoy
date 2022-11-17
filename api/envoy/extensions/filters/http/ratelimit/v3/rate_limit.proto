@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.ratelimit.v3;
 
+import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/extension.proto";
 import "envoy/config/ratelimit/v3/rls.proto";
 import "envoy/config/route/v3/route_components.proto";
@@ -24,7 +25,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Rate limit :ref:`configuration overview <config_http_filters_rate_limit>`.
 // [#extension: envoy.filters.http.ratelimit]
 
-// [#next-free-field: 11]
+// [#next-free-field: 12]
 message RateLimit {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.rate_limit.v2.RateLimit";
@@ -120,6 +121,11 @@ message RateLimit {
   // .. note::
   //   If this is set to < 400, 429 will be used instead.
   type.v3.HttpStatus rate_limited_status = 10;
+
+  // Specifies a list of HTTP headers that should be added to each response for requests that
+  // have been rate limited.
+  repeated config.core.v3.HeaderValueOption response_headers_to_add = 11
+      [(validate.rules).repeated = {max_items: 10}];
 }
 
 // Global rate limiting :ref:`architecture overview <arch_overview_global_rate_limit>`.
@@ -331,6 +337,7 @@ message RateLimitConfig {
 }
 
 message RateLimitPerRoute {
+  // [#next-major-version: unify with local ratelimit, should use common.ratelimit.v3.VhRateLimitsOptions instead.]
   enum VhRateLimitsOptions {
     // Use the virtual host rate limits unless the route has a rate limit policy.
     OVERRIDE = 0;
@@ -359,6 +366,7 @@ message RateLimitPerRoute {
   }
 
   // Specifies if the rate limit filter should include the virtual host rate limits.
+  // [#next-major-version: unify with local ratelimit, should use common.ratelimit.v3.VhRateLimitsOptions instead.]
   VhRateLimitsOptions vh_rate_limits = 1 [(validate.rules).enum = {defined_only: true}];
 
   // Specifies if the rate limit filter should include the lower levels (route level, virtual host level or cluster weight level) rate limits override options.

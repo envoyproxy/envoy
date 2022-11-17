@@ -95,5 +95,6 @@ message RegexMatchAndSubstitute {
   // backslash followed by the capture group number to denote a numbered
   // capture group. E.g., ``\1`` refers to capture group 1, and ``\2`` refers
   // to capture group 2.
-  string substitution = 2;
+  string substitution = 2
+      [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 }

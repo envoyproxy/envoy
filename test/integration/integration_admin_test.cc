@@ -349,9 +349,10 @@ TEST_P(IntegrationAdminTest, Admin) {
        ++listener_info_it, ++listener_it) {
     auto local_address = (*listener_info_it)->getObject("local_address");
     auto socket_address = local_address->getObject("socket_address");
-    EXPECT_EQ(listener_it->get().listenSocketFactory().localAddress()->ip()->addressAsString(),
-              socket_address->getString("address"));
-    EXPECT_EQ(listener_it->get().listenSocketFactory().localAddress()->ip()->port(),
+    EXPECT_EQ(
+        listener_it->get().listenSocketFactories()[0]->localAddress()->ip()->addressAsString(),
+        socket_address->getString("address"));
+    EXPECT_EQ(listener_it->get().listenSocketFactories()[0]->localAddress()->ip()->port(),
               socket_address->getInteger("port_value"));
 
     std::vector<Json::ObjectSharedPtr> additional_local_addresses =
@@ -486,7 +487,7 @@ TEST_P(IntegrationAdminTest, AdminOnDestroyCallbacks) {
   bool test = true;
 
   // add an handler which adds a callback to the list of callback called when connection is dropped.
-  auto callback = [&test](absl::string_view, Http::HeaderMap&, Buffer::Instance&,
+  auto callback = [&test](Http::HeaderMap&, Buffer::Instance&,
                           Server::AdminStream& admin_stream) -> Http::Code {
     auto on_destroy_callback = [&test]() { test = false; };
 
@@ -496,7 +497,7 @@ TEST_P(IntegrationAdminTest, AdminOnDestroyCallbacks) {
   };
 
   EXPECT_TRUE(
-      test_server_->server().admin().addHandler("/foo/bar", "hello", callback, true, false));
+      test_server_->server().admin()->addHandler("/foo/bar", "hello", callback, true, false));
 
   // As part of the request, on destroy() should be called and the on_destroy_callback invoked.
   BufferingStreamDecoderPtr response;

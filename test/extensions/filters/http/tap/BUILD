@@ -2,6 +2,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test_library",
     "envoy_package",
+    "envoy_select_admin_functionality",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
@@ -22,7 +23,7 @@ envoy_cc_test_library(
 
 envoy_extension_cc_test(
     name = "tap_filter_test",
-    srcs = ["tap_filter_test.cc"],
+    srcs = envoy_select_admin_functionality(["tap_filter_test.cc"]),
     extension_names = ["envoy.filters.http.tap"],
     deps = [
         ":common",
@@ -37,7 +38,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "tap_config_impl_test",
-    srcs = ["tap_config_impl_test.cc"],
+    srcs = envoy_select_admin_functionality(["tap_config_impl_test.cc"]),
     extension_names = ["envoy.filters.http.tap"],
     deps = [
         ":common",
@@ -50,7 +51,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "tap_filter_integration_test",
-    srcs = ["tap_filter_integration_test.cc"],
+    srcs = envoy_select_admin_functionality(["tap_filter_integration_test.cc"]),
     extension_names = ["envoy.filters.http.tap"],
     deps = [
         "//source/extensions/filters/http/tap:config",

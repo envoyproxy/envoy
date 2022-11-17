@@ -302,9 +302,11 @@ TEST_F(HttpConnectionManagerImplTest, PopulateStreamInfo) {
   Buffer::OwnedImpl fake_input("input");
   conn_manager_->createCodec(fake_input);
 
-  decoder_ = &conn_manager_->newStream(response_encoder_);
+  startRequest(true);
 
-  EXPECT_EQ(requestIDExtension().get(), decoder_->streamInfo().getRequestIDProvider());
+  EXPECT_NE(absl::nullopt, decoder_->streamInfo().getStreamIdProvider());
+  EXPECT_NE(absl::nullopt, decoder_->streamInfo().getStreamIdProvider()->toInteger());
+  EXPECT_NE(absl::nullopt, decoder_->streamInfo().getStreamIdProvider()->toStringView());
   EXPECT_EQ(ssl_connection_, decoder_->streamInfo().downstreamAddressProvider().sslConnection());
   EXPECT_EQ(filter_callbacks_.connection_.id_,
             decoder_->streamInfo().downstreamAddressProvider().connectionID().value());
@@ -709,11 +711,13 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
           EXPECT_EQ(default_cluster->info(), decoder_filters_[0]->callbacks_->clusterInfo());
 
           // Not clearing cached route returns cached route and doesn't invoke cb.
-          Router::RouteConstSharedPtr route = decoder_filters_[0]->callbacks_->route(
-              [](Router::RouteConstSharedPtr, Router::RouteEvalStatus) -> Router::RouteMatchStatus {
-                ADD_FAILURE() << "When route cache is not cleared CB should not be invoked";
-                return Router::RouteMatchStatus::Accept;
-              });
+          Router::RouteConstSharedPtr route =
+              decoder_filters_[0]->callbacks_->downstreamCallbacks()->route(
+                  [](Router::RouteConstSharedPtr,
+                     Router::RouteEvalStatus) -> Router::RouteMatchStatus {
+                    ADD_FAILURE() << "When route cache is not cleared CB should not be invoked";
+                    return Router::RouteMatchStatus::Accept;
+                  });
           EXPECT_EQ(default_route, route);
 
           int ctr = 0;
@@ -751,8 +755,8 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
             return Router::RouteMatchStatus::Accept;
           };
 
-          decoder_filters_[0]->callbacks_->clearRouteCache();
-          route = decoder_filters_[0]->callbacks_->route(cb);
+          decoder_filters_[0]->callbacks_->downstreamCallbacks()->clearRouteCache();
+          route = decoder_filters_[0]->callbacks_->downstreamCallbacks()->route(cb);
 
           EXPECT_EQ(default_route, route);
           EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->route());
@@ -808,8 +812,8 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
             return Router::RouteMatchStatus::Accept;
           };
 
-          decoder_filters_[0]->callbacks_->clearRouteCache();
-          decoder_filters_[1]->callbacks_->route(cb);
+          decoder_filters_[0]->callbacks_->downstreamCallbacks()->clearRouteCache();
+          decoder_filters_[1]->callbacks_->downstreamCallbacks()->route(cb);
 
           EXPECT_EQ(foo_bar_route, decoder_filters_[1]->callbacks_->route());
           EXPECT_EQ(foo_bar_route, decoder_filters_[1]->callbacks_->streamInfo().route());
@@ -897,7 +901,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterSetRouteToDelegatingRouteWithCluster
         // StreamFilterCallbacks to manually override the cached route for the current request.
         foo_route_override = std::make_shared<Router::ExampleDerivedDelegatingRoute>(
             decoder_filters_[0]->callbacks_->route(), foo_cluster_name);
-        decoder_filters_[0]->callbacks_->setRoute(foo_route_override);
+        decoder_filters_[0]->callbacks_->downstreamCallbacks()->setRoute(foo_route_override);
 
         return FilterHeadersStatus::Continue;
       }));
@@ -973,7 +977,7 @@ TEST_F(HttpConnectionManagerImplTest, DelegatingRouteEntryAllCalls) {
         // StreamFilterCallbacks to manually override the cached route for the current request.
         delegating_route_foo = std::make_shared<Router::ExampleDerivedDelegatingRoute>(
             default_route, foo_cluster_name);
-        decoder_filters_[0]->callbacks_->setRoute(delegating_route_foo);
+        decoder_filters_[0]->callbacks_->downstreamCallbacks()->setRoute(delegating_route_foo);
 
         return FilterHeadersStatus::Continue;
       }));
@@ -1940,6 +1944,57 @@ TEST_F(HttpConnectionManagerImplTest,
   conn_manager_->onData(fake_input, false);
 }
 
+TEST_F(HttpConnectionManagerImplTest, NoHCMTracingConfigAndActiveSpanWouldBeNullSpan) {
+  setup(false, "");
+  // Null HCM tracing config.
+  tracing_config_ = nullptr;
+
+  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> void {
+        auto factory = createDecoderFilterFactoryCb(filter);
+        manager.applyFilterFactoryCb({}, factory);
+      }));
+
+  // Treat request as internal, otherwise x-request-id header will be overwritten.
+  use_remote_address_ = false;
+  EXPECT_CALL(random_, uuid()).Times(0);
+
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
+        decoder_ = &conn_manager_->newStream(response_encoder_);
+
+        RequestHeaderMapPtr headers{
+            new TestRequestHeaderMapImpl{{":method", "GET"},
+                                         {":authority", "host"},
+                                         {":path", "/"},
+                                         {"x-request-id", "125a4afb-6f55-a4ba-ad80-413f09f48a28"}}};
+        decoder_->decodeHeaders(std::move(headers), true);
+
+        filter->callbacks_->streamInfo().setResponseCodeDetails("");
+        ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{
+            {":status", "200"}, {"x-envoy-decorator-operation", "testOp"}}};
+        filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+
+        // Active span always be null span when there is no HCM tracing config.
+        EXPECT_EQ(&Tracing::NullSpan::instance(), &filter->callbacks_->activeSpan());
+        // Child span should also be null span.
+        Tracing::SpanPtr child_span = filter->callbacks_->activeSpan().spawnChild(
+            Tracing::EgressConfig::get(), "null_child", test_time_.systemTime());
+        Tracing::SpanPtr null_span = std::make_unique<Tracing::NullSpan>();
+        auto& child_span_ref = *child_span;
+        auto& null_span_ref = *null_span;
+        EXPECT_EQ(typeid(child_span_ref).name(), typeid(null_span_ref).name());
+
+        data.drain(4);
+        return Http::okStatus();
+      }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
 TEST_F(HttpConnectionManagerImplTest, TestAccessLog) {
   static constexpr char remote_address[] = "0.0.0.0";
   static constexpr char xff_address[] = "1.2.3.4";
@@ -2582,7 +2637,7 @@ TEST_F(HttpConnectionManagerImplTest, DurationTimeout) {
   conn_manager_->onData(fake_input, false);
 
   // Clear and refresh the route cache (checking clusterInfo refreshes the route cache)
-  decoder_filters_[0]->callbacks_->clearRouteCache();
+  decoder_filters_[0]->callbacks_->downstreamCallbacks()->clearRouteCache();
   decoder_filters_[0]->callbacks_->clusterInfo();
 
   Event::MockTimer* timer = setUpTimer();
@@ -2593,7 +2648,7 @@ TEST_F(HttpConnectionManagerImplTest, DurationTimeout) {
     EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, maxStreamDuration())
         .Times(2)
         .WillRepeatedly(Return(std::chrono::milliseconds(30)));
-    decoder_filters_[0]->callbacks_->clearRouteCache();
+    decoder_filters_[0]->callbacks_->downstreamCallbacks()->clearRouteCache();
     decoder_filters_[0]->callbacks_->clusterInfo();
   }
 
@@ -2603,7 +2658,7 @@ TEST_F(HttpConnectionManagerImplTest, DurationTimeout) {
     EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, maxStreamDuration())
         .Times(1)
         .WillRepeatedly(Return(absl::nullopt));
-    decoder_filters_[0]->callbacks_->clearRouteCache();
+    decoder_filters_[0]->callbacks_->downstreamCallbacks()->clearRouteCache();
     decoder_filters_[0]->callbacks_->clusterInfo();
   }
 
@@ -2614,7 +2669,7 @@ TEST_F(HttpConnectionManagerImplTest, DurationTimeout) {
     EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, maxStreamDuration())
         .Times(1)
         .WillRepeatedly(Return(absl::nullopt));
-    decoder_filters_[0]->callbacks_->clearRouteCache();
+    decoder_filters_[0]->callbacks_->downstreamCallbacks()->clearRouteCache();
     decoder_filters_[0]->callbacks_->clusterInfo();
     max_stream_duration_ = absl::nullopt;
   }
@@ -2626,7 +2681,7 @@ TEST_F(HttpConnectionManagerImplTest, DurationTimeout) {
     EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, maxStreamDuration())
         .Times(1)
         .WillRepeatedly(Return(absl::nullopt));
-    decoder_filters_[0]->callbacks_->clearRouteCache();
+    decoder_filters_[0]->callbacks_->downstreamCallbacks()->clearRouteCache();
     decoder_filters_[0]->callbacks_->clusterInfo();
   }
 
@@ -2636,7 +2691,7 @@ TEST_F(HttpConnectionManagerImplTest, DurationTimeout) {
         .Times(AnyNumber())
         .WillRepeatedly(Return(std::chrono::milliseconds(0)));
     EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(60000), _));
-    decoder_filters_[0]->callbacks_->clearRouteCache();
+    decoder_filters_[0]->callbacks_->downstreamCallbacks()->clearRouteCache();
     decoder_filters_[0]->callbacks_->clusterInfo();
   }
 
@@ -2646,7 +2701,7 @@ TEST_F(HttpConnectionManagerImplTest, DurationTimeout) {
         .Times(AnyNumber())
         .WillRepeatedly(Return(std::chrono::milliseconds(20000000)));
     EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(60000), _));
-    decoder_filters_[0]->callbacks_->clearRouteCache();
+    decoder_filters_[0]->callbacks_->downstreamCallbacks()->clearRouteCache();
     decoder_filters_[0]->callbacks_->clusterInfo();
   }
 
@@ -2656,7 +2711,7 @@ TEST_F(HttpConnectionManagerImplTest, DurationTimeout) {
         .Times(AnyNumber())
         .WillRepeatedly(Return(std::chrono::milliseconds(20)));
     EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(20), _));
-    decoder_filters_[0]->callbacks_->clearRouteCache();
+    decoder_filters_[0]->callbacks_->downstreamCallbacks()->clearRouteCache();
     decoder_filters_[0]->callbacks_->clusterInfo();
   }
 
@@ -2667,7 +2722,7 @@ TEST_F(HttpConnectionManagerImplTest, DurationTimeout) {
         .Times(AnyNumber())
         .WillRepeatedly(Return(std::chrono::milliseconds(20)));
     EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(0), _));
-    decoder_filters_[0]->callbacks_->clearRouteCache();
+    decoder_filters_[0]->callbacks_->downstreamCallbacks()->clearRouteCache();
     decoder_filters_[0]->callbacks_->clusterInfo();
   }
 
@@ -2682,7 +2737,7 @@ TEST_F(HttpConnectionManagerImplTest, DurationTimeout) {
         .Times(AnyNumber())
         .WillRepeatedly(Return(std::chrono::milliseconds(10)));
     EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(10), _));
-    decoder_filters_[0]->callbacks_->clearRouteCache();
+    decoder_filters_[0]->callbacks_->downstreamCallbacks()->clearRouteCache();
     decoder_filters_[0]->callbacks_->clusterInfo();
   }
 
@@ -2696,7 +2751,7 @@ TEST_F(HttpConnectionManagerImplTest, DurationTimeout) {
         .Times(AnyNumber())
         .WillRepeatedly(Return(std::chrono::milliseconds(30)));
     EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(0), _));
-    decoder_filters_[0]->callbacks_->clearRouteCache();
+    decoder_filters_[0]->callbacks_->downstreamCallbacks()->clearRouteCache();
     decoder_filters_[0]->callbacks_->clusterInfo();
   }
 
@@ -2712,7 +2767,7 @@ TEST_F(HttpConnectionManagerImplTest, DurationTimeout) {
         .Times(AnyNumber())
         .WillRepeatedly(Return(absl::nullopt));
     EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(15), _));
-    decoder_filters_[0]->callbacks_->clearRouteCache();
+    decoder_filters_[0]->callbacks_->downstreamCallbacks()->clearRouteCache();
     decoder_filters_[0]->callbacks_->clusterInfo();
   }
 
@@ -2728,7 +2783,7 @@ TEST_F(HttpConnectionManagerImplTest, DurationTimeout) {
         .Times(AnyNumber())
         .WillRepeatedly(Return(absl::nullopt));
     EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(0), _));
-    decoder_filters_[0]->callbacks_->clearRouteCache();
+    decoder_filters_[0]->callbacks_->downstreamCallbacks()->clearRouteCache();
     decoder_filters_[0]->callbacks_->clusterInfo();
   }
 
@@ -2741,7 +2796,7 @@ TEST_F(HttpConnectionManagerImplTest, DurationTimeout) {
     EXPECT_CALL(route_config_provider_.route_config_->route_->route_entry_, maxStreamDuration())
         .Times(2)
         .WillRepeatedly(Return(std::chrono::milliseconds(30)));
-    decoder_filters_[0]->callbacks_->clearRouteCache();
+    decoder_filters_[0]->callbacks_->downstreamCallbacks()->clearRouteCache();
     decoder_filters_[0]->callbacks_->clusterInfo();
   }
 

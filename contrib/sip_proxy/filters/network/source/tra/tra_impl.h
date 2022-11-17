@@ -98,8 +98,7 @@ private:
   void sendRequest(
       const std::string& method,
       envoy::extensions::filters::network::sip_proxy::tra::v3alpha::TraServiceRequest& request,
-      absl::optional<TraContextMap> context, Tracing::Span& parent_span,
-      const StreamInfo::StreamInfo& stream_info);
+      Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info);
 
 private:
   class AsyncRequestCallbacks

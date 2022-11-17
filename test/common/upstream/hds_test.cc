@@ -63,6 +63,7 @@ protected:
         async_client_(new Grpc::MockAsyncClient()),
         api_(Api::createApiForTest(stats_store_, random_)),
         ssl_context_manager_(api_->timeSource()) {
+    ON_CALL(server_context_, api()).WillByDefault(ReturnRef(*api_));
     node_.set_id("hds-node");
   }
 
@@ -78,13 +79,14 @@ protected:
   // Creates an HdsDelegate
   void createHdsDelegate() {
     InSequence s;
-    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
-      retry_timer_cb_ = timer_cb;
-      return retry_timer_;
-    }));
+    EXPECT_CALL(server_context_.dispatcher_, createTimer_(_))
+        .WillOnce(Invoke([this](Event::TimerCb timer_cb) {
+          retry_timer_cb_ = timer_cb;
+          return retry_timer_;
+        }));
     // First call will set up the response timer for assertions, all other future calls
     // just return a new timer that we won't keep track of.
-    EXPECT_CALL(dispatcher_, createTimer_(_))
+    EXPECT_CALL(server_context_.dispatcher_, createTimer_(_))
         .Times(AtLeast(1))
         .WillOnce(Invoke([this](Event::TimerCb timer_cb) {
           server_response_timer_cb_ = timer_cb;
@@ -93,14 +95,13 @@ protected:
         .WillRepeatedly(testing::ReturnNew<NiceMock<Event::MockTimer>>());
 
     hds_delegate_ = std::make_unique<HdsDelegate>(
-        server_context_, stats_store_, Grpc::RawAsyncClientPtr(async_client_), dispatcher_,
-        runtime_, stats_store_, ssl_context_manager_, test_factory_, log_manager_, cm_, local_info_,
-        admin_, singleton_manager_, tls_, validation_visitor_, *api_, options_);
+        server_context_, stats_store_, Grpc::RawAsyncClientPtr(async_client_), stats_store_,
+        ssl_context_manager_, test_factory_);
   }
 
   void expectCreateClientConnection() {
     // Create a new mock connection for each call to createClientConnection.
-    EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
+    EXPECT_CALL(server_context_.dispatcher_, createClientConnection_(_, _, _, _))
         .WillRepeatedly(Invoke(
             [](Network::Address::InstanceConstSharedPtr, Network::Address::InstanceConstSharedPtr,
                Network::TransportSocketPtr&, const Network::ConnectionSocket::OptionsSharedPtr&) {
@@ -152,7 +153,8 @@ protected:
   // Creates a HealthCheckSpecifier message that contains several clusters, endpoints, localities,
   // with only one health check type.
   std::unique_ptr<envoy::service::health::v3::HealthCheckSpecifier>
-  createComplexSpecifier(uint32_t n_clusters, uint32_t n_localities, uint32_t n_endpoints) {
+  createComplexSpecifier(uint32_t n_clusters, uint32_t n_localities, uint32_t n_endpoints,
+                         bool disable_hc = false) {
     // Final specifier to return.
     std::unique_ptr<envoy::service::health::v3::HealthCheckSpecifier> msg =
         std::make_unique<envoy::service::health::v3::HealthCheckSpecifier>();
@@ -187,11 +189,13 @@ protected:
 
         // add some endpoints to the locality group with iterative naming for verification.
         for (uint32_t endpoint_num = 0; endpoint_num < n_endpoints; endpoint_num++) {
-          auto* socket_address =
-              locality_endpoints->add_endpoints()->mutable_address()->mutable_socket_address();
+          auto* endpoint = locality_endpoints->add_endpoints();
+
+          auto* socket_address = endpoint->mutable_address()->mutable_socket_address();
           socket_address->set_address(
               absl::StrCat("127.", cluster_num, ".", loc_num, ".", endpoint_num));
           socket_address->set_port_value(1234);
+          endpoint->mutable_health_check_config()->set_disable_active_health_check(disable_hc);
         }
       }
     }
@@ -232,7 +236,6 @@ transport_socket_match_criteria:
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   Event::SimulatedTimeSystem time_system_;
   envoy::config::core::v3::Node node_;
-  Event::MockDispatcher dispatcher_;
   Stats::IsolatedStoreImpl stats_store_;
   MockClusterInfoFactory test_factory_;
 
@@ -249,19 +252,9 @@ transport_socket_match_criteria:
   std::unique_ptr<envoy::service::health::v3::HealthCheckSpecifier> message;
   Grpc::MockAsyncStream async_stream_;
   Grpc::MockAsyncClient* async_client_;
-  Runtime::MockLoader runtime_;
-  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
   Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager_;
   NiceMock<Random::MockRandomGenerator> random_;
-  NiceMock<Envoy::AccessLog::MockAccessLogManager> log_manager_;
-  NiceMock<Upstream::MockClusterManager> cm_;
-  NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  NiceMock<Server::MockAdmin> admin_;
-  Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
-  NiceMock<ThreadLocal::MockInstance> tls_;
-  Server::MockOptions options_;
-  NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
 };
 
 // Test that HdsDelegate builds and sends initial message correctly
@@ -273,7 +266,7 @@ TEST_F(HdsTest, HealthCheckRequest) {
   request.mutable_health_check_request()->mutable_capability()->add_health_check_protocols(
       envoy::service::health::v3::Capability::TCP);
 
-  EXPECT_CALL(local_info_, node()).WillOnce(ReturnRef(node_));
+  EXPECT_CALL(server_context_.local_info_, node()).WillOnce(ReturnRef(node_));
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessageRaw_(Grpc::ProtoBufferEq(request), false));
   createHdsDelegate();
@@ -423,12 +416,13 @@ TEST_F(HdsTest, TestProcessMessageMissingFieldsWithFallback) {
   message.reset(createSimpleMessage());
 
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
-  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillRepeatedly(Return(connection));
+  EXPECT_CALL(server_context_.dispatcher_, createClientConnection_(_, _, _, _))
+      .WillRepeatedly(Return(connection));
   EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(2);
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
   EXPECT_CALL(test_factory_, createClusterInfo(_)).WillOnce(Return(cluster_info_));
   EXPECT_CALL(*connection, setBufferLimits(_));
-  EXPECT_CALL(dispatcher_, deferredDelete_(_));
+  EXPECT_CALL(server_context_.dispatcher_, deferredDelete_(_));
   // Process message
   hds_delegate_->onReceiveMessage(std::move(message));
   connection->raiseEvent(Network::ConnectionEvent::Connected);
@@ -505,7 +499,8 @@ TEST_F(HdsTest, TestSendResponseMultipleEndpoints) {
         cluster_info->name_ = params.cluster_.name();
         return cluster_info;
       }));
-  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(NumClusters * NumLocalities * NumEndpoints);
+  EXPECT_CALL(server_context_.dispatcher_, deferredDelete_(_))
+      .Times(NumClusters * NumLocalities * NumEndpoints);
 
   // Process message
   hds_delegate_->onReceiveMessage(std::move(message));
@@ -574,7 +569,8 @@ TEST_F(HdsTest, TestSocketContext) {
   addTransportSocketMatches(message->mutable_cluster_health_checks(0), "test_match", "test_match");
 
   Network::MockClientConnection* connection = new NiceMock<Network::MockClientConnection>();
-  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillRepeatedly(Return(connection));
+  EXPECT_CALL(server_context_.dispatcher_, createClientConnection_(_, _, _, _))
+      .WillRepeatedly(Return(connection));
 
   // Pull out socket_matcher object normally internal to createClusterInfo, to test that a matcher
   // would match the expected socket.
@@ -585,10 +581,9 @@ TEST_F(HdsTest, TestSocketContext) {
         Envoy::Stats::ScopeSharedPtr scope =
             params.stats_.createScope(fmt::format("cluster.{}.", params.cluster_.name()));
         Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-            params.admin_, params.ssl_context_manager_, *scope, params.cm_, params.local_info_,
-            params.dispatcher_, params.stats_, params.singleton_manager_, params.tls_,
-            params.validation_visitor_, params.server_context_.api(), params.options_,
-            params.access_log_manager_);
+            params.server_context_, params.ssl_context_manager_, *scope,
+            params.server_context_.clusterManager(), params.stats_,
+            params.server_context_.messageValidationVisitor());
 
         // Create a mock socket_factory for the scope of this unit test.
         std::unique_ptr<Envoy::Network::UpstreamTransportSocketFactory> socket_factory =
@@ -603,7 +598,7 @@ TEST_F(HdsTest, TestSocketContext) {
       }));
 
   EXPECT_CALL(*connection, setBufferLimits(_));
-  EXPECT_CALL(dispatcher_, deferredDelete_(_));
+  EXPECT_CALL(server_context_.dispatcher_, deferredDelete_(_));
 
   // Process message.
   EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(AtLeast(1));
@@ -701,12 +696,13 @@ TEST_F(HdsTest, TestSendResponseOneEndpointTimeout) {
   message.reset(createSimpleMessage());
 
   Network::MockClientConnection* connection_ = new NiceMock<Network::MockClientConnection>();
-  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillRepeatedly(Return(connection_));
+  EXPECT_CALL(server_context_.dispatcher_, createClientConnection_(_, _, _, _))
+      .WillRepeatedly(Return(connection_));
   EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(2);
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
   EXPECT_CALL(test_factory_, createClusterInfo(_)).WillOnce(Return(cluster_info_));
   EXPECT_CALL(*connection_, setBufferLimits(_));
-  EXPECT_CALL(dispatcher_, deferredDelete_(_));
+  EXPECT_CALL(server_context_.dispatcher_, deferredDelete_(_));
   // Process message
   hds_delegate_->onReceiveMessage(std::move(message));
   connection_->raiseEvent(Network::ConnectionEvent::Connected);
@@ -749,7 +745,7 @@ TEST_F(HdsTest, TestSameSpecifier) {
   EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(AtLeast(1));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
   EXPECT_CALL(test_factory_, createClusterInfo(_)).WillRepeatedly(Return(cluster_info_));
-  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
+  EXPECT_CALL(server_context_.dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
   hds_delegate_->onReceiveMessage(std::move(message));
   hds_delegate_->sendResponse();
 
@@ -784,7 +780,7 @@ TEST_F(HdsTest, TestClusterChange) {
   EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(AtLeast(1));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
   EXPECT_CALL(test_factory_, createClusterInfo(_)).WillRepeatedly(Return(cluster_info_));
-  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
+  EXPECT_CALL(server_context_.dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
   // Process message
   hds_delegate_->onReceiveMessage(std::move(message));
   hds_delegate_->sendResponse();
@@ -849,7 +845,7 @@ TEST_F(HdsTest, TestUpdateEndpoints) {
   EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(AtLeast(1));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
   EXPECT_CALL(test_factory_, createClusterInfo(_)).WillRepeatedly(Return(cluster_info_));
-  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
+  EXPECT_CALL(server_context_.dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
   // Process message
   hds_delegate_->onReceiveMessage(std::move(message));
   hds_delegate_->sendResponse();
@@ -900,6 +896,42 @@ TEST_F(HdsTest, TestUpdateEndpoints) {
   checkHdsCounters(3, 0, 0, 3);
 }
 
+// Skip the endpoints with disabled active health check during message processing.
+TEST_F(HdsTest, TestUpdateEndpointsWithActiveHCflag) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
+  createHdsDelegate();
+
+  // Create Message, and later add/remove endpoints from the second cluster.
+  message.reset(createSimpleMessage());
+  message->MergeFrom(*createComplexSpecifier(1, 1, 2));
+
+  // Create a new active connection on request, setting its status to connected
+  // to mock a found endpoint.
+  expectCreateClientConnection();
+
+  EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(AtLeast(1));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
+  EXPECT_CALL(test_factory_, createClusterInfo(_)).WillRepeatedly(Return(cluster_info_));
+  EXPECT_CALL(server_context_.dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
+  // Process message
+  hds_delegate_->onReceiveMessage(std::move(message));
+  hds_delegate_->sendResponse();
+
+  // Save list of hosts/endpoints for comparison later.
+  auto original_hosts = hds_delegate_->hdsClusters()[1]->hosts();
+  ASSERT_EQ(original_hosts.size(), 2);
+
+  // Ignoring the endpoints with disabled active health check.
+  message.reset(createSimpleMessage());
+  message->MergeFrom(*createComplexSpecifier(1, 1, 2, true));
+  hds_delegate_->onReceiveMessage(std::move(message));
+
+  // Get the new clusters list from HDS.
+  auto new_hosts = hds_delegate_->hdsClusters()[1]->hosts();
+  ASSERT_EQ(new_hosts.size(), 0);
+}
+
 // Test adding, reusing, and removing health checks.
 TEST_F(HdsTest, TestUpdateHealthCheckers) {
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
@@ -919,7 +951,7 @@ TEST_F(HdsTest, TestUpdateHealthCheckers) {
   EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(AtLeast(1));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
   EXPECT_CALL(test_factory_, createClusterInfo(_)).WillRepeatedly(Return(cluster_info_));
-  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
+  EXPECT_CALL(server_context_.dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
   // Process message
   hds_delegate_->onReceiveMessage(std::move(message));
   hds_delegate_->sendResponse();
@@ -973,7 +1005,7 @@ TEST_F(HdsTest, TestClusterSameName) {
   EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(AtLeast(1));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
   EXPECT_CALL(test_factory_, createClusterInfo(_)).WillRepeatedly(Return(cluster_info_));
-  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
+  EXPECT_CALL(server_context_.dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
   // Process message
   hds_delegate_->onReceiveMessage(std::move(message));
   hds_delegate_->sendResponse();
@@ -1038,10 +1070,9 @@ TEST_F(HdsTest, TestUpdateSocketContext) {
         Envoy::Stats::ScopeSharedPtr scope =
             params.stats_.createScope(fmt::format("cluster.{}.", params.cluster_.name()));
         Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-            params.admin_, params.ssl_context_manager_, *scope, params.cm_, params.local_info_,
-            params.dispatcher_, params.stats_, params.singleton_manager_, params.tls_,
-            params.validation_visitor_, params.server_context_.api(), params.options_,
-            params.access_log_manager_);
+            params.server_context_, params.ssl_context_manager_, *scope,
+            params.server_context_.clusterManager(), params.stats_,
+            params.server_context_.messageValidationVisitor());
 
         // Create a mock socket_factory for the scope of this unit test.
         std::unique_ptr<Envoy::Network::UpstreamTransportSocketFactory> socket_factory =
@@ -1054,7 +1085,7 @@ TEST_F(HdsTest, TestUpdateSocketContext) {
         // But still use the fake cluster_info_.
         return cluster_info_;
       }));
-  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
+  EXPECT_CALL(server_context_.dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
   EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(AtLeast(1));
 
   // Create Message, with a non-valid match and process.

@@ -27,6 +27,28 @@ using testing::Return;
 
 namespace Envoy {
 namespace Http {
+namespace {
+
+void sendLocalReplyTestHelper(const bool& is_reset, StreamDecoderFilterCallbacks& callbacks,
+                              const Utility::LocalReplyData& local_reply_data) {
+  absl::string_view details;
+  if (callbacks.streamInfo().responseCodeDetails().has_value()) {
+    details = callbacks.streamInfo().responseCodeDetails().value();
+  };
+
+  Utility::sendLocalReply(
+      is_reset,
+      Utility::EncodeFunctions{nullptr, nullptr,
+                               [&](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
+                                 callbacks.encodeHeaders(std::move(headers), end_stream, details);
+                               },
+                               [&](Buffer::Instance& data, bool end_stream) -> void {
+                                 callbacks.encodeData(data, end_stream);
+                               }},
+      local_reply_data);
+}
+
+} // namespace
 
 TEST(HttpUtility, parseQueryString) {
   EXPECT_EQ(Utility::QueryParams(), Utility::parseQueryString("/hello"));
@@ -39,6 +61,10 @@ TEST(HttpUtility, parseQueryString) {
   EXPECT_EQ(Utility::QueryParams({{"hello", ""}}),
             Utility::parseAndDecodeQueryString("/hello?hello"));
 
+  EXPECT_EQ(Utility::QueryParams({{"hello%26", ""}}), Utility::parseQueryString("/hello?hello%26"));
+  EXPECT_EQ(Utility::QueryParams({{"hello&", ""}}),
+            Utility::parseAndDecodeQueryString("/hello?hello%26"));
+
   EXPECT_EQ(Utility::QueryParams({{"hello", "world"}}),
             Utility::parseQueryString("/hello?hello=world"));
   EXPECT_EQ(Utility::QueryParams({{"hello", "world"}}),
@@ -48,9 +74,19 @@ TEST(HttpUtility, parseQueryString) {
   EXPECT_EQ(Utility::QueryParams({{"hello", ""}}),
             Utility::parseAndDecodeQueryString("/hello?hello="));
 
+  EXPECT_EQ(Utility::QueryParams({{"hello%26", ""}}),
+            Utility::parseQueryString("/hello?hello%26="));
+  EXPECT_EQ(Utility::QueryParams({{"hello&", ""}}),
+            Utility::parseAndDecodeQueryString("/hello?hello%26="));
+
   EXPECT_EQ(Utility::QueryParams({{"hello", ""}}), Utility::parseQueryString("/hello?hello=&"));
   EXPECT_EQ(Utility::QueryParams({{"hello", ""}}),
             Utility::parseAndDecodeQueryString("/hello?hello=&"));
+
+  EXPECT_EQ(Utility::QueryParams({{"hello%26", ""}}),
+            Utility::parseQueryString("/hello?hello%26=&"));
+  EXPECT_EQ(Utility::QueryParams({{"hello&", ""}}),
+            Utility::parseAndDecodeQueryString("/hello?hello%26=&"));
 
   EXPECT_EQ(Utility::QueryParams({{"hello", ""}, {"hello2", "world2"}}),
             Utility::parseQueryString("/hello?hello=&hello2=world2"));
@@ -71,6 +107,11 @@ TEST(HttpUtility, parseQueryString) {
             Utility::parseQueryString("/hello?params_has_encoded_%26=a%26b&ok=1"));
   EXPECT_EQ(Utility::QueryParams({{"params_has_encoded_&", "a&b"}, {"ok", "1"}}),
             Utility::parseAndDecodeQueryString("/hello?params_has_encoded_%26=a%26b&ok=1"));
+
+  EXPECT_EQ(Utility::QueryParams({{"params_%xy_%%yz", "%xy%%yz"}}),
+            Utility::parseQueryString("/hello?params_%xy_%%yz=%xy%%yz"));
+  EXPECT_EQ(Utility::QueryParams({{"params_%xy_%%yz", "%xy%%yz"}}),
+            Utility::parseAndDecodeQueryString("/hello?params_%xy_%%yz=%xy%%yz"));
 
   // A sample of request path with query strings by Prometheus:
   // https://github.com/envoyproxy/envoy/issues/10926#issuecomment-651085261.
@@ -824,7 +865,7 @@ TEST(HttpUtility, SendLocalReply) {
   EXPECT_CALL(callbacks, encodeHeaders_(_, false));
   EXPECT_CALL(callbacks, encodeData(_, true));
   EXPECT_CALL(callbacks, streamInfo());
-  Utility::sendLocalReply(
+  sendLocalReplyTestHelper(
       is_reset, callbacks,
       Utility::LocalReplyData{false, Http::Code::PayloadTooLarge, "large", absl::nullopt, false});
 }
@@ -843,7 +884,7 @@ TEST(HttpUtility, SendLocalGrpcReply) {
         EXPECT_NE(headers.GrpcMessage(), nullptr);
         EXPECT_EQ(headers.getGrpcMessageValue(), "large");
       }));
-  Utility::sendLocalReply(
+  sendLocalReplyTestHelper(
       is_reset, callbacks,
       Utility::LocalReplyData{true, Http::Code::PayloadTooLarge, "large", absl::nullopt, false});
 }
@@ -862,7 +903,7 @@ TEST(HttpUtility, SendLocalGrpcReplyGrpcStatusAlreadyExists) {
         EXPECT_NE(headers.GrpcMessage(), nullptr);
         EXPECT_EQ(headers.getGrpcMessageValue(), "large");
       }));
-  Utility::sendLocalReply(
+  sendLocalReplyTestHelper(
       is_reset, callbacks,
       Utility::LocalReplyData{true, Http::Code::PayloadTooLarge, "large",
                               Grpc::Status::WellKnownGrpcStatus::InvalidArgument, false});
@@ -921,7 +962,7 @@ TEST(HttpUtility, SendLocalGrpcReplyWithUpstreamJsonPayload) {
         const auto& encoded = Utility::PercentEncoding::encode(json);
         EXPECT_EQ(headers.getGrpcMessageValue(), encoded);
       }));
-  Utility::sendLocalReply(
+  sendLocalReplyTestHelper(
       is_reset, callbacks,
       Utility::LocalReplyData{true, Http::Code::Unauthorized, json, absl::nullopt, false});
 }
@@ -936,7 +977,7 @@ TEST(HttpUtility, RateLimitedGrpcStatus) {
         EXPECT_EQ(headers.getGrpcStatusValue(),
                   std::to_string(enumToInt(Grpc::Status::WellKnownGrpcStatus::Unavailable)));
       }));
-  Utility::sendLocalReply(
+  sendLocalReplyTestHelper(
       false, callbacks,
       Utility::LocalReplyData{true, Http::Code::TooManyRequests, "", absl::nullopt, false});
 
@@ -946,7 +987,7 @@ TEST(HttpUtility, RateLimitedGrpcStatus) {
         EXPECT_EQ(headers.getGrpcStatusValue(),
                   std::to_string(enumToInt(Grpc::Status::WellKnownGrpcStatus::ResourceExhausted)));
       }));
-  Utility::sendLocalReply(
+  sendLocalReplyTestHelper(
       false, callbacks,
       Utility::LocalReplyData{true, Http::Code::TooManyRequests, "",
                               absl::make_optional<Grpc::Status::GrpcStatus>(
@@ -963,7 +1004,7 @@ TEST(HttpUtility, SendLocalReplyDestroyedEarly) {
     is_reset = true;
   }));
   EXPECT_CALL(callbacks, encodeData(_, true)).Times(0);
-  Utility::sendLocalReply(
+  sendLocalReplyTestHelper(
       is_reset, callbacks,
       Utility::LocalReplyData{false, Http::Code::PayloadTooLarge, "large", absl::nullopt, false});
 }
@@ -976,7 +1017,7 @@ TEST(HttpUtility, SendLocalReplyHeadRequest) {
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ(headers.getContentLengthValue(), fmt::format("{}", strlen("large")));
       }));
-  Utility::sendLocalReply(
+  sendLocalReplyTestHelper(
       is_reset, callbacks,
       Utility::LocalReplyData{false, Http::Code::PayloadTooLarge, "large", absl::nullopt, true});
 }
@@ -1614,6 +1655,7 @@ TEST(PercentEncoding, Encoding) {
   EXPECT_EQ(Utility::PercentEncoding::encode("too%large"), "too%25large");
   EXPECT_EQ(Utility::PercentEncoding::encode("too%!large/"), "too%25!large/");
   EXPECT_EQ(Utility::PercentEncoding::encode("too%!large/", "%!/"), "too%25%21large%2F");
+  EXPECT_EQ(Utility::PercentEncoding::encode("São Paulo"), "S%C3%A3o Paulo");
 }
 
 TEST(CheckRequiredHeaders, Request) {

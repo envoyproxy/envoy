@@ -28,6 +28,7 @@ public:
     const std::string dns_start = "envoy.dynamic_forward_proxy.dns_start_ms";
     const std::string dns_end = "envoy.dynamic_forward_proxy.dns_end_ms";
     StreamInfo::StreamInfo& stream_info = decoder_callbacks_->streamInfo();
+    const StreamInfo::StreamInfo& conn_stream_info = decoder_callbacks_->connection()->streamInfo();
 
     if (stream_info.downstreamTiming().getValue(dns_start).has_value()) {
       headers.addCopy(Http::LowerCaseString("dns_start"),
@@ -37,11 +38,22 @@ public:
       headers.addCopy(Http::LowerCaseString("dns_end"),
                       toUsec(stream_info.downstreamTiming().getValue(dns_end).value()));
     }
+    if (conn_stream_info.downstreamTiming().has_value() &&
+        conn_stream_info.downstreamTiming()->downstreamHandshakeComplete().has_value()) {
+      headers.addCopy(
+          Http::LowerCaseString("downstream_handshake_complete"),
+          toUsec(conn_stream_info.downstreamTiming()->downstreamHandshakeComplete().value()));
+    }
     if (decoder_callbacks_->streamInfo().upstreamInfo()) {
       if (decoder_callbacks_->streamInfo().upstreamInfo()->upstreamSslConnection()) {
         headers.addCopy(
             Http::LowerCaseString("alpn"),
             decoder_callbacks_->streamInfo().upstreamInfo()->upstreamSslConnection()->alpn());
+      }
+      if (decoder_callbacks_->streamInfo().upstreamInfo()->upstreamRemoteAddress()) {
+        headers.addCopy(
+            Http::LowerCaseString("remote_address"),
+            decoder_callbacks_->streamInfo().upstreamInfo()->upstreamRemoteAddress()->asString());
       }
 
       headers.addCopy(Http::LowerCaseString("num_streams"),
