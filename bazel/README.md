@@ -700,6 +700,7 @@ The following optional features can be disabled on the Bazel build command-line:
 * http3/quic with --//bazel:http3=False
 * autolinking libraries with --define=library_autolink=disabled
 * admin HTML home page with `--define=admin_html=disabled`
+* admin functionality with `--define=admin_functionality=disabled`
 
 ## Enabling optional features
 

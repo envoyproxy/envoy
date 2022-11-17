@@ -54,10 +54,11 @@ public:
 class TestZoneAwareLoadBalancer : public ZoneAwareLoadBalancerBase {
 public:
   TestZoneAwareLoadBalancer(
-      const PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
+      const PrioritySet& priority_set, ClusterLbStats& lb_stats, Runtime::Loader& runtime,
       Random::RandomGenerator& random,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
-      : ZoneAwareLoadBalancerBase(priority_set, nullptr, stats, runtime, random, common_config) {}
+      : ZoneAwareLoadBalancerBase(priority_set, nullptr, lb_stats, runtime, random, common_config) {
+  }
   void runInvalidLocalitySourceType() {
     localitySourceType(static_cast<LoadBalancerBase::HostAvailability>(123));
   }
@@ -76,14 +77,13 @@ protected:
   MockHostSet& hostSet() { return GetParam() ? host_set_ : failover_host_set_; }
 
   LoadBalancerTestBase()
-      : stat_names_(stats_store_.symbolTable()),
-        stats_(ClusterInfoImpl::generateStats(stats_store_, stat_names_)) {
+      : stat_names_(stats_store_.symbolTable()), stats_(stat_names_, stats_store_) {
     least_request_lb_config_.mutable_choice_count()->set_value(2);
   }
 
   Stats::IsolatedStoreImpl stats_store_;
-  ClusterStatNames stat_names_;
-  ClusterStats stats_;
+  ClusterLbStatNames stat_names_;
+  ClusterLbStats stats_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<MockPrioritySet> priority_set_;
@@ -97,10 +97,10 @@ protected:
 
 class TestLb : public LoadBalancerBase {
 public:
-  TestLb(const PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
+  TestLb(const PrioritySet& priority_set, ClusterLbStats& lb_stats, Runtime::Loader& runtime,
          Random::RandomGenerator& random,
          const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
-      : LoadBalancerBase(priority_set, stats, runtime, random, common_config) {}
+      : LoadBalancerBase(priority_set, lb_stats, runtime, random, common_config) {}
   using LoadBalancerBase::chooseHostSet;
   using LoadBalancerBase::isInPanic;
   using LoadBalancerBase::percentageDegradedLoad;
@@ -581,10 +581,11 @@ TEST_P(LoadBalancerBaseTest, BoundaryConditions) {
 
 class TestZoneAwareLb : public ZoneAwareLoadBalancerBase {
 public:
-  TestZoneAwareLb(const PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
-                  Random::RandomGenerator& random,
+  TestZoneAwareLb(const PrioritySet& priority_set, ClusterLbStats& lb_stats,
+                  Runtime::Loader& runtime, Random::RandomGenerator& random,
                   const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
-      : ZoneAwareLoadBalancerBase(priority_set, nullptr, stats, runtime, random, common_config) {}
+      : ZoneAwareLoadBalancerBase(priority_set, nullptr, lb_stats, runtime, random, common_config) {
+  }
 
   HostConstSharedPtr chooseHostOnce(LoadBalancerContext*) override {
     return choose_host_once_host_;
@@ -1959,14 +1960,12 @@ TEST_P(LeastRequestLoadBalancerTest, SingleHost) {
   // Host weight is 1.
   {
     EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(2)).WillOnce(Return(3));
-    stats_.max_host_weight_.set(1UL);
     EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
   }
 
   // Host weight is 100.
   {
     EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(2)).WillOnce(Return(3));
-    stats_.max_host_weight_.set(100UL);
     EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
   }
 
@@ -1991,7 +1990,6 @@ TEST_P(LeastRequestLoadBalancerTest, SingleHost) {
 TEST_P(LeastRequestLoadBalancerTest, Normal) {
   hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
                               makeTestHost(info_, "tcp://127.0.0.1:81", simTime())};
-  stats_.max_host_weight_.set(1UL);
   hostSet().hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
 
@@ -2011,7 +2009,6 @@ TEST_P(LeastRequestLoadBalancerTest, PNC) {
                               makeTestHost(info_, "tcp://127.0.0.1:81", simTime()),
                               makeTestHost(info_, "tcp://127.0.0.1:82", simTime()),
                               makeTestHost(info_, "tcp://127.0.0.1:83", simTime())};
-  stats_.max_host_weight_.set(1UL);
   hostSet().hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
 
@@ -2058,7 +2055,6 @@ TEST_P(LeastRequestLoadBalancerTest, PNC) {
 TEST_P(LeastRequestLoadBalancerTest, WeightImbalance) {
   hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), 1),
                               makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), 2)};
-  stats_.max_host_weight_.set(2UL);
 
   hostSet().hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
@@ -2183,7 +2179,6 @@ TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceWithCustomActiveRequestBias)
 TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceCallbacks) {
   hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), 1),
                               makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), 2)};
-  stats_.max_host_weight_.set(2UL);
 
   hostSet().hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
