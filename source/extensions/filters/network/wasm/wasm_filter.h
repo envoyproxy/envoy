@@ -28,17 +28,22 @@ public:
 
   std::shared_ptr<Context> createFilter() {
     Wasm* wasm = nullptr;
+    if (!tls_slot_->currentThreadRegistered()) {
+      return nullptr;
+    }
     PluginHandleSharedPtr handle = tls_slot_->get()->handle();
+    if (!handle) {
+      return nullptr;
+    }
     if (handle->wasmHandle()) {
       wasm = handle->wasmHandle()->wasm().get();
     }
     if (!wasm || wasm->isFailed()) {
       if (handle->plugin()->fail_open_) {
-        // Fail open skips adding this filter to callbacks.
-        return nullptr;
+        return nullptr; // Fail open skips adding this filter to callbacks.
       } else {
-        // Fail closed is handled by an empty Context.
-        return std::make_shared<Context>(nullptr, 0, handle);
+        return std::make_shared<Context>(nullptr, 0,
+                                         handle); // Fail closed is handled by an empty Context.
       }
     }
     return std::make_shared<Context>(wasm, handle->rootContextId(), handle);
