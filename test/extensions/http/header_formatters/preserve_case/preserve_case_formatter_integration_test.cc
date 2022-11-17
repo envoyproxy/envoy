@@ -1,5 +1,7 @@
 #include "envoy/extensions/http/header_formatters/preserve_case/v3/preserve_case.pb.h"
 
+#include "source/extensions/filters/http/common/pass_through_filter.h"
+
 #include "test/integration/filters/common.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/registry.h"

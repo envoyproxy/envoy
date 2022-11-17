@@ -1,4 +1,4 @@
-load("//bazel:envoy_build_system.bzl", "envoy_package")
+load("//bazel:envoy_build_system.bzl", "envoy_cc_test", "envoy_package")
 load(
     "//test/extensions:extensions_build_system.bzl",
     "envoy_extension_cc_test",
@@ -24,5 +24,13 @@ envoy_extension_cc_test(
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "cache_file_fixed_block_test",
+    srcs = ["cache_file_fixed_block_test.cc"],
+    deps = [
+        "//source/extensions/http/cache/file_system_http_cache:cache_file_fixed_block",
     ],
 )

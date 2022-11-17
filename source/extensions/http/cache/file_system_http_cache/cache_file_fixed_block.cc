@@ -10,69 +10,57 @@ namespace Cache {
 namespace FileSystemHttpCache {
 
 namespace {
-uint64_t ntohl64(uint64_t n) {
-#if defined(ABSL_IS_LITTLE_ENDIAN)
-  // in-place byte order swap for a uint64.
-  // Optimization in clang or gcc can recognize this as a single `bswap` instruction.
-  n = ((n & 0xFF00000000000000u) >> 56u) | ((n & 0x00FF000000000000u) >> 40u) |
-      ((n & 0x0000FF0000000000u) >> 24u) | ((n & 0x000000FF00000000u) >> 8u) |
-      ((n & 0x00000000FF000000u) << 8u) | ((n & 0x0000000000FF0000u) << 24u) |
-      ((n & 0x000000000000FF00u) << 40u) | ((n & 0x00000000000000FFu) << 56u);
-#endif
-  return n;
-}
-uint64_t htonl64(uint64_t n) { return ntohl64(n); }
-
-uint32_t ntohl32(uint32_t n) {
-#if defined(ABSL_IS_LITTLE_ENDIAN)
-  // in-place byte order swap for a uint32.
-  // Optimization in clang or gcc can recognize this as a single `bswap` instruction.
-  n = ((n & 0xFF000000u) >> 24u) | ((n & 0x00FF0000u) >> 8u) | ((n & 0x0000FF00u) << 8u) |
-      ((n & 0x000000FFu) << 24u);
-#endif
-  return n;
-}
-uint64_t htonl32(uint32_t n) { return ntohl32(n); }
-
-// The expected first four bytes of the header - if fileId() doesn't match expectedFileId
+// The expected first four bytes of the header - if fileId() doesn't match ExpectedFileId
 // then the file is not a cache file and should be removed from the cache.
 // Beginning of file should be "CACH".
-constexpr uint32_t expectedFileId = (static_cast<uint32_t>('C') << 24) +
-                                    (static_cast<uint32_t>('A') << 16) +
-                                    (static_cast<uint32_t>('C') << 8) + static_cast<uint32_t>('H');
+constexpr std::array<char, 4> ExpectedFileId = {'C', 'A', 'C', 'H'};
 
 // The expected next four bytes of the header - if cacheVersionId() doesn't match
-// expectedCacheVersionId then the file is from an incompatible cache version and should
+// ExpectedCacheVersionId then the file is from an incompatible cache version and should
 // be removed from the cache.
 // Next 4 bytes of file should be "0000".
-// Increment this to invalidate old cache files if the format changes.
-// Formatted string-style rather than as an actual int to make it easily human-readable.
-constexpr uint32_t expectedCacheVersionId =
-    (static_cast<uint32_t>('0') << 24) + (static_cast<uint32_t>('0') << 16) +
-    (static_cast<uint32_t>('0') << 8) + static_cast<uint32_t>('0');
+constexpr std::array<char, 4> ExpectedCacheVersionId = {'0', '0', '0', '0'};
 
 } // namespace
 
-CacheFileFixedBlock::CacheFileFixedBlock() {
-  setFileId(expectedFileId);
-  setCacheVersionId(expectedCacheVersionId);
-  setHeadersSize(0);
-  setTrailersSize(0);
-  setBodySize(0);
-}
+CacheFileFixedBlock::CacheFileFixedBlock()
+    : file_id_(ExpectedFileId), cache_version_id_(ExpectedCacheVersionId), header_size_(0),
+      trailer_size_(0), body_size_(0) {}
 
 void CacheFileFixedBlock::populateFromStringView(absl::string_view s) {
-  ASSERT(s.size() == size());
-  safeMemcpyUnsafeSrc(&contents_, s.begin());
+  // The string view should be the size of the buffer, and
+  // Since we're explicitly reading byte offsets here, the size should match
+  // what we read.
+  // (This will remind us to change this function if we change the size
+  // and vice-versa!)
+  ASSERT(s.size() == size() && size() == 24);
+  // Serialize the values from the string_view s into the member values.
+  std::copy(s.begin(), s.begin() + 4, file_id_.begin());
+  std::copy(s.begin() + 4, s.begin() + 8, cache_version_id_.begin());
+  header_size_ = absl::big_endian::Load32(&s[8]);
+  trailer_size_ = absl::big_endian::Load32(&s[12]);
+  body_size_ = absl::big_endian::Load64(&s[16]);
 }
 
-uint32_t CacheFileFixedBlock::getUint32(const uint32_t& t) const { return ntohl32(t); }
-uint64_t CacheFileFixedBlock::getUint64(const uint64_t& t) const { return ntohl64(t); }
-void CacheFileFixedBlock::setUint32(uint32_t& t, uint32_t v) { t = htonl32(v); }
-void CacheFileFixedBlock::setUint64(uint64_t& t, uint64_t v) { t = htonl64(v); }
+void CacheFileFixedBlock::serializeToBuffer(Buffer::Instance& buffer) {
+  char b[size()];
+  // Since we're explicitly writing byte offsets here, the size should match
+  // what we write.
+  // (This will remind us to change this function if we change the size
+  // and vice-versa!)
+  ASSERT(size() == 24);
+  // Serialize the values from the member values into the stack buffer b.
+  std::copy(file_id_.begin(), file_id_.end(), &b[0]);
+  std::copy(cache_version_id_.begin(), cache_version_id_.end(), &b[4]);
+  absl::big_endian::Store32(&b[8], header_size_);
+  absl::big_endian::Store32(&b[12], trailer_size_);
+  absl::big_endian::Store64(&b[16], body_size_);
+  // Append that buffer into the target buffer object.
+  buffer.add(absl::string_view{b, size()});
+}
 
 bool CacheFileFixedBlock::isValid() const {
-  return fileId() == expectedFileId && cacheVersionId() == expectedCacheVersionId;
+  return fileId() == ExpectedFileId && cacheVersionId() == ExpectedCacheVersionId;
 }
 
 } // namespace FileSystemHttpCache

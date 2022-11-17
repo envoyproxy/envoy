@@ -27,10 +27,26 @@ CodecFactoryPtr FilterConfig::codecFactoryFromProto(
   return factory.createFactory(*message, context);
 }
 
-RouteMatcherPtr
-FilterConfig::routeMatcherFromProto(const RouteConfiguration& route_config,
-                                    Envoy::Server::Configuration::FactoryContext& context) {
-  return std::make_unique<RouteMatcherImpl>(route_config, context);
+Rds::RouteConfigProviderSharedPtr FilterConfig::routeConfigProviderFromProto(
+    const ProxyConfig& config, Server::Configuration::FactoryContext& context,
+    RouteConfigProviderManager& route_config_provider_manager) {
+  if (config.has_generic_rds()) {
+    if (config.generic_rds().config_source().config_source_specifier_case() ==
+        envoy::config::core::v3::ConfigSource::kApiConfigSource) {
+      const auto api_type = config.generic_rds().config_source().api_config_source().api_type();
+      if (api_type != envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC &&
+          api_type != envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC) {
+        throw EnvoyException("genericrds supports only aggregated api_type in api_config_source");
+      }
+    }
+
+    return route_config_provider_manager.createRdsRouteConfigProvider(
+        config.generic_rds(), context.getServerFactoryContext(), config.stat_prefix(),
+        context.initManager());
+  } else {
+    return route_config_provider_manager.createStaticRouteConfigProvider(
+        config.route_config(), context.getServerFactoryContext());
+  }
 }
 
 std::vector<NamedFilterFactoryCb> FilterConfig::filtersFactoryFromProto(
@@ -113,7 +129,7 @@ void ActiveStream::continueDecoding() {
   }
 
   if (cached_route_entry_ == nullptr) {
-    cached_route_entry_ = parent_.config_->route_matcher_->routeEntry(*downstream_request_stream_);
+    cached_route_entry_ = parent_.config_->routeEntry(*downstream_request_stream_);
   }
 
   ASSERT(downstream_request_stream_ != nullptr);
@@ -164,6 +180,13 @@ void ActiveStream::onEncodingSuccess(Buffer::Instance& buffer, bool close_connec
   parent_.connection().write(buffer, close_connection);
 }
 
+void ActiveStream::initializeFilterChain(FilterChainFactory& factory) {
+  factory.createFilterChain(*this);
+  // Reverse the encoder filter chain so that the first encoder filter is the last filter in the
+  // chain.
+  std::reverse(encoder_filters_.begin(), encoder_filters_.end());
+}
+
 Envoy::Network::FilterStatus Filter::onData(Envoy::Buffer::Instance& data, bool) {
   if (downstream_connection_closed_) {
     return Envoy::Network::FilterStatus::StopIteration;
@@ -189,8 +212,8 @@ void Filter::newDownstreamRequest(RequestPtr request) {
   auto raw_stream = stream.get();
   LinkedList::moveIntoList(std::move(stream), active_streams_);
 
-  config_->createFilterChain(*raw_stream);
-
+  // Initialize filter chian.
+  raw_stream->initializeFilterChain(*config_);
   // Start request.
   raw_stream->continueDecoding();
 }

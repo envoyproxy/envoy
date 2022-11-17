@@ -8,14 +8,17 @@
 #include "source/common/common/logger.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
+#include "source/common/json/json_loader.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/tracing/http_tracer_impl.h"
 
 #include "jwt_verify_lib/jwt.h"
+#include "jwt_verify_lib/struct_utils.h"
 #include "jwt_verify_lib/verify.h"
 
 using ::google::jwt_verify::CheckAudience;
 using ::google::jwt_verify::Status;
+using ::google::jwt_verify::StructUtils;
 
 namespace Envoy {
 namespace Extensions {
@@ -23,6 +26,18 @@ namespace HttpFilters {
 namespace JwtAuthn {
 namespace {
 
+// If the number is unsigned 64 bit integer, convert to string as integer,
+// otherwise, convert to string as double.
+static std::string convertClaimDoubleToString(double double_value) {
+  double int_part;
+  if (double_value < 0 ||
+      double_value >= static_cast<double>(std::numeric_limits<uint64_t>::max()) ||
+      modf(double_value, &int_part) != 0) {
+    return std::to_string(double_value);
+  }
+  const uint64_t int_claim_value = static_cast<uint64_t>(double_value);
+  return std::to_string(int_claim_value);
+}
 /**
  * Object to implement Authenticator interface.
  */
@@ -39,7 +54,6 @@ public:
         create_jwks_fetcher_cb_(create_jwks_fetcher_cb), check_audience_(check_audience),
         provider_(provider), is_allow_failed_(allow_failed), is_allow_missing_(allow_missing),
         time_source_(time_source) {}
-
   // Following functions are for JwksFetcher::JwksReceiver interface
   void onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) override;
   void onJwksError(Failure reason) override;
@@ -69,8 +83,12 @@ private:
   // finds one to verify with key.
   void startVerify();
 
+  // Copy the JWT Claim to HTTP Header
+  void addJWTClaimToHeader(const std::string& claim_name, const std::string& header_name);
+
   // The jwks cache object.
   JwksCache& jwks_cache_;
+
   // the cluster manager object.
   Upstream::ClusterManager& cm_;
 
@@ -270,6 +288,33 @@ void AuthenticatorImpl::verifyKey() {
   handleGoodJwt(/*cache_hit=*/false);
 }
 
+void AuthenticatorImpl::addJWTClaimToHeader(const std::string& claim_name,
+                                            const std::string& header_name) {
+  StructUtils payload_getter(jwt_->payload_pb_);
+  const ProtobufWkt::Value* claim_value;
+  const auto status = payload_getter.GetValue(claim_name, claim_value);
+  std::string str_claim_value;
+  if (status == StructUtils::OK) {
+    if (claim_value->kind_case() == Envoy::ProtobufWkt::Value::kStringValue) {
+      str_claim_value = claim_value->string_value();
+    } else if (claim_value->kind_case() == Envoy::ProtobufWkt::Value::kNumberValue) {
+      str_claim_value = convertClaimDoubleToString(claim_value->number_value());
+    } else if (claim_value->kind_case() == Envoy::ProtobufWkt::Value::kBoolValue) {
+      str_claim_value = claim_value->bool_value() ? "true" : "false";
+    } else {
+      ENVOY_LOG(
+          debug,
+          "--------claim : {} is not a primitive type of int, double, string, or bool -----------",
+          claim_name);
+    }
+    if (!str_claim_value.empty()) {
+      headers_->addCopy(Http::LowerCaseString(header_name), str_claim_value);
+      ENVOY_LOG(debug, "--------claim : {} with value : {} is added to the header : {} -----------",
+                claim_name, str_claim_value, header_name);
+    }
+  }
+}
+
 void AuthenticatorImpl::handleGoodJwt(bool cache_hit) {
   // Forward the payload
   const auto& provider = jwks_data_->getJwtProvider();
@@ -284,6 +329,11 @@ void AuthenticatorImpl::handleGoodJwt(bool cache_hit) {
       headers_->addCopy(Http::LowerCaseString(provider.forward_payload_header()),
                         jwt_->payload_str_base64url_);
     }
+  }
+
+  // Copy JWT claim to header
+  for (const auto& header_and_claim : provider.claim_to_headers()) {
+    addJWTClaimToHeader(header_and_claim.claim_name(), header_and_claim.header_name());
   }
 
   if (!provider.forward()) {

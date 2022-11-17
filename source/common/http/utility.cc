@@ -551,25 +551,6 @@ bool Utility::isWebSocketUpgradeRequest(const RequestHeaderMap& headers) {
                                  Http::Headers::get().UpgradeValues.WebSocket));
 }
 
-void Utility::sendLocalReply(const bool& is_reset, StreamDecoderFilterCallbacks& callbacks,
-                             const LocalReplyData& local_reply_data) {
-  absl::string_view details;
-  if (callbacks.streamInfo().responseCodeDetails().has_value()) {
-    details = callbacks.streamInfo().responseCodeDetails().value();
-  };
-
-  sendLocalReply(
-      is_reset,
-      Utility::EncodeFunctions{nullptr, nullptr,
-                               [&](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
-                                 callbacks.encodeHeaders(std::move(headers), end_stream, details);
-                               },
-                               [&](Buffer::Instance& data, bool end_stream) -> void {
-                                 callbacks.encodeData(data, end_stream);
-                               }},
-      local_reply_data);
-}
-
 void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode_functions,
                              const LocalReplyData& local_reply_data) {
   // encode_headers() may reset the stream, so the stream must not be reset before calling it.
@@ -1006,7 +987,7 @@ std::string Utility::PercentEncoding::encode(absl::string_view value, const size
     if (ch < ' ' || ch >= '~' || reserved_char_set.find(ch) != reserved_char_set.end()) {
       // For consistency, URI producers should use uppercase hexadecimal digits for all
       // percent-encodings. https://tools.ietf.org/html/rfc3986#section-2.1.
-      absl::StrAppend(&encoded, fmt::format("%{:02X}", ch));
+      absl::StrAppend(&encoded, fmt::format("%{:02X}", static_cast<const unsigned char&>(ch)));
     } else {
       encoded.push_back(ch);
     }
@@ -1135,13 +1116,10 @@ bool Utility::isSafeRequest(const Http::RequestHeaderMap& request_headers) {
 }
 
 Http::Code Utility::maybeRequestTimeoutCode(bool remote_decode_complete) {
-  return remote_decode_complete &&
-                 Runtime::runtimeFeatureEnabled(
-                     "envoy.reloadable_features.override_request_timeout_by_gateway_timeout")
-             ? Http::Code::GatewayTimeout
-             // Http::Code::RequestTimeout is more expensive because HTTP1 client cannot use the
-             // connection any more.
-             : Http::Code::RequestTimeout;
+  return remote_decode_complete ? Http::Code::GatewayTimeout
+                                // Http::Code::RequestTimeout is more expensive because HTTP1 client
+                                // cannot use the connection any more.
+                                : Http::Code::RequestTimeout;
 }
 
 } // namespace Http

@@ -1,6 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
+    "envoy_cc_library",
     "envoy_extension_package",
     "envoy_proto_library",
 )
@@ -17,8 +18,17 @@ envoy_proto_library(
 
 envoy_cc_extension(
     name = "config",
-    srcs = glob(["*.cc"]),
-    hdrs = glob(["*.h"]),
+    srcs = [
+        "config.cc",
+        "file_system_http_cache.cc",
+        "insert_context.cc",
+        "lookup_context.cc",
+    ],
+    hdrs = [
+        "file_system_http_cache.h",
+        "insert_context.h",
+        "lookup_context.h",
+    ],
     deps = [
         ":cache_file_header_proto_cc_proto",
         "//envoy/common:time_interface",
@@ -36,5 +46,15 @@ envoy_cc_extension(
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/extensions/http/cache/file_system_http_cache/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "cache_file_fixed_block",
+    srcs = ["cache_file_fixed_block.cc"],
+    hdrs = ["cache_file_fixed_block.h"],
+    deps = [
+        "//envoy/buffer:buffer_interface",
+        "@com_google_absl//absl/strings",
     ],
 )

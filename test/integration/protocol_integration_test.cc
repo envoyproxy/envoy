@@ -2666,36 +2666,6 @@ TEST_P(ProtocolIntegrationTest, MaxStreamTimeoutWhenRequestIsNotComplete) {
   EXPECT_EQ("504", response->headers().getStatusValue());
 }
 
-// Test case above except disabling runtime guard "override_request_timeout_by_gateway_timeout".
-// Verify the old behavior is reverted by disabling the runtime guard.
-TEST_P(ProtocolIntegrationTest, MaxStreamTimeoutWhenRequestIsNotCompleteRuntimeDisabled) {
-  config_helper_.setDownstreamMaxStreamDuration(std::chrono::milliseconds(500));
-
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.override_request_timeout_by_gateway_timeout", "false");
-  autonomous_upstream_ = false;
-
-  initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  // The request is not header only. Envoy is expecting more data to end the request.
-  auto encoder_decoder =
-      codec_client_->startRequest(default_request_headers_, /*header_only_request=*/true);
-  request_encoder_ = &encoder_decoder.first;
-  auto response = std::move(encoder_decoder.second);
-
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-
-  test_server_->waitForCounterGe("http.config_test.downstream_rq_max_duration_reached", 1);
-  ASSERT_TRUE(response->waitForEndStream());
-
-  EXPECT_TRUE(upstream_request_->complete());
-  ASSERT_TRUE(response->complete());
-  EXPECT_EQ("408", response->headers().getStatusValue());
-}
-
 TEST_P(DownstreamProtocolIntegrationTest, MaxRequestsPerConnectionReached) {
   config_helper_.setDownstreamMaxRequestsPerConnection(2);
   initialize();
@@ -3944,5 +3914,45 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidResponseHeaderName) {
   test_server_->waitForCounterGe("http.config_test.downstream_rq_5xx", 1);
 }
 #endif
+
+TEST_P(DownstreamProtocolIntegrationTest, InvalidSchemeHeaderWithWhitespace) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Start the request.
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "/admin http"},
+                                     {":authority", "sni.lyft.com"}});
+
+#ifdef ENVOY_ENABLE_UHV
+  if (downstreamProtocol() != Http::CodecType::HTTP1) {
+    ASSERT_TRUE(response->waitForReset());
+    EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("invalid"));
+    return;
+  }
+#else
+  if (downstreamProtocol() == Http::CodecType::HTTP2 &&
+      GetParam().http2_implementation == Http2Impl::Nghttp2) {
+    ASSERT_TRUE(response->waitForReset());
+    EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("invalid"));
+    return;
+  }
+#endif
+  // Other HTTP codecs accept the bad scheme but the Envoy should replace it with a valid one.
+  waitForNextUpstreamRequest();
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    // The scheme header is not conveyed in HTTP/1.
+    EXPECT_EQ(nullptr, upstream_request_->headers().Scheme());
+  } else {
+    EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Http::Headers::get().Scheme, "http"));
+  }
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
 
 } // namespace Envoy
