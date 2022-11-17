@@ -23,7 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // associated HTTP connection manager filters) to use different route
 // configurations. Each listener will bind its HTTP connection manager filter to
 // a route table via this identifier.
-service FcdsDiscoveryService {
+service ListenerFcdsDiscoveryService {
   option (envoy.annotations.resource).type = "envoy.config.litener.v3.FilterChain";
 
   rpc StreamFilterChains(stream discovery.v3.DiscoveryRequest)

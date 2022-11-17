@@ -202,6 +202,10 @@ public:
                           Network::DrainableFilterChainSharedPtr, MessageUtil, MessageUtil>;
   using FcdsResourcesMap = 
       absl::flat_hash_map<std::string, envoy::config::listener::v3::FilterChain>;
+
+  using FcHashValueMap = 
+      absl::flat_hash_map<std::string, uint64_t>;
+
   FilterChainManagerImpl(const std::vector<Network::Address::InstanceConstSharedPtr>& addresses,
                          Configuration::FactoryContext& factory_context,
                          Init::Manager& init_manager)
@@ -243,12 +247,14 @@ public:
   }
   void removeFilterChains(
     absl::Span<const envoy::config::listener::v3::FilterChain> filter_chain_span);
-    
   const FcdsResourcesMap& getFcdsResources() {return fc_name_to_obj_map_;}
-
+  const FcHashValueMap& getFcHashes() {return fc_name_to_hash_map_;}
   void fcdsInit();
   FcdsApiPtr createFcdsApi(const envoy::config::listener::v3::Fcds& fcds_config, 
-		      		           FilterChainFactoryBuilder* fc_builder);
+		      		           FilterChainFactoryBuilder* fc_builder);a
+  void addFcToFcdsDrainingList(Network::DrainableFilterChainSharedPtr);
+  void removeFcFromFcdsDrainingList(Network::DrainableFilterChainSharedPtr);
+  void startDrainingSequenceForListenerFcds();
 private:
   void convertIPsToTries();
   const Network::FilterChain*
@@ -293,6 +299,7 @@ private:
   using DestinationIPsTriePtr = std::unique_ptr<DestinationIPsTrie>;
   using DestinationPortsMap =
       absl::flat_hash_map<uint16_t, std::pair<DestinationIPsMap, DestinationIPsTriePtr>>;
+  using FilterChainsList = std::list<Network::DrainableFilterChainSharedPtr>;
 
   void addFilterChainForDestinationPorts(
       DestinationPortsMap& destination_ports_map, uint16_t destination_port,
@@ -418,6 +425,18 @@ private:
 
   // Hashmap to maintain fcds resource name (filter chain name) and filter chain config mapping
   FcdsResourcesMap fc_name_to_obj_map_;
+
+  // Hashmap to maintain fcds resource name (filter chain name) and filter chain config hash mapping
+  FcHashValueMap fc_name_to_hash_map_;
+  
+  // List of filters to be drained during Listener FCDS
+  FilterChainsList draining_fc_list_;
+
+  // Pointer back to the listener manager that is managing this FCM
+  ListenerManager* listener_manager_;
+
+  // Listener that uses this FCM 
+  std::string listener_name_;
 };
 } // namespace Server
 } // namespace Envoy

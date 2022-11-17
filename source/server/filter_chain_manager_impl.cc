@@ -211,24 +211,15 @@ void FilterChainManagerImpl::removeFilterChains(
   int count = 0;
   for (const auto& filter_chain : filter_chain_span) {
     if (fc_contexts_.find(filter_chain) != fc_contexts_.end()) {
-	std::shared_ptr<Envoy::Network::DrainableFilterChain> fc_to_delete = fc_contexts_[filter_chain];
-	fc_to_delete.reset();
-
-	if (fc_to_delete == nullptr) {
-	   // Clear the filter chain context map
-	   auto itr1 = fc_contexts_.find(filter_chain);
-	   fc_contexts_.erase(itr1);
-
 	   // Clear the filter chain name to filter chain obj map
        	   auto itr2 = fc_name_to_obj_map_.find(filter_chain.name());
        	   fc_name_to_obj_map_.erase(itr2);
 
+	   auto itr1 = fc_name_to_hash_map_.find(filter_chain.name());
+           fc_name_to_hash_map_.erase(itr1);
+
 	   ++count;
-  	   ENVOY_LOG(debug, "filter chain removed successfully; fc name: {}", filter_chain.name());
-	} else {
-  	   ENVOY_LOG(debug, "filter chain could not be removed");
-	   continue;
-	}
+  	   //ENVOY_LOG(debug, "RAKESH Filter chain context removed from master; fc name: {}", filter_chain.name());
     }
   }
   ENVOY_LOG(debug, "new fc_contexts has {} filter chains, with {} jus deleted",fc_contexts_.size(), count);
@@ -271,19 +262,11 @@ void FilterChainManagerImpl::addFilterChains(
     // Reuse created filter chain if possible.
     // FilterChainManager maintains the lifetime of FilterChainFactoryContext
     // ListenerImpl maintains the dependencies of FilterChainFactoryContext
-    bool is_valid_fcds_update = false;
     auto filter_chain_impl = findExistingFilterChain(*filter_chain, is_fcds_config_update);
     if (filter_chain_impl == nullptr) {
       filter_chain_impl =
           filter_chain_factory_builder.buildFilterChain(*filter_chain, context_creator);
       ++new_filter_chain_size;
-    } else if (is_fcds_config_update) {
-      is_valid_fcds_update = true;
-    }
-
-    bool fcds_valid_update = false;
-    if (is_fcds_update && filter_chain_impl) {
-	    fcds_valid_update = true;
     }
 
     // If using the matcher, require usage of "name" field and skip building the index.
@@ -341,11 +324,12 @@ void FilterChainManagerImpl::addFilterChains(
           filter_chain_match.application_protocols(), direct_source_ips,
           filter_chain_match.source_type(), source_ips, filter_chain_match.source_ports(),
           filter_chain_impl,
-	  is_valid_fcds_update);
+	  is_fcds_confgig_update);
     }
 
     fc_contexts_[*filter_chain] = filter_chain_impl;
     fc_name_to_obj_map_[filter_chain->name()] = *filter_chain;
+    fc_name_to_hash_map_[filter_chain->name()] = MessageUtil::hash(*filter_chain);
   }
   convertIPsToTries();
   copyOrRebuildDefaultFilterChain(default_filter_chain, filter_chain_factory_builder,
@@ -558,8 +542,13 @@ void FilterChainManagerImpl::addFilterChainForSourcePorts(
     source_ports_map_ptr = std::make_shared<SourcePortsMap>();
   }
   auto& source_ports_map = *source_ports_map_ptr;
+  auto itr = source_ports_map.find(source_port);
+  if ((itr != source_ports_map.end()) &&
+      (is_valid_fcds_update)) {
+      source_ports_map.erase(itr);
+  }
 
-  if (!source_ports_map.try_emplace(source_port, filter_chain).second && !is_valid_fcds_update) {
+  if (!source_ports_map.try_emplace(source_port, filter_chain).second) {
     // If we got here and found already configured branch, then it means that this FilterChainMatch
     // is a duplicate, and that there is some overlap in the repeated fields with already processed
     // FilterChainMatches.
@@ -894,6 +883,8 @@ Network::DrainableFilterChainSharedPtr FilterChainManagerImpl::findExistingFilte
     if (is_fcds_config_update){
       auto iter = this->fc_contexts_.find(filter_chain_message);
       if (iter != this->fc_contexts_.end()) {
+        // FC is unmodified so no need to drain
+	this->removeFcFromFcdsDrainingList(iter->second);
    	return iter->second;
       }
     } else {
@@ -970,8 +961,29 @@ Stats::Scope& FactoryContextImpl::listenerScope() { return listener_scope_; }
 bool FactoryContextImpl::isQuicListener() const { return is_quic_; }
 
 FcdsApiPtr FilterChainManagerImpl::createFcdsApi(const envoy::config::listener::v3::Fcds& fcds_config,
-		                                 FilterChainFactoryBuilder* fc_builder){
+		                                 FilterChainFactoryBuilder* fc_builder,
+						 ListenerManager* listener_mgr,
+						 std::string listener_name){
+  listener_manager_ = listener_mgr;
+  listener_name_ = listener_name;
   return std::make_shared<FcdsApi>(fcds_config, parent_context_, init_manager_, *this, fc_builder);
-};
+}
+void FilterChainManagerImpl::addFcToFcdsDrainingList(Network::DrainableFilterChainSharedPtr fc)
+{
+  this->draining_fc_list_.push_back(fc);
+}
+void FilterChainManagerImpl::removeFcFromFcdsDrainingList(Network::DrainableFilterChainSharedPtr fc)
+{
+	this->draining_fc_list_.remove(fc);
+}
+void FilterChainManagerImpl::startDrainingSequenceForListenerFcds()
+{
+	if (this->draining_fc_list_.size()) {
+  		ENVOY_LOG(debug, "FCDS: {} filter chains to be drained", this->draining_fc_list_.size());
+		listener_manager_->startDrainingSequenceForListenerFcds(listener_name_,
+				this->draining_fc_list_);
+		this->draining_fc_list_.clear();
+	}
+}
 } // namespace Server
 } // namespace Envoy

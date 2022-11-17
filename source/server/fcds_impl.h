@@ -31,11 +31,13 @@
 #include "source/common/config/subscription_base.h"
 #include "absl/container/node_hash_map.h"
 #include "absl/container/node_hash_set.h"
+//#include "envoy/server/listener_manager.h"
 
 namespace Envoy {
 namespace Server {
 class FilterChainManagerImpl;
 class FilterChainFactoryBuilder;
+
 /**
  * A class that fetches the filter chain configuration dynamically using the FCDS API and updates them to
  * FCDS config providers.
@@ -79,7 +81,6 @@ private:
 
   FilterChainManagerImpl& filter_chain_manager_;
   FilterChainFactoryBuilder* fc_builder_;
-  // Config::SubscriptionCallbacks
   void onConfigUpdate(const std::vector<Envoy::Config::DecodedResourceRef>& resources,
                       const std::string& version_info) override;
 

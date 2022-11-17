@@ -139,8 +139,8 @@ message Listener {
   // :ref:`FAQ entry <faq_how_to_setup_sni>`.
   repeated FilterChain filter_chains = 3;
 
-  // FCDS: Filter Chain Discovery Service config block. filter_chains and fcds are mutually exclusive
-  Fcds fcds = 34;
+  // Listener FCDS: Listener Filter Chain Discovery Service config block. filter_chains and fcds are mutually exclusive
+  ListenerFcds fcds_cfg = 34;
 
   // :ref:`Matcher API <arch_overview_matching_listener>` resolving the filter chain name from the
   // network properties. This matcher is used as a replacement for the filter chain match condition
@@ -363,7 +363,7 @@ message Listener {
   bool ignore_global_conn_limit = 31;
 }
 
-message Fcds{
-  string fcds_name = 1 [(validate.rules).string.min_len = 1];
+message ListenerFcds{
+  string name = 1 [(validate.rules).string.min_len = 1];
   envoy.config.core.v3.ConfigSource config_source = 2 [(validate.rules).message.required = true];
 }
