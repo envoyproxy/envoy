@@ -102,14 +102,12 @@ void EnvoyQuicClientSession::OnConnectionClosed(const quic::QuicConnectionCloseF
 void EnvoyQuicClientSession::Initialize() {
   quic::QuicSpdyClientSession::Initialize();
   initialized_ = true;
-  network_connection_->setEnvoyConnection(*this, *this);
+  network_connection_->setEnvoyConnection(*this);
 }
 
 void EnvoyQuicClientSession::OnCanWrite() {
-  uint64_t old_bytes_to_send = bytesToSend();
   quic::QuicSpdyClientSession::OnCanWrite();
-  const bool has_sent_any_data = bytesToSend() != old_bytes_to_send;
-  maybeUpdateDelayCloseTimer(has_sent_any_data);
+  maybeApplyDelayClosePolicy();
 }
 
 void EnvoyQuicClientSession::OnHttp3GoAway(uint64_t stream_id) {

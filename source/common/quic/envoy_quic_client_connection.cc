@@ -271,10 +271,5 @@ void EnvoyQuicClientConnection::EnvoyPathValidationResultDelegate::OnPathValidat
   connection_.onPathValidationFailure(std::move(context));
 }
 
-void EnvoyQuicClientConnection::OnCanWrite() {
-  quic::QuicConnection::OnCanWrite();
-  onWriteEventDone();
-}
-
 } // namespace Quic
 } // namespace Envoy

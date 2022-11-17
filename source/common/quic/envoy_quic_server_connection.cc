@@ -47,10 +47,5 @@ bool EnvoyQuicServerConnection::OnPacketHeader(const quic::QuicPacketHeader& hea
   return true;
 }
 
-void EnvoyQuicServerConnection::OnCanWrite() {
-  quic::QuicConnection::OnCanWrite();
-  onWriteEventDone();
-}
-
 } // namespace Quic
 } // namespace Envoy
