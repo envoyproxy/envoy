@@ -58,7 +58,6 @@ public:
     // if async_fetch is enabled, timer is created
     if (config_.has_async_fetch()) {
       timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-      expected_duration_ = JwksAsyncFetcher::getCacheDuration(config_);
     }
 
     async_fetcher_ = std::make_unique<JwksAsyncFetcher>(
@@ -87,7 +86,6 @@ public:
   Init::TargetHandlePtr init_target_handle_;
   NiceMock<Init::ExpectableWatcherImpl> init_watcher_;
   Event::MockTimer* timer_{};
-  std::chrono::milliseconds expected_duration_;
 };
 
 INSTANTIATE_TEST_SUITE_P(JwksAsyncFetcherTest, JwksAsyncFetcherTest,
@@ -193,7 +191,9 @@ TEST_P(JwksAsyncFetcherTest, TestGoodFetchAndRefresh) {
   EXPECT_EQ(out_jwks_array_.size(), 1);
 
   // Expect refresh timer is enabled.
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  const std::chrono::milliseconds expected_refetch_time =
+      JwksAsyncFetcher::getCacheDuration(config_) - std::chrono::seconds(5);
+  EXPECT_CALL(*timer_, enableTimer(expected_refetch_time, nullptr));
   timer_->invokeCallback();
 
   // refetch again after cache duration interval: successful.
@@ -225,7 +225,8 @@ TEST_P(JwksAsyncFetcherTest, TestNetworkFailureFetchAndRefresh) {
   EXPECT_EQ(out_jwks_array_.size(), 0);
 
   // Expect refresh timer is enabled.
-  EXPECT_CALL(*timer_, enableTimer(expected_duration_, nullptr));
+  const std::chrono::milliseconds expected_refetch_time = std::chrono::seconds(1);
+  EXPECT_CALL(*timer_, enableTimer(expected_refetch_time, nullptr));
   timer_->invokeCallback();
 
   // refetch again after cache duration interval: network failure.
