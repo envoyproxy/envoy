@@ -23,9 +23,14 @@ import "source/extensions/filters/http/cache/key.proto";
 // - for this case at the 'hub' entry there is no trailer or body, and the only header
 // is a 'vary' header, which indicates that the actual cache key will include some headers
 // from the request.
+
+// For serializing to cache files only, the CacheFileHeader message contains the cache
+// entry key, the cache metadata, and the http response headers.
 message CacheFileHeader {
   Key key = 1;
   google.protobuf.Timestamp metadata_response_time = 2;
+  // Repeated Header messages are used, rather than a proto map, because there may be
+  // repeated keys, and ordering may be important.
   message Header {
     string key = 1;
     string value = 2;
@@ -33,7 +38,11 @@ message CacheFileHeader {
   repeated Header headers = 3;
 };
 
+// For serializing to cache files only, the CacheFileTrailer message contains the http
+// response trailers.
 message CacheFileTrailer {
+  // Repeated Trailer messages are used, rather than a proto map, because there may be
+  // repeated keys, and ordering may be important.
   message Trailer {
     string key = 1;
     string value = 2;
