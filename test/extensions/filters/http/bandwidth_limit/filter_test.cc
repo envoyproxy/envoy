@@ -514,8 +514,8 @@ TEST_F(FilterTest, WithTrailers) {
               injectEncodedDataToFilterChain(BufferStringEqual(std::string(5, 'e')), false));
   response_timer->invokeCallback();
   EXPECT_EQ(0, findGauge("test.http_bandwidth_limit.response_pending"));
-  EXPECT_EQ("50", response_trailers_.get_("test-bandwidth-request-delay-ms"));
-  EXPECT_EQ("50", response_trailers_.get_("test-bandwidth-response-delay-ms"));
+  EXPECT_EQ(false, response_trailers_.has("test-bandwidth-request-delay-ms"));
+  EXPECT_EQ(false, response_trailers_.has("test-bandwidth-response-delay-ms"));
 }
 
 TEST_F(FilterTest, WithTrailersNoEndStream) {
