@@ -638,10 +638,10 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context, uint64_
   // If we're doing locality weighted balancing, pick locality.
   //
   // The chooseDegradedLocality or chooseHealthyLocality may return valid locality index
-  // when the locality_weighted_lb_config is set or load balancing policy extensioin is used.
+  // when the locality_weighted_lb_config is set or load balancing policy extension is used.
   // This if statement is to make sure we only do locality weighted balancing when the
   // locality_weighted_lb_config is set explicitly even the hostSourceToUse is called in the
-  // load balancing policy extensioins.
+  // load balancing policy extensions.
   if (locality_weighted_balancing_) {
     absl::optional<uint32_t> locality;
     if (host_availability == HostAvailability::Degraded) {
