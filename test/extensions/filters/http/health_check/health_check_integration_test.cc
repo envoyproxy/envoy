@@ -130,6 +130,7 @@ typed_config:
 }
 
 TEST_P(HealthCheckIntegrationTest, HealthCheck) {
+  DISABLE_IF_ADMIN_DISABLED;
   initialize();
 
   BufferingStreamDecoderPtr response;
@@ -143,6 +144,7 @@ TEST_P(HealthCheckIntegrationTest, HealthCheck) {
 }
 
 TEST_P(HealthCheckIntegrationTest, HealthCheckWithoutServerStats) {
+  DISABLE_IF_ADMIN_DISABLED;
   envoy::config::metrics::v3::StatsMatcher stats_matcher;
   stats_matcher.mutable_exclusion_list()->add_patterns()->set_prefix("server.");
   config_helper_.addConfigModifier(
