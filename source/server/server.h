@@ -234,10 +234,11 @@ public:
    */
   InstanceImpl(Init::Manager& init_manager, const Options& options, Event::TimeSystem& time_system,
                Network::Address::InstanceConstSharedPtr local_address, ListenerHooks& hooks,
-               HotRestart& restarter, Stats::Store& store, Thread::BasicLockable& access_log_lock,
-               ComponentFactory& component_factory, Random::RandomGeneratorPtr&& random_generator,
-               ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
-               Filesystem::Instance& file_system, std::unique_ptr<ProcessContext> process_context,
+               HotRestart& restarter, Stats::StoreRoot& store,
+               Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
+               Random::RandomGeneratorPtr&& random_generator, ThreadLocal::Instance& tls,
+               Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system,
+               std::unique_ptr<ProcessContext> process_context,
                Buffer::WatermarkFactorySharedPtr watermark_factory = nullptr);
 
   ~InstanceImpl() override;
@@ -347,7 +348,7 @@ private:
   HotRestart& restarter_;
   const time_t start_time_;
   time_t original_start_time_;
-  Stats::Store& stats_store_;
+  Stats::StoreRoot& stats_store_;
   std::unique_ptr<ServerStats> server_stats_;
   std::unique_ptr<CompilationSettings::ServerCompilationSettingsStats>
       server_compilation_settings_stats_;

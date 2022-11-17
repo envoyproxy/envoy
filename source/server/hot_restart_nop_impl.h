@@ -23,7 +23,7 @@ public:
     return absl::nullopt;
   }
   void sendParentTerminateRequest() override {}
-  ServerStatsFromParent mergeParentStatsIfAny(Stats::Store&) override { return {}; }
+  ServerStatsFromParent mergeParentStatsIfAny(Stats::StoreRoot&) override { return {}; }
   void shutdown() override {}
   uint32_t baseId() override { return 0; }
   std::string version() override { return "disabled"; }

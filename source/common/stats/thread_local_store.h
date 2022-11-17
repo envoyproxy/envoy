@@ -142,7 +142,7 @@ using ParentHistogramImplSharedPtr = RefcountPtr<ParentHistogramImpl>;
  * Store implementation with thread local caching. For design details see
  * https://github.com/envoyproxy/envoy/blob/main/source/docs/stats.md
  */
-class ThreadLocalStoreImpl : Logger::Loggable<Logger::Id::stats>, public Store {
+class ThreadLocalStoreImpl : Logger::Loggable<Logger::Id::stats>, public StoreRoot {
 public:
   static const char DeleteScopeSync[];
   static const char IterateScopeSync[];
@@ -150,7 +150,6 @@ public:
 
   ThreadLocalStoreImpl(Allocator& alloc);
   ~ThreadLocalStoreImpl() override;
-
   // Stats::Store
   NullCounterImpl& nullCounter() override { return null_counter_; }
   NullGaugeImpl& nullGauge() override { return null_gauge_; }
@@ -180,6 +179,7 @@ public:
   HistogramOptConstRef findHistogram(StatName name) const override;
   TextReadoutOptConstRef findTextReadout(StatName name) const override;
 
+  // Stats::StoreRoot
   void addSink(Sink& sink) override { timer_sinks_.push_back(sink); }
   void setTagProducer(TagProducerPtr&& tag_producer) override {
     tag_producer_ = std::move(tag_producer);

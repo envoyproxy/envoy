@@ -130,6 +130,7 @@ public:
   virtual bool iterate(const IterateFn<Histogram>& fn) const PURE;
   virtual bool iterate(const IterateFn<TextReadout>& fn) const PURE;
 
+
   // TODO(#24007): The cast operator is available temporarily to bound the size
   // of https://github.com/envoyproxy/envoy/pull/23851, which detaches the
   // inheritance of Scope as a parent of Store. There is semantic complexity to
@@ -156,7 +157,20 @@ public:
     return rootScope()->histogramFromString(name, unit);
   }
   ScopeSharedPtr createScope(const std::string& name) { return rootScope()->createScope(name); }
+};
 
+using StorePtr = std::unique_ptr<Store>;
+
+/**
+ * Callback invoked when a store's mergeHistogram() runs.
+ */
+using PostMergeCb = std::function<void()>;
+
+/**
+ * The root of the stat store.
+ */
+class StoreRoot : public Store {
+public:
   /**
    * Add a sink that is used for stat flushing.
    */
@@ -194,11 +208,6 @@ public:
   virtual void shutdownThreading() PURE;
 
   /**
-   * Callback invoked when a store's mergeHistogram() runs.
-   */
-  using PostMergeCb = std::function<void()>;
-
-  /**
    * Called during the flush process to merge all the thread local histograms. The passed in
    * callback will be called on the main thread, but it will happen after the method returns
    * which means that the actual flush process will happen on the main thread after this method
@@ -216,7 +225,7 @@ public:
   virtual void setSinkPredicates(std::unique_ptr<SinkPredicates>&& sink_predicates) PURE;
 };
 
-using StorePtr = std::unique_ptr<Store>;
+using StoreRootPtr = std::unique_ptr<StoreRoot>;
 
 } // namespace Stats
 } // namespace Envoy
