@@ -30,8 +30,6 @@ jobs:
         run: |
           cd mobile && ./bazelw build \
             --config=sizeopt \
-            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux-clang") \
-            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //test/performance:test_binary_size
       - uses: actions/upload-artifact@v2
         with:
@@ -50,6 +48,8 @@ jobs:
       - uses: actions/checkout@v1
         with:
           submodules: true
+      - name: Add safe directory
+        run: git config --global --add safe.directory /__w/envoy/envoy
       - name: 'Build test binary'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -57,8 +57,6 @@ jobs:
           git checkout main && git pull origin main && git submodule update
           cd mobile && ./bazelw build \
             --config=sizeopt \
-            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux-clang") \
-            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //test/performance:test_binary_size
       - uses: actions/upload-artifact@v2
         with:

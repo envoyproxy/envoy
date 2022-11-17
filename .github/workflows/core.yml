@@ -25,6 +25,4 @@ jobs:
         run: |
           cd mobile && ./bazelw test \
             --test_output=all \
-            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
-            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //test/common/...

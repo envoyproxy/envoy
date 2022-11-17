@@ -39,8 +39,6 @@ jobs:
             --test_output=all \
             --config=ios \
             --build_tests_only \
-            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
-            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //test/swift/...
   objctests:
     name: c_and_objc_tests
@@ -71,7 +69,5 @@ jobs:
             --test_output=all \
             --config=ios \
             --build_tests_only \
-            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
-            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //test/objective-c/...  \
             //test/cc/unit:envoy_config_test
