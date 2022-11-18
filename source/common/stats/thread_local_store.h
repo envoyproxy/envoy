@@ -341,6 +341,7 @@ private:
       return iterHelper(fn, centralCacheLockHeld()->text_readouts_);
     }
     ThreadLocalStoreImpl& store() override { return parent_; }
+    const ThreadLocalStoreImpl& constStore() const override { return parent_; }
 
     // NOTE: The find methods assume that `name` is fully-qualified.
     // Implementations will not add the scope prefix.

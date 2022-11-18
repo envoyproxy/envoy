@@ -39,22 +39,27 @@ using ScopePtr ABSL_DEPRECATED("Use ScopeSharedPtr() instead.") = ScopeSharedPtr
 template <class StatType> using IterateFn = std::function<bool(const RefcountPtr<StatType>&)>;
 
 /**
- * A named scope for stats. Scopes are a grouping of stats that can be acted on as a unit if needed
- * (for example to free/delete all of them).
+ * A named scope for stats. Scopes are a grouping of stats that can be acted on
+ * as a unit if needed (for example to free/delete all of them).
  *
- * We enable use of shared pointers for Scopes to make it possible for the admin
+ * Every counters, gauges, histograms, and text-readouts is managed by a Scope.
+ *
+ * Scopes are managed by shared pointers. This makes it possible for the admin
  * stats handler to safely capture all the scope references and remain robust to
  * other threads deleting those scopes while rendering an admin stats page.
  *
+ * It is invalid to allocate a Scope using std::unique_ptr or directly on the
+ * stack.
+ *
  * We use std::shared_ptr rather than Stats::RefcountPtr, which we use for other
  * stats, because:
- *  * existing uses of shared_ptr<Scope> exist in the Wasm extension and would need
- *    to be rewritten to allow for RefcountPtr<Scope>.
+ *  * existing uses of shared_ptr<Scope> exist in the Wasm extension and would
+ *    need to be rewritten to allow for RefcountPtr<Scope>.
  *  * the main advantage of RefcountPtr is it's smaller per instance by 16
  *    bytes, but there are not typically enough scopes that the extra per-scope
  *    overhead would matter.
- *  * It's a little less coding to use enable_shared_from_this compared to adding
- *    a ref_count to the scope object, for each of its implementations.
+ *  * It's a little less coding to use enable_shared_from_this compared to
+ *    adding a ref_count to the scope object, for each of its implementations.
  */
 class Scope : public std::enable_shared_from_this<Scope> {
 public:
@@ -274,6 +279,7 @@ public:
    * @return a reference to the Store object that owns this scope.
    */
   virtual Store& store() PURE;
+  virtual const Store& constStore() const PURE;
 };
 
 } // namespace Stats

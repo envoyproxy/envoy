@@ -180,6 +180,7 @@ public:
                                            StatNameTagVectorOptConstRef tags,
                                            Histogram::Unit unit) override;
   TestStore& store() override { return store_; }
+  const TestStore& constStore() const override { return store_; }
 
 private:
   static std::string addDot(const std::string& prefix) {

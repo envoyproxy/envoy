@@ -27,7 +27,23 @@ class Sink;
 class SinkPredicates;
 
 /**
- * A store for all known counters, gauges, and timers.
+ * Store keeps track of all Scopes created in it, and the Scopes manage
+ * individual stats. Each stat is defined in a scope. There is a single root
+ * scope created in the Store, and more sub-scopes can be created.
+ *
+ * Stores enable iteration over all stats in its owned Scopes.
+ *
+ * There is typically one Store instance in a test or binary, though Isolated
+ * Stores can be created in some scenarios. Stores are typically allocated
+ * as part of other objects or via std::unique_ptr.
+ *
+ * In contast, Scopes are managed via shared_ptr, unique nickname
+ * ScopeSharedPtr, and should not be directly instantiated or allocated via
+ * std::unique_ptr.
+ *
+ * A reference to the root-scope held by the Store until it shuts down. Holding
+ * onto a reference to the root-scope's shared_ptr that outlives the Store is
+ * not allowed.
  */
 class Store {
 public:
@@ -187,7 +203,7 @@ public:
    */
   ScopeSharedPtr createScope(const std::string& name) { return rootScope()->createScope(name); }
 };
-
+.
 using StorePtr = std::unique_ptr<Store>;
 
 /**

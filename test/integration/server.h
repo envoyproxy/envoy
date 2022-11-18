@@ -158,6 +158,7 @@ public:
   }
   StatName prefix() const override { return wrapped_scope_->prefix(); }
   Store& store() override { return store_; }
+  const Store& constStore() const override { return store_; }
 
 private:
   Thread::MutexBasicLockable& lock_;
