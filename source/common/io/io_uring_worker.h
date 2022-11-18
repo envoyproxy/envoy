@@ -139,8 +139,9 @@ public:
       return;
     }
 
+    read_req_ = nullptr;
+
     if (result <= 0) {
-      read_req_ = nullptr;
       iouring_read_buf_.release();
 
       if (result == -ECANCELED) {
@@ -164,8 +165,6 @@ public:
       io_uring_handler_.onRead(param);
       return;
     }
-
-    read_req_ = nullptr;
 
     // If iouring_read_buf_ is nullptr, it means there is pending data.
     if (iouring_read_buf_ != nullptr) {
@@ -208,12 +207,12 @@ public:
     }
 
     write_req_ = nullptr;
-    delete iovecs_;
-    iovecs_ = nullptr;
+    if (iovecs_ != nullptr) {
+      delete iovecs_;
+      iovecs_ = nullptr;
+    }
 
     if (result <= 0) {
-
-
       if (is_closing_ && read_req_ == nullptr && cancel_req_ == nullptr && write_req_ == nullptr) {
         ASSERT(close_req_ == nullptr);
         close_req_ = parent_.submitCloseRequest(*this);
