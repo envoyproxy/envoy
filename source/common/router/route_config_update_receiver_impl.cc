@@ -20,9 +20,10 @@ namespace {
 
 // Resets 'route_config::virtual_hosts' by merging VirtualHost contained in
 // 'rds_vhosts' and 'vhds_vhosts'.
-void rebuildRouteConfigVirtualHosts(const VirtualHostMap& rds_vhosts,
-                                    const VirtualHostMap& vhds_vhosts,
-                                    envoy::config::route::v3::RouteConfiguration& route_config) {
+void rebuildRouteConfigVirtualHosts(
+    const RouteConfigUpdateReceiverImpl::VirtualHostMap& rds_vhosts,
+    const RouteConfigUpdateReceiverImpl::VirtualHostMap& vhds_vhosts,
+    envoy::config::route::v3::RouteConfiguration& route_config) {
   route_config.clear_virtual_hosts();
   for (const auto& vhost : rds_vhosts) {
     route_config.mutable_virtual_hosts()->Add()->CopyFrom(vhost.second);
