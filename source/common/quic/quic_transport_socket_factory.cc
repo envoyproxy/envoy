@@ -24,7 +24,8 @@ QuicServerTransportSocketConfigFactory::createTransportSocketFactory(
       quic_transport.downstream_tls_context(), context);
   // TODO(RyanTheOptimist): support TLS client authentication.
   if (server_config->requireClientCertificate() &&
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reject_require_client_certificate_with_quic")) {
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.reject_require_client_certificate_with_quic")) {
     throw EnvoyException("TLS Client Authentication is not supported over QUIC");
   }
 
