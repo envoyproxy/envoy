@@ -3,8 +3,6 @@
 #include <memory>
 #include <string>
 
-#include "envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.pb.h"
-
 #include "source/common/common/enum_to_int.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/utility.h"
