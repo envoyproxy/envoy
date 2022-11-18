@@ -52,7 +52,9 @@ public:
     read_buffer_size_(read_buffer_size), iov_(new struct iovec[1]) {}
 
   ~IoUringServerSocket() {
-    ::close(fd_);
+    if (SOCKET_VALID(fd_)) {
+      ::close(fd_);
+    }
   }
 
   // IoUringSocket
@@ -70,7 +72,7 @@ public:
     cancel_req_ = nullptr;
     ENVOY_LOG(debug, "cancel request done, result = {}, fd = {}", result, fd_);
 
-    if (is_closing_ && read_req_ == nullptr && write_req_ == nullptr) {
+    if (is_closing_ && read_req_ == nullptr && write_req_ == nullptr && close_req_ == nullptr) {
       close_req_ = parent_.submitCloseRequest(*this);
     }
   }
@@ -83,19 +85,19 @@ public:
     ASSERT(close_req_ == nullptr);
     ASSERT(cancel_req_ == nullptr);
     std::unique_ptr<IoUringSocket> self = parent_.removeSocket(fd_);
+    SET_SOCKET_INVALID(fd_);
     parent_.dispatcher().deferredDelete(std::move(self));
   }
 
   void close() override {
+    is_closing_ = true;
     if (read_req_ != nullptr) {
-      is_closing_ = true;
       ASSERT(cancel_req_ == nullptr);
       cancel_req_ = parent_.submitCancelRequest(*this, read_req_);
       return;
     }
   
     if (write_req_ != nullptr) {
-      is_closing_ =true;
       return;
     }
 
@@ -160,7 +162,12 @@ public:
         }
         return;
       }
-      
+
+      if (result == -EAGAIN && is_closing_) {
+        ENVOY_LOG(trace, "ignore injected event when closing");
+        return;
+      }
+
       ReadParam param{pending_read_buf_, result};
       io_uring_handler_.onRead(param);
       return;
@@ -213,9 +220,14 @@ public:
     }
 
     if (result <= 0) {
-      if (is_closing_ && read_req_ == nullptr && cancel_req_ == nullptr && write_req_ == nullptr) {
+      if (is_closing_ && read_req_ == nullptr && cancel_req_ == nullptr && write_req_ == nullptr && close_req_ == nullptr) {
         ASSERT(close_req_ == nullptr);
         close_req_ = parent_.submitCloseRequest(*this);
+        return;
+      }
+
+      if (result == -EAGAIN && is_closing_) {
+        ENVOY_LOG(trace, "ignore injected event when closing");
         return;
       }
 
