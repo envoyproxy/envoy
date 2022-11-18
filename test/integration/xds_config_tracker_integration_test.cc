@@ -249,8 +249,6 @@ TEST_P(XdsConfigTrackerIntegrationTest, XdsConfigTrackerFailureCount) {
   }
 
   test_server_->waitForCounterEq("test_xds_tracker.on_config_rejected", 1);
-  ENVOY_LOG_MISC(warn, "Boteng test {}",
-                 test_server_->counter("test_xds_tracker.on_config_rejected")->value());
   EXPECT_EQ(1, test_server_->counter("test_xds_tracker.on_config_rejected")->value());
 }
 
