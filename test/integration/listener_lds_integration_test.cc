@@ -567,6 +567,8 @@ TEST_P(ListenerIntegrationTest, MultipleLdsUpdatesSharingListenSocketFactory) {
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
   // Make a connection to the listener from version 1.
   codec_client_ = makeHttpConnection(lookupPort(listener_name_));
+  // Ensure Envoy has accepted the connection before starting reloads.
+  test_server_->waitForCounterGe("listener.127.0.0.1_0.downstream_cx_total", 1);
 
   for (int version = 2; version <= 10; version++) {
     // Touch the metadata to get a different hash.
