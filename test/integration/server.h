@@ -81,7 +81,8 @@ public:
 
   ScopeSharedPtr scopeFromStatName(StatName name) override {
     Thread::LockGuard lock(lock_);
-    return std::make_shared<TestScopeWrapper>(lock_, wrapped_scope_->scopeFromStatName(name), store_);
+    return std::make_shared<TestScopeWrapper>(lock_, wrapped_scope_->scopeFromStatName(name),
+                                              store_);
   }
 
   Counter& counterFromStatNameWithTags(const StatName& name,

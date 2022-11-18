@@ -20,19 +20,8 @@ public:
   EdsReadyFilter(const Stats::Scope& root_scope, Stats::SymbolTable& symbol_table)
       : root_scope_(root_scope), stat_name_("cluster.cluster_0.membership_healthy", symbol_table) {}
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
-#if 0
-    Stats::GaugeOptConstRef gauge;
-    Stats::Store& store = const_cast<Stats::Scope&>(root_scope_).store();
-    store.forEachGauge(nullptr, [this, &gauge](Stats::Gauge& g) {
-      if (g.statName() == stat_name_.statName()) {
-        gauge = g;
-      }
-    });
-    //Stats::GaugeOptConstRef gauge = root_scope_.findGauge(stat_name_.statName());
-#else
     Stats::Store& store = const_cast<Stats::Scope&>(root_scope_).store();
     Stats::GaugeOptConstRef gauge = store.findGauge(stat_name_.statName());
-#endif
     if (!gauge.has_value()) {
       decoder_callbacks_->sendLocalReply(Envoy::Http::Code::InternalServerError,
                                          "Couldn't find stat", nullptr, absl::nullopt, "");
