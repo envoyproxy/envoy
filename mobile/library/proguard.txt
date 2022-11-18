@@ -15,6 +15,10 @@
    <methods>;
 }
 
+-keep, includedescriptorclasses class org.chromium.net.AndroidCertVerifyResult {
+   <methods>;
+}
+
 -keep, includedescriptorclasses class io.envoyproxy.envoymobile.engine.types.EnvoyEventTracker {
    <methods>;
 }
