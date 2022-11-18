@@ -218,6 +218,16 @@ public:
   }
 
 protected:
+  /**
+   * Provides a hook for sub-classes to define how to create new scopes. When
+   * subclassing IsolatedStoreImpl you likely want to also subclass
+   * IsolatedScopeImpl. Overriding this method enables scopes of the approriate
+   * type to be created from Store::rootScope(), Scope::scopeFromStatName, and
+   * Scope::createScope, without needing to overide those. makeScope is usually
+   * implemented by "return std::make_shared<YourScopeType>(name, *this)".
+   *
+   * @param name the fully qualified stat name -- no further prefixing needed.
+   */
   virtual ScopeSharedPtr makeScope(StatName name);
 
 private:
