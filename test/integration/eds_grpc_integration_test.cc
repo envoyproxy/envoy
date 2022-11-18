@@ -118,6 +118,11 @@ protected:
 
   void initializeTest(bool http_active_hc, uint32_t num_clusters_to_add,
                       bool ignore_new_hosts_until_first_hc) {
+    if (sotw_or_delta_ == Grpc::SotwOrDelta::Delta) {
+      std::cerr << "********************sotw_or_delta_ == Grpc::SotwOrDelta::Delta********************" << std::endl;
+    } else {
+      std::cerr << "********************sotw_or_delta_ == Grpc::SotwOrDelta::Sotws********************" << std::endl;
+    }
     setUpstreamCount(4);
     setUpstreamProtocol(Http::CodecType::HTTP2);
     if (edsUpdateMode() == Grpc::EdsUpdateMode::Multiplexed) {
@@ -162,68 +167,31 @@ protected:
     // Add the assignment and localities.
     cluster_load_assignment_.set_cluster_name("cluster_0");
     acceptXdsConnection();
-    // for (uint32_t i = 0; i < num_clusters_to_add; ++i) {
-    //   EXPECT_TRUE(compareDiscoveryRequest(
-    //       Config::TypeUrl::get().ClusterLoadAssignment, "",
-    //       {resource_names_.begin(), resource_names_.begin() + i + 1}, {}, {}, true));
-    // }
-    /*
-      AssertionResult compareDiscoveryRequest(
-      const std::string& expected_type_url, const std::string& expected_version,
-      const std::vector<std::string>& expected_resource_names,
-      const std::vector<std::string>& expected_resource_names_added,
-      const std::vector<std::string>& expected_resource_names_removed, bool expect_node = false,
-      const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
-      const std::string& expected_error_message = "", FakeStream* stream = nullptr);
-    */
-          // SDS for the first cluster.
-    initXdsStream(xds_stream_1_);
-    EXPECT_TRUE(compareDiscoveryRequest(
+
+    initXdsStream();
+    initXdsStream();
+
+    if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
+      DiscoveryRequestExpectedContents r1 = DiscoveryRequestExpectedContents{Config::TypeUrl::get().ClusterLoadAssignment, {"cluster_0"}, {}, Grpc::Status::WellKnownGrpcStatus::Ok, ""};
+      DiscoveryRequestExpectedContents r2 = DiscoveryRequestExpectedContents{Config::TypeUrl::get().ClusterLoadAssignment, {"cluster_1"}, {}, Grpc::Status::WellKnownGrpcStatus::Ok, ""};
+      std::list<DiscoveryRequestExpectedContents> expected_requests_contents ( {r1, r2} );
+      compareMultipleDiscoveryRequestsOnMultipleStreams(expected_requests_contents);
+    } else {
+          EXPECT_TRUE(compareDiscoveryRequest(
         /*expected_type_url=*/Config::TypeUrl::get().ClusterLoadAssignment,
         /*expected_version=*/std::to_string(eds_version_),
         /*expected_resource_names=*/{"cluster_0"}, {}, {}, true,
         Grpc::Status::WellKnownGrpcStatus::Ok,
-        /*expected_error_message=*/"", xds_stream_1_.get()));
-    sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-        Config::TypeUrl::get().ClusterLoadAssignment, {clusters_to_add_[0]}, {clusters_to_add_[0]}, {},
-        std::to_string(eds_version_));
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment,
-                                        std::to_string(eds_version_), {}, {}, {}, true));
-    eds_version_++;
+        /*expected_error_message=*/"", xds_streams_[0].get()));
 
-
-    initXdsStream(xds_stream_2_);
     EXPECT_TRUE(compareDiscoveryRequest(
         /*expected_type_url=*/Config::TypeUrl::get().ClusterLoadAssignment,
-        /*expected_version=*/std::to_string(eds_version_),
+        /*expected_version=*/std::to_string(eds_version_+1),
         /*expected_resource_names=*/{"cluster_1"}, {}, {}, true,
         Grpc::Status::WellKnownGrpcStatus::Ok,
-        /*expected_error_message=*/"", xds_stream_1_.get()));
-/*
-  void sendDiscoveryResponse(const std::string& type_url, const std::vector<T>& state_of_the_world,
-                             const std::vector<T>& added_or_updated,
-                             const std::vector<std::string>& removed, const std::string& version)
-*/
-    sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-        Config::TypeUrl::get().ClusterLoadAssignment, {"cluster_1"}, {"cluster_1"}, {},
-        std::to_string(eds_version_));
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment,
-                                        std::to_string(eds_version_), {}, {}, {}, true));
-    eds_version_++;
+        /*expected_error_message=*/"", xds_streams_[1].get()));
 
-    initXdsStream(xds_stream_3_);
-    EXPECT_TRUE(compareDiscoveryRequest(
-        /*expected_type_url=*/Config::TypeUrl::get().ClusterLoadAssignment,
-        /*expected_version=*/std::to_string(eds_version_),
-        /*expected_resource_names=*/{"cluster_2"}, {}, {}, true,
-        Grpc::Status::WellKnownGrpcStatus::Ok,
-        /*expected_error_message=*/"", xds_stream_1_.get()));
-    sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-        Config::TypeUrl::get().ClusterLoadAssignment, {"cluster_2"}, {"cluster_2"}, {},
-        std::to_string(eds_version_));
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment,
-                                        std::to_string(eds_version_), {}, {}, {}, true));
-    eds_version_++;
+    }
 
     // // Receive EDS ack.
     // EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment,
@@ -235,6 +203,176 @@ protected:
     registerTestServerPorts({"http"});
     test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
   }
+
+    struct DiscoveryRequestExpectedContents {
+    DiscoveryRequestExpectedContents(
+        const std::string& type_url, const std::vector<std::string>& subscriptions,
+        const std::vector<std::string>& unsubscriptions,
+        const Protobuf::int32 error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
+        const std::string& error_substring = "")
+        : type_url_(type_url),
+          // Convert subscribed/unsubscribed names into sets to ignore ordering.
+          subscriptions_(subscriptions.begin(), subscriptions.end()),
+          unsubscriptions_(unsubscriptions.begin(), unsubscriptions.end()), error_code_(error_code),
+          error_substring_(error_substring) {}
+
+    const std::string& type_url_;
+    const std::set<std::string> subscriptions_;
+    const std::set<std::string> unsubscriptions_;
+    const Protobuf::int32 error_code_;
+    const std::string& error_substring_;
+  };
+
+  AssertionResult compareMultipleDiscoveryRequestsOnMultipleStreams(
+    std::list<DiscoveryRequestExpectedContents>& expected_requests_contents) {
+  uint32_t curr_stream_idx = 0;
+  while (curr_stream_idx < xds_streams_.size()) {
+    bool comparison_result;
+    for (auto it = expected_requests_contents.begin(); it != expected_requests_contents.end(); ++it){
+      if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
+        comparison_result = assertExpectedDiscoveryRequest(curr_stream_idx, *it);
+      } else {
+        comparison_result = assertExpectedDeltaDiscoveryRequest(curr_stream_idx, *it);
+      }
+      if (comparison_result) {
+        sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+        Config::TypeUrl::get().ClusterLoadAssignment, {clas_to_add_[curr_stream_idx]}, {clas_to_add_[curr_stream_idx]}, {},
+        std::to_string(eds_version_),xds_streams_[curr_stream_idx]);
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment,
+                                        std::to_string(eds_version_), {}, {}, {}, true, Grpc::Status::WellKnownGrpcStatus::Ok,
+        /*expected_error_message=*/"", xds_streams_[curr_stream_idx].get()));
+        ++curr_stream_idx;
+        expected_requests_contents.erase(it);
+        ++eds_version_;
+        // Request received on current stream, no more requests expected for this stream.
+        break;
+      } else {
+        continue;
+      }
+    }
+  }
+  if (!expected_requests_contents.empty()){
+    return AssertionFailure();
+  } else {
+      return AssertionSuccess();
+  }
+
+}
+
+AssertionResult assertExpectedDiscoveryRequest(uint32_t stream_idx, const DiscoveryRequestExpectedContents& expected_request){
+    envoy::service::discovery::v3::DiscoveryRequest request;
+    VERIFY_ASSERTION(xds_streams_[stream_idx]->waitForGrpcMessage(*dispatcher_, request));
+    if (!request.has_node() || request.node().id().empty() || request.node().cluster().empty()) {
+      return AssertionFailure() << "Weird node field";
+    }
+    // Convert subscribed/unsubscribed names into sets to ignore ordering.
+    const std::set<std::string> actual_sub{request.resource_names().begin(),
+                                          request.resource_names().end()};
+    return internalCompareDiscoveryRequest(expected_request, request, actual_sub);
+}
+
+AssertionResult assertExpectedDeltaDiscoveryRequest(uint32_t stream_idx, const DiscoveryRequestExpectedContents& expected_request){
+    envoy::service::discovery::v3::DeltaDiscoveryRequest request;
+    VERIFY_ASSERTION(xds_streams_[stream_idx]->waitForGrpcMessage(*dispatcher_, request));
+    if (!request.has_node() || request.node().id().empty() || request.node().cluster().empty()) {
+      return AssertionFailure() << "Weird node field";
+    }
+    const std::set<std::string> actual_sub{request.resource_names_subscribe().begin(),
+                                           request.resource_names_subscribe().end()};
+    const std::set<std::string> actual_unsub{request.resource_names_unsubscribe().begin(),
+                                             request.resource_names_unsubscribe().end()};
+    return internalCompareDeltaDiscoveryRequest(expected_request, request, actual_sub, actual_unsub);
+}
+
+AssertionResult internalCompareDiscoveryRequest(
+    const DiscoveryRequestExpectedContents& expected_request,
+    const envoy::service::discovery::v3::DiscoveryRequest& actual_request,
+    const std::set<std::string>& actual_sub) {
+
+  if (actual_request.type_url() != expected_request.type_url_) {
+    return AssertionFailure() << fmt::format("type_url {} does not match expected {}.",
+                                             actual_request.type_url(), expected_request.type_url_);
+  }
+  auto sub_result =
+      compareSets(expected_request.subscriptions_, actual_sub, "expected_resource_subscriptions");
+  if (!sub_result) {
+    return sub_result;
+  }
+  // auto unsub_result = compareSets(expected_request.unsubscriptions_, actual_unsub,
+  //                                 "expected_resource_unsubscriptions");
+  // if (!unsub_result) {
+  //   return unsub_result;
+  // }
+  // // (We don't care about response_nonce or initial_resource_versions.)
+
+  if (actual_request.error_detail().code() != expected_request.error_code_) {
+    return AssertionFailure() << fmt::format(
+               "error code {} does not match expected {}. (Error message is {}).",
+               actual_request.error_detail().code(), expected_request.error_code_,
+               actual_request.error_detail().message());
+  }
+  if (expected_request.error_code_ != Grpc::Status::WellKnownGrpcStatus::Ok &&
+      actual_request.error_detail().message().find(expected_request.error_substring_) ==
+          std::string::npos) {
+    return AssertionFailure() << "\"" << expected_request.error_substring_
+                              << "\" is not a substring of actual error message \""
+                              << actual_request.error_detail().message() << "\"";
+  }
+  return AssertionSuccess();
+}
+
+AssertionResult internalCompareDeltaDiscoveryRequest(
+    const DiscoveryRequestExpectedContents& expected_request,
+    const envoy::service::discovery::v3::DeltaDiscoveryRequest& actual_request,
+    const std::set<std::string>& actual_sub, const std::set<std::string>& actual_unsub) {
+
+  if (actual_request.type_url() != expected_request.type_url_) {
+    return AssertionFailure() << fmt::format("type_url {} does not match expected {}.",
+                                             actual_request.type_url(), expected_request.type_url_);
+  }
+  auto sub_result =
+      compareSets(expected_request.subscriptions_, actual_sub, "expected_resource_subscriptions");
+  if (!sub_result) {
+    return sub_result;
+  }
+  auto unsub_result = compareSets(expected_request.unsubscriptions_, actual_unsub,
+                                  "expected_resource_unsubscriptions");
+  if (!unsub_result) {
+    return unsub_result;
+  }
+  // // (We don't care about response_nonce or initial_resource_versions.)
+
+  if (actual_request.error_detail().code() != expected_request.error_code_) {
+    return AssertionFailure() << fmt::format(
+               "error code {} does not match expected {}. (Error message is {}).",
+               actual_request.error_detail().code(), expected_request.error_code_,
+               actual_request.error_detail().message());
+  }
+  if (expected_request.error_code_ != Grpc::Status::WellKnownGrpcStatus::Ok &&
+      actual_request.error_detail().message().find(expected_request.error_substring_) ==
+          std::string::npos) {
+    return AssertionFailure() << "\"" << expected_request.error_substring_
+                              << "\" is not a substring of actual error message \""
+                              << actual_request.error_detail().message() << "\"";
+  }
+  return AssertionSuccess();
+}
+
+AssertionResult compareSets(const std::set<std::string>& set1, const std::set<std::string>& set2,
+                            absl::string_view name) {
+  if (set1 == set2) {
+    return AssertionSuccess();
+  }
+  auto failure = AssertionFailure() << name << " field not as expected.\nExpected: {";
+  for (const auto& x : set1) {
+    failure << x << ", ";
+  }
+  failure << "}\nActual: {";
+  for (const auto& x : set2) {
+    failure << x << ", ";
+  }
+  return failure << "}";
+}
 
   envoy::config::cluster::v3::Cluster buildCluster(const std::string& name, bool http_active_hc,
                                                    bool ignore_new_hosts_until_first_hc) {
@@ -278,10 +416,11 @@ protected:
     // xds_stream_->startGrpcStream();
   }
 
-    void initXdsStream(FakeStreamPtr& stream) {
-    result = xds_connection_->waitForNewStream(*dispatcher_, stream);
+    void initXdsStream() {
+    xds_streams_.emplace_back();
+    AssertionResult result = xds_connection_->waitForNewStream(*dispatcher_, xds_streams_.back());
     RELEASE_ASSERT(result, result.message());
-    stream->startGrpcStream();
+    xds_streams_.back()->startGrpcStream();
   }
 
   void resetFakeUpstreamInfo(FakeUpstreamInfo& upstream_info) {
@@ -351,9 +490,7 @@ protected:
   std::vector<FakeUpstreamInfo> hosts_upstreams_info_;
   uint32_t eds_version_{};
   bool test_skipped_{false};
-  FakeStreamPtr xds_stream_1_;
-  FakeStreamPtr xds_stream_2_;
-  FakeStreamPtr xds_stream_3_;
+  std::vector<FakeStreamPtr> xds_streams_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeSotwOrDeltaEdsMode, EdsOverGrpcIntegrationTest,
@@ -564,32 +701,32 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeSotwOrDeltaEdsMode, EdsOverGrpcInte
 
 TEST_P(EdsOverGrpcIntegrationTest, StreamPerClusterMultipleClusters) {
   if (edsUpdateMode() == Grpc::EdsUpdateMode::StreamPerCluster) {
-    initializeTest(false, 3, false);
-    EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_total")->value());
-    EXPECT_EQ(0, test_server_->gauge("cluster.cluster_1.membership_total")->value());
-    EXPECT_EQ(0, test_server_->gauge("cluster.cluster_2.membership_total")->value());
-    switch (clientType()) {
-    case Grpc::ClientType::EnvoyGrpc:
-      // As EDS uses HTTP2, number of streams created by Envoy for EDS cluster equals to number
-      // of requests.
-      EXPECT_EQ(3UL, test_server_->counter("cluster.eds_cluster.upstream_rq_total")->value());
-      break;
-    case Grpc::ClientType::GoogleGrpc:
-      // // One EDS mux/stream is created and reused for all 3 clusters when initializing first EDS
-      // // cluster (cluster_0). As a consequence, only one Google async grpc client and one
-      // // corresponding set of client stats should be created.
-      // EXPECT_EQ(1UL,
-      //           test_server_->counter("cluster.cluster_0.grpc.eds_cluster.streams_total")->value());
-      // EXPECT_EQ(TestUtility::findCounter(test_server_->statStore(),
-      //                                    "cluster.cluster_1.grpc.eds_cluster.streams_total"),
-      //           nullptr);
-      // EXPECT_EQ(TestUtility::findCounter(test_server_->statStore(),
-      //                                    "cluster.cluster_2.grpc.eds_cluster.streams_total"),
-      //           nullptr);
-      break;
-    default:
-      PANIC("reached unexpected code");
-    }
+    initializeTest(false, 2, false);
+    // EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+    // EXPECT_EQ(0, test_server_->gauge("cluster.cluster_1.membership_total")->value());
+    // EXPECT_EQ(0, test_server_->gauge("cluster.cluster_2.membership_total")->value());
+    // switch (clientType()) {
+    // case Grpc::ClientType::EnvoyGrpc:
+    //   // As EDS uses HTTP2, number of streams created by Envoy for EDS cluster equals to number
+    //   // of requests.
+    //   EXPECT_EQ(3UL, test_server_->counter("cluster.eds_cluster.upstream_rq_total")->value());
+    //   break;
+    // case Grpc::ClientType::GoogleGrpc:
+    //   // // One EDS mux/stream is created and reused for all 3 clusters when initializing first EDS
+    //   // // cluster (cluster_0). As a consequence, only one Google async grpc client and one
+    //   // // corresponding set of client stats should be created.
+    //   // EXPECT_EQ(1UL,
+    //   //           test_server_->counter("cluster.cluster_0.grpc.eds_cluster.streams_total")->value());
+    //   // EXPECT_EQ(TestUtility::findCounter(test_server_->statStore(),
+    //   //                                    "cluster.cluster_1.grpc.eds_cluster.streams_total"),
+    //   //           nullptr);
+    //   // EXPECT_EQ(TestUtility::findCounter(test_server_->statStore(),
+    //   //                                    "cluster.cluster_2.grpc.eds_cluster.streams_total"),
+    //   //           nullptr);
+    //   break;
+    // default:
+    //   PANIC("reached unexpected code");
+    // }
   } else {
     test_skipped_ = true;
   }
