@@ -1,8 +1,6 @@
 #include "source/extensions/filters/http/gcp_authn/gcp_authn_filter.h"
 
-#include <iostream>
 #include <memory>
-#include <stdexcept>
 #include <string>
 
 #include "envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.pb.h"
@@ -19,14 +17,13 @@ namespace HttpFilters {
 namespace GcpAuthn {
 namespace {
 void addTokenToRequest(Http::RequestHeaderMap& hdrs, absl::string_view token_str,
-                       bool has_token_header,
                        const envoy::extensions::filters::http::gcp_authn::v3::TokenHeader& header) {
-  if (has_token_header) {
-    std::string id_token = absl::StrCat(header.value_prefix(), token_str);
-    hdrs.setCopy(Http::LowerCaseString(header.name()), id_token);
-  } else {
+  if (header.ByteSizeLong() == 0) {
     std::string id_token = absl::StrCat("Bearer ", token_str);
     hdrs.setCopy(authorizationHeaderKey(), id_token);
+  } else {
+    std::string id_token = absl::StrCat(header.value_prefix(), token_str);
+    hdrs.setCopy(Http::LowerCaseString(header.name()), id_token);
   }
 }
 } // namespace
@@ -66,8 +63,7 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
       if (token != nullptr) {
         // If token is found in the cache, we add the token string to the request directly and
         // continue the filter chain iteration.
-        addTokenToRequest(hdrs, token->jwt_, filter_config_->has_token_header(),
-                          filter_config_->token_header());
+        addTokenToRequest(hdrs, token->jwt_, filter_config_->token_header());
         return FilterHeadersStatus::Continue;
       }
     }
@@ -108,8 +104,7 @@ void GcpAuthnFilter::onComplete(const Http::ResponseMessage* response) {
       // `Authorization: Bearer ID_TOKEN` header).
       std::string token_str = response->bodyAsString();
       if (request_header_map_ != nullptr) {
-        addTokenToRequest(*request_header_map_, token_str, filter_config_->has_token_header(),
-                          filter_config_->token_header());
+        addTokenToRequest(*request_header_map_, token_str, filter_config_->token_header());
       } else {
         ENVOY_LOG(debug, "No request header to be modified.");
       }

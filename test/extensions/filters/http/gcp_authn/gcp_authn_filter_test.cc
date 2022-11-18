@@ -38,7 +38,6 @@ constexpr char DefaultConfig[] = R"EOF(
         base_interval: 1s
         max_interval: 10s
       num_retries: 5
-    header_name: customheader
   )EOF";
 
 class GcpAuthnFilterTest : public testing::Test {

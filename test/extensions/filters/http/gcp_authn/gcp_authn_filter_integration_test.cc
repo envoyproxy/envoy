@@ -236,7 +236,7 @@ TEST_P(GcpAuthnFilterIntegrationTest, Basicflow) {
 }
 
 TEST_P(GcpAuthnFilterIntegrationTest, OverrideDefaultHeader) {
-  initializeConfig(/*add_audience=*/true, true);
+  initializeConfig(/*add_audience=*/true, /*configure_token_header=*/true);
   HttpIntegrationTest::initialize();
   int num = 2;
   // Send multiple requests.
@@ -245,7 +245,8 @@ TEST_P(GcpAuthnFilterIntegrationTest, OverrideDefaultHeader) {
     // Send the request to cluster `gcp_authn`.
     waitForGcpAuthnServerResponse();
     // Send the request to cluster `cluster_0` and validate the response.
-    sendRequestToDestinationAndValidateResponse(/*with_audience=*/true, true);
+    sendRequestToDestinationAndValidateResponse(/*with_audience=*/true,
+                                                /*with_configured_token_header*/ true);
     // Clean up the codec and connections.
     cleanup();
   }
