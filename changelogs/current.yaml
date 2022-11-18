@@ -26,6 +26,10 @@ bug_fixes:
     server scope for stats instead of the listener's global scope. This fixes a
     use-after-free that can occur if the listener is drained but the cached
     gRPC access logger uses the listener's global scope for stats.
+- area: oauth
+  change: |
+    Fixed a cookie validator bug that HMAC caluation could be same for different payloads.
+    This will avoid malicious client is able to construct credentials with permanent validity in some specific scenario.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
