@@ -10,12 +10,14 @@ namespace Io {
 bool isIoUringSupported();
 
 struct InjectedCompletion {
-  InjectedCompletion(void* user_data, int32_t result) : user_data_(user_data), result_(result) {}
+  InjectedCompletion(os_fd_t fd, void* user_data, int32_t result) : fd_(fd), user_data_(user_data), result_(result) {}
+
+  os_fd_t fd_;
   void* user_data_;
   int32_t result_;
 };
 
-class IoUringImpl : public IoUring {
+class IoUringImpl : public IoUring, protected Logger::Loggable<Logger::Id::io> {
 public:
   IoUringImpl(uint32_t io_uring_size, bool use_submission_queue_polling);
   ~IoUringImpl() override;
@@ -24,7 +26,8 @@ public:
   void unregisterEventfd() override;
   bool isEventfdRegistered() const override;
   void forEveryCompletion(CompletionCb completion_cb) override;
-  void injectCompletion(void* user_data, int32_t result) override;
+  void injectCompletion(os_fd_t fd, void* user_data, int32_t result) override;
+  void removeInjectedCompletion(os_fd_t fd) override;
 
   IoUringResult prepareAccept(os_fd_t fd, struct sockaddr* remote_addr, socklen_t* remote_addr_len,
                               void* user_data) override;

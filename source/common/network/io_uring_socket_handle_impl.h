@@ -82,6 +82,7 @@ public:
   // IoUringHandler
   void onAcceptSocket(Io::AcceptedSocketParam& param) override;
   void onRead(Io::ReadParam& param) override;
+  void onWrite(Io::WriteParam& param) override;
   void onRequestCompletion(const Io::Request& req, int32_t result) override;
 
 private:
@@ -118,10 +119,11 @@ private:
 
   OptRef<Io::AcceptedSocketParam> accepted_socket_param_{absl::nullopt};
   OptRef<Io::ReadParam> read_param_{absl::nullopt};
+  OptRef<Io::WriteParam> write_param_{absl::nullopt};
   IoUringSocketType io_uring_socket_type_{IoUringSocketType::Unknown};
 
   std::unique_ptr<IoHandle> shadow_io_handle_;
-  bool enable_server_socket_{false};
+  bool enable_server_socket_{true};
 };
 
 } // namespace Network

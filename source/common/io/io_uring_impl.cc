@@ -33,7 +33,7 @@ IoUringImpl::~IoUringImpl() { io_uring_queue_exit(&ring_); }
 
 os_fd_t IoUringImpl::registerEventfd() {
   ASSERT(!isEventfdRegistered());
-  event_fd_ = eventfd(0, 0);
+  event_fd_ = eventfd(0, EFD_NONBLOCK);
   int res = io_uring_register_eventfd(&ring_, event_fd_);
   RELEASE_ASSERT(res == 0, fmt::format("unable to register eventfd: {}", errorDetails(-res)));
   return event_fd_;
@@ -49,10 +49,20 @@ bool IoUringImpl::isEventfdRegistered() const { return SOCKET_VALID(event_fd_); 
 
 void IoUringImpl::forEveryCompletion(CompletionCb completion_cb) {
   ASSERT(SOCKET_VALID(event_fd_));
-
+  
   eventfd_t v;
-  int ret = eventfd_read(event_fd_, &v);
-  RELEASE_ASSERT(ret == 0, "unable to drain eventfd");
+  while (true) {
+    int ret = eventfd_read(event_fd_, &v);
+    ENVOY_LOG(trace, "iteration every completion, ret = {}", ret);
+    if (ret != 0) {
+      ENVOY_LOG(trace, "iteration every completion, ret = {}, errno = {}", ret, errno);
+      if (errno == EAGAIN) {
+        break;
+      } else {
+        return;
+      }
+    }
+  }
 
   unsigned count = io_uring_peek_batch_cqe(&ring_, cqes_.data(), io_uring_size_);
 
@@ -61,16 +71,31 @@ void IoUringImpl::forEveryCompletion(CompletionCb completion_cb) {
     completion_cb(reinterpret_cast<void*>(cqe->user_data), cqe->res);
   }
 
+  ENVOY_LOG(trace, "has injected event, num = {}", injected_completions_.size());
+
   for (auto& completion : injected_completions_) {
     completion_cb(completion.user_data_, completion.result_);
   }
   injected_completions_.clear();
 
+  ENVOY_LOG(debug, "count = {}", count);
   io_uring_cq_advance(&ring_, count);
 }
 
-void IoUringImpl::injectCompletion(void* user_data, int32_t result) {
-  injected_completions_.emplace_back(user_data, result);
+void IoUringImpl::injectCompletion(os_fd_t fd, void* user_data, int32_t result) {
+  injected_completions_.emplace_back(fd, user_data, result);
+}
+
+void IoUringImpl::removeInjectedCompletion(os_fd_t fd) {
+  ENVOY_LOG(debug, "remove injected completion, fd = {}", fd);
+  for(auto iter = injected_completions_.begin(); iter != injected_completions_.end(); ) {
+    if (iter->fd_ == fd) {
+      iter = injected_completions_.erase(iter);
+    } else {
+      iter++;
+    }
+  }
+  ENVOY_LOG(debug, "remove injected completion done, fd = {}", fd);
 }
 
 IoUringResult IoUringImpl::prepareAccept(os_fd_t fd, struct sockaddr* remote_addr,

@@ -51,7 +51,12 @@ public:
   /**
    * Inject complation entry in the completion queue.
    */
-  virtual void injectCompletion(void* user_data, int32_t result) PURE;
+  virtual void injectCompletion(os_fd_t fd, void* user_data, int32_t result) PURE;
+
+  /**
+   * Remove specific fd injection.
+   */
+  virtual void removeInjectedCompletion(os_fd_t fd) PURE;
 
   /**
    * Prepares an accept system call and puts it into the submission queue.
@@ -160,6 +165,10 @@ struct ReadParam {
   int32_t result_;
 };
 
+struct WriteParam {
+  int32_t result_;
+};
+
 class IoUringSocket : public Event::DeferredDeletable {
 public:
   virtual ~IoUringSocket() = default;
@@ -170,6 +179,8 @@ public:
   virtual void enable() PURE;
   virtual void disable() PURE;
 
+  virtual uint64_t write(Buffer::Instance&) { PANIC("not implemented"); }
+  virtual uint64_t writev(const Buffer::RawSlice*, uint64_t) { PANIC("not implemented"); }
   virtual void onAccept(int32_t) { PANIC("not implemented"); };
   virtual void onClose(int32_t) { PANIC("not implemented"); };
   virtual void onCancel(int32_t) { PANIC("not implemented"); };
@@ -187,16 +198,18 @@ public:
   virtual void enableSocket(os_fd_t fd) PURE;
   virtual void disableSocket(os_fd_t fd) PURE;
   virtual void addAcceptSocket(os_fd_t fd, IoUringHandler& handler) PURE;
-  virtual void addServerSocket(os_fd_t fd, IoUringHandler& handler, uint32_t read_buffer_size, bool is_disabled) PURE;
+  virtual void addServerSocket(os_fd_t fd, IoUringHandler& handler, uint32_t read_buffer_size) PURE;
   virtual void closeSocket(os_fd_t fd) PURE;
   virtual std::unique_ptr<IoUringSocket> removeSocket(os_fd_t) PURE;
   virtual Event::Dispatcher& dispatcher() PURE;
+  virtual IoUringSocket& getIoUringSocket(os_fd_t fd) PURE;
 
   virtual Request* submitAcceptRequest(IoUringSocket& socket, sockaddr_storage* remote_addr,
                                          socklen_t* remote_addr_len) PURE;
   virtual Request* submitCancelRequest(IoUringSocket& socket, Request* request_to_cancel) PURE;
   virtual Request* submitCloseRequest(IoUringSocket& socket) PURE;
   virtual Request* submitReadRequest(IoUringSocket& socket, struct iovec* iov) PURE;
+  virtual Request* submitWritevRequest(IoUringSocket& socket, struct iovec* iovecs, uint64_t num_vecs) PURE;
 
   virtual void injectCompletion(os_fd_t, RequestType type, int32_t result) PURE;
   virtual void injectCompletion(IoUringSocket& socket, RequestType type, int32_t result) PURE;
@@ -210,6 +223,7 @@ public:
 
   virtual void onAcceptSocket(AcceptedSocketParam& param) PURE;
   virtual void onRead(ReadParam& param) PURE;
+  virtual void onWrite(WriteParam& param) PURE;
 
   virtual void onRequestCompletion(const Request& req, int32_t result) PURE;
 };
