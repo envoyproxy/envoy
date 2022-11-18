@@ -81,15 +81,11 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
     const VirtualHostRefVector& added_vhosts, const std::set<std::string>& added_resource_ids,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& version_info) {
-  std::unique_ptr<std::map<std::string, envoy::config::route::v3::VirtualHost>>
-      vhosts_after_this_update;
+  std::unique_ptr<VirtualHostMap> vhosts_after_this_update;
   if (vhds_virtual_hosts_ != nullptr) {
-    vhosts_after_this_update =
-        std::make_unique<std::map<std::string, envoy::config::route::v3::VirtualHost>>(
-            *vhds_virtual_hosts_);
+    vhosts_after_this_update = std::make_unique<VirtualHostMap>(*vhds_virtual_hosts_);
   } else {
-    vhosts_after_this_update =
-        std::make_unique<std::map<std::string, envoy::config::route::v3::VirtualHost>>();
+    vhosts_after_this_update = std::make_unique<VirtualHostMap>();
   }
   const bool removed = removeVhosts(*vhosts_after_this_update, removed_resources);
   const bool updated = updateVhosts(*vhosts_after_this_update, added_vhosts);

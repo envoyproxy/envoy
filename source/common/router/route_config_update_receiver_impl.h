@@ -34,6 +34,8 @@ private:
   ProtobufMessage::ValidationVisitor& validator_;
 };
 
+using VirtualHostMap = std::map<std::string, envoy::config::route::v3::VirtualHost>;
+
 class RouteConfigUpdateReceiverImpl : public RouteConfigUpdateReceiver {
 public:
   RouteConfigUpdateReceiverImpl(Rds::ProtoTraits& proto_traits,
@@ -42,7 +44,7 @@ public:
       : config_traits_(optional_http_filters,
                        factory_context.messageValidationContext().dynamicValidationVisitor()),
         base_(config_traits_, proto_traits, factory_context), last_vhds_config_hash_(0ul),
-        vhds_virtual_hosts_(nullptr), vhds_configuration_changed_(true) {}
+        vhds_configuration_changed_(true) {}
 
   bool removeVhosts(std::map<std::string, envoy::config::route::v3::VirtualHost>& vhosts,
                     const Protobuf::RepeatedPtrField<std::string>& removed_vhost_names);
@@ -84,8 +86,8 @@ private:
   Rds::RouteConfigUpdateReceiverImpl base_;
 
   uint64_t last_vhds_config_hash_;
-  std::map<std::string, envoy::config::route::v3::VirtualHost> rds_virtual_hosts_;
-  std::unique_ptr<std::map<std::string, envoy::config::route::v3::VirtualHost>> vhds_virtual_hosts_;
+  VirtualHostMap rds_virtual_hosts_;
+  std::unique_ptr<VirtualHostMap> vhds_virtual_hosts_;
   std::set<std::string> resource_ids_in_last_update_;
   bool vhds_configuration_changed_;
 };
