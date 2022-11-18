@@ -99,26 +99,25 @@ public:
 
   /**
    * @param The name of the stat, obtained from the SymbolTable.
-   * @return a reference to a counter within the scope's namespace, if it exists.
+   * @return a reference to a counter within the entire store, if it exists.
    */
   virtual CounterOptConstRef findCounter(StatName name) const PURE;
 
   /**
    * @param The name of the stat, obtained from the SymbolTable.
-   * @return a reference to a gauge within the scope's namespace, if it exists.
+   * @return a reference to a gauge within the entire store, if it exists.
    */
   virtual GaugeOptConstRef findGauge(StatName name) const PURE;
 
   /**
    * @param The name of the stat, obtained from the SymbolTable.
-   * @return a reference to a histogram within the scope's namespace, if it
-   * exists.
+   * @return a reference to a histogram within the entire store, if it exists.
    */
   virtual HistogramOptConstRef findHistogram(StatName name) const PURE;
 
   /**
    * @param The name of the stat, obtained from the SymbolTable.
-   * @return a reference to a text readout within the scope's namespace, if it exists.
+   * @return a reference to a text readout within the entire store, if it exists.
    */
   virtual TextReadoutOptConstRef findTextReadout(StatName name) const PURE;
 
@@ -168,7 +167,7 @@ public:
   operator Scope&() { return *rootScope(); }
 
   // Delegate somea methods to the root scope; these are exposed to make it more
-  // convenient to use stats_macros.h. We can consider dropping them if desired,
+  // convenient to use stats_macros.h. We mayconsider dropping them if desired,
   // when we resovle #24007 or in the next follow-up.
   Counter& counterFromString(const std::string& name) {
     return rootScope()->counterFromString(name);

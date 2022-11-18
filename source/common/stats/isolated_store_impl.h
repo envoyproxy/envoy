@@ -119,8 +119,6 @@ public:
   }
 
 private:
-  //friend class IsolatedStoreImpl;
-
   StatNameHashMap<RefcountPtr<Base>> stats_;
   CounterAllocator counter_alloc_;
   GaugeAllocator gauge_alloc_;
@@ -185,15 +183,15 @@ public:
   }
 
   void forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const override {
-    IsolatedStoreImpl::forEachCounter(f_size, f_stat);
+    forEachCounter(f_size, f_stat);
   }
 
   void forEachSinkedGauge(SizeFn f_size, StatFn<Gauge> f_stat) const override {
-    IsolatedStoreImpl::forEachGauge(f_size, f_stat);
+    forEachGauge(f_size, f_stat);
   }
 
   void forEachSinkedTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const override {
-    IsolatedStoreImpl::forEachTextReadout(f_size, f_stat);
+    forEachTextReadout(f_size, f_stat);
   }
 
   CounterOptConstRef findCounter(StatName name) const override { return counters_.find(name); }
