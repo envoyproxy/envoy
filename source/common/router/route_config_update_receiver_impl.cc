@@ -63,7 +63,7 @@ bool RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message& rc,
   for (const auto& vhost : new_route_config->virtual_hosts()) {
     rds_virtual_hosts.emplace(vhost.name(), vhost);
   }
-  if(vhds_virtual_hosts_->size() > 0) {
+  if (vhds_virtual_hosts_->size() > 0) {
     // If there are vhosts that were provided by VHDS, merge them with RDS vhosts.
     rebuildRouteConfigVirtualHosts(rds_virtual_hosts, *vhds_virtual_hosts_, *new_route_config);
   }
