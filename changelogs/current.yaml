@@ -250,6 +250,11 @@ bug_fixes:
   change: |
     Fix a use-after-free bug that occurs in the CORS filter if the ``origin`` header is removed between
     request header decoding and response header encoding.
+- area: oauth2
+  change: |
+    Fixed a cookie validator bug that meant the HMAC calculation could be the same for different payloads.
+
+    This prevents malicious clients from constructing credentials with permanent validity in some specific scenarios.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
