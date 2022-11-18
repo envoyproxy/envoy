@@ -222,7 +222,7 @@ if [[ "$CI_TARGET" == "bazel.release" ]]; then
 
   setup_clang_toolchain
   echo "Testing ${TEST_TARGETS[*]} with options: ${BAZEL_BUILD_OPTIONS[*]}"
-  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c opt "${TEST_TARGETS[@]}"
+  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --test_arg="-l trace" -c opt "${TEST_TARGETS[@]}"
 
   echo "bazel release build..."
   bazel_envoy_binary_build release
