@@ -31,7 +31,7 @@ minor_behavior_changes:
     Requests which match the passthrough header now have their own metric ``oauth_passthrough`` and aren't included in ``oauth_success`` anymore.
 - area: rate_limit
   change: |
-    add `MONTH` and `YEAR` to the unit of time for rate limit.
+    add ``MONTH`` and ``YEAR`` to the unit of time for rate limit.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
