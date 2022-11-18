@@ -17,7 +17,6 @@
 namespace Envoy {
 namespace {
 
-
 class EdsOverGrpcIntegrationTest : public Grpc::MultiplexedDeltaSotwIntegrationParamTest,
                                    public HttpIntegrationTest {
 protected:
@@ -93,13 +92,16 @@ protected:
                                                         : envoy::config::core::v3::UNKNOWN);
       }
     }
+    auto& stream =
+        (edsUpdateMode() == Grpc::EdsUpdateMode::Multiplexed) ? xds_stream_ : xds_streams_.front();
     sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
         Config::TypeUrl::get().ClusterLoadAssignment, {cluster_load_assignment},
-        {cluster_load_assignment}, {}, std::to_string(eds_version_++));
+        {cluster_load_assignment}, {}, std::to_string(eds_version_++), stream);
     if (await_update) {
       // Receive EDS ack.
       EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment,
-                                          std::to_string(eds_version_ - 1), {}, {}, {}, true));
+                                          std::to_string(eds_version_ - 1), {}, {}, {}, true,
+                                          Grpc::Status::WellKnownGrpcStatus::Ok, "", stream.get()));
     }
   }
 
@@ -118,11 +120,6 @@ protected:
 
   void initializeTest(bool http_active_hc, uint32_t num_clusters_to_add,
                       bool ignore_new_hosts_until_first_hc) {
-    if (sotw_or_delta_ == Grpc::SotwOrDelta::Delta) {
-      std::cerr << "********************sotw_or_delta_ == Grpc::SotwOrDelta::Delta********************" << std::endl;
-    } else {
-      std::cerr << "********************sotw_or_delta_ == Grpc::SotwOrDelta::Sotws********************" << std::endl;
-    }
     setUpstreamCount(4);
     setUpstreamProtocol(Http::CodecType::HTTP2);
     if (edsUpdateMode() == Grpc::EdsUpdateMode::Multiplexed) {
@@ -168,35 +165,33 @@ protected:
     cluster_load_assignment_.set_cluster_name("cluster_0");
     acceptXdsConnection();
 
-    initXdsStream();
-    initXdsStream();
-
-    if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
-      DiscoveryRequestExpectedContents r1 = DiscoveryRequestExpectedContents{Config::TypeUrl::get().ClusterLoadAssignment, {"cluster_0"}, {}, Grpc::Status::WellKnownGrpcStatus::Ok, ""};
-      DiscoveryRequestExpectedContents r2 = DiscoveryRequestExpectedContents{Config::TypeUrl::get().ClusterLoadAssignment, {"cluster_1"}, {}, Grpc::Status::WellKnownGrpcStatus::Ok, ""};
-      std::list<DiscoveryRequestExpectedContents> expected_requests_contents ( {r1, r2} );
-      compareMultipleDiscoveryRequestsOnMultipleStreams(expected_requests_contents);
+    if (edsUpdateMode() == Grpc::EdsUpdateMode::Multiplexed) {
+      initXdsStream(xds_stream_);
+      for (uint32_t i = 0; i < num_clusters_to_add; ++i) {
+        EXPECT_TRUE(compareDiscoveryRequest(
+            Config::TypeUrl::get().ClusterLoadAssignment, "",
+            {resource_names_.begin(), resource_names_.begin() + i + 1}, {}, {}, true));
+      }
+      sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+          Config::TypeUrl::get().ClusterLoadAssignment, clas_to_add_, clas_to_add_, {},
+          std::to_string(eds_version_));
+      // Receive EDS ack.
+      EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment,
+                                          std::to_string(eds_version_), {}, {}, {}, true));
+      eds_version_++;
     } else {
-          EXPECT_TRUE(compareDiscoveryRequest(
-        /*expected_type_url=*/Config::TypeUrl::get().ClusterLoadAssignment,
-        /*expected_version=*/std::to_string(eds_version_),
-        /*expected_resource_names=*/{"cluster_0"}, {}, {}, true,
-        Grpc::Status::WellKnownGrpcStatus::Ok,
-        /*expected_error_message=*/"", xds_streams_[0].get()));
-
-    EXPECT_TRUE(compareDiscoveryRequest(
-        /*expected_type_url=*/Config::TypeUrl::get().ClusterLoadAssignment,
-        /*expected_version=*/std::to_string(eds_version_+1),
-        /*expected_resource_names=*/{"cluster_1"}, {}, {}, true,
-        Grpc::Status::WellKnownGrpcStatus::Ok,
-        /*expected_error_message=*/"", xds_streams_[1].get()));
-
+      std::list<DiscoveryRequestExpectedContents> expected_requests_contents;
+      for (uint32_t i = 0; i < num_clusters_to_add; ++i) {
+        xds_streams_.emplace_back();
+        initXdsStream(xds_streams_.back());
+        expected_requests_contents.push_back({Config::TypeUrl::get().ClusterLoadAssignment,
+                                              {"cluster_" + std::to_string(i)},
+                                              {},
+                                              Grpc::Status::WellKnownGrpcStatus::Ok,
+                                              ""});
+        compareMultipleDiscoveryRequestsOnMultipleStreams(expected_requests_contents);
+      }
     }
-
-    // // Receive EDS ack.
-    // EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment,
-    //                                     std::to_string(eds_version_), {}, {}, {}, true));
-    // eds_version_++;
     // Wait for our statically specified listener to become ready, and register its port in the
     // test framework's downstream listener port map.
     test_server_->waitUntilListenersReady();
@@ -204,175 +199,55 @@ protected:
     test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
   }
 
-    struct DiscoveryRequestExpectedContents {
-    DiscoveryRequestExpectedContents(
-        const std::string& type_url, const std::vector<std::string>& subscriptions,
-        const std::vector<std::string>& unsubscriptions,
-        const Protobuf::int32 error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
-        const std::string& error_substring = "")
-        : type_url_(type_url),
-          // Convert subscribed/unsubscribed names into sets to ignore ordering.
-          subscriptions_(subscriptions.begin(), subscriptions.end()),
-          unsubscriptions_(unsubscriptions.begin(), unsubscriptions.end()), error_code_(error_code),
-          error_substring_(error_substring) {}
-
-    const std::string& type_url_;
-    const std::set<std::string> subscriptions_;
-    const std::set<std::string> unsubscriptions_;
-    const Protobuf::int32 error_code_;
-    const std::string& error_substring_;
-  };
-
   AssertionResult compareMultipleDiscoveryRequestsOnMultipleStreams(
-    std::list<DiscoveryRequestExpectedContents>& expected_requests_contents) {
-  uint32_t curr_stream_idx = 0;
-  while (curr_stream_idx < xds_streams_.size()) {
+      std::list<DiscoveryRequestExpectedContents>& expected_requests_contents) {
+    uint32_t curr_stream_idx = 0;
     bool comparison_result;
-    for (auto it = expected_requests_contents.begin(); it != expected_requests_contents.end(); ++it){
-      if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
-        comparison_result = assertExpectedDiscoveryRequest(curr_stream_idx, *it);
-      } else {
-        comparison_result = assertExpectedDeltaDiscoveryRequest(curr_stream_idx, *it);
-      }
-      if (comparison_result) {
-        sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-        Config::TypeUrl::get().ClusterLoadAssignment, {clas_to_add_[curr_stream_idx]}, {clas_to_add_[curr_stream_idx]}, {},
-        std::to_string(eds_version_),xds_streams_[curr_stream_idx]);
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment,
-                                        std::to_string(eds_version_), {}, {}, {}, true, Grpc::Status::WellKnownGrpcStatus::Ok,
-        /*expected_error_message=*/"", xds_streams_[curr_stream_idx].get()));
-        ++curr_stream_idx;
-        expected_requests_contents.erase(it);
-        ++eds_version_;
-        // Request received on current stream, no more requests expected for this stream.
-        break;
-      } else {
-        continue;
+    while (curr_stream_idx < xds_streams_.size()) {
+      for (auto it = expected_requests_contents.begin(); it != expected_requests_contents.end();
+           ++it) {
+        const auto expected_request = *it;
+        if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
+          envoy::service::discovery::v3::DiscoveryRequest request;
+          VERIFY_ASSERTION(
+              xds_streams_[curr_stream_idx]->waitForGrpcMessage(*dispatcher_, request));
+          comparison_result = assertExpectedDiscoveryRequest(request, expected_request);
+        } else {
+          envoy::service::discovery::v3::DeltaDiscoveryRequest request;
+          VERIFY_ASSERTION(
+              xds_streams_[curr_stream_idx]->waitForGrpcMessage(*dispatcher_, request));
+          comparison_result = assertExpectedDeltaDiscoveryRequest(request, expected_request);
+        }
+        if (comparison_result) {
+          sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+              Config::TypeUrl::get().ClusterLoadAssignment, {clas_to_add_[curr_stream_idx]},
+              {clas_to_add_[curr_stream_idx]}, {}, std::to_string(eds_version_),
+              xds_streams_[curr_stream_idx]);
+          // Receive EDS ack.
+          EXPECT_TRUE(compareDiscoveryRequest(
+              Config::TypeUrl::get().ClusterLoadAssignment, std::to_string(eds_version_), {}, {},
+              {}, true, Grpc::Status::WellKnownGrpcStatus::Ok,
+              /*expected_error_message=*/"", xds_streams_[curr_stream_idx].get()));
+          ++curr_stream_idx;
+          expected_requests_contents.erase(it);
+          ++eds_version_;
+          // Request received on current stream, no more requests expected for this stream.
+          break;
+        } else {
+          // No matching request found.
+          if (it == expected_requests_contents.end()) {
+            return AssertionFailure();
+          }
+          continue;
+        }
       }
     }
-  }
-  if (!expected_requests_contents.empty()){
-    return AssertionFailure();
-  } else {
+    if (!expected_requests_contents.empty()) {
+      return AssertionFailure();
+    } else {
       return AssertionSuccess();
-  }
-
-}
-
-AssertionResult assertExpectedDiscoveryRequest(uint32_t stream_idx, const DiscoveryRequestExpectedContents& expected_request){
-    envoy::service::discovery::v3::DiscoveryRequest request;
-    VERIFY_ASSERTION(xds_streams_[stream_idx]->waitForGrpcMessage(*dispatcher_, request));
-    if (!request.has_node() || request.node().id().empty() || request.node().cluster().empty()) {
-      return AssertionFailure() << "Weird node field";
     }
-    // Convert subscribed/unsubscribed names into sets to ignore ordering.
-    const std::set<std::string> actual_sub{request.resource_names().begin(),
-                                          request.resource_names().end()};
-    return internalCompareDiscoveryRequest(expected_request, request, actual_sub);
-}
-
-AssertionResult assertExpectedDeltaDiscoveryRequest(uint32_t stream_idx, const DiscoveryRequestExpectedContents& expected_request){
-    envoy::service::discovery::v3::DeltaDiscoveryRequest request;
-    VERIFY_ASSERTION(xds_streams_[stream_idx]->waitForGrpcMessage(*dispatcher_, request));
-    if (!request.has_node() || request.node().id().empty() || request.node().cluster().empty()) {
-      return AssertionFailure() << "Weird node field";
-    }
-    const std::set<std::string> actual_sub{request.resource_names_subscribe().begin(),
-                                           request.resource_names_subscribe().end()};
-    const std::set<std::string> actual_unsub{request.resource_names_unsubscribe().begin(),
-                                             request.resource_names_unsubscribe().end()};
-    return internalCompareDeltaDiscoveryRequest(expected_request, request, actual_sub, actual_unsub);
-}
-
-AssertionResult internalCompareDiscoveryRequest(
-    const DiscoveryRequestExpectedContents& expected_request,
-    const envoy::service::discovery::v3::DiscoveryRequest& actual_request,
-    const std::set<std::string>& actual_sub) {
-
-  if (actual_request.type_url() != expected_request.type_url_) {
-    return AssertionFailure() << fmt::format("type_url {} does not match expected {}.",
-                                             actual_request.type_url(), expected_request.type_url_);
   }
-  auto sub_result =
-      compareSets(expected_request.subscriptions_, actual_sub, "expected_resource_subscriptions");
-  if (!sub_result) {
-    return sub_result;
-  }
-  // auto unsub_result = compareSets(expected_request.unsubscriptions_, actual_unsub,
-  //                                 "expected_resource_unsubscriptions");
-  // if (!unsub_result) {
-  //   return unsub_result;
-  // }
-  // // (We don't care about response_nonce or initial_resource_versions.)
-
-  if (actual_request.error_detail().code() != expected_request.error_code_) {
-    return AssertionFailure() << fmt::format(
-               "error code {} does not match expected {}. (Error message is {}).",
-               actual_request.error_detail().code(), expected_request.error_code_,
-               actual_request.error_detail().message());
-  }
-  if (expected_request.error_code_ != Grpc::Status::WellKnownGrpcStatus::Ok &&
-      actual_request.error_detail().message().find(expected_request.error_substring_) ==
-          std::string::npos) {
-    return AssertionFailure() << "\"" << expected_request.error_substring_
-                              << "\" is not a substring of actual error message \""
-                              << actual_request.error_detail().message() << "\"";
-  }
-  return AssertionSuccess();
-}
-
-AssertionResult internalCompareDeltaDiscoveryRequest(
-    const DiscoveryRequestExpectedContents& expected_request,
-    const envoy::service::discovery::v3::DeltaDiscoveryRequest& actual_request,
-    const std::set<std::string>& actual_sub, const std::set<std::string>& actual_unsub) {
-
-  if (actual_request.type_url() != expected_request.type_url_) {
-    return AssertionFailure() << fmt::format("type_url {} does not match expected {}.",
-                                             actual_request.type_url(), expected_request.type_url_);
-  }
-  auto sub_result =
-      compareSets(expected_request.subscriptions_, actual_sub, "expected_resource_subscriptions");
-  if (!sub_result) {
-    return sub_result;
-  }
-  auto unsub_result = compareSets(expected_request.unsubscriptions_, actual_unsub,
-                                  "expected_resource_unsubscriptions");
-  if (!unsub_result) {
-    return unsub_result;
-  }
-  // // (We don't care about response_nonce or initial_resource_versions.)
-
-  if (actual_request.error_detail().code() != expected_request.error_code_) {
-    return AssertionFailure() << fmt::format(
-               "error code {} does not match expected {}. (Error message is {}).",
-               actual_request.error_detail().code(), expected_request.error_code_,
-               actual_request.error_detail().message());
-  }
-  if (expected_request.error_code_ != Grpc::Status::WellKnownGrpcStatus::Ok &&
-      actual_request.error_detail().message().find(expected_request.error_substring_) ==
-          std::string::npos) {
-    return AssertionFailure() << "\"" << expected_request.error_substring_
-                              << "\" is not a substring of actual error message \""
-                              << actual_request.error_detail().message() << "\"";
-  }
-  return AssertionSuccess();
-}
-
-AssertionResult compareSets(const std::set<std::string>& set1, const std::set<std::string>& set2,
-                            absl::string_view name) {
-  if (set1 == set2) {
-    return AssertionSuccess();
-  }
-  auto failure = AssertionFailure() << name << " field not as expected.\nExpected: {";
-  for (const auto& x : set1) {
-    failure << x << ", ";
-  }
-  failure << "}\nActual: {";
-  for (const auto& x : set2) {
-    failure << x << ", ";
-  }
-  return failure << "}";
-}
 
   envoy::config::cluster::v3::Cluster buildCluster(const std::string& name, bool http_active_hc,
                                                    bool ignore_new_hosts_until_first_hc) {
@@ -408,19 +283,15 @@ AssertionResult compareSets(const std::set<std::string>& set1, const std::set<st
   }
 
   void acceptXdsConnection() {
-    AssertionResult result = // xds_connection_ is filled with the new FakeHttpConnection.
+    AssertionResult result =
         fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, xds_connection_);
     RELEASE_ASSERT(result, result.message());
-    // result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
-    // RELEASE_ASSERT(result, result.message());
-    // xds_stream_->startGrpcStream();
   }
 
-    void initXdsStream() {
-    xds_streams_.emplace_back();
-    AssertionResult result = xds_connection_->waitForNewStream(*dispatcher_, xds_streams_.back());
+  void initXdsStream(FakeStreamPtr& stream) {
+    AssertionResult result = xds_connection_->waitForNewStream(*dispatcher_, stream);
     RELEASE_ASSERT(result, result.message());
-    xds_streams_.back()->startGrpcStream();
+    stream->startGrpcStream();
   }
 
   void resetFakeUpstreamInfo(FakeUpstreamInfo& upstream_info) {
@@ -467,15 +338,17 @@ AssertionResult compareSets(const std::set<std::string>& set1, const std::set<st
         setUpstreamAddress(i, *endpoint);
       }
     }
-
+    auto& stream =
+        (edsUpdateMode() == Grpc::EdsUpdateMode::Multiplexed) ? xds_stream_ : xds_streams_.front();
     sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
         Config::TypeUrl::get().ClusterLoadAssignment, {cluster_load_assignment},
-        {cluster_load_assignment}, {}, std::to_string(eds_version_++));
+        {cluster_load_assignment}, {}, std::to_string(eds_version_++), stream);
 
     if (await_update) {
       // Receive EDS ack.
       EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment,
-                                          std::to_string(eds_version_ - 1), {}, {}, {}, true));
+                                          std::to_string(eds_version_ - 1), {}, {}, {}, true,
+                                          Grpc::Status::WellKnownGrpcStatus::Ok, "", stream.get()));
     }
   }
 
@@ -496,241 +369,237 @@ AssertionResult compareSets(const std::set<std::string>& set1, const std::set<st
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeSotwOrDeltaEdsMode, EdsOverGrpcIntegrationTest,
                          EDS_MODE_DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
 
-// // Validates that endpoints can be added and then moved to other priorities without causing crashes.
-// // Primarily as a regression test for https://github.com/envoyproxy/envoy/issues/8764
-// TEST_P(EdsOverGrpcIntegrationTest, Http2UpdatePriorities) {
-//   initializeTest(true);
-//   setEndpointsInPriorities(2, 2);
-//   setEndpointsInPriorities(4, 0);
-//   setEndpointsInPriorities(0, 4);
-// }
+// Validates that endpoints can be added and then moved to other priorities without causing crashes.
+// Primarily as a regression test for https://github.com/envoyproxy/envoy/issues/8764
+TEST_P(EdsOverGrpcIntegrationTest, Http2UpdatePriorities) {
+  initializeTest(true);
+  setEndpointsInPriorities(2, 2);
+  setEndpointsInPriorities(4, 0);
+  setEndpointsInPriorities(0, 4);
+}
 
-// // Verify that a host stabilized via active health checking which is first removed from EDS and
-// // then fails health checking is removed.
-// TEST_P(EdsOverGrpcIntegrationTest, RemoveAfterHcFail) {
-//   initializeTest(true);
-//   setEndpoints(1, 0, 0, false);
-//   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
-//   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
-//   // Wait for the first HC and verify the host is healthy.
-//   waitForHealthCheck(0);
-//   hosts_upstreams_info_[0].defaultStream()->encodeHeaders(
-//       Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-//   test_server_->waitForGaugeEq("cluster.cluster_0.membership_healthy", 1);
-//   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
-//   // Clear out the host and verify the host is still healthy.
-//   setEndpoints(0, 0, 0);
-//   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
-//   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
-//   // Fail HC and verify the host is gone.
-//   waitForHealthCheck(0);
-//   hosts_upstreams_info_[0].defaultStream()->encodeHeaders(
-//       Http::TestResponseHeaderMapImpl{{":status", "503"}, {"connection", "close"}}, true);
-//   test_server_->waitForGaugeEq("cluster.cluster_0.membership_healthy", 0);
-//   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_total")->value());
-// }
+// Verify that a host stabilized via active health checking which is first removed from EDS and
+// then fails health checking is removed.
+TEST_P(EdsOverGrpcIntegrationTest, RemoveAfterHcFail) {
+  initializeTest(true);
+  setEndpoints(1, 0, 0, false);
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+  // Wait for the first HC and verify the host is healthy.
+  waitForHealthCheck(0);
+  hosts_upstreams_info_[0].defaultStream()->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  test_server_->waitForGaugeEq("cluster.cluster_0.membership_healthy", 1);
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  // Clear out the host and verify the host is still healthy.
+  setEndpoints(0, 0, 0);
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+  // Fail HC and verify the host is gone.
+  waitForHealthCheck(0);
+  hosts_upstreams_info_[0].defaultStream()->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "503"}, {"connection", "close"}}, true);
+  test_server_->waitForGaugeEq("cluster.cluster_0.membership_healthy", 0);
+  EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+}
 
-// // Verifies that endpoints are ignored until health checked when configured to.
-// TEST_P(EdsOverGrpcIntegrationTest, EndpointWarmingSuccessfulHc) {
-//   // Endpoints are initially excluded.
-//   initializeTest(true, 1, true);
-//   setEndpoints(1, 0, 0, false);
-//   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
-//   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_excluded")->value());
-//   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
-//   // Wait for the first HC and verify the host is healthy and that it is no longer being
-//   // excluded.
-//   // The other endpoint should still be excluded.
-//   waitForNextUpstreamRequest(1);
-//   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-//   test_server_->waitForGaugeEq("cluster.cluster_0.membership_excluded", 0);
-//   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
-//   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
-// }
+// Verifies that endpoints are ignored until health checked when configured to.
+TEST_P(EdsOverGrpcIntegrationTest, EndpointWarmingSuccessfulHc) {
+  // Endpoints are initially excluded.
+  initializeTest(true, 1, true);
+  setEndpoints(1, 0, 0, false);
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_excluded")->value());
+  EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+  // Wait for the first HC and verify the host is healthy and that it is no longer being
+  // excluded.
+  // The other endpoint should still be excluded.
+  waitForNextUpstreamRequest(1);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  test_server_->waitForGaugeEq("cluster.cluster_0.membership_excluded", 0);
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+}
 
-// // Verifies that endpoints are ignored until health checked when configured to when the first
-// // health check fails.
-// TEST_P(EdsOverGrpcIntegrationTest, EndpointWarmingFailedHc) {
-//   // Endpoints are initially excluded.
-//   initializeTest(true, 1, true);
-//   setEndpoints(1, 0, 0, false);
-//   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
-//   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_excluded")->value());
-//   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+// Verifies that endpoints are ignored until health checked when configured to when the first
+// health check fails.
+TEST_P(EdsOverGrpcIntegrationTest, EndpointWarmingFailedHc) {
+  // Endpoints are initially excluded.
+  initializeTest(true, 1, true);
+  setEndpoints(1, 0, 0, false);
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_excluded")->value());
+  EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
 
-//   // Wait for the first HC and verify the host is healthy and that it is no longer being
-//   // excluded.
-//   // The other endpoint should still be excluded.
-//   waitForNextUpstreamRequest(1);
-//   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
-//   test_server_->waitForGaugeEq("cluster.cluster_0.membership_excluded", 0);
-//   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
-//   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
-// }
+  // Wait for the first HC and verify the host is healthy and that it is no longer being
+  // excluded.
+  // The other endpoint should still be excluded.
+  waitForNextUpstreamRequest(1);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
+  test_server_->waitForGaugeEq("cluster.cluster_0.membership_excluded", 0);
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+}
 
-// // Validate that health status updates are consumed from EDS.
-// TEST_P(EdsOverGrpcIntegrationTest, HealthUpdate) {
-//   initializeTest(false);
-//   // Initial state, no cluster members.
-//   EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.membership_change")->value());
-//   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_total")->value());
-//   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
-//   // 2/2 healthy endpoints.
-//   setEndpoints(2, 2, 0);
-//   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.membership_change")->value());
-//   EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_total")->value());
-//   EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
-//   // Drop to 0/2 healthy endpoints.
-//   setEndpoints(2, 0, 0);
-//   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.membership_change")->value());
-//   EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_total")->value());
-//   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
-//   // Increase to 1/2 healthy endpoints.
-//   setEndpoints(2, 1, 0);
-//   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.membership_change")->value());
-//   EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_total")->value());
-//   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
-//   // Add host and modify health to 2/3 healthy endpoints.
-//   setEndpoints(3, 2, 0);
-//   EXPECT_EQ(2, test_server_->counter("cluster.cluster_0.membership_change")->value());
-//   EXPECT_EQ(3, test_server_->gauge("cluster.cluster_0.membership_total")->value());
-//   EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
-//   // Modify health to 2/3 healthy and 1/3 degraded.
-//   setEndpoints(3, 2, 1);
-//   EXPECT_EQ(2, test_server_->counter("cluster.cluster_0.membership_change")->value());
-//   EXPECT_EQ(3, test_server_->gauge("cluster.cluster_0.membership_total")->value());
-//   EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
-//   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_degraded")->value());
-// }
+// Validate that health status updates are consumed from EDS.
+TEST_P(EdsOverGrpcIntegrationTest, HealthUpdate) {
+  initializeTest(false);
+  // Initial state, no cluster members.
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.membership_change")->value());
+  EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+  // 2/2 healthy endpoints.
+  setEndpoints(2, 2, 0);
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.membership_change")->value());
+  EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+  // Drop to 0/2 healthy endpoints.
+  setEndpoints(2, 0, 0);
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.membership_change")->value());
+  EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+  // Increase to 1/2 healthy endpoints.
+  setEndpoints(2, 1, 0);
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.membership_change")->value());
+  EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+  // Add host and modify health to 2/3 healthy endpoints.
+  setEndpoints(3, 2, 0);
+  EXPECT_EQ(2, test_server_->counter("cluster.cluster_0.membership_change")->value());
+  EXPECT_EQ(3, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+  // Modify health to 2/3 healthy and 1/3 degraded.
+  setEndpoints(3, 2, 1);
+  EXPECT_EQ(2, test_server_->counter("cluster.cluster_0.membership_change")->value());
+  EXPECT_EQ(3, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_degraded")->value());
+}
 
-// // Validate that overprovisioning_factor update are picked up by Envoy.
-// TEST_P(EdsOverGrpcIntegrationTest, OverprovisioningFactorUpdate) {
-//   initializeTest(false);
-//   // Default overprovisioning factor.
-//   setEndpoints(4, 4, 0);
-//   auto get_and_compare = [this](const uint32_t expected_factor) {
-//     const auto& cluster_map = test_server_->server().clusterManager().clusters();
-//     EXPECT_EQ(2, cluster_map.active_clusters_.size());
-//     EXPECT_EQ(1, cluster_map.active_clusters_.count("cluster_0"));
-//     const auto& cluster_ref = cluster_map.active_clusters_.find("cluster_0")->second;
-//     const auto& hostset_per_priority = cluster_ref.get().prioritySet().hostSetsPerPriority();
-//     EXPECT_EQ(2, hostset_per_priority.size());
-//     const Envoy::Upstream::HostSetPtr& host_set = hostset_per_priority[0];
-//     EXPECT_EQ(expected_factor, host_set->overprovisioningFactor());
-//   };
-//   get_and_compare(Envoy::Upstream::kDefaultOverProvisioningFactor);
-//   // Use new overprovisioning factor 200.
-//   setEndpoints(4, 4, 0, true, 200);
-//   get_and_compare(200);
-// }
+// Validate that overprovisioning_factor update are picked up by Envoy.
+TEST_P(EdsOverGrpcIntegrationTest, OverprovisioningFactorUpdate) {
+  initializeTest(false);
+  // Default overprovisioning factor.
+  setEndpoints(4, 4, 0);
+  auto get_and_compare = [this](const uint32_t expected_factor) {
+    const auto& cluster_map = test_server_->server().clusterManager().clusters();
+    EXPECT_EQ(2, cluster_map.active_clusters_.size());
+    EXPECT_EQ(1, cluster_map.active_clusters_.count("cluster_0"));
+    const auto& cluster_ref = cluster_map.active_clusters_.find("cluster_0")->second;
+    const auto& hostset_per_priority = cluster_ref.get().prioritySet().hostSetsPerPriority();
+    EXPECT_EQ(2, hostset_per_priority.size());
+    const Envoy::Upstream::HostSetPtr& host_set = hostset_per_priority[0];
+    EXPECT_EQ(expected_factor, host_set->overprovisioningFactor());
+  };
+  get_and_compare(Envoy::Upstream::kDefaultOverProvisioningFactor);
+  // Use new overprovisioning factor 200.
+  setEndpoints(4, 4, 0, true, 200);
+  get_and_compare(200);
+}
 
-// // Verifies that EDS update only triggers member update callbacks once per update.
-// TEST_P(EdsOverGrpcIntegrationTest, BatchMemberUpdateCb) {
-//   initializeTest(false);
-//   uint32_t member_update_count{};
-//   auto& priority_set = test_server_->server()
-//                            .clusterManager()
-//                            .clusters()
-//                            .active_clusters_.find("cluster_0")
-//                            ->second.get()
-//                            .prioritySet();
-//   // Keep track of how many times we're seeing a member update callback.
-//   auto member_update_cb = priority_set.addMemberUpdateCb([&](const auto& hosts_added, const auto&) {
-//     // We should see both hosts present in the member update callback.
-//     EXPECT_EQ(2, hosts_added.size());
-//     member_update_count++;
-//   });
-//   setEndpoints(2, 2, 0);
-//   EXPECT_EQ(1, member_update_count);
-// }
+// Verifies that EDS update only triggers member update callbacks once per update.
+TEST_P(EdsOverGrpcIntegrationTest, BatchMemberUpdateCb) {
+  initializeTest(false);
+  uint32_t member_update_count{};
+  auto& priority_set = test_server_->server()
+                           .clusterManager()
+                           .clusters()
+                           .active_clusters_.find("cluster_0")
+                           ->second.get()
+                           .prioritySet();
+  // Keep track of how many times we're seeing a member update callback.
+  auto member_update_cb = priority_set.addMemberUpdateCb([&](const auto& hosts_added, const auto&) {
+    // We should see both hosts present in the member update callback.
+    EXPECT_EQ(2, hosts_added.size());
+    member_update_count++;
+  });
+  setEndpoints(2, 2, 0);
+  EXPECT_EQ(1, member_update_count);
+}
 
-// TEST_P(EdsOverGrpcIntegrationTest, StatsReadyFilter) {
-//   config_helper_.prependFilter("name: eds-ready-filter");
-//   initializeTest(false);
-//   // Initial state: no healthy endpoints
-//   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
-//   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-//       lookupPort("http"), "GET", "/cluster1", "", downstream_protocol_, version_, "foo.com");
-//   ASSERT_TRUE(response->complete());
-//   EXPECT_EQ("500", response->headers().getStatusValue());
-//   EXPECT_EQ("EDS not ready", response->body());
-//   cleanupUpstreamAndDownstream();
-//   // 2/2 healthy endpoints.
-//   setEndpoints(2, 2, 0);
-//   EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
-//   response = IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", "/cluster1", "",
-//                                                 downstream_protocol_, version_, "foo.com");
-//   ASSERT_TRUE(response->complete());
-//   EXPECT_EQ("200", response->headers().getStatusValue());
-//   EXPECT_EQ("EDS is ready", response->body());
-//   cleanupUpstreamAndDownstream();
-// }
+TEST_P(EdsOverGrpcIntegrationTest, StatsReadyFilter) {
+  config_helper_.prependFilter("name: eds-ready-filter");
+  initializeTest(false);
+  // Initial state: no healthy endpoints
+  EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("http"), "GET", "/cluster1", "", downstream_protocol_, version_, "foo.com");
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("500", response->headers().getStatusValue());
+  EXPECT_EQ("EDS not ready", response->body());
+  cleanupUpstreamAndDownstream();
+  // 2/2 healthy endpoints.
+  setEndpoints(2, 2, 0);
+  EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+  response = IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", "/cluster1", "",
+                                                downstream_protocol_, version_, "foo.com");
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("EDS is ready", response->body());
+  cleanupUpstreamAndDownstream();
+}
 
-// TEST_P(EdsOverGrpcIntegrationTest, ReuseMuxAndStreamForMultipleClusters) {
-//   if (edsUpdateMode() == Grpc::EdsUpdateMode::Multiplexed) {
-//     initializeTest(false, 3, false);
-//     EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_total")->value());
-//     EXPECT_EQ(0, test_server_->gauge("cluster.cluster_1.membership_total")->value());
-//     EXPECT_EQ(0, test_server_->gauge("cluster.cluster_2.membership_total")->value());
-//     switch (clientType()) {
-//     case Grpc::ClientType::EnvoyGrpc:
-//       // As EDS uses HTTP2, number of streams created by Envoy for EDS cluster equals to number
-//       // of requests.
-//       EXPECT_EQ(1UL, test_server_->counter("cluster.eds_cluster.upstream_rq_total")->value());
-//       break;
-//     case Grpc::ClientType::GoogleGrpc:
-//       // One EDS mux/stream is created and reused for all 3 clusters when initializing first EDS
-//       // cluster (cluster_0). As a consequence, only one Google async grpc client and one
-//       // corresponding set of client stats should be created.
-//       EXPECT_EQ(1UL,
-//                 test_server_->counter("cluster.cluster_0.grpc.eds_cluster.streams_total")->value());
-//       EXPECT_EQ(TestUtility::findCounter(test_server_->statStore(),
-//                                          "cluster.cluster_1.grpc.eds_cluster.streams_total"),
-//                 nullptr);
-//       EXPECT_EQ(TestUtility::findCounter(test_server_->statStore(),
-//                                          "cluster.cluster_2.grpc.eds_cluster.streams_total"),
-//                 nullptr);
-//       break;
-//     default:
-//       PANIC("reached unexpected code");
-//     }
-//   } else {
-//     test_skipped_ = true;
-//   }
-// }
+TEST_P(EdsOverGrpcIntegrationTest, ReuseMuxAndStreamForMultipleClusters) {
+  if (edsUpdateMode() == Grpc::EdsUpdateMode::Multiplexed) {
+    initializeTest(false, 3, false);
+    EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+    EXPECT_EQ(0, test_server_->gauge("cluster.cluster_1.membership_total")->value());
+    EXPECT_EQ(0, test_server_->gauge("cluster.cluster_2.membership_total")->value());
+    switch (clientType()) {
+    case Grpc::ClientType::EnvoyGrpc:
+      // As EDS uses HTTP2, number of streams created by Envoy for EDS cluster equals to number
+      // of requests.
+      EXPECT_EQ(1UL, test_server_->counter("cluster.eds_cluster.upstream_rq_total")->value());
+      break;
+    case Grpc::ClientType::GoogleGrpc:
+      // One EDS mux/stream is created and reused for all 3 clusters when initializing first EDS
+      // cluster (cluster_0). As a consequence, only one Google async grpc client and one
+      // corresponding set of client stats should be created.
+      EXPECT_EQ(1UL,
+                test_server_->counter("cluster.cluster_0.grpc.eds_cluster.streams_total")->value());
+      EXPECT_EQ(TestUtility::findCounter(test_server_->statStore(),
+                                         "cluster.cluster_1.grpc.eds_cluster.streams_total"),
+                nullptr);
+      EXPECT_EQ(TestUtility::findCounter(test_server_->statStore(),
+                                         "cluster.cluster_2.grpc.eds_cluster.streams_total"),
+                nullptr);
+      break;
+    default:
+      PANIC("reached unexpected code");
+    }
+  } else {
+    test_skipped_ = true;
+  }
+}
 
 TEST_P(EdsOverGrpcIntegrationTest, StreamPerClusterMultipleClusters) {
   if (edsUpdateMode() == Grpc::EdsUpdateMode::StreamPerCluster) {
-    initializeTest(false, 2, false);
-    // EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_total")->value());
-    // EXPECT_EQ(0, test_server_->gauge("cluster.cluster_1.membership_total")->value());
-    // EXPECT_EQ(0, test_server_->gauge("cluster.cluster_2.membership_total")->value());
-    // switch (clientType()) {
-    // case Grpc::ClientType::EnvoyGrpc:
-    //   // As EDS uses HTTP2, number of streams created by Envoy for EDS cluster equals to number
-    //   // of requests.
-    //   EXPECT_EQ(3UL, test_server_->counter("cluster.eds_cluster.upstream_rq_total")->value());
-    //   break;
-    // case Grpc::ClientType::GoogleGrpc:
-    //   // // One EDS mux/stream is created and reused for all 3 clusters when initializing first EDS
-    //   // // cluster (cluster_0). As a consequence, only one Google async grpc client and one
-    //   // // corresponding set of client stats should be created.
-    //   // EXPECT_EQ(1UL,
-    //   //           test_server_->counter("cluster.cluster_0.grpc.eds_cluster.streams_total")->value());
-    //   // EXPECT_EQ(TestUtility::findCounter(test_server_->statStore(),
-    //   //                                    "cluster.cluster_1.grpc.eds_cluster.streams_total"),
-    //   //           nullptr);
-    //   // EXPECT_EQ(TestUtility::findCounter(test_server_->statStore(),
-    //   //                                    "cluster.cluster_2.grpc.eds_cluster.streams_total"),
-    //   //           nullptr);
-    //   break;
-    // default:
-    //   PANIC("reached unexpected code");
-    // }
+    initializeTest(false, 3, false);
+    EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+    EXPECT_EQ(0, test_server_->gauge("cluster.cluster_1.membership_total")->value());
+    EXPECT_EQ(0, test_server_->gauge("cluster.cluster_2.membership_total")->value());
+    switch (clientType()) {
+    case Grpc::ClientType::EnvoyGrpc:
+      // As EDS uses HTTP2, number of streams created by Envoy for EDS cluster equals to number
+      // of requests.
+      EXPECT_EQ(3UL, test_server_->counter("cluster.eds_cluster.upstream_rq_total")->value());
+      break;
+    case Grpc::ClientType::GoogleGrpc:
+      // One EDS mux/stream is created for each cluster. As a consequence, 3 sets of client stats
+      // should be instantiated.
+      EXPECT_EQ(1UL,
+                test_server_->counter("cluster.cluster_0.grpc.eds_cluster.streams_total")->value());
+      EXPECT_EQ(1UL,
+                test_server_->counter("cluster.cluster_1.grpc.eds_cluster.streams_total")->value());
+      EXPECT_EQ(1UL,
+                test_server_->counter("cluster.cluster_2.grpc.eds_cluster.streams_total")->value());
+      break;
+    default:
+      PANIC("reached unexpected code");
+    }
   } else {
     test_skipped_ = true;
   }
 }
 
 } // namespace
-} // namespace Envoy
