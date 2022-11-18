@@ -113,7 +113,8 @@ public:
 
   Upstream::MockClusterManager cm_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  Stats::MockStore scope_;
+  Stats::MockStore store_;
+  Stats::MockScope& scope_{store_.mockScope()};
   DangerousDeprecatedTestTime test_time_;
   Api::ApiPtr api_;
   StatNames stat_names_;
@@ -157,7 +158,7 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcInvalid) {
 }
 
 TEST_F(AsyncClientManagerImplTest, GoogleGrpc) {
-  EXPECT_CALL(scope_.mockScope(), createScope_("grpc.foo."));
+  EXPECT_CALL(scope_, createScope_("grpc.foo."));
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_google_grpc()->set_stat_prefix("foo");
 
@@ -171,7 +172,7 @@ TEST_F(AsyncClientManagerImplTest, GoogleGrpc) {
 }
 
 TEST_F(AsyncClientManagerImplTest, GoogleGrpcIllegalCharsInKey) {
-  EXPECT_CALL(scope_.mockScope(), createScope_("grpc.foo."));
+  EXPECT_CALL(scope_, createScope_("grpc.foo."));
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_google_grpc()->set_stat_prefix("foo");
 
@@ -191,7 +192,7 @@ TEST_F(AsyncClientManagerImplTest, GoogleGrpcIllegalCharsInKey) {
 }
 
 TEST_F(AsyncClientManagerImplTest, LegalGoogleGrpcChar) {
-  EXPECT_CALL(scope_.mockScope(), createScope_("grpc.foo."));
+  EXPECT_CALL(scope_, createScope_("grpc.foo."));
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_google_grpc()->set_stat_prefix("foo");
 
@@ -209,7 +210,7 @@ TEST_F(AsyncClientManagerImplTest, LegalGoogleGrpcChar) {
 }
 
 TEST_F(AsyncClientManagerImplTest, GoogleGrpcIllegalCharsInValue) {
-  EXPECT_CALL(scope_.mockScope(), createScope_("grpc.foo."));
+  EXPECT_CALL(scope_, createScope_("grpc.foo."));
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_google_grpc()->set_stat_prefix("foo");
 
