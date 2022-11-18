@@ -124,11 +124,11 @@ public:
 
     bool cluster_found = false;
     test_server_->server().dispatcher().post([&]() {
-      const ClusterConstOptRef& cluster_ref =
+      const Upstream::ClusterConstOptRef& cluster_ref =
           test_server_->server().clusterManager().clusters().getCluster(cluster_name);
       if (cluster_ref.has_value()) {
-        const auto& traffic_stats = *cluster_ref->get().info()->trafficStats();
-        traffic_stats;
+        const Upstream::ClusterTrafficStats& traffic_stats ABSL_ATTRIBUTE_UNUSED =
+            *cluster_ref->get().info()->trafficStats();
         cluster_found = true;
       }
       notifier.Notify();
