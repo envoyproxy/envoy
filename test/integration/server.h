@@ -72,16 +72,16 @@ namespace Stats {
 class TestScopeWrapper : public Scope {
 public:
   TestScopeWrapper(Thread::MutexBasicLockable& lock, ScopeSharedPtr wrapped_scope, Store& store)
-      : lock_(lock), wrapped_scope_(std::move(wrapped_scope)), store_(store) {}
+      : lock_(lock), wrapped_scope_(wrapped_scope), store_(store) {}
 
   ScopeSharedPtr createScope(const std::string& name) override {
     Thread::LockGuard lock(lock_);
-    return ScopeSharedPtr{new TestScopeWrapper(lock_, wrapped_scope_->createScope(name), store_)};
+    return std::make_shared<TestScopeWrapper>(lock_, wrapped_scope_->createScope(name), store_);
   }
 
   ScopeSharedPtr scopeFromStatName(StatName name) override {
     Thread::LockGuard lock(lock_);
-    return ScopeSharedPtr{new TestScopeWrapper(lock_, wrapped_scope_->scopeFromStatName(name), store_)};
+    return std::make_shared<TestScopeWrapper>(lock_, wrapped_scope_->scopeFromStatName(name), store_);
   }
 
   Counter& counterFromStatNameWithTags(const StatName& name,
@@ -308,10 +308,14 @@ public:
   void setSinkPredicates(std::unique_ptr<SinkPredicates>&& sink_predicates) override {
     UNREFERENCED_PARAMETER(sink_predicates);
   }
-  void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
+  void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
+    Thread::LockGuard lock(lock_);
+    store_.deliverHistogramToSinks(histogram, value);
+  }
   NullGaugeImpl& nullGauge() override { return store_.nullGauge(); }
   NullCounterImpl& nullCounter() override { return store_.nullCounter(); }
   ScopeSharedPtr rootScope() override {
+    Thread::LockGuard lock(lock_);
     if (lazy_default_scope_ == nullptr) {
       lazy_default_scope_ = std::make_shared<TestScopeWrapper>(lock_, store_.rootScope(), *this);
     }
