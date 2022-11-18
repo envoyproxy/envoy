@@ -203,7 +203,7 @@ public:
    */
   ScopeSharedPtr createScope(const std::string& name) { return rootScope()->createScope(name); }
 };
-.
+
 using StorePtr = std::unique_ptr<Store>;
 
 /**
