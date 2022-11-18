@@ -127,9 +127,7 @@ public:
       const Upstream::ClusterConstOptRef& cluster_ref =
           test_server_->server().clusterManager().clusters().getCluster(cluster_name);
       if (cluster_ref.has_value()) {
-        const Upstream::ClusterTrafficStats& traffic_stats =
-            *cluster_ref->get().info()->trafficStats();
-        UNREFERENCED_PARAMETER(traffic_stats);
+        *cluster_ref->get().info()->trafficStats();
         cluster_found = true;
       }
       notifier.Notify();
