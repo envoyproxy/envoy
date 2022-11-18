@@ -143,7 +143,8 @@ public:
   ~HttpIntegrationTest() override;
 
   void initialize() override;
-  void setupHttpImplOverrides(Http1Impl http1_implementation, Http2Impl http2_implementation);
+  void setupHttp1ImplOverrides(Http1Impl http1_implementation);
+  void setupHttp2ImplOverrides(Http2Impl http2_implementation);
 
 protected:
   void useAccessLog(absl::string_view format = "",

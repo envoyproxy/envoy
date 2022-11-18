@@ -57,7 +57,8 @@ public:
             GetParam().downstream_protocol, GetParam().version,
             ConfigHelper::httpProxyConfig(/*downstream_is_quic=*/GetParam().downstream_protocol ==
                                           Http::CodecType::HTTP3)) {
-    setupHttpImplOverrides(GetParam().http1_implementation, GetParam().http2_implementation);
+    setupHttp1ImplOverrides(GetParam().http1_implementation);
+    setupHttp2ImplOverrides(GetParam().http2_implementation);
     config_helper_.addRuntimeOverride(Runtime::defer_processing_backedup_streams,
                                       GetParam().defer_processing_backedup_streams ? "true"
                                                                                    : "false");
@@ -86,8 +87,8 @@ public:
             std::get<0>(GetParam()).downstream_protocol, std::get<0>(GetParam()).version,
             ConfigHelper::httpProxyConfig(std::get<0>(GetParam()).downstream_protocol ==
                                           Http::CodecType::HTTP3)) {
-    setupHttpImplOverrides(std::get<0>(GetParam()).http1_implementation,
-                           std::get<0>(GetParam()).http2_implementation);
+    setupHttp1ImplOverrides(std::get<0>(GetParam()).http1_implementation);
+    setupHttp2ImplOverrides(std::get<0>(GetParam()).http2_implementation);
     config_helper_.addRuntimeOverride(
         Runtime::defer_processing_backedup_streams,
         std::get<0>(GetParam()).defer_processing_backedup_streams ? "true" : "false");
