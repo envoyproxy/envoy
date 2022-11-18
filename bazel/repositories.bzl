@@ -204,7 +204,9 @@ def envoy_dependencies(skip_targets = []):
     _io_opencensus_cpp()
     _com_github_curl()
     _com_github_envoyproxy_sqlparser()
-    _com_googlesource_chromium_v8()
+    _v8()
+    _com_googlesource_chromium_base_trace_event_common()
+    _com_googlesource_chromium_zlib()
     _com_github_google_quiche()
     _com_googlesource_googleurl()
     _com_lightstep_tracer_cpp()
@@ -215,7 +217,7 @@ def envoy_dependencies(skip_targets = []):
     _upb()
     _proxy_wasm_cpp_sdk()
     _proxy_wasm_cpp_host()
-    _emscripten_toolchain()
+    _emsdk()
     _rules_fuzzing()
     external_http_archive("proxy_wasm_rust_sdk")
     external_http_archive("com_googlesource_code_re2")
@@ -224,11 +226,7 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("com_github_google_flatbuffers")
     external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
-    external_http_archive(
-        name = "envoy_build_tools",
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel/external:envoy_build_tools.patch"],
-    )
+    external_http_archive("envoy_build_tools")
     external_http_archive("rules_cc")
     external_http_archive("rules_pkg")
     _com_github_fdio_vpp_vcl()
@@ -806,16 +804,35 @@ cc_library(name = "curl", visibility = ["//visibility:public"], deps = ["@envoy/
         actual = "@envoy//bazel/foreign_cc:curl",
     )
 
-def _com_googlesource_chromium_v8():
-    external_genrule_repository(
-        name = "com_googlesource_chromium_v8",
-        genrule_cmd_file = "@envoy//bazel/external:wee8.genrule_cmd",
-        build_file = "@envoy//bazel/external:wee8.BUILD",
-        patches = ["@envoy//bazel/external:wee8.patch"],
+def _v8():
+    external_http_archive(
+        name = "v8",
+        patches = ["@envoy//bazel:v8.patch"],
+        patch_args = ["-p1"],
     )
     native.bind(
         name = "wee8",
-        actual = "@com_googlesource_chromium_v8//:wee8",
+        actual = "@v8//:wee8",
+    )
+
+def _com_googlesource_chromium_base_trace_event_common():
+    external_http_archive(
+        name = "com_googlesource_chromium_base_trace_event_common",
+        build_file = "@v8//:bazel/BUILD.trace_event_common",
+    )
+    native.bind(
+        name = "base_trace_event_common",
+        actual = "@com_googlesource_chromium_base_trace_event_common//:trace_event_common",
+    )
+
+def _com_googlesource_chromium_zlib():
+    external_http_archive(
+        name = "com_googlesource_chromium_zlib",
+        build_file = "@v8//:bazel/BUILD.zlib",
+    )
+    native.bind(
+        name = "zlib_compression_utils",
+        actual = "@com_googlesource_chromium_zlib//:zlib_compression_utils",
     )
 
 def _com_github_google_quiche():
@@ -944,17 +961,8 @@ def _proxy_wasm_cpp_sdk():
 def _proxy_wasm_cpp_host():
     external_http_archive(name = "proxy_wasm_cpp_host")
 
-def _emscripten_toolchain():
-    external_http_archive(
-        name = "emscripten_toolchain",
-        build_file_content = _build_all_content(exclude = [
-            "upstream/emscripten/cache/is_vanilla.txt",
-            ".emscripten_sanity",
-        ]),
-        patch_cmds = [
-            "if [[ \"$(uname -m)\" == \"x86_64\" ]]; then ./emsdk install 2.0.7 && ./emsdk activate --embedded 2.0.7; fi",
-        ],
-    )
+def _emsdk():
+    external_http_archive(name = "emsdk")
 
 def _com_github_google_jwt_verify():
     external_http_archive("com_github_google_jwt_verify")
@@ -1062,6 +1070,13 @@ def _com_github_wasm_c_api():
     )
     native.bind(
         name = "wasmtime",
+        actual = "@com_github_wasm_c_api//:wasmtime_lib",
+    )
+
+    # This isn't needed in builds with a single Wasm engine, but "bazel query"
+    # complains about a missing dependency, so point it at the regular target.
+    native.bind(
+        name = "prefixed_wasmtime",
         actual = "@com_github_wasm_c_api//:wasmtime_lib",
     )
 

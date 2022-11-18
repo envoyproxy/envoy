@@ -81,8 +81,8 @@ TEST_P(WasmStatSinkConfigTest, CreateWasmFailOpen) {
 }
 
 TEST_P(WasmStatSinkConfigTest, CreateWasmFromWASM) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
+#if !defined(__x86_64__)
+  // TODO(PiotrSikora): Emscripten ships binaries only for x86_64.
   if (GetParam() != "null") {
     return;
   }

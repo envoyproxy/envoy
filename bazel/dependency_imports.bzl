@@ -1,14 +1,14 @@
 load("@rules_foreign_cc//foreign_cc:repositories.bzl", "rules_foreign_cc_dependencies")
 load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
-load("@bazel_toolchains//rules/exec_properties:exec_properties.bzl", "create_rbe_exec_properties_dict", "custom_exec_properties")
 load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
 load("@build_bazel_rules_apple//apple:repositories.bzl", "apple_rules_dependencies")
 load("@rules_fuzzing//fuzzing:repositories.bzl", "rules_fuzzing_dependencies")
 load("@upb//bazel:workspace_deps.bzl", "upb_deps")
-load("@rules_rust//rust:repositories.bzl", "rust_repositories")
+load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies", "rust_register_toolchains")
 load("@rules_antlr//antlr:deps.bzl", "antlr_dependencies")
 load("@proxy_wasm_rust_sdk//bazel:dependencies.bzl", "proxy_wasm_rust_sdk_dependencies")
 load("@rules_cc//cc:repositories.bzl", "rules_cc_dependencies", "rules_cc_toolchains")
+load("@emsdk//:emscripten_deps.bzl", "emscripten_deps")
 
 # go version for rules_go
 GO_VERSION = "1.17.5"
@@ -20,7 +20,8 @@ def envoy_dependency_imports(go_version = GO_VERSION):
     go_register_toolchains(go_version)
     gazelle_dependencies()
     apple_rules_dependencies()
-    rust_repositories()
+    rules_rust_dependencies()
+    rust_register_toolchains()
     upb_deps()
     antlr_dependencies(472)
     proxy_wasm_rust_sdk_dependencies()
@@ -30,13 +31,7 @@ def envoy_dependency_imports(go_version = GO_VERSION):
     )
     rules_cc_dependencies()
     rules_cc_toolchains()
-
-    custom_exec_properties(
-        name = "envoy_large_machine_exec_property",
-        constants = {
-            "LARGE_MACHINE": create_rbe_exec_properties_dict(labels = dict(size = "large")),
-        },
-    )
+    emscripten_deps()
 
     # These dependencies, like most of the Go in this repository, exist only for the API.
     go_repository(
