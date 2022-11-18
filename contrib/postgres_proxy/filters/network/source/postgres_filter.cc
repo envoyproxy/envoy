@@ -3,6 +3,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/network/connection.h"
 
+#include "source/common/common/assert.h"
 #include "source/extensions/filters/network/well_known_names.h"
 
 #include "contrib/postgres_proxy/filters/network/source/postgres_decoder.h"
@@ -249,8 +250,10 @@ void PostgresFilter::sendUpstream(Buffer::Instance& data) {
 }
 
 void PostgresFilter::encryptUpstream(bool upstream_agreed, Buffer::Instance& data) {
-  ASSERT(config_->upstream_ssl_ !=
-         envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::SSL_DISABLE);
+  RELEASE_ASSERT(
+      config_->upstream_ssl_ !=
+          envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::SSL_DISABLE,
+      "encryptUpstream should not be called when upstream SSL is disabled.");
   if (!upstream_agreed) {
     ENVOY_CONN_LOG(info,
                    "postgres_proxy: upstream server rejected request to establish SSL connection.",
