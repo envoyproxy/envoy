@@ -158,7 +158,7 @@ TEST(NetworkUtility, ParseInternetAddress) {
   EXPECT_EQ(nullptr, Utility::parseInternetAddressNoThrow("[::1]:1"));
 #else
   EXPECT_EQ("[::]:0", Utility::parseInternetAddressNoThrow("[::]")->asString());
-  EXPECT_EQ("[::1]:1", Utility::parseInternetAddressNoThrow("[::1]:1")->asString());
+  EXPECT_EQ("[::1]:0", Utility::parseInternetAddressNoThrow("[::1]:1")->asString());
 #endif
   EXPECT_EQ(nullptr, Utility::parseInternetAddressNoThrow("fe80::1%"));
 
