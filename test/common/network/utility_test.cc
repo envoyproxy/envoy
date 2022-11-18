@@ -156,6 +156,9 @@ TEST(NetworkUtility, ParseInternetAddress) {
 #ifndef WIN32
   EXPECT_EQ(nullptr, Utility::parseInternetAddressNoThrow("[::]"));
   EXPECT_EQ(nullptr, Utility::parseInternetAddressNoThrow("[::1]:1"));
+#else
+  EXPECT_EQ("[::]:0", Utility::parseInternetAddressNoThrow("[::]")->asString());
+  EXPECT_EQ("[::1]:1", Utility::parseInternetAddressNoThrow("[::1]:1")->asString());
 #endif
   EXPECT_EQ(nullptr, Utility::parseInternetAddressNoThrow("fe80::1%"));
 
