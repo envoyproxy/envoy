@@ -127,12 +127,15 @@ public:
     ENVOY_LOG(trace, "onRead with result {}, fd = {}, read req = {}", result, fd_, fmt::ptr(read_req_));
 
     // This is injected event and we have another regular read request, so push this event directly.
-    if (read_req_ != nullptr && result == -EAGAIN && !is_disabled_) {
-      // TODO: using ptr in read param;
-      ENVOY_LOG(trace, "there is a inject event, and same time we have regular read request, fd = {}", fd_);
-      Buffer::OwnedImpl temp_buf;
-      ReadParam param{temp_buf, result};
-      io_uring_handler_.onRead(param);
+    // Or ignored if disabled.
+    if (read_req_ != nullptr && result == -EAGAIN) {
+      if (!is_disabled_) {
+        // TODO: using ptr in read param;
+        ENVOY_LOG(trace, "there is a inject event, and same time we have regular read request, fd = {}", fd_);
+        Buffer::OwnedImpl temp_buf;
+        ReadParam param{temp_buf, result};
+        io_uring_handler_.onRead(param);
+      }
       return;
     }
 
