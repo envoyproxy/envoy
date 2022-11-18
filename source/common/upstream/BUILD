@@ -583,3 +583,13 @@ envoy_cc_library(
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_library(
+    name = "upstream_http_factory_context_lib",
+    hdrs = ["upstream_http_factory_context_impl.h"],
+    deps = [
+        "//envoy/init:manager_interface",
+        "//envoy/server:factory_context_interface",
+        "//envoy/stats:stats_interface",
+    ],
+)

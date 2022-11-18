@@ -16,74 +16,6 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace GenericProxy {
 
-CodecFactoryPtr FilterConfig::codecFactoryFromProto(
-    const envoy::config::core::v3::TypedExtensionConfig& codec_config,
-    Envoy::Server::Configuration::FactoryContext& context) {
-  auto& factory = Config::Utility::getAndCheckFactory<CodecFactoryConfig>(codec_config);
-
-  ProtobufTypes::MessagePtr message = factory.createEmptyConfigProto();
-  Envoy::Config::Utility::translateOpaqueConfig(codec_config.typed_config(),
-                                                context.messageValidationVisitor(), *message);
-  return factory.createFactory(*message, context);
-}
-
-Rds::RouteConfigProviderSharedPtr FilterConfig::routeConfigProviderFromProto(
-    const ProxyConfig& config, Server::Configuration::FactoryContext& context,
-    RouteConfigProviderManager& route_config_provider_manager) {
-  if (config.has_generic_rds()) {
-    if (config.generic_rds().config_source().config_source_specifier_case() ==
-        envoy::config::core::v3::ConfigSource::kApiConfigSource) {
-      const auto api_type = config.generic_rds().config_source().api_config_source().api_type();
-      if (api_type != envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC &&
-          api_type != envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC) {
-        throw EnvoyException("genericrds supports only aggregated api_type in api_config_source");
-      }
-    }
-
-    return route_config_provider_manager.createRdsRouteConfigProvider(
-        config.generic_rds(), context.getServerFactoryContext(), config.stat_prefix(),
-        context.initManager());
-  } else {
-    return route_config_provider_manager.createStaticRouteConfigProvider(
-        config.route_config(), context.getServerFactoryContext());
-  }
-}
-
-std::vector<NamedFilterFactoryCb> FilterConfig::filtersFactoryFromProto(
-    const ProtobufWkt::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>& filters,
-    const std::string stats_prefix, Envoy::Server::Configuration::FactoryContext& context) {
-
-  std::vector<NamedFilterFactoryCb> factories;
-  bool has_terminal_filter = false;
-  std::string terminal_filter_name;
-  for (const auto& filter : filters) {
-    if (has_terminal_filter) {
-      throw EnvoyException(fmt::format("Terminal filter: {} must be the last generic L7 filter",
-                                       terminal_filter_name));
-    }
-
-    auto& factory = Config::Utility::getAndCheckFactory<NamedFilterConfigFactory>(filter);
-
-    ProtobufTypes::MessagePtr message = factory.createEmptyConfigProto();
-    ASSERT(message != nullptr);
-    Envoy::Config::Utility::translateOpaqueConfig(filter.typed_config(),
-                                                  context.messageValidationVisitor(), *message);
-
-    factories.push_back(
-        {filter.name(), factory.createFilterFactoryFromProto(*message, stats_prefix, context)});
-
-    if (factory.isTerminalFilter()) {
-      terminal_filter_name = filter.name();
-      has_terminal_filter = true;
-    }
-  }
-
-  if (!has_terminal_filter) {
-    throw EnvoyException("A terminal L7 filter is necessary for generic proxy");
-  }
-  return factories;
-}
-
 ActiveStream::ActiveStream(Filter& parent, RequestPtr request)
     : parent_(parent), downstream_request_stream_(std::move(request)) {}
 
@@ -100,7 +32,7 @@ ActiveStream::~ActiveStream() {
 }
 
 Envoy::Event::Dispatcher& ActiveStream::dispatcher() { return parent_.connection().dispatcher(); }
-const CodecFactory& ActiveStream::downstreamCodec() { return *parent_.config_->codec_factory_; }
+const CodecFactory& ActiveStream::downstreamCodec() { return parent_.config_->codecFactory(); }
 void ActiveStream::resetStream() {
   if (active_stream_reset_) {
     return;
