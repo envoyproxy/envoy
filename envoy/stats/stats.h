@@ -209,5 +209,8 @@ using SizeFn = std::function<void(std::size_t)>;
  */
 template <typename Stat> using StatFn = std::function<void(Stat&)>;
 
+// Template that lazy-init a StatsStruct.
+template <typename StatsStructType> struct LazyInit;
+
 } // namespace Stats
 } // namespace Envoy

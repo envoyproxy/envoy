@@ -109,23 +109,31 @@ public:
   void registerPort(const std::string& key, uint32_t port);
   uint32_t lookupPort(const std::string& key);
 
+  /**
+   * @brief Schedule a callback on main thread to force create the traffic stats for the given
+   * cluster.
+   *
+   * @param cluster_name name of the cluster.
+   * @return true if cluster is found.
+   * @return false otherwise.
+   */
   bool forceCreationOfClusterTrafficStats(absl::string_view cluster_name) {
     // With https://github.com/envoyproxy/envoy/pull/23921 ClusterInfo::trafficStats is lazy init.
     // We need to trigger creation of ClusterInfo::trafficStats() by calling the * operator.
-    absl::Notification n;
+    absl::Notification notifier;
 
     bool cluster_found = false;
     test_server_->server().dispatcher().post([&]() {
-      const auto& cluster_ref =
+      const ClusterConstOptRef& cluster_ref =
           test_server_->server().clusterManager().clusters().getCluster(cluster_name);
       if (cluster_ref.has_value()) {
         const auto& traffic_stats = *cluster_ref->get().info()->trafficStats();
-        (void)traffic_stats;
+        traffic_stats;
         cluster_found = true;
       }
-      n.Notify();
+      notifier.Notify();
     });
-    n.WaitForNotification();
+    notifier.WaitForNotification();
     return cluster_found;
   }
 

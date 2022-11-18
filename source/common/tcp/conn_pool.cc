@@ -25,7 +25,7 @@ ActiveTcpClient::ActiveTcpClient(Envoy::ConnectionPool::ConnPoolImplBase& parent
   connection_->addConnectionCallbacks(*this);
   read_filter_handle_ = std::make_shared<ConnReadFilter>(*this);
   connection_->addReadFilter(read_filter_handle_);
-  auto& cluster_traffic_stats = *host->cluster().trafficStats();
+  Upstream::ClusterTrafficStats& cluster_traffic_stats = *host->cluster().trafficStats();
   connection_->setConnectionStats({cluster_traffic_stats.upstream_cx_rx_bytes_total_,
                                    cluster_traffic_stats.upstream_cx_rx_bytes_buffered_,
                                    cluster_traffic_stats.upstream_cx_tx_bytes_total_,

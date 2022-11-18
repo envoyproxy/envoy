@@ -6,9 +6,9 @@ namespace Envoy {
 namespace Stats {
 
 /**
- * LazyInit is a wrapper with creator of the actual "$StatsStruct"
+ * LazyInit is a wrapper with creator of the actual "StatsStructType"
  * structure.
- * It instantiate a $StatsStruct struct when any data member is referenced.
+ * It instantiates a $StatsStruct struct when any data member is referenced.
  * See https://github.com/envoyproxy/envoy/issues/23575 for more details.
  */
 template <typename StatsStructType> struct LazyInit {
