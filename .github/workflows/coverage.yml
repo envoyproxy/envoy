@@ -46,7 +46,7 @@ jobs:
       - name: 'Package coverage'
         if: steps.check_context.outputs.run_coverage == 'true'
         run: |
-          tar -czvf coverage.tar.gz ../generated/coverage
+          cd mobile && tar -czvf coverage.tar.gz generated/coverage
       - name: 'Upload report'
         if: steps.check_context.outputs.run_coverage == 'true'
         uses: actions/upload-artifact@v2
