@@ -44,6 +44,9 @@ bug_fixes:
 - area: generic_proxy
   change: |
     fixed a bug that encoder filters and decoder filters of generic proxy will be executed in the same order. The encoder filters' execuate order should be the reverse of decoder filters' in the generic proxy.
+- area: quic
+  change: |
+    reject configs that specify require_client_certificate with QUIC since clients certificates are currently unsupported in QUIC. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.reject_require_client_certificate_with_quic`` to false.
 - area: http
   change: |
     fixed a bug where Utility::PercentEncoding::encode() encodes some characters incorrectly because it was treating the value as negative.
