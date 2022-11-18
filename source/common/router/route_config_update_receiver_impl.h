@@ -42,9 +42,7 @@ public:
       : config_traits_(optional_http_filters,
                        factory_context.messageValidationContext().dynamicValidationVisitor()),
         base_(config_traits_, proto_traits, factory_context), last_vhds_config_hash_(0ul),
-        vhds_virtual_hosts_(
-            std::make_unique<std::map<std::string, envoy::config::route::v3::VirtualHost>>()),
-        vhds_configuration_changed_(true) {}
+        vhds_virtual_hosts_(nullptr), vhds_configuration_changed_(true) {}
 
   bool removeVhosts(std::map<std::string, envoy::config::route::v3::VirtualHost>& vhosts,
                     const Protobuf::RepeatedPtrField<std::string>& removed_vhost_names);
