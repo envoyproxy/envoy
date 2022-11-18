@@ -11,7 +11,7 @@ void IoUringAcceptSocket::onAccept(int32_t result) {
   if (result < 0) {
     ENVOY_LOG(debug, "Accept request failed");
     
-    if (is_closing_ && result == -ECANCELED && cancel_req_ == nullptr) {
+    if (is_closing_ && result == -ECANCELED && cancel_req_ == nullptr && close_req_ == nullptr) {
       close_req_ = parent_.submitCloseRequest(*this);
     }
     return;
@@ -38,7 +38,7 @@ void IoUringAcceptSocket::onCancel(int32_t) {
   cancel_req_ = nullptr;
   accept_req_ = nullptr;
   ENVOY_LOG(debug, "cancel request done, pending_accept = {}", is_pending_accept_);
-  if (is_closing_) {
+  if (is_closing_ && close_req_ == nullptr) {
     if (is_pending_accept_) {
       // close the pending socket
       ENVOY_LOG(trace, "close the pending fd, fd = {}", connection_fd_);
