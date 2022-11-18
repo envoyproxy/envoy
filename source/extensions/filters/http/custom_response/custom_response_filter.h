@@ -40,7 +40,7 @@ public:
   ::Envoy::Http::RequestHeaderMap* downstreamHeaders() { return downstream_headers_; }
   ::Envoy::Http::StreamEncoderFilterCallbacks* encoderCallbacks() { return encoder_callbacks_; }
   ::Envoy::Http::StreamDecoderFilterCallbacks* decoderCallbacks() { return decoder_callbacks_; }
-  bool onLocalRepplyCalled() const { return on_local_reply_called_; }
+  bool onLocalReplyCalled() const { return on_local_reply_called_; }
 
   ~CustomResponseFilter() override = default;
 

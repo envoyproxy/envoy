@@ -30,7 +30,7 @@ protected:
   Policy() = default;
 };
 
-using PolicySharedPtr = std::shared_ptr<Policy>;
+using PolicySharedPtr = std::shared_ptr<const Policy>;
 
 struct CustomResponseMatchAction : public Matcher::ActionBase<ProtobufWkt::Any> {
   explicit CustomResponseMatchAction(PolicySharedPtr policy) : policy_(policy) {}

@@ -93,8 +93,11 @@ std::unique_ptr<ModifyRequestHeadersAction> RedirectPolicy::createModifyRequestH
   }
 
   // Modify the request headers & recreate stream.
-  // TODO(pradeepcrao): Currently Custom Response is not compatible with sendLocalReply.
-  if (custom_response_filter.onLocalRepplyCalled()) {
+  if (custom_response_filter.onLocalReplyCalled()) {
+    // This condition is true if send local reply is called at any point before
+    // the encode call for the custom response filter.
+    // TODO(pradeepcrao): Currently redirect policy is not compatible with send local reply as we
+    // cannot call recreateStream once sendLocalReply has been called.
     return ::Envoy::Http::FilterHeadersStatus::Continue;
   }
   auto downstream_headers = custom_response_filter.downstreamHeaders();
@@ -130,14 +133,10 @@ std::unique_ptr<ModifyRequestHeadersAction> RedirectPolicy::createModifyRequestH
   downstream_headers->setHost(absolute_url.hostAndPort());
 
   auto path_and_query = path_;
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http_reject_path_with_fragment")) {
-    // Envoy treats internal redirect as a new request and will reject it if URI path
-    // contains #fragment. However the Location header is allowed to have #fragment in URI path.
-    // To prevent Envoy from rejecting internal redirect, strip the #fragment from Location URI if
-    // it is present.
-    auto fragment_pos = path_.find('#');
-    path_and_query = path_.substr(0, fragment_pos);
-  }
+  // Strip the #fragment from Location URI if it is present.
+  auto fragment_pos = path_.find('#');
+  path_and_query = path_.substr(0, fragment_pos);
+
   downstream_headers->setPath(path_);
 
   if (decoder_callbacks->downstreamCallbacks()) {
@@ -154,6 +153,9 @@ std::unique_ptr<ModifyRequestHeadersAction> RedirectPolicy::createModifyRequestH
   if (!route) {
     stats_.custom_response_redirect_no_route_.inc();
     ENVOY_LOG(trace, "Redirect for custom response failed: no route found");
+    // Note that at this point the header mutations have already taken into affect
+    // and access logs will log the mutated headers, even though no internal
+    // redirect will take place.
     return ::Envoy::Http::FilterHeadersStatus::Continue;
   }
   downstream_headers->setMethod(::Envoy::Http::Headers::get().MethodValues.Get);

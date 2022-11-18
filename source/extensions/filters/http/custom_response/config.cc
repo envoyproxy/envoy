@@ -27,22 +27,28 @@ public:
   }
 };
 
+Matcher::MatchTreePtr<::Envoy::Http::HttpMatchingData>
+createMatcher(const envoy::extensions::filters::http::custom_response::v3::CustomResponse& config,
+              Server::Configuration::ServerFactoryContext& context, Stats::StatName stats_prefix) {
+  if (config.has_custom_response_matcher()) {
+    CustomResponseMatchActionValidationVisitor validation_visitor;
+    CustomResponseActionFactoryContext action_factory_context{context, stats_prefix};
+    Matcher::MatchTreeFactory<::Envoy::Http::HttpMatchingData, CustomResponseActionFactoryContext>
+        factory(action_factory_context, context, validation_visitor);
+    return factory.create(config.custom_response_matcher())();
+  } else {
+    // Allow matcher to not be set, to allow for cases where we only have route or
+    // virtual host specific configurations.
+    return Matcher::MatchTreePtr<::Envoy::Http::HttpMatchingData>();
+  }
+}
+
 } // namespace
 
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::custom_response::v3::CustomResponse& config,
     Server::Configuration::ServerFactoryContext& context, Stats::StatName stats_prefix)
-    : stats_prefix_(stats_prefix) {
-  // Allow matcher to not be set, to allow for cases where we only have route or
-  // virtual host specific configurations.
-  if (config.has_custom_response_matcher()) {
-    CustomResponseMatchActionValidationVisitor validation_visitor;
-    CustomResponseActionFactoryContext action_factory_context{context, stats_prefix_};
-    Matcher::MatchTreeFactory<::Envoy::Http::HttpMatchingData, CustomResponseActionFactoryContext>
-        factory(action_factory_context, context, validation_visitor);
-    matcher_ = factory.create(config.custom_response_matcher())();
-  }
-}
+    : stats_prefix_(stats_prefix), matcher_{createMatcher(config, context, stats_prefix)} {}
 
 PolicySharedPtr FilterConfig::getPolicy(::Envoy::Http::ResponseHeaderMap& headers,
                                         const StreamInfo::StreamInfo& stream_info) const {

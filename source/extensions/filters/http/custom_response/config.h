@@ -40,7 +40,7 @@ public:
 
 private:
   Stats::StatName stats_prefix_;
-  Matcher::MatchTreePtr<::Envoy::Http::HttpMatchingData> matcher_;
+  const Matcher::MatchTreePtr<::Envoy::Http::HttpMatchingData> matcher_;
 };
 
 } // namespace CustomResponse
