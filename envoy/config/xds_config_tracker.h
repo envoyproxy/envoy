@@ -34,6 +34,10 @@ public:
    * Invoked when SotW xDS configuration updates have been successfully parsed, applied on
    * the Envoy instance, and are about to be ACK'ed.
    *
+   * For SotW, resources are all the resouces except for the heart-beat ones in the original
+   * message. The call of this method means there is a subscriber for this type_url and the type of
+   * resource is same as the message's type_url.
+   *
    * @param type_url The type url of xDS message.
    * @param resources A list of decoded resources to add to the current state.
    */
@@ -41,8 +45,11 @@ public:
                                 const std::vector<DecodedResourcePtr>& resources) PURE;
 
   /**
-   * Invoked when Delta xDS configuration updates have been successfully parsed, applied on
+   * Invoked when Delta xDS configuration updates have been successfully accepted, applied on
    * the Envoy instance, and are about to be ACK'ed.
+   *
+   * For Delta, added_resources are all the received added resouces except for the heart-beat ones
+   * in the original message, and the removed resouces are the same in the xDS message.
    *
    * @param type_url The type url of xDS message.
    * @param added_resources A list of decoded resources to add to the current state.

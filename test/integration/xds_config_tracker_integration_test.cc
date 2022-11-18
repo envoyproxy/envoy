@@ -36,6 +36,10 @@ struct TestXdsTrackerStats {
   ALL_TEST_XDS_TRACKER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
+/**
+ * A test implementation of the XdsConfigTracker extension.
+ * It just increases the test counter when a related method is called.
+ */
 class TestXdsConfigTracker : public Config::XdsConfigTracker {
 public:
   TestXdsConfigTracker(Stats::Scope& scope) : stats_(generateStats("test_xds_tracker", scope)) {}
@@ -96,7 +100,7 @@ public:
     sotw_or_delta_ = sotwOrDelta();
 
     config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux",
-                                      (this->sotwOrDelta() == Grpc::SotwOrDelta::Sotw ||
+                                      (this->sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta ||
                                        this->sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw)
                                           ? "true"
                                           : "false");
@@ -159,8 +163,6 @@ public:
     setUpstreamProtocol(Http::CodecType::HTTP2);
     HttpIntegrationTest::initialize();
     registerTestServerPorts({});
-    initial_xds_update_ = test_server_->counter("test_xds_tracker.on_config_accepted")->value();
-    initial_xds_reject_ = test_server_->counter("test_xds_tracker.on_config_rejected")->value();
   }
 
   void acceptXdsConnection() {
@@ -169,9 +171,6 @@ public:
     RELEASE_ASSERT(result, result.message());
     xds_stream_->startGrpcStream();
   }
-
-  uint32_t initial_xds_update_{0};
-  uint32_t initial_xds_reject_{0};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, XdsConfigTrackerIntegrationTest,
@@ -186,7 +185,7 @@ TEST_P(XdsConfigTrackerIntegrationTest, XdsConfigTrackerSuccessCount) {
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "", {"some_rtds_layer"},
                                       {"some_rtds_layer"}, {}, true));
-  auto some_rtds_layer = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
+  const auto some_rtds_layer = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
     name: some_rtds_layer
     layer:
       foo: bar
@@ -194,9 +193,8 @@ TEST_P(XdsConfigTrackerIntegrationTest, XdsConfigTrackerSuccessCount) {
   )EOF");
   sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
       Config::TypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1");
-  test_server_->waitForCounterEq("test_xds_tracker.on_config_accepted", initial_xds_update_ + 1);
-  EXPECT_EQ(test_server_->counter("test_xds_tracker.on_config_accepted")->value(),
-            initial_xds_update_ + 1);
+  test_server_->waitForCounterEq("test_xds_tracker.on_config_accepted", 1);
+  EXPECT_EQ(1, test_server_->counter("test_xds_tracker.on_config_accepted")->value());
 }
 
 TEST_P(XdsConfigTrackerIntegrationTest, XdsConfigTrackerFailureCount) {
@@ -208,14 +206,9 @@ TEST_P(XdsConfigTrackerIntegrationTest, XdsConfigTrackerFailureCount) {
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "", {"some_rtds_layer"},
                                       {"some_rtds_layer"}, {}, true));
-  auto some_rtds_layer = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
-    name: different_rtds_layer
-    layer:
-      foo: bar
-      baz: meh
-  )EOF");
 
-  auto route_config = TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
+  const auto route_config =
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
     name: my_route
     vhds:
       config_source:
@@ -229,19 +222,36 @@ TEST_P(XdsConfigTrackerIntegrationTest, XdsConfigTrackerFailureCount) {
     )EOF");
 
   FakeStream* stream = xds_stream_.get();
-  envoy::service::discovery::v3::DiscoveryResponse discovery_response;
-  discovery_response.set_version_info("1");
-  discovery_response.set_type_url(Config::TypeUrl::get().Runtime);
-  discovery_response.add_resources()->PackFrom(route_config);
+  if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw ||
+      sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedSotw) {
+    envoy::service::discovery::v3::DiscoveryResponse discovery_response;
+    discovery_response.set_version_info("1");
+    discovery_response.set_type_url(Config::TypeUrl::get().Runtime);
+    discovery_response.add_resources()->PackFrom(route_config);
 
-  static int next_nonce_counter = 0;
-  discovery_response.set_nonce(absl::StrCat("nonce", next_nonce_counter++));
+    static int next_nonce_counter = 0;
+    discovery_response.set_nonce(absl::StrCat("nonce", next_nonce_counter++));
 
-  // Message's TypeUrl != Resource's
-  stream->sendGrpcMessage(discovery_response);
-  test_server_->waitForCounterEq("test_xds_tracker.on_config_rejected", initial_xds_reject_ + 1);
-  EXPECT_EQ(test_server_->counter("test_xds_tracker.on_config_rejected")->value(),
-            initial_xds_reject_ + 1);
+    // Message's TypeUrl != Resource's
+    stream->sendGrpcMessage(discovery_response);
+  } else {
+    std::vector<envoy::service::discovery::v3::Resource> resources;
+    envoy::service::discovery::v3::Resource resource;
+    resource.mutable_resource()->PackFrom(route_config);
+    resource.set_name("my_route");
+    resource.set_version("1");
+    resources.emplace_back(resource);
+    const auto delta_discovery_response = createExplicitResourcesDeltaDiscoveryResponse(
+        Config::TypeUrl::get().Runtime, resources, {});
+
+    // Message's TypeUrl != Resource's
+    stream->sendGrpcMessage(delta_discovery_response);
+  }
+
+  test_server_->waitForCounterEq("test_xds_tracker.on_config_rejected", 1);
+  ENVOY_LOG_MISC(warn, "Boteng test {}",
+                 test_server_->counter("test_xds_tracker.on_config_rejected")->value());
+  EXPECT_EQ(1, test_server_->counter("test_xds_tracker.on_config_rejected")->value());
 }
 
 } // namespace

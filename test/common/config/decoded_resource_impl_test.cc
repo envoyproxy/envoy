@@ -52,11 +52,11 @@ TEST(DecodedResourceImplTest, All) {
     EXPECT_FALSE(decoded_resource.metadata().has_value());
   }
 
+  // To verify the metadata is decoded as expected.
   {
     envoy::service::discovery::v3::Resource resource_wrapper;
     resource_wrapper.set_name("real_name");
     resource_wrapper.mutable_resource()->MergeFrom(some_opaque_resource);
-    resource_wrapper.set_version("foo");
     auto metadata = resource_wrapper.mutable_metadata();
     metadata->mutable_filter_metadata()->insert(
         {"fake_test_domain", MessageUtil::keyValueStruct("fake_test_key", "fake_test_value")});
@@ -66,7 +66,6 @@ TEST(DecodedResourceImplTest, All) {
     EXPECT_CALL(resource_decoder, resourceName(ProtoEq(ProtobufWkt::Empty()))).Times(0);
     DecodedResourceImpl decoded_resource(resource_decoder, resource_wrapper);
     EXPECT_EQ("real_name", decoded_resource.name());
-    EXPECT_EQ("foo", decoded_resource.version());
     EXPECT_THAT(decoded_resource.resource(), ProtoEq(ProtobufWkt::Empty()));
     EXPECT_TRUE(decoded_resource.hasResource());
     EXPECT_TRUE(decoded_resource.metadata().has_value());
