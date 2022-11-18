@@ -108,13 +108,14 @@ void ValidationInstance::initialize(const Options& options,
     runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(std::move(runtime_ptr));
   }
 
-  secret_manager_ = std::make_unique<Secret::SecretManagerImpl>(admin().getConfigTracker());
+  secret_manager_ = std::make_unique<Secret::SecretManagerImpl>(admin()->getConfigTracker());
   ssl_context_manager_ = createContextManager("ssl_context_manager", api_->timeSource());
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
-      admin(), runtime(), stats(), threadLocal(), dnsResolver(), sslContextManager(), dispatcher(),
-      localInfo(), *secret_manager_, messageValidationContext(), *api_, http_context_,
-      grpc_context_, router_context_, accessLogManager(), singletonManager(), options,
-      quic_stat_names_, *this);
+      admin(), runtime(), stats(), threadLocal(),
+      [this]() -> Network::DnsResolverSharedPtr { return this->dnsResolver(); },
+      sslContextManager(), dispatcher(), localInfo(), *secret_manager_, messageValidationContext(),
+      *api_, http_context_, grpc_context_, router_context_, accessLogManager(), singletonManager(),
+      options, quic_stat_names_, *this);
   config_.initialize(bootstrap_, *this, *cluster_manager_factory_);
   runtime().initialize(clusterManager());
   clusterManager().setInitializedCb([this]() -> void { init_manager_.initialize(init_watcher_); });

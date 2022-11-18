@@ -163,6 +163,11 @@ public:
     return locality_zone_stat_name_->statName();
   }
 
+  bool disableActiveHealthCheck() const override { return disable_active_health_check_; }
+  void setDisableActiveHealthCheck(bool disable_active_health_check) override {
+    disable_active_health_check_ = disable_active_health_check;
+  }
+
   MOCK_METHOD(Network::Address::InstanceConstSharedPtr, address, (), (const));
   MOCK_METHOD(const std::vector<Network::Address::InstanceConstSharedPtr>&, addressList, (),
               (const));
@@ -213,6 +218,7 @@ public:
   LoadMetricStatsImpl load_metric_stats_;
   mutable Stats::TestUtil::TestSymbolTable symbol_table_;
   mutable std::unique_ptr<Stats::StatNameManagedStorage> locality_zone_stat_name_;
+  bool disable_active_health_check_ = false;
 };
 
 } // namespace Upstream

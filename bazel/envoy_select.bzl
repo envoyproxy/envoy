@@ -32,6 +32,13 @@ def envoy_select_admin_html(xs, repository = ""):
         "//conditions:default": xs,
     })
 
+# Selects the given values if admin functionality is enabled in the current build.
+def envoy_select_admin_functionality(xs, repository = ""):
+    return select({
+        repository + "//bazel:disable_admin_functionality": [],
+        "//conditions:default": xs,
+    })
+
 def envoy_select_admin_no_html(xs, repository = ""):
     return select({
         repository + "//bazel:disable_admin_html": xs,
