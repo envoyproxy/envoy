@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+    paths:
+    - 'mobile/**'
   pull_request:
 
 jobs:
@@ -21,7 +23,7 @@ jobs:
         with:
           submodules: true
       - name: Add safe directory
-        run: git config --global --add safe.directory /__w/envoy-mobile/envoy-mobile
+        run: git config --global --add safe.directory /__w/envoy/envoy
       - id: check_context
         name: 'Check whether to run'
         run: |
@@ -43,7 +45,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         if: steps.check_context.outputs.run_tests == 'true'
         run: |
-          ./bazelw test \
+          cd mobile && ./bazelw test \
             --test_output=all \
             --test_env=ENVOY_IP_TEST_VERSIONS=v4only \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
