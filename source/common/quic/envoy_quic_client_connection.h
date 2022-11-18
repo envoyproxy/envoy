@@ -67,8 +67,10 @@ public:
   // Switch underlying socket with the given one. This is used in connection migration.
   void switchConnectionSocket(Network::ConnectionSocketPtr&& connection_socket);
 
+  // quic::QuicConnection
   // Potentially trigger migration.
   void OnPathDegradingDetected() override;
+  void OnCanWrite() override;
 
   // Called when port migration probing succeeds. Attempts to migrate this connection onto the new
   // socket extracted from context.
