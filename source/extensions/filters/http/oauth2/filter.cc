@@ -434,10 +434,10 @@ void OAuth2Filter::onGetAccessTokenSuccess(const std::string& access_code,
 }
 
 void OAuth2Filter::finishFlow(std::chrono::seconds expires_in) {
-  std::string token_payload;
-  auto new_expires = time_source_.systemTime() + expires_in;
-  std::string new_expires_str = std::to_string(
+  const auto new_expires = time_source_.systemTime() + expires_in;
+  const std::string new_expires_str = std::to_string(
       std::chrono::duration_cast<std::chrono::seconds>(new_expires.time_since_epoch()).count());
+  std::string token_payload;
   if (config_->forwardBearerToken()) {
     token_payload = absl::StrCat(host_, new_expires_str, access_token_, id_token_, refresh_token_);
   } else {
