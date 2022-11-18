@@ -34,8 +34,6 @@ private:
   ProtobufMessage::ValidationVisitor& validator_;
 };
 
-using VirtualHostMap = std::map<std::string, envoy::config::route::v3::VirtualHost>;
-
 class RouteConfigUpdateReceiverImpl : public RouteConfigUpdateReceiver {
 public:
   RouteConfigUpdateReceiverImpl(Rds::ProtoTraits& proto_traits,
@@ -46,10 +44,11 @@ public:
         base_(config_traits_, proto_traits, factory_context), last_vhds_config_hash_(0ul),
         vhds_configuration_changed_(true) {}
 
-  bool removeVhosts(std::map<std::string, envoy::config::route::v3::VirtualHost>& vhosts,
+  using VirtualHostMap = std::map<std::string, envoy::config::route::v3::VirtualHost>;
+
+  bool removeVhosts(VirtualHostMap& vhosts,
                     const Protobuf::RepeatedPtrField<std::string>& removed_vhost_names);
-  bool updateVhosts(std::map<std::string, envoy::config::route::v3::VirtualHost>& vhosts,
-                    const VirtualHostRefVector& added_vhosts);
+  bool updateVhosts(VirtualHostMap& vhosts, const VirtualHostRefVector& added_vhosts);
   bool onDemandFetchFailed(const envoy::service::discovery::v3::Resource& resource) const;
 
   // Router::RouteConfigUpdateReceiver
