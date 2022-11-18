@@ -110,10 +110,6 @@ public:
     }
   }
 
-private:
-  friend class IsolatedScopeImpl;
-  friend class IsolatedStoreImpl;
-
   BaseOptConstRef find(StatName name) const {
     auto stat = stats_.find(name);
     if (stat == stats_.end()) {
@@ -121,6 +117,9 @@ private:
     }
     return std::cref(*stat->second);
   }
+
+private:
+  //friend class IsolatedStoreImpl;
 
   StatNameHashMap<RefcountPtr<Base>> stats_;
   CounterAllocator counter_alloc_;

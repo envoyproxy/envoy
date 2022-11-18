@@ -33,9 +33,24 @@ class Store {
 public:
   virtual ~Store() = default;
 
+  /**
+   * @return the root scope (creating it if necessary)
+   */
   virtual ScopeSharedPtr rootScope() PURE;
+
+  /**
+   * @return the root scope (creating it if necessary)
+   */
   virtual ConstScopeSharedPtr constRootScope() const PURE;
+
+  /**
+   * @return The symbol table.
+   **/
   virtual const SymbolTable& constSymbolTable() const PURE;
+
+  /**
+   * @return The symbol table.
+   **/
   virtual SymbolTable& symbolTable() PURE;
 
   /**
@@ -108,6 +123,16 @@ public:
   virtual TextReadoutOptConstRef findTextReadout(StatName name) const PURE;
 
   /**
+   * @return a null counter that will ignore increemts and always return 0.
+   */
+  virtual Counter& nullCounter() PURE;
+
+  /**
+   * @return a null gauge that will ignore set() calls and always return 0.
+   */
+  virtual Gauge& nullGauge() PURE;
+
+  /**
    * Iterate over all stats that need to be flushed to sinks. Note, that implementations can
    * potentially hold on to a mutex that will deadlock if the passed in functors try to create
    * or delete a stat.
@@ -120,11 +145,13 @@ public:
   virtual void forEachSinkedTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const PURE;
 
   /**
-   * @return a null gauge within the scope's namespace.
+   * Calls 'fn' for every stat. Note that in the case of overlapping scopes, the
+   * implementation may call fn more than one time for each counter. Iteration
+   * stops if `fn` returns false;
+   *
+   * @param fn Function to be run for every counter, or until fn return false.
+   * @return false if fn(counter) return false during iteration, true if every counter was hit.
    */
-  virtual Gauge& nullGauge() PURE;
-  virtual Counter& nullCounter() PURE;
-
   virtual bool iterate(const IterateFn<Counter>& fn) const PURE;
   virtual bool iterate(const IterateFn<Gauge>& fn) const PURE;
   virtual bool iterate(const IterateFn<Histogram>& fn) const PURE;
@@ -155,6 +182,10 @@ public:
   Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) {
     return rootScope()->histogramFromString(name, unit);
   }
+
+  /**
+   * @returns a scape of the given name.
+   */
   ScopeSharedPtr createScope(const std::string& name) { return rootScope()->createScope(name); }
 };
 

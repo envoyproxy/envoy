@@ -62,6 +62,7 @@ public:
 
   /** @return a shared_ptr for this */
   ScopeSharedPtr getShared() { return shared_from_this(); }
+
   /** @return a const shared_ptr for this */
   ConstScopeSharedPtr getConstShared() const { return shared_from_this(); }
 
@@ -227,9 +228,7 @@ public:
   virtual SymbolTable& symbolTable() PURE;
 
   /**
-   * Calls 'fn' for every counter. Note that in the case of overlapping scopes,
-   * the implementation may call fn more than one time for each counter. Iteration
-   * stops if `fn` returns false;
+   * Calls 'fn' for every counter. Iteration stops if `fn` returns false;
    *
    * @param fn Function to be run for every counter, or until fn return false.
    * @return false if fn(counter) return false during iteration, true if every counter was hit.
@@ -237,9 +236,7 @@ public:
   virtual bool iterate(const IterateFn<Counter>& fn) const PURE;
 
   /**
-   * Calls 'fn' for every gauge. Note that in the case of overlapping scopes,
-   * the implementation may call fn more than one time for each gauge. Iteration
-   * stops if `fn` returns false;
+   * Calls 'fn' for every gauge. Iteration stops if `fn` returns false;
    *
    * @param fn Function to be run for every gauge, or until fn return false.
    * @return false if fn(gauge) return false during iteration, true if every gauge was hit.
@@ -247,9 +244,7 @@ public:
   virtual bool iterate(const IterateFn<Gauge>& fn) const PURE;
 
   /**
-   * Calls 'fn' for every histogram. Note that in the case of overlapping
-   * scopes, the implementation may call fn more than one time for each
-   * histogram. Iteration stops if `fn` returns false;
+   * Calls 'fn' for every histogram. Iteration stops if `fn` returns false;
    *
    * @param fn Function to be run for every histogram, or until fn return false.
    * @return false if fn(histogram) return false during iteration, true if every histogram was hit.
