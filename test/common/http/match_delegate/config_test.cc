@@ -308,7 +308,7 @@ TEST(DelegatingFilterTest, MatchTreeSkipActionEncodingHeaders) {
   delegating_filter->setEncoderFilterCallbacks(callbacks);
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue,
             delegating_filter->encodeHeaders(*response_headers, false));
-  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue,
+  EXPECT_EQ(Envoy::Http::Filter1xxHeadersStatus::Continue,
             delegating_filter->encode1xxHeaders(*response_headers));
 
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, delegating_filter->encodeData(buffer, false));

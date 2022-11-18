@@ -72,7 +72,7 @@ public:
   void setDecoderFilterCallbacks(Envoy::Http::StreamDecoderFilterCallbacks& callbacks) override;
 
   // Envoy::Http::StreamEncoderFilter
-  Envoy::Http::FilterHeadersStatus
+  Envoy::Http::Filter1xxHeadersStatus
   encode1xxHeaders(Envoy::Http::ResponseHeaderMap& headers) override;
   Envoy::Http::FilterHeadersStatus encodeHeaders(Envoy::Http::ResponseHeaderMap& headers,
                                                  bool end_stream) override;

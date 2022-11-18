@@ -183,10 +183,10 @@ void DelegatingStreamFilter::setDecoderFilterCallbacks(
   decoder_filter_->setDecoderFilterCallbacks(callbacks);
 }
 
-Envoy::Http::FilterHeadersStatus
+Envoy::Http::Filter1xxHeadersStatus
 DelegatingStreamFilter::encode1xxHeaders(Envoy::Http::ResponseHeaderMap& headers) {
   if (match_state_.skipFilter()) {
-    return Envoy::Http::FilterHeadersStatus::Continue;
+    return Envoy::Http::Filter1xxHeadersStatus::Continue;
   }
   return encoder_filter_->encode1xxHeaders(headers);
 }

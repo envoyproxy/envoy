@@ -177,9 +177,9 @@ TEST_F(HttpConnectionManagerImplTest, 1xxResponseWithEncoderFilters) {
   sendRequestHeadersAndData();
 
   EXPECT_CALL(*encoder_filters_[0], encode1xxHeaders(_))
-      .WillOnce(Return(FilterHeadersStatus::Continue));
+      .WillOnce(Return(Filter1xxHeadersStatus::Continue));
   EXPECT_CALL(*encoder_filters_[1], encode1xxHeaders(_))
-      .WillOnce(Return(FilterHeadersStatus::Continue));
+      .WillOnce(Return(Filter1xxHeadersStatus::Continue));
   EXPECT_CALL(response_encoder_, encode1xxHeaders(_));
   ResponseHeaderMapPtr continue_headers{new TestResponseHeaderMapImpl{{":status", "100"}}};
   decoder_filters_[0]->callbacks_->encode1xxHeaders(std::move(continue_headers));
@@ -205,7 +205,7 @@ TEST_F(HttpConnectionManagerImplTest, PauseResume1xx) {
   // Stop the 100-Continue at encoder filter 1. Encoder filter 0 should not yet receive the
   // 100-Continue
   EXPECT_CALL(*encoder_filters_[1], encode1xxHeaders(_))
-      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+      .WillOnce(Return(Filter1xxHeadersStatus::StopIteration));
   EXPECT_CALL(*encoder_filters_[0], encode1xxHeaders(_)).Times(0);
   EXPECT_CALL(response_encoder_, encode1xxHeaders(_)).Times(0);
   ResponseHeaderMapPtr continue_headers{new TestResponseHeaderMapImpl{{":status", "100"}}};
@@ -213,7 +213,7 @@ TEST_F(HttpConnectionManagerImplTest, PauseResume1xx) {
 
   // Have the encoder filter 1 continue. Make sure the 100-Continue is resumed as expected.
   EXPECT_CALL(*encoder_filters_[0], encode1xxHeaders(_))
-      .WillOnce(Return(FilterHeadersStatus::Continue));
+      .WillOnce(Return(Filter1xxHeadersStatus::Continue));
   EXPECT_CALL(response_encoder_, encode1xxHeaders(_));
   encoder_filters_[1]->callbacks_->continueEncoding();
 
