@@ -216,13 +216,13 @@ void BandwidthLimiter::updateStatsOnEncodeFinish() {
     const auto& config = getConfig();
 
     if (config.enableResponseTrailers() && trailers_ != nullptr) {
-      if (request_delay_ > ZeroMilliseconds) {
+      if (request_delay_ > zero_milliseconds_) {
         trailers_->setCopy(config.requestDelayTrailer(), std::to_string(request_delay_.count()));
-        request_delay_ = ZeroMilliseconds;
+        request_delay_ = zero_milliseconds_;
       }
-      if (response_delay_ > ZeroMilliseconds) {
+      if (response_delay_ > zero_milliseconds_) {
         trailers_->setCopy(config.responseDelayTrailer(), std::to_string(response_delay_.count()));
-        response_delay_ = ZeroMilliseconds;
+        response_delay_ = zero_milliseconds_;
       }
     }
 
