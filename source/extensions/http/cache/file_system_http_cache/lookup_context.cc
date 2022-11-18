@@ -67,7 +67,7 @@ void FileLookupContext::getHeadersWithLock(LookupHeadersCallback cb) {
                       cb(LookupResult{});
                       return;
                     }
-                    auto header_proto = headerProtoFromBuffer(*read_result.value());
+                    auto header_proto = makeCacheFileHeaderProto(*read_result.value());
                     if (header_proto.headers_size() == 1 &&
                         header_proto.headers().at(0).key() == "vary") {
                       auto maybe_vary_key = cache_.makeVaryKey(

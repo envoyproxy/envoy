@@ -30,7 +30,9 @@ envoy_cc_extension(
         "lookup_context.h",
     ],
     deps = [
+        ":cache_file_fixed_block",
         ":cache_file_header_proto_cc_proto",
+        ":cache_file_header_proto_util",
         "//envoy/common:time_interface",
         "//envoy/http:header_map_interface",
         "//envoy/registry",

@@ -1,5 +1,6 @@
 #include "source/extensions/http/cache/file_system_http_cache/file_system_http_cache.h"
 
+#include "source/common/http/header_map_impl.h"
 #include "source/extensions/http/cache/file_system_http_cache/cache_file_fixed_block.h"
 #include "source/extensions/http/cache/file_system_http_cache/cache_file_header_proto_util.h"
 #include "source/extensions/http/cache/file_system_http_cache/insert_context.h"
@@ -32,7 +33,8 @@ void FileSystemHttpCache::writeVaryNodeToDisk(const Key& key,
         CacheFileFixedBlock block;
         auto buf = bufferFromProto(*headers);
         block.setHeadersSize(buf.length());
-        Buffer::OwnedImpl buf2{block.stringView()};
+        Buffer::OwnedImpl buf2;
+        block.serializeToBuffer(buf2);
         buf2.add(buf);
         size_t sz = buf2.length();
         auto queued = file_handle->write(
@@ -103,8 +105,8 @@ public:
       : filepath_(absl::StrCat(cache.cachePath(), cache.generateFilename(key))),
         cache_path_(cache.cachePath()), cleanup_(cleanup),
         async_file_manager_(cache.asyncFileManager()),
-        response_(protoFromHeadersAndMetadata(key, response_headers, metadata)),
-        on_complete_(on_complete) {}
+        response_headers_(Http::createHeaderMap<Http::ResponseHeaderMapImpl>(response_headers)),
+        response_metadata_(metadata), on_complete_(on_complete) {}
 
   void begin(std::shared_ptr<HeaderUpdateContext> ctx) {
     async_file_manager_->openExistingFile(filepath_,
@@ -167,7 +169,7 @@ private:
             fail("failed to read headers", read_result.status());
             return;
           }
-          header_proto_ = headerProtoFromBuffer(*read_result.value());
+          header_proto_ = makeCacheFileHeaderProto(*read_result.value());
           if (header_proto_.headers_size() == 1 && header_proto_.headers(0).key() == "vary") {
             // TODO(ravenblack): do we need to handle vary entries here? How
             // did we get to updateHeaders on a vary entry rather than the
@@ -177,7 +179,8 @@ private:
             fail("not implemented updating vary header", absl::OkStatus());
             return;
           }
-          updateProtoFromHeadersAndMetadata(header_proto_, response_);
+          header_proto_ = mergeProtoWithHeadersAndMetadata(header_proto_, *response_headers_,
+                                                           response_metadata_);
           header_block_.setHeadersSize(headerProtoSize(header_proto_));
           startWriting(ctx);
         });
@@ -195,7 +198,8 @@ private:
         });
   }
   void writeHeaderBlock(std::shared_ptr<HeaderUpdateContext> ctx) {
-    Buffer::OwnedImpl buf{header_block_.stringView()};
+    Buffer::OwnedImpl buf;
+    header_block_.serializeToBuffer(buf);
     auto queued = write_handle_->write(buf, 0, [ctx, this](absl::StatusOr<size_t> write_result) {
       if (!write_result.ok() || write_result.value() != CacheFileFixedBlock::size()) {
         fail("failed to write header block", write_result.status());
@@ -264,7 +268,8 @@ private:
   std::string cache_path_;
   std::shared_ptr<Cleanup> cleanup_;
   std::shared_ptr<Common::AsyncFiles::AsyncFileManager> async_file_manager_;
-  CacheFileHeader response_;
+  Http::ResponseHeaderMapPtr response_headers_;
+  ResponseMetadata response_metadata_;
   CacheFileFixedBlock header_block_;
   CacheFileHeader header_proto_;
   AsyncFileHandle read_handle_;

@@ -167,10 +167,9 @@ public:
       EXPECT_TRUE(result);
       true_callbacks_called_++;
     };
-    trailers_size_ = bufferFromProto(protoFromTrailers(response_trailers_)).length();
+    trailers_size_ = bufferFromProto(makeCacheFileTrailerProto(response_trailers_)).length();
     key_ = LookupRequest{request_headers_, time_system_.systemTime(), vary_allow_list_}.key();
-    headers_size_ =
-        headerProtoSize(protoFromHeadersAndMetadata(key_, response_headers_, metadata_));
+    headers_size_ = headerProtoSize(makeCacheFileHeaderProto(key_, response_headers_, metadata_));
   }
 
   Buffer::InstancePtr testHeaderBlock(size_t body_size) {
@@ -178,11 +177,13 @@ public:
     block.setHeadersSize(headers_size_);
     block.setTrailersSize(trailers_size_);
     block.setBodySize(body_size);
-    return std::make_unique<Buffer::OwnedImpl>(block.stringView());
+    auto buffer = std::make_unique<Buffer::OwnedImpl>();
+    block.serializeToBuffer(*buffer);
+    return buffer;
   }
 
   Buffer::InstancePtr testHeaderProto() {
-    auto headers = protoFromHeadersAndMetadata(key_, response_headers_, metadata_);
+    auto headers = makeCacheFileHeaderProto(key_, response_headers_, metadata_);
     return std::make_unique<Buffer::OwnedImpl>(bufferFromProto(headers));
   }
 
@@ -393,9 +394,12 @@ TEST_F(FileSystemHttpCacheTestWithMockFiles, FailedReadOfHeaderBlockInvalidatesT
 
 Buffer::InstancePtr invalidHeaderBlock() {
   CacheFileFixedBlock block;
-  block.setFileId(0);
-  block.setCacheVersionId(0);
-  return std::make_unique<Buffer::OwnedImpl>(block.stringView());
+  auto buffer = std::make_unique<Buffer::OwnedImpl>();
+  block.serializeToBuffer(*buffer);
+  // Replace the four byte id at the start with a bad id.
+  buffer->drain(4);
+  buffer->prepend("BAD!");
+  return buffer;
 }
 
 TEST_F(FileSystemHttpCacheTestWithMockFiles, ReadWithInvalidHeaderBlockInvalidatesTheCacheEntry) {

@@ -16,7 +16,13 @@ namespace Cache {
 namespace FileSystemHttpCache {
 namespace {
 
-ConfigProto cleanConfig(const ConfigProto& original) {
+/**
+ * Returns a copy of the original ConfigProto with a slash appended to cache_path
+ * if one was not present.
+ * @param original the original ConfigProto.
+ * @return the normalized ConfigProto.
+ */
+ConfigProto normalizeConfig(const ConfigProto& original) {
   ConfigProto config = original;
   if (!absl::EndsWith(config.cache_path(), "/") && !absl::EndsWith(config.cache_path(), "\\")) {
     config.set_cache_path(absl::StrCat(config.cache_path(), "/"));
@@ -24,6 +30,14 @@ ConfigProto cleanConfig(const ConfigProto& original) {
   return config;
 }
 
+/**
+ * A singleton that acts as a factory for generating and looking up FileSystemHttpCaches.
+ * When given equivalent configs, the singleton returns pointers to the same cache.
+ * When given different configs, the singleton returns different cache instances.
+ * If given configs with the same cache_path but different configuration,
+ * an exception is thrown, as it doesn't make sense two operate two caches in the
+ * same path with different configurations.
+ */
 class CacheSingleton : public Envoy::Singleton::Instance {
 public:
   CacheSingleton(
@@ -31,10 +45,10 @@ public:
       : async_file_manager_factory_(async_file_manager_factory) {}
 
   std::shared_ptr<FileSystemHttpCache> get(std::shared_ptr<CacheSingleton> singleton,
-                                           const ConfigProto& config) {
+                                           const ConfigProto& non_normalized_config) {
     std::shared_ptr<FileSystemHttpCache> cache;
-    ConfigProto clean_config = cleanConfig(config);
-    auto key = clean_config.cache_path();
+    ConfigProto config = normalizeConfig(non_normalized_config);
+    auto key = config.cache_path();
     absl::MutexLock lock(&mu_);
     auto it = caches_.find(key);
     if (it != caches_.end()) {
@@ -42,7 +56,7 @@ public:
     }
     if (!cache) {
       cache = std::make_shared<FileSystemHttpCache>(
-          singleton, std::move(clean_config),
+          singleton, std::move(config),
           async_file_manager_factory_->getAsyncFileManager(config.manager_config()));
       caches_[key] = cache;
     } else if (!Protobuf::util::MessageDifferencer::Equals(cache->config(), config)) {

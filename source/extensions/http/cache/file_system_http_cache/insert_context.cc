@@ -49,21 +49,20 @@ void FileInsertContext::insertTrailers(const Http::ResponseTrailerMap& trailers,
 void InsertOperationQueue::writeChunk(std::shared_ptr<InsertOperationQueue> p,
                                       QueuedFileChunk&& chunk) {
   mu_.AssertHeld();
-  auto callback = chunk.done_callback;
+  callback_in_flight_ = chunk.done_callback;
   if (chunk.type == QueuedFileChunk::Type::Trailer) {
     size_t sz = chunk.chunk.length();
     auto queued = file_handle_->write(
         chunk.chunk, header_block_.offsetToTrailers(),
-        [this, p, sz, callback](absl::StatusOr<size_t> write_result) {
+        [this, p, sz](absl::StatusOr<size_t> write_result) {
           absl::MutexLock lock(&mu_);
           cancel_action_in_flight_ = nullptr;
           if (!write_result.ok() || write_result.value() != sz) {
             cancelInsert(p, writeFailureMessage("trailer chunk", write_result, sz));
-            callback(false);
             return;
           }
           header_block_.setTrailersSize(sz);
-          commit(p, callback);
+          commit(p, callback_in_flight_);
         });
     ASSERT(queued.ok(), queued.status().ToString());
     cancel_action_in_flight_ = queued.value();
@@ -72,19 +71,19 @@ void InsertOperationQueue::writeChunk(std::shared_ptr<InsertOperationQueue> p,
     bool end_stream = chunk.end_stream;
     auto queued = file_handle_->write(
         chunk.chunk, header_block_.offsetToBody() + header_block_.bodySize(),
-        [this, p, sz, callback, end_stream](absl::StatusOr<size_t> write_result) {
+        [this, p, sz, end_stream](absl::StatusOr<size_t> write_result) {
           absl::MutexLock lock(&mu_);
           cancel_action_in_flight_ = nullptr;
           if (!write_result.ok() || write_result.value() != sz) {
             cancelInsert(p, writeFailureMessage("body chunk", write_result, sz));
-            callback(false);
             return;
           }
           header_block_.setBodySize(header_block_.bodySize() + sz);
           if (end_stream) {
-            commit(p, callback);
+            commit(p, callback_in_flight_);
           } else {
-            callback(true);
+            callback_in_flight_(true);
+            callback_in_flight_ = nullptr;
             writeNextChunk(p);
           }
         });
@@ -96,7 +95,7 @@ void InsertOperationQueue::writeChunk(std::shared_ptr<InsertOperationQueue> p,
 void InsertOperationQueue::writeNextChunk(std::shared_ptr<InsertOperationQueue> p) {
   mu_.AssertHeld();
   if (queue_.empty()) {
-    cancel_action_in_flight_ = nullptr;
+    ASSERT(cancel_action_in_flight_ == nullptr);
     return;
   }
   auto chunk = std::move(queue_.front());
@@ -123,6 +122,7 @@ void InsertOperationQueue::insertHeaders(std::shared_ptr<InsertOperationQueue> p
                                          const ResponseMetadata& metadata,
                                          InsertCallback insert_complete, bool end_stream) {
   absl::MutexLock lock(&mu_);
+  callback_in_flight_ = insert_complete;
   if (VaryHeaderUtils::hasVary(response_headers)) {
     auto vary_header_values = VaryHeaderUtils::getVaryValues(response_headers);
     Key old_key = key_;
@@ -133,7 +133,6 @@ void InsertOperationQueue::insertHeaders(std::shared_ptr<InsertOperationQueue> p
     } else {
       // No error for this cancel, it's just an entry that's ineligible for insertion.
       cancelInsert(p);
-      insert_complete(false);
       return;
     }
     cleanup_ = cache_->setCacheEntryToVary(old_key, response_headers, key_, cleanup_);
@@ -143,54 +142,51 @@ void InsertOperationQueue::insertHeaders(std::shared_ptr<InsertOperationQueue> p
   if (!cleanup_) {
     // No error for this cancel, someone else just got there first.
     cancelInsert(p);
-    insert_complete(false);
     return;
   }
-  auto header_proto = protoFromHeadersAndMetadata(key_, response_headers, metadata);
+  auto header_proto = makeCacheFileHeaderProto(key_, response_headers, metadata);
   // Open the file.
   cancel_action_in_flight_ = cache_->asyncFileManager()->createAnonymousFile(
-      cache_->cachePath(), [this, p, insert_complete, end_stream,
-                            header_proto](absl::StatusOr<AsyncFileHandle> open_result) {
+      cache_->cachePath(),
+      [this, p, end_stream, header_proto](absl::StatusOr<AsyncFileHandle> open_result) {
         absl::MutexLock lock(&mu_);
         cancel_action_in_flight_ = nullptr;
         if (!open_result.ok()) {
           cancelInsert(p, "failed to create anonymous file");
-          insert_complete(false);
           return;
         }
         file_handle_ = std::move(open_result.value());
-        Buffer::OwnedImpl unset_header(header_block_.stringView());
+        Buffer::OwnedImpl unset_header;
+        header_block_.serializeToBuffer(unset_header);
         // Write an empty header block.
         auto queued = file_handle_->write(
             unset_header, 0,
-            [this, p, insert_complete, end_stream,
-             header_proto](absl::StatusOr<size_t> write_result) {
+            [this, p, end_stream, header_proto](absl::StatusOr<size_t> write_result) {
               absl::MutexLock lock(&mu_);
               cancel_action_in_flight_ = nullptr;
               if (!write_result.ok() || write_result.value() != CacheFileFixedBlock::size()) {
                 cancelInsert(p, writeFailureMessage("empty header block", write_result,
                                                     CacheFileFixedBlock::size()));
-                insert_complete(false);
                 return;
               }
               auto buf = bufferFromProto(header_proto);
               auto sz = buf.length();
               auto queued = file_handle_->write(
                   buf, header_block_.offsetToHeaders(),
-                  [this, p, insert_complete, end_stream, sz](absl::StatusOr<size_t> write_result) {
+                  [this, p, end_stream, sz](absl::StatusOr<size_t> write_result) {
                     absl::MutexLock lock(&mu_);
                     cancel_action_in_flight_ = nullptr;
                     if (!write_result.ok() || write_result.value() != sz) {
                       cancelInsert(p, writeFailureMessage("headers", write_result, sz));
-                      insert_complete(false);
                       return;
                     }
                     header_block_.setHeadersSize(sz);
                     if (end_stream) {
-                      commit(p, insert_complete);
+                      commit(p, callback_in_flight_);
                       return;
                     }
-                    insert_complete(true);
+                    callback_in_flight_(true);
+                    callback_in_flight_ = nullptr;
                     writeNextChunk(p);
                   });
               ASSERT(queued.ok(), queued.status().ToString());
@@ -210,7 +206,7 @@ void InsertOperationQueue::insertBody(std::shared_ptr<InsertOperationQueue> p,
 void InsertOperationQueue::insertTrailers(std::shared_ptr<InsertOperationQueue> p,
                                           const Http::ResponseTrailerMap& response_trailers,
                                           InsertCallback insert_complete) {
-  CacheFileTrailer file_trailer = protoFromTrailers(response_trailers);
+  CacheFileTrailer file_trailer = makeCacheFileTrailerProto(response_trailers);
   push(p, QueuedFileChunk{QueuedFileChunk::Type::Trailer, bufferFromProto(file_trailer),
                           insert_complete, true});
 }
@@ -219,21 +215,22 @@ void InsertOperationQueue::commit(std::shared_ptr<InsertOperationQueue> p,
                                   InsertCallback callback) {
   mu_.AssertHeld();
   // Write the file header block now that we know the sizes of the pieces.
-  Buffer::OwnedImpl block_buffer(header_block_.stringView());
-  auto queued = file_handle_->write(
-      block_buffer, 0, [this, callback, p](absl::StatusOr<size_t> write_result) {
+  Buffer::OwnedImpl block_buffer;
+  callback_in_flight_ = callback;
+  header_block_.serializeToBuffer(block_buffer);
+  auto queued =
+      file_handle_->write(block_buffer, 0, [this, p](absl::StatusOr<size_t> write_result) {
         absl::MutexLock lock(&mu_);
         cancel_action_in_flight_ = nullptr;
         if (!write_result.ok() || write_result.value() != CacheFileFixedBlock::size()) {
           cancelInsert(
               p, writeFailureMessage("header block", write_result, CacheFileFixedBlock::size()));
-          callback(false);
           return;
         }
         // Unlink any existing cache entry with this filename.
         cancel_action_in_flight_ = cache_->asyncFileManager()->unlink(
             absl::StrCat(cache_->cachePath(), cache_->generateFilename(key_)),
-            [this, callback, p](absl::Status) {
+            [this, p](absl::Status) {
               // We can ignore the result of unlink - the file may or may not have previously
               // existed.
               absl::MutexLock lock(&mu_);
@@ -241,18 +238,18 @@ void InsertOperationQueue::commit(std::shared_ptr<InsertOperationQueue> p,
               // Link the file to its filename.
               auto queued = file_handle_->createHardLink(
                   absl::StrCat(cache_->cachePath(), cache_->generateFilename(key_)),
-                  [this, callback, p](absl::Status link_result) {
+                  [this, p](absl::Status link_result) {
                     absl::MutexLock lock(&mu_);
                     cancel_action_in_flight_ = nullptr;
                     if (!link_result.ok()) {
                       cancelInsert(p, absl::StrCat("failed to link file (", link_result.ToString(),
                                                    "): ", cache_->cachePath(),
                                                    cache_->generateFilename(key_)));
-                      callback(false);
                       return;
                     }
                     ENVOY_LOG(debug, "created cache file {}", cache_->generateFilename(key_));
-                    callback(true);
+                    callback_in_flight_(true);
+                    callback_in_flight_ = nullptr;
                     // By clearing cleanup before destructor, we prevent logging an error.
                     cleanup_ = nullptr;
                   });
@@ -275,6 +272,10 @@ void InsertOperationQueue::cancelInsert(std::shared_ptr<InsertOperationQueue>,
   if (cancel_action_in_flight_) {
     cancel_action_in_flight_();
     cancel_action_in_flight_ = nullptr;
+  }
+  if (callback_in_flight_) {
+    callback_in_flight_(false);
+    callback_in_flight_ = nullptr;
   }
   while (!queue_.empty()) {
     auto chunk = std::move(queue_.front());
