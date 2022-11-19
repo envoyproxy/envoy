@@ -84,7 +84,9 @@ private:
   Rds::RouteConfigUpdateReceiverImpl base_;
 
   uint64_t last_vhds_config_hash_{0ul};
-  VirtualHostMap rds_virtual_hosts_;
+  // vhosts supplied by RDS, to be merged with VHDS vhosts in onVhdsUpdate.
+  std::unique_ptr<VirtualHostMap> rds_virtual_hosts_;
+  // vhosts supplied by VHDS, to be merged with RDS vhosts in onRdsUpdate.
   std::unique_ptr<VirtualHostMap> vhds_virtual_hosts_;
   std::set<std::string> resource_ids_in_last_update_;
   bool vhds_configuration_changed_{true};
