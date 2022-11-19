@@ -246,9 +246,9 @@ absl::optional<CelValue> UpstreamWrapper::operator[](CelValue key) const {
         info_.upstreamInfo().value().get().upstreamTransportFailureReason());
   } else if (value == UpstreamClusterName) {
     auto upstreamClusterInfo = info_.upstreamClusterInfo();
-    if (upstreamClusterInfo.has_value() && upstreamClusterInfo.value() != nullptr) {
+    //if (upstreamClusterInfo.has_value() && upstreamClusterInfo.value() != nullptr) {
       return CelValue::CreateStringView(upstreamClusterInfo.value()->name());
-    }
+    //}
   }
 
   auto ssl_info = info_.upstreamInfo().value().get().upstreamSslConnection();

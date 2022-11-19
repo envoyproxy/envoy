@@ -455,6 +455,8 @@ TEST(Context, ConnectionAttributes) {
       new NiceMock<Envoy::Upstream::MockHostDescription>());
   auto downstream_ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   auto upstream_ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+
+  
   ConnectionWrapper connection(info);
   UpstreamWrapper upstream(info);
   PeerWrapper source(info, false);
@@ -518,6 +520,12 @@ TEST(Context, ConnectionAttributes) {
       .WillRepeatedly(ReturnRef(peer_certificate_digest));
   EXPECT_CALL(*upstream_ssl_info, sha256PeerCertificateDigest())
       .WillRepeatedly(ReturnRef(peer_certificate_digest));
+
+  auto cluster_info_mock = std::make_shared<Upstream::MockClusterInfo>();
+  absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info = cluster_info_mock;
+  EXPECT_CALL(info, upstreamClusterInfo()).WillRepeatedly(Return(cluster_info));
+  const std::string cluster_name = "fake_cluster";
+  EXPECT_CALL(*cluster_info_mock, name()).WillRepeatedly(ReturnRef(cluster_name));
 
   {
     auto value = connection[CelValue::CreateStringView(Undefined)];
@@ -733,6 +741,13 @@ TEST(Context, ConnectionAttributes) {
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsString());
     EXPECT_EQ(upstream_transport_failure_reason, value.value().StringOrDie().value());
+  }
+
+  {
+    auto value = upstream[CelValue::CreateStringView(UpstreamClusterName)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ(cluster_name, value.value().StringOrDie().value());
   }
 }
 
