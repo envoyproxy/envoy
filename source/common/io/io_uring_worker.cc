@@ -225,6 +225,15 @@ void IoUringWorkerImpl::addServerSocket(os_fd_t fd, IoUringHandler& handler, uin
   io_uring_impl_.submit();
 }
 
+void IoUringWorkerImpl::addClientSocket(os_fd_t fd, IoUringHandler& handler, uint32_t read_buffer_size) {
+  ENVOY_LOG(trace, "add client socket, fd = {}", fd);
+  std::unique_ptr<IoUringClientSocket> socket = std::make_unique<IoUringClientSocket>(fd, handler, *this, read_buffer_size);
+  socket->start();
+  ASSERT(sockets_.find(fd) == sockets_.end());
+  sockets_.insert({fd, std::move(socket)});
+  io_uring_impl_.submit();
+}
+
 void IoUringWorkerImpl::closeSocket(os_fd_t fd) {
   ENVOY_LOG(debug, "close socket, fd = {}", fd);
   auto socket_iter = sockets_.find(fd);

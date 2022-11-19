@@ -44,14 +44,14 @@ private:
   bool is_closing_{false};
 };
 
-class IoUringServerSocket : public IoUringSocket, protected Logger::Loggable<Logger::Id::io> {
+class IoUringBaseSocket : public IoUringSocket, protected Logger::Loggable<Logger::Id::io> {
 public:
-  IoUringServerSocket(os_fd_t fd, IoUringHandler& io_uring_handler,
+  IoUringBaseSocket(os_fd_t fd, IoUringHandler& io_uring_handler,
                       IoUringWorker& parent, uint32_t read_buffer_size) :
     fd_(fd), io_uring_handler_(io_uring_handler), parent_(parent),
     read_buffer_size_(read_buffer_size), iov_(new struct iovec[1]) {}
 
-  ~IoUringServerSocket() {
+  virtual ~IoUringBaseSocket() {
     if (SOCKET_VALID(fd_)) {
       ::close(fd_);
     }
@@ -365,6 +365,21 @@ private:
   bool is_full_{false};
 };
 
+class IoUringServerSocket : public IoUringBaseSocket {
+public:
+  IoUringServerSocket(os_fd_t fd, IoUringHandler& io_uring_handler,
+                      IoUringWorker& parent, uint32_t read_buffer_size):
+    IoUringBaseSocket(fd, io_uring_handler, parent, read_buffer_size) {}
+};
+
+class IoUringClientSocket : public IoUringBaseSocket {
+public:
+  IoUringClientSocket(os_fd_t fd, IoUringHandler& io_uring_handler,
+                      IoUringWorker& parent, uint32_t read_buffer_size):
+    IoUringBaseSocket(fd, io_uring_handler, parent, read_buffer_size) {}
+};
+
+
 class IoUringWorkerImpl : public IoUringWorker, protected Logger::Loggable<Logger::Id::io> {
 public:
   IoUringWorkerImpl(uint32_t io_uring_size, bool use_submission_queue_polling, Event::Dispatcher& dispatcher);
@@ -387,6 +402,7 @@ public:
   }
   void addAcceptSocket(os_fd_t fd, IoUringHandler& handler) override;
   void addServerSocket(os_fd_t fd, IoUringHandler& handler, uint32_t read_buffer_size) override;
+  void addClientSocket(os_fd_t fd, IoUringHandler& handler, uint32_t read_buffer_size) override;
   void closeSocket(os_fd_t fd) override;
   Event::Dispatcher& dispatcher() override;
 

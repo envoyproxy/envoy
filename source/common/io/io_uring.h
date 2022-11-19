@@ -199,6 +199,7 @@ public:
   virtual void disableSocket(os_fd_t fd) PURE;
   virtual void addAcceptSocket(os_fd_t fd, IoUringHandler& handler) PURE;
   virtual void addServerSocket(os_fd_t fd, IoUringHandler& handler, uint32_t read_buffer_size) PURE;
+  virtual void addClientSocket(os_fd_t fd, IoUringHandler& handler, uint32_t read_buffer_size) PURE;
   virtual void closeSocket(os_fd_t fd) PURE;
   virtual std::unique_ptr<IoUringSocket> removeSocket(os_fd_t) PURE;
   virtual Event::Dispatcher& dispatcher() PURE;
