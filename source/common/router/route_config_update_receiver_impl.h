@@ -41,8 +41,7 @@ public:
                                 const OptionalHttpFilters& optional_http_filters)
       : config_traits_(optional_http_filters,
                        factory_context.messageValidationContext().dynamicValidationVisitor()),
-        base_(config_traits_, proto_traits, factory_context), last_vhds_config_hash_(0ul),
-        vhds_configuration_changed_(true) {}
+        base_(config_traits_, proto_traits, factory_context) {}
 
   using VirtualHostMap = std::map<std::string, envoy::config::route::v3::VirtualHost>;
 
@@ -84,11 +83,11 @@ private:
 
   Rds::RouteConfigUpdateReceiverImpl base_;
 
-  uint64_t last_vhds_config_hash_;
+  uint64_t last_vhds_config_hash_{0ul};
   VirtualHostMap rds_virtual_hosts_;
   std::unique_ptr<VirtualHostMap> vhds_virtual_hosts_;
   std::set<std::string> resource_ids_in_last_update_;
-  bool vhds_configuration_changed_;
+  bool vhds_configuration_changed_{true};
 };
 
 } // namespace Router
