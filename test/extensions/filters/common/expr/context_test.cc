@@ -455,8 +455,6 @@ TEST(Context, ConnectionAttributes) {
       new NiceMock<Envoy::Upstream::MockHostDescription>());
   auto downstream_ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   auto upstream_ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
-
-  
   ConnectionWrapper connection(info);
   UpstreamWrapper upstream(info);
   PeerWrapper source(info, false);
