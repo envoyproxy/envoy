@@ -7,7 +7,7 @@
 #include "source/common/config/utility.h"
 #include "source/common/config/xds_resource.h"
 #include "source/common/singleton/manager_impl.h"
-#include "source/common/upstream/leds.h"
+#include "source/extensions/clusters/eds/leds.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/local_info/mocks.h"

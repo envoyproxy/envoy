@@ -180,6 +180,7 @@ TEST_P(ConnectionLimitIntegrationTest, TestBothLimits) {
 }
 
 TEST_P(ConnectionLimitIntegrationTest, TestGlobalLimitOptOut) {
+  DISABLE_IF_ADMIN_DISABLED; // Requires admin config.
   // Includes 4 connections because the tracking is performed regardless of whether a specific
   // listener has opted out. Since the fake upstream has a listener, we need to keep value at 4 so
   // it can accept connections. (2 downstream listener conns + 2 upstream listener conns)
