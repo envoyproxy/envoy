@@ -70,7 +70,6 @@ constexpr absl::string_view SHA256PeerCertificateDigest = "sha256_peer_certifica
 
 // Source properties
 constexpr absl::string_view Source = "source";
-constexpr absl::string_view Cluster = "cluster";
 constexpr absl::string_view Address = "address";
 constexpr absl::string_view Port = "port";
 
@@ -79,6 +78,7 @@ constexpr absl::string_view Destination = "destination";
 
 // Upstream properties
 constexpr absl::string_view Upstream = "upstream";
+constexpr absl::string_view UpstreamClusterName = "cluster_name";
 constexpr absl::string_view UpstreamLocalAddress = "local_address";
 constexpr absl::string_view UpstreamTransportFailureReason = "transport_failure_reason";
 
