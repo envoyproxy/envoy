@@ -202,10 +202,14 @@ public:
     }
   }
 
-  void onWrite(int32_t result) override {
+  void onWrite(int32_t result, Request* req) override {
     ENVOY_LOG(trace, "onWrite with result {}, fd = {}", result, fd_);
-
-    if (result == -EAGAIN && write_req_ != nullptr) {
+    bool injected_event = (result == -EAGAIN && write_req_ != req);
+    if (injected_event) {
+      if (is_closing_) {
+        ENVOY_LOG(trace, "there is a inject event, but is closing, ignore it, fd = {}", fd_);
+        return;
+      }
        // TODO: using ptr in read param;
       ENVOY_LOG(trace, "there is a inject event, and same time we have regular write request, fd = {}", fd_);
       WriteParam param{result};
@@ -226,9 +230,18 @@ public:
         return;
       }
 
-      if (result == -EAGAIN && is_closing_) {
-        ENVOY_LOG(trace, "ignore injected event when closing");
-        return;
+      if (result == -EAGAIN) {
+        if (is_closing_) {
+          ENVOY_LOG(trace, "ignore injected event when closing");
+          return;
+        }
+        if (!injected_event) {
+          if (write_buf_.length() > 0) {
+            ENVOY_LOG(trace, "continue write buf since get eagain, size = {}, fd = {}", write_buf_.length(), fd_);
+            submitWriteRequest();
+          }
+          return;
+        }
       }
 
       WriteParam param{result};
@@ -248,19 +261,33 @@ public:
       ENVOY_LOG(trace, "write is done, try to close the socket, fd = {}", fd_);
       ASSERT(close_req_ == nullptr);
       close_req_ = parent_.submitCloseRequest(*this);
+      return;
+    }
+  
+    if (is_full_ && write_buf_.length() == 0) {
+      is_full_ = false;
+      WriteParam param{result};
+      io_uring_handler_.onWrite(param);
     }
   }
 
   uint64_t write(Buffer::Instance& buffer) override {
-    ENVOY_LOG(trace, "write, size = {}, fd = {}", buffer.length(), fd_);
-    auto length_to_write = buffer.length();
-    write_buf_.move(buffer);
+    ENVOY_LOG(trace, "write, size = {}, fd = {}, slices = {}", buffer.length(), fd_, buffer.getRawSlices().size());
+    uint64_t buffer_limit = 1024 * 1024;
+    uint64_t writable_size = buffer_limit - write_buf_.length();
+    if (writable_size <= 0) {
+      is_full_ = true;
+      return 0;
+    }
+    auto length_to_write = std::min(buffer.length(), writable_size);
+    write_buf_.move(buffer, length_to_write);
 
     if (write_req_ != nullptr) {
       ENVOY_LOG(trace, "write already submited, fd = {}", fd_);
       return length_to_write;
     }
 
+    ENVOY_LOG(trace, "write buf, size = {}, slices = {}", write_buf_.length(), write_buf_.getRawSlices().size());
     submitWriteRequest();
     return length_to_write;
   }
@@ -295,7 +322,6 @@ private:
   }
 
   void submitWriteRequest() {
-    ENVOY_LOG(trace, "submit write request, fd = {}", fd_);
     ASSERT(write_req_ == nullptr);
     ASSERT(iovecs_ == nullptr);
 
@@ -305,6 +331,8 @@ private:
       iovecs_[i].iov_base = slices[i].mem_;
       iovecs_[i].iov_len = slices[i].len_;
     }
+
+    ENVOY_LOG(trace, "submit write request, write_buf size = {}, num_iovecs = {}, fd = {}", write_buf_.length(), slices.size(), fd_);
 
     write_req_ = parent_.submitWritevRequest(*this, iovecs_, slices.size());
   }
@@ -332,6 +360,9 @@ private:
   Request* cancel_req_{nullptr};
   Request* close_req_{nullptr};
   Request* write_req_{nullptr};
+
+  //TODO Using water maker
+  bool is_full_{false};
 };
 
 class IoUringWorkerImpl : public IoUringWorker, protected Logger::Loggable<Logger::Id::io> {

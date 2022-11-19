@@ -34,6 +34,7 @@ IoUringSocketHandleImpl::IoUringSocketHandleImpl(const uint32_t read_buffer_size
                                                  bool is_server_socket)
     : read_buffer_size_(read_buffer_size), io_uring_factory_(io_uring_factory), fd_(fd),
       socket_v6only_(socket_v6only), domain_(domain) {
+  ENVOY_LOG(debug, "construct io uring socket handle, fd = {}, is_server_socket = {}", fd_, is_server_socket);
   if (is_server_socket) {
     io_uring_socket_type_ = IoUringSocketType::Server;
   }
@@ -335,6 +336,10 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::write(Buffer::Instance& buffer)
     ASSERT(io_uring_worker_.has_value());
     auto& io_uring_server_socket = io_uring_worker_.ref().getIoUringSocket(fd_);
     auto ret = io_uring_server_socket.write(buffer);
+    if (ret == 0) {
+      return {
+        0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(), IoSocketError::deleteIoError)};
+    }
     return {ret, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError)};
   }
 
@@ -733,7 +738,7 @@ void IoUringSocketHandleImpl::onRead(Io::ReadParam& param) {
 
 void IoUringSocketHandleImpl::onWrite(Io::WriteParam& param) {
   write_param_ = param;
-  ENVOY_LOG(trace, "call event callback since result = {}", write_param_->result_);
+  ENVOY_LOG(trace, "call event callback for write since result = {}", write_param_->result_);
   cb_(Event::FileReadyType::Write);
   write_param_ = absl::nullopt;
 }

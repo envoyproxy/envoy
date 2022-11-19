@@ -186,7 +186,7 @@ public:
   virtual void onCancel(int32_t) { PANIC("not implemented"); };
   virtual void onConnect(int32_t) { PANIC("not implemented"); };
   virtual void onRead(int32_t) { PANIC("not implemented"); };
-  virtual void onWrite(int32_t) { PANIC("not implemented"); };
+  virtual void onWrite(int32_t, Request*) { PANIC("not implemented"); };
 };
 
 class IoUringWorker : public ThreadLocal::ThreadLocalObject {

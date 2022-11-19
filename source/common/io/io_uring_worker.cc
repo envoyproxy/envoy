@@ -160,8 +160,8 @@ void IoUringWorkerImpl::onFileEvent() {
         req->io_uring_socket_->get().onRead(result);
         break;
       case RequestType::Write:
-        ENVOY_LOG(trace, "receive write request completion, fd = {}", req->io_uring_socket_->get().fd());
-        req->io_uring_socket_->get().onWrite(result);
+        ENVOY_LOG(trace, "receive write request completion, fd = {}, write_req = {}", req->io_uring_socket_->get().fd(), fmt::ptr(req));
+        req->io_uring_socket_->get().onWrite(result, req);
         break;
       case RequestType::Close:
         ENVOY_LOG(trace, "receive close request completion, fd = {}", req->io_uring_socket_->get().fd());
@@ -327,11 +327,12 @@ Request* IoUringWorkerImpl::submitReadRequest(IoUringSocket& socket, struct iove
 }
 
 Request* IoUringWorkerImpl::submitWritevRequest(IoUringSocket& socket, struct iovec* iovecs, uint64_t num_vecs) {
-  ENVOY_LOG(trace, "submit write request, fd = {}", socket.fd());
   Request* req = new Request();
   req->io_uring_socket_ = socket;
   req->type_ = RequestType::Write;
-  
+
+  ENVOY_LOG(trace, "submit write request, fd = {}, req = {}", socket.fd(), fmt::ptr(req));
+
   auto res = io_uring_impl_.prepareWritev(socket.fd(), iovecs, num_vecs, 0, req);
   if (res == Io::IoUringResult::Failed) {
     // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
