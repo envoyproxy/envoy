@@ -49,7 +49,12 @@ bool IoUringImpl::isEventfdRegistered() const { return SOCKET_VALID(event_fd_); 
 
 void IoUringImpl::forEveryCompletion(CompletionCb completion_cb) {
   ASSERT(SOCKET_VALID(event_fd_));
-  
+  // move the current injected completions into temp vector in case
+  // the event callback will inject new completion, then we should
+  // go through those new completion in next round.
+  std::vector<InjectedCompletion> current_injected_completions;
+  current_injected_completions.swap(injected_completions_);
+
   eventfd_t v;
   while (true) {
     int ret = eventfd_read(event_fd_, &v);
@@ -73,10 +78,9 @@ void IoUringImpl::forEveryCompletion(CompletionCb completion_cb) {
 
   ENVOY_LOG(trace, "has injected event, num = {}", injected_completions_.size());
 
-  for (auto& completion : injected_completions_) {
+  for (auto& completion : current_injected_completions) {
     completion_cb(completion.user_data_, completion.result_);
   }
-  injected_completions_.clear();
 
   ENVOY_LOG(debug, "count = {}", count);
   io_uring_cq_advance(&ring_, count);
@@ -84,6 +88,7 @@ void IoUringImpl::forEveryCompletion(CompletionCb completion_cb) {
 
 void IoUringImpl::injectCompletion(os_fd_t fd, void* user_data, int32_t result) {
   injected_completions_.emplace_back(fd, user_data, result);
+  ENVOY_LOG(trace, "inject completion, fd = {}, req = {}, num injects = {}", fd, fmt::ptr(user_data), injected_completions_.size());
 }
 
 void IoUringImpl::removeInjectedCompletion(os_fd_t fd) {
