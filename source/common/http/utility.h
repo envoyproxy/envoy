@@ -578,6 +578,9 @@ struct AuthorityAttributes {
 AuthorityAttributes parseAuthority(absl::string_view host);
 
 /**
+ * WARNING: This function will throw exception. Please call it in the config
+ * parsing time in the main thread to validate the core retry policy.
+ *
  * It returns RetryPolicy defined in core api to route api.
  * @param retry_policy core retry policy
  * @param retry_on this specifies when retry should be invoked.
