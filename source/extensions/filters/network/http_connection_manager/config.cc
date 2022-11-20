@@ -687,8 +687,9 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
-void HttpConnectionManagerConfig::createFilterChain(Http::FilterChainManager& manager) const {
+bool HttpConnectionManagerConfig::createFilterChain(Http::FilterChainManager& manager, bool) const {
   Http::FilterChainUtility::createFilterChainForFactories(manager, filter_factories_);
+  return true;
 }
 
 bool HttpConnectionManagerConfig::createUpgradeFilterChain(

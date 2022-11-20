@@ -17,11 +17,15 @@
 namespace Envoy {
 namespace Secret {
 
-SecretManagerImpl::SecretManagerImpl(Server::ConfigTracker& config_tracker)
-    : config_tracker_entry_(
-          config_tracker.add("secrets", [this](const Matchers::StringMatcher& name_matcher) {
-            return dumpSecretConfigs(name_matcher);
-          })) {}
+SecretManagerImpl::SecretManagerImpl(OptRef<Server::ConfigTracker> config_tracker) {
+  if (config_tracker.has_value()) {
+    config_tracker_entry_ =
+        config_tracker->add("secrets", [this](const Matchers::StringMatcher& name_matcher) {
+          return dumpSecretConfigs(name_matcher);
+        });
+  }
+}
+
 void SecretManagerImpl::addStaticSecret(
     const envoy::extensions::transport_sockets::tls::v3::Secret& secret) {
   switch (secret.type_case()) {

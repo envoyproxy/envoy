@@ -2,6 +2,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
     "envoy_package",
+    "envoy_select_admin_functionality",
     "envoy_sh_test",
 )
 
@@ -61,7 +62,7 @@ envoy_sh_test(
 
 envoy_cc_test(
     name = "main_common_test",
-    srcs = ["main_common_test.cc"],
+    srcs = envoy_select_admin_functionality(["main_common_test.cc"]),
     data = [
         "//test/config/integration:google_com_proxy_port_0",
     ],
@@ -69,6 +70,7 @@ envoy_cc_test(
         "//source/common/api:api_lib",
         "//source/exe:envoy_main_common_with_core_extensions_lib",
         "//source/exe:platform_impl_lib",
+        "//source/extensions/clusters/logical_dns:logical_dns_cluster_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:contention_lib",
         "//test/test_common:environment_lib",

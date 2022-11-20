@@ -4204,6 +4204,51 @@ TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsPassedToTcpConnPool) {
   EXPECT_TRUE(opt_cp.has_value());
 }
 
+TEST_F(ClusterManagerImplTest, SelectOverrideHostTestNoOverrideHost) {
+  createWithLocalClusterUpdate();
+  NiceMock<MockLoadBalancerContext> context;
+
+  auto to_create = new Tcp::ConnectionPool::MockInstance();
+
+  EXPECT_CALL(context, overrideHostToSelect()).WillOnce(Return(absl::nullopt));
+
+  EXPECT_CALL(factory_, allocateTcpConnPool_(_)).WillOnce(Return(to_create));
+  EXPECT_CALL(*to_create, addIdleCallback(_));
+
+  auto opt_cp = cluster_manager_->getThreadLocalCluster("cluster_1")
+                    ->tcpConnPool(ResourcePriority::Default, &context);
+  EXPECT_TRUE(opt_cp.has_value());
+}
+
+TEST_F(ClusterManagerImplTest, SelectOverrideHostTestWithOverrideHost) {
+  createWithLocalClusterUpdate();
+  NiceMock<MockLoadBalancerContext> context;
+
+  auto to_create = new Tcp::ConnectionPool::MockInstance();
+
+  EXPECT_CALL(context, overrideHostToSelect())
+      .WillRepeatedly(Return(absl::make_optional<absl::string_view>("127.0.0.1:11002")));
+
+  EXPECT_CALL(factory_, allocateTcpConnPool_(_))
+      .WillOnce(testing::Invoke([&](HostConstSharedPtr host) {
+        EXPECT_EQ("127.0.0.1:11002", host->address()->asStringView());
+        return to_create;
+      }));
+  EXPECT_CALL(*to_create, addIdleCallback(_));
+
+  auto opt_cp_1 = cluster_manager_->getThreadLocalCluster("cluster_1")
+                      ->tcpConnPool(ResourcePriority::Default, &context);
+  EXPECT_TRUE(opt_cp_1.has_value());
+
+  auto opt_cp_2 = cluster_manager_->getThreadLocalCluster("cluster_1")
+                      ->tcpConnPool(ResourcePriority::Default, &context);
+  EXPECT_TRUE(opt_cp_2.has_value());
+
+  auto opt_cp_3 = cluster_manager_->getThreadLocalCluster("cluster_1")
+                      ->tcpConnPool(ResourcePriority::Default, &context);
+  EXPECT_TRUE(opt_cp_3.has_value());
+}
+
 TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsPassedToConnPool) {
   createWithLocalClusterUpdate();
   NiceMock<MockLoadBalancerContext> context;
@@ -6009,6 +6054,25 @@ TEST_F(PreconnectTest, PreconnectOn) {
       .WillRepeatedly(ReturnNew<NiceMock<Tcp::ConnectionPool::MockInstance>>());
   auto tcp_handle = cluster_manager_->getThreadLocalCluster("cluster_1")
                         ->tcpConnPool(ResourcePriority::Default, nullptr);
+  ASSERT_TRUE(tcp_handle.has_value());
+  tcp_handle.value().newConnection(tcp_callbacks_);
+}
+
+TEST_F(PreconnectTest, PreconnectOnWithOverrideHost) {
+  // With preconnect set to 1.1, maybePreconnect will kick off
+  // preconnecting, so create the pool for both the current connection and the
+  // anticipated one.
+  initialize(1.1);
+
+  NiceMock<MockLoadBalancerContext> context;
+  EXPECT_CALL(context, overrideHostToSelect())
+      .WillRepeatedly(Return(absl::make_optional<absl::string_view>("127.0.0.1:80")));
+
+  // Only allocate connection pool once.
+  EXPECT_CALL(factory_, allocateTcpConnPool_)
+      .WillOnce(ReturnNew<NiceMock<Tcp::ConnectionPool::MockInstance>>());
+  auto tcp_handle = cluster_manager_->getThreadLocalCluster("cluster_1")
+                        ->tcpConnPool(ResourcePriority::Default, &context);
   ASSERT_TRUE(tcp_handle.has_value());
   tcp_handle.value().newConnection(tcp_callbacks_);
 }
