@@ -36,7 +36,7 @@ template <class Rds, class RouteConfiguration, int NameFieldNumber, class Config
 class RouteConfigProviderManagerImpl : public RouteConfigProviderManager<Rds, RouteConfiguration>,
                                        public Singleton::Instance {
 public:
-  RouteConfigProviderManagerImpl(Server::Admin& admin)
+  RouteConfigProviderManagerImpl(OptRef<Server::Admin> admin)
       : manager_(admin, absl::AsciiStrToLower(getRdsName()) + "_routes", proto_traits_) {}
 
   // RouteConfigProviderManager

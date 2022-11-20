@@ -71,6 +71,29 @@ public:
   MOCK_METHOD(MessageCreatorPtr, messageCreator, (), (const));
 };
 
+class MockProxyFactory : public ProxyFactory {
+public:
+  MockProxyFactory();
+
+  MOCK_METHOD(void, createProxy, (Network::FilterManager&, const FilterConfigSharedPtr&), (const));
+};
+
+class MockStreamCodecFactoryConfig : public CodecFactoryConfig {
+public:
+  MockStreamCodecFactoryConfig();
+
+  MOCK_METHOD(CodecFactoryPtr, createCodecFactory,
+              (const Protobuf::Message&, Envoy::Server::Configuration::FactoryContext&));
+  MOCK_METHOD(ProxyFactoryPtr, createProxyFactory,
+              (const Protobuf::Message&, Envoy::Server::Configuration::FactoryContext&));
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::Struct>();
+  }
+  std::set<std::string> configTypes() override { return {"envoy.generic_proxy.codecs.mock.type"}; }
+  std::string name() const override { return "envoy.generic_proxy.codecs.mock"; }
+};
+
 } // namespace GenericProxy
 } // namespace NetworkFilters
 } // namespace Extensions
