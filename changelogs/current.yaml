@@ -47,6 +47,9 @@ bug_fixes:
 - area: http
   change: |
     fixed a bug where Utility::PercentEncoding::encode() encodes some characters incorrectly because it was treating the value as negative.
+- area: upstream
+  change: |
+    fixed a bug that only coarse health status is used for override host selection.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
