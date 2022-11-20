@@ -98,14 +98,14 @@ TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponseWithEarlyHeade
   early_header_mutations_.push_back(std::move(mock_early_header_mutation_1));
   early_header_mutations_.push_back(std::move(mock_early_header_mutation_2));
 
-  EXPECT_CALL(*raw_mock_early_header_mutation_1, mutate(_))
+  EXPECT_CALL(*raw_mock_early_header_mutation_1, mutate(_, _))
       .Times(2)
       .WillRepeatedly(Invoke([](RequestHeaderMap& headers) -> bool {
         headers.addCopy(Http::LowerCaseString("x-early-mutation"), "true");
         return false;
       }));
   // This should not be called because the first extension returns false.
-  EXPECT_CALL(*raw_mock_early_header_mutation_2, mutate(_)).Times(0);
+  EXPECT_CALL(*raw_mock_early_header_mutation_2, mutate(_, _)).Times(0);
 
   // Store the basic request encoder during filter chain setup.
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());

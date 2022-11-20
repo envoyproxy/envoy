@@ -9,7 +9,7 @@ class MockEarlyHeaderMutation : public EarlyHeaderMutation {
 public:
   MockEarlyHeaderMutation();
 
-  MOCK_METHOD(bool, mutate, (RequestHeaderMap&), (const));
+  MOCK_METHOD(bool, mutate, (RequestHeaderMap&, const StreamInfo::StreamInfo&), (const));
 };
 
 } // namespace Http
