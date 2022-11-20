@@ -100,7 +100,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponseWithEarlyHeade
 
   EXPECT_CALL(*raw_mock_early_header_mutation_1, mutate(_, _))
       .Times(2)
-      .WillRepeatedly(Invoke([](RequestHeaderMap& headers) -> bool {
+      .WillRepeatedly(Invoke([](RequestHeaderMap& headers, const StreamInfo::StreamInfo&) -> bool {
         headers.addCopy(Http::LowerCaseString("x-early-mutation"), "true");
         return false;
       }));
@@ -130,9 +130,10 @@ TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponseWithEarlyHeade
 
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .Times(2)
-      .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> void {
+      .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
         auto factory = createDecoderFilterFactoryCb(filter);
         manager.applyFilterFactoryCb({}, factory);
+        return true;
       }));
 
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(2);
