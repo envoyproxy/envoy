@@ -106,6 +106,7 @@ categories:
 - envoy.rbac.matchers
 - envoy.access_loggers.extension_filters
 - envoy.http.stateful_session
+- envoy.matching.action
 - envoy.matching.http.input
 - envoy.matching.http.custom_matchers
 - envoy.matching.network.input
