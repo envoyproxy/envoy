@@ -16,12 +16,18 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
-static constexpr HostUtility::HostStatusSet UnhealthyStatus =
-    1u << static_cast<size_t>(Host::Health::Unhealthy);
-static constexpr HostUtility::HostStatusSet DegradedStatus =
-    1u << static_cast<size_t>(Host::Health::Degraded);
+static constexpr HostUtility::HostStatusSet UnknownStatus =
+    1u << static_cast<uint32_t>(envoy::config::core::v3::HealthStatus::UNKNOWN);
 static constexpr HostUtility::HostStatusSet HealthyStatus =
-    1u << static_cast<size_t>(Host::Health::Healthy);
+    1u << static_cast<uint32_t>(envoy::config::core::v3::HealthStatus::HEALTHY);
+static constexpr HostUtility::HostStatusSet UnhealthyStatus =
+    1u << static_cast<uint32_t>(envoy::config::core::v3::HealthStatus::UNHEALTHY);
+static constexpr HostUtility::HostStatusSet DrainingStatus =
+    1u << static_cast<uint32_t>(envoy::config::core::v3::HealthStatus::DRAINING);
+static constexpr HostUtility::HostStatusSet TimeoutStatus =
+    1u << static_cast<uint32_t>(envoy::config::core::v3::HealthStatus::TIMEOUT);
+static constexpr HostUtility::HostStatusSet DegradedStatus =
+    1u << static_cast<uint32_t>(envoy::config::core::v3::HealthStatus::DEGRADED);
 
 TEST(HostUtilityTest, All) {
   auto cluster = std::make_shared<NiceMock<MockClusterInfo>>();
@@ -81,7 +87,7 @@ TEST(HostUtilityTest, CreateOverrideHostStatus) {
         ::envoy::config::core::v3::HealthStatus::UNKNOWN);
     lb_config.mutable_override_host_status()->add_statuses(
         ::envoy::config::core::v3::HealthStatus::HEALTHY);
-    EXPECT_EQ(HostUtility::createOverrideHostStatus(lb_config), HealthyStatus);
+    EXPECT_EQ(HostUtility::createOverrideHostStatus(lb_config), UnknownStatus | HealthyStatus);
   }
   {
     envoy::config::cluster::v3::Cluster::CommonLbConfig lb_config;
@@ -92,7 +98,8 @@ TEST(HostUtilityTest, CreateOverrideHostStatus) {
     lb_config.mutable_override_host_status()->add_statuses(
         ::envoy::config::core::v3::HealthStatus::TIMEOUT);
 
-    EXPECT_EQ(HostUtility::createOverrideHostStatus(lb_config), UnhealthyStatus);
+    EXPECT_EQ(HostUtility::createOverrideHostStatus(lb_config),
+              UnhealthyStatus | DrainingStatus | TimeoutStatus);
   }
   {
     envoy::config::cluster::v3::Cluster::CommonLbConfig lb_config;
@@ -102,7 +109,8 @@ TEST(HostUtilityTest, CreateOverrideHostStatus) {
   }
   {
     envoy::config::cluster::v3::Cluster::CommonLbConfig lb_config;
-    EXPECT_EQ(HostUtility::createOverrideHostStatus(lb_config), 0b110u);
+    EXPECT_EQ(HostUtility::createOverrideHostStatus(lb_config),
+              UnknownStatus | HealthyStatus | DegradedStatus);
   }
   {
     envoy::config::cluster::v3::Cluster::CommonLbConfig lb_config;
@@ -117,7 +125,8 @@ TEST(HostUtilityTest, CreateOverrideHostStatus) {
     lb_config.mutable_override_host_status()->add_statuses(
         ::envoy::config::core::v3::HealthStatus::HEALTHY);
 
-    EXPECT_EQ(HostUtility::createOverrideHostStatus(lb_config), 0b101u);
+    EXPECT_EQ(HostUtility::createOverrideHostStatus(lb_config),
+              UnhealthyStatus | DrainingStatus | TimeoutStatus | UnknownStatus | HealthyStatus);
   }
 
   {
@@ -134,7 +143,9 @@ TEST(HostUtilityTest, CreateOverrideHostStatus) {
         ::envoy::config::core::v3::HealthStatus::HEALTHY);
     lb_config.mutable_override_host_status()->add_statuses(
         ::envoy::config::core::v3::HealthStatus::DEGRADED);
-    EXPECT_EQ(HostUtility::createOverrideHostStatus(lb_config), 0b111u);
+    EXPECT_EQ(HostUtility::createOverrideHostStatus(lb_config),
+              UnknownStatus | HealthyStatus | UnhealthyStatus | DrainingStatus | TimeoutStatus |
+                  DegradedStatus);
   }
 }
 
@@ -142,8 +153,9 @@ TEST(HostUtilityTest, SelectOverrideHostTest) {
 
   NiceMock<Upstream::MockLoadBalancerContext> context;
 
-  const HostUtility::HostStatusSet all_health_statuses =
-      UnhealthyStatus | DegradedStatus | HealthyStatus;
+  const HostUtility::HostStatusSet all_health_statuses = UnknownStatus | HealthyStatus |
+                                                         UnhealthyStatus | DrainingStatus |
+                                                         TimeoutStatus | DegradedStatus;
 
   {
     // No valid host map.
@@ -171,31 +183,48 @@ TEST(HostUtilityTest, SelectOverrideHostTest) {
     EXPECT_EQ(nullptr, HostUtility::selectOverrideHost(host_map.get(), HealthyStatus, &context));
   }
   {
-    // The status of host is not as expected.
     auto mock_host = std::make_shared<NiceMock<MockHost>>();
-    EXPECT_CALL(*mock_host, coarseHealth()).WillOnce(Return(Host::Health::Unhealthy));
+    EXPECT_CALL(*mock_host, healthStatus())
+        .WillRepeatedly(Return(envoy::config::core::v3::HealthStatus::UNHEALTHY));
 
     LoadBalancerContext::OverrideHost override_host{"1.2.3.4"};
     EXPECT_CALL(context, overrideHostToSelect())
-        .WillOnce(Return(absl::make_optional(override_host)));
+        .WillRepeatedly(Return(absl::make_optional(override_host)));
 
     auto host_map = std::make_shared<HostMap>();
     host_map->insert({"1.2.3.4", mock_host});
+
+    EXPECT_EQ(mock_host,
+              HostUtility::selectOverrideHost(host_map.get(), UnhealthyStatus, &context));
+    EXPECT_EQ(mock_host,
+              HostUtility::selectOverrideHost(host_map.get(), all_health_statuses, &context));
+
     EXPECT_EQ(nullptr, HostUtility::selectOverrideHost(host_map.get(), HealthyStatus, &context));
+    EXPECT_EQ(nullptr, HostUtility::selectOverrideHost(host_map.get(), DegradedStatus, &context));
+    EXPECT_EQ(nullptr, HostUtility::selectOverrideHost(host_map.get(), TimeoutStatus, &context));
+    EXPECT_EQ(nullptr, HostUtility::selectOverrideHost(host_map.get(), DrainingStatus, &context));
+    EXPECT_EQ(nullptr, HostUtility::selectOverrideHost(host_map.get(), UnknownStatus, &context));
   }
   {
-    // Get expected host.
     auto mock_host = std::make_shared<NiceMock<MockHost>>();
-    EXPECT_CALL(*mock_host, coarseHealth()).WillOnce(Return(Host::Health::Degraded));
+    EXPECT_CALL(*mock_host, healthStatus())
+        .WillRepeatedly(Return(envoy::config::core::v3::HealthStatus::DEGRADED));
 
     LoadBalancerContext::OverrideHost override_host{"1.2.3.4"};
     EXPECT_CALL(context, overrideHostToSelect())
-        .WillOnce(Return(absl::make_optional(override_host)));
+        .WillRepeatedly(Return(absl::make_optional(override_host)));
 
     auto host_map = std::make_shared<HostMap>();
     host_map->insert({"1.2.3.4", mock_host});
-    EXPECT_EQ(mock_host, HostUtility::selectOverrideHost(host_map.get(),
-                                                         HealthyStatus | DegradedStatus, &context));
+    EXPECT_EQ(mock_host, HostUtility::selectOverrideHost(host_map.get(), DegradedStatus, &context));
+    EXPECT_EQ(mock_host,
+              HostUtility::selectOverrideHost(host_map.get(), all_health_statuses, &context));
+
+    EXPECT_EQ(nullptr, HostUtility::selectOverrideHost(host_map.get(), HealthyStatus, &context));
+    EXPECT_EQ(nullptr, HostUtility::selectOverrideHost(host_map.get(), UnhealthyStatus, &context));
+    EXPECT_EQ(nullptr, HostUtility::selectOverrideHost(host_map.get(), TimeoutStatus, &context));
+    EXPECT_EQ(nullptr, HostUtility::selectOverrideHost(host_map.get(), DrainingStatus, &context));
+    EXPECT_EQ(nullptr, HostUtility::selectOverrideHost(host_map.get(), UnknownStatus, &context));
   }
 }
 

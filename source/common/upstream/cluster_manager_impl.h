@@ -565,12 +565,15 @@ private:
       // be shared across its hosts.
       Http::PersistentQuicInfoPtr quic_info_;
 
-      // Expected override host statues. Every bit in the OverrideHostStatus represent an enum value
-      // of Host::Health. The specific correspondence is shown below:
+      // Expected override host statues. Every bit in the HostStatusSet represent an enum value
+      // of envoy::config::core::v3::HealthStatus. The specific correspondence is shown below:
       //
-      // * 0b001: Host::Health::Unhealthy
-      // * 0b010: Host::Health::Degraded
-      // * 0b100: Host::Health::Healthy
+      // * 0b000001: envoy::config::core::v3::HealthStatus::UNKNOWN
+      // * 0b000010: envoy::config::core::v3::HealthStatus::HEALTHY
+      // * 0b000100: envoy::config::core::v3::HealthStatus::UNHEALTHY
+      // * 0b001000: envoy::config::core::v3::HealthStatus::DRAINING
+      // * 0b010000: envoy::config::core::v3::HealthStatus::TIMEOUT
+      // * 0b100000: envoy::config::core::v3::HealthStatus::DEGRADED
       //
       // If multiple bit fields are set, it is acceptable as long as the status of override host is
       // in any of these statuses.

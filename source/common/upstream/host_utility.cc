@@ -96,9 +96,11 @@ HostUtility::HostStatusSet HostUtility::createOverrideHostStatus(
   HostStatusSet override_host_status;
 
   if (!common_config.has_override_host_status()) {
-    // No override host status and 'Healthy' and 'Degraded' will be applied by default.
-    override_host_status.set(static_cast<size_t>(Host::Health::Healthy));
-    override_host_status.set(static_cast<size_t>(Host::Health::Degraded));
+    // No override host status and [UNKNOWN, HEALTHY, DEGRADED] will be applied by default.
+    override_host_status.set(static_cast<uint32_t>(envoy::config::core::v3::HealthStatus::UNKNOWN));
+    override_host_status.set(static_cast<uint32_t>(envoy::config::core::v3::HealthStatus::HEALTHY));
+    override_host_status.set(
+        static_cast<uint32_t>(envoy::config::core::v3::HealthStatus::DEGRADED));
     return override_host_status;
   }
 
@@ -107,15 +109,11 @@ HostUtility::HostStatusSet HostUtility::createOverrideHostStatus(
       PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
     case envoy::config::core::v3::HealthStatus::UNKNOWN:
     case envoy::config::core::v3::HealthStatus::HEALTHY:
-      override_host_status.set(static_cast<size_t>(Host::Health::Healthy));
-      break;
     case envoy::config::core::v3::HealthStatus::UNHEALTHY:
     case envoy::config::core::v3::HealthStatus::DRAINING:
     case envoy::config::core::v3::HealthStatus::TIMEOUT:
-      override_host_status.set(static_cast<size_t>(Host::Health::Unhealthy));
-      break;
     case envoy::config::core::v3::HealthStatus::DEGRADED:
-      override_host_status.set(static_cast<size_t>(Host::Health::Degraded));
+      override_host_status.set(static_cast<uint32_t>(single_status));
       break;
     }
   }
@@ -147,7 +145,7 @@ HostConstSharedPtr HostUtility::selectOverrideHost(const HostMap* host_map, Host
   HostConstSharedPtr host = host_iter->second;
   ASSERT(host != nullptr);
 
-  if (status[static_cast<size_t>(host->coarseHealth())]) {
+  if (status[static_cast<uint32_t>(host->healthStatus())]) {
     return host;
   }
   return nullptr;
