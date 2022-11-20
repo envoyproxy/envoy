@@ -1,4 +1,4 @@
-#include "source/extensions/http/early_header_mutation/regex_mutation/config.h"
+#include "source/extensions/http/early_header_mutation/header_mutation/config.h"
 
 #include "source/common/config/utility.h"
 
@@ -6,7 +6,7 @@ namespace Envoy {
 namespace Extensions {
 namespace Http {
 namespace EarlyHeaderMutation {
-namespace RegexMutation {
+namespace HeaderMutation {
 
 Envoy::Http::EarlyHeaderMutationPtr
 Factory::createExtension(const Protobuf::Message& message,
@@ -14,14 +14,14 @@ Factory::createExtension(const Protobuf::Message& message,
   auto mptr = Envoy::Config::Utility::translateAnyToFactoryConfig(
       dynamic_cast<const ProtobufWkt::Any&>(message), context.messageValidationVisitor(), *this);
   const auto& proto_config = MessageUtil::downcastAndValidate<
-      const envoy::extensions::http::early_header_mutation::regex_mutation::v3::RegexMutation&>(
+      const envoy::extensions::http::early_header_mutation::header_mutation::v3::HeaderMutation&>(
       *mptr, context.messageValidationVisitor());
-  return std::make_unique<RegexMutation>(proto_config.header_mutations());
+  return std::make_unique<HeaderMutation>(proto_config);
 }
 
 REGISTER_FACTORY(Factory, Envoy::Http::EarlyHeaderMutationFactory);
 
-} // namespace RegexMutation
+} // namespace HeaderMutation
 } // namespace EarlyHeaderMutation
 } // namespace Http
 } // namespace Extensions

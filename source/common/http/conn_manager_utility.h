@@ -70,7 +70,8 @@ public:
                                                          Network::Connection& connection,
                                                          ConnectionManagerConfig& config,
                                                          const Router::Config& route_config,
-                                                         const LocalInfo::LocalInfo& local_info);
+                                                         const LocalInfo::LocalInfo& local_info,
+                                                         const StreamInfo::StreamInfo& stream_info);
   /**
    * Mutates response headers in various ways. This functionality is broken out because of its
    * complexity for ease of testing. See the method itself for detailed comments on what

@@ -378,7 +378,7 @@ EXTENSIONS = {
     #
     # HTTP Early Header Mutation
     #
-    "envoy.http.early_header_mutation.regex_mutation": "//source/extensions/http/early_header_mutation/regex_mutation:config",
+    "envoy.http.early_header_mutation.header_mutation": "//source/extensions/http/early_header_mutation/header_mutation:config",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which

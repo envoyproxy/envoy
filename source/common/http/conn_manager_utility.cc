@@ -77,11 +77,11 @@ ServerConnectionPtr ConnectionManagerUtility::autoCreateCodec(
 ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::mutateRequestHeaders(
     RequestHeaderMap& request_headers, Network::Connection& connection,
     ConnectionManagerConfig& config, const Router::Config& route_config,
-    const LocalInfo::LocalInfo& local_info) {
+    const LocalInfo::LocalInfo& local_info, const StreamInfo::StreamInfo& stream_info) {
 
   if (!config.earlyHeaderMutationExtensions().empty()) {
     for (const auto& extension : config.earlyHeaderMutationExtensions()) {
-      if (!extension->mutate(request_headers)) {
+      if (!extension->mutate(request_headers, stream_info)) {
         break;
       }
     }

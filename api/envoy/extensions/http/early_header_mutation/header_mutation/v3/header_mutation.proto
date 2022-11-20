@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package envoy.extensions.http.early_header_mutation.header_mutation.v3;
+
+import "envoy/config/core/v3/base.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.http.early_header_mutation.header_mutation.v3";
+option java_outer_classname = "HeaderMutationProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/http/early_header_mutation/header_mutation/v3;header_mutationv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Custom early header mutation extension]
+// [#extension: envoy.http.early_header_mutation.header_mutation]
+
+// This extension allows for custom early header mutation by the regex match and rewrite.
+// It is configured with a list of
+// :ref:`header mutation <envoy_v3_api_msg_config.common.mutation_rules.v3.HeaderMutation>`.
+message HeaderMutation {
+  repeated config.core.v3.HeaderValueOption headers_to_append = 1;
+
+  repeated string headers_to_remove = 2;
+}

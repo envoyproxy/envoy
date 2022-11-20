@@ -1,5 +1,5 @@
-#include "envoy/extensions/http/early_header_mutation/regex_mutation/v3/regex_mutation.pb.h"
-#include "envoy/extensions/http/early_header_mutation/regex_mutation/v3/regex_mutation.pb.validate.h"
+#include "envoy/extensions/http/early_header_mutation/header_mutation/v3/header_mutation.pb.h"
+#include "envoy/extensions/http/early_header_mutation/header_mutation/v3/header_mutation.pb.validate.h"
 
 #include "test/integration/filters/common.h"
 #include "test/integration/http_integration.h"
@@ -8,34 +8,41 @@
 namespace Envoy {
 namespace {
 
-using ProtoRegexMutation =
-    envoy::extensions::http::early_header_mutation::regex_mutation::v3::RegexMutation;
+using ProtoHeaderMutation =
+    envoy::extensions::http::early_header_mutation::header_mutation::v3::HeaderMutation;
 
-class RegexMutationIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                                     public HttpIntegrationTest {
+class HeaderMutationIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                                      public HttpIntegrationTest {
 public:
-  RegexMutationIntegrationTest() : HttpIntegrationTest(Envoy::Http::CodecType::HTTP1, GetParam()) {}
+  HeaderMutationIntegrationTest()
+      : HttpIntegrationTest(Envoy::Http::CodecType::HTTP1, GetParam()) {}
 
-  void initializeExtension(const std::string& regex_mutation_yaml) {
+  void initializeExtension(const std::string& header_mutation_yaml) {
     config_helper_.addConfigModifier(
-        [regex_mutation_yaml](
+        [header_mutation_yaml](
             envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) {
-          ProtoRegexMutation proto_mutation;
-          TestUtility::loadFromYaml(regex_mutation_yaml, proto_mutation);
+          ProtoHeaderMutation proto_mutation;
+          TestUtility::loadFromYaml(header_mutation_yaml, proto_mutation);
 
           // Load extension.
           auto* new_extension = hcm.add_early_header_mutation_extensions();
           new_extension->set_name("test");
           new_extension->mutable_typed_config()->PackFrom(proto_mutation);
 
-          // Update route to make sure only requests that have path start with "/prefix" will be
-          // processed by the HCM.
           hcm.mutable_route_config()
               ->mutable_virtual_hosts(0)
               ->mutable_routes(0)
               ->mutable_match()
               ->set_prefix("/prefix");
+
+          auto header = hcm.mutable_route_config()
+                            ->mutable_virtual_hosts(0)
+                            ->mutable_routes(0)
+                            ->mutable_match()
+                            ->add_headers();
+          header->set_name("flag-header");
+          header->set_exact_match("true");
         });
 
     HttpIntegrationTest::initialize();
@@ -44,32 +51,30 @@ public:
   ScopedInjectableLoader<Regex::Engine> engine_{std::make_unique<Regex::GoogleReEngine>()};
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, RegexMutationIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, HeaderMutationIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(RegexMutationIntegrationTest, TestRegexMutation) {
-  const std::string regex_mutation_yaml = R"EOF(
-  header_mutations:
-    - header: "flag-header"
-      rename: ":path"          # Try to reset path.
-      regex_rewrite:
-        pattern:
-          regex: "^reset-path$"
-        substitution: "/prefix"
+TEST_P(HeaderMutationIntegrationTest, TestHeaderMutation) {
+  const std::string header_mutation_yaml = R"EOF(
+  headers_to_append:
+  - header:
+      key: "flag-header"
+      value: "%REQ(another-flag-header)%"
+    append_action: OVERWRITE_IF_EXISTS_OR_ADD
   )EOF";
 
-  initializeExtension(regex_mutation_yaml);
+  initializeExtension(header_mutation_yaml);
 
   // Not reset path by the regex mutation and get 404.
   {
     codec_client_ = makeHttpConnection(lookupPort("http"));
 
     Envoy::Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
-                                                          {":path", "/suffix"},
+                                                          {":path", "/prefix"},
                                                           {":scheme", "http"},
                                                           {":authority", "host"},
-                                                          {"flag-header", "no-reset-path"}};
+                                                          {"flag-header", "false"}};
     auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
 
     ASSERT_TRUE(response->waitForEndStream());
@@ -82,11 +87,9 @@ TEST_P(RegexMutationIntegrationTest, TestRegexMutation) {
   {
     codec_client_ = makeHttpConnection(lookupPort("http"));
 
-    Envoy::Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
-                                                          {":path", "/suffix"},
-                                                          {":scheme", "http"},
-                                                          {":authority", "host"},
-                                                          {"flag-header", "reset-path"}};
+    Envoy::Http::TestRequestHeaderMapImpl request_headers{
+        {":method", "GET"},     {":path", "/prefix"},     {":scheme", "http"},
+        {":authority", "host"}, {"flag-header", "false"}, {"another-flag-header", "true"}};
     auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
 
     waitForNextUpstreamRequest();

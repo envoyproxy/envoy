@@ -275,7 +275,7 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 # Dubbo codec
 /*/extensions/common/dubbo @wbpcode @lizan
 # Early header mutation
-/*/extensions/http/early_header_mutation/regex_mutation @wbpcode @UNOWNED
+/*/extensions/http/early_header_mutation/header_mutation @wbpcode @UNOWNED
 
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED

@@ -10,13 +10,13 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
-    name = "regex_mutation_lib",
-    srcs = ["regex_mutation.cc"],
-    hdrs = ["regex_mutation.h"],
+    name = "header_mutation_lib",
+    srcs = ["header_mutation.cc"],
+    hdrs = ["header_mutation.h"],
     deps = [
         "//envoy/http:early_header_mutation_interface",
-        "//source/common/common:regex_lib",
-        "@envoy_api//envoy/extensions/http/early_header_mutation/regex_mutation/v3:pkg_cc_proto",
+        "//source/common/router:header_parser_lib",
+        "@envoy_api//envoy/extensions/http/early_header_mutation/header_mutation/v3:pkg_cc_proto",
     ],
 )
 
@@ -25,10 +25,10 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
-        ":regex_mutation_lib",
+        ":header_mutation_lib",
         "//envoy/http:early_header_mutation_interface",
         "//envoy/registry",
         "//source/common/config:utility_lib",
-        "@envoy_api//envoy/extensions/http/early_header_mutation/regex_mutation/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/http/early_header_mutation/header_mutation/v3:pkg_cc_proto",
     ],
 )

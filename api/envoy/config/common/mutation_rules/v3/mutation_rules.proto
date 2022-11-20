@@ -85,19 +85,3 @@ message HeaderMutationRules {
   // Default is false.
   google.protobuf.BoolValue disallow_is_error = 7;
 }
-
-// HeaderMutation defines an API to apply match and rewrite operations to header value.
-message HeaderMutation {
-  // The header name of the request header that will be mutated.
-  string header = 1
-      [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
-
-  // Optional new header name. If not empty, the final header name after mutation will be replaced with this name.
-  string rename = 2 [
-    (validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false ignore_empty: true}
-  ];
-
-  // Regex match and rewrite operations that will be applied to the header value.
-  type.matcher.v3.RegexMatchAndSubstitute regex_rewrite = 3
-      [(validate.rules).message = {required: true}];
-}

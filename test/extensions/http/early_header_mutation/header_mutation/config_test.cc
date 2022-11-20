@@ -1,7 +1,7 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/config/utility.h"
-#include "source/extensions/http/early_header_mutation/regex_mutation/config.h"
+#include "source/extensions/http/early_header_mutation/header_mutation/config.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/utility.h"
@@ -12,11 +12,11 @@ namespace Envoy {
 namespace Extensions {
 namespace Http {
 namespace EarlyHeaderMutation {
-namespace RegexMutation {
+namespace HeaderMutation {
 namespace {
 
-using ProtoRegexMutation =
-    envoy::extensions::http::early_header_mutation::regex_mutation::v3::RegexMutation;
+using ProtoHeaderMutation =
+    envoy::extensions::http::early_header_mutation::header_mutation::v3::HeaderMutation;
 
 TEST(FactoryTest, FactoryTest) {
   ScopedInjectableLoader<Regex::Engine> engine{std::make_unique<Regex::GoogleReEngine>()};
@@ -24,30 +24,20 @@ TEST(FactoryTest, FactoryTest) {
   testing::NiceMock<Server::Configuration::MockFactoryContext> context;
 
   auto* factory = Registry::FactoryRegistry<Envoy::Http::EarlyHeaderMutationFactory>::getFactory(
-      "envoy.http.early_header_mutation.regex_mutation");
+      "envoy.http.early_header_mutation.header_mutation");
   ASSERT_NE(factory, nullptr);
 
   const std::string config = R"EOF(
-  header_mutations:
-    - header: "foo"
-      regex_rewrite:
-        pattern:
-          regex: "foo"
-        substitution: "bar"
-    - header: "foo"
-      regex_rewrite:
-        pattern:
-          regex: "bar"
-        substitution: "qux"
-    - header: "foo"
-      rename: "bar"
-      regex_rewrite:
-        pattern:
-          regex: "^(.*)$"
-        substitution: "\\1"
+  headers_to_remove:
+  - "flag-header"
+  headers_to_append:
+  - header:
+      key: "flag-header"
+      value: "%REQ(ANOTHER-FLAG-HEADER)%"
+    append_action: APPEND_IF_EXISTS_OR_ADD
   )EOF";
 
-  ProtoRegexMutation proto_mutation;
+  ProtoHeaderMutation proto_mutation;
   TestUtility::loadFromYaml(config, proto_mutation);
 
   ProtobufWkt::Any any_config;
@@ -57,7 +47,7 @@ TEST(FactoryTest, FactoryTest) {
 }
 
 } // namespace
-} // namespace RegexMutation
+} // namespace HeaderMutation
 } // namespace EarlyHeaderMutation
 } // namespace Http
 } // namespace Extensions

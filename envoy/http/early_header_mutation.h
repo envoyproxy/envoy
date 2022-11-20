@@ -7,6 +7,7 @@
 #include "envoy/config/typed_config.h"
 #include "envoy/http/header_map.h"
 #include "envoy/server/factory_context.h"
+#include "envoy/stream_info/stream_info.h"
 
 namespace Envoy {
 namespace Http {
@@ -21,11 +22,13 @@ public:
   /**
    * Mutate the request headers at very early.
    *
-   * @param headers request headers.
-   * @return true if the mutation is could be continued for the flollowing extensions. Make no sense
-   * if there is no following extensions.
+   * @param headers request headers to be mutated.
+   * @param stream_info stream info.
+   * @return true if the mutation is could be continued for the flollowing extensions.
+   * Make no sense if there is no following extensions.
    */
-  virtual bool mutate(RequestHeaderMap& headers) const PURE;
+  virtual bool mutate(RequestHeaderMap& headers,
+                      const StreamInfo::StreamInfo& stream_info) const PURE;
 };
 
 using EarlyHeaderMutationPtr = std::unique_ptr<EarlyHeaderMutation>;
