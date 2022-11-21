@@ -1,6 +1,6 @@
 rlqs_server:
-    envoy_grpc:
-      cluster_name: rate_limit_quota_service
+  envoy_grpc:
+    cluster_name: rate_limit_quota_service
   domain: "acme-services"
   matcher:
     matcher_list:
