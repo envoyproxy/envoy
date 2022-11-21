@@ -40,7 +40,7 @@ void benchmarkLazyInitCreation(::benchmark::State& state) {
 }
 
 BENCHMARK(benchmarkLazyInitCreation)
-    ->ArgsProduct({{0, 1}, {1000, 10000}})
+    ->ArgsProduct({{0, 1}, {1000, 10000, 100000, 500000}})
     ->Unit(::benchmark::kMillisecond);
 
 // Benchmark lazy-init stats in same thread, mimicking main thread creation.
@@ -70,7 +70,7 @@ void benchmarkLazyInitCreationInstantiateSameThread(::benchmark::State& state) {
 }
 
 BENCHMARK(benchmarkLazyInitCreationInstantiateSameThread)
-    ->ArgsProduct({{0, 1}, {1000, 10000}})
+    ->ArgsProduct({{0, 1}, {1000, 10000, 100000, 500000}})
     ->Unit(::benchmark::kMillisecond);
 
 class ThreadLocalStoreNoMocksTestBase {
@@ -127,7 +127,6 @@ void benchmarkLazyInitCreationInstantiateOnWorkerThreads(::benchmark::State& sta
   const bool lazy_init = state.range(0) == 1;
   const uint64_t num_stats = state.range(1);
   Envoy::Event::Libevent::Global::initialize();
-  ENVOY_LOG_MISC(error, "INIT CALLED!");
   MultiThreadLazyinitStatsTest test;
   std::vector<Stats::ScopeSharedPtr> scopes;
   std::vector<std::shared_ptr<Stats::LazyInit<ClusterTrafficStats>>> lazy_stats;
@@ -158,8 +157,8 @@ void benchmarkLazyInitCreationInstantiateOnWorkerThreads(::benchmark::State& sta
     std::atomic_uint64_t idx = 0;
     test.runOnAllWorkersBlocking([&]() {
       while (true) {
-        uint64_t index = ++idx;
-        if (index <= num_stats) {
+        uint64_t index = idx++;
+        if (index < num_stats) {
           if (lazy_init) {
             // Lazy-init on workers happen when the "index"-th stat instance is not created.
             (*lazy_stats[index])->upstream_rq_active_.inc();
@@ -169,6 +168,8 @@ void benchmarkLazyInitCreationInstantiateOnWorkerThreads(::benchmark::State& sta
             normal_stats[index]->upstream_rq_active_.inc();
             normal_stats[index]->upstream_rq_total_.inc();
           }
+        } else {
+          break;
         }
       }
     });
@@ -176,7 +177,7 @@ void benchmarkLazyInitCreationInstantiateOnWorkerThreads(::benchmark::State& sta
 }
 
 BENCHMARK(benchmarkLazyInitCreationInstantiateOnWorkerThreads)
-    ->ArgsProduct({{0, 1}, {1000, 10000}})
+    ->ArgsProduct({{0, 1}, {1000, 10000, 100000, 500000}})
     ->Unit(::benchmark::kMillisecond);
 
 } // namespace
