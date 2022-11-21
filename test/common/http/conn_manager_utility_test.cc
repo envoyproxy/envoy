@@ -2060,7 +2060,7 @@ TEST_F(ConnectionManagerUtilityTest, KeepFragmentFromPathWithBothOverrides) {
   EXPECT_EQ(header_map_with_fragment2.getPathValue(), "/baz/%23fragment");
 }
 
-// Verify when append_x_forward_port is turned on, the x-forwarded-port header should be appended.
+// Verify when append_x_forwarded_port is turned on, the x-forwarded-port header should be appended.
 TEST_F(ConnectionManagerUtilityTest, AppendXForwardedPort) {
   EXPECT_CALL(config_, appendXForwardedPort()).WillOnce(Return(true));
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
@@ -2071,7 +2071,7 @@ TEST_F(ConnectionManagerUtilityTest, AppendXForwardedPort) {
   EXPECT_EQ("8080", headers.getForwardedPortValue());
 }
 
-// Verify when append_x_forward_port is not turned on, the x-forwarded-port header should not be
+// Verify when append_x_forwarded_port is not turned on, the x-forwarded-port header should not be
 // appended.
 TEST_F(ConnectionManagerUtilityTest, DoNotAppendXForwardedPort) {
   EXPECT_CALL(config_, appendXForwardedPort()).WillOnce(Return(false));
