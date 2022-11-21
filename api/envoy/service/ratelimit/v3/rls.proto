@@ -92,6 +92,12 @@ message RateLimitResponse {
 
       // The time unit representing a day.
       DAY = 4;
+
+      // The time unit representing a month.
+      MONTH = 5;
+
+      // The time unit representing a year.
+      YEAR = 6;
     }
 
     // A name or description of this limit.
