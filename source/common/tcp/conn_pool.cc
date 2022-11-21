@@ -93,7 +93,7 @@ void ActiveTcpClient::onEvent(Network::ConnectionEvent event) {
 
 void ActiveTcpClient::onIdleTimeout() {
   ENVOY_CONN_LOG(debug, "idle timeout", *this);
-  parent_.host()->cluster().stats().upstream_cx_idle_timeout_.inc();
+  parent_.host()->cluster().trafficStats().upstream_cx_idle_timeout_.inc();
   close();
 }
 
