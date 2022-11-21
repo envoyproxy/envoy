@@ -53,7 +53,7 @@ jobs:
       - env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ./bazelw run \
+          cd mobile && ./bazelw run \
             --config=ios \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
@@ -88,7 +88,7 @@ jobs:
       - env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ./bazelw run \
+          cd mobile && ./bazelw run \
             --config=ios \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
@@ -123,7 +123,7 @@ jobs:
       - env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ./bazelw run \
+          cd mobile && ./bazelw run \
             --config=ios \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
@@ -158,7 +158,7 @@ jobs:
       - env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ./bazelw run \
+          cd mobile && ./bazelw run \
             --config=ios \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
@@ -193,7 +193,7 @@ jobs:
       - env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ./bazelw run \
+          cd mobile && ./bazelw run \
             --config=ios \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
