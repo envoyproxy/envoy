@@ -42,7 +42,7 @@ public:
                             ->mutable_match()
                             ->add_headers();
           header->set_name("flag-header");
-          header->set_exact_match("true");
+          header->mutable_string_match()->set_exact("true");
         });
 
     HttpIntegrationTest::initialize();
