@@ -6,6 +6,7 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_mobile_android_test(
+    timeout = "long",
     name = "cronvoy_test",
     srcs = [
         "AtomicCombinatoryStateTest.java",
