@@ -16,7 +16,7 @@ Regex::EnginePtr createRegexEngine(const envoy::config::bootstrap::v3::Bootstrap
         Config::Utility::getAndCheckFactory<Regex::EngineFactory>(default_regex_engine);
     auto config = Config::Utility::translateAnyToFactoryConfig(default_regex_engine.typed_config(),
                                                                validation_visitor, factory);
-    Regex::EnginePtr regex_engine = factory.createEngine(*config, server_factory_context);
+    regex_engine = factory.createEngine(*config, server_factory_context);
   } else {
     regex_engine = std::make_shared<Regex::GoogleReEngine>();
   }
