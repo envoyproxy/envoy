@@ -61,78 +61,12 @@ configuration enables rate limit quota filter with 3 buckets. Note that bucket I
 
 3.  Bucket id ``name: default-rate-limit-quota`` for all other requests. Until RLQS assigns a quota, 1K RPS quota is applied.
 
-.. code-block:: yaml
-
-  rlqs_server:
-    envoy_grpc:
-      cluster_name: rate_limit_quota_service
-  domain: "acme-services"
-  matcher:
-    matcher_list:
-      matchers:
-      - predicate:
-        - single_predicate:
-            input:
-              name: request-headers
-              typed_config:
-                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                header_name: deployment
-            value_match:
-              exact: prod
-        on_match:
-          action:
-            name: prod-bucket
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
-              bucket_id_builder:
-                bucket_id_builder:
-                  "name":
-                    string_value: "prod-rate-limit-quota"
-              reporting_interval: 60s
-              no_assignment_behavior:
-                blanket_rule: ALLOW_ALL
-      - predicate:
-        - single_predicate:
-            input:
-              name: request-headers
-              typed_config:
-                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                header_name: deployment
-            value_match:
-              exact: staging
-        on_match:
-          action:
-            name: staging-bucket
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
-              bucket_id_builder:
-                bucket_id_builder:
-                  "name":
-                    string_value: "staging-rate-limit-quota"
-              reporting_interval: 60s
-              no_assignment_behavior:
-                blanket_rule: DENY_ALL
-    # The "catch all" bucket settings
-    on_no_match:
-      action:
-        name: default-bucket
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
-          bucket_id_builder:
-            bucket_id_builder:
-              "name":
-                string_value: "default-rate-limit-quota"
-          reporting_interval: 60s
-          deny_response_settings:
-            http_status_code: 429
-          no_assignment_behavior:
-            blanket_rule: ALLOW_ALL
-          expired_assignment_behavior:
-            fallback_rate_limit:
-              requests_per_time_unit:
-                requests_per_time_unit: 1000
-                time_unit: 1s
-
+.. literalinclude:: _include/rate-limit-quota-filter-configuration.yaml
+   :language: yaml
+   :lines: 1-69
+   :linenos:
+   :lineno-start: 1
+   :caption: :download:`rate-limit-quota-filter-configuration.yaml <_include/rate-limit-quota-filter-configuration.yaml>`
 
 Rate Limit Quota Override
 -------------------------
