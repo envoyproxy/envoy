@@ -11,6 +11,7 @@
 #include "source/common/stats/isolated_store_impl.h"
 
 #include "test/test_common/environment.h"
+#include "test/test_common/utility.h"
 
 #include "quiche/quic/core/http/quic_spdy_session.h"
 #include "quiche/quic/core/qpack/qpack_encoder.h"
@@ -273,8 +274,8 @@ std::vector<std::pair<Network::Address::IpVersion, quic::ParsedQuicVersion>> gen
 std::string testParamsToString(
     const ::testing::TestParamInfo<std::pair<Network::Address::IpVersion, quic::ParsedQuicVersion>>&
         params) {
-  std::string ip_version = params.param.first == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6";
-  return absl::StrCat(ip_version, quic::QuicVersionToString(params.param.second.transport_version));
+  return absl::StrCat(TestUtility::ipVersionToString(params.param.first),
+                      quic::QuicVersionToString(params.param.second.transport_version));
 }
 
 class MockProofVerifyContext : public EnvoyQuicProofVerifyContext {

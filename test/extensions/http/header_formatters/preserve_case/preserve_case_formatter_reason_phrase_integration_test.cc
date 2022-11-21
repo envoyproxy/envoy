@@ -4,6 +4,7 @@
 #include "test/integration/http_integration.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace {
@@ -21,8 +22,7 @@ struct TestParams {
 };
 
 std::string testParamsToString(const ::testing::TestParamInfo<TestParams>& p) {
-  return fmt::format("{}_{}_{}",
-                     p.param.ip_version == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
+  return fmt::format("{}_{}_{}", TestUtility::ipVersionToString(p.param.ip_version),
                      p.param.parser_impl == ParserImpl::HttpParser ? "HttpParser" : "BalsaParser",
                      p.param.forward_reason_phrase ? "enabled" : "disabled");
 }
