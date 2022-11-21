@@ -9,12 +9,12 @@ sdk_install_target="/github/home/.android"
 mkdir "$sdk_install_target"
 pushd "$sdk_install_target"
 if [ ! -d ./sdk/cmdline-tools/latest ]; then
-	mkdir -p sdk/
-	cmdline_file="commandlinetools-linux-7583922_latest.zip"
-	curl -OL "https://dl.google.com/android/repository/$cmdline_file"
-	unzip "$cmdline_file"
-	mkdir -p sdk/cmdline-tools/latest
-	mv cmdline-tools/* sdk/cmdline-tools/latest
+    mkdir -p sdk/
+    cmdline_file="commandlinetools-linux-7583922_latest.zip"
+    curl -OL "https://dl.google.com/android/repository/$cmdline_file"
+    unzip "$cmdline_file"
+    mkdir -p sdk/cmdline-tools/latest
+    mv cmdline-tools/* sdk/cmdline-tools/latest
 fi
 
 ANDROID_HOME="$(realpath "$sdk_install_target/sdk")"
