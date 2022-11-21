@@ -54,9 +54,8 @@ class DeterministicApertureLoadBalancerTest : public Event::TestUsingSimulatedTi
                                               public testing::TestWithParam<bool> {
 public:
   DeterministicApertureLoadBalancerTest()
-      : stat_names_(stats_store_.symbolTable()),
-        stats_(ClusterInfoImpl::generateStats(stats_store_, stat_names_)), rng_(random_dev_()),
-        random_distribution_(0, 1) {}
+      : stat_names_(stats_store_.symbolTable()), stats_(stat_names_, stats_store_),
+        rng_(random_dev_()), random_distribution_(0, 1) {}
 
   void init() {
     lb_ = std::make_unique<DeterministicApertureLoadBalancer>(
@@ -77,8 +76,8 @@ public:
   MockHostSet& failover_host_set_ = *priority_set_.getMockHostSet(1);
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   Stats::IsolatedStoreImpl stats_store_;
-  ClusterStatNames stat_names_;
-  ClusterStats stats_;
+  ClusterLbStatNames stat_names_;
+  ClusterLbStats stats_;
   absl::optional<envoy::config::cluster::v3::Cluster::DeterministicApertureLbConfig> config_;
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
   NiceMock<Runtime::MockLoader> runtime_;

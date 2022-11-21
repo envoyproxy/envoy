@@ -56,7 +56,7 @@ struct DeterministicApertureLoadBalancerRingStats {
 class DeterministicApertureLoadBalancer : public RingHashLoadBalancer {
 public:
   DeterministicApertureLoadBalancer(
-      const PrioritySet& priority_set, ClusterStats& stats, Stats::Scope& scope,
+      const PrioritySet& priority_set, ClusterLbStats& stats, Stats::Scope& scope,
       Runtime::Loader& runtime, Random::RandomGenerator& random,
       const absl::optional<envoy::config::cluster::v3::Cluster::DeterministicApertureLbConfig>&
           config,

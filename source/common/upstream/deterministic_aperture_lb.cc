@@ -6,7 +6,7 @@ namespace Envoy {
 namespace Upstream {
 
 DeterministicApertureLoadBalancer::DeterministicApertureLoadBalancer(
-    const PrioritySet& priority_set, ClusterStats& stats, Stats::Scope& scope,
+    const PrioritySet& priority_set, ClusterLbStats& stats, Stats::Scope& scope,
     Runtime::Loader& runtime, Random::RandomGenerator& random,
     const absl::optional<envoy::config::cluster::v3::Cluster::DeterministicApertureLbConfig>&
         config,
@@ -151,7 +151,7 @@ ThreadAwareLoadBalancerPtr DeterministicApertureLoadBalancerFactory::create(
     Random::RandomGenerator& random, TimeSource& time_source) {
   (void)time_source;
   return std::make_unique<DeterministicApertureLoadBalancer>(
-      priority_set, cluster_info.stats(), cluster_info.statsScope(), runtime, random,
+      priority_set, cluster_info.lbStats(), cluster_info.statsScope(), runtime, random,
       cluster_info.lbDeterministicApertureConfig(), cluster_info.lbConfig());
 }
 
