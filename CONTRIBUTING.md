@@ -168,9 +168,18 @@ Some changes in Envoy are deemed worthy of runtime guarding. Instead of just rep
 old code with new code, both code paths are supported for between one Envoy release (if it is
 guarded due to performance concerns) and a full deprecation cycle (if it is a high risk behavioral
 change). Generally as a community we try to guard both high risk changes (major
-refactors such as replacing Envoy's buffer implementation) and most user-visible
+refactors such as replacing Envoy's buffer implementation), most user-visible
 non-config-guarded changes to protocol processing (for example additions or changes to HTTP headers or
-how HTTP is serialized out) for non-alpha features. Feel free to tag @envoyproxy/maintainers
+how HTTP is serialized out) for non-alpha features and fixing API behavior.
+
+When using runtime guarding for API behavior change, follow the rules below:
+* If the API works without any meaningful behavior, it can be fixed directly without any runtime guarding.
+* If the API works without any meaningful behavior but the fixing is breaking change (eg. API returns a rejection),
+  the rejection should be added with runtime guarding.
+* If the API works with a meaningful behavior but is different from API documentation description including an unclear
+  description, it should fix with runtime guarding.
+
+Feel free to tag @envoyproxy/maintainers
 if you aren't sure if a given change merits runtime guarding.
 
 The canonical way to runtime guard a feature is
