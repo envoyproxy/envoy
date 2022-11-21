@@ -95,6 +95,7 @@ public:
     log_entry->mutable_common_properties()->clear_time_to_first_downstream_tx_byte();
     log_entry->mutable_common_properties()->clear_time_to_last_downstream_tx_byte();
     log_entry->mutable_request()->clear_request_id();
+    log_entry->mutable_common_properties()->clear_stream_id();
     if (request_msg.has_identifier()) {
       auto* node = request_msg.mutable_identifier()->mutable_node();
       node->clear_extensions();
