@@ -11,8 +11,10 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/router/rds_impl.h"
 #include "source/common/router/route_config_update_receiver_impl.h"
-#include "source/server/admin/admin.h"
 
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
+#include "source/server/admin/admin.h"
+#endif
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/server/instance.h"

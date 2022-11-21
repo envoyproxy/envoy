@@ -18,7 +18,7 @@ namespace Secret {
 
 class SecretManagerImpl : public SecretManager {
 public:
-  SecretManagerImpl(Server::ConfigTracker& config_tracker);
+  SecretManagerImpl(OptRef<Server::ConfigTracker> config_tracker);
   void
   addStaticSecret(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) override;
 

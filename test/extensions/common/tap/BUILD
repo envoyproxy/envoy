@@ -3,6 +3,7 @@ load(
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
+    "envoy_select_admin_functionality",
 )
 
 licenses(["notice"])  # Apache 2
@@ -22,7 +23,7 @@ envoy_cc_test_library(
 
 envoy_cc_test(
     name = "admin_test",
-    srcs = ["admin_test.cc"],
+    srcs = envoy_select_admin_functionality(["admin_test.cc"]),
     deps = [
         "//source/extensions/common/tap:admin",
         "//test/mocks/server:admin_mocks",
