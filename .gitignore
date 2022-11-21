@@ -22,6 +22,7 @@
 !\.zuul.yaml
 
 /bazel-*
+/mobile/bazel-*
 BROWSE
 /build
 /build_*

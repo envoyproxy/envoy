@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+    paths:
+    - 'mobile/**'
   pull_request:
 
 jobs:
@@ -23,7 +25,7 @@ jobs:
         with:
           submodules: true
       - name: 'Run formatters'
-        run: ./tools/check_format.sh
+        run: cd mobile && ./tools/check_format.sh
   precommit:
     name: precommit
     runs-on: macos-12
@@ -33,17 +35,7 @@ jobs:
       - name: 'Install precommit'
         run: brew install pre-commit
       - name: 'Run precommit'
-        run: pre-commit run --all-files
-  swiftlint:
-    name: swift_lint
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    container:
-      image: ghcr.io/realm/swiftlint:0.47.1
-    steps:
-      - uses: actions/checkout@v1
-      - name: 'Run Swift Lint (SwiftLint)'
-        run: swiftlint lint --strict
+        run: cd mobile && find mobile/* | pre-commit run --files
   drstring:
     name: drstring
     runs-on: macos-12
@@ -54,8 +46,8 @@ jobs:
           submodules: true
       - name: 'Run DrString'
         env:
-          DEVELOPER_DIR: /Applications/Xcode_14.1.app
-        run: ./bazelw run @DrString//:drstring check
+          DEVELOPER_DIR: /Applications/Xcode_14.0.app
+        run: cd mobile && ./bazelw run @DrString//:drstring check
   kotlinlint:
     name: kotlin_lint
     runs-on: macos-12
@@ -69,17 +61,17 @@ jobs:
           java-version: '8'
           java-package: jdk
           architecture: x64
-      - run: ./ci/mac_ci_setup.sh
+      - run: cd mobile && ./ci/mac_ci_setup.sh
         name: 'Install dependencies'
       - name: 'Run Kotlin Lint (Detekt)'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ./bazelw build \
+          cd mobile && ./bazelw build \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //library/kotlin/io/envoyproxy/envoymobile:envoy_lib_lint \
             //examples/kotlin/hello_world:hello_envoy_kt_lint
       - name: 'Run Kotlin Formatter (ktlint)'
         run: |
-          ./bazelw build kotlin_format
+          cd mobile && ./bazelw build kotlin_format
