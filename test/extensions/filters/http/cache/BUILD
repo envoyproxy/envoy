@@ -16,7 +16,6 @@ envoy_cc_test_library(
     deps = [
         "//source/extensions/filters/http/cache:cache_headers_utils_lib",
         "//source/extensions/filters/http/cache:http_cache_lib",
-        "//source/extensions/http/cache/simple_http_cache:config",
     ],
 )
 
