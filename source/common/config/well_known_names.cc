@@ -1,5 +1,7 @@
 #include "source/common/config/well_known_names.h"
 
+#include "source/common/runtime/runtime_features.h"
+
 #include "absl/strings/str_replace.h"
 
 namespace Envoy {
@@ -135,7 +137,9 @@ TagNameValues::TagNameValues() {
   // Extract ext_authz stat_prefix field
   // cluster.[<cluster>.]ext_authz.[<ext_authz_prefix>.]*
   // http.[<http_conn_mgr_prefix>.]ext_authz.[<ext_authz_prefix>.]*
-  addRe2(EXT_AUTHZ_PREFIX, R"(^(?:cluster|http)\.(?:[^\.]+\.)?ext_authz\.((<TAG_VALUE>)\.))");
+  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.ext_authz_prefix_handling")) {
+    addRe2(EXT_AUTHZ_PREFIX, R"(^(?:cluster|http)\.(?:[^\.]+\.)?ext_authz\.((<TAG_VALUE>)\.))");
+  } // else: don't extract this prefix at all
 
   // http.(<stat_prefix>.)*
   addTokenized(HTTP_CONN_MANAGER_PREFIX, "http.$.**");

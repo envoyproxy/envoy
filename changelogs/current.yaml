@@ -100,6 +100,9 @@ minor_behavior_changes:
 - area: dynamic_forward_proxy
   change: |
     No longer waiting on DNS responses in the dynamic forward proxy filter if upstream proxying is turned on. This behaviorial change can be reverted by setting runtime guard ``envoy.reloadable_features.skip_dns_lookup_for_proxied_requests`` to false.
+- area: stats
+  change: |
+    Properly extract the ext_authz stat-prefix as a tag when exporting prometheus metrics.  This behavior can be reverted by setting runtime guard ``envoy.restart_features.ext_authz_prefix_handling`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
