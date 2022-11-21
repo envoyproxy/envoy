@@ -214,6 +214,26 @@ envoy_cc_benchmark_binary(
     ],
 )
 
+envoy_cc_benchmark_binary(
+    name = "lazyinit_stats_benchmark",
+    srcs = ["lazyinit_stats_speed_test.cc"],
+    external_deps = [
+        "benchmark",
+    ],
+    deps = [
+                "//source/common/stats:thread_local_store_lib",
+        "//source/common/common:random_generator_lib",
+
+                "//source/common/stats:symbol_table_lib",
+        "//source/common/stats:isolated_store_lib",
+          "//source/common/stats:lazy_init",
+        "//source/common/common:utility_lib",
+        "//source/common/runtime:runtime_lib",
+                "//test/test_common:real_threads_test_helper_lib",
+
+    ],
+)
+
 envoy_benchmark_test(
     name = "symbol_table_benchmark_test",
     benchmark_binary = "symbol_table_benchmark",
