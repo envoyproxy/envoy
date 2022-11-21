@@ -20,8 +20,8 @@ Is there a contract my HTTP filter must adhere to?
     ``FilterHeadersStatus::ContinueAndDontEndStream`` when called with ``end_stream`` set to *false*. In this case
     ``FilterHeadersStatus::Continue`` should be returned.
 
-  * A filter's ``encode1xxHeaders()`` must return ``FilterHeadersStatus::Continue`` or
-    ``FilterHeadersStatus::StopIteration``.
+  * A filter's ``encode1xxHeaders()`` must return ``Filter1xxHeadersStatus::Continue`` or
+    ``Filter1xxHeadersStatus::StopIteration``.
 
 * Data encoding/decoding
 
