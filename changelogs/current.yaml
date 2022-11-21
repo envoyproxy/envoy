@@ -95,6 +95,13 @@ new_features:
 - area: upstream
   change: |
     added a new field :ref:`socket_options <envoy_v3_api_field_config.core.v3.ExtraSourceAddress.socket_options>` to the ExtraSourceAddress, allowing specifying discrete socket options for each source address.
+- area: access_log
+  change: |
+    added a new field :ref:`intermediate_log_entry <envoy_v3_api_field_data.accesslog.v3.AccessLogCommon.intermediate_log_entry>` to detect if the gRPC log entry is an intermediate log entry or not and added
+    support to flush TCP log entries periodly according to the configured :ref:`inteval <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.access_log_flush_interval>`.
+- area: access_log
+  change: |
+    added support for :ref:`%STREAM_ID% <config_access_log_format_stream_id>` for stream unique identifier.
 - area: thrift
   change: |
     added payload to metadata filter which matches a given payload field's value would be extracted and attached to the request as dynamic metadata.

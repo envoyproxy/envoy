@@ -268,6 +268,11 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
   ConnectionImpl::raiseEvent(close_type);
 }
 
+void ConnectionImpl::onConnected() {
+  ASSERT(!connecting_);
+  transport_socket_->onConnected();
+}
+
 void ConnectionImpl::noDelay(bool enable) {
   // There are cases where a connection to localhost can immediately fail (e.g., if the other end
   // does not have enough fds, reaches a backlog limit, etc.). Because we run with deferred error
@@ -683,7 +688,6 @@ void ConnectionImpl::onWriteReady() {
       ENVOY_CONN_LOG_EVENT(debug, "connection_connected", "connected", *this);
       connecting_ = false;
       onConnected();
-      transport_socket_->onConnected();
       // It's possible that we closed during the connect callback.
       if (state() != State::Open) {
         ENVOY_CONN_LOG_EVENT(debug, "connection_closed_callback", "close during connected callback",
@@ -842,6 +846,17 @@ void ServerConnectionImpl::raiseEvent(ConnectionEvent event) {
     transport_socket_connect_timer_.reset();
   }
   ConnectionImpl::raiseEvent(event);
+}
+bool ServerConnectionImpl::initializeReadFilters() {
+  bool initialized = ConnectionImpl::initializeReadFilters();
+  if (initialized) {
+    // Server connection starts as connected, and we must explicitly signal to
+    // the downstream transport socket that the underlying socket is connected.
+    // We delay this step until after the filters are initialized and can
+    // receive the connection events.
+    onConnected();
+  }
+  return initialized;
 }
 
 void ServerConnectionImpl::onTransportSocketConnectTimeout() {
