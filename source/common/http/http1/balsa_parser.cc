@@ -226,8 +226,8 @@ void BalsaParser::OnRequestFirstLineInput(absl::string_view /*line_input*/,
 
 void BalsaParser::OnResponseFirstLineInput(absl::string_view /*line_input*/,
                                            absl::string_view /*version_input*/,
-                                           absl::string_view status_input,
-                                           absl::string_view /*reason_input*/) {
+                                           absl::string_view /*status_input*/,
+                                           absl::string_view reason_input) {
   if (status_ == ParserStatus::Error) {
     return;
   }
@@ -235,7 +235,7 @@ void BalsaParser::OnResponseFirstLineInput(absl::string_view /*line_input*/,
   if (status_ == ParserStatus::Error) {
     return;
   }
-  status_ = convertResult(connection_->onStatus(status_input.data(), status_input.size()));
+  status_ = convertResult(connection_->onStatus(reason_input.data(), reason_input.size()));
 }
 
 void BalsaParser::OnChunkLength(size_t chunk_length) {

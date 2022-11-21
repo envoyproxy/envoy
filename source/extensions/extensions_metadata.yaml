@@ -380,7 +380,7 @@ envoy.filters.http.jwt_authn:
   categories:
   - envoy.filters.http
   security_posture: robust_to_untrusted_downstream
-  status: alpha
+  status: stable
   type_urls:
   - envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication
   - envoy.extensions.filters.http.jwt_authn.v3.PerRouteConfig
