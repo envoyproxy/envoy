@@ -10,14 +10,16 @@ behavior_changes:
     the listener and the new value of those fields applied to it. This only happens when :ref:`enable_reuse_port <envoy_v3_api_field_config.listener.v3.Listener.enable_reuse_port>` is true.
     Otherwise if those fields change the update is rejected.
     New runtime flag ``envoy.reloadable_features.enable_update_listener_socket_options`` can be used for revert this behavior.
+- area: build
+  change: |
+    removed the cares and apple resolvers as required extensions. Envoy now only creates DNS resolvers when necessary (e.g. for logical DNS cluster) so does not require cares to always be included. If your Envoys do DNS resolution and you override extensions_build_config you will need to include cares explicitly.
 - area: listener
   change: |
     Previously a listener update with different :ref:`enable_reuse_port <envoy_v3_api_field_config.listener.v3.Listener.enable_reuse_port>` value will be ignored. Now,
     this kind of update will be rejected. The runtime flag ``envoy.reloadable_features.enable_update_listener_socket_options`` can be used for revert this behavior.
 - area: build
   change: |
-    moved the strict_dns, original_dst, and logical_dns clusters to extensions. If you use these clusters and override extensions_build_config.bzl you will now need to include it explicitly.
-    moved the static, strict_dns and original_dst clusters to extensions. If you use these clusters and override extensions_build_config.bzl you will now need to include it explicitly.
+    moved the strict_dns, original_dst, logical_dns, static, and eds clusters to extensions. If you use these clusters and override extensions_build_config.bzl you will now need to include it explicitly.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -78,6 +80,9 @@ removed_config_or_runtime:
 - area: ecds
   change: |
     removed ``envoy.reloadable_features.top_level_ecds_stats`` and legacy code paths.
+- area: http
+  change: |
+    removed ``envoy.reloadable_features.skip_delay_close`` and legacy code paths.
 
 new_features:
 - area: build
@@ -108,9 +113,15 @@ new_features:
 - area: udp_proxy
   change: |
     added support for :ref:`proxy_access_log <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.proxy_access_log>`.
+- area: health_check
+  change: |
+    added an optional bool flag :ref:`disable_active_health_check <envoy_v3_api_field_config.endpoint.v3.Endpoint.HealthCheckConfig.disable_active_health_check>` to disable the active health check for the endpoint.
 - area: mobile
   change: |
     started merging the Envoy mobile library into the main Envoy repo.
+- area: matching
+  change: |
+    support filter chain selection based on the dynamic metadata and the filter state using :ref:`formatter actions <extension_envoy.matching.actions.format_string>`.
 - area: redis
   change: |
     extended :ref:`cluster support <arch_overview_redis_cluster_support>` by adding a :ref:`dns_cache_config <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.dns_cache_config>` option that can be used to resolve hostnames returned by MOVED/ASK responses.
@@ -120,5 +131,8 @@ new_features:
 - area: http
   change: |
     added :ref:`append_x_forwarded_port <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.append_x_forwarded_port>` to append the ``x-forwarded-port`` header to HTTP upstream requests.
+- area: jwt_authn
+  change: |
+    added support for copying jwt claims to http headers.
 
 deprecated:
