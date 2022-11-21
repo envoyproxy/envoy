@@ -1278,7 +1278,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "overload_integration_test",
     srcs = ["overload_integration_test.cc"],
-    shard_count = 4,
+    shard_count = 8,
     deps = [
         ":base_overload_integration_test_lib",
         ":http_protocol_integration_lib",
