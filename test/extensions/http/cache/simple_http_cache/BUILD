@@ -14,7 +14,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.extensions.http.cache.simple"],
     deps = [
         "//source/extensions/filters/http/cache:cache_entry_utils_lib",
-        "//source/extensions/filters/http/cache/simple_http_cache:config",
+        "//source/extensions/http/cache/simple_http_cache:config",
         "//test/extensions/filters/http/cache:common",
         "//test/extensions/filters/http/cache:http_cache_implementation_test_common_lib",
         "//test/mocks/server:factory_context_mocks",
