@@ -49,7 +49,7 @@ bug_fixes:
     fixed a bug where Utility::PercentEncoding::encode() encodes some characters incorrectly because it was treating the value as negative.
 - area: validation
   change: |
-    fixed a crash wihch could happen when optional ``engine_type`` is not provided in regex.
+    fixed a crash which could happen when optional ``engine_type`` is not provided in regex.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
