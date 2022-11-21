@@ -63,9 +63,9 @@ configuration enables rate limit quota filter with 3 buckets. Note that bucket I
 
 .. literalinclude:: _include/rate-limit-quota-filter-configuration.yaml
    :language: yaml
-   :lines: 1-69
+   :lines: 28-96
    :linenos:
-   :lineno-start: 1
+   :lineno-start: 28
    :caption: :download:`rate-limit-quota-filter-configuration.yaml <_include/rate-limit-quota-filter-configuration.yaml>`
 
 Rate Limit Quota Override
