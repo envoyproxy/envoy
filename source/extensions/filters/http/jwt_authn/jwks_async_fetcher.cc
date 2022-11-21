@@ -11,7 +11,7 @@ namespace HttpFilters {
 namespace JwtAuthn {
 namespace {
 
-// Default cache expiration time in 5 minutes.
+// Default cache expiration time in 10 minutes.
 constexpr std::chrono::seconds DefaultCacheExpirationSec{600};
 
 // Number of seconds to refetch before a cached jwks is expired.

@@ -314,7 +314,7 @@ message RemoteJwks {
   config.core.v3.HttpUri http_uri = 1;
 
   // Duration after which the cached JWKS should be expired. If not specified, default cache
-  // duration is 5 minutes.
+  // duration is 10 minutes.
   google.protobuf.Duration cache_duration = 2;
 
   // Fetch Jwks asynchronously in the main thread before the listener is activated.
