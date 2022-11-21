@@ -30,6 +30,9 @@ behavior_changes:
   change: |
     When active HC is enabled per cluster, slow start calculation now starts after first passing HC. Cluster membership duration condition is dropped from slow start calculation.
     Endpoint can now re-enter slow start if active HC is configured per cluster, on each "unhealthy -> healthy" state transition.
+- area: http
+  change: |
+    Flip default value of ``envoy.reloadable_features.http1_use_balsa_parser`` runtime flag from false to true.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
