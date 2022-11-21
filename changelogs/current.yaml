@@ -135,11 +135,11 @@ new_features:
 - area: tracing
   change: |
     added support for setting the hostname used when sending spans to a Datadog collector using the :ref:`collector_hostname <envoy_v3_api_field_config.trace.v3.DatadogConfig.collector_hostname>` field.
-- area: http
-  change: |
-    added :ref:`append_x_forwarded_port <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.append_x_forwarded_port>` to append the ``x-forwarded-port`` header to HTTP upstream requests.
 - area: jwt_authn
   change: |
     added support for copying jwt claims to http headers.
+- area: http
+  change: |
+    added :ref:`append_x_forwarded_port <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.append_x_forwarded_port>` to append the ``x-forwarded-port`` header to HTTP upstream requests.
 
 deprecated:
