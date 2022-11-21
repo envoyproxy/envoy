@@ -98,18 +98,20 @@ public:
                                            ProtobufMessage::getStrictValidationVisitor(), config);
     Stats::ScopeSharedPtr scope = stats_store_.createScope("cluster.name.");
     Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_store_,
-        singleton_manager_, tls_, validation_visitor_, *api_, options_, access_log_manager_);
+        server_context_, ssl_context_manager_, *scope, server_context_.cluster_manager_,
+        stats_store_, validation_visitor_);
 
-    cluster_ =
-        std::make_shared<Cluster>(cluster_config, config, cm_, runtime_, api_->randomGenerator(),
-                                  factory_context, std::move(scope), false);
+    cluster_ = std::make_shared<Cluster>(
+        server_context_, cluster_config, config, server_context_.cluster_manager_, runtime_,
+        api_->randomGenerator(), factory_context, std::move(scope), false);
 
-    cm_.initializeThreadLocalClusters({"primary", "secondary"});
+    server_context_.cluster_manager_.initializeThreadLocalClusters({"primary", "secondary"});
     primary_.cluster_.info_->name_ = "primary";
-    EXPECT_CALL(cm_, getThreadLocalCluster(Eq("primary"))).WillRepeatedly(Return(&primary_));
+    EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster(Eq("primary")))
+        .WillRepeatedly(Return(&primary_));
     secondary_.cluster_.info_->name_ = "secondary";
-    EXPECT_CALL(cm_, getThreadLocalCluster(Eq("secondary"))).WillRepeatedly(Return(&secondary_));
+    EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster(Eq("secondary")))
+        .WillRepeatedly(Return(&secondary_));
     ON_CALL(primary_, prioritySet()).WillByDefault(ReturnRef(primary_ps_));
     ON_CALL(secondary_, prioritySet()).WillByDefault(ReturnRef(secondary_ps_));
 
@@ -123,15 +125,11 @@ public:
     lb_ = lb_factory_->create();
   }
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   Stats::TestUtil::TestStore stats_store_;
   Ssl::MockContextManager ssl_context_manager_;
-  NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Random::MockRandomGenerator> random_;
-  NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Event::MockDispatcher> dispatcher_;
-  NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  NiceMock<Server::MockAdmin> admin_;
   Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_{Api::createApiForTest(stats_store_, random_)};
@@ -140,8 +138,8 @@ public:
   Upstream::ThreadAwareLoadBalancerPtr thread_aware_lb_;
   Upstream::LoadBalancerFactorySharedPtr lb_factory_;
   Upstream::LoadBalancerPtr lb_;
-  Upstream::ClusterStatNames stat_names_;
-  Upstream::ClusterStats stats_;
+  Upstream::ClusterTrafficStatNames stat_names_;
+  Upstream::ClusterTrafficStats stats_;
   std::shared_ptr<Upstream::MockClusterInfo> primary_info_{
       new NiceMock<Upstream::MockClusterInfo>()};
   std::shared_ptr<Upstream::MockClusterInfo> secondary_info_{
@@ -149,7 +147,6 @@ public:
   NiceMock<Upstream::MockThreadLocalCluster> primary_, secondary_;
   Upstream::PrioritySetImpl primary_ps_, secondary_ps_;
   NiceMock<Upstream::MockLoadBalancer> primary_load_balancer_, secondary_load_balancer_;
-  NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
 
   const std::string default_yaml_config_ = R"EOF(
     name: aggregate_cluster

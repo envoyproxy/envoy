@@ -5,8 +5,10 @@ services:
       context: .
       dockerfile: Dockerfile-ratelimit
     ports:
-    - "9901:9901"
-    - "9902:9902"
-    - "10000:10000"
+    - "${PORT_PROXY:-10000}:10000"
+    - "${PORT_STATS0:-9901}:9901"
+    - "${PORT_STATS1:-9902}:9902"
   service:
-    image: nginx@sha256:4ed64c2e0857ad21c38b98345ebb5edb01791a0a10b0e9e3d9ddde185cdbd31a
+    build:
+      context: .
+      dockerfile: Dockerfile-nginx

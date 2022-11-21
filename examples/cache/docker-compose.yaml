@@ -14,12 +14,11 @@ services:
       context: .
       dockerfile: Dockerfile-frontenvoy
     ports:
-    - "8000:8000"
+    - "${PORT_PROXY:-8000}:8000"
 
   service1:
     build:
-      context: .
-      dockerfile: Dockerfile-service
+      context: ../shared/service
     volumes:
     - ./responses.yaml:/etc/responses.yaml
     - ./service.py:/code/service.py
@@ -28,8 +27,7 @@ services:
 
   service2:
     build:
-      context: .
-      dockerfile: Dockerfile-service
+      context: ../shared/service
     volumes:
     - ./responses.yaml:/etc/responses.yaml
     - ./service.py:/code/service.py

@@ -6,23 +6,29 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-    - "10000:10000"
-    - "12345:12345"
+    - "${PORT_PROXY:-10000}:10000"
+    - "${PORT_ADMIN:-12345}:12345"
 
   service-https-http2:
-    image: mendhak/http-https-echo
+    build:
+      context: .
+      dockerfile: Dockerfile-echo
     hostname: service-https-http2
     environment:
     - HTTP_PORT=0
 
   service-https-http1.1:
-    image: mendhak/http-https-echo
+    build:
+      context: .
+      dockerfile: Dockerfile-echo
     hostname: service-https-http1.1
     environment:
     - HTTP_PORT=0
 
   service-http:
-    image: mendhak/http-https-echo
+    build:
+      context: .
+      dockerfile: Dockerfile-echo
     hostname: service-http
     environment:
     - HTTPS_PORT=0

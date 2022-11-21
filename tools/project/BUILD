@@ -35,3 +35,13 @@ envoy_entry_point(
     pkg = "envoy.base.utils",
     script = "envoy.project",
 )
+
+envoy_entry_point(
+    name = "publish",
+    args = [
+        "publish",
+        PATH,
+    ],
+    pkg = "envoy.base.utils",
+    script = "envoy.project",
+)

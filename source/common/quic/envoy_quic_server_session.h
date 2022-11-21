@@ -52,7 +52,8 @@ public:
                          quic::QuicCompressedCertsCache* compressed_certs_cache,
                          Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
                          QuicStatNames& quic_stat_names, Stats::Scope& listener_scope,
-                         EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory);
+                         EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
+                         std::unique_ptr<StreamInfo::StreamInfo>&& stream_info);
 
   ~EnvoyQuicServerSession() override;
 
@@ -76,6 +77,9 @@ public:
   void MaybeSendRstStreamFrame(quic::QuicStreamId id, quic::QuicResetStreamError error,
                                quic::QuicStreamOffset bytes_written) override;
   void OnRstStream(const quic::QuicRstStreamFrame& frame) override;
+  void ProcessUdpPacket(const quic::QuicSocketAddress& self_address,
+                        const quic::QuicSocketAddress& peer_address,
+                        const quic::QuicReceivedPacket& packet) override;
 
   void setHeadersWithUnderscoreAction(
       envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction

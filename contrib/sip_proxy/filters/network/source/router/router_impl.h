@@ -234,19 +234,11 @@ public:
   }
 
   std::shared_ptr<UpstreamRequest> getUpstreamRequest(const std::string& host) {
-    if (tls_->getTyped<ThreadLocalTransactionInfo>().upstream_request_map_.find(host) !=
-        tls_->getTyped<ThreadLocalTransactionInfo>().upstream_request_map_.end()) {
-      return tls_->getTyped<ThreadLocalTransactionInfo>().upstream_request_map_.at(host);
-    } else {
-      return nullptr;
-    }
-#if 0
     try {
       return tls_->getTyped<ThreadLocalTransactionInfo>().upstream_request_map_.at(host);
-    } catch (std::out_of_range const & e) {
+    } catch (std::out_of_range const& e) {
       return nullptr;
     }
-#endif
   }
 
   void deleteUpstreamRequest(const std::string& host) {

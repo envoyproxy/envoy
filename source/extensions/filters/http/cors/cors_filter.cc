@@ -1,5 +1,7 @@
 #include "source/extensions/filters/http/cors/cors_filter.h"
 
+#include <algorithm>
+
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
 #include "envoy/stats/scope.h"
@@ -38,12 +40,42 @@ Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::Respons
     access_control_max_age_handle(Http::CustomHeaders::get().AccessControlMaxAge);
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
     access_control_expose_headers_handle(Http::CustomHeaders::get().AccessControlExposeHeaders);
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
+    access_control_request_private_network_handle(
+        Http::CustomHeaders::get().AccessControlRequestPrviateNetwork);
+Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
+    access_control_response_private_network_handle(
+        Http::CustomHeaders::get().AccessControlAllowPrviateNetwork);
 
 CorsFilterConfig::CorsFilterConfig(const std::string& stats_prefix, Stats::Scope& scope)
     : stats_(generateStats(stats_prefix + "cors.", scope)) {}
 
-CorsFilter::CorsFilter(CorsFilterConfigSharedPtr config)
-    : policies_({{nullptr, nullptr}}), config_(std::move(config)) {}
+CorsFilter::CorsFilter(CorsFilterConfigSharedPtr config) : config_(std::move(config)) {}
+
+void CorsFilter::initializeCorsPolicies() {
+  decoder_callbacks_->traversePerFilterConfig([this](const Router::RouteSpecificFilterConfig& cfg) {
+    const auto* typed_cfg = dynamic_cast<const Router::CorsPolicy*>(&cfg);
+    if (typed_cfg != nullptr) {
+      policies_.push_back(typed_cfg);
+    }
+  });
+
+  // The 'traversePerFilterConfig' will handle cors policy of virtual host first. So, we need
+  // reverse the 'policies_' to make sure the cors policy of route entry to be first item in the
+  // 'policies_'.
+  if (policies_.size() >= 2) {
+    std::reverse(policies_.begin(), policies_.end());
+  }
+
+  // If no cors policy is configured in the per filter config, then the cors policy fields in the
+  // route configuration will be ignored.
+  if (policies_.empty()) {
+    policies_ = {
+        decoder_callbacks_->route()->routeEntry()->corsPolicy(),
+        decoder_callbacks_->route()->routeEntry()->virtualHost().corsPolicy(),
+    };
+  }
+}
 
 // This handles the CORS preflight request as described in
 // https://www.w3.org/TR/cors/#resource-preflight-requests
@@ -53,10 +85,7 @@ Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::RequestHeaderMap& head
     return Http::FilterHeadersStatus::Continue;
   }
 
-  policies_ = {{
-      decoder_callbacks_->route()->routeEntry()->corsPolicy(),
-      decoder_callbacks_->route()->routeEntry()->virtualHost().corsPolicy(),
-  }};
+  initializeCorsPolicies();
 
   if (!enabled() && !shadowEnabled()) {
     return Http::FilterHeadersStatus::Continue;
@@ -123,6 +152,12 @@ Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::RequestHeaderMap& head
 
   if (!maxAge().empty()) {
     response_headers->setInline(access_control_max_age_handle.handle(), maxAge());
+  }
+
+  // More details refer to https://developer.chrome.com/blog/private-network-access-preflight.
+  if (allowPrivateNetworkAccess() &&
+      headers.getInlineValue(access_control_request_private_network_handle.handle()) == "true") {
+    response_headers->setInline(access_control_response_private_network_handle.handle(), "true");
   }
 
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true,
@@ -217,6 +252,15 @@ bool CorsFilter::allowCredentials() {
   for (const auto policy : policies_) {
     if (policy && policy->allowCredentials()) {
       return policy->allowCredentials().value();
+    }
+  }
+  return false;
+}
+
+bool CorsFilter::allowPrivateNetworkAccess() {
+  for (const auto policy : policies_) {
+    if (policy && policy->allowPrivateNetworkAccess()) {
+      return policy->allowPrivateNetworkAccess().value();
     }
   }
   return false;

@@ -36,6 +36,8 @@
 #include "source/common/network/udp_packet_writer_handler_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
 
+#include "test/mocks/protobuf/mocks.h"
+
 #if defined(ENVOY_ENABLE_QUIC)
 #include "source/common/quic/active_quic_listener.h"
 #include "source/common/quic/quic_stat_names.h"
@@ -139,6 +141,12 @@ public:
   waitForData(Event::Dispatcher& client_dispatcher, absl::string_view body,
               std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
+  using ValidatorFunction = const std::function<bool(const std::string&)>;
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult
+  waitForData(Event::Dispatcher& client_dispatcher, const ValidatorFunction& data_validator,
+              std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
   ABSL_MUST_USE_RESULT
   testing::AssertionResult waitForEndStream(
       Event::Dispatcher& client_dispatcher,
@@ -203,7 +211,6 @@ public:
       }
     }
     decodeGrpcFrame(message);
-    ENVOY_LOG(debug, "Received gRPC message: {}", message.DebugString());
     return AssertionSuccess();
   }
 
@@ -413,6 +420,7 @@ public:
   bool connected() const { return shared_connection_.connected(); }
 
   void postToConnectionThread(std::function<void()> cb);
+  SharedConnectionWrapper& sharedConnection() { return shared_connection_; }
 
 protected:
   FakeConnectionBase(SharedConnectionWrapper& shared_connection, Event::TestTimeSystem& time_system)
@@ -472,6 +480,13 @@ public:
 
   // Update the maximum number of concurrent streams.
   void updateConcurrentStreams(uint64_t max_streams);
+
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult
+  waitForInexactRawData(const char* data, std::string* out = nullptr,
+                        std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
+  void writeRawData(absl::string_view data);
 
 private:
   struct ReadFilter : public Network::ReadFilterBaseImpl {
@@ -549,10 +564,21 @@ public:
     };
   }
 
+  // Creates a ValidatorFunction which returns true when data_to_wait_for
+  // equals the incoming data string.
+  static ValidatorFunction waitForMatch(const char* data_to_wait_for) {
+    return [data_to_wait_for](const std::string& data) -> bool { return data == data_to_wait_for; };
+  }
+
   // Creates a ValidatorFunction which returns true when data_to_wait_for is
   // contains at least bytes_read bytes.
   static ValidatorFunction waitForAtLeastBytes(uint32_t bytes) {
     return [bytes](const std::string& data) -> bool { return data.size() >= bytes; };
+  }
+
+  void clearData() {
+    absl::MutexLock lock(&lock_);
+    data_.clear();
   }
 
 private:
@@ -605,7 +631,8 @@ class FakeUpstream : Logger::Loggable<Logger::Id::testing>,
                      public Network::FilterChainFactory {
 public:
   // Creates a fake upstream bound to the specified unix domain socket path.
-  FakeUpstream(const std::string& uds_path, const FakeUpstreamConfig& config);
+  FakeUpstream(Network::DownstreamTransportSocketFactoryPtr&& transport_socket_factory,
+               const std::string& uds_path, const FakeUpstreamConfig& config);
 
   // Creates a fake upstream bound to the specified |address|.
   FakeUpstream(Network::DownstreamTransportSocketFactoryPtr&& transport_socket_factory,
@@ -640,6 +667,9 @@ public:
     return socket_->connectionInfoProvider().localAddress();
   }
 
+  void convertFromRawToHttp(FakeRawConnectionPtr& raw_connection,
+                            FakeHttpConnectionPtr& connection);
+
   virtual std::unique_ptr<FakeRawConnection>
   makeRawConnection(SharedConnectionWrapper& shared_connection,
                     Event::TestTimeSystem& time_system) {
@@ -665,7 +695,8 @@ public:
                        const Network::Address::InstanceConstSharedPtr& peer);
 
   // Network::FilterChainManager
-  const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
+  const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&,
+                                              const StreamInfo::StreamInfo&) const override {
     return filter_chain_.get();
   }
 
@@ -678,6 +709,7 @@ public:
                                     Network::UdpReadFilterCallbacks& callbacks) override;
 
   void setReadDisableOnNewConnection(bool value) { read_disable_on_new_connection_ = value; }
+  void setDisableAllAndDoNotEnable(bool value) { disable_and_do_not_enable_ = value; }
   Event::TestTimeSystem& timeSystem() { return time_system_; }
 
   // Stops the dispatcher loop and joins the listening thread.
@@ -778,7 +810,7 @@ private:
       if (is_quic) {
 #if defined(ENVOY_ENABLE_QUIC)
         udp_listener_config_.listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
-            parent_.quic_options_, 1, parent_.quic_stat_names_);
+            parent_.quic_options_, 1, parent_.quic_stat_names_, parent_.validation_visitor_);
         // Initialize QUICHE flags.
         quiche::FlagRegistry::getInstance();
 #else
@@ -796,13 +828,10 @@ private:
     // Network::ListenerConfig
     Network::FilterChainManager& filterChainManager() override { return parent_; }
     Network::FilterChainFactory& filterChainFactory() override { return parent_; }
-    Network::ListenSocketFactory& listenSocketFactory() override {
-      return *parent_.socket_factories_[0];
-    }
     std::vector<Network::ListenSocketFactoryPtr>& listenSocketFactories() override {
       return parent_.socket_factories_;
     }
-    bool bindToPort() override { return true; }
+    bool bindToPort() const override { return true; }
     bool handOffRestoredDestinationConnections() const override { return false; }
     uint32_t perConnectionBufferLimitBytes() const override { return 0; }
     std::chrono::milliseconds listenerFiltersTimeout() const override { return {}; }
@@ -869,7 +898,11 @@ private:
   std::list<SharedConnectionWrapperPtr> consumed_connections_ ABSL_GUARDED_BY(lock_);
   std::list<FakeHttpConnectionPtr> quic_connections_ ABSL_GUARDED_BY(lock_);
   const FakeUpstreamConfig config_;
+  // Normally connections are read disabled until a fake raw or http connection
+  // is created, and are then read enabled. Setting these true skips both these.
   bool read_disable_on_new_connection_;
+  // Setting this true disables all events and does not re-enable as the above does.
+  bool disable_and_do_not_enable_{};
   const bool enable_half_close_;
   FakeListener listener_;
   const Network::FilterChainSharedPtr filter_chain_;
@@ -878,6 +911,7 @@ private:
   Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
+  testing::NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
 #ifdef ENVOY_ENABLE_QUIC
   Quic::QuicStatNames quic_stat_names_ = Quic::QuicStatNames(stats_store_.symbolTable());
 #endif

@@ -10,7 +10,7 @@ option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/matching/common_inputs/network/v3;networkv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Common Network Matching Inputs]
+// [#protodoc-title: Common network matching inputs]
 
 // Specifies that matching should be performed by the destination IP address.
 // [#extension: envoy.matching.inputs.destination_ip]
@@ -73,7 +73,7 @@ message TransportProtocolInput {
 // Examples:
 //
 // * ``'h2','http/1.1'``
-// * ``'h2c'```
+// * ``'h2c'``
 //
 // Suggested values in the list include:
 //

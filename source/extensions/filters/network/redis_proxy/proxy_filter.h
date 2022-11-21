@@ -12,6 +12,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
 #include "source/extensions/filters/network/common/redis/codec.h"
 #include "source/extensions/filters/network/redis_proxy/command_splitter.h"
 
@@ -45,11 +46,13 @@ struct ProxyStats {
 /**
  * Configuration for the redis proxy filter.
  */
-class ProxyFilterConfig {
+class ProxyFilterConfig : public Logger::Loggable<Logger::Id::redis> {
 public:
-  ProxyFilterConfig(const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy& config,
-                    Stats::Scope& scope, const Network::DrainDecision& drain_decision,
-                    Runtime::Loader& runtime, Api::Api& api);
+  ProxyFilterConfig(
+      const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy& config,
+      Stats::Scope& scope, const Network::DrainDecision& drain_decision, Runtime::Loader& runtime,
+      Api::Api& api,
+      Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory);
 
   const Network::DrainDecision& drain_decision_;
   Runtime::Loader& runtime_;
@@ -57,10 +60,16 @@ public:
   const std::string redis_drain_close_runtime_key_{"redis.drain_close_enabled"};
   ProxyStats stats_;
   const std::string downstream_auth_username_;
-  const std::string downstream_auth_password_;
+  std::vector<std::string> downstream_auth_passwords_;
+
+  // DNS cache used for ASK/MOVED responses.
+  const Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr dns_cache_manager_;
+  const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache_{nullptr};
 
 private:
   static ProxyStats generateStats(const std::string& prefix, Stats::Scope& scope);
+  Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr
+  getCache(const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy& config);
 };
 
 using ProxyFilterConfigSharedPtr = std::shared_ptr<ProxyFilterConfig>;
@@ -92,6 +101,8 @@ public:
 
   bool connectionAllowed() { return connection_allowed_; }
 
+  Common::Redis::Client::Transaction& transaction() { return transaction_; }
+
 private:
   friend class RedisProxyFilterTest;
 
@@ -101,6 +112,7 @@ private:
 
     // RedisProxy::CommandSplitter::SplitCallbacks
     bool connectionAllowed() override { return parent_.connectionAllowed(); }
+    void onQuit() override { parent_.onQuit(*this); }
     void onAuth(const std::string& password) override { parent_.onAuth(*this, password); }
     void onAuth(const std::string& username, const std::string& password) override {
       parent_.onAuth(*this, username, password);
@@ -109,14 +121,18 @@ private:
       parent_.onResponse(*this, std::move(value));
     }
 
+    Common::Redis::Client::Transaction& transaction() override { return parent_.transaction(); }
+
     ProxyFilter& parent_;
     Common::Redis::RespValuePtr pending_response_;
     CommandSplitter::SplitRequestPtr request_handle_;
   };
 
+  void onQuit(PendingRequest& request);
   void onAuth(PendingRequest& request, const std::string& password);
   void onAuth(PendingRequest& request, const std::string& username, const std::string& password);
   void onResponse(PendingRequest& request, Common::Redis::RespValuePtr&& value);
+  bool checkPassword(const std::string& password);
 
   Common::Redis::DecoderPtr decoder_;
   Common::Redis::EncoderPtr encoder_;
@@ -126,6 +142,8 @@ private:
   Network::ReadFilterCallbacks* callbacks_{};
   std::list<PendingRequest> pending_requests_;
   bool connection_allowed_;
+  Common::Redis::Client::Transaction transaction_;
+  bool connection_quit_;
 };
 
 } // namespace RedisProxy

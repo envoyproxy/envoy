@@ -99,9 +99,6 @@ public:
     Decoder::REGISTERHandler msgHandler(decoder);
     Decoder::HeaderHandler headerHandler(msgHandler);
     EXPECT_EQ(HeaderType::Via, headerHandler.currentHeader());
-    absl::string_view str("");
-    headerHandler.processEvent(str);
-    headerHandler.processCseq(str);
 
     DecoderStateMachine::DecoderStatus status(State::MessageBegin);
   }
@@ -271,9 +268,58 @@ TEST_F(SipDecoderTest, DecodeOK200) {
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
   EXPECT_EQ(2U, store_.counter("test.request").value());
-  EXPECT_EQ(2U, stats_.request_active_.value());
+  EXPECT_EQ(1U, stats_.request_active_.value());
   EXPECT_EQ(0U, store_.counter("test.response").value());
 }
+
+TEST_F(SipDecoderTest, DecodeOK200EmptyHeader) {
+  initializeFilter(yaml);
+
+  const std::string SIP_OK200_EMPTY_HEADER =
+      "SIP/2.0 200 OK\x0d\x0a"
+      "Via:SIP/2.0/TCP 11.0.0.10:15060;branch=z9hG4bK-3193-1-0\x0d\x0a"
+      "From:<sip:User.0001@tas01.defult.svc.cluster.local>;tag=1\x0d\x0a"
+      "To:<sip:User.0000@tas01.defult.svc.cluster.local>\x0d\x0a"
+      "Call-ID:1-3193@11.0.0.10\x0d\x0a"
+      "CSeq:100 REGISTER\x0d\x0a"
+      "Session-ID:fdc85ff600804114a90b50e04de2b988;remote=b74c76b50080450dabd12317fb6b8aa7\x0d\x0a"
+      "User-Agent:test-client-v1.1\x0d\x0a"
+      "Supported:\x0d\x0a"
+      "Contact:<sip:User.0001@11.0.0.10:15060;transport=TCP>\x0d\x0a"
+      "Content-Length:0\x0d\x0a"
+      "\x0d\x0a";
+  buffer_.add(SIP_OK200_EMPTY_HEADER);
+  EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+
+  EXPECT_EQ(1U, store_.counter("test.request").value());
+  EXPECT_EQ(1U, stats_.request_active_.value());
+  EXPECT_EQ(0U, store_.counter("test.response").value());
+}
+
+TEST_F(SipDecoderTest, DecodeOK200DifferentHeaderFormats) {
+  initializeFilter(yaml);
+
+  const std::string SIP_OK200_DIFF_HEADER_FORMATS =
+      "SIP/2.0 200 OK\x0d\x0a"
+      "Via:             SIP/2.0/TCP 11.0.0.10:15060;branch=z9hG4bK-3193-1-0\x0d\x0a"
+      "From          :<sip:User.0001@tas01.defult.svc.cluster.local>;tag=1\x0d\x0a"
+      "To      :           <sip:User.0000@tas01.defult.svc.cluster.local>\x0d\x0a"
+      "Call-ID:1-3193@11.0.0.10\x0d\x0a"
+      "CSeq: 100 REGISTER\x0d\x0a"
+      "Session-ID:   fdc85ff600804114ae04de2b988;remote=b74c76b50050dabd12317fb6b8aa7\x0d\x0a"
+      "User-Agent  :    test-client-v1.1\x0d\x0a"
+      "Supported   :\x0d\x0a"
+      "Contact  :  <sip:User.0001@11.0.0.10:15060;transport=TCP>\x0d\x0a"
+      "Content-Length: 0\x0d\x0a"
+      "\x0d\x0a";
+  buffer_.add(SIP_OK200_DIFF_HEADER_FORMATS);
+  EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+
+  EXPECT_EQ(1U, store_.counter("test.request").value());
+  EXPECT_EQ(1U, stats_.request_active_.value());
+  EXPECT_EQ(0U, store_.counter("test.response").value());
+}
+
 TEST_F(SipDecoderTest, DecodeGeneral) {
   initializeFilter(yaml);
 
@@ -348,7 +394,7 @@ TEST_F(SipDecoderTest, DecodeSUBSCRIBE) {
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
   EXPECT_EQ(2U, store_.counter("test.request").value());
-  EXPECT_EQ(2U, stats_.request_active_.value());
+  EXPECT_EQ(1U, stats_.request_active_.value());
   EXPECT_EQ(0U, store_.counter("test.response").value());
 }
 

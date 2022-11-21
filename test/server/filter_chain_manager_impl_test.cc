@@ -25,6 +25,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/drain_manager.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/server/utility.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/registry.h"
@@ -58,6 +59,9 @@ public:
 class FilterChainManagerImplTest : public testing::TestWithParam<bool> {
 public:
   void SetUp() override {
+    addresses_.emplace_back(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234));
+    filter_chain_manager_ =
+        std::make_unique<FilterChainManagerImpl>(addresses_, parent_context_, init_manager_);
     local_address_ = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234);
     remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234);
     TestUtility::loadFromYaml(
@@ -95,16 +99,17 @@ public:
       remote_address_ = Network::Utility::parseInternetAddress(source_address, source_port);
     }
     mock_socket->connection_info_provider_->setRemoteAddress(remote_address_);
-    return filter_chain_manager_.findFilterChain(*mock_socket);
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    return filter_chain_manager_->findFilterChain(*mock_socket, stream_info);
   }
 
   void addSingleFilterChainHelper(
       const envoy::config::listener::v3::FilterChain& filter_chain,
       const envoy::config::listener::v3::FilterChain* fallback_filter_chain = nullptr) {
-    filter_chain_manager_.addFilterChains(
+    filter_chain_manager_->addFilterChains(
         GetParam() ? &matcher_ : nullptr,
         std::vector<const envoy::config::listener::v3::FilterChain*>{&filter_chain},
-        fallback_filter_chain, filter_chain_factory_builder_, filter_chain_manager_);
+        fallback_filter_chain, filter_chain_factory_builder_, *filter_chain_manager_);
   }
 
   // Intermediate states.
@@ -155,10 +160,9 @@ public:
 
   NiceMock<MockFilterChainFactoryBuilder> filter_chain_factory_builder_;
   NiceMock<Server::Configuration::MockFactoryContext> parent_context_;
+  std::vector<Network::Address::InstanceConstSharedPtr> addresses_;
   // Test target.
-  FilterChainManagerImpl filter_chain_manager_{
-      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234), parent_context_,
-      init_manager_};
+  std::unique_ptr<FilterChainManagerImpl> filter_chain_manager_;
 };
 
 TEST_P(FilterChainManagerImplTest, FilterChainMatchNothing) {
@@ -169,10 +173,10 @@ TEST_P(FilterChainManagerImplTest, FilterChainMatchNothing) {
 TEST_P(FilterChainManagerImplTest, FilterChainMatchCaseInSensitive) {
   envoy::config::listener::v3::FilterChain new_filter_chain = filter_chain_template_;
   new_filter_chain.mutable_filter_chain_match()->add_server_names("foo.EXAMPLE.com");
-  filter_chain_manager_.addFilterChains(
+  filter_chain_manager_->addFilterChains(
       GetParam() ? &matcher_ : nullptr,
       std::vector<const envoy::config::listener::v3::FilterChain*>{&new_filter_chain}, nullptr,
-      filter_chain_factory_builder_, filter_chain_manager_);
+      filter_chain_factory_builder_, *filter_chain_manager_);
   auto filter_chain =
       findFilterChainHelper(10000, "127.0.0.1", "FOO.example.com", "tls", {}, "8.8.8.8", 111);
   EXPECT_NE(filter_chain, nullptr);
@@ -217,11 +221,11 @@ TEST_P(FilterChainManagerImplTest, LookupFilterChainContextByFilterChainMessage)
     filter_chain_messages.push_back(std::move(new_filter_chain));
   }
   EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _)).Times(2);
-  filter_chain_manager_.addFilterChains(
+  filter_chain_manager_->addFilterChains(
       GetParam() ? &matcher_ : nullptr,
       std::vector<const envoy::config::listener::v3::FilterChain*>{&filter_chain_messages[0],
                                                                    &filter_chain_messages[1]},
-      nullptr, filter_chain_factory_builder_, filter_chain_manager_);
+      nullptr, filter_chain_factory_builder_, *filter_chain_manager_);
 }
 
 TEST_P(FilterChainManagerImplTest, DuplicateContextsAreNotBuilt) {
@@ -236,14 +240,12 @@ TEST_P(FilterChainManagerImplTest, DuplicateContextsAreNotBuilt) {
   }
 
   EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _));
-  filter_chain_manager_.addFilterChains(
+  filter_chain_manager_->addFilterChains(
       GetParam() ? &matcher_ : nullptr,
       std::vector<const envoy::config::listener::v3::FilterChain*>{&filter_chain_messages[0]},
-      nullptr, filter_chain_factory_builder_, filter_chain_manager_);
-
-  FilterChainManagerImpl new_filter_chain_manager{
-      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234), parent_context_,
-      init_manager_, filter_chain_manager_};
+      nullptr, filter_chain_factory_builder_, *filter_chain_manager_);
+  FilterChainManagerImpl new_filter_chain_manager{addresses_, parent_context_, init_manager_,
+                                                  *filter_chain_manager_};
   // The new filter chain manager maintains 3 filter chains, but only 2 filter chain context is
   // built because it reuse the filter chain context in the previous filter chain manager
   EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _)).Times(2);
@@ -263,8 +265,8 @@ TEST_P(FilterChainManagerImplTest, CreatedFilterChainFactoryContextHasIndependen
     new_filter_chain.mutable_filter_chain_match()->mutable_destination_port()->set_value(10000 + i);
     filter_chain_messages.push_back(std::move(new_filter_chain));
   }
-  auto context0 = filter_chain_manager_.createFilterChainFactoryContext(&filter_chain_messages[0]);
-  auto context1 = filter_chain_manager_.createFilterChainFactoryContext(&filter_chain_messages[1]);
+  auto context0 = filter_chain_manager_->createFilterChainFactoryContext(&filter_chain_messages[0]);
+  auto context1 = filter_chain_manager_->createFilterChainFactoryContext(&filter_chain_messages[1]);
 
   // Server as whole is not draining.
   MockDrainManager not_a_draining_manager;

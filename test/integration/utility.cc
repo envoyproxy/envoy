@@ -25,6 +25,7 @@
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/client_connection_factory_impl.h"
 #include "source/common/quic/quic_transport_socket_factory.h"
+#include "quiche/quic/core/deterministic_connection_id_generator.h"
 #endif
 
 #include "test/common/upstream/utility.h"
@@ -193,6 +194,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
                 Filesystem::fileSystemForTest(), random_generator, bootstrap);
   Event::DispatcherPtr dispatcher(api.allocateDispatcher("test_thread"));
   TestConnectionCallbacks connection_callbacks(*dispatcher);
+  Network::TransportSocketOptionsConstSharedPtr options;
 
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
@@ -204,7 +206,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
                                  dispatcher->createClientConnection(
                                      addr, Network::Address::InstanceConstSharedPtr(),
                                      Network::Test::createRawBufferSocket(), nullptr, nullptr),
-                                 host_description, *dispatcher, random);
+                                 host_description, *dispatcher, random, options);
     return sendRequestAndWaitForResponse(*dispatcher, method, url, body, host, content_type,
                                          client);
   }
@@ -225,13 +227,17 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
     // Docker only works with loopback v6 address.
     local_address = std::make_shared<Network::Address::Ipv6Instance>("::1");
   }
+  quic::DeterministicConnectionIdGenerator generator(quic::kQuicDefaultConnectionIdLength);
   Network::ClientConnectionPtr connection = Quic::createQuicNetworkConnection(
       *persistent_info, quic_transport_socket_factory.getCryptoConfig(),
-      quic::QuicServerId(quic_transport_socket_factory.clientContextConfig().serverNameIndication(),
-                         static_cast<uint16_t>(addr->ip()->port())),
-      *dispatcher, addr, local_address, quic_stat_names, {}, mock_stats_store, nullptr, nullptr);
+      quic::QuicServerId(
+          quic_transport_socket_factory.clientContextConfig()->serverNameIndication(),
+          static_cast<uint16_t>(addr->ip()->port())),
+      *dispatcher, addr, local_address, quic_stat_names, {}, mock_stats_store, nullptr, nullptr,
+      generator);
   connection->addConnectionCallbacks(connection_callbacks);
-  Http::CodecClientProd client(type, std::move(connection), host_description, *dispatcher, random);
+  Http::CodecClientProd client(type, std::move(connection), host_description, *dispatcher, random,
+                               options);
   // Quic connection needs to finish handshake.
   dispatcher->run(Event::Dispatcher::RunType::Block);
   return sendRequestAndWaitForResponse(*dispatcher, method, url, body, host, content_type, client);

@@ -19,6 +19,7 @@ namespace StreamInfo {
 
 MockUpstreamInfo::MockUpstreamInfo()
     : upstream_local_address_(new Network::Address::Ipv4Instance("127.1.2.3", 58443)),
+      upstream_remote_address_(new Network::Address::Ipv4Instance("10.0.0.1", 443)),
       upstream_host_(new testing::NiceMock<Upstream::MockHostDescription>()) {
   ON_CALL(*this, dumpState(_, _)).WillByDefault(Invoke([](std::ostream& os, int indent_level) {
     os << "MockUpstreamInfo test dumpState with indent: " << indent_level << std::endl;
@@ -66,6 +67,7 @@ MockUpstreamInfo::MockUpstreamInfo()
     upstream_protocol_ = protocol;
   }));
   ON_CALL(*this, upstreamProtocol()).WillByDefault(ReturnPointee(&upstream_protocol_));
+  ON_CALL(*this, upstreamRemoteAddress()).WillByDefault(ReturnRef(upstream_remote_address_));
 }
 
 MockUpstreamInfo::~MockUpstreamInfo() = default;
@@ -143,7 +145,9 @@ MockStreamInfo::MockStreamInfo()
   ON_CALL(*this, hasAnyResponseFlag()).WillByDefault(Invoke([this]() {
     return response_flags_ != 0;
   }));
-  ON_CALL(*this, responseFlags()).WillByDefault(Return(response_flags_));
+  ON_CALL(*this, responseFlags()).WillByDefault(Invoke([this]() -> uint64_t {
+    return response_flags_;
+  }));
   ON_CALL(*this, dynamicMetadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(Const(*this), dynamicMetadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(*this, filterState()).WillByDefault(ReturnRef(filter_state_));

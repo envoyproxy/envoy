@@ -1,5 +1,4 @@
 load(":dev_binding.bzl", "envoy_dev_binding")
-load(":genrule_repository.bzl", "genrule_repository")
 load("@envoy_api//bazel:envoy_http_archive.bzl", "envoy_http_archive")
 load("@envoy_api//bazel:external_deps.bzl", "load_repository_locations")
 load(":repository_locations.bzl", "PROTOC_VERSIONS", "REPOSITORY_LOCATIONS_SPEC")
@@ -12,7 +11,6 @@ WINDOWS_SKIP_TARGETS = [
     "envoy.filters.http.language",
     "envoy.filters.http.sxg",
     "envoy.tracers.dynamic_ot",
-    "envoy.tracers.lightstep",
     "envoy.tracers.datadog",
     "envoy.tracers.opencensus",
 ]
@@ -32,14 +30,6 @@ def external_http_archive(name, **kwargs):
         name,
         locations = REPOSITORY_LOCATIONS,
         **kwargs
-    )
-
-# Use this macro to reference any genrule_repository sourced from bazel/repository_locations.bzl.
-def external_genrule_repository(name, **kwargs):
-    location = REPOSITORY_LOCATIONS[name]
-    genrule_repository(
-        name = name,
-        **dict(location, **kwargs)
     )
 
 def _default_envoy_build_config_impl(ctx):
@@ -160,6 +150,10 @@ def envoy_dependencies(skip_targets = []):
         name = "ssl",
         actual = "@envoy//bazel:boringssl",
     )
+    native.bind(
+        name = "crypto",
+        actual = "@envoy//bazel:boringcrypto",
+    )
 
     # The long repo names (`com_github_fmtlib_fmt` instead of `fmtlib`) are
     # semi-standard in the Bazel community, intended to avoid both duplicate
@@ -182,6 +176,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_grpc_grpc()
     _com_github_unicode_org_icu()
     _com_github_intel_ipp_crypto_crypto_mb()
+    _com_github_intel_qatlib()
     _com_github_jbeder_yaml_cpp()
     _com_github_libevent_libevent()
     _com_github_luajit_luajit()
@@ -201,12 +196,11 @@ def envoy_dependencies(skip_targets = []):
     _com_github_envoyproxy_sqlparser()
     _v8()
     _com_googlesource_chromium_base_trace_event_common()
-    _com_googlesource_chromium_zlib()
     _com_github_google_quiche()
     _com_googlesource_googleurl()
-    _com_lightstep_tracer_cpp()
     _io_hyperscan()
     _io_opentracing_cpp()
+    _net_colm_open_source_colm()
     _net_colm_open_source_ragel()
     _net_zlib()
     _intel_dlb()
@@ -268,9 +262,8 @@ def _boringssl():
     )
 
 def _boringssl_fips():
-    external_genrule_repository(
+    external_http_archive(
         name = "boringssl_fips",
-        genrule_cmd_file = "@envoy//bazel/external:boringssl_fips.genrule_cmd",
         build_file = "@envoy//bazel/external:boringssl_fips.BUILD",
         patches = ["@envoy//bazel/external:boringssl_fips.patch"],
     )
@@ -396,6 +389,12 @@ def _com_github_intel_ipp_crypto_crypto_mb():
         build_file_content = BUILD_ALL_CONTENT,
     )
 
+def _com_github_intel_qatlib():
+    external_http_archive(
+        name = "com_github_intel_qatlib",
+        build_file_content = BUILD_ALL_CONTENT,
+    )
+
 def _com_github_jbeder_yaml_cpp():
     external_http_archive(
         name = "com_github_jbeder_yaml_cpp",
@@ -413,6 +412,16 @@ def _com_github_libevent_libevent():
     native.bind(
         name = "event",
         actual = "@envoy//bazel/foreign_cc:event",
+    )
+
+def _net_colm_open_source_colm():
+    external_http_archive(
+        name = "net_colm_open_source_colm",
+        build_file_content = BUILD_ALL_CONTENT,
+    )
+    native.bind(
+        name = "colm",
+        actual = "@envoy//bazel/foreign_cc:colm",
     )
 
 def _net_colm_open_source_ragel():
@@ -548,13 +557,6 @@ def _io_opentracing_cpp():
         actual = "@io_opentracing_cpp//:opentracing",
     )
 
-def _com_lightstep_tracer_cpp():
-    external_http_archive("com_lightstep_tracer_cpp")
-    native.bind(
-        name = "lightstep",
-        actual = "@com_lightstep_tracer_cpp//:manual_tracer_lib",
-    )
-
 def _com_github_datadog_dd_opentracing_cpp():
     external_http_archive("com_github_datadog_dd_opentracing_cpp")
     external_http_archive(
@@ -622,7 +624,11 @@ def _com_github_ncopa_suexec():
     )
 
 def _com_google_googletest():
-    external_http_archive("com_google_googletest")
+    external_http_archive(
+        "com_google_googletest",
+        patches = ["@envoy//bazel:googletest.patch"],
+        patch_args = ["-p1"],
+    )
     native.bind(
         name = "googletest",
         actual = "@com_google_googletest//:gtest",
@@ -871,16 +877,6 @@ def _com_googlesource_chromium_base_trace_event_common():
         actual = "@com_googlesource_chromium_base_trace_event_common//:trace_event_common",
     )
 
-def _com_googlesource_chromium_zlib():
-    external_http_archive(
-        name = "com_googlesource_chromium_zlib",
-        build_file = "@v8//:bazel/BUILD.zlib",
-    )
-    native.bind(
-        name = "zlib_compression_utils",
-        actual = "@com_googlesource_chromium_zlib//:zlib_compression_utils",
-    )
-
 def _com_github_google_quiche():
     external_http_archive(
         name = "com_github_google_quiche",
@@ -918,7 +914,11 @@ def _org_llvm_releases_compiler_rt():
     )
 
 def _com_github_grpc_grpc():
-    external_http_archive("com_github_grpc_grpc")
+    external_http_archive(
+        name = "com_github_grpc_grpc",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:grpc.patch"],
+    )
     external_http_archive("build_bazel_rules_apple")
 
     # Rebind some stuff to match what the gRPC Bazel is expecting.
@@ -929,6 +929,10 @@ def _com_github_grpc_grpc():
     native.bind(
         name = "libssl",
         actual = "//external:ssl",
+    )
+    native.bind(
+        name = "libcrypto",
+        actual = "//external:crypto",
     )
     native.bind(
         name = "cares",
@@ -978,6 +982,16 @@ def _com_github_grpc_grpc():
     native.bind(
         name = "upb_json_lib",
         actual = "@upb//:json",
+    )
+
+    native.bind(
+        name = "upb_reflection",
+        actual = "@upb//:reflection",
+    )
+
+    native.bind(
+        name = "upb_generated_code_support__only_for_generated_code_do_not_use__i_give_permission_to_break_me",
+        actual = "@upb//:generated_code_support__only_for_generated_code_do_not_use__i_give_permission_to_break_me",
     )
 
 def _re2():
@@ -1058,6 +1072,14 @@ def _com_github_google_tcmalloc():
     native.bind(
         name = "tcmalloc",
         actual = "@com_github_google_tcmalloc//tcmalloc",
+    )
+    native.bind(
+        name = "tcmalloc_profile_marshaler",
+        actual = "@com_github_google_tcmalloc//tcmalloc:profile_marshaler",
+    )
+    native.bind(
+        name = "tcmalloc_malloc_extension",
+        actual = "@com_github_google_tcmalloc//tcmalloc:malloc_extension",
     )
 
 def _com_github_gperftools_gperftools():
@@ -1191,7 +1213,7 @@ filegroup(
     )
 
     # This archive provides Kafka client in Python, so we can use it to interact with Kafka server
-    # during interation tests.
+    # during integration tests.
     external_http_archive(
         name = "kafka_python_client",
         build_file_content = BUILD_ALL_CONTENT,

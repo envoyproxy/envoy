@@ -1,11 +1,11 @@
-# 1. Use already imported python dependencies.
-# 2. Fix the include path for //external:zlib.
-# 3. Add support for --define=no_debug_info=1.
-# 4. Disable pointer compression (https://crbug.com/v8/12592).
-# 5. Add M1 CPU support https://chromium-review.googlesource.com/c/v8/v8/+/3502848
+# 1. Use already imported python dependencies
+# 2. Disable pointer compression (limits the maximum number of WasmVMs).
+# 3. Add support for --define=no_debug_info=1. 
+# 4. Allow compiling v8 on macOS 10.15 to 13.0. TODO(dio): Will remove this patch when https://bugs.chromium.org/p/v8/issues/detail?id=13428 is fixed.
+# 5. Don't expose Wasm C API (only Wasm C++ API).
 
 diff --git a/BUILD.bazel b/BUILD.bazel
-index 13f2a5bebf..2197568c48 100644
+index 4e89f90e7e..ced403d5aa 100644
 --- a/BUILD.bazel
 +++ b/BUILD.bazel
 @@ -4,7 +4,7 @@
@@ -17,6 +17,10 @@ index 13f2a5bebf..2197568c48 100644
  load(
      "@v8//:bazel/defs.bzl",
      "v8_binary",
+diff --git a/BUILD.bazel b/BUILD.bazel
+index 4e89f90e7e..3fcb38b3f3 100644
+--- a/BUILD.bazel
++++ b/BUILD.bazel
 @@ -157,7 +157,7 @@ v8_int(
  # If no explicit value for v8_enable_pointer_compression, we set it to 'none'.
  v8_string(
@@ -27,10 +31,26 @@ index 13f2a5bebf..2197568c48 100644
  
  # Default setting for v8_enable_pointer_compression.
 diff --git a/bazel/defs.bzl b/bazel/defs.bzl
-index dee5e69cc4..d0b5a3c49a 100644
+index e957c0fad3..a6de50e6ab 100644
 --- a/bazel/defs.bzl
 +++ b/bazel/defs.bzl
-@@ -151,6 +151,11 @@ def _default_args():
+@@ -116,6 +116,7 @@ def _default_args():
+         }) + select({
+             "@v8//bazel/config:is_clang": [
+                 "-Wno-invalid-offsetof",
++                "-Wno-unneeded-internal-declaration",
+                 "-std=c++17",
+             ],
+             "@v8//bazel/config:is_gcc": [
+@@ -131,6 +132,7 @@ def _default_args():
+                 "-Wno-redundant-move",
+                 "-Wno-return-type",
+                 "-Wno-stringop-overflow",
++                "-Wno-nonnull",
+                 # Use GNU dialect, because GCC doesn't allow using
+                 # ##__VA_ARGS__ when in standards-conforming mode.
+                 "-std=gnu++17",
+@@ -151,6 +153,23 @@ def _default_args():
                  "-fno-integrated-as",
              ],
              "//conditions:default": [],
@@ -39,27 +59,37 @@ index dee5e69cc4..d0b5a3c49a 100644
 +                "-g0",
 +            ],
 +            "//conditions:default": [],
++        }) + select({
++            "@v8//bazel/config:is_macos": [
++                # The clang available on macOS catalina has a warning that isn't clean on v8 code.
++                "-Wno-range-loop-analysis",
++
++                # To supress warning on deprecated declaration on v8 code. For example:
++                # external/v8/src/base/platform/platform-darwin.cc:56:22: 'getsectdatafromheader_64'
++                # is deprecated: first deprecated in macOS 13.0.
++                # https://bugs.chromium.org/p/v8/issues/detail?id=13428.
++                "-Wno-deprecated-declarations",
++            ],
++            "//conditions:default": [],
          }),
          includes = ["include"],
          linkopts = select({
-@@ -383,6 +388,7 @@ def _v8_target_cpu_transition_impl(settings, attr):
-         "k8": "x64",
-         "x86_64": "x64",
-         "darwin": "x64",
-+        "darwin_arm64": "arm64",
-         "darwin_x86_64": "x64",
-         "x64_windows": "x64",
-         "x86": "ia32",
-diff --git a/src/snapshot/snapshot-utils.cc b/src/snapshot/snapshot-utils.cc
-index 6db6698d7e..b56d31085f 100644
---- a/src/snapshot/snapshot-utils.cc
-+++ b/src/snapshot/snapshot-utils.cc
-@@ -5,7 +5,7 @@
- #include "src/snapshot/snapshot-utils.h"
+diff --git a/src/wasm/c-api.cc b/src/wasm/c-api.cc
+index ce3f569fd5..dc8a4c4f6a 100644
+--- a/src/wasm/c-api.cc
++++ b/src/wasm/c-api.cc
+@@ -2238,6 +2238,8 @@ auto Instance::exports() const -> ownvec<Extern> {
  
- #include "src/base/sanitizer/msan.h"
--#include "third_party/zlib/zlib.h"
-+#include "zlib.h"
+ }  // namespace wasm
  
- namespace v8 {
- namespace internal {
++#if 0
++
+ // BEGIN FILE wasm-c.cc
+ 
+ extern "C" {
+@@ -3257,3 +3259,5 @@ wasm_instance_t* wasm_frame_instance(const wasm_frame_t* frame) {
+ #undef WASM_DEFINE_SHARABLE_REF
+ 
+ }  // extern "C"
++
++#endif

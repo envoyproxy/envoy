@@ -34,7 +34,9 @@ public:
   };
 
   void expectBasicHttp() {
-    EXPECT_CALL(callbacks_, connection()).Times(2).WillRepeatedly(Return(&connection_));
+    EXPECT_CALL(callbacks_, connection())
+        .Times(2)
+        .WillRepeatedly(Return(OptRef<const Network::Connection>{connection_}));
     connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
     connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
     EXPECT_CALL(Const(connection_), ssl()).Times(2).WillRepeatedly(Return(ssl_));
@@ -297,7 +299,9 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeer) {
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-downstream-service-cluster", "foo"},
                                                  {":path", "/bar"}};
   envoy::service::auth::v3::CheckRequest request;
-  EXPECT_CALL(callbacks_, connection()).WillRepeatedly(Return(&connection_));
+  EXPECT_CALL(callbacks_, connection())
+      .Times(2)
+      .WillRepeatedly(Return(OptRef<const Network::Connection>{connection_}));
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   EXPECT_CALL(Const(connection_), ssl()).WillRepeatedly(Return(ssl_));

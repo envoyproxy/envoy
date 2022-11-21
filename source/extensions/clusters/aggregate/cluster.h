@@ -39,7 +39,8 @@ using ClusterSetConstSharedPtr = std::shared_ptr<const ClusterSet>;
 
 class Cluster : public Upstream::ClusterImplBase {
 public:
-  Cluster(const envoy::config::cluster::v3::Cluster& cluster,
+  Cluster(Server::Configuration::ServerFactoryContext& server_context,
+          const envoy::config::cluster::v3::Cluster& cluster,
           const envoy::extensions::clusters::aggregate::v3::ClusterConfig& config,
           Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime,
           Random::RandomGenerator& random,
@@ -90,10 +91,10 @@ private:
   // priority set could be empty, we cannot initialize LoadBalancerBase when priority set is empty.
   class LoadBalancerImpl : public Upstream::LoadBalancerBase {
   public:
-    LoadBalancerImpl(const PriorityContext& priority_context, Upstream::ClusterStats& stats,
+    LoadBalancerImpl(const PriorityContext& priority_context, Upstream::ClusterLbStats& lb_stats,
                      Runtime::Loader& runtime, Random::RandomGenerator& random,
                      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
-        : Upstream::LoadBalancerBase(priority_context.priority_set_, stats, runtime, random,
+        : Upstream::LoadBalancerBase(priority_context.priority_set_, lb_stats, runtime, random,
                                      common_config),
           priority_context_(priority_context) {}
 
@@ -146,6 +147,7 @@ struct AggregateLoadBalancerFactory : public Upstream::LoadBalancerFactory {
         cluster_.info(), cluster_.cluster_manager_, cluster_.runtime_, cluster_.random_,
         cluster_.clusters_);
   }
+  Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override { return create(); }
 
   const Cluster& cluster_;
 };
@@ -170,6 +172,7 @@ public:
 private:
   std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
   createClusterWithConfig(
+      Server::Configuration::ServerFactoryContext& server_context,
       const envoy::config::cluster::v3::Cluster& cluster,
       const envoy::extensions::clusters::aggregate::v3::ClusterConfig& proto_config,
       Upstream::ClusterFactoryContext& context,

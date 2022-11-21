@@ -21,6 +21,9 @@ import yaml
 from sphinx.directives.code import CodeBlock
 import sphinx_rtd_theme
 
+# TODO(phlax): move the pygments style to envoy.docs.sphinx_runner and remove this
+sys.path.append(os.path.abspath("./_pygments"))
+
 
 class SphinxConfigError(Exception):
     pass
@@ -317,3 +320,5 @@ htmlhelp_basename = 'envoydoc'
 rediraffe_redirects = "redirects.txt"
 
 intersphinx_mapping = _config("intersphinx_mapping")
+
+pygments_style = "style.EnvoyCodeStyle"

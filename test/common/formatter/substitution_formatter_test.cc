@@ -15,6 +15,7 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/string_accessor_impl.h"
+#include "source/common/stream_info/stream_id_provider_impl.h"
 
 #include "test/common/formatter/command_extension.h"
 #include "test/mocks/api/mocks.h"
@@ -186,6 +187,21 @@ TEST(SubstitutionFormatterTest, plainStringFormatter) {
               ProtoEq(ValueUtil::stringValue("plain")));
 }
 
+TEST(SubstitutionFormatterTest, plainNumberFormatter) {
+  PlainNumberFormatter formatter(400);
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
+  StreamInfo::MockStreamInfo stream_info;
+  std::string body;
+
+  EXPECT_EQ("400", formatter.format(request_headers, response_headers, response_trailers,
+                                    stream_info, body));
+  EXPECT_THAT(formatter.formatValue(request_headers, response_headers, response_trailers,
+                                    stream_info, body),
+              ProtoEq(ValueUtil::numberValue(400)));
+}
+
 TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   EXPECT_THROW(StreamInfoFormatter formatter("unknown_field"), EnvoyException);
 
@@ -283,6 +299,31 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     EXPECT_THAT(ttlb_duration_format.formatValue(request_headers, response_headers,
                                                  response_trailers, stream_info, body),
                 ProtoEq(ValueUtil::numberValue(15.0)));
+  }
+
+  {
+    StreamInfoFormatter handshake_duration_format("DOWNSTREAM_HANDSHAKE_DURATION");
+
+    EXPECT_EQ(absl::nullopt,
+              handshake_duration_format.format(request_headers, response_headers, response_trailers,
+                                               stream_info, body));
+    EXPECT_THAT(handshake_duration_format.formatValue(request_headers, response_headers,
+                                                      response_trailers, stream_info, body),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+
+  {
+    StreamInfoFormatter handshake_duration_format("DOWNSTREAM_HANDSHAKE_DURATION");
+
+    EXPECT_CALL(time_system, monotonicTime)
+        .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(25000000))));
+    stream_info.downstream_timing_.onDownstreamHandshakeComplete(time_system);
+
+    EXPECT_EQ("25", handshake_duration_format.format(request_headers, response_headers,
+                                                     response_trailers, stream_info, body));
+    EXPECT_THAT(handshake_duration_format.formatValue(request_headers, response_headers,
+                                                      response_trailers, stream_info, body),
+                ProtoEq(ValueUtil::numberValue(25.0)));
   }
 
   {
@@ -782,6 +823,21 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
                                             stream_info, body),
                 ProtoEq(ValueUtil::numberValue(id)));
+  }
+
+  {
+    StreamInfoFormatter upstream_format("STREAM_ID");
+
+    StreamInfo::StreamIdProviderImpl id_provider("ffffffff-0012-0110-00ff-0c00400600ff");
+    EXPECT_CALL(stream_info, getStreamIdProvider())
+        .WillRepeatedly(Return(makeOptRef<const StreamInfo::StreamIdProvider>(id_provider)));
+
+    EXPECT_EQ("ffffffff-0012-0110-00ff-0c00400600ff",
+              upstream_format.format(request_headers, response_headers, response_trailers,
+                                     stream_info, body));
+    EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
+                                            stream_info, body),
+                ProtoEq(ValueUtil::stringValue("ffffffff-0012-0110-00ff-0c00400600ff")));
   }
 
   {
@@ -2340,15 +2396,16 @@ TEST(SubstitutionFormatterTest, StartTimeFormatter) {
   }
 }
 
-TEST(SubstitutionFormatterTest, GrpcStatusFormatterTest) {
-  GrpcStatusFormatter formatter("grpc-status", "", absl::optional<size_t>());
+TEST(SubstitutionFormatterTest, GrpcStatusFormatterCamelStringTest) {
+  GrpcStatusFormatter formatter("grpc-status", "", absl::optional<size_t>(),
+                                GrpcStatusFormatter::Format::CamelString);
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   Http::TestRequestHeaderMapImpl request_header;
   Http::TestResponseHeaderMapImpl response_header;
   Http::TestResponseTrailerMapImpl response_trailer;
   std::string body;
 
-  std::array<std::string, 17> grpc_statuses{
+  std::vector<std::string> grpc_statuses{
       "OK",       "Canceled",       "Unknown",          "InvalidArgument",   "DeadlineExceeded",
       "NotFound", "AlreadyExists",  "PermissionDenied", "ResourceExhausted", "FailedPrecondition",
       "Aborted",  "OutOfRange",     "Unimplemented",    "Internal",          "Unavailable",
@@ -2401,8 +2458,83 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterTest) {
   }
 }
 
-TEST(SubstitutionFormatterTest, GrpcStatusNumberFormatterTest) {
-  GrpcStatusFormatter formatter("grpc-status", "", absl::optional<size_t>(), true);
+TEST(SubstitutionFormatterTest, GrpcStatusFormatterSnakeStringTest) {
+  GrpcStatusFormatter formatter("grpc-status", "", absl::optional<size_t>(),
+                                GrpcStatusFormatter::Format::SnakeString);
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  Http::TestRequestHeaderMapImpl request_header;
+  Http::TestResponseHeaderMapImpl response_header;
+  Http::TestResponseTrailerMapImpl response_trailer;
+  std::string body;
+
+  std::vector<std::string> grpc_statuses{"OK",
+                                         "CANCELLED",
+                                         "UNKNOWN",
+                                         "INVALID_ARGUMENT",
+                                         "DEADLINE_EXCEEDED",
+                                         "NOT_FOUND",
+                                         "ALREADY_EXISTS",
+                                         "PERMISSION_DENIED",
+                                         "RESOURCE_EXHAUSTED",
+                                         "FAILED_PRECONDITION",
+                                         "ABORTED",
+                                         "OUT_OF_RANGE",
+                                         "UNIMPLEMENTED",
+                                         "INTERNAL",
+                                         "UNAVAILABLE",
+                                         "DATA_LOSS",
+                                         "UNAUTHENTICATED"};
+  for (size_t i = 0; i < grpc_statuses.size(); ++i) {
+    response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", std::to_string(i)}};
+    EXPECT_EQ(grpc_statuses[i], formatter.format(request_header, response_header, response_trailer,
+                                                 stream_info, body));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info, body),
+        ProtoEq(ValueUtil::stringValue(grpc_statuses[i])));
+  }
+  {
+    response_trailer = Http::TestResponseTrailerMapImpl{{"not-a-grpc-status", "13"}};
+    EXPECT_EQ(absl::nullopt, formatter.format(request_header, response_header, response_trailer,
+                                              stream_info, body));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info, body),
+        ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "-1"}};
+    EXPECT_EQ("-1", formatter.format(request_header, response_header, response_trailer, stream_info,
+                                     body));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info, body),
+        ProtoEq(ValueUtil::stringValue("-1")));
+    response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "42738"}};
+    EXPECT_EQ("42738", formatter.format(request_header, response_header, response_trailer,
+                                        stream_info, body));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info, body),
+        ProtoEq(ValueUtil::stringValue("42738")));
+    response_trailer.clear();
+  }
+  {
+    response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "-1"}};
+    EXPECT_EQ("-1", formatter.format(request_header, response_header, response_trailer, stream_info,
+                                     body));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info, body),
+        ProtoEq(ValueUtil::stringValue("-1")));
+    response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "42738"}};
+    EXPECT_EQ("42738", formatter.format(request_header, response_header, response_trailer,
+                                        stream_info, body));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info, body),
+        ProtoEq(ValueUtil::stringValue("42738")));
+    response_header.clear();
+  }
+}
+
+TEST(SubstitutionFormatterTest, GrpcStatusFormatterNumberTest) {
+  GrpcStatusFormatter formatter("grpc-status", "", absl::optional<size_t>(),
+                                GrpcStatusFormatter::Format::Number);
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   Http::TestRequestHeaderMapImpl request_header;
   Http::TestResponseHeaderMapImpl response_header;
@@ -2484,6 +2616,32 @@ TEST(SubstitutionFormatterTest, StructFormatterPlainStringTest) {
   ProtobufWkt::Struct key_mapping;
   TestUtility::loadFromYaml(R"EOF(
     plain_string: plain_string_value
+  )EOF",
+                            key_mapping);
+  StructFormatter formatter(key_mapping, false, false);
+
+  verifyStructOutput(
+      formatter.format(request_header, response_header, response_trailer, stream_info, body),
+      expected_json_map);
+}
+
+TEST(SubstitutionFormatterTest, StructFormatterPlainNumberTest) {
+  StreamInfo::MockStreamInfo stream_info;
+  Http::TestRequestHeaderMapImpl request_header;
+  Http::TestResponseHeaderMapImpl response_header;
+  Http::TestResponseTrailerMapImpl response_trailer;
+  std::string body;
+
+  envoy::config::core::v3::Metadata metadata;
+  populateMetadataTestData(metadata);
+  absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
+  EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
+
+  absl::node_hash_map<std::string, std::string> expected_json_map = {{"plain_number", "400"}};
+
+  ProtobufWkt::Struct key_mapping;
+  TestUtility::loadFromYaml(R"EOF(
+    plain_number: 400
   )EOF",
                             key_mapping);
   StructFormatter formatter(key_mapping, false, false);

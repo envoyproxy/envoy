@@ -26,7 +26,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.udp_listener.udp_proxy]
 
 // Configuration for the UDP proxy filter.
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message UdpProxyConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.udp.udp_proxy.v2alpha.UdpProxyConfig";
@@ -75,7 +75,7 @@ message UdpProxyConfig {
   google.protobuf.Duration idle_timeout = 3;
 
   // Use the remote downstream IP address as the sender IP address when sending packets to upstream hosts.
-  // This option requires Envoy to be run with the *CAP_NET_ADMIN* capability on Linux.
+  // This option requires Envoy to be run with the ``CAP_NET_ADMIN`` capability on Linux.
   // And the IPv6 stack must be enabled on Linux kernel.
   // This option does not preserve the remote downstream port.
   // If this option is enabled, the IP address of sent datagrams will be changed to the remote downstream IP address.
@@ -105,6 +105,9 @@ message UdpProxyConfig {
   // to upstream host selected on first chunk receival for that "session" (identified by source IP/port and local IP/port).
   bool use_per_packet_load_balancing = 7;
 
-  // Configuration for access logs emitted by the UDP proxy. Note that certain UDP specific data is emitted as :ref:`Dynamic Metadata <config_access_log_format_dynamic_metadata>`.
+  // Configuration for session access logs emitted by the UDP proxy. Note that certain UDP specific data is emitted as :ref:`Dynamic Metadata <config_access_log_format_dynamic_metadata>`.
   repeated config.accesslog.v3.AccessLog access_log = 8;
+
+  // Configuration for proxy access logs emitted by the UDP proxy. Note that certain UDP specific data is emitted as :ref:`Dynamic Metadata <config_access_log_format_dynamic_metadata>`.
+  repeated config.accesslog.v3.AccessLog proxy_access_log = 10;
 }

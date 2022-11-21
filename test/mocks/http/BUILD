@@ -39,6 +39,15 @@ envoy_cc_mock(
 )
 
 envoy_cc_mock(
+    name = "header_validator_mocks",
+    hdrs = ["header_validator.h"],
+    deps = [
+        "//envoy/http:header_validator_interface",
+        "//test/mocks:common_lib",
+    ],
+)
+
+envoy_cc_mock(
     name = "http_mocks",
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
@@ -76,6 +85,7 @@ envoy_cc_mock(
     hdrs = ["stream.h"],
     deps = [
         "//envoy/http:codec_interface",
+        "//source/common/network:socket_lib",
     ],
 )
 

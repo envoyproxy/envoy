@@ -27,6 +27,7 @@ envoy_extension_cc_test(
     srcs = ["oauth_integration_test.cc"],
     extension_names = ["envoy.filters.http.oauth2"],
     deps = [
+        "//source/common/common:base64_lib",
         "//source/common/http:utility_lib",
         "//source/extensions/filters/http/oauth2:config",
         "//source/extensions/filters/http/oauth2:oauth_lib",
@@ -49,6 +50,7 @@ envoy_extension_cc_test(
         "//test/integration:http_integration_lib",
         "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/extensions/filters/http/oauth2/v3:pkg_cc_proto",
     ],
 )

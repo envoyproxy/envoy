@@ -29,7 +29,7 @@ MockInstance::MockInstance()
   ON_CALL(*this, routerContext()).WillByDefault(ReturnRef(router_context_));
   ON_CALL(*this, dnsResolver()).WillByDefault(Return(dns_resolver_));
   ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
-  ON_CALL(*this, admin()).WillByDefault(ReturnRef(admin_));
+  ON_CALL(*this, admin()).WillByDefault(Return(OptRef<Server::Admin>{admin_}));
   ON_CALL(*this, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
   ON_CALL(*this, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
   ON_CALL(*this, accessLogManager()).WillByDefault(ReturnRef(access_log_manager_));
@@ -69,7 +69,7 @@ MockServerFactoryContext::MockServerFactoryContext()
   ON_CALL(*this, serverScope()).WillByDefault(ReturnRef(scope_));
   ON_CALL(*this, singletonManager()).WillByDefault(ReturnRef(*singleton_manager_));
   ON_CALL(*this, threadLocal()).WillByDefault(ReturnRef(thread_local_));
-  ON_CALL(*this, admin()).WillByDefault(ReturnRef(admin_));
+  ON_CALL(*this, admin()).WillByDefault(Return(OptRef<Server::Admin>{admin_}));
   ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
   ON_CALL(*this, timeSource()).WillByDefault(ReturnRef(time_system_));
   ON_CALL(*this, messageValidationContext()).WillByDefault(ReturnRef(validation_context_));
@@ -81,6 +81,7 @@ MockServerFactoryContext::MockServerFactoryContext()
   ON_CALL(*this, accessLogManager()).WillByDefault(ReturnRef(access_log_manager_));
   ON_CALL(*this, initManager()).WillByDefault(ReturnRef(init_manager_));
   ON_CALL(*this, lifecycleNotifier()).WillByDefault(ReturnRef(lifecycle_notifier_));
+  ON_CALL(*this, options()).WillByDefault(ReturnRef(options_));
 }
 MockServerFactoryContext::~MockServerFactoryContext() = default;
 

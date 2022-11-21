@@ -6,6 +6,7 @@ import "envoy/config/core/v3/socket_option.proto";
 
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -32,15 +33,20 @@ message Pipe {
 }
 
 // The address represents an envoy internal listener.
-// [#comment: TODO(lambdai): Make this address available for listener and endpoint.
-// TODO(asraa): When address available, remove workaround from test/server/server_fuzz_test.cc:30.]
+// [#comment: TODO(asraa): When address available, remove workaround from test/server/server_fuzz_test.cc:30.]
 message EnvoyInternalAddress {
   oneof address_name_specifier {
     option (validate.required) = true;
 
-    // [#not-implemented-hide:] The :ref:`listener name <envoy_v3_api_field_config.listener.v3.Listener.name>` of the destination internal listener.
+    // Specifies the :ref:`name <envoy_v3_api_field_config.listener.v3.Listener.name>` of the
+    // internal listener.
     string server_listener_name = 1;
   }
+
+  // Specifies an endpoint identifier to distinguish between multiple endpoints for the same internal listener in a
+  // single upstream pool. Only used in the upstream addresses for tracking changes to individual endpoints. This, for
+  // example, may be set to the final destination IP for the target internal listener.
+  string endpoint_id = 2;
 }
 
 // [#next-free-field: 7]
@@ -62,8 +68,8 @@ message SocketAddress {
   // within an upstream :ref:`BindConfig <envoy_v3_api_msg_config.core.v3.BindConfig>`, the address
   // controls the source address of outbound connections. For :ref:`clusters
   // <envoy_v3_api_msg_config.cluster.v3.Cluster>`, the cluster type determines whether the
-  // address must be an IP (*STATIC* or *EDS* clusters) or a hostname resolved by DNS
-  // (*STRICT_DNS* or *LOGICAL_DNS* clusters). Address resolution can be customized
+  // address must be an IP (``STATIC`` or ``EDS`` clusters) or a hostname resolved by DNS
+  // (``STRICT_DNS`` or ``LOGICAL_DNS`` clusters). Address resolution can be customized
   // via :ref:`resolver_name <envoy_v3_api_field_config.core.v3.SocketAddress.resolver_name>`.
   string address = 2 [(validate.rules).string = {min_len: 1}];
 
@@ -82,7 +88,7 @@ message SocketAddress {
   // this is empty, a context dependent default applies. If the address is a concrete
   // IP address, no resolution will occur. If address is a hostname this
   // should be set for resolution other than DNS. Specifying a custom resolver with
-  // *STRICT_DNS* or *LOGICAL_DNS* will generate an error at runtime.
+  // ``STRICT_DNS`` or ``LOGICAL_DNS`` will generate an error at runtime.
   string resolver_name = 5;
 
   // When binding to an IPv6 address above, this enables `IPv4 compatibility
@@ -110,17 +116,32 @@ message TcpKeepalive {
   google.protobuf.UInt32Value keepalive_interval = 3;
 }
 
+message ExtraSourceAddress {
+  // The additional address to bind.
+  SocketAddress address = 1 [(validate.rules).message = {required: true}];
+
+  // Additional socket options that may not be present in Envoy source code or
+  // precompiled binaries. If specified, this will override the
+  // :ref:`socket_options <envoy_v3_api_field_config.core.v3.BindConfig.socket_options>`
+  // in the BindConfig. If specified with no
+  // :ref:`socket_options <envoy_v3_api_field_config.core.v3.SocketOptionsOverride.socket_options>`
+  // or an empty list of :ref:`socket_options <envoy_v3_api_field_config.core.v3.SocketOptionsOverride.socket_options>`,
+  // it means no socket option will apply.
+  SocketOptionsOverride socket_options = 2;
+}
+
+// [#next-free-field: 6]
 message BindConfig {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.BindConfig";
 
   // The address to bind to when creating a socket.
   SocketAddress source_address = 1 [(validate.rules).message = {required: true}];
 
-  // Whether to set the *IP_FREEBIND* option when creating the socket. When this
+  // Whether to set the ``IP_FREEBIND`` option when creating the socket. When this
   // flag is set to true, allows the :ref:`source_address
-  // <envoy_v3_api_field_config.cluster.v3.UpstreamBindConfig.source_address>` to be an IP address
+  // <envoy_v3_api_field_config.core.v3.BindConfig.source_address>` to be an IP address
   // that is not configured on the system running Envoy. When this flag is set
-  // to false, the option *IP_FREEBIND* is disabled on the socket. When this
+  // to false, the option ``IP_FREEBIND`` is disabled on the socket. When this
   // flag is not set (default), the socket is not modified, i.e. the option is
   // neither enabled nor disabled.
   google.protobuf.BoolValue freebind = 2;
@@ -128,6 +149,21 @@ message BindConfig {
   // Additional socket options that may not be present in Envoy source code or
   // precompiled binaries.
   repeated SocketOption socket_options = 3;
+
+  // Extra source addresses appended to the address specified in the `source_address`
+  // field. This enables to specify multiple source addresses. Currently, only one extra
+  // address can be supported, and the extra address should have a different IP version
+  // with the address in the `source_address` field. The address which has the same IP
+  // version with the target host's address IP version will be used as bind address. If more
+  // than one extra address specified, only the first address matched IP version will be
+  // returned. If there is no same IP version address found, the address in the `source_address`
+  // will be returned.
+  repeated ExtraSourceAddress extra_source_addresses = 5;
+
+  // Deprecated by
+  // :ref:`extra_source_addresses <envoy_v3_api_field_config.core.v3.BindConfig.extra_source_addresses>`
+  repeated SocketAddress additional_source_addresses = 4
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 }
 
 // Addresses specify either a logical or physical address and port, which are
@@ -143,7 +179,8 @@ message Address {
 
     Pipe pipe = 2;
 
-    // [#not-implemented-hide:]
+    // Specifies a user-space address handled by :ref:`internal listeners
+    // <envoy_v3_api_field_config.listener.v3.Listener.internal_listener>`.
     EnvoyInternalAddress envoy_internal_address = 3;
   }
 }

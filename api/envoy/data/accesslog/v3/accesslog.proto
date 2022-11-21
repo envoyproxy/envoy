@@ -80,7 +80,7 @@ message ConnectionProperties {
 }
 
 // Defines fields that are shared by all Envoy access logs.
-// [#next-free-field: 23]
+// [#next-free-field: 28]
 message AccessLogCommon {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.data.accesslog.v2.AccessLogCommon";
@@ -110,14 +110,14 @@ message AccessLogCommon {
   google.protobuf.Duration time_to_last_rx_byte = 6;
 
   // Interval between the first downstream byte received and the first upstream byte sent. There may
-  // by considerable delta between *time_to_last_rx_byte* and this value due to filters.
-  // Additionally, the same caveats apply as documented in *time_to_last_downstream_tx_byte* about
+  // by considerable delta between ``time_to_last_rx_byte`` and this value due to filters.
+  // Additionally, the same caveats apply as documented in ``time_to_last_downstream_tx_byte`` about
   // not accounting for kernel socket buffer time, etc.
   google.protobuf.Duration time_to_first_upstream_tx_byte = 7;
 
   // Interval between the first downstream byte received and the last upstream byte sent. There may
-  // by considerable delta between *time_to_last_rx_byte* and this value due to filters.
-  // Additionally, the same caveats apply as documented in *time_to_last_downstream_tx_byte* about
+  // by considerable delta between ``time_to_last_rx_byte`` and this value due to filters.
+  // Additionally, the same caveats apply as documented in ``time_to_last_downstream_tx_byte`` about
   // not accounting for kernel socket buffer time, etc.
   google.protobuf.Duration time_to_last_upstream_tx_byte = 8;
 
@@ -130,14 +130,14 @@ message AccessLogCommon {
   google.protobuf.Duration time_to_last_upstream_rx_byte = 10;
 
   // Interval between the first downstream byte received and the first downstream byte sent.
-  // There may be a considerable delta between the *time_to_first_upstream_rx_byte* and this field
+  // There may be a considerable delta between the ``time_to_first_upstream_rx_byte`` and this field
   // due to filters. Additionally, the same caveats apply as documented in
-  // *time_to_last_downstream_tx_byte* about not accounting for kernel socket buffer time, etc.
+  // ``time_to_last_downstream_tx_byte`` about not accounting for kernel socket buffer time, etc.
   google.protobuf.Duration time_to_first_downstream_tx_byte = 11;
 
   // Interval between the first downstream byte received and the last downstream byte sent.
   // Depending on protocol, buffering, windowing, filters, etc. there may be a considerable delta
-  // between *time_to_last_upstream_rx_byte* and this field. Note also that this is an approximate
+  // between ``time_to_last_upstream_rx_byte`` and this field. Note also that this is an approximate
   // time. In the current implementation it does not include kernel socket buffer time. In the
   // current implementation it also does not include send window buffering inside the HTTP/2 codec.
   // In the future it is likely that work will be done to make this duration more accurate.
@@ -150,7 +150,7 @@ message AccessLogCommon {
   // The upstream local/origin address that handles this exchange. This does not include retries.
   config.core.v3.Address upstream_local_address = 14;
 
-  // The upstream cluster that *upstream_remote_address* belongs to.
+  // The upstream cluster that ``upstream_remote_address`` belongs to.
   string upstream_cluster = 15;
 
   // Flags indicating occurrences during request/response processing.
@@ -181,14 +181,40 @@ message AccessLogCommon {
   config.core.v3.Address downstream_direct_remote_address = 20;
 
   // Map of filter state in stream info that have been configured to be logged. If the filter
-  // state serialized to any message other than `google.protobuf.Any` it will be packed into
-  // `google.protobuf.Any`.
+  // state serialized to any message other than ``google.protobuf.Any`` it will be packed into
+  // ``google.protobuf.Any``.
   map<string, google.protobuf.Any> filter_state_objects = 21;
 
   // A list of custom tags, which annotate logs with additional information.
   // To configure this value, users should configure
   // :ref:`custom_tags <envoy_v3_api_field_extensions.access_loggers.grpc.v3.CommonGrpcAccessLogConfig.custom_tags>`.
   map<string, string> custom_tags = 22;
+
+  // For HTTP: Total duration in milliseconds of the request from the start time to the last byte out.
+  // For TCP: Total duration in milliseconds of the downstream connection.
+  // This is the total duration of the request (i.e., when the request's ActiveStream is destroyed)
+  // and may be longer than ``time_to_last_downstream_tx_byte``.
+  google.protobuf.Duration duration = 23;
+
+  // For HTTP: Number of times the request is attempted upstream. Note that the field is omitted when the request was never attempted upstream.
+  // For TCP: Number of times the connection request is attempted upstream. Note that the field is omitted when the connect request was never attempted upstream.
+  uint32 upstream_request_attempt_count = 24;
+
+  // Connection termination details may provide additional information about why the connection was terminated by Envoy for L4 reasons.
+  string connection_termination_details = 25;
+
+  // Optional unique id of stream (TCP connection, long-live HTTP2 stream, HTTP request) for logging and tracing.
+  // This could be any format string that could be used to identify one stream.
+  string stream_id = 26;
+
+  // If this log entry is final log entry that flushed after the stream completed or
+  // intermediate log entry that flushed periodically during the stream.
+  // There may be multiple intermediate log entries and only one final log entry for each
+  // long-live stream (TCP connection, long-live HTTP2 stream).
+  // And if it is necessary, unique ID or identifier can be added to the log entry
+  // :ref:`stream_id <envoy_v3_api_field_data.accesslog.v3.AccessLogCommon.stream_id>` to
+  // correlate all these intermediate log entries and final log entry.
+  bool intermediate_log_entry = 27;
 }
 
 // Flags indicating occurrences during request/response processing.
@@ -296,7 +322,7 @@ message ResponseFlags {
 }
 
 // Properties of a negotiated TLS connection.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message TLSProperties {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.data.accesslog.v2.TLSProperties";
@@ -353,6 +379,9 @@ message TLSProperties {
 
   // The TLS session ID.
   string tls_session_id = 6;
+
+  // The ``JA3`` fingerprint when ``JA3`` fingerprinting is enabled.
+  string ja3_fingerprint = 7;
 }
 
 // [#next-free-field: 14]

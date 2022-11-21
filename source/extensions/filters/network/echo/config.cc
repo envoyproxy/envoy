@@ -30,7 +30,7 @@ private:
   }
 
   bool isTerminalFilterByProtoTyped(const envoy::extensions::filters::network::echo::v3::Echo&,
-                                    Server::Configuration::FactoryContext&) override {
+                                    Server::Configuration::ServerFactoryContext&) override {
     return true;
   }
 };

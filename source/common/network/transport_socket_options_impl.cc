@@ -11,6 +11,7 @@
 #include "source/common/common/scalar_to_byte_vector.h"
 #include "source/common/common/utility.h"
 #include "source/common/network/application_protocol.h"
+#include "source/common/network/filter_state_proxy_info.h"
 #include "source/common/network/proxy_protocol_filter_state.h"
 #include "source/common/network/upstream_server_name.h"
 #include "source/common/network/upstream_subject_alt_names.h"
@@ -59,6 +60,7 @@ TransportSocketOptionsUtility::fromFilterState(const StreamInfo::FilterState& fi
   std::vector<std::string> subject_alt_names;
   std::vector<std::string> alpn_fallback;
   absl::optional<Network::ProxyProtocolData> proxy_protocol_options;
+  std::unique_ptr<const TransportSocketOptions::Http11ProxyInfo> proxy_info;
 
   bool needs_transport_socket_options = false;
   if (auto typed_data = filter_state.getDataReadOnly<UpstreamServerName>(UpstreamServerName::key());
@@ -88,6 +90,14 @@ TransportSocketOptionsUtility::fromFilterState(const StreamInfo::FilterState& fi
     needs_transport_socket_options = true;
   }
 
+  if (auto typed_data = filter_state.getDataReadOnly<Http11ProxyInfoFilterState>(
+          Http11ProxyInfoFilterState::key());
+      typed_data != nullptr) {
+    proxy_info = std::make_unique<TransportSocketOptions::Http11ProxyInfo>(typed_data->hostname(),
+                                                                           typed_data->address());
+    needs_transport_socket_options = true;
+  }
+
   StreamInfo::FilterState::ObjectsPtr objects = filter_state.objectsSharedWithUpstreamConnection();
   if (!objects->empty()) {
     needs_transport_socket_options = true;
@@ -96,7 +106,8 @@ TransportSocketOptionsUtility::fromFilterState(const StreamInfo::FilterState& fi
   if (needs_transport_socket_options) {
     return std::make_shared<Network::TransportSocketOptionsImpl>(
         server_name, std::move(subject_alt_names), std::move(application_protocols),
-        std::move(alpn_fallback), proxy_protocol_options, std::move(objects));
+        std::move(alpn_fallback), proxy_protocol_options, std::move(objects),
+        std::move(proxy_info));
   } else {
     return nullptr;
   }

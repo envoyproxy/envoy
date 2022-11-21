@@ -42,8 +42,8 @@ public:
                                            ProtobufMessage::getStrictValidationVisitor(), config);
     Stats::ScopeSharedPtr scope = stats_store_.createScope("cluster.name.");
     Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_store_,
-        singleton_manager_, tls_, validation_visitor_, *api_, options_, access_log_manager_);
+        server_context_, ssl_context_manager_, *scope, server_context_.cluster_manager_,
+        stats_store_, validation_visitor_);
     if (uses_tls) {
       EXPECT_CALL(ssl_context_manager_, createSslClientContext(_, _));
     }
@@ -52,8 +52,8 @@ public:
     // actually correct. It's possible this will have to change in the future.
     EXPECT_CALL(*dns_cache_manager_->dns_cache_, addUpdateCallbacks_(_))
         .WillOnce(DoAll(SaveArgAddress(&update_callbacks_), Return(nullptr)));
-    cluster_ = std::make_shared<Cluster>(cluster_config, config, runtime_, *this, local_info_,
-                                         factory_context, std::move(scope), false);
+    cluster_ = std::make_shared<Cluster>(server_context_, cluster_config, config, runtime_, *this,
+                                         local_info_, factory_context, std::move(scope), false);
     thread_aware_lb_ = std::make_unique<Cluster::ThreadAwareLoadBalancer>(*cluster_);
     lb_factory_ = thread_aware_lb_->factory();
     refreshLb();
@@ -132,18 +132,13 @@ public:
   MOCK_METHOD(void, onMemberUpdateCb,
               (const Upstream::HostVector& hosts_added, const Upstream::HostVector& hosts_removed));
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   Stats::TestUtil::TestStore stats_store_;
   Ssl::MockContextManager ssl_context_manager_;
-  NiceMock<Upstream::MockClusterManager> cm_;
-  NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  NiceMock<Server::MockAdmin> admin_;
-  Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_{Api::createApiForTest(stats_store_)};
-  Server::MockOptions options_;
   std::shared_ptr<Extensions::Common::DynamicForwardProxy::MockDnsCacheManager> dns_cache_manager_{
       new Extensions::Common::DynamicForwardProxy::MockDnsCacheManager()};
   std::shared_ptr<Cluster> cluster_;
@@ -157,7 +152,6 @@ public:
                       std::shared_ptr<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>>
       host_map_;
   Envoy::Common::CallbackHandlePtr member_update_cb_;
-  NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
 
   const std::string default_yaml_config_ = R"EOF(
 name: name
@@ -583,31 +577,24 @@ protected:
     envoy::config::cluster::v3::Cluster cluster_config =
         Upstream::parseClusterFromV3Yaml(yaml_config);
     Upstream::ClusterFactoryContextImpl cluster_factory_context(
-        cm_, stats_store_, tls_, nullptr, ssl_context_manager_, runtime_, dispatcher_, log_manager_,
-        local_info_, admin_, singleton_manager_, nullptr, true, validation_visitor_, *api_,
-        options_);
+        server_context_, server_context_.cluster_manager_, stats_store_, nullptr,
+        ssl_context_manager_, nullptr, true, validation_visitor_);
     std::unique_ptr<Upstream::ClusterFactory> cluster_factory = std::make_unique<ClusterFactory>();
 
     std::tie(cluster_, thread_aware_lb_) =
-        cluster_factory->create(cluster_config, cluster_factory_context);
+        cluster_factory->create(server_context_, cluster_config, cluster_factory_context);
   }
 
 private:
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   Stats::TestUtil::TestStore stats_store_;
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;
-  NiceMock<Upstream::MockClusterManager> cm_;
-  NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  NiceMock<AccessLog::MockAccessLogManager> log_manager_;
-  NiceMock<Server::MockAdmin> admin_;
-  Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_{Api::createApiForTest(stats_store_)};
   Upstream::ClusterSharedPtr cluster_;
   Upstream::ThreadAwareLoadBalancerPtr thread_aware_lb_;
-  Server::MockOptions options_;
 };
 
 TEST_F(ClusterFactoryTest, InvalidUpstreamHttpProtocolOptions) {

@@ -11,26 +11,23 @@ RpcInvocationImpl::Attachment::Attachment(MapPtr&& value, size_t offset)
     : attachment_(std::move(value)), attachment_offset_(offset) {
   headers_ = Http::RequestHeaderMapImpl::create();
 
-  ASSERT(attachment_);
-  ASSERT(attachment_->toMutableUntypedMap());
+  ASSERT(attachment_ != nullptr);
+  ASSERT(attachment_->toMutableUntypedMap().has_value());
 
-  for (const auto& pair : *attachment_->toMutableUntypedMap()) {
+  for (const auto& pair : *attachment_) {
     const auto key = pair.first->toString();
     const auto value = pair.second->toString();
     if (!key.has_value() || !value.has_value()) {
       continue;
     }
-    headers_->addCopy(Http::LowerCaseString(*(key.value())), *(value.value()));
+    headers_->addCopy(Http::LowerCaseString(key.value().get()), value.value().get());
   }
 }
 
 void RpcInvocationImpl::Attachment::insert(const std::string& key, const std::string& value) {
   attachment_updated_ = true;
 
-  ASSERT(attachment_->toMutableUntypedMap());
-
-  attachment_->toMutableUntypedMap()->emplace(std::make_unique<String>(key),
-                                              std::make_unique<String>(value));
+  attachment_->emplace(std::make_unique<String>(key), std::make_unique<String>(value));
 
   auto lowcase_key = Http::LowerCaseString(key);
   headers_->remove(lowcase_key);
@@ -38,21 +35,20 @@ void RpcInvocationImpl::Attachment::insert(const std::string& key, const std::st
 }
 
 void RpcInvocationImpl::Attachment::remove(const std::string& key) {
+  ASSERT(attachment_->toMutableUntypedMap().has_value());
+
   attachment_updated_ = true;
-
-  ASSERT(attachment_->toMutableUntypedMap());
-
-  attachment_->toMutableUntypedMap()->erase(std::make_unique<String>(key));
+  attachment_->toMutableUntypedMap().value().get().erase(key);
   headers_->remove(Http::LowerCaseString(key));
 }
 
 const std::string* RpcInvocationImpl::Attachment::lookup(const std::string& key) const {
-  ASSERT(attachment_->toMutableUntypedMap());
+  ASSERT(attachment_->toMutableUntypedMap().has_value());
 
-  auto map = attachment_->toMutableUntypedMap();
-  auto result = map->find(std::make_unique<String>(key));
-  if (result != map->end() && result->second->toString().has_value()) {
-    return result->second->toString().value();
+  auto& map = attachment_->toMutableUntypedMap().value().get();
+  auto result = map.find(key);
+  if (result != map.end() && result->second->toString().has_value()) {
+    return &(result->second->toString().value().get());
   }
   return nullptr;
 }

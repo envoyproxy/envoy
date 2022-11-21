@@ -404,5 +404,13 @@ SysCallIntResult OsSysCallsImpl::getifaddrs([[maybe_unused]] InterfaceAddressVec
 #endif
 }
 
+SysCallIntResult OsSysCallsImpl::getaddrinfo(const char* node, const char* service,
+                                             const addrinfo* hints, addrinfo** res) {
+  const int rc = ::getaddrinfo(node, service, hints, res);
+  return {rc, errno};
+}
+
+void OsSysCallsImpl::freeaddrinfo(addrinfo* res) { ::freeaddrinfo(res); }
+
 } // namespace Api
 } // namespace Envoy

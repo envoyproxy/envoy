@@ -34,8 +34,8 @@ The control plane has not yet been started.
 
     $ pwd
     envoy/examples/dynamic-config-cp
-    $ docker-compose build --pull
-    $ docker-compose up -d proxy
+    $ docker-compose pull
+    $ docker-compose up --build -d proxy
     $ docker-compose ps
 
            Name                            Command                State                     Ports
@@ -157,8 +157,8 @@ from ``service1`` to ``service2``:
 
 .. literalinclude:: _include/dynamic-config-cp/resource.go
    :language: go
-   :lines: 33-40
-   :lineno-start: 33
+   :lines: 34-43
+   :lineno-start: 34
    :emphasize-lines: 6
    :linenos:
 
@@ -168,7 +168,7 @@ Further down in this file you must also change the configuration snapshot versio
 .. literalinclude:: _include/dynamic-config-cp/resource.go
    :language: go
    :lineno-start: 164
-   :lines: 164-174
+   :lines: 174-186
    :emphasize-lines: 3
    :linenos:
 

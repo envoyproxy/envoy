@@ -170,8 +170,9 @@ public:
    * @param reset_imminent True if the downstream connection should be closed after this response
    * @param LocalErrorStatus the action to take after onLocalError completes.
    */
-  virtual LocalErrorStatus onLocalReply([[maybe_unused]] const MessageMetadata& metadata,
-                                        [[maybe_unused]] bool end_stream) {
+  virtual LocalErrorStatus onLocalReply(const MessageMetadata& metadata, bool end_stream) {
+    UNREFERENCED_PARAMETER(metadata);
+    UNREFERENCED_PARAMETER(end_stream);
     return LocalErrorStatus::Continue;
   }
 

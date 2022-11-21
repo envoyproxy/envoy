@@ -1,6 +1,6 @@
 .. _api-v3_config_contrib:
 
-Contrib Extensions
+Contrib extensions
 ==================
 
 .. toctree::
@@ -9,4 +9,7 @@ Contrib Extensions
 
   sip/sip
   cryptomb/cryptomb
-  hyperscan/hyperscan
+  hyperscan/matcher
+  hyperscan/regex_engine
+  dlb/dlb
+  qat/qat

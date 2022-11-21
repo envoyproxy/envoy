@@ -38,7 +38,7 @@ TEST_P(HttpTimeoutIntegrationTest, GlobalTimeout) {
   timeSystem().advanceTimeWait(std::chrono::milliseconds(501));
 
   // Ensure we got a timeout downstream and canceled the upstream request.
-  response->waitForHeaders();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(upstream_request_->waitForReset(std::chrono::seconds(15)));
 
   codec_client_->close();
@@ -49,7 +49,7 @@ TEST_P(HttpTimeoutIntegrationTest, GlobalTimeout) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("504", response->headers().getStatusValue());
   EXPECT_EQ(response->headers().getProxyStatusValue(),
-            "envoy; error=connection_timeout; details=\"upstream_response_timeout; UT\"");
+            "envoy; error=connection_timeout; details=\"response_timeout; UT\"");
 }
 
 // Testing that `x-envoy-expected-timeout-ms` header, set by egress envoy, is respected by ingress
@@ -81,7 +81,7 @@ TEST_P(HttpTimeoutIntegrationTest, UseTimeoutSetByEgressEnvoy) {
   timeSystem().advanceTimeWait(std::chrono::milliseconds(301));
 
   // Ensure we got a timeout downstream and canceled the upstream request.
-  response->waitForHeaders();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(upstream_request_->waitForReset(std::chrono::seconds(15)));
 
   codec_client_->close();
@@ -122,7 +122,7 @@ TEST_P(HttpTimeoutIntegrationTest, DeriveTimeoutInIngressEnvoy) {
   timeSystem().advanceTimeWait(std::chrono::milliseconds(501));
 
   // Ensure we got a timeout downstream and canceled the upstream request.
-  response->waitForHeaders();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(upstream_request_->waitForReset(std::chrono::seconds(15)));
 
   codec_client_->close();
@@ -164,7 +164,7 @@ TEST_P(HttpTimeoutIntegrationTest, IgnoreTimeoutSetByEgressEnvoy) {
   timeSystem().advanceTimeWait(std::chrono::milliseconds(501));
 
   // Ensure we got a timeout downstream and canceled the upstream request.
-  response->waitForHeaders();
+  ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(upstream_request_->waitForReset(std::chrono::seconds(15)));
 
   codec_client_->close();
@@ -261,7 +261,7 @@ TEST_P(HttpTimeoutIntegrationTest, PerTryTimeout) {
 
   // Trigger global timeout.
   timeSystem().advanceTimeWait(std::chrono::milliseconds(100));
-  response->waitForHeaders();
+  ASSERT_TRUE(response->waitForEndStream());
 
   codec_client_->close();
 
@@ -313,7 +313,7 @@ TEST_P(HttpTimeoutIntegrationTest, PerTryTimeoutWithoutGlobalTimeout) {
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   upstream_request_->encodeHeaders(response_headers, true);
 
-  response->waitForHeaders();
+  ASSERT_TRUE(response->waitForEndStream());
   codec_client_->close();
 
   EXPECT_TRUE(upstream_request_->complete());
@@ -368,7 +368,7 @@ TEST_P(HttpTimeoutIntegrationTest, HedgedPerTryTimeout) {
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   upstream_request_->encodeHeaders(response_headers, true);
 
-  response->waitForHeaders();
+  ASSERT_TRUE(response->waitForEndStream());
 
   // The second request should be reset since we used the response from the first request.
   ASSERT_TRUE(upstream_request2->waitForReset(std::chrono::seconds(15)));

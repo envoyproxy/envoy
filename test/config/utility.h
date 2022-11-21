@@ -138,7 +138,7 @@ public:
   // By default, this runs with an L7 proxy config, but config can be set to TCP_PROXY_CONFIG
   // to test L4 proxying.
   ConfigHelper(const Network::Address::IpVersion version, Api::Api& api,
-               const std::string& config = httpProxyConfig(false));
+               const std::string& config = httpProxyConfig(false, false));
 
   static void
   initializeTls(const ServerSslOptions& options,
@@ -154,10 +154,11 @@ public:
   static std::string baseConfigNoListeners();
 
   // A basic configuration (admin port, cluster_0, one listener) with no network filters.
-  static std::string baseConfig();
+  static std::string baseConfig(bool multiple_addresses = false);
 
   // A basic configuration (admin port, cluster_0, one udp listener) with no network filters.
-  static std::string baseUdpListenerConfig(std::string listen_address = "0.0.0.0");
+  static std::string baseUdpListenerConfig(std::string listen_address = "0.0.0.0",
+                                           bool multiple_addresses = false);
 
   // A string for a tls inspector listener filter which can be used with addListenerFilter()
   static std::string tlsInspectorFilter(bool enable_ja3_fingerprinting = false);
@@ -168,9 +169,10 @@ public:
   // A basic configuration for L4 proxying.
   static std::string tcpProxyConfig();
   // A basic configuration for L7 proxying.
-  static std::string httpProxyConfig(bool downstream_use_quic = false);
+  static std::string httpProxyConfig(bool downstream_use_quic = false,
+                                     bool multiple_addresses = false);
   // A basic configuration for L7 proxying with QUIC transport.
-  static std::string quicHttpProxyConfig();
+  static std::string quicHttpProxyConfig(bool multiple_addresses = false);
   // A string for a basic buffer filter, which can be used with prependFilter()
   static std::string defaultBufferFilter();
   // A string for a small buffer filter, which can be used with prependFilter()
@@ -277,7 +279,9 @@ public:
   void addVirtualHost(const envoy::config::route::v3::VirtualHost& vhost);
 
   // Add an HTTP filter prior to existing filters.
-  void prependFilter(const std::string& filter_yaml);
+  // By default, this prepends a downstream filter, but if downstream is set to
+  // false it will prepend an upstream filter.
+  void prependFilter(const std::string& filter_yaml, bool downstream = true);
 
   // Add an HTTP filter prior to existing filters.
   // TODO(rgs1): remove once envoy-filter-example has been updated.

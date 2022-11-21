@@ -12,10 +12,12 @@
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
+#include "envoy/http/filter_factory.h"
 #include "envoy/http/stateful_session.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/router/shadow_writer.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
@@ -30,6 +32,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
+#include "source/common/http/filter_chain_helper.h"
 #include "source/common/http/utility.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/router/context_impl.h"
@@ -37,6 +40,7 @@
 #include "source/common/stats/symbol_table.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/upstream_http_factory_context_impl.h"
 
 namespace Envoy {
 namespace Router {
@@ -195,7 +199,7 @@ public:
 /**
  * Configuration for the router filter.
  */
-class FilterConfig {
+class FilterConfig : Http::FilterChainFactory {
 public:
   FilterConfig(Stats::StatName stat_prefix, const LocalInfo::LocalInfo& local_info,
                Stats::Scope& scope, Upstream::ClusterManager& cm, Runtime::Loader& runtime,
@@ -206,9 +210,10 @@ public:
                TimeSource& time_source, Http::Context& http_context,
                Router::Context& router_context)
       : router_context_(router_context), scope_(scope), local_info_(local_info), cm_(cm),
-        runtime_(runtime), random_(random), stats_(router_context_.statNames(), scope, stat_prefix),
-        emit_dynamic_stats_(emit_dynamic_stats), start_child_span_(start_child_span),
-        suppress_envoy_headers_(suppress_envoy_headers),
+        runtime_(runtime), default_stats_(router_context_.statNames(), scope_, stat_prefix),
+        async_stats_(router_context_.statNames(), scope, http_context.asyncClientStatPrefix()),
+        random_(random), emit_dynamic_stats_(emit_dynamic_stats),
+        start_child_span_(start_child_span), suppress_envoy_headers_(suppress_envoy_headers),
         respect_expected_rq_timeout_(respect_expected_rq_timeout),
         suppress_grpc_request_failure_code_stats_(suppress_grpc_request_failure_code_stats),
         http_context_(http_context), zone_name_(local_info_.zoneStatName()),
@@ -234,7 +239,43 @@ public:
     for (const auto& upstream_log : config.upstream_log()) {
       upstream_logs_.push_back(AccessLog::AccessLogFactory::fromProto(upstream_log, context));
     }
+    if (config.upstream_http_filters_size() > 0) {
+      auto& server_factory_ctx = context.getServerFactoryContext();
+      const Http::FilterChainUtility::FiltersList& upstream_http_filters =
+          config.upstream_http_filters();
+      std::shared_ptr<Http::UpstreamFilterConfigProviderManager> filter_config_provider_manager =
+          Http::FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(
+              server_factory_ctx);
+      std::string prefix = context.scope().symbolTable().toString(context.scope().prefix());
+      upstream_ctx_ = std::make_unique<Upstream::UpstreamHttpFactoryContextImpl>(
+          server_factory_ctx, context.initManager(), context.scope());
+      Http::FilterChainHelper<Server::Configuration::UpstreamHttpFactoryContext,
+                              Server::Configuration::UpstreamHttpFilterConfigFactory>
+          helper(*filter_config_provider_manager, server_factory_ctx, *upstream_ctx_, prefix);
+      helper.processFilters(upstream_http_filters, "router upstream http", "router upstream http",
+                            upstream_http_filter_factories_);
+    }
   }
+
+  bool createFilterChain(Http::FilterChainManager& manager,
+                         bool only_create_if_configured = false) const override {
+    // Currently there is no default filter chain, so only_create_if_configured true doesn't make
+    // sense.
+    ASSERT(!only_create_if_configured);
+    if (upstream_http_filter_factories_.empty()) {
+      return false;
+    }
+    Http::FilterChainUtility::createFilterChainForFactories(manager,
+                                                            upstream_http_filter_factories_);
+    return true;
+  }
+
+  bool createUpgradeFilterChain(absl::string_view, const UpgradeMap*,
+                                Http::FilterChainManager&) const override {
+    // Upgrade filter chains not yet supported for upstream filters.
+    return false;
+  }
+
   using HeaderVector = std::vector<Http::LowerCaseString>;
   using HeaderVectorPtr = std::unique_ptr<HeaderVector>;
 
@@ -246,8 +287,9 @@ public:
   const LocalInfo::LocalInfo& local_info_;
   Upstream::ClusterManager& cm_;
   Runtime::Loader& runtime_;
+  FilterStats default_stats_;
+  FilterStats async_stats_;
   Random::RandomGenerator& random_;
-  FilterStats stats_;
   const bool emit_dynamic_stats_;
   const bool start_child_span_;
   const bool suppress_envoy_headers_;
@@ -259,6 +301,8 @@ public:
   Http::Context& http_context_;
   Stats::StatName zone_name_;
   Stats::StatName empty_stat_name_;
+  std::unique_ptr<Server::Configuration::UpstreamHttpFactoryContext> upstream_ctx_;
+  Http::FilterChainUtility::FilterFactoriesList upstream_http_filter_factories_;
 
 private:
   ShadowWriterPtr shadow_writer_;
@@ -319,8 +363,8 @@ class Filter : Logger::Loggable<Logger::Id::router>,
                public Upstream::LoadBalancerContextBase,
                public RouterFilterInterface {
 public:
-  Filter(FilterConfig& config)
-      : config_(config), final_upstream_request_(nullptr), downstream_1xx_headers_encoded_(false),
+  Filter(FilterConfig& config, FilterStats& stats)
+      : config_(config), stats_(stats), downstream_1xx_headers_encoded_(false),
         downstream_response_started_(false), downstream_end_stream_(false), is_retry_(false),
         request_buffer_overflowed_(false) {}
 
@@ -382,7 +426,7 @@ public:
     return nullptr;
   }
   const Network::Connection* downstreamConnection() const override {
-    return callbacks_->connection();
+    return callbacks_->connection().ptr();
   }
   const Http::RequestHeaderMap* downstreamHeaders() const override { return downstream_headers_; }
 
@@ -405,7 +449,6 @@ public:
     if (!is_retry_) {
       return original_priority_load;
     }
-
     return retry_state_->priorityLoadForRetry(priority_set, original_priority_load,
                                               priority_mapping_func);
   }
@@ -414,7 +457,6 @@ public:
     if (!is_retry_) {
       return 1;
     }
-
     return retry_state_->hostSelectionMaxAttempts();
   }
 
@@ -431,7 +473,6 @@ public:
     if (is_retry_) {
       return {};
     }
-
     return callbacks_->upstreamOverrideHost();
   }
 
@@ -496,6 +537,8 @@ public:
   }
   const UpstreamRequest* finalUpstreamRequest() const override { return final_upstream_request_; }
   TimeSource& timeSource() override { return config_.timeSource(); }
+
+  const FilterStats& stats() { return stats_; }
 
 protected:
   void setRetryShadownBufferLimit(uint32_t retry_shadow_buffer_limit) {
@@ -581,9 +624,10 @@ private:
   FilterUtility::HedgingParams hedging_params_;
   Http::Code timeout_response_code_ = Http::Code::GatewayTimeout;
   std::list<UpstreamRequestPtr> upstream_requests_;
+  FilterStats stats_;
   // Tracks which upstream request "wins" and will have the corresponding
   // response forwarded downstream
-  UpstreamRequest* final_upstream_request_;
+  UpstreamRequest* final_upstream_request_ = nullptr;
   bool grpc_request_{};
   bool exclude_http_code_stats_ = false;
   Http::RequestHeaderMap* downstream_headers_{};
@@ -593,6 +637,8 @@ private:
   MetadataMatchCriteriaConstPtr metadata_match_;
   std::function<void(Http::ResponseHeaderMap&)> modify_headers_;
   std::vector<std::reference_wrapper<const ShadowPolicy>> active_shadow_policies_{};
+  std::unique_ptr<Http::RequestHeaderMap> shadow_headers_;
+  std::unique_ptr<Http::RequestTrailerMap> shadow_trailers_;
   // The stream lifetime configured by request header.
   absl::optional<std::chrono::milliseconds> dynamic_max_stream_duration_;
   // list of cookies to add to upstream headers

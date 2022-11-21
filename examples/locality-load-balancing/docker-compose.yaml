@@ -13,8 +13,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile-client
-    ports:
-      - 8001:8001
     depends_on:
     - "backend-local-1"
     - "backend-local-2"
@@ -22,29 +20,33 @@ services:
     - "backend-remote-2"
 
   backend-local-1:
-    image: flask_service:python-3.10-slim-bullseye
+    build:
+      context: ../shared/service
     volumes:
     - ./service.py:/code/service.py
     environment:
-      - HOST=backend-local-1
+    - HOST=backend-local-1
 
   backend-local-2:
-    image: flask_service:python-3.10-slim-bullseye
+    build:
+      context: ../shared/service
     volumes:
     - ./service.py:/code/service.py
     environment:
-      - HOST=backend-local-2
+    - HOST=backend-local-2
 
   backend-remote-1:
-    image: flask_service:python-3.10-slim-bullseye
+    build:
+      context: ../shared/service
     volumes:
     - ./service.py:/code/service.py
     environment:
-      - HOST=backend-remote-1
+    - HOST=backend-remote-1
 
   backend-remote-2:
-    image: flask_service:python-3.10-slim-bullseye
+    build:
+      context: ../shared/service
     volumes:
     - ./service.py:/code/service.py
     environment:
-      - HOST=backend-remote-2
+    - HOST=backend-remote-2

@@ -6,11 +6,10 @@ services:
       context: .
       dockerfile: Dockerfile-proxy
     ports:
-    - "8000:8000"
+    - "${PORT_PROXY:-8000}:8000"
 
   web_service:
     build:
-      context: .
-      dockerfile: Dockerfile-web-service
+      context: ../shared/echo
     ports:
-    - "8080:80"
+    - "${PORT_WEB:-8080}:8080"

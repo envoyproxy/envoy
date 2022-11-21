@@ -9,9 +9,20 @@
 #
 # $ ln -s ../../support/hooks/pre-push .git/hooks/pre-push
 
+if [[ -e .env ]]; then
+    # shellcheck disable=SC1091
+    . .env
+fi
+
+if [[ -n "$NO_VERIFY" ]]; then
+    exit 0
+fi
+
 DUMMY_SHA=0000000000000000000000000000000000000000
 
-echo "Running pre-push check; to skip this step use 'push --no-verify'"
+# shellcheck disable=SC2016
+echo 'Running pre-push check; to skip this step use `push --no-verify` or add `NO_VERIFY=1` to `.env`'
+echo
 AUTHOR=$(git var GIT_AUTHOR_IDENT | sed -n 's/^\(.*>\).*$/\1/p')
 
 # shellcheck disable=SC2034

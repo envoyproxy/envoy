@@ -24,9 +24,9 @@ namespace Http {
 namespace Http1 {
 
 ActiveClient::StreamWrapper::StreamWrapper(ResponseDecoder& response_decoder, ActiveClient& parent)
-    : RequestEncoderWrapper(parent.codec_client_->newStream(*this)),
+    : RequestEncoderWrapper(&parent.codec_client_->newStream(*this)),
       ResponseDecoderWrapper(response_decoder), parent_(parent) {
-  RequestEncoderWrapper::inner_.getStream().addCallbacks(*this);
+  RequestEncoderWrapper::inner_encoder_->getStream().addCallbacks(*this);
 }
 
 ActiveClient::StreamWrapper::~StreamWrapper() {
@@ -42,7 +42,7 @@ void ActiveClient::StreamWrapper::decodeHeaders(ResponseHeaderMapPtr&& headers, 
   close_connection_ =
       HeaderUtility::shouldCloseConnection(parent_.codec_client_->protocol(), *headers);
   if (close_connection_) {
-    parent_.parent().host()->cluster().stats().upstream_cx_close_notify_.inc();
+    parent_.parent().host()->cluster().trafficStats().upstream_cx_close_notify_.inc();
   }
   ResponseDecoderWrapper::decodeHeaders(std::move(headers), end_stream);
 }
@@ -76,7 +76,7 @@ ActiveClient::ActiveClient(HttpConnPoolImplBase& parent,
     : Envoy::Http::ActiveClient(parent, parent.host()->cluster().maxRequestsPerConnection(),
                                 /* effective_concurrent_stream_limit */ 1,
                                 /* configured_concurrent_stream_limit */ 1, data) {
-  parent.host()->cluster().stats().upstream_cx_http1_total_.inc();
+  parent.host()->cluster().trafficStats().upstream_cx_http1_total_.inc();
 }
 
 ActiveClient::~ActiveClient() { ASSERT(!stream_wrapper_.get()); }
@@ -104,9 +104,9 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
         return std::make_unique<ActiveClient>(*pool, absl::nullopt);
       },
       [](Upstream::Host::CreateConnectionData& data, HttpConnPoolImplBase* pool) {
-        CodecClientPtr codec{new CodecClientProd(CodecType::HTTP1, std::move(data.connection_),
-                                                 data.host_description_, pool->dispatcher(),
-                                                 pool->randomGenerator())};
+        CodecClientPtr codec{new CodecClientProd(
+            CodecType::HTTP1, std::move(data.connection_), data.host_description_,
+            pool->dispatcher(), pool->randomGenerator(), pool->transportSocketOptions())};
         return codec;
       },
       std::vector<Protocol>{Protocol::Http11}, absl::nullopt, nullptr);

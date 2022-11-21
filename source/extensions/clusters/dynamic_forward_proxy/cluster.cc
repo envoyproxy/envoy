@@ -18,6 +18,7 @@ namespace Clusters {
 namespace DynamicForwardProxy {
 
 Cluster::Cluster(
+    Server::Configuration::ServerFactoryContext& server_context,
     const envoy::config::cluster::v3::Cluster& cluster,
     const envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig& config,
     Runtime::Loader& runtime,
@@ -25,8 +26,8 @@ Cluster::Cluster(
     const LocalInfo::LocalInfo& local_info,
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
     Stats::ScopeSharedPtr&& stats_scope, bool added_via_api)
-    : Upstream::BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
-                                       added_via_api,
+    : Upstream::BaseDynamicClusterImpl(server_context, cluster, runtime, factory_context,
+                                       std::move(stats_scope), added_via_api,
                                        factory_context.mainThreadDispatcher().timeSource()),
       dns_cache_manager_(cache_manager_factory.get()),
       dns_cache_(dns_cache_manager_->getCache(config.dns_cache_config())),
@@ -53,8 +54,6 @@ void Cluster::addOrUpdateHost(
   Upstream::LogicalHostSharedPtr emplaced_host;
   {
     absl::WriterMutexLock lock{&host_map_lock_};
-    // We should never get a host with no address from the cache.
-    ASSERT(host_info->address() != nullptr);
 
     // NOTE: Right now we allow a DNS cache to be shared between multiple clusters. Though we have
     // connection/request circuit breakers on the cluster, we don't have any way to control the
@@ -170,7 +169,7 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
     if (host_it == cluster_.host_map_.end()) {
       return nullptr;
     } else {
-      if (host_it->second.logical_host_->health() == Upstream::Host::Health::Unhealthy) {
+      if (host_it->second.logical_host_->coarseHealth() == Upstream::Host::Health::Unhealthy) {
         return nullptr;
       }
       host_it->second.shared_host_info_->touch();
@@ -247,6 +246,7 @@ void Cluster::LoadBalancer::onConnectionDraining(Envoy::Http::ConnectionPool::In
 
 std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
 ClusterFactory::createClusterWithConfig(
+    Server::Configuration::ServerFactoryContext& server_context,
     const envoy::config::cluster::v3::Cluster& cluster,
     const envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig& proto_config,
     Upstream::ClusterFactoryContext& context,
@@ -264,8 +264,8 @@ ClusterFactory::createClusterWithConfig(
   }
 
   auto new_cluster = std::make_shared<Cluster>(
-      cluster_config, proto_config, context.runtime(), cache_manager_factory, context.localInfo(),
-      socket_factory_context, std::move(stats_scope), context.addedViaApi());
+      server_context, cluster_config, proto_config, context.runtime(), cache_manager_factory,
+      context.localInfo(), socket_factory_context, std::move(stats_scope), context.addedViaApi());
 
   auto& options = new_cluster->info()->upstreamHttpProtocolOptions();
 

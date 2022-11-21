@@ -1,0 +1,308 @@
+suffixes:
+  # Suffixes to include in checking
+  included:
+  - BUILD
+  - WORKSPACE
+  - .bzl
+  - .cc
+  - .h
+  - .java
+  - .m
+  - .mm
+  - .proto
+
+  # Histogram names which are allowed to be suffixed with the unit symbol, all of the pre-existing
+  # ones were grandfathered as part of PR #8484 for backwards compatibility.
+  histogram_with_si:
+    include:
+    - cx_rtt_us
+    - cx_rtt_variance_us
+    - downstream_cx_length_ms
+    - downstream_cx_length_ms
+    - initialization_time_ms
+    - loop_duration_us
+    - poll_delay_us
+    - request_time_ms
+    - upstream_cx_connect_ms
+    - upstream_cx_length_ms
+
+  proto:
+  - .proto
+
+  repositories_bzl:
+  - bazel/repositories.bzl
+
+paths:
+  # Path prefixes to exclude from checking
+  excluded:
+  - .
+  - bazel/external/http_parser/
+  - bazel/toolchains/configs/
+  - bazel-
+  - build
+  - contrib/contrib_build_config.bzl
+  - examples/wasm-cc
+  - generated/
+  - source/extensions/common/wasm/ext
+  - source/extensions/extensions_build_config.bzl
+  - third_party/
+  - thirdparty/
+  - tools/dev/src
+  - tools/pyformat/
+  - tools/testdata/check_format/
+  - test/extensions/access_loggers/wasm/test_data
+  - test/extensions/bootstrap/wasm/test_data
+  - test/extensions/common/wasm/test_data
+  - test/extensions/filters/http/wasm/test_data
+  - test/extensions/filters/network/wasm/test_data
+  - test/extensions/stats_sinks/wasm/test_data
+
+  build_fixer:
+    exclude:
+    - bazel/BUILD
+    - bazel/external/
+    - bazel/toolchains/
+    - tools/clang_tools
+
+  # `build_urls`:
+  #   We want all URL references to exist in repository_locations.bzl files and have
+  #   metadata that conforms to the schema in ./api/bazel/external_deps.bzl. Below
+  #   we have some exceptions for either infrastructure files or places we fall
+  #   short today (Rust).
+  #
+  # NB: Please DO NOT extend the `build_urls` allow list without consulting
+  # @envoyproxy/dependency-shepherds.
+  build_urls:
+    include:
+    - api/bazel/envoy_http_archive.bzl
+    - api/bazel/repository_locations.bzl
+    - bazel/external/cargo/crates.bzl
+    - bazel/repository_locations.bzl
+
+  # Header files that can throw exceptions. These should be limited; the only
+  # valid situation identified so far is template functions used for config
+  # processing.
+  exception:
+    include:
+    - source/common/config/utility.h
+    # These files should not throw exceptions. Add HTTP/1 when exceptions removed.
+    exclude:
+    - source/common/http/http2/codec_impl.h
+    - source/common/http/http2/codec_impl.cc
+
+  # Only one C++ file should instantiate grpc_init
+  grpc_init:
+    include:
+    - source/common/grpc/google_grpc_context.cc
+
+  # Files in these paths can use Protobuf::util::JsonStringToMessage
+  json_string_to_message:
+    include:
+    - source/common/protobuf/utility.cc
+    - test/extensions/bootstrap/wasm/test_data/speed_cpp.cc
+
+  namespace_check:
+    exclude:
+    - tools/api_boost/testdata/
+    - tools/clang_tools/
+
+  # Files that should not raise an error for using memcpy
+  memcpy:
+    include:
+    - source/common/common/mem_block_builder.h
+    - source/common/common/safe_memcpy.h
+
+  # Files in these paths can make reference to protobuf stuff directly
+  protobuf:
+    include:
+    - api/test
+    - ci/prebuilt
+    - source/common/protobuf
+    - test/extensions/bootstrap/wasm/test_data
+
+  # Files that are allowed to use try without main thread assertion.
+  raw_try:
+    include:
+    - source/common/common/regex.cc
+    - source/common/common/thread.h
+    - source/common/network/utility.cc
+
+  # Files matching these exact names can reference real-world time. These include the class
+  # definitions for real-world time, the construction of them in main(), and perf annotation.
+  # For now it includes the validation server but that really should be injected too.
+  real_time:
+    include:
+    - source/common/common/perf_annotation.h
+    - source/common/common/utility.h
+    - source/common/event/real_time_system.cc
+    - source/common/event/real_time_system.h
+    - source/exe/main_common.cc
+    - source/exe/main_common.h
+    - source/extensions/common/aws/utility.cc
+    - source/server/config_validation/server.cc
+    - test/common/common/log_macros_test.cc
+    - test/common/protobuf/utility_test.cc
+    - test/integration/integration.h
+    - test/test_common/simulated_time_system.cc
+    - test/test_common/simulated_time_system.h
+    - test/test_common/test_time.cc
+    - test/test_common/test_time.h
+    - test/test_common/utility.cc
+    - test/test_common/utility.h
+    - test/tools/wee8_compile/wee8_compile.cc
+
+  # Tests in these paths may make use of the Registry::RegisterFactory constructor or the
+  # REGISTER_FACTORY macro. Other locations should use the InjectFactory helper class to
+  # perform temporary registrations.
+  register_factory_test:
+    include:
+    - test/common/config/registry_test.cc
+    - test/extensions/transport_sockets/tls/
+    - test/integration/clusters/
+    - test/integration/filters/
+    - test/integration/load_balancers/
+
+  # Files in these paths can use MessageLite::SerializeAsString
+  serialize_as_string:
+    include:
+    - contrib/config/source/kv_store_xds_delegate.cc
+    - source/common/protobuf/utility.cc
+    - source/extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.cc
+    - test/common/grpc/codec_fuzz_test.cc
+    - test/common/grpc/codec_test.cc
+    - test/common/protobuf/utility_test.cc
+    - test/extensions/bootstrap/wasm/test_data/speed_cpp.cc
+    - test/extensions/filters/common/expr/context_test.cc
+    - test/extensions/filters/http/common/fuzz/uber_filter.h
+    - test/tools/router_check/router_check.cc
+
+  # Files in these paths can use std::regex
+  std_regex:
+    include:
+    - contrib/squash/filters/http/source/squash_filter.h
+    - contrib/squash/filters/http/source/squash_filter.cc
+    - source/common/common/regex.h
+    - source/common/common/regex.cc
+    - source/common/common/utility.cc
+    - source/common/formatter/substitution_formatter.cc
+    - source/common/stats/tag_extractor_impl.h
+    - source/common/stats/tag_extractor_impl.cc
+    - source/common/version/version.cc
+    - source/server/admin/prometheus_stats.h
+    - source/server/admin/prometheus_stats.cc
+    - source/server/admin/stats_params.h
+    - source/server/admin/stats_request.cc
+    - source/server/admin/utils.h
+    - source/server/admin/utils.cc
+    - tools/clang_tools/api_booster/main.cc
+    - tools/clang_tools/api_booster/proto_cxx_utils.cc
+
+  # These are entire files that are allowed to use std::string_view vs. individual exclusions. Right
+  # now this is just WASM which makes use of std::string_view heavily so we need to convert to
+  # absl::string_view internally. Everywhere else should be using absl::string_view for additional
+  # safety.
+  std_string_view:
+    include:
+    - source/extensions/common/wasm/context.h
+    - source/extensions/common/wasm/context.cc
+    - source/extensions/common/wasm/foreign.cc
+    - source/extensions/common/wasm/wasm.h
+    - source/extensions/common/wasm/wasm.cc
+    - source/extensions/common/wasm/wasm_vm.h
+    - source/extensions/common/wasm/wasm_vm.cc
+    - test/extensions/bootstrap/wasm/wasm_speed_test.cc
+    - test/extensions/bootstrap/wasm/wasm_test.cc
+    - test/extensions/common/wasm/wasm_test.cc
+    - test/extensions/stats_sinks/wasm/wasm_stat_sink_test.cc
+    - test/test_common/wasm_base.h
+
+dir_order:
+- envoy
+- common
+- source
+- exe
+- server
+- extensions
+- test
+
+re:
+  codeowners_contrib: (/contrib/[^@]*\s+)(@.*)
+  codeowners_extensions: .*(extensions[^@]*\s+)(@.*)
+  comment: //|\*
+  designated_initializer: \{\s*\.\w+\s*\=
+  # Check for punctuation in a terminal ref clause, e.g.
+  # :ref:`panic mode. <arch_overview_load_balancing_panic_threshold>`
+  dot_multi_space: \. +
+  duration_value: \b[Dd]uration\(([0-9.]+)
+  # C++17 feature, lacks sufficient support across various libraries / compilers.
+  for_each_n: for_each_n\(
+  histogram_si_suffix: (?<=HISTOGRAM\()[a-zA-Z0-9_]+_(b|kb|mb|ns|us|ms|s)(?=,)
+  line_number: ^(\d+)[a|c|d]?\d*(?:,\d+[a|c|d]?\d*)?$
+  mangled_protobuf_name: envoy::[a-z0-9_:]+::[A-Z][a-z]\w*_\w*_[A-Z]{2}
+  maintainers: .*github.com.(.*)\)\)
+  old_mock_method: MOCK_METHOD\d
+  proto_validation_string: \bmin_bytes\b
+  owner: "@\\S+"
+  runtime_guard_flag: RUNTIME_GUARD\((.*)\);
+  test_name_starting_lc: TEST(_.\(.*,\s|\()[a-z].*\)\s\{
+  virtual_include_headers: \#include.*/_virtual_includes/
+  x_envoy_used_directly: .*\"x-envoy-.*\".*
+
+re_multiline:
+  proto_package: ^package (\S+);\n*
+
+replacements:
+  code_convention:
+    # We can't just remove Times(1) everywhere, since .Times(1).WillRepeatedly
+    # is a legitimate pattern. See
+    # https://github.com/google/googletest/blob/master/googlemock/docs/for_dummies.md#cardinalities-how-many-times-will-it-be-called
+    ".Times(1);": ";"
+    # These may miss some cases, due to line breaks, but should reduce the
+    # Times(1) noise.
+    ".Times(1).WillOnce": ".WillOnce"
+    ".Times(1).WillRepeatedly": ".WillOnce"
+    "Stats::ScopePtr": "Stats::ScopeSharedPtr"
+
+  libcxx:
+    "absl::make_unique<": "std::make_unique<"
+
+  protobuf_type_errors:
+    # Well-known types should be referenced from the ProtobufWkt namespace.
+    "Protobuf::Any": "ProtobufWkt::Any"
+    "Protobuf::Empty": "ProtobufWkt::Empty"
+    "Protobuf::ListValue": "ProtobufWkt::ListValue"
+    "Protobuf::NULL_VALUE": "ProtobufWkt::NULL_VALUE"
+    "Protobuf::StringValue": "ProtobufWkt::StringValue"
+    "Protobuf::Struct": "ProtobufWkt::Struct"
+    "Protobuf::Value": "ProtobufWkt::Value"
+    # Other common mis-namespacing of protobuf types.
+    "ProtobufWkt::Map": "Protobuf::Map"
+    "ProtobufWkt::MapPair": "Protobuf::MapPair"
+    "ProtobufUtil::MessageDifferencer": "Protobuf::util::MessageDifferencer"
+
+include_angle: "#include <"
+unsorted_flags:
+- envoy.reloadable_features.activate_timers_next_event_loop
+- envoy.reloadable_features.grpc_json_transcoder_adhere_to_buffer_limits
+- envoy.reloadable_features.sanitize_http_header_referer
+
+# https://github.com/envoyproxy/envoy/issues/20589
+# https://github.com/envoyproxy/envoy/issues/9953
+# PLEASE DO NOT ADD FILES TO THIS LIST WITHOUT SENIOR MAINTAINER APPROVAL
+visibility_excludes:
+- source/extensions/clusters/eds/
+- source/extensions/clusters/strict_dns/
+- source/extensions/clusters/static/
+- source/extensions/clusters/original_dst/
+- source/extensions/clusters/logical_dns/
+- source/extensions/early_data/BUILD
+- source/extensions/filters/http/buffer/BUILD
+- source/extensions/filters/network/common/BUILD
+- source/extensions/http/header_validators/envoy_default/BUILD
+- source/extensions/transport_sockets/common/BUILD
+- source/extensions/udp_packet_writer/default/BUILD
+- source/extensions/udp_packet_writer/gso/BUILD
+- source/extensions/path/uri_template_lib/BUILD
+- source/extensions/path/match/uri_template/BUILD
+- source/extensions/path/rewrite/uri_template/BUILD
+- source/extensions/quic/connection_id_generator/BUILD

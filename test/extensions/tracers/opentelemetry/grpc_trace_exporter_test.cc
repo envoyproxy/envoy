@@ -61,14 +61,14 @@ TEST_F(OpenTelemetryGrpcTraceExporterTest, CreateExporterAndExportSpan) {
 
   expectStreamMessage(R"EOF(
     resource_spans:
-      instrumentation_library_spans:
+      scope_spans:
         - spans:
           - name: "test"
   )EOF");
   opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest request;
   opentelemetry::proto::trace::v1::Span span;
   span.set_name("test");
-  *request.add_resource_spans()->add_instrumentation_library_spans()->add_spans() = span;
+  *request.add_resource_spans()->add_scope_spans()->add_spans() = span;
   EXPECT_TRUE(exporter.log(request));
 }
 
@@ -80,7 +80,7 @@ TEST_F(OpenTelemetryGrpcTraceExporterTest, NoExportWithHighWatermark) {
   opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest request;
   opentelemetry::proto::trace::v1::Span span;
   span.set_name("tests");
-  *request.add_resource_spans()->add_instrumentation_library_spans()->add_spans() = span;
+  *request.add_resource_spans()->add_scope_spans()->add_spans() = span;
   EXPECT_FALSE(exporter.log(request));
 }
 
@@ -88,7 +88,7 @@ TEST_F(OpenTelemetryGrpcTraceExporterTest, ExportWithRemoteClose) {
   OpenTelemetryGrpcTraceExporter exporter(Grpc::RawAsyncClientPtr{async_client_});
   std::string request_yaml = R"EOF(
     resource_spans:
-      instrumentation_library_spans:
+      scope_spans:
         - spans:
           - name: "test"
   )EOF";
@@ -97,7 +97,7 @@ TEST_F(OpenTelemetryGrpcTraceExporterTest, ExportWithRemoteClose) {
   opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest request;
   opentelemetry::proto::trace::v1::Span span;
   span.set_name("test");
-  *request.add_resource_spans()->add_instrumentation_library_spans()->add_spans() = span;
+  *request.add_resource_spans()->add_scope_spans()->add_spans() = span;
   EXPECT_TRUE(exporter.log(request));
 
   // Close the stream, now that we've created it.
@@ -113,14 +113,14 @@ TEST_F(OpenTelemetryGrpcTraceExporterTest, ExportWithNoopCallbacks) {
   OpenTelemetryGrpcTraceExporter exporter(Grpc::RawAsyncClientPtr{async_client_});
   expectStreamMessage(R"EOF(
     resource_spans:
-      instrumentation_library_spans:
+      scope_spans:
         - spans:
           - name: "test"
   )EOF");
   opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest request;
   opentelemetry::proto::trace::v1::Span span;
   span.set_name("test");
-  *request.add_resource_spans()->add_instrumentation_library_spans()->add_spans() = span;
+  *request.add_resource_spans()->add_scope_spans()->add_spans() = span;
   EXPECT_TRUE(exporter.log(request));
 
   Http::TestRequestHeaderMapImpl metadata;

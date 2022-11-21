@@ -42,6 +42,14 @@ constexpr char DefaultConfig[] = R"EOF(
 
 class GcpAuthnFilterTest : public testing::Test {
 public:
+  GcpAuthnFilterTest() {
+    // Initialize the default configuration.
+    TestUtility::loadFromYaml(DefaultConfig, config_);
+    filter_config_ =
+        std::make_shared<envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig>(
+            config_);
+  }
+
   void setupMockObjects() {
     EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster(_))
         .WillRepeatedly(Return(&thread_local_cluster_));
@@ -58,7 +66,7 @@ public:
   }
 
   void setupFilterAndCallback() {
-    filter_ = std::make_unique<GcpAuthnFilter>(config_, context_, "stats", nullptr);
+    filter_ = std::make_unique<GcpAuthnFilter>(filter_config_, context_, "stats", nullptr);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
 
@@ -77,13 +85,14 @@ public:
     ON_CALL(*cluster_info_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
   }
 
-  void createClient(const std::string& config_str = DefaultConfig) {
-    TestUtility::loadFromYaml(config_str, config_);
-    client_ = std::make_unique<GcpAuthnClient>(config_, context_);
+  void overrideConfig(const GcpAuthnFilterConfig& config) {
+    config_ = config;
+    filter_config_ =
+        std::make_shared<envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig>(
+            config);
   }
-  void createClient(const GcpAuthnFilterConfig& config) {
-    client_ = std::make_unique<GcpAuthnClient>(config, context_);
-  }
+
+  void createClient() { client_ = std::make_unique<GcpAuthnClient>(config_, context_); }
 
   NiceMock<MockFactoryContext> context_;
   NiceMock<MockThreadLocalCluster> thread_local_cluster_;
@@ -101,6 +110,7 @@ public:
   std::unique_ptr<GcpAuthnClient> client_;
   std::unique_ptr<GcpAuthnFilter> filter_;
   GcpAuthnFilterConfig config_;
+  FilterConfigSharedPtr filter_config_;
   Http::TestRequestHeaderMapImpl default_headers_{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
   envoy::config::core::v3::Metadata metadata_;
@@ -152,7 +162,8 @@ TEST_F(GcpAuthnFilterTest, NoCluster) {
   EXPECT_CALL(request_callbacks_, onComplete(/*response_ptr=*/nullptr));
   GcpAuthnFilterConfig config;
   TestUtility::loadFromYaml(no_cluster_config, config);
-  createClient(config);
+  overrideConfig(config);
+  createClient();
   client_->fetchToken(request_callbacks_, buildRequest(config.http_uri().uri()));
 }
 
@@ -224,7 +235,7 @@ TEST_F(GcpAuthnFilterTest, ResumeFilterChainIteration) {
   setupMockFilterMetadata(/*valid=*/true);
 
   EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
-            Http::FilterHeadersStatus::StopIteration);
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
   Envoy::Http::ResponseHeaderMapPtr resp_headers(new Envoy::Http::TestResponseHeaderMapImpl({
       {":status", "200"},
   }));
@@ -236,17 +247,17 @@ TEST_F(GcpAuthnFilterTest, ResumeFilterChainIteration) {
   client_callback_->onSuccess(client_request_, std::move(response));
 }
 
-TEST_F(GcpAuthnFilterTest, DestoryFilter) {
+TEST_F(GcpAuthnFilterTest, DestroyFilter) {
   setupMockObjects();
   setupFilterAndCallback();
   // Set up mock filter metadata.
   setupMockFilterMetadata(/*valid=*/true);
 
-  // decodeHeaders() is expected to return `StopIteration` and state is expected to be in `Calling`
-  // state because none of complete functions(i.e., onSuccess, onFailure, onDestroy, etc) has been
-  // called.
+  // decodeHeaders() is expected to return `StopAllIterationAndWatermark` and state is expected to
+  // be in `Calling` state because none of complete functions(i.e., onSuccess, onFailure, onDestroy,
+  // etc) has been called.
   EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
-            Http::FilterHeadersStatus::StopIteration);
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
   EXPECT_EQ(filter_->state(), GcpAuthnFilter::State::Calling);
   filter_->onDestroy();
   // onDestroy() call is expected to update the state from `Calling` to `Complete`.

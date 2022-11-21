@@ -17,7 +17,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/service/load_s
 option java_generic_services = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Load Reporting service (LRS)]
+// [#protodoc-title: Load reporting service (LRS)]
 
 // Load Reporting Service is an Envoy API to emit load reports. Envoy will initiate a bi-directional
 // stream with a management server. Upon connecting, the management server can send a
@@ -79,7 +79,7 @@ message LoadStatsResponse {
       "envoy.service.load_stats.v2.LoadStatsResponse";
 
   // Clusters to report stats for.
-  // Not populated if *send_all_clusters* is true.
+  // Not populated if ``send_all_clusters`` is true.
   repeated string clusters = 1;
 
   // If true, the client should send all clusters it knows about.
@@ -90,14 +90,14 @@ message LoadStatsResponse {
   // The minimum interval of time to collect stats over. This is only a minimum for two reasons:
   //
   // 1. There may be some delay from when the timer fires until stats sampling occurs.
-  // 2. For clusters that were already feature in the previous *LoadStatsResponse*, any traffic
-  //    that is observed in between the corresponding previous *LoadStatsRequest* and this
-  //    *LoadStatsResponse* will also be accumulated and billed to the cluster. This avoids a period
+  // 2. For clusters that were already feature in the previous ``LoadStatsResponse``, any traffic
+  //    that is observed in between the corresponding previous ``LoadStatsRequest`` and this
+  //    ``LoadStatsResponse`` will also be accumulated and billed to the cluster. This avoids a period
   //    of inobservability that might otherwise exists between the messages. New clusters are not
   //    subject to this consideration.
   google.protobuf.Duration load_reporting_interval = 2;
 
-  // Set to *true* if the management server supports endpoint granularity
+  // Set to ``true`` if the management server supports endpoint granularity
   // report.
   bool report_endpoint_granularity = 3;
 }

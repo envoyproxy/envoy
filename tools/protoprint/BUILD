@@ -26,7 +26,6 @@ py_binary(
         requirement("packaging"),
         "//tools/type_whisperer",
         "//tools/type_whisperer:api_type_db_proto_py_proto",
-        "@bazel_tools//tools/python/runfiles",
         "@com_envoyproxy_protoc_gen_validate//validate:validate_py",
         "@com_github_cncf_udpa//udpa/annotations:pkg_py_proto",
         "@com_github_cncf_udpa//xds/annotations/v3:pkg_py_proto",
@@ -38,7 +37,10 @@ py_binary(
 
 protoprint_rule(
     name = "protoprinted_srcs",
-    deps = ["//tools/protoxform:api_protoxform"],
+    deps = [
+        "@envoy_api//versioning:active_protos",
+        "@envoy_api//versioning:frozen_protos",
+    ],
 )
 
 pkg_files(
@@ -56,6 +58,7 @@ pkg_files(
 pkg_tar(
     name = "protoprinted",
     srcs = [":protoprinted_files_stripped"],
+    extension = "tar.gz",
 )
 
 protoprint_rule(
@@ -72,11 +75,13 @@ pkg_files(
 pkg_tar(
     name = "test_protoprinted",
     srcs = [":test_protoprinted_files_stripped"],
+    extension = "tar.gz",
 )
 
 pkg_tar(
     name = "golden_test_protos",
     srcs = ["//tools/testdata/protoxform/envoy/v2:golden_proto_files"],
+    extension = "tar.gz",
 )
 
 envoy_py_data(

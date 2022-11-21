@@ -4,8 +4,8 @@
 OAuth2
 ======
 
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.oauth2.v3.OAuth2``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.oauth2.v3.OAuth2>`
-* This filter should be configured with the name *envoy.filters.http.oauth2*.
 
 The OAuth filter's flow involves:
 
@@ -27,8 +27,8 @@ The OAuth filter's flow involves:
   flow. These cookies are calculated using the
   :ref:`hmac_secret <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Credentials.hmac_secret>`
   to assist in encoding.
-* The filter calls continueDecoding() to unblock the filter chain.
-* The filter sets `IdToken` and `RefreshToken` cookies if they are provided by Identity provider along with `AccessToken`.
+* The filter calls ``continueDecoding()`` to unblock the filter chain.
+* The filter sets ``IdToken`` and ``RefreshToken`` cookies if they are provided by Identity provider along with ``AccessToken``.
 
 When the authn server validates the client and returns an authorization token back to the OAuth filter,
 no matter what format that token is, if
@@ -61,7 +61,7 @@ The following is an example configuring the filter.
       uri: oauth.com/token
       timeout: 3s
     authorization_endpoint: https://oauth.com/oauth/authorize/
-    redirect_uri: "%REQ(:x-forwarded-proto)%://%REQ(:authority)%/callback"
+    redirect_uri: "%REQ(x-forwarded-proto)%://%REQ(:authority)%/callback"
     redirect_path_matcher:
       path:
         exact: /callback
@@ -118,7 +118,7 @@ Below is a complete code example of how we employ the filter as one of
                     uri: oauth.com/token
                     timeout: 3s
                   authorization_endpoint: https://oauth.com/oauth/authorize/
-                  redirect_uri: "%REQ(:x-forwarded-proto)%://%REQ(:authority)%/callback"
+                  redirect_uri: "%REQ(x-forwarded-proto)%://%REQ(:authority)%/callback"
                   redirect_path_matcher:
                     path:
                       exact: /callback
@@ -229,7 +229,7 @@ sending the user to the configured auth endpoint.
 
 :ref:`pass_through_matcher <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.pass_through_matcher>` provides
 an interface for users to provide specific header matching criteria such that, when applicable, the OAuth flow is entirely skipped.
-When this occurs, the ``oauth_success`` metric is still incremented.
+When this occurs, the ``oauth_passthrough`` metric is incremented but ``success`` is not.
 
 Generally, allowlisting is inadvisable from a security standpoint.
 
@@ -243,5 +243,6 @@ The OAuth2 filter outputs statistics in the *<stat_prefix>.* namespace.
   :widths: 1, 1, 2
 
   oauth_failure, Counter, Total requests that were denied.
+  oauth_passthrough, Counter, Total request that matched a passthrough header.
   oauth_success, Counter, Total requests that were allowed.
   oauth_unauthorization_rq, Counter, Total unauthorized requests.

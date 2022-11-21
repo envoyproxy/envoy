@@ -24,7 +24,7 @@ services:
       context: .
       dockerfile: Dockerfile-frontenvoy
     ports:
-    - "8000:8000"
+    - "${PORT_PROXY:-10000}:8000"
     dns:
     - 8.8.8.8
     - 8.8.4.4
@@ -54,8 +54,10 @@ services:
     - 8.8.4.4
 
   jaeger:
-    image: jaegertracing/all-in-one
+    build:
+      context: .
+      dockerfile: Dockerfile-jaeger
     environment:
     - COLLECTOR_ZIPKIN_HOST_PORT=9411
     ports:
-    - "16686:16686"
+    - "${PORT_UI:-10000}:16686"

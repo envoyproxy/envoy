@@ -246,7 +246,7 @@ private:
  * HTTP ext_authz filter. Depending on the route configuration, this filter calls the global
  * ext_authz service before allowing further filter iteration.
  */
-class Filter : public Logger::Loggable<Logger::Id::filter>,
+class Filter : public Logger::Loggable<Logger::Id::ext_authz>,
                public Http::StreamFilter,
                public Filters::Common::ExtAuthz::RequestCallbacks {
 public:
@@ -278,8 +278,7 @@ public:
 private:
   absl::optional<MonotonicTime> start_time_;
   void addResponseHeaders(Http::HeaderMap& header_map, const Http::HeaderVector& headers);
-  void initiateCall(const Http::RequestHeaderMap& headers,
-                    const Router::RouteConstSharedPtr& route);
+  void initiateCall(const Http::RequestHeaderMap& headers);
   void continueDecoding();
   bool isBufferFull() const;
 

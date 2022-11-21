@@ -64,7 +64,7 @@ public:
   }
 
   const Filters::Common::RBAC::RoleBasedAccessControlEngine*
-  engine(const Router::RouteConstSharedPtr route,
+  engine(const Http::StreamFilterCallbacks* callbacks,
          Filters::Common::RBAC::EnforcementMode mode) const;
 
 private:

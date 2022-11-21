@@ -5,21 +5,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile-proxy
-    networks:
-    - envoymesh
     ports:
-    - "1999:1999"
-    - "8001:8001"
+    - "${PORT_ADMIN:-8001}:8001"
 
   mysql:
     build:
       context: .
       dockerfile: Dockerfile-mysql
-    networks:
-    - envoymesh
     environment:
     - MYSQL_ALLOW_EMPTY_PASSWORD=yes
-
-networks:
-  envoymesh:
-    name: envoymesh

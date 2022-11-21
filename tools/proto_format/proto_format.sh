@@ -48,3 +48,10 @@ fi
 # Generate api/BUILD file based on updated type database.
 bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/type_whisperer:api_build_file
 cp -f bazel-bin/tools/type_whisperer/BUILD.api_build_file api/BUILD
+
+# Dont run this in git hooks by default
+if [[ -n "$AZP_BRANCH" ]] || [[ "${FORCE_PROTO_FORMAT}" == "yes" ]]; then
+    echo "Run buf tests"
+    cd api/ || exit 1
+    bazel run "${BAZEL_BUILD_OPTIONS[@]}" @com_github_bufbuild_buf//:bin/buf lint
+fi

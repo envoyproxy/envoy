@@ -1,7 +1,7 @@
 #include <string>
 
-#include "envoy/admin/v3/config_dump.pb.h"
-#include "envoy/admin/v3/config_dump.pb.validate.h"
+#include "envoy/admin/v3/config_dump_shared.pb.h"
+#include "envoy/admin/v3/config_dump_shared.pb.validate.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/scoped_route.pb.h"
@@ -350,7 +350,7 @@ protected:
         .WillRepeatedly(
             Invoke([this](const envoy::config::core::v3::ConfigSource&, absl::string_view,
                           Stats::Scope&, Envoy::Config::SubscriptionCallbacks& callbacks,
-                          Envoy::Config::OpaqueResourceDecoder&,
+                          Envoy::Config::OpaqueResourceDecoderSharedPtr,
                           const Envoy::Config::SubscriptionOptions&) {
               auto ret = std::make_unique<NiceMock<Envoy::Config::MockSubscription>>();
               rds_subscription_by_config_subscription_[ret.get()] = &callbacks;

@@ -114,9 +114,9 @@ TEST(JsonEscapeTest, Escape) {
   expect_json_escape("\x1f", "\\u001f");
 }
 
-class LoggerCustomFlagsTest : public testing::Test {
+class LoggerCustomFlagsTest : public testing::TestWithParam<spdlog::logger*> {
 public:
-  LoggerCustomFlagsTest() : logger_(Registry::getSink()) {}
+  LoggerCustomFlagsTest() : logger_(GetParam()) {}
 
   void expectLogMessage(const std::string& pattern, const std::string& message,
                         const std::string& expected) {
@@ -130,29 +130,33 @@ public:
             CustomFlagFormatter::EscapeMessageJsonString::Placeholder)
         .set_pattern(pattern);
     logger_->set_formatter(std::move(formatter));
+    logger_->set_level(spdlog::level::info);
 
     testing::internal::CaptureStderr();
-    logger_->log(spdlog::details::log_msg("test", spdlog::level::info, message));
+    logger_->log(spdlog::level::info, message);
     EXPECT_EQ(absl::StrCat(expected, TestEnvironment::newLine),
               testing::internal::GetCapturedStderr());
   }
 
 protected:
-  DelegatingLogSinkSharedPtr logger_;
+  spdlog::logger* logger_;
 };
 
-TEST_F(LoggerCustomFlagsTest, LogMessageAsIs) {
+INSTANTIATE_TEST_SUITE_P(EnvoyAndFineGrainLoggerFormatTest, LoggerCustomFlagsTest,
+                         testing::ValuesIn(TestEnvironment::getSpdLoggersForTest()));
+
+TEST_P(LoggerCustomFlagsTest, LogMessageAsIs) {
   // This uses "%v", the default flag for printing the actual text to log.
   // https://github.com/gabime/spdlog/wiki/3.-Custom-formatting#pattern-flags.
   expectLogMessage("%v", "\n\nmessage\n\n", "\n\nmessage\n\n");
 }
 
-TEST_F(LoggerCustomFlagsTest, LogMessageAsEscaped) {
+TEST_P(LoggerCustomFlagsTest, LogMessageAsEscaped) {
   // This uses "%_", the added custom flag that escapes newlines from the actual text to log.
   expectLogMessage("%_", "\n\nmessage\n\n", "\\n\\nmessage\\n\\n");
 }
 
-TEST_F(LoggerCustomFlagsTest, LogMessageAsJsonStringEscaped) {
+TEST_P(LoggerCustomFlagsTest, LogMessageAsJsonStringEscaped) {
   // This uses "%j", the added custom flag that JSON escape the characters inside the log message
   // payload.
   expectLogMessage("%j", "message", "message");

@@ -16,7 +16,7 @@ services:
     environment:
     - FRONT_ENVOY_YAML
     ports:
-    - "8000:8000"
+    - "${PORT_PROXY:-8000}:8000"
 
   ext_authz-http-service:
     build:
@@ -35,7 +35,9 @@ services:
     - ./users.json:/etc/users.json
 
   ext_authz-opa-service:
-    image: openpolicyagent/opa:0.25.1-istio
+    build:
+      context: .
+      dockerfile: Dockerfile-opa
     volumes:
     - ./config/opa-service/policy.rego:/etc/policy.rego
     command:
@@ -47,6 +49,7 @@ services:
     - /etc/policy.rego
 
   upstream-service:
-    image: flask_service:python-3.10-slim-bullseye
+    build:
+      context: ../shared/service
     volumes:
     - ./upstream/service/service.py:/code/service.py

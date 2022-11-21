@@ -3,8 +3,8 @@
 Tap
 ===
 
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.tap.v3.Tap``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.tap.v3.Tap>`
-* This filter should be configured with the name *envoy.filters.http.tap*.
 
 .. attention::
 

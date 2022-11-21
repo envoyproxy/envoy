@@ -7,8 +7,8 @@ The router filter implements Thrift forwarding. It will be used in almost all Th
 scenarios. The filter's main job is to follow the instructions specified in the configured
 :ref:`route table <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.RouteConfiguration>`.
 
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.network.thrift_proxy.router.v3.Router``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.router.v3.Router>`
-* This filter should be configured with the name *envoy.filters.thrift.router*.
 
 Statistics
 ----------
@@ -48,6 +48,8 @@ Since these stats utilize the underlying cluster scope, we prefix with the ``thr
   thrift.upstream_rq_size, Histogram, Request message size in bytes per upstream
   thrift.upstream_resp_size, Histogram, Response message size in bytes per upstream
   thrift.upstream_cx_drain_close, Counter, Total upstream connections that were closed due to draining.
+  thrift.downstream_cx_partial_response_close, Counter, Total downstream connections that were closed due to the partial response.
+  thrift.downstream_cx_underflow_response_close, Counter, Total downstream connections that were closed due to the underflow response.
 
 If the service zone is available for both the local service (via :option:`--service-zone`)
 and the :ref:`upstream cluster <arch_overview_service_discovery_types_eds>`,

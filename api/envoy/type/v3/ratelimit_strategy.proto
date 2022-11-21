@@ -17,6 +17,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/type/v3;typev3
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 option (xds.annotations.v3.file_status).work_in_progress = true;
 
+// [#not-implemented-hide:]
 // [#protodoc-title: Rate Limit Strategies]
 
 message RateLimitStrategy {

@@ -47,12 +47,122 @@ updates:
     interval: "daily"
 
 - package-ecosystem: "docker"
+  directory: "/.devcontainer"
+  schedule:
+    interval: daily
+
+- package-ecosystem: "docker"
   directory: "/ci"
   schedule:
     interval: daily
 
 - package-ecosystem: "docker"
-  directory: "/.devcontainer"
+  directory: "/examples/dynamic-config-cp"
+  schedule:
+    interval: daily
+
+- package-ecosystem: "docker"
+  directory: "/examples/ext_authz"
+  schedule:
+    interval: daily
+
+- package-ecosystem: "docker"
+  directory: "/examples/ext_authz/auth/http-service"
+  schedule:
+    interval: daily
+
+- package-ecosystem: "docker"
+  directory: "/examples/ext_authz/auth/grpc-service"
+  schedule:
+    interval: daily
+
+- package-ecosystem: "docker"
+  directory: "/examples/fault-injection"
+  schedule:
+    interval: daily
+
+- package-ecosystem: "docker"
+  directory: "/examples/grpc-bridge"
+  schedule:
+    interval: daily
+
+- package-ecosystem: "docker"
+  directory: "/examples/grpc-bridge/client"
+  schedule:
+    interval: daily
+
+- package-ecosystem: "docker"
+  directory: "/examples/grpc-bridge/server"
+  schedule:
+    interval: daily
+
+- package-ecosystem: "docker"
+  directory: "/examples/load-reporting-service"
+  schedule:
+    interval: daily
+
+- package-ecosystem: "docker"
+  directory: "/examples/local_ratelimit"
+  schedule:
+    interval: daily
+
+- package-ecosystem: "docker"
+  directory: "/examples/lua"
+  schedule:
+    interval: daily
+
+- package-ecosystem: "docker"
+  directory: "/examples/mysql"
+  schedule:
+    interval: daily
+
+- package-ecosystem: "docker"
+  directory: "/examples/redis"
+  schedule:
+    interval: daily
+
+- package-ecosystem: "docker"
+  directory: "/examples/shared/echo"
+  schedule:
+    interval: daily
+
+- package-ecosystem: "docker"
+  directory: "/examples/shared/flask"
+  schedule:
+    interval: daily
+
+- package-ecosystem: "docker"
+  directory: "/examples/shared/postgres"
+  schedule:
+    interval: daily
+
+- package-ecosystem: "docker"
+  directory: "/examples/skywalking-tracing"
+  schedule:
+    interval: daily
+
+- package-ecosystem: "docker"
+  directory: "/examples/tls"
+  schedule:
+    interval: daily
+
+- package-ecosystem: "docker"
+  directory: "/examples/tls-sni"
+  schedule:
+    interval: daily
+
+- package-ecosystem: "docker"
+  directory: "/examples/tls-inspector"
+  schedule:
+    interval: daily
+
+- package-ecosystem: "docker"
+  directory: "/examples/websocket"
+  schedule:
+    interval: daily
+
+- package-ecosystem: "docker"
+  directory: "/examples/zipkin-tracing"
   schedule:
     interval: daily
 
@@ -80,4 +190,3 @@ updates:
   directory: "/examples/load-reporting-service"
   schedule:
     interval: daily
-

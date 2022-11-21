@@ -36,7 +36,7 @@ on demand CDS is enabled for requests using this virtual host or route.
 
 Configuration
 -------------
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.OnDemand>`
 * :ref:`v3 API reference for per route/virtual host config <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.PerRouteConfig>`
-* This filter should be configured with the name *envoy.filters.http.on_demand*.
 * The filter should be placed before *envoy.filters.http.router* filter in the HttpConnectionManager's filter chain.

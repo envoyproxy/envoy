@@ -378,7 +378,10 @@ public:
    *
    * @return the stat names.
    */
-  virtual const ClusterStatNames& clusterStatNames() const PURE;
+  virtual const ClusterTrafficStatNames& clusterStatNames() const PURE;
+  virtual const ClusterConfigUpdateStatNames& clusterConfigUpdateStatNames() const PURE;
+  virtual const ClusterLbStatNames& clusterLbStatNames() const PURE;
+  virtual const ClusterEndpointStatNames& clusterEndpointStatNames() const PURE;
   virtual const ClusterLoadReportStatNames& clusterLoadReportStatNames() const PURE;
   virtual const ClusterCircuitBreakersStatNames& clusterCircuitBreakersStatNames() const PURE;
   virtual const ClusterRequestResponseSizeStatNames&
@@ -533,22 +536,13 @@ public:
    * Parameters for createClusterInfo().
    */
   struct CreateClusterInfoParams {
-    Server::Admin& admin_;
-    Runtime::Loader& runtime_;
+    Server::Configuration::ServerFactoryContext& server_context_;
     const envoy::config::cluster::v3::Cluster& cluster_;
     const envoy::config::core::v3::BindConfig& bind_config_;
     Stats::Store& stats_;
     Ssl::ContextManager& ssl_context_manager_;
     const bool added_via_api_;
-    ClusterManager& cm_;
-    const LocalInfo::LocalInfo& local_info_;
-    Event::Dispatcher& dispatcher_;
-    Singleton::Manager& singleton_manager_;
     ThreadLocal::SlotAllocator& tls_;
-    ProtobufMessage::ValidationVisitor& validation_visitor_;
-    Api::Api& api_;
-    const Server::Options& options_;
-    AccessLog::AccessLogManager& access_log_manager_;
   };
 
   /**

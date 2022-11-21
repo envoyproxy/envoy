@@ -52,6 +52,7 @@
 using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Upstream {
@@ -62,19 +63,23 @@ namespace Upstream {
 class TestClusterManagerFactory : public ClusterManagerFactory {
 public:
   TestClusterManagerFactory() : api_(Api::createApiForTest(stats_, random_)) {
+    ON_CALL(server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
     ON_CALL(*this, clusterFromProto_(_, _, _, _))
         .WillByDefault(Invoke(
             [&](const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
                 Outlier::EventLoggerSharedPtr outlier_event_logger,
                 bool added_via_api) -> std::pair<ClusterSharedPtr, ThreadAwareLoadBalancer*> {
               auto result = ClusterFactoryImplBase::create(
-                  cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_,
-                  dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
-                  outlier_event_logger, added_via_api, validation_visitor_, *api_, options_);
+                  server_context_, cluster, cm, stats_,
+                  [this]() -> Network::DnsResolverSharedPtr { return this->dns_resolver_; },
+                  ssl_context_manager_, outlier_event_logger, added_via_api, validation_visitor_);
               // Convert from load balancer unique_ptr -> raw pointer -> unique_ptr.
               return std::make_pair(result.first, result.second.release());
             }));
+    ON_CALL(server_context_, singletonManager()).WillByDefault(ReturnRef(singleton_manager_));
   }
+
+  ~TestClusterManagerFactory() override { dispatcher_.to_delete_.clear(); }
 
   Http::ConnectionPool::InstancePtr allocateConnPool(
       Event::Dispatcher&, HostConstSharedPtr host, ResourcePriority, std::vector<Http::Protocol>&,
@@ -130,23 +135,24 @@ public:
                Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api));
   MOCK_METHOD(CdsApi*, createCds_, ());
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   Stats::TestUtil::TestStore stats_;
-  NiceMock<ThreadLocal::MockInstance> tls_;
+  NiceMock<ThreadLocal::MockInstance>& tls_ = server_context_.thread_local_;
   std::shared_ptr<NiceMock<Network::MockDnsResolver>> dns_resolver_{
       new NiceMock<Network::MockDnsResolver>};
-  NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Event::MockDispatcher> dispatcher_;
+  NiceMock<Runtime::MockLoader>& runtime_ = server_context_.runtime_loader_;
+  NiceMock<Event::MockDispatcher>& dispatcher_ = server_context_.dispatcher_;
   Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager_{
       dispatcher_.timeSource()};
-  NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  NiceMock<Server::MockAdmin> admin_;
+  NiceMock<LocalInfo::MockLocalInfo>& local_info_ = server_context_.local_info_;
+  NiceMock<Server::MockAdmin>& admin_ = server_context_.admin_;
   NiceMock<Secret::MockSecretManager> secret_manager_;
-  NiceMock<AccessLog::MockAccessLogManager> log_manager_;
+  NiceMock<AccessLog::MockAccessLogManager>& log_manager_ = server_context_.access_log_manager_;
   Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   NiceMock<Random::MockRandomGenerator> random_;
   Api::ApiPtr api_;
-  Server::MockOptions options_;
+  Server::MockOptions& options_ = server_context_.options_;
 };
 
 // Helper to intercept calls to postThreadLocalClusterUpdate.

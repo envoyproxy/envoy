@@ -20,6 +20,7 @@ The Redis project offers a thorough reference on partitioning as it relates to R
 
 * `Redis protocol <https://redis.io/topics/protocol>`_ codec.
 * Hash-based partitioning.
+* Redis transaction support.
 * Ketama distribution.
 * Detailed command statistics.
 * Active and passive healthchecking.
@@ -81,7 +82,7 @@ following information:
 * The primaries for each shard.
 * Nodes entering or leaving the cluster.
 
-Envoy proxy supports identification of the nodes via both IP address and hostnames in the `cluster slots` command response. In case of failure to resolve a primary hostname, Envoy will retry resolution of all nodes periodically until success. Failure to resolve a replica simply skips that replica.
+Envoy proxy supports identification of the nodes via both IP address and hostnames in the ``cluster slots`` command response. In case of failure to resolve a primary hostname, Envoy will retry resolution of all nodes periodically until success. Failure to resolve a replica simply skips that replica. On the other hand, if the :ref:`enable_redirection <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.enable_redirection>` option is set and a MOVED or ASK response containing a hostname is received Envoy will not automatically do a DNS lookup and instead bubble the error to the client verbatim. To have Envoy do the DNS lookup and follow the redirection, you need to configure the DNS cache option :ref:`dns_cache_config <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.dns_cache_config>` under the connection pool settings. For a configuration example on how to enable DNS lookups for redirections, see the filter :ref:`configuration reference <config_network_filters_redis_proxy>`.
 
 For topology configuration details, see the Redis Cluster
 :ref:`v3 API reference <envoy_v3_api_msg_extensions.clusters.redis.v3.RedisClusterConfig>`.
@@ -109,10 +110,21 @@ Per-cluster command statistics can be enabled via the setting :ref:`enable_comma
   upstream_commands.[command].total, Counter, Total number of requests for a specific Redis command (sum of success and failure)
   upstream_commands.[command].latency, Histogram, Latency of requests for a specific Redis command
 
+Transactions
+------------
+
+Transactions (MULTI) are supported. Their use is no different from regular Redis: you start a transaction with MULTI,
+and you execute it with EXEC. Within the transaction only commands that are supported by Envoy (see below) and are single-key
+commands are supported, i.e. MGET and MSET are not supported. The DISCARD command is supported.
+
+When working in Redis Cluster mode, Envoy will relay all the commands in the transaction to the node handling the first
+key-based command in the transaction. It is the user's responsibility to ensure that all keys in the transaction are mapped
+to the same hashslot, as commands will not be redirected.
+
 Supported commands
 ------------------
 
-At the protocol level, pipelines are supported. MULTI (transaction block) is not.
+At the protocol level, pipelines are supported.
 Use pipelining wherever possible for the best performance.
 
 At the command level, Envoy only supports commands that can be reliably hashed to a server. AUTH and PING
@@ -132,8 +144,11 @@ For details on each command's usage see the official
 
   AUTH, Authentication
   PING, Connection
+  QUIT, Connection
   DEL, Generic
+  DISCARD, Transaction
   DUMP, Generic
+  EXEC, Transaction
   EXISTS, Generic
   EXPIRE, Generic
   EXPIREAT, Generic
@@ -167,6 +182,8 @@ For details on each command's usage see the official
   HSETNX, Hash
   HSTRLEN, Hash
   HVALS, Hash
+  PFADD, HyperLogLog
+  PFCOUNT, HyperLogLog
   LINDEX, List
   LINSERT, List
   LLEN, List
@@ -177,6 +194,7 @@ For details on each command's usage see the official
   LREM, List
   LSET, List
   LTRIM, List
+  MULTI, Transaction
   RPOP, List
   RPUSH, List
   RPUSHX, List

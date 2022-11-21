@@ -241,7 +241,7 @@ private:
 
   ProtobufTypes::MessagePtr dumpListenerConfigs(const Matchers::StringMatcher& name_matcher);
   static ListenerManagerStats generateStats(Stats::Scope& scope);
-  static bool hasListenerWithCompatibleAddress(const ListenerList& list,
+  static bool hasListenerWithDuplicatedAddress(const ListenerList& list,
                                                const ListenerImpl& listener);
   void updateWarmingActiveGauges() {
     // Using set() avoids a multiple modifiers problem during the multiple processes phase of hot
@@ -298,14 +298,12 @@ private:
    */
   ListenerList::iterator getListenerByName(ListenerList& listeners, const std::string& name);
 
-  void setNewOrDrainingSocketFactory(const std::string& name,
-                                     const envoy::config::core::v3::Address& proto_address,
-                                     ListenerImpl& listener);
-  Network::ListenSocketFactoryPtr
-  createListenSocketFactory(const envoy::config::core::v3::Address& proto_address,
-                            ListenerImpl& listener);
+  void setNewOrDrainingSocketFactory(const std::string& name, ListenerImpl& listener);
+  void createListenSocketFactory(ListenerImpl& listener);
 
   void maybeCloseSocketsForListener(ListenerImpl& listener);
+  void setupSocketFactoryForListener(ListenerImpl& new_listener,
+                                     const ListenerImpl& existing_listener);
 
   ApiListenerPtr api_listener_;
   // Active listeners are listeners that are currently accepting new connections on the workers.

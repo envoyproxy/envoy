@@ -45,7 +45,7 @@ ActiveClient::ActiveClient(HttpConnPoolImplBase& parent,
     : MultiplexedActiveClientBase(
           parent, calculateInitialStreamsLimit(parent.cache(), parent.origin(), parent.host()),
           parent.host()->cluster().http2Options().max_concurrent_streams().value(),
-          parent.host()->cluster().stats().upstream_cx_http2_total_, data) {}
+          parent.host()->cluster().trafficStats().upstream_cx_http2_total_, data) {}
 
 ConnectionPool::InstancePtr
 allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
@@ -61,9 +61,9 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
         return std::make_unique<ActiveClient>(*pool, absl::nullopt);
       },
       [](Upstream::Host::CreateConnectionData& data, HttpConnPoolImplBase* pool) {
-        CodecClientPtr codec{new CodecClientProd(CodecType::HTTP2, std::move(data.connection_),
-                                                 data.host_description_, pool->dispatcher(),
-                                                 pool->randomGenerator())};
+        CodecClientPtr codec{new CodecClientProd(
+            CodecType::HTTP2, std::move(data.connection_), data.host_description_,
+            pool->dispatcher(), pool->randomGenerator(), pool->transportSocketOptions())};
         return codec;
       },
       std::vector<Protocol>{Protocol::Http2}, origin, cache);

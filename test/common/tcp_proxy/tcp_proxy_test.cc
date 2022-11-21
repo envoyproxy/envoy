@@ -626,7 +626,7 @@ TEST_F(TcpProxyTest, StreamInfoDynamicMetadata) {
       (*metadata.mutable_filter_metadata())[Envoy::Config::MetadataFilters::get().ENVOY_LB];
   (*map.mutable_fields())["test"] = val;
   EXPECT_CALL(filter_callbacks_.connection_.stream_info_, dynamicMetadata())
-      .WillOnce(ReturnRef(metadata));
+      .WillRepeatedly(ReturnRef(metadata));
 
   filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
@@ -680,7 +680,7 @@ TEST_F(TcpProxyTest, StreamInfoDynamicMetadataAndConfigMerged) {
   (*map.mutable_fields())["k1"] = v1;
   (*map.mutable_fields())["k2"] = v2;
   EXPECT_CALL(filter_callbacks_.connection_.stream_info_, dynamicMetadata())
-      .WillOnce(ReturnRef(metadata));
+      .WillRepeatedly(ReturnRef(metadata));
 
   filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
@@ -954,6 +954,29 @@ TEST_F(TcpProxyTest, AccessLogDownstreamAddress) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
   filter_.reset();
   EXPECT_EQ(access_log_data_, "1.1.1.1 1.1.1.2:20000");
+}
+
+// Test that intermediate log entry by field %DURATION%.
+TEST_F(TcpProxyTest, IntermediateLogEntry) {
+  auto config = accessLogConfig("%DURATION%");
+  config.mutable_access_log_flush_interval()->set_seconds(1);
+  config.mutable_idle_timeout()->set_seconds(0);
+
+  auto* flush_timer = new NiceMock<Event::MockTimer>(&filter_callbacks_.connection_.dispatcher_);
+  EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(1000), _));
+
+  setup(1, config);
+  raiseEventUpstreamConnected(0);
+
+  // The timer will be enabled cyclically.
+  EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(1000), _));
+  flush_timer->invokeCallback();
+
+  // No valid duration until the connection is closed.
+  EXPECT_EQ(access_log_data_.value(), fmt::format("-"));
+
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+  filter_.reset();
 }
 
 TEST_F(TcpProxyTest, AccessLogUpstreamSSLConnection) {
@@ -1326,6 +1349,17 @@ TEST_F(TcpProxyTest, UpstreamConnectFailureStreamInfoAccessLog) {
 
   filter_.reset();
   EXPECT_EQ(access_log_data_, "test_transport_failure");
+}
+
+// Test that call to tcp_proxy filter's startUpstreamSecureTransport results
+// in upstream's startUpstreamSecureTransport call.
+TEST_F(TcpProxyTest, UpstreamStartSecureTransport) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+
+  setup(1, config);
+  raiseEventUpstreamConnected(0);
+  EXPECT_CALL(*upstream_connections_.at(0), startSecureTransport);
+  filter_->startUpstreamSecureTransport();
 }
 
 } // namespace

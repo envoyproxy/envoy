@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.upstreams.http.v3;
 
 import "envoy/config/core/v3/protocol.proto";
+import "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto";
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
@@ -19,7 +20,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // HttpProtocolOptions specifies Http upstream protocol options. This object
 // is used in
 // :ref:`typed_extension_protocol_options<envoy_v3_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`,
-// keyed by the name `envoy.extensions.upstreams.http.v3.HttpProtocolOptions`.
+// keyed by the name ``envoy.extensions.upstreams.http.v3.HttpProtocolOptions``.
 //
 // This controls what protocol(s) should be used for upstream and how said protocol(s) are configured.
 //
@@ -57,7 +58,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //             http2_protocol_options:
 //               max_concurrent_streams: 100
 //        .... [further cluster config]
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message HttpProtocolOptions {
   // If this is used, the cluster will only operate on one of the possible upstream protocols.
   // Note that HTTP/2 or above should generally be used for upstream gRPC clusters.
@@ -94,9 +95,9 @@ message HttpProtocolOptions {
 
   // If this is used, the cluster can use either HTTP/1 or HTTP/2, and will use whichever
   // protocol is negotiated by ALPN with the upstream.
-  // Clusters configured with *AutoHttpConfig* will use the highest available
+  // Clusters configured with ``AutoHttpConfig`` will use the highest available
   // protocol; HTTP/2 if supported, otherwise HTTP/1.
-  // If the upstream does not support ALPN, *AutoHttpConfig* will fail over to HTTP/1.
+  // If the upstream does not support ALPN, ``AutoHttpConfig`` will fail over to HTTP/1.
   // This can only be used with transport sockets which support ALPN. Using a
   // transport socket which does not support ALPN will result in configuration
   // failure. The transport layer may be configured with custom ALPN, but the default ALPN
@@ -137,8 +138,8 @@ message HttpProtocolOptions {
   oneof upstream_protocol_options {
     option (validate.required) = true;
 
-    // To explicitly configure either HTTP/1 or HTTP/2 (but not both!) use *explicit_http_config*.
-    // If the *explicit_http_config* is empty, HTTP/1.1 is used.
+    // To explicitly configure either HTTP/1 or HTTP/2 (but not both!) use ``explicit_http_config``.
+    // If the ``explicit_http_config`` is empty, HTTP/1.1 is used.
     ExplicitHttpConfig explicit_http_config = 3;
 
     // This allows switching on protocol based on what protocol the downstream
@@ -148,4 +149,18 @@ message HttpProtocolOptions {
     // This allows switching on protocol based on ALPN
     AutoHttpConfig auto_config = 5;
   }
+
+  // .. note::
+  //   Upstream HTTP filters are currently in alpha.
+  //
+  // Optional HTTP filters for the upstream filter chain.
+  //
+  // These filters will be applied for all HTTP streams which flow through this
+  // cluster. Unlike downstream filters, they will *not* be applied to terminated CONNECT requests.
+  //
+  // If using upstream filters, please be aware that local errors sent by
+  // upstream filters will not trigger retries, and local errors sent by
+  // upstream filters will count as a final response if hedging is configured.
+  // [#extension-category: envoy.filters.http.upstream]
+  repeated filters.network.http_connection_manager.v3.HttpFilter http_filters = 6;
 }

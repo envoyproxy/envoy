@@ -3,6 +3,10 @@ load(
     "envoy_cc_library",
     "envoy_package",
 )
+load(
+    "@envoy_build_config//:extensions_build_config.bzl",
+    "LEGACY_ALWAYSLINK",
+)
 
 licenses(["notice"])  # Apache 2
 
@@ -70,12 +74,15 @@ envoy_cc_library(
         "//source/common/tracing:http_tracer_lib",
         "//source/common/upstream:retry_factory_lib",
         "//source/extensions/early_data:default_early_data_policy_lib",
+        "//source/extensions/path/match/uri_template:config",
+        "//source/extensions/path/rewrite/uri_template:config",
         "@envoy_api//envoy/config/common/matcher/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
+    alwayslink = LEGACY_ALWAYSLINK,
 )
 
 envoy_cc_library(
@@ -278,17 +285,20 @@ envoy_cc_library(
         ":debug_config_lib",
         ":header_parser_lib",
         ":retry_state_lib",
+        ":upstream_codec_filter_lib",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:timer_interface",
         "//envoy/grpc:status",
         "//envoy/http:codec_interface",
         "//envoy/http:codes_interface",
         "//envoy/http:conn_pool_interface",
+        "//envoy/http:filter_factory_interface",
         "//envoy/http:filter_interface",
         "//envoy/http:stateful_session_interface",
         "//envoy/local_info:local_info_interface",
         "//envoy/router:shadow_writer_interface",
         "//envoy/runtime:runtime_interface",
+        "//envoy/server:factory_context_interface",
         "//envoy/server:filter_config_interface",
         "//envoy/stats:stats_interface",
         "//envoy/stats:stats_macros",
@@ -309,6 +319,8 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/grpc:common_lib",
         "//source/common/http:codes_lib",
+        "//source/common/http:filter_chain_helper_lib",
+        "//source/common/http:filter_manager_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
@@ -321,9 +333,45 @@ envoy_cc_library(
         "//source/common/stream_info:uint32_accessor_lib",
         "//source/common/tracing:http_tracer_lib",
         "//source/common/upstream:load_balancer_lib",
+        "//source/common/upstream:upstream_http_factory_context_lib",
         "//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",
+        "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/upstream_codec/v3:pkg_cc_proto",
     ],
+)
+
+envoy_cc_library(
+    name = "upstream_codec_filter_lib",
+    srcs = [
+        "upstream_codec_filter.cc",
+    ],
+    hdrs = [
+        "upstream_codec_filter.h",
+    ],
+    deps = [
+        ":config_lib",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/http:codec_interface",
+        "//envoy/http:filter_interface",
+        "//envoy/runtime:runtime_interface",
+        "//envoy/stats:stats_interface",
+        "//envoy/stats:stats_macros",
+        "//envoy/upstream:upstream_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:cleanup_lib",
+        "//source/common/common:empty_string",
+        "//source/common/common:utility_lib",
+        "//source/common/config:utility_lib",
+        "//source/common/http:codes_lib",
+        "//source/common/http:header_map_lib",
+        "//source/common/http:headers_lib",
+        "//source/common/http:message_lib",
+        "//source/common/http:utility_lib",
+        "//source/extensions/filters/http/common:factory_base_lib",
+        "@envoy_api//envoy/extensions/filters/http/upstream_codec/v3:pkg_cc_proto",
+    ],
+    alwayslink = LEGACY_ALWAYSLINK,
 )
 
 envoy_cc_library(
@@ -363,7 +411,10 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "header_parser_lib",
-    srcs = ["header_parser.cc"],
+    srcs = [
+        "header_parser.cc",
+        "header_parser_utils.cc",
+    ],
     hdrs = ["header_parser.h"],
     deps = [
         ":header_formatter_lib",

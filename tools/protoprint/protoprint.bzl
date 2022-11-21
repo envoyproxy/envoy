@@ -20,6 +20,7 @@ protoprint_aspect = api_proto_plugin_aspect(
     "//tools/protoprint",
     _protoprint_impl,
     use_type_db = True,
+    extra_inputs = ["//:.clang-format"],
 )
 
 def _protoprint_rule_impl(ctx):
@@ -28,7 +29,6 @@ def _protoprint_rule_impl(ctx):
         for path in dep[OutputGroupInfo].pproto.to_list():
             envoy_api = (
                 path.short_path.startswith("../envoy_api") or
-                # path.short_path.startswith("../com_github_cncf_udpa") or
                 path.short_path.startswith("tools/testdata")
             )
             if envoy_api:

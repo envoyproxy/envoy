@@ -10,6 +10,7 @@
 #include "source/common/network/matching/data_impl.h"
 #include "source/common/network/matching/inputs.h"
 #include "source/common/network/socket_interface.h"
+#include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/server/configuration_impl.h"
 
@@ -30,30 +31,29 @@ Network::Address::InstanceConstSharedPtr fakeAddress() {
                          Network::Utility::parseInternetAddress("255.255.255.255"));
 }
 
-struct FilterChainNameAction : public Matcher::ActionBase<ProtobufWkt::StringValue> {
-  explicit FilterChainNameAction(Network::DrainableFilterChainSharedPtr chain) : chain_(chain) {}
-  const Network::DrainableFilterChainSharedPtr chain_;
+struct FilterChainNameAction
+    : public Matcher::ActionBase<ProtobufWkt::StringValue, FilterChainBaseAction> {
+  explicit FilterChainNameAction(const std::string& name) : name_(name) {}
+  const Network::FilterChain* get(const FilterChainsByName& filter_chains_by_name,
+                                  const StreamInfo::StreamInfo&) const override {
+    const auto chain_match = filter_chains_by_name.find(name_);
+    if (chain_match != filter_chains_by_name.end()) {
+      return chain_match->second.get();
+    }
+    return nullptr;
+  }
+  const std::string name_;
 };
-
-using FilterChainActionFactoryContext =
-    absl::flat_hash_map<std::string, Network::DrainableFilterChainSharedPtr>;
 
 class FilterChainNameActionFactory : public Matcher::ActionFactory<FilterChainActionFactoryContext>,
                                      Logger::Loggable<Logger::Id::config> {
 public:
   std::string name() const override { return "filter-chain-name"; }
   Matcher::ActionFactoryCb createActionFactoryCb(const Protobuf::Message& config,
-                                                 FilterChainActionFactoryContext& filter_chains,
+                                                 FilterChainActionFactoryContext&,
                                                  ProtobufMessage::ValidationVisitor&) override {
-    Network::DrainableFilterChainSharedPtr chain = nullptr;
     const auto& name = dynamic_cast<const ProtobufWkt::StringValue&>(config);
-    const auto chain_match = filter_chains.find(name.value());
-    if (chain_match != filter_chains.end()) {
-      chain = chain_match->second;
-    } else {
-      ENVOY_LOG(debug, "matcher API points to an absent filter chain '{}'", name.value());
-    }
-    return [chain]() { return std::make_unique<FilterChainNameAction>(chain); };
+    return [value = name.value()]() { return std::make_unique<FilterChainNameAction>(value); };
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<ProtobufWkt::StringValue>();
@@ -163,7 +163,7 @@ OverloadManager& PerFilterChainFactoryContextImpl::overloadManager() {
   return parent_context_.overloadManager();
 }
 
-Admin& PerFilterChainFactoryContextImpl::admin() { return parent_context_.admin(); }
+OptRef<Admin> PerFilterChainFactoryContextImpl::admin() { return parent_context_.admin(); }
 
 TimeSource& PerFilterChainFactoryContextImpl::timeSource() { return api().timeSource(); }
 
@@ -194,10 +194,10 @@ bool PerFilterChainFactoryContextImpl::isQuicListener() const {
 }
 
 FilterChainManagerImpl::FilterChainManagerImpl(
-    const Network::Address::InstanceConstSharedPtr& address,
+    const std::vector<Network::Address::InstanceConstSharedPtr>& addresses,
     Configuration::FactoryContext& factory_context, Init::Manager& init_manager,
     const FilterChainManagerImpl& parent_manager)
-    : address_(address), parent_context_(factory_context), origin_(&parent_manager),
+    : addresses_(addresses), parent_context_(factory_context), origin_(&parent_manager),
       init_manager_(init_manager) {}
 
 bool FilterChainManagerImpl::isWildcardServerName(const std::string& name) {
@@ -215,22 +215,24 @@ void FilterChainManagerImpl::addFilterChains(
                       MessageUtil>
       filter_chains;
   uint32_t new_filter_chain_size = 0;
-  absl::flat_hash_map<std::string, Network::DrainableFilterChainSharedPtr> filter_chains_by_name;
+  FilterChainsByName filter_chains_by_name;
 
   for (const auto& filter_chain : filter_chain_span) {
     const auto& filter_chain_match = filter_chain->filter_chain_match();
     if (!filter_chain_match.address_suffix().empty() || filter_chain_match.has_suffix_len()) {
-      throw EnvoyException(fmt::format("error adding listener '{}': filter chain '{}' contains "
-                                       "unimplemented fields",
-                                       address_->asString(), filter_chain->name()));
+      throw EnvoyException(fmt::format(
+          "error adding listener '{}': filter chain '{}' contains "
+          "unimplemented fields",
+          absl::StrJoin(addresses_, ",", Network::AddressStrFormatter()), filter_chain->name()));
     }
     if (!filter_chain_matcher) {
       const auto& matching_iter = filter_chains.find(filter_chain_match);
       if (matching_iter != filter_chains.end()) {
-        throw EnvoyException(fmt::format("error adding listener '{}': filter chain '{}' has "
-                                         "the same matching rules defined as '{}'",
-                                         address_->asString(), filter_chain->name(),
-                                         matching_iter->second));
+        throw EnvoyException(
+            fmt::format("error adding listener '{}': filter chain '{}' has "
+                        "the same matching rules defined as '{}'",
+                        absl::StrJoin(addresses_, ",", Network::AddressStrFormatter()),
+                        filter_chain->name(), matching_iter->second));
       }
       filter_chains.insert({filter_chain_match, filter_chain->name()});
     }
@@ -250,14 +252,14 @@ void FilterChainManagerImpl::addFilterChains(
       if (filter_chain->name().empty()) {
         throw EnvoyException(fmt::format(
             "error adding listener '{}': \"name\" field is required when using a listener matcher",
-            address_->asString()));
+            absl::StrJoin(addresses_, ",", Network::AddressStrFormatter())));
       }
       auto [_, inserted] =
           filter_chains_by_name.try_emplace(filter_chain->name(), filter_chain_impl);
       if (!inserted) {
-        throw EnvoyException(
-            fmt::format("error adding listener '{}': \"name\" field is duplicated with value '{}'",
-                        address_->asString(), filter_chain->name()));
+        throw EnvoyException(fmt::format(
+            "error adding listener '{}': \"name\" field is duplicated with value '{}'",
+            absl::StrJoin(addresses_, ",", Network::AddressStrFormatter()), filter_chain->name()));
       }
       if (filter_chain->has_filter_chain_match()) {
         ENVOY_LOG(debug, "filter chain match in chain '{}' is ignored", filter_chain->name());
@@ -288,7 +290,7 @@ void FilterChainManagerImpl::addFilterChains(
           throw EnvoyException(
               fmt::format("error adding listener '{}': partial wildcards are not supported in "
                           "\"server_names\"",
-                          address_->asString()));
+                          absl::StrJoin(addresses_, ",", Network::AddressStrFormatter())));
         }
         server_names.push_back(absl::AsciiStrToLower(server_name));
       }
@@ -309,9 +311,11 @@ void FilterChainManagerImpl::addFilterChains(
                                   context_creator);
   // Construct matcher if it is present in the listener configuration.
   if (filter_chain_matcher) {
+    filter_chains_by_name_ = filter_chains_by_name;
     FilterChainNameActionValidationVisitor validation_visitor;
     Matcher::MatchTreeFactory<Network::MatchingData, FilterChainActionFactoryContext> factory(
-        filter_chains_by_name, parent_context_.getServerFactoryContext(), validation_visitor);
+        parent_context_.getServerFactoryContext(), parent_context_.getServerFactoryContext(),
+        validation_visitor);
     matcher_ = factory.create(*filter_chain_matcher)();
   }
   ENVOY_LOG(debug, "new fc_contexts has {} filter chains, including {} newly built",
@@ -512,9 +516,10 @@ void FilterChainManagerImpl::addFilterChainForSourcePorts(
     // If we got here and found already configured branch, then it means that this FilterChainMatch
     // is a duplicate, and that there is some overlap in the repeated fields with already processed
     // FilterChainMatches.
-    throw EnvoyException(fmt::format("error adding listener '{}': multiple filter chains with "
-                                     "overlapping matching rules are defined",
-                                     address_->asString()));
+    throw EnvoyException(
+        fmt::format("error adding listener '{}': multiple filter chains with "
+                    "overlapping matching rules are defined",
+                    absl::StrJoin(addresses_, ",", Network::AddressStrFormatter())));
   }
 }
 
@@ -543,9 +548,10 @@ std::pair<T, std::vector<Network::Address::CidrRange>> makeCidrListEntry(const s
 }; // namespace
 
 const Network::FilterChain*
-FilterChainManagerImpl::findFilterChain(const Network::ConnectionSocket& socket) const {
+FilterChainManagerImpl::findFilterChain(const Network::ConnectionSocket& socket,
+                                        const StreamInfo::StreamInfo& info) const {
   if (matcher_) {
-    return findFilterChainUsingMatcher(socket);
+    return findFilterChainUsingMatcher(socket, info);
   }
 
   const auto& address = socket.connectionInfoProvider().localAddress();
@@ -577,14 +583,15 @@ FilterChainManagerImpl::findFilterChain(const Network::ConnectionSocket& socket)
 }
 
 const Network::FilterChain*
-FilterChainManagerImpl::findFilterChainUsingMatcher(const Network::ConnectionSocket& socket) const {
+FilterChainManagerImpl::findFilterChainUsingMatcher(const Network::ConnectionSocket& socket,
+                                                    const StreamInfo::StreamInfo& info) const {
   Network::Matching::MatchingDataImpl data(socket);
   const auto& match_result = Matcher::evaluateMatch<Network::MatchingData>(*matcher_, data);
   ASSERT(match_result.match_state_ == Matcher::MatchState::MatchComplete,
          "Matching must complete for network streams.");
   if (match_result.result_) {
     const auto result = match_result.result_();
-    return result->getTyped<FilterChainNameAction>().chain_.get();
+    return result->getTyped<FilterChainBaseAction>().get(filter_chains_by_name_, info);
   }
   return default_filter_chain_.get();
 }
@@ -866,7 +873,7 @@ Stats::Scope& FactoryContextImpl::scope() { return global_scope_; }
 Singleton::Manager& FactoryContextImpl::singletonManager() { return server_.singletonManager(); }
 OverloadManager& FactoryContextImpl::overloadManager() { return server_.overloadManager(); }
 ThreadLocal::SlotAllocator& FactoryContextImpl::threadLocal() { return server_.threadLocal(); }
-Admin& FactoryContextImpl::admin() { return server_.admin(); }
+OptRef<Admin> FactoryContextImpl::admin() { return server_.admin(); }
 TimeSource& FactoryContextImpl::timeSource() { return server_.timeSource(); }
 ProtobufMessage::ValidationContext& FactoryContextImpl::messageValidationContext() {
   return server_.messageValidationContext();

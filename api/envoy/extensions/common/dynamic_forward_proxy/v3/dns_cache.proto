@@ -61,13 +61,13 @@ message DnsCacheConfig {
   // The refresh rate is rounded to the closest millisecond, and must be at least 1ms.
   //
   // Once a host has been resolved, the refresh rate will be the DNS TTL, capped
-  // at a minimum of `dns_min_refresh_rate`.
+  // at a minimum of ``dns_min_refresh_rate``.
   google.protobuf.Duration dns_refresh_rate = 3
       [(validate.rules).duration = {gte {nanos: 1000000}}];
 
-  // The minimum rate that DNS resolution will occur. Per `dns_refresh_rate`, once a host is
-  // resolved, the DNS TTL will be used, with a minimum set by `dns_min_refresh_rate`.
-  // `dns_min_refresh_rate` defaults to 5s and must also be >= 5s.
+  // The minimum rate that DNS resolution will occur. Per ``dns_refresh_rate``, once a host is
+  // resolved, the DNS TTL will be used, with a minimum set by ``dns_min_refresh_rate``.
+  // ``dns_min_refresh_rate`` defaults to 5s and must also be >= 5s.
   google.protobuf.Duration dns_min_refresh_rate = 14
       [(validate.rules).duration = {gte {seconds: 5}}];
 
@@ -76,7 +76,7 @@ message DnsCacheConfig {
   //
   // .. note:
   //
-  //   The TTL is only checked at the time of DNS refresh, as specified by *dns_refresh_rate*. This
+  //   The TTL is only checked at the time of DNS refresh, as specified by ``dns_refresh_rate``. This
   //   means that if the configured TTL is shorter than the refresh rate the host may not be removed
   //   immediately.
   //
@@ -104,7 +104,7 @@ message DnsCacheConfig {
   DnsCacheCircuitBreakers dns_cache_circuit_breaker = 7;
 
   // Always use TCP queries instead of UDP queries for DNS lookups.
-  // This field is deprecated in favor of *dns_resolution_config*
+  // This field is deprecated in favor of ``dns_resolution_config``
   // which aggregates all of the DNS resolver configuration in a single message.
   bool use_tcp_for_dns_lookups = 8
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
@@ -119,12 +119,12 @@ message DnsCacheConfig {
   // or any other DNS resolver types and the related parameters.
   // For example, an object of
   // :ref:`CaresDnsResolverConfig <envoy_v3_api_msg_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig>`
-  // can be packed into this *typed_dns_resolver_config*. This configuration replaces the
+  // can be packed into this ``typed_dns_resolver_config``. This configuration replaces the
   // :ref:`dns_resolution_config <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_resolution_config>`
   // configuration.
-  // During the transition period when both *dns_resolution_config* and *typed_dns_resolver_config* exists,
-  // when *typed_dns_resolver_config* is in place, Envoy will use it and ignore *dns_resolution_config*.
-  // When *typed_dns_resolver_config* is missing, the default behavior is in place.
+  // During the transition period when both ``dns_resolution_config`` and ``typed_dns_resolver_config`` exists,
+  // when ``typed_dns_resolver_config`` is in place, Envoy will use it and ignore ``dns_resolution_config``.
+  // When ``typed_dns_resolver_config`` is missing, the default behavior is in place.
   // [#extension-category: envoy.network.dns_resolver]
   config.core.v3.TypedExtensionConfig typed_dns_resolver_config = 12;
 

@@ -12,6 +12,7 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/router/context_impl.h"
+#include "source/common/router/upstream_codec_filter.h"
 
 #include "test/common/http/common.h"
 #include "test/mocks/buffer/mocks.h"

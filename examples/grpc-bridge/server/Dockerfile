@@ -1,4 +1,4 @@
-FROM golang:1.13.0-stretch as builder
+FROM golang:1.19.3-bullseye@sha256:399a26403fd88e2f64a85891f59953b5a6ade5319c4435ac46dfcb133ada5cf3 as builder
 
 WORKDIR /build
 
@@ -20,7 +20,7 @@ ENV CGO_ENABLED=0
 RUN go build -o server
 
 # Build the main container (Linux Runtime)
-FROM alpine:latest
+FROM debian:bullseye-slim@sha256:68c1f6bae105595d2ebec1589d9d476ba2939fdb11eaba1daec4ea826635ce75
 WORKDIR /root/
 
 # Copy the linux amd64 binary

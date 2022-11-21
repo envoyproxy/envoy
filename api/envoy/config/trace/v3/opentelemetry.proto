@@ -21,4 +21,8 @@ message OpenTelemetryConfig {
   // The upstream gRPC cluster that will receive OTLP traces.
   // Note that the tracer drops traces if the server does not read data fast enough.
   core.v3.GrpcService grpc_service = 1 [(validate.rules).message = {required: true}];
+
+  // The name for the service. This will be populated in the ResourceSpan Resource attributes.
+  // If it is not provided, it will default to "unknown_service:envoy".
+  string service_name = 2;
 }

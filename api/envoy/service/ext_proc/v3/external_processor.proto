@@ -21,7 +21,7 @@ option java_generic_services = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 option (xds.annotations.v3.file_status).work_in_progress = true;
 
-// [#protodoc-title: External Processing Service]
+// [#protodoc-title: External processing service]
 
 // A service that can access and modify HTTP requests and responses
 // as part of a filter chain.
@@ -65,10 +65,10 @@ message ProcessingRequest {
   // or asynchronous mode. The choice of synchronous or asynchronous mode
   // can be set in the filter configuration, and defaults to false.
   //
-  // * A value of "false" indicates that the server must respond
+  // * A value of ``false`` indicates that the server must respond
   //   to this message by either sending back a matching ProcessingResponse message,
   //   or by closing the stream.
-  // * A value of "true" indicates that the server must not respond to this
+  // * A value of ``true`` indicates that the server must not respond to this
   //   message, although it may still close the stream to indicate that no more messages
   //   are needed.
   //
@@ -81,37 +81,37 @@ message ProcessingRequest {
     option (validate.required) = true;
 
     // Information about the HTTP request headers, as well as peer info and additional
-    // properties. Unless "async_mode" is true, the server must send back a
+    // properties. Unless ``async_mode`` is ``true``, the server must send back a
     // HeaderResponse message, an ImmediateResponse message, or close the stream.
     HttpHeaders request_headers = 2;
 
     // Information about the HTTP response headers, as well as peer info and additional
-    // properties. Unless "async_mode" is true, the server must send back a
+    // properties. Unless ``async_mode`` is ``true``, the server must send back a
     // HeaderResponse message or close the stream.
     HttpHeaders response_headers = 3;
 
-    // A chunk of the HTTP request body. Unless "async_mode" is true, the server must send back
+    // A chunk of the HTTP request body. Unless ``async_mode`` is true, the server must send back
     // a BodyResponse message, an ImmediateResponse message, or close the stream.
     HttpBody request_body = 4;
 
-    // A chunk of the HTTP request body. Unless "async_mode" is true, the server must send back
+    // A chunk of the HTTP request body. Unless ``async_mode`` is ``true``, the server must send back
     // a BodyResponse message or close the stream.
     HttpBody response_body = 5;
 
-    // The HTTP trailers for the request path. Unless "async_mode" is true, the server
+    // The HTTP trailers for the request path. Unless ``async_mode`` is ``true``, the server
     // must send back a TrailerResponse message or close the stream.
     //
-    // This message is only sent if the trailers processing mode is set to "SEND".
+    // This message is only sent if the trailers processing mode is set to ``SEND``.
     // If there are no trailers on the original downstream request, then this message
     // will only be sent (with empty trailers waiting to be populated) if the
     // processing mode is set before the request headers are sent, such as
     // in the filter configuration.
     HttpTrailers request_trailers = 6;
 
-    // The HTTP trailers for the response path. Unless "async_mode" is true, the server
+    // The HTTP trailers for the response path. Unless ``async_mode`` is ``true``, the server
     // must send back a TrailerResponse message or close the stream.
     //
-    // This message is only sent if the trailers processing mode is set to "SEND".
+    // This message is only sent if the trailers processing mode is set to ``SEND``.
     // If there are no trailers on the original downstream request, then this message
     // will only be sent (with empty trailers waiting to be populated) if the
     // processing mode is set before the request headers are sent, such as
@@ -120,7 +120,7 @@ message ProcessingRequest {
   }
 }
 
-// For every ProcessingRequest received by the server with the "async_mode" field
+// For every ProcessingRequest received by the server with the ``async_mode`` field
 // set to false, the server must send back exactly one ProcessingResponse message.
 // [#next-free-field: 10]
 message ProcessingResponse {
@@ -128,34 +128,34 @@ message ProcessingResponse {
     option (validate.required) = true;
 
     // The server must send back this message in response to a message with the
-    // "request_headers" field set.
+    // ``request_headers`` field set.
     HeadersResponse request_headers = 1;
 
     // The server must send back this message in response to a message with the
-    // "response_headers" field set.
+    // ``response_headers`` field set.
     HeadersResponse response_headers = 2;
 
     // The server must send back this message in response to a message with
-    // the "request_body" field set.
+    // the ``request_body`` field set.
     BodyResponse request_body = 3;
 
     // The server must send back this message in response to a message with
-    // the "response_body" field set.
+    // the ``response_body`` field set.
     BodyResponse response_body = 4;
 
     // The server must send back this message in response to a message with
-    // the "request_trailers" field set.
+    // the ``request_trailers`` field set.
     TrailersResponse request_trailers = 5;
 
     // The server must send back this message in response to a message with
-    // the "response_trailers" field set.
+    // the ``response_trailers`` field set.
     TrailersResponse response_trailers = 6;
 
     // If specified, attempt to create a locally generated response, send it
     // downstream, and stop processing additional filters and ignore any
     // additional messages received from the remote server for this request or
     // response. If a response has already started -- for example, if this
-    // message is sent response to a "response_body" message -- then
+    // message is sent response to a ``response_body`` message -- then
     // this will either ship the reply directly to the downstream codec,
     // or reset the stream.
     ImmediateResponse immediate_response = 7;
@@ -163,7 +163,7 @@ message ProcessingResponse {
 
   // [#not-implemented-hide:]
   // Optional metadata that will be emitted as dynamic metadata to be consumed by the next
-  // filter. This metadata will be placed in the namespace "envoy.filters.http.ext_proc".
+  // filter. This metadata will be placed in the namespace ``envoy.filters.http.ext_proc``.
   google.protobuf.Struct dynamic_metadata = 8;
 
   // Override how parts of the HTTP request and response are processed
@@ -183,8 +183,8 @@ message HttpHeaders {
   config.core.v3.HeaderMap headers = 1;
 
   // [#not-implemented-hide:]
-  // The values of properties selected by the "request_attributes"
-  // or "response_attributes" list in the configuration. Each entry
+  // The values of properties selected by the ``request_attributes``
+  // or ``response_attributes`` list in the configuration. Each entry
   // in the list is populated
   // from the standard :ref:`attributes <arch_overview_attributes>`
   // supported across Envoy.
@@ -261,7 +261,7 @@ message CommonResponse {
   // Replace the body of the last message sent to the remote server on this
   // stream. If responding to an HttpBody request, simply replace or clear
   // the body chunk that was sent with that request. Body mutations only take
-  // effect in response to "body" messages and are ignored otherwise.
+  // effect in response to ``body`` messages and are ignored otherwise.
   BodyMutation body_mutation = 3;
 
   // [#not-implemented-hide:]
@@ -313,12 +313,12 @@ message GrpcStatus {
 // headers.
 message HeaderMutation {
   // Add or replace HTTP headers. Attempts to set the value of
-  // any "x-envoy" header, and attempts to set the ":method",
-  // ":authority", ":scheme", or "host" headers will be ignored.
+  // any ``x-envoy`` header, and attempts to set the ``:method``,
+  // ``:authority``, ``:scheme``, or ``host`` headers will be ignored.
   repeated config.core.v3.HeaderValueOption set_headers = 1;
 
   // Remove these HTTP headers. Attempts to remove system headers --
-  // any header starting with ":", plus "host" -- will be ignored.
+  // any header starting with ``:``, plus ``host`` -- will be ignored.
   repeated string remove_headers = 2;
 }
 

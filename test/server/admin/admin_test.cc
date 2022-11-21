@@ -100,8 +100,9 @@ TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
 }
 
 TEST_P(AdminInstanceTest, CustomHandler) {
-  auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&,
-                     AdminStream&) -> Http::Code { return Http::Code::Accepted; };
+  auto callback = [](Http::HeaderMap&, Buffer::Instance&, AdminStream&) -> Http::Code {
+    return Http::Code::Accepted;
+  };
 
   // Test removable handler.
   EXPECT_NO_LOGS(EXPECT_TRUE(admin_.addHandler("/foo/bar", "hello", callback, true, false)));
@@ -126,6 +127,65 @@ TEST_P(AdminInstanceTest, CustomHandler) {
   EXPECT_EQ(Http::Code::Accepted, getCallback("/foo/bar", header_map, response));
 }
 
+TEST_P(AdminInstanceTest, Help) {
+  Http::TestResponseHeaderMapImpl header_map;
+  Buffer::OwnedImpl response;
+  EXPECT_EQ(Http::Code::OK, getCallback("/help", header_map, response));
+  const std::string expected = R"EOF(admin commands are:
+  /: Admin home page
+  /certs: print certs on machine
+  /clusters: upstream cluster status
+  /config_dump: dump current Envoy configs (experimental)
+      resource: The resource to dump
+      mask: The mask to apply. When both resource and mask are specified, the mask is applied to every element in the desired repeated field so that only a subset of fields are returned. The mask is parsed as a ProtobufWkt::FieldMask
+      name_regex: Dump only the currently loaded configurations whose names match the specified regex. Can be used with both resource and mask query parameters.
+      include_eds: Dump currently loaded configuration including EDS. See the response definition for more information
+  /contention: dump current Envoy mutex contention stats (if enabled)
+  /cpuprofiler (POST): enable/disable the CPU profiler
+      enable: enables the CPU profiler; One of (y, n)
+  /drain_listeners (POST): drain listeners
+      graceful: When draining listeners, enter a graceful drain period prior to closing listeners. This behaviour and duration is configurable via server options or CLI
+      inboundonly: Drains all inbound listeners. traffic_direction field in envoy_v3_api_msg_config.listener.v3.Listener is used to determine whether a listener is inbound or outbound.
+  /healthcheck/fail (POST): cause the server to fail health checks
+  /healthcheck/ok (POST): cause the server to pass health checks
+  /heap_dump: dump current Envoy heap (if supported)
+  /heapprofiler (POST): enable/disable the heap profiler
+      enable: enable/disable the heap profiler; One of (y, n)
+  /help: print out list of admin commands
+  /hot_restart_version: print the hot restart compatibility version
+  /init_dump: dump current Envoy init manager information (experimental)
+      mask: The desired component to dump unready targets. The mask is parsed as a ProtobufWkt::FieldMask. For example, get the unready targets of all listeners with /init_dump?mask=listener`
+  /listeners: print listener info
+      format: File format to use; One of (text, json)
+  /logging (POST): query/change logging levels
+      paths: Change multiple logging levels by setting to <logger_name1>:<desired_level1>,<logger_name2>:<desired_level2>.
+      level: desired logging level; One of (, trace, debug, info, warning, error, critical, off)
+  /memory: print current allocation/heap usage
+  /quitquitquit (POST): exit the server
+  /ready: print server state, return 200 if LIVE, otherwise return 503
+  /reopen_logs (POST): reopen access logs
+  /reset_counters (POST): reset all counters to zero
+  /runtime: print runtime values
+  /runtime_modify (POST): Adds or modifies runtime values as passed in query parameters. To delete a previously added key, use an empty string as the value. Note that deletion only applies to overrides added via this endpoint; values loaded from disk can be modified via override but not deleted. E.g. ?key1=value1&key2=value2...
+  /server_info: print server version/status information
+  /stats: print server stats
+      usedonly: Only include stats that have been written by system since restart
+      filter: Regular expression (Google re2) for filtering stats
+      format: Format to use; One of (html, text, json)
+      type: Stat types to include.; One of (All, Counters, Histograms, Gauges, TextReadouts)
+      histogram_buckets: Histogram bucket display mode; One of (cumulative, disjoint, none)
+  /stats/prometheus: print server stats in prometheus format
+      usedonly: Only include stats that have been written by system since restart
+      text_readouts: Render text_readouts as new gaugues with value 0 (increases Prometheus data size)
+      filter: Regular expression (Google re2) for filtering stats
+  /stats/recentlookups: Show recent stat-name lookups
+  /stats/recentlookups/clear (POST): clear list of stat-name lookups and counter
+  /stats/recentlookups/disable (POST): disable recording of reset stat-name lookup names
+  /stats/recentlookups/enable (POST): enable recording of reset stat-name lookup names
+)EOF";
+  EXPECT_EQ(expected, response.toString());
+}
+
 class ChunkedHandler : public Admin::Request {
 public:
   Http::Code start(Http::ResponseHeaderMap&) override { return Http::Code::OK; }
@@ -140,7 +200,7 @@ private:
 };
 
 TEST_P(AdminInstanceTest, CustomChunkedHandler) {
-  auto callback = [](absl::string_view, AdminStream&) -> Admin::RequestPtr {
+  auto callback = [](AdminStream&) -> Admin::RequestPtr {
     Admin::RequestPtr handler = Admin::RequestPtr(new ChunkedHandler);
     return handler;
   };
@@ -208,8 +268,9 @@ TEST_P(AdminInstanceTest, StatsWithMultipleChunks) {
 }
 
 TEST_P(AdminInstanceTest, RejectHandlerWithXss) {
-  auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&,
-                     AdminStream&) -> Http::Code { return Http::Code::Accepted; };
+  auto callback = [](Http::HeaderMap&, Buffer::Instance&, AdminStream&) -> Http::Code {
+    return Http::Code::Accepted;
+  };
   EXPECT_LOG_CONTAINS("error",
                       "filter \"/foo<script>alert('hi')</script>\" contains invalid character '<'",
                       EXPECT_FALSE(admin_.addHandler("/foo<script>alert('hi')</script>", "hello",
@@ -217,8 +278,9 @@ TEST_P(AdminInstanceTest, RejectHandlerWithXss) {
 }
 
 TEST_P(AdminInstanceTest, RejectHandlerWithEmbeddedQuery) {
-  auto callback = [](absl::string_view, Http::HeaderMap&, Buffer::Instance&,
-                     AdminStream&) -> Http::Code { return Http::Code::Accepted; };
+  auto callback = [](Http::HeaderMap&, Buffer::Instance&, AdminStream&) -> Http::Code {
+    return Http::Code::Accepted;
+  };
   EXPECT_LOG_CONTAINS("error",
                       "filter \"/bar?queryShouldNotBeInPrefix\" contains invalid character '?'",
                       EXPECT_FALSE(admin_.addHandler("/bar?queryShouldNotBeInPrefix", "hello",

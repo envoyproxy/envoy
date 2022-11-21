@@ -13,6 +13,7 @@
 #include "test/benchmark/main.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
@@ -227,10 +228,11 @@ BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainManagerBuildTest)
 
   initialize(state);
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  std::vector<Network::Address::InstanceConstSharedPtr> addresses;
+  addresses.emplace_back(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234));
   for (auto _ : state) {
-    FilterChainManagerImpl filter_chain_manager{
-        std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234), factory_context,
-        init_manager_};
+    UNREFERENCED_PARAMETER(_);
+    FilterChainManagerImpl filter_chain_manager{addresses, factory_context, init_manager_};
     filter_chain_manager.addFilterChains(nullptr, filter_chains_, nullptr, dummy_builder_,
                                          filter_chain_manager);
   }
@@ -251,16 +253,17 @@ BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainFindTest)
         10000 + i, "127.0.0.1", "", "", "tls", {}, "8.8.8.8", 111)));
   }
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  FilterChainManagerImpl filter_chain_manager{
-      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234), factory_context,
-      init_manager_};
+  std::vector<Network::Address::InstanceConstSharedPtr> addresses;
+  addresses.emplace_back(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234));
+  FilterChainManagerImpl filter_chain_manager{addresses, factory_context, init_manager_};
 
   filter_chain_manager.addFilterChains(nullptr, filter_chains_, nullptr, dummy_builder_,
                                        filter_chain_manager);
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   for (auto _ : state) {
     UNREFERENCED_PARAMETER(_);
     for (int i = 0; i < state.range(0); i++) {
-      filter_chain_manager.findFilterChain(sockets[i]);
+      filter_chain_manager.findFilterChain(sockets[i], stream_info);
     }
   }
 }

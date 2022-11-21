@@ -18,17 +18,14 @@ absl::optional<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatch
 maybeCreateStringMatcher(const envoy::config::route::v3::QueryParameterMatcher& config) {
   switch (config.query_parameter_match_specifier_case()) {
   case envoy::config::route::v3::QueryParameterMatcher::QueryParameterMatchSpecifierCase::
-      kStringMatch: {
+      kStringMatch:
     return Matchers::StringMatcherImpl(config.string_match());
-  }
   case envoy::config::route::v3::QueryParameterMatcher::QueryParameterMatchSpecifierCase::
-      kPresentMatch: {
+      kPresentMatch:
     return absl::nullopt;
-  }
   case envoy::config::route::v3::QueryParameterMatcher::QueryParameterMatchSpecifierCase::
-      QUERY_PARAMETER_MATCH_SPECIFIER_NOT_SET: {
+      QUERY_PARAMETER_MATCH_SPECIFIER_NOT_SET:
     return absl::nullopt;
-  }
   }
 
   return absl::nullopt;
@@ -143,6 +140,8 @@ Http::Code ConfigUtility::parseClusterNotFoundResponseCode(
     return Http::Code::ServiceUnavailable;
   case envoy::config::route::v3::RouteAction::NOT_FOUND:
     return Http::Code::NotFound;
+  case envoy::config::route::v3::RouteAction::INTERNAL_SERVER_ERROR:
+    return Http::Code::InternalServerError;
   }
   PANIC_DUE_TO_CORRUPT_ENUM;
 }

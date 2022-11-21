@@ -45,6 +45,13 @@ message TlsParameters {
   }
 
   // Minimum TLS protocol version. By default, it's ``TLSv1_2`` for both clients and servers.
+  //
+  // TLS protocol versions below TLSv1_2 require setting compatible ciphers with the
+  // ``cipher_suites`` setting as the default ciphers no longer include compatible ciphers.
+  //
+  // .. attention::
+  //
+  //   Using TLS protocol versions below TLSv1_2 has serious security considerations and risks.
   TlsProtocol tls_minimum_protocol_version = 1 [(validate.rules).enum = {defined_only: true}];
 
   // Maximum TLS protocol version. By default, it's ``TLSv1_2`` for clients and ``TLSv1_3`` for
@@ -142,24 +149,24 @@ message TlsCertificate {
 
   // The TLS certificate chain.
   //
-  // If *certificate_chain* is a filesystem path, a watch will be added to the
+  // If ``certificate_chain`` is a filesystem path, a watch will be added to the
   // parent directory for any file moves to support rotation. This currently
-  // only applies to dynamic secrets, when the *TlsCertificate* is delivered via
+  // only applies to dynamic secrets, when the ``TlsCertificate`` is delivered via
   // SDS.
   config.core.v3.DataSource certificate_chain = 1;
 
   // The TLS private key.
   //
-  // If *private_key* is a filesystem path, a watch will be added to the parent
+  // If ``private_key`` is a filesystem path, a watch will be added to the parent
   // directory for any file moves to support rotation. This currently only
-  // applies to dynamic secrets, when the *TlsCertificate* is delivered via SDS.
+  // applies to dynamic secrets, when the ``TlsCertificate`` is delivered via SDS.
   config.core.v3.DataSource private_key = 2 [(udpa.annotations.sensitive) = true];
 
-  // `Pkcs12` data containing TLS certificate, chain, and private key.
+  // ``Pkcs12`` data containing TLS certificate, chain, and private key.
   //
-  // If *pkcs12* is a filesystem path, the file will be read, but no watch will
-  // be added to the parent directory, since *pkcs12* isn't used by SDS.
-  // This field is mutually exclusive with *certificate_chain*, *private_key* and *private_key_provider*.
+  // If ``pkcs12`` is a filesystem path, the file will be read, but no watch will
+  // be added to the parent directory, since ``pkcs12`` isn't used by SDS.
+  // This field is mutually exclusive with ``certificate_chain``, ``private_key`` and ``private_key_provider``.
   // This can't be marked as ``oneof`` due to API compatibility reasons. Setting
   // both :ref:`private_key <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.private_key>`,
   // :ref:`certificate_chain <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.certificate_chain>`,
@@ -167,17 +174,17 @@ message TlsCertificate {
   // and :ref:`pkcs12 <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.pkcs12>`
   // fields will result in an error. Use :ref:`password
   // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.password>`
-  // to specify the password to unprotect the `PKCS12` data, if necessary.
+  // to specify the password to unprotect the ``PKCS12`` data, if necessary.
   config.core.v3.DataSource pkcs12 = 8 [(udpa.annotations.sensitive) = true];
 
-  // If specified, updates of file-based *certificate_chain* and *private_key*
+  // If specified, updates of file-based ``certificate_chain`` and ``private_key``
   // sources will be triggered by this watch. The certificate/key pair will be
   // read together and validated for atomic read consistency (i.e. no
   // intervening modification occurred between cert/key read, verified by file
   // hash comparisons). This allows explicit control over the path watched, by
   // default the parent directories of the filesystem paths in
-  // *certificate_chain* and *private_key* are watched if this field is not
-  // specified. This only applies when a *TlsCertificate* is delivered by SDS
+  // ``certificate_chain`` and ``private_key`` are watched if this field is not
+  // specified. This only applies when a ``TlsCertificate`` is delivered by SDS
   // with references to filesystem paths. See the :ref:`SDS key rotation
   // <sds_key_rotation>` documentation for further details.
   config.core.v3.WatchedDirectory watched_directory = 7;
@@ -320,12 +327,12 @@ message CertificateValidationContext {
   // See :ref:`the TLS overview <arch_overview_ssl_enabling_verification>` for a list of common
   // system CA locations.
   //
-  // If *trusted_ca* is a filesystem path, a watch will be added to the parent
+  // If ``trusted_ca`` is a filesystem path, a watch will be added to the parent
   // directory for any file moves to support rotation. This currently only
-  // applies to dynamic secrets, when the *CertificateValidationContext* is
+  // applies to dynamic secrets, when the ``CertificateValidationContext`` is
   // delivered via SDS.
   //
-  // Only one of *trusted_ca* and *ca_certificate_provider_instance* may be specified.
+  // Only one of ``trusted_ca`` and ``ca_certificate_provider_instance`` may be specified.
   //
   // [#next-major-version: This field and watched_directory below should ideally be moved into a
   // separate sub-message, since there's no point in specifying the latter field without this one.]
@@ -334,16 +341,16 @@ message CertificateValidationContext {
 
   // Certificate provider instance for fetching TLS certificates.
   //
-  // Only one of *trusted_ca* and *ca_certificate_provider_instance* may be specified.
+  // Only one of ``trusted_ca`` and ``ca_certificate_provider_instance`` may be specified.
   // [#not-implemented-hide:]
   CertificateProviderPluginInstance ca_certificate_provider_instance = 13
       [(udpa.annotations.field_migrate).oneof_promotion = "ca_cert_source"];
 
-  // If specified, updates of a file-based *trusted_ca* source will be triggered
+  // If specified, updates of a file-based ``trusted_ca`` source will be triggered
   // by this watch. This allows explicit control over the path watched, by
-  // default the parent directory of the filesystem path in *trusted_ca* is
+  // default the parent directory of the filesystem path in ``trusted_ca`` is
   // watched if this field is not specified. This only applies when a
-  // *CertificateValidationContext* is delivered by SDS with references to
+  // ``CertificateValidationContext`` is delivered by SDS with references to
   // filesystem paths. See the :ref:`SDS key rotation <sds_key_rotation>`
   // documentation for further details.
   config.core.v3.WatchedDirectory watched_directory = 11;

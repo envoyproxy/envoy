@@ -56,6 +56,7 @@ envoy_extension_cc_test(
         "//source/extensions/clusters/dynamic_forward_proxy:cluster",
         "//source/extensions/filters/http/dynamic_forward_proxy:config",
         "//source/extensions/key_value/file_based:config_lib",
+        "//source/extensions/network/dns_resolver/getaddrinfo:config",
         "//test/integration:http_integration_lib",
         "//test/integration/filters:stream_info_to_headers_filter_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",

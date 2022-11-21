@@ -115,14 +115,14 @@ OptRef<const Router::Route> OnDemandRouteUpdate::handleMissingRoute() {
       std::make_shared<Http::RouteConfigUpdatedCallback>(Http::RouteConfigUpdatedCallback(
           [this](bool route_exists) -> void { onRouteConfigUpdateCompletion(route_exists); }));
   filter_iteration_state_ = Http::FilterHeadersStatus::StopIteration;
-  callbacks_->requestRouteConfigUpdate(route_config_updated_callback_);
+  callbacks_->downstreamCallbacks()->requestRouteConfigUpdate(route_config_updated_callback_);
   // decodeHeaders() is completed.
   decode_headers_active_ = false;
   return makeOptRefFromPtr(callbacks_->route().get());
 }
 
 Http::FilterHeadersStatus OnDemandRouteUpdate::decodeHeaders(Http::RequestHeaderMap&, bool) {
-  auto config = getConfig(callbacks_->route());
+  auto config = getConfig();
 
   config->decodeHeadersBehavior().decodeHeaders(*this);
   return filter_iteration_state_;
@@ -159,10 +159,8 @@ void OnDemandRouteUpdate::handleOnDemandCds(const Router::Route& route,
       odcds.requestOnDemandClusterDiscovery(cluster_name, std::move(callback), timeout);
 }
 
-const OnDemandFilterConfig*
-OnDemandRouteUpdate::getConfig(const Router::RouteConstSharedPtr& route) {
-  auto config = Http::Utility::resolveMostSpecificPerFilterConfig<OnDemandFilterConfig>(
-      HttpFilterNames::get().OnDemand, route);
+const OnDemandFilterConfig* OnDemandRouteUpdate::getConfig() {
+  auto config = Http::Utility::resolveMostSpecificPerFilterConfig<OnDemandFilterConfig>(callbacks_);
   if (config != nullptr) {
     return config;
   }
@@ -223,7 +221,7 @@ void OnDemandRouteUpdate::onClusterDiscoveryCompletion(
       !callbacks_->decodingBuffer()) { // Redirects with body not yet supported.
     const Http::ResponseHeaderMap* headers = nullptr;
     if (callbacks_->recreateStream(headers)) {
-      callbacks_->clearRouteCache();
+      callbacks_->downstreamCallbacks()->clearRouteCache();
       return;
     }
   }

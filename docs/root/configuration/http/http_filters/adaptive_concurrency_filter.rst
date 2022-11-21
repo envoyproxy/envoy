@@ -3,9 +3,8 @@
 Adaptive Concurrency
 ====================
 
-This filter should be configured with the name ``envoy.filters.http.adaptive_concurrency``.
-
-See the :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.adaptive_concurrency.v3.AdaptiveConcurrency>` for details on each configuration parameter.
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.adaptive_concurrency.v3.AdaptiveConcurrency``.
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.adaptive_concurrency.v3.AdaptiveConcurrency>` for details on each configuration parameter.
 
 Overview
 --------

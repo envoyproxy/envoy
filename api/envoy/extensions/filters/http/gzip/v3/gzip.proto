@@ -72,7 +72,7 @@ message Gzip {
   google.protobuf.UInt32Value window_bits = 9 [(validate.rules).uint32 = {lte: 15 gte: 9}];
 
   // Set of configuration parameters common for all compression filters. You can define
-  // `content_length`, `content_type` and other parameters in this field.
+  // ``content_length``, ``content_type`` and other parameters in this field.
   compressor.v3.Compressor compressor = 10;
 
   // Value for Zlib's next output buffer. If not set, defaults to 4096.

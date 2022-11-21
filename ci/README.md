@@ -32,7 +32,7 @@ running tests that reflects the latest built Windows 2019 Envoy image.
 Currently there are three build images for Linux and one for Windows:
 
 * `envoyproxy/envoy-build` &mdash; alias to `envoyproxy/envoy-build-ubuntu`.
-* `envoyproxy/envoy-build-ubuntu` &mdash; based on Ubuntu 18.04 (Bionic) with GCC 9 and Clang 14 compiler.
+* `envoyproxy/envoy-build-ubuntu` &mdash; based on Ubuntu 20.04 (Focal) with GCC 9 and Clang 14 compiler.
 * `envoyproxy/envoy-build-centos` &mdash; based on CentOS 7 with GCC 9 and Clang 14 compiler, this image is experimental and not well tested.
 * `envoyproxy/envoy-build-windows2019` &mdash; based on Windows ltsc2019 with VS 2019 Build Tools, as well as LLVM.
 
@@ -64,7 +64,7 @@ invoking the build.
 IMAGE_NAME=envoyproxy/envoy-build-ubuntu http_proxy=http://proxy.foo.com:8080 https_proxy=http://proxy.bar.com:8080 ./ci/run_envoy_docker.sh <build_script_args>
 ```
 
-Besides `http_proxy` and `https_proxy`, maybe you need to set `go_proxy` to replace the defualt GOPROXY in China.
+Besides `http_proxy` and `https_proxy`, maybe you need to set `go_proxy` to replace the default GOPROXY in China.
 
 ```bash
 IMAGE_NAME=envoyproxy/envoy-build-ubuntu go_proxy=https://goproxy.cn,direct http_proxy=http://proxy.foo.com:8080 https_proxy=http://proxy.bar.com:8080 ./ci/run_envoy_docker.sh <build_script_args>
@@ -104,11 +104,11 @@ For a debug version of the Envoy binary you can run:
 The build artifact can be found in `/tmp/envoy-docker-build/envoy/source/exe/envoy-debug` (or wherever
 `$ENVOY_DOCKER_BUILD_DIR` points).
 
-To leverage a [bazel remote cache](https://github.com/envoyproxy/envoy/tree/main/bazel#advanced-caching-setup) add the http_remote_cache endpoint to
+To leverage a [bazel remote cache](https://github.com/envoyproxy/envoy/tree/main/bazel#advanced-caching-setup) add the remote cache endpoint to
 the BAZEL_BUILD_EXTRA_OPTIONS environment variable
 
 ```bash
-./ci/run_envoy_docker.sh "BAZEL_BUILD_EXTRA_OPTIONS='--remote_http_cache=http://127.0.0.1:28080' ./ci/do_ci.sh bazel.release"
+./ci/run_envoy_docker.sh "BAZEL_BUILD_EXTRA_OPTIONS='--remote_cache=http://127.0.0.1:28080' ./ci/do_ci.sh bazel.release"
 ```
 
 The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:

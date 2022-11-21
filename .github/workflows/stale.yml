@@ -9,12 +9,12 @@ jobs:
       issues: write  # for actions/stale to close stale issues
       pull-requests: write  # for actions/stale to close stale PRs
     name: Prune Stale
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     if: github.repository == 'envoyproxy/envoy'
 
     steps:
     - name: Prune Stale
-      uses: actions/stale@428b0ed64d74596742200dc98805bb90f39ef9f0
+      uses: actions/stale@9c1b1c6e115ca2af09755448e0dbba24e5061cc8
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         # Different amounts of days for issues/PRs are not currently supported but there is a PR

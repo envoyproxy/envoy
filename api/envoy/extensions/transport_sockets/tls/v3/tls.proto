@@ -210,13 +210,13 @@ message CommonTlsContext {
         [(validate.rules).message = {required: true}];
 
     // Certificate provider for fetching CA certs. This will populate the
-    // *default_validation_context.trusted_ca* field.
+    // ``default_validation_context.trusted_ca`` field.
     // [#not-implemented-hide:]
     CertificateProvider validation_context_certificate_provider = 3
         [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
     // Certificate provider instance for fetching CA certs. This will populate the
-    // *default_validation_context.trusted_ca* field.
+    // ``default_validation_context.trusted_ca`` field.
     // [#not-implemented-hide:]
     CertificateProviderInstance validation_context_certificate_provider_instance = 4
         [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
@@ -234,8 +234,8 @@ message CommonTlsContext {
   // RSA certificate is used for clients that only support RSA and the first ECDSA certificate is
   // used for clients that support ECDSA.
   //
-  // Only one of *tls_certificates*, *tls_certificate_sds_secret_configs*,
-  // and *tls_certificate_provider_instance* may be used.
+  // Only one of ``tls_certificates``, ``tls_certificate_sds_secret_configs``,
+  // and ``tls_certificate_provider_instance`` may be used.
   // [#next-major-version: These mutually exclusive fields should ideally be in a oneof, but it's
   // not legal to put a repeated field in a oneof. In the next major version, we should rework
   // this to avoid this problem.]
@@ -247,8 +247,8 @@ message CommonTlsContext {
   // The same number and types of certificates as :ref:`tls_certificates <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.tls_certificates>`
   // are valid in the the certificates fetched through this setting.
   //
-  // Only one of *tls_certificates*, *tls_certificate_sds_secret_configs*,
-  // and *tls_certificate_provider_instance* may be used.
+  // Only one of ``tls_certificates``, ``tls_certificate_sds_secret_configs``,
+  // and ``tls_certificate_provider_instance`` may be used.
   // [#next-major-version: These mutually exclusive fields should ideally be in a oneof, but it's
   // not legal to put a repeated field in a oneof. In the next major version, we should rework
   // this to avoid this problem.]
@@ -257,8 +257,8 @@ message CommonTlsContext {
 
   // Certificate provider instance for fetching TLS certs.
   //
-  // Only one of *tls_certificates*, *tls_certificate_sds_secret_configs*,
-  // and *tls_certificate_provider_instance* may be used.
+  // Only one of ``tls_certificates``, ``tls_certificate_sds_secret_configs``,
+  // and ``tls_certificate_provider_instance`` may be used.
   // [#not-implemented-hide:]
   CertificateProviderPluginInstance tls_certificate_provider_instance = 14;
 

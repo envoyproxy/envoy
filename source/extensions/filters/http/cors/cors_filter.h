@@ -6,6 +6,8 @@
 
 #include "source/common/buffer/buffer_impl.h"
 
+#include "absl/container/inlined_vector.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -46,6 +48,8 @@ class CorsFilter : public Http::StreamFilter {
 public:
   CorsFilter(CorsFilterConfigSharedPtr config);
 
+  void initializeCorsPolicies();
+
   // Http::StreamFilterBase
   void onDestroy() override {}
 
@@ -79,6 +83,10 @@ public:
     encoder_callbacks_ = &callbacks;
   };
 
+  const absl::InlinedVector<const Envoy::Router::CorsPolicy*, 2>& policiesForTest() const {
+    return policies_;
+  }
+
 private:
   friend class CorsFilterTest;
 
@@ -88,13 +96,14 @@ private:
   const std::string& exposeHeaders();
   const std::string& maxAge();
   bool allowCredentials();
+  bool allowPrivateNetworkAccess();
   bool shadowEnabled();
   bool enabled();
   bool isOriginAllowed(const Http::HeaderString& origin);
 
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
-  std::array<const Envoy::Router::CorsPolicy*, 2> policies_;
+  absl::InlinedVector<const Envoy::Router::CorsPolicy*, 2> policies_;
   bool is_cors_request_{};
   const Http::HeaderEntry* origin_{};
 

@@ -22,3 +22,11 @@ Please note that fully resolved IP address should be passed in this header. For 
 routed to a host with IP address 10.195.16.237 at port 8888, the request header value should be set as
 ``10.195.16.237:8888``.
 
+.. _arch_overview_load_balancing_types_original_destination_request_header_filter_state:
+
+Original destination filter state
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Custom extensions can override the destination address using the filter state
+object ``envoy.network.transport_socket.original_dst_address``. This behavior
+can be used for tunneling to an intermediary proxy instead of the direct
+original destination.

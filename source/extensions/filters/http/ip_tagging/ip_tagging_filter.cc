@@ -85,7 +85,7 @@ Http::FilterHeadersStatus IpTaggingFilter::decodeHeaders(Http::RequestHeaderMap&
     headers.appendEnvoyIpTags(tags_join, ",");
 
     // We must clear the route cache or else we can't match on x-envoy-ip-tags.
-    callbacks_->clearRouteCache();
+    callbacks_->downstreamCallbacks()->clearRouteCache();
 
     // For a large number(ex > 1000) of tags, stats cardinality will be an issue.
     // If there are use cases with a large set of tags, a way to opt into these stats

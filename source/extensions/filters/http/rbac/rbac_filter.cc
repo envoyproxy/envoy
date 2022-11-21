@@ -67,10 +67,10 @@ RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
           proto_config, context, validation_visitor, action_validation_visitor_)) {}
 
 const Filters::Common::RBAC::RoleBasedAccessControlEngine*
-RoleBasedAccessControlFilterConfig::engine(const Router::RouteConstSharedPtr route,
+RoleBasedAccessControlFilterConfig::engine(const Http::StreamFilterCallbacks* callbacks,
                                            Filters::Common::RBAC::EnforcementMode mode) const {
   const auto* route_local = Http::Utility::resolveMostSpecificPerFilterConfig<
-      RoleBasedAccessControlRouteSpecificFilterConfig>("envoy.filters.http.rbac", route);
+      RoleBasedAccessControlRouteSpecificFilterConfig>(callbacks);
 
   if (route_local) {
     return route_local->engine(mode);
@@ -115,7 +115,7 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
 
   std::string effective_policy_id;
   const auto shadow_engine =
-      config_->engine(callbacks_->route(), Filters::Common::RBAC::EnforcementMode::Shadow);
+      config_->engine(callbacks_, Filters::Common::RBAC::EnforcementMode::Shadow);
 
   if (shadow_engine != nullptr) {
     std::string shadow_resp_code =
@@ -144,8 +144,7 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
     callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.rbac", metrics);
   }
 
-  const auto engine =
-      config_->engine(callbacks_->route(), Filters::Common::RBAC::EnforcementMode::Enforced);
+  const auto engine = config_->engine(callbacks_, Filters::Common::RBAC::EnforcementMode::Enforced);
   if (engine != nullptr) {
     std::string effective_policy_id;
     bool allowed = engine->handleAction(*callbacks_->connection(), headers,

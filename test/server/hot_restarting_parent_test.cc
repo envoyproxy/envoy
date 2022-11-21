@@ -55,8 +55,13 @@ TEST_F(HotRestartingParentTest, GetListenSocketsForChildNotBindPort) {
   EXPECT_CALL(server_, listenerManager()).WillOnce(ReturnRef(listener_manager));
   EXPECT_CALL(listener_manager, listeners(ListenerManager::ListenerState::ACTIVE))
       .WillOnce(Return(listeners));
-  EXPECT_CALL(listener_config, listenSocketFactory());
-  EXPECT_CALL(listener_config.socket_factory_, localAddress());
+  EXPECT_CALL(listener_config, listenSocketFactories());
+  Network::Address::InstanceConstSharedPtr address(
+      new Network::Address::Ipv4Instance("0.0.0.0", 80));
+  EXPECT_CALL(
+      *static_cast<Network::MockListenSocketFactory*>(listener_config.socket_factories_[0].get()),
+      localAddress())
+      .WillOnce(ReturnRef(address));
   EXPECT_CALL(listener_config, bindToPort()).WillOnce(Return(false));
 
   HotRestartMessage::Request request;
@@ -79,21 +84,85 @@ TEST_F(HotRestartingParentTest, GetListenSocketsForChildSocketType) {
   EXPECT_CALL(server_, listenerManager()).WillOnce(ReturnRef(listener_manager));
   EXPECT_CALL(listener_manager, listeners(ListenerManager::ListenerState::ACTIVE))
       .WillOnce(Return(listeners));
-  EXPECT_CALL(tcp_listener_config, listenSocketFactory());
-  EXPECT_CALL(tcp_listener_config.socket_factory_, localAddress());
+  Network::Address::InstanceConstSharedPtr address(
+      new Network::Address::Ipv4Instance("0.0.0.0", 80));
+  EXPECT_CALL(tcp_listener_config, listenSocketFactories());
+  EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(
+                  tcp_listener_config.socket_factories_[0].get()),
+              localAddress())
+      .WillOnce(ReturnRef(address));
   EXPECT_CALL(tcp_listener_config, bindToPort()).WillOnce(Return(true));
-  EXPECT_CALL(tcp_listener_config.socket_factory_, socketType())
+  EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(
+                  tcp_listener_config.socket_factories_[0].get()),
+              socketType())
       .WillOnce(Return(Network::Socket::Type::Stream));
 
-  EXPECT_CALL(udp_listener_config, listenSocketFactory());
-  EXPECT_CALL(udp_listener_config.socket_factory_, localAddress());
+  EXPECT_CALL(udp_listener_config, listenSocketFactories());
+  EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(
+                  udp_listener_config.socket_factories_[0].get()),
+              localAddress())
+      .WillOnce(ReturnRef(address));
   EXPECT_CALL(udp_listener_config, bindToPort()).WillOnce(Return(true));
-  EXPECT_CALL(udp_listener_config.socket_factory_, socketType())
+  EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(
+                  udp_listener_config.socket_factories_[0].get()),
+              socketType())
       .WillOnce(Return(Network::Socket::Type::Datagram));
 
   EXPECT_CALL(server_, options()).WillOnce(ReturnRef(options));
   EXPECT_CALL(options, concurrency()).WillOnce(Return(1));
-  EXPECT_CALL(udp_listener_config.socket_factory_, getListenSocket(_));
+  EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(
+                  udp_listener_config.socket_factories_[0].get()),
+              getListenSocket(_));
+
+  HotRestartMessage::Request request;
+  request.mutable_pass_listen_socket()->set_address("udp://0.0.0.0:80");
+  HotRestartMessage message = hot_restarting_parent_.getListenSocketsForChild(request);
+  EXPECT_EQ(0, message.reply().pass_listen_socket().fd());
+}
+
+TEST_F(HotRestartingParentTest, GetListenSocketsWithMultipleAddresses) {
+  Network::SocketSharedPtr socket = std::make_shared<NiceMock<Network::MockListenSocket>>();
+  MockListenerManager listener_manager;
+  Network::MockListenerConfig udp_listener_config;
+  MockOptions options;
+  std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners;
+  InSequence s;
+
+  // Add one more socket factory to mimic two addresses in the listener.
+  udp_listener_config.socket_factories_.emplace_back(
+      std::make_unique<Network::MockListenSocketFactory>());
+  listeners.push_back(std::ref(*static_cast<Network::ListenerConfig*>(&udp_listener_config)));
+
+  EXPECT_CALL(server_, listenerManager()).WillOnce(ReturnRef(listener_manager));
+  EXPECT_CALL(listener_manager, listeners(ListenerManager::ListenerState::ACTIVE))
+      .WillOnce(Return(listeners));
+  Network::Address::InstanceConstSharedPtr address(
+      new Network::Address::Ipv4Instance("0.0.0.0", 80));
+  Network::Address::InstanceConstSharedPtr alt_address(
+      new Network::Address::Ipv4Instance("0.0.0.0", 8080));
+
+  EXPECT_CALL(udp_listener_config, listenSocketFactories());
+  EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(
+                  udp_listener_config.socket_factories_[0].get()),
+              localAddress())
+      .WillOnce(ReturnRef(alt_address));
+
+  EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(
+                  udp_listener_config.socket_factories_[1].get()),
+              localAddress())
+      .WillOnce(ReturnRef(address));
+  EXPECT_CALL(udp_listener_config, bindToPort()).WillOnce(Return(true));
+  EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(
+                  udp_listener_config.socket_factories_[1].get()),
+              socketType())
+      .WillOnce(Return(Network::Socket::Type::Datagram));
+
+  EXPECT_CALL(server_, options()).WillOnce(ReturnRef(options));
+  EXPECT_CALL(options, concurrency()).WillOnce(Return(1));
+  EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(
+                  udp_listener_config.socket_factories_[1].get()),
+              getListenSocket(_))
+      .WillOnce(Return(socket));
 
   HotRestartMessage::Request request;
   request.mutable_pass_listen_socket()->set_address("udp://0.0.0.0:80");
@@ -115,15 +184,22 @@ TEST_F(HotRestartingParentTest, GetListenSocketsForChildUnixDomainSocket) {
   EXPECT_CALL(server_, listenerManager()).WillOnce(ReturnRef(listener_manager));
   EXPECT_CALL(listener_manager, listeners(ListenerManager::ListenerState::ACTIVE))
       .WillOnce(Return(listeners));
-  EXPECT_CALL(listener_config, listenSocketFactory());
-  EXPECT_CALL(listener_config.socket_factory_, localAddress()).WillOnce(ReturnRef(local_address));
+  EXPECT_CALL(listener_config, listenSocketFactories());
+  EXPECT_CALL(
+      *static_cast<Network::MockListenSocketFactory*>(listener_config.socket_factories_[0].get()),
+      localAddress())
+      .WillOnce(ReturnRef(local_address));
   EXPECT_CALL(listener_config, bindToPort()).WillOnce(Return(true));
-  EXPECT_CALL(listener_config.socket_factory_, socketType())
+  EXPECT_CALL(
+      *static_cast<Network::MockListenSocketFactory*>(listener_config.socket_factories_[0].get()),
+      socketType())
       .WillOnce(Return(Network::Socket::Type::Stream));
 
   EXPECT_CALL(server_, options()).WillOnce(ReturnRef(options));
   EXPECT_CALL(options, concurrency()).WillOnce(Return(1));
-  EXPECT_CALL(listener_config.socket_factory_, getListenSocket(_));
+  EXPECT_CALL(
+      *static_cast<Network::MockListenSocketFactory*>(listener_config.socket_factories_[0].get()),
+      getListenSocket(_));
 
   HotRestartMessage::Request request;
   request.mutable_pass_listen_socket()->set_address("unix://domain.socket");

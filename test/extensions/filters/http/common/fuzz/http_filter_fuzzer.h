@@ -44,12 +44,20 @@ public:
   // Fuzzed headers and trailers are needed for access logging, reset the data and destroy filters.
   void reset() {
     enabled_ = true;
+    encoding_finished_ = false;
+    decoding_finished_ = false;
     request_headers_.clear();
     response_headers_.clear();
     request_trailers_.clear();
     response_trailers_.clear();
     encoded_trailers_.clear();
   }
+
+  // Returns true if decoder and encoder are both finished or nonexistent.
+  bool isFilterFinished() { return decoding_finished_ && encoding_finished_; }
+
+  // Records that the filter type has finished processing.
+  template <class FilterType> void finishFilter(FilterType* filter) = delete;
 
 protected:
   // Templated functions to validate and send headers/data/trailers for decoders/encoders.
@@ -71,6 +79,9 @@ protected:
   // sendLocalReply to set enabled_ to false.
   bool enabled_ = true;
 
+  bool decoding_finished_ = false;
+  bool encoding_finished_ = false;
+
   // Headers/trailers need to be saved for the lifetime of the filter,
   // so save them as member variables.
   Http::TestRequestHeaderMapImpl request_headers_;
@@ -89,9 +100,8 @@ void HttpFilterFuzzer::runData(FilterType* filter, const test::fuzz::HttpData& d
   }
   const auto& headersStatus = sendHeaders(filter, data, end_stream);
   ENVOY_LOG_MISC(debug, "Finished with FilterHeadersStatus: {}", static_cast<int>(headersStatus));
-  if ((headersStatus != Http::FilterHeadersStatus::Continue &&
-       headersStatus != Http::FilterHeadersStatus::StopIteration) ||
-      !enabled_) {
+  if ((end_stream && headersStatus == Http::FilterHeadersStatus::Continue) || !enabled_) {
+    finishFilter(filter);
     return;
   }
 
@@ -103,13 +113,15 @@ void HttpFilterFuzzer::runData(FilterType* filter, const test::fuzz::HttpData& d
     Buffer::OwnedImpl buffer(data_chunks[i]);
     const auto& dataStatus = sendData(filter, buffer, end_stream);
     ENVOY_LOG_MISC(debug, "Finished with FilterDataStatus: {}", static_cast<int>(dataStatus));
-    if (dataStatus != Http::FilterDataStatus::Continue || !enabled_) {
+    if ((end_stream && dataStatus == Http::FilterDataStatus::Continue) || !enabled_) {
+      finishFilter(filter);
       return;
     }
   }
 
   if (data.has_trailers() && enabled_) {
     sendTrailers(filter, data);
+    finishFilter(filter);
   }
 }
 
@@ -155,6 +167,14 @@ inline Http::FilterHeadersStatus HttpFilterFuzzer::sendHeaders(Http::StreamEncod
     filter->encodeComplete();
   }
   return status;
+}
+
+template <> inline void HttpFilterFuzzer::finishFilter(Http::StreamDecoderFilter*) {
+  decoding_finished_ = true;
+}
+
+template <> inline void HttpFilterFuzzer::finishFilter(Http::StreamEncoderFilter*) {
+  encoding_finished_ = true;
 }
 
 template <>

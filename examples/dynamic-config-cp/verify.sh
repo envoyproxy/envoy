@@ -20,11 +20,9 @@ curl -s http://localhost:19000/config_dump \
     | grep NO_CLUSTERS
 
 run_log "Bring up go-control-plane"
-docker-compose up --build -d go-control-plane
-
-wait_for 30 sh -c "docker-compose ps go-control-plane | grep healthy | grep -v unhealthy"
-
-sleep 2
+"$DOCKER_COMPOSE" up --build -d go-control-plane
+wait_for 30 sh -c "${DOCKER_COMPOSE} ps go-control-plane | grep healthy | grep -v unhealthy"
+wait_for 10 bash -c "responds_with 'Request served by service1' http://localhost:10000"
 
 run_log "Check for response from service1 backend"
 responds_with \
@@ -40,9 +38,12 @@ curl -s http://localhost:19000/config_dump \
     | grep '"address": "service1"'
 
 run_log "Bring down the control plane"
-docker-compose stop go-control-plane
+"$DOCKER_COMPOSE" stop go-control-plane
 
-sleep 2
+wait_for 10 sh -c "\
+         curl -s http://localhost:19000/config_dump \
+         | jq -r '.configs[1].dynamic_active_clusters' \
+         | grep '\"version_info\": \"1\"'"
 
 run_log "Check for continued response from service1 backend"
 responds_with \
@@ -62,8 +63,8 @@ sed -i'.bak' s/service1/service2/ resource.go
 sed -i'.bak' s/\"1\",/\"2\",/ resource.go
 
 run_log "Bring back up the control plane"
-docker-compose up --build -d go-control-plane
-wait_for 30 sh -c "docker-compose ps go-control-plane | grep healthy | grep -v unhealthy"
+"$DOCKER_COMPOSE" up --build -d go-control-plane
+wait_for 30 sh -c "${DOCKER_COMPOSE} ps go-control-plane | grep healthy | grep -v unhealthy"
 
 run_log "Check for response from service2 backend"
 responds_with \

@@ -407,7 +407,7 @@ You can disable IPv6 by setting the ``dns_lookup_family`` to ``V4_ONLY`` in your
    :linenos:
    :lineno-start: 34
    :lines: 34-46
-   :emphasize-lines: 4
+   :emphasize-lines: 5
    :caption: :download:`envoy-demo.yaml <_include/envoy-demo.yaml>`
 
 Debugging Envoy

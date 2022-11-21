@@ -22,11 +22,14 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
+#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "udpa/type/v1/typed_struct.pb.h"
 #include "xds/type/v3/typed_struct.pb.h"
 
+using testing::Eq;
+using testing::Optional;
 using testing::Ref;
 using testing::Return;
 
@@ -558,6 +561,44 @@ TEST(UtilityTest, CheckCluster) {
   ON_CALL(*cm.active_clusters_["foo"]->info_, addedViaApi()).WillByDefault(Return(false));
   EXPECT_NO_THROW(Utility::checkCluster("prefix", "foo", cm, true));
   EXPECT_NO_THROW(Utility::checkCluster("prefix", "foo", cm, false));
+}
+
+// Validates getGrpcControlPlane() functionality.
+TEST(UtilityTest, GetGrpcControlPlane) {
+  {
+    // Google gRPC.
+    envoy::config::core::v3::ApiConfigSource api_config_source;
+    const std::string config_yaml = R"EOF(
+      api_type: GRPC
+      grpc_services:
+        google_grpc:
+          target_uri: trafficdirector.googleapis.com
+    )EOF";
+    TestUtility::loadFromYaml(config_yaml, api_config_source);
+    EXPECT_THAT(Utility::getGrpcControlPlane(api_config_source),
+                Optional(Eq("trafficdirector.googleapis.com")));
+  }
+  {
+    // Envoy gRPC.
+    envoy::config::core::v3::ApiConfigSource api_config_source;
+    const std::string config_yaml = R"EOF(
+      api_type: GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: some_xds_cluster
+    )EOF";
+    TestUtility::loadFromYaml(config_yaml, api_config_source);
+    EXPECT_THAT(Utility::getGrpcControlPlane(api_config_source), Optional(Eq("some_xds_cluster")));
+  }
+  {
+    // No control plane.
+    envoy::config::core::v3::ApiConfigSource api_config_source;
+    const std::string config_yaml = R"EOF(
+      api_type: GRPC
+    )EOF";
+    TestUtility::loadFromYaml(config_yaml, api_config_source);
+    EXPECT_EQ(absl::nullopt, Utility::getGrpcControlPlane(api_config_source));
+  }
 }
 
 } // namespace

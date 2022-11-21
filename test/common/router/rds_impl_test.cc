@@ -2,8 +2,8 @@
 #include <memory>
 #include <string>
 
-#include "envoy/admin/v3/config_dump.pb.h"
-#include "envoy/admin/v3/config_dump.pb.validate.h"
+#include "envoy/admin/v3/config_dump_shared.pb.h"
+#include "envoy/admin/v3/config_dump_shared.pb.validate.h"
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
@@ -11,9 +11,12 @@
 
 #include "source/common/config/utility.h"
 #include "source/common/json/json_loader.h"
+#include "source/common/router/config_impl.h"
 #include "source/common/router/rds_impl.h"
-#include "source/server/admin/admin.h"
 
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
+#include "source/server/admin/admin.h"
+#endif
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/matcher/mocks.h"

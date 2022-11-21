@@ -1,6 +1,7 @@
 #!/bin/bash -e
 
 export NAME=redis
+export PORT_ADMIN="${REDIS_PORT_ADMIN:-11800}"
 
 # shellcheck source=examples/verify-common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
@@ -17,4 +18,4 @@ redis-cli -h localhost -p 1999 get bar | grep BAR
 run_log "Test redis stats"
 responds_with \
     egress_redis \
-    "http://localhost:8001/stats?usedonly&filter=redis.egress_redis.command"
+    "http://localhost:${PORT_ADMIN}/stats?usedonly&filter=redis.egress_redis.command"

@@ -72,7 +72,7 @@ public:
                          std::chrono::milliseconds timeout);
   // Get the per-route config if it's available, otherwise the
   // extension's config.
-  const OnDemandFilterConfig* getConfig(const Router::RouteConstSharedPtr& route);
+  const OnDemandFilterConfig* getConfig();
 
   void setFilterIterationState(Envoy::Http::FilterHeadersStatus status) {
     filter_iteration_state_ = status;

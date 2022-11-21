@@ -21,8 +21,8 @@ public:
   using ProdClusterManagerFactory::ProdClusterManagerFactory;
 
   explicit ValidationClusterManagerFactory(
-      Server::Admin& admin, Runtime::Loader& runtime, Stats::Store& stats,
-      ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
+      OptRef<Server::Admin> admin, Runtime::Loader& runtime, Stats::Store& stats,
+      ThreadLocal::Instance& tls, LazyCreateDnsResolver dns_resolver_fn,
       Ssl::ContextManager& ssl_context_manager, Event::Dispatcher& main_thread_dispatcher,
       const LocalInfo::LocalInfo& local_info, Secret::SecretManager& secret_manager,
       ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
@@ -31,9 +31,11 @@ public:
       const Server::Options& options, Quic::QuicStatNames& quic_stat_names,
       Server::Instance& server)
       : ProdClusterManagerFactory(
-            admin, runtime, stats, tls, dns_resolver, ssl_context_manager, main_thread_dispatcher,
-            local_info, secret_manager, validation_context, api, http_context, grpc_context,
-            router_context, log_manager, singleton_manager, options, quic_stat_names, server),
+            const_cast<Server::Configuration::ServerFactoryContext&>(server.serverFactoryContext()),
+            admin, runtime, stats, tls, dns_resolver_fn, ssl_context_manager,
+            main_thread_dispatcher, local_info, secret_manager, validation_context, api,
+            http_context, grpc_context, router_context, log_manager, singleton_manager, options,
+            quic_stat_names, server),
         grpc_context_(grpc_context), router_context_(router_context) {}
 
   ClusterManagerPtr

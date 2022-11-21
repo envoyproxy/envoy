@@ -14,10 +14,11 @@ services:
       context: .
       dockerfile: Dockerfile-frontenvoy
     ports:
-    - "8002:8000"
+    - "${PORT_CROSS:-8002}:8000"
 
   service:
-    image: flask_service:python-3.10-slim-bullseye
+    build:
+      context: ../../shared/service
     volumes:
     - ./service.py:/code/service.py
     - ../index.html:/code/index.html

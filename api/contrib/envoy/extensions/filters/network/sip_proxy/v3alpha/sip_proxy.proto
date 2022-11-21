@@ -81,7 +81,7 @@ message SipProxy {
   // A list of individual Sip filters that make up the filter chain for requests made to the
   // Sip proxy. Order matters as the filters are processed sequentially. For backwards
   // compatibility, if no sip_filters are specified, a default Sip router filter
-  // (`envoy.filters.sip.router`) is used.
+  // (``envoy.filters.sip.router``) is used.
   // [#extension-category: envoy.sip_proxy.filters]
   repeated SipFilter sip_filters = 3;
 
@@ -104,7 +104,7 @@ message SipFilter {
 
 // SipProtocolOptions specifies Sip upstream protocol options. This object is used in
 // :ref:`typed_extension_protocol_options<envoy_v3_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`,
-// keyed by the name `envoy.filters.network.sip_proxy`.
+// keyed by the name ``envoy.filters.network.sip_proxy``.
 message SipProtocolOptions {
   // All sip messages in one dialog should go to the same endpoint.
   bool session_affinity = 1;
@@ -153,9 +153,9 @@ message Cache {
 
 // Local Service
 message LocalService {
-  //The domain need to matched
+  // The domain need to matched
   string domain = 1;
 
-  //The parameter to get domain
+  // The parameter to get domain
   string parameter = 2;
 }

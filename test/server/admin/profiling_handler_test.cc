@@ -69,13 +69,23 @@ TEST_P(AdminInstanceTest, AdminBadProfiler) {
   AdminImpl admin_bad_profile_path(TestEnvironment::temporaryPath("some/unlikely/bad/path.prof"),
                                    server_, false);
   Http::TestResponseHeaderMapImpl header_map;
-  const absl::string_view post = Http::Headers::get().MethodValues.Post;
-  request_headers_.setMethod(post);
+  request_headers_.setMethod(Http::Headers::get().MethodValues.Post);
+  request_headers_.setPath("/cpuprofiler?enable=y");
   admin_filter_.decodeHeaders(request_headers_, false);
   EXPECT_NO_LOGS(EXPECT_EQ(Http::Code::InternalServerError,
-                           admin_bad_profile_path.runCallback("/cpuprofiler?enable=y", header_map,
-                                                              data, admin_filter_)));
+                           admin_bad_profile_path.runCallback(header_map, data, admin_filter_)));
   EXPECT_FALSE(Profiler::Cpu::profilerEnabled());
+}
+
+TEST_P(AdminInstanceTest, AdminHeapDump) {
+  Buffer::OwnedImpl data;
+  Http::TestResponseHeaderMapImpl header_map;
+
+#ifdef TCMALLOC
+  EXPECT_EQ(Http::Code::OK, postCallback("/heap_dump", header_map, data));
+#else
+  EXPECT_EQ(Http::Code::NotImplemented, postCallback("/heap_dump", header_map, data));
+#endif
 }
 
 } // namespace Server

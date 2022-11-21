@@ -1,6 +1,7 @@
 #include "test/common/router/router_test_base.h"
 
 #include "source/common/router/debug_config.h"
+#include "source/common/router/upstream_codec_filter.h"
 
 namespace Envoy {
 namespace Router {
@@ -18,7 +19,7 @@ RouterTestBase::RouterTestBase(bool start_child_span, bool suppress_envoy_header
               ShadowWriterPtr{shadow_writer_}, true, start_child_span, suppress_envoy_headers,
               false, suppress_grpc_request_failure_code_stats, std::move(strict_headers_to_check),
               test_time_.timeSystem(), http_context_, router_context_),
-      router_(config_) {
+      router_(config_, config_.default_stats_) {
   router_.setDecoderFilterCallbacks(callbacks_);
   upstream_locality_.set_zone("to_az");
   cm_.initializeThreadLocalClusters({"fake_cluster"});
@@ -38,7 +39,6 @@ RouterTestBase::RouterTestBase(bool start_child_span, bool suppress_envoy_header
   EXPECT_CALL(callbacks_.dispatcher_, pushTrackedObject(_)).Times(AnyNumber());
   EXPECT_CALL(callbacks_.dispatcher_, popTrackedObject(_)).Times(AnyNumber());
   EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_)).Times(AnyNumber());
-  callbacks_.dispatcher_.delete_immediately_ = true;
 
   EXPECT_CALL(callbacks_.route_->route_entry_.early_data_policy_, allowsEarlyDataForRequest(_))
       .WillRepeatedly(Invoke(Http::Utility::isSafeRequest));
@@ -230,7 +230,8 @@ void RouterTestBase::enableRedirects(uint32_t max_internal_redirects) {
       .WillByDefault(Return(max_internal_redirects));
   ON_CALL(callbacks_.route_->route_entry_.internal_redirect_policy_, isCrossSchemeRedirectAllowed())
       .WillByDefault(Return(false));
-  ON_CALL(callbacks_, connection()).WillByDefault(Return(&connection_));
+  ON_CALL(callbacks_, connection())
+      .WillByDefault(Return(OptRef<const Network::Connection>{connection_}));
 }
 
 void RouterTestBase::setNumPreviousRedirect(uint32_t num_previous_redirects) {

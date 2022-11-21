@@ -4,8 +4,8 @@ Bandwidth limit
 ====================
 
 * Bandwidth limiting :ref:`architecture overview <arch_overview_bandwidth_limit>`
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.bandwidth_limit.v3.BandwidthLimit``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.bandwidth_limit.v3.BandwidthLimit>`
-* This filter should be configured with the name ``envoy.filters.http.bandwidth_limit``.
 
 The HTTP Bandwidth limit filter limits the size of data flow to the max bandwidth set in the ``limit_kbps``
 when the request's route, virtual host or filter chain has a

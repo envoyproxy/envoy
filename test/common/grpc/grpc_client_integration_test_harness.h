@@ -23,6 +23,7 @@
 #include "source/common/network/connection_impl.h"
 #include "source/common/network/raw_buffer_socket.h"
 #include "source/common/router/context_impl.h"
+#include "source/common/router/upstream_codec_filter.h"
 #include "source/common/stats/symbol_table.h"
 
 #include "source/extensions/transport_sockets/tls/context_config_impl.h"

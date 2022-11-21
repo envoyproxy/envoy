@@ -175,14 +175,15 @@ def envoy_jinja_env(
     native.genrule(
         name = name_env,
         cmd = """
-        TEMPLATE_PATH=$$(realpath %s) \
-        && echo -n "\
+        echo -n "\
+               \nimport pathlib \
                \nfrom envoy.base.utils.jinja_env import JinjaEnvironment \
-               \nenv = JinjaEnvironment.load(\\"$$TEMPLATE_PATH\\", %s)" \
+               \npath=pathlib.Path(__file__).parent.joinpath(pathlib.Path(\\"%s\\").name) \
+               \nenv = JinjaEnvironment.load(str(path), %s)" \
                > $@
         """ % (template_arg, load_args),
         outs = [name_env_py],
-        tools = [name_templates],
+        exec_tools = [name_templates],
     )
 
     py_library(
@@ -315,10 +316,11 @@ def envoy_py_data(name, src, format = None, entry_point = base_entry_point):
     native.genrule(
         name = name_env,
         cmd = """
-        PICKLE_PATH=$$(realpath %s) \
+        PICKLE_DATA=$$(cat %s | base64) \
         && echo -n "\
-               \nfrom envoy.base.utils.data_env import DataEnvironment \
-               \ndata = DataEnvironment.load(\\"$$PICKLE_PATH\\")" \
+               \nimport base64 \
+               \nimport pickle \
+               \ndata = pickle.loads(base64.b64decode(\\"\\"\\"$$PICKLE_DATA\\"\\"\\"))\n" \
                > $@
         """ % pickle_arg,
         outs = [name_env_py],

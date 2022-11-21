@@ -1,0 +1,1 @@
+FROM openzipkin/zipkin:latest@sha256:9a7dbc81516a15348a250225fb79cd60d0d9938f1a5373b2a0118ba8c828ffdf

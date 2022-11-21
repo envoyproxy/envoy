@@ -1,6 +1,6 @@
 FROM envoyproxy:tracing
 
-RUN apt-get update && apt-get -q install --no-install-recommends -y curl
+RUN apt-get -qq update && apt-get -qq install --no-install-recommends -y curl
 
 #
 # for discussion on jaeger binary compatibility, and the source of the file, see here:

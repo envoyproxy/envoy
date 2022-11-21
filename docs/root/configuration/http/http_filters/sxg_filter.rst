@@ -2,16 +2,16 @@
 .. _config_http_filters_sxg:
 
 SXG
-======
+===
 
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.sxg.v3alpha.SXG``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.sxg.v3alpha.SXG>`
-* This filter should be configured with the name *envoy.filters.http.sxg*.
 
 .. attention::
 
   The SXG filter is experimental and is currently under active development.
 
-This filter generates a Signed HTTP Exchange (SXG) package from a downstream web application. It uses `libsxg <https://github.com/google/libsxg/>`_ to perform the SXG packaging and signing, setting the Content-Type header to `application/signed-exchange;v=b3` and response body with the generated SXG document.
+This filter generates a Signed HTTP Exchange (SXG) package from a downstream web application. It uses `libsxg <https://github.com/google/libsxg/>`_ to perform the SXG packaging and signing, setting the ``Content-Type`` header to ``application/signed-exchange;v=b3`` and response body with the generated SXG document.
 
 The SXG filter is only included in :ref:`contrib images <install_contrib>`
 
@@ -24,6 +24,10 @@ Transaction flow:
 If there is an error generating the SXG package we fall back to the original HTML.
 
 For more information on Signed HTTP Exchanges see `this doc <https://developers.google.com/web/updates/2018/11/signed-exchanges>`_.
+
+.. note::
+
+ These features are only supported on Linux amd64.
 
 Example configuration
 ---------------------

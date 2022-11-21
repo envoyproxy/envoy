@@ -1,9 +1,11 @@
 FROM envoyproxy/envoy-dev:latest
 
-RUN apt-get update \
-    && apt-get install --no-install-recommends -y curl \
-    && apt-get autoremove -y \
-    && apt-get clean \
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get -qq update \
+    && apt-get -qq install --no-install-recommends -y curl \
+    && apt-get -qq autoremove -y \
+    && apt-get -qq clean \
     && rm -rf /tmp/* /var/tmp/* /var/lib/apt/lists/*
 
 COPY ./front-envoy-jaeger.yaml /etc/front-envoy.yaml
