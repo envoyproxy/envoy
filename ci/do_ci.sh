@@ -213,6 +213,17 @@ else
   TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "@com_github_google_quiche//:ci_tests" "//mobile/test/...")
 fi
 
+SKIP_TESTS=0
+# Use this a proxy for "is this running under CI"
+if [[ -z "$BAZEL_REMOTE_CACHE" ]]; then
+  if  git diff --name-only origin/main | grep -v mobile; then
+    echo "Envoy Tests will run"
+  else
+    echo "Tests will not run: no non-mobile changes"
+    SKIP_TESTS=1
+  fi
+fi
+
 if [[ "$CI_TARGET" == "bazel.release" ]]; then
   # When testing memory consumption, we want to test against exact byte-counts
   # where possible. As these differ between platforms and compile options, we
@@ -440,14 +451,16 @@ elif [[ "$CI_TARGET" == "bazel.api_compat" ]]; then
   bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/api_proto_breaking_change_detector:detector_ci "${BASE_BRANCH_REF}"
   exit 0
 elif [[ "$CI_TARGET" == "bazel.coverage" || "$CI_TARGET" == "bazel.fuzz_coverage" ]]; then
-  setup_clang_toolchain
-  echo "${CI_TARGET} build with tests ${COVERAGE_TEST_TARGETS[*]}"
+  if ! $SKIP_TESTS; then
+    setup_clang_toolchain
+    echo "${CI_TARGET} build with tests ${COVERAGE_TEST_TARGETS[*]}"
 
-  [[ "$CI_TARGET" == "bazel.fuzz_coverage" ]] && export FUZZ_COVERAGE=true
+    [[ "$CI_TARGET" == "bazel.fuzz_coverage" ]] && export FUZZ_COVERAGE=true
 
-  # We use custom BAZEL_BUILD_OPTIONS here to cover profiler's code.
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]} --define tcmalloc=gperftools" "${ENVOY_SRCDIR}"/test/run_envoy_bazel_coverage.sh "${COVERAGE_TEST_TARGETS[@]}"
-  collect_build_profile coverage
+    # We use custom BAZEL_BUILD_OPTIONS here to cover profiler's code.
+    BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]} --define tcmalloc=gperftools" "${ENVOY_SRCDIR}"/test/run_envoy_bazel_coverage.sh "${COVERAGE_TEST_TARGETS[@]}"
+    collect_build_profile coverage
+  fi
   exit 0
 elif [[ "$CI_TARGET" == "bazel.clang_tidy" ]]; then
   # clang-tidy will warn on standard library issues with libc++
