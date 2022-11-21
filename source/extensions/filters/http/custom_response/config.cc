@@ -39,7 +39,7 @@ createMatcher(const envoy::extensions::filters::http::custom_response::v3::Custo
   } else {
     // Allow matcher to not be set, to allow for cases where we only have route or
     // virtual host specific configurations.
-    return Matcher::MatchTreePtr<::Envoy::Http::HttpMatchingData>();
+    return Matcher::MatchTreePtr<::Envoy::Http::HttpMatchingData>{};
   }
 }
 
