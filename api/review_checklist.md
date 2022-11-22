@@ -108,6 +108,9 @@ consider the answers to these questions before sending a PR.
 - Will the dependencies cause problems for any known xDS clients (e.g.,
   [Envoy's dependency policy](https://github.com/envoyproxy/envoy/blob/main/DEPENDENCY_POLICY.md))?
 
+## Behavior changes:
+- Is it applied to the [runtime guarding rules](CONTRIBUTING.md#runtime-guarding)?
+
 ## Failure Modes
 - What is the failure mode if this feature is configured but is not working
   for some reason?
