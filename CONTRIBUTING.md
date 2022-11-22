@@ -175,8 +175,8 @@ how HTTP is serialized out) for non-alpha features and fixing API behavior.
 
 When using runtime guarding for API behavior change, follow the rules below:
 * If the API works without any meaningful behavior, it can be fixed directly without any runtime guarding.
-* If the API works without any meaningful behavior but the fixing is breaking change (eg. API returns a rejection),
-  the rejection should be added with runtime guarding.
+* If the API works without any meaningful behavior but the fixing is breaking change (eg. API returns a rejection which previously accepted),
+  it should be added with runtime guarding.
 * If the API works with a meaningful behavior but is different from API documentation description including an unclear
   description, it should fix with runtime guarding.
 
