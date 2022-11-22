@@ -147,19 +147,21 @@ void benchmarkLazyInitCreationInstantiateOnWorkerThreads(::benchmark::State& sta
         }
       }
     });
-    Envoy::Random::RandomGeneratorImpl random;
-    // indexes of stats on which the upstream_rq_active_.inc() will be called.
-    std::atomic_uint64_t idx = 0;
+    std::atomic_int thread_idx = 0;
     test.runOnAllWorkersBlocking([&]() {
-      while (++idx <= num_stats) {
-        const uint64_t index = random.random() % num_stats;
+      int32_t batch_size = num_stats / 5;
+      int t_idx = thread_idx++;
+      uint64_t begin = t_idx * batch_size;
+      uint64_t end = std::min(begin + batch_size, num_stats);
+      for (uint64_t idx = begin; idx < end; ++idx) {
         if (lazy_init) {
           // Lazy-init on workers happen when the "index"-th stat instance is not created.
-          (*lazy_stats[index])->upstream_rq_active_.inc();
-          (*lazy_stats[index])->upstream_rq_total_.inc();
+          ClusterTrafficStats& stats = *(*lazy_stats[idx]);
+          UNREFERENCED_PARAMETER(stats);
+
         } else {
-          normal_stats[index]->upstream_rq_active_.inc();
-          normal_stats[index]->upstream_rq_total_.inc();
+          ClusterTrafficStats& stats = *normal_stats[idx];
+          UNREFERENCED_PARAMETER(stats);
         }
       }
     });
@@ -168,7 +170,53 @@ void benchmarkLazyInitCreationInstantiateOnWorkerThreads(::benchmark::State& sta
 
 BENCHMARK(benchmarkLazyInitCreationInstantiateOnWorkerThreads)
     ->ArgsProduct({{0, 1}, {1000, 10000, 100000, 500000}})
-    ->UseRealTime()
+    ->Unit(::benchmark::kMillisecond);
+
+// Benchmark mimicks that worker threads inc the stats.
+void benchmarkLazyInitStatsAccess(::benchmark::State& state) {
+  const bool lazy_init = state.range(0) == 1;
+  const uint64_t num_stats = state.range(1);
+  Envoy::Event::Libevent::Global::initialize();
+  MultiThreadLazyinitStatsTest test;
+  std::vector<Stats::ScopeSharedPtr> scopes;
+  std::vector<std::shared_ptr<Stats::LazyInit<ClusterTrafficStats>>> lazy_stats;
+  std::vector<std::shared_ptr<ClusterTrafficStats>> normal_stats;
+  Upstream::ClusterTrafficStatNames stat_names{test.store_->symbolTable()};
+
+  for (auto _ : state) {           // NOLINT: Silences warning about dead store
+    test.runOnMainBlocking([&]() { // Create stats on main-thread.
+      for (uint64_t i = 0; i < num_stats; ++i) {
+        std::string new_cluster_name = absl::StrCat("cluster_", i);
+        auto scope = test.store_->createScope(new_cluster_name);
+        scopes.push_back(scope);
+        if (lazy_init) {
+          auto ptr = std::make_shared<Stats::LazyInit<ClusterTrafficStats>>(*scope, stat_names);
+          *(*ptr);
+          lazy_stats.push_back(std::move(ptr));
+        } else {
+          normal_stats.push_back(std::make_shared<ClusterTrafficStats>(stat_names, *scope));
+        }
+      }
+    });
+    test.runOnAllWorkersBlocking([&]() {
+      // 50 x num_stats inc() calls.
+      for (uint64_t idx = 0; idx < 10 * num_stats; ++idx) {
+        if (lazy_init) {
+          // Lazy-init on workers happen when the "index"-th stat instance is not created.
+          ClusterTrafficStats& stats = *(*lazy_stats[idx]);
+          stats.upstream_cx_active_.inc();
+
+        } else {
+          ClusterTrafficStats& stats = *normal_stats[idx];
+          stats.upstream_cx_active_.inc();
+        }
+      }
+    });
+  }
+}
+
+BENCHMARK(benchmarkLazyInitStatsAccess)
+    ->ArgsProduct({{0, 1}, {1000, 10000, 100000, 500000}})
     ->Unit(::benchmark::kMillisecond);
 
 } // namespace
