@@ -98,4 +98,3 @@ are emitted to the normal cluster :ref:`dynamic HTTP statistics <config_cluster_
   over_limit, Counter, Total requests that exceeded assigned rate limit
   no_assigment, Counter, Total requests that were applied the :ref:`no_assigment_behavior <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.no_assignment_behavior>`
   expired_assigment, Counter, Total requests that were applied the :ref:`expired_assignment_behavior <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.expired_assignment_behavior>`
-
