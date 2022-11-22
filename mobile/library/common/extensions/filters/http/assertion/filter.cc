@@ -1,4 +1,4 @@
-#include "mobile/library/common/extensions/filters/http/assertion/filter.h"
+#include "library/common/extensions/filters/http/assertion/filter.h"
 
 #include "envoy/http/codes.h"
 #include "envoy/server/filter_config.h"
