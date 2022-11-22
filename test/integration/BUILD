@@ -788,6 +788,7 @@ envoy_cc_test(
         "//test/integration/filters:reset_idle_timer_filter_lib",
         "//test/integration/filters:set_route_filter_lib",
         "//test/test_common:test_time_lib",
+        "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
