@@ -16,7 +16,7 @@ HeadersBuilder& HeadersBuilder::set(std::string name,
   if (this->isRestrictedHeader(name)) {
     return *this;
   }
-  this->headers_[std::move(name)] = values;
+  this->headers_[std::move(name)] = std::move(values);
   return *this;
 }
 
