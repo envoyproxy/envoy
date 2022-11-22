@@ -14,7 +14,7 @@ namespace {
 
 using Upstream::ClusterTrafficStats;
 
-// Benchmark no-lazy-init on stats.
+// Benchmark no-lazy-init on stats, the lazy init version is much faster since no allocation.
 void benchmarkLazyInitCreation(::benchmark::State& state) {
   const bool lazy_init = state.range(0) == 1;
   const uint64_t num_stats = state.range(1);
@@ -43,7 +43,7 @@ BENCHMARK(benchmarkLazyInitCreation)
     ->ArgsProduct({{0, 1}, {1000, 10000, 100000, 500000}})
     ->Unit(::benchmark::kMillisecond);
 
-// Benchmark lazy-init stats in same thread, mimicking main thread creation.
+// Benchmark lazy-init of stats in same thread, mimicking main thread creation.
 void benchmarkLazyInitCreationInstantiateSameThread(::benchmark::State& state) {
   const bool lazy_init = state.range(0) == 1;
   const uint64_t num_stats = state.range(1);
@@ -122,7 +122,7 @@ public:
   MultiThreadLazyinitStatsTest() : ThreadLocalRealThreadsTestBase(5) {}
 };
 
-// Benchmark lazy-init stats in different thread, mimicking worker threads creation.
+// Benchmark lazy-init stats in different worker thread, mimicking worker threads creation.
 void benchmarkLazyInitCreationInstantiateOnWorkerThreads(::benchmark::State& state) {
   const bool lazy_init = state.range(0) == 1;
   const uint64_t num_stats = state.range(1);
@@ -147,29 +147,19 @@ void benchmarkLazyInitCreationInstantiateOnWorkerThreads(::benchmark::State& sta
         }
       }
     });
-
     Envoy::Random::RandomGeneratorImpl random;
     // indexes of stats on which the upstream_rq_active_.inc() will be called.
-    std::vector<int32_t> stat_indexes(num_stats);
-    for (uint64_t i = 0; i < num_stats; ++i) {
-      stat_indexes.push_back(random.random() % num_stats);
-    }
     std::atomic_uint64_t idx = 0;
     test.runOnAllWorkersBlocking([&]() {
-      while (true) {
-        uint64_t index = idx++;
-        if (index < num_stats) {
-          if (lazy_init) {
-            // Lazy-init on workers happen when the "index"-th stat instance is not created.
-            (*lazy_stats[index])->upstream_rq_active_.inc();
-            (*lazy_stats[index])->upstream_rq_total_.inc();
-
-          } else {
-            normal_stats[index]->upstream_rq_active_.inc();
-            normal_stats[index]->upstream_rq_total_.inc();
-          }
+      while (++idx <= num_stats) {
+        const uint64_t index = random.random() % num_stats;
+        if (lazy_init) {
+          // Lazy-init on workers happen when the "index"-th stat instance is not created.
+          (*lazy_stats[index])->upstream_rq_active_.inc();
+          (*lazy_stats[index])->upstream_rq_total_.inc();
         } else {
-          break;
+          normal_stats[index]->upstream_rq_active_.inc();
+          normal_stats[index]->upstream_rq_total_.inc();
         }
       }
     });
@@ -178,6 +168,7 @@ void benchmarkLazyInitCreationInstantiateOnWorkerThreads(::benchmark::State& sta
 
 BENCHMARK(benchmarkLazyInitCreationInstantiateOnWorkerThreads)
     ->ArgsProduct({{0, 1}, {1000, 10000, 100000, 500000}})
+    ->UseRealTime()
     ->Unit(::benchmark::kMillisecond);
 
 } // namespace
