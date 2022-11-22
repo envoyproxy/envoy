@@ -3,6 +3,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.validate.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/load_balancing_policies/deterministic_aperture/v3/deterministic_aperture.pb.h"
 
 #include "test/integration/http_integration.h"
 
@@ -26,8 +27,8 @@ public:
       cluster->set_lb_policy(envoy::config::cluster::v3::Cluster::LOAD_BALANCING_POLICY_CONFIG);
       auto mutable_lb_policy = cluster->mutable_load_balancing_policy();
       envoy::config::cluster::v3::LoadBalancingPolicy::Policy lbpolicy;
-      envoy::config::cluster::v3::Cluster::DeterministicApertureLbConfig
-          deterministic_aperture_config;
+      envoy::extensions::load_balancing_policies::deterministic_aperture::v3::
+          DeterministicApertureLbConfig deterministic_aperture_config;
       lbpolicy.mutable_typed_extension_config()->set_name(
           "envoy.load_balancing_policies.deterministic_aperture");
       lbpolicy.mutable_typed_extension_config()->mutable_typed_config()->PackFrom(

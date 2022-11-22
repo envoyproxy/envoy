@@ -164,6 +164,7 @@ envoy_cc_library(
         "//envoy/upstream:types_interface",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/load_balancing_policies/deterministic_aperture/v3:pkg_cc_proto",
     ],
 )
 

@@ -13,6 +13,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/config/typed_metadata.h"
+#include "envoy/extensions/load_balancing_policies/deterministic_aperture/v3/deterministic_aperture.pb.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/filter_factory.h"
 #include "envoy/network/connection.h"
@@ -602,7 +603,7 @@ public:
   GAUGE(membership_total, NeverImport)
 
 /**
- * All cluster loadbalancing related stats.
+ * All cluster load-balancing related stats.
  */
 #define ALL_CLUSTER_LB_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)                    \
   COUNTER(lb_healthy_panic)                                                                        \
@@ -987,11 +988,12 @@ public:
 
   /**
    * @return const
-   * absl::optional<envoy::config::cluster::v3::Cluster::DeterministicApertureLbConfig>& the
-   * configuration for the Deterministic Aperture load balancing policy, only used if type is set to
-   *         DETERMINISTIC_APERTURE_LB.
+   * absl::optional<envoy::extensions::load_balancing_policies::deterministic_aperture::v3::DeterministicApertureLbConfig>&
+   * the configuration for the Deterministic Aperture load balancing policy, only used if type is
+   * set to DETERMINISTIC_APERTURE_LB.
    */
-  virtual const absl::optional<envoy::config::cluster::v3::Cluster::DeterministicApertureLbConfig>&
+  virtual const absl::optional<envoy::extensions::load_balancing_policies::deterministic_aperture::
+                                   v3::DeterministicApertureLbConfig>&
   lbDeterministicApertureConfig() const PURE;
 
   /**

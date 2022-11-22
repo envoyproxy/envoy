@@ -9,6 +9,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/config/typed_metadata.h"
+#include "envoy/extensions/load_balancing_policies/deterministic_aperture/v3/deterministic_aperture.pb.h"
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
@@ -136,9 +137,9 @@ public:
               lbRingHashConfig, (), (const));
   MOCK_METHOD(const absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig>&,
               lbMaglevConfig, (), (const));
-  MOCK_METHOD(
-      const absl::optional<envoy::config::cluster::v3::Cluster::DeterministicApertureLbConfig>&,
-      lbDeterministicApertureConfig, (), (const));
+  MOCK_METHOD(const absl::optional<envoy::extensions::load_balancing_policies::
+                                       deterministic_aperture::v3::DeterministicApertureLbConfig>&,
+              lbDeterministicApertureConfig, (), (const));
   MOCK_METHOD(const absl::optional<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>&,
               lbRoundRobinConfig, (), (const));
   MOCK_METHOD(const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>&,

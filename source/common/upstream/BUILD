@@ -413,6 +413,7 @@ envoy_cc_library(
         ":upstream_lib",
         "//source/common/common:minimal_logger_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/load_balancing_policies/deterministic_aperture/v3:pkg_cc_proto",
     ],
 )
 

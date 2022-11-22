@@ -5,6 +5,7 @@
 
 #include "envoy/common/random_generator.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/extensions/load_balancing_policies/deterministic_aperture/v3/deterministic_aperture.pb.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
@@ -58,8 +59,8 @@ public:
   DeterministicApertureLoadBalancer(
       const PrioritySet& priority_set, ClusterLbStats& stats, Stats::Scope& scope,
       Runtime::Loader& runtime, Random::RandomGenerator& random,
-      const absl::optional<envoy::config::cluster::v3::Cluster::DeterministicApertureLbConfig>&
-          config,
+      const absl::optional<envoy::extensions::load_balancing_policies::deterministic_aperture::v3::
+                               DeterministicApertureLbConfig>& config,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
 
   using HashFunction = envoy::config::cluster::v3::Cluster::RingHashLbConfig::HashFunction;
@@ -176,7 +177,8 @@ public:
                                     TimeSource& time_source) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::config::cluster::v3::Cluster::DeterministicApertureLbConfig>();
+    return std::make_unique<envoy::extensions::load_balancing_policies::deterministic_aperture::v3::
+                                DeterministicApertureLbConfig>();
   }
 };
 

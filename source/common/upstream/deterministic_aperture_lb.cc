@@ -5,17 +5,33 @@
 namespace Envoy {
 namespace Upstream {
 
+envoy::config::cluster::v3::Cluster::RingHashLbConfig toClusterRingHashLbConfig(
+    const envoy::extensions::load_balancing_policies::ring_hash::v3::RingHash& ring_hash_config) {
+  envoy::config::cluster::v3::Cluster::RingHashLbConfig return_value;
+
+  return_value.set_hash_function(
+      static_cast<envoy::config::cluster::v3::Cluster::RingHashLbConfig::HashFunction>(
+          ring_hash_config.hash_function()));
+
+  return_value.mutable_minimum_ring_size()->CopyFrom(ring_hash_config.minimum_ring_size());
+  return_value.mutable_maximum_ring_size()->CopyFrom(ring_hash_config.maximum_ring_size());
+
+  return return_value;
+}
+
 DeterministicApertureLoadBalancer::DeterministicApertureLoadBalancer(
     const PrioritySet& priority_set, ClusterLbStats& stats, Stats::Scope& scope,
     Runtime::Loader& runtime, Random::RandomGenerator& random,
-    const absl::optional<envoy::config::cluster::v3::Cluster::DeterministicApertureLbConfig>&
-        config,
+    const absl::optional<envoy::extensions::load_balancing_policies::deterministic_aperture::v3::
+                             DeterministicApertureLbConfig>& config,
     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
     : RingHashLoadBalancer(
           priority_set, stats, scope, runtime, random,
           (config.has_value()
-               ? absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig>(
-                     config->ring_config())
+               ? (config->has_ring_config()
+                      ? absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig>(
+                            toClusterRingHashLbConfig(config->ring_config()))
+                      : absl::nullopt)
                : absl::nullopt),
           common_config),
       width_((config.has_value() && config->total_peers() > 0) ? (1.0 / config->total_peers())

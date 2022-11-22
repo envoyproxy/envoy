@@ -5,6 +5,7 @@
 #include <string>
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/extensions/load_balancing_policies/deterministic_aperture/v3/deterministic_aperture.pb.h"
 
 #include "source/common/network/utility.h"
 #include "source/common/upstream/deterministic_aperture_lb.h"
@@ -78,7 +79,9 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   ClusterLbStatNames stat_names_;
   ClusterLbStats stats_;
-  absl::optional<envoy::config::cluster::v3::Cluster::DeterministicApertureLbConfig> config_;
+  absl::optional<envoy::extensions::load_balancing_policies::deterministic_aperture::v3::
+                     DeterministicApertureLbConfig>
+      config_;
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Random::MockRandomGenerator> random_;
@@ -98,7 +101,8 @@ INSTANTIATE_TEST_SUITE_P(DeterministicAperturePrimaryOrFailover, DeterministicAp
 
 // Given no hosts, expect chooseHost to return null.
 TEST_P(DeterministicApertureLoadBalancerTest, NoHost) {
-  config_ = envoy::config::cluster::v3::Cluster::DeterministicApertureLbConfig();
+  config_ = envoy::extensions::load_balancing_policies::deterministic_aperture::v3::
+      DeterministicApertureLbConfig();
   init();
   EXPECT_EQ(nullptr, lb_->factory()->create()->chooseHost(nullptr));
 
@@ -144,7 +148,8 @@ TEST_P(DeterministicApertureLoadBalancerTest, Basic) {
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().runCallbacks({}, {});
 
-  config_ = envoy::config::cluster::v3::Cluster::DeterministicApertureLbConfig();
+  config_ = envoy::extensions::load_balancing_policies::deterministic_aperture::v3::
+      DeterministicApertureLbConfig();
   config_->mutable_ring_config()->mutable_minimum_ring_size()->set_value(8);
   config_->mutable_ring_config()->mutable_maximum_ring_size()->set_value(8);
 
@@ -246,7 +251,8 @@ TEST_P(DeterministicApertureFailoverTest, BasicFailover) {
   failover_host_set_.healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:82", simTime())};
   failover_host_set_.hosts_ = failover_host_set_.healthy_hosts_;
 
-  config_ = envoy::config::cluster::v3::Cluster::DeterministicApertureLbConfig();
+  config_ = envoy::extensions::load_balancing_policies::deterministic_aperture::v3::
+      DeterministicApertureLbConfig();
   config_->mutable_ring_config()->mutable_minimum_ring_size()->set_value(12);
   config_->set_total_peers(12);
   config_->set_peer_index(0);
