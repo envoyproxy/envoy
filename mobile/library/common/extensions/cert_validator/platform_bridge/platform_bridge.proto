@@ -1,0 +1,5 @@
+syntax = "proto3";
+
+package envoy_mobile.extensions.cert_validator.platform_bridge;
+
+message PlatformBridgeCertValidator {}
