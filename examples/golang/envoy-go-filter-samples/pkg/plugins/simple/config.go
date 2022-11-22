@@ -1,13 +1,15 @@
 package simple
 
 import (
-	"github.com/envoyproxy/envoy/examples/golang/envoy-go-filter-samples/pkg/http/api"
+    "github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
 )
 
-func ConfigFactory(interface{}) api.HttpFilterFactory {
-	return func(callbacks api.FilterCallbackHandler) api.HttpFilter {
-		return &filter{
-			callbacks: callbacks,
-		}
-	}
+const Name = "simple"
+
+func ConfigFactory(interface{}) api.StreamFilterFactory {
+    return func(callbacks api.FilterCallbackHandler) api.StreamFilter {
+        return &filter{
+            callbacks: callbacks,
+        }
+    }
 }
