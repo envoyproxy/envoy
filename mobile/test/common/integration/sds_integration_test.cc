@@ -63,8 +63,6 @@ protected:
     api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
     auto* grpc_service = api_config_source->add_grpc_services();
     setGrpcService(*grpc_service, std::string(XDS_CLUSTER), fake_upstreams_.back()->localAddress());
-    // TODO(abeyad): Remove the initial_fetch_timeout when
-    // https://github.com/envoyproxy/envoy-mobile/issues/2678 is fixed.
     config_source->mutable_initial_fetch_timeout()->set_seconds(1);
   }
 
