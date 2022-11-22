@@ -33,6 +33,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/upstream:96.0"
 "source/common/watchdog:58.6" # Death tests don't report LCOV
 "source/exe:92.6"
+"source/extensions/clusters/common:68.2"
 "source/extensions/common:95.8"
 "source/extensions/common/tap:92.9"
 "source/extensions/common/wasm:94.7" # flaky: be careful adjusting
@@ -61,12 +62,13 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/network/sni_cluster:88.9"
 "source/extensions/filters/network/sni_dynamic_forward_proxy:95.2"
 "source/extensions/filters/network/thrift_proxy/router:96.4"
+"source/extensions/filters/network/thrift_proxy/filters/payload_to_metadata:96.2"
 "source/extensions/filters/network/wasm:95.7"
 "source/extensions/filters/udp:96.4"
 "source/extensions/filters/udp/dns_filter:96.1"
 "source/extensions/health_checkers:95.7"
 "source/extensions/health_checkers/redis:95.7"
-"source/extensions/http/cache/simple_http_cache:96.0"
+"source/extensions/http/cache/simple_http_cache:95.9"
 "source/extensions/io_socket:96.2"
 "source/extensions/io_socket/user_space:96.2"
 "source/extensions/network/dns_resolver/getaddrinfo:96.3"
@@ -93,7 +95,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/watchdog:83.3" # Death tests within extensions
 "source/extensions/watchdog/profile_action:83.3"
 "source/server:93.3" # flaky: be careful adjusting. See https://github.com/envoyproxy/envoy/issues/15239
-"source/server/admin:97.5"
+"source/server/admin:97.4"
 "source/server/admin:profiler-lib:83"
 "source/server/config_validation:74.8"
 )
