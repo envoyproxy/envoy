@@ -9,6 +9,7 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/base64.h"
 #include "source/common/common/enum_to_int.h"
+#include "source/common/common/lock_guard.h"
 #include "source/common/common/utility.h"
 #include "source/common/grpc/common.h"
 #include "source/common/grpc/context_impl.h"
@@ -226,7 +227,7 @@ void Filter::onDestroy() {
   ENVOY_LOG(info, "golang filter on destroy");
 
   {
-    std::lock_guard<std::mutex> lock(mutex_);
+    Thread::LockGuard lock(mutex_);
     if (has_destroyed_) {
       ENVOY_LOG(warn, "golang filter has been destroyed");
       return;
@@ -282,6 +283,8 @@ GolangStatus Filter::doHeadersGo(ProcessorState& state, Http::RequestOrResponseH
     if (req_ == nullptr) {
       req_ = new httpRequestInternal(weak_from_this());
       req_->configId = getMergedConfigId(state);
+      req_->plugin_name.data = config_->plugin_name().data();
+      req_->plugin_name.len = config_->plugin_name().length();
     }
 
     req_->phase = static_cast<int>(state.phase());
@@ -611,7 +614,7 @@ void Filter::continueStatus(GolangStatus status) {
 }
 
 absl::optional<absl::string_view> Filter::getHeader(absl::string_view key) {
-  std::lock_guard<std::mutex> lock(mutex_);
+  Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(warn, "golang filter has been destroyed");
     return "";
@@ -637,14 +640,14 @@ void copyHeaderMapToGo(Http::HeaderMap& m, GoString* goStrs, char* goBuf) {
     auto len = key.length();
     goStrs[i].n = len;
     goStrs[i].p = goBuf;
-    memcpy(goBuf, key.data(), len);
+    memcpy(goBuf, key.data(), len); // NOLINT(safe-memcpy)
     goBuf += len;
     i++;
 
     len = value.length();
     goStrs[i].n = len;
     goStrs[i].p = goBuf;
-    memcpy(goBuf, value.data(), len);
+    memcpy(goBuf, value.data(), len); // NOLINT(safe-memcpy)
     goBuf += len;
     i++;
     return Http::HeaderMap::Iterate::Continue;
@@ -652,7 +655,7 @@ void copyHeaderMapToGo(Http::HeaderMap& m, GoString* goStrs, char* goBuf) {
 }
 
 void Filter::copyHeaders(GoString* goStrs, char* goBuf) {
-  std::lock_guard<std::mutex> lock(mutex_);
+  Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(warn, "golang filter has been destroyed");
     return;
@@ -662,7 +665,7 @@ void Filter::copyHeaders(GoString* goStrs, char* goBuf) {
 }
 
 void Filter::setHeader(absl::string_view key, absl::string_view value) {
-  std::lock_guard<std::mutex> lock(mutex_);
+  Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(warn, "golang filter has been destroyed");
     return;
@@ -672,7 +675,7 @@ void Filter::setHeader(absl::string_view key, absl::string_view value) {
 }
 
 void Filter::removeHeader(absl::string_view key) {
-  std::lock_guard<std::mutex> lock(mutex_);
+  Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(warn, "golang filter has been destroyed");
     return;
@@ -682,20 +685,20 @@ void Filter::removeHeader(absl::string_view key) {
 }
 
 void Filter::copyBuffer(Buffer::Instance* buffer, char* data) {
-  std::lock_guard<std::mutex> lock(mutex_);
+  Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(warn, "golang filter has been destroyed");
     return;
   }
   for (const Buffer::RawSlice& slice : buffer->getRawSlices()) {
-    memcpy(data, static_cast<const char*>(slice.mem_), slice.len_);
+    memcpy(data, static_cast<const char*>(slice.mem_), slice.len_); // NOLINT(safe-memcpy)
     data += slice.len_;
   }
 }
 
 void Filter::setBufferHelper(Buffer::Instance* buffer, absl::string_view& value,
                              bufferAction action) {
-  std::lock_guard<std::mutex> lock(mutex_);
+  Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(warn, "golang filter has been destroyed");
     return;
@@ -710,7 +713,7 @@ void Filter::setBufferHelper(Buffer::Instance* buffer, absl::string_view& value,
 }
 
 void Filter::copyTrailers(GoString* goStrs, char* goBuf) {
-  std::lock_guard<std::mutex> lock(mutex_);
+  Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(warn, "golang filter has been destroyed");
     return;
@@ -720,7 +723,7 @@ void Filter::copyTrailers(GoString* goStrs, char* goBuf) {
 }
 
 void Filter::setTrailer(absl::string_view key, absl::string_view value) {
-  std::lock_guard<std::mutex> lock(mutex_);
+  Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(warn, "golang filter has been destroyed");
     return;
@@ -730,7 +733,7 @@ void Filter::setTrailer(absl::string_view key, absl::string_view value) {
 }
 
 void Filter::getStringValue(int id, GoString* valueStr) {
-  std::lock_guard<std::mutex> lock(mutex_);
+  Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(warn, "golang filter has been destroyed");
     return;
@@ -774,9 +777,10 @@ uint64_t Filter::getMergedConfigId(ProcessorState& state) {
 
 /*** FilterConfig ***/
 
-FilterConfig::FilterConfig(const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config)
-    : plugin_name_(proto_config.plugin_name()), so_id_(proto_config.so_id()),
-      plugin_config_(proto_config.plugin_config()) {
+FilterConfig::FilterConfig(
+    const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config)
+    : plugin_name_(proto_config.plugin_name()), so_id_(proto_config.library_id()),
+      so_path_(proto_config.library_path()), plugin_config_(proto_config.plugin_config()) {
   ENVOY_LOG(info, "initilizing golang filter config");
   // NP: dso may not loaded yet, can not invoke moeNewHttpPluginConfig yet.
 };

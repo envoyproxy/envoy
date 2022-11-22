@@ -1,19 +1,18 @@
 #pragma once
 
 #include <atomic>
-#include <mutex>
 
 #include "envoy/access_log/access_log.h"
-#include "contrib/envoy/extensions/filters/http/golang/v3alpha/golang.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "source/common/http/utility.h"
-#include "source/common/grpc/context_impl.h"
-
-#include "source/common/common/linked_object.h"
 #include "source/common/buffer/watermark_buffer.h"
+#include "source/common/common/linked_object.h"
+#include "source/common/common/thread.h"
+#include "source/common/grpc/context_impl.h"
+#include "source/common/http/utility.h"
 
+#include "contrib/envoy/extensions/filters/http/golang/v3alpha/golang.pb.h"
 #include "contrib/golang/filters/http/source/common/dso/dso.h"
 #include "contrib/golang/filters/http/source/processor_state.h"
 
@@ -34,6 +33,7 @@ public:
 
   const std::string& filter_chain() const { return filter_chain_; }
   const std::string& so_id() const { return so_id_; }
+  const std::string& so_path() const { return so_path_; }
   const std::string& plugin_name() const { return plugin_name_; }
   uint64_t getConfigId();
 
@@ -41,7 +41,8 @@ private:
   const std::string filter_chain_;
   const std::string plugin_name_;
   const std::string so_id_;
-  const Protobuf::Any plugin_config_;
+  const std::string so_path_;
+  const ProtobufWkt::Any plugin_config_;
   uint64_t config_id_{0};
 };
 
@@ -60,7 +61,7 @@ public:
   uint64_t getMergedConfigId(uint64_t parent_id, std::string so_id);
 
 private:
-  const Protobuf::Any plugin_config_;
+  const ProtobufWkt::Any plugin_config_;
   uint64_t config_id_{0};
   uint64_t merged_config_id_{0};
 };
@@ -219,7 +220,7 @@ private:
   // lock for has_destroyed_,
   // to avoid race between envoy c thread and go thread (when calling back from go).
   // it should also be okay without this lock in most cases, just for extreme case.
-  std::mutex mutex_{};
+  Thread::MutexBasicLockable mutex_{};
   bool has_destroyed_{false};
 
   // other filter trigger sendLocalReply during go processing in async.
@@ -243,11 +244,13 @@ struct httpRequestInternal : httpRequest {
 // used to count function execution time
 template <typename T = std::chrono::microseconds> struct measure {
   template <typename F, typename... Args> static typename T::rep execution(F func, Args&&... args) {
-    auto start = std::chrono::steady_clock::now();
+    auto start = std::chrono::steady_clock::now(); // NO_CHECK_FORMAT(real_time)
 
     func(std::forward<Args>(args)...);
 
-    auto duration = std::chrono::duration_cast<T>(std::chrono::steady_clock::now() - start);
+    auto duration = std::chrono::duration_cast<T>(
+        std::chrono::steady_clock::now() - // NO_CHECK_FORMAT(real_time)
+        start);
 
     return duration.count();
   }

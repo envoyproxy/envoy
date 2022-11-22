@@ -2,8 +2,8 @@
 
 #include "envoy/registry/registry.h"
 
-#include "contrib/golang/filters/http/source/golang_filter.h"
 #include "contrib/golang/filters/http/source/common/dso/dso.h"
+#include "contrib/golang/filters/http/source/golang_filter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -11,22 +11,22 @@ namespace HttpFilters {
 namespace Golang {
 
 Http::FilterFactoryCb GolangFilterConfig::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config, const std::string&,
-    Server::Configuration::FactoryContext& context) {
+    const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
+    const std::string&, Server::Configuration::FactoryContext& context) {
 
   FilterConfigSharedPtr config = std::make_shared<FilterConfig>(proto_config);
 
   handler_ = context.lifecycleNotifier().registerCallback(
       Server::ServerLifecycleNotifier::Stage::PostInit,
-      [lib_id = config.library_id(), lib_path = config.library_path()] {
+      [lib_id = config->so_id(), lib_path = config->so_path()] {
         Envoy::Dso::DsoInstanceManager::pub(lib_id, lib_path);
-        ENVOY_LOG(info, "open golang library at postInit: {} {}", lib_id, lib_path);
+        // ENVOY_LOG(info, "open golang library at postInit: {} {}", lib_id, lib_path);
       });
 
   return [&context, config](Http::FilterChainFactoryCallbacks& callbacks) {
     auto filter =
         std::make_shared<Filter>(context.grpcContext(), config, Filter::global_stream_id_++,
-                                 Dso::DsoInstanceManager::getDsoInstanceByID(config->library_id()));
+                                 Dso::DsoInstanceManager::getDsoInstanceByID(config->so_id()));
     callbacks.addStreamFilter(filter);
     callbacks.addAccessLogHandler(filter);
   };

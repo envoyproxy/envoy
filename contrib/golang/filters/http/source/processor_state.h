@@ -7,10 +7,10 @@
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 
-#include "source/common/http/codes.h"
-#include "source/common/http/utility.h"
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
+#include "source/common/http/codes.h"
+#include "source/common/http/utility.h"
 
 #include "absl/status/status.h"
 

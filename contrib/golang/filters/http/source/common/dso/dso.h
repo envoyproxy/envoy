@@ -1,11 +1,12 @@
 #pragma once
 
-#include <string>
 #include <dlfcn.h>
-#include <shared_mutex>
+
+#include <string>
 
 #include "source/common/common/logger.h"
 
+#include "absl/synchronization/mutex.h"
 #include "contrib/golang/filters/http/source/common/dso/libgolang.h"
 
 namespace Envoy {
@@ -48,7 +49,7 @@ public:
   static std::string show();
 
 private:
-  static std::shared_mutex mutex_;
+  static absl::Mutex mutex_;
   static std::map<std::string, DsoInstance*> dso_map_;
 };
 

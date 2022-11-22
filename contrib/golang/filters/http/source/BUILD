@@ -1,10 +1,8 @@
-package(default_visibility = ["//visibility:public"])
-
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_contrib_extension",
-    "envoy_contrib_package",
     "envoy_cc_library",
+    "envoy_contrib_package",
 )
 
 licenses(["notice"])  # Apache 2
@@ -26,17 +24,18 @@ envoy_cc_library(
     ],
     deps = [
         ":cgo",
+        "//contrib/golang/filters/http/source/common/dso:dso_lib",
         "//envoy/http:codes_interface",
         "//envoy/http:filter_interface",
+        "//source/common/buffer:watermark_buffer_lib",
         "//source/common/common:enum_to_int",
+        "//source/common/common:linked_object",
+        "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
         "//source/common/grpc:context_lib",
         "//source/common/http:headers_lib",
-        "//source/common/http/http1:codec_lib",
         "//source/common/http:utility_lib",
-        "//source/common/buffer:watermark_buffer_lib",
-        "//source/common/common:linked_object",
-        "//contrib/golang/filters/http/source/common/dso:dso_lib",
+        "//source/common/http/http1:codec_lib",
         "@envoy_api//contrib/envoy/extensions/filters/http/golang/v3alpha:pkg_cc_proto",
     ],
 )
@@ -47,11 +46,11 @@ envoy_cc_contrib_extension(
     hdrs = ["config.h"],
     deps = [
         ":golang_filter_lib",
+        "//contrib/golang/filters/http/source/common/dso:dso_lib",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
         "//envoy/server:lifecycle_notifier_interface",
         "//source/extensions/filters/http/common:factory_base_lib",
-        "//contrib/golang/filters/http/source/common/dso:dso_lib",
         "@envoy_api//contrib/envoy/extensions/filters/http/golang/v3alpha:pkg_cc_proto",
     ],
 )
@@ -64,17 +63,17 @@ envoy_cc_library(
         "processor_state.h",
     ],
     deps = [
+        "//contrib/golang/filters/http/source/common/dso:dso_lib",
         "//envoy/http:codes_interface",
         "//envoy/http:filter_interface",
+        "//source/common/buffer:watermark_buffer_lib",
         "//source/common/common:enum_to_int",
+        "//source/common/common:linked_object",
         "//source/common/common:utility_lib",
         "//source/common/grpc:context_lib",
         "//source/common/http:headers_lib",
-        "//source/common/http/http1:codec_lib",
         "//source/common/http:utility_lib",
-        "//source/common/buffer:watermark_buffer_lib",
-        "//source/common/common:linked_object",
-        "//contrib/golang/filters/http/source/common/dso:dso_lib",
+        "//source/common/http/http1:codec_lib",
         "@envoy_api//contrib/envoy/extensions/filters/http/golang/v3alpha:pkg_cc_proto",
     ],
 )

@@ -12,59 +12,54 @@
 #define GO_CGO_EXPORT_PROLOGUE_H
 
 #ifndef GO_CGO_GOSTRING_TYPEDEF
-typedef struct { const char *p; ptrdiff_t n; } _GoString_; // NOLINT(modernize-use-using)
+typedef struct {
+  const char* p;
+  ptrdiff_t n;
+} _GoString_; // NOLINT(modernize-use-using)
 #endif
 
 #endif
 
-/* Start of preamble from import "C" comments.  */
-
+/* Start of preamble from import "C" comments. */
 
 #line 20 "export.go"
 
 // ref https://github.com/golang/go/issues/25832
-
-
-
-
 
 #include <stdlib.h>
 #include <string.h>
 
 #include "api.h"
 
-
 #line 1 "cgo-generated-wrapper"
 
+/* End of preamble from import "C" comments. */
 
-/* End of preamble from import "C" comments.  */
-
-
-/* Start of boilerplate cgo prologue.  */
+/* Start of boilerplate cgo prologue. */
 #line 1 "cgo-gcc-export-header-prolog"
 
 #ifndef GO_CGO_PROLOGUE_H
 #define GO_CGO_PROLOGUE_H
 
-typedef signed char GoInt8; // NOLINT(modernize-use-using)
-typedef unsigned char GoUint8; // NOLINT(modernize-use-using)
-typedef short GoInt16; // NOLINT(modernize-use-using)
-typedef unsigned short GoUint16; // NOLINT(modernize-use-using)
-typedef int GoInt32; // NOLINT(modernize-use-using)
-typedef unsigned int GoUint32; // NOLINT(modernize-use-using)
-typedef long long GoInt64; // NOLINT(modernize-use-using)
+typedef signed char GoInt8;          // NOLINT(modernize-use-using)
+typedef unsigned char GoUint8;       // NOLINT(modernize-use-using)
+typedef short GoInt16;               // NOLINT(modernize-use-using)
+typedef unsigned short GoUint16;     // NOLINT(modernize-use-using)
+typedef int GoInt32;                 // NOLINT(modernize-use-using)
+typedef unsigned int GoUint32;       // NOLINT(modernize-use-using)
+typedef long long GoInt64;           // NOLINT(modernize-use-using)
 typedef unsigned long long GoUint64; // NOLINT(modernize-use-using)
-typedef GoInt64 GoInt; // NOLINT(modernize-use-using)
-typedef GoUint64 GoUint; // NOLINT(modernize-use-using)
-typedef size_t GoUintptr; // NOLINT(modernize-use-using)
-typedef float GoFloat32; // NOLINT(modernize-use-using)
-typedef double GoFloat64; // NOLINT(modernize-use-using)
+typedef GoInt64 GoInt;               // NOLINT(modernize-use-using)
+typedef GoUint64 GoUint;             // NOLINT(modernize-use-using)
+typedef size_t GoUintptr;            // NOLINT(modernize-use-using)
+typedef float GoFloat32;             // NOLINT(modernize-use-using)
+typedef double GoFloat64;            // NOLINT(modernize-use-using)
 #ifdef _MSC_VER
 #include <complex.h>
-typedef _Fcomplex GoComplex64; // NOLINT(modernize-use-using)
+typedef _Fcomplex GoComplex64;  // NOLINT(modernize-use-using)
 typedef _Dcomplex GoComplex128; // NOLINT(modernize-use-using)
 #else
-typedef float _Complex GoComplex64; // NOLINT(modernize-use-using)
+typedef float _Complex GoComplex64;   // NOLINT(modernize-use-using)
 typedef double _Complex GoComplex128; // NOLINT(modernize-use-using)
 #endif
 
@@ -72,41 +67,56 @@ typedef double _Complex GoComplex128; // NOLINT(modernize-use-using)
   static assertion to make sure the file is being used on architecture
   at least with matching size of GoInt.
 */
-typedef char _check_for_64_bit_pointer_matching_GoInt[sizeof(void*)==64/8 ? 1:-1]; // NOLINT(modernize-use-using)
+typedef char _check_for_64_bit_pointer_matching_GoInt[sizeof(void*) == 64 / 8
+                                                          ? 1
+                                                          : -1]; // NOLINT(modernize-use-using)
 
 #ifndef GO_CGO_GOSTRING_TYPEDEF
 typedef _GoString_ GoString; // NOLINT(modernize-use-using)
 #endif
-typedef void *GoMap; // NOLINT(modernize-use-using)
-typedef void *GoChan; // NOLINT(modernize-use-using)
-typedef struct { void *t; void *v; } GoInterface; // NOLINT(modernize-use-using)
-typedef struct { void *data; GoInt len; GoInt cap; } GoSlice; // NOLINT(modernize-use-using)
+typedef void* GoMap;  // NOLINT(modernize-use-using)
+typedef void* GoChan; // NOLINT(modernize-use-using)
+typedef struct {
+  void* t;
+  void* v;
+} GoInterface; // NOLINT(modernize-use-using)
+typedef struct {
+  void* data;
+  GoInt len;
+  GoInt cap;
+} GoSlice; // NOLINT(modernize-use-using)
 
 #endif
 
-/* End of boilerplate cgo prologue.  */
+/* End of boilerplate cgo prologue. */
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-
-//go:linkname moeNewHttpPluginConfig mosn.io/envoy-go-extension/pkg/http.moeNewHttpPluginConfig
+// go:linkname moeNewHttpPluginConfig
+// github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.moeNewHttpPluginConfig
 extern GoUint64 moeNewHttpPluginConfig(GoUint64 configPtr, GoUint64 configLen);
 
-//go:linkname moeDestroyHttpPluginConfig mosn.io/envoy-go-extension/pkg/http.moeDestroyHttpPluginConfig
+// go:linkname moeDestroyHttpPluginConfig
+// github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.moeDestroyHttpPluginConfig
 extern void moeDestroyHttpPluginConfig(GoUint64 id);
 
-//go:linkname moeMergeHttpPluginConfig mosn.io/envoy-go-extension/pkg/http.moeMergeHttpPluginConfig
+// go:linkname moeMergeHttpPluginConfig
+// github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.moeMergeHttpPluginConfig
 extern GoUint64 moeMergeHttpPluginConfig(GoUint64 parentId, GoUint64 childId);
 
-//go:linkname moeOnHttpHeader mosn.io/envoy-go-extension/pkg/http.moeOnHttpHeader
-extern GoUint64 moeOnHttpHeader(httpRequest* r, GoUint64 endStream, GoUint64 headerNum, GoUint64 headerBytes);
+// go:linkname moeOnHttpHeader
+// github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.moeOnHttpHeader
+extern GoUint64 moeOnHttpHeader(httpRequest* r, GoUint64 endStream, GoUint64 headerNum,
+                                GoUint64 headerBytes);
 
-//go:linkname moeOnHttpData mosn.io/envoy-go-extension/pkg/http.moeOnHttpData
+// go:linkname moeOnHttpData
+// github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.moeOnHttpData
 extern GoUint64 moeOnHttpData(httpRequest* r, GoUint64 endStream, GoUint64 buffer, GoUint64 length);
 
-//go:linkname moeOnHttpDestroy mosn.io/envoy-go-extension/pkg/http.moeOnHttpDestroy
+// go:linkname moeOnHttpDestroy
+// github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.moeOnHttpDestroy
 extern void moeOnHttpDestroy(httpRequest* r, GoUint64 reason);
 
 #ifdef __cplusplus
