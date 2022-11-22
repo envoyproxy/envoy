@@ -18,17 +18,18 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: golang extension filter]
-// golang extension filter.
+// Golang :ref:`configuration overview <config_http_filters_golang>`.
+// [#extension: envoy.filters.http.golang]
 //
 // In the below example, we configured the go plugin 'auth' and 'limit' dynamic libraries into
 // Envoy, which can avoid rebuilding Envoy.
 //
 // * Develop go-plugin
 //
-// We can implement the interface of :ref:`StreamFilter <contrib.go_plugin_api.plugin.StreamFilter>`
+// We can implement the interface of :ref:`StreamFilter <contrib/golang/filters/http/source/go/pkg/api.StreamFilter>`
 // API by the GO language to achieve the effects of Envoy native filter.
 //
-// The filter based on the APIs implementation :ref:`StreamFilter <contrib.go_plugin_api.plugin.StreamFilter>`
+// The filter based on the APIs implementation :ref:`StreamFilter <contrib/golang/filters/http/source/go/pkg/api.StreamFilter>`
 // For details, take a look at the :ref:`golang plugin filter sandbox example <install_sandboxes_golang>`.
 //
 // Then put the GO plugin source code into the ${OUTPUT}/src/ directory with the name of the plugin
@@ -93,7 +94,8 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //                     - name: envoy.filters.http.golang
 //                       typed_config:
 //                         "@type": type.googleapis.com/envoy.extensions.filters.http.golang.v3alpha.Config
-//                         library: "/home/admin/envoy/go-plugins/liblimit.so"
+//                         library_id: limit-id
+//                         library_path: "/home/admin/envoy/go-plugins/liblimit.so"
 //                         plugine_name: limit
 //                         plugin_config:
 //                           "@type": type.googleapis.com/envoy.extensions.filters.http.golang.plugins.limit.v3.Config
@@ -103,7 +105,8 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //                     - name: envoy.filters.http.golang
 //                       typed_config:
 //                         "@type": type.googleapis.com/envoy.extensions.filters.http.golang.v3alpha.Config
-//                         library: "/home/admin/envoy/go-plugins/libauth.so"
+//                         library_id: auth-id
+//                         library_path: "/home/admin/envoy/go-plugins/libauth.so"
 //                         plugine_name: auth
 //                         plugin_config:
 //                           "@type": type.googleapis.com/envoy.extensions.filters.http.golang.plugins.auth.v3.Config
@@ -124,14 +127,15 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //                     - name: envoy.filters.http.golang
 //                       typed_config:
 //                         "@type": type.googleapis.com/envoy.extensions.filters.http.golang.v3alpha.Config
-//                         library: "/home/admin/envoy/go-plugins/libauth.so"
+//                         library_id: auth-id
+//                         library_path: "/home/admin/envoy/go-plugins/libauth.so"
 //                         plugine_name: auth
 //                         plugin_config:
 //                           "@type": type.googleapis.com/envoy.extensions.filters.http.golang.plugins.auth.v3.Config
 //                           xxx1: xx1
 //                           xxx2: xx2
 //                     - name: envoy.filters.http.router
-// [#not-implemented-hide:]
+// [#next-free-field: 6]
 message Config {
   enum MergePolicy {
     MERGE_VIRTUALHOST_ROUTER_FILTER = 0;
@@ -143,9 +147,9 @@ message Config {
   string library_id = 1 [(validate.rules).string = {min_len: 1}];
 
   // Dynamic library implementing the interface of
-  // :ref:`StreamFilter <contrib.go_plugin_api.plugin.StreamFilter>`.
+  // :ref:`StreamFilter <contrib/golang/filters/http/source/go/pkg/api.StreamFilter>`.
   // [#comment:TODO(wangfakang): Support for downloading libraries from remote repositories.]
-  string library_path = 2[(validate.rules).string = {min_len: 1}];
+  string library_path = 2 [(validate.rules).string = {min_len: 1}];
 
   // plugin_name is the name of the go plugin, which needs to be consistent with the name
   // registered in StreamFilterFactoryManager::RegisterStreamFactory.
@@ -166,7 +170,7 @@ message Config {
   MergePolicy merge_policy = 5 [(validate.rules).enum = {defined_only: true}];
 }
 
-// [#not-implemented-hide:]
+// [#next-free-field: 3]
 message RouterPlugin {
   // The extension_plugin_options field is used to provide extension options for plugin.
   google.protobuf.Struct extension_plugin_options = 1;
@@ -175,7 +179,7 @@ message RouterPlugin {
   google.protobuf.Any config = 2;
 }
 
-// [#not-implemented-hide:]
+// [#next-free-field: 2]
 message ConfigsPerRoute {
   // plugins_config is the configuration of the go plugin at the per-router, and
   // key is the name of the go plugin.
