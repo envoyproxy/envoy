@@ -274,19 +274,28 @@ public:
     lds_stream_->sendGrpcMessage(response);
   }
 
-  void sendXdsResponse(const std::string& name, const std::string& version,
-                       const std::string& yaml_config, bool ttl = false,
-                       bool is_set_resp_code_config = true) {
+  void sendEcdsResponse(const envoy::config::core::v3::TypedExtensionConfig& typed_config,
+                        const std::string& name, const std::string& version, const bool ttl,
+                        FakeStreamPtr& ecds_stream) {
+    envoy::service::discovery::v3::Resource resource;
+    resource.set_name(name);
+    if (ttl) {
+      resource.mutable_ttl()->set_seconds(1);
+    }
+    resource.mutable_resource()->PackFrom(typed_config);
+
     envoy::service::discovery::v3::DiscoveryResponse response;
     response.set_version_info(version);
     response.set_type_url("type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig");
+    response.add_resources()->PackFrom(resource);
+    ecds_stream->sendGrpcMessage(response);
+  }
 
+  void sendHttpFilterEcdsResponse(const std::string& name, const std::string& version,
+                                  const std::string& yaml_config, bool ttl = false,
+                                  bool is_set_resp_code_config = true) {
     envoy::config::core::v3::TypedExtensionConfig typed_config;
     typed_config.set_name(name);
-
-    envoy::service::discovery::v3::Resource resource;
-    resource.set_name(name);
-
     if (is_set_resp_code_config) {
       const auto configuration =
           TestUtility::parseYaml<test::integration::filters::SetResponseCodeFilterConfig>(
@@ -298,43 +307,26 @@ public:
               yaml_config);
       typed_config.mutable_typed_config()->PackFrom(configuration);
     }
-    resource.mutable_resource()->PackFrom(typed_config);
-    if (ttl) {
-      resource.mutable_ttl()->set_seconds(1);
-    }
-    response.add_resources()->PackFrom(resource);
-    ecds_stream_->sendGrpcMessage(response);
+    sendEcdsResponse(typed_config, name, version, ttl, ecds_stream_);
   }
 
   void sendListenerFilterEcdsResponse(const std::string& name, const std::string& version,
                                       const uint32_t drain_bytes) {
-    envoy::service::discovery::v3::DiscoveryResponse response;
-    response.set_version_info(version);
-    response.set_type_url("type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig");
     envoy::config::core::v3::TypedExtensionConfig typed_config;
     typed_config.set_name(name);
-    envoy::service::discovery::v3::Resource resource;
-    resource.set_name(name);
-
     auto configuration = test::integration::filters::TestTcpListenerFilterConfig();
     configuration.set_drain_bytes(drain_bytes);
     typed_config.mutable_typed_config()->PackFrom(configuration);
-    resource.mutable_resource()->PackFrom(typed_config);
-    response.add_resources()->PackFrom(resource);
-    ecds2_stream_->sendGrpcMessage(response);
+    sendEcdsResponse(typed_config, name, version, false, ecds2_stream_);
   }
 
-  void sendXdsResponseWithFullYaml(const std::string& name, const std::string& version,
-                                   const std::string& full_yaml) {
-    envoy::service::discovery::v3::DiscoveryResponse response;
-    response.set_version_info(version);
-    response.set_type_url("type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig");
+  void sendHttpFilterEcdsResponseWithFullYaml(const std::string& name, const std::string& version,
+                                              const std::string& full_yaml) {
     const auto configuration = TestUtility::parseYaml<ProtobufWkt::Any>(full_yaml);
     envoy::config::core::v3::TypedExtensionConfig typed_config;
     typed_config.set_name(name);
     typed_config.mutable_typed_config()->MergeFrom(configuration);
-    response.add_resources()->PackFrom(typed_config);
-    ecds_stream_->sendGrpcMessage(response);
+    sendEcdsResponse(typed_config, name, version, false, ecds_stream_);
   }
 
   absl::string_view request(const std::string port_key, const std::string method,
@@ -381,7 +373,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicSuccess) {
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
   registerTestServerPorts({"http"});
-  sendXdsResponse("foo", "1", denyPrivateConfig());
+  sendHttpFilterEcdsResponse("foo", "1", denyPrivateConfig());
   test_server_->waitForCounterGe("extension_config_discovery.http_filter.foo.config_reload", 1);
   test_server_->waitUntilListenersReady();
   test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
@@ -405,7 +397,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicSuccess) {
   }
   // Update again but keep the connection.
   {
-    sendXdsResponse("foo", "2", allowAllConfig());
+    sendHttpFilterEcdsResponse("foo", "2", allowAllConfig());
     test_server_->waitForCounterGe("extension_config_discovery.http_filter.foo.config_reload", 2);
     auto response = codec_client_->makeHeaderOnlyRequest(banned_request_headers);
     ASSERT_TRUE(response->waitForEndStream());
@@ -421,7 +413,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicSuccessWithTtl) {
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
   registerTestServerPorts({"http"});
-  sendXdsResponse("foo", "1", denyPrivateConfig(), true);
+  sendHttpFilterEcdsResponse("foo", "1", denyPrivateConfig(), true);
   test_server_->waitForCounterGe("extension_config_discovery.http_filter.foo.config_reload", 1);
   test_server_->waitUntilListenersReady();
   test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
@@ -456,7 +448,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicSuccessWithTtl) {
 
   {
     // Reinstate the previous configuration.
-    sendXdsResponse("foo", "1", denyPrivateConfig(), true);
+    sendHttpFilterEcdsResponse("foo", "1", denyPrivateConfig(), true);
     // Wait until the new configuration has been applied.
     test_server_->waitForCounterGe("extension_config_discovery.http_filter.foo.config_reload", 3);
     auto response = codec_client_->makeHeaderOnlyRequest(banned_request_headers);
@@ -473,7 +465,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicSuccessWithTtlWithDefault) {
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
   registerTestServerPorts({"http"});
-  sendXdsResponse("foo", "1", allowAllConfig(), true);
+  sendHttpFilterEcdsResponse("foo", "1", allowAllConfig(), true);
   test_server_->waitForCounterGe("extension_config_discovery.http_filter.foo.config_reload", 1);
   test_server_->waitUntilListenersReady();
   test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
@@ -507,7 +499,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicSuccessWithMatcher) {
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
   registerTestServerPorts({"http"});
-  sendXdsResponseWithFullYaml("foo", "1", denyPrivateConfigWithMatcher());
+  sendHttpFilterEcdsResponseWithFullYaml("foo", "1", denyPrivateConfigWithMatcher());
   test_server_->waitForCounterGe("extension_config_discovery.http_filter.foo.config_reload", 1);
   test_server_->waitUntilListenersReady();
   test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
@@ -549,7 +541,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicDefaultMatcher) {
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
   registerTestServerPorts({"http"});
-  sendXdsResponse("foo", "1", invalidConfig());
+  sendHttpFilterEcdsResponse("foo", "1", invalidConfig());
   test_server_->waitForCounterGe("extension_config_discovery.http_filter.foo.config_fail", 1);
   test_server_->waitUntilListenersReady();
   test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
@@ -586,7 +578,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, ReuseExtensionConfig) {
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
   registerTestServerPorts({"http"});
-  sendXdsResponse("foo", "1", allowAllConfig());
+  sendHttpFilterEcdsResponse("foo", "1", allowAllConfig());
   test_server_->waitForCounterGe("extension_config_discovery.http_filter.foo.config_reload", 1);
   test_server_->waitUntilListenersReady();
   test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
@@ -617,7 +609,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, ReuseExtensionConfigInvalid) {
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
   registerTestServerPorts({"http"});
-  sendXdsResponseWithFullYaml("foo", "1", denyPrivateConfigWithMatcher());
+  sendHttpFilterEcdsResponseWithFullYaml("foo", "1", denyPrivateConfigWithMatcher());
   test_server_->waitForCounterGe("extension_config_discovery.http_filter.foo.config_reload", 1);
   test_server_->waitUntilListenersReady();
   test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
@@ -654,7 +646,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicFailWithDefault) {
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
   registerTestServerPorts({"http"});
-  sendXdsResponse("foo", "1", invalidConfig());
+  sendHttpFilterEcdsResponse("foo", "1", invalidConfig());
   test_server_->waitForCounterGe("extension_config_discovery.http_filter.foo.config_fail", 1);
   test_server_->waitUntilListenersReady();
   test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
@@ -675,7 +667,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicFailWithoutDefault) {
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
   registerTestServerPorts({"http"});
-  sendXdsResponse("foo", "1", invalidConfig());
+  sendHttpFilterEcdsResponse("foo", "1", invalidConfig());
   test_server_->waitForCounterGe("extension_config_discovery.http_filter.foo.config_fail", 1);
   test_server_->waitUntilListenersReady();
   test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
@@ -710,7 +702,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicWithoutWarming) {
   }
 
   // Update should cause a different response.
-  sendXdsResponse("bar", "1", denyPrivateConfig());
+  sendHttpFilterEcdsResponse("bar", "1", denyPrivateConfig());
   test_server_->waitForCounterGe("extension_config_discovery.http_filter.bar.config_reload", 1);
   {
     auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
@@ -731,7 +723,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicWithoutWarmingFail) {
   test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   // Update should not cause a different response.
-  sendXdsResponse("bar", "1", invalidConfig());
+  sendHttpFilterEcdsResponse("bar", "1", invalidConfig());
   test_server_->waitForCounterGe("extension_config_discovery.http_filter.bar.config_fail", 1);
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
@@ -749,7 +741,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicTwoSubscriptionsSameName) {
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
   registerTestServerPorts({"http"});
-  sendXdsResponse("baz", "1", denyPrivateConfig());
+  sendHttpFilterEcdsResponse("baz", "1", denyPrivateConfig());
   test_server_->waitForCounterGe("extension_config_discovery.http_filter.baz.config_reload", 1);
   test_server_->waitUntilListenersReady();
   test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
@@ -788,7 +780,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, BasicFailTerminalFilterNotAtEndOfFilte
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
   registerTestServerPorts({"http"});
-  sendXdsResponse("foo", "1", terminalFilterConfig(), false, false);
+  sendHttpFilterEcdsResponse("foo", "1", terminalFilterConfig(), false, false);
   test_server_->waitForCounterGe("extension_config_discovery.http_filter.foo.config_fail", 1);
   test_server_->waitUntilListenersReady();
   test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
@@ -810,7 +802,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, ReloadBoth) {
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 1);
   EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initializing);
   registerTestServerPorts({"http"});
-  sendXdsResponse("foo", "1", denyPrivateConfig());
+  sendHttpFilterEcdsResponse("foo", "1", denyPrivateConfig());
   test_server_->waitForCounterGe("extension_config_discovery.http_filter.foo.config_reload", 1);
   test_server_->waitUntilListenersReady();
   test_server_->waitForGaugeGe("listener_manager.workers_started", 1);
@@ -845,7 +837,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, ReloadBoth) {
 
   // Update ECDS but keep the connection.
   {
-    sendXdsResponse("foo", "2", allowAllConfig());
+    sendHttpFilterEcdsResponse("foo", "2", allowAllConfig());
     test_server_->waitForCounterGe("extension_config_discovery.http_filter.foo.config_reload", 2);
     auto response = codec_client_->makeHeaderOnlyRequest(banned_request_headers);
     ASSERT_TRUE(response->waitForEndStream());
@@ -871,7 +863,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, ConfigDumpWithTwoSubscriptionTypes) {
   registerTestServerPorts({"http"});
 
   // Send configuration update for HTTP ECDS filter.
-  sendXdsResponse("foo", "1", denyPrivateConfig());
+  sendHttpFilterEcdsResponse("foo", "1", denyPrivateConfig());
   // Send configuration update for listener ECDS filter.
   sendListenerFilterEcdsResponse("bar", "2", 7);
   test_server_->waitForCounterGe("extension_config_discovery.http_filter.foo.config_reload", 1);
