@@ -11,8 +11,7 @@ HeadersBuilder& HeadersBuilder::add(std::string name, std::string value) {
   return *this;
 }
 
-HeadersBuilder& HeadersBuilder::set(std::string name,
-                                    std::vector<std::string> values) {
+HeadersBuilder& HeadersBuilder::set(std::string name, std::vector<std::string> values) {
   if (this->isRestrictedHeader(name)) {
     return *this;
   }
@@ -30,8 +29,7 @@ HeadersBuilder& HeadersBuilder::remove(const std::string& name) {
 
 HeadersBuilder::HeadersBuilder() {}
 
-HeadersBuilder& HeadersBuilder::internalSet(std::string name,
-                                            std::vector<std::string> values) {
+HeadersBuilder& HeadersBuilder::internalSet(std::string name, std::vector<std::string> values) {
   this->headers_[std::move(name)] = std::move(values);
   return *this;
 }
