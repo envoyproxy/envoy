@@ -3,6 +3,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/tracing/http_tracer_impl.h"
 
+using envoy::extensions::filters::http::jwt_authn::v3::JwksAsyncFetch;
 using envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks;
 
 namespace Envoy {
@@ -19,6 +20,14 @@ constexpr std::chrono::seconds RefetchBeforeExpiredSec{5};
 
 // Number of seconds to refetch after a failed fetch.
 constexpr std::chrono::seconds RefetchAfterFailedSec{1};
+
+std::chrono::seconds getFailedRefetchDuration(const JwksAsyncFetch& async_fetch) {
+  if (async_fetch.has_failed_refetch_duration()) {
+    return std::chrono::seconds(
+        DurationUtil::durationToMilliseconds(async_fetch.failed_refetch_duration()));
+  }
+  return RefetchAfterFailedSec;
+}
 
 } // namespace
 
@@ -40,10 +49,11 @@ JwksAsyncFetcher::JwksAsyncFetcher(const RemoteJwks& remote_jwks,
   // an on-demand fetch. But async_fetch is preferred as it is done in the main thread
   // and not need to block request processing but on-demand fetch is done in the worker
   // thread and block request processing.
-  refetch_duration_ = getCacheDuration(remote_jwks);
-  if (refetch_duration_ > RefetchBeforeExpiredSec) {
-    refetch_duration_ = refetch_duration_ - RefetchBeforeExpiredSec;
+  good_refetch_duration_ = getCacheDuration(remote_jwks);
+  if (good_refetch_duration_ > RefetchBeforeExpiredSec) {
+    good_refetch_duration_ = good_refetch_duration_ - RefetchBeforeExpiredSec;
   }
+  failed_refetch_duration_ = getFailedRefetchDuration(remote_jwks.async_fetch());
 
   refetch_timer_ = context_.mainThreadDispatcher().createTimer([this]() -> void { fetch(); });
 
@@ -85,7 +95,7 @@ void JwksAsyncFetcher::handleFetchDone() {
 void JwksAsyncFetcher::onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) {
   done_fn_(std::move(jwks));
   handleFetchDone();
-  refetch_timer_->enableTimer(refetch_duration_);
+  refetch_timer_->enableTimer(good_refetch_duration_);
   stats_.jwks_fetch_success_.inc();
 
   // Note: not to free fetcher_ within onJwksSuccess or onJwksError function.
@@ -101,7 +111,7 @@ void JwksAsyncFetcher::onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) {
 void JwksAsyncFetcher::onJwksError(Failure) {
   ENVOY_LOG(warn, "{}: failed", debug_name_);
   handleFetchDone();
-  refetch_timer_->enableTimer(RefetchAfterFailedSec);
+  refetch_timer_->enableTimer(failed_refetch_duration_);
   stats_.jwks_fetch_failed_.inc();
 
   // Note: not to free fetcher_ in this function. Please see comment at onJwksSuccess.

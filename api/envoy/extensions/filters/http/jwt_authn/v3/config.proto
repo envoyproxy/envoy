@@ -376,6 +376,9 @@ message JwksAsyncFetch {
   // If true, it is activated without waiting for the initial fetch to complete.
   // Default is false.
   bool fast_listener = 1;
+
+  // The duration to refetch after a failed fetch. If not specified, default is 1 secnod.
+  google.protobuf.Duration failed_refetch_duration = 2;
 }
 
 // This message specifies a header location to extract JWT token.
