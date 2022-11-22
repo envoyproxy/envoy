@@ -23,6 +23,8 @@ variables:
 - name: isStableBranch
   # A release branch can be either `main` or a `release/v1.x` stable branch
   value: $[or(eq(variables['isMain'], 'true'), eq(variables['isReleaseBranch'], 'true'))]
+- name: nonMobileFilesChanged
+  value: git diff --name-only origin/main | grep -qe common/
 
 stages:
 - stage: precheck
@@ -339,6 +341,7 @@ stages:
         ciTarget: $(CI_TARGET)
 
   - job: coverage
+    condition: ne(variables['nonMobileFilesChanged'], '')
     displayName: "linux_x64"
     dependsOn: []
     timeoutInMinutes: 120
