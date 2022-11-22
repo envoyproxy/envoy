@@ -1,12 +1,15 @@
-#include "source/common/stats/symbol_table.h"
 #include "envoy/upstream/upstream.h"
-#include "test/benchmark/main.h"
-#include "benchmark/benchmark.h"
-#include "source/common/stats/isolated_store_impl.h"
-#include "test/test_common/real_threads_test_helper.h"
-#include "source/common/thread_local/thread_local_impl.h"
+
 #include "source/common/common/random_generator.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/common/stats/symbol_table.h"
 #include "source/common/stats/thread_local_store.h"
+#include "source/common/thread_local/thread_local_impl.h"
+
+#include "test/benchmark/main.h"
+#include "test/test_common/real_threads_test_helper.h"
+
+#include "benchmark/benchmark.h"
 
 namespace Envoy {
 

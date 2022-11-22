@@ -221,16 +221,14 @@ envoy_cc_benchmark_binary(
         "benchmark",
     ],
     deps = [
-                "//source/common/stats:thread_local_store_lib",
         "//source/common/common:random_generator_lib",
-
-                "//source/common/stats:symbol_table_lib",
-        "//source/common/stats:isolated_store_lib",
-          "//source/common/stats:lazy_init",
         "//source/common/common:utility_lib",
         "//source/common/runtime:runtime_lib",
-                "//test/test_common:real_threads_test_helper_lib",
-
+        "//source/common/stats:isolated_store_lib",
+        "//source/common/stats:lazy_init",
+        "//source/common/stats:symbol_table_lib",
+        "//source/common/stats:thread_local_store_lib",
+        "//test/test_common:real_threads_test_helper_lib",
     ],
 )
 
