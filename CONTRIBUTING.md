@@ -203,7 +203,7 @@ release is cut. Old code paths for refactors can be cleaned up after a release a
 some production run time. Old code for behavioral changes will be deprecated after six months if no
 Envoy operators have raised concerns. If the behavioral change is problematic for any Envoy users,
 the maintainers team will work to find a satisfactory resolution, generally in the form of a permanent
-configiguration knob for the behavioral differences.
+configuration knob for the behavioral differences.
 
 Runtime features are set true by default by inclusion in
 [source/common/runtime/runtime_features.cc](https://github.com/envoyproxy/envoy/blob/main/source/common/runtime/runtime_features.cc)
