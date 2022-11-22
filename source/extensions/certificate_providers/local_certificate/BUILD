@@ -20,9 +20,9 @@ envoy_cc_library(
         "//envoy/server:transport_socket_config_interface",
         "//source/common/common:callback_impl_lib",
         "//source/common/common:logger_lib",
-        "//source/common/common:utility_lib",
+
         "//source/common/config:datasource_lib",
-        "//source/common/protobuf:message_validator_lib",
+
         "@envoy_api//envoy/extensions/certificate_providers/local_certificate/v3:pkg_cc_proto",
     ],
 )
@@ -35,5 +35,7 @@ envoy_cc_extension(
         ":local_certificate_provider",
         "//envoy/certificate_provider:certificate_provider_factory_lib",
         "//envoy/certificate_provider:certificate_provider_interface",
+        "//source/common/common:utility_lib",
+        "//source/common/protobuf:message_validator_lib",
     ],
 )

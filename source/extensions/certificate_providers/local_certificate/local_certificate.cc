@@ -4,28 +4,23 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/config/datasource.h"
-#include "source/common/config/utility.h"
-#include "source/common/protobuf/message_validator_impl.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace CertificateProviders {
 namespace LocalCertificate {
 
-Provider::Provider(const envoy::config::core::v3::TypedExtensionConfig& config,
+Provider::Provider(const envoy::extensions::certificate_providers::local_certificate::v3::LocalCertificate& config,
                    Server::Configuration::TransportSocketFactoryContext& factory_context,
                    Api::Api& api)
     : main_thread_dispatcher_(factory_context.mainThreadDispatcher()) {
-  envoy::extensions::certificate_providers::local_certificate::v3::LocalCertificate message;
-  Config::Utility::translateOpaqueConfig(config.typed_config(),
-                                         ProtobufMessage::getStrictValidationVisitor(), message);
-  ca_cert_ = Config::DataSource::read(message.rootca_cert(), true, api);
-  ca_key_ = Config::DataSource::read(message.rootca_key(), true, api);
-  default_identity_cert_ = Config::DataSource::read(message.default_identity_cert(), true, api);
-  default_identity_key_ = Config::DataSource::read(message.default_identity_key(), true, api);
+  ca_cert_ = Config::DataSource::read(config.rootca_cert(), true, api);
+  ca_key_ = Config::DataSource::read(config.rootca_key(), true, api);
+  default_identity_cert_ = Config::DataSource::read(config.default_identity_cert(), true, api);
+  default_identity_key_ = Config::DataSource::read(config.default_identity_key(), true, api);
 
-  if (message.has_expiration_time()) {
-    auto seconds = google::protobuf::util::TimeUtil::TimestampToSeconds(message.expiration_time());
+  if (config.has_expiration_time()) {
+    auto seconds = google::protobuf::util::TimeUtil::TimestampToSeconds(config.expiration_time());
     expiration_config_ = std::chrono::system_clock::from_time_t(static_cast<time_t>(seconds));
   }
 

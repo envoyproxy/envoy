@@ -5,6 +5,8 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/server/transport_socket_config.h"
 
+#include "envoy/extensions/certificate_providers/local_certificate/v3/local_certificate.pb.h"
+
 #include "source/common/common/callback_impl.h"
 #include "source/common/common/logger.h"
 
@@ -17,7 +19,7 @@ namespace LocalCertificate {
 class Provider : public CertificateProvider::CertificateProvider,
                  Logger::Loggable<Logger::Id::cert_provider> {
 public:
-  Provider(const envoy::config::core::v3::TypedExtensionConfig& config,
+  Provider(const envoy::extensions::certificate_providers::local_certificate::v3::LocalCertificate& config,
            Server::Configuration::TransportSocketFactoryContext& factory_context, Api::Api& api);
 
   // CertificateProvider::CertificateProvider
