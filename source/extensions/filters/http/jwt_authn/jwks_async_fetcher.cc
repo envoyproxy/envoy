@@ -24,7 +24,7 @@ constexpr std::chrono::seconds DefaultRefetchAfterFailedSec{1};
 std::chrono::seconds getFailedRefetchDuration(const JwksAsyncFetch& async_fetch) {
   if (async_fetch.has_failed_refetch_duration()) {
     return std::chrono::seconds(
-        DurationUtil::durationToMilliseconds(async_fetch.failed_refetch_duration()));
+        DurationUtil::durationToSeconds(async_fetch.failed_refetch_duration()));
   }
   return DefaultRefetchAfterFailedSec;
 }
