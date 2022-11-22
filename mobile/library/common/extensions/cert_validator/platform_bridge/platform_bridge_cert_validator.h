@@ -73,21 +73,14 @@ private:
           result_callback_(std::move(result_callback)),
           transport_socket_options_(std::move(transport_socket_options)) {}
 
+    // Ensure that this class is never moved or copied to guarantee pointer stability.
+    PendingValidation(const PendingValidation&) = delete;
+    PendingValidation(PendingValidation&&) = delete;
+
     void verifyCertsByPlatform();
 
     void postVerifyResultAndCleanUp(bool success, absl::string_view error_details,
                                     uint8_t tls_alert, OptRef<Stats::Counter> error_counter);
-
-    struct Hash {
-      size_t operator()(const PendingValidation& p) const {
-        return reinterpret_cast<size_t>(p.result_callback_.get());
-      }
-    };
-    struct Eq {
-      bool operator()(const PendingValidation& a, const PendingValidation& b) const {
-        return a.result_callback_.get() == b.result_callback_.get();
-      }
-    };
 
   private:
     Event::SchedulableCallbackPtr next_iteration_callback_;
@@ -111,8 +104,7 @@ private:
   // latches the platform extension API.
   const envoy_cert_validator* platform_validator_;
   absl::flat_hash_map<std::thread::id, std::thread> validation_threads_;
-  absl::flat_hash_set<PendingValidation, PendingValidation::Hash, PendingValidation::Eq>
-      validations_;
+  absl::flat_hash_set<std::unique_ptr<PendingValidation>> validations_;
   std::shared_ptr<size_t> alive_indicator_{new size_t(1)};
 };
 
