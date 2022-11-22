@@ -43,7 +43,7 @@ void benchmarkLazyInitCreation(::benchmark::State& state) {
 }
 
 BENCHMARK(benchmarkLazyInitCreation)
-    ->ArgsProduct({{0, 1}, {1000, 10000, 100000, 500000}})
+    ->ArgsProduct({{0, 1}, {1000, 10000, 20000, 100000, 500000}})
     ->Unit(::benchmark::kMillisecond);
 
 // Benchmark lazy-init of stats in same thread, mimicking main thread creation.
@@ -73,7 +73,7 @@ void benchmarkLazyInitCreationInstantiateSameThread(::benchmark::State& state) {
 }
 
 BENCHMARK(benchmarkLazyInitCreationInstantiateSameThread)
-    ->ArgsProduct({{0, 1}, {1000, 10000, 100000, 500000}})
+    ->ArgsProduct({{0, 1}, {1000, 10000, 20000, 100000, 500000}})
     ->Unit(::benchmark::kMillisecond);
 
 class ThreadLocalStoreNoMocksTestBase {
@@ -172,7 +172,7 @@ void benchmarkLazyInitCreationInstantiateOnWorkerThreads(::benchmark::State& sta
 }
 
 BENCHMARK(benchmarkLazyInitCreationInstantiateOnWorkerThreads)
-    ->ArgsProduct({{0, 1}, {1000, 10000, 100000, 500000}})
+    ->ArgsProduct({{0, 1}, {1000, 10000, 20000, 100000, 500000}})
     ->Unit(::benchmark::kMillisecond);
 
 // Benchmark mimicks that worker threads inc the stats.
@@ -206,11 +206,11 @@ void benchmarkLazyInitStatsAccess(::benchmark::State& state) {
       for (uint64_t idx = 0; idx < 10 * num_stats; ++idx) {
         if (lazy_init) {
           // Lazy-init on workers happen when the "index"-th stat instance is not created.
-          ClusterTrafficStats& stats = *(*lazy_stats[idx]);
+          ClusterTrafficStats& stats = *(*lazy_stats[idx % num_stats]);
           stats.upstream_cx_active_.inc();
 
         } else {
-          ClusterTrafficStats& stats = *normal_stats[idx];
+          ClusterTrafficStats& stats = *normal_stats[idx % num_stats];
           stats.upstream_cx_active_.inc();
         }
       }
@@ -219,7 +219,7 @@ void benchmarkLazyInitStatsAccess(::benchmark::State& state) {
 }
 
 BENCHMARK(benchmarkLazyInitStatsAccess)
-    ->ArgsProduct({{0, 1}, {1000, 10000, 100000, 500000}})
+    ->ArgsProduct({{0, 1}, {1000, 10000, 20000, 100000, 500000}})
     ->Unit(::benchmark::kMillisecond);
 
 } // namespace
