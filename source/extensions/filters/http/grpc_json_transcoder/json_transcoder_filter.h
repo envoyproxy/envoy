@@ -15,6 +15,7 @@
 #include "google/api/http.pb.h"
 #include "grpc_transcoding/path_matcher.h"
 #include "grpc_transcoding/request_message_translator.h"
+#include "grpc_transcoding/response_to_json_translator.h"
 #include "grpc_transcoding/transcoder.h"
 #include "grpc_transcoding/type_helper.h"
 
@@ -128,11 +129,12 @@ private:
   Protobuf::DescriptorPool descriptor_pool_;
   google::grpc::transcoding::PathMatcherPtr<MethodInfoSharedPtr> path_matcher_;
   std::unique_ptr<google::grpc::transcoding::TypeHelper> type_helper_;
-  Protobuf::util::JsonPrintOptions print_options_;
+  google::grpc::transcoding::JsonResponseTranslateOptions response_translate_options_;
 
   bool match_incoming_request_route_{false};
   bool ignore_unknown_query_parameters_{false};
   bool convert_grpc_status_{false};
+  bool case_insensitive_enum_parsing_{false};
 
   bool disabled_;
 };
@@ -179,7 +181,7 @@ private:
   bool checkAndRejectIfRequestTranscoderFailed(const std::string& details);
   bool checkAndRejectIfResponseTranscoderFailed();
   bool readToBuffer(Protobuf::io::ZeroCopyInputStream& stream, Buffer::Instance& data);
-  void maybeSendHttpBodyRequestMessage();
+  void maybeSendHttpBodyRequestMessage(Buffer::Instance* data);
   /**
    * Builds response from HttpBody protobuf.
    * Returns true if at least one gRPC frame has processed.

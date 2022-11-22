@@ -170,8 +170,7 @@ class SubsetLoadBalancerTest : public Event::TestUsingSimulatedTime,
 public:
   SubsetLoadBalancerTest()
       : scope_(stats_store_.createScope("testprefix")), stat_names_(stats_store_.symbolTable()),
-        stats_(ClusterInfoImpl::generateStats(stats_store_, stat_names_)) {
-    stats_.max_host_weight_.set(1UL);
+        stats_(stat_names_, stats_store_) {
     least_request_lb_config_.mutable_choice_count()->set_value(2);
   }
 
@@ -528,8 +527,8 @@ public:
   NiceMock<Random::MockRandomGenerator> random_;
   Stats::IsolatedStoreImpl stats_store_;
   Stats::ScopeSharedPtr scope_;
-  ClusterStatNames stat_names_;
-  ClusterStats stats_;
+  ClusterLbStatNames stat_names_;
+  ClusterLbStats stats_;
   PrioritySetImpl local_priority_set_;
   HostVectorSharedPtr local_hosts_;
   HostsPerLocalitySharedPtr local_hosts_per_locality_;
@@ -551,26 +550,6 @@ TEST_F(SubsetLoadBalancerTest, NoFallback) {
   std::vector<uint8_t> hash_key;
   auto mock_host = std::make_shared<NiceMock<MockHost>>();
   EXPECT_FALSE(lb_->selectExistingConnection(nullptr, *mock_host, hash_key).has_value());
-}
-
-TEST_F(SubsetLoadBalancerTest, SelectOverrideHost) {
-  init();
-
-  NiceMock<Upstream::MockLoadBalancerContext> context;
-
-  auto mock_host = std::make_shared<NiceMock<MockHost>>();
-  EXPECT_CALL(*mock_host, health()).WillOnce(Return(Host::Health::Degraded));
-
-  LoadBalancerContext::OverrideHost expected_host{"1.2.3.4"};
-  EXPECT_CALL(context, overrideHostToSelect()).WillOnce(Return(absl::make_optional(expected_host)));
-
-  // Mock membership update and update host map shared pointer in the lb.
-  auto host_map = std::make_shared<HostMap>();
-  host_map->insert({"1.2.3.4", mock_host});
-  priority_set_.cross_priority_host_map_ = host_map;
-  configureHostSet({{"tcp://127.0.0.1:80", {{"version", "1.0"}}}}, host_set_);
-
-  EXPECT_EQ(mock_host, lb_->chooseHost(&context));
 }
 
 // Validate that SubsetLoadBalancer unregisters its priority set member update
@@ -1942,8 +1921,8 @@ TEST_F(SubsetLoadBalancerTest, DisabledLocalityWeightAwareness) {
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(&context));
 }
 
-// Verifies that we do *not* invoke health() on hosts when constructing the load balancer. Since
-// health is modified concurrently from multiple threads, it is not safe to call on the worker
+// Verifies that we do *not* invoke coarseHealth() on hosts when constructing the load balancer.
+// Since health is modified concurrently from multiple threads, it is not safe to call on the worker
 // threads.
 TEST_F(SubsetLoadBalancerTest, DoesNotCheckHostHealth) {
   EXPECT_CALL(subset_info_, isEnabled()).WillRepeatedly(Return(true));
@@ -1978,6 +1957,7 @@ TEST_F(SubsetLoadBalancerTest, EnabledLocalityWeightAwareness) {
       },
       host_set_, {1, 100});
 
+  common_config_.mutable_locality_weighted_lb_config();
   lb_ = std::make_shared<SubsetLoadBalancer>(lb_type_, priority_set_, nullptr, stats_, stats_store_,
                                              runtime_, random_, subset_info_, ring_hash_lb_config_,
                                              maglev_lb_config_, round_robin_lb_config_,
@@ -2014,6 +1994,7 @@ TEST_F(SubsetLoadBalancerTest, EnabledScaleLocalityWeights) {
       },
       host_set_, {50, 50});
 
+  common_config_.mutable_locality_weighted_lb_config();
   lb_ = std::make_shared<SubsetLoadBalancer>(lb_type_, priority_set_, nullptr, stats_, stats_store_,
                                              runtime_, random_, subset_info_, ring_hash_lb_config_,
                                              maglev_lb_config_, round_robin_lb_config_,
@@ -2060,6 +2041,7 @@ TEST_F(SubsetLoadBalancerTest, EnabledScaleLocalityWeightsRounding) {
       },
       host_set_, {2, 2});
 
+  common_config_.mutable_locality_weighted_lb_config();
   lb_ = std::make_shared<SubsetLoadBalancer>(lb_type_, priority_set_, nullptr, stats_, stats_store_,
                                              runtime_, random_, subset_info_, ring_hash_lb_config_,
                                              maglev_lb_config_, round_robin_lb_config_,

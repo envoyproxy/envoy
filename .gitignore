@@ -16,11 +16,13 @@
 !\.gitignore
 !\.python-version
 !\.style.yapf
+!\.yamllint
 !\.yapfignore
 !\.zuul
 !\.zuul.yaml
 
 /bazel-*
+/mobile/bazel-*
 BROWSE
 /build
 /build_*

@@ -69,6 +69,8 @@ public:
     // require a flush timeout not already covered by other timeouts.
   }
 
+  Buffer::BufferMemoryAccountSharedPtr account() const override { return buffer_memory_account_; }
+
   void setAccount(Buffer::BufferMemoryAccountSharedPtr account) override {
     // TODO(kbaichoo): implement account tracking for H1. Particularly, binding
     // the account to the buffers used. The current wiring is minimal, and used
@@ -553,8 +555,6 @@ private:
   // The action to take when a request header name contains underscore characters.
   const envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
-
-  const bool runtime_lazy_read_disable_{};
 };
 
 /**

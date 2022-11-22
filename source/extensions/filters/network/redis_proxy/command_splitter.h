@@ -5,6 +5,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
 
+#include "source/extensions/filters/network/common/redis/client.h"
 #include "source/extensions/filters/network/common/redis/codec.h"
 
 namespace Envoy {
@@ -64,6 +65,12 @@ public:
    * @param value supplies the response which is now owned by the callee.
    */
   virtual void onResponse(Common::Redis::RespValuePtr&& value) PURE;
+
+  /**
+   * Called to retrieve information about the current Redis transaction.
+   * @return reference to a Transaction instance of the current connection.
+   */
+  virtual Common::Redis::Client::Transaction& transaction() PURE;
 };
 
 /**

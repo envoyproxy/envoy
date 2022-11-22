@@ -558,7 +558,7 @@ public:
     absl::MutexLock lock(&mutex_);
     if (!ares_library_initialized_) {
       ares_library_initialized_ = true;
-      ENVOY_LOG(info, "c-ares library initialized.");
+      ENVOY_LOG(debug, "c-ares library initialized.");
       ares_library_init(ARES_LIB_INIT_ALL);
     }
   }
@@ -567,7 +567,7 @@ public:
     absl::MutexLock lock(&mutex_);
     if (ares_library_initialized_) {
       ares_library_initialized_ = false;
-      ENVOY_LOG(info, "c-ares library cleaned up.");
+      ENVOY_LOG(debug, "c-ares library cleaned up.");
       ares_library_cleanup();
     }
   }

@@ -464,6 +464,11 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutUnconfiguredDoesNotTriggerOnBod
 }
 
 TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutTriggersOnRawIncompleteRequestWithHeaders) {
+  if (GetParam().http1_implementation == Http1Impl::BalsaParser) {
+    // TODO(#21245): Re-enable this test for BalsaParser.
+    return;
+  }
+
   // Omitting \r\n\r\n does not indicate incomplete request in HTTP2
   if (downstreamProtocol() == Envoy::Http::CodecType::HTTP2) {
     return;
@@ -473,7 +478,7 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutTriggersOnRawIncompleteRequestW
   initialize();
 
   std::string raw_response;
-  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.1", &raw_response, true);
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.1", &raw_response);
   EXPECT_THAT(raw_response, testing::HasSubstr("request timeout"));
 }
 
@@ -486,7 +491,7 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutDoesNotTriggerOnRawCompleteRequ
   initialize();
 
   std::string raw_response;
-  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.1\r\n\r\n", &raw_response, true);
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.1\r\n\r\n", &raw_response);
   EXPECT_THAT(raw_response, testing::Not(testing::HasSubstr("request timeout")));
 }
 

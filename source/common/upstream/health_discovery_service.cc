@@ -114,7 +114,7 @@ envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse HdsDelega
               *host->address(), *endpoint->mutable_endpoint()->mutable_address());
           // TODO(lilika): Add support for more granular options of
           // envoy::config::core::v3::HealthStatus
-          if (host->health() == Host::Health::Healthy) {
+          if (host->coarseHealth() == Host::Health::Healthy) {
             endpoint->set_health_status(envoy::config::core::v3::HEALTHY);
           } else {
             if (host->healthFlagGet(Host::HealthFlag::ACTIVE_HC_TIMEOUT)) {
@@ -167,6 +167,12 @@ envoy::config::cluster::v3::Cluster HdsDelegate::createClusterConfig(
 
     // add all endpoints for this locality group to the config
     for (const auto& endpoint : locality_endpoints.endpoints()) {
+      if (endpoint.has_health_check_config() &&
+          endpoint.health_check_config().disable_active_health_check()) {
+        ENVOY_LOG(debug, "Skip adding the endpoint {} with optional disabled health check for HDS.",
+                  endpoint.DebugString());
+        continue;
+      }
       auto* new_endpoint = endpoints->add_lb_endpoints()->mutable_endpoint();
       new_endpoint->mutable_address()->MergeFrom(endpoint.address());
       new_endpoint->mutable_health_check_config()->MergeFrom(endpoint.health_check_config());
@@ -508,12 +514,9 @@ ProdClusterInfoFactory::createClusterInfo(const CreateClusterInfoParams& params)
       params.stats_.createScope(fmt::format("cluster.{}.", params.cluster_.name()));
 
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-      params.server_context_.admin(), params.ssl_context_manager_, *scope,
-      params.server_context_.clusterManager(), params.server_context_.localInfo(),
-      params.server_context_.mainThreadDispatcher(), params.stats_,
-      params.server_context_.singletonManager(), params.server_context_.threadLocal(),
-      params.server_context_.messageValidationVisitor(), params.server_context_.api(),
-      params.server_context_.options(), params.server_context_.accessLogManager());
+      params.server_context_, params.ssl_context_manager_, *scope,
+      params.server_context_.clusterManager(), params.stats_,
+      params.server_context_.messageValidationVisitor());
 
   // TODO(JimmyCYJ): Support SDS for HDS cluster.
   Network::UpstreamTransportSocketFactoryPtr socket_factory =

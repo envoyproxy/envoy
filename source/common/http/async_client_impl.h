@@ -167,6 +167,13 @@ private:
     uint32_t retryShadowBufferLimit() const override {
       return std::numeric_limits<uint32_t>::max();
     }
+    const Router::RouteSpecificFilterConfig*
+    mostSpecificPerFilterConfig(const std::string&) const override {
+      return nullptr;
+    }
+    void traversePerFilterConfig(
+        const std::string&,
+        std::function<void(const Router::RouteSpecificFilterConfig&)>) const override {}
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullConfig route_configuration_;
   };
@@ -356,7 +363,9 @@ private:
   // TODO(kbaichoo): Plumb account from owning request filter.
   Buffer::BufferMemoryAccountSharedPtr account() const override { return nullptr; }
   Tracing::Span& activeSpan() override { return active_span_; }
-  const Tracing::Config& tracingConfig() override { return tracing_config_; }
+  OptRef<const Tracing::Config> tracingConfig() const override {
+    return makeOptRef<const Tracing::Config>(tracing_config_);
+  }
   void continueDecoding() override {}
   RequestTrailerMap& addDecodedTrailers() override { PANIC("not implemented"); }
   void addDecodedData(Buffer::Instance&, bool) override {

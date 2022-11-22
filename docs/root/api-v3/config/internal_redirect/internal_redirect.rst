@@ -1,4 +1,4 @@
-Internal Redirect Predicates
+Internal redirect predicates
 ============================
 
 .. toctree::

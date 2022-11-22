@@ -43,7 +43,7 @@ Network::FilterStatus ProxyFilter::onNewConnection() {
 
   uint32_t default_port = config_->port();
 
-  auto result = config_->cache().loadDnsCacheEntry(sni, default_port, *this);
+  auto result = config_->cache().loadDnsCacheEntry(sni, default_port, false, *this);
 
   cache_load_handle_ = std::move(result.handle_);
   if (cache_load_handle_ == nullptr) {
@@ -59,6 +59,7 @@ Network::FilterStatus ProxyFilter::onNewConnection() {
   case LoadDnsCacheEntryStatus::Loading:
     ASSERT(cache_load_handle_ != nullptr);
     ENVOY_CONN_LOG(debug, "waiting to load DNS cache entry", read_callbacks_->connection());
+    read_callbacks_->connection().readDisable(true);
     return Network::FilterStatus::StopIteration;
   case LoadDnsCacheEntryStatus::Overflow:
     ASSERT(cache_load_handle_ == nullptr);
@@ -74,6 +75,7 @@ void ProxyFilter::onLoadDnsCacheComplete(const Common::DynamicForwardProxy::DnsH
   ENVOY_CONN_LOG(debug, "load DNS cache complete, continuing", read_callbacks_->connection());
   ASSERT(circuit_breaker_ != nullptr);
   circuit_breaker_.reset();
+  read_callbacks_->connection().readDisable(false);
   read_callbacks_->continueReading();
 }
 

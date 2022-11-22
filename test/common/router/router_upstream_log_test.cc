@@ -106,7 +106,7 @@ public:
     Stats::StatNameManagedStorage prefix("prefix", context_.scope().symbolTable());
     config_ = std::make_shared<FilterConfig>(prefix.statName(), context_,
                                              ShadowWriterPtr(new MockShadowWriter()), router_proto);
-    router_ = std::make_shared<TestFilter>(*config_);
+    router_ = std::make_shared<TestFilter>(*config_, config_->default_stats_);
     router_->setDecoderFilterCallbacks(callbacks_);
     EXPECT_CALL(callbacks_.dispatcher_, pushTrackedObject(_)).Times(testing::AnyNumber());
     EXPECT_CALL(callbacks_.dispatcher_, popTrackedObject(_)).Times(testing::AnyNumber());
@@ -121,14 +121,6 @@ public:
         ->setLocalAddress(host_address_);
     router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
         ->setRemoteAddress(Network::Utility::parseInternetAddressAndPort("1.2.3.4:80"));
-    ON_CALL(*context_.cluster_manager_.thread_local_cluster_.cluster_.info_, createFilterChain(_))
-        .WillByDefault(Invoke([&](Http::FilterChainManager& manager) -> void {
-          Http::FilterFactoryCb factory_cb =
-              [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-            callbacks.addStreamDecoderFilter(std::make_shared<UpstreamCodecFilter>());
-          };
-          manager.applyFilterFactoryCb({}, factory_cb);
-        }));
   }
 
   void expectResponseTimerCreate() {

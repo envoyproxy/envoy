@@ -161,6 +161,14 @@ public:
    * Set the currently selected upstream host for the connection.
    */
   virtual void upstreamHost(Upstream::HostDescriptionConstSharedPtr host) PURE;
+
+  /**
+   * Signal to the filter manager to enable secure transport mode in upstream connection.
+   * This is done when upstream connection's transport socket is of startTLS type. At the moment
+   * it is the only transport socket type which can be programmatically converted from non-secure
+   * mode to secure mode.
+   */
+  virtual bool startUpstreamSecureTransport() PURE;
 };
 
 /**
@@ -199,6 +207,13 @@ public:
    * @param callbacks supplies the callbacks.
    */
   virtual void initializeReadFilterCallbacks(ReadFilterCallbacks& callbacks) PURE;
+
+  /**
+   * Method is called by the filter manager to convert upstream's connection transport socket
+   * from non-secure mode to secure mode. Only terminal filters are aware of upstream connection and
+   * non-terminal filters should not implement startUpstreamSecureTransport.
+   */
+  virtual bool startUpstreamSecureTransport() { return false; }
 };
 
 using ReadFilterSharedPtr = std::shared_ptr<ReadFilter>;
@@ -290,6 +305,20 @@ public:
    * @return Object on which filters can share data on a per-request basis.
    */
   virtual StreamInfo::FilterState& filterState() PURE;
+
+  /**
+   * @return the Dispatcher for issuing events.
+   */
+  virtual Event::Dispatcher& dispatcher() PURE;
+
+  /**
+   * If a filter returned `FilterStatus::ContinueIteration`, `continueFilterChain(true)`
+   * should be called to continue the filter chain iteration. Or `continueFilterChain(false)`
+   * should be called if the filter returned `FilterStatus::StopIteration` and closed
+   * the socket.
+   * @param success boolean telling whether the filter execution was successful or not.
+   */
+  virtual void continueFilterChain(bool success) PURE;
 };
 
 /**
@@ -423,10 +452,13 @@ public:
   /**
    * Find filter chain that's matching metadata from the new connection.
    * @param socket supplies connection metadata that's going to be used for the filter chain lookup.
+   * @param info supplies the dynamic metadata and the filter state populated by the listener
+   * filters.
    * @return const FilterChain* filter chain to be used by the new connection,
    *         nullptr if no matching filter chain was found.
    */
-  virtual const FilterChain* findFilterChain(const ConnectionSocket& socket) const PURE;
+  virtual const FilterChain* findFilterChain(const ConnectionSocket& socket,
+                                             const StreamInfo::StreamInfo& info) const PURE;
 };
 
 /**

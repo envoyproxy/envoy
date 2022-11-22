@@ -667,6 +667,11 @@ INSTANTIATE_TEST_SUITE_P(Protocols, LdsIntegrationTest,
 
 // Sample test making sure our config framework correctly reloads listeners.
 TEST_P(LdsIntegrationTest, ReloadConfig) {
+#ifdef ENVOY_ENABLE_UHV
+  // TODO(#23287) - Determine HTTP/0.9 and HTTP/1.0 support within UHV
+  return;
+#endif
+
   config_helper_.disableDelayClose();
   autonomous_upstream_ = true;
   initialize();
@@ -716,10 +721,12 @@ TEST_P(LdsIntegrationTest, NewListenerWithBadPostListenSocketOption) {
       version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
   new_config_helper.addConfigModifier(
       [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-        auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-        listener->mutable_address()->mutable_socket_address()->set_port_value(
+        auto* new_listener = bootstrap.mutable_static_resources()->add_listeners();
+        new_listener->MergeFrom(bootstrap.static_resources().listeners(0));
+        new_listener->set_name("new_listener");
+        new_listener->mutable_address()->mutable_socket_address()->set_port_value(
             addr_socket.second->connectionInfoProvider().localAddress()->ip()->port());
-        auto socket_option = listener->add_socket_options();
+        auto socket_option = new_listener->add_socket_options();
         socket_option->set_state(envoy::config::core::v3::SocketOption::STATE_LISTENING);
         socket_option->set_level(10000);     // Invalid level.
         socket_option->set_int_value(10000); // Invalid value.

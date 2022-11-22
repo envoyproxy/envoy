@@ -263,7 +263,7 @@ OverloadManager& ListenerFactoryContextBaseImpl::overloadManager() {
 ThreadLocal::Instance& ListenerFactoryContextBaseImpl::threadLocal() {
   return server_.threadLocal();
 }
-Admin& ListenerFactoryContextBaseImpl::admin() { return server_.admin(); }
+OptRef<Admin> ListenerFactoryContextBaseImpl::admin() { return server_.admin(); }
 const envoy::config::core::v3::Metadata& ListenerFactoryContextBaseImpl::listenerMetadata() const {
   return metadata_;
 };
@@ -353,12 +353,9 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
                           }),
       transport_factory_context_(
           std::make_shared<Server::Configuration::TransportSocketFactoryContextImpl>(
-              parent_.server_.admin(), parent_.server_.sslContextManager(), listenerScope(),
-              parent_.server_.clusterManager(), parent_.server_.localInfo(),
-              parent_.server_.dispatcher(), parent_.server_.stats(),
-              parent_.server_.singletonManager(), parent_.server_.threadLocal(),
-              validation_visitor_, parent_.server_.api(), parent_.server_.options(),
-              parent_.server_.accessLogManager())),
+              parent_.server_.serverFactoryContext(), parent_.server_.sslContextManager(),
+              listenerScope(), parent_.server_.clusterManager(), parent_.server_.stats(),
+              validation_visitor_)),
       quic_stat_names_(parent_.quicStatNames()),
       missing_listener_config_stats_({ALL_MISSING_LISTENER_CONFIG_STATS(
           POOL_COUNTER(listener_factory_context_->listenerScope()))}) {
@@ -491,14 +488,9 @@ void ListenerImpl::checkIpv4CompatAddress(const Network::Address::InstanceConstS
       (address->ip()->version() != Network::Address::IpVersion::v6 ||
        (!address->ip()->isAnyAddress() &&
         address->ip()->ipv6()->v4CompatibleAddress() == nullptr))) {
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_check_on_ipv4_compat")) {
-      throw EnvoyException(fmt::format(
-          "Only IPv6 address '::' or valid IPv4-mapped IPv6 address can set ipv4_compat: {}",
-          address->asStringView()));
-    } else {
-      ENVOY_LOG(warn, "An invalid IPv4-mapped IPv6 address is used when ipv4_compat is set: {}",
-                address->asStringView());
-    }
+    throw EnvoyException(fmt::format(
+        "Only IPv6 address '::' or valid IPv4-mapped IPv6 address can set ipv4_compat: {}",
+        address->asStringView()));
   }
 }
 
@@ -612,7 +604,8 @@ void ListenerImpl::buildUdpListenerFactory(uint32_t concurrency) {
                            "doesn't work with connection balancer.");
     }
     udp_listener_config_->listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
-        config_.udp_listener_config().quic_options(), concurrency, quic_stat_names_);
+        config_.udp_listener_config().quic_options(), concurrency, quic_stat_names_,
+        validation_visitor_);
 #if UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT
     // TODO(mattklein123): We should be able to use GSO without QUICHE/QUIC. Right now this causes
     // non-QUIC integration tests to fail, which I haven't investigated yet. Additionally, from
@@ -868,7 +861,9 @@ OverloadManager& PerListenerFactoryContextImpl::overloadManager() {
 ThreadLocal::Instance& PerListenerFactoryContextImpl::threadLocal() {
   return listener_factory_context_base_->threadLocal();
 }
-Admin& PerListenerFactoryContextImpl::admin() { return listener_factory_context_base_->admin(); }
+OptRef<Admin> PerListenerFactoryContextImpl::admin() {
+  return listener_factory_context_base_->admin();
+}
 const envoy::config::core::v3::Metadata& PerListenerFactoryContextImpl::listenerMetadata() const {
   return listener_factory_context_base_->listenerMetadata();
 };
@@ -989,7 +984,16 @@ bool ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3::L
   if (usesProxyProto(config_) ^ usesProxyProto(config)) {
     return false;
   }
-  return ListenerMessageUtil::filterChainOnlyChange(config_, config);
+
+  if (ListenerMessageUtil::filterChainOnlyChange(config_, config)) {
+    // We need to calculate the reuse port's default value then ensure whether it is changed or not.
+    // Since reuse port's default value isn't the YAML bool field default value. When
+    // `enable_reuse_port` is specified, `ListenerMessageUtil::filterChainOnlyChange` use the YAML
+    // default value to do the comparison.
+    return reuse_port_ == getReusePortOrDefault(parent_.server_, config, socket_type_);
+  }
+
+  return false;
 }
 
 ListenerImplPtr
@@ -1065,6 +1069,10 @@ bool ListenerImpl::getReusePortOrDefault(Server::Instance& server,
   return initial_reuse_port_value;
 }
 
+bool ListenerImpl::socketOptionsEqual(const ListenerImpl& other) const {
+  return ListenerMessageUtil::socketOptionsEqual(config_, other.config_);
+}
+
 bool ListenerImpl::hasCompatibleAddress(const ListenerImpl& other) const {
   if ((socket_type_ != other.socket_type_) || (addresses_.size() != other.addresses().size())) {
     return false;
@@ -1090,6 +1098,13 @@ bool ListenerImpl::hasCompatibleAddress(const ListenerImpl& other) const {
 }
 
 bool ListenerImpl::hasDuplicatedAddress(const ListenerImpl& other) const {
+  // Skip the duplicate address check if this is the case of a listener update with new socket
+  // options.
+  if (Runtime::runtimeFeatureEnabled(ENABLE_UPDATE_LISTENER_SOCKET_OPTIONS_RUNTIME_FLAG) &&
+      (name_ == other.name_) && !ListenerMessageUtil::socketOptionsEqual(config_, other.config_)) {
+    return false;
+  }
+
   if (socket_type_ != other.socket_type_) {
     return false;
   }
@@ -1121,6 +1136,26 @@ void ListenerImpl::closeAllSockets() {
   for (auto& socket_factory : socket_factories_) {
     socket_factory->closeAllSockets();
   }
+}
+
+bool ListenerMessageUtil::socketOptionsEqual(const envoy::config::listener::v3::Listener& lhs,
+                                             const envoy::config::listener::v3::Listener& rhs) {
+  if ((PROTOBUF_GET_WRAPPED_OR_DEFAULT(lhs, transparent, false) !=
+       PROTOBUF_GET_WRAPPED_OR_DEFAULT(rhs, transparent, false)) ||
+      (PROTOBUF_GET_WRAPPED_OR_DEFAULT(lhs, freebind, false) !=
+       PROTOBUF_GET_WRAPPED_OR_DEFAULT(rhs, freebind, false)) ||
+      (PROTOBUF_GET_WRAPPED_OR_DEFAULT(lhs, tcp_fast_open_queue_length, 0) !=
+       PROTOBUF_GET_WRAPPED_OR_DEFAULT(rhs, tcp_fast_open_queue_length, 0))) {
+    return false;
+  }
+
+  return std::equal(lhs.socket_options().begin(), lhs.socket_options().end(),
+                    rhs.socket_options().begin(), rhs.socket_options().end(),
+                    [](const ::envoy::config::core::v3::SocketOption& option,
+                       const ::envoy::config::core::v3::SocketOption& other_option) {
+                      Protobuf::util::MessageDifferencer differencer;
+                      return differencer.Compare(option, other_option);
+                    });
 }
 
 bool ListenerMessageUtil::filterChainOnlyChange(const envoy::config::listener::v3::Listener& lhs,

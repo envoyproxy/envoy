@@ -13,7 +13,7 @@ namespace Extensions {
 namespace UriTemplate {
 namespace Rewrite {
 
-Router::PathMatcherSharedPtr createMatcherPredicateFromYaml(std::string yaml_string) {
+Router::PathMatcherSharedPtr createMatcherFromYaml(std::string yaml_string) {
   envoy::config::core::v3::TypedExtensionConfig config;
   TestUtility::loadFromYaml(yaml_string, config);
 
@@ -53,9 +53,9 @@ TEST(RewriteTest, BasicSetup) {
         path_template_rewrite: "/bar/{lang}/{country}"
 )EOF";
 
-  Router::PathRewriterSharedPtr predicate = createRewriterFromYaml(yaml_string);
-  EXPECT_EQ(predicate->uriTemplate(), "/bar/{lang}/{country}");
-  EXPECT_EQ(predicate->name(), "envoy.path.rewrite.uri_template.uri_template_rewriter");
+  Router::PathRewriterSharedPtr rewriter = createRewriterFromYaml(yaml_string);
+  EXPECT_EQ(rewriter->uriTemplate(), "/bar/{lang}/{country}");
+  EXPECT_EQ(rewriter->name(), "envoy.path.rewrite.uri_template.uri_template_rewriter");
 }
 
 TEST(RewriteTest, BasicUsage) {
@@ -66,9 +66,9 @@ TEST(RewriteTest, BasicUsage) {
         path_template_rewrite: "/bar/{lang}/{country}"
 )EOF";
 
-  Router::PathRewriterSharedPtr predicate = createRewriterFromYaml(yaml_string);
-  EXPECT_EQ(predicate->rewritePath("/bar/en/usa", "/bar/{country}/{lang}").value(), "/bar/usa/en");
-  EXPECT_EQ(predicate->name(), "envoy.path.rewrite.uri_template.uri_template_rewriter");
+  Router::PathRewriterSharedPtr rewriter = createRewriterFromYaml(yaml_string);
+  EXPECT_EQ(rewriter->rewritePath("/bar/en/usa", "/bar/{country}/{lang}").value(), "/bar/usa/en");
+  EXPECT_EQ(rewriter->name(), "envoy.path.rewrite.uri_template.uri_template_rewriter");
 }
 
 TEST(RewriteTest, PatternNotMatched) {
@@ -79,9 +79,9 @@ TEST(RewriteTest, PatternNotMatched) {
         path_template_rewrite: "/bar/{lang}/{country}/{test}"
 )EOF";
 
-  Router::PathRewriterSharedPtr predicate = createRewriterFromYaml(yaml_string);
+  Router::PathRewriterSharedPtr rewriter = createRewriterFromYaml(yaml_string);
   absl::StatusOr<std::string> rewrite_or_error =
-      predicate->rewritePath("/bar/en/usa", "/bar/{country}/{lang}/{test}");
+      rewriter->rewritePath("/bar/en/usa", "/bar/{country}/{lang}/{test}");
   EXPECT_FALSE(rewrite_or_error.ok());
   EXPECT_EQ(rewrite_or_error.status().message(), "Pattern not match");
 }
@@ -94,9 +94,9 @@ TEST(RewriteTest, RewriteInvalidRegex) {
         path_template_rewrite: "/bar/{lang}/{country}"
 )EOF";
 
-  Router::PathRewriterSharedPtr predicate = createRewriterFromYaml(yaml_string);
+  Router::PathRewriterSharedPtr rewriter = createRewriterFromYaml(yaml_string);
   absl::StatusOr<std::string> rewrite_or_error =
-      predicate->rewritePath("/bar/en/usa", "/bar/invalid}/{lang}");
+      rewriter->rewritePath("/bar/en/usa", "/bar/invalid}/{lang}");
   EXPECT_FALSE(rewrite_or_error.ok());
   EXPECT_EQ(rewrite_or_error.status().message(), "Unable to parse matched_path");
 }
@@ -117,7 +117,7 @@ TEST(RewriteTest, MatchPatternValidation) {
 )EOF";
 
   Router::PathRewriterSharedPtr rewriter = createRewriterFromYaml(rewrite_yaml_string);
-  Router::PathMatcherSharedPtr matcher = createMatcherPredicateFromYaml(match_yaml_string);
+  Router::PathMatcherSharedPtr matcher = createMatcherFromYaml(match_yaml_string);
 
   EXPECT_TRUE(rewriter->isCompatiblePathMatcher(matcher).ok());
 }
@@ -155,7 +155,7 @@ TEST(RewriteTest, MatchPatternMismatchedVars) {
 )EOF";
 
   Router::PathRewriterSharedPtr rewriter = createRewriterFromYaml(rewrite_yaml_string);
-  Router::PathMatcherSharedPtr matcher = createMatcherPredicateFromYaml(match_yaml_string);
+  Router::PathMatcherSharedPtr matcher = createMatcherFromYaml(match_yaml_string);
 
   absl::Status error = rewriter->isCompatiblePathMatcher(matcher);
   EXPECT_FALSE(error.ok());
