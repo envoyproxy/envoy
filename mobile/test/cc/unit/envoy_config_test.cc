@@ -1,7 +1,6 @@
 #include <string>
 #include <vector>
 
-#include "extension_registry.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_replace.h"
@@ -16,7 +15,6 @@
 #if defined(__APPLE__)
 #include "source/extensions/network/dns_resolver/apple/apple_dns_impl.h"
 #endif
-#include "library/common/extensions/cert_validator/platform_bridge/platform_bridge.pb.h"
 
 using testing::HasSubstr;
 using testing::Not;
@@ -324,8 +322,6 @@ TEST(TestConfig, RemainingTemplatesThrows) {
 }
 
 TEST(TestConfig, EnablePlatformCertificatesValidation) {
-  envoy_mobile::extensions::cert_validator::platform_bridge::PlatformBridgeCertValidator validator;
-  UNREFERENCED_PARAMETER(validator); // Simply used to avoid unknown type errors.
   EngineBuilder engine_builder;
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   engine_builder.enablePlatformCertificatesValidation(false);
