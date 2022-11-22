@@ -26,7 +26,6 @@
 
 #include "extension_registry_platform_additions.h"
 #include "library/common/extensions/cert_validator/platform_bridge/config.h"
-#include "library/common/extensions/cert_validator/platform_bridge/platform_bridge.pb.h"
 #include "library/common/extensions/filters/http/assertion/config.h"
 #include "library/common/extensions/filters/http/local_error/config.h"
 #include "library/common/extensions/filters/http/network_configuration/config.h"
