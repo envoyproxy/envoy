@@ -330,7 +330,7 @@ void TcpStatsdSink::TlsSink::write(Buffer::Instance& buffer) {
   //       since if we stay over, the other threads will eventually kill their connections too.
   // TODO(mattklein123): The use of the stat is somewhat of a hack, and should be replaced with
   // real flow control callbacks once they are available.
-  if (parent_.cluster_info_->stats().upstream_cx_tx_bytes_buffered_.value() >
+  if (parent_.cluster_info_->trafficStats().upstream_cx_tx_bytes_buffered_.value() >
       MAX_BUFFERED_STATS_BYTES) {
     if (connection_) {
       connection_->close(Network::ConnectionCloseType::NoFlush);
@@ -354,11 +354,12 @@ void TcpStatsdSink::TlsSink::write(Buffer::Instance& buffer) {
 
     connection_ = std::move(info.connection_);
     connection_->addConnectionCallbacks(*this);
-    connection_->setConnectionStats({parent_.cluster_info_->stats().upstream_cx_rx_bytes_total_,
-                                     parent_.cluster_info_->stats().upstream_cx_rx_bytes_buffered_,
-                                     parent_.cluster_info_->stats().upstream_cx_tx_bytes_total_,
-                                     parent_.cluster_info_->stats().upstream_cx_tx_bytes_buffered_,
-                                     &parent_.cluster_info_->stats().bind_errors_, nullptr});
+    connection_->setConnectionStats(
+        {parent_.cluster_info_->trafficStats().upstream_cx_rx_bytes_total_,
+         parent_.cluster_info_->trafficStats().upstream_cx_rx_bytes_buffered_,
+         parent_.cluster_info_->trafficStats().upstream_cx_tx_bytes_total_,
+         parent_.cluster_info_->trafficStats().upstream_cx_tx_bytes_buffered_,
+         &parent_.cluster_info_->trafficStats().bind_errors_, nullptr});
     connection_->connect();
   }
 

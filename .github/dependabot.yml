@@ -32,6 +32,16 @@ updates:
     interval: "daily"
 
 - package-ecosystem: "pip"
+  directory: "/mobile/docs"
+  schedule:
+    interval: "daily"
+
+- package-ecosystem: "pip"
+  directory: "/mobile/third_party/python"
+  schedule:
+    interval: "daily"
+
+- package-ecosystem: "pip"
   directory: "/tools/base"
   schedule:
     interval: "daily"

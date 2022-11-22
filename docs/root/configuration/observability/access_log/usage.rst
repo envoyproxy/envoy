@@ -590,6 +590,15 @@ The following command operators are supported:
   is unique with high likelihood within an execution, but can duplicate across
   multiple instances or between restarts.
 
+.. _config_access_log_format_stream_id:
+
+%STREAM_ID%
+  An identifier for the stream (HTTP request, long-live HTTP2 stream, TCP connection, etc.). It can be used to
+  cross-reference TCP access logs across multiple log sinks, or to cross-reference timer-based reports for the same connection.
+  Different with %CONNECTION_ID%, the identifier should be unique across multiple instances or between restarts.
+  And it's value should be same with %REQ(X-REQUEST-ID)% for HTTP request.
+  This should be used to replace %CONNECTION_ID% and %REQ(X-REQUEST-ID)% in most cases.
+
 %GRPC_STATUS(X)%
   `gRPC status code <https://github.com/googleapis/googleapis/blob/master/google/rpc/code.proto>`_ formatted according to the optional parameter ``X``, which can be ``CAMEL_STRING``, ``SNAKE_STRING`` and ``NUMBER``.
   For example, if the grpc status is ``INVALID_ARGUMENT`` (represented by number 3), the formatter will return ``InvalidArgument`` for ``CAMEL_STRING``, ``INVALID_ARGUMENT`` for ``SNAKE_STRING`` and ``3`` for ``NUMBER``.

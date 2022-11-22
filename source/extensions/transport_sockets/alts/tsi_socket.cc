@@ -362,6 +362,7 @@ void TsiSocket::closeSocket(Network::ConnectionEvent) {
 
 void TsiSocket::onConnected() {
   ASSERT(!handshake_complete_);
+  // Client initiates the handshake, so ignore onConnect call on the downstream.
   if (!downstream_) {
     doHandshakeNext();
   }
