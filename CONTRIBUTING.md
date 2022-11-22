@@ -113,7 +113,8 @@ versioning guidelines:
   inline with protos as per the [API contribution guidelines](api/CONTRIBUTING.md). If a change applies
   to multiple sections of the release notes, it should be noted in the first (most important) section
   that applies. For instance, a bug fix that introduces incompatible behavior should be noted in
-  `Incompatible Behavior Changes` but not in `Bug Fixes`.
+  `Incompatible Behavior Changes` but not in `Bug Fixes`. Also should follow the runtime guarding rules
+  [runtime guarding](CONTRIBUTING.md#runtime-guarding).
 * All code comments and documentation are expected to have proper English grammar and punctuation.
   If you are not a fluent English speaker (or a bad writer ;-)) please let us know and we will try
   to find some help but there are no guarantees.
