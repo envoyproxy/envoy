@@ -40,6 +40,8 @@ public:
   const std::string& tlsVersion() const override;
   const std::string& alpn() const override;
   const std::string& sni() const override;
+  int pkeyTypePeerCertificate() const override;
+  int pkeySizePeerCertificate() const override;
 
   virtual SSL* ssl() const PURE;
 

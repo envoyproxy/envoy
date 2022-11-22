@@ -1,5 +1,7 @@
 #include "source/extensions/transport_sockets/tls/connection_info_impl_base.h"
 
+#include <openssl/evp.h>
+
 #include "source/common/common/hex.h"
 
 #include "absl/strings/str_replace.h"
@@ -294,6 +296,29 @@ const std::string& ConnectionInfoImplBase::sessionId() const {
   const uint8_t* session_id = SSL_SESSION_get_id(session, &session_id_length);
   cached_session_id_ = Hex::encode(session_id, session_id_length);
   return cached_session_id_;
+}
+
+int ConnectionInfoImplBase::pkeyTypePeerCertificate() const {
+  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl()));
+  bssl::UniquePtr<EVP_PKEY> public_key(X509_get_pubkey(cert.get()));
+  const int pkey_id = EVP_PKEY_id(public_key.get());
+  return pkey_id;
+}
+
+int ConnectionInfoImplBase::pkeySizePeerCertificate() const {
+  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl()));
+  bssl::UniquePtr<EVP_PKEY> public_key(X509_get_pubkey(cert.get()));
+  const int pkey_id = EVP_PKEY_id(public_key.get());
+  switch (pkey_id) {
+  case EVP_PKEY_EC: {
+    const EC_GROUP* ecdsa_group = EC_KEY_get0_group(EVP_PKEY_get0_EC_KEY(public_key.get()));
+    return EC_GROUP_get_curve_name(ecdsa_group);
+  } break;
+  case EVP_PKEY_RSA: {
+    return RSA_bits(EVP_PKEY_get0_RSA(public_key.get()));
+  } break;
+  }
+  return -1;
 }
 
 } // namespace Tls

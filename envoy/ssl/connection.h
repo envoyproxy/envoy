@@ -147,6 +147,16 @@ public:
    * @return std::string the SNI used to establish the connection.
    **/
   virtual const std::string& sni() const PURE;
+
+  /**
+   * @return pkey id, EVP_PKEY_EC or EVP_PKEY_RSA
+   */
+  virtual int pkeyTypePeerCertificate() const PURE;
+
+  /**
+   * @return EC curve name or RSA size
+   */
+  virtual int pkeySizePeerCertificate() const PURE;
 };
 
 using ConnectionInfoConstSharedPtr = std::shared_ptr<const ConnectionInfo>;

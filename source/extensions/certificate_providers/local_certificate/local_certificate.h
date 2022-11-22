@@ -3,6 +3,7 @@
 #include "envoy/certificate_provider/certificate_provider.h"
 #include "envoy/common/callback.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/extensions/certificate_providers/local_certificate/v3/local_certificate.pb.h"
 #include "envoy/server/transport_socket_config.h"
 
 #include "envoy/extensions/certificate_providers/local_certificate/v3/local_certificate.pb.h"
@@ -55,18 +56,25 @@ private:
   void runAddUpdateCallback();
   void runOnDemandUpdateCallback(const std::string& host,
                                  Event::Dispatcher& thread_local_dispatcher, bool in_cache = true);
-  //void signCertificate(std::string sni, absl::Span<const std::string> dns_sans, const std::string subject,
-  //                     Event::Dispatcher& thread_local_dispatcher);
+  // void signCertificate(std::string sni, absl::Span<const std::string> dns_sans, const std::string
+  // subject,
+  //                      Event::Dispatcher& thread_local_dispatcher);
   void signCertificate(const std::string sni,
                        Envoy::CertificateProvider::OnDemandUpdateMetadataPtr metadata,
                        Event::Dispatcher& thread_local_dispatcher);
-  void setSubject(absl::string_view subject, X509_NAME* x509_name);
+
+  void setSubjectToCSR(absl::string_view subject, X509_REQ* req);
+  void setPkeyToCSR(Envoy::CertificateProvider::OnDemandUpdateMetadataPtr metadata, EVP_PKEY* key,
+                    X509_REQ* req);
+  void setExpirationTime(Envoy::CertificateProvider::OnDemandUpdateMetadataPtr metadata, X509* crt);
+  void setSANs(Envoy::CertificateProvider::OnDemandUpdateMetadataPtr metadata, X509* crt);
   Event::Dispatcher& main_thread_dispatcher_;
   std::string ca_cert_;
   std::string ca_key_;
   std::string default_identity_cert_;
   std::string default_identity_key_;
   absl::optional<SystemTime> expiration_config_;
+  envoy::extensions::certificate_providers::local_certificate::v3::LocalCertificate_Pkey pkey_;
 
   Common::CallbackManager<> update_callback_manager_;
   absl::flat_hash_map<std::string, std::list<OnDemandUpdateHandleImpl*>>
