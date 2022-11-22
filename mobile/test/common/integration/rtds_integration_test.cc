@@ -20,8 +20,6 @@ envoy::config::bootstrap::v3::LayeredRuntime layeredRuntimeConfig(const std::str
       rtds_layer:
         name: some_rtds_layer
         rtds_config:
-          # TODO(abeyad): Remove the initial_fetch_timeout when
-          # https://github.com/envoyproxy/envoy-mobile/issues/2678 is fixed.
           initial_fetch_timeout:
             seconds: 1
           resource_api_version: V3
