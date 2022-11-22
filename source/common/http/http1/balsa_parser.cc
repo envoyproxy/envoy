@@ -119,6 +119,14 @@ BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t m
 size_t BalsaParser::execute(const char* slice, int len) {
   ASSERT(status_ != ParserStatus::Error);
 
+  if (len > 0 && !on_message_begin_called_) {
+    status_ = convertResult(connection_->onMessageBegin());
+    on_message_begin_called_ = true;
+    if (status_ == ParserStatus::Error) {
+      return 0;
+    }
+  }
+
   if (len == 0 && headers_done_ && !isChunked() &&
       ((!framer_.is_request() && hasTransferEncoding()) || !headers_.content_length_valid())) {
     MessageDone();
@@ -210,10 +218,6 @@ void BalsaParser::OnRequestFirstLineInput(absl::string_view /*line_input*/,
     error_message_ = "HPE_INVALID_METHOD";
     return;
   }
-  status_ = convertResult(connection_->onMessageBegin());
-  if (status_ == ParserStatus::Error) {
-    return;
-  }
   const bool is_connect = method_input == Headers::get().MethodValues.Connect;
   if (!isUrlValid(request_uri, is_connect)) {
     status_ = ParserStatus::Error;
@@ -228,10 +232,6 @@ void BalsaParser::OnResponseFirstLineInput(absl::string_view /*line_input*/,
                                            absl::string_view /*version_input*/,
                                            absl::string_view /*status_input*/,
                                            absl::string_view reason_input) {
-  if (status_ == ParserStatus::Error) {
-    return;
-  }
-  status_ = convertResult(connection_->onMessageBegin());
   if (status_ == ParserStatus::Error) {
     return;
   }
@@ -268,6 +268,7 @@ void BalsaParser::MessageDone() {
   }
   status_ = convertResult(connection_->onMessageComplete());
   framer_.Reset();
+  on_message_begin_called_ = false;
 }
 
 void BalsaParser::HandleError(BalsaFrameEnums::ErrorCode error_code) {
