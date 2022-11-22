@@ -377,7 +377,7 @@ message JwksAsyncFetch {
   // Default is false.
   bool fast_listener = 1;
 
-  // The duration to refetch after a failed fetch. If not specified, default is 1 secnod.
+  // The duration to refetch after a failed fetch. If not specified, default is 1 second.
   google.protobuf.Duration failed_refetch_duration = 2;
 }
 

@@ -18,15 +18,15 @@ constexpr std::chrono::seconds DefaultCacheExpirationSec{600};
 // Number of seconds to refetch before a cached jwks is expired.
 constexpr std::chrono::seconds RefetchBeforeExpiredSec{5};
 
-// Number of seconds to refetch after a failed fetch.
-constexpr std::chrono::seconds RefetchAfterFailedSec{1};
+// Default number of seconds to refetch after a failed fetch.
+constexpr std::chrono::seconds DefaultRefetchAfterFailedSec{1};
 
 std::chrono::seconds getFailedRefetchDuration(const JwksAsyncFetch& async_fetch) {
   if (async_fetch.has_failed_refetch_duration()) {
     return std::chrono::seconds(
         DurationUtil::durationToMilliseconds(async_fetch.failed_refetch_duration()));
   }
-  return RefetchAfterFailedSec;
+  return DefaultRefetchAfterFailedSec;
 }
 
 } // namespace
