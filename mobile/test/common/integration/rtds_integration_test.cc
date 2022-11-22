@@ -94,6 +94,8 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
   )EOF");
   sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
       Config::TypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1");
+  // Wait until the RTDS updates from the DiscoveryResponse have been applied.
+  ASSERT_TRUE(waitForCounterGe("runtime.load_success", 1));
 
   // Verify that the Runtime config values are from the RTDS response.
   EXPECT_EQ("bar", getRuntimeKey("foo"));
