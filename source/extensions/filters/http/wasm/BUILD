@@ -22,6 +22,7 @@ envoy_cc_library(
         "//source/extensions/common/wasm:wasm_lib",
         "@envoy_api//envoy/extensions/filters/http/wasm/v3:pkg_cc_proto",
     ],
+    alwayslink = 1,
 )
 
 envoy_cc_extension(

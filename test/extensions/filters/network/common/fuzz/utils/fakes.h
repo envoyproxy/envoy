@@ -22,7 +22,7 @@ public:
   Stats::Scope& scope() override { return scope_; }
   Singleton::Manager& singletonManager() override { return *singleton_manager_; }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
-  Server::Admin& admin() override { return admin_; }
+  OptRef<Server::Admin> admin() override { return admin_; }
   Stats::Scope& listenerScope() override { return listener_scope_; }
   Api::Api& api() override { return *api_; }
   TimeSource& timeSource() override { return time_system_; }

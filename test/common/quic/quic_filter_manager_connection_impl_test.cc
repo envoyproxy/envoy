@@ -17,8 +17,11 @@ public:
                                       const quic::QuicConnectionId& connection_id,
                                       Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
                                       std::shared_ptr<QuicSslConnectionInfo>&& ssl_info)
-      : QuicFilterManagerConnectionImpl(connection, connection_id, dispatcher, send_buffer_limit,
-                                        std::move(ssl_info)) {}
+      : QuicFilterManagerConnectionImpl(
+            connection, connection_id, dispatcher, send_buffer_limit, std::move(ssl_info),
+            std::make_unique<StreamInfo::StreamInfoImpl>(
+                dispatcher.timeSource(),
+                connection.connectionSocket()->connectionInfoProviderSharedPtr())) {}
 
   void dumpState(std::ostream& /*os*/, int /*indent_level = 0*/) const override {}
   absl::string_view requestedServerName() const override { return {}; }

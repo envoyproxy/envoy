@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -193,21 +194,24 @@ public:
                  Server::Configuration::FactoryContext& context);
     const TcpProxyStats& stats() { return stats_; }
     const absl::optional<std::chrono::milliseconds>& idleTimeout() { return idle_timeout_; }
-    const absl::optional<std::chrono::milliseconds>& maxDownstreamConnectinDuration() const {
+    const absl::optional<std::chrono::milliseconds>& maxDownstreamConnectionDuration() const {
       return max_downstream_connection_duration_;
+    }
+    const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() const {
+      return access_log_flush_interval_;
     }
     TunnelingConfigHelperOptConstRef tunnelingConfigHelper() {
       if (tunneling_config_helper_) {
-        return TunnelingConfigHelperOptConstRef(*tunneling_config_helper_);
+        return {*tunneling_config_helper_};
       } else {
-        return TunnelingConfigHelperOptConstRef();
+        return {};
       }
     }
     OnDemandConfigOptConstRef onDemandConfig() {
       if (on_demand_config_) {
-        return OnDemandConfigOptConstRef(*on_demand_config_);
+        return {*on_demand_config_};
       } else {
-        return OnDemandConfigOptConstRef();
+        return {};
       }
     }
 
@@ -221,6 +225,7 @@ public:
     const TcpProxyStats stats_;
     absl::optional<std::chrono::milliseconds> idle_timeout_;
     absl::optional<std::chrono::milliseconds> max_downstream_connection_duration_;
+    absl::optional<std::chrono::milliseconds> access_log_flush_interval_;
     std::unique_ptr<TunnelingConfigHelper> tunneling_config_helper_;
     std::unique_ptr<OnDemandConfig> on_demand_config_;
   };
@@ -248,7 +253,10 @@ public:
     return shared_config_->idleTimeout();
   }
   const absl::optional<std::chrono::milliseconds>& maxDownstreamConnectionDuration() const {
-    return shared_config_->maxDownstreamConnectinDuration();
+    return shared_config_->maxDownstreamConnectionDuration();
+  }
+  const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() const {
+    return shared_config_->accessLogFlushInterval();
   }
   // Return nullptr if there is no tunneling config.
   TunnelingConfigHelperOptConstRef tunnelingConfigHelper() {
@@ -271,6 +279,7 @@ public:
   }
   // This function must not be called if on demand is disabled.
   const OnDemandStats& onDemandStats() const { return shared_config_->onDemandConfig()->stats(); }
+  Random::RandomGenerator& randomGenerator() { return random_generator_; }
 
 private:
   struct SimpleRouteImpl : public Route {
@@ -471,6 +480,9 @@ protected:
   void resetIdleTimer();
   void disableIdleTimer();
   void onMaxDownstreamConnectionDuration();
+  void onAccessLogFlushInterval();
+  void resetAccessLogFlushTimer();
+  void disableAccessLogFlushTimer();
 
   const ConfigSharedPtr config_;
   Upstream::ClusterManager& cluster_manager_;
@@ -479,6 +491,7 @@ protected:
   DownstreamCallbacks downstream_callbacks_;
   Event::TimerPtr idle_timer_;
   Event::TimerPtr connection_duration_timer_;
+  Event::TimerPtr access_log_flush_timer_;
 
   // A pointer to the on demand cluster lookup when lookup is in flight.
   Upstream::ClusterDiscoveryCallbackHandlePtr cluster_discovery_handle_;

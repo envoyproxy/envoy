@@ -1381,7 +1381,7 @@ TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTlsRealSymbolTable) {
   TestUtil::forEachSampleStat(
       100, true, [this](absl::string_view name) { store_.counterFromString(std::string(name)); });
   EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 688080); // July 2, 2020
-  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 0.75 * million_);
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 0.85 * million_);
 }
 
 TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithTlsRealSymbolTable) {
@@ -1390,7 +1390,7 @@ TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithTlsRealSymbolTable) {
   TestUtil::forEachSampleStat(
       100, true, [this](absl::string_view name) { store_.counterFromString(std::string(name)); });
   EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 827616); // Sep 25, 2020
-  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 0.9 * million_);
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 0.97 * million_);
 }
 
 TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {

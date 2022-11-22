@@ -114,7 +114,7 @@ envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse HdsDelega
               *host->address(), *endpoint->mutable_endpoint()->mutable_address());
           // TODO(lilika): Add support for more granular options of
           // envoy::config::core::v3::HealthStatus
-          if (host->health() == Host::Health::Healthy) {
+          if (host->coarseHealth() == Host::Health::Healthy) {
             endpoint->set_health_status(envoy::config::core::v3::HEALTHY);
           } else {
             if (host->healthFlagGet(Host::HealthFlag::ACTIVE_HC_TIMEOUT)) {
@@ -167,6 +167,12 @@ envoy::config::cluster::v3::Cluster HdsDelegate::createClusterConfig(
 
     // add all endpoints for this locality group to the config
     for (const auto& endpoint : locality_endpoints.endpoints()) {
+      if (endpoint.has_health_check_config() &&
+          endpoint.health_check_config().disable_active_health_check()) {
+        ENVOY_LOG(debug, "Skip adding the endpoint {} with optional disabled health check for HDS.",
+                  endpoint.DebugString());
+        continue;
+      }
       auto* new_endpoint = endpoints->add_lb_endpoints()->mutable_endpoint();
       new_endpoint->mutable_address()->MergeFrom(endpoint.address());
       new_endpoint->mutable_health_check_config()->MergeFrom(endpoint.health_check_config());

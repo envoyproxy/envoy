@@ -2,82 +2,16 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/config/typed_config.h"
+#include "envoy/network/filter.h"
 #include "envoy/server/factory_context.h"
 
+#include "contrib/generic_proxy/filters/network/source/interface/codec_callbacks.h"
 #include "contrib/generic_proxy/filters/network/source/interface/stream.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace GenericProxy {
-
-/**
- * Decoder callback of request.
- */
-class RequestDecoderCallback {
-public:
-  virtual ~RequestDecoderCallback() = default;
-
-  /**
-   * If request decoding success then this method will be called.
-   * @param request request from decoding.
-   */
-  virtual void onDecodingSuccess(RequestPtr request) PURE;
-
-  /**
-   * If request decoding failure then this method will be called.
-   */
-  virtual void onDecodingFailure() PURE;
-};
-
-/**
- * Decoder callback of Response.
- */
-class ResponseDecoderCallback {
-public:
-  virtual ~ResponseDecoderCallback() = default;
-
-  /**
-   * If response decoding success then this method will be called.
-   * @param response response from decoding.
-   */
-  virtual void onDecodingSuccess(ResponsePtr response) PURE;
-
-  /**
-   * If response decoding failure then this method will be called.
-   */
-  virtual void onDecodingFailure() PURE;
-};
-
-/**
- * Encoder callback of request.
- */
-class RequestEncoderCallback {
-public:
-  virtual ~RequestEncoderCallback() = default;
-
-  /**
-   * If request encoding success then this method will be called.
-   * @param buffer encoding result buffer.
-   * @param expect_response whether the current request requires an upstream response.
-   */
-  virtual void onEncodingSuccess(Buffer::Instance& buffer, bool expect_response) PURE;
-};
-
-/**
- * Encoder callback of Response.
- */
-class ResponseEncoderCallback {
-public:
-  virtual ~ResponseEncoderCallback() = default;
-
-  /**
-   * If response encoding success then this method will be called.
-   * @param buffer encoding result buffer.
-   * @param close_connection whether the downstream connection should be closed.
-   */
-  virtual void onEncodingSuccess(Buffer::Instance& buffer, bool close_connection) PURE;
-};
 
 /**
  * Decoder of request.
@@ -178,15 +112,53 @@ public:
 
 using CodecFactoryPtr = std::unique_ptr<CodecFactory>;
 
+class FilterConfig;
+using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
+
+/**
+ * Custom read filter factory for generic proxy.
+ */
+class ProxyFactory {
+public:
+  virtual ~ProxyFactory() = default;
+
+  /**
+   * Create a custom proxy instance.
+   * @param filter_manager the filter manager of the network filter chain.
+   * @param filter_config supplies the read filter config.
+   */
+  virtual void createProxy(Network::FilterManager& filter_manager,
+                           const FilterConfigSharedPtr& filter_config) const PURE;
+};
+using ProxyFactoryPtr = std::unique_ptr<ProxyFactory>;
+
 /**
  * Factory config for codec factory. This class is used to register and create codec factories.
  */
 class CodecFactoryConfig : public Envoy::Config::TypedFactory {
 public:
-  virtual CodecFactoryPtr createFactory(const Protobuf::Message& config,
-                                        Envoy::Server::Configuration::FactoryContext& context) PURE;
+  /**
+   * Create a codec factory. This should never return nullptr.
+   * @param config supplies the config.
+   * @param context supplies the server context.
+   * @return CodecFactoryPtr the codec factory.
+   */
+  virtual CodecFactoryPtr createCodecFactory(const Protobuf::Message&,
+                                             Envoy::Server::Configuration::FactoryContext&) PURE;
 
-  std::string category() const override { return "envoy.generic_proxy.codec"; }
+  /**
+   * Create a optional custom proxy factory.
+   * @param config supplies the config.
+   * @param context supplies the server context.
+   * @return ProxyFactoryPtr the proxy factory to create generic proxy instance or nullptr if no
+   * custom proxy is needed and the default generic proxy will be used.
+   */
+  virtual ProxyFactoryPtr createProxyFactory(const Protobuf::Message&,
+                                             Envoy::Server::Configuration::FactoryContext&) {
+    return nullptr;
+  }
+
+  std::string category() const override { return "envoy.generic_proxy.codecs"; }
 };
 
 } // namespace GenericProxy

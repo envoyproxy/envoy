@@ -904,10 +904,6 @@ TEST_P(Http1ServerConnectionImplTest, Http10MultipleResponses) {
 
   // Now send an HTTP/1.1 request and make sure the protocol is tracked correctly.
   {
-    TestRequestHeaderMapImpl expected_headers{{":authority", "www.somewhere.com"},
-                                              {":scheme", "http"},
-                                              {":path", "/foobar"},
-                                              {":method", "GET"}};
     Buffer::OwnedImpl buffer("GET /foobar HTTP/1.1\r\nHost: www.somewhere.com\r\n\r\n");
 
     Http::ResponseEncoder* response_encoder = nullptr;
@@ -1141,6 +1137,7 @@ TEST_P(Http1ServerConnectionImplTest, SimpleGet) {
   auto status = codec_->dispatch(buffer);
   EXPECT_TRUE(status.ok());
   EXPECT_EQ(0U, buffer.length());
+  EXPECT_EQ(Protocol::Http11, codec_->protocol());
 }
 
 // Test that if the stream is not created at the time an error is detected, it
@@ -1550,6 +1547,7 @@ TEST_P(Http1ServerConnectionImplTest, HeaderOnlyResponse) {
   TestResponseHeaderMapImpl headers{{":status", "200"}};
   response_encoder->encodeHeaders(headers, true);
   EXPECT_EQ("HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n", output);
+  EXPECT_EQ(Protocol::Http11, codec_->protocol());
 }
 
 // As with Http1ClientConnectionImplTest.LargeHeaderRequestEncode but validate
@@ -3283,41 +3281,6 @@ TEST_P(Http1ServerConnectionImplTest, RuntimeLazyReadDisableTest) {
     // Delete active request.
     connection_.dispatcher_.clearDeferredDeleteList();
   }
-
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_lazy_read_disable", "false"}});
-
-  // Always call readDisable if lazy read disable flag is set to false.
-  {
-    initialize();
-
-    NiceMock<MockRequestDecoder> decoder;
-    Http::ResponseEncoder* response_encoder = nullptr;
-    EXPECT_CALL(callbacks_, newStream(_, _))
-        .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
-          response_encoder = &encoder;
-          return decoder;
-        }));
-
-    EXPECT_CALL(decoder, decodeHeaders_(_, true));
-    EXPECT_CALL(decoder, decodeData(_, _)).Times(0);
-
-    EXPECT_CALL(connection_, readDisable(true));
-
-    Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nhost: a.com\r\n\r\n");
-
-    auto status = codec_->dispatch(buffer);
-    EXPECT_TRUE(status.ok());
-
-    std::string output;
-    ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
-    TestResponseHeaderMapImpl headers{{":status", "200"}};
-    response_encoder->encodeHeaders(headers, true);
-    EXPECT_EQ("HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n", output);
-
-    EXPECT_CALL(connection_, readDisable(false));
-    // Delete active request.
-    connection_.dispatcher_.clearDeferredDeleteList();
-  }
 }
 
 // Tests the scenario where the client sends pipelined requests and the requests reach Envoy at the
@@ -3798,6 +3761,26 @@ TEST_P(Http1ServerConnectionImplTest, ParseUrl) {
     EXPECT_TRUE(isCodecProtocolError(status)) << invalid_first_line;
     EXPECT_EQ("http/1.1 protocol error: HPE_INVALID_URL", status.message());
     EXPECT_EQ("http1.codec_error", response_encoder->getStream().responseDetails());
+  }
+}
+
+// The client's HTTP parser does not have access to the request.
+// Test that it determines the HTTP version based on the response correctly.
+TEST_P(Http1ClientConnectionImplTest, ResponseHttpVersion) {
+  for (Protocol http_version : {Protocol::Http10, Protocol::Http11}) {
+    initialize();
+    NiceMock<MockResponseDecoder> response_decoder;
+    Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+    TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+    EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
+
+    EXPECT_CALL(response_decoder, decodeHeaders_(_, true));
+    Buffer::OwnedImpl response(http_version == Protocol::Http10
+                                   ? "HTTP/1.0 200 OK\r\nContent-Length: 0\r\n\r\n"
+                                   : "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
+    auto status = codec_->dispatch(response);
+    EXPECT_TRUE(status.ok());
+    EXPECT_EQ(http_version, codec_->protocol());
   }
 }
 
