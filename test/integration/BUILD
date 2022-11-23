@@ -892,6 +892,7 @@ envoy_cc_test_library(
         "base_integration_test.h",
     ],
     deps = [
+        "//source/server:proto_descriptors_lib",
         "//source/extensions/request_id/uuid:config",
         ":autonomous_upstream_lib",
         ":fake_upstream_lib",
