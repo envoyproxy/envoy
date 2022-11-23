@@ -47,7 +47,7 @@ BENCHMARK(benchmarkLazyInitCreation)
     ->ArgsProduct({{0, 1}, {1000, 10000, 20000, 100000}})
     ->Unit(::benchmark::kMillisecond);
 
-// Benchmark lazy-init of stats in same thread, mimicking main thread creation.
+// Benchmark lazy-init of stats in same thread, mimics main thread creation.
 void benchmarkLazyInitCreationInstantiateSameThread(::benchmark::State& state) {
   const bool lazy_init = state.range(0) == 1;
   const uint64_t num_stats = state.range(1);
@@ -84,7 +84,7 @@ public:
   }
 };
 
-// Benchmark lazy-init stats in different worker thread, mimicking worker threads creation.
+// Benchmark lazy-init stats in different worker thread, mimics worker threads creation.
 void benchmarkLazyInitCreationInstantiateOnWorkerThreads(::benchmark::State& state) {
   const bool lazy_init = state.range(0) == 1;
   const uint64_t num_stats = state.range(1);
@@ -130,7 +130,7 @@ BENCHMARK(benchmarkLazyInitCreationInstantiateOnWorkerThreads)
     ->ArgsProduct({{0, 1}, {1000, 10000, 20000, 100000}})
     ->Unit(::benchmark::kMillisecond);
 
-// Benchmark mimicks that worker threads inc the stats.
+// Benchmark mimics that worker threads inc the stats.
 void benchmarkLazyInitStatsAccess(::benchmark::State& state) {
   const bool lazy_init = state.range(0) == 1;
   const uint64_t num_stats = state.range(1);
