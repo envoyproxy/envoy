@@ -240,6 +240,7 @@ envoy_cc_benchmark_binary(
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:lazy_init",
         "//source/common/stats:symbol_table_lib",
+        "//source/exe:process_wide_lib",
     ],
 )
 

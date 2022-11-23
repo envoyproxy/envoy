@@ -5,6 +5,7 @@
 #include "source/common/stats/symbol_table.h"
 #include "source/common/stats/thread_local_store.h"
 #include "source/common/thread_local/thread_local_impl.h"
+#include "source/exe/process_wide.h"
 
 #include "test/benchmark/main.h"
 #include "test/common/stats/real_thread_test_base.h"
@@ -21,7 +22,7 @@ using Upstream::ClusterTrafficStats;
 // Benchmark no-lazy-init on stats, the lazy init version is much faster since no allocation.
 void benchmarkLazyInitCreation(::benchmark::State& state) {
   const bool lazy_init = state.range(0) == 1;
-  const uint64_t num_stats = state.range(1);
+  const uint64_t num_clusters = state.range(1);
   Stats::IsolatedStoreImpl stats_store;
   Upstream::ClusterTrafficStatNames stat_names{stats_store.symbolTable()};
   std::vector<Stats::ScopeSharedPtr> scopes;
@@ -29,7 +30,7 @@ void benchmarkLazyInitCreation(::benchmark::State& state) {
   std::vector<std::shared_ptr<ClusterTrafficStats>> normal_stats;
 
   for (auto _ : state) { // NOLINT: Silences warning about dead store
-    for (uint64_t i = 0; i < num_stats; ++i) {
+    for (uint64_t i = 0; i < num_clusters; ++i) {
       std::string new_cluster_name = absl::StrCat("cluster_", i);
       auto scope = stats_store.createScope(new_cluster_name);
       scopes.push_back(scope);
@@ -50,7 +51,7 @@ BENCHMARK(benchmarkLazyInitCreation)
 // Benchmark lazy-init of stats in same thread, mimics main thread creation.
 void benchmarkLazyInitCreationInstantiateSameThread(::benchmark::State& state) {
   const bool lazy_init = state.range(0) == 1;
-  const uint64_t num_stats = state.range(1);
+  const uint64_t num_clusters = state.range(1);
   Stats::IsolatedStoreImpl stats_store;
   Upstream::ClusterTrafficStatNames stat_names{stats_store.symbolTable()};
   std::vector<Stats::ScopeSharedPtr> scopes;
@@ -58,7 +59,7 @@ void benchmarkLazyInitCreationInstantiateSameThread(::benchmark::State& state) {
   std::vector<std::shared_ptr<ClusterTrafficStats>> normal_stats;
 
   for (auto _ : state) { // NOLINT: Silences warning about dead store
-    for (uint64_t i = 0; i < num_stats; ++i) {
+    for (uint64_t i = 0; i < num_clusters; ++i) {
       std::string new_cluster_name = absl::StrCat("cluster_", i);
       auto scope = stats_store.createScope(new_cluster_name);
       scopes.push_back(scope);
@@ -79,15 +80,14 @@ BENCHMARK(benchmarkLazyInitCreationInstantiateSameThread)
 
 class MultiThreadLazyinitStatsTest : public ThreadLocalRealThreadsTestBase {
 public:
-  MultiThreadLazyinitStatsTest() : ThreadLocalRealThreadsTestBase(5) {
-    Envoy::Event::Libevent::Global::initialize();
-  }
+  MultiThreadLazyinitStatsTest() : ThreadLocalRealThreadsTestBase(5) {}
+  ProcessWide process_wide_; // Process-wide state setup/teardown (excluding grpc).
 };
 
-// Benchmark lazy-init stats in different worker thread, mimics worker threads creation.
+// Benchmark lazy-init stats in different worker threads, mimics worker threads creation.
 void benchmarkLazyInitCreationInstantiateOnWorkerThreads(::benchmark::State& state) {
   const bool lazy_init = state.range(0) == 1;
-  const uint64_t num_stats = state.range(1);
+  const uint64_t num_clusters = state.range(1);
   MultiThreadLazyinitStatsTest test;
   std::vector<Stats::ScopeSharedPtr> scopes;
   std::vector<std::shared_ptr<Stats::LazyInit<ClusterTrafficStats>>> lazy_stats;
@@ -96,7 +96,7 @@ void benchmarkLazyInitCreationInstantiateOnWorkerThreads(::benchmark::State& sta
 
   for (auto _ : state) {           // NOLINT: Silences warning about dead store
     test.runOnMainBlocking([&]() { // Create stats on main-thread.
-      for (uint64_t i = 0; i < num_stats; ++i) {
+      for (uint64_t i = 0; i < num_clusters; ++i) {
         std::string new_cluster_name = absl::StrCat("cluster_", i);
         auto scope = test.store_->createScope(new_cluster_name);
         scopes.push_back(scope);
@@ -110,11 +110,13 @@ void benchmarkLazyInitCreationInstantiateOnWorkerThreads(::benchmark::State& sta
     });
     std::atomic<int> thread_idx = 0;
     test.runOnAllWorkersBlocking([&]() {
-      int32_t batch_size = num_stats / 5;
-      int t_idx = thread_idx.fetch_add(1, std::memory_order_relaxed);
+      int32_t batch_size = num_clusters / 5;
+      int t_idx = thread_idx++;
       uint64_t begin = t_idx * batch_size;
-      uint64_t end = std::min(begin + batch_size, num_stats);
+      uint64_t end = std::min(begin + batch_size, num_clusters);
       for (uint64_t idx = begin; idx < end; ++idx) {
+        // Instantiate the actual ClusterTrafficStats objects in worker threads, in batches to avoid
+        // possible contention.
         if (lazy_init) {
           // Lazy-init on workers happen when the "index"-th stat instance is not created.
           *(*lazy_stats[idx]);
@@ -133,7 +135,7 @@ BENCHMARK(benchmarkLazyInitCreationInstantiateOnWorkerThreads)
 // Benchmark mimics that worker threads inc the stats.
 void benchmarkLazyInitStatsAccess(::benchmark::State& state) {
   const bool lazy_init = state.range(0) == 1;
-  const uint64_t num_stats = state.range(1);
+  const uint64_t num_clusters = state.range(1);
   MultiThreadLazyinitStatsTest test;
   std::vector<Stats::ScopeSharedPtr> scopes;
   std::vector<std::shared_ptr<Stats::LazyInit<ClusterTrafficStats>>> lazy_stats;
@@ -142,7 +144,7 @@ void benchmarkLazyInitStatsAccess(::benchmark::State& state) {
 
   for (auto _ : state) {           // NOLINT: Silences warning about dead store
     test.runOnMainBlocking([&]() { // Create stats on main-thread.
-      for (uint64_t i = 0; i < num_stats; ++i) {
+      for (uint64_t i = 0; i < num_clusters; ++i) {
         std::string new_cluster_name = absl::StrCat("cluster_", i);
         auto scope = test.store_->createScope(new_cluster_name);
         scopes.push_back(scope);
@@ -156,15 +158,15 @@ void benchmarkLazyInitStatsAccess(::benchmark::State& state) {
       }
     });
     test.runOnAllWorkersBlocking([&]() {
-      // 50 x num_stats inc() calls.
-      for (uint64_t idx = 0; idx < 10 * num_stats; ++idx) {
+      // 50 x num_clusters inc() calls.
+      for (uint64_t idx = 0; idx < 10 * num_clusters; ++idx) {
         if (lazy_init) {
           // Lazy-init on workers happen when the "index"-th stat instance is not created.
-          ClusterTrafficStats& stats = *(*lazy_stats[idx % num_stats]);
+          ClusterTrafficStats& stats = *(*lazy_stats[idx % num_clusters]);
           stats.upstream_cx_active_.inc();
 
         } else {
-          ClusterTrafficStats& stats = *normal_stats[idx % num_stats];
+          ClusterTrafficStats& stats = *normal_stats[idx % num_clusters];
           stats.upstream_cx_active_.inc();
         }
       }
