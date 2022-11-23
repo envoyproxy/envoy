@@ -1,0 +1,6 @@
+syntax = "proto3";
+
+package envoymobile.extensions.filters.http.route_cache_reset;
+
+message RouteCacheReset {
+}
