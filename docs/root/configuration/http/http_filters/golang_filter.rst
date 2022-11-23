@@ -35,4 +35,4 @@ A simple example of configuring Golang HTTP filter that default `echo` go plugin
 Complete example
 ----------------
 
-A complete example using Docker is available in :repo:`/examples/golang`.
+A complete example using Docker is available in :repo:`/contrib/golang/filters/http/source/go` and run ``make build``.
