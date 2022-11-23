@@ -20,6 +20,7 @@
 !\.yapfignore
 !\.zuul
 !\.zuul.yaml
+!\.github/workflows/*
 
 /bazel-*
 /mobile/bazel-*
