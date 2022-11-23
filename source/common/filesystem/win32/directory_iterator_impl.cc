@@ -42,7 +42,7 @@ DirectoryIteratorImpl& DirectoryIteratorImpl::operator++() {
   return *this;
 }
 
-DirectoryEntry DirectoryIteratorImpl::makeEntry(const WIN32_FIND_DATA& find_data) const {
+DirectoryEntry DirectoryIteratorImpl::makeEntry(const WIN32_FIND_DATA& find_data) {
   FileType file_type;
   if ((find_data.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) &&
       !(find_data.dwReserved0 & IO_REPARSE_TAG_SYMLINK)) {
