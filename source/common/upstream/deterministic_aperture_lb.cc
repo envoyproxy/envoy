@@ -25,15 +25,12 @@ DeterministicApertureLoadBalancer::DeterministicApertureLoadBalancer(
     const absl::optional<envoy::extensions::load_balancing_policies::deterministic_aperture::v3::
                              DeterministicApertureLbConfig>& config,
     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
-    : RingHashLoadBalancer(
-          priority_set, stats, scope, runtime, random,
-          (config.has_value()
-               ? (config->has_ring_config()
-                      ? absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig>(
-                            toClusterRingHashLbConfig(config->ring_config()))
-                      : absl::nullopt)
-               : absl::nullopt),
-          common_config),
+    : RingHashLoadBalancer(priority_set, stats, scope, runtime, random,
+                           ((config.has_value() && config->has_ring_config())
+                            : absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig>(
+                                toClusterRingHashLbConfig(config->ring_config()))
+                            : absl::nullopt),
+                           common_config),
       width_((config.has_value() && config->total_peers() > 0) ? (1.0 / config->total_peers())
                                                                : 1.0),
       offset_((config.has_value() && width_ > 0.0) ? (width_ * config->peer_index()) : 0.0),
