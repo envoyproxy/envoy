@@ -507,9 +507,9 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       using_new_timeouts_(route.route().has_max_stream_duration()),
       prefix_rewrite_redirect_(route.redirect().prefix_rewrite()),
       strip_query_(route.redirect().strip_query()),
-      hedge_policy_(buildHedgePolicy(vhost.hedgePolicy().get(), route.route())),
+      hedge_policy_(buildHedgePolicy(vhost.hedgePolicy(), route.route())),
       retry_policy_(
-          buildRetryPolicy(vhost.retryPolicy().get(), route.route(), validator, factory_context)),
+          buildRetryPolicy(vhost.retryPolicy(), route.route(), validator, factory_context)),
       internal_redirect_policy_(
           buildInternalRedirectPolicy(route.route(), validator, route.name())),
       rate_limit_policy_(route.route().rate_limits(), validator),
@@ -1124,7 +1124,7 @@ RouteEntryImplBase::parseOpaqueConfig(const envoy::config::route::v3::Route& rou
 }
 
 std::unique_ptr<HedgePolicyImpl> RouteEntryImplBase::buildHedgePolicy(
-    const envoy::config::route::v3::HedgePolicy* vhost_hedge_policy,
+    const OptRef<envoy::config::route::v3::HedgePolicy> vhost_hedge_policy,
     const envoy::config::route::v3::RouteAction& route_config) const {
   // Route specific policy wins, if available.
   if (route_config.has_hedge_policy()) {
@@ -1132,7 +1132,7 @@ std::unique_ptr<HedgePolicyImpl> RouteEntryImplBase::buildHedgePolicy(
   }
 
   // If not, we fall back to the virtual host policy if there is one.
-  if (vhost_hedge_policy != nullptr) {
+  if (vhost_hedge_policy.has_value()) {
     return std::make_unique<HedgePolicyImpl>(*vhost_hedge_policy);
   }
 
@@ -1141,7 +1141,7 @@ std::unique_ptr<HedgePolicyImpl> RouteEntryImplBase::buildHedgePolicy(
 }
 
 std::unique_ptr<RetryPolicyImpl> RouteEntryImplBase::buildRetryPolicy(
-    const envoy::config::route::v3::RetryPolicy* vhost_retry_policy,
+    const OptRef<envoy::config::route::v3::RetryPolicy> vhost_retry_policy,
     const envoy::config::route::v3::RouteAction& route_config,
     ProtobufMessage::ValidationVisitor& validation_visitor,
     Server::Configuration::ServerFactoryContext& factory_context) const {
@@ -1154,7 +1154,7 @@ std::unique_ptr<RetryPolicyImpl> RouteEntryImplBase::buildRetryPolicy(
   }
 
   // If not, we fallback to the virtual host policy if there is one.
-  if (vhost_retry_policy != nullptr) {
+  if (vhost_retry_policy.has_value()) {
     return std::make_unique<RetryPolicyImpl>(*vhost_retry_policy, validation_visitor,
                                              retry_factory_context);
   }
