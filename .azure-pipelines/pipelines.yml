@@ -27,6 +27,19 @@ variables:
   value: git diff --name-only origin/main | grep -qe common/
 
 stages:
+- stage: change_detection
+  jobs:
+  - job: repo_change
+    dependsOn: []
+    pool:
+      vmImage: "ubuntu-20.04"
+    steps:
+    - bash: |
+        git diff --name-only origin/main | grep -qe common/ \
+          || echo "##vso[task.setvariable variable=nonMobileFilesChanged]False"
+      displayName: "Detect repo changes"
+      workingDirectory: $(Build.SourcesDirectory)
+
 - stage: precheck
   jobs:
   - job: format
