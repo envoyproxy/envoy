@@ -315,7 +315,7 @@ private:
   const bool include_attempt_count_in_response_;
   absl::optional<envoy::config::route::v3::RetryPolicy> retry_policy_;
   absl::optional<envoy::config::route::v3::HedgePolicy> hedge_policy_;
-  const CatchAllVirtualCluster virtual_cluster_catch_all_;
+  std::unique_ptr<CatchAllVirtualCluster> virtual_cluster_catch_all_;
   Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher_;
 };
 
