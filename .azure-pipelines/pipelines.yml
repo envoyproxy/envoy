@@ -24,7 +24,7 @@ variables:
   # A release branch can be either `main` or a `release/v1.x` stable branch
   value: $[or(eq(variables['isMain'], 'true'), eq(variables['isReleaseBranch'], 'true'))]
 - name: nonMobileFilesChanged
-  value: git diff --name-only origin/main | grep -qe common/
+  value: True
 
 stages:
 - stage: change_detection
