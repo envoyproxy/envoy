@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package envoymobile.extensions.filters.http.test_event_tracker;
+
+import "validate/validate.proto";
+
+message TestEventTracker {
+  // The attributes to report as part of envoy event emitted by `TestEventTrackerFilter` filter.
+  map<string, string> attributes = 1;
+}
