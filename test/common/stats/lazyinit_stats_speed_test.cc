@@ -108,10 +108,10 @@ void benchmarkLazyInitCreationInstantiateOnWorkerThreads(::benchmark::State& sta
         }
       }
     });
-    std::atomic_int thread_idx = 0;
+    std::atomic<int> thread_idx = 0;
     test.runOnAllWorkersBlocking([&]() {
       int32_t batch_size = num_stats / 5;
-      int t_idx = thread_idx++;
+      int t_idx = thread_idx.fetch_add(1, std::memory_order_relaxed);
       uint64_t begin = t_idx * batch_size;
       uint64_t end = std::min(begin + batch_size, num_stats);
       for (uint64_t idx = begin; idx < end; ++idx) {
