@@ -73,13 +73,12 @@ def envoy_wasm_cc_binary(name, additional_linker_inputs = [], linkopts = [], tag
         ],
         linkopts = linkopts + [
             "--js-library=$(location @envoy//source/extensions/common/wasm/ext:envoy_proxy_wasm_api_js)",
-            "-noprofilelib",
         ],
         tags = tags + ["manual"],
         **kwargs
     )
 
-def wasm_rust_binary(name, tags = [], wasi = False, precompile = False, **kwargs):
+def wasm_rust_binary(name, tags = [], wasi = False, precompile = False, rustc_flags = [], **kwargs):
     wasm_name = "_wasm_" + name.replace(".", "_")
     kwargs.setdefault("visibility", ["//visibility:public"])
 
@@ -88,6 +87,7 @@ def wasm_rust_binary(name, tags = [], wasi = False, precompile = False, **kwargs
         edition = "2018",
         crate_type = "cdylib",
         out_binary = True,
+        rustc_flags = rustc_flags + ["--linkopt=-noprofilelib"],
         tags = ["manual"],
         **kwargs
     )
