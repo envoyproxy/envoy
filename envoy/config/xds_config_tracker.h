@@ -18,8 +18,8 @@ namespace Config {
 
 /**
  * An interface for hooking into xDS update events to provide the ablility to use some external
- * processor in xDS update. This traker provides the process point when the discovery response
- * is received, when the resoures are successfully processed and applied, and when there is any
+ * processor in xDS update. This tracker provides the process point when the discovery response
+ * is received, when the resources are successfully processed and applied, and when there is any
  * failure.
  *
  * Instance of this interface get invoked on the main Envoy thread. Thus, it is important
@@ -34,9 +34,9 @@ public:
    * Invoked when SotW xDS configuration updates have been successfully parsed, applied on
    * the Envoy instance, and are about to be ACK'ed.
    *
-   * For SotW, resources are all the resouces except for the heart-beat ones in the original
-   * message. The call of this method means there is a subscriber for this type_url and the type of
-   * resource is same as the message's type_url.
+   * For SotW, the passed resources contain all the received resources except for the heart-beat
+   * ones in the original message. The call of this method means there is a subscriber for this
+   * type_url and the type of resource is same as the message's type_url.
    *
    * @param type_url The type url of xDS message.
    * @param resources A list of decoded resources to add to the current state.
@@ -48,8 +48,8 @@ public:
    * Invoked when Delta xDS configuration updates have been successfully accepted, applied on
    * the Envoy instance, and are about to be ACK'ed.
    *
-   * For Delta, added_resources are all the received added resouces except for the heart-beat ones
-   * in the original message, and the removed resouces are the same in the xDS message.
+   * For Delta, added_resources contains all the received added resources except for the heart-beat
+   * ones in the original message, and the removed resouces are the same in the xDS message.
    *
    * @param type_url The type url of xDS message.
    * @param added_resources A list of decoded resources to add to the current state.
