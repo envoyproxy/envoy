@@ -15,7 +15,7 @@ template <typename StatsStructType> class LazyInit {
 public:
   // Capture the stat names object and the scope with a ctor, that can be used to instantiate a
   // StatsStructType object later.
-  // Just like any StatsStruct, caller should make sure scope and stat_names outlive this object.
+  // Caller should make sure scope and stat_names outlive this object.
   LazyInit(Stats::Scope& scope, const typename StatsStructType::StatNameType& stat_names)
       : ctor_([&scope, &stat_names]() -> StatsStructType* {
           return new StatsStructType(stat_names, scope);
