@@ -31,7 +31,7 @@ A simple example of configuring Golang HTTP filter that default `echo` go plugin
 .. attention::
 
   The go plugin dynamic library built needs to be consistent with the envoy version of glibc.
-  
+
 Complete example
 ----------------
 

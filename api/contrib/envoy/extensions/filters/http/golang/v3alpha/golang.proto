@@ -26,10 +26,10 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //
 // * Develop go-plugin
 //
-// We can implement the interface of :ref:`StreamFilter <contrib/golang/filters/http/source/go/pkg/api.StreamFilter>`
+// We can implement the interface of ``StreamFilter <contrib/golang/filters/http/source/go/pkg/api.StreamFilter>``
 // API by the GO language to achieve the effects of Envoy native filter.
 //
-// The filter based on the APIs implementation :ref:`StreamFilter <contrib/golang/filters/http/source/go/pkg/api.StreamFilter>`
+// The filter based on the APIs implementation ``StreamFilter <contrib/golang/filters/http/source/go/pkg/api.StreamFilter>``
 // For details, take a look at the :ref:`golang plugin filter sandbox example <install_sandboxes_golang>`.
 //
 // Then put the GO plugin source code into the ${OUTPUT}/src/ directory with the name of the plugin
@@ -38,13 +38,13 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //
 // .. code-block:: bash
 //
-// $tree /home/admin/envoy/go-plugins/src/
-// |--auth
-// |   |--config.go
-// |   |--filter.go
-// ---limit
-//     |--config.go
-//     |--filter.go
+//   $ tree /home/admin/envoy/go-plugins/src/
+//     |--auth
+//     |   |--config.go
+//     |   |--filter.go
+//     ---limit
+//         |--config.go
+//         |--filter.go
 //
 // * Build go-plugin
 //
@@ -66,8 +66,8 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //
 // .. code-block:: bash
 //
-//   $go_plugin_generate.sh limit
-//   $go_plugin_generate.sh auth
+//   $ go_plugin_generate.sh limit
+//   $ go_plugin_generate.sh auth
 //
 // * Configure go-plugin
 //
@@ -147,12 +147,12 @@ message Config {
   string library_id = 1 [(validate.rules).string = {min_len: 1}];
 
   // Dynamic library implementing the interface of
-  // :ref:`StreamFilter <contrib/golang/filters/http/source/go/pkg/api.StreamFilter>`.
+  // ``StreamFilter <contrib/golang/filters/http/source/go/pkg/api.StreamFilter>``.
   // [#comment:TODO(wangfakang): Support for downloading libraries from remote repositories.]
   string library_path = 2 [(validate.rules).string = {min_len: 1}];
 
   // plugin_name is the name of the go plugin, which needs to be consistent with the name
-  // registered in StreamFilterFactoryManager::RegisterStreamFactory.
+  // registered in http::RegisterHttpFilterConfigFactory.
   string plugin_name = 3 [(validate.rules).string = {min_bytes: 1}];
 
   // plugin_config is the configuration of the go plugin, note that this configuration is
@@ -170,7 +170,6 @@ message Config {
   MergePolicy merge_policy = 5 [(validate.rules).enum = {defined_only: true}];
 }
 
-// [#next-free-field: 3]
 message RouterPlugin {
   // The extension_plugin_options field is used to provide extension options for plugin.
   google.protobuf.Struct extension_plugin_options = 1;
@@ -179,24 +178,26 @@ message RouterPlugin {
   google.protobuf.Any config = 2;
 }
 
-// [#next-free-field: 2]
 message ConfigsPerRoute {
   // plugins_config is the configuration of the go plugin at the per-router, and
   // key is the name of the go plugin.
   // Example
-  // typed_per_filter_config:
-  //   golang:
-  //     "@type": type.googleapis.com/golang.http.ConfigsPerRoute
-  //     plugins_config:
-  //       plugin1:
-  //        extension_plugin_options:
-  //          disabled: true
-  //        config:
-  //          "@type": type.googleapis.com/golang.http.plugin1
-  //          xxx: xxx
-  //       plugin2:
-  //        config:
-  //          "@type": type.googleapis.com/golang.http.plugin2
-  //          xxx: xxx
+  //
+  // .. code-block:: yaml
+  //
+  //   typed_per_filter_config:
+  //     envoy.filters.http.golang:
+  //       "@type": type.googleapis.com/envoy.extensions.filters.http.golang.v3alpha.ConfigsPerRoute
+  //       plugins_config:
+  //         plugin1:
+  //          extension_plugin_options:
+  //            disabled: true
+  //          config:
+  //            "@type": type.googleapis.com/golang.http.plugin1
+  //            xxx: xxx
+  //         plugin2:
+  //          config:
+  //            "@type": type.googleapis.com/golang.http.plugin2
+  //            xxx: xxx
   map<string, RouterPlugin> plugins_config = 1;
 }
