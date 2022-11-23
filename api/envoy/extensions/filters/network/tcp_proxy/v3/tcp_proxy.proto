@@ -24,7 +24,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // TCP Proxy :ref:`configuration overview <config_network_filters_tcp_proxy>`.
 // [#extension: envoy.filters.network.tcp_proxy]
 
-// [#next-free-field: 15]
+// [#next-free-field: 16]
 message TcpProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.tcp_proxy.v2.TcpProxy";
@@ -198,5 +198,12 @@ message TcpProxy {
   // was established. If not set, there is no max duration. When max_downstream_connection_duration
   // is reached the connection will be closed. Duration must be at least 1ms.
   google.protobuf.Duration max_downstream_connection_duration = 13
+      [(validate.rules).duration = {gte {nanos: 1000000}}];
+
+  // The interval to flush access log. The TCP proxy will flush only one access log when the connection
+  // is closed by default. If this field is set, the TCP proxy will flush access log periodically with
+  // the specified interval.
+  // The interval must be at least 1ms.
+  google.protobuf.Duration access_log_flush_interval = 15
       [(validate.rules).duration = {gte {nanos: 1000000}}];
 }

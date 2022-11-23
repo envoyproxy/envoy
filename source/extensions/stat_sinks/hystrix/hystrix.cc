@@ -283,11 +283,13 @@ HystrixSink::HystrixSink(Server::Configuration::ServerFactoryContext& server,
       upstream_rq_2xx_(stat_name_pool_.add("upstream_rq_2xx")),
       upstream_rq_4xx_(stat_name_pool_.add("upstream_rq_4xx")),
       upstream_rq_5xx_(stat_name_pool_.add("upstream_rq_5xx")) {
-  Server::Admin& admin = server_.admin();
+  if (!server.admin().has_value()) {
+    return;
+  }
   ENVOY_LOG(debug,
             "adding hystrix_event_stream endpoint to enable connection to hystrix dashboard");
-  admin.addHandler("/hystrix_event_stream", "send hystrix event stream",
-                   MAKE_ADMIN_HANDLER(handlerHystrixEventStream), false, false);
+  server.admin()->addHandler("/hystrix_event_stream", "send hystrix event stream",
+                             MAKE_ADMIN_HANDLER(handlerHystrixEventStream), false, false);
 }
 
 Http::Code HystrixSink::handlerHystrixEventStream(Http::ResponseHeaderMap& response_headers,

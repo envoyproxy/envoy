@@ -9,6 +9,7 @@
 #include "source/common/config/metadata.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/raw_buffer_socket.h"
+#include "source/common/router/upstream_codec_filter.h"
 #include "source/common/upstream/upstream_impl.h"
 
 using testing::_;
@@ -146,6 +147,19 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, clusterType()).WillByDefault(ReturnRef(cluster_type_));
   ON_CALL(*this, upstreamHttpProtocol(_))
       .WillByDefault(Return(std::vector<Http::Protocol>{Http::Protocol::Http11}));
+  ON_CALL(*this, createFilterChain(_, _))
+      .WillByDefault(
+          Invoke([&](Http::FilterChainManager& manager, bool only_create_if_configured) -> bool {
+            if (only_create_if_configured) {
+              return false;
+            }
+            Http::FilterFactoryCb factory_cb =
+                [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+              callbacks.addStreamDecoderFilter(std::make_shared<Router::UpstreamCodecFilter>());
+            };
+            manager.applyFilterFactoryCb({}, factory_cb);
+            return true;
+          }));
 }
 
 MockClusterInfo::~MockClusterInfo() = default;

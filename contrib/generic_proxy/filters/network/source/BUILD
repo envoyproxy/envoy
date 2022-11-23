@@ -21,6 +21,7 @@ envoy_cc_library(
         ":rds_lib",
         ":route_lib",
         "//contrib/generic_proxy/filters/network/source/interface:codec_interface",
+        "//contrib/generic_proxy/filters/network/source/interface:proxy_config_interface",
         "//contrib/generic_proxy/filters/network/source/router:router_lib",
         "//envoy/network:filter_interface",
         "//envoy/server:factory_context_interface",
