@@ -1146,44 +1146,7 @@ TEST_F(RouterTest, ResetDuringEncodeHeaders) {
   router_.onDestroy();
 }
 
-TEST_F(RouterTest, UpstreamTimeoutNoStatsEmissionWhenRuntimeGuardFalse) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.do_not_await_headers_on_upstream_timeout_to_emit_stats",
-        "false"}});
-
-  NiceMock<Http::MockRequestEncoder> encoder;
-  Http::ResponseDecoder* response_decoder = nullptr;
-  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
-
-  expectResponseTimerCreate();
-
-  Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
-  HttpTestUtility::addDefaultHeaders(headers);
-  router_.decodeHeaders(headers, false);
-  Buffer::OwnedImpl data;
-  router_.decodeData(data, true);
-  EXPECT_EQ(1U,
-            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
-
-  EXPECT_CALL(callbacks_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::UpstreamRequestTimeout));
-  EXPECT_CALL(encoder.stream_, resetStream(Http::StreamResetReason::LocalReset));
-  Http::ResponseHeaderMapPtr response_headers(
-      new Http::TestResponseHeaderMapImpl{{":status", "503"}});
-  // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
-  response_decoder->decodeHeaders(std::move(response_headers), false);
-  response_timeout_->invokeCallback();
-
-  EXPECT_EQ(0U,
-            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_timeout")
-                .value());
-  EXPECT_EQ(0U,
-            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_timeout_.value());
-  EXPECT_EQ(0UL, cm_.thread_local_cluster_.conn_pool_.host_->stats().rq_timeout_.value());
-}
-
-TEST_F(RouterTest, UpstreamTimeoutAllStatsEmissionWhenRuntimeGuardTrue) {
+TEST_F(RouterTest, UpstreamTimeoutAllStatsEmission) {
   NiceMock<Http::MockRequestEncoder> encoder;
   Http::ResponseDecoder* response_decoder = nullptr;
   expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
