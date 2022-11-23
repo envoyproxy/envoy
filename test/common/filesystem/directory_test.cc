@@ -261,13 +261,13 @@ TEST_F(DirectoryTest, Fifo) {
   remove(fifo_path.c_str());
 }
 
+// This test seems like it should be doable by removing a file after directory
+// iteration begins, but apparently the behavior of that varies per-filesystem
+// (in some cases the absent file is not seen, in others it is). So we test
+// instead by directly calling the private function.
 TEST_F(DirectoryTest, MakeEntryThrowsOnStatFailure) {
-  const std::string file_path = dir_path_ + "/foo";
-  { const std::ofstream file(file_path); }
   Directory directory(dir_path_);
-  DirectoryIteratorImpl it = directory.begin();
-  TestEnvironment::removePath(file_path);
-  EXPECT_THROW_WITH_REGEX(while (++it != directory.end()){}, EnvoyException,
+  EXPECT_THROW_WITH_REGEX(directory.begin().makeEntry("foo"), EnvoyException,
                           "unable to stat file: '.*foo' .*");
 }
 #endif

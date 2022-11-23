@@ -34,6 +34,8 @@ private:
   std::string directory_path_;
   DIR* dir_{nullptr};
   Api::OsSysCallsImpl& os_sys_calls_;
+
+  friend class DirectoryTest_MakeEntryThrowsOnStatFailure_Test;
 };
 
 } // namespace Filesystem
