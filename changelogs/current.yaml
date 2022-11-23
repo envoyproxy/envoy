@@ -89,6 +89,9 @@ removed_config_or_runtime:
 - area: http
   change: |
     removed ``envoy.reloadable_features.skip_delay_close`` and legacy code paths.
+- area: router
+  change: |
+    removed ``envoy.reloadable_features.do_not_await_headers_on_upstream_timeout_to_emit_stats`` and legacy code paths.
 
 new_features:
 - area: build
