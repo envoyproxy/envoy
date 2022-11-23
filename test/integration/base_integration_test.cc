@@ -536,19 +536,37 @@ AssertionResult BaseIntegrationTest::compareDiscoveryRequest(
     const std::vector<std::string>& expected_resource_names,
     const std::vector<std::string>& expected_resource_names_added,
     const std::vector<std::string>& expected_resource_names_removed, bool expect_node,
-    const Protobuf::int32 expected_error_code, const std::string& expected_error_substring,
-    FakeStream* stream) {
+    const Protobuf::int32 expected_error_code, const std::string& expected_error_substring) {
   if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw ||
       sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedSotw) {
     return compareSotwDiscoveryRequest(expected_type_url, expected_version, expected_resource_names,
-                                       expect_node, expected_error_code, expected_error_substring,
-                                       stream);
+                                       expect_node, expected_error_code, expected_error_substring);
   } else {
     return compareDeltaDiscoveryRequest(expected_type_url, expected_resource_names_added,
-                                        expected_resource_names_removed, stream,
+                                        expected_resource_names_removed,
                                         expected_error_code, expected_error_substring, expect_node);
   }
 }
+
+
+AssertionResult BaseIntegrationTest::compareDiscoveryRequest(
+    const std::string& expected_type_url, const std::string& expected_version,
+    const std::vector<std::string>& expected_resource_names,
+    const std::vector<std::string>& expected_resource_names_added,
+    const std::vector<std::string>& expected_resource_names_removed, FakeStreamPtr& stream, bool expect_node,
+    const Protobuf::int32 expected_error_code,
+    const std::string& expected_error_message) {
+  if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw ||
+      sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedSotw) {
+    return compareSotwDiscoveryRequest(expected_type_url, expected_version, expected_resource_names,
+                                      expect_node, expected_error_code, expected_error_message,
+                                      stream.get());
+  } else {
+    return compareDeltaDiscoveryRequest(expected_type_url, expected_resource_names_added,
+                                        expected_resource_names_removed, stream,
+                                        expected_error_code, expected_error_message, expect_node);
+  }
+  }
 
 AssertionResult compareSets(const std::set<std::string>& set1, const std::set<std::string>& set2,
                             absl::string_view name) {
@@ -649,12 +667,9 @@ BaseIntegrationTest::createExplicitResourcesDeltaDiscoveryResponse(
 AssertionResult BaseIntegrationTest::compareDeltaDiscoveryRequest(
     const std::string& expected_type_url,
     const std::vector<std::string>& expected_resource_subscriptions,
-    const std::vector<std::string>& expected_resource_unsubscriptions, FakeStream* xds_stream,
+    const std::vector<std::string>& expected_resource_unsubscriptions, FakeStreamPtr& xds_stream,
     const Protobuf::int32 expected_error_code, const std::string& expected_error_substring,
     bool expect_node) {
-  if (xds_stream == nullptr) {
-    xds_stream = xds_stream_.get();
-  }
   envoy::service::discovery::v3::DeltaDiscoveryRequest request;
   VERIFY_ASSERTION(xds_stream->waitForGrpcMessage(*dispatcher_, request));
 

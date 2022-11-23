@@ -100,8 +100,8 @@ protected:
     if (await_update) {
       // Receive EDS ack.
       EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment,
-                                          std::to_string(eds_version_ - 1), {}, {}, {}, true,
-                                          Grpc::Status::WellKnownGrpcStatus::Ok, "", stream.get()));
+                                          std::to_string(eds_version_ - 1), {}, {}, {}, stream, true,
+                                          Grpc::Status::WellKnownGrpcStatus::Ok, ""));
     }
   }
 
@@ -225,9 +225,9 @@ protected:
               xds_streams_[curr_stream_idx]);
           // Receive EDS ack.
           EXPECT_TRUE(compareDiscoveryRequest(
-              Config::TypeUrl::get().ClusterLoadAssignment, std::to_string(eds_version_), {}, {},
-              {}, true, Grpc::Status::WellKnownGrpcStatus::Ok,
-              /*expected_error_message=*/"", xds_streams_[curr_stream_idx].get()));
+              Config::TypeUrl::get().ClusterLoadAssignment, std::to_string(eds_version_), {}, {}, {}, xds_streams_[curr_stream_idx],
+              true, Grpc::Status::WellKnownGrpcStatus::Ok,
+              /*expected_error_message=*/""));
           ++curr_stream_idx;
           expected_requests_contents.erase(it);
           ++eds_version_;
@@ -347,8 +347,8 @@ protected:
     if (await_update) {
       // Receive EDS ack.
       EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment,
-                                          std::to_string(eds_version_ - 1), {}, {}, {}, true,
-                                          Grpc::Status::WellKnownGrpcStatus::Ok, "", stream.get()));
+                                          std::to_string(eds_version_ - 1), {}, {}, {}, stream, true,
+                                          Grpc::Status::WellKnownGrpcStatus::Ok, ""));
     }
   }
 
@@ -602,4 +602,5 @@ TEST_P(EdsOverGrpcIntegrationTest, StreamPerClusterMultipleClusters) {
   }
 }
 
-} // namespace
+}
+} // namespace Envoy

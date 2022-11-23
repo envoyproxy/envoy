@@ -173,7 +173,16 @@ public:
       const std::vector<std::string>& expected_resource_names_added,
       const std::vector<std::string>& expected_resource_names_removed, bool expect_node = false,
       const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
-      const std::string& expected_error_message = "", FakeStream* stream = nullptr);
+      const std::string& expected_error_message = "");
+
+  AssertionResult compareDiscoveryRequest(
+      const std::string& expected_type_url, const std::string& expected_version,
+      const std::vector<std::string>& expected_resource_names,
+      const std::vector<std::string>& expected_resource_names_added,
+      const std::vector<std::string>& expected_resource_names_removed, FakeStreamPtr& stream, bool expect_node = false,
+      const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
+      const std::string& expected_error_message = "");
+
   template <class T>
   void sendDiscoveryResponse(const std::string& type_url, const std::vector<T>& state_of_the_world,
                              const std::vector<T>& added_or_updated,
@@ -206,14 +215,14 @@ public:
       const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
       const std::string& expected_error_message = "", bool expect_node = true) {
     return compareDeltaDiscoveryRequest(expected_type_url, expected_resource_subscriptions,
-                                        expected_resource_unsubscriptions, xds_stream_.get(),
+                                        expected_resource_unsubscriptions, xds_stream_,
                                         expected_error_code, expected_error_message, expect_node);
   }
 
   AssertionResult compareDeltaDiscoveryRequest(
       const std::string& expected_type_url,
       const std::vector<std::string>& expected_resource_subscriptions,
-      const std::vector<std::string>& expected_resource_unsubscriptions, FakeStream* stream,
+      const std::vector<std::string>& expected_resource_unsubscriptions, FakeStreamPtr& stream,
       const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
       const std::string& expected_error_message = "", bool expect_node = true);
 
