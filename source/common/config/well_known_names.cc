@@ -135,10 +135,11 @@ TagNameValues::TagNameValues() {
   addRe2(HTTP_CONN_MANAGER_PREFIX, R"(^listener\..*?\.http\.((<TAG_VALUE>)\.))", ".http.");
 
   // Extract ext_authz stat_prefix field
-  // cluster.[<cluster>.]ext_authz.[<ext_authz_prefix>.]*
-  // http.[<http_conn_mgr_prefix>.]ext_authz.[<ext_authz_prefix>.]*
   if (Runtime::runtimeFeatureEnabled("envoy.restart_features.ext_authz_prefix_handling")) {
-    addRe2(EXT_AUTHZ_PREFIX, R"(^(?:cluster|http)\.(?:[^\.]+\.)?ext_authz\.((<TAG_VALUE>)\.))");
+    // cluster.[<cluster>.]ext_authz.[<ext_authz_prefix>.]*
+    addRe2(EXT_AUTHZ_PREFIX, R"(^cluster\.(?:[^\.]+\.)?ext_authz\.((<TAG_VALUE>)\.))");
+    // http.[<http_conn_mgr_prefix>.]ext_authz.[<ext_authz_prefix>.]*
+    addRe2(EXT_AUTHZ_PREFIX, R"(^http\.(?:[^\.]+\.)?ext_authz\.((<TAG_VALUE>)\.))");
   } // else: don't extract this prefix at all
 
   // http.(<stat_prefix>.)*
