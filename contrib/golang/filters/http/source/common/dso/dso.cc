@@ -4,7 +4,7 @@ namespace Envoy {
 namespace Dso {
 
 std::map<std::string, DsoInstance*> DsoInstanceManager::dso_map_ = {};
-std::shared_mutex DsoInstanceManager::mutex_ = {};
+absl::Mutex DsoInstanceManager::mutex_ = {};
 
 bool DsoInstanceManager::pub(std::string dsoId, std::string dsoName) {
   if (getDsoInstanceByID(dsoId) != NULL) {
@@ -12,7 +12,7 @@ bool DsoInstanceManager::pub(std::string dsoId, std::string dsoName) {
     return false;
   }
 
-  std::unique_lock<std::shared_mutex> w_lock(DsoInstanceManager::mutex_);
+  absl::WriterMutexLock lock(&DsoInstanceManager::mutex_);
 
   DsoInstance* dso = new DsoInstance(dsoName);
   if (!dso->loaded()) {
@@ -24,13 +24,13 @@ bool DsoInstanceManager::pub(std::string dsoId, std::string dsoName) {
 
 bool DsoInstanceManager::unpub(std::string dsoId) {
   // TODO need delete dso
-  std::unique_lock<std::shared_mutex> w_lock(DsoInstanceManager::mutex_);
+  absl::WriterMutexLock lock(&DsoInstanceManager::mutex_);
   ENVOY_LOG_MISC(warn, "unpub {} dso instance.", dsoId);
   return dso_map_.erase(dsoId) == 1;
 }
 
 DsoInstance* DsoInstanceManager::getDsoInstanceByID(std::string dsoId) {
-  std::shared_lock<std::shared_mutex> r_lock(DsoInstanceManager::mutex_);
+  absl::ReaderMutexLock lock(&DsoInstanceManager::mutex_);
   auto it = dso_map_.find(dsoId);
   if (it != dso_map_.end()) {
     return it->second;
@@ -39,9 +39,8 @@ DsoInstance* DsoInstanceManager::getDsoInstanceByID(std::string dsoId) {
   return NULL;
 }
 
-// TODO implement
 std::string DsoInstanceManager::show() {
-  std::shared_lock<std::shared_mutex> r_lock(DsoInstanceManager::mutex_);
+  absl::ReaderMutexLock lock(&DsoInstanceManager::mutex_);
   std::string ids = "";
   for (auto it = dso_map_.begin(); it != dso_map_.end(); ++it) {
     ids += it->first;
