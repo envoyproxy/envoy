@@ -50,6 +50,15 @@ protected:
     }
   }
 
+  void addFileWithContents(absl::string_view file_name, absl::string_view contents) {
+    const std::string full_path = absl::StrCat(dir_path_, "/", file_name);
+    {
+      std::ofstream file(full_path);
+      file << contents;
+    }
+    files_to_remove_.push(full_path);
+  }
+
   void addSymlinks(std::list<std::pair<std::string, std::string>> symlinks) {
     for (const auto& link : symlinks) {
       const std::string target_path = dir_path_ + "/" + link.first;
@@ -96,6 +105,18 @@ TEST_F(DirectoryTest, DirectoryWithOneFile) {
       {".", FileType::Directory, 0},
       {"..", FileType::Directory, 0},
       {"file", FileType::Regular, 0},
+  };
+  EXPECT_EQ(expected, getDirectoryContents(dir_path_, false));
+}
+
+TEST_F(DirectoryTest, DirectoryWithOneFileIncludesCorrectFileSize) {
+  absl::string_view contents = "hello!";
+  addFileWithContents("file", contents);
+
+  const EntrySet expected = {
+      {".", FileType::Directory, 0},
+      {"..", FileType::Directory, 0},
+      {"file", FileType::Regular, contents.size()},
   };
   EXPECT_EQ(expected, getDirectoryContents(dir_path_, false));
 }
