@@ -57,6 +57,7 @@
 #include "source/server/connection_handler_impl.h"
 #include "source/server/guarddog_impl.h"
 #include "source/server/listener_hooks.h"
+#include "source/server/regex_engine.h"
 #include "source/server/ssl_context_manager.h"
 
 namespace Envoy {
@@ -448,19 +449,8 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   // Initialize the regex engine and inject to singleton.
   // Needs to happen before stats store initialization because the stats
   // matcher config can include regexes.
-  if (bootstrap_.has_default_regex_engine()) {
-    const auto& default_regex_engine = bootstrap_.default_regex_engine();
-    Regex::EngineFactory& factory =
-        Config::Utility::getAndCheckFactory<Regex::EngineFactory>(default_regex_engine);
-    auto config = Config::Utility::translateAnyToFactoryConfig(
-        default_regex_engine.typed_config(), messageValidationContext().staticValidationVisitor(),
-        factory);
-    regex_engine_ = factory.createEngine(*config, serverFactoryContext());
-  } else {
-    regex_engine_ = std::make_shared<Regex::GoogleReEngine>();
-  }
-  Regex::EngineSingleton::clear();
-  Regex::EngineSingleton::initialize(regex_engine_.get());
+  regex_engine_ = createRegexEngine(
+      bootstrap_, messageValidationContext().staticValidationVisitor(), serverFactoryContext());
 
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
   // stats.
