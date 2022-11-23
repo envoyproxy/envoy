@@ -134,7 +134,7 @@ TEST_F(AwsLambdaFilterTest, PerRouteConfigCorrectClusterMetadata) {
 
 /**
  * If there's a per route config which has lambda function arn from different region
- * then the sigv4 signer will sign with the region where the lambda function is present.
+ * then the SigV4 signer will sign with the region where the lambda function is present.
  */
 TEST_F(AwsLambdaFilterTest, PerRouteConfigCorrectRegionForSigning) {
   setupFilter({arn_, InvocationMode::Synchronous, false /*passthrough*/});
