@@ -164,12 +164,4 @@ static inline std::string statPrefixJoin(absl::string_view prefix, absl::string_
     ALL_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT,           \
               GENERATE_TEXT_READOUT_STRUCT, GENERATE_STATNAME_STRUCT)                              \
   }
-
-namespace Stats {
-
-// Template that lazy-init a StatsStruct.
-template <typename StatsStructType> struct LazyInit;
-
-} // namespace Stats
-
 } // namespace Envoy

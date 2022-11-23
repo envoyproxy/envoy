@@ -114,8 +114,7 @@ public:
    * cluster.
    *
    * @param cluster_name name of the cluster.
-   * @return true if cluster is found.
-   * @return false otherwise.
+   * @return whether cluster is found.
    */
   bool forceCreationOfClusterTrafficStats(absl::string_view cluster_name) {
     // With https://github.com/envoyproxy/envoy/pull/23921 ClusterInfo::trafficStats is lazy init.

@@ -7,13 +7,14 @@
 #include "source/common/thread_local/thread_local_impl.h"
 
 #include "test/benchmark/main.h"
+#include "test/common/stats/real_thread_test_base.h"
 #include "test/test_common/real_threads_test_helper.h"
 
 #include "benchmark/benchmark.h"
 
 namespace Envoy {
 
-namespace {
+namespace Stats {
 
 using Upstream::ClusterTrafficStats;
 
@@ -76,60 +77,17 @@ BENCHMARK(benchmarkLazyInitCreationInstantiateSameThread)
     ->ArgsProduct({{0, 1}, {1000, 10000, 20000, 100000, 500000}})
     ->Unit(::benchmark::kMillisecond);
 
-class ThreadLocalStoreNoMocksTestBase {
-public:
-  ThreadLocalStoreNoMocksTestBase()
-      : alloc_(symbol_table_), store_(std::make_unique<Stats::ThreadLocalStoreImpl>(alloc_)),
-        pool_(symbol_table_) {}
-  ~ThreadLocalStoreNoMocksTestBase() {
-    if (store_ != nullptr) {
-      store_->shutdownThreading();
-    }
-  }
-
-  Stats::StatName makeStatName(absl::string_view name) { return pool_.add(name); }
-
-  Stats::SymbolTableImpl symbol_table_;
-  Stats::AllocatorImpl alloc_;
-  Stats::ThreadLocalStoreImplPtr store_;
-  Stats::StatNamePool pool_;
-};
-
-class ThreadLocalRealThreadsTestBase : public Thread::RealThreadsTestHelper,
-                                       public ThreadLocalStoreNoMocksTestBase {
-public:
-  ThreadLocalRealThreadsTestBase(uint32_t num_threads) : RealThreadsTestHelper(num_threads) {
-    runOnMainBlocking([this]() { store_->initializeThreading(*main_dispatcher_, *tls_); });
-  }
-
-  ~ThreadLocalRealThreadsTestBase() {
-    // TODO(chaoqin-li1123): clean this up when we figure out how to free the threading resources in
-    // RealThreadsTestHelper.
-    shutdownThreading();
-    exitThreads([this]() { store_.reset(); });
-  }
-
-  void shutdownThreading() {
-    runOnMainBlocking([this]() {
-      if (!tls_->isShutdown()) {
-        tls_->shutdownGlobalThreading();
-      }
-      store_->shutdownThreading();
-      tls_->shutdownThread();
-    });
-  }
-};
-
 class MultiThreadLazyinitStatsTest : public ThreadLocalRealThreadsTestBase {
 public:
-  MultiThreadLazyinitStatsTest() : ThreadLocalRealThreadsTestBase(5) {}
+  MultiThreadLazyinitStatsTest() : ThreadLocalRealThreadsTestBase(5) {
+    Envoy::Event::Libevent::Global::initialize();
+  }
 };
 
 // Benchmark lazy-init stats in different worker thread, mimicking worker threads creation.
 void benchmarkLazyInitCreationInstantiateOnWorkerThreads(::benchmark::State& state) {
   const bool lazy_init = state.range(0) == 1;
   const uint64_t num_stats = state.range(1);
-  Envoy::Event::Libevent::Global::initialize();
   MultiThreadLazyinitStatsTest test;
   std::vector<Stats::ScopeSharedPtr> scopes;
   std::vector<std::shared_ptr<Stats::LazyInit<ClusterTrafficStats>>> lazy_stats;
@@ -159,12 +117,9 @@ void benchmarkLazyInitCreationInstantiateOnWorkerThreads(::benchmark::State& sta
       for (uint64_t idx = begin; idx < end; ++idx) {
         if (lazy_init) {
           // Lazy-init on workers happen when the "index"-th stat instance is not created.
-          ClusterTrafficStats& stats = *(*lazy_stats[idx]);
-          UNREFERENCED_PARAMETER(stats);
-
+          *(*lazy_stats[idx]);
         } else {
-          ClusterTrafficStats& stats = *normal_stats[idx];
-          UNREFERENCED_PARAMETER(stats);
+          *normal_stats[idx];
         }
       }
     });
@@ -179,7 +134,6 @@ BENCHMARK(benchmarkLazyInitCreationInstantiateOnWorkerThreads)
 void benchmarkLazyInitStatsAccess(::benchmark::State& state) {
   const bool lazy_init = state.range(0) == 1;
   const uint64_t num_stats = state.range(1);
-  Envoy::Event::Libevent::Global::initialize();
   MultiThreadLazyinitStatsTest test;
   std::vector<Stats::ScopeSharedPtr> scopes;
   std::vector<std::shared_ptr<Stats::LazyInit<ClusterTrafficStats>>> lazy_stats;
@@ -222,6 +176,6 @@ BENCHMARK(benchmarkLazyInitStatsAccess)
     ->ArgsProduct({{0, 1}, {1000, 10000, 20000, 100000, 500000}})
     ->Unit(::benchmark::kMillisecond);
 
-} // namespace
+} // namespace Stats
 
 } // namespace Envoy
