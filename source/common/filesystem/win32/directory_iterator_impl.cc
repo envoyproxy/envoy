@@ -16,7 +16,7 @@ DirectoryIteratorImpl::DirectoryIteratorImpl(const std::string& directory_path)
         fmt::format("unable to open directory {}: {}", directory_path, ::GetLastError()));
   }
 
-  entry_ = {std::string(find_data.cFileName), fileType(find_data)};
+  entry_ = makeEntry(find_data);
 }
 
 DirectoryIteratorImpl::~DirectoryIteratorImpl() {
@@ -34,27 +34,28 @@ DirectoryIteratorImpl& DirectoryIteratorImpl::operator++() {
   }
 
   if (ret == 0) {
-    entry_ = {"", FileType::Other};
+    entry_ = {"", FileType::Other, 0};
   } else {
-    entry_ = {std::string(find_data.cFileName), fileType(find_data)};
+    entry_ = makeEntry(find_data);
   }
 
   return *this;
 }
 
-FileType DirectoryIteratorImpl::fileType(const WIN32_FIND_DATA& find_data) const {
+DirectoryEntry DirectoryIteratorImpl::makeEntry(const WIN32_FIND_DATA& find_data) const {
+  FileType file_type;
   if ((find_data.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) &&
       !(find_data.dwReserved0 & IO_REPARSE_TAG_SYMLINK)) {
     // The file is reparse point and not a symlink, so it can't be
     // a regular file or a directory
-    return FileType::Other;
+    file_type = FileType::Other;
+  } else if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+    file_type = FileType::Directory;
+  } else {
+    file_type = FileType::Regular;
   }
-
-  if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-    return FileType::Directory;
-  }
-
-  return FileType::Regular;
+  return {std::string(find_data.cFileName), file_type,
+          static_cast<uint64_t>(find_data.nFileSizeHigh) << 32 + find_data.nFileSizeLow};
 }
 
 } // namespace Filesystem

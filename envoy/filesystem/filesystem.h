@@ -169,6 +169,9 @@ struct DirectoryEntry {
   // target. For example, if name_ is a symlink to a directory, its file type will be Directory.
   FileType type_;
 
+  // The file size in bytes.
+  uint64_t size_bytes_;
+
   bool operator==(const DirectoryEntry& rhs) const {
     return name_ == rhs.name_ && type_ == rhs.type_;
   }
@@ -177,7 +180,7 @@ struct DirectoryEntry {
 class DirectoryIteratorImpl;
 class DirectoryIterator {
 public:
-  DirectoryIterator() : entry_({"", FileType::Other}) {}
+  DirectoryIterator() : entry_({"", FileType::Other, 0}) {}
   virtual ~DirectoryIterator() = default;
 
   const DirectoryEntry& operator*() const { return entry_; }
