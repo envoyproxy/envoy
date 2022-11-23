@@ -24,15 +24,13 @@ public:
 protected:
   void SetUp() override { TestEnvironment::createPath(dir_path_); }
 
-  void removeAllAddedFiles() {
+  void TearDown() override {
     while (!files_to_remove_.empty()) {
       const std::string& f = files_to_remove_.top();
       TestEnvironment::removePath(f);
       files_to_remove_.pop();
     }
   }
-
-  void TearDown() override { removeAllAddedFiles(); }
 
   void addSubDirs(std::list<std::string> sub_dirs) {
     for (const std::string& dir_name : sub_dirs) {
@@ -264,12 +262,13 @@ TEST_F(DirectoryTest, Fifo) {
 }
 
 TEST_F(DirectoryTest, MakeEntryThrowsOnStatFailure) {
-  addFiles({"foo"});
+  const std::string file_path = dir_path_ + "/foo";
+  { const std::ofstream file(file_path); }
   Directory directory(dir_path_);
   DirectoryIteratorImpl it = directory.begin();
-  ++it;
-  removeAllAddedFiles();
-  EXPECT_THROW_WITH_REGEX(++it, EnvoyException, "unable to stat file: '.*foo' .*");
+  TestEnvironment::removePath(file_path);
+  EXPECT_THROW_WITH_REGEX(while (++it != directory.end()){}, EnvoyException,
+                          "unable to stat file: '.*foo' .*");
 }
 #endif
 
