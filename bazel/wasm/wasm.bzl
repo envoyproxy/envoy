@@ -73,6 +73,7 @@ def envoy_wasm_cc_binary(name, additional_linker_inputs = [], linkopts = [], tag
         ],
         linkopts = linkopts + [
             "--js-library=$(location @envoy//source/extensions/common/wasm/ext:envoy_proxy_wasm_api_js)",
+            "-noprofilelib",
         ],
         tags = tags + ["manual"],
         **kwargs
