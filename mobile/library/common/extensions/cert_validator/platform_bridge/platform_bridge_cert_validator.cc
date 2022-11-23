@@ -141,8 +141,8 @@ void PlatformBridgeCertValidator::PendingValidation::postVerifyResultAndCleanUp(
             "Finished platform cert validation for {}, post result callback to network thread",
             host_name_);
 
-  if (parent_.platform_validator_->release_validator) {
-    parent_.platform_validator_->release_validator();
+  if (parent_.platform_validator_->validation_cleanup) {
+    parent_.platform_validator_->validation_cleanup();
   }
   std::weak_ptr<size_t> weak_alive_indicator(parent_.alive_indicator_);
 
