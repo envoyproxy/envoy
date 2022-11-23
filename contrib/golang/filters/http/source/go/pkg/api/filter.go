@@ -21,82 +21,82 @@ import "google.golang.org/protobuf/types/known/anypb"
 
 // request
 type StreamDecoderFilter interface {
-	DecodeHeaders(RequestHeaderMap, bool) StatusType
-	DecodeData(BufferInstance, bool) StatusType
-	DecodeTrailers(RequestTrailerMap) StatusType
-	/*
-	DecodeMetadata(MetadataMap) StatusType
-	*/
+    DecodeHeaders(RequestHeaderMap, bool) StatusType
+    DecodeData(BufferInstance, bool) StatusType
+    DecodeTrailers(RequestTrailerMap) StatusType
+    /*
+    DecodeMetadata(MetadataMap) StatusType
+    */
 }
 
 // TODO merge it to StreamFilterConfigFactory
 type StreamFilterConfigParser interface {
-	Parse(any *anypb.Any) interface{}
-	Merge(parentConfig interface{}, childConfig interface{}) interface{}
+    Parse(any *anypb.Any) interface{}
+    Merge(parentConfig interface{}, childConfig interface{}) interface{}
 }
 
 type StreamFilterConfigFactory func(config interface{}) StreamFilterFactory
 type StreamFilterFactory func(callbacks FilterCallbackHandler) StreamFilter
 
 type StreamFilter interface {
-	// http request
-	StreamDecoderFilter
-	// response stream
-	StreamEncoderFilter
-	// TODO add more
-	/*
-	// stream complete
-	OnStreamComplete()
-	// error log
-	Log(LogType, string)
-	*/
-	// destroy filter
-	OnDestroy(DestroyReason)
+    // http request
+    StreamDecoderFilter
+    // response stream
+    StreamEncoderFilter
+    // TODO add more
+    /*
+    // stream complete
+    OnStreamComplete()
+    // error log
+    Log(LogType, string)
+    */
+    // destroy filter
+    OnDestroy(DestroyReason)
 }
 
 // response
 type StreamEncoderFilter interface {
-	EncodeHeaders(ResponseHeaderMap, bool) StatusType
-	EncodeData(BufferInstance, bool) StatusType
-	EncodeTrailers(ResponseTrailerMap) StatusType
-	// TODO add more
-	/*
-	EncodeMetadata(MetadataMap) StatusType
-	EncoderCallbacks() EncoderFilterCallbacks
-	*/
+    EncodeHeaders(ResponseHeaderMap, bool) StatusType
+    EncodeData(BufferInstance, bool) StatusType
+    EncodeTrailers(ResponseTrailerMap) StatusType
+    // TODO add more
+    /*
+    EncodeMetadata(MetadataMap) StatusType
+    EncoderCallbacks() EncoderFilterCallbacks
+    */
 }
 
 // stream info
 // refer https://github.com/envoyproxy/envoy/blob/main/envoy/stream_info/stream_info.h
 type StreamInfo interface {
-	GetRouteName() string
-	// TODO add more
-	/*
-	VirtualClusterName() string
-	BytesReceived() int64
-	BytesSent() int64
-	Protocol() string
-	ResponseCode() int
-	GetRequestHeaders() RequestHeaderMap
-	ResponseCodeDetails() string
-	*/
+    GetRouteName() string
+    // TODO add more
+    /*
+    VirtualClusterName() string
+    BytesReceived() int64
+    BytesSent() int64
+    Protocol() string
+    ResponseCode() int
+    GetRequestHeaders() RequestHeaderMap
+    ResponseCodeDetails() string
+    */
 }
 
 type StreamFilterCallbacks interface {
-	StreamInfo() StreamInfo
+    StreamInfo() StreamInfo
 }
 
 type FilterCallbacks interface {
-	StreamFilterCallbacks
-	// Continue or SendLocalReply should be last API invoked, no more code after them.
-	Continue(StatusType)
-	SendLocalReply(responseCode int, bodyText string, headers map[string]string, grpcStatus int64, details string)
-	// TODO add more
-	/*
-	AddDecodedData(buffer BufferInstance, streamingFilter bool)
-	*/
+    StreamFilterCallbacks
+    // Continue or SendLocalReply should be last API invoked, no more code after them.
+    Continue(StatusType)
+    SendLocalReply(responseCode int, bodyText string, headers map[string]string, grpcStatus int64, details string)
+    // TODO add more
+    /*
+    AddDecodedData(buffer BufferInstance, streamingFilter bool)
+    */
 }
 
 type FilterCallbackHandler interface {
-	FilterCallbacks
+    FilterCallbacks
 }
