@@ -74,11 +74,11 @@ jobs:
       image: envoyproxy/envoy-build-ubuntu:0a02a76af5951bf7f4c7029c0ea6d29d96c0f682
     steps:
       - uses: actions/checkout@v1
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: sizecurrent
           path: dist/sizecurrent
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: sizemain
           path: dist/sizemain
