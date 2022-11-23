@@ -120,12 +120,12 @@ public:
         std::make_shared<FilterConfigPerRoute>(per_route_proto_config, server_factory_context_);
   }
 
-  void setupFilter(const std::string& soId) {
+  void setupFilter(const std::string& so_id) {
     Event::SimulatedTimeSystem test_time;
     test_time.setSystemTime(std::chrono::microseconds(1583879145572237));
 
     filter_ = std::make_unique<TestFilter>(server_factory_context_.grpcContext(), config_, 1,
-                                           Dso::DsoInstanceManager::getDsoInstanceByID(soId));
+                                           Dso::DsoInstanceManager::getDsoInstanceByID(so_id));
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }

@@ -67,10 +67,8 @@ typedef double _Complex GoComplex128; // NOLINT(modernize-use-using)
   static assertion to make sure the file is being used on architecture
   at least with matching size of GoInt.
 */
-typedef char
-    _check_for_64_bit_pointer_matching_GoInt[sizeof(void*) == 64 / 8 // NOLINT(modernize-use-using)
-                                                 ? 1
-                                                 : -1];
+typedef char // NOLINT(modernize-use-using)
+    _check_for_64_bit_pointer_matching_GoInt[sizeof(void*) == 64 / 8 ? 1 : -1];
 
 #ifndef GO_CGO_GOSTRING_TYPEDEF
 typedef _GoString_ GoString; // NOLINT(modernize-use-using)
