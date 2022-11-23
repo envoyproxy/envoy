@@ -1732,13 +1732,13 @@ VirtualHostImpl::VirtualHostImpl(
   }
 
   if (!virtual_host.virtual_clusters().empty()) {
+    virtual_cluster_catch_all_ = std::make_unique<CatchAllVirtualCluster>(
+        *vcluster_scope_, factory_context.routerContext().virtualClusterStatNames());
     for (const auto& virtual_cluster : virtual_host.virtual_clusters()) {
       virtual_clusters_.push_back(
           VirtualClusterEntry(virtual_cluster, *vcluster_scope_,
                               factory_context.routerContext().virtualClusterStatNames()));
     }
-    virtual_cluster_catch_all_ = std::make_unique<CatchAllVirtualCluster>(
-        *vcluster_scope_, factory_context.routerContext().virtualClusterStatNames());
   }
 
   if (virtual_host.has_cors()) {
