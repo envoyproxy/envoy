@@ -12,8 +12,6 @@
 
 #include "gtest/gtest.h"
 
-using ::testing::ElementsAre;
-
 namespace Envoy {
 namespace Stats {
 
