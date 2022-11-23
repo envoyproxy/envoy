@@ -27,13 +27,8 @@
 
 using testing::_;
 using testing::AtLeast;
-using testing::Eq;
-using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
-using testing::Return;
-using testing::ReturnRef;
-using testing::StrEq;
 
 namespace Envoy {
 namespace Extensions {
@@ -83,7 +78,8 @@ public:
 
   ~GolangHttpFilterTest() override { filter_->onDestroy(); }
 
-  void setup(const std::string& libId, const std::string& lipPath, const std::string& pluginName) {
+  void setup(const std::string& lib_id, const std::string& lib_path,
+             const std::string& plugin_name) {
     const auto yaml_fmt = R"EOF(
     library_id: %s
     library_path: %s
@@ -97,14 +93,14 @@ public:
           int: 10
     )EOF";
 
-    auto yaml_string = absl::StrFormat(yaml_fmt, libId, lipPath, pluginName);
+    auto yaml_string = absl::StrFormat(yaml_fmt, lib_id, lib_path, plugin_name);
     envoy::extensions::filters::http::golang::v3alpha::Config proto_config;
     TestUtility::loadFromYaml(yaml_string, proto_config);
 
     envoy::extensions::filters::http::golang::v3alpha::ConfigsPerRoute per_route_proto_config;
     setupDso();
     setupConfig(proto_config, per_route_proto_config);
-    setupFilter(libId);
+    setupFilter(lib_id);
   }
 
   std::string genSoPath(std::string name) {

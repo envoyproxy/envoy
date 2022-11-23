@@ -47,8 +47,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   ENVOY_LOG(debug, "golang filter decodeHeaders, state: {}, phase: {}, end_stream: {}",
             state.stateStr(), state.phaseStr(), end_stream);
 
-  if (dynamicLib_ == nullptr) {
-    ENVOY_LOG(error, "dynamicLib_ is nullPtr, maybe the instance already unpub.");
+  if (dynamic_lib_ == nullptr) {
+    ENVOY_LOG(error, "dynamic_lib_ is nullPtr, maybe the instance already unpub.");
     // TODO return Network::FilterStatus::StopIteration and close connection immediately?
     return Http::FilterHeadersStatus::Continue;
   }
@@ -66,8 +66,8 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
             "golang filter decodeData, state: {}, phase: {}, data length: {}, end_stream: {}",
             state.stateStr(), state.phaseStr(), data.length(), end_stream);
 
-  if (dynamicLib_ == nullptr) {
-    ENVOY_LOG(error, "dynamicLib_ is nullPtr, maybe the instance already unpub.");
+  if (dynamic_lib_ == nullptr) {
+    ENVOY_LOG(error, "dynamic_lib_ is nullPtr, maybe the instance already unpub.");
     // TODO return Network::FilterStatus::StopIteration and close connection immediately?
     return Http::FilterDataStatus::Continue;
   }
@@ -91,8 +91,8 @@ Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap& trail
 
   state.setSeenTrailers();
 
-  if (dynamicLib_ == nullptr) {
-    ENVOY_LOG(error, "dynamicLib_ is nullPtr, maybe the instance already unpub.");
+  if (dynamic_lib_ == nullptr) {
+    ENVOY_LOG(error, "dynamic_lib_ is nullPtr, maybe the instance already unpub.");
     // TODO return Network::FilterStatus::StopIteration and close connection immediately?
     return Http::FilterTrailersStatus::Continue;
   }
@@ -107,8 +107,8 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   ENVOY_LOG(debug, "golang filter encodeHeaders, state: {}, phase: {}, end_stream: {}",
             state.stateStr(), state.phaseStr(), end_stream);
 
-  if (dynamicLib_ == nullptr) {
-    ENVOY_LOG(error, "dynamicLib_ is nullPtr, maybe the instance already unpub.");
+  if (dynamic_lib_ == nullptr) {
+    ENVOY_LOG(error, "dynamic_lib_ is nullPtr, maybe the instance already unpub.");
     // TODO return Network::FilterStatus::StopIteration and close connection immediately?
     return Http::FilterHeadersStatus::Continue;
   }
@@ -174,8 +174,8 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_strea
             "golang filter encodeData, state: {}, phase: {}, data length: {}, end_stream: {}",
             state.stateStr(), state.phaseStr(), data.length(), end_stream);
 
-  if (dynamicLib_ == nullptr) {
-    ENVOY_LOG(error, "dynamicLib_ is nullPtr, maybe the instance already unpub.");
+  if (dynamic_lib_ == nullptr) {
+    ENVOY_LOG(error, "dynamic_lib_ is nullPtr, maybe the instance already unpub.");
     // TODO return Network::FilterStatus::StopIteration and close connection immediately?
     return Http::FilterDataStatus::Continue;
   }
@@ -205,8 +205,8 @@ Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap& trai
 
   encoding_state_.setSeenTrailers();
 
-  if (dynamicLib_ == nullptr) {
-    ENVOY_LOG(error, "dynamicLib_ is nullPtr, maybe the instance already unpub.");
+  if (dynamic_lib_ == nullptr) {
+    ENVOY_LOG(error, "dynamic_lib_ is nullPtr, maybe the instance already unpub.");
     // TODO return Network::FilterStatus::StopIteration and close connection immediately?
     return Http::FilterTrailersStatus::Continue;
   }
@@ -235,7 +235,7 @@ void Filter::onDestroy() {
     has_destroyed_ = true;
   }
 
-  if (dynamicLib_ == NULL) {
+  if (dynamic_lib_ == nullptr) {
     ENVOY_LOG(error, "golang filter dynamicLib is nullPtr.");
     return;
   }
@@ -245,7 +245,7 @@ void Filter::onDestroy() {
     auto& state = getProcessorState();
     auto reason = state.isProcessingInGo() ? DestroyReason::Terminate : DestroyReason::Normal;
 
-    dynamicLib_->moeOnHttpDestroy(req_, int(reason));
+    dynamic_lib_->moeOnHttpDestroy(req_, int(reason));
   } catch (...) {
     ENVOY_LOG(error, "golang filter onDestroy do destoryStream catch "
                      "unknown exception.");
@@ -283,14 +283,14 @@ GolangStatus Filter::doHeadersGo(ProcessorState& state, Http::RequestOrResponseH
     if (req_ == nullptr) {
       req_ = new httpRequestInternal(weak_from_this());
       req_->configId = getMergedConfigId(state);
-      req_->plugin_name.data = config_->plugin_name().data();
-      req_->plugin_name.len = config_->plugin_name().length();
+      req_->plugin_name.data = config_->pluginName().data();
+      req_->plugin_name.len = config_->pluginName().length();
     }
 
     req_->phase = static_cast<int>(state.phase());
     headers_ = &headers;
     auto status =
-        dynamicLib_->moeOnHttpHeader(req_, end_stream ? 1 : 0, headers.size(), headers.byteSize());
+        dynamic_lib_->moeOnHttpHeader(req_, end_stream ? 1 : 0, headers.size(), headers.byteSize());
     return static_cast<GolangStatus>(status);
 
   } catch (const EnvoyException& e) {
@@ -330,8 +330,8 @@ bool Filter::doDataGo(ProcessorState& state, Buffer::Instance& data, bool end_st
   try {
     ASSERT(req_ != nullptr);
     req_->phase = static_cast<int>(state.phase());
-    auto status = dynamicLib_->moeOnHttpData(req_, end_stream ? 1 : 0,
-                                             reinterpret_cast<uint64_t>(&buffer), buffer.length());
+    auto status = dynamic_lib_->moeOnHttpData(req_, end_stream ? 1 : 0,
+                                              reinterpret_cast<uint64_t>(&buffer), buffer.length());
 
     return state.handleDataGolangStatus(static_cast<GolangStatus>(status));
 
@@ -396,7 +396,7 @@ bool Filter::doTrailerGo(ProcessorState& state, Http::HeaderMap& trailers) {
   try {
     ASSERT(req_ != nullptr);
     req_->phase = static_cast<int>(state.phase());
-    auto status = dynamicLib_->moeOnHttpHeader(req_, 1, trailers.size(), trailers.byteSize());
+    auto status = dynamic_lib_->moeOnHttpHeader(req_, 1, trailers.size(), trailers.byteSize());
     done = state.handleTrailerGolangStatus(static_cast<GolangStatus>(status));
 
   } catch (const EnvoyException& e) {
@@ -629,39 +629,39 @@ absl::optional<absl::string_view> Filter::getHeader(absl::string_view key) {
   return result[0]->value().getStringView();
 }
 
-void copyHeaderMapToGo(Http::HeaderMap& m, GoString* goStrs, char* goBuf) {
+void copyHeaderMapToGo(Http::HeaderMap& m, GoString* go_strs, char* go_buf) {
   auto i = 0;
-  m.iterate([&i, &goStrs, &goBuf](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+  m.iterate([&i, &go_strs, &go_buf](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
     auto key = std::string(header.key().getStringView());
     auto value = std::string(header.value().getStringView());
 
     // std::cout << "idx: " << i << ", key: " << key << ", value: " << value << std::endl;
 
     auto len = key.length();
-    goStrs[i].n = len;
-    goStrs[i].p = goBuf;
-    memcpy(goBuf, key.data(), len); // NOLINT(safe-memcpy)
-    goBuf += len;
+    go_strs[i].n = len;
+    go_strs[i].p = go_buf;
+    memcpy(go_buf, key.data(), len); // NOLINT(safe-memcpy)
+    go_buf += len;
     i++;
 
     len = value.length();
-    goStrs[i].n = len;
-    goStrs[i].p = goBuf;
-    memcpy(goBuf, value.data(), len); // NOLINT(safe-memcpy)
-    goBuf += len;
+    go_strs[i].n = len;
+    go_strs[i].p = go_buf;
+    memcpy(go_buf, value.data(), len); // NOLINT(safe-memcpy)
+    go_buf += len;
     i++;
     return Http::HeaderMap::Iterate::Continue;
   });
 }
 
-void Filter::copyHeaders(GoString* goStrs, char* goBuf) {
+void Filter::copyHeaders(GoString* go_strs, char* go_buf) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(warn, "golang filter has been destroyed");
     return;
   }
   ASSERT(headers_ != nullptr, "headers is empty, may already continue to next filter");
-  copyHeaderMapToGo(*headers_, goStrs, goBuf);
+  copyHeaderMapToGo(*headers_, go_strs, go_buf);
 }
 
 void Filter::setHeader(absl::string_view key, absl::string_view value) {
@@ -712,14 +712,14 @@ void Filter::setBufferHelper(Buffer::Instance* buffer, absl::string_view& value,
   buffer->add(value);
 }
 
-void Filter::copyTrailers(GoString* goStrs, char* goBuf) {
+void Filter::copyTrailers(GoString* go_strs, char* go_buf) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(warn, "golang filter has been destroyed");
     return;
   }
   ASSERT(trailers_ != nullptr, "trailers is empty");
-  copyHeaderMapToGo(*trailers_, goStrs, goBuf);
+  copyHeaderMapToGo(*trailers_, go_strs, go_buf);
 }
 
 void Filter::setTrailer(absl::string_view key, absl::string_view value) {
@@ -732,7 +732,7 @@ void Filter::setTrailer(absl::string_view key, absl::string_view value) {
   trailers_->setCopy(Http::LowerCaseString(key), value);
 }
 
-void Filter::getStringValue(int id, GoString* valueStr) {
+void Filter::getStringValue(int id, GoString* value_str) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(warn, "golang filter has been destroyed");
@@ -748,8 +748,8 @@ void Filter::getStringValue(int id, GoString* valueStr) {
     ASSERT(false, "invalid string value id");
   }
 
-  valueStr->p = req_->strValue.data();
-  valueStr->n = req_->strValue.length();
+  value_str->p = req_->strValue.data();
+  value_str->n = req_->strValue.length();
 }
 
 /* ConfigId */
@@ -767,9 +767,9 @@ uint64_t Filter::getMergedConfigId(ProcessorState& state) {
   ENVOY_LOG(error, "golang filter route config list length: {}.", route_config_list.size());
 
   auto id = config_->getConfigId();
-  for (auto it = route_config_list.cbegin(); it != route_config_list.cend(); ++it) {
+  for (auto it : route_config_list) {
     auto route_config = *it;
-    id = route_config->getPluginConfigId(id, config_->plugin_name(), config_->so_id());
+    id = route_config.getPluginConfigId(id, config_->pluginName(), config_->soId());
   }
 
   return id;
@@ -790,7 +790,7 @@ uint64_t FilterConfig::getConfigId() {
     return config_id_;
   }
   auto dlib = Dso::DsoInstanceManager::getDsoInstanceByID(so_id_);
-  if (dlib == NULL) {
+  if (dlib == nullptr) {
     ENVOY_LOG(error, "golang extension filter dynamicLib is nullPtr.");
     return 0;
   }
@@ -815,9 +815,9 @@ FilterConfigPerRoute::FilterConfigPerRoute(
   // NP: dso may not loaded yet, can not invoke moeNewHttpPluginConfig yet.
   ENVOY_LOG(info, "initilizing per route golang filter config");
 
-  for (auto it = config.plugins_config().cbegin(); it != config.plugins_config().cend(); ++it) {
-    auto plugin_name = it->first;
-    auto route_plugin = it->second;
+  for (const auto& it : config.plugins_config()) {
+    auto plugin_name = it.first;
+    auto route_plugin = it.second;
     auto conf = new RoutePluginConfig(route_plugin);
     ENVOY_LOG(debug, "per route golang filter config, type_url: {}",
               route_plugin.config().type_url());
@@ -841,7 +841,7 @@ uint64_t RoutePluginConfig::getMergedConfigId(uint64_t parent_id, std::string so
     return merged_config_id_;
   }
   auto dlib = Dso::DsoInstanceManager::getDsoInstanceByID(so_id);
-  if (dlib == NULL) {
+  if (dlib == nullptr) {
     ENVOY_LOG(error, "golang extension filter dynamicLib is nullPtr.");
     return 0;
   }

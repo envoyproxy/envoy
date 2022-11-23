@@ -14,7 +14,7 @@ namespace Dso {
 
 class DsoInstance {
 public:
-  DsoInstance(const std::string dsoName);
+  DsoInstance(const std::string dso_name);
   ~DsoInstance();
 
   GoUint64 moeNewHttpPluginConfig(GoUint64 p0, GoUint64 p1);
@@ -28,24 +28,25 @@ public:
   bool loaded() { return loaded_; }
 
 private:
-  const std::string dsoName_;
+  const std::string dso_name_;
   void* handler_{nullptr};
   bool loaded_{false};
 
-  GoUint64 (*moeNewHttpPluginConfig_)(GoUint64 p0, GoUint64 p1) = {nullptr};
-  GoUint64 (*moeMergeHttpPluginConfig_)(GoUint64 p0, GoUint64 p1) = {nullptr};
+  GoUint64 (*moe_new_http_plugin_config_)(GoUint64 p0, GoUint64 p1) = {nullptr};
+  GoUint64 (*moe_merge_http_plugin_config_)(GoUint64 p0, GoUint64 p1) = {nullptr};
 
-  GoUint64 (*moeOnHttpHeader_)(httpRequest* p0, GoUint64 p1, GoUint64 p2, GoUint64 p3) = {nullptr};
-  GoUint64 (*moeOnHttpData_)(httpRequest* p0, GoUint64 p1, GoUint64 p2, GoUint64 p3) = {nullptr};
+  GoUint64 (*moe_on_http_header_)(httpRequest* p0, GoUint64 p1, GoUint64 p2,
+                                  GoUint64 p3) = {nullptr};
+  GoUint64 (*moe_on_http_data_)(httpRequest* p0, GoUint64 p1, GoUint64 p2, GoUint64 p3) = {nullptr};
 
-  void (*moeOnHttpDestroy_)(httpRequest* p0, GoUint64 p1) = {nullptr};
+  void (*moe_on_http_destroy_)(httpRequest* p0, GoUint64 p1) = {nullptr};
 };
 
 class DsoInstanceManager {
 public:
-  static bool pub(std::string dsoId, std::string dsoName);
-  static bool unpub(std::string dsoId);
-  static DsoInstance* getDsoInstanceByID(std::string dsoId);
+  static bool pub(std::string dso_id, std::string dso_name);
+  static bool unpub(std::string dso_id);
+  static DsoInstance* getDsoInstanceByID(std::string dso_id);
   static std::string show();
 
 private:

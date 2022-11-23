@@ -6,16 +6,16 @@
 
 #line 1 "cgo-builtin-export-prolog"
 
-#include <stddef.h>
+#include <stddef.h> // NOLINT(modernize-deprecated-headers)
 
 #ifndef GO_CGO_EXPORT_PROLOGUE_H
 #define GO_CGO_EXPORT_PROLOGUE_H
 
 #ifndef GO_CGO_GOSTRING_TYPEDEF
-typedef struct {
+typedef struct { // NOLINT(modernize-use-using)
   const char* p;
   ptrdiff_t n;
-} _GoString_; // NOLINT(modernize-use-using)
+} _GoString_;
 #endif
 
 #endif
@@ -26,8 +26,8 @@ typedef struct {
 
 // ref https://github.com/golang/go/issues/25832
 
-#include <stdlib.h>
-#include <string.h>
+#include <stdlib.h> // NOLINT(modernize-deprecated-headers)
+#include <string.h> // NOLINT(modernize-deprecated-headers)
 
 #include "api.h"
 
@@ -67,24 +67,25 @@ typedef double _Complex GoComplex128; // NOLINT(modernize-use-using)
   static assertion to make sure the file is being used on architecture
   at least with matching size of GoInt.
 */
-typedef char _check_for_64_bit_pointer_matching_GoInt[sizeof(void*) == 64 / 8
-                                                          ? 1
-                                                          : -1]; // NOLINT(modernize-use-using)
+typedef char
+    _check_for_64_bit_pointer_matching_GoInt[sizeof(void*) == 64 / 8 // NOLINT(modernize-use-using)
+                                                 ? 1
+                                                 : -1];
 
 #ifndef GO_CGO_GOSTRING_TYPEDEF
 typedef _GoString_ GoString; // NOLINT(modernize-use-using)
 #endif
 typedef void* GoMap;  // NOLINT(modernize-use-using)
 typedef void* GoChan; // NOLINT(modernize-use-using)
-typedef struct {
+typedef struct {      // NOLINT(modernize-use-using)
   void* t;
   void* v;
-} GoInterface; // NOLINT(modernize-use-using)
-typedef struct {
+} GoInterface;
+typedef struct { // NOLINT(modernize-use-using)
   void* data;
   GoInt len;
   GoInt cap;
-} GoSlice; // NOLINT(modernize-use-using)
+} GoSlice;
 
 #endif
 
@@ -96,7 +97,8 @@ extern "C" {
 
 // go:linkname moeNewHttpPluginConfig
 // github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.moeNewHttpPluginConfig
-extern GoUint64 moeNewHttpPluginConfig(GoUint64 configPtr, GoUint64 configLen);
+extern GoUint64 moeNewHttpPluginConfig(GoUint64 configPtr,  // NOLINT(readability-identifier-naming)
+                                       GoUint64 configLen); // NOLINT(readability-identifier-naming)
 
 // go:linkname moeDestroyHttpPluginConfig
 // github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.moeDestroyHttpPluginConfig
@@ -104,16 +106,22 @@ extern void moeDestroyHttpPluginConfig(GoUint64 id);
 
 // go:linkname moeMergeHttpPluginConfig
 // github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.moeMergeHttpPluginConfig
-extern GoUint64 moeMergeHttpPluginConfig(GoUint64 parentId, GoUint64 childId);
+extern GoUint64 moeMergeHttpPluginConfig(GoUint64 parentId, // NOLINT(readability-identifier-naming)
+                                         GoUint64 childId); // NOLINT(readability-identifier-naming)
 
 // go:linkname moeOnHttpHeader
 // github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.moeOnHttpHeader
-extern GoUint64 moeOnHttpHeader(httpRequest* r, GoUint64 endStream, GoUint64 headerNum,
-                                GoUint64 headerBytes);
+extern GoUint64 moeOnHttpHeader(httpRequest* r,
+                                GoUint64 endStream,    // NOLINT(readability-identifier-naming)
+                                GoUint64 headerNum,    // NOLINT(readability-identifier-naming)
+                                GoUint64 headerBytes); // NOLINT(readability-identifier-naming)
 
 // go:linkname moeOnHttpData
 // github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.moeOnHttpData
-extern GoUint64 moeOnHttpData(httpRequest* r, GoUint64 endStream, GoUint64 buffer, GoUint64 length);
+extern GoUint64 moeOnHttpData(httpRequest* r,
+                              GoUint64 endStream, // NOLINT(readability-identifier-naming)
+                              GoUint64 buffer,
+                              GoUint64 length); // NOLINT(readability-identifier-naming)
 
 // go:linkname moeOnHttpDestroy
 // github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.moeOnHttpDestroy

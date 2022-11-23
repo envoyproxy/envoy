@@ -18,7 +18,7 @@ Http::FilterFactoryCb GolangFilterConfig::createFilterFactoryFromProtoTyped(
 
   handler_ = context.lifecycleNotifier().registerCallback(
       Server::ServerLifecycleNotifier::Stage::PostInit,
-      [lib_id = config->so_id(), lib_path = config->so_path()] {
+      [lib_id = config->soId(), lib_path = config->soPath()] {
         Envoy::Dso::DsoInstanceManager::pub(lib_id, lib_path);
         // ENVOY_LOG(info, "open golang library at postInit: {} {}", lib_id, lib_path);
       });
@@ -26,7 +26,7 @@ Http::FilterFactoryCb GolangFilterConfig::createFilterFactoryFromProtoTyped(
   return [&context, config](Http::FilterChainFactoryCallbacks& callbacks) {
     auto filter =
         std::make_shared<Filter>(context.grpcContext(), config, Filter::global_stream_id_++,
-                                 Dso::DsoInstanceManager::getDsoInstanceByID(config->so_id()));
+                                 Dso::DsoInstanceManager::getDsoInstanceByID(config->soId()));
     callbacks.addStreamFilter(filter);
     callbacks.addAccessLogHandler(filter);
   };

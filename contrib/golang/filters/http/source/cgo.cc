@@ -15,7 +15,7 @@ absl::string_view copyGoString(void* str) {
     return "";
   }
   auto goStr = reinterpret_cast<GoString*>(str);
-  return absl::string_view(goStr->p, goStr->n);
+  return absl::string_view(goStr->p, goStr->n); // NOLINT(modernize-return-braced-init-list)
 }
 
 extern "C" {
@@ -82,17 +82,17 @@ void moeHttpRemoveHeader(void* r, void* key) {
   });
 }
 
-void moeHttpGetBuffer(void* r, unsigned long long int bufferPtr, void* data) {
-  moeHandlerWrapper(r, [bufferPtr, data](std::shared_ptr<Filter>& filter) {
-    auto buffer = reinterpret_cast<Buffer::Instance*>(bufferPtr);
+void moeHttpGetBuffer(void* r, unsigned long long int buffer_ptr, void* data) {
+  moeHandlerWrapper(r, [buffer_ptr, data](std::shared_ptr<Filter>& filter) {
+    auto buffer = reinterpret_cast<Buffer::Instance*>(buffer_ptr);
     filter->copyBuffer(buffer, reinterpret_cast<char*>(data));
   });
 }
 
-void moeHttpSetBufferHelper(void* r, unsigned long long int bufferPtr, void* data, int length,
+void moeHttpSetBufferHelper(void* r, unsigned long long int buffer_ptr, void* data, int length,
                             bufferAction action) {
-  moeHandlerWrapper(r, [bufferPtr, data, length, action](std::shared_ptr<Filter>& filter) {
-    auto buffer = reinterpret_cast<Buffer::Instance*>(bufferPtr);
+  moeHandlerWrapper(r, [buffer_ptr, data, length, action](std::shared_ptr<Filter>& filter) {
+    auto buffer = reinterpret_cast<Buffer::Instance*>(buffer_ptr);
     auto value = absl::string_view(reinterpret_cast<const char*>(data), length);
     filter->setBufferHelper(buffer, value, action);
   });

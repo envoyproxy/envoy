@@ -21,7 +21,7 @@ Buffer::Instance& BufferList::push(Buffer::Instance& data) {
 
 void BufferList::moveOut(Buffer::Instance& data) {
   for (auto it = queue_.begin(); it != queue_.end(); it = queue_.erase(it)) {
-    data.move(*(*it).get());
+    data.move(**it);
   }
   bytes_ = 0;
 };

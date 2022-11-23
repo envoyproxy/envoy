@@ -17,7 +17,7 @@ typedef struct { // NOLINT(modernize-use-using)
   int phase;
 } httpRequest;
 
-typedef enum {
+typedef enum { // NOLINT(modernize-use-using)
   Set,
   Append,
   Prepend,

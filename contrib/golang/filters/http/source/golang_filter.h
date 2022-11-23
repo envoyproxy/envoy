@@ -27,14 +27,13 @@ namespace Golang {
 class FilterConfig : Logger::Loggable<Logger::Id::http> {
 public:
   FilterConfig(const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config);
-  ~FilterConfig() {
-    // TODO: delete config in Go
-  }
+  // TODO: delete config in Go
+  virtual ~FilterConfig() = default;
 
-  const std::string& filter_chain() const { return filter_chain_; }
-  const std::string& so_id() const { return so_id_; }
-  const std::string& so_path() const { return so_path_; }
-  const std::string& plugin_name() const { return plugin_name_; }
+  const std::string& filterChain() const { return filter_chain_; }
+  const std::string& soId() const { return so_id_; }
+  const std::string& soPath() const { return so_path_; }
+  const std::string& pluginName() const { return plugin_name_; }
   uint64_t getConfigId();
 
 private:
@@ -55,9 +54,8 @@ public:
     ENVOY_LOG(debug, "initilizing golang filter route plugin config, type_url: {}",
               config.config().type_url());
   };
-  ~RoutePluginConfig() {
-    // TODO: delete plugin config in Go
-  }
+  // TODO: delete plugin config in Go
+  ~RoutePluginConfig() = default;
   uint64_t getMergedConfigId(uint64_t parent_id, std::string so_id);
 
 private:
@@ -76,9 +74,9 @@ public:
                        Server::Configuration::ServerFactoryContext&);
   uint64_t getPluginConfigId(uint64_t parent_id, std::string plugin_name, std::string so_id) const;
 
-  ~FilterConfigPerRoute() {
-    for (auto it = plugins_config_.cbegin(); it != plugins_config_.cend(); ++it) {
-      delete it->second;
+  ~FilterConfigPerRoute() override {
+    for (const auto& it : plugins_config_) {
+      delete it.second;
     }
   }
 
@@ -106,8 +104,8 @@ class Filter : public Http::StreamFilter,
                public AccessLog::Instance {
 public:
   explicit Filter(Grpc::Context& context, FilterConfigSharedPtr config, uint64_t sid,
-                  Dso::DsoInstance* dynamicLib)
-      : config_(config), dynamicLib_(dynamicLib), decoding_state_(*this), encoding_state_(*this),
+                  Dso::DsoInstance* dynamic_lib)
+      : config_(config), dynamic_lib_(dynamic_lib), decoding_state_(*this), encoding_state_(*this),
         context_(context), stream_id_(sid) {
     (void)context_;
     (void)stream_id_;
@@ -162,14 +160,14 @@ public:
                       Grpc::Status::GrpcStatus grpc_status, absl::string_view details);
 
   absl::optional<absl::string_view> getHeader(absl::string_view key);
-  void copyHeaders(GoString* goStrs, char* goBuf);
+  void copyHeaders(GoString* go_strs, char* go_buf);
   void setHeader(absl::string_view key, absl::string_view value);
   void removeHeader(absl::string_view key);
   void copyBuffer(Buffer::Instance* buffer, char* data);
   void setBufferHelper(Buffer::Instance* buffer, absl::string_view& value, bufferAction action);
-  void copyTrailers(GoString* goStrs, char* goBuf);
+  void copyTrailers(GoString* go_strs, char* go_buf);
   void setTrailer(absl::string_view key, absl::string_view value);
-  void getStringValue(int id, GoString* valueStr);
+  void getStringValue(int id, GoString* value_str);
 
 private:
   ProcessorState& getProcessorState();
@@ -195,7 +193,7 @@ private:
                               Grpc::Status::GrpcStatus grpc_status, absl::string_view details);
 
   const FilterConfigSharedPtr config_;
-  Dso::DsoInstance* dynamicLib_;
+  Dso::DsoInstance* dynamic_lib_;
 
   Http::RequestOrResponseHeaderMap* headers_{nullptr};
   Http::HeaderMap* trailers_{nullptr};
@@ -215,7 +213,7 @@ private:
   uint64_t cost_time_mem_{0};
   uint64_t stream_id_{0};
 
-  httpRequestInternal* req_{0};
+  httpRequestInternal* req_{nullptr};
 
   // lock for has_destroyed_,
   // to avoid race between envoy c thread and go thread (when calling back from go).
@@ -242,7 +240,7 @@ struct httpRequestInternal : httpRequest {
 };
 
 // used to count function execution time
-template <typename T = std::chrono::microseconds> struct measure {
+template <typename T = std::chrono::microseconds> struct Measure {
   template <typename F, typename... Args> static typename T::rep execution(F func, Args&&... args) {
     auto start = std::chrono::steady_clock::now(); // NO_CHECK_FORMAT(real_time)
 
