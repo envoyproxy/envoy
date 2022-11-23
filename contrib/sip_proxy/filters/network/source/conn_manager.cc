@@ -31,7 +31,17 @@ TrafficRoutingAssistantHandler::TrafficRoutingAssistantHandler(
 void TrafficRoutingAssistantHandler::updateTrafficRoutingAssistant(
     const std::string& type, const std::string& key, const std::string& val,
     const absl::optional<TraContextMap> context) {
-  if (cache_manager_[type][key] != val) {
+
+  bool should_update_tra = false;
+  try {
+    if (cache_manager_.at(type, key) != val) {
+      should_update_tra = true;
+    }
+  } catch (std::out_of_range) {
+    should_update_tra = true;
+  }
+
+  if (should_update_tra) {
     cache_manager_.insertCache(type, key, val);
     if (traClient()) {
       traClient()->updateTrafficRoutingAssistant(
@@ -44,9 +54,11 @@ void TrafficRoutingAssistantHandler::updateTrafficRoutingAssistant(
 QueryStatus TrafficRoutingAssistantHandler::retrieveTrafficRoutingAssistant(
     const std::string& type, const std::string& key, const absl::optional<TraContextMap> context,
     SipFilters::DecoderFilterCallbacks& activetrans, std::string& host) {
-  if (cache_manager_.contains(type, key)) {
-    host = cache_manager_[type][key];
+  try {
+    host = cache_manager_.at(type, key);
     return QueryStatus::Continue;
+  } catch (std::out_of_range) {
+    // type, key doesn't exist, continue
   }
 
   if (activetrans.metadata()->affinityIteration()->query()) {
@@ -102,7 +114,11 @@ void TrafficRoutingAssistantHandler::complete(const TrafficRoutingAssistant::Res
         parent_.onResponseHandleForPendingList(
             message_type, item.first,
             [&](MessageMetadataSharedPtr metadata, DecoderEventHandler& decoder_event_handler) {
-              cache_manager_[message_type].emplace(item.first, item.second);
+              // TODO For skey case, no need to add to local cache. This will be controlled by
+              // config cache->add_query_to_cache.
+              if (message_type != "skey") {
+                cache_manager_[message_type].emplace(item.first, item.second);
+              }
               metadata->setDestination(item.second);
               return parent_.continueHandling(metadata, decoder_event_handler);
             });
@@ -281,7 +297,7 @@ void ConnectionManager::sendLocalReply(MessageMetadata& metadata, const DirectRe
   default:
     PANIC("not reached");
   }
-  stats_.counterFromElements("", "local-generated-response").inc();
+  stats_.response_local_generated_.inc();
 }
 
 void ConnectionManager::setLocalResponseSent(absl::string_view transaction_id) {
@@ -330,7 +346,7 @@ void ConnectionManager::onEvent(Network::ConnectionEvent event) {
 }
 
 DecoderEventHandler& ConnectionManager::newDecoderEventHandler(MessageMetadataSharedPtr metadata) {
-  stats_.counterFromElements(methodStr[metadata->methodType()], "request_received").inc();
+  stats_.sipMethodCounter(metadata->methodType(), SipMethodStatsSuffix::RequestReceived).inc();
 
   std::string&& k = std::string(metadata->transactionId().value());
   // if (metadata->methodType() == MethodType::Ack) {
@@ -395,7 +411,7 @@ FilterStatus ConnectionManager::ResponseDecoder::transportEnd() {
   cm.read_callbacks_->connection().write(buffer, false);
 
   cm.stats_.response_.inc();
-  cm.stats_.counterFromElements(methodStr[metadata_->methodType()], "response_proxied").inc();
+  cm.stats_.sipMethodCounter(metadata_->methodType(), SipMethodStatsSuffix::ResponseProxied).inc();
 
   return FilterStatus::Continue;
 }

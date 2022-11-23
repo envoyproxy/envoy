@@ -17,7 +17,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/fil
 option java_generic_services = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Tra]
+// [#protodoc-title: TRA]
 
 service TraService {
   rpc Create(TraServiceRequest) returns (TraServiceResponse) {

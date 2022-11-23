@@ -14,6 +14,7 @@ envoy_cc_contrib_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
+        ":router_interface",
         ":router_lib",
         "//contrib/sip_proxy/filters/network/source/filters:factory_base_lib",
         "//contrib/sip_proxy/filters/network/source/filters:filter_config_interface",

@@ -1,7 +1,5 @@
 #pragma once
 
-#include <cstddef>
-
 #include "envoy/buffer/buffer.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/server/transport_socket_config.h"
@@ -204,6 +202,7 @@ public:
   }
 
   bool contains(const K& key) { return cache_.find(key) != cache_.end(); }
+  V& at(const K& key) { return cache_.at(key).value_; }
 
   void erase(const K& key) {
     if (contains(key)) {
@@ -259,8 +258,12 @@ public:
     // TODO return caches_.contains(type) && caches_[type].contains(key);
     return caches_.find(type) != caches_.end() && caches_[type].contains(key);
   }
-  V& at(const T& type, const K& key) { return caches_[type][key]; }
-  Cache<K, V>& at(const T& type) { return caches_[type]; }
+
+  /**
+   * NOTE: This may throw exception std::out_of_range if type or key doesn't exist.
+   */
+  V& at(const T& type, const K& key) { return caches_.at(type).at(key); }
+  Cache<K, V>& at(const T& type) { return caches_.at(type); }
   Cache<K, V>& operator[](const T& type) { return caches_[type]; }
 
 private:

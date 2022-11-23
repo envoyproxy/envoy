@@ -1,9 +1,5 @@
 #pragma once
 
-#include <map>
-#include <memory>
-#include <string>
-
 #include "envoy/router/router.h"
 
 #include "contrib/sip_proxy/filters/network/source/metadata.h"
@@ -69,6 +65,26 @@ public:
 };
 
 using ConfigConstSharedPtr = std::shared_ptr<const Config>;
+
+#define ALL_SIP_ROUTER_STATS(COUNTER, GAUGE, HISTOGRAM)                                            \
+  COUNTER(route_missing)                                                                           \
+  COUNTER(unknown_cluster)                                                                         \
+  COUNTER(upstream_rq_maintenance_mode)                                                            \
+  COUNTER(no_healthy_upstream)
+
+struct RouterStats {
+  ALL_SIP_ROUTER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
+};
+
+/**
+ * The router filter configuration
+ */
+class RouterFilterConfig {
+public:
+  virtual ~RouterFilterConfig() = default;
+
+  virtual RouterStats& stats() PURE;
+};
 
 } // namespace Router
 } // namespace SipProxy

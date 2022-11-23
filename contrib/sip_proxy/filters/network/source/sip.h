@@ -1,9 +1,5 @@
 #pragma once
-#include <map>
-
 #include "source/common/singleton/const_singleton.h"
-
-#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -45,6 +41,7 @@ enum MethodType {
   Cancel,
   Ok200,
   Failure4xx,
+  OtherMethod,
   NullMethod
 };
 
@@ -88,7 +85,7 @@ public:
   }
 
 private:
-  const std::map<absl::string_view, HeaderType> sip_header_type_map_{
+  const absl::flat_hash_map<absl::string_view, HeaderType> sip_header_type_map_{
       {"Call-ID", HeaderType::CallId},
       {"Via", HeaderType::Via},
       {"To", HeaderType::To},
