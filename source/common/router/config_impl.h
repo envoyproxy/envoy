@@ -245,7 +245,7 @@ public:
     if (retry_policy_ != nullptr) {
       return *retry_policy_;
     }
-    return ansl::nullopt;
+    return absl::nullopt;
   }
   const OptRef<envoy::config::route::v3::HedgePolicy> hedgePolicy() const {
     if (hedge_policy_ != nullptr) {
