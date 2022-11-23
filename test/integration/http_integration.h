@@ -20,6 +20,12 @@ namespace Envoy {
 
 using ::Envoy::Http::Http2::Http2Frame;
 
+// See https://github.com/envoyproxy/envoy/issues/21245.
+enum class Http1Impl {
+  HttpParser, // http-parser from node.js
+  BalsaParser // Balsa from QUICHE
+};
+
 enum class Http2Impl {
   Nghttp2,
   Oghttp2,
@@ -137,7 +143,8 @@ public:
   ~HttpIntegrationTest() override;
 
   void initialize() override;
-  void setupHttp2Overrides(Http2Impl implementation);
+  void setupHttp1ImplOverrides(Http1Impl http1_implementation);
+  void setupHttp2ImplOverrides(Http2Impl http2_implementation);
 
 protected:
   void useAccessLog(absl::string_view format = "",
