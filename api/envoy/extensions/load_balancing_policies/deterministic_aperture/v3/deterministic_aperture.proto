@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.load_balancing_policies.deterministic_aperture.v3;
 
 import "envoy/extensions/load_balancing_policies/ring_hash/v3/ring_hash.proto";
+
 import "udpa/annotations/status.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.load_balancing_policies.deterministic_aperture.v3";
@@ -25,7 +26,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 message DeterministicApertureLbConfig {
   // Hash ring configuration for the internal ring for endpoints.
-  load_balancing_policies.ring_hash.v3.RingHash ring_config = 1;
+  ring_hash.v3.RingHash ring_config = 1;
 
   // Index of this peer (0 indexed).
   uint32 peer_index = 2;

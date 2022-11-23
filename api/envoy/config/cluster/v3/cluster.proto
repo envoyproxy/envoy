@@ -1069,7 +1069,7 @@ message Cluster {
     RoundRobinLbConfig round_robin_lb_config = 56;
 
     // Optional configuration for the Deterministic Aperture load balancing policy.
-    extensions.load_balancing_policies.deterministic_aperture.v3.DeterministicApertureLbConfig
+    envoy.extensions.load_balancing_policies.deterministic_aperture.v3.DeterministicApertureLbConfig
         deterministic_aperture_lb_config = 57;
   }
 
