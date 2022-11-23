@@ -151,7 +151,7 @@ void benchmarkLazyInitStatsAccess(::benchmark::State& state) {
         if (lazy_init) {
           auto ptr = std::make_shared<Stats::LazyInit<ClusterTrafficStats>>(*scope, stat_names);
           *(*ptr);
-          lazy_stats.push_back(std::move(ptr));
+          lazy_stats.push_back(ptr);
         } else {
           normal_stats.push_back(std::make_shared<ClusterTrafficStats>(stat_names, *scope));
         }
