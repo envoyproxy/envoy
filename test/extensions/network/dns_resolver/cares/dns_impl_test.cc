@@ -626,7 +626,7 @@ public:
   }
 
 private:
-  void abslHashValue(absl::HashState state) const override{
+  void abslHashValue(absl::HashState state) const override {
     instance_.abslHashValue(std::move(state));
   }
 

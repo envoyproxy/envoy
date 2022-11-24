@@ -148,6 +148,7 @@ public:
     absl::HashState::combine(std::move(state), ip_.ipv4_.address_.sin_addr.s_addr,
                              ip_.ipv4_.address_.sin_port);
   }
+
 private:
   /**
    * Construct from an existing unix IPv4 socket address (IP v4 address and port).
@@ -242,6 +243,7 @@ public:
                                             sizeof(ip_.ipv6_.address_.sin6_addr.s6_addr)),
         ip_.ipv6_.address_.sin6_port, ip_.ipv6_.address_.sin6_scope_id);
   }
+
 private:
   /**
    * Construct from an existing unix IPv6 socket address (IP v6 address and port).
@@ -334,6 +336,7 @@ public:
                                                                  sizeof(pipe_.address_.sun_path)),
                              0);
   }
+
 private:
   /**
    * Construct from an existing unix address.
@@ -384,6 +387,7 @@ public:
     // Envoy internal address only hash by address id, ignore the endpoint id.
     absl::HashState::combine(std::move(state), internal_address_.address_id_);
   }
+
 private:
   struct EnvoyInternalAddressImpl : public EnvoyInternalAddress {
     explicit EnvoyInternalAddressImpl(const std::string& address_id, const std::string& endpoint_id)
