@@ -280,12 +280,17 @@ Ipv6Instance::Ipv6Instance(const std::string& address, const SocketInterface* so
 
 Ipv6Instance::Ipv6Instance(const std::string& address, uint32_t port,
                            const SocketInterface* sock_interface, bool v6only)
+    : Ipv6Instance(address, port, 0, sock_interface, v6only) {}
+
+Ipv6Instance::Ipv6Instance(const std::string& address, uint32_t port, uint32_t scope_id,
+                           const SocketInterface* sock_interface, bool v6only)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
   throwOnError(validateProtocolSupported());
   sockaddr_in6 addr_in;
   memset(&addr_in, 0, sizeof(addr_in));
   addr_in.sin6_family = AF_INET6;
   addr_in.sin6_port = htons(port);
+  addr_in.sin6_scope_id = scope_id;
   if (!address.empty()) {
     if (1 != inet_pton(AF_INET6, address.c_str(), &addr_in.sin6_addr)) {
       throw EnvoyException(fmt::format("invalid ipv6 address '{}'", address));

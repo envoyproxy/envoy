@@ -10,6 +10,7 @@
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
 
+#include "absl/hash/hash.h"
 #include "absl/numeric/int128.h"
 #include "absl/strings/string_view.h"
 
@@ -230,6 +231,28 @@ public:
    * @return SocketInterface to be used with the address.
    */
   virtual const Network::SocketInterface& socketInterface() const PURE;
+
+  /**
+   * For support absl::Hash.
+   */
+  virtual void abslHashValue(absl::HashState state) const PURE;
+};
+
+struct AddressKey {
+  AddressKey(InstanceConstSharedPtr address) : address_(address) {}
+
+  friend bool operator==(const AddressKey& lhs, const AddressKey& rhs) {
+    return *(lhs.address_) == *(rhs.address_);
+  }
+
+  // Add absl::Hash support.
+  template <typename H>
+  friend H AbslHashValue(H state, const AddressKey& s) { // NOLINT(readability-identifier-naming)
+    s.address_->abslHashValue(absl::HashState::Create(&state));
+    return std::move(state);
+  }
+
+  InstanceConstSharedPtr address_;
 };
 
 } // namespace Address

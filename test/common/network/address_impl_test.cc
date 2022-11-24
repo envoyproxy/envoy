@@ -2,6 +2,9 @@
 #include <memory>
 #include <string>
 
+#include "absl/container/flat_hash_map.h"
+#include "absl/hash/hash_testing.h"
+
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 
@@ -232,6 +235,33 @@ TEST(Ipv4InstanceTest, BadAddress) {
   EXPECT_THROW(Ipv4Instance("bar", 1), EnvoyException);
 }
 
+TEST(Ipv4InstanceTest, Hashable) {
+  EXPECT_TRUE(absl::VerifyTypeImplementsAbslHashCorrectly({
+      AddressKey(std::make_shared<Ipv4Instance>("255.255.255.255", 80)),
+      AddressKey(std::make_shared<Ipv4Instance>("255.255.255.255", 8080)),
+      AddressKey(std::make_shared<Ipv4Instance>("255.255.255.0", 8080)),
+  }));
+
+  EXPECT_FALSE(absl::VerifyTypeImplementsAbslHashCorrectly({
+      AddressKey(std::make_shared<Ipv4Instance>("255.255.255.255", 80)),
+      AddressKey(std::make_shared<Ipv4Instance>("255.255.255.255", 80)),
+  }));
+}
+
+TEST(Ipv6InstanceTest, Hashable) {
+  EXPECT_TRUE(absl::VerifyTypeImplementsAbslHashCorrectly({
+      AddressKey(std::make_shared<Ipv6Instance>("::1", 80)),
+      AddressKey(std::make_shared<Ipv6Instance>("::1", 8080)),
+      AddressKey(std::make_shared<Ipv6Instance>("::1", 8080, 1)),
+      AddressKey(std::make_shared<Ipv6Instance>("::2", 8080, 1)),
+  }));
+
+  EXPECT_FALSE(absl::VerifyTypeImplementsAbslHashCorrectly({
+      AddressKey(std::make_shared<Ipv6Instance>("::1", 80)),
+      AddressKey(std::make_shared<Ipv6Instance>("::1", 80)),
+  }));
+}
+
 TEST(Ipv6InstanceTest, SocketAddress) {
   sockaddr_in6 addr6;
   memset(&addr6, 0, sizeof(addr6));
@@ -329,6 +359,19 @@ TEST(PipeInstanceTest, Basic) {
   EXPECT_EQ(Type::Pipe, address.type());
   EXPECT_EQ(nullptr, address.ip());
   EXPECT_EQ(nullptr, address.envoyInternalAddress());
+}
+
+TEST(InternalInstanceTest, Hashable) {
+  EXPECT_TRUE(absl::VerifyTypeImplementsAbslHashCorrectly({
+      AddressKey(std::make_shared<EnvoyInternalInstance>("listener_foo")),
+      AddressKey(std::make_shared<EnvoyInternalInstance>("listener_bar")),
+      AddressKey(std::make_shared<EnvoyInternalInstance>("listener_foo", "1")),
+  }));
+
+  EXPECT_FALSE(absl::VerifyTypeImplementsAbslHashCorrectly({
+      AddressKey(std::make_shared<EnvoyInternalInstance>("listener_foo")),
+      AddressKey(std::make_shared<EnvoyInternalInstance>("listener_foo")),
+  }));
 }
 
 TEST(InternalInstanceTest, Basic) {
@@ -470,6 +513,18 @@ TEST(PipeInstanceTest, UnlinksExistingFile) {
   const std::string path = TestEnvironment::unixDomainSocketPath("UnlinksExistingFile.sock");
   bind_uds_socket(path);
   bind_uds_socket(path); // after closing, second bind to the same path should succeed.
+}
+
+TEST(PipeInstanceTest, Hashable) {
+  EXPECT_TRUE(absl::VerifyTypeImplementsAbslHashCorrectly({
+      AddressKey(std::make_shared<PipeInstance>("/foo/bar")),
+      AddressKey(std::make_shared<PipeInstance>("/foo/bar2")),
+  }));
+
+  EXPECT_FALSE(absl::VerifyTypeImplementsAbslHashCorrectly({
+      AddressKey(std::make_shared<PipeInstance>("/foo/bar")),
+      AddressKey(std::make_shared<PipeInstance>("/foo/bar")),
+  }));
 }
 
 TEST(AddressFromSockAddrDeathTest, IPv4) {

@@ -36,6 +36,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "address_impl_test",
     srcs = ["address_impl_test.cc"],
+    external_deps = ["abseil_hash_testing"],
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",

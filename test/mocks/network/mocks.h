@@ -548,6 +548,7 @@ public:
   const Network::SocketInterface& socketInterface() const override {
     return SocketInterfaceSingleton::get();
   }
+  void abslHashValue(absl::HashState) const override {}
 
   const std::string logical_;
   const std::string physical_;

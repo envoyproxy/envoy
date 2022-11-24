@@ -145,6 +145,11 @@ public:
   static absl::Status validateProtocolSupported();
 
 private:
+  void abslHashValue(absl::HashState state) const override {
+    absl::HashState::combine(std::move(state), ip_.ipv4_.address_.sin_addr.s_addr,
+                             ip_.ipv4_.address_.sin_port);
+  }
+
   /**
    * Construct from an existing unix IPv4 socket address (IP v4 address and port).
    * Store the status code in passed in parameter instead of throwing.
@@ -207,6 +212,12 @@ public:
                const SocketInterface* sock_interface = nullptr, bool v6only = true);
 
   /**
+   * Construct from a string IPv6 address such as "12:34::5" as well as a port and scope id.
+   */
+  Ipv6Instance(const std::string& address, uint32_t port, uint32_t scope_id,
+               const SocketInterface* sock_interface = nullptr, bool v6only = true);
+
+  /**
    * Construct from a port. The IPv6 address will be set to "any" and is suitable for binding
    * a port to any available address.
    */
@@ -227,6 +238,13 @@ public:
   static absl::Status validateProtocolSupported();
 
 private:
+  void abslHashValue(absl::HashState state) const override {
+    absl::HashState::combine(
+        absl::HashState::combine_contiguous(std::move(state), ip_.ipv6_.address_.sin6_addr.s6_addr,
+                                            sizeof(ip_.ipv6_.address_.sin6_addr.s6_addr)),
+        ip_.ipv6_.address_.sin6_port, ip_.ipv6_.address_.sin6_scope_id);
+  }
+
   /**
    * Construct from an existing unix IPv6 socket address (IP v6 address and port).
    * Store the status code in passed in parameter instead of throwing.
@@ -313,6 +331,13 @@ public:
   absl::string_view addressType() const override { return "default"; }
 
 private:
+  void abslHashValue(absl::HashState state) const override {
+    absl::HashState::combine(absl::HashState::combine_contiguous(std::move(state),
+                                                                 pipe_.address_.sun_path,
+                                                                 sizeof(pipe_.address_.sun_path)),
+                             0);
+  }
+
   /**
    * Construct from an existing unix address.
    * Store the error status code in passed in parameter instead of throwing.
@@ -359,6 +384,11 @@ public:
   absl::string_view addressType() const override { return "envoy_internal"; }
 
 private:
+  void abslHashValue(absl::HashState state) const override {
+    absl::HashState::combine(std::move(state), internal_address_.address_id_,
+                             internal_address_.endpoint_id_);
+  }
+
   struct EnvoyInternalAddressImpl : public EnvoyInternalAddress {
     explicit EnvoyInternalAddressImpl(const std::string& address_id, const std::string& endpoint_id)
         : address_id_(address_id), endpoint_id_(endpoint_id) {}
