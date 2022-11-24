@@ -672,6 +672,7 @@ void Filter::setHeader(absl::string_view key, absl::string_view value) {
   }
   ASSERT(headers_ != nullptr, "headers is empty, may already continue to next filter");
   headers_->setCopy(Http::LowerCaseString(key), value);
+  onHeadersModified();
 }
 
 void Filter::removeHeader(absl::string_view key) {
@@ -682,6 +683,7 @@ void Filter::removeHeader(absl::string_view key) {
   }
   ASSERT(headers_ != nullptr, "headers is empty, may already continue to next filter");
   headers_->remove(Http::LowerCaseString(key));
+  onHeadersModified();
 }
 
 void Filter::copyBuffer(Buffer::Instance* buffer, char* data) {
