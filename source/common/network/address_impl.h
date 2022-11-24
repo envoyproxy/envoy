@@ -385,6 +385,7 @@ public:
 
 private:
   void abslHashValue(absl::HashState state) const override {
+    // Envoy internal address only hash by address id, ignore the endpoint id.
     absl::HashState::combine(std::move(state), internal_address_.address_id_);
   }
 

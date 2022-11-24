@@ -238,10 +238,16 @@ public:
   virtual void abslHashValue(absl::HashState state) const PURE;
 };
 
+/**
+ * Wrapper for InstanceConstSharedPtr, enable to use InstanceConstSharedPtr
+ * hash key for absl::Hash.
+ */
 struct AddressKey {
   AddressKey(InstanceConstSharedPtr address) : address_(address) {}
 
   friend bool operator==(const AddressKey& lhs, const AddressKey& rhs) {
+    // For the envoy internal address, only compare the address id and
+    // ignore the endpoint id.
     if (lhs.address_->type() == Type::EnvoyInternal &&
         rhs.address_->type() == Type::EnvoyInternal) {
       return lhs.address_->envoyInternalAddress()->addressId() ==
