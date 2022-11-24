@@ -56,6 +56,9 @@ bug_fixes:
 - area: validation
   change: |
     fixed a crash which could happen when optional ``engine_type`` is not provided in regex.
+- area: eds
+  change: |
+    added ``envoy.reloadable_features.multiplex_eds`` to enable eds multiplexing by default.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
