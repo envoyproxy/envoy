@@ -519,7 +519,7 @@ public:
                                                  StreamInfo::StreamInfo& stream_info) PURE;
 
   /**
-   * @return whether to append the x-forwarded-port header by the listener's port.
+   * @return whether to append the x-forwarded-port header.
    */
   virtual bool appendXForwardedPort() const PURE;
 };
