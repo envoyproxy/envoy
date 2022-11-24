@@ -54,14 +54,6 @@ public:
     message_->headers().setPath("/");
     ON_CALL(*cm_.thread_local_cluster_.conn_pool_.host_, locality())
         .WillByDefault(ReturnRef(envoy::config::core::v3::Locality().default_instance()));
-    ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, createFilterChain(_))
-        .WillByDefault(Invoke([&](Http::FilterChainManager& manager) -> void {
-          Http::FilterFactoryCb factory_cb =
-              [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-            callbacks.addStreamDecoderFilter(std::make_shared<Router::UpstreamCodecFilter>());
-          };
-          manager.applyFilterFactoryCb({}, factory_cb);
-        }));
     cm_.initializeThreadLocalClusters({"fake_cluster"});
     HttpTestUtility::addDefaultHeaders(headers_);
   }

@@ -441,9 +441,28 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         ":integration_lib",
+        "//test/integration/filters:add_header_filter_config_lib",
         "//test/integration/filters:on_local_reply_filter_config_lib",
         "//test/integration/filters:repick_cluster_filter_lib",
         "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "upstream_http_filter_integration_test",
+    srcs = ["upstream_http_filter_integration_test.cc"],
+    deps = [
+        ":http_integration_lib",
+        ":integration_lib",
+        "//test/integration/filters:add_header_filter_config_lib",
+        "//test/integration/filters:on_local_reply_filter_config_lib",
+        "//test/integration/filters:repick_cluster_filter_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
 
@@ -882,6 +901,7 @@ envoy_cc_test_library(
         "//source/common/config:api_version_lib",
         "//source/extensions/network/dns_resolver/cares:config",
         "//source/extensions/clusters/static:static_cluster_lib",
+        "//source/extensions/clusters/eds:eds_lib",
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "//source/extensions/transport_sockets/tls:context_lib",
         "//source/extensions/transport_sockets/tls:ssl_socket_lib",
@@ -1258,7 +1278,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "overload_integration_test",
     srcs = ["overload_integration_test.cc"],
-    shard_count = 4,
+    shard_count = 8,
     deps = [
         ":base_overload_integration_test_lib",
         ":http_protocol_integration_lib",
