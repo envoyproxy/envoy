@@ -260,7 +260,7 @@ struct AddressKey {
   template <typename H>
   friend H AbslHashValue(H state, const AddressKey& s) { // NOLINT(readability-identifier-naming)
     s.address_->abslHashValue(absl::HashState::Create(&state));
-    return std::move(state);
+    return state;
   }
 
   InstanceConstSharedPtr address_;
