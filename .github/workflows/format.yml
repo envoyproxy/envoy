@@ -41,7 +41,7 @@ jobs:
   drstring:
     name: drstring
     runs-on: macos-12
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v1
         with:

@@ -35,7 +35,7 @@ jobs:
     name: swift_helloworld
     needs: iosbuild
     runs-on: macos-12
-    timeout-minutes: 35
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v1
         with:
@@ -70,7 +70,7 @@ jobs:
     name: swift_baseline_app
     needs: iosbuild
     runs-on: macos-12
-    timeout-minutes: 25
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v1
         with:
@@ -105,7 +105,7 @@ jobs:
     name: swift_experimental_app
     needs: iosbuild
     runs-on: macos-12
-    timeout-minutes: 25
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v1
         with:
@@ -140,7 +140,7 @@ jobs:
     name: swift_async_await
     needs: iosbuild
     runs-on: macos-12
-    timeout-minutes: 35
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v1
         with:
@@ -175,7 +175,7 @@ jobs:
     name: objc_helloworld
     needs: iosbuild
     runs-on: macos-12
-    timeout-minutes: 25
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v1
         with:
