@@ -2,9 +2,6 @@
 #include <memory>
 #include <string>
 
-#include "absl/container/flat_hash_map.h"
-#include "absl/hash/hash_testing.h"
-
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 
@@ -21,6 +18,8 @@
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
+#include "absl/container/flat_hash_map.h"
+#include "absl/hash/hash_testing.h"
 #include "gtest/gtest.h"
 
 using testing::_;

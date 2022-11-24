@@ -242,8 +242,10 @@ struct AddressKey {
   AddressKey(InstanceConstSharedPtr address) : address_(address) {}
 
   friend bool operator==(const AddressKey& lhs, const AddressKey& rhs) {
-    if (lhs.address_->type() == Type::EnvoyInternal && rhs.address_->type() == Type::EnvoyInternal) {
-      return lhs.address_->envoyInternalAddress()->addressId() == rhs.address_->envoyInternalAddress()->addressId();
+    if (lhs.address_->type() == Type::EnvoyInternal &&
+        rhs.address_->type() == Type::EnvoyInternal) {
+      return lhs.address_->envoyInternalAddress()->addressId() ==
+             rhs.address_->envoyInternalAddress()->addressId();
     }
     return *(lhs.address_) == *(rhs.address_);
   }

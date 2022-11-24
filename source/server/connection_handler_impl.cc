@@ -113,7 +113,8 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
           // Only override the listener when this is an update of the existing listener by
           // checking the address, this ensures the Ipv4 address listener won't be override
           // by the listener which has the same IPv4-mapped address.
-          Network::Address::InstanceConstSharedPtr ipv4_any_address = std::make_shared<Network::Address::Ipv4Instance>(address->ip()->port());
+          Network::Address::InstanceConstSharedPtr ipv4_any_address =
+              std::make_shared<Network::Address::Ipv4Instance>(address->ip()->port());
           auto ipv4_any_listener = tcp_listener_map_by_address_.find(ipv4_any_address);
           if (ipv4_any_listener == tcp_listener_map_by_address_.end() ||
               *ipv4_any_listener->second->address_ == *address) {
@@ -124,14 +125,13 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
           // When `v6only` is false, the address with an invalid IPv4-mapped address is rejected
           // early.
           ASSERT(v4_compatible_addr != nullptr);
-          tcp_listener_map_by_address_.insert_or_assign(v4_compatible_addr,
-                                                        per_address_details);
+          tcp_listener_map_by_address_.insert_or_assign(v4_compatible_addr, per_address_details);
         }
       }
     } else if (absl::holds_alternative<std::reference_wrapper<Network::InternalListener>>(
                    per_address_details->typed_listener_)) {
-      internal_listener_map_by_address_.insert_or_assign(
-          per_address_details->address_, per_address_details);
+      internal_listener_map_by_address_.insert_or_assign(per_address_details->address_,
+                                                         per_address_details);
     }
   }
   listener_map_by_tag_.emplace(config.listenerTag(), std::move(details));
@@ -154,9 +154,9 @@ void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
             address->ip()->version() == Network::Address::IpVersion::v6 &&
             !address->ip()->ipv6()->v6only()) {
           if (address->ip()->isAnyAddress()) {
-            Network::Address::InstanceConstSharedPtr any_addr= std::make_shared<Network::Address::Ipv4Instance>(address->ip()->port());
-            auto ipv4_any_addr_iter = tcp_listener_map_by_address_.find(
-                any_addr);
+            Network::Address::InstanceConstSharedPtr any_addr =
+                std::make_shared<Network::Address::Ipv4Instance>(address->ip()->port());
+            auto ipv4_any_addr_iter = tcp_listener_map_by_address_.find(any_addr);
             // Since both "::" with ipv4_compat and "0.0.0.0" can be supported, ensure they are same
             // listener by tag.
             if (ipv4_any_addr_iter != tcp_listener_map_by_address_.end() &&
@@ -288,8 +288,7 @@ void ConnectionHandlerImpl::setListenerRejectFraction(UnitFloat reject_fraction)
 Network::InternalListenerOptRef
 ConnectionHandlerImpl::findByAddress(const Network::Address::InstanceConstSharedPtr& address) {
   ASSERT(address->type() == Network::Address::Type::EnvoyInternal);
-  if (auto listener_it =
-          internal_listener_map_by_address_.find(address);
+  if (auto listener_it = internal_listener_map_by_address_.find(address);
       listener_it != internal_listener_map_by_address_.end()) {
     return {listener_it->second->internalListener().value().get()};
   }
@@ -335,8 +334,8 @@ ConnectionHandlerImpl::getBalancedHandlerByTag(uint64_t listener_tag,
   return absl::nullopt;
 }
 
-Network::BalancedConnectionHandlerOptRef
-ConnectionHandlerImpl::getBalancedHandlerByAddress(const Network::Address::InstanceConstSharedPtr& address) {
+Network::BalancedConnectionHandlerOptRef ConnectionHandlerImpl::getBalancedHandlerByAddress(
+    const Network::Address::InstanceConstSharedPtr& address) {
   // Only Ip address can be restored to original address and redirect.
   ASSERT(address->type() == Network::Address::Type::Ip);
 

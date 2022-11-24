@@ -145,9 +145,11 @@ private:
   // Declare before its users ActiveListenerDetails.
   std::atomic<uint64_t> num_handler_connections_{};
   absl::flat_hash_map<uint64_t, std::unique_ptr<ActiveListenerDetails>> listener_map_by_tag_;
-  absl::flat_hash_map<Network::Address::AddressKey, std::shared_ptr<PerAddressActiveListenerDetails>>
+  absl::flat_hash_map<Network::Address::AddressKey,
+                      std::shared_ptr<PerAddressActiveListenerDetails>>
       tcp_listener_map_by_address_;
-  absl::flat_hash_map<Network::Address::AddressKey, std::shared_ptr<PerAddressActiveListenerDetails>>
+  absl::flat_hash_map<Network::Address::AddressKey,
+                      std::shared_ptr<PerAddressActiveListenerDetails>>
       internal_listener_map_by_address_;
 
   bool disable_listeners_;
