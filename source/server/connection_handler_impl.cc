@@ -131,7 +131,7 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
     } else if (absl::holds_alternative<std::reference_wrapper<Network::InternalListener>>(
                    per_address_details->typed_listener_)) {
       internal_listener_map_by_address_.insert_or_assign(
-          per_address_details->address_->envoyInternalAddress()->addressId(), per_address_details);
+          per_address_details->address_, per_address_details);
     }
   }
   listener_map_by_tag_.emplace(config.listenerTag(), std::move(details));
@@ -174,11 +174,10 @@ void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
           }
         }
       } else if (address->type() == Network::Address::Type::EnvoyInternal) {
-        const auto& address_id = address->envoyInternalAddress()->addressId();
-        if (internal_listener_map_by_address_.contains(address_id) &&
-            internal_listener_map_by_address_[address_id]->listener_tag_ ==
+        if (internal_listener_map_by_address_.contains(address) &&
+            internal_listener_map_by_address_[address]->listener_tag_ ==
                 per_address_details->listener_tag_) {
-          internal_listener_map_by_address_.erase(address_id);
+          internal_listener_map_by_address_.erase(address);
         }
       }
     }
@@ -290,7 +289,7 @@ Network::InternalListenerOptRef
 ConnectionHandlerImpl::findByAddress(const Network::Address::InstanceConstSharedPtr& address) {
   ASSERT(address->type() == Network::Address::Type::EnvoyInternal);
   if (auto listener_it =
-          internal_listener_map_by_address_.find(address->envoyInternalAddress()->addressId());
+          internal_listener_map_by_address_.find(address);
       listener_it != internal_listener_map_by_address_.end()) {
     return {listener_it->second->internalListener().value().get()};
   }

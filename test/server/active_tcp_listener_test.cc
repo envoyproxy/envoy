@@ -38,7 +38,7 @@ public:
   MOCK_METHOD(Network::BalancedConnectionHandlerOptRef, getBalancedHandlerByTag,
               (uint64_t listener_tag, const Network::Address::Instance&));
   MOCK_METHOD(Network::BalancedConnectionHandlerOptRef, getBalancedHandlerByAddress,
-              (Network::Address::InstanceConstSharedPtr& address));
+              (const Network::Address::InstanceConstSharedPtr& address));
 };
 
 class ActiveTcpListenerTest : public testing::Test, protected Logger::Loggable<Logger::Id::main> {
