@@ -53,6 +53,7 @@ RUNTIME_GUARD(envoy_reloadable_features_http_skip_adding_content_length_to_upgra
 RUNTIME_GUARD(envoy_reloadable_features_http_strip_fragment_from_path_unsafe_if_disabled);
 RUNTIME_GUARD(envoy_reloadable_features_local_ratelimit_match_all_descriptors);
 RUNTIME_GUARD(envoy_reloadable_features_lua_respond_with_send_local_reply);
+RUNTIME_GUARD(envoy_reloadable_features_multiplex_eds);
 RUNTIME_GUARD(envoy_reloadable_features_no_delay_close_for_upgrades);
 RUNTIME_GUARD(envoy_reloadable_features_no_extension_lookup_by_name);
 RUNTIME_GUARD(envoy_reloadable_features_oauth_header_passthrough_fix);
@@ -71,7 +72,6 @@ RUNTIME_GUARD(envoy_reloadable_features_validate_connect);
 RUNTIME_GUARD(envoy_restart_features_explicit_wildcard_resource);
 RUNTIME_GUARD(envoy_restart_features_remove_runtime_singleton);
 RUNTIME_GUARD(envoy_restart_features_use_apple_api_for_dns_lookups);
-RUNTIME_GUARD(envoy_reloadable_features_multiplex_eds);
 
 // Begin false flags. These should come with a TODO to flip true.
 // Sentinel and test flag.
