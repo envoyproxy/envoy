@@ -804,7 +804,7 @@ message HttpConnectionManager {
   config.core.v3.TypedExtensionConfig typed_header_validation_config = 50;
 
   // Append the `x-forwarded-port` header with the port value client used to connect to Envoy. It
-  // will be ignored if the `x-forwarded-port` header has been set by any proxy in front of Envoy.
+  // will be ignored if the `x-forwarded-port` header has been set by any trusted proxy in front of Envoy.
   bool append_x_forwarded_port = 51;
 }
 

@@ -409,6 +409,9 @@ Envoy will append the ``x-forwarded-port`` header if :ref:`append_x_forwarded_po
 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.append_x_forwarded_port>`
 is set to true and the header has not been set.
 
+Downstream ``x-forwarded-port`` headers will only be trusted if ``xff_num_trusted_hops`` is non-zero.
+If ``xff_num_trusted_hops`` is zero, downstream ``x-forwarded-port`` headers will be overwritten.
+
 .. _config_http_conn_man_headers_x-forwarded-proto:
 
 x-forwarded-proto
