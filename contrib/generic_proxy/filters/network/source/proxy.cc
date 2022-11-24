@@ -16,58 +16,6 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace GenericProxy {
 
-CodecFactoryPtr FilterConfig::codecFactoryFromProto(
-    const envoy::config::core::v3::TypedExtensionConfig& codec_config,
-    Envoy::Server::Configuration::FactoryContext& context) {
-  auto& factory = Config::Utility::getAndCheckFactory<CodecFactoryConfig>(codec_config);
-
-  ProtobufTypes::MessagePtr message = factory.createEmptyConfigProto();
-  Envoy::Config::Utility::translateOpaqueConfig(codec_config.typed_config(),
-                                                context.messageValidationVisitor(), *message);
-  return factory.createFactory(*message, context);
-}
-
-RouteMatcherPtr
-FilterConfig::routeMatcherFromProto(const RouteConfiguration& route_config,
-                                    Envoy::Server::Configuration::FactoryContext& context) {
-  return std::make_unique<RouteMatcherImpl>(route_config, context);
-}
-
-std::vector<NamedFilterFactoryCb> FilterConfig::filtersFactoryFromProto(
-    const ProtobufWkt::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>& filters,
-    const std::string stats_prefix, Envoy::Server::Configuration::FactoryContext& context) {
-
-  std::vector<NamedFilterFactoryCb> factories;
-  bool has_terminal_filter = false;
-  std::string terminal_filter_name;
-  for (const auto& filter : filters) {
-    if (has_terminal_filter) {
-      throw EnvoyException(fmt::format("Terminal filter: {} must be the last generic L7 filter",
-                                       terminal_filter_name));
-    }
-
-    auto& factory = Config::Utility::getAndCheckFactory<NamedFilterConfigFactory>(filter);
-
-    ProtobufTypes::MessagePtr message = factory.createEmptyConfigProto();
-    ASSERT(message != nullptr);
-    Envoy::Config::Utility::translateOpaqueConfig(filter.typed_config(),
-                                                  context.messageValidationVisitor(), *message);
-
-    factories.push_back(
-        {filter.name(), factory.createFilterFactoryFromProto(*message, stats_prefix, context)});
-
-    if (factory.isTerminalFilter()) {
-      terminal_filter_name = filter.name();
-      has_terminal_filter = true;
-    }
-  }
-
-  if (!has_terminal_filter) {
-    throw EnvoyException("A terminal L7 filter is necessary for generic proxy");
-  }
-  return factories;
-}
-
 ActiveStream::ActiveStream(Filter& parent, RequestPtr request)
     : parent_(parent), downstream_request_stream_(std::move(request)) {}
 
@@ -84,7 +32,7 @@ ActiveStream::~ActiveStream() {
 }
 
 Envoy::Event::Dispatcher& ActiveStream::dispatcher() { return parent_.connection().dispatcher(); }
-const CodecFactory& ActiveStream::downstreamCodec() { return *parent_.config_->codec_factory_; }
+const CodecFactory& ActiveStream::downstreamCodec() { return parent_.config_->codecFactory(); }
 void ActiveStream::resetStream() {
   if (active_stream_reset_) {
     return;
@@ -113,7 +61,7 @@ void ActiveStream::continueDecoding() {
   }
 
   if (cached_route_entry_ == nullptr) {
-    cached_route_entry_ = parent_.config_->route_matcher_->routeEntry(*downstream_request_stream_);
+    cached_route_entry_ = parent_.config_->routeEntry(*downstream_request_stream_);
   }
 
   ASSERT(downstream_request_stream_ != nullptr);

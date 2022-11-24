@@ -3,9 +3,9 @@
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
-#include "mobile/library/common/extensions/filters/http/assertion/config.h"
-#include "mobile/library/common/extensions/filters/http/assertion/filter.h"
-#include "mobile/library/common/extensions/filters/http/assertion/filter.pb.h"
+#include "library/common/extensions/filters/http/assertion/config.h"
+#include "library/common/extensions/filters/http/assertion/filter.h"
+#include "library/common/extensions/filters/http/assertion/filter.pb.h"
 
 using testing::ByMove;
 using testing::Return;
@@ -531,7 +531,7 @@ match_config:
   EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->encodeTrailers(response_trailers));
 }
 
-TEST(AssertionFilterFactoryTest, DEPRECATED_FEATURE_TEST(Config)) {
+TEST(AssertionFilterFactoryTest, Config) {
   AssertionFilterFactory factory;
   NiceMock<Server::Configuration::MockFactoryContext> context;
 

@@ -16,14 +16,27 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "codec_callbacks_interface",
+    hdrs = [
+        "codec_callbacks.h",
+    ],
+    deps = [
+        ":stream_interface",
+        "//envoy/buffer:buffer_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "codec_interface",
     hdrs = [
         "codec.h",
     ],
     deps = [
+        ":codec_callbacks_interface",
         ":stream_interface",
         "//envoy/buffer:buffer_interface",
         "//envoy/config:typed_config_interface",
+        "//envoy/network:filter_interface",
         "//envoy/server:factory_context_interface",
     ],
 )
@@ -50,6 +63,7 @@ envoy_cc_library(
         "//envoy/config:typed_metadata_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/network:connection_interface",
+        "//envoy/rds:rds_config_interface",
         "//envoy/stream_info:stream_info_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
@@ -64,5 +78,17 @@ envoy_cc_library(
         ":filter_interface",
         "//envoy/config:typed_config_interface",
         "//envoy/server:factory_context_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "proxy_config_interface",
+    hdrs = [
+        "proxy_config.h",
+    ],
+    deps = [
+        ":codec_interface",
+        ":filter_interface",
+        ":route_interface",
     ],
 )

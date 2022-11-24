@@ -15,11 +15,13 @@ Supported service discovery types
 
 Static
 ^^^^^^
+.. _extension_envoy.clusters.static:
 
 Static is the simplest service discovery type. The configuration explicitly specifies the resolved
 network name (IP address/port, unix domain socket, etc.) of each upstream host.
 
 .. _arch_overview_service_discovery_types_strict_dns:
+.. _extension_envoy.clusters.strict_dns:
 
 Strict DNS
 ^^^^^^^^^^
@@ -51,6 +53,7 @@ controls the refresh frequency during failures, and, if not configured, the DNS 
 DNS resolving emits :ref:`cluster statistics <config_cluster_manager_cluster_stats>` fields *update_attempt*, *update_success* and *update_failure*.
 
 .. _arch_overview_service_discovery_types_logical_dns:
+.. _extension_envoy.clusters.logical_dns:
 
 Logical DNS
 ^^^^^^^^^^^
@@ -102,7 +105,8 @@ When using the original destination cluster for HTTP upstreams, please set :ref:
 .. _arch_overview_service_discovery_types_eds:
 
 Endpoint discovery service (EDS)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. _extension_envoy.clusters.eds:
 
 The *endpoint discovery service* is a :ref:`xDS management server based on gRPC or REST-JSON API server
 <config_overview_management_server>` used by Envoy to fetch cluster members. The cluster members are called

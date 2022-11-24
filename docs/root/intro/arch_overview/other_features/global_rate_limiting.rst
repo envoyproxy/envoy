@@ -13,6 +13,16 @@ tight enough circuit breaking limit on each downstream host such that the system
 normally during typical request patterns but still prevent cascading failure when the system starts
 to fail. Global rate limiting is a good solution for this case.
 
+Envoy provides two global rate limiting implementations:
+
+#. Per connection or per HTTP request rate limit check.
+#. Quota based, with periodic load reports that allows fair sharing of a global rate limit
+   among multiple instances of Envoy. This implementation is suitable for large Envoy deployments with
+   high request per second load that may not be evenly balanced across all Envoy instances.
+
+Per connection or per HTTP request rate limiting
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 Envoy integrates directly with a global gRPC rate limiting service. Although any service that
 implements the defined RPC/IDL protocol can be used, Envoy provides a `reference implementation <https://github.com/envoyproxy/ratelimit>`_
 written in Go which uses a Redis backend. Envoy’s rate limit integration has the following features:
@@ -36,3 +46,18 @@ global rate limit service. For example, a local token bucket rate limit can abso
 in load that might otherwise overwhelm a global rate limit service. Thus, the rate limit is applied
 in two stages. The initial coarse grained limiting is performed by the token bucket limit before
 a fine grained global limit finishes the job.
+
+
+Quota based rate limiting
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Open source reference implementation of the rate limiting service is currently unavailable. The rate limit
+quota extension can be presently used with the Google Cloud Rate Limit Service.
+
+.. TODO(tyxia): Add links to GCP docs and reference implementation when available.
+
+Quota based global rate limit can only be applied to HTTP requests. Envoy will bucketize requests and
+request quota assignments from the rate limit quota service using the HTTP filter
+:ref:`configuration <config_http_filters_rate_limit_quota>`.
+
+Rate limit quota service :ref:`configuration <config_rate_limit_quota_service>`.

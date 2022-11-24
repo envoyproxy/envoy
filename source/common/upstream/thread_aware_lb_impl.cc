@@ -131,7 +131,6 @@ void ThreadAwareLoadBalancerBase::refresh() {
     factory_->healthy_per_priority_load_ = healthy_per_priority_load;
     factory_->degraded_per_priority_load_ = degraded_per_priority_load;
     factory_->per_priority_state_ = per_priority_state_vector;
-    factory_->cross_priority_host_map_ = priority_set_.crossPriorityHostMap();
   }
 }
 
@@ -142,11 +141,7 @@ ThreadAwareLoadBalancerBase::LoadBalancerImpl::chooseHost(LoadBalancerContext* c
     return nullptr;
   }
 
-  HostConstSharedPtr host = LoadBalancerContextBase::selectOverrideHost(
-      cross_priority_host_map_.get(), override_host_status_, context);
-  if (host != nullptr) {
-    return host;
-  }
+  HostConstSharedPtr host;
 
   // If there is no hash in the context, just choose a random value (this effectively becomes
   // the random LB but it won't crash if someone configures it this way).
@@ -187,8 +182,6 @@ LoadBalancerPtr ThreadAwareLoadBalancerBase::LoadBalancerFactoryImpl::create() {
   lb->healthy_per_priority_load_ = healthy_per_priority_load_;
   lb->degraded_per_priority_load_ = degraded_per_priority_load_;
   lb->per_priority_state_ = per_priority_state_;
-  lb->cross_priority_host_map_ = cross_priority_host_map_;
-  lb->override_host_status_ = override_host_status_;
   return lb;
 }
 
@@ -197,7 +190,7 @@ double ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::hostOverload
   // TODO(scheler): This will not work if rq_active cluster stat is disabled, need to detect
   // and alert the user if that's the case.
 
-  const uint32_t overall_active = host.cluster().stats().upstream_rq_active_.value();
+  const uint32_t overall_active = host.cluster().trafficStats().upstream_rq_active_.value();
   const uint32_t host_active = host.stats().rq_active_.value();
 
   const uint32_t total_slots = ((overall_active + 1) * hash_balance_factor_ + 99) / 100;

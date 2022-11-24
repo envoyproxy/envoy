@@ -23,7 +23,7 @@ using HostPredicate = std::function<bool(const Host&)>;
 
 SubsetLoadBalancer::SubsetLoadBalancer(
     LoadBalancerType lb_type, PrioritySet& priority_set, const PrioritySet* local_priority_set,
-    ClusterStats& stats, Stats::Scope& scope, Runtime::Loader& runtime,
+    ClusterLbStats& stats, Stats::Scope& scope, Runtime::Loader& runtime,
     Random::RandomGenerator& random, const LoadBalancerSubsetInfo& subsets,
     const absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig>&
         lb_ring_hash_config,
@@ -45,8 +45,7 @@ SubsetLoadBalancer::SubsetLoadBalancer(
       original_local_priority_set_(local_priority_set),
       locality_weight_aware_(subsets.localityWeightAware()),
       scale_locality_weight_(subsets.scaleLocalityWeight()), list_as_any_(subsets.listAsAny()),
-      time_source_(time_source),
-      override_host_status_(LoadBalancerContextBase::createOverrideHostStatus(common_config)) {
+      time_source_(time_source) {
   ASSERT(subsets.isEnabled());
 
   if (fallback_policy_ != envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK) {
@@ -75,9 +74,6 @@ SubsetLoadBalancer::SubsetLoadBalancer(
   // Configure future updates.
   original_priority_set_callback_handle_ = priority_set.addPriorityUpdateCb(
       [this](uint32_t priority, const HostVector&, const HostVector&) {
-        // Update cross priority host map.
-        cross_priority_host_map_ = original_priority_set_.crossPriorityHostMap();
-
         refreshSubsets(priority);
         purgeEmptySubsets(subsets_);
       });
@@ -170,11 +166,6 @@ void SubsetLoadBalancer::initSelectorFallbackSubset(
 }
 
 HostConstSharedPtr SubsetLoadBalancer::chooseHost(LoadBalancerContext* context) {
-  HostConstSharedPtr override_host = LoadBalancerContextBase::selectOverrideHost(
-      cross_priority_host_map_.get(), override_host_status_, context);
-  if (override_host != nullptr) {
-    return override_host;
-  }
   if (metadata_fallback_policy_ !=
       envoy::config::cluster::v3::
           Cluster_LbSubsetConfig_LbSubsetMetadataFallbackPolicy_FALLBACK_LIST) {
@@ -475,9 +466,9 @@ void SubsetLoadBalancer::processSubsets(uint32_t priority, const HostVector& all
     }
   }
 
-  // This stat isn't added to `ClusterStats` because it wouldn't be used for nearly all clusters,
-  // and is only set during configuration updates, not in the data path, so performance of looking
-  // up the stat isn't critical.
+  // This stat isn't added to `ClusterTrafficStats` because it wouldn't be used for nearly all
+  // clusters, and is only set during configuration updates, not in the data path, so performance of
+  // looking up the stat isn't critical.
   if (single_duplicate_stat_ == nullptr) {
     Stats::StatNameManagedStorage name_storage("lb_subsets_single_host_per_subset_duplicate",
                                                scope_.symbolTable());

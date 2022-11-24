@@ -50,7 +50,6 @@ void recordLatestDataFilter(const typename FilterList<T>::iterator current_filte
 } // namespace
 
 void ActiveStreamFilterBase::commonContinue() {
-  // TODO(mattklein123): Raise an error if this is called during a callback.
   if (!canContinue()) {
     ENVOY_STREAM_LOG(trace, "cannot continue filter chain: filter={}", *this,
                      static_cast<const void*>(this));
@@ -253,7 +252,7 @@ void ActiveStreamFilterBase::restoreContextOnContinue(
   parent_.contextOnContinue(tracked_object_stack);
 }
 
-const Tracing::Config& ActiveStreamFilterBase::tracingConfig() {
+OptRef<const Tracing::Config> ActiveStreamFilterBase::tracingConfig() const {
   return parent_.filter_manager_callbacks_.tracingConfig();
 }
 
@@ -922,20 +921,14 @@ void DownstreamFilterManager::sendLocalReplyViaFilterChain(
           },
           [this](ResponseHeaderMap& response_headers, Code& code, std::string& body,
                  absl::string_view& content_type) -> void {
-            // TODO(snowp): This &get() business isn't nice, rework LocalReply and others to accept
-            // opt refs.
             local_reply_.rewrite(filter_manager_callbacks_.requestHeaders().ptr(), response_headers,
                                  streamInfo(), code, body, content_type);
           },
           [this, modify_headers](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
             filter_manager_callbacks_.setResponseHeaders(std::move(headers));
-            // TODO: Start encoding from the last decoder filter that saw the
-            // request instead.
             encodeHeaders(nullptr, filter_manager_callbacks_.responseHeaders().ref(), end_stream);
           },
           [this](Buffer::Instance& data, bool end_stream) -> void {
-            // TODO: Start encoding from the last decoder filter that saw the
-            // request instead.
             encodeData(nullptr, data, end_stream,
                        FilterManager::FilterIterationStartState::CanStartFromCurrent);
           }},

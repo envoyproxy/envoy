@@ -92,7 +92,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   uint64_t streamId() const override;
   StreamInfo::StreamInfo& streamInfo() override;
   Tracing::Span& activeSpan() override;
-  const Tracing::Config& tracingConfig() override;
+  OptRef<const Tracing::Config> tracingConfig() const override;
   const ScopeTrackedObject& scope() override;
   void restoreContextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) override;
   void resetIdleTimer() override;
@@ -504,7 +504,7 @@ public:
   /**
    * Returns the tracing configuration to use for this stream.
    */
-  virtual const Tracing::Config& tracingConfig() PURE;
+  virtual OptRef<const Tracing::Config> tracingConfig() const PURE;
 
   /**
    * Returns the tracked scope to use for this stream.
@@ -1050,6 +1050,18 @@ public:
                       const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                       absl::string_view details) override;
+
+  /**
+   * Whether remote processing has been marked as complete.
+   * For the DownstreamFilterManager rely on external state, to handle the case
+   * of internal redirects.
+   */
+  bool remoteDecodeComplete() const override {
+    return streamInfo().downstreamTiming() &&
+           streamInfo().downstreamTiming()->lastDownstreamRxByteReceived().has_value();
+  }
+
+private:
   /**
    * Sends a local reply by constructing a response and passing it through all the encoder
    * filters. The resulting response will be passed out via the FilterManagerCallbacks.
@@ -1068,17 +1080,6 @@ public:
                             bool is_head_request,
                             const absl::optional<Grpc::Status::GrpcStatus> grpc_status);
 
-  /**
-   * Whether remote processing has been marked as complete.
-   * For the DownstreamFilterManager rely on external state, to handle the case
-   * of internal redirects.
-   */
-  bool remoteDecodeComplete() const override {
-    return streamInfo().downstreamTiming() &&
-           streamInfo().downstreamTiming()->lastDownstreamRxByteReceived().has_value();
-  }
-
-private:
   OverridableRemoteConnectionInfoSetterStreamInfo stream_info_;
   const LocalReply::LocalReply& local_reply_;
 };

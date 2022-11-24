@@ -107,6 +107,7 @@ envoy_cc_library(
         ":quic_io_handle_wrapper_lib",
         ":quic_transport_socket_factory_lib",
         "//envoy/ssl:tls_certificate_config_interface",
+        "//source/common/stream_info:stream_info_lib",
         "//source/server:connection_handler_lib",
         "@com_github_google_quiche//:quic_core_crypto_certificate_view_lib",
     ],

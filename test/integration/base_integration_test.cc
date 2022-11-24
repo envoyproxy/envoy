@@ -20,6 +20,7 @@
 #include "source/common/network/utility.h"
 #include "source/extensions/transport_sockets/tls/context_config_impl.h"
 #include "source/extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/server/proto_descriptors.h"
 
 #include "test/integration/utility.h"
 #include "test/test_common/environment.h"
@@ -47,6 +48,7 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
       version_(version), upstream_address_fn_(upstream_address_fn),
       config_helper_(version, *api_, config),
       default_log_level_(TestEnvironment::getOptions().logLevel()) {
+  Envoy::Server::validateProtoDescriptors();
   // This is a hack, but there are situations where we disconnect fake upstream connections and
   // then we expect the server connection pool to get the disconnect before the next test starts.
   // This does not always happen. This pause should allow the server to pick up the disconnect
@@ -64,6 +66,11 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
   // Allow extension lookup by name in the integration tests.
   config_helper_.addRuntimeOverride("envoy.reloadable_features.no_extension_lookup_by_name",
                                     "false");
+
+#ifndef ENVOY_ADMIN_FUNCTIONALITY
+  config_helper_.addConfigModifier(
+      [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void { bootstrap.clear_admin(); });
+#endif
 }
 
 BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
@@ -100,9 +107,11 @@ void BaseIntegrationTest::initialize() {
   createXdsUpstream();
   createEnvoy();
 
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
   if (!skip_tag_extraction_rule_check_) {
     checkForMissingTagExtractionRules();
   }
+#endif
 }
 
 Network::DownstreamTransportSocketFactoryPtr
@@ -334,6 +343,34 @@ void BaseIntegrationTest::setUpstreamAddress(
   socket_address->set_port_value(fake_upstreams_[upstream_index]->localAddress()->ip()->port());
 }
 
+bool BaseIntegrationTest::getSocketOption(const std::string& listener_name, int level, int optname,
+                                          void* optval, socklen_t* optlen) {
+  bool listeners_ready = false;
+  absl::Mutex l;
+  std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners;
+  test_server_->server().dispatcher().post([&]() {
+    listeners = test_server_->server().listenerManager().listeners();
+    l.Lock();
+    listeners_ready = true;
+    l.Unlock();
+  });
+  l.LockWhen(absl::Condition(&listeners_ready));
+  l.Unlock();
+
+  for (auto& listener : listeners) {
+    if (listener.get().name() == listener_name) {
+      for (auto& socket_factory : listener.get().listenSocketFactories()) {
+        auto socket = socket_factory->getListenSocket(0);
+        if (socket->getSocketOption(level, optname, optval, optlen).return_value_ != 0) {
+          return false;
+        }
+      }
+      return true;
+    }
+  }
+  return false;
+}
+
 void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>& port_names,
                                                   IntegrationTestServerPtr& test_server) {
   bool listeners_ready = false;
@@ -362,15 +399,17 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
       }
     }
   }
-  const auto admin_addr =
-      test_server->server().admin().socket().connectionInfoProvider().localAddress();
-  if (admin_addr->type() == Network::Address::Type::Ip) {
-    registerPort("admin", admin_addr->ip()->port());
+  if (test_server->server().admin().has_value()) {
+    const auto admin_addr =
+        test_server->server().admin()->socket().connectionInfoProvider().localAddress();
+    if (admin_addr->type() == Network::Address::Type::Ip) {
+      registerPort("admin", admin_addr->ip()->port());
+    }
   }
 }
 
 std::string getListenerDetails(Envoy::Server::Instance& server) {
-  const auto& cbs_maps = server.admin().getConfigTracker().getCallbacksMap();
+  const auto& cbs_maps = server.admin()->getConfigTracker().getCallbacksMap();
   ProtobufTypes::MessagePtr details = cbs_maps.at("listeners")(Matchers::UniversalStringMatcher());
   auto listener_info = Protobuf::down_cast<envoy::admin::v3::ListenersConfigDump>(*details);
   return MessageUtil::getYamlStringFromMessage(listener_info.dynamic_listeners(0).error_state());
@@ -543,30 +582,29 @@ AssertionResult BaseIntegrationTest::compareDiscoveryRequest(
                                        expect_node, expected_error_code, expected_error_substring);
   } else {
     return compareDeltaDiscoveryRequest(expected_type_url, expected_resource_names_added,
-                                        expected_resource_names_removed,
-                                        expected_error_code, expected_error_substring, expect_node);
+                                        expected_resource_names_removed, expected_error_code,
+                                        expected_error_substring, expect_node);
   }
 }
-
 
 AssertionResult BaseIntegrationTest::compareDiscoveryRequest(
     const std::string& expected_type_url, const std::string& expected_version,
     const std::vector<std::string>& expected_resource_names,
     const std::vector<std::string>& expected_resource_names_added,
-    const std::vector<std::string>& expected_resource_names_removed, FakeStreamPtr& stream, bool expect_node,
-    const Protobuf::int32 expected_error_code,
+    const std::vector<std::string>& expected_resource_names_removed, FakeStreamPtr& stream,
+    bool expect_node, const Protobuf::int32 expected_error_code,
     const std::string& expected_error_message) {
   if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw ||
       sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedSotw) {
     return compareSotwDiscoveryRequest(expected_type_url, expected_version, expected_resource_names,
-                                      expect_node, expected_error_code, expected_error_message,
-                                      stream.get());
+                                       expect_node, expected_error_code, expected_error_message,
+                                       stream.get());
   } else {
     return compareDeltaDiscoveryRequest(expected_type_url, expected_resource_names_added,
                                         expected_resource_names_removed, stream,
                                         expected_error_code, expected_error_message, expect_node);
   }
-  }
+}
 
 AssertionResult compareSets(const std::set<std::string>& set1, const std::set<std::string>& set2,
                             absl::string_view name) {
