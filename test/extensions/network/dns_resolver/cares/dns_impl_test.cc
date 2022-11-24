@@ -626,6 +626,10 @@ public:
   }
 
 private:
+  void abslHashValue(absl::HashState state) const override{
+    instance_.abslHashValue(std::move(state));
+  }
+
   std::string antagonistic_name_;
   Address::Ipv4Instance instance_;
 };
