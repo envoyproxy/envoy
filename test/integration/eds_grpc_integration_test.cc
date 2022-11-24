@@ -543,10 +543,9 @@ TEST_P(EdsOverGrpcIntegrationTest, StatsReadyFilter) {
 
 TEST_P(EdsOverGrpcIntegrationTest, ReuseMuxAndStreamForMultipleClusters) {
   if (edsUpdateMode() == Grpc::EdsUpdateMode::Multiplexed) {
-    initializeTest(false, 3, false);
+    initializeTest(false, 2, false);
     EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_total")->value());
     EXPECT_EQ(0, test_server_->gauge("cluster.cluster_1.membership_total")->value());
-    EXPECT_EQ(0, test_server_->gauge("cluster.cluster_2.membership_total")->value());
     switch (clientType()) {
     case Grpc::ClientType::EnvoyGrpc:
       // As EDS uses HTTP2, number of streams created by Envoy for EDS cluster equals to number
@@ -554,16 +553,13 @@ TEST_P(EdsOverGrpcIntegrationTest, ReuseMuxAndStreamForMultipleClusters) {
       EXPECT_EQ(1UL, test_server_->counter("cluster.eds_cluster.upstream_rq_total")->value());
       break;
     case Grpc::ClientType::GoogleGrpc:
-      // One EDS mux/stream is created and reused for all 3 clusters when initializing first EDS
+      // One EDS mux/stream is created and reused for 2 clusters when initializing first EDS
       // cluster (cluster_0). As a consequence, only one Google async grpc client and one
       // corresponding set of client stats should be created.
       EXPECT_EQ(1UL,
                 test_server_->counter("cluster.cluster_0.grpc.eds_cluster.streams_total")->value());
       EXPECT_EQ(TestUtility::findCounter(test_server_->statStore(),
                                          "cluster.cluster_1.grpc.eds_cluster.streams_total"),
-                nullptr);
-      EXPECT_EQ(TestUtility::findCounter(test_server_->statStore(),
-                                         "cluster.cluster_2.grpc.eds_cluster.streams_total"),
                 nullptr);
       break;
     default:
@@ -576,25 +572,22 @@ TEST_P(EdsOverGrpcIntegrationTest, ReuseMuxAndStreamForMultipleClusters) {
 
 TEST_P(EdsOverGrpcIntegrationTest, StreamPerClusterMultipleClusters) {
   if (edsUpdateMode() == Grpc::EdsUpdateMode::StreamPerCluster) {
-    initializeTest(false, 3, false);
+    initializeTest(false, 2, false);
     EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_total")->value());
     EXPECT_EQ(0, test_server_->gauge("cluster.cluster_1.membership_total")->value());
-    EXPECT_EQ(0, test_server_->gauge("cluster.cluster_2.membership_total")->value());
     switch (clientType()) {
     case Grpc::ClientType::EnvoyGrpc:
       // As EDS uses HTTP2, number of streams created by Envoy for EDS cluster equals to number
       // of requests.
-      EXPECT_EQ(3UL, test_server_->counter("cluster.eds_cluster.upstream_rq_total")->value());
+      EXPECT_EQ(2UL, test_server_->counter("cluster.eds_cluster.upstream_rq_total")->value());
       break;
     case Grpc::ClientType::GoogleGrpc:
-      // One EDS mux/stream is created for each cluster. As a consequence, 3 sets of client stats
+      // One EDS mux/stream is created for each cluster. As a consequence, 2 sets of client stats
       // should be instantiated.
       EXPECT_EQ(1UL,
                 test_server_->counter("cluster.cluster_0.grpc.eds_cluster.streams_total")->value());
       EXPECT_EQ(1UL,
                 test_server_->counter("cluster.cluster_1.grpc.eds_cluster.streams_total")->value());
-      EXPECT_EQ(1UL,
-                test_server_->counter("cluster.cluster_2.grpc.eds_cluster.streams_total")->value());
       break;
     default:
       PANIC("reached unexpected code");
