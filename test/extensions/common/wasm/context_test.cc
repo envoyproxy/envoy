@@ -85,9 +85,7 @@ TEST_F(ContextTest, StubFunctionsTest) {
 TEST_F(ContextTest, GetRequestStreamInfoTest) {
   Http::MockStreamEncoderFilterCallbacks encoder_callbacks;
   Envoy::StreamInfo::MockStreamInfo encoder_si;
-  EXPECT_CALL(encoder_callbacks, streamInfo())
-      .Times(2)
-      .WillRepeatedly(testing::ReturnRef(encoder_si));
+  EXPECT_CALL(encoder_callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(encoder_si));
   ctx_.setEncoderFilterCallbacksPtr(&encoder_callbacks);
 
   Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
@@ -140,13 +138,14 @@ TEST_F(ContextTest, GetRequestStreamInfoTest) {
   EXPECT_EQ(ctx_.getConstRequestStreamInfo(), &write_filter_si);
   EXPECT_EQ(ctx_.getRequestStreamInfo(), &write_filter_si);
   ctx_.setNetworkWriteFilterCallbacksPtr(nullptr);
+  EXPECT_EQ(ctx_.getConstRequestStreamInfo(), nullptr);
+  EXPECT_EQ(ctx_.getRequestStreamInfo(), nullptr);
 }
 
 TEST_F(ContextTest, GetConnectionTest) {
   Http::MockStreamEncoderFilterCallbacks encoder_callbacks;
   Envoy::Network::MockConnection encoder_connection;
   EXPECT_CALL(encoder_callbacks, connection())
-      .Times(1)
       .WillRepeatedly(testing::Return(
           makeOptRef(dynamic_cast<const Network::Connection&>(encoder_connection))));
   ctx_.setEncoderFilterCallbacksPtr(&encoder_callbacks);
@@ -154,7 +153,6 @@ TEST_F(ContextTest, GetConnectionTest) {
   Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
   Envoy::Network::MockConnection decoder_connection;
   EXPECT_CALL(decoder_callbacks, connection())
-      .Times(1)
       .WillRepeatedly(testing::Return(
           makeOptRef(dynamic_cast<const Network::Connection&>(decoder_connection))));
   ctx_.setDecoderFilterCallbacksPtr(&decoder_callbacks);
@@ -165,14 +163,12 @@ TEST_F(ContextTest, GetConnectionTest) {
   Network::MockReadFilterCallbacks read_filter_callbacks;
   Envoy::Network::MockConnection read_filter_connection;
   EXPECT_CALL(read_filter_callbacks, connection())
-      .Times(1)
       .WillRepeatedly(testing::ReturnRef(read_filter_connection));
   ctx_.setNetworkReadFilterCallbacksPtr(&read_filter_callbacks);
 
   Network::MockWriteFilterCallbacks write_filter_callbacks;
   Envoy::Network::MockConnection write_filter_connection;
   EXPECT_CALL(write_filter_callbacks, connection())
-      .Times(1)
       .WillRepeatedly(testing::ReturnRef(write_filter_connection));
   ctx_.setNetworkWriteFilterCallbacksPtr(&write_filter_callbacks);
 
@@ -187,6 +183,8 @@ TEST_F(ContextTest, GetConnectionTest) {
 
   EXPECT_EQ(ctx_.getConnection(), &write_filter_connection);
   ctx_.setNetworkWriteFilterCallbacksPtr(nullptr);
+
+  EXPECT_EQ(ctx_.getConnection(), nullptr);
 }
 
 TEST_F(ContextTest, SerializeValueMapTest) {
