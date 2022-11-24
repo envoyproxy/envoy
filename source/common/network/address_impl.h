@@ -385,8 +385,7 @@ public:
 
 private:
   void abslHashValue(absl::HashState state) const override {
-    absl::HashState::combine(std::move(state), internal_address_.address_id_,
-                             internal_address_.endpoint_id_);
+    absl::HashState::combine(std::move(state), internal_address_.address_id_);
   }
 
   struct EnvoyInternalAddressImpl : public EnvoyInternalAddress {

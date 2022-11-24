@@ -365,12 +365,16 @@ TEST(InternalInstanceTest, Hashable) {
   EXPECT_TRUE(absl::VerifyTypeImplementsAbslHashCorrectly({
       AddressKey(std::make_shared<EnvoyInternalInstance>("listener_foo")),
       AddressKey(std::make_shared<EnvoyInternalInstance>("listener_bar")),
-      AddressKey(std::make_shared<EnvoyInternalInstance>("listener_foo", "1")),
   }));
 
   EXPECT_FALSE(absl::VerifyTypeImplementsAbslHashCorrectly({
       AddressKey(std::make_shared<EnvoyInternalInstance>("listener_foo")),
       AddressKey(std::make_shared<EnvoyInternalInstance>("listener_foo")),
+  }));
+
+  EXPECT_FALSE(absl::VerifyTypeImplementsAbslHashCorrectly({
+      AddressKey(std::make_shared<EnvoyInternalInstance>("listener_foo")),
+      AddressKey(std::make_shared<EnvoyInternalInstance>("listener_foo", "1")),
   }));
 }
 
