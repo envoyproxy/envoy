@@ -193,7 +193,7 @@ public:
    * listener doesn't exist or rebalancer doesn't exist.
    */
   virtual BalancedConnectionHandlerOptRef
-  getBalancedHandlerByAddress(const Network::Address::Instance& address) PURE;
+  getBalancedHandlerByAddress(const Network::Address::InstanceConstSharedPtr& address) PURE;
 };
 
 /**

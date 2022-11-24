@@ -129,7 +129,7 @@ void ActiveTcpListener::resumeListening() {
 }
 
 Network::BalancedConnectionHandlerOptRef
-ActiveTcpListener::getBalancedHandlerByAddress(const Network::Address::Instance& address) {
+ActiveTcpListener::getBalancedHandlerByAddress(const Network::Address::InstanceConstSharedPtr& address) {
   return tcp_conn_handler_.getBalancedHandlerByAddress(address);
 }
 

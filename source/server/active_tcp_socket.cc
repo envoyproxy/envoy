@@ -185,7 +185,7 @@ void ActiveTcpSocket::newConnection() {
       socket_->connectionInfoProvider().localAddressRestored()) {
     // Find a listener associated with the original destination address.
     new_listener =
-        listener_.getBalancedHandlerByAddress(*socket_->connectionInfoProvider().localAddress());
+        listener_.getBalancedHandlerByAddress(socket_->connectionInfoProvider().localAddress());
   }
 
   // Reset the file events which are registered by listener filter.

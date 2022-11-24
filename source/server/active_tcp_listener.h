@@ -55,7 +55,7 @@ public:
   // ActiveListenerImplBase
   Network::Listener* listener() override { return listener_.get(); }
   Network::BalancedConnectionHandlerOptRef
-  getBalancedHandlerByAddress(const Network::Address::Instance& address) override;
+  getBalancedHandlerByAddress(const Network::Address::InstanceConstSharedPtr& address) override;
 
   void pauseListening() override;
   void resumeListening() override;

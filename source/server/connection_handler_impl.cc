@@ -98,7 +98,7 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
     // This map only stores the new listener.
     if (absl::holds_alternative<std::reference_wrapper<ActiveTcpListener>>(
             per_address_details->typed_listener_)) {
-      tcp_listener_map_by_address_.insert_or_assign(per_address_details->address_->asStringView(),
+      tcp_listener_map_by_address_.insert_or_assign(per_address_details->address_,
                                                     per_address_details);
 
       auto& address = per_address_details->address_;
@@ -113,7 +113,7 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
           // Only override the listener when this is an update of the existing listener by
           // checking the address, this ensures the Ipv4 address listener won't be override
           // by the listener which has the same IPv4-mapped address.
-          auto ipv4_any_address = Network::Address::Ipv4Instance(address->ip()->port()).asString();
+          Network::Address::InstanceConstSharedPtr ipv4_any_address = std::make_shared<Network::Address::Ipv4Instance>(address->ip()->port());
           auto ipv4_any_listener = tcp_listener_map_by_address_.find(ipv4_any_address);
           if (ipv4_any_listener == tcp_listener_map_by_address_.end() ||
               *ipv4_any_listener->second->address_ == *address) {
@@ -124,7 +124,7 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
           // When `v6only` is false, the address with an invalid IPv4-mapped address is rejected
           // early.
           ASSERT(v4_compatible_addr != nullptr);
-          tcp_listener_map_by_address_.insert_or_assign(v4_compatible_addr->asStringView(),
+          tcp_listener_map_by_address_.insert_or_assign(v4_compatible_addr,
                                                         per_address_details);
         }
       }
@@ -144,19 +144,19 @@ void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
     // which find from listener_map_by_tag_, only delete it when it is same listener.
     for (const auto& per_address_details : listener_iter->second->per_address_details_list_) {
       auto& address = per_address_details->address_;
-      auto address_view = address->asStringView();
-      if (tcp_listener_map_by_address_.contains(address_view) &&
-          tcp_listener_map_by_address_[address_view]->listener_tag_ ==
+      if (tcp_listener_map_by_address_.contains(address) &&
+          tcp_listener_map_by_address_[address]->listener_tag_ ==
               per_address_details->listener_tag_) {
-        tcp_listener_map_by_address_.erase(address_view);
+        tcp_listener_map_by_address_.erase(address);
 
         // If the address is Ipv6 and isn't v6only, delete the corresponding Ipv4 item from the map.
         if (address->type() == Network::Address::Type::Ip &&
             address->ip()->version() == Network::Address::IpVersion::v6 &&
             !address->ip()->ipv6()->v6only()) {
           if (address->ip()->isAnyAddress()) {
+            Network::Address::InstanceConstSharedPtr any_addr= std::make_shared<Network::Address::Ipv4Instance>(address->ip()->port());
             auto ipv4_any_addr_iter = tcp_listener_map_by_address_.find(
-                Network::Address::Ipv4Instance(address->ip()->port()).asStringView());
+                any_addr);
             // Since both "::" with ipv4_compat and "0.0.0.0" can be supported, ensure they are same
             // listener by tag.
             if (ipv4_any_addr_iter != tcp_listener_map_by_address_.end() &&
@@ -170,7 +170,7 @@ void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
             ASSERT(v4_compatible_addr != nullptr);
             // both "::FFFF:<ipv4-addr>" with ipv4_compat and "<ipv4-addr>" isn't valid case,
             // remove the v4 compatible addr item directly.
-            tcp_listener_map_by_address_.erase(v4_compatible_addr->asStringView());
+            tcp_listener_map_by_address_.erase(v4_compatible_addr);
           }
         }
       } else if (address->type() == Network::Address::Type::EnvoyInternal) {
@@ -337,13 +337,13 @@ ConnectionHandlerImpl::getBalancedHandlerByTag(uint64_t listener_tag,
 }
 
 Network::BalancedConnectionHandlerOptRef
-ConnectionHandlerImpl::getBalancedHandlerByAddress(const Network::Address::Instance& address) {
+ConnectionHandlerImpl::getBalancedHandlerByAddress(const Network::Address::InstanceConstSharedPtr& address) {
   // Only Ip address can be restored to original address and redirect.
-  ASSERT(address.type() == Network::Address::Type::Ip);
+  ASSERT(address->type() == Network::Address::Type::Ip);
 
   // We do not return stopped listeners.
   // If there is exact address match, return the corresponding listener.
-  if (auto listener_it = tcp_listener_map_by_address_.find(address.asStringView());
+  if (auto listener_it = tcp_listener_map_by_address_.find(address);
       listener_it != tcp_listener_map_by_address_.end() &&
       listener_it->second->listener_->listener() != nullptr) {
     return Network::BalancedConnectionHandlerOptRef(
@@ -355,11 +355,15 @@ ConnectionHandlerImpl::getBalancedHandlerByAddress(const Network::Address::Insta
   // We do not return stopped listeners.
   // TODO(wattli): consolidate with previous search for more efficiency.
 
-  std::string addr_str = address.ip()->version() == Network::Address::IpVersion::v4
-                             ? Network::Address::Ipv4Instance(address.ip()->port()).asString()
-                             : Network::Address::Ipv6Instance(address.ip()->port()).asString();
+  Network::Address::InstanceConstSharedPtr any_addr = nullptr;
 
-  auto iter = tcp_listener_map_by_address_.find(addr_str);
+  if (address->ip()->version() == Network::Address::IpVersion::v4) {
+    any_addr = std::make_shared<Network::Address::Ipv4Instance>(address->ip()->port());
+  } else {
+    any_addr = std::make_shared<Network::Address::Ipv6Instance>(address->ip()->port());
+  }
+
+  auto iter = tcp_listener_map_by_address_.find(any_addr);
   if (iter != tcp_listener_map_by_address_.end() &&
       iter->second->listener_->listener() != nullptr) {
     details = *iter->second;

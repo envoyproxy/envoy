@@ -55,7 +55,7 @@ public:
 
   // Network::TcpConnectionHandler
   Network::BalancedConnectionHandlerOptRef
-  getBalancedHandlerByAddress(const Network::Address::Instance&) override {
+  getBalancedHandlerByAddress(const Network::Address::InstanceConstSharedPtr&) override {
     // Internal listener doesn't support migrate connection to another worker.
     // TODO(lambdai): implement the function of handling off to another listener of the same worker.
     PANIC("not implemented");

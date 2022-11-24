@@ -2486,10 +2486,10 @@ TEST_F(ConnectionHandlerTest, TcpListenerRemoveIpv6AnyAddressWithIpv4CompatListe
   handler_->removeListeners(1);
 
   // Ensure both the Ipv6 and Ipv4 address was removed.
-  EXPECT_FALSE(handler_->getBalancedHandlerByAddress(*any_address_ipv6).has_value());
+  EXPECT_FALSE(handler_->getBalancedHandlerByAddress(any_address_ipv6).has_value());
   Network::Address::InstanceConstSharedPtr any_address_ipv4(
       new Network::Address::Ipv4Instance("0.0.0.0", 80, nullptr));
-  EXPECT_FALSE(handler_->getBalancedHandlerByAddress(*any_address_ipv4).has_value());
+  EXPECT_FALSE(handler_->getBalancedHandlerByAddress(any_address_ipv4).has_value());
 }
 
 TEST_F(ConnectionHandlerTest, TcpListenerRemoveIpv4CompatAddressListener) {
@@ -2515,10 +2515,10 @@ TEST_F(ConnectionHandlerTest, TcpListenerRemoveIpv4CompatAddressListener) {
   handler_->removeListeners(1);
 
   // Ensure both the ipv6 and ipv4 address was removed.
-  EXPECT_FALSE(handler_->getBalancedHandlerByAddress(*address_ipv6).has_value());
+  EXPECT_FALSE(handler_->getBalancedHandlerByAddress(address_ipv6).has_value());
   Network::Address::InstanceConstSharedPtr address_ipv4(
       new Network::Address::Ipv4Instance("192.168.0.1", 80, nullptr));
-  EXPECT_FALSE(handler_->getBalancedHandlerByAddress(*address_ipv4).has_value());
+  EXPECT_FALSE(handler_->getBalancedHandlerByAddress(address_ipv4).has_value());
 }
 
 TEST_F(ConnectionHandlerTest, TcpListenerRemoveWithBothIpv4AnyAndIpv6Any) {
@@ -2558,8 +2558,8 @@ TEST_F(ConnectionHandlerTest, TcpListenerRemoveWithBothIpv4AnyAndIpv6Any) {
   handler_->removeListeners(1);
 
   // Ensure only ipv6 address was removed.
-  EXPECT_FALSE(handler_->getBalancedHandlerByAddress(*address_ipv6).has_value());
-  EXPECT_TRUE(handler_->getBalancedHandlerByAddress(*address_ipv4).has_value());
+  EXPECT_FALSE(handler_->getBalancedHandlerByAddress(address_ipv6).has_value());
+  EXPECT_TRUE(handler_->getBalancedHandlerByAddress(address_ipv4).has_value());
 
   // Now remove Listener2.
   EXPECT_CALL(*listener2, onDestroy());
@@ -2568,7 +2568,7 @@ TEST_F(ConnectionHandlerTest, TcpListenerRemoveWithBothIpv4AnyAndIpv6Any) {
   EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
   handler_->removeListeners(2);
   // Ensure the listener2 is gone.
-  EXPECT_FALSE(handler_->getBalancedHandlerByAddress(*address_ipv4).has_value());
+  EXPECT_FALSE(handler_->getBalancedHandlerByAddress(address_ipv4).has_value());
 }
 
 TEST_F(ConnectionHandlerTest, TcpListenerGlobalCxLimitReject) {

@@ -80,7 +80,7 @@ public:
   virtual void removeFilterChain(const Network::FilterChain* filter_chain) PURE;
 
   virtual Network::BalancedConnectionHandlerOptRef
-  getBalancedHandlerByAddress(const Network::Address::Instance& address) PURE;
+  getBalancedHandlerByAddress(const Network::Address::InstanceConstSharedPtr& address) PURE;
 
   void onSocketAccepted(std::unique_ptr<ActiveTcpSocket> active_socket) {
     // Create and run the filters
