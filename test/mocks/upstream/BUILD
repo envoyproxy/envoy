@@ -29,7 +29,6 @@ envoy_cc_mock(
         "//test/mocks/stats:stats_mocks",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/load_balancing_policies/deterministic_aperture/v3:pkg_cc_proto",
     ],
 )
 

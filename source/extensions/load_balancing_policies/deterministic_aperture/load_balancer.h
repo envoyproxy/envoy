@@ -16,7 +16,9 @@
 #include "absl/synchronization/mutex.h"
 
 namespace Envoy {
-namespace Upstream {
+namespace Extensions {
+namespace LoadBalancingPolicies {
+namespace DeterministicAperture {
 
 /**
  * Concepts:
@@ -47,37 +49,38 @@ namespace Upstream {
 /**
  * Struct definition for all DeterministicAperture load balancer ring stats. @see stats_macros.h
  */
-struct DeterministicApertureLoadBalancerRingStats {
+struct LoadBalancerRingStats {
   ALL_DETERMINISTIC_APERTURE_LOAD_BALANCER_RING_STATS(GENERATE_COUNTER_STRUCT)
 };
 
 /**
  * Thread aware load balancer implementation for DeterministicAperture.
  */
-class DeterministicApertureLoadBalancer : public RingHashLoadBalancer {
+class LoadBalancer : public Upstream::RingHashLoadBalancer {
 public:
-  DeterministicApertureLoadBalancer(
-      const PrioritySet& priority_set, ClusterLbStats& stats, Stats::Scope& scope,
-      Runtime::Loader& runtime, Random::RandomGenerator& random,
+  LoadBalancer(
+      const Upstream::PrioritySet& priority_set, Upstream::ClusterLbStats& stats,
+      Stats::Scope& scope, Runtime::Loader& runtime, Random::RandomGenerator& random,
       const absl::optional<envoy::extensions::load_balancing_policies::deterministic_aperture::v3::
                                DeterministicApertureLbConfig>& config,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
 
   using HashFunction = envoy::config::cluster::v3::Cluster::RingHashLbConfig::HashFunction;
 
-  const RingHashLoadBalancerStats& ringStats() const { return ring_stats_; }
+  const Upstream::RingHashLoadBalancerStats& ringStats() const { return ring_stats_; }
   /*
    * Customization of the `RingHashLoadBalancer` ring to add functionality that allows calculating
    * the intersecting ring segments.
    */
-  struct Ring : public RingHashLoadBalancer::Ring {
-    Ring(double offset, double width, const NormalizedHostWeightVector& normalized_host_weights,
+  struct Ring : public Upstream::RingHashLoadBalancer::Ring {
+    Ring(double offset, double width,
+         const Upstream::NormalizedHostWeightVector& normalized_host_weights,
          double min_normalized_weight, uint64_t min_ring_size, uint64_t max_ring_size,
          HashFunction hash_function, bool use_hostname_for_hashing, Stats::ScopeSharedPtr scope,
-         RingHashLoadBalancerStats ring_stats);
+         Upstream::RingHashLoadBalancerStats ring_stats);
 
     // ThreadAwareLoadBalancerBase::HashingLoadBalancer
-    HostConstSharedPtr chooseHost(uint64_t hash, uint32_t attempt) const override;
+    Upstream::HostConstSharedPtr chooseHost(uint64_t hash, uint32_t attempt) const override;
 
     //
     // Utility Ring methods
@@ -117,7 +120,7 @@ public:
     std::pair<size_t, size_t> pick2() const;
 
   private:
-    static DeterministicApertureLoadBalancerRingStats generateStats(Stats::Scope& scope);
+    static LoadBalancerRingStats generateStats(Stats::Scope& scope);
 
     const double offset_;
     const double width_;
@@ -125,7 +128,7 @@ public:
     std::random_device random_dev_;
     mutable std::mt19937 rng_;
     mutable std::uniform_real_distribution<double> random_distribution_;
-    DeterministicApertureLoadBalancerRingStats stats_;
+    LoadBalancerRingStats stats_;
 
     double intersect(double b0, double e0, double b1, double e1) const;
     double nextRandom() const { return random_distribution_(rng_); }
@@ -136,7 +139,7 @@ public:
 private:
   // ThreadAwareLoadBalancerBase
   HashingLoadBalancerSharedPtr
-  createLoadBalancer(const NormalizedHostWeightVector& normalized_host_weights,
+  createLoadBalancer(const Upstream::NormalizedHostWeightVector& normalized_host_weights,
                      double min_normalized_weight, double /* max_normalized_weight */) override {
     HashingLoadBalancerSharedPtr deterministic_aperture_lb = std::make_shared<Ring>(
         offset_, width_, normalized_host_weights, min_normalized_weight, min_ring_size_,
@@ -152,10 +155,10 @@ private:
   double width_;
   double offset_;
   Stats::ScopeSharedPtr scope_;
-  RingHashLoadBalancerStats ring_stats_;
+  Upstream::RingHashLoadBalancerStats ring_stats_;
 };
 
-class DeterministicApertureLoadBalancerFactory : public TypedLoadBalancerFactory {
+class LoadBalancerFactory : public Upstream::TypedLoadBalancerFactory {
 public:
   // Upstream::TypedLoadBalancerFactory
   std::string name() const override {
@@ -171,10 +174,11 @@ public:
    * @param random supplies the random generator.
    * @param time_source supplies the time source.
    */
-  ThreadAwareLoadBalancerPtr create(const ClusterInfo& cluster_info,
-                                    const PrioritySet& priority_set, Runtime::Loader& runtime,
-                                    Random::RandomGenerator& random,
-                                    TimeSource& time_source) override;
+  Upstream::ThreadAwareLoadBalancerPtr create(const Upstream::ClusterInfo& cluster_info,
+                                              const Upstream::PrioritySet& priority_set,
+                                              Runtime::Loader& runtime,
+                                              Random::RandomGenerator& random,
+                                              TimeSource& time_source) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::extensions::load_balancing_policies::deterministic_aperture::v3::
@@ -182,5 +186,7 @@ public:
   }
 };
 
-} // namespace Upstream
+} // namespace DeterministicAperture
+} // namespace LoadBalancingPolicies
+} // namespace Extensions
 } // namespace Envoy

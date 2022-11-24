@@ -1333,3 +1333,10 @@ envoy.matching.actions.format_string:
   status: alpha
   type_urls:
   - envoy.config.core.v3.SubstitutionFormatString
+envoy.load_balancing_policies.deterministic_aperture:
+  categories:
+  - envoy.load_balancing_policies
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.load_balancing_policies_deterministic_aperture.v3.DeterministicApertureLbConfig

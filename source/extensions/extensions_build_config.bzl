@@ -381,6 +381,12 @@ EXTENSIONS = {
     #
 
     "envoy.route.early_data_policy.default":           "//source/extensions/early_data:default_early_data_policy_lib",
+
+    #
+    # Load balancing policies
+    #
+
+    "envoy.load_balancing_policies.deterministic_aperture": "//source/extensions/load_balancing_policies/deterministic_aperture",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which

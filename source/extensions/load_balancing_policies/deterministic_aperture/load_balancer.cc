@@ -1,9 +1,11 @@
-#include "source/common/upstream/deterministic_aperture_lb.h"
+#include "source/extensions/load_balancing_policies/deterministic_aperture/load_balancer.h"
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
 namespace Envoy {
-namespace Upstream {
+namespace Extensions {
+namespace LoadBalancingPolicies {
+namespace DeterministicAperture {
 
 envoy::config::cluster::v3::Cluster::RingHashLbConfig toClusterRingHashLbConfig(
     const envoy::extensions::load_balancing_policies::ring_hash::v3::RingHash& ring_hash_config) {
@@ -19,13 +21,13 @@ envoy::config::cluster::v3::Cluster::RingHashLbConfig toClusterRingHashLbConfig(
   return return_value;
 }
 
-DeterministicApertureLoadBalancer::DeterministicApertureLoadBalancer(
-    const PrioritySet& priority_set, ClusterLbStats& stats, Stats::Scope& scope,
+LoadBalancer::LoadBalancer(
+    const Upstream::PrioritySet& priority_set, Upstream::ClusterLbStats& stats, Stats::Scope& scope,
     Runtime::Loader& runtime, Random::RandomGenerator& random,
     const absl::optional<envoy::extensions::load_balancing_policies::deterministic_aperture::v3::
                              DeterministicApertureLbConfig>& config,
     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
-    : RingHashLoadBalancer(
+    : Upstream::RingHashLoadBalancer(
           priority_set, stats, scope, runtime, random,
           ((config.has_value() && config->has_ring_config())
                ? absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig>(
@@ -36,10 +38,9 @@ DeterministicApertureLoadBalancer::DeterministicApertureLoadBalancer(
                                                                : 1.0),
       offset_((config.has_value() && width_ > 0.0) ? (width_ * config->peer_index()) : 0.0),
       scope_(scope.createScope("deterministic_aperture_lb.")),
-      ring_stats_(RingHashLoadBalancer::generateStats(*scope_)) {}
+      ring_stats_(Upstream::RingHashLoadBalancer::generateStats(*scope_)) {}
 
-DeterministicApertureLoadBalancerRingStats
-DeterministicApertureLoadBalancer::Ring::generateStats(Stats::Scope& scope) {
+LoadBalancerRingStats LoadBalancer::Ring::generateStats(Stats::Scope& scope) {
   return {ALL_DETERMINISTIC_APERTURE_LOAD_BALANCER_RING_STATS(POOL_COUNTER(scope))};
 }
 
@@ -48,15 +49,15 @@ DeterministicApertureLoadBalancer::Ring::generateStats(Stats::Scope& scope) {
  * don't actually use the hash of the nodes placed in the ring. We use `random` algorithm in the
  * Deterministic aperture load balancer. Hence we ignore the `h` and `attempt` here.
  */
-HostConstSharedPtr DeterministicApertureLoadBalancer::Ring::chooseHost(uint64_t, uint32_t) const {
+Upstream::HostConstSharedPtr LoadBalancer::Ring::chooseHost(uint64_t, uint32_t) const {
   if (ring_.empty()) {
     return nullptr;
   }
 
   const std::pair<size_t, size_t> index_pair = pick2();
 
-  const RingHashLoadBalancer::RingEntry& first = ring_[index_pair.first];
-  const RingHashLoadBalancer::RingEntry& second = ring_[index_pair.second];
+  const Upstream::RingHashLoadBalancer::RingEntry& first = ring_[index_pair.first];
+  const Upstream::RingHashLoadBalancer::RingEntry& second = ring_[index_pair.second];
 
   ENVOY_LOG(debug, "pick2 returned hosts: (hash1: {}, address1: {}, hash2: {}, address2: {})",
             first.hash_, first.host_->address()->asString(), second.hash_,
@@ -68,14 +69,15 @@ HostConstSharedPtr DeterministicApertureLoadBalancer::Ring::chooseHost(uint64_t,
 }
 
 using HashFunction = envoy::config::cluster::v3::Cluster::RingHashLbConfig::HashFunction;
-DeterministicApertureLoadBalancer::Ring::Ring(
-    double offset, double width, const NormalizedHostWeightVector& normalized_host_weights,
-    double min_normalized_weight, uint64_t min_ring_size, uint64_t max_ring_size,
-    HashFunction hash_function, bool use_hostname_for_hashing, Stats::ScopeSharedPtr scope,
-    RingHashLoadBalancerStats ring_stats)
-    : RingHashLoadBalancer::Ring(normalized_host_weights, min_normalized_weight, min_ring_size,
-                                 max_ring_size, hash_function, use_hostname_for_hashing,
-                                 ring_stats),
+LoadBalancer::Ring::Ring(double offset, double width,
+                         const Upstream::NormalizedHostWeightVector& normalized_host_weights,
+                         double min_normalized_weight, uint64_t min_ring_size,
+                         uint64_t max_ring_size, HashFunction hash_function,
+                         bool use_hostname_for_hashing, Stats::ScopeSharedPtr scope,
+                         Upstream::RingHashLoadBalancerStats ring_stats)
+    : Upstream::RingHashLoadBalancer::Ring(normalized_host_weights, min_normalized_weight,
+                                           min_ring_size, max_ring_size, hash_function,
+                                           use_hostname_for_hashing, ring_stats),
       offset_(offset), width_(width), unit_width_(1.0 / ring_size_), rng_(random_dev_()),
       random_distribution_(0, 1), stats_(generateStats(*scope)) {
   if (width_ > 1.0 || width_ < 0) {
@@ -84,8 +86,7 @@ DeterministicApertureLoadBalancer::Ring::Ring(
   }
 }
 
-absl::optional<double> DeterministicApertureLoadBalancer::Ring::weight(size_t index, double offset,
-                                                                       double width) const {
+absl::optional<double> LoadBalancer::Ring::weight(size_t index, double offset, double width) const {
   if (index >= ring_size_ || width > 1 || offset > 1) {
     return absl::nullopt;
   }
@@ -102,22 +103,21 @@ absl::optional<double> DeterministicApertureLoadBalancer::Ring::weight(size_t in
   return intersect(index_begin, index_end, offset, offset + width) / unit_width_;
 }
 
-size_t DeterministicApertureLoadBalancer::Ring::getIndex(double offset) const {
+size_t LoadBalancer::Ring::getIndex(double offset) const {
   ASSERT(offset >= 0 && offset <= 1, "valid offset");
   return offset / unit_width_;
 }
 
-double DeterministicApertureLoadBalancer::Ring::intersect(double b0, double e0, double b1,
-                                                          double e1) const {
+double LoadBalancer::Ring::intersect(double b0, double e0, double b1, double e1) const {
   ENVOY_LOG(trace, "Overlap for (b0: {}, e0: {}, b1: {}, e1: {})", b0, e0, b1, e1);
   return std::max(0.0, std::min(e0, e1) - std::max(b0, b1));
 }
 
-size_t DeterministicApertureLoadBalancer::Ring::pick() const {
+size_t LoadBalancer::Ring::pick() const {
   return getIndex(std::fmod((offset_ + width_ * nextRandom()), 1.0));
 }
 
-size_t DeterministicApertureLoadBalancer::Ring::pickSecond(size_t first) const {
+size_t LoadBalancer::Ring::pickSecond(size_t first) const {
   double f_begin = first * unit_width_;
   ENVOY_LOG(trace, "Pick second for (first: {}, offset: {}, width: {}, first begin: {})", first,
             offset_, width_, f_begin);
@@ -147,7 +147,7 @@ size_t DeterministicApertureLoadBalancer::Ring::pickSecond(size_t first) const {
   return getIndex(std::fmod(pos, 1.0));
 }
 
-std::pair<size_t, size_t> DeterministicApertureLoadBalancer::Ring::pick2() const {
+std::pair<size_t, size_t> LoadBalancer::Ring::pick2() const {
   ENVOY_LOG(trace, "pick2 for offset: {}, width: {}", offset_, width_);
   const size_t first = pick();
   const size_t second = pickSecond(first);
@@ -160,16 +160,27 @@ std::pair<size_t, size_t> DeterministicApertureLoadBalancer::Ring::pick2() const
   return {first, second};
 }
 
-ThreadAwareLoadBalancerPtr DeterministicApertureLoadBalancerFactory::create(
-    const ClusterInfo& cluster_info, const PrioritySet& priority_set, Runtime::Loader& runtime,
-    Random::RandomGenerator& random, TimeSource& time_source) {
+Upstream::ThreadAwareLoadBalancerPtr
+LoadBalancerFactory::create(const Upstream::ClusterInfo& cluster_info,
+                            const Upstream::PrioritySet& priority_set, Runtime::Loader& runtime,
+                            Random::RandomGenerator& random, TimeSource& time_source) {
   (void)time_source;
-  return std::make_unique<DeterministicApertureLoadBalancer>(
-      priority_set, cluster_info.lbStats(), cluster_info.statsScope(), runtime, random,
-      cluster_info.lbDeterministicApertureConfig(), cluster_info.lbConfig());
+
+  const auto* typed_config =
+      dynamic_cast<const envoy::extensions::load_balancing_policies::deterministic_aperture::v3::
+                       DeterministicApertureLbConfig*>(cluster_info.loadBalancingPolicy().get());
+  RELEASE_ASSERT(
+      typed_config != nullptr,
+      "Invalid load balancing policy configuration for deterministic aperture load balancer");
+
+  return std::make_unique<LoadBalancer>(priority_set, cluster_info.lbStats(),
+                                        cluster_info.statsScope(), runtime, random, *typed_config,
+                                        cluster_info.lbConfig());
 }
 
-REGISTER_FACTORY(DeterministicApertureLoadBalancerFactory, Upstream::TypedLoadBalancerFactory);
+REGISTER_FACTORY(LoadBalancerFactory, Upstream::TypedLoadBalancerFactory);
 
-} // namespace Upstream
+} // namespace DeterministicAperture
+} // namespace LoadBalancingPolicies
+} // namespace Extensions
 } // namespace Envoy

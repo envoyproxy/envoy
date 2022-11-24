@@ -456,9 +456,9 @@ envoy_cc_test(
         ":utility_lib",
         "//envoy/router:router_interface",
         "//source/common/network:utility_lib",
-        "//source/common/upstream:deterministic_aperture_lb_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
+        "//source/extensions/load_balancing_policies/deterministic_aperture:deterministic_aperture_lb_lib",
         "//test/mocks:common_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
@@ -467,8 +467,6 @@ envoy_cc_test(
         "//test/mocks/upstream:load_balancer_context_mock",
         "//test/mocks/upstream:priority_set_mocks",
         "//test/test_common:simulated_time_system_lib",
-        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/load_balancing_policies/deterministic_aperture/v3:pkg_cc_proto",
     ],
 )
 

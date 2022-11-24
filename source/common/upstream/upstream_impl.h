@@ -769,11 +769,6 @@ public:
   lbOriginalDstConfig() const override {
     return lb_original_dst_config_;
   }
-  const absl::optional<envoy::extensions::load_balancing_policies::deterministic_aperture::v3::
-                           DeterministicApertureLbConfig>&
-  lbDeterministicApertureConfig() const override {
-    return lb_aperture_config_;
-  }
   const absl::optional<envoy::config::core::v3::TypedExtensionConfig>&
   upstreamConfig() const override {
     return upstream_config_;
@@ -925,9 +920,6 @@ private:
   absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig> lb_ring_hash_config_;
   absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig> lb_maglev_config_;
   absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig> lb_original_dst_config_;
-  absl::optional<envoy::extensions::load_balancing_policies::deterministic_aperture::v3::
-                     DeterministicApertureLbConfig>
-      lb_aperture_config_;
   absl::optional<envoy::config::core::v3::TypedExtensionConfig> upstream_config_;
   const bool added_via_api_;
   LoadBalancerSubsetInfoImpl lb_subset_;

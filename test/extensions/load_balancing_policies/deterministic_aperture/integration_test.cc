@@ -11,6 +11,9 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace LoadBalancingPolicies {
+namespace DeterministicAperture {
 
 class DeterministicApertureCustomLbTest : public HttpIntegrationTest, public testing::Test {
 public:
@@ -122,4 +125,7 @@ TEST_F(DeterministicApertureCustomLbTest, BasicLoadBalancer) {
   runTest(request_headers_);
 }
 
+} // namespace DeterministicAperture
+} // namespace LoadBalancingPolicies
+} // namespace Extensions
 } // namespace Envoy

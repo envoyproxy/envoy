@@ -155,3 +155,22 @@ Random
 The random load balancer selects a random available host. The random load balancer generally performs
 better than round robin if no health checking policy is configured. Random selection avoids bias
 towards the host in the set that comes after a failed host.
+
+.. _arch_overview_load_balancing_types_deterministic_aperture:
+
+Deterministic Aperture
+^^^^^^^^^^^^^^^^^^^^^^
+
+Deterministic Aperture load balancing is designed to conserve connections between Envoy and
+backend instances. This is achieved by dividing the backends uniformly among participating peers.
+This way, we avoid a complete mesh of connections between Envoy and backends. The participating
+Envoy peers are placed on a ring that is conceptually laid on top of the Ring Hash of backends
+to determine their overlaps. By using the ring overlaps as a mechanism to divide the backends,
+the backends get divided as a fraction of their overlaps with each peer. The algorithm uses a
+uniform random distribution to select a backend from the range of overlapping backends. This
+along with P2C ensures uniform load distribution.
+
+`peer_index
+<envoy_v3_api_field_extensions.load_balancing_policies.deterministic_aperture.v3.DeterministicApertureLbConfig.peer_index>`
+is used to determine the configured Envoy's segment of the Ring as a fraction of `total_peers
+<envoy_v3_api_field_extensions.load_balancing_policies.deterministic_aperture.v3.DeterministicApertureLbConfig.total_peers>`.

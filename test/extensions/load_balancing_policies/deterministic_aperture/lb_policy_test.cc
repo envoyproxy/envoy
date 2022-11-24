@@ -8,8 +8,8 @@
 #include "envoy/extensions/load_balancing_policies/deterministic_aperture/v3/deterministic_aperture.pb.h"
 
 #include "source/common/network/utility.h"
-#include "source/common/upstream/deterministic_aperture_lb.h"
 #include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/load_balancing_policies/deterministic_aperture/load_balancer.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
@@ -29,21 +29,23 @@ using testing::NiceMock;
 using testing::Return;
 
 namespace Envoy {
-namespace Upstream {
-namespace {
+namespace Extensions {
+namespace LoadBalancingPolicies {
+namespace DeterministicAperture {
 
-class TestLoadBalancerContext : public LoadBalancerContextBase {
+class TestLoadBalancerContext : public Upstream::LoadBalancerContextBase {
 public:
-  using HostPredicate = std::function<bool(const Host&)>;
+  using HostPredicate = std::function<bool(const Upstream::Host&)>;
 
-  TestLoadBalancerContext() : TestLoadBalancerContext(0, [](const Host&) { return false; }) {}
+  TestLoadBalancerContext()
+      : TestLoadBalancerContext(0, [](const Upstream::Host&) { return false; }) {}
   TestLoadBalancerContext(uint32_t retry_count, HostPredicate should_select_another_host)
       : retry_count_(retry_count), should_select_another_host_(should_select_another_host) {}
 
   // Upstream::LoadBalancerContext
   absl::optional<uint64_t> computeHashKey() override { return 0; }
   uint32_t hostSelectionRetryCount() const override { return retry_count_; };
-  bool shouldSelectAnotherHost(const Host& host) override {
+  bool shouldSelectAnotherHost(const Upstream::Host& host) override {
     return should_select_another_host_(host);
   }
 
@@ -51,56 +53,55 @@ public:
   HostPredicate should_select_another_host_;
 };
 
-class DeterministicApertureLoadBalancerTest : public Event::TestUsingSimulatedTime,
-                                              public testing::TestWithParam<bool> {
+class LoadBalancerTest : public Event::TestUsingSimulatedTime, public testing::TestWithParam<bool> {
 public:
-  DeterministicApertureLoadBalancerTest()
+  LoadBalancerTest()
       : stat_names_(stats_store_.symbolTable()), stats_(stat_names_, stats_store_),
         rng_(random_dev_()), random_distribution_(0, 1) {}
 
   void init() {
-    lb_ = std::make_unique<DeterministicApertureLoadBalancer>(
-        priority_set_, stats_, stats_store_, runtime_, random_, config_, common_config_);
+    lb_ = std::make_unique<LoadBalancer>(priority_set_, stats_, stats_store_, runtime_, random_,
+                                         config_, common_config_);
     lb_->initialize();
   }
 
   // Run all tests against both priority 0 and priority 1 host sets, to ensure
   // all the load balancers have equivalent functionality for failover host sets.
-  MockHostSet& hostSet() { return GetParam() ? host_set_ : failover_host_set_; }
+  Upstream::MockHostSet& hostSet() { return GetParam() ? host_set_ : failover_host_set_; }
 
   bool nearlyEqual(double a, double b) const { return fabs(a - b) < 0.005f; }
 
   using HashFunction = envoy::config::cluster::v3::Cluster::RingHashLbConfig::HashFunction;
 
-  NiceMock<MockPrioritySet> priority_set_;
-  MockHostSet& host_set_ = *priority_set_.getMockHostSet(0);
-  MockHostSet& failover_host_set_ = *priority_set_.getMockHostSet(1);
-  std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
+  NiceMock<Upstream::MockPrioritySet> priority_set_;
+  Upstream::MockHostSet& host_set_ = *priority_set_.getMockHostSet(0);
+  Upstream::MockHostSet& failover_host_set_ = *priority_set_.getMockHostSet(1);
+  std::shared_ptr<Upstream::MockClusterInfo> info_{new NiceMock<Upstream::MockClusterInfo>()};
   Stats::IsolatedStoreImpl stats_store_;
-  ClusterLbStatNames stat_names_;
-  ClusterLbStats stats_;
+  Upstream::ClusterLbStatNames stat_names_;
+  Upstream::ClusterLbStats stats_;
   absl::optional<envoy::extensions::load_balancing_policies::deterministic_aperture::v3::
                      DeterministicApertureLbConfig>
       config_;
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Random::MockRandomGenerator> random_;
-  std::unique_ptr<DeterministicApertureLoadBalancer> lb_;
+  std::unique_ptr<DeterministicAperture::LoadBalancer> lb_;
   std::random_device random_dev_;
   mutable std::mt19937 rng_;
   mutable std::uniform_real_distribution<double> random_distribution_;
 };
 
 // For tests which don't need to be run in both primary and failover modes.
-using DeterministicApertureFailoverTest = DeterministicApertureLoadBalancerTest;
+using DeterministicApertureFailoverTest = LoadBalancerTest;
 
-INSTANTIATE_TEST_SUITE_P(DeterministicAperturePrimaryOrFailover,
-                         DeterministicApertureLoadBalancerTest, ::testing::Values(true, false));
+INSTANTIATE_TEST_SUITE_P(DeterministicAperturePrimaryOrFailover, LoadBalancerTest,
+                         ::testing::Values(true, false));
 INSTANTIATE_TEST_SUITE_P(DeterministicAperturePrimaryOrFailover, DeterministicApertureFailoverTest,
                          ::testing::Values(true));
 
 // Given no hosts, expect chooseHost to return null.
-TEST_P(DeterministicApertureLoadBalancerTest, NoHost) {
+TEST_P(LoadBalancerTest, NoHost) {
   config_ = envoy::extensions::load_balancing_policies::deterministic_aperture::v3::
       DeterministicApertureLbConfig();
   init();
@@ -109,19 +110,19 @@ TEST_P(DeterministicApertureLoadBalancerTest, NoHost) {
   EXPECT_EQ(nullptr, lb_->factory()->create()->peekAnotherHost(nullptr));
   EXPECT_FALSE(lb_->factory()->create()->lifetimeCallbacks().has_value());
   std::vector<uint8_t> hash_key;
-  auto mock_host = std::make_shared<NiceMock<MockHost>>();
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHost>>();
   EXPECT_FALSE(lb_->factory()
                    ->create()
                    ->selectExistingConnection(nullptr, *mock_host, hash_key)
                    .has_value());
 }
 
-TEST_P(DeterministicApertureLoadBalancerTest, BaseMethods) {
+TEST_P(LoadBalancerTest, BaseMethods) {
   init();
   EXPECT_EQ(nullptr, lb_->peekAnotherHost(nullptr));
   EXPECT_FALSE(lb_->lifetimeCallbacks().has_value());
   std::vector<uint8_t> hash_key;
-  auto mock_host = std::make_shared<NiceMock<MockHost>>();
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHost>>();
   EXPECT_FALSE(lb_->selectExistingConnection(nullptr, *mock_host, hash_key).has_value());
 };
 
@@ -129,7 +130,7 @@ TEST_P(DeterministicApertureLoadBalancerTest, BaseMethods) {
 // cluster, the operation does not immediately reach the worker thread. There may be cases where the
 // thread aware load balancer is destructed, but the load balancer factory is still used in the
 // worker thread.
-TEST_P(DeterministicApertureLoadBalancerTest, LbDestructedBeforeFactory) {
+TEST_P(LoadBalancerTest, LbDestructedBeforeFactory) {
   init();
 
   auto factory = lb_->factory();
@@ -138,13 +139,13 @@ TEST_P(DeterministicApertureLoadBalancerTest, LbDestructedBeforeFactory) {
   EXPECT_NE(nullptr, factory->create());
 }
 
-TEST_P(DeterministicApertureLoadBalancerTest, Basic) {
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:92", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:93", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:94", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:95", simTime())};
+TEST_P(LoadBalancerTest, Basic) {
+  hostSet().hosts_ = {Upstream::makeTestHost(info_, "tcp://127.0.0.1:90", simTime()),
+                      Upstream::makeTestHost(info_, "tcp://127.0.0.1:91", simTime()),
+                      Upstream::makeTestHost(info_, "tcp://127.0.0.1:92", simTime()),
+                      Upstream::makeTestHost(info_, "tcp://127.0.0.1:93", simTime()),
+                      Upstream::makeTestHost(info_, "tcp://127.0.0.1:94", simTime()),
+                      Upstream::makeTestHost(info_, "tcp://127.0.0.1:95", simTime())};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().runCallbacks({}, {});
 
@@ -182,7 +183,7 @@ TEST_P(DeterministicApertureLoadBalancerTest, Basic) {
       EXPECT_EQ(1, lb_->ringStats().min_hashes_per_host_.value());
       EXPECT_EQ(2, lb_->ringStats().max_hashes_per_host_.value());
 
-      LoadBalancerPtr lb = lb_->factory()->create();
+      Upstream::LoadBalancerPtr lb = lb_->factory()->create();
 
       TestLoadBalancerContext context;
       EXPECT_EQ(hostSet().hosts_[expected_hosts[peer_index]], lb->chooseHost(&context));
@@ -190,7 +191,7 @@ TEST_P(DeterministicApertureLoadBalancerTest, Basic) {
   }
 }
 
-TEST_P(DeterministicApertureLoadBalancerTest, RingPick2) {
+TEST_P(LoadBalancerTest, RingPick2) {
   const uint64_t ring_size = 10;
   const auto hash_function = HashFunction::Cluster_RingHashLbConfig_HashFunction_MURMUR_HASH_2;
   const double peer_offset = random_distribution_(rng_);
@@ -200,17 +201,17 @@ TEST_P(DeterministicApertureLoadBalancerTest, RingPick2) {
     peer_width += 0.4;
   }
 
-  NormalizedHostWeightVector normalized_host_weights;
+  Upstream::NormalizedHostWeightVector normalized_host_weights;
 
   for (uint64_t i = 0; i < ring_size; ++i) {
-    auto host = makeTestHost(info_, absl::StrCat("tcp://127.0.0.1:", i), simTime());
+    auto host = Upstream::makeTestHost(info_, absl::StrCat("tcp://127.0.0.1:", i), simTime());
     normalized_host_weights.push_back({host, 0.1});
   }
 
   auto scope = stats_store_.createScope("ring_hash.");
-  auto ring_hash_lb = std::make_shared<DeterministicApertureLoadBalancer::Ring>(
+  auto ring_hash_lb = std::make_shared<LoadBalancer::Ring>(
       peer_offset, peer_width, normalized_host_weights, 0.1, ring_size, ring_size, hash_function,
-      false, scope, RingHashLoadBalancer::generateStats(*scope));
+      false, scope, Upstream::RingHashLoadBalancer::generateStats(*scope));
 
   absl::flat_hash_map<size_t, size_t> index_count;
   absl::flat_hash_map<size_t, double> index_weight;
@@ -247,13 +248,15 @@ TEST_P(DeterministicApertureLoadBalancerTest, RingPick2) {
 
 // Ensure if all the hosts with priority 0 unhealthy, the next priority hosts are used.
 TEST_P(DeterministicApertureFailoverTest, BasicFailover) {
-  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime())};
-  failover_host_set_.healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:82", simTime())};
+  host_set_.hosts_ = {Upstream::makeTestHost(info_, "tcp://127.0.0.1:80", simTime())};
+  failover_host_set_.healthy_hosts_ = {
+      Upstream::makeTestHost(info_, "tcp://127.0.0.1:82", simTime())};
   failover_host_set_.hosts_ = failover_host_set_.healthy_hosts_;
 
   config_ = envoy::extensions::load_balancing_policies::deterministic_aperture::v3::
       DeterministicApertureLbConfig();
   config_->mutable_ring_config()->mutable_minimum_ring_size()->set_value(12);
+  config_->mutable_ring_config()->mutable_maximum_ring_size()->set_value(12);
   config_->set_total_peers(12);
   config_->set_peer_index(0);
   init();
@@ -261,7 +264,7 @@ TEST_P(DeterministicApertureFailoverTest, BasicFailover) {
   EXPECT_EQ(12, lb_->ringStats().min_hashes_per_host_.value());
   EXPECT_EQ(12, lb_->ringStats().max_hashes_per_host_.value());
 
-  LoadBalancerPtr lb = lb_->factory()->create();
+  Upstream::LoadBalancerPtr lb = lb_->factory()->create();
   EXPECT_EQ(failover_host_set_.healthy_hosts_[0], lb->chooseHost(nullptr));
 
   // Add a healthy host at P=0 and it will be chosen.
@@ -277,8 +280,8 @@ TEST_P(DeterministicApertureFailoverTest, BasicFailover) {
   EXPECT_EQ(failover_host_set_.healthy_hosts_[0], lb->chooseHost(nullptr));
 
   // Set up so P=0 gets 70% of the load, and P=1 gets 30%.
-  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:81", simTime())};
+  host_set_.hosts_ = {Upstream::makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
+                      Upstream::makeTestHost(info_, "tcp://127.0.0.1:81", simTime())};
   host_set_.healthy_hosts_ = {host_set_.hosts_[0]};
   host_set_.runCallbacks({}, {});
   lb = lb_->factory()->create();
@@ -288,6 +291,7 @@ TEST_P(DeterministicApertureFailoverTest, BasicFailover) {
   EXPECT_EQ(failover_host_set_.healthy_hosts_[0], lb->chooseHost(nullptr));
 }
 
-} // namespace
-} // namespace Upstream
+} // namespace DeterministicAperture
+} // namespace LoadBalancingPolicies
+} // namespace Extensions
 } // namespace Envoy

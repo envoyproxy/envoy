@@ -13,7 +13,6 @@ import "envoy/config/core/v3/health_check.proto";
 import "envoy/config/core/v3/protocol.proto";
 import "envoy/config/core/v3/resolver.proto";
 import "envoy/config/endpoint/v3/endpoint.proto";
-import "envoy/extensions/load_balancing_policies/deterministic_aperture/v3/deterministic_aperture.proto";
 import "envoy/type/v3/percent.proto";
 
 import "google/protobuf/any.proto";
@@ -45,7 +44,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 58]
+// [#next-free-field: 57]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster";
 
@@ -1067,10 +1066,6 @@ message Cluster {
 
     // Optional configuration for the RoundRobin load balancing policy.
     RoundRobinLbConfig round_robin_lb_config = 56;
-
-    // Optional configuration for the Deterministic Aperture load balancing policy.
-    envoy.extensions.load_balancing_policies.deterministic_aperture.v3.DeterministicApertureLbConfig
-        deterministic_aperture_lb_config = 57;
   }
 
   // Common configuration for all load balancer implementations.
