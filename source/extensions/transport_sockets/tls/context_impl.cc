@@ -242,8 +242,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
         ASSERT(rsa_public_key != nullptr);
         const unsigned rsa_key_length = RSA_bits(rsa_public_key);
 #ifdef BORINGSSL_FIPS
-        if (rsa_key_length != 2048 && rsa_key_length != 3072 &&
-            rsa_key_length != 4096) {
+        if (rsa_key_length != 2048 && rsa_key_length != 3072 && rsa_key_length != 4096) {
           throw EnvoyException(
               fmt::format("Failed to load certificate chain from {}, only RSA certificates with "
                           "2048-bit, 3072-bit or 4096-bit keys are supported in FIPS mode",
