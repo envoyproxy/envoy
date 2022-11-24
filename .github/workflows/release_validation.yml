@@ -4,7 +4,11 @@ on:
   push:
     branches:
       - main
+    paths:
+    - 'mobile/**'
   pull_request:
+    paths:
+    - 'mobile/**'
 
 jobs:
   validate_swiftpm_example:
