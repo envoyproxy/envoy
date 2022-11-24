@@ -55,6 +55,10 @@ public:
   }
 
 private:
+  void abslHashValue(absl::HashState state) const override {
+    absl::HashState::combine(std::move(state), address_);
+  }
+
   const std::string address_{"synthetic"};
 };
 } // namespace Address
