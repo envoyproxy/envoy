@@ -376,6 +376,9 @@ TEST(InternalInstanceTest, Hashable) {
       AddressKey(std::make_shared<EnvoyInternalInstance>("listener_foo")),
       AddressKey(std::make_shared<EnvoyInternalInstance>("listener_foo", "1")),
   }));
+
+  EXPECT_TRUE(AddressKey(std::make_shared<EnvoyInternalInstance>("listener_foo")) ==
+              AddressKey(std::make_shared<EnvoyInternalInstance>("listener_foo", "1")));
 }
 
 TEST(InternalInstanceTest, Basic) {
