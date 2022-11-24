@@ -5,6 +5,7 @@
 #include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/integration/integration.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gtest/gtest.h"
 
@@ -89,7 +90,8 @@ TEST_P(SslCertValidatorIntegrationTest, CertValidatedWithVerifyDepth) {
 // Test Config:
 //   peer certificate chain: leaf cert -> level-2 intermediate -> level-1 intermediate -> root
 //   trust ca certificate chain: root
-// With only root trusted, certificate validation succeeds without max depth
+// With only root trusted, certificate validation succeeds without setting max depth since the
+// default value is 100
 TEST_P(SslCertValidatorIntegrationTest, CertValidationSucceedNoDepthWithTrustRootOnly) {
   config_helper_.addSslConfig(ConfigHelper::ServerSslOptions()
                                   .setRsaCert(true)
@@ -144,5 +146,27 @@ TEST_P(SslCertValidatorIntegrationTest, CertValidationFailedDepthWithTrustRootOn
   test_server_->waitForCounterGe(listenerStatPrefix("ssl.fail_verify_error"), 1);
   ASSERT_TRUE(codec->waitForDisconnect());
 }
+
+// Test Config:
+//   peer certificate chain: leaf cert -> level-2 intermediate -> level-1 intermediate -> root
+//   trust ca certificate chain: level-2 intermediate -> level-1 intermediate
+// With verify-depth set, certificate validation is expected to fail since we disallow partial chain
+// by setting runtime flag.
+TEST_P(SslCertValidatorIntegrationTest,
+       CertValidationFailedWithVerifyDepthAndPaitialChainDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_intermediate_ca", "false"}});
+  config_helper_.addSslConfig(ConfigHelper::ServerSslOptions()
+                                  .setRsaCert(true)
+                                  .setTlsV13(true)
+                                  .setClientWithIntermediateCert(true)
+                                  .setVerifyDepth(1));
+  initialize();
+  auto conn = makeSslClientConnection({});
+  IntegrationCodecClientPtr codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
+  test_server_->waitForCounterGe(listenerStatPrefix("ssl.fail_verify_error"), 1);
+  ASSERT_TRUE(codec->waitForDisconnect());
+}
+
 } // namespace Ssl
 } // namespace Envoy
