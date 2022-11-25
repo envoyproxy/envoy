@@ -2070,6 +2070,59 @@ filter_chains:
   testListenerUpdateWithSocketOptionsChangeDeprecatedBehavior(listener_origin, listener_updated);
 }
 
+TEST_P(ListenerManagerImplTest, UpdateListenerWithDifferentSocketOptionsWithMultiAddressesDeprecatedBehavior) {
+  const std::string listener_origin = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 5678
+  socket_options:
+    socket_options:
+    - level: 1
+      name: 9
+      int_value: 2
+enable_reuse_port: true
+socket_options:
+    - level: 1
+      name: 9
+      int_value: 1
+filter_chains:
+- filters: []
+  )EOF";
+
+  const std::string listener_updated = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 5678
+  socket_options:
+    socket_options:
+    - level: 1
+      name: 9
+      int_value: 3
+enable_reuse_port: true
+socket_options:
+    - level: 1
+      name: 9
+      int_value: 1
+filter_chains:
+- filters: []
+  )EOF";
+  testListenerUpdateWithSocketOptionsChangeDeprecatedBehavior(listener_origin, listener_updated, true);
+}
+
 // The socket options update is only available when enable_reuse_port as true.
 // Linux is the only platform allowing the enable_reuse_port as true.
 #ifdef __linux__
@@ -2104,6 +2157,61 @@ filter_chains:
 - filters: []
   )EOF";
   testListenerUpdateWithSocketOptionsChange(listener_origin, listener_updated);
+}
+#endif
+
+#ifdef __linux__
+TEST_P(ListenerManagerImplTest, UpdateListenerWithDifferentSocketOptionsWithMultiAddresses) {
+  const std::string listener_origin = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 5678
+  socket_options:
+    socket_options:
+    - level: 1
+      name: 9
+      int_value: 2
+enable_reuse_port: true
+socket_options:
+    - level: 1
+      name: 9
+      int_value: 1
+filter_chains:
+- filters: []
+  )EOF";
+
+  const std::string listener_updated = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 5678
+  socket_options:
+    socket_options:
+    - level: 1
+      name: 9
+      int_value: 3
+enable_reuse_port: true
+socket_options:
+    - level: 1
+      name: 9
+      int_value: 1
+filter_chains:
+- filters: []
+  )EOF";
+  testListenerUpdateWithSocketOptionsChange(listener_origin, listener_updated, true);
 }
 #endif
 
