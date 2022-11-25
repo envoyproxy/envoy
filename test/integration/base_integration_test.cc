@@ -344,7 +344,7 @@ void BaseIntegrationTest::setUpstreamAddress(
 }
 
 bool BaseIntegrationTest::getSocketOption(const std::string& listener_name, int level, int optname,
-                                          void* optval, socklen_t* optlen) {
+                                          void* optval, socklen_t* optlen, int address_index) {
   bool listeners_ready = false;
   absl::Mutex l;
   std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners;
@@ -359,11 +359,10 @@ bool BaseIntegrationTest::getSocketOption(const std::string& listener_name, int 
 
   for (auto& listener : listeners) {
     if (listener.get().name() == listener_name) {
-      for (auto& socket_factory : listener.get().listenSocketFactories()) {
-        auto socket = socket_factory->getListenSocket(0);
-        if (socket->getSocketOption(level, optname, optval, optlen).return_value_ != 0) {
-          return false;
-        }
+      auto& socket_factory = listener.get().listenSocketFactories()[address_index];
+      auto socket = socket_factory->getListenSocket(0);
+      if (socket->getSocketOption(level, optname, optval, optlen).return_value_ != 0) {
+        return false;
       }
       return true;
     }
