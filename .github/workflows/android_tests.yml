@@ -21,8 +21,6 @@ jobs:
     timeout-minutes: 90
     steps:
     - uses: actions/checkout@v1
-      with:
-        submodules: true
     - id: check_context
       name: 'Check whether to run'
       run: |
@@ -60,8 +58,6 @@ jobs:
     timeout-minutes: 120
     steps:
     - uses: actions/checkout@v1
-      with:
-        submodules: true
     - id: check_context
       name: 'Check whether to run'
       run: |
@@ -107,8 +103,6 @@ jobs:
         CXX: /opt/llvm/bin/clang++
     steps:
     - uses: actions/checkout@v1
-      with:
-        submodules: true
     - name: Add safe directory
       run: git config --global --add safe.directory /__w/envoy/envoy
     - id: check_context
