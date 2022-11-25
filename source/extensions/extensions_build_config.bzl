@@ -386,7 +386,7 @@ EXTENSIONS = {
     # Load balancing policies
     #
 
-    "envoy.load_balancing_policies.deterministic_aperture": "//source/extensions/load_balancing_policies/deterministic_aperture",
+    "envoy.load_balancing_policies.deterministic_aperture": "//source/extensions/load_balancing_policies/deterministic_aperture:load_balancer_lib",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which

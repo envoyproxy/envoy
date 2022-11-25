@@ -1339,4 +1339,4 @@ envoy.load_balancing_policies.deterministic_aperture:
   security_posture: unknown
   status: alpha
   type_urls:
-  - envoy.load_balancing_policies_deterministic_aperture.v3.DeterministicApertureLbConfig
+  - envoy.extensions.load_balancing_policies_deterministic_aperture.v3.DeterministicApertureLbConfig

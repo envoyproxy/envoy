@@ -7,7 +7,7 @@ import "envoy/extensions/load_balancing_policies/ring_hash/v3/ring_hash.proto";
 import "udpa/annotations/status.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.load_balancing_policies.deterministic_aperture.v3";
-option java_outer_classname = "DeterministicApertureLbProto";
+option java_outer_classname = "DeterministicApertureProto";
 option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/load_balancing_policies/deterministic_aperture/v3;deterministic_aperturev3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;

@@ -402,22 +402,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "deterministic_aperture_lb_lib",
-    srcs = ["deterministic_aperture_lb.cc"],
-    hdrs = ["deterministic_aperture_lb.h"],
-    external_deps = [
-        "abseil_inlined_vector",
-    ],
-    deps = [
-        ":ring_hash_lb_lib",
-        ":upstream_lib",
-        "//source/common/common:minimal_logger_lib",
-        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/load_balancing_policies/deterministic_aperture/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
     name = "subset_lb_lib",
     srcs = ["subset_lb.cc"],
     hdrs = ["subset_lb.h"],
