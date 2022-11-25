@@ -293,10 +293,8 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess(bool degrade
       // A host that was told to exclude based on immediate failure, but is now passing, should
       // no longer be excluded.
       host_->healthFlagClear(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
-
       host_->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
       parent_.incHealthy();
-      host_->setLastHcPassTime(time_source_.monotonicTime());
       changed_state = HealthTransition::Changed;
       if (parent_.event_logger_) {
         parent_.event_logger_->logAddHealthy(parent_.healthCheckerType(), host_, first_check_);
@@ -304,6 +302,7 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess(bool degrade
     } else {
       changed_state = HealthTransition::ChangePending;
     }
+    host_->setLastHcPassTime(time_source_.monotonicTime());
   }
 
   changed_state = clearPendingFlag(changed_state);
