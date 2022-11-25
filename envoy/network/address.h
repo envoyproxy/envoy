@@ -233,7 +233,7 @@ public:
   virtual const Network::SocketInterface& socketInterface() const PURE;
 
   /**
-   * For support absl::Hash.
+   * For support the absl::Hash.
    */
   virtual void abslHashValue(absl::HashState state) const PURE;
 };
