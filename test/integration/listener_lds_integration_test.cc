@@ -481,6 +481,7 @@ TEST_P(ListenerMultiAddressesIntegrationTest, BasicSuccessWithMultiAddresses) {
   EXPECT_EQ(request_size, upstream_request_->bodyLength());
 }
 
+#ifdef __linux__
 TEST_P(ListenerMultiAddressesIntegrationTest, BasicSuccessWithMultiAddressesAndSocketOpts) {
   on_server_init_function_ = [&]() {
     createLdsStream();
@@ -564,6 +565,7 @@ TEST_P(ListenerMultiAddressesIntegrationTest, BasicSuccessWithMultiAddressesAndS
   EXPECT_EQ(opt_len, sizeof(opt_value));
   EXPECT_EQ(4, opt_value);
 }
+#endif
 
 // Tests that a LDS adding listener works as expected.
 TEST_P(ListenerIntegrationTest, BasicSuccess) {
