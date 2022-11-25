@@ -457,7 +457,7 @@ private:
   void buildUdpListenerWorkerRouter(const Network::Address::Instance& address,
                                     uint32_t concurrency);
   void buildUdpListenerFactory(uint32_t concurrency);
-  void buildListenSocketOptions();
+  void buildListenSocketOptions(std::vector<std::pair<const Network::Address::InstanceConstSharedPtr, const Protobuf::RepeatedPtrField<envoy::config::core::v3::SocketOption>&>>& address_opts_list);
   void createListenerFilterFactories();
   void validateFilterChains();
   void buildFilterChains();
