@@ -80,7 +80,7 @@ message ConnectionProperties {
 }
 
 // Defines fields that are shared by all Envoy access logs.
-// [#next-free-field: 26]
+// [#next-free-field: 28]
 message AccessLogCommon {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.data.accesslog.v2.AccessLogCommon";
@@ -202,6 +202,19 @@ message AccessLogCommon {
 
   // Connection termination details may provide additional information about why the connection was terminated by Envoy for L4 reasons.
   string connection_termination_details = 25;
+
+  // Optional unique id of stream (TCP connection, long-live HTTP2 stream, HTTP request) for logging and tracing.
+  // This could be any format string that could be used to identify one stream.
+  string stream_id = 26;
+
+  // If this log entry is final log entry that flushed after the stream completed or
+  // intermediate log entry that flushed periodically during the stream.
+  // There may be multiple intermediate log entries and only one final log entry for each
+  // long-live stream (TCP connection, long-live HTTP2 stream).
+  // And if it is necessary, unique ID or identifier can be added to the log entry
+  // :ref:`stream_id <envoy_v3_api_field_data.accesslog.v3.AccessLogCommon.stream_id>` to
+  // correlate all these intermediate log entries and final log entry.
+  bool intermediate_log_entry = 27;
 }
 
 // Flags indicating occurrences during request/response processing.

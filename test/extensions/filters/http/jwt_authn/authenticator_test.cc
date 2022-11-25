@@ -136,6 +136,44 @@ TEST_F(AuthenticatorTest, TestCompletePaddingInJwtPayload) {
   EXPECT_EQ(headers.get_("sec-istio-auth-userinfo"), ExpectedPayloadValueWithPadding);
 }
 
+// This test verifies whether the claim is successfully added to header or not
+TEST_F(AuthenticatorTest, TestClaimToHeader) {
+  createAuthenticator();
+  EXPECT_CALL(*raw_fetcher_, fetch(_, _))
+      .WillOnce(Invoke([this](Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
+        receiver.onJwksSuccess(std::move(jwks_));
+      }));
+
+  Http::TestRequestHeaderMapImpl headers{
+      {"Authorization", "Bearer " + std::string(NestedGoodToken)}};
+
+  expectVerifyStatus(Status::Ok, headers);
+
+  EXPECT_EQ(headers.get_("x-jwt-claim-sub"), "test@example.com");
+  EXPECT_EQ(headers.get_("x-jwt-claim-nested"), "value1");
+  EXPECT_EQ(headers.get_("x-jwt-bool-claim"), "true");
+  EXPECT_EQ(headers.get_("x-jwt-int-claim"), "9999");
+}
+
+// This test verifies when wrong claim is passed in claim_to_headers
+TEST_F(AuthenticatorTest, TestClaimToHeaderWithHeaderReplace) {
+  createAuthenticator();
+  EXPECT_CALL(*raw_fetcher_, fetch(_, _))
+      .WillOnce(Invoke([this](Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
+        receiver.onJwksSuccess(std::move(jwks_));
+      }));
+
+  Http::TestRequestHeaderMapImpl headers{
+      {"Authorization", "Bearer " + std::string(NestedGoodToken)}};
+
+  expectVerifyStatus(Status::Ok, headers);
+
+  EXPECT_EQ(headers.get_("x-jwt-claim-sub"), "test@example.com");
+  EXPECT_EQ(headers.get_("x-jwt-claim-nested"), "value1");
+  EXPECT_FALSE(headers.has("x-jwt-claim-nested-wrong"));
+  EXPECT_FALSE(headers.has("x-jwt-unsupported-type-claim"));
+}
+
 // This test verifies the Jwt is forwarded if "forward" flag is set.
 TEST_F(AuthenticatorTest, TestForwardJwt) {
   // Config forward_jwt flag

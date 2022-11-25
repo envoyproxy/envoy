@@ -164,6 +164,8 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/matching/input_matchers/consistent_hashing @snowp @donyu
 # environment generic input
 /*/extensions/matching/common_inputs/environment @snowp @donyu
+# format string matching
+/*/extensions/matching/actions/format_string @kyessenov @UNOWNED
 # user space socket pair, event, connection and listener
 /*/extensions/io_socket/user_space @kyessenov @antoniovicente
 /*/extensions/bootstrap/internal_listener @kyessenov @adisuissa
@@ -175,6 +177,8 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/filters/common/ratelimit @esmet @mattklein123
 /*/extensions/filters/http/ratelimit @esmet @mattklein123
 /*/extensions/filters/network/ratelimit @esmet @mattklein123
+# HTTP Quota Based Rate Limit
+/*/extensions/filters/http/rate_limit_quota @tyxia @yanavlasov
 # HTTP Bandwidth Limit
 /*/extensions/filters/http/bandwidth_limit @nitgoy @mattklein123 @yanavlasov @tonya11en
 # Original IP detection
@@ -191,8 +195,9 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 # Config Validators
 /*/extensions/config/validators/minimum_clusters @adisuissa @htuch
 # File system based extensions
-/*/extensions/common/async_files @mattklein123 @ravenblack
-/*/extensions/filters/http/file_system_buffer @mattklein123 @ravenblack
+/*/extensions/common/async_files @mattklein123 @ravenblackx
+/*/extensions/filters/http/file_system_buffer @mattklein123 @ravenblackx
+/*/extensions/http/cache/file_system_http_cache @mattklein123 @ravenblackx
 # Google Cloud Platform Authentication Filter
 /*/extensions/filters/http/gcp_authn @tyxia @yanavlasov
 # DNS resolution
@@ -284,6 +289,7 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/clusters/original_dst @UNOWNED @UNOWNED
 /*/extensions/clusters/logical_dns/ @UNOWNED @UNOWNED
 /*/extensions/clusters/common/ @UNOWNED @UNOWNED
+/*/extensions/clusters/eds/ @UNOWNED @UNOWNED
 
 # URL Pattern Match and Rewrite Library
 /*/extensions/path/uri_template_lib @alyssawilk @yanjunxiang-google
@@ -310,4 +316,4 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /contrib/language/ @diceride @diceride
 /contrib/dlb/ @mattklein123 @daixiang0
 /contrib/qat/ @ipuustin @VillePihlava
-/contrib/generic_proxy/ @wbpcode @zhaohuabing @rojkov @htuch
+/contrib/generic_proxy/ @wbpcode @soulxu @zhaohuabing @rojkov @htuch

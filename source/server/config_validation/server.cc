@@ -11,6 +11,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/singleton/manager_impl.h"
 #include "source/common/version/version.h"
+#include "source/server/regex_engine.h"
 #include "source/server/ssl_context_manager.h"
 
 namespace Envoy {
@@ -82,6 +83,10 @@ void ValidationInstance::initialize(const Options& options,
   InstanceUtil::loadBootstrapConfig(bootstrap_, options,
                                     messageValidationContext().staticValidationVisitor(), *api_);
 
+  // Inject regex engine to singleton.
+  Regex::EnginePtr regex_engine = createRegexEngine(
+      bootstrap_, messageValidationContext().staticValidationVisitor(), serverFactoryContext());
+
   Config::Utility::createTagProducer(bootstrap_, options_.statsTags());
   if (!bootstrap_.node().user_agent_build_version().has_version()) {
     *bootstrap_.mutable_node()->mutable_user_agent_build_version() = VersionInfo::buildVersion();
@@ -108,7 +113,7 @@ void ValidationInstance::initialize(const Options& options,
     runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(std::move(runtime_ptr));
   }
 
-  secret_manager_ = std::make_unique<Secret::SecretManagerImpl>(admin().getConfigTracker());
+  secret_manager_ = std::make_unique<Secret::SecretManagerImpl>(admin()->getConfigTracker());
   ssl_context_manager_ = createContextManager("ssl_context_manager", api_->timeSource());
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
       admin(), runtime(), stats(), threadLocal(),

@@ -54,10 +54,11 @@ public:
 class TestZoneAwareLoadBalancer : public ZoneAwareLoadBalancerBase {
 public:
   TestZoneAwareLoadBalancer(
-      const PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
+      const PrioritySet& priority_set, ClusterLbStats& lb_stats, Runtime::Loader& runtime,
       Random::RandomGenerator& random,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
-      : ZoneAwareLoadBalancerBase(priority_set, nullptr, stats, runtime, random, common_config) {}
+      : ZoneAwareLoadBalancerBase(priority_set, nullptr, lb_stats, runtime, random, common_config) {
+  }
   void runInvalidLocalitySourceType() {
     localitySourceType(static_cast<LoadBalancerBase::HostAvailability>(123));
   }
@@ -76,14 +77,13 @@ protected:
   MockHostSet& hostSet() { return GetParam() ? host_set_ : failover_host_set_; }
 
   LoadBalancerTestBase()
-      : stat_names_(stats_store_.symbolTable()),
-        stats_(ClusterInfoImpl::generateStats(stats_store_, stat_names_)) {
+      : stat_names_(stats_store_.symbolTable()), stats_(stat_names_, stats_store_) {
     least_request_lb_config_.mutable_choice_count()->set_value(2);
   }
 
   Stats::IsolatedStoreImpl stats_store_;
-  ClusterStatNames stat_names_;
-  ClusterStats stats_;
+  ClusterLbStatNames stat_names_;
+  ClusterLbStats stats_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<MockPrioritySet> priority_set_;
@@ -97,10 +97,10 @@ protected:
 
 class TestLb : public LoadBalancerBase {
 public:
-  TestLb(const PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
+  TestLb(const PrioritySet& priority_set, ClusterLbStats& lb_stats, Runtime::Loader& runtime,
          Random::RandomGenerator& random,
          const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
-      : LoadBalancerBase(priority_set, stats, runtime, random, common_config) {}
+      : LoadBalancerBase(priority_set, lb_stats, runtime, random, common_config) {}
   using LoadBalancerBase::chooseHostSet;
   using LoadBalancerBase::isInPanic;
   using LoadBalancerBase::percentageDegradedLoad;
@@ -581,10 +581,11 @@ TEST_P(LoadBalancerBaseTest, BoundaryConditions) {
 
 class TestZoneAwareLb : public ZoneAwareLoadBalancerBase {
 public:
-  TestZoneAwareLb(const PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
-                  Random::RandomGenerator& random,
+  TestZoneAwareLb(const PrioritySet& priority_set, ClusterLbStats& lb_stats,
+                  Runtime::Loader& runtime, Random::RandomGenerator& random,
                   const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
-      : ZoneAwareLoadBalancerBase(priority_set, nullptr, stats, runtime, random, common_config) {}
+      : ZoneAwareLoadBalancerBase(priority_set, nullptr, lb_stats, runtime, random, common_config) {
+  }
 
   HostConstSharedPtr chooseHostOnce(LoadBalancerContext*) override {
     return choose_host_once_host_;
@@ -618,11 +619,16 @@ TEST_F(ZoneAwareLoadBalancerBaseTest, BaseMethods) {
 
 class RoundRobinLoadBalancerTest : public LoadBalancerTestBase {
 public:
-  void init(bool need_local_cluster) {
+  void init(bool need_local_cluster, bool locality_weight_aware = false) {
     if (need_local_cluster) {
       local_priority_set_ = std::make_shared<PrioritySetImpl>();
       local_priority_set_->getOrCreateHostSet(0);
     }
+
+    if (locality_weight_aware) {
+      common_config_.mutable_locality_weighted_lb_config();
+    }
+
     lb_ = std::make_shared<RoundRobinLoadBalancer>(priority_set_, local_priority_set_.get(), stats_,
                                                    runtime_, random_, common_config_,
                                                    round_robin_lb_config_, simTime());
@@ -920,7 +926,7 @@ TEST_P(RoundRobinLoadBalancerTest, Locality) {
   hostSet().hosts_ = *hosts;
   hostSet().healthy_hosts_ = *hosts;
   hostSet().healthy_hosts_per_locality_ = hosts_per_locality;
-  init(false);
+  init(false, true);
   // chooseHealthyLocality() return value determines which locality we use.
   EXPECT_CALL(hostSet(), chooseHealthyLocality()).WillOnce(Return(0));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
@@ -959,7 +965,7 @@ TEST_P(RoundRobinLoadBalancerTest, DegradedLocality) {
   hostSet().hosts_per_locality_ = hosts_per_locality;
   hostSet().healthy_hosts_per_locality_ = healthy_hosts_per_locality;
   hostSet().degraded_hosts_per_locality_ = degraded_hosts_per_locality;
-  init(false);
+  init(false, true);
 
   EXPECT_CALL(random_, random()).WillOnce(Return(50)).WillOnce(Return(0));
   // Since we're split between healthy and degraded, the LB should call into both

@@ -25,6 +25,8 @@ behavior_changes:
   change: |
     When active HC is enabled per cluster, slow start calculation now starts after first passing HC. Cluster membership duration condition is dropped from slow start calculation.
     Endpoint can now re-enter slow start if active HC is configured per cluster, on each "unhealthy -> healthy" state transition.
+    moved the strict_dns, original_dst, logical_dns, static, and eds clusters to extensions. If you use these clusters and override extensions_build_config.bzl you will now need to include it explicitly.
+
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
 - area: cache_filter
@@ -33,6 +35,9 @@ minor_behavior_changes:
 - area: oauth2
   change: |
     Requests which match the passthrough header now have their own metric ``oauth_passthrough`` and aren't included in ``oauth_success`` anymore.
+- area: rate_limit
+  change: |
+    add ``MONTH`` and ``YEAR`` to the unit of time for rate limit.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -48,9 +53,15 @@ bug_fixes:
 - area: generic_proxy
   change: |
     fixed a bug that encoder filters and decoder filters of generic proxy will be executed in the same order. The encoder filters' execuate order should be the reverse of decoder filters' in the generic proxy.
+- area: quic
+  change: |
+    reject configs that specify require_client_certificate with QUIC since clients certificates are currently unsupported in QUIC. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.reject_require_client_certificate_with_quic`` to false.
 - area: http
   change: |
     fixed a bug where Utility::PercentEncoding::encode() encodes some characters incorrectly because it was treating the value as negative.
+- area: validation
+  change: |
+    fixed a crash which could happen when optional ``engine_type`` is not provided in regex.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -87,6 +98,9 @@ removed_config_or_runtime:
 - area: http
   change: |
     removed ``envoy.reloadable_features.skip_delay_close`` and legacy code paths.
+- area: router
+  change: |
+    removed ``envoy.reloadable_features.do_not_await_headers_on_upstream_timeout_to_emit_stats`` and legacy code paths.
 
 new_features:
 - area: build
@@ -99,6 +113,13 @@ new_features:
 - area: upstream
   change: |
     added a new field :ref:`socket_options <envoy_v3_api_field_config.core.v3.ExtraSourceAddress.socket_options>` to the ExtraSourceAddress, allowing specifying discrete socket options for each source address.
+- area: access_log
+  change: |
+    added a new field :ref:`intermediate_log_entry <envoy_v3_api_field_data.accesslog.v3.AccessLogCommon.intermediate_log_entry>` to detect if the gRPC log entry is an intermediate log entry or not and added
+    support to flush TCP log entries periodly according to the configured :ref:`inteval <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.access_log_flush_interval>`.
+- area: access_log
+  change: |
+    added support for :ref:`%STREAM_ID% <config_access_log_format_stream_id>` for stream unique identifier.
 - area: thrift
   change: |
     added payload to metadata filter which matches a given payload field's value would be extracted and attached to the request as dynamic metadata.
@@ -117,14 +138,26 @@ new_features:
 - area: udp_proxy
   change: |
     added support for :ref:`proxy_access_log <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.proxy_access_log>`.
+- area: health_check
+  change: |
+    added an optional bool flag :ref:`disable_active_health_check <envoy_v3_api_field_config.endpoint.v3.Endpoint.HealthCheckConfig.disable_active_health_check>` to disable the active health check for the endpoint.
 - area: mobile
   change: |
     started merging the Envoy mobile library into the main Envoy repo.
+- area: matching
+  change: |
+    support filter chain selection based on the dynamic metadata and the filter state using :ref:`formatter actions <extension_envoy.matching.actions.format_string>`.
 - area: redis
   change: |
     extended :ref:`cluster support <arch_overview_redis_cluster_support>` by adding a :ref:`dns_cache_config <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.dns_cache_config>` option that can be used to resolve hostnames returned by MOVED/ASK responses.
+- area: gcp_authn
+  change: |
+    added support for configuring header that holds token fetched from GCE metadata server in new field :ref:`token_header <envoy_v3_api_field_extensions.filters.http.gcp_authn.v3.GcpAuthnFilterConfig.token_header>`.
 - area: tracing
   change: |
     added support for setting the hostname used when sending spans to a Datadog collector using the :ref:`collector_hostname <envoy_v3_api_field_config.trace.v3.DatadogConfig.collector_hostname>` field.
+- area: jwt_authn
+  change: |
+    added support for copying jwt claims to http headers.
 
 deprecated:
