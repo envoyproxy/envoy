@@ -1090,8 +1090,9 @@ void ListenerManagerImpl::createListenSocketFactory(ListenerImpl& listener) {
     Network::SocketCreationOptions creation_options;
     creation_options.mptcp_enabled_ = listener.mptcpEnabled();
     for (auto& address : listener.addresses()) {
+      auto socket_opts = listener.listenSocketOptions(address);
       listener.addSocketFactory(std::make_unique<ListenSocketFactoryImpl>(
-          factory_, address, socket_type, listener.listenSocketOptions(), listener.name(),
+          factory_, address, socket_type, socket_opts == absl::nullopt ? nullptr : socket_opts.ref(), listener.name(),
           listener.tcpBacklogSize(), bind_type, creation_options, server_.options().concurrency()));
     }
   }

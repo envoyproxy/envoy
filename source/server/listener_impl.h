@@ -318,7 +318,13 @@ public:
   }
   void addSocketFactory(Network::ListenSocketFactoryPtr&& socket_factory);
   void setSocketAndOptions(const Network::SocketSharedPtr& socket);
-  const Network::Socket::OptionsSharedPtr& listenSocketOptions() { return listen_socket_options_; }
+  OptRef<const Network::Socket::OptionsSharedPtr> listenSocketOptions(const Network::Address::InstanceConstSharedPtr& address) {
+    auto iter = listen_socket_options_map_.find(address->asString());
+    if (iter != listen_socket_options_map_.end()) {
+      return iter->second;
+    }
+    return absl::nullopt;
+  }
   const std::string& versionInfo() const { return version_info_; }
   bool reusePort() const { return reuse_port_; }
   static bool getReusePortOrDefault(Server::Instance& server,
@@ -380,10 +386,11 @@ public:
     return config().traffic_direction();
   }
 
-  void ensureSocketOptions() {
-    if (!listen_socket_options_) {
-      listen_socket_options_ =
-          std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
+  void ensureSocketOptions(const Network::Address::InstanceConstSharedPtr& address) {
+    if (!listen_socket_options_map_.contains(address->asString())) {
+      listen_socket_options_map_.insert(
+          {address->asString(),
+          std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>()});
     }
   }
 
@@ -461,9 +468,10 @@ private:
   void checkIpv4CompatAddress(const Network::Address::InstanceConstSharedPtr& address,
                               const envoy::config::core::v3::Address& proto_address);
 
-  void addListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) {
-    ensureSocketOptions();
-    Network::Socket::appendOptions(listen_socket_options_, options);
+  void addListenSocketOptions(const Network::Address::InstanceConstSharedPtr& address, const Network::Socket::OptionsSharedPtr& options) {
+    ensureSocketOptions(address);
+    ASSERT(listen_socket_options_map_.contains(address->asString()));
+    Network::Socket::appendOptions(listen_socket_options_map_[address->asString()], options);
   }
 
   ListenerManagerImpl& parent_;
@@ -495,7 +503,7 @@ private:
   std::vector<AccessLog::InstanceSharedPtr> access_logs_;
   const envoy::config::listener::v3::Listener config_;
   const std::string version_info_;
-  Network::Socket::OptionsSharedPtr listen_socket_options_;
+  absl::flat_hash_map<std::string, Network::Socket::OptionsSharedPtr> listen_socket_options_map_;
   const std::chrono::milliseconds listener_filters_timeout_;
   const bool continue_on_listener_filters_timeout_;
   std::shared_ptr<UdpListenerConfigImpl> udp_listener_config_;

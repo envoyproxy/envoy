@@ -630,39 +630,41 @@ void ListenerImpl::buildUdpListenerFactory(uint32_t concurrency) {
 }
 
 void ListenerImpl::buildListenSocketOptions() {
-  // The process-wide `signal()` handling may fail to handle SIGPIPE if overridden
-  // in the process (i.e., on a mobile client). Some OSes support handling it at the socket layer:
-  if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
-    addListenSocketOptions(Network::SocketOptionFactory::buildSocketNoSigpipeOptions());
-  }
-  if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config_, transparent, false)) {
-    addListenSocketOptions(Network::SocketOptionFactory::buildIpTransparentOptions());
-  }
-  if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config_, freebind, false)) {
-    addListenSocketOptions(Network::SocketOptionFactory::buildIpFreebindOptions());
-  }
-  if (reuse_port_) {
-    addListenSocketOptions(Network::SocketOptionFactory::buildReusePortOptions());
-  }
-  if (!config_.socket_options().empty()) {
-    addListenSocketOptions(
-        Network::SocketOptionFactory::buildLiteralOptions(config_.socket_options()));
-  }
-  if (socket_type_ == Network::Socket::Type::Datagram) {
-    // Needed for recvmsg to return destination address in IP header.
-    addListenSocketOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
-    // Needed to return receive buffer overflown indicator.
-    addListenSocketOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
-    // TODO(yugant) : Add a config option for UDP_GRO
-    if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
-      // Needed to receive gso_size option
-      addListenSocketOptions(Network::SocketOptionFactory::buildUdpGroOptions());
+  for (auto& address: addresses_) {
+    // The process-wide `signal()` handling may fail to handle SIGPIPE if overridden
+    // in the process (i.e., on a mobile client). Some OSes support handling it at the socket layer:
+    if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
+      addListenSocketOptions(address, Network::SocketOptionFactory::buildSocketNoSigpipeOptions());
     }
+    if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config_, transparent, false)) {
+      addListenSocketOptions(address, Network::SocketOptionFactory::buildIpTransparentOptions());
+    }
+    if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config_, freebind, false)) {
+      addListenSocketOptions(address, Network::SocketOptionFactory::buildIpFreebindOptions());
+    }
+    if (reuse_port_) {
+      addListenSocketOptions(address, Network::SocketOptionFactory::buildReusePortOptions());
+    }
+    if (!config_.socket_options().empty()) {
+      addListenSocketOptions(address,
+          Network::SocketOptionFactory::buildLiteralOptions(config_.socket_options()));
+    }
+    if (socket_type_ == Network::Socket::Type::Datagram) {
+      // Needed for recvmsg to return destination address in IP header.
+      addListenSocketOptions(address, Network::SocketOptionFactory::buildIpPacketInfoOptions());
+      // Needed to return receive buffer overflown indicator.
+      addListenSocketOptions(address, Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
+      // TODO(yugant) : Add a config option for UDP_GRO
+      if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
+        // Needed to receive gso_size option
+        addListenSocketOptions(address, Network::SocketOptionFactory::buildUdpGroOptions());
+      }
 
-    // Additional factory specific options.
-    ASSERT(udp_listener_config_->listener_factory_ != nullptr,
-           "buildUdpListenerFactory() must run first");
-    addListenSocketOptions(udp_listener_config_->listener_factory_->socketOptions());
+      // Additional factory specific options.
+      ASSERT(udp_listener_config_->listener_factory_ != nullptr,
+            "buildUdpListenerFactory() must run first");
+      addListenSocketOptions(address, udp_listener_config_->listener_factory_->socketOptions());
+    }
   }
 }
 
@@ -777,8 +779,10 @@ void ListenerImpl::buildConnectionBalancer(const Network::Address::Instance& add
 
 void ListenerImpl::buildSocketOptions() {
   if (config_.has_tcp_fast_open_queue_length()) {
-    addListenSocketOptions(Network::SocketOptionFactory::buildTcpFastOpenOptions(
-        config_.tcp_fast_open_queue_length().value()));
+    for (auto& address: addresses_) {
+      addListenSocketOptions(address, Network::SocketOptionFactory::buildTcpFastOpenOptions(
+          config_.tcp_fast_open_queue_length().value()));
+    }
   }
 }
 
