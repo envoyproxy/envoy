@@ -31,6 +31,7 @@
 #include "source/server/filter_chain_manager_impl.h"
 #include "source/server/listener_manager_impl.h"
 #include "source/server/transport_socket_config_impl.h"
+#include <functional>
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/active_quic_listener.h"
@@ -359,18 +360,18 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       quic_stat_names_(parent_.quicStatNames()),
       missing_listener_config_stats_({ALL_MISSING_LISTENER_CONFIG_STATS(
           POOL_COUNTER(listener_factory_context_->listenerScope()))}) {
-  std::vector<std::pair<const Network::Address::InstanceConstSharedPtr, const Protobuf::RepeatedPtrField<envoy::config::core::v3::SocketOption>&>> address_opts_list;
+  std::vector<std::reference_wrapper<const Protobuf::RepeatedPtrField<envoy::config::core::v3::SocketOption>>> address_opts_list;
   if (config.has_internal_listener()) {
     addresses_.emplace_back(
         std::make_shared<Network::Address::EnvoyInternalInstance>(config.name()));
-    address_opts_list.emplace_back(addresses_.back(), config_.socket_options());
+    address_opts_list.emplace_back(std::ref(config_.socket_options()));
   } else {
     // All the addresses should be same socket type, so get the first address's socket type is
     // enough.
     auto address = Network::Address::resolveProtoAddress(config.address());
     checkIpv4CompatAddress(address, config.address());
     addresses_.emplace_back(address);
-    address_opts_list.emplace_back(address, config_.socket_options());
+    address_opts_list.emplace_back(std::ref(config_.socket_options()));
 
     for (auto i = 0; i < config.additional_addresses_size(); i++) {
       if (socket_type_ !=
@@ -385,9 +386,9 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       checkIpv4CompatAddress(address, config.additional_addresses(i).address());
       addresses_.emplace_back(additional_address);
       if (config.additional_addresses(i).has_socket_options()) {
-        address_opts_list.emplace_back(additional_address, config.additional_addresses(i).socket_options().socket_options());
+        address_opts_list.emplace_back(std::ref(config.additional_addresses(i).socket_options().socket_options()));
       } else {
-        address_opts_list.emplace_back(additional_address, config_.socket_options());
+        address_opts_list.emplace_back(std::ref(config_.socket_options()));
       }
     }
   }
@@ -410,6 +411,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
   // buildUdpListenerFactory() must come before buildListenSocketOptions() because the UDP
   // listener factory can provide additional options.
   buildUdpListenerFactory(parent_.server_.options().concurrency());
+  listen_socket_options_list_.insert(listen_socket_options_list_.begin(), addresses_.size(), nullptr);
   buildListenSocketOptions(address_opts_list);
   createListenerFilterFactories();
   validateFilterChains();
@@ -453,7 +455,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
       dynamic_init_manager_(std::make_unique<Init::ManagerImpl>(
           fmt::format("Listener-local-init-manager {} {}", name, hash))),
       config_(config), version_info_(version_info),
-      listen_socket_options_map_(origin.listen_socket_options_map_),
+      listen_socket_options_list_(origin.listen_socket_options_list_),
       listener_filters_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, listener_filters_timeout, 15000)),
       continue_on_listener_filters_timeout_(config.continue_on_listener_filters_timeout()),
@@ -637,41 +639,41 @@ void ListenerImpl::buildUdpListenerFactory(uint32_t concurrency) {
   }
 }
 
-void ListenerImpl::buildListenSocketOptions(std::vector<std::pair<const Network::Address::InstanceConstSharedPtr, const Protobuf::RepeatedPtrField<envoy::config::core::v3::SocketOption>&>>& address_opts_list) {
-  for (auto& address_opts: address_opts_list) {
+void ListenerImpl::buildListenSocketOptions(std::vector<std::reference_wrapper<const Protobuf::RepeatedPtrField<envoy::config::core::v3::SocketOption>>>& address_opts_list) {
+  for (std::vector<std::reference_wrapper<const google::protobuf::RepeatedPtrField<envoy::config::core::v3::SocketOption> &>>::size_type i = 0; i < address_opts_list.size(); i++) {
     // The process-wide `signal()` handling may fail to handle SIGPIPE if overridden
     // in the process (i.e., on a mobile client). Some OSes support handling it at the socket layer:
     if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
-      addListenSocketOptions(address_opts.first, Network::SocketOptionFactory::buildSocketNoSigpipeOptions());
+      addListenSocketOptions(i, Network::SocketOptionFactory::buildSocketNoSigpipeOptions());
     }
     if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config_, transparent, false)) {
-      addListenSocketOptions(address_opts.first, Network::SocketOptionFactory::buildIpTransparentOptions());
+      addListenSocketOptions(i, Network::SocketOptionFactory::buildIpTransparentOptions());
     }
     if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config_, freebind, false)) {
-      addListenSocketOptions(address_opts.first, Network::SocketOptionFactory::buildIpFreebindOptions());
+      addListenSocketOptions(i, Network::SocketOptionFactory::buildIpFreebindOptions());
     }
     if (reuse_port_) {
-      addListenSocketOptions(address_opts.first, Network::SocketOptionFactory::buildReusePortOptions());
+      addListenSocketOptions(i, Network::SocketOptionFactory::buildReusePortOptions());
     }
     if (!config_.socket_options().empty()) {
-      addListenSocketOptions(address_opts.first,
-          Network::SocketOptionFactory::buildLiteralOptions(address_opts.second));
+      addListenSocketOptions(i,
+          Network::SocketOptionFactory::buildLiteralOptions(address_opts_list[i]));
     }
     if (socket_type_ == Network::Socket::Type::Datagram) {
       // Needed for recvmsg to return destination address in IP header.
-      addListenSocketOptions(address_opts.first, Network::SocketOptionFactory::buildIpPacketInfoOptions());
+      addListenSocketOptions(i, Network::SocketOptionFactory::buildIpPacketInfoOptions());
       // Needed to return receive buffer overflown indicator.
-      addListenSocketOptions(address_opts.first, Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
+      addListenSocketOptions(i, Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
       // TODO(yugant) : Add a config option for UDP_GRO
       if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
         // Needed to receive gso_size option
-        addListenSocketOptions(address_opts.first, Network::SocketOptionFactory::buildUdpGroOptions());
+        addListenSocketOptions(i, Network::SocketOptionFactory::buildUdpGroOptions());
       }
 
       // Additional factory specific options.
       ASSERT(udp_listener_config_->listener_factory_ != nullptr,
             "buildUdpListenerFactory() must run first");
-      addListenSocketOptions(address_opts.first, udp_listener_config_->listener_factory_->socketOptions());
+      addListenSocketOptions(i, udp_listener_config_->listener_factory_->socketOptions());
     }
   }
 }
@@ -787,8 +789,8 @@ void ListenerImpl::buildConnectionBalancer(const Network::Address::Instance& add
 
 void ListenerImpl::buildSocketOptions() {
   if (config_.has_tcp_fast_open_queue_length()) {
-    for (auto& address: addresses_) {
-      addListenSocketOptions(address, Network::SocketOptionFactory::buildTcpFastOpenOptions(
+    for (std::vector<Network::Address::InstanceConstSharedPtr>::size_type i = 0; i < addresses_.size(); i++) {
+      addListenSocketOptions(i, Network::SocketOptionFactory::buildTcpFastOpenOptions(
           config_.tcp_fast_open_queue_length().value()));
     }
   }
