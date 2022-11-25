@@ -2070,7 +2070,8 @@ filter_chains:
   testListenerUpdateWithSocketOptionsChangeDeprecatedBehavior(listener_origin, listener_updated);
 }
 
-TEST_P(ListenerManagerImplTest, UpdateListenerWithDifferentSocketOptionsWithMultiAddressesDeprecatedBehavior) {
+TEST_P(ListenerManagerImplTest,
+       UpdateListenerWithDifferentSocketOptionsWithMultiAddressesDeprecatedBehavior) {
   const std::string listener_origin = R"EOF(
 name: foo
 address:
@@ -2120,7 +2121,8 @@ socket_options:
 filter_chains:
 - filters: []
   )EOF";
-  testListenerUpdateWithSocketOptionsChangeDeprecatedBehavior(listener_origin, listener_updated, true);
+  testListenerUpdateWithSocketOptionsChangeDeprecatedBehavior(listener_origin, listener_updated,
+                                                              true);
 }
 
 // The socket options update is only available when enable_reuse_port as true.
@@ -6129,7 +6131,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, LiteralSockoptListenerEnabled) {
   EXPECT_EQ(1U, manager_->listeners().size());
 }
 
-TEST_P(ListenerManagerImplWithRealFiltersTest, LiteralSockoptListenerEnabledWithMultiAddressesNoOverrideOpts) {
+TEST_P(ListenerManagerImplWithRealFiltersTest,
+       LiteralSockoptListenerEnabledWithMultiAddressesNoOverrideOpts) {
   const envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
     name: SockoptsListener
     address:
@@ -6174,7 +6177,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, LiteralSockoptListenerEnabledWith
   EXPECT_EQ(1U, manager_->listeners().size());
 }
 
-TEST_P(ListenerManagerImplWithRealFiltersTest, LiteralSockoptListenerEnabledWithMultiAddressesOverrideOpts) {
+TEST_P(ListenerManagerImplWithRealFiltersTest,
+       LiteralSockoptListenerEnabledWithMultiAddressesOverrideOpts) {
   const envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
     name: SockoptsListener
     address:
@@ -6236,7 +6240,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, LiteralSockoptListenerEnabledWith
   EXPECT_EQ(1U, manager_->listeners().size());
 }
 
-TEST_P(ListenerManagerImplWithRealFiltersTest, LiteralSockoptListenerEnabledWithMultiAddressesEmptyOverrideOpts) {
+TEST_P(ListenerManagerImplWithRealFiltersTest,
+       LiteralSockoptListenerEnabledWithMultiAddressesEmptyOverrideOpts) {
   const envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
     name: SockoptsListener
     address:
@@ -6267,7 +6272,6 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, LiteralSockoptListenerEnabledWith
   expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
                            /* expected_num_options */ 3,
                            ListenerComponentFactory::BindType::NoReusePort);
-  
 
   // First address' prebind options.
   expectSetsockopt(

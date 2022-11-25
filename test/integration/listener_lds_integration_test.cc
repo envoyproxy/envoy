@@ -489,7 +489,9 @@ TEST_P(ListenerMultiAddressesIntegrationTest, BasicSuccessWithMultiAddressesAndS
     socket_option->set_name(IP_TOS);
     socket_option->set_int_value(8); // IPTOS_THROUGHPUT
     socket_option->set_state(envoy::config::core::v3::SocketOption::STATE_LISTENING);
-    auto* additional_socket_option = listener_config_.mutable_additional_addresses(0)->mutable_socket_options()->add_socket_options();
+    auto* additional_socket_option = listener_config_.mutable_additional_addresses(0)
+                                         ->mutable_socket_options()
+                                         ->add_socket_options();
     additional_socket_option->set_level(IPPROTO_IP);
     additional_socket_option->set_name(IP_TOS);
     additional_socket_option->set_int_value(4); // IPTOS_RELIABILITY

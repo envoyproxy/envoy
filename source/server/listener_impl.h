@@ -386,7 +386,8 @@ public:
   void ensureSocketOptions(uint32_t address_index) {
     ASSERT(listen_socket_options_list_.size() > address_index);
     if (listen_socket_options_list_[address_index] == nullptr) {
-      listen_socket_options_list_[address_index] = std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
+      listen_socket_options_list_[address_index] =
+          std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
     }
   }
 
@@ -453,7 +454,8 @@ private:
   void buildUdpListenerWorkerRouter(const Network::Address::Instance& address,
                                     uint32_t concurrency);
   void buildUdpListenerFactory(uint32_t concurrency);
-  void buildListenSocketOptions(std::vector<std::reference_wrapper<const Protobuf::RepeatedPtrField<envoy::config::core::v3::SocketOption>>>& address_opts_list);
+  void buildListenSocketOptions(std::vector<std::reference_wrapper<const Protobuf::RepeatedPtrField<
+                                    envoy::config::core::v3::SocketOption>>>& address_opts_list);
   void createListenerFilterFactories();
   void validateFilterChains();
   void buildFilterChains();
@@ -464,7 +466,8 @@ private:
   void checkIpv4CompatAddress(const Network::Address::InstanceConstSharedPtr& address,
                               const envoy::config::core::v3::Address& proto_address);
 
-  void addListenSocketOptions(uint32_t address_index, const Network::Socket::OptionsSharedPtr& options) {
+  void addListenSocketOptions(uint32_t address_index,
+                              const Network::Socket::OptionsSharedPtr& options) {
     ASSERT(listen_socket_options_list_.size() > address_index);
     ensureSocketOptions(address_index);
     Network::Socket::appendOptions(listen_socket_options_list_[address_index], options);

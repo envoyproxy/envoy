@@ -254,7 +254,8 @@ protected:
               EXPECT_TRUE(Network::Socket::applyOptions(options, *listener_factory_.socket_,
                                                         expected_state));
               return listener_factory_.socket_;
-            })).RetiresOnSaturation();
+            }))
+        .RetiresOnSaturation();
   }
 
   /**
@@ -355,8 +356,9 @@ protected:
 
     ListenerHandle* listener_origin = expectListenerCreate(true, true);
     if (multiple_addresses) {
-      EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0)).Times(2)
-        .WillRepeatedly(Return(socket));
+      EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0))
+          .Times(2)
+          .WillRepeatedly(Return(socket));
     } else {
       EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0))
           .WillOnce(Return(socket));
@@ -372,8 +374,9 @@ protected:
 
     ListenerHandle* listener_updated = expectListenerCreate(true, true);
     if (multiple_addresses) {
-      EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0)).Times(2)
-        .WillRepeatedly(Return(socket));
+      EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0))
+          .Times(2)
+          .WillRepeatedly(Return(socket));
     } else {
       EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0))
           .WillOnce(Return(socket));
@@ -420,9 +423,8 @@ protected:
     EXPECT_CALL(*listener_origin, onDestroy());
   }
 
-  void testListenerUpdateWithSocketOptionsChangeDeprecatedBehavior(const std::string& origin,
-                                                                   const std::string& updated,
-                                                                   bool multiple_addresses = false) {
+  void testListenerUpdateWithSocketOptionsChangeDeprecatedBehavior(
+      const std::string& origin, const std::string& updated, bool multiple_addresses = false) {
     TestScopedRuntime scoped_runtime;
     scoped_runtime.mergeValues(
         {{"envoy.reloadable_features.enable_update_listener_socket_options", "false"}});
