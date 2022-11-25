@@ -254,7 +254,7 @@ protected:
               EXPECT_TRUE(Network::Socket::applyOptions(options, *listener_factory_.socket_,
                                                         expected_state));
               return listener_factory_.socket_;
-            }));
+            })).RetiresOnSaturation();
   }
 
   /**
