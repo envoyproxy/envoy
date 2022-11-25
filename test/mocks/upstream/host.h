@@ -158,7 +158,7 @@ public:
     setOutlierDetector_(outlier_detector);
   }
 
-  void setLastHcPassTime(MonotonicTime&& last_hc_pass_time) override {
+  void setLastHcPassTime(MonotonicTime last_hc_pass_time) override {
     setLastHcPassTime_(last_hc_pass_time);
   }
 

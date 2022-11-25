@@ -230,7 +230,7 @@ protected:
     outlier_detector_ = std::move(outlier_detector);
   }
 
-  void setLastHcPassTimeImpl(MonotonicTime&& last_hc_pass_time) {
+  void setLastHcPassTimeImpl(MonotonicTime last_hc_pass_time) {
     last_hc_pass_time_.emplace(std::move(last_hc_pass_time));
   }
 
@@ -307,7 +307,7 @@ public:
     setOutlierDetectorImpl(std::move(outlier_detector));
   }
 
-  void setLastHcPassTime(MonotonicTime&& last_hc_pass_time) override {
+  void setLastHcPassTime(MonotonicTime last_hc_pass_time) override {
     setLastHcPassTimeImpl(std::move(last_hc_pass_time));
   }
 

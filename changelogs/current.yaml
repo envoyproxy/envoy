@@ -21,6 +21,10 @@ behavior_changes:
   change: |
     moved the strict_dns, original_dst, and logical_dns clusters to extensions. If you use these clusters and override extensions_build_config.bzl you will now need to include it explicitly.
     moved the static, strict_dns and original_dst clusters to extensions. If you use these clusters and override extensions_build_config.bzl you will now need to include it explicitly.
+- area: loadbalancing
+  change: |
+    When active HC is enabled per cluster, slow start calculation now starts after first passing HC. Cluster membership duration condition is dropped from slow start calculation.
+    Endpoint can now re-enter slow start if active HC is configured per cluster, on each "unhealthy -> healthy" state transition.
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
 - area: cache_filter
