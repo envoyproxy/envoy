@@ -210,6 +210,9 @@ private:
 };
 using CorsPolicyImpl = CorsPolicyImplBase<envoy::config::route::v3::CorsPolicy>;
 
+using RetryPolicyConstOptRef = const OptRef<const envoy::config::route::v3::RetryPolicy>;
+using HedgePolicyConstOptRef = const OptRef<const envoy::config::route::v3::HedgePolicy>;
+
 class ConfigImpl;
 /**
  * Holds all routing configuration for an entire virtual host.
@@ -241,13 +244,13 @@ public:
   bool includeAttemptCountInRequest() const override { return include_attempt_count_in_request_; }
   bool includeAttemptCountInResponse() const override { return include_attempt_count_in_response_; }
   const std::vector<ShadowPolicyPtr>& shadowPolicies() const { return shadow_policies_; }
-  const OptRef<envoy::config::route::v3::RetryPolicy> retryPolicy() const {
+  RetryPolicyConstOptRef retryPolicy() const {
     if (retry_policy_ != nullptr) {
       return *retry_policy_;
     }
     return absl::nullopt;
   }
-  const OptRef<envoy::config::route::v3::HedgePolicy> hedgePolicy() const {
+  HedgePolicyConstOptRef hedgePolicy() const {
     if (hedge_policy_ != nullptr) {
       return *hedge_policy_;
     }
@@ -968,11 +971,11 @@ private:
   bool evaluateTlsContextMatch(const StreamInfo::StreamInfo& stream_info) const;
 
   std::unique_ptr<HedgePolicyImpl>
-  buildHedgePolicy(const OptRef<envoy::config::route::v3::HedgePolicy> vhost_hedge_policy,
+  buildHedgePolicy(HedgePolicyConstOptRef vhost_hedge_policy,
                    const envoy::config::route::v3::RouteAction& route_config) const;
 
   std::unique_ptr<RetryPolicyImpl>
-  buildRetryPolicy(const OptRef<envoy::config::route::v3::RetryPolicy> vhost_retry_policy,
+  buildRetryPolicy(RetryPolicyConstOptRef vhost_retry_policy,
                    const envoy::config::route::v3::RouteAction& route_config,
                    ProtobufMessage::ValidationVisitor& validation_visitor,
                    Server::Configuration::ServerFactoryContext& factory_context) const;

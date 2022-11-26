@@ -1124,7 +1124,7 @@ RouteEntryImplBase::parseOpaqueConfig(const envoy::config::route::v3::Route& rou
 }
 
 std::unique_ptr<HedgePolicyImpl> RouteEntryImplBase::buildHedgePolicy(
-    const OptRef<envoy::config::route::v3::HedgePolicy> vhost_hedge_policy,
+    HedgePolicyConstOptRef vhost_hedge_policy,
     const envoy::config::route::v3::RouteAction& route_config) const {
   // Route specific policy wins, if available.
   if (route_config.has_hedge_policy()) {
@@ -1141,7 +1141,7 @@ std::unique_ptr<HedgePolicyImpl> RouteEntryImplBase::buildHedgePolicy(
 }
 
 std::unique_ptr<RetryPolicyImpl> RouteEntryImplBase::buildRetryPolicy(
-    const OptRef<envoy::config::route::v3::RetryPolicy> vhost_retry_policy,
+    RetryPolicyConstOptRef vhost_retry_policy,
     const envoy::config::route::v3::RouteAction& route_config,
     ProtobufMessage::ValidationVisitor& validation_visitor,
     Server::Configuration::ServerFactoryContext& factory_context) const {
