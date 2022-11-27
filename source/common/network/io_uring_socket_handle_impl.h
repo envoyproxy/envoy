@@ -83,10 +83,8 @@ public:
   void onAcceptSocket(Io::AcceptedSocketParam& param) override;
   void onRead(Io::ReadParam& param) override;
   void onWrite(Io::WriteParam& param) override;
-  void onRequestCompletion(const Io::Request& req, int32_t result) override;
 
 private:
-  void addReadRequest();
 
   std::string ioUringSocketTypeStr() {
     switch (io_uring_socket_type_) {
@@ -109,13 +107,6 @@ private:
   const absl::optional<int> domain_;
 
   Event::FileReadyCb cb_;
-  Buffer::OwnedImpl read_buf_;
-  int32_t bytes_to_read_{0};
-  Io::Request* read_req_{nullptr};
-  bool is_read_enabled_{true};
-  int32_t bytes_already_wrote_{0};
-  bool is_write_added_{false};
-  bool remote_closed_{false};
 
   OptRef<Io::AcceptedSocketParam> accepted_socket_param_{absl::nullopt};
   OptRef<Io::ReadParam> read_param_{absl::nullopt};

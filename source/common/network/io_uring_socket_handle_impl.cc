@@ -101,27 +101,7 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::close() {
     return Api::ioCallUint64ResultNoError();
   }
 
-  auto& uring = io_uring_factory_.get().ref();
-  if (read_req_) {
-    auto req = new Io::Request{*this, Io::RequestType::Cancel};
-    auto res = uring.prepareCancel(read_req_, req);
-    if (res == Io::IoUringResult::Failed) {
-      // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
-      uring.submit();
-      res = uring.prepareCancel(read_req_, req);
-      RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare cancel");
-    }
-  }
-
-  auto req = new Io::Request{absl::nullopt, Io::RequestType::Close};
-  auto res = uring.prepareClose(fd_, req);
-  if (res == Io::IoUringResult::Failed) {
-    // Fall back to posix system call.
-    ::close(fd_);
-  }
-  uring.submit();
-  SET_SOCKET_INVALID(fd_);
-  return Api::ioCallUint64ResultNoError();
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 bool IoUringSocketHandleImpl::isOpen() const { return SOCKET_VALID(fd_); }
@@ -172,32 +152,7 @@ IoUringSocketHandleImpl::readv(uint64_t max_length, Buffer::RawSlice* slices, ui
     return {num_bytes_to_read, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError)};
   }
 
-  if (remote_closed_) {
-    return Api::ioCallUint64ResultNoError();
-  }
-
-  if (bytes_to_read_ < 0) {
-    return {0, Api::IoErrorPtr(new IoSocketError(-bytes_to_read_), IoSocketError::deleteIoError)};
-  }
-
-  if (bytes_to_read_ == 0 || read_req_ == nullptr) {
-    addReadRequest();
-    return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
-                               IoSocketError::deleteIoError)};
-  }
-
-  const uint64_t max_read_length = std::min(max_length, static_cast<uint64_t>(bytes_to_read_));
-  uint64_t num_bytes_to_read = read_buf_.copyOutToSlices(max_read_length, slices, num_slice);
-  ASSERT(num_bytes_to_read <= max_read_length);
-  read_buf_.drain(num_bytes_to_read);
-  bytes_to_read_ -= num_bytes_to_read;
-  if (bytes_to_read_ == 0) {
-    bytes_to_read_ = 0;
-    read_req_ = nullptr;
-    addReadRequest();
-  }
-
-  return {num_bytes_to_read, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError)};
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::read(Buffer::Instance& buffer,
@@ -261,50 +216,7 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::writev(const Buffer::RawSlice* 
     return {ret, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError)};
   }
 
-  if (is_write_added_) {
-    return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
-                               IoSocketError::deleteIoError)};
-  }
-
-  if (bytes_already_wrote_ < 0) {
-    return {
-        0, Api::IoErrorPtr(new IoSocketError(-bytes_already_wrote_), IoSocketError::deleteIoError)};
-  }
-
-  if (bytes_already_wrote_ > 0) {
-    uint64_t len = bytes_already_wrote_;
-    bytes_already_wrote_ = 0;
-    return {len, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError)};
-  }
-
-  struct iovec* iovecs = new struct iovec[num_slice];
-  struct iovec* iov = iovecs;
-  uint64_t num_slices_to_write = 0;
-  for (uint64_t i = 0; i < num_slice; ++i) {
-    if (slices[i].mem_ != nullptr && slices[i].len_ != 0) {
-      iov[num_slices_to_write].iov_base = slices[i].mem_;
-      iov[num_slices_to_write].iov_len = slices[i].len_;
-      num_slices_to_write++;
-    }
-  }
-
-  if (num_slices_to_write > 0) {
-    is_write_added_ = true; // don't add WRITE if it's been already added.
-    auto req = new Io::Request{*this, Io::RequestType::Write, iovecs};
-    auto& uring = io_uring_factory_.get().ref();
-    auto res = uring.prepareWritev(fd_, iovecs, num_slice, 0, req);
-    if (res == Io::IoUringResult::Failed) {
-      // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
-      uring.submit();
-      res = uring.prepareWritev(fd_, iovecs, num_slice, 0, req);
-      RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare writev");
-    }
-    // Need to ensure the write request submitted.
-    uring.submit();
-  }
-
-  return {
-      0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(), IoSocketError::deleteIoError)};
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::write(Buffer::Instance& buffer) {
@@ -343,16 +255,7 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::write(Buffer::Instance& buffer)
     return {ret, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError)};
   }
 
-  // old path
-
-  // If buffer gets written and drained, the following writev will return bytes_already_wrote_
-  // directly.
-  if (bytes_already_wrote_ > 0) {
-    buffer.drain(static_cast<uint64_t>(bytes_already_wrote_));
-  }
-
-  Buffer::RawSliceVector slices = buffer.getRawSlices();
-  return writev(slices.begin(), slices.size());
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 Api::IoCallUint64Result
@@ -413,9 +316,6 @@ IoHandlePtr IoUringSocketHandleImpl::accept(struct sockaddr* addr, socklen_t* ad
   auto io_handle = std::make_unique<IoUringSocketHandleImpl>(read_buffer_size_, io_uring_factory_,
                                                              accepted_socket_param_->fd_, socket_v6only_,
                                                              domain_, enable_server_socket);
-  if (!enable_server_socket) {
-    io_handle->addReadRequest();
-  }
   accepted_socket_param_ = absl::nullopt;
 
   return io_handle;
@@ -573,13 +473,7 @@ void IoUringSocketHandleImpl::activateFileEvents(uint32_t events) {
     return;
   }
 
-  // old code path.
-  if (events & Event::FileReadyType::Write) {
-    if (io_uring_socket_type_ != IoUringSocketType::Server) {
-      addReadRequest();
-    }
-    cb_(Event::FileReadyType::Write);
-  }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 void IoUringSocketHandleImpl::enableFileEvents(uint32_t events) {
@@ -603,15 +497,6 @@ void IoUringSocketHandleImpl::enableFileEvents(uint32_t events) {
 
   if (io_uring_socket_type_ == IoUringSocketType::Client) {
     shadow_io_handle_->enableFileEvents(events);
-  } else {
-    // old code path.
-    if (events & Event::FileReadyType::Read) {
-      is_read_enabled_ = true;
-      addReadRequest();
-      cb_(Event::FileReadyType::Read);
-    } else {
-      is_read_enabled_ = false;
-    }
   }
 }
 
@@ -635,29 +520,6 @@ void IoUringSocketHandleImpl::resetFileEvents() {
 
 Api::SysCallIntResult IoUringSocketHandleImpl::shutdown(int how) {
   return Api::OsSysCallsSingleton::get().shutdown(fd_, how);
-}
-
-void IoUringSocketHandleImpl::addReadRequest() {
-  if (!is_read_enabled_ || !SOCKET_VALID(fd_) || read_req_) {
-    return;
-  }
-
-  ASSERT(io_uring_socket_type_ != IoUringSocketType::Client);
-
-  read_req_ = new Io::Request{*this, Io::RequestType::Read};
-  read_req_->buf_ = std::make_unique<uint8_t[]>(read_buffer_size_);
-  read_req_->iov_ = new struct iovec[1];
-  read_req_->iov_->iov_base = read_req_->buf_.get();
-  read_req_->iov_->iov_len = read_buffer_size_;
-  auto& uring = io_uring_factory_.get().ref();
-  auto res = uring.prepareReadv(fd_, read_req_->iov_, 1, 0, read_req_);
-
-  if (res == Io::IoUringResult::Failed) {
-    // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
-    uring.submit();
-    res = uring.prepareReadv(fd_, read_req_->iov_, 1, 0, read_req_);
-    RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare readv");
-  }
 }
 
 absl::optional<std::string> IoUringSocketHandleImpl::interfaceName() {
@@ -741,86 +603,6 @@ void IoUringSocketHandleImpl::onWrite(Io::WriteParam& param) {
   ENVOY_LOG(trace, "call event callback for write since result = {}", write_param_->result_);
   cb_(Event::FileReadyType::Write);
   write_param_ = absl::nullopt;
-}
-
-void IoUringSocketHandleImpl::onRequestCompletion(const Io::Request& req,
-                                                  int32_t result) {
-  if (result < 0) {
-    ENVOY_LOG(debug, "async request failed: {}", errorDetails(-result));
-  }
-
-  // This is hacky fix, we should check the req is valid or not.
-  if (fd_ == -1) {
-    ENVOY_LOG_MISC(debug, "the uring's fd already closed");
-    return;
-  }
-
-  switch (req.type_) {
-  case Io::RequestType::Accept:
-    // All the logic moved to IoUring worker, suppose
-    // not reach here anymore.
-    PANIC("not impelement");
-    break;
-  case Io::RequestType::Read: {
-    // Read is cancellable.
-    if (result == -ECANCELED) {
-      return;
-    }
-
-    // This is hacky fix, we should check the req is valid or not.
-    if (fd_ == -1) {
-      ENVOY_LOG_MISC(debug, "the uring's fd already closed");
-      return;
-    }
-
-    bytes_to_read_ = result;
-    if (result == 0) {
-      remote_closed_ = true;
-    }
-    if (result > 0) {
-      Buffer::BufferFragment* fragment = new Buffer::BufferFragmentImpl(
-          const_cast<Io::Request&>(req).buf_.release(), result,
-          [](const void* data, size_t /*len*/, const Buffer::BufferFragmentImpl* this_fragment) {
-            delete[] reinterpret_cast<const uint8_t*>(data);
-            delete this_fragment;
-          });
-      read_buf_.addBufferFragment(*fragment);
-    }
-    ENVOY_LOG(trace, "old path: calling callback on read event, socket type = {}, fd = {}", ioUringSocketTypeStr(), fd_);
-    cb_(Event::FileReadyType::Read);
-    break;
-  }
-  case Io::RequestType::Connect: {
-    if (result < 0) {
-      cb_(Event::FileReadyType::Closed);
-      return;
-    }
-
-    ENVOY_LOG(trace, "old path: calling callback on connect event, socket type = {}, fd = {}", ioUringSocketTypeStr(), fd_);
-    cb_(Event::FileReadyType::Write);
-    addReadRequest();
-    break;
-  }
-  case Io::RequestType::Write: {
-    // This is hacky fix, we should check the req is valid or not.
-    if (fd_ == -1) {
-      ENVOY_LOG_MISC(debug, "the uring's fd already closed");
-      return;
-    }
-
-    bytes_already_wrote_ = result;
-    is_write_added_ = false;
-    ENVOY_LOG(trace, "old path: calling callback on write event, socket type = {}, fd = {}", ioUringSocketTypeStr(), fd_);
-    cb_(Event::FileReadyType::Write);
-    break;
-  }
-  case Io::RequestType::Close:
-    break;
-  case Io::RequestType::Cancel:
-    break;
-  default:
-    PANIC("not implemented");
-  }
 }
 
 } // namespace Network

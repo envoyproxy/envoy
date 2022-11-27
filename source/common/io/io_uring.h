@@ -225,8 +225,6 @@ public:
   virtual void onAcceptSocket(AcceptedSocketParam& param) PURE;
   virtual void onRead(ReadParam& param) PURE;
   virtual void onWrite(WriteParam& param) PURE;
-
-  virtual void onRequestCompletion(const Request& req, int32_t result) PURE;
 };
 
 } // namespace Io
