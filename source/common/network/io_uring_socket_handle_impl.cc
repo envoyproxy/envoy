@@ -326,20 +326,7 @@ Api::SysCallIntResult IoUringSocketHandleImpl::connect(Address::InstanceConstSha
     return shadow_io_handle_->connect(address);
   }
 
-  auto& uring = io_uring_factory_.get().ref();
-  auto req = new Io::Request{*this, Io::RequestType::Connect};
-  auto res = uring.prepareConnect(fd_, address, req);
-  if (res == Io::IoUringResult::Failed) {
-    res = uring.submit();
-    if (res == Io::IoUringResult::Busy) {
-      return Api::SysCallIntResult{0, SOCKET_ERROR_AGAIN};
-    }
-    res = uring.prepareConnect(fd_, address, req);
-    RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare connect");
-  }
-  // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
-  uring.submit();
-  return Api::SysCallIntResult{0, SOCKET_ERROR_IN_PROGRESS};
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 Api::SysCallIntResult IoUringSocketHandleImpl::setOption(int level, int optname, const void* optval,
