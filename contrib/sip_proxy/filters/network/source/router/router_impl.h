@@ -240,14 +240,9 @@ class Router : public Upstream::LoadBalancerContextBase,
                public SipFilters::DecoderFilter,
                Logger::Loggable<Logger::Id::connection> {
 public:
-  Router(RouterFilterConfig& config, Upstream::ClusterManager& cluster_manager,
-         const std::string& stat_prefix, Stats::Scope& scope,
+  Router(std::shared_ptr<RouterFilterConfig> config, Upstream::ClusterManager& cluster_manager,
          Server::Configuration::FactoryContext& context)
-      : cluster_manager_(cluster_manager), stats_(config.stats()), context_(context) {
-    UNREFERENCED_PARAMETER(context_);
-    UNREFERENCED_PARAMETER(stat_prefix);
-    UNREFERENCED_PARAMETER(scope);
-  }
+      : cluster_manager_(cluster_manager), stats_(config->stats()), context_(context) {}
 
   // SipFilters::DecoderFilter
   void onDestroy() override;
@@ -277,12 +272,6 @@ public:
 
 private:
   void cleanup();
-  RouterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
-    return RouterStats{ALL_SIP_ROUTER_STATS(POOL_COUNTER_PREFIX(scope, prefix),
-                                            POOL_GAUGE_PREFIX(scope, prefix),
-                                            POOL_HISTOGRAM_PREFIX(scope, prefix))};
-  }
-
   FilterStatus handleAffinity();
   FilterStatus messageHandlerWithLoadBalancer(std::shared_ptr<TransactionInfo> transaction_info,
                                               MessageMetadataSharedPtr metadata, std::string dest,

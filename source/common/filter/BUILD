@@ -20,7 +20,6 @@ envoy_cc_library(
         "//envoy/thread_local:thread_local_interface",
         "//source/common/common:containers_lib",
         "//source/common/config:subscription_base_interface",
-        "//source/common/config:subscription_factory_lib",
         "//source/common/config:utility_lib",
         "//source/common/grpc:common_lib",
         "//source/common/init:manager_lib",

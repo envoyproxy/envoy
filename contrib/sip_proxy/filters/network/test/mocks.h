@@ -38,6 +38,12 @@ public:
   MOCK_METHOD(std::shared_ptr<SipSettings>, settings, ());
 };
 
+class MockRouterFilterConfig : public Router::RouterFilterConfig {
+public:
+  // Router::RouterFilterConfig
+  MOCK_METHOD(Router::RouterStats&, stats, ());
+};
+
 class MockDecoderEventHandler : public DecoderEventHandler {
 public:
   MockDecoderEventHandler();

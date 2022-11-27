@@ -86,6 +86,7 @@ envoy_cc_library(
         "//envoy/tracing:http_tracer_interface",
         "//source/common/access_log:access_log_manager_lib",
         "//source/common/common:assert_lib",
+        "//source/common/common:random_generator_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:utility_lib",
         "//source/common/grpc:common_lib",

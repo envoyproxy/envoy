@@ -23,13 +23,13 @@ public:
 
   RouterStats& stats() override { return stats_; }
 
-private:
-  RouterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
+  static RouterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
     return RouterStats{ALL_SIP_ROUTER_STATS(POOL_COUNTER_PREFIX(scope, prefix),
                                             POOL_GAUGE_PREFIX(scope, prefix),
                                             POOL_HISTOGRAM_PREFIX(scope, prefix))};
   }
 
+private:
   RouterStats stats_;
 };
 
