@@ -277,7 +277,7 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/path/rewrite/uri_template @alyssawilk @yanjunxiang-google
 # Dubbo codec
 /*/extensions/common/dubbo @wbpcode @lizan
-/*/extensions/load_balancing_policies/deterministic_aperture @conqerAtapple
+/*/extensions/load_balancing_policies/deterministic_aperture @conqerAtapple @ggreenway
 
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED
