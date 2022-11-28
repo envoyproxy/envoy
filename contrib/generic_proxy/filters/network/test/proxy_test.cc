@@ -647,7 +647,7 @@ TEST_F(FilterTest, NewStreamAndReplyNormally) {
       }));
 
   EXPECT_CALL(factory_context_.drain_manager_, drainClose()).WillOnce(Return(false));
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
 
   auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
   active_stream->upstreamResponse(std::move(response));
@@ -676,7 +676,7 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithDrainClose) {
       }));
 
   EXPECT_CALL(factory_context_.drain_manager_, drainClose()).WillOnce(Return(true));
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
 
   auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
