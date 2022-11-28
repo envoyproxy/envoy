@@ -4,6 +4,7 @@
 !\.bazelci
 !\.bazelignore
 !\.bazelrc
+!\.bazelproject
 !\.bazelversion
 !\.clang-format
 !\.clang-tidy
@@ -20,7 +21,6 @@
 !\.yapfignore
 !\.zuul
 !\.zuul.yaml
-!\.bazelproject
 
 /bazel-*
 /mobile/bazel-*
