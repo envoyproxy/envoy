@@ -1,0 +1,17 @@
+GitPython==2.0.8
+Jinja2==2.10
+MarkupSafe==1.1.0
+Pygments==2.2.0
+alabaster==0.7.10
+babel==2.4.0
+docutils==0.14
+gitdb==0.6.4
+imagesize==0.7.1
+pytz==2017.2
+requests>=2.20.0
+six==1.10.0
+smmap==0.9.0
+snowballstemmer==1.2.1
+sphinx==1.8.1
+sphinxcontrib-httpdomain==1.6.1
+sphinx_rtd_theme==0.4.2
