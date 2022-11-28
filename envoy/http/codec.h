@@ -46,6 +46,7 @@ const char MaxResponseHeadersCountOverrideKey[] =
     "envoy.reloadable_features.max_response_headers_count";
 
 class Stream;
+class RequestDecoder;
 
 /**
  * Error codes used to convey the reason for a GOAWAY.
@@ -135,6 +136,46 @@ public:
 };
 
 /**
+ * Stream encoder used for sending a response (server to client). Virtual inheritance is required
+ * due to a parallel implementation split between the shared base class and the derived class.
+ */
+class ResponseEncoder : public virtual StreamEncoder {
+public:
+  /**
+   * Encode supported 1xx headers.
+   * Currently 100-Continue, 102-Processing, and 103-Early-Data headers are supported.
+   * @param headers supplies the 1xx header map to encode.
+   */
+  virtual void encode1xxHeaders(const ResponseHeaderMap& headers) PURE;
+
+  /**
+   * Encode headers, optionally indicating end of stream. Response headers must
+   * have a valid :status set.
+   * @param headers supplies the header map to encode.
+   * @param end_stream supplies whether this is a header only response.
+   */
+  virtual void encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) PURE;
+
+  /**
+   * Encode trailers. This implicitly ends the stream.
+   * @param trailers supplies the trailers to encode.
+   */
+  virtual void encodeTrailers(const ResponseTrailerMap& trailers) PURE;
+
+  /**
+   * Indicates whether invalid HTTP messaging should be handled with a stream error or a connection
+   * error.
+   */
+  virtual bool streamErrorOnInvalidHttpMessage() const PURE;
+
+  /**
+   * Set a new request decoder for this ResponseEncoder.
+   * @param decoder new request decoder.
+   */
+  virtual void setRequestDecoder(RequestDecoder& decoder) PURE;
+};
+
+/**
  * Decodes an HTTP stream. These are callbacks fired into a sink. This interface contains methods
  * common to both the request and response path.
  * TODO(mattklein123): Consider removing the StreamDecoder interface entirely and just duplicating
@@ -204,46 +245,6 @@ public:
    * @return List of shared pointers to access loggers for this stream.
    */
   virtual std::list<AccessLog::InstanceSharedPtr> accessLogHandlers() PURE;
-};
-
-/**
- * Stream encoder used for sending a response (server to client). Virtual inheritance is required
- * due to a parallel implementation split between the shared base class and the derived class.
- */
-class ResponseEncoder : public virtual StreamEncoder {
-public:
-  /**
-   * Encode supported 1xx headers.
-   * Currently 100-Continue, 102-Processing, and 103-Early-Data headers are supported.
-   * @param headers supplies the 1xx header map to encode.
-   */
-  virtual void encode1xxHeaders(const ResponseHeaderMap& headers) PURE;
-
-  /**
-   * Encode headers, optionally indicating end of stream. Response headers must
-   * have a valid :status set.
-   * @param headers supplies the header map to encode.
-   * @param end_stream supplies whether this is a header only response.
-   */
-  virtual void encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) PURE;
-
-  /**
-   * Encode trailers. This implicitly ends the stream.
-   * @param trailers supplies the trailers to encode.
-   */
-  virtual void encodeTrailers(const ResponseTrailerMap& trailers) PURE;
-
-  /**
-   * Indicates whether invalid HTTP messaging should be handled with a stream error or a connection
-   * error.
-   */
-  virtual bool streamErrorOnInvalidHttpMessage() const PURE;
-
-  /**
-   * Set a new request decoder for this ResponseEncoder.
-   * @param decoder new request decoder.
-   */
-  virtual void setRequestDecoder(RequestDecoder& decoder) PURE;
 };
 
 /**
