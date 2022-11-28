@@ -3781,5 +3781,24 @@ TEST_P(Http1ClientConnectionImplTest, ResponseHttpVersion) {
   }
 }
 
+// 304 responses must not have a body.
+TEST_P(Http1ClientConnectionImplTest, 304WithBody) {
+  initialize();
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
+
+  EXPECT_CALL(response_decoder, decodeHeaders_(_, true));
+  Buffer::OwnedImpl response("HTTP/1.1 304 Not Modified\r\n"
+                             "Content-Length: 2\r\n"
+                             "\r\n"
+                             "blah");
+  auto status = codec_->dispatch(response);
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ("http/1.1 protocol error: extraneous data after response complete", status.message());
+}
+
 } // namespace Http
 } // namespace Envoy
