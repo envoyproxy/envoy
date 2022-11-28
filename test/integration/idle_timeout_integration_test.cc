@@ -3,6 +3,7 @@
 
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/test_time.h"
+#include "test/test_common/utility.h"
 
 using testing::HasSubstr;
 
