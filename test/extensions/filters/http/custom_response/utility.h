@@ -40,10 +40,6 @@ constexpr absl::string_view kDefaultConfig = R"EOF(
               status_code: 499
               body:
                 inline_string: "not allowed"
-              body_format:
-                json_format:
-                  status: "%RESPONSE_CODE%"
-                  message: "%LOCAL_REPLY_BODY%"
               response_headers_to_add:
               - header:
                   key: "foo"
@@ -174,6 +170,8 @@ void modifyPolicy(
 // on route specific config.
 class LocalReplyDuringDecodeIfNotCER : public ::Envoy::Http::PassThroughFilter {
 public:
+  ~LocalReplyDuringDecodeIfNotCER() override;
+
   constexpr static char name[] = "local-reply-during-decode-if-not-cer";
 
   ::Envoy::Http::FilterHeadersStatus decodeHeaders(::Envoy::Http::RequestHeaderMap&,
@@ -195,6 +193,8 @@ public:
 
 class LocalReplyDuringEncodeIfNotCER : public ::Envoy::Http::PassThroughFilter {
 public:
+  ~LocalReplyDuringEncodeIfNotCER() override;
+
   constexpr static char name[] = "local-reply-during-encode-if-not-cer";
 
   ::Envoy::Http::FilterHeadersStatus encodeHeaders(::Envoy::Http::ResponseHeaderMap&,

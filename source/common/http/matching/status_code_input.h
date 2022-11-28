@@ -70,9 +70,10 @@ public:
 template <class DataInputType, class ProtoType>
 class HttpResponseStatusCodeInputFactoryBase : public Matcher::DataInputFactory<HttpMatchingData> {
 public:
-  explicit HttpResponseStatusCodeInputFactoryBase(const std::string& name) : name_(name) {}
+  explicit HttpResponseStatusCodeInputFactoryBase(const std::string& name)
+      : name_("envoy.matching.inputs." + name) {}
 
-  std::string name() const override { return "envoy.matching.inputs." + name_; }
+  std::string name() const override { return name_; }
 
   Matcher::DataInputFactoryCb<HttpMatchingData>
   createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {

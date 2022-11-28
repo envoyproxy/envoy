@@ -23,7 +23,10 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // policies in a matcher tree. The configuration can be defined at the filter,
 // virtual host or route level. The most specific configuration will apply.
 message CustomResponse {
-  // Matcher to match against the original response.
+  // Matcher to match against the original response to select a
+  // :ref:`Custom Response Policy <extension_category_envoy.http.custom_response>`
+  // that will override the original response. The matching is done by matching
+  // against :ref:`response header values<extension_category_envoy.matching.http.input>`
   // Example:
   //
   // .. validated-code-block:: yaml
@@ -99,5 +102,6 @@ message CustomResponse {
   //
   // Refer to :ref:`Unified Matcher API <envoy_v3_api_msg_.xds.type.matcher.v3.Matcher>`
   // documentation for more information on the matcher trees.
+  // [#extension-category: envoy.http.custom_response]
   xds.type.matcher.v3.Matcher custom_response_matcher = 1;
 }

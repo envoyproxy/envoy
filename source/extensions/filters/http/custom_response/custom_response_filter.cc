@@ -42,13 +42,14 @@ Http::FilterHeadersStatus CustomResponseFilter::encodeHeaders(Http::ResponseHead
   }
 
   // Check for route specific config.
-  const auto* per_route_settings =
+  const FilterConfig* per_route_settings =
       Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfig>(decoder_callbacks_);
-  const auto config_to_use = per_route_settings
-                                 ? static_cast<const FilterConfig*>(per_route_settings)
-                                 : static_cast<const FilterConfig*>(config_.get());
+  const FilterConfig* config_to_use = per_route_settings
+                                          ? static_cast<const FilterConfig*>(per_route_settings)
+                                          : static_cast<const FilterConfig*>(config_.get());
   // Check if any custom response policy applies to this response.
-  const auto policy = config_to_use->getPolicy(headers, encoder_callbacks_->streamInfo());
+  const PolicySharedPtr policy =
+      config_to_use->getPolicy(headers, encoder_callbacks_->streamInfo());
 
   // A valid custom response was not found. We should just pass through.
   if (!policy) {

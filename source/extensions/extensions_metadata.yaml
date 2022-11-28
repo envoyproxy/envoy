@@ -1346,7 +1346,7 @@ envoy.http.custom_response.redirect_policy:
   security_posture: unknown
   status: wip
   type_urls:
-  - envoy.extensions.http.custom_response.redirect_policy.v3.CustomResponse
+  - envoy.extensions.http.custom_response.redirect_policy.v3.RedirectPolicy
 envoy.http.custom_response.local_response_policy:
   categories:
   - envoy.http.custom_response

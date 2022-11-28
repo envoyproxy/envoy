@@ -36,11 +36,10 @@ createMatcher(const envoy::extensions::filters::http::custom_response::v3::Custo
     Matcher::MatchTreeFactory<::Envoy::Http::HttpMatchingData, CustomResponseActionFactoryContext>
         factory(action_factory_context, context, validation_visitor);
     return factory.create(config.custom_response_matcher())();
-  } else {
-    // Allow matcher to not be set, to allow for cases where we only have route or
-    // virtual host specific configurations.
-    return Matcher::MatchTreePtr<::Envoy::Http::HttpMatchingData>{};
   }
+  // Allow matcher to not be set, to allow for cases where we only have route or
+  // virtual host specific configurations.
+  return {};
 }
 
 } // namespace

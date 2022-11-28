@@ -526,7 +526,9 @@ TEST_P(CustomResponseIntegrationTest, RouteHeaderMatch) {
 
 // Test ModifyRequestHeadersAction
 TEST_P(CustomResponseIntegrationTest, ModifyRequestHeaders) {
-  // Add modify_request_headers_action to the config.
+  // Add modify_request_headers_action to the config. This will enable
+  // TestModifyRequestHeadersAction to add "x-envoy-cer-backend" header to the
+  // request before being redirected.
   modifyPolicy<RedirectPolicyProto>(custom_response_filter_config_, "520_action",
                                     [](RedirectPolicyProto& policy) {
                                       auto action = policy.mutable_modify_request_headers_action();

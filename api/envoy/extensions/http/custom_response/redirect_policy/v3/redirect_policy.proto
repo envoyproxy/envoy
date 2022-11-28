@@ -26,9 +26,9 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // upstream.
 // [#next-free-field: 7]
 message RedirectPolicy {
-  // TODO(pradeepcrao): Add the ability to specify the full uri, or just host or
+  // [#comment: TODO(pradeepcrao): Add the ability to specify the full uri, or just host or
   // path rewrite for the redirection in the same vein as
-  // config.route.v3.RedirectAction
+  // config.route.v3.RedirectAction]
   // The host that will serve the custom response.
   //
   // Example:
@@ -45,7 +45,8 @@ message RedirectPolicy {
   //
   //  .. code-block:: yaml
   //
-  //  path: /path/to/503_response.txt
+  //    path: /path/to/503_response.txt
+  //
   string path = 2 [(validate.rules).string = {min_len: 1}];
 
   // The new response status code if specified. This is used to override the
@@ -67,6 +68,6 @@ message RedirectPolicy {
 
   // Custom action to modify request headers before selection of the
   // redirected route.
-  // TODO(pradeepcrao) add an extension category.
+  // [#comment: TODO(pradeepcrao) add an extension category.]
   config.core.v3.TypedExtensionConfig modify_request_headers_action = 6;
 }

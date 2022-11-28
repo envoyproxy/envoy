@@ -6,5 +6,35 @@ This filter is used to override responses from upstream (primarily error respons
 
 Configuration
 -------------
+The filter configuration consists of a matcher that matches the original response to specific custom response policies to be used to override the response.
+
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.CustomResponse``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.custom_response.v3.CustomResponse>`
+
+.. _extension_category_envoy.http.custom_response:
+
+Custom Response Policies
+------------------------
+
+Custom response policies define where from and how to retrieve custom responses once a response is matched to a particular policy by the matcher.
+
+.. _extension_envoy.http.custom_response.redirect_policy:
+
+Redirect policy
+###############
+
+The redirect policy can be used to override the original response by internally redirecting it to a different route by modifying the host and path of the original request. The policy config can be used to modify both the request and response headers and the response status code.
+
+* This extension should be configued with the type URL ``type.googleapis.com/envoy.extensions.http.custom_response.redirect_policy.v3.RedirectPolicy``.
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.http.custom_response.redirect_policy.v3.RedirectPolicy>`
+
+.. _extension_envoy.http.custom_response.local_response_policy:
+
+Local Response Policy
+#####################
+
+The local response policy can be used to override the original response with a locally stored response body. The policy config can be used to modify the response headers and the response status code.
+
+* This extension should be configued with the type URL ``type.googleapis.com/envoy.extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy``.
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy>`
+

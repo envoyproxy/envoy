@@ -29,7 +29,9 @@ message LocalResponsePolicy {
   // in the `%LOCAL_REPLY_BODY%` command operator in the `body_format`.
   config.core.v3.DataSource body = 1;
 
-  // Optional body format to be used for this response.
+  // Optional body format to be used for this response. If `body_format` is  not
+  // provided, and `body` is, the contents of `body` will be used to populate
+  // the body of the local reply without formatting.
   config.core.v3.SubstitutionFormatString body_format = 2;
 
   // The new response status code if specified.

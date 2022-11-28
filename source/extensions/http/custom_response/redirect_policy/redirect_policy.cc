@@ -72,11 +72,11 @@ std::unique_ptr<ModifyRequestHeadersAction> RedirectPolicy::createModifyRequestH
   // the remote source and return.
   auto encoder_callbacks = custom_response_filter.encoderCallbacks();
   auto decoder_callbacks = custom_response_filter.decoderCallbacks();
-  auto filter_state = encoder_callbacks->streamInfo().filterState()->getDataReadOnly<Policy>(
+  const Policy* policy = encoder_callbacks->streamInfo().filterState()->getDataReadOnly<Policy>(
       "envoy.filters.http.custom_response");
-  if (filter_state) {
-    ENVOY_BUG(filter_state == this, "Policy filter state should be this policy.");
-    //  Apply mutations if this is a non-error response. Else leave be.
+  if (policy) {
+    ENVOY_BUG(policy == this, "Policy filter state should be this policy.");
+    //  Apply mutations if this is not an error or redirect response. Else leave be.
     auto const cr_code = ::Envoy::Http::Utility::getResponseStatusOrNullopt(headers);
     if (!cr_code.has_value() || (*cr_code < 100 || *cr_code > 299)) {
       return ::Envoy::Http::FilterHeadersStatus::Continue;
@@ -133,8 +133,10 @@ std::unique_ptr<ModifyRequestHeadersAction> RedirectPolicy::createModifyRequestH
   downstream_headers->setHost(absolute_url.hostAndPort());
 
   auto path_and_query = path_;
-  // Strip the #fragment from Location URI if it is present.
-  auto fragment_pos = path_.find('#');
+  // Strip the #fragment from Location URI if it is present. Envoy treats
+  // internal redirect as a new request and will reject it if the URI path
+  // contains #fragment.
+  const auto fragment_pos = path_.find('#');
   path_and_query = path_.substr(0, fragment_pos);
 
   downstream_headers->setPath(path_);

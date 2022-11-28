@@ -7,8 +7,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace CustomResponse {
 
-constexpr char LocalReplyDuringEncodeIfNotCER::name[];
-constexpr char LocalReplyDuringDecodeIfNotCER::name[];
+LocalReplyDuringEncodeIfNotCER::~LocalReplyDuringEncodeIfNotCER() = default;
+LocalReplyDuringDecodeIfNotCER::~LocalReplyDuringDecodeIfNotCER() = default;
 
 } // namespace CustomResponse
 } // namespace HttpFilters
