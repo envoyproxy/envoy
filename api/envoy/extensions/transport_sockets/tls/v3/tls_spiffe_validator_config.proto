@@ -35,9 +35,9 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //         trust_bundle:
 //           filename: "envoy.pem"
 //
-// In this example, a presented peer certificate whose SAN matches ``spiffe//foo.com/**`` is validated against
+// In this example, a presented peer certificate whose SAN matches ``spiffe://foo.com/**`` is validated against
 // the "foo.pem" x.509 certificate. All the trust bundles are isolated from each other, so no trust domain can mint
-// a SVID belonging to another trust domain. That means, in this example, a SVID signed by ``envoy.com``'s CA with ``spiffe//foo.com/**``
+// a SVID belonging to another trust domain. That means, in this example, a SVID signed by ``envoy.com``'s CA with ``spiffe://foo.com/**``
 // SAN would be rejected since Envoy selects the trust bundle according to the presented SAN before validate the certificate.
 //
 // Note that SPIFFE validator inherits and uses the following options from :ref:`CertificateValidationContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.CertificateValidationContext>`.
