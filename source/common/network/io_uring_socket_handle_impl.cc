@@ -417,35 +417,6 @@ void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
   ENVOY_LOG(trace, "initialize file event fd = {}", fd_);
   io_uring_worker_ = io_uring_factory_.getIoUringWorker().ref();
 
-  // if (io_uring_socket_type_ == IoUringSocketType::Listen) {
-  //   //addAcceptRequest();
-  //   //io_uring_factory_.get().ref().submit();
-  //   ENVOY_LOG(trace, "initialize file event for accept socket, fd = {}", fd_);
-  //   io_uring_worker_.ref().addAcceptSocket(fd_, *this);
-  // } else if (io_uring_socket_type_ == IoUringSocketType::Server) {
-  //   ENVOY_LOG(trace, "initialize file event for server socket, fd = {}", fd_);
-  //   if (enable_server_socket_) {
-  //     io_uring_worker_->addServerSocket(fd_, *this, read_buffer_size_);
-  //   } else {
-  //     ENVOY_LOG(trace, "fallback to IoSocketHandle for server socket");
-  //     int flags = fcntl(fd_, F_GETFL, 0);
-  //     ::fcntl(fd_, F_SETFL, flags | O_NONBLOCK);
-  //     shadow_io_handle_ = std::make_unique<IoSocketHandleImpl>(fd_, socket_v6only_, domain_);
-  //     shadow_io_handle_->initializeFileEvent(dispatcher, cb, trigger, events);
-  //     return;
-  //   }
-  // } else {
-  //   ASSERT(io_uring_socket_type_ == IoUringSocketType::Unknown);
-  //   ENVOY_LOG(trace, "initialize file event for client socket, fd = {}", fd_);
-  //   ENVOY_LOG(trace, "fallback to IoSocketHandle for client socket");
-  //   io_uring_socket_type_ = IoUringSocketType::Client;
-  //   int flags = fcntl(fd_, F_GETFL, 0);
-  //   ::fcntl(fd_, F_SETFL, flags | O_NONBLOCK);
-  //   shadow_io_handle_ = std::make_unique<IoSocketHandleImpl>(fd_, socket_v6only_, domain_);
-  //   shadow_io_handle_->initializeFileEvent(dispatcher, cb, trigger, events);
-  //   return;
-  // }
-
   switch (io_uring_socket_type_) {
     case IoUringSocketType::Server: {
       ENVOY_LOG(trace, "initialize file event for server socket, fd = {}", fd_);
@@ -487,30 +458,6 @@ void IoUringSocketHandleImpl::activateFileEvents(uint32_t events) {
   ASSERT(io_uring_socket_type_ != IoUringSocketType::Unknown);
   ENVOY_LOG(trace, "activate file events {}, fd = {}, io_uring_socket_type = {}", events, fd_, ioUringSocketTypeStr());
 
-  // if (io_uring_socket_type_ == IoUringSocketType::Client) {
-  //   shadow_io_handle_->activateFileEvents(events);
-  //   return;
-  // }
-
-  // if (io_uring_socket_type_ == IoUringSocketType::Server && !enable_server_socket_) {
-  //   ASSERT(shadow_io_handle_ != nullptr);
-  //   shadow_io_handle_->activateFileEvents(events);
-  //   return;
-  // }
-
-  // if (io_uring_socket_type_ == IoUringSocketType::Listen || io_uring_socket_type_ == IoUringSocketType::Server) {
-  //   // TODO (soulxu): maybe not use EAGAIN here.
-  //   if (events & Event::FileReadyType::Read) {
-  //     ENVOY_LOG(trace, "inject read event, fd = {}, io_uring_socket_type = {}", fd_, ioUringSocketTypeStr());
-  //     io_uring_worker_.ref().injectCompletion(fd_, Io::RequestType::Read, -EAGAIN);
-  //   }
-  //   if (events & Event::FileReadyType::Write) {
-  //     ENVOY_LOG(trace, "inject write event, fd = {}, io_uring_socket_type = {}", fd_, ioUringSocketTypeStr());
-  //     io_uring_worker_.ref().injectCompletion(fd_, Io::RequestType::Write, -EAGAIN);
-  //   }
-  //   return;
-  // }
-
   switch (io_uring_socket_type_) {
     case IoUringSocketType::Client: {
       shadow_io_handle_->activateFileEvents(events);
@@ -546,25 +493,6 @@ void IoUringSocketHandleImpl::enableFileEvents(uint32_t events) {
   ENVOY_LOG(trace, "enable file events {}, fd = {}, io_uring_socket_type = {}", events, fd_, ioUringSocketTypeStr());
   ASSERT(io_uring_socket_type_ != IoUringSocketType::Unknown);
 
-  // if (io_uring_socket_type_ == IoUringSocketType::Server && !enable_server_socket_) {
-  //   ASSERT(shadow_io_handle_ != nullptr);
-  //   shadow_io_handle_->enableFileEvents(events);
-  //   return;
-  // }
-
-  // if (io_uring_socket_type_ == IoUringSocketType::Listen || io_uring_socket_type_ == IoUringSocketType::Server) {
-  //   if (!(events & Event::FileReadyType::Read)) {
-  //     io_uring_worker_.ref().disableSocket(fd_);
-  //   } else {
-  //     io_uring_worker_.ref().enableSocket(fd_);
-  //   }
-  //   return;
-  // }
-
-  // if (io_uring_socket_type_ == IoUringSocketType::Client) {
-  //   shadow_io_handle_->enableFileEvents(events);
-  // }
-
   switch (io_uring_socket_type_) {
     case IoUringSocketType::Client: {
       shadow_io_handle_->enableFileEvents(events);
@@ -595,19 +523,6 @@ void IoUringSocketHandleImpl::enableFileEvents(uint32_t events) {
 void IoUringSocketHandleImpl::resetFileEvents() {
   ASSERT(io_uring_socket_type_ != IoUringSocketType::Unknown);
   ENVOY_LOG(trace, "reset file, fd = {}, io_uring_socket_type = {}", fd_, ioUringSocketTypeStr());
-  // if (io_uring_socket_type_ == IoUringSocketType::Server && !enable_server_socket_) {
-  //   ASSERT(shadow_io_handle_ != nullptr);
-  //   shadow_io_handle_->resetFileEvents();
-  //   return;
-  // }
-
-  // if (io_uring_socket_type_ == IoUringSocketType::Listen || io_uring_socket_type_ == IoUringSocketType::Server) {
-  //   io_uring_worker_.ref().disableSocket(fd_);
-  // }
-
-  // if (io_uring_socket_type_ == IoUringSocketType::Client) {
-  //   shadow_io_handle_->resetFileEvents();
-  // }
 
   switch (io_uring_socket_type_) {
     case IoUringSocketType::Client: {
