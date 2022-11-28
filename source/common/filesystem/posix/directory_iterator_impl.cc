@@ -44,8 +44,6 @@ void DirectoryIteratorImpl::nextEntry() {
   if (entry == nullptr) {
     entry_ = {"", FileType::Other, 0};
   } else {
-    const std::string current_path(entry->d_name);
-    const std::string full_path(directory_path_ + "/" + current_path);
     entry_ = makeEntry(entry->d_name);
   }
 }
@@ -73,7 +71,7 @@ DirectoryEntry DirectoryIteratorImpl::makeEntry(absl::string_view filename) cons
     file_type = FileType::Directory;
   } else if (S_ISREG(stat_buf.st_mode)) {
     file_type = FileType::Regular;
-  }
+  } // else use the already-assigned FileType::Other.
   return DirectoryEntry{std::string{filename}, file_type, static_cast<uint64_t>(stat_buf.st_size)};
 }
 
