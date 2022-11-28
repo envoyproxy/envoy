@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - ci-run-swiftlint-on-mobile-changes
     paths:
       - 'mobile/**'
   pull_request:
