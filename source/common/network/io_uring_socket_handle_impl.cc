@@ -55,50 +55,54 @@ IoUringSocketHandleImpl::~IoUringSocketHandleImpl() {
 Api::IoCallUint64Result IoUringSocketHandleImpl::close() {
   ASSERT(SOCKET_VALID(fd_));
   ENVOY_LOG(debug, "close, fd = {}", fd_);
-  // There is case the socket will be closed directly without initialize any event.
-  if (io_uring_socket_type_ == IoUringSocketType::Unknown) {
-    ::close(fd_);
-    SET_SOCKET_INVALID(fd_);
-    return Api::ioCallUint64ResultNoError();
-  }
 
-  if (io_uring_socket_type_ == IoUringSocketType::Client) {
-    ENVOY_LOG(trace, "close the client socket");
-    if (shadow_io_handle_ == nullptr) {
-      ::close(fd_);
-      SET_SOCKET_INVALID(fd_);
-      return Api::ioCallUint64ResultNoError();
-    }
-    SET_SOCKET_INVALID(fd_);
-    return shadow_io_handle_->close();
-  }
-
-  if (io_uring_socket_type_ == IoUringSocketType::Server) {
-    if (!enable_server_socket_) {
+  switch (io_uring_socket_type_) {
+    case IoUringSocketType::Client: {
+      // Fall back to shadow io handle if server socket disabled.
+      // This will be removed when all the debug work done.
+      ENVOY_LOG(trace, "close the client socket");
       if (shadow_io_handle_ == nullptr) {
-        ENVOY_LOG(trace, "close the server socket directly, fd = {}", fd_);
         ::close(fd_);
         SET_SOCKET_INVALID(fd_);
         return Api::ioCallUint64ResultNoError();
       }
-      ENVOY_LOG(trace, "close the server socket, fd = {}", fd_);
       SET_SOCKET_INVALID(fd_);
-      return shadow_io_handle_->close(); 
+      return shadow_io_handle_->close();
     }
-  }
+    case IoUringSocketType::Server: {
+      // Fall back to shadow io handle if server socket disabled.
+      // This will be removed when all the debug work done.
+      if (!enable_server_socket_) {
+        ENVOY_LOG(trace, "close the server socket, fd = {}", fd_);
+        if (shadow_io_handle_ == nullptr) {
+          ::close(fd_);
+          SET_SOCKET_INVALID(fd_);
+          return Api::ioCallUint64ResultNoError();
+        }
+        SET_SOCKET_INVALID(fd_);
+        return shadow_io_handle_->close(); 
+      }
+      // If server socket is enabled, then execute the same code with listen socket.
+    }
+    case IoUringSocketType::Listen: {
+      ENVOY_LOG(trace, "close the socket, fd = {}, io_uring_socket_type = {}", fd_, ioUringSocketTypeStr());
 
-  if (io_uring_socket_type_ == IoUringSocketType::Listen || io_uring_socket_type_ == IoUringSocketType::Server) {
-    ENVOY_LOG(trace, "close the socket, fd = {}, io_uring_socket_type = {}", fd_, ioUringSocketTypeStr());
-
-    // There could be chance the listen socket was close before initialzie file event.
-    if (!io_uring_worker_.has_value()) {
+      // There could be chance the listen socket was close before initialzie file event.
+      if (!io_uring_worker_.has_value()) {
+        ::close(fd_);
+        SET_SOCKET_INVALID(fd_);
+        return Api::ioCallUint64ResultNoError();
+      }
+      io_uring_worker_.ref().closeSocket(fd_);
+      SET_SOCKET_INVALID(fd_);
+      return Api::ioCallUint64ResultNoError();
+    }
+    case IoUringSocketType::Unknown: {
+      // There is case the socket will be closed directly without initialize any event.
       ::close(fd_);
       SET_SOCKET_INVALID(fd_);
       return Api::ioCallUint64ResultNoError();
     }
-    io_uring_worker_.ref().closeSocket(fd_);
-    SET_SOCKET_INVALID(fd_);
-    return Api::ioCallUint64ResultNoError();
   }
 
   PANIC_DUE_TO_CORRUPT_ENUM;
