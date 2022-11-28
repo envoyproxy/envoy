@@ -1,6 +1,0 @@
-HTTP/1.1 200 OK
-Content-Type: text/plain
-Access-Control-Allow-Origin: *
-header-name: header-value
-multi-header-name: header-value1
-multi-header-name: header-value2
