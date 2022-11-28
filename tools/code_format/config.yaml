@@ -34,6 +34,7 @@ suffixes:
 
 paths:
   # Path prefixes to exclude from checking
+  # TODO(alyssawilk) unexclude mobile
   excluded:
   - .
   - bazel/external/http_parser/
@@ -43,6 +44,7 @@ paths:
   - contrib/contrib_build_config.bzl
   - examples/wasm-cc
   - generated/
+  - mobile/
   - source/extensions/common/wasm/ext
   - source/extensions/extensions_build_config.bzl
   - third_party/
