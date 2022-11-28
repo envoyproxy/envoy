@@ -11,6 +11,7 @@
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/utility.h"
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "quiche/quic/core/deterministic_connection_id_generator.h"
@@ -19,12 +20,6 @@
 namespace Envoy {
 
 using ::Envoy::Http::Http2::Http2Frame;
-
-// See https://github.com/envoyproxy/envoy/issues/21245.
-enum class Http1Impl {
-  HttpParser, // http-parser from node.js
-  BalsaParser // Balsa from QUICHE
-};
 
 enum class Http2Impl {
   Nghttp2,
@@ -143,7 +138,7 @@ public:
   ~HttpIntegrationTest() override;
 
   void initialize() override;
-  void setupHttp1ImplOverrides(Http1Impl http1_implementation);
+  void setupHttp1ImplOverrides(Http1ParserImpl http1_implementation);
   void setupHttp2ImplOverrides(Http2Impl http2_implementation);
 
 protected:
