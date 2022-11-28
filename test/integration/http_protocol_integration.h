@@ -1,6 +1,7 @@
 #pragma once
 
 #include "test/integration/http_integration.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -10,7 +11,7 @@ struct HttpProtocolTestParams {
   Network::Address::IpVersion version;
   Http::CodecType downstream_protocol;
   Http::CodecType upstream_protocol;
-  Http1Impl http1_implementation;
+  Http1ParserImpl http1_implementation;
   Http2Impl http2_implementation;
   bool defer_processing_backedup_streams;
 };
