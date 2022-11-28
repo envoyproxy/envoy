@@ -909,6 +909,7 @@ TEST_F(HttpHealthCheckerImplTest, Degraded) {
   respond(0, "200", false, false, true, false, {}, false);
   EXPECT_EQ(Host::Health::Healthy,
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
+  EXPECT_FALSE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->lastHcPassTime());
 }
 
 TEST_F(HttpHealthCheckerImplTest, SuccessIntervalJitter) {
