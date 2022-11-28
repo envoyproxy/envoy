@@ -39,7 +39,8 @@ public:
   void setBody(const std::string& body) { message_->body().add(body); }
 
   void expectSignHeaders(absl::string_view service_name, absl::string_view signature,
-                         absl::string_view payload, bool use_unsigned_payload) {
+                         absl::string_view payload, bool use_unsigned_payload,
+                         const absl::string_view override_region = "") {
     auto* credentials_provider = new NiceMock<MockCredentialsProvider>();
     EXPECT_CALL(*credentials_provider, getCredentials()).WillOnce(Return(credentials_));
     Http::TestRequestHeaderMapImpl headers{};
@@ -50,15 +51,16 @@ public:
     SignerImpl signer(service_name, "region", CredentialsProviderSharedPtr{credentials_provider},
                       time_system_, Extensions::Common::Aws::AwsSigV4HeaderExclusionVector{});
     if (use_unsigned_payload) {
-      signer.signUnsignedPayload(headers);
+      signer.signUnsignedPayload(headers, override_region);
     } else {
-      signer.signEmptyPayload(headers);
+      signer.signEmptyPayload(headers, override_region);
     }
 
-    EXPECT_EQ(fmt::format("AWS4-HMAC-SHA256 Credential=akid/20180102/region/{}/aws4_request, "
+    EXPECT_EQ(fmt::format("AWS4-HMAC-SHA256 Credential=akid/20180102/{}/{}/aws4_request, "
                           "SignedHeaders=host;x-amz-content-sha256;x-amz-date, "
                           "Signature={}",
-                          service_name, signature),
+                          override_region.empty() ? "region" : override_region, service_name,
+                          signature),
               headers.get(Http::CustomHeaders::get().Authorization)[0]->value().getStringView());
     EXPECT_EQ(payload,
               headers.get(SignatureHeaders::get().ContentSha256)[0]->value().getStringView());
@@ -170,6 +172,25 @@ TEST_F(SignerImplTest, SignContentHeader) {
                 .getStringView());
 }
 
+// Verify we sign the content header correctly when we have a body with region override
+TEST_F(SignerImplTest, SignContentHeaderOverrideRegion) {
+  EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(credentials_));
+  addMethod("POST");
+  addPath("/");
+  setBody("test1234");
+  signer_.sign(*message_, true, "region1");
+  EXPECT_EQ(
+      "937e8d5fbb48bd4949536cd65b8d35c426b80d2f830c5c308e2cdec422ae2244",
+      message_->headers().get(SignatureHeaders::get().ContentSha256)[0]->value().getStringView());
+  EXPECT_EQ("AWS4-HMAC-SHA256 Credential=akid/20180102/region1/service/aws4_request, "
+            "SignedHeaders=x-amz-content-sha256;x-amz-date, "
+            "Signature=fe8136ed21972d8618171e051f4023b7c06b85d61b4d4325be869846f404b399",
+            message_->headers()
+                .get(Http::CustomHeaders::get().Authorization)[0]
+                ->value()
+                .getStringView());
+}
+
 // Verify we sign some extra headers
 TEST_F(SignerImplTest, SignExtraHeaders) {
   EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(credentials_));
@@ -214,6 +235,16 @@ TEST_F(SignerImplTest, SignHeadersByService) {
                     SignatureConstants::get().UnsignedPayload, true);
   expectSignHeaders("glacier", "8d1f241d77c64cda57b042cd312180f16e98dbd7a96e5545681430f8dbde45a0",
                     SignatureConstants::get().UnsignedPayload, true);
+
+  // with override region
+  expectSignHeaders("s3", "70b80eaedfe73d9cf18a9d2f786f02a7dab013780a8cdc42a7c819a27bfd943c",
+                    SignatureConstants::get().UnsignedPayload, true, "region1");
+  expectSignHeaders("service", "297ca067391806a1e3cdb25723082063d0bf66a6472b902dd986d540a2058a13",
+                    SignatureConstants::get().HashedEmptyString, false, "region1");
+  expectSignHeaders("es", "cec43f0777c0d4cb2f3799a5c755dc4c3b893c23e268c1bd4e34f770fba3c1ca",
+                    SignatureConstants::get().UnsignedPayload, true, "region1");
+  expectSignHeaders("glacier", "0792940297330f2930dc1c18d0b99c0b85429865c09e836f5c086f7f182e2809",
+                    SignatureConstants::get().UnsignedPayload, true, "region1");
 }
 
 } // namespace
