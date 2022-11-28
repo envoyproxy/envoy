@@ -153,5 +153,8 @@ new_features:
 - area: jwt_authn
   change: |
     added support for copying jwt claims to http headers.
+- area: generic_proxy
+  change: |
+    added drain support to generic proxy to doing graceful closes on connections when possible.
 
 deprecated:
