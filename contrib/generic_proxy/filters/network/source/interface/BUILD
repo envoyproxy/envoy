@@ -23,6 +23,7 @@ envoy_cc_library(
     deps = [
         ":stream_interface",
         "//envoy/buffer:buffer_interface",
+        "//envoy/network:drain_decision_interface",
     ],
 )
 

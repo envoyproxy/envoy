@@ -5,6 +5,8 @@
 
 #include "contrib/generic_proxy/filters/network/source/interface/stream.h"
 
+#include "envoy/network/drain_decision.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
