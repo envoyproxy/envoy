@@ -51,7 +51,7 @@ void initializeUpstreamTlsContextConfig(
     yaml_plain += R"EOF(
     tls_certificates:
       certificate_chain:
-        filename: "{{ test_rundir }}/test/config/integration/certs/client2cert.pem"
+        filename: "{{ test_rundir }}/test/config/integration/certs/client2_chain.pem"
       private_key:
         filename: "{{ test_rundir }}/test/config/integration/certs/client2key.pem"
 )EOF";

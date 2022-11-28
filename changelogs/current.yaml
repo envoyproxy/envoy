@@ -23,6 +23,14 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: tls
+  change: |
+    added support for intermediate CA as trusted ca. The peer certificate issued by an intermediate CA will be trusted by
+    building valid partial chain. In old days, it can not be verified without trusting its ancestor root CA and building
+    a full chain.
+    :ref:`trust_ca<envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.trusted_ca>`.
+    This change can be reverted via the ``envoy.reloadable_features.enable_intermediate_ca``.
+
 - area: cache_filter
   change: |
     add a completion callback to updateHeaders interface. Any external cache implementations will need to update to match this new interface. See changes to simple_http_cache in PR#23666 for example.
