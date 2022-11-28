@@ -6,9 +6,11 @@ on:
       - main
     paths:
     - 'mobile/**'
+    - '.github/workflows/**'
   pull_request:
     paths:
     - 'mobile/**'
+    - '.github/workflows/**'
 
 jobs:
   kotlintestsmac:
@@ -96,7 +98,7 @@ jobs:
     # Only kotlin tests are executed since with linux:
     # https://github.com/envoyproxy/envoy-mobile/issues/1418.
     name: kotlin_tests_linux
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 90
     container:
       image: envoyproxy/envoy-build-ubuntu:0a02a76af5951bf7f4c7029c0ea6d29d96c0f682
