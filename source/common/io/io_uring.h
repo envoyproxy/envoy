@@ -181,6 +181,9 @@ public:
 
   virtual uint64_t write(Buffer::Instance&) { PANIC("not implemented"); }
   virtual uint64_t writev(const Buffer::RawSlice*, uint64_t) { PANIC("not implemented"); }
+
+  virtual void connect(const Network::Address::InstanceConstSharedPtr&) { PANIC("not implemented"); }
+
   virtual void onAccept(int32_t) { PANIC("not implemented"); };
   virtual void onClose(int32_t) { PANIC("not implemented"); };
   virtual void onCancel(int32_t) { PANIC("not implemented"); };
@@ -211,6 +214,7 @@ public:
   virtual Request* submitCloseRequest(IoUringSocket& socket) PURE;
   virtual Request* submitReadRequest(IoUringSocket& socket, struct iovec* iov) PURE;
   virtual Request* submitWritevRequest(IoUringSocket& socket, struct iovec* iovecs, uint64_t num_vecs) PURE;
+  virtual Request* submitConnectRequest(IoUringSocket& socket, const Network::Address::InstanceConstSharedPtr& address) PURE;
 
   virtual void injectCompletion(os_fd_t, RequestType type, int32_t result) PURE;
   virtual void injectCompletion(IoUringSocket& socket, RequestType type, int32_t result) PURE;

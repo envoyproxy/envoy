@@ -172,7 +172,7 @@ void IoUringWorkerImpl::addAcceptSocket(os_fd_t fd, IoUringHandler& handler) {
   socket->start();
   ASSERT(sockets_.find(fd) == sockets_.end());
   sockets_.insert({fd, std::move(socket)});
-  io_uring_impl_.submit();
+  //io_uring_impl_.submit();
 }
 
 void IoUringWorkerImpl::addServerSocket(os_fd_t fd, IoUringHandler& handler, uint32_t read_buffer_size) {
@@ -181,7 +181,7 @@ void IoUringWorkerImpl::addServerSocket(os_fd_t fd, IoUringHandler& handler, uin
   socket->start();
   ASSERT(sockets_.find(fd) == sockets_.end());
   sockets_.insert({fd, std::move(socket)});
-  io_uring_impl_.submit();
+  //io_uring_impl_.submit();
 }
 
 void IoUringWorkerImpl::addClientSocket(os_fd_t fd, IoUringHandler& handler, uint32_t read_buffer_size) {
@@ -190,7 +190,7 @@ void IoUringWorkerImpl::addClientSocket(os_fd_t fd, IoUringHandler& handler, uin
   socket->start();
   ASSERT(sockets_.find(fd) == sockets_.end());
   sockets_.insert({fd, std::move(socket)});
-  io_uring_impl_.submit();
+  //io_uring_impl_.submit();
 }
 
 void IoUringWorkerImpl::closeSocket(os_fd_t fd) {
@@ -306,6 +306,24 @@ Request* IoUringWorkerImpl::submitWritevRequest(IoUringSocket& socket, struct io
     // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
     io_uring_impl_.submit();
     res = io_uring_impl_.prepareWritev(socket.fd(), iovecs, num_vecs, 0, req);
+    RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare writev");
+  }
+  io_uring_impl_.submit();
+  return req;
+}
+
+Request* IoUringWorkerImpl::submitConnectRequest(IoUringSocket& socket, const Network::Address::InstanceConstSharedPtr& address) {
+  Request* req = new Request();
+  req->io_uring_socket_ = socket;
+  req->type_ = RequestType::Connect;
+
+  ENVOY_LOG(trace, "submit connect request, fd = {}, req = {}", socket.fd(), fmt::ptr(req));
+
+  auto res = io_uring_impl_.prepareConnect(socket.fd(), address, req);
+  if (res == Io::IoUringResult::Failed) {
+    // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
+    io_uring_impl_.submit();
+    res = io_uring_impl_.prepareConnect(socket.fd(), address, req);
     RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare writev");
   }
   io_uring_impl_.submit();

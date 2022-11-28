@@ -42,10 +42,6 @@ IoUringSocketHandleImpl::IoUringSocketHandleImpl(const uint32_t read_buffer_size
 
 IoUringSocketHandleImpl::~IoUringSocketHandleImpl() {
   if (SOCKET_VALID(fd_)) {
-    if (io_uring_socket_type_ == IoUringSocketType::Client) {
-      shadow_io_handle_->close();
-      return;
-    }
     // The TLS slot has been shut down by this moment with IoUring wiped out, thus
     // better use this posix system call instead of IoUringSocketHandleImpl::close().
     ::close(fd_);
@@ -287,9 +283,9 @@ Api::SysCallIntResult IoUringSocketHandleImpl::connect(Address::InstanceConstSha
     return shadow_io_handle_->connect(address);
   }
 
-  auto sockaddr_to_use = address->sockAddr();
-  auto sockaddr_len_to_use = address->sockAddrLen();
-  return Api::OsSysCallsSingleton::get().connect(fd_, sockaddr_to_use, sockaddr_len_to_use);
+  auto& io_uring_client_socket = io_uring_worker_.ref().getIoUringSocket(fd_);
+  io_uring_client_socket.connect(address);
+  return Api::SysCallIntResult{0, 0};
 }
 
 Api::SysCallIntResult IoUringSocketHandleImpl::setOption(int level, int optname, const void* optval,

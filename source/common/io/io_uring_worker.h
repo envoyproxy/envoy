@@ -310,7 +310,7 @@ public:
     return data_to_write;
   }
 
-private:
+protected:
   void submitReadRequest() {
     ENVOY_LOG(trace, "submit read request, fd = {}", fd_);
     ASSERT(read_req_ == nullptr);
@@ -377,6 +377,35 @@ public:
   IoUringClientSocket(os_fd_t fd, IoUringHandler& io_uring_handler,
                       IoUringWorker& parent, uint32_t read_buffer_size):
     IoUringBaseSocket(fd, io_uring_handler, parent, read_buffer_size) {}
+
+  void start() override {
+    ENVOY_LOG(debug, "start client socket, fd = {}", fd_);
+    // Client socket do nothing for start, it need to connect the client first.
+  }
+
+  void connect(const Network::Address::InstanceConstSharedPtr& address) override {
+    ENVOY_LOG(trace, "connect to {}, fd = {}", address->asString(), fd_);
+    connect_req_ = parent_.submitConnectRequest(*this, address);
+  }
+
+  void onConnect(int32_t result) override {
+    ENVOY_LOG(trace, "on connect, fd = {}, result = {}", fd_, result);
+    connect_req_ = nullptr;
+    parent_.injectCompletion(*this, RequestType::Write, -EAGAIN);
+  }
+
+  void onWrite(int32_t result, Request* req) override {
+    if (connecting_ && result == -EAGAIN && req != write_req_) {
+      ENVOY_LOG(debug, "connecting finished");
+      connecting_ = false;
+      submitReadRequest();
+    }
+    IoUringBaseSocket::onWrite(result, req);
+  }
+
+private:
+  Request* connect_req_{nullptr};
+  bool connecting_{true};
 };
 
 
@@ -417,6 +446,7 @@ public:
   Request* submitCloseRequest(IoUringSocket& socket) override;
   Request* submitReadRequest(IoUringSocket& socket, struct iovec* iov) override;
   Request* submitWritevRequest(IoUringSocket& socket, struct iovec* iovecs, uint64_t num_vecs) override;
+  Request* submitConnectRequest(IoUringSocket& socket, const Network::Address::InstanceConstSharedPtr& address) override;
 
   void injectCompletion(os_fd_t, RequestType type, int32_t result) override;
   void injectCompletion(IoUringSocket& socket, RequestType type, int32_t result) override;
