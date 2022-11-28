@@ -1,5 +1,8 @@
 #pragma once
 
+#include <string>
+#include "absl/types/variant.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {

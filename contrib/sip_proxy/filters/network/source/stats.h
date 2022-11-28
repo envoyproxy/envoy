@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
 #include "contrib/sip_proxy/filters/network/source/sip.h"
 
 namespace Envoy {

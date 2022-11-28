@@ -149,6 +149,12 @@ void TrafficRoutingAssistantHandler::complete(const TrafficRoutingAssistant::Res
       ENVOY_LOG(debug, "TRA UPDATE {}: {}={}", message_type, item.first, item.second);
       cache_manager_[message_type].emplace(item.first, item.second);
     }
+    break;
+  }
+  case TrafficRoutingAssistant::ResponseType::FailureResp: {
+    ENVOY_LOG(trace, "TRA === FailureResp");
+
+    break;
   }
   default:
     break;
