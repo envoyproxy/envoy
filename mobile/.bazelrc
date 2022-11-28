@@ -101,7 +101,7 @@ build:tsan-dev --test_env="TSAN_OPTIONS=report_atomic_races=0"
 build:release-common --define=no_debug_info=1
 
 # Compile releases optimizing for size (eg -Os, etc).
-build:release-common --config=sizeopt
+build:release-common --config=sizeopt --define=admin_functionality=disabled
 
 # Set default symbols visibility to hidden to reduce .dynstr and the symbol table size
 build:release-common --copt=-fvisibility=hidden
