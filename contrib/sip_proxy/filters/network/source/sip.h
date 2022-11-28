@@ -1,8 +1,9 @@
 #pragma once
 
-#include "absl/strings/string_view.h"
-#include "absl/container/flat_hash_map.h"
 #include "source/common/singleton/const_singleton.h"
+
+#include "absl/container/flat_hash_map.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Extensions {
