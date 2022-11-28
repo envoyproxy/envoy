@@ -65,6 +65,9 @@ DirectoryEntry DirectoryIteratorImpl::makeEntry(absl::string_view filename) cons
       }
     }
     if (file_type == FileType::Other) {
+      // TODO: throwing an exception here makes this dangerous to use in worker threads,
+      // and in general since it's not clear to the user of Directory that an exception
+      // may be thrown. Perhaps make this return StatusOr and handle failures gracefully.
       throw EnvoyException(fmt::format("unable to stat file: '{}' ({})", full_path, errno));
     }
   } else if (S_ISDIR(stat_buf.st_mode)) {
