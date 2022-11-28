@@ -170,32 +170,36 @@ IoUringSocketHandleImpl::readv(uint64_t max_length, Buffer::RawSlice* slices, ui
 Api::IoCallUint64Result IoUringSocketHandleImpl::read(Buffer::Instance& buffer,
                                                       absl::optional<uint64_t> max_length_opt) {
   ASSERT(io_uring_socket_type_ != IoUringSocketType::Unknown);
-
   ENVOY_LOG(trace, "read, fd = {}, socket type = {}", fd_, ioUringSocketTypeStr());
 
-  if (io_uring_socket_type_ == IoUringSocketType::Client) {
-    return shadow_io_handle_->read(buffer, max_length_opt);
+  switch (io_uring_socket_type_) {
+    case IoUringSocketType::Client:
+      return shadow_io_handle_->read(buffer, max_length_opt);
+    case IoUringSocketType::Server: {
+      if (!enable_server_socket_) {
+        return shadow_io_handle_->read(buffer, max_length_opt);
+      } else {
+        const uint64_t max_length = max_length_opt.value_or(UINT64_MAX);
+        if (max_length == 0) {
+          return Api::ioCallUint64ResultNoError();
+        }
+
+        Buffer::Reservation reservation = buffer.reserveForRead();
+        Api::IoCallUint64Result result = readv(std::min(reservation.length(), max_length),
+                                              reservation.slices(), reservation.numSlices());
+        uint64_t bytes_to_commit = result.ok() ? result.return_value_ : 0;
+        ASSERT(bytes_to_commit <= max_length);
+        reservation.commit(bytes_to_commit);
+        return result;
+      }
+    }
+    case IoUringSocketType::Listen:
+      break;
+    case IoUringSocketType::Unknown:
+      break;
   }
 
-  if (io_uring_socket_type_ == IoUringSocketType::Server && !enable_server_socket_) {
-    ENVOY_LOG(trace, "fallback to IoSocketHandle");
-    auto ret = shadow_io_handle_->read(buffer, max_length_opt);
-    ENVOY_LOG(trace, "IoSocketHandle read return {}", ret.return_value_);
-    return ret;
-  }
-
-  const uint64_t max_length = max_length_opt.value_or(UINT64_MAX);
-  if (max_length == 0) {
-    return Api::ioCallUint64ResultNoError();
-  }
-
-  Buffer::Reservation reservation = buffer.reserveForRead();
-  Api::IoCallUint64Result result = readv(std::min(reservation.length(), max_length),
-                                         reservation.slices(), reservation.numSlices());
-  uint64_t bytes_to_commit = result.ok() ? result.return_value_ : 0;
-  ASSERT(bytes_to_commit <= max_length);
-  reservation.commit(bytes_to_commit);
-  return result;
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::writev(const Buffer::RawSlice* slices,
