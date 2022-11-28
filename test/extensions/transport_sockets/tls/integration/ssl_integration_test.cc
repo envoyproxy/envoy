@@ -661,8 +661,7 @@ public:
                      envoy::extensions::transport_sockets::tls::v3::TlsParameters::TlsProtocol>>&
           params) {
     return fmt::format("{}_TLSv1_{}",
-                       std::get<0>(params.param) == Network::Address::IpVersion::v4 ? "IPv4"
-                                                                                    : "IPv6",
+                       TestUtility::ipVersionToString(std::get<0>(params.param)),
                        std::get<1>(params.param) - 1);
   }
 
