@@ -26,8 +26,8 @@ public:
     }
   }
   // Helper operators to get-or-create and return the StatsStructType object.
-  StatsStructType* operator->() { return internal_stats_.get(ctor_); }
-  StatsStructType& operator*() { return *internal_stats_.get(ctor_); }
+  inline StatsStructType* operator->() { return internal_stats_.get(ctor_); }
+  inline StatsStructType& operator*() { return *internal_stats_.get(ctor_); }
 
 private:
   std::function<StatsStructType*()> ctor_;
