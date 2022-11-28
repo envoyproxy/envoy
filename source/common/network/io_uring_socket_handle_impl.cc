@@ -207,29 +207,31 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::writev(const Buffer::RawSlice* 
   ASSERT(io_uring_socket_type_ != IoUringSocketType::Unknown);
   ENVOY_LOG(trace, "writev, fd = {}", fd_);
 
-  if (io_uring_socket_type_ == IoUringSocketType::Client) {
-    return shadow_io_handle_->writev(slices, num_slice);
-  }
+  switch (io_uring_socket_type_) {
+    case IoUringSocketType::Client:
+      return shadow_io_handle_->writev(slices, num_slice);
+    case IoUringSocketType::Server:
+      if (!enable_server_socket_) {
+        return shadow_io_handle_->writev(slices, num_slice);
+      } else {
+        ENVOY_LOG(trace, "server socket write, fd = {}", fd_);
+        if (write_param_ != absl::nullopt) {
+          // EAGAIN means an injected event, then just submit new write.
+          if (write_param_->result_ < 0 && write_param_->result_ != -EAGAIN) {
+            return {0, Api::IoErrorPtr(new IoSocketError(write_param_->result_), IoSocketError::deleteIoError)};
+          }
+          ENVOY_LOG(trace, "an inject event, result = {}, fd = {}", write_param_->result_, fd_);
+        }
 
-  if (io_uring_socket_type_ == IoUringSocketType::Server && !enable_server_socket_) {
-    return shadow_io_handle_->writev(slices, num_slice);
-  }
-
-  // The handle for io uring server socket.
-  if (io_uring_socket_type_ == IoUringSocketType::Server) {
-    ENVOY_LOG(trace, "server socket write, fd = {}", fd_);
-    if (write_param_ != absl::nullopt) {
-      // EAGAIN means an injected event, then just submit new write.
-      if (write_param_->result_ < 0 && write_param_->result_ != -EAGAIN) {
-        return {0, Api::IoErrorPtr(new IoSocketError(write_param_->result_), IoSocketError::deleteIoError)};
+        ASSERT(io_uring_worker_.has_value());
+        auto& io_uring_server_socket = io_uring_worker_.ref().getIoUringSocket(fd_);
+        auto ret = io_uring_server_socket.writev(slices, num_slice);
+        return {ret, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError)};
       }
-      ENVOY_LOG(trace, "an inject event, result = {}, fd = {}", write_param_->result_, fd_);
-    }
-
-    ASSERT(io_uring_worker_.has_value());
-    auto& io_uring_server_socket = io_uring_worker_.ref().getIoUringSocket(fd_);
-    auto ret = io_uring_server_socket.writev(slices, num_slice);
-    return {ret, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError)};
+    case IoUringSocketType::Listen:
+      break;
+    case IoUringSocketType::Unknown:
+      break;
   }
 
   PANIC_DUE_TO_CORRUPT_ENUM;
@@ -239,36 +241,37 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::write(Buffer::Instance& buffer)
   ASSERT(io_uring_socket_type_ != IoUringSocketType::Unknown);
   ENVOY_LOG(trace, "write, length = {}, fd = {}", buffer.length(), fd_);
 
-  if (io_uring_socket_type_ == IoUringSocketType::Client) {
-    return shadow_io_handle_->write(buffer);
-  }
+  switch (io_uring_socket_type_) {
+    case IoUringSocketType::Client:
+      return shadow_io_handle_->write(buffer);
+    case IoUringSocketType::Server:
+      if (!enable_server_socket_) {
+        return shadow_io_handle_->write(buffer);
+      } else {
+        ENVOY_LOG(trace, "server socket write, fd = {}", fd_);
 
-  // server socket fallback path
-  if (io_uring_socket_type_ == IoUringSocketType::Server && !enable_server_socket_) {
-    return shadow_io_handle_->write(buffer);
-  }
+        if (write_param_ != absl::nullopt) {
+          // EAGAIN means an injected event, then just submit new write.
+          if (write_param_->result_ < 0 && write_param_->result_ != -EAGAIN) {
+            return {
+              0, Api::IoErrorPtr(new IoSocketError(write_param_->result_), IoSocketError::deleteIoError)};
+          }
+          ENVOY_LOG(trace, "an inject event, result = {}, fd = {}", write_param_->result_, fd_);
+        }
 
-  // The handle for io uring server socket.
-  if (io_uring_socket_type_ == IoUringSocketType::Server) {
-    ENVOY_LOG(trace, "server socket write, fd = {}", fd_);
-
-    if (write_param_ != absl::nullopt) {
-      // EAGAIN means an injected event, then just submit new write.
-      if (write_param_->result_ < 0 && write_param_->result_ != -EAGAIN) {
-        return {
-          0, Api::IoErrorPtr(new IoSocketError(write_param_->result_), IoSocketError::deleteIoError)};
+        ASSERT(io_uring_worker_.has_value());
+        auto& io_uring_server_socket = io_uring_worker_.ref().getIoUringSocket(fd_);
+        auto ret = io_uring_server_socket.write(buffer);
+        if (ret == 0) {
+          return {
+            0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(), IoSocketError::deleteIoError)};
+        }
+        return {ret, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError)};
       }
-      ENVOY_LOG(trace, "an inject event, result = {}, fd = {}", write_param_->result_, fd_);
-    }
-
-    ASSERT(io_uring_worker_.has_value());
-    auto& io_uring_server_socket = io_uring_worker_.ref().getIoUringSocket(fd_);
-    auto ret = io_uring_server_socket.write(buffer);
-    if (ret == 0) {
-      return {
-        0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(), IoSocketError::deleteIoError)};
-    }
-    return {ret, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError)};
+    case IoUringSocketType::Listen:
+      break;
+    case IoUringSocketType::Unknown:
+      break;
   }
 
   PANIC_DUE_TO_CORRUPT_ENUM;
