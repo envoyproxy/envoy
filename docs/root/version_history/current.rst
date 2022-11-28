@@ -1,4 +1,4 @@
-1.21.6 (November 18, 2022)
+1.21.6 (November 28, 2022)
 ==========================
 
 Incompatible Behavior Changes
