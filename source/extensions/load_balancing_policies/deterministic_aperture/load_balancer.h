@@ -9,8 +9,9 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "source/common/upstream/ring_hash_lb.h"
-#include "source/common/upstream/upstream_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/upstream/ring.h"
+#include "source/common/upstream/thread_aware_lb_impl.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/synchronization/mutex.h"
@@ -44,19 +45,20 @@ namespace DeterministicAperture {
 /**
  * All DeterministicAperture load balancer ring stats. @see stats_macros.h
  */
-#define ALL_DETERMINISTIC_APERTURE_LOAD_BALANCER_RING_STATS(COUNTER) COUNTER(pick2_same)
+#define ALL_DETERMINISTIC_APERTURE_LOAD_BALANCER_STATS(COUNTER) COUNTER(pick2_same)
 
 /**
  * Struct definition for all DeterministicAperture load balancer ring stats. @see stats_macros.h
  */
-struct LoadBalancerRingStats {
-  ALL_DETERMINISTIC_APERTURE_LOAD_BALANCER_RING_STATS(GENERATE_COUNTER_STRUCT)
+struct LoadBalancerStats {
+  ALL_DETERMINISTIC_APERTURE_LOAD_BALANCER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
 /**
  * Thread aware load balancer implementation for DeterministicAperture.
  */
-class LoadBalancer : public Upstream::RingHashLoadBalancer {
+class LoadBalancer : public Upstream::ThreadAwareLoadBalancerBase,
+                     protected Logger::Loggable<Logger::Id::upstream> {
 public:
   LoadBalancer(
       const Upstream::PrioritySet& priority_set, Upstream::ClusterLbStats& stats,
@@ -65,19 +67,20 @@ public:
                                DeterministicApertureLbConfig>& config,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
 
-  using HashFunction = envoy::config::cluster::v3::Cluster::RingHashLbConfig::HashFunction;
+  using ProtoHashFunction = envoy::extensions::load_balancing_policies::deterministic_aperture::v3::
+      DeterministicApertureLbConfig::HashFunction;
 
-  const Upstream::RingHashLoadBalancerStats& ringStats() const { return ring_stats_; }
+  const Upstream::RingStats& ringStats() const { return ring_stats_; }
   /*
    * Customization of the `RingHashLoadBalancer` ring to add functionality that allows calculating
    * the intersecting ring segments.
    */
-  struct Ring : public Upstream::RingHashLoadBalancer::Ring {
+  struct Ring : public Upstream::Ring {
     Ring(double offset, double width,
          const Upstream::NormalizedHostWeightVector& normalized_host_weights,
          double min_normalized_weight, uint64_t min_ring_size, uint64_t max_ring_size,
          HashFunction hash_function, bool use_hostname_for_hashing, Stats::ScopeSharedPtr scope,
-         Upstream::RingHashLoadBalancerStats ring_stats);
+         Upstream::RingStats ring_stats);
 
     // ThreadAwareLoadBalancerBase::HashingLoadBalancer
     Upstream::HostConstSharedPtr chooseHost(uint64_t hash, uint32_t attempt) const override;
@@ -120,7 +123,7 @@ public:
     std::pair<size_t, size_t> pick2() const;
 
   private:
-    static LoadBalancerRingStats generateStats(Stats::Scope& scope);
+    static LoadBalancerStats generateStats(Stats::Scope& scope);
 
     const double offset_;
     const double width_;
@@ -128,7 +131,7 @@ public:
     std::random_device random_dev_;
     mutable std::mt19937 rng_;
     mutable std::uniform_real_distribution<double> random_distribution_;
-    LoadBalancerRingStats stats_;
+    LoadBalancerStats stats_;
 
     double intersect(double b0, double e0, double b1, double e1) const;
     double nextRandom() const { return random_distribution_(rng_); }
@@ -152,10 +155,17 @@ private:
         deterministic_aperture_lb, std::move(normalized_host_weights), hash_balance_factor_);
   }
 
+  Upstream::Ring::HashFunction toRingHashFunction(const ProtoHashFunction&) const;
+
+  const uint64_t min_ring_size_;
+  const uint64_t max_ring_size_;
+  const Ring::HashFunction hash_function_;
+  const bool use_hostname_for_hashing_;
+  const uint32_t hash_balance_factor_;
   double width_;
   double offset_;
   Stats::ScopeSharedPtr scope_;
-  Upstream::RingHashLoadBalancerStats ring_stats_;
+  Upstream::RingStats ring_stats_;
 };
 
 class LoadBalancerFactory : public Upstream::TypedLoadBalancerFactory {

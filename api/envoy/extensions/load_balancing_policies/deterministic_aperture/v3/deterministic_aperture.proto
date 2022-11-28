@@ -2,9 +2,11 @@ syntax = "proto3";
 
 package envoy.extensions.load_balancing_policies.deterministic_aperture.v3;
 
-import "envoy/extensions/load_balancing_policies/ring_hash/v3/ring_hash.proto";
+import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
+
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.load_balancing_policies.deterministic_aperture.v3";
 option java_outer_classname = "DeterministicApertureProto";
@@ -13,7 +15,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/loa
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Deterministic Aperture Load Balancing Policy]
-// [#not-implemented-hide:]
+// [#extension: envoy.load_balancing_policies]
 
 // Deterministic Aperture load balancing is designed to conserve connections between Envoy and
 // backend instances. This is achieved by dividing the backends uniformly among participating peers.
@@ -23,14 +25,37 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // the backends get divided as a fraction of their overlaps with each peer. The algorithm uses a
 // uniform random distribution to select a backend from the range of overlapping backends. This
 // along with P2C ensures uniform load distribution.
-// [#extension: envoy.load_balancing_policies]
 message DeterministicApertureLbConfig {
   // Hash ring configuration for the internal ring for endpoints.
-  ring_hash.v3.RingHash ring_config = 1;
+  // The hash function used to hash hosts onto the ketama ring.
+  enum HashFunction {
+    // Use `xxHash <https://github.com/Cyan4973/xxHash>`_, this is the default hash function.
+    XX_HASH = 0;
+
+    // Use `MurmurHash2 <https://sites.google.com/site/murmurhash/>`_, this is compatible with
+    // std:hash<string> in GNU libstdc++ 3.4.20 or above. This is typically the case when compiled
+    // on Linux and not macOS.
+    MURMUR_HASH_2 = 1;
+  }
+
+  // Minimum hash ring size. The larger the ring is (that is, the more hashes there are for each
+  // provided host) the better the request distribution will reflect the desired weights. Defaults
+  // to 1024 entries, and limited to 8M entries. See also
+  // :ref:`maximum_ring_size<envoy_v3_api_field_config.cluster.v3.Cluster.RingHashLbConfig.maximum_ring_size>`.
+  google.protobuf.UInt64Value minimum_ring_size = 2 [(validate.rules).uint64 = {lte: 8388608}];
+
+  // The hash function used to hash hosts onto the ketama ring. The value defaults to
+  // :ref:`XX_HASH<envoy_v3_api_enum_value_config.cluster.v3.Cluster.RingHashLbConfig.HashFunction.XX_HASH>`.
+  HashFunction hash_function = 3 [(validate.rules).enum = {defined_only: true}];
+
+  // Maximum hash ring size. Defaults to 8M entries, and limited to 8M entries, but can be lowered
+  // to further constrain resource use. See also
+  // :ref:`minimum_ring_size<envoy_v3_api_field_config.cluster.v3.Cluster.RingHashLbConfig.minimum_ring_size>`.
+  google.protobuf.UInt64Value maximum_ring_size = 4 [(validate.rules).uint64 = {lte: 8388608}];
 
   // Index of this peer (0 indexed).
-  uint32 peer_index = 2;
+  uint32 peer_index = 5;
 
   // Total number of peers participating in the algorithm (that share the outer ring).
-  uint32 total_peers = 3;
+  uint32 total_peers = 6;
 }

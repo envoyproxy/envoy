@@ -71,8 +71,6 @@ public:
 
   bool nearlyEqual(double a, double b) const { return fabs(a - b) < 0.005f; }
 
-  using HashFunction = envoy::config::cluster::v3::Cluster::RingHashLbConfig::HashFunction;
-
   NiceMock<Upstream::MockPrioritySet> priority_set_;
   Upstream::MockHostSet& host_set_ = *priority_set_.getMockHostSet(0);
   Upstream::MockHostSet& failover_host_set_ = *priority_set_.getMockHostSet(1);
@@ -151,8 +149,8 @@ TEST_P(LoadBalancerTest, Basic) {
 
   config_ = envoy::extensions::load_balancing_policies::deterministic_aperture::v3::
       DeterministicApertureLbConfig();
-  config_->mutable_ring_config()->mutable_minimum_ring_size()->set_value(8);
-  config_->mutable_ring_config()->mutable_maximum_ring_size()->set_value(8);
+  config_->mutable_minimum_ring_size()->set_value(8);
+  config_->mutable_maximum_ring_size()->set_value(8);
 
   // hash ring:
   // port | position
@@ -193,7 +191,7 @@ TEST_P(LoadBalancerTest, Basic) {
 
 TEST_P(LoadBalancerTest, RingPick2) {
   const uint64_t ring_size = 10;
-  const auto hash_function = HashFunction::Cluster_RingHashLbConfig_HashFunction_MURMUR_HASH_2;
+  const auto hash_function = Upstream::Ring::HashFunction::MURMUR_HASH_2;
   const double peer_offset = random_distribution_(rng_);
   double peer_width = random_distribution_(rng_);
 
@@ -211,7 +209,7 @@ TEST_P(LoadBalancerTest, RingPick2) {
   auto scope = stats_store_.createScope("ring_hash.");
   auto ring_hash_lb = std::make_shared<LoadBalancer::Ring>(
       peer_offset, peer_width, normalized_host_weights, 0.1, ring_size, ring_size, hash_function,
-      false, scope, Upstream::RingHashLoadBalancer::generateStats(*scope));
+      false, scope, Upstream::Ring::generateStats(*scope));
 
   absl::flat_hash_map<size_t, size_t> index_count;
   absl::flat_hash_map<size_t, double> index_weight;
@@ -255,8 +253,8 @@ TEST_P(DeterministicApertureFailoverTest, BasicFailover) {
 
   config_ = envoy::extensions::load_balancing_policies::deterministic_aperture::v3::
       DeterministicApertureLbConfig();
-  config_->mutable_ring_config()->mutable_minimum_ring_size()->set_value(12);
-  config_->mutable_ring_config()->mutable_maximum_ring_size()->set_value(12);
+  config_->mutable_minimum_ring_size()->set_value(12);
+  config_->mutable_maximum_ring_size()->set_value(12);
   config_->set_total_peers(12);
   config_->set_peer_index(0);
   init();

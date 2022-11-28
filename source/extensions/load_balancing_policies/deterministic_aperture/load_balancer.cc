@@ -7,18 +7,16 @@ namespace Extensions {
 namespace LoadBalancingPolicies {
 namespace DeterministicAperture {
 
-envoy::config::cluster::v3::Cluster::RingHashLbConfig toClusterRingHashLbConfig(
-    const envoy::extensions::load_balancing_policies::ring_hash::v3::RingHash& ring_hash_config) {
-  envoy::config::cluster::v3::Cluster::RingHashLbConfig return_value;
-
-  return_value.set_hash_function(
-      static_cast<envoy::config::cluster::v3::Cluster::RingHashLbConfig::HashFunction>(
-          ring_hash_config.hash_function()));
-
-  return_value.mutable_minimum_ring_size()->CopyFrom(ring_hash_config.minimum_ring_size());
-  return_value.mutable_maximum_ring_size()->CopyFrom(ring_hash_config.maximum_ring_size());
-
-  return return_value;
+Upstream::Ring::HashFunction
+LoadBalancer::toRingHashFunction(const ProtoHashFunction& hash_func) const {
+  switch (hash_func) {
+  case ProtoHashFunction::DeterministicApertureLbConfig_HashFunction_XX_HASH:
+    return Upstream::Ring::HashFunction::XX_HASH;
+  case ProtoHashFunction::DeterministicApertureLbConfig_HashFunction_MURMUR_HASH_2:
+    return Upstream::Ring::HashFunction::MURMUR_HASH_2;
+  default:
+    throw EnvoyException("Unsupported hash function");
+  }
 }
 
 LoadBalancer::LoadBalancer(
@@ -27,21 +25,30 @@ LoadBalancer::LoadBalancer(
     const absl::optional<envoy::extensions::load_balancing_policies::deterministic_aperture::v3::
                              DeterministicApertureLbConfig>& config,
     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
-    : Upstream::RingHashLoadBalancer(
-          priority_set, stats, scope, runtime, random,
-          ((config.has_value() && config->has_ring_config())
-               ? absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig>(
-                     toClusterRingHashLbConfig(config->ring_config()))
-               : absl::nullopt),
-          common_config),
+    : ThreadAwareLoadBalancerBase(priority_set, stats, runtime, random, common_config),
+      min_ring_size_(config ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.value(), minimum_ring_size,
+                                                              Upstream::Ring::DefaultMinRingSize)
+                            : Upstream::Ring::DefaultMinRingSize),
+      max_ring_size_(config ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.value(), maximum_ring_size,
+                                                              Upstream::Ring::DefaultMaxRingSize)
+                            : Upstream::Ring::DefaultMaxRingSize),
+      hash_function_(toRingHashFunction(
+          config ? config.value().hash_function()
+                 : ProtoHashFunction::DeterministicApertureLbConfig_HashFunction_XX_HASH)),
+      use_hostname_for_hashing_(
+          common_config.has_consistent_hashing_lb_config()
+              ? common_config.consistent_hashing_lb_config().use_hostname_for_hashing()
+              : false),
+      hash_balance_factor_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          common_config.consistent_hashing_lb_config(), hash_balance_factor, 0)),
       width_((config.has_value() && config->total_peers() > 0) ? (1.0 / config->total_peers())
                                                                : 1.0),
       offset_((config.has_value() && width_ > 0.0) ? (width_ * config->peer_index()) : 0.0),
       scope_(scope.createScope("deterministic_aperture_lb.")),
-      ring_stats_(Upstream::RingHashLoadBalancer::generateStats(*scope_)) {}
+      ring_stats_(Upstream::Ring::generateStats(*scope_)) {}
 
-LoadBalancerRingStats LoadBalancer::Ring::generateStats(Stats::Scope& scope) {
-  return {ALL_DETERMINISTIC_APERTURE_LOAD_BALANCER_RING_STATS(POOL_COUNTER(scope))};
+LoadBalancerStats LoadBalancer::Ring::generateStats(Stats::Scope& scope) {
+  return {ALL_DETERMINISTIC_APERTURE_LOAD_BALANCER_STATS(POOL_COUNTER(scope))};
 }
 
 /*
@@ -56,8 +63,8 @@ Upstream::HostConstSharedPtr LoadBalancer::Ring::chooseHost(uint64_t, uint32_t) 
 
   const std::pair<size_t, size_t> index_pair = pick2();
 
-  const Upstream::RingHashLoadBalancer::RingEntry& first = ring_[index_pair.first];
-  const Upstream::RingHashLoadBalancer::RingEntry& second = ring_[index_pair.second];
+  const Upstream::Ring::Entry& first = ring_[index_pair.first];
+  const Upstream::Ring::Entry& second = ring_[index_pair.second];
 
   ENVOY_LOG(debug, "pick2 returned hosts: (hash1: {}, address1: {}, hash2: {}, address2: {})",
             first.hash_, first.host_->address()->asString(), second.hash_,
@@ -74,10 +81,9 @@ LoadBalancer::Ring::Ring(double offset, double width,
                          double min_normalized_weight, uint64_t min_ring_size,
                          uint64_t max_ring_size, HashFunction hash_function,
                          bool use_hostname_for_hashing, Stats::ScopeSharedPtr scope,
-                         Upstream::RingHashLoadBalancerStats ring_stats)
-    : Upstream::RingHashLoadBalancer::Ring(normalized_host_weights, min_normalized_weight,
-                                           min_ring_size, max_ring_size, hash_function,
-                                           use_hostname_for_hashing, ring_stats),
+                         Upstream::RingStats ring_stats)
+    : Upstream::Ring(normalized_host_weights, min_normalized_weight, min_ring_size, max_ring_size,
+                     hash_function, use_hostname_for_hashing, ring_stats),
       offset_(offset), width_(width), unit_width_(1.0 / ring_size_), rng_(random_dev_()),
       random_distribution_(0, 1), stats_(generateStats(*scope)) {
   if (width_ > 1.0 || width_ < 0) {

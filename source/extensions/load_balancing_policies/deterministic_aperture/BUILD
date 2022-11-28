@@ -14,8 +14,8 @@ envoy_cc_extension(
     hdrs = ["load_balancer.h"],
     deps = [
         "//source/common/common:minimal_logger_lib",
+        "//source/common/upstream:lb_ring_lib",
         "//source/common/upstream:load_balancer_lib",
-        "//source/common/upstream:ring_hash_lb_lib",
         "//source/common/upstream:upstream_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/load_balancing_policies/deterministic_aperture/v3:pkg_cc_proto",

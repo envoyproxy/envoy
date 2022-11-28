@@ -388,6 +388,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "lb_ring_lib",
+    srcs = ["ring.cc"],
+    hdrs = ["ring.h"],
+    external_deps = [
+        "abseil_inlined_vector",
+    ],
+    deps = [
+        ":thread_aware_lb_lib",
+        "//source/common/common:minimal_logger_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "ring_hash_lb_lib",
     srcs = ["ring_hash_lb.cc"],
     hdrs = ["ring_hash_lb.h"],
@@ -395,6 +408,7 @@ envoy_cc_library(
         "abseil_inlined_vector",
     ],
     deps = [
+        ":lb_ring_lib",
         ":thread_aware_lb_lib",
         "//source/common/common:minimal_logger_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",

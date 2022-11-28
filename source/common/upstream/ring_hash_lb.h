@@ -8,25 +8,11 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/upstream/ring.h"
 #include "source/common/upstream/thread_aware_lb_impl.h"
 
 namespace Envoy {
 namespace Upstream {
-
-/**
- * All ring hash load balancer stats. @see stats_macros.h
- */
-#define ALL_RING_HASH_LOAD_BALANCER_STATS(GAUGE)                                                   \
-  GAUGE(max_hashes_per_host, Accumulate)                                                           \
-  GAUGE(min_hashes_per_host, Accumulate)                                                           \
-  GAUGE(size, Accumulate)
-
-/**
- * Struct definition for all ring hash load balancer stats. @see stats_macros.h
- */
-struct RingHashLoadBalancerStats {
-  ALL_RING_HASH_LOAD_BALANCER_STATS(GENERATE_GAUGE_STRUCT)
-};
 
 /**
  * A load balancer that implements consistent modulo hashing ("ketama"). Currently, zone aware
@@ -46,32 +32,14 @@ public:
       const absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig>& config,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
 
-  const RingHashLoadBalancerStats& stats() const { return stats_; }
+  const RingStats& stats() const { return stats_; }
 
-  static RingHashLoadBalancerStats generateStats(Stats::Scope& scope);
-
-protected:
   using HashFunction = envoy::config::cluster::v3::Cluster::RingHashLbConfig::HashFunction;
 
-  struct RingEntry {
-    uint64_t hash_;
-    HostConstSharedPtr host_;
-  };
+private:
+  Ring::HashFunction toRingHashFunction(const HashFunction&) const;
 
-  struct Ring : public HashingLoadBalancer {
-    Ring(const NormalizedHostWeightVector& normalized_host_weights, double min_normalized_weight,
-         uint64_t min_ring_size, uint64_t max_ring_size, HashFunction hash_function,
-         bool use_hostname_for_hashing, RingHashLoadBalancerStats& stats);
-
-    // ThreadAwareLoadBalancerBase::HashingLoadBalancer
-    HostConstSharedPtr chooseHost(uint64_t hash, uint32_t attempt) const override;
-
-    std::vector<RingEntry> ring_;
-
-    uint64_t ring_size_{0};
-
-    RingHashLoadBalancerStats& stats_;
-  };
+protected:
   using RingConstSharedPtr = std::shared_ptr<const Ring>;
 
   // ThreadAwareLoadBalancerBase
@@ -90,13 +58,15 @@ protected:
   }
 
   Stats::ScopeSharedPtr scope_;
-  RingHashLoadBalancerStats stats_;
+  // Ideally Ring should have its own stats but at the time of refactoring `Ring` into its own
+  // library, we don't intend to change the ownership model as it will change the stats interface to
+  // the load balancer.
+  // TODO (jojy): Reconsider the stats interface.
+  RingStats stats_;
 
-  static const uint64_t DefaultMinRingSize = 1024;
-  static const uint64_t DefaultMaxRingSize = 1024 * 1024 * 8;
   const uint64_t min_ring_size_;
   const uint64_t max_ring_size_;
-  const HashFunction hash_function_;
+  const Ring::HashFunction hash_function_;
   const bool use_hostname_for_hashing_;
   const uint32_t hash_balance_factor_;
 };
