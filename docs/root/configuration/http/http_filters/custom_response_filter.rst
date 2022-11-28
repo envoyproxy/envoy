@@ -11,14 +11,9 @@ The filter configuration consists of a matcher that matches the original respons
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.custom_response.v3.CustomResponse``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.custom_response.v3.CustomResponse>`
 
-.. _extension_category_envoy.http.custom_response:
-
-Custom Response Policies
 ------------------------
 
 Custom response policies define where from and how to retrieve custom responses once a response is matched to a particular policy by the matcher.
-
-.. _extension_envoy.http.custom_response.redirect_policy:
 
 Redirect policy
 ###############
@@ -27,8 +22,6 @@ The redirect policy can be used to override the original response by internally 
 
 * This extension should be configued with the type URL ``type.googleapis.com/envoy.extensions.http.custom_response.redirect_policy.v3.RedirectPolicy``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.http.custom_response.redirect_policy.v3.RedirectPolicy>`
-
-.. _extension_envoy.http.custom_response.local_response_policy:
 
 Local Response Policy
 #####################

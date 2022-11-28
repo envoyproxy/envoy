@@ -46,12 +46,18 @@ public:
     // Add a virtual host corresponding to redirected route for
     // gateway_error_action in kDefaultConfig. Note that the redirect policy
     // overwrites the response code specified here.
-    auto foo = config_helper_.createVirtualHost("foo.example");
-    foo.mutable_routes(0)->set_name("foo");
-    foo.mutable_routes(0)->mutable_direct_response()->set_status(221);
-    foo.mutable_routes(0)->mutable_direct_response()->mutable_body()->set_inline_string("foo");
-    foo.mutable_routes(0)->mutable_match()->set_prefix("/");
-    config_helper_.addVirtualHost(foo);
+    config_helper_.addVirtualHost(
+        TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(R"EOF(
+    name: foo
+    domains: ["foo.example"]
+    routes:
+    - direct_response:
+        status: 221
+        body:
+          inline_string: foo
+      match:
+        prefix: "/"
+    )EOF"));
 
     config_helper_.addConfigModifier(
         [this](
@@ -106,11 +112,21 @@ public:
         TestUtility::parseYaml<CustomResponse>(std::string(kDefaultConfig));
   }
 
-  void setPerRouteConfig(Route* route, const CustomResponse& cfg) {
+  void addVirtualHostWithPerRouteConfig(const char* virtual_host_domain) {
+    auto host = config_helper_.createVirtualHost(virtual_host_domain);
+    auto per_route_config = TestUtility::parseYaml<CustomResponse>(std::string(kDefaultConfig));
+    modifyPolicy<RedirectPolicyProto>(
+        per_route_config, "gateway_error_action", [](RedirectPolicyProto& policy) {
+          policy.mutable_status_code()->set_value(291);
+          policy.mutable_response_headers_to_add()->at(0).mutable_header()->mutable_value()->assign(
+              "y-foo2");
+        });
+
     Any cfg_any;
-    ASSERT_TRUE(cfg_any.PackFrom(cfg));
-    route->mutable_typed_per_filter_config()->insert(
+    ASSERT_TRUE(cfg_any.PackFrom(per_route_config));
+    host.mutable_routes(0)->mutable_typed_per_filter_config()->insert(
         MapPair<std::string, Any>("envoy.filters.http.custom_response", cfg_any));
+    config_helper_.addVirtualHost(host);
   }
 
   void setPerHostConfig(VirtualHost& vh, const CustomResponse& cfg) {
@@ -120,6 +136,7 @@ public:
         MapPair<std::string, Any>("envoy.filters.http.custom_response", cfg_any));
   }
 
+  // Change the matcher to match `5xx` for local response policies.
   void setLocalResponseFor5xx() {
     auto& matcher = custom_response_filter_config_.mutable_custom_response_matcher()
                         ->mutable_matcher_list()
@@ -158,6 +175,7 @@ TEST_P(CustomResponseIntegrationTest, CustomResponseNotConfigured) {
   auto response =
       sendRequestAndWaitForResponse(default_request_headers_, 0, unauthorized_response_, 0);
   EXPECT_TRUE(response->complete());
+  // Verify that the original response is not modified.
   EXPECT_EQ("401", response->headers().getStatusValue());
   EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_4xx")->value());
 }
@@ -179,6 +197,8 @@ TEST_P(CustomResponseIntegrationTest, LocalReply) {
 }
 
 // Verify we get the correct custom response using the redirect policy.
+// TODO(pradeepcrao): Add a test that returns a redirected response from an
+// upstream.
 TEST_P(CustomResponseIntegrationTest, RedirectPolicyResponse) {
   initialize();
 
@@ -198,6 +218,9 @@ TEST_P(CustomResponseIntegrationTest, RedirectPolicyResponse) {
 // Verify we get the original response if the route is not found for the
 // specified custom response.
 TEST_P(CustomResponseIntegrationTest, RouteNotFound) {
+
+  // Modify the host for the redirect policy so no match is found in the route
+  // table for the internal redirect.
   modifyPolicy<RedirectPolicyProto>(
       custom_response_filter_config_, "gateway_error_action",
       [](RedirectPolicyProto& policy) { policy.set_host("https://fo1.example"); });
@@ -218,17 +241,7 @@ TEST_P(CustomResponseIntegrationTest, RouteNotFound) {
 // Verify that the route specific filter is picked if specified.
 TEST_P(CustomResponseIntegrationTest, RouteSpecificFilter) {
   // Add per route filter config to a new virtual host.
-  auto host = config_helper_.createVirtualHost("host.with.route_specific.cer_config");
-  auto per_route_config = TestUtility::parseYaml<CustomResponse>(std::string(kDefaultConfig));
-  modifyPolicy<RedirectPolicyProto>(
-      per_route_config, "gateway_error_action", [](RedirectPolicyProto& policy) {
-        policy.mutable_status_code()->set_value(291);
-        policy.mutable_response_headers_to_add()->at(0).mutable_header()->mutable_value()->assign(
-            "y-foo2");
-      });
-
-  setPerRouteConfig(host.mutable_routes(0), per_route_config);
-  config_helper_.addVirtualHost(host);
+  addVirtualHostWithPerRouteConfig("host.with.route_specific.cer_config");
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -236,7 +249,7 @@ TEST_P(CustomResponseIntegrationTest, RouteSpecificFilter) {
   default_request_headers_.setHost("host.with.route_specific.cer_config");
   auto response =
       sendRequestAndWaitForResponse(default_request_headers_, 0, gateway_error_response_, 0, 0);
-  // Verify we get the status code of the local config
+  // Verify we get the status code of the local config.
   EXPECT_EQ("291", response->headers().getStatusValue());
   EXPECT_EQ(
       "y-foo2",
@@ -248,7 +261,8 @@ TEST_P(CustomResponseIntegrationTest, RouteSpecificFilter) {
   // Send request to host without per route config
   default_request_headers_.setHost("original.host");
   response = sendRequestAndWaitForResponse(default_request_headers_, 0, gateway_error_response_, 0);
-  // Verify we get the modified status value.
+  // Verify we get the modified status value of the http connection manager
+  // level config.
   EXPECT_EQ("299", response->headers().getStatusValue());
   EXPECT_EQ(0,
             test_server_->counter("http.config_test.custom_response_redirect_no_route")->value());
@@ -264,18 +278,7 @@ TEST_P(CustomResponseIntegrationTest, OnlyRouteSpecificFilter) {
   custom_response_filter_config_.clear_custom_response_matcher();
 
   // Add per route filter config
-  auto some_other_host = config_helper_.createVirtualHost("some.other.host");
-  // std::string per_route_config(kDefaultConfig);
-  auto per_route_config = TestUtility::parseYaml<CustomResponse>(std::string(kDefaultConfig));
-  modifyPolicy<RedirectPolicyProto>(
-      per_route_config, "gateway_error_action", [](RedirectPolicyProto& policy) {
-        policy.mutable_status_code()->set_value(291);
-        policy.mutable_response_headers_to_add()->at(0).mutable_header()->mutable_value()->assign(
-            "y-foo2");
-      });
-
-  setPerRouteConfig(some_other_host.mutable_routes(0), per_route_config);
-  config_helper_.addVirtualHost(some_other_host);
+  addVirtualHostWithPerRouteConfig("host.with.route_specific.cer_config");
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -287,6 +290,16 @@ TEST_P(CustomResponseIntegrationTest, OnlyRouteSpecificFilter) {
   EXPECT_EQ("502", response->headers().getStatusValue());
 
   EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_5xx")->value());
+
+  // Send request to host with per route config.
+  default_request_headers_.setHost("host.with.route_specific.cer_config");
+  response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, gateway_error_response_, 0, 0);
+  // Verify we get the status code of the local config.
+  EXPECT_EQ("291", response->headers().getStatusValue());
+  EXPECT_EQ(
+      "y-foo2",
+      response->headers().get(::Envoy::Http::LowerCaseString("foo2"))[0]->value().getStringView());
 }
 
 // Verify that we do not provide a custom response for a response that has
@@ -294,12 +307,18 @@ TEST_P(CustomResponseIntegrationTest, OnlyRouteSpecificFilter) {
 // Verify that the route specific filter is picked if specified.
 TEST_P(CustomResponseIntegrationTest, NoRecursion) {
   // Make the redirect policy response for gateway_error policy return 401
-  auto fo1 = config_helper_.createVirtualHost("fo1.example");
-  fo1.mutable_routes(0)->set_name("fo1");
-  fo1.mutable_routes(0)->mutable_direct_response()->set_status(401);
-  fo1.mutable_routes(0)->mutable_direct_response()->mutable_body()->set_inline_string("fo1");
-  fo1.mutable_routes(0)->mutable_match()->set_prefix("/");
-  config_helper_.addVirtualHost(fo1);
+  config_helper_.addVirtualHost(TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(R"EOF(
+    name: fo1
+    domains: ["fo1.example"]
+    routes:
+    - direct_response:
+        status: 401
+        body:
+          inline_string: fo1
+      match:
+        prefix: "/"
+    )EOF"));
+
   modifyPolicy<RedirectPolicyProto>(
       custom_response_filter_config_, "gateway_error_action",
       [](RedirectPolicyProto& policy) { policy.set_host("https://fo1.example"); });
@@ -322,7 +341,7 @@ TEST_P(CustomResponseIntegrationTest, NoRecursion) {
   // gateway_error_response policy
   default_request_headers_.setHost("original.host");
   response = sendRequestAndWaitForResponse(default_request_headers_, 0, gateway_error_response_, 0);
-  // Verify we get status code for fo1.example
+  // Verify we get status code 401 for fo1.example
   EXPECT_EQ("401", response->headers().getStatusValue());
 }
 
@@ -494,15 +513,19 @@ typed_config:
 // header.
 TEST_P(CustomResponseIntegrationTest, RouteHeaderMatch) {
   // Add route with header matcher
-  auto virtual_host = config_helper_.createVirtualHost("host.with.route.with.header.matcher");
-  virtual_host.mutable_routes(0)->mutable_match()->set_prefix("/");
-  // "cer-only" header needs to be present for route matching.
-  auto header = virtual_host.mutable_routes(0)->mutable_match()->mutable_headers()->Add();
-  header->set_name("cer-only");
-  virtual_host.mutable_routes(0)->mutable_direct_response()->mutable_body()->set_inline_bytes(
-      "cer-only-response");
-  virtual_host.mutable_routes(0)->mutable_direct_response()->set_status(202);
-  config_helper_.addVirtualHost(virtual_host);
+  config_helper_.addVirtualHost(TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(R"EOF(
+    name: cer-only-host
+    domains: ["host.with.route.with.header.matcher"]
+    routes:
+    - direct_response:
+        status: 202
+        body:
+          inline_string: cer-only-response
+      match:
+        prefix: "/"
+        headers:
+        - name: cer-only
+    )EOF"));
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -541,7 +564,7 @@ TEST_P(CustomResponseIntegrationTest, ModifyRequestHeaders) {
                                     });
 
   // Add TestModifyRequestHeaders extension that will add the
-  // `x-envoy-cer-backend` header to the redirected request, which is required
+  // "x-envoy-cer-backend" header to the redirected request, which is required
   // for route selection for the redirected request.
   TestModifyRequestHeadersActionFactory factory;
   Envoy::Registry::InjectFactory<
