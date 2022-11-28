@@ -1,8 +1,8 @@
 # Envoy Mobile Bazel build/test options.
-try-import ./envoy/.bazelrc
+try-import ../.bazelrc
 
 # Common flags for all builds
-build --platform_mappings=envoy/bazel/platform_mappings
+build --platform_mappings=bazel/platform_mappings
 build --define=google_grpc=disabled
 build --define=hot_restart=disabled
 build --define=tcmalloc=disabled
@@ -19,7 +19,7 @@ build --ios_minimum_os=12.0
 build --ios_simulator_device="iPhone 13"
 build --ios_simulator_version=16.1
 build --verbose_failures
-build --workspace_status_command=envoy/bazel/get_workspace_status
+build --workspace_status_command=../bazel/get_workspace_status
 build --xcode_version=14.1
 build --use_top_level_targets_for_symlinks
 build --experimental_repository_downloader_retries=2

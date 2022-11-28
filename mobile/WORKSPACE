@@ -28,7 +28,7 @@ envoy_mobile_repositories()
 
 local_repository(
     name = "envoy",
-    path = "envoy",
+    path = "..",
 )
 
 local_repository(
