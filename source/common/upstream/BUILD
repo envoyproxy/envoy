@@ -168,6 +168,7 @@ envoy_cc_library(
     hdrs = ["conn_pool_map_impl.h"],
     deps = [
         ":conn_pool_map",
+        "//source/common/stats:lazy_init",
     ],
 )
 

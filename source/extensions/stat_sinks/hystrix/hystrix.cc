@@ -11,6 +11,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/http/headers.h"
+#include "source/common/stats/lazy_init.h"
 #include "source/common/stats/utility.h"
 
 #include "absl/strings/str_cat.h"

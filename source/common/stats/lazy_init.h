@@ -1,6 +1,7 @@
 #pragma once
 
 #include "source/common/common/thread.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Stats {
@@ -19,8 +20,11 @@ public:
   LazyInit(Stats::Scope& scope, const typename StatsStructType::StatNameType& stat_names)
       : ctor_([&scope, &stat_names]() -> StatsStructType* {
           return new StatsStructType(stat_names, scope);
-        }) {}
-
+        }) {
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_stats_lazyinit")) {
+      internal_stats_.get(ctor_);
+    }
+  }
   // Helper operators to get-or-create and return the StatsStructType object.
   StatsStructType* operator->() { return internal_stats_.get(ctor_); }
   StatsStructType& operator*() { return *internal_stats_.get(ctor_); }

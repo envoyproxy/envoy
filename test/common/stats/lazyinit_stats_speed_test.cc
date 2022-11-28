@@ -2,6 +2,7 @@
 
 #include "source/common/common/random_generator.h"
 #include "source/common/stats/isolated_store_impl.h"
+#include "source/common/stats/lazy_init.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/common/stats/thread_local_store.h"
 #include "source/common/thread_local/thread_local_impl.h"

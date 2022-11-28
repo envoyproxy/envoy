@@ -41,6 +41,7 @@ envoy_cc_library(
     hdrs = ["lazy_init.h"],
     deps = [
         "//source/common/common:thread_lib",
+        "//source/common/runtime:runtime_features_lib",
     ],
 )
 
@@ -289,7 +290,6 @@ envoy_cc_library(
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
     deps = [
-        ":lazy_init",
         ":symbol_table_lib",
         "//envoy/stats:stats_interface",
     ],
