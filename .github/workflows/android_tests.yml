@@ -6,9 +6,11 @@ on:
       - main
     paths:
     - 'mobile/**'
+    - '.github/workflows/**'
   pull_request:
     paths:
     - 'mobile/**'
+    - '.github/workflows/**'
 
 jobs:
   kotlintestsmac:
