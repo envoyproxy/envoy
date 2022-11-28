@@ -95,7 +95,7 @@ constexpr absl::string_view kDefaultConfig = R"EOF(
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.http.custom_response.redirect_policy.v3.RedirectPolicy
               status_code: 292
-              host: "https://some.other.host"
+              host: "https://host.with.route.with.header.matcher"
               path: "/internal_server_error"
               response_headers_to_add:
               - header:

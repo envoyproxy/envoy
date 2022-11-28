@@ -40,8 +40,8 @@ public:
     setMaxRequestHeadersCount(100);
 
     // Add a virtual host for the original request.
-    auto some_route = config_helper_.createVirtualHost("some.route");
-    config_helper_.addVirtualHost(some_route);
+    auto virtual_host = config_helper_.createVirtualHost("original.host");
+    config_helper_.addVirtualHost(virtual_host);
 
     // Add a virtual host corresponding to redirected route for
     // gateway_error_action in kDefaultConfig. Note that the redirect policy
@@ -167,7 +167,7 @@ TEST_P(CustomResponseIntegrationTest, LocalReply) {
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  default_request_headers_.setHost("some.route");
+  default_request_headers_.setHost("original.host");
   auto response =
       sendRequestAndWaitForResponse(default_request_headers_, 0, unauthorized_response_, 0);
   // Verify that we get the modified status value.
@@ -178,12 +178,12 @@ TEST_P(CustomResponseIntegrationTest, LocalReply) {
       response->headers().get(::Envoy::Http::LowerCaseString("foo"))[0]->value().getStringView());
 }
 
-// Verify we get the correct remote custom response.
-TEST_P(CustomResponseIntegrationTest, RemoteDataSource) {
+// Verify we get the correct custom response using the redirect policy.
+TEST_P(CustomResponseIntegrationTest, RedirectPolicyResponse) {
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  default_request_headers_.setHost("some.route");
+  default_request_headers_.setHost("original.host");
   auto response = sendRequestAndWaitForResponse(
       default_request_headers_, 0, gateway_error_response_, 0, 0, std::chrono::minutes(20));
   // Verify we get the modified status value.
@@ -204,7 +204,7 @@ TEST_P(CustomResponseIntegrationTest, RouteNotFound) {
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  default_request_headers_.setHost("some.route");
+  default_request_headers_.setHost("original.host");
   auto response =
       sendRequestAndWaitForResponse(default_request_headers_, 0, gateway_error_response_, 0);
   // Verify we get the original error status code.
@@ -218,7 +218,7 @@ TEST_P(CustomResponseIntegrationTest, RouteNotFound) {
 // Verify that the route specific filter is picked if specified.
 TEST_P(CustomResponseIntegrationTest, RouteSpecificFilter) {
   // Add per route filter config to a new virtual host.
-  auto some_other_host = config_helper_.createVirtualHost("some.other.host");
+  auto host = config_helper_.createVirtualHost("host.with.route_specific.cer_config");
   auto per_route_config = TestUtility::parseYaml<CustomResponse>(std::string(kDefaultConfig));
   modifyPolicy<RedirectPolicyProto>(
       per_route_config, "gateway_error_action", [](RedirectPolicyProto& policy) {
@@ -227,13 +227,13 @@ TEST_P(CustomResponseIntegrationTest, RouteSpecificFilter) {
             "y-foo2");
       });
 
-  setPerRouteConfig(some_other_host.mutable_routes(0), per_route_config);
-  config_helper_.addVirtualHost(some_other_host);
+  setPerRouteConfig(host.mutable_routes(0), per_route_config);
+  config_helper_.addVirtualHost(host);
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   // Send request to host with per route config
-  default_request_headers_.setHost("some.other.host");
+  default_request_headers_.setHost("host.with.route_specific.cer_config");
   auto response =
       sendRequestAndWaitForResponse(default_request_headers_, 0, gateway_error_response_, 0, 0);
   // Verify we get the status code of the local config
@@ -246,7 +246,7 @@ TEST_P(CustomResponseIntegrationTest, RouteSpecificFilter) {
   EXPECT_EQ(0, test_server_->counter("custom_response_redirect_no_route")->value());
 
   // Send request to host without per route config
-  default_request_headers_.setHost("some.route");
+  default_request_headers_.setHost("original.host");
   response = sendRequestAndWaitForResponse(default_request_headers_, 0, gateway_error_response_, 0);
   // Verify we get the modified status value.
   EXPECT_EQ("299", response->headers().getStatusValue());
@@ -280,7 +280,7 @@ TEST_P(CustomResponseIntegrationTest, OnlyRouteSpecificFilter) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  default_request_headers_.setHost("some.route");
+  default_request_headers_.setHost("original.host");
   auto response =
       sendRequestAndWaitForResponse(default_request_headers_, 0, gateway_error_response_, 0);
   // Verify we get the original error status code.
@@ -293,7 +293,7 @@ TEST_P(CustomResponseIntegrationTest, OnlyRouteSpecificFilter) {
 // already been redirected by the custom response filter.
 // Verify that the route specific filter is picked if specified.
 TEST_P(CustomResponseIntegrationTest, NoRecursion) {
-  // Make the remote response for gateway_error policy return 401
+  // Make the redirect policy response for gateway_error policy return 401
   auto fo1 = config_helper_.createVirtualHost("fo1.example");
   fo1.mutable_routes(0)->set_name("fo1");
   fo1.mutable_routes(0)->mutable_direct_response()->set_status(401);
@@ -308,7 +308,7 @@ TEST_P(CustomResponseIntegrationTest, NoRecursion) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   // Verify that a 401 response will trigger 400_response policy
-  default_request_headers_.setHost("some.route");
+  default_request_headers_.setHost("original.host");
   auto response =
       sendRequestAndWaitForResponse(default_request_headers_, 0, unauthorized_response_, 0);
   // Verify that we get the modified status value.
@@ -320,7 +320,7 @@ TEST_P(CustomResponseIntegrationTest, NoRecursion) {
 
   // Verify that 400_response policy cannot be triggered by the
   // gateway_error_response policy
-  default_request_headers_.setHost("some.route");
+  default_request_headers_.setHost("original.host");
   response = sendRequestAndWaitForResponse(default_request_headers_, 0, gateway_error_response_, 0);
   // Verify we get status code for fo1.example
   EXPECT_EQ("401", response->headers().getStatusValue());
@@ -337,7 +337,7 @@ typed_config:
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  default_request_headers_.setHost("some.route");
+  default_request_headers_.setHost("original.host");
   auto response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
@@ -359,7 +359,7 @@ typed_config:
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  default_request_headers_.setHost("some.route");
+  default_request_headers_.setHost("original.host");
   auto response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
@@ -382,7 +382,7 @@ typed_config:
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  default_request_headers_.setHost("some.route");
+  default_request_headers_.setHost("original.host");
   auto response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
@@ -404,7 +404,7 @@ typed_config:
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  default_request_headers_.setHost("some.route");
+  default_request_headers_.setHost("original.host");
   auto response = sendRequestAndWaitForResponse(default_request_headers_, 0, okay_response_, 0);
   // Verify we don't get the modified status value.
   EXPECT_EQ("500", response->headers().getStatusValue());
@@ -421,7 +421,7 @@ typed_config:
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  default_request_headers_.setHost("some.route");
+  default_request_headers_.setHost("original.host");
   auto response = sendRequestAndWaitForResponse(default_request_headers_, 0, okay_response_, 0);
   // Verify we don't get the modified status value.
   EXPECT_EQ("500", response->headers().getStatusValue());
@@ -438,7 +438,7 @@ typed_config:
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  default_request_headers_.setHost("some.route");
+  default_request_headers_.setHost("original.host");
   auto response = sendRequestAndWaitForResponse(default_request_headers_, 0, okay_response_, 0);
   // Verify we don't get the modified status value.
   EXPECT_EQ("500", response->headers().getStatusValue());
@@ -461,7 +461,7 @@ typed_config:
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  default_request_headers_.setHost("some.route");
+  default_request_headers_.setHost("original.host");
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
@@ -482,7 +482,7 @@ typed_config:
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  default_request_headers_.setHost("some.route");
+  default_request_headers_.setHost("original.host");
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
@@ -494,29 +494,32 @@ typed_config:
 // header.
 TEST_P(CustomResponseIntegrationTest, RouteHeaderMatch) {
   // Add route with header matcher
-  auto some_other_host = config_helper_.createVirtualHost("some.other.host");
-  some_other_host.mutable_routes(0)->mutable_match()->set_prefix("/");
+  auto virtual_host = config_helper_.createVirtualHost("host.with.route.with.header.matcher");
+  virtual_host.mutable_routes(0)->mutable_match()->set_prefix("/");
   // "cer-only" header needs to be present for route matching.
-  auto header = some_other_host.mutable_routes(0)->mutable_match()->mutable_headers()->Add();
+  auto header = virtual_host.mutable_routes(0)->mutable_match()->mutable_headers()->Add();
   header->set_name("cer-only");
-  some_other_host.mutable_routes(0)->mutable_direct_response()->mutable_body()->set_inline_bytes(
+  virtual_host.mutable_routes(0)->mutable_direct_response()->mutable_body()->set_inline_bytes(
       "cer-only-response");
-  some_other_host.mutable_routes(0)->mutable_direct_response()->set_status(202);
-  config_helper_.addVirtualHost(some_other_host);
+  virtual_host.mutable_routes(0)->mutable_direct_response()->set_status(202);
+  config_helper_.addVirtualHost(virtual_host);
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  // Verify some.other.host is reachable via the redirect policy with the
+  // Verify `host.with.route.with.header.matcher` is reachable via the redirect policy with the
   // "cer-only" header added.
-  default_request_headers_.setHost("some.route");
+  default_request_headers_.setHost("original.host");
   auto response2 = sendRequestAndWaitForResponse(
       default_request_headers_, 0, internal_server_error_, 0, 0, std::chrono::minutes(20));
+  // The `500_action` redirect policy in kDefaultConfig adds the required header
+  // to match the route for internal redirection. Verify that this is worked as
+  // expected.
   EXPECT_EQ("292", response2->headers().getStatusValue());
   EXPECT_EQ("cer-only-response", response2->body());
-  default_request_headers_.setHost("some.other.host");
 
-  // Verify some.other.host is not directly reachable.
+  // Verify `host.with.route.with.header.matcher` is not directly reachable.
+  default_request_headers_.setHost("host.with.route.with.header.matcher");
   auto response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
@@ -537,11 +540,17 @@ TEST_P(CustomResponseIntegrationTest, ModifyRequestHeaders) {
                                           "type.googleapis.com/google.protobuf.Struct");
                                     });
 
+  // Add TestModifyRequestHeaders extension that will add the
+  // `x-envoy-cer-backend` header to the redirected request, which is required
+  // for route selection for the redirected request.
   TestModifyRequestHeadersActionFactory factory;
   Envoy::Registry::InjectFactory<
       Extensions::Http::CustomResponse::ModifyRequestHeadersActionFactory>
       registration(factory);
 
+  // Add route corresponding to the internal redirect for the redirect policy
+  // that requires the presence of the `x-envoy-cer-backend` header for
+  // matching.
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) -> void {
@@ -559,7 +568,7 @@ TEST_P(CustomResponseIntegrationTest, ModifyRequestHeaders) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  default_request_headers_.setHost("some.route");
+  default_request_headers_.setHost("original.host");
   auto response = sendRequestAndWaitForResponse(
       default_request_headers_, 0,
       ::Envoy::Http::TestResponseHeaderMapImpl{{":status", "520"}, {"content-length", "0"}}, 0, 0,
