@@ -185,13 +185,15 @@ bool GenericKeyAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor
 
 MetaDataAction::MetaDataAction(const envoy::config::route::v3::RateLimit::Action::MetaData& action)
     : metadata_key_(action.metadata_key()), descriptor_key_(action.descriptor_key()),
-      default_value_(action.default_value()), source_(action.source()) {}
+      default_value_(action.default_value()), source_(action.source()),
+      skip_if_absent_(action.skip_if_absent()) {}
 
 MetaDataAction::MetaDataAction(
     const envoy::config::route::v3::RateLimit::Action::DynamicMetaData& action)
     : metadata_key_(action.metadata_key()), descriptor_key_(action.descriptor_key()),
       default_value_(action.default_value()),
-      source_(envoy::config::route::v3::RateLimit::Action::MetaData::DYNAMIC) {}
+      source_(envoy::config::route::v3::RateLimit::Action::MetaData::DYNAMIC),
+      skip_if_absent_(false) {}
 
 bool MetaDataAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
                                         const std::string&, const Http::RequestHeaderMap&,
@@ -219,7 +221,10 @@ bool MetaDataAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_e
     return true;
   }
 
-  return false;
+  // If the metadata key is not present and no default value is set, skip this
+  // descriptor if skip_if_absent is true. If skip_if_absent is false, do not
+  // call rate limiting service.
+  return skip_if_absent_;
 }
 
 HeaderValueMatchAction::HeaderValueMatchAction(
