@@ -3,12 +3,12 @@ name: format
 on:
   push:
     branches:
-      - main
+    - main
     paths:
-      - 'mobile/**'
+    - 'mobile/**'
   pull_request:
     paths:
-      - 'mobile/**'
+    - 'mobile/**'
 
 jobs:
   formatall:
