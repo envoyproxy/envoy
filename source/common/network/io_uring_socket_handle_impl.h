@@ -115,6 +115,7 @@ private:
 
   std::unique_ptr<IoHandle> shadow_io_handle_;
   bool enable_server_socket_{true};
+  bool enable_client_socket_{false};
 };
 
 } // namespace Network

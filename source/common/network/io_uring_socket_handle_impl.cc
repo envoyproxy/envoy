@@ -54,13 +54,13 @@ IoUringSocketHandleImpl::~IoUringSocketHandleImpl() {
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::close() {
   ASSERT(SOCKET_VALID(fd_));
-  ENVOY_LOG(debug, "close, fd = {}", fd_);
+  ENVOY_LOG(trace, "close, fd = {}, type = {}", fd_, ioUringSocketTypeStr());
 
-  switch (io_uring_socket_type_) {
-    case IoUringSocketType::Client: {
-      // Fall back to shadow io handle if client socket disabled.
-      // This will be removed when all the debug work done.
-      ENVOY_LOG(trace, "close the client socket");
+  // Fall back to shadow io handle if client/server socket disabled.
+  // This will be removed when all the debug work done.
+  if ((io_uring_socket_type_ == IoUringSocketType::Client && !enable_client_socket_) ||
+      (io_uring_socket_type_ == IoUringSocketType::Server && !enable_server_socket_)) {
+      ENVOY_LOG(trace, "fallback to shadow io uring handle, fd = {}, type = {}", fd_, ioUringSocketTypeStr());
       if (shadow_io_handle_ == nullptr) {
         ::close(fd_);
         SET_SOCKET_INVALID(fd_);
@@ -68,44 +68,24 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::close() {
       }
       SET_SOCKET_INVALID(fd_);
       return shadow_io_handle_->close();
-    }
-    case IoUringSocketType::Server: {
-      // Fall back to shadow io handle if server socket disabled.
-      // This will be removed when all the debug work done.
-      if (!enable_server_socket_) {
-        ENVOY_LOG(trace, "close the server socket, fd = {}", fd_);
-        if (shadow_io_handle_ == nullptr) {
-          ::close(fd_);
-          SET_SOCKET_INVALID(fd_);
-          return Api::ioCallUint64ResultNoError();
-        }
-        SET_SOCKET_INVALID(fd_);
-        return shadow_io_handle_->close(); 
-      }
-      // If server socket is enabled, then execute the same code with listen socket.
-    }
-    case IoUringSocketType::Listen: {
-      ENVOY_LOG(trace, "close the socket, fd = {}, io_uring_socket_type = {}", fd_, ioUringSocketTypeStr());
-
-      // There could be chance the listen socket was close before initialzie file event.
-      if (!io_uring_worker_.has_value()) {
-        ::close(fd_);
-        SET_SOCKET_INVALID(fd_);
-        return Api::ioCallUint64ResultNoError();
-      }
-      io_uring_worker_.ref().closeSocket(fd_);
-      SET_SOCKET_INVALID(fd_);
-      return Api::ioCallUint64ResultNoError();
-    }
-    case IoUringSocketType::Unknown: {
-      // There is case the socket will be closed directly without initialize any event.
-      ::close(fd_);
-      SET_SOCKET_INVALID(fd_);
-      return Api::ioCallUint64ResultNoError();
-    }
   }
 
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  // There is case the socket will be closed directly without initialize any event.
+  if (io_uring_socket_type_ == IoUringSocketType::Unknown) {
+    ::close(fd_);
+    SET_SOCKET_INVALID(fd_);
+    return Api::ioCallUint64ResultNoError();
+  }
+
+  // There could be chance the listen socket was close before initialize file event.
+  if (!io_uring_worker_.has_value()) {
+    ::close(fd_);
+    SET_SOCKET_INVALID(fd_);
+    return Api::ioCallUint64ResultNoError();
+  }
+  io_uring_worker_.ref().closeSocket(fd_);
+  SET_SOCKET_INVALID(fd_);
+  return Api::ioCallUint64ResultNoError();
 }
 
 bool IoUringSocketHandleImpl::isOpen() const { return SOCKET_VALID(fd_); }
@@ -113,168 +93,128 @@ bool IoUringSocketHandleImpl::isOpen() const { return SOCKET_VALID(fd_); }
 Api::IoCallUint64Result
 IoUringSocketHandleImpl::readv(uint64_t max_length, Buffer::RawSlice* slices, uint64_t num_slice) {
   ASSERT(io_uring_socket_type_ != IoUringSocketType::Unknown);
+  ASSERT(io_uring_socket_type_ != IoUringSocketType::Listen);
+  ENVOY_LOG(debug, "readv, fd = {}, type = {}", fd_, ioUringSocketTypeStr());
 
-  switch (io_uring_socket_type_) {
-    case IoUringSocketType::Client:
-      // Fall back to shadow io handle if client socket disabled.
-      // This will be removed when all the debug work done.
-      return shadow_io_handle_->readv(max_length, slices, num_slice);
-    case IoUringSocketType::Server: {
-      // Fall back to shadow io handle if server socket disabled.
-      // This will be removed when all the debug work done.
-      if (!enable_server_socket_) {
-        return shadow_io_handle_->readv(max_length, slices, num_slice);
-      } else {
-        ENVOY_LOG(debug, "readv, result = {}, fd = {}", read_param_->result_, fd_);
-
-        if (read_param_ == absl::nullopt) {
-          return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
-                                      IoSocketError::deleteIoError)};
-        }
-
-        if (read_param_->result_ == 0) {
-          ENVOY_LOG(debug, "readv remote close");
-          return Api::ioCallUint64ResultNoError();
-        }
-
-        if (read_param_->result_ == -EAGAIN) {
-          ENVOY_LOG(debug, "read eagain");
-          return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
-                                    IoSocketError::deleteIoError)};
-        }
-      
-        if (read_param_->result_ < 0) {
-          return {0, Api::IoErrorPtr(new IoSocketError(-read_param_->result_), IoSocketError::deleteIoError)};
-        }
-
-        if (read_param_->pending_read_buf_.length() == 0) {
-          return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
-                                    IoSocketError::deleteIoError)};
-        }
-
-        const uint64_t max_read_length = std::min(max_length, static_cast<uint64_t>(read_param_->result_));
-        uint64_t num_bytes_to_read = read_param_->pending_read_buf_.copyOutToSlices(max_read_length, slices, num_slice);
-        read_param_->pending_read_buf_.drain(num_bytes_to_read);
-        return {num_bytes_to_read, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError)};
-      }
-    }
-    case IoUringSocketType::Listen:
-      break;
-    case IoUringSocketType::Unknown:
-      break;
+  // Fall back to shadow io handle if client/server socket disabled.
+  // This will be removed when all the debug work done.
+  if ((io_uring_socket_type_ == IoUringSocketType::Client && !enable_client_socket_) ||
+      (io_uring_socket_type_ == IoUringSocketType::Server && !enable_server_socket_)) {
+    ENVOY_LOG(debug, "readv fallback to shadow io handle, fd = {}, type = {}", fd_, ioUringSocketTypeStr());
+    return shadow_io_handle_->readv(max_length, slices, num_slice);
   }
 
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  ENVOY_LOG(debug, "readv available, result = {}, fd = {}, type = {}", read_param_->result_, fd_, ioUringSocketTypeStr());
+
+  if (read_param_ == absl::nullopt) {
+    return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
+                                IoSocketError::deleteIoError)};
+  }
+
+  if (read_param_->result_ == 0) {
+    ENVOY_LOG(debug, "readv remote close");
+    return Api::ioCallUint64ResultNoError();
+  }
+
+  if (read_param_->result_ == -EAGAIN) {
+    ENVOY_LOG(debug, "read eagain");
+    return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
+                              IoSocketError::deleteIoError)};
+  }
+
+  if (read_param_->result_ < 0) {
+    return {0, Api::IoErrorPtr(new IoSocketError(-read_param_->result_), IoSocketError::deleteIoError)};
+  }
+
+  if (read_param_->pending_read_buf_.length() == 0) {
+    return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
+                              IoSocketError::deleteIoError)};
+  }
+
+  const uint64_t max_read_length = std::min(max_length, static_cast<uint64_t>(read_param_->result_));
+  uint64_t num_bytes_to_read = read_param_->pending_read_buf_.copyOutToSlices(max_read_length, slices, num_slice);
+  read_param_->pending_read_buf_.drain(num_bytes_to_read);
+  return {num_bytes_to_read, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError)};
 }
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::read(Buffer::Instance& buffer,
                                                       absl::optional<uint64_t> max_length_opt) {
   ASSERT(io_uring_socket_type_ != IoUringSocketType::Unknown);
-  ENVOY_LOG(trace, "read, fd = {}, socket type = {}", fd_, ioUringSocketTypeStr());
+  ASSERT(io_uring_socket_type_ != IoUringSocketType::Listen);
+  ENVOY_LOG(trace, "read, fd = {}, type = {}", fd_, ioUringSocketTypeStr());
 
-  switch (io_uring_socket_type_) {
-    case IoUringSocketType::Client:
-      return shadow_io_handle_->read(buffer, max_length_opt);
-    case IoUringSocketType::Server: {
-      if (!enable_server_socket_) {
-        return shadow_io_handle_->read(buffer, max_length_opt);
-      } else {
-        const uint64_t max_length = max_length_opt.value_or(UINT64_MAX);
-        if (max_length == 0) {
-          return Api::ioCallUint64ResultNoError();
-        }
-
-        Buffer::Reservation reservation = buffer.reserveForRead();
-        Api::IoCallUint64Result result = readv(std::min(reservation.length(), max_length),
-                                              reservation.slices(), reservation.numSlices());
-        uint64_t bytes_to_commit = result.ok() ? result.return_value_ : 0;
-        ASSERT(bytes_to_commit <= max_length);
-        reservation.commit(bytes_to_commit);
-        return result;
-      }
-    }
-    case IoUringSocketType::Listen:
-      break;
-    case IoUringSocketType::Unknown:
-      break;
+  // Fall back to shadow io handle if client/server socket disabled.
+  // This will be removed when all the debug work done.
+  if ((io_uring_socket_type_ == IoUringSocketType::Client && !enable_client_socket_) ||
+      (io_uring_socket_type_ == IoUringSocketType::Server && !enable_server_socket_)) {
+    return shadow_io_handle_->read(buffer, max_length_opt);
   }
 
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  const uint64_t max_length = max_length_opt.value_or(UINT64_MAX);
+  if (max_length == 0) {
+    return Api::ioCallUint64ResultNoError();
+  }
+
+  Buffer::Reservation reservation = buffer.reserveForRead();
+  Api::IoCallUint64Result result = readv(std::min(reservation.length(), max_length),
+                                        reservation.slices(), reservation.numSlices());
+  uint64_t bytes_to_commit = result.ok() ? result.return_value_ : 0;
+  ASSERT(bytes_to_commit <= max_length);
+  reservation.commit(bytes_to_commit);
+  return result;
 }
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::writev(const Buffer::RawSlice* slices,
                                                         uint64_t num_slice) {
   ASSERT(io_uring_socket_type_ != IoUringSocketType::Unknown);
-  ENVOY_LOG(trace, "writev, fd = {}", fd_);
+  ASSERT(io_uring_socket_type_ != IoUringSocketType::Listen);
+  ENVOY_LOG(trace, "writev, fd = {}, type = {}", fd_, ioUringSocketTypeStr());
 
-  switch (io_uring_socket_type_) {
-    case IoUringSocketType::Client:
-      return shadow_io_handle_->writev(slices, num_slice);
-    case IoUringSocketType::Server:
-      if (!enable_server_socket_) {
-        return shadow_io_handle_->writev(slices, num_slice);
-      } else {
-        ENVOY_LOG(trace, "server socket write, fd = {}", fd_);
-        if (write_param_ != absl::nullopt) {
-          // EAGAIN means an injected event, then just submit new write.
-          if (write_param_->result_ < 0 && write_param_->result_ != -EAGAIN) {
-            return {0, Api::IoErrorPtr(new IoSocketError(write_param_->result_), IoSocketError::deleteIoError)};
-          }
-          ENVOY_LOG(trace, "an inject event, result = {}, fd = {}", write_param_->result_, fd_);
-        }
-
-        ASSERT(io_uring_worker_.has_value());
-        auto& io_uring_server_socket = io_uring_worker_.ref().getIoUringSocket(fd_);
-        auto ret = io_uring_server_socket.writev(slices, num_slice);
-        return {ret, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError)};
-      }
-    case IoUringSocketType::Listen:
-      break;
-    case IoUringSocketType::Unknown:
-      break;
+  if ((io_uring_socket_type_ == IoUringSocketType::Client && !enable_client_socket_) ||
+      (io_uring_socket_type_ == IoUringSocketType::Server && !enable_server_socket_)) {
+    return shadow_io_handle_->writev(slices, num_slice);
   }
 
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  if (write_param_ != absl::nullopt) {
+    // EAGAIN means an injected event, then just submit new write.
+    if (write_param_->result_ < 0 && write_param_->result_ != -EAGAIN) {
+      return {0, Api::IoErrorPtr(new IoSocketError(write_param_->result_), IoSocketError::deleteIoError)};
+    }
+    ENVOY_LOG(trace, "an inject event, result = {}, fd = {}", write_param_->result_, fd_);
+  }
+
+  ASSERT(io_uring_worker_.has_value());
+  auto& io_uring_server_socket = io_uring_worker_.ref().getIoUringSocket(fd_);
+  auto ret = io_uring_server_socket.writev(slices, num_slice);
+  return {ret, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError)};
 }
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::write(Buffer::Instance& buffer) {
   ASSERT(io_uring_socket_type_ != IoUringSocketType::Unknown);
-  ENVOY_LOG(trace, "write, length = {}, fd = {}", buffer.length(), fd_);
+  ENVOY_LOG(trace, "write, length = {}, fd = {}, type = {}", buffer.length(), fd_, ioUringSocketTypeStr());
 
-  switch (io_uring_socket_type_) {
-    case IoUringSocketType::Client:
-      return shadow_io_handle_->write(buffer);
-    case IoUringSocketType::Server:
-      if (!enable_server_socket_) {
-        return shadow_io_handle_->write(buffer);
-      } else {
-        ENVOY_LOG(trace, "server socket write, fd = {}", fd_);
-
-        if (write_param_ != absl::nullopt) {
-          // EAGAIN means an injected event, then just submit new write.
-          if (write_param_->result_ < 0 && write_param_->result_ != -EAGAIN) {
-            return {
-              0, Api::IoErrorPtr(new IoSocketError(write_param_->result_), IoSocketError::deleteIoError)};
-          }
-          ENVOY_LOG(trace, "an inject event, result = {}, fd = {}", write_param_->result_, fd_);
-        }
-
-        ASSERT(io_uring_worker_.has_value());
-        auto& io_uring_server_socket = io_uring_worker_.ref().getIoUringSocket(fd_);
-        auto ret = io_uring_server_socket.write(buffer);
-        if (ret == 0) {
-          return {
-            0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(), IoSocketError::deleteIoError)};
-        }
-        return {ret, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError)};
-      }
-    case IoUringSocketType::Listen:
-      break;
-    case IoUringSocketType::Unknown:
-      break;
+  if ((io_uring_socket_type_ == IoUringSocketType::Client && !enable_client_socket_) ||
+      (io_uring_socket_type_ == IoUringSocketType::Server && !enable_server_socket_)) {
+    return shadow_io_handle_->write(buffer);
   }
 
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  if (write_param_ != absl::nullopt) {
+    // EAGAIN means an injected event, then just submit new write.
+    if (write_param_->result_ < 0 && write_param_->result_ != -EAGAIN) {
+      return {
+        0, Api::IoErrorPtr(new IoSocketError(write_param_->result_), IoSocketError::deleteIoError)};
+    }
+    ENVOY_LOG(trace, "an inject event, result = {}, fd = {}", write_param_->result_, fd_);
+  }
+
+  ASSERT(io_uring_worker_.has_value());
+  auto& io_uring_server_socket = io_uring_worker_.ref().getIoUringSocket(fd_);
+  auto ret = io_uring_server_socket.write(buffer);
+  if (ret == 0) {
+    return {
+      0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(), IoSocketError::deleteIoError)};
+  }
+  return {ret, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError)};
 }
 
 Api::IoCallUint64Result
@@ -341,11 +281,15 @@ IoHandlePtr IoUringSocketHandleImpl::accept(struct sockaddr* addr, socklen_t* ad
 }
 
 Api::SysCallIntResult IoUringSocketHandleImpl::connect(Address::InstanceConstSharedPtr address) {
-  if (io_uring_socket_type_ == IoUringSocketType::Client) {
+  ASSERT(io_uring_socket_type_ == IoUringSocketType::Client);
+
+  if (!enable_client_socket_) {
     return shadow_io_handle_->connect(address);
   }
 
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  auto sockaddr_to_use = address->sockAddr();
+  auto sockaddr_len_to_use = address->sockAddrLen();
+  return Api::OsSysCallsSingleton::get().connect(fd_, sockaddr_to_use, sockaddr_len_to_use);
 }
 
 Api::SysCallIntResult IoUringSocketHandleImpl::setOption(int level, int optname, const void* optval,
@@ -440,13 +384,17 @@ void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
     case IoUringSocketType::Client:
     case IoUringSocketType::Unknown:
       ENVOY_LOG(trace, "initialize file event for client socket, fd = {}", fd_);
-      ENVOY_LOG(trace, "fallback to IoSocketHandle for client socket");
       io_uring_socket_type_ = IoUringSocketType::Client;
-      int flags = fcntl(fd_, F_GETFL, 0);
-      ::fcntl(fd_, F_SETFL, flags | O_NONBLOCK);
-      shadow_io_handle_ = std::make_unique<IoSocketHandleImpl>(fd_, socket_v6only_, domain_);
-      shadow_io_handle_->initializeFileEvent(dispatcher, cb, trigger, events);
-      return;
+      if (!enable_client_socket_) {
+        ENVOY_LOG(trace, "fallback to IoSocketHandle for client socket");
+        int flags = fcntl(fd_, F_GETFL, 0);
+        ::fcntl(fd_, F_SETFL, flags | O_NONBLOCK);
+        shadow_io_handle_ = std::make_unique<IoSocketHandleImpl>(fd_, socket_v6only_, domain_);
+        shadow_io_handle_->initializeFileEvent(dispatcher, cb, trigger, events);
+        return;
+      } else {
+        io_uring_worker_.ref().addClientSocket(fd_, *this, read_buffer_size_);
+      }
   }
 
   cb_ = std::move(cb);
@@ -458,93 +406,51 @@ void IoUringSocketHandleImpl::activateFileEvents(uint32_t events) {
   ASSERT(io_uring_socket_type_ != IoUringSocketType::Unknown);
   ENVOY_LOG(trace, "activate file events {}, fd = {}, io_uring_socket_type = {}", events, fd_, ioUringSocketTypeStr());
 
-  switch (io_uring_socket_type_) {
-    case IoUringSocketType::Client: {
-      shadow_io_handle_->activateFileEvents(events);
-      return;
-    }
-    case IoUringSocketType::Server: {
-      if (!enable_server_socket_) {
-        ASSERT(shadow_io_handle_ != nullptr);
-        shadow_io_handle_->activateFileEvents(events);
-        return;
-      }
-    }
-    case IoUringSocketType::Listen: {
-      // TODO (soulxu): maybe not use EAGAIN here.
-      if (events & Event::FileReadyType::Read) {
-        ENVOY_LOG(trace, "inject read event, fd = {}, io_uring_socket_type = {}", fd_, ioUringSocketTypeStr());
-        io_uring_worker_.ref().injectCompletion(fd_, Io::RequestType::Read, -EAGAIN);
-      }
-      if (events & Event::FileReadyType::Write) {
-        ENVOY_LOG(trace, "inject write event, fd = {}, io_uring_socket_type = {}", fd_, ioUringSocketTypeStr());
-        io_uring_worker_.ref().injectCompletion(fd_, Io::RequestType::Write, -EAGAIN);
-      }
-      return;
-    }
-    case IoUringSocketType::Unknown:
-      break;
+  if ((io_uring_socket_type_ == IoUringSocketType::Client && !enable_client_socket_) ||
+      (io_uring_socket_type_ == IoUringSocketType::Server && !enable_server_socket_)) {
+    shadow_io_handle_->activateFileEvents(events);
+    return;
   }
 
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  // TODO (soulxu): maybe not use EAGAIN here.
+  if (events & Event::FileReadyType::Read) {
+    ENVOY_LOG(trace, "inject read event, fd = {}, io_uring_socket_type = {}", fd_, ioUringSocketTypeStr());
+    io_uring_worker_.ref().injectCompletion(fd_, Io::RequestType::Read, -EAGAIN);
+  }
+  if (events & Event::FileReadyType::Write) {
+    ENVOY_LOG(trace, "inject write event, fd = {}, io_uring_socket_type = {}", fd_, ioUringSocketTypeStr());
+    io_uring_worker_.ref().injectCompletion(fd_, Io::RequestType::Write, -EAGAIN);
+  }
 }
 
 void IoUringSocketHandleImpl::enableFileEvents(uint32_t events) {
   ENVOY_LOG(trace, "enable file events {}, fd = {}, io_uring_socket_type = {}", events, fd_, ioUringSocketTypeStr());
   ASSERT(io_uring_socket_type_ != IoUringSocketType::Unknown);
 
-  switch (io_uring_socket_type_) {
-    case IoUringSocketType::Client: {
-      shadow_io_handle_->enableFileEvents(events);
-      return;
-    }
-    case IoUringSocketType::Server: {
-      if (!enable_server_socket_) {
-        ASSERT(shadow_io_handle_ != nullptr);
-        shadow_io_handle_->enableFileEvents(events);
-        return;
-      }
-    }
-    case IoUringSocketType::Listen: {
-      if (!(events & Event::FileReadyType::Read)) {
-        io_uring_worker_.ref().disableSocket(fd_);
-      } else {
-        io_uring_worker_.ref().enableSocket(fd_);
-      }
-      return;
-    }
-    case IoUringSocketType::Unknown:
-      break;
+  if ((io_uring_socket_type_ == IoUringSocketType::Client && !enable_client_socket_) ||
+      (io_uring_socket_type_ == IoUringSocketType::Server && !enable_server_socket_)) {
+    shadow_io_handle_->enableFileEvents(events);
+    return;
   }
 
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  if (!(events & Event::FileReadyType::Read)) {
+    io_uring_worker_.ref().disableSocket(fd_);
+  } else {
+    io_uring_worker_.ref().enableSocket(fd_);
+  }
 }
 
 void IoUringSocketHandleImpl::resetFileEvents() {
   ASSERT(io_uring_socket_type_ != IoUringSocketType::Unknown);
   ENVOY_LOG(trace, "reset file, fd = {}, io_uring_socket_type = {}", fd_, ioUringSocketTypeStr());
 
-  switch (io_uring_socket_type_) {
-    case IoUringSocketType::Client: {
-      shadow_io_handle_->resetFileEvents();
-      return;
-    }
-    case IoUringSocketType::Server: {
-      if (!enable_server_socket_) {
-        ASSERT(shadow_io_handle_ != nullptr);
-        shadow_io_handle_->resetFileEvents();
-        return;
-      }
-    }
-    case IoUringSocketType::Listen: {
-      io_uring_worker_.ref().disableSocket(fd_);
-      return;
-    }
-    case IoUringSocketType::Unknown:
-      break;
+  if ((io_uring_socket_type_ == IoUringSocketType::Client && !enable_client_socket_) ||
+      (io_uring_socket_type_ == IoUringSocketType::Server && !enable_server_socket_)) {
+    shadow_io_handle_->resetFileEvents();
+    return;
   }
 
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  io_uring_worker_.ref().disableSocket(fd_);
 }
 
 Api::SysCallIntResult IoUringSocketHandleImpl::shutdown(int how) {
