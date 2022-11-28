@@ -58,7 +58,7 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::close() {
 
   switch (io_uring_socket_type_) {
     case IoUringSocketType::Client: {
-      // Fall back to shadow io handle if server socket disabled.
+      // Fall back to shadow io handle if client socket disabled.
       // This will be removed when all the debug work done.
       ENVOY_LOG(trace, "close the client socket");
       if (shadow_io_handle_ == nullptr) {
@@ -114,46 +114,54 @@ Api::IoCallUint64Result
 IoUringSocketHandleImpl::readv(uint64_t max_length, Buffer::RawSlice* slices, uint64_t num_slice) {
   ASSERT(io_uring_socket_type_ != IoUringSocketType::Unknown);
 
-  if (io_uring_socket_type_ == IoUringSocketType::Client) {
-    return shadow_io_handle_->readv(max_length, slices, num_slice);
-  }
+  switch (io_uring_socket_type_) {
+    case IoUringSocketType::Client:
+      // Fall back to shadow io handle if client socket disabled.
+      // This will be removed when all the debug work done.
+      return shadow_io_handle_->readv(max_length, slices, num_slice);
+    case IoUringSocketType::Server: {
+      // Fall back to shadow io handle if server socket disabled.
+      // This will be removed when all the debug work done.
+      if (!enable_server_socket_) {
+        return shadow_io_handle_->readv(max_length, slices, num_slice);
+      } else {
+        ENVOY_LOG(debug, "readv, result = {}, fd = {}", read_param_->result_, fd_);
 
-  if (io_uring_socket_type_ == IoUringSocketType::Server && !enable_server_socket_) {
-    return shadow_io_handle_->readv(max_length, slices, num_slice);
-  }
+        if (read_param_ == absl::nullopt) {
+          return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
+                                      IoSocketError::deleteIoError)};
+        }
 
-  if (io_uring_socket_type_ == IoUringSocketType::Server) {
-    ENVOY_LOG(debug, "readv, result = {}, fd = {}", read_param_->result_, fd_);
+        if (read_param_->result_ == 0) {
+          ENVOY_LOG(debug, "readv remote close");
+          return Api::ioCallUint64ResultNoError();
+        }
 
-    if (read_param_ == absl::nullopt) {
-      return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
-                                  IoSocketError::deleteIoError)};
+        if (read_param_->result_ == -EAGAIN) {
+          ENVOY_LOG(debug, "read eagain");
+          return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
+                                    IoSocketError::deleteIoError)};
+        }
+      
+        if (read_param_->result_ < 0) {
+          return {0, Api::IoErrorPtr(new IoSocketError(-read_param_->result_), IoSocketError::deleteIoError)};
+        }
+
+        if (read_param_->pending_read_buf_.length() == 0) {
+          return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
+                                    IoSocketError::deleteIoError)};
+        }
+
+        const uint64_t max_read_length = std::min(max_length, static_cast<uint64_t>(read_param_->result_));
+        uint64_t num_bytes_to_read = read_param_->pending_read_buf_.copyOutToSlices(max_read_length, slices, num_slice);
+        read_param_->pending_read_buf_.drain(num_bytes_to_read);
+        return {num_bytes_to_read, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError)};
+      }
     }
-
-    if (read_param_->result_ == 0) {
-      ENVOY_LOG(debug, "readv remote close");
-      return Api::ioCallUint64ResultNoError();
-    }
-
-    if (read_param_->result_ == -EAGAIN) {
-      ENVOY_LOG(debug, "read eagain");
-      return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
-                                 IoSocketError::deleteIoError)};
-    }
-  
-    if (read_param_->result_ < 0) {
-      return {0, Api::IoErrorPtr(new IoSocketError(-read_param_->result_), IoSocketError::deleteIoError)};
-    }
-
-    if (read_param_->pending_read_buf_.length() == 0) {
-      return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
-                                 IoSocketError::deleteIoError)};
-    }
-
-    const uint64_t max_read_length = std::min(max_length, static_cast<uint64_t>(read_param_->result_));
-    uint64_t num_bytes_to_read = read_param_->pending_read_buf_.copyOutToSlices(max_read_length, slices, num_slice);
-    read_param_->pending_read_buf_.drain(num_bytes_to_read);
-    return {num_bytes_to_read, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError)};
+    case IoUringSocketType::Listen:
+      break;
+    case IoUringSocketType::Unknown:
+      break;
   }
 
   PANIC_DUE_TO_CORRUPT_ENUM;
