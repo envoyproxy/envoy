@@ -12,23 +12,33 @@
 namespace Envoy {
 namespace Quic {
 
+// Ack listener that stores access logging information and performs
+// logging after the final ack.
 class QuicStatsGatherer : public quic::QuicAckListenerInterface {
 public:
+  // QuicAckListenerInterface
   void OnPacketAcked(int acked_bytes, quic::QuicTime::Delta delta_largest_observed) override;
   void OnPacketRetransmitted(int /* retransmitted_bytes */) override {}
+
+  // Add bytes sent for this stream, for internal tracking of bytes acked.
   void addBytesSent(uint64_t bytes_sent, bool end_stream) {
     bytes_outstanding_ += bytes_sent;
     fin_sent_ = end_stream;
   }
+  // Log this stream using available stream info and access loggers.
   void doDeferredLog();
+  // Add a pointer to stream info that should be logged. There can be
+  // multiple in case of a recreated stream (e.g. internal redirect)
   void addStreamInfo(std::shared_ptr<StreamInfo::StreamInfo> stream_info) {
     if (stream_info != nullptr) {
       stream_info_.push_back(stream_info);
     }
   }
+  // Set list of pointers to access loggers.
   void setAccessLogHandlers(std::list<AccessLog::InstanceSharedPtr> handlers) {
     access_log_handlers_ = handlers;
   }
+  // Set time source, for recording the timestamp of the final ack.
   void setTimeSource(Envoy::TimeSource* time_source) { time_source_ = time_source; }
 
 private:

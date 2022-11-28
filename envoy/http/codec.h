@@ -237,7 +237,7 @@ public:
   virtual StreamInfo::StreamInfo& streamInfo() PURE;
 
   /**
-   * @return Shared pointer to the stream_info for this stream.
+   * @return shared pointer to the stream_info for this stream.
    */
   virtual std::shared_ptr<StreamInfo::StreamInfo> streamInfoSharedPtr() PURE;
 

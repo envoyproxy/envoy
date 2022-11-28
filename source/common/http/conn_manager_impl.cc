@@ -278,12 +278,17 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
 
   stream.completeRequest();
   stream.filter_manager_.onStreamComplete();
+
+  // For HTTP/3, skip access logging here and add deferred logging info
+  // to stream info for QuicStatsGatherer to use later. If there was a
+  // downstream reset, log here as usual.
   if (codec_ && codec_->protocol() == Protocol::Http3 &&
       !stream.filter_manager_.sawDownstreamReset() &&
       Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.quic_defer_logging_to_ack_listener")) {
     stream.filter_manager_.streamInfo().setDeferredLoggingInfo(stream.deferredLoggingInfo());
   } else {
+    // For HTTP/1 and HTTP/2, log here as usual.
     stream.filter_manager_.log();
   }
 

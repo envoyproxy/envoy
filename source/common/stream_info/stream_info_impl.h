@@ -364,6 +364,8 @@ struct StreamInfoImpl : public StreamInfo {
   // TODO(agrawroh): Check if the owner of this storage outlives the StreamInfo. We should only copy
   // the string if it could outlive the StreamInfo.
   absl::optional<std::string> virtual_cluster_name_;
+  // Headers and trailers required for access logs, stored in StreamInfo for deferred logging (i.e.
+  // after typical cleanup of a stream). nullopt indicates that deferred logging should be skipped.
   absl::optional<DeferredLoggingInfo> deferred_logging_info_;
 
 private:
