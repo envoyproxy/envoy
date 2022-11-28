@@ -15,7 +15,7 @@ on:
 jobs:
   formatall:
     name: format_all
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 45
     container:
       image: envoyproxy/envoy-build-ubuntu:0a02a76af5951bf7f4c7029c0ea6d29d96c0f682
