@@ -1996,7 +1996,7 @@ name: local-reply-during-encode-data
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestUrlRejected) {
-  if (GetParam().http1_implementation == Http1Impl::BalsaParser) {
+  if (GetParam().http1_implementation == Http1ParserImpl::BalsaParser) {
     // TODO(#21245): Re-enable this test for BalsaParser.
     return;
   }
@@ -2011,7 +2011,7 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestUrlAccepted) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersRejected) {
-  if (GetParam().http1_implementation == Http1Impl::BalsaParser) {
+  if (GetParam().http1_implementation == Http1ParserImpl::BalsaParser) {
     // TODO(#21245): Re-enable this test for BalsaParser.
     return;
   }
@@ -2021,7 +2021,7 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersRejected) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, VeryLargeRequestHeadersRejected) {
-  if (GetParam().http1_implementation == Http1Impl::BalsaParser) {
+  if (GetParam().http1_implementation == Http1ParserImpl::BalsaParser) {
     // TODO(#21245): Re-enable this test for BalsaParser.
     return;
   }
@@ -2125,7 +2125,7 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestTrailersAccepted) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestTrailersRejected) {
-  if (GetParam().http1_implementation == Http1Impl::BalsaParser) {
+  if (GetParam().http1_implementation == Http1ParserImpl::BalsaParser) {
     // TODO(#21245): Re-enable this test for BalsaParser.
     return;
   }
@@ -2137,7 +2137,7 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestTrailersRejected) {
 // This test uses an Http::HeaderMapImpl instead of an Http::TestHeaderMapImpl to avoid
 // time-consuming byte size verification that will cause this test to timeout.
 TEST_P(DownstreamProtocolIntegrationTest, ManyTrailerHeaders) {
-  if (GetParam().http1_implementation == Http1Impl::BalsaParser) {
+  if (GetParam().http1_implementation == Http1ParserImpl::BalsaParser) {
     // TODO(#21245): Re-enable this test for BalsaParser.
     return;
   }
@@ -2829,7 +2829,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectStreamRejection) {
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/12131
 TEST_P(DownstreamProtocolIntegrationTest, Test100AndDisconnect) {
-  if (GetParam().http1_implementation == Http1Impl::BalsaParser) {
+  if (GetParam().http1_implementation == Http1ParserImpl::BalsaParser) {
     // TODO(#21245): Re-enable this test for BalsaParser.
     return;
   }
@@ -3908,7 +3908,7 @@ TEST_P(ProtocolIntegrationTest, LocalInterfaceNameForUpstreamConnection) {
 // These tests send invalid request and response header names which violate ASSERT while creating
 // such request/response headers. So they can only be run in NDEBUG mode.
 TEST_P(DownstreamProtocolIntegrationTest, InvalidRequestHeaderName) {
-  if (GetParam().http1_implementation == Http1Impl::BalsaParser) {
+  if (GetParam().http1_implementation == Http1ParserImpl::BalsaParser) {
     // TODO(#21245): Re-enable this test for BalsaParser.
     return;
   }
