@@ -1,7 +1,4 @@
-excluded:
-  - envoy
 only_rules:
-  - anyobject_protocol
   - array_init
   - attributes
   - block_based_kvo

@@ -5,10 +5,10 @@ on:
     branches:
       - main
     paths:
-    - 'mobile/**'
+      - 'mobile/**'
   pull_request:
     paths:
-    - 'mobile/**'
+      - 'mobile/**'
 
 jobs:
   formatall:
@@ -38,6 +38,17 @@ jobs:
         run: brew install pre-commit
       - name: 'Run precommit'
         run: cd mobile && find mobile/* | pre-commit run --files
+  swiftlint:
+    name: swift_lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    container:
+      image: ghcr.io/realm/swiftlint:0.50.1
+    steps:
+      - uses: actions/checkout@v1
+      - name: 'Run Swift Lint (SwiftLint)'
+        run: swiftlint lint --strict
+        working-directory: mobile
   drstring:
     name: drstring
     runs-on: macos-12
