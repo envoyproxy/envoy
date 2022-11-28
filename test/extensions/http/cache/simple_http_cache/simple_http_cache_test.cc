@@ -4,7 +4,7 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/filters/http/cache/cache_entry_utils.h"
 #include "source/extensions/filters/http/cache/cache_headers_utils.h"
-#include "source/extensions/filters/http/cache/simple_http_cache/simple_http_cache.h"
+#include "source/extensions/http/cache/simple_http_cache/simple_http_cache.h"
 
 #include "test/extensions/filters/http/cache/common.h"
 #include "test/extensions/filters/http/cache/http_cache_implementation_test_common.h"
@@ -37,7 +37,7 @@ INSTANTIATE_TEST_SUITE_P(SimpleHttpCacheTest, HttpCacheImplementationTest,
 
 TEST(Registration, GetFactory) {
   HttpCacheFactory* factory = Registry::FactoryRegistry<HttpCacheFactory>::getFactoryByType(
-      "envoy.extensions.cache.simple_http_cache.v3.SimpleHttpCacheConfig");
+      "envoy.extensions.http.cache.simple_http_cache.v3.SimpleHttpCacheConfig");
   ASSERT_NE(factory, nullptr);
   envoy::extensions::filters::http::cache::v3::CacheConfig config;
   testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
