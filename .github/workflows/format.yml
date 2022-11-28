@@ -3,7 +3,7 @@ name: format
 on:
   push:
     branches:
-      - main
+    - main
     paths:
     - 'mobile/**'
     - '.github/workflows/**'
@@ -15,7 +15,7 @@ on:
 jobs:
   formatall:
     name: format_all
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 45
     container:
       image: envoyproxy/envoy-build-ubuntu:0a02a76af5951bf7f4c7029c0ea6d29d96c0f682
@@ -40,6 +40,17 @@ jobs:
         run: brew install pre-commit
       - name: 'Run precommit'
         run: cd mobile && find mobile/* | pre-commit run --files
+  swiftlint:
+    name: swift_lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    container:
+      image: ghcr.io/realm/swiftlint:0.50.1
+    steps:
+      - uses: actions/checkout@v1
+      - name: 'Run Swift Lint (SwiftLint)'
+        run: swiftlint lint --strict
+        working-directory: mobile
   drstring:
     name: drstring
     runs-on: macos-12
@@ -50,7 +61,7 @@ jobs:
           submodules: true
       - name: 'Run DrString'
         env:
-          DEVELOPER_DIR: /Applications/Xcode_14.0.app
+          DEVELOPER_DIR: /Applications/Xcode_14.1.app
         run: cd mobile && ./bazelw run @DrString//:drstring check
   kotlinlint:
     name: kotlin_lint
