@@ -770,9 +770,9 @@ void EdfLoadBalancerBase::initialize() {
 }
 
 void EdfLoadBalancerBase::recalculateHostsInSlowStart(const HostVector& hosts) {
-  auto current_time = time_source_.monotonicTime();
   // TODO(nezdolik): linear scan can be improved with using flat hash set for hosts in slow start.
   for (const auto& host : hosts) {
+    auto current_time = time_source_.monotonicTime();
     // Host enters slow start if only it has transitioned into healthy state.
     if (host->coarseHealth() == Upstream::Host::Health::Healthy) {
       auto host_last_hc_pass_time =
