@@ -50,7 +50,7 @@ jobs:
           submodules: true
       - name: 'Run DrString'
         env:
-          DEVELOPER_DIR: /Applications/Xcode_14.0.app
+          DEVELOPER_DIR: /Applications/Xcode_14.1.app
         run: cd mobile && ./bazelw run @DrString//:drstring check
   kotlinlint:
     name: kotlin_lint
