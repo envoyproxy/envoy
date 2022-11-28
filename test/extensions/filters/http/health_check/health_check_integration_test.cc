@@ -1,4 +1,5 @@
 #include "test/integration/http_protocol_integration.h"
+#include "test/test_common/utility.h"
 
 using testing::HasSubstr;
 using testing::Not;
@@ -146,7 +147,7 @@ TEST_P(HealthCheckIntegrationTest, HealthCheck) {
 TEST_P(HealthCheckIntegrationTest, HealthCheckWithoutServerStats) {
   DISABLE_IF_ADMIN_DISABLED;
 
-  if (GetParam().http1_implementation == Http1Impl::BalsaParser) {
+  if (GetParam().http1_implementation == Http1ParserImpl::BalsaParser) {
     // TODO(#21245): Re-enable this test for BalsaParser.
     return;
   }
