@@ -50,7 +50,7 @@ protected:
       const std::string full_path = dir_path_ + "/" + file_name;
       {
         const std::ofstream file(full_path);
-        ASSERT_TRUE(file) << "failed to open test file";
+        EXPECT_TRUE(file) << "failed to open test file";
       }
       files_to_remove_.push(full_path);
     }
@@ -60,10 +60,10 @@ protected:
     const std::string full_path = absl::StrCat(dir_path_, "/", file_name);
     {
       std::ofstream file(full_path);
-      ASSERT_TRUE(file) << "failed to open test file";
+      EXPECT_TRUE(file) << "failed to open test file";
       file << contents;
       file.close();
-      ASSERT_TRUE(file) << "failed to write to test file";
+      EXPECT_TRUE(file) << "failed to write to test file";
     }
     files_to_remove_.push(full_path);
   }
