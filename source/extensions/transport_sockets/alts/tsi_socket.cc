@@ -11,13 +11,14 @@ namespace TransportSockets {
 namespace Alts {
 
 TsiSocket::TsiSocket(HandshakerFactory handshaker_factory, HandshakeValidator handshake_validator,
-                     Network::TransportSocketPtr&& raw_socket)
+                     Network::TransportSocketPtr&& raw_socket, bool downstream)
     : handshaker_factory_(handshaker_factory), handshake_validator_(handshake_validator),
-      raw_buffer_socket_(std::move(raw_socket)) {}
+      raw_buffer_socket_(std::move(raw_socket)), downstream_(downstream) {}
 
-TsiSocket::TsiSocket(HandshakerFactory handshaker_factory, HandshakeValidator handshake_validator)
+TsiSocket::TsiSocket(HandshakerFactory handshaker_factory, HandshakeValidator handshake_validator,
+                     bool downstream)
     : TsiSocket(handshaker_factory, handshake_validator,
-                std::make_unique<Network::RawBufferSocket>()) {
+                std::make_unique<Network::RawBufferSocket>(), downstream) {
   raw_read_buffer_.setWatermarks(default_max_frame_size_);
 }
 
@@ -361,7 +362,10 @@ void TsiSocket::closeSocket(Network::ConnectionEvent) {
 
 void TsiSocket::onConnected() {
   ASSERT(!handshake_complete_);
-  doHandshakeNext();
+  // Client initiates the handshake, so ignore onConnect call on the downstream.
+  if (!downstream_) {
+    doHandshakeNext();
+  }
 }
 
 void TsiSocket::onNextDone(NextResultPtr&& result) {
@@ -383,11 +387,11 @@ bool TsiSocketFactory::implementsSecureTransport() const { return true; }
 Network::TransportSocketPtr
 TsiSocketFactory::createTransportSocket(Network::TransportSocketOptionsConstSharedPtr,
                                         Upstream::HostDescriptionConstSharedPtr) const {
-  return std::make_unique<TsiSocket>(handshaker_factory_, handshake_validator_);
+  return std::make_unique<TsiSocket>(handshaker_factory_, handshake_validator_, false);
 }
 
 Network::TransportSocketPtr TsiSocketFactory::createDownstreamTransportSocket() const {
-  return std::make_unique<TsiSocket>(handshaker_factory_, handshake_validator_);
+  return std::make_unique<TsiSocket>(handshaker_factory_, handshake_validator_, true);
 }
 
 } // namespace Alts

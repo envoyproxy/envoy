@@ -53,7 +53,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //       cache_duration:
 //         seconds: 300
 //
-// [#next-free-field: 15]
+// [#next-free-field: 16]
 message JwtProvider {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.jwt_authn.v2alpha.JwtProvider";
@@ -277,6 +277,18 @@ message JwtProvider {
   // Enables JWT cache, its size is specified by ``jwt_cache_size``.
   // Only valid JWT tokens are cached.
   JwtCacheConfig jwt_cache_config = 12;
+
+  // Add JWT claim to HTTP Header
+  // Specify the claim name you want to copy in which HTTP header. For examples, following config:
+  // The claim must be of type; string, int, double, bool. Array type claims are not supported
+  // .. code-block:: yaml
+  //
+  //   claim_to_headers:
+  //     - name: x-jwt-claim-nested-claim
+  //       claim: claim.nested.key
+  //
+  // This header is only reserved for jwt claim; any other value will be overwrite.
+  repeated JwtClaimToHeader claim_to_headers = 15;
 }
 
 // This message specifies JWT Cache configuration.
@@ -302,7 +314,7 @@ message RemoteJwks {
   config.core.v3.HttpUri http_uri = 1;
 
   // Duration after which the cached JWKS should be expired. If not specified, default cache
-  // duration is 5 minutes.
+  // duration is 10 minutes.
   google.protobuf.Duration cache_duration = 2;
 
   // Fetch Jwks asynchronously in the main thread before the listener is activated.
@@ -364,6 +376,9 @@ message JwksAsyncFetch {
   // If true, it is activated without waiting for the initial fetch to complete.
   // Default is false.
   bool fast_listener = 1;
+
+  // The duration to refetch after a failed fetch. If not specified, default is 1 second.
+  google.protobuf.Duration failed_refetch_duration = 2;
 }
 
 // This message specifies a header location to extract JWT token.
@@ -716,4 +731,17 @@ message PerRouteConfig {
     // in ``JwtAuthentication``. If no, the requests using this route will be rejected with 403.
     string requirement_name = 2 [(validate.rules).string = {min_len: 1}];
   }
+}
+
+// This message specifies a combination of header name and claim name.
+message JwtClaimToHeader {
+  // The HTTP header name to copy the claim to.
+  // The header name will be sanitized and replaced.
+  string header_name = 1
+      [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+
+  // The field name for the JWT Claim : it can be a nested claim of type (eg. "claim.nested.key", "sub")
+  // String separated with "." in case of nested claims. The nested claim name must use dot "." to separate
+  // the JSON name path.
+  string claim_name = 2 [(validate.rules).string = {min_len: 1}];
 }

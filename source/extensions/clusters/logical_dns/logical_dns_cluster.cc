@@ -106,7 +106,7 @@ LogicalDnsCluster::~LogicalDnsCluster() {
 
 void LogicalDnsCluster::startResolve() {
   ENVOY_LOG(debug, "starting async DNS resolution for {}", dns_address_);
-  info_->stats().update_attempt_.inc();
+  info_->configUpdateStats().update_attempt_.inc();
 
   active_dns_query_ = dns_resolver_->resolve(
       dns_address_, dns_lookup_family_,
@@ -121,7 +121,7 @@ void LogicalDnsCluster::startResolve() {
         // cluster does not update. This ensures that a potentially previously resolved address does
         // not stabilize back to 0 hosts.
         if (status == Network::DnsResolver::ResolutionStatus::Success && !response.empty()) {
-          info_->stats().update_success_.inc();
+          info_->configUpdateStats().update_success_.inc();
           const auto addrinfo = response.front().addrInfo();
           // TODO(mattklein123): Move port handling into the DNS interface.
           ASSERT(addrinfo.address_ != nullptr);
@@ -166,7 +166,7 @@ void LogicalDnsCluster::startResolve() {
           ENVOY_LOG(debug, "DNS refresh rate reset for {}, refresh rate {} ms", dns_address_,
                     final_refresh_rate.count());
         } else {
-          info_->stats().update_failure_.inc();
+          info_->configUpdateStats().update_failure_.inc();
           final_refresh_rate =
               std::chrono::milliseconds(failure_backoff_strategy_->nextBackOffMs());
           ENVOY_LOG(debug, "DNS refresh rate reset for {}, (failure) refresh rate {} ms",

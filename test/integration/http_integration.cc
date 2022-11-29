@@ -375,8 +375,19 @@ void HttpIntegrationTest::initialize() {
 #endif
 }
 
-void HttpIntegrationTest::setupHttp2Overrides(Http2Impl implementation) {
-  switch (implementation) {
+void HttpIntegrationTest::setupHttp1ImplOverrides(Http1ParserImpl http1_implementation) {
+  switch (http1_implementation) {
+  case Http1ParserImpl::HttpParser:
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.http1_use_balsa_parser", "false");
+    break;
+  case Http1ParserImpl::BalsaParser:
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.http1_use_balsa_parser", "true");
+    break;
+  }
+}
+
+void HttpIntegrationTest::setupHttp2ImplOverrides(Http2Impl http2_implementation) {
+  switch (http2_implementation) {
   case Http2Impl::Nghttp2:
     config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_use_oghttp2", "false");
     break;

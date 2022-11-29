@@ -24,7 +24,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // TCP Proxy :ref:`configuration overview <config_network_filters_tcp_proxy>`.
 // [#extension: envoy.filters.network.tcp_proxy]
 
-// [#next-free-field: 15]
+// [#next-free-field: 16]
 message TcpProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.tcp_proxy.v2.TcpProxy";
@@ -64,6 +64,7 @@ message TcpProxy {
   // Configuration for tunneling TCP over other transports or application layers.
   // Tunneling is supported over both HTTP/1.1 and HTTP/2. Upstream protocol is
   // determined by the cluster configuration.
+  // [#next-free-field: 6]
   message TunnelingConfig {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.tcp_proxy.v2.TcpProxy.TunnelingConfig";
@@ -103,6 +104,11 @@ message TcpProxy {
     // Save the response headers to the downstream info filter state for consumption
     // by the network filters. The filter state key is ``envoy.tcp_proxy.propagate_response_headers``.
     bool propagate_response_headers = 4;
+
+    // The path used with POST method. Default path is ``/``. If post path is specified and
+    // :ref:`use_post field <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.use_post>`
+    // isn't true, it will be rejected.
+    string post_path = 5;
   }
 
   message OnDemand {
@@ -198,5 +204,12 @@ message TcpProxy {
   // was established. If not set, there is no max duration. When max_downstream_connection_duration
   // is reached the connection will be closed. Duration must be at least 1ms.
   google.protobuf.Duration max_downstream_connection_duration = 13
+      [(validate.rules).duration = {gte {nanos: 1000000}}];
+
+  // The interval to flush access log. The TCP proxy will flush only one access log when the connection
+  // is closed by default. If this field is set, the TCP proxy will flush access log periodically with
+  // the specified interval.
+  // The interval must be at least 1ms.
+  google.protobuf.Duration access_log_flush_interval = 15
       [(validate.rules).duration = {gte {nanos: 1000000}}];
 }

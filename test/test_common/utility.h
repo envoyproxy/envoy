@@ -143,6 +143,12 @@ private:
   RealTimeSource real_time_source_;
 };
 
+// See https://github.com/envoyproxy/envoy/issues/21245.
+enum class Http1ParserImpl {
+  HttpParser, // http-parser from node.js
+  BalsaParser // Balsa from QUICHE
+};
+
 class TestUtility {
 public:
   /**
@@ -532,6 +538,17 @@ public:
     MessageType message;
     TestUtility::loadFromYaml(yaml, message);
     return message;
+  }
+
+  // Allows pretty printed test names.
+  static std::string http1ParserImplToString(Http1ParserImpl impl) {
+    switch (impl) {
+    case Http1ParserImpl::HttpParser:
+      return "HttpParser";
+    case Http1ParserImpl::BalsaParser:
+      return "BalsaParser";
+    }
+    return "UnknownHttp1Impl";
   }
 
   // Allows pretty printed test names for TEST_P using TestEnvironment::getIpVersionsForTest().

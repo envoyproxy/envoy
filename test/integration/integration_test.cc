@@ -121,6 +121,7 @@ TEST_P(IntegrationTest, BadPostListenSocketOption) {
 
 // Make sure we have correctly specified per-worker performance stats.
 TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
+  DISABLE_IF_ADMIN_DISABLED; // Uses admin stats
   concurrency_ = 2;
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
@@ -177,6 +178,7 @@ public:
 
 // Test extend balance.
 TEST_P(IntegrationTest, ConnectionBalanceFactory) {
+  DISABLE_IF_ADMIN_DISABLED; // Uses admin stats
   concurrency_ = 2;
 
   TestConnectionBalanceFactory factory;
@@ -2113,6 +2115,7 @@ TEST_P(IntegrationTest, Response204WithBody) {
 }
 
 TEST_P(IntegrationTest, QuitQuitQuit) {
+  DISABLE_IF_ADMIN_DISABLED; // Uses admin interface.
   initialize();
   test_server_->useAdminInterfaceToQuit(true);
 }

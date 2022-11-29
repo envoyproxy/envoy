@@ -51,15 +51,17 @@ class TsiSocket : public Network::TransportSocket,
 public:
   // For Test
   TsiSocket(HandshakerFactory handshaker_factory, HandshakeValidator handshake_validator,
-            Network::TransportSocketPtr&& raw_socket_ptr);
+            Network::TransportSocketPtr&& raw_socket_ptr, bool downstream);
 
   /**
    * @param handshaker_factory a function to initiate a TsiHandshaker
    * @param handshake_validator a function to validate the peer. Called right
    * after the handshake completed with peer data to do the peer validation.
    * The connection will be closed immediately if it returns false.
+   * @param downstream is true for downstream transport socket.
    */
-  TsiSocket(HandshakerFactory handshaker_factory, HandshakeValidator handshake_validator);
+  TsiSocket(HandshakerFactory handshaker_factory, HandshakeValidator handshake_validator,
+            bool downstream);
   ~TsiSocket() override;
 
   // Network::TransportSocket
@@ -118,6 +120,7 @@ private:
   Envoy::Network::TransportSocketCallbacks* callbacks_{};
   std::unique_ptr<TsiTransportSocketCallbacks> tsi_callbacks_;
   Network::TransportSocketPtr raw_buffer_socket_;
+  const bool downstream_;
 
   Buffer::WatermarkBuffer raw_read_buffer_{[]() {}, []() {}, []() {}};
   Envoy::Buffer::OwnedImpl raw_write_buffer_;
