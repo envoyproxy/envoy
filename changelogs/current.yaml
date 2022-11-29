@@ -178,6 +178,9 @@ new_features:
 - area: jwt_authn
   change: |
     added support for copying jwt claims to http headers.
+- area: http
+  change: |
+    added :ref:`append_x_forwarded_port <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.append_x_forwarded_port>` to append the ``x-forwarded-port`` header to HTTP upstream requests.
 
 - area: ext_authz
   change: |
