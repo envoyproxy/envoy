@@ -75,6 +75,9 @@ bug_fixes:
 - area: validation
   change: |
     fixed a crash which could happen when optional ``engine_type`` is not provided in regex.
+- area: jwt_authn
+  change: |
+    fix a bug that jwt_cache breaks the :ref:`provider_and_audiences <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtRequirement.provider_and_audiences>` JWT requirement.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
