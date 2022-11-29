@@ -519,9 +519,10 @@ protected:
   // edge cases (such as for METADATA frames) where nghttp2 will issue a callback for a stream_id
   // that is not associated with an existing stream.
   const StreamImpl* getStream(int32_t stream_id) const;
-  // Same as getStream, but without the ASSERT.
-  StreamImpl* getStreamUnchecked(int32_t stream_id);
   StreamImpl* getStream(int32_t stream_id);
+  // Same as getStream, but without the ASSERT.
+  const StreamImpl* getStreamUnchecked(int32_t stream_id) const;
+  StreamImpl* getStreamUnchecked(int32_t stream_id);
   int saveHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value);
 
   /**
