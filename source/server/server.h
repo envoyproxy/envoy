@@ -368,7 +368,6 @@ private:
   Network::ConnectionHandlerPtr handler_;
   std::unique_ptr<Runtime::ScopedLoaderSingleton> runtime_singleton_;
   std::unique_ptr<Runtime::Loader> runtime_;
-  ProdListenerComponentFactory listener_component_factory_;
   ProdWorkerFactory worker_factory_;
   std::unique_ptr<ListenerManager> listener_manager_;
   absl::node_hash_map<Stage, LifecycleNotifierCallbacks> stage_callbacks_;

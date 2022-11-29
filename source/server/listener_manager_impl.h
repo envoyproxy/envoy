@@ -182,7 +182,7 @@ private:
  */
 class ListenerManagerImpl : public ListenerManager, Logger::Loggable<Logger::Id::config> {
 public:
-  ListenerManagerImpl(Instance& server, ListenerComponentFactory& listener_factory,
+  ListenerManagerImpl(Instance& server, std::unique_ptr<ListenerComponentFactory>&& factory,
                       WorkerFactory& worker_factory, bool enable_dispatcher_stats,
                       Quic::QuicStatNames& quic_stat_names);
 
@@ -195,7 +195,7 @@ public:
   void createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config,
                     const xds::core::v3::ResourceLocator* lds_resources_locator) override {
     ASSERT(lds_api_ == nullptr);
-    lds_api_ = factory_.createLdsApi(lds_config, lds_resources_locator);
+    lds_api_ = factory_->createLdsApi(lds_config, lds_resources_locator);
   }
   std::vector<std::reference_wrapper<Network::ListenerConfig>>
   listeners(ListenerState state = ListenerState::ACTIVE) override;
@@ -213,7 +213,7 @@ public:
   Quic::QuicStatNames& quicStatNames() { return quic_stat_names_; }
 
   Instance& server_;
-  ListenerComponentFactory& factory_;
+  std::unique_ptr<ListenerComponentFactory> factory_;
 
 private:
   using ListenerList = std::list<ListenerImplPtr>;

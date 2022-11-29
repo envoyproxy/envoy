@@ -68,7 +68,9 @@ public:
 
 protected:
   ListenerManagerImplTest()
-      : api_(Api::createApiForTest(server_.api_.random_)), use_matcher_(GetParam()) {}
+      : listener_factory_ptr_(std::make_unique<NiceMock<MockListenerComponentFactory>>()),
+        listener_factory_(*listener_factory_ptr_),
+        api_(Api::createApiForTest(server_.api_.random_)), use_matcher_(GetParam()) {}
 
   void SetUp() override {
     ON_CALL(server_, api()).WillByDefault(ReturnRef(*api_));
@@ -78,9 +80,9 @@ protected:
         .WillByDefault(ReturnRef(validation_visitor));
     ON_CALL(server_.validation_context_, dynamicValidationVisitor())
         .WillByDefault(ReturnRef(validation_visitor));
-    manager_ =
-        std::make_unique<ListenerManagerImpl>(server_, listener_factory_, worker_factory_,
-                                              enable_dispatcher_stats_, server_.quic_stat_names_);
+    manager_ = std::make_unique<ListenerManagerImpl>(server_, std::move(listener_factory_ptr_),
+                                                     worker_factory_, enable_dispatcher_stats_,
+                                                     server_.quic_stat_names_);
 
     // Use real filter loading by default.
     ON_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
@@ -456,7 +458,8 @@ protected:
   std::shared_ptr<DumbInternalListenerRegistry> internal_registry_{
       std::make_shared<DumbInternalListenerRegistry>()};
 
-  NiceMock<MockListenerComponentFactory> listener_factory_;
+  std::unique_ptr<NiceMock<MockListenerComponentFactory>> listener_factory_ptr_;
+  NiceMock<MockListenerComponentFactory>& listener_factory_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
   MockWorker* worker_ = new MockWorker();
   NiceMock<MockWorkerFactory> worker_factory_;

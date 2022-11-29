@@ -277,13 +277,16 @@ DrainingFilterChainsManager::DrainingFilterChainsManager(ListenerImplPtr&& drain
       workers_pending_removal_(workers_pending_removal) {}
 
 ListenerManagerImpl::ListenerManagerImpl(Instance& server,
-                                         ListenerComponentFactory& listener_factory,
+                                         std::unique_ptr<ListenerComponentFactory>&& factory,
                                          WorkerFactory& worker_factory,
                                          bool enable_dispatcher_stats,
                                          Quic::QuicStatNames& quic_stat_names)
-    : server_(server), factory_(listener_factory),
+    : server_(server), factory_(std::move(factory)),
       scope_(server.stats().createScope("listener_manager.")), stats_(generateStats(*scope_)),
       enable_dispatcher_stats_(enable_dispatcher_stats), quic_stat_names_(quic_stat_names) {
+  if (!factory_) {
+    factory_ = std::make_unique<ProdListenerComponentFactory>(server);
+  }
   if (server.admin().has_value()) {
     config_tracker_entry_ = server.admin()->getConfigTracker().add(
         "listeners", [this](const Matchers::StringMatcher& name_matcher) {
@@ -397,7 +400,7 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3:
     if (!api_listener_ && !added_via_api) {
       // TODO(junr03): dispatch to different concrete constructors when there are other
       // ApiListenerImplBase derived classes.
-      api_listener_ = std::make_unique<HttpApiListener>(config, *this, config.name());
+      api_listener_ = std::make_unique<HttpApiListener>(config, server_, config.name());
       return true;
     } else {
       ENVOY_LOG(warn, "listener {} can not be added because currently only one ApiListener is "
@@ -956,7 +959,7 @@ ListenerFilterChainFactoryBuilder::ListenerFilterChainFactoryBuilder(
     ListenerImpl& listener,
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context)
     : listener_(listener), validator_(listener.validation_visitor_),
-      listener_component_factory_(listener.parent_.factory_), factory_context_(factory_context) {}
+      listener_component_factory_(*listener.parent_.factory_), factory_context_(factory_context) {}
 
 Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildFilterChain(
     const envoy::config::listener::v3::FilterChain& filter_chain,
@@ -1091,7 +1094,7 @@ void ListenerManagerImpl::createListenSocketFactory(ListenerImpl& listener) {
     creation_options.mptcp_enabled_ = listener.mptcpEnabled();
     for (auto& address : listener.addresses()) {
       listener.addSocketFactory(std::make_unique<ListenSocketFactoryImpl>(
-          factory_, address, socket_type, listener.listenSocketOptions(), listener.name(),
+          *factory_, address, socket_type, listener.listenSocketOptions(), listener.name(),
           listener.tcpBacklogSize(), bind_type, creation_options, server_.options().concurrency()));
     }
   }
