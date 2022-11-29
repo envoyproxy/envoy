@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+# ARBITRARY DOCS CHANGE
+
 # set SPHINX_SKIP_CONFIG_VALIDATION environment variable to true to skip
 # validation of configuration examples
 
