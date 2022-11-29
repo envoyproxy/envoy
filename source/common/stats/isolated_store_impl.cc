@@ -38,7 +38,7 @@ IsolatedStoreImpl::IsolatedStoreImpl(SymbolTable& symbol_table)
 ScopeSharedPtr IsolatedStoreImpl::rootScope() {
   if (lazy_default_scope_ == nullptr) {
     StatNameManagedStorage name_storage("", symbolTable());
-    lazy_default_scope_ = makeScope(StatName(name_storage.statName()));
+    lazy_default_scope_ = makeScope(name_storage.statName());
   }
   return lazy_default_scope_;
 }
