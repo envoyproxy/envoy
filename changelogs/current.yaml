@@ -32,6 +32,9 @@ minor_behavior_changes:
 - area: rate_limit
   change: |
     add ``MONTH`` and ``YEAR`` to the unit of time for rate limit.
+- area: router
+  change: |
+    Virtual cluster statistics are no longer created for routes without any `virtual_clusters`. Previously statistics for a `catch all` virtual cluster were created, but never updated.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
