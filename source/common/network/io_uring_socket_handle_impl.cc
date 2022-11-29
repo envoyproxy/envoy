@@ -100,12 +100,12 @@ IoUringSocketHandleImpl::readv(uint64_t max_length, Buffer::RawSlice* slices, ui
     return shadow_io_handle_->readv(max_length, slices, num_slice);
   }
 
-  ENVOY_LOG(debug, "readv available, result = {}, fd = {}, type = {}", read_param_->result_, fd_, ioUringSocketTypeStr());
-
   if (read_param_ == absl::nullopt) {
     return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
                                 IoSocketError::deleteIoError)};
   }
+
+  ENVOY_LOG(debug, "readv available, result = {}, fd = {}, type = {}", read_param_->result_, fd_, ioUringSocketTypeStr());
 
   if (read_param_->result_ == 0) {
     ENVOY_LOG(debug, "readv remote close");
