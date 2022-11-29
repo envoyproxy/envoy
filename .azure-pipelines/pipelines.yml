@@ -25,7 +25,75 @@ variables:
   value: $[or(eq(variables['isMain'], 'true'), eq(variables['isReleaseBranch'], 'true'))]
 
 stages:
+- stage: env
+  #
+  # Note to use the outputs created here - this `stage` must be set as a dependency in the relevant stage
+  # eg:
+  #
+  # stage: mystage
+  # dependsOn: ["env"]
+  #
+  # To use a variable as a condition for a `stage` you can specify it as follows:
+  #
+  # condition: ne(dependencies.env.outputs['repo.changed.mobileOnly'], 'true')
+  #
+  # To use a variable as a condition for a `job` you can specify it as follows:
+  #
+  # job:
+  #   condition: ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true')
+  #
+  # Note the difference in name resolution when used in stages and jobs.
+  #
+  # NB: Avoid using _inclusive_ lists to trigger CI - eg _dont_ only trigger mobile CI if `mobile/` changed.
+  #  Instead use _exclusive_ bools - eg _do_ suppress other CI if only `mobile/` changed
+  #
+  # To use a variable in a `step` you can specify it as follows:
+  #
+  # stage: my_next_stage
+  #   jobs:
+  #     job: another_job
+  #     variables:
+  #       mobileOnly: $[stageDependencies.env.repo.outputs['changed.mobileOnly']]
+  #     steps:
+  #     - bash: echo $(mobileOnly)
+  #
+
+  jobs:
+  - job: repo
+    pool:
+      vmImage: "ubuntu-20.04"
+    steps:
+    - bash: |
+        if [[ $(Build.Reason) == "PullRequest" ]]; then
+            CHANGE_TARGET="origin/$(System.PullRequest.TargetBranch)"
+        else
+            # This may not work so well on release branches where multiple commits are rebased to the branch
+            CHANGE_TARGET=$(git log --format="%H" -2 | tail -n1)
+        fi
+
+        echo "Comparing changes ${CHANGE_TARGET}...HEAD"
+        CHANGED_PATHS="$(git diff --quiet --name-only ${CHANGE_TARGET}...HEAD | cut -d/ -f1 | sort -u | jq -R 'split("\n")')"
+        CHANGED_PATH_COUNT=$(echo $CHANGED_PATHS | jq '. | length')
+        CHANGED_MOBILE_ONLY=false
+        CHANGED_DOCS_ONLY=false
+
+        CHANGED_MOBILE=$(echo $CHANGED_PATHS | jq '. as $A | "mobile" | IN($A[])')
+        if [[ $CHANGED_MOBILE == true && $CHANGED_PATH_COUNT -eq 1 ]]; then
+            CHANGED_MOBILE_ONLY=true
+        fi
+        CHANGED_DOCS=$(echo $CHANGED_PATHS | jq '. as $A | "docs" | IN($A[])')
+        if [[ $CHANGED_DOCS == true && $CHANGED_PATH_COUNT -eq 1 ]]; then
+            CHANGED_DOCS_ONLY=true
+        fi
+
+        echo "##vso[task.setvariable variable=mobileOnly;isoutput=true]${CHANGED_MOBILE_ONLY}"
+        echo "##vso[task.setvariable variable=docsOnly;isoutput=true]${CHANGED_DOCS_ONLY}"
+      displayName: "Detect repo changes"
+      workingDirectory: $(Build.SourcesDirectory)
+      name: changed
+
 - stage: precheck
+  dependsOn: ["env"]
   jobs:
   - job: format
     dependsOn: []
@@ -305,7 +373,8 @@ stages:
       displayName: "Verify packages"
 
 - stage: check
-  dependsOn: ["linux_x64"]
+  dependsOn: ["env", "linux_x64"]
+  condition: or(eq(variables['PostSubmit'], true), and(ne(dependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(dependencies.env.repo.outputs['changed.docsOnly'], 'true')))
   jobs:
   - job: bazel
     displayName: "linux_x64"
