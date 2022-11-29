@@ -3,7 +3,7 @@ name: release_validation
 on:
   push:
     branches:
-      - main
+    - main
     paths:
     - 'mobile/**'
     - '.github/workflows/**'
@@ -18,23 +18,23 @@ jobs:
     runs-on: macos-12
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v1
-        with:
-          submodules: true
-      - run: cd mobile && ./ci/mac_ci_setup.sh
-        name: 'Install dependencies'
-      - env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          cd mobile && ./bazelw build \
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+    - run: cd mobile && ./ci/mac_ci_setup.sh
+      name: 'Install dependencies'
+    - env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        cd mobile && ./bazelw build \
             --config=ios \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //:ios_xcframework
-        name: 'Build xcframework'
-      # Ignore errors: Bad CRC when unzipping large files: https://bbs.archlinux.org/viewtopic.php?id=153011
-      - run: unzip mobile/bazel-bin/library/swift/Envoy.xcframework.zip -d mobile/examples/swift/swiftpm/Packages || true
-        name: 'Unzip xcframework'
-      - run: xcodebuild -project mobile/examples/swift/swiftpm/EnvoySwiftPMExample.xcodeproj -scheme EnvoySwiftPMExample -destination platform="iOS Simulator,name=iPhone 13 Pro Max,OS=16.1"
-        name: 'Build app'
-      # TODO(jpsim): Run app and inspect logs to validate
+      name: 'Build xcframework'
+    # Ignore errors: Bad CRC when unzipping large files: https://bbs.archlinux.org/viewtopic.php?id=153011
+    - run: unzip mobile/bazel-bin/library/swift/Envoy.xcframework.zip -d mobile/examples/swift/swiftpm/Packages || true
+      name: 'Unzip xcframework'
+    - run: xcodebuild -project mobile/examples/swift/swiftpm/EnvoySwiftPMExample.xcodeproj -scheme EnvoySwiftPMExample -destination platform="iOS Simulator,name=iPhone 13 Pro Max,OS=16.1"
+      name: 'Build app'
+    # TODO(jpsim): Run app and inspect logs to validate

@@ -4,8 +4,6 @@
 #include <string>
 #include <utility>
 
-#include "envoy/extensions/cache/simple_http_cache/v3/config.pb.h"
-
 #include "source/common/common/assert.h"
 #include "source/extensions/filters/http/cache/cache_headers_utils.h"
 #include "source/extensions/filters/http/cache/http_cache.h"

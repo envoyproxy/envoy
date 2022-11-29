@@ -5,7 +5,7 @@ Cache filter
 
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.cache.v3.CacheConfig``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.cache.v3.CacheConfig>`
-* :ref:`v3 SimpleHTTPCache API reference <envoy_v3_api_msg_extensions.cache.simple_http_cache.v3.SimpleHttpCacheConfig>`
+* :ref:`v3 SimpleHTTPCache API reference <envoy_v3_api_msg_extensions.http.cache.simple_http_cache.v3.SimpleHttpCacheConfig>`
 * This filter doesn't support virtual host-specific configurations.
 
 The HTTP Cache filter implements most of the complexity of HTTP caching semantics.
@@ -24,7 +24,7 @@ For HTTP Responses:
 HTTP Cache delegates the actual storage of HTTP responses to implementations of the ``HttpCache`` interface. These implementations can
 cover all points on the spectrum of persistence, performance, and distribution, from local RAM caches to globally distributed
 persistent caches. They can be fully custom caches, or wrappers/adapters around local or remote open-source or proprietary caches.
-Currently the only available cache storage implementation is :ref:`SimpleHTTPCache <envoy_v3_api_msg_extensions.cache.simple_http_cache.v3.SimpleHttpCacheConfig>`
+Currently the only available cache storage implementation is :ref:`SimpleHTTPCache <envoy_v3_api_msg_extensions.http.cache.simple_http_cache.v3.SimpleHttpCacheConfig>`
 
 Example configuration
 ---------------------

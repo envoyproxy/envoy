@@ -45,8 +45,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/common/lua:96.5"
 "source/extensions/filters/common/rbac:88.1"
 "source/extensions/filters/http/aws_lambda:96.2"
-"source/extensions/filters/http/cache:93.4"
-"source/extensions/filters/http/cache/simple_http_cache:95.9"
+"source/extensions/filters/http/cache:93.3"
 "source/extensions/filters/http/grpc_json_transcoder:94.7"
 "source/extensions/filters/http/ip_tagging:87.0"
 "source/extensions/filters/http/kill_request:91.7" # Death tests don't report LCOV
@@ -70,6 +69,8 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/udp/dns_filter:96.1"
 "source/extensions/health_checkers:95.7"
 "source/extensions/health_checkers/redis:95.7"
+"source/extensions/http/cache:96.5"
+"source/extensions/http/cache/simple_http_cache:95.9"
 "source/extensions/io_socket:96.2"
 "source/extensions/io_socket/user_space:96.2"
 "source/extensions/network/dns_resolver/getaddrinfo:96.3"
