@@ -3,7 +3,7 @@ name: ios_tests
 on:
   push:
     branches:
-      - main
+    - main
     paths:
     - 'mobile/**'
     - '.github/workflows/**'
@@ -18,27 +18,27 @@ jobs:
     runs-on: macos-12
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v1
-        with:
-          submodules: true
-      - id: check_context
-        name: 'Check whether to run'
-        run: |
-          if git rev-parse --abbrev-ref HEAD | grep -q ^main$ || git diff --name-only origin/main | grep -qe common/ -e objective-c/ -e swift/ -e bazel/ -e ^\.bazelrc$ -e ^envoy$ -e ^WORKSPACE$ -e ^.github/workflows/ios_tests.yml$ ; then
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+    - id: check_context
+      name: 'Check whether to run'
+      run: |
+        if git rev-parse --abbrev-ref HEAD | grep -q ^main$ || git diff --name-only origin/main | grep -qe common/ -e objective-c/ -e swift/ -e bazel/ -e ^\.bazelrc$ -e ^envoy$ -e ^WORKSPACE$ -e ^.github/workflows/ios_tests.yml$ ; then
             echo "Tests will run."
             echo "run_tests=true" >> $GITHUB_OUTPUT
           else
             echo "Skipping tests."
             echo "run_tests=false" >> $GITHUB_OUTPUT
           fi
-      - name: 'Install dependencies'
-        run: cd mobile && ./ci/mac_ci_setup.sh
-      - name: 'Run swift library tests'
-        if: steps.check_context.outputs.run_tests == 'true'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          cd mobile && ./bazelw test \
+    - name: 'Install dependencies'
+      run: cd mobile && ./ci/mac_ci_setup.sh
+    - name: 'Run swift library tests'
+      if: steps.check_context.outputs.run_tests == 'true'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        cd mobile && ./bazelw test \
             --experimental_ui_max_stdouterr_bytes=10485760 \
             --test_output=all \
             --config=ios \
@@ -51,27 +51,27 @@ jobs:
     runs-on: macos-12
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v1
-        with:
-          submodules: true
-      - id: check_context
-        name: 'Check whether to run'
-        run: |
-          if git rev-parse --abbrev-ref HEAD | grep -q ^main$ || git diff --name-only origin/main | grep -qe common/ -e objective-c/ -e swift/ -e bazel/ -e ^\.bazelrc$ -e ^envoy$ -e ^WORKSPACE$ -e ^.github/workflows/ios_tests.yml$ ; then
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+    - id: check_context
+      name: 'Check whether to run'
+      run: |
+        if git rev-parse --abbrev-ref HEAD | grep -q ^main$ || git diff --name-only origin/main | grep -qe common/ -e objective-c/ -e swift/ -e bazel/ -e ^\.bazelrc$ -e ^envoy$ -e ^WORKSPACE$ -e ^.github/workflows/ios_tests.yml$ ; then
             echo "Tests will run."
             echo "run_tests=true" >> $GITHUB_OUTPUT
           else
             echo "Skipping tests."
             echo "run_tests=false" >> $GITHUB_OUTPUT
           fi
-      - name: 'Install dependencies'
-        run: cd mobile && ./ci/mac_ci_setup.sh
-      - name: 'Run Objective-C library tests'
-        if: steps.check_context.outputs.run_tests == 'true'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          cd mobile && ./bazelw test \
+    - name: 'Install dependencies'
+      run: cd mobile && ./ci/mac_ci_setup.sh
+    - name: 'Run Objective-C library tests'
+      if: steps.check_context.outputs.run_tests == 'true'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        cd mobile && ./bazelw test \
             --test_output=all \
             --config=ios \
             --build_tests_only \

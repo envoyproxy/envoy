@@ -3,7 +3,7 @@ name: tsan
 on:
   push:
     branches:
-      - main
+    - main
     paths:
     - 'mobile/**'
     - '.github/workflows/**'
@@ -23,33 +23,33 @@ jobs:
         CC: /opt/llvm/bin/clang
         CXX: /opt/llvm/bin/clang++
     steps:
-      - uses: actions/checkout@v1
-        with:
-          submodules: true
-      - name: Add safe directory
-        run: git config --global --add safe.directory /__w/envoy/envoy
-      - id: check_context
-        name: 'Check whether to run'
-        run: |
-          if git rev-parse --abbrev-ref HEAD | grep -q ^main$ || git diff --name-only origin/main | grep -qe common/ -e bazel/ -e ^\.bazelrc$ -e ^envoy$ -e ^WORKSPACE$ -e ^.github/workflows/tsan.yml$ ; then
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+    - name: Add safe directory
+      run: git config --global --add safe.directory /__w/envoy/envoy
+    - id: check_context
+      name: 'Check whether to run'
+      run: |
+        if git rev-parse --abbrev-ref HEAD | grep -q ^main$ || git diff --name-only origin/main | grep -qe common/ -e bazel/ -e ^\.bazelrc$ -e ^envoy$ -e ^WORKSPACE$ -e ^.github/workflows/tsan.yml$ ; then
             echo "Tests will run."
             echo "run_tests=true" >> $GITHUB_OUTPUT
           else
             echo "Skipping tests."
             echo "run_tests=false" >> $GITHUB_OUTPUT
           fi
-      - uses: actions/setup-java@v1
-        if: steps.check-cache.outputs.cache-hit != 'true'
-        with:
-          java-version: '8'
-          java-package: jdk
-          architecture: x64
-      - name: 'Run tests'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        if: steps.check_context.outputs.run_tests == 'true'
-        run: |
-          cd mobile && ./bazelw test \
+    - uses: actions/setup-java@v1
+      if: steps.check-cache.outputs.cache-hit != 'true'
+      with:
+        java-version: '8'
+        java-package: jdk
+        architecture: x64
+    - name: 'Run tests'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      if: steps.check_context.outputs.run_tests == 'true'
+      run: |
+        cd mobile && ./bazelw test \
             --test_output=all \
             --test_env=ENVOY_IP_TEST_VERSIONS=v4only \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \

@@ -3,7 +3,7 @@ name: coverage
 on:
   push:
     branches:
-      - main
+    - main
     paths:
     - 'mobile/**'
     - '.github/workflows/**'
@@ -23,37 +23,37 @@ jobs:
     container:
       image: envoyproxy/envoy-build-ubuntu:0a02a76af5951bf7f4c7029c0ea6d29d96c0f682
     steps:
-      - uses: actions/checkout@v1
-        with:
-          submodules: true
-      - name: Add safe directory
-        run: git config --global --add safe.directory /__w/envoy/envoy
-      - id: check_context
-        name: 'Check whether to run'
-        run: |
-          if git rev-parse --abbrev-ref HEAD | grep -q ^main$ || git diff --name-only origin/main | grep -qe common/ -e ^.github/workflows/coverage.yml ; then
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+    - name: Add safe directory
+      run: git config --global --add safe.directory /__w/envoy/envoy
+    - id: check_context
+      name: 'Check whether to run'
+      run: |
+        if git rev-parse --abbrev-ref HEAD | grep -q ^main$ || git diff --name-only origin/main | grep -qe common/ -e ^.github/workflows/coverage.yml ; then
             echo "Coverage will run."
             echo "run_coverage=true" >> $GITHUB_OUTPUT
           else
             echo "Skipping coverage."
             echo "run_coverage=false" >> $GITHUB_OUTPUT
           fi
-      - name: 'Run coverage'
-        if: steps.check_context.outputs.run_coverage == 'true'
-        continue-on-error: true
-        run: |
-          echo "build --remote_header=\"Authorization=Bearer ${{ secrets.GITHUB_TOKEN }}\"" > ~/.bazelrc
+    - name: 'Run coverage'
+      if: steps.check_context.outputs.run_coverage == 'true'
+      continue-on-error: true
+      run: |
+        echo "build --remote_header=\"Authorization=Bearer ${{ secrets.GITHUB_TOKEN }}\"" > ~/.bazelrc
           cd mobile && BAZEL_BUILD_OPTIONS="--config=remote-ci-linux-coverage" \
             PATH=/opt/llvm/bin:${PATH} \
             COVERAGE_THRESHOLD=95 \
             ../test/run_envoy_bazel_coverage.sh //test/common/...
-      - name: 'Package coverage'
-        if: steps.check_context.outputs.run_coverage == 'true'
-        run: |
-          cd mobile && tar -czvf coverage.tar.gz generated/coverage
-      - name: 'Upload report'
-        if: steps.check_context.outputs.run_coverage == 'true'
-        uses: actions/upload-artifact@v2
-        with:
-          name: coverage.tar.gz
-          path: coverage.tar.gz
+    - name: 'Package coverage'
+      if: steps.check_context.outputs.run_coverage == 'true'
+      run: |
+        cd mobile && tar -czvf coverage.tar.gz generated/coverage
+    - name: 'Upload report'
+      if: steps.check_context.outputs.run_coverage == 'true'
+      uses: actions/upload-artifact@v2
+      with:
+        name: coverage.tar.gz
+        path: coverage.tar.gz
