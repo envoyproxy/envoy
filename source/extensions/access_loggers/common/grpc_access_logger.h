@@ -79,7 +79,17 @@ public:
   GrpcAccessLogClient(const Grpc::RawAsyncClientSharedPtr& client,
                       const Protobuf::MethodDescriptor& service_method,
                       OptRef<const envoy::config::core::v3::RetryPolicy> retry_policy)
-      : client_(client), service_method_(service_method), grpc_stream_retry_policy_(retry_policy) {}
+      : client_(client), service_method_(service_method),
+        grpc_stream_retry_policy_(
+            [retry_policy]() -> absl::optional<envoy::config::route::v3::RetryPolicy> {
+              if (!retry_policy) {
+                return absl::nullopt;
+              }
+              Http::Utility::validateCoreRetryPolicy(*retry_policy);
+              const auto route_retry =
+                  Http::Utility::convertCoreToRouteRetryPolicy(*retry_policy, "connect-failure");
+              return absl::optional<envoy::config::route::v3::RetryPolicy>{route_retry};
+            }()) {}
 
 public:
   struct LocalStream : public Grpc::AsyncStreamCallbacks<LogResponse> {
@@ -133,17 +143,15 @@ public:
       return opt;
     }
 
-    const auto retry_policy =
-        Http::Utility::convertCoreToRouteRetryPolicy(*grpc_stream_retry_policy_, "connect-failure");
     opt.setBufferBodyForRetry(true);
-    opt.setRetryPolicy(retry_policy);
+    opt.setRetryPolicy(*grpc_stream_retry_policy_);
     return opt;
   }
 
   Grpc::AsyncClient<LogRequest, LogResponse> client_;
   std::unique_ptr<LocalStream> stream_;
   const Protobuf::MethodDescriptor& service_method_;
-  const absl::optional<envoy::config::core::v3::RetryPolicy> grpc_stream_retry_policy_;
+  const absl::optional<envoy::config::route::v3::RetryPolicy> grpc_stream_retry_policy_;
 };
 
 } // namespace Detail
