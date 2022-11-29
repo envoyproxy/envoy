@@ -405,7 +405,7 @@ public:
   }
 
   void onWrite(int32_t result, Request* req) override {
-    if (connecting_ && result == -EAGAIN && req != write_req_) {
+    if (connecting_ && result == -EAGAIN && req != write_req_ && !is_closing_) {
       ENVOY_LOG(debug, "connecting finished");
       connecting_ = false;
       submitReadRequest();
