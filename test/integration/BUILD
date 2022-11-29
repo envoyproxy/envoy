@@ -873,7 +873,7 @@ envoy_cc_test_library(
         "//source/common/network:udp_packet_writer_handler_lib",
         "//source/common/network:utility_lib",
         "//source/common/stats:isolated_store_lib",
-        "//source/server:active_raw_udp_listener_config",
+        "//source/extensions/listener_managers/listener_manager:active_raw_udp_listener_config",
         "//source/server:connection_handler_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:test_time_system_interface",
