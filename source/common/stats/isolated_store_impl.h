@@ -126,6 +126,9 @@ private:
   TextReadoutAllocator text_readout_alloc_;
 };
 
+// Isolated implementation of Stats::Store. This class is not thread-safe by
+// itself, but a thread-safe wrapper can be built, e.g. TestIsolatedStoreImpl
+// in test/integration/server.h.
 class IsolatedStoreImpl : public StoreImpl {
 public:
   IsolatedStoreImpl();
