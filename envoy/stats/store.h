@@ -29,15 +29,17 @@ class SinkPredicates;
 /**
  * Store keeps track of all Scopes created in it, and the Scopes manage
  * individual stats. Each stat is defined in a scope. There is a single root
- * scope created in the Store, and more sub-scopes can be created.
+ * scope created in the Store, and more sub-scopes can be created. Scopes do not
+ * own the scopes created underneath; they are managed by the return
+ * SharePtr. However, sub-scopes combine the prefixes from their parental chain.
  *
- * Stores enable iteration over all stats in its owned Scopes.
+ * Stores enable iteration over all stats in its transitively owned Scopes,
  *
  * There is typically one Store instance in a test or binary, though Isolated
  * Stores can be created in some scenarios. Stores are typically allocated
  * as part of other objects or via std::unique_ptr.
  *
- * In contast, Scopes are managed via shared_ptr, unique nickname
+ * In contrast, Scopes are managed via shared_ptr, unique nickname
  * ScopeSharedPtr, and should not be directly instantiated or allocated via
  * std::unique_ptr.
  *

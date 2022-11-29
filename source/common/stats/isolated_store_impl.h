@@ -339,11 +339,14 @@ protected:
 private:
   template <class StatType> IterateFn<StatType> iterFilter(const IterateFn<StatType>& fn) const {
     // We determine here what's in the scope by looking at name
-    // prefixes. Strictly speaking this is not correct, as a stat name can be in
-    // different scopes. But there is no data in `ScopePrefixer` to resurrect
-    // actual membership of a stat in a scope, so we go by name matching. Note
-    // that `ScopePrefixer` is not used in `ThreadLocalStore`, which has
-    // accurate maps describing which stats are in which scopes.
+    // prefixes. Strictly speaking this is not correct, as the same stat can be
+    // in different scopes, e.g. counter "b.c" in scope "a", and counter "c"
+    // created in scope "a.b".
+    //
+    // There is currently no mechanism to resurrect actual membership of a stat
+    // in a scope, so we go by name matching. Note that this hack is not needed
+    // in `ThreadLocalStore`, which has accurate maps describing which stats are
+    // in which scopes.
     //
     // TODO(jmarantz): In the scope of this limited implementation, it would be
     // faster to match on the StatName prefix. This would be possible if
