@@ -126,6 +126,7 @@ public:
   struct TestConnection {
     Network::MockClientConnection* connection_;
     Event::MockTimer* connect_timer_;
+    NiceMock<Event::MockTimer>* idle_timer_;
     Network::ReadFilterSharedPtr filter_;
   };
 
@@ -134,6 +135,11 @@ public:
     TestConnection& test_conn = test_conns_.back();
     test_conn.connection_ = new NiceMock<Network::MockClientConnection>();
     test_conn.connect_timer_ = new NiceMock<Event::MockTimer>(&mock_dispatcher_);
+    if (has_idle_timers_) {
+      Event::MockDispatcher* dispatcher =
+          static_cast<Event::MockDispatcher*>(&(test_conn.connection_->dispatcher()));
+      test_conn.idle_timer_ = new NiceMock<Event::MockTimer>(dispatcher);
+    }
 
     EXPECT_CALL(mock_dispatcher_, createClientConnection_(_, _, _, options_))
         .WillOnce(Return(test_conn.connection_));
@@ -149,6 +155,8 @@ public:
         }));
   }
 
+  void setupIdleTimers() { has_idle_timers_ = true; }
+
   void expectEnableUpstreamReady(bool run);
 
   std::unique_ptr<Tcp::ConnectionPool::Instance> conn_pool_;
@@ -159,6 +167,7 @@ public:
   Network::ConnectionCallbacks* callbacks_ = nullptr;
   Network::ConnectionSocket::OptionsSharedPtr options_;
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
+  bool has_idle_timers_{false};
 
 protected:
   class ConnPoolImplForTest : public ConnPoolImpl {
@@ -177,14 +186,18 @@ protected:
     }
 
     Envoy::ConnectionPool::ActiveClientPtr instantiateActiveClient() override {
+      absl::optional<std::chrono::milliseconds> idle_timeout;
+      if (parent_.has_idle_timers_) {
+        // put a random timeout to equip the idle timer, and simulates by manual invokeCallback
+        idle_timeout = std::chrono::hours(1);
+      }
       return std::make_unique<TestActiveTcpClient>(
-          *this, Envoy::ConnectionPool::ConnPoolImplBase::host(), 1, absl::nullopt);
+          *this, Envoy::ConnectionPool::ConnPoolImplBase::host(), 1, idle_timeout);
     }
 
     void onConnDestroyed() override { parent_.onConnDestroyedForTest(); }
 
     Upstream::ClusterConnectivityState state_;
-    Event::PostCb post_cb_;
     ConnPoolBase& parent_;
   };
 };
@@ -402,6 +415,29 @@ TEST_F(TcpConnPoolImplTest, DrainConnections) {
     dispatcher_.clearDeferredDeleteList();
   }
   EXPECT_TRUE(conn_pool_->isIdle());
+}
+
+/**
+ * Verify that connections are closed when idle timeout.
+ */
+TEST_F(TcpConnPoolImplTest, IdleTimerCloseConnections) {
+  initialize();
+  cluster_->resetResourceManager(2, 1024, 1024, 1, 1);
+  conn_pool_->setupIdleTimers();
+
+  ActiveTestConn c1(*this, 0, ActiveTestConn::Type::CreateConnection);
+
+  EXPECT_CALL(*conn_pool_, onConnReleasedForTest());
+  c1.releaseConn();
+
+  {
+    EXPECT_CALL(*conn_pool_, onConnDestroyedForTest());
+
+    conn_pool_->test_conns_[0].idle_timer_->invokeCallback();
+    dispatcher_.clearDeferredDeleteList();
+  }
+  EXPECT_TRUE(conn_pool_->isIdle());
+  // stats
 }
 
 /**
