@@ -1,7 +1,5 @@
 #include "source/common/config/well_known_names.h"
 
-#include "source/common/runtime/runtime_features.h"
-
 #include "absl/strings/str_replace.h"
 
 namespace Envoy {
@@ -135,12 +133,10 @@ TagNameValues::TagNameValues() {
   addRe2(HTTP_CONN_MANAGER_PREFIX, R"(^listener\..*?\.http\.((<TAG_VALUE>)\.))", ".http.");
 
   // Extract ext_authz stat_prefix field
-  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.ext_authz_prefix_handling")) {
-    // cluster.[<cluster>.]ext_authz.[<ext_authz_prefix>.]*
-    addRe2(EXT_AUTHZ_PREFIX, R"(^cluster\.(?:[^\.]+\.)?ext_authz\.((<TAG_VALUE>)\.))");
-    // http.[<http_conn_mgr_prefix>.]ext_authz.[<ext_authz_prefix>.]*
-    addRe2(EXT_AUTHZ_PREFIX, R"(^http\.(?:[^\.]+\.)?ext_authz\.((<TAG_VALUE>)\.))");
-  } // else: don't extract this prefix at all
+  // cluster.[<cluster>.]ext_authz.[<ext_authz_prefix>.]*
+  addRe2(EXT_AUTHZ_PREFIX, R"(^cluster\.(?:[^\.]+\.)?ext_authz\.((<TAG_VALUE>)\.))");
+  // http.[<http_conn_mgr_prefix>.]ext_authz.[<ext_authz_prefix>.]*
+  addRe2(EXT_AUTHZ_PREFIX, R"(^http\.(?:[^\.]+\.)?ext_authz\.((<TAG_VALUE>)\.))");
 
   // http.(<stat_prefix>.)*
   addTokenized(HTTP_CONN_MANAGER_PREFIX, "http.$.**");

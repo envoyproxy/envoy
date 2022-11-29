@@ -34,8 +34,7 @@ minor_behavior_changes:
     add ``MONTH`` and ``YEAR`` to the unit of time for rate limit.
 - area: stats
   change: |
-    Properly extract the ext_authz stat-prefix as a tag when exporting prometheus metrics.  This behavior can be reverted by setting runtime guard ``envoy.restart_features.ext_authz_prefix_handling`` to false.
-    add ``MONTH`` and ``YEAR`` to the unit of time for rate limit.
+    Properly extract the ext_authz stat-prefix as a tag when exporting prometheus metrics.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*

@@ -111,8 +111,6 @@ envoy_cc_test_library(
         "//source/common/common:assert_lib",
         "//source/common/memory:stats_lib",
         "//source/common/stats:isolated_store_lib",
-        "//source/common/stats:tag_extractor_lib",
-        "//source/common/stats:tag_producer_lib",
         "//test/test_common:global_lib",
     ],
 )
@@ -224,20 +222,6 @@ envoy_benchmark_test(
 envoy_cc_test(
     name = "tag_extractor_impl_test",
     srcs = ["tag_extractor_impl_test.cc"],
-    deps = [
-        "//source/common/stats:tag_extractor_lib",
-        "//source/common/stats:tag_producer_lib",
-        "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_test(
-    name = "tag_extractor_impl_legacy_test",
-    srcs = ["tag_extractor_impl_legacy_test.cc"],
-    args = [
-        "--runtime-feature-disable-for-tests=envoy.restart_features.ext_authz_prefix_handling",
-    ],
     deps = [
         "//source/common/stats:tag_extractor_lib",
         "//source/common/stats:tag_producer_lib",

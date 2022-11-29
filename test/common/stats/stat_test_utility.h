@@ -5,7 +5,6 @@
 #include "source/common/common/logger.h"
 #include "source/common/memory/stats.h"
 #include "source/common/stats/isolated_store_impl.h"
-#include "source/common/stats/tag_producer_impl.h"
 
 #include "test/test_common/global.h"
 
@@ -221,28 +220,5 @@ std::vector<uint8_t> serializeDeserializeNumber(uint64_t number);
 void serializeDeserializeString(absl::string_view in);
 
 } // namespace TestUtil
-
-class DefaultTagRegexTester {
-public:
-  DefaultTagRegexTester() : tag_extractors_(envoy::config::metrics::v3::StatsConfig()){};
-
-  void testRegex(const std::string& stat_name, const std::string& expected_tag_extracted_name,
-                 const TagVector& expected_tags);
-
-  /**
-   * Reimplements TagProducerImpl::produceTags, but extracts the tags in reverse order.
-   * This helps demonstrate that the order of extractors does not matter to the end result,
-   * assuming we don't care about tag-order. This is in large part correct by design because
-   * stat_name is not mutated until all the extraction is done.
-   * @param metric_name std::string a name of Stats::Metric (Counter, Gauge, Histogram).
-   * @param tags TagVector& a set of Stats::Tag.
-   * @return std::string the metric_name with tags removed.
-   */
-  std::string produceTagsReverse(const std::string& metric_name, TagVector& tags) const;
-
-  SymbolTableImpl symbol_table_;
-  TagProducerImpl tag_extractors_;
-};
-
 } // namespace Stats
 } // namespace Envoy
