@@ -6,8 +6,9 @@ load(
     "envoy_proto_library",
 )
 load(
-    "//source/extensions:all_extensions.bzl",
-    "envoy_all_network_filters",
+    "filter_fuzz_support.bzl",
+    "fuzz_filters_targets",
+    "generate_from_template",
 )
 
 licenses(["notice"])  # Apache 2
@@ -35,6 +36,19 @@ envoy_proto_library(
         "@envoy_api//envoy/config/listener/v3:pkg",
     ],
 )
+
+_readfilter_fuzz_filters = [
+    "envoy.filters.network.client_ssl_auth",
+    "envoy.filters.network.ext_authz",
+    "envoy.filters.network.envoy_mobile_http_connection_manager",
+    # A dedicated http_connection_manager fuzzer can be found in
+    # test/common/http/conn_manager_impl_fuzz_test.cc
+    "envoy.filters.network.http_connection_manager",
+    "envoy.filters.network.local_ratelimit",
+    "envoy.filters.network.rbac",
+    # TODO(asraa): Remove when fuzzer sets up connections for TcpProxy properly.
+    # "envoy.filters.network.tcp_proxy",
+]
 
 envoy_cc_test_library(
     name = "vig_anymap_ext_lib",
@@ -85,15 +99,28 @@ envoy_cc_fuzz_test(
     srcs = ["network_readfilter_fuzz_test.cc"],
     corpus = "network_readfilter_corpus",
     dictionaries = ["network_readfilter_fuzz_test.dict"],
-    # All Envoy network filters must be linked to the test in order for the fuzzer to pick
-    # these up via the NamedNetworkFilterConfigFactory.
     deps = [
         ":uber_readfilter_lib",
         ":vig_anymap_ext_lib",
         "//source/common/config:utility_lib",
         "//test/config:utility_lib",
         "//test/test_common:test_runtime_lib",
-    ] + envoy_all_network_filters(),
+    ] + fuzz_filters_targets(_readfilter_fuzz_filters),
+)
+
+_writefilter_fuzz_filters = [
+    "envoy.filters.network.zookeeper_proxy",
+    "envoy.filters.network.kafka_broker",
+    "envoy.filters.network.mongo_proxy",
+    "envoy.filters.network.mysql_proxy",
+    # TODO(jianwendong) Add "NetworkFilterNames::get().Postgres" after it
+    # supports untrusted data.
+]
+
+generate_from_template(
+    name = "uber_per_writefilter",
+    filters = _writefilter_fuzz_filters,
+    template_file = "uber_per_writefilter.tmpl.cc",
 )
 
 envoy_cc_test_library(
@@ -123,8 +150,6 @@ envoy_cc_fuzz_test(
         ":uber_writefilter_lib",
         ":vig_anymap_ext_lib",
         "//source/common/config:utility_lib",
-        "//source/extensions/filters/network/mongo_proxy:config",
-        "//source/extensions/filters/network/zookeeper_proxy:config",
         "//test/config:utility_lib",
-    ],
+    ] + fuzz_filters_targets(_writefilter_fuzz_filters),
 )
