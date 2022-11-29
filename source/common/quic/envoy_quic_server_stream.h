@@ -24,7 +24,6 @@ public:
     request_decoder_ = &decoder;
     stats_gatherer_->addStreamInfo(request_decoder_->streamInfoSharedPtr());
     stats_gatherer_->setAccessLogHandlers(request_decoder_->accessLogHandlers());
-    stats_gatherer_->setTimeSource(&connection()->dispatcher().timeSource());
   }
 
   // Http::StreamEncoder

@@ -16,6 +16,8 @@ namespace Quic {
 // logging after the final ack.
 class QuicStatsGatherer : public quic::QuicAckListenerInterface {
 public:
+  QuicStatsGatherer(Envoy::TimeSource* time_source) : time_source_(time_source) {}
+
   // QuicAckListenerInterface
   void OnPacketAcked(int acked_bytes, quic::QuicTime::Delta delta_largest_observed) override;
   void OnPacketRetransmitted(int /* retransmitted_bytes */) override {}
@@ -38,8 +40,6 @@ public:
   void setAccessLogHandlers(std::list<AccessLog::InstanceSharedPtr> handlers) {
     access_log_handlers_ = handlers;
   }
-  // Set time source, for recording the timestamp of the final ack.
-  void setTimeSource(Envoy::TimeSource* time_source) { time_source_ = time_source; }
 
 private:
   uint64_t bytes_outstanding_ = 0;

@@ -38,7 +38,7 @@ EnvoyQuicServerStream::EnvoyQuicServerStream(
   ASSERT(static_cast<uint32_t>(GetReceiveWindow().value()) > 8 * 1024,
          "Send buffer limit should be larger than 8KB.");
 
-  stats_gatherer_ = new QuicStatsGatherer();
+  stats_gatherer_ = new QuicStatsGatherer(&connection()->dispatcher().timeSource());
   set_ack_listener(stats_gatherer_);
 }
 
