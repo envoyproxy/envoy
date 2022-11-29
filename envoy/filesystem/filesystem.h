@@ -169,11 +169,11 @@ struct DirectoryEntry {
   // target. For example, if name_ is a symlink to a directory, its file type will be Directory.
   FileType type_;
 
-  // The file size in bytes.
+  // The file size in bytes. 0 for directories or broken symlinks.
   uint64_t size_bytes_;
 
   bool operator==(const DirectoryEntry& rhs) const {
-    return name_ == rhs.name_ && type_ == rhs.type_;
+    return name_ == rhs.name_ && type_ == rhs.type_ && size_bytes_ == rhs.size_bytes_;
   }
 };
 

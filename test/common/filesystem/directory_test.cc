@@ -15,6 +15,11 @@
 namespace Envoy {
 namespace Filesystem {
 
+void PrintTo(const DirectoryEntry& entry, std::ostream* os) {
+  *os << "{name=" << entry.name_ << ", type=" << static_cast<int>(entry.type_)
+      << ", size=" << entry.size_bytes_ << "}";
+}
+
 class DirectoryTest : public testing::Test {
 public:
   DirectoryTest() : dir_path_(TestEnvironment::temporaryPath("envoy_test")) {
@@ -183,14 +188,15 @@ TEST_F(DirectoryTest, DirectoryWithFileAndDirectory) {
 
 // Test that a symlink to a file has type FileType::Regular
 TEST_F(DirectoryTest, DirectoryWithSymlinkToFile) {
-  addFiles({"file"});
+  const absl::string_view contents = "hello";
+  addFileWithContents("file", contents);
   addSymlinks({{"file", "link"}});
 
   const EntrySet expected = {
       {".", FileType::Directory, 0},
       {"..", FileType::Directory, 0},
-      {"file", FileType::Regular, 0},
-      {"link", FileType::Regular, 0},
+      {"file", FileType::Regular, contents.size()},
+      {"link", FileType::Regular, contents.size()},
   };
   EXPECT_EQ(expected, getDirectoryContents(dir_path_, false));
 }

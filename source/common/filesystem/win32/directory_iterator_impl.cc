@@ -43,19 +43,17 @@ DirectoryIteratorImpl& DirectoryIteratorImpl::operator++() {
 }
 
 DirectoryEntry DirectoryIteratorImpl::makeEntry(const WIN32_FIND_DATA& find_data) {
-  FileType file_type;
+  uint64_t size = static_cast<uint64_t>(find_data.nFileSizeHigh) << 32 + find_data.nFileSizeLow;
   if ((find_data.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) &&
       !(find_data.dwReserved0 & IO_REPARSE_TAG_SYMLINK)) {
     // The file is reparse point and not a symlink, so it can't be
     // a regular file or a directory
-    file_type = FileType::Other;
+    return {std::string(find_data.cFileName), FileType::Other, size};
   } else if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-    file_type = FileType::Directory;
+    return {std::string(find_data.cFileName), FileType::Directory, 0};
   } else {
-    file_type = FileType::Regular;
+    return {std::string(find_data.cFileName), FileType::Regular, size};
   }
-  return {std::string(find_data.cFileName), file_type,
-          static_cast<uint64_t>(find_data.nFileSizeHigh) << 32 + find_data.nFileSizeLow};
 }
 
 } // namespace Filesystem

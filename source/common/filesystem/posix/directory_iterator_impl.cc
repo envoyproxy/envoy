@@ -51,31 +51,30 @@ void DirectoryIteratorImpl::nextEntry() {
 DirectoryEntry DirectoryIteratorImpl::makeEntry(absl::string_view filename) const {
   const std::string full_path = absl::StrCat(directory_path_, "/", filename);
   struct stat stat_buf;
-  FileType file_type = FileType::Other;
-
   const Api::SysCallIntResult result = os_sys_calls_.stat(full_path.c_str(), &stat_buf);
   if (result.return_value_ != 0) {
     if (result.errno_ == ENOENT) {
       // Special case. This directory entity is likely to be a symlink,
       // but the reference is broken as the target could not be stat()'ed.
       // If we confirm this with an lstat, treat this file entity as
-      // a regular file, which may be unlink()'ed.
+      // a regular file, which may be unlink()'ed, with size 0.
       if (::lstat(full_path.c_str(), &stat_buf) == 0 && S_ISLNK(stat_buf.st_mode)) {
-        file_type = FileType::Regular;
+        return DirectoryEntry{std::string{filename}, FileType::Regular, 0};
       }
     }
-    if (file_type == FileType::Other) {
-      // TODO: throwing an exception here makes this dangerous to use in worker threads,
-      // and in general since it's not clear to the user of Directory that an exception
-      // may be thrown. Perhaps make this return StatusOr and handle failures gracefully.
-      throw EnvoyException(fmt::format("unable to stat file: '{}' ({})", full_path, errno));
-    }
+    // TODO: throwing an exception here makes this dangerous to use in worker threads,
+    // and in general since it's not clear to the user of Directory that an exception
+    // may be thrown. Perhaps make this return StatusOr and handle failures gracefully.
+    throw EnvoyException(fmt::format("unable to stat file: '{}' ({})", full_path, errno));
   } else if (S_ISDIR(stat_buf.st_mode)) {
-    file_type = FileType::Directory;
+    return DirectoryEntry{std::string{filename}, FileType::Directory, 0};
   } else if (S_ISREG(stat_buf.st_mode)) {
-    file_type = FileType::Regular;
-  } // else use the already-assigned FileType::Other.
-  return DirectoryEntry{std::string{filename}, file_type, static_cast<uint64_t>(stat_buf.st_size)};
+    return DirectoryEntry{std::string{filename}, FileType::Regular,
+                          static_cast<uint64_t>(stat_buf.st_size)};
+  } else {
+    return DirectoryEntry{std::string{filename}, FileType::Other,
+                          static_cast<uint64_t>(stat_buf.st_size)};
+  }
 }
 
 } // namespace Filesystem
