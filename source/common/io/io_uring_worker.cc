@@ -166,31 +166,31 @@ IoUring& IoUringWorkerImpl::get() {
   return io_uring_impl_;
 }
 
-void IoUringWorkerImpl::addAcceptSocket(os_fd_t fd, IoUringHandler& handler) {
+IoUringSocket& IoUringWorkerImpl::addAcceptSocket(os_fd_t fd, IoUringHandler& handler) {
   ENVOY_LOG(trace, "add accept socket, fd = {}", fd);
   std::unique_ptr<IoUringAcceptSocket> socket = std::make_unique<IoUringAcceptSocket>(fd, handler, *this);
   socket->start();
   ASSERT(sockets_.find(fd) == sockets_.end());
   sockets_.insert({fd, std::move(socket)});
-  //io_uring_impl_.submit();
+  return *sockets_[fd];
 }
 
-void IoUringWorkerImpl::addServerSocket(os_fd_t fd, IoUringHandler& handler, uint32_t read_buffer_size) {
+IoUringSocket& IoUringWorkerImpl::addServerSocket(os_fd_t fd, IoUringHandler& handler, uint32_t read_buffer_size) {
   ENVOY_LOG(trace, "add server socket, fd = {}", fd);
   std::unique_ptr<IoUringServerSocket> socket = std::make_unique<IoUringServerSocket>(fd, handler, *this, read_buffer_size);
   socket->start();
   ASSERT(sockets_.find(fd) == sockets_.end());
   sockets_.insert({fd, std::move(socket)});
-  //io_uring_impl_.submit();
+  return *sockets_[fd];
 }
 
-void IoUringWorkerImpl::addClientSocket(os_fd_t fd, IoUringHandler& handler, uint32_t read_buffer_size) {
+IoUringSocket& IoUringWorkerImpl::addClientSocket(os_fd_t fd, IoUringHandler& handler, uint32_t read_buffer_size) {
   ENVOY_LOG(trace, "add client socket, fd = {}", fd);
   std::unique_ptr<IoUringClientSocket> socket = std::make_unique<IoUringClientSocket>(fd, handler, *this, read_buffer_size);
   socket->start();
   ASSERT(sockets_.find(fd) == sockets_.end());
   sockets_.insert({fd, std::move(socket)});
-  //io_uring_impl_.submit();
+  return *sockets_[fd];
 }
 
 void IoUringWorkerImpl::closeSocket(os_fd_t fd) {

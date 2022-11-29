@@ -439,9 +439,9 @@ public:
     ASSERT(socket_iter != sockets_.end());
     socket_iter->second->disable();
   }
-  void addAcceptSocket(os_fd_t fd, IoUringHandler& handler) override;
-  void addServerSocket(os_fd_t fd, IoUringHandler& handler, uint32_t read_buffer_size) override;
-  void addClientSocket(os_fd_t fd, IoUringHandler& handler, uint32_t read_buffer_size) override;
+  IoUringSocket& addAcceptSocket(os_fd_t fd, IoUringHandler& handler) override;
+  IoUringSocket& addServerSocket(os_fd_t fd, IoUringHandler& handler, uint32_t read_buffer_size) override;
+  IoUringSocket& addClientSocket(os_fd_t fd, IoUringHandler& handler, uint32_t read_buffer_size) override;
   void closeSocket(os_fd_t fd) override;
   Event::Dispatcher& dispatcher() override;
 

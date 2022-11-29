@@ -79,7 +79,7 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::close() {
     SET_SOCKET_INVALID(fd_);
     return Api::ioCallUint64ResultNoError();
   }
-  io_uring_worker_.ref().closeSocket(fd_);
+  io_uring_socket_.ref().close();
   SET_SOCKET_INVALID(fd_);
   return Api::ioCallUint64ResultNoError();
 }
@@ -180,8 +180,7 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::writev(const Buffer::RawSlice* 
   }
 
   ASSERT(io_uring_worker_.has_value());
-  auto& io_uring_server_socket = io_uring_worker_.ref().getIoUringSocket(fd_);
-  auto ret = io_uring_server_socket.writev(slices, num_slice);
+  auto ret = io_uring_socket_.ref().writev(slices, num_slice);
   return {ret, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError)};
 }
 
@@ -204,8 +203,7 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::write(Buffer::Instance& buffer)
   }
 
   ASSERT(io_uring_worker_.has_value());
-  auto& io_uring_server_socket = io_uring_worker_.ref().getIoUringSocket(fd_);
-  auto ret = io_uring_server_socket.write(buffer);
+  auto ret = io_uring_socket_.ref().write(buffer);
   if (ret == 0) {
     return {
       0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(), IoSocketError::deleteIoError)};
@@ -283,8 +281,7 @@ Api::SysCallIntResult IoUringSocketHandleImpl::connect(Address::InstanceConstSha
     return shadow_io_handle_->connect(address);
   }
 
-  auto& io_uring_client_socket = io_uring_worker_.ref().getIoUringSocket(fd_);
-  io_uring_client_socket.connect(address);
+  io_uring_socket_.ref().connect(address);
   return Api::SysCallIntResult{0, 0};
 }
 
@@ -361,7 +358,7 @@ void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
     case IoUringSocketType::Server: {
       ENVOY_LOG(trace, "initialize file event for server socket, fd = {}", fd_);
       if (enable_server_socket_) {
-        io_uring_worker_->addServerSocket(fd_, *this, read_buffer_size_);
+        io_uring_socket_ = io_uring_worker_->addServerSocket(fd_, *this, read_buffer_size_);
         break;
       } else {
         ENVOY_LOG(trace, "fallback to IoSocketHandle for server socket");
@@ -374,7 +371,7 @@ void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
     }
     case IoUringSocketType::Listen: {
       ENVOY_LOG(trace, "initialize file event for accept socket, fd = {}", fd_);
-      io_uring_worker_.ref().addAcceptSocket(fd_, *this);
+      io_uring_socket_ = io_uring_worker_.ref().addAcceptSocket(fd_, *this);
       break;
     }
     case IoUringSocketType::Client:
@@ -389,7 +386,7 @@ void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
         shadow_io_handle_->initializeFileEvent(dispatcher, cb, trigger, events);
         return;
       } else {
-        io_uring_worker_.ref().addClientSocket(fd_, *this, read_buffer_size_);
+        io_uring_socket_ = io_uring_worker_.ref().addClientSocket(fd_, *this, read_buffer_size_);
       }
   }
 
@@ -430,9 +427,9 @@ void IoUringSocketHandleImpl::enableFileEvents(uint32_t events) {
   }
 
   if (!(events & Event::FileReadyType::Read)) {
-    io_uring_worker_.ref().disableSocket(fd_);
+    io_uring_socket_.ref().disable();
   } else {
-    io_uring_worker_.ref().enableSocket(fd_);
+    io_uring_socket_.ref().enable();
   }
 }
 
@@ -446,7 +443,7 @@ void IoUringSocketHandleImpl::resetFileEvents() {
     return;
   }
 
-  io_uring_worker_.ref().disableSocket(fd_);
+  io_uring_socket_.ref().disable();
 }
 
 Api::SysCallIntResult IoUringSocketHandleImpl::shutdown(int how) {
@@ -519,8 +516,9 @@ void IoUringSocketHandleImpl::onRead(Io::ReadParam& param) {
   read_param_ = param;
   if (read_param_->result_ > 0) {
     while (read_param_->pending_read_buf_.length() > 0) {
-      ENVOY_LOG(trace, "calling event callback since pending read buf has {} size data, data = {}, io_uring_socket_type = {}", read_param_->pending_read_buf_.length(), read_param_->pending_read_buf_.toString(), ioUringSocketTypeStr());
+      ENVOY_LOG(trace, "calling event callback since pending read buf has {} size data, data = {}, io_uring_socket_type = {}, fd = {}", read_param_->pending_read_buf_.length(), read_param_->pending_read_buf_.toString(), ioUringSocketTypeStr(), fd_);
       cb_(Event::FileReadyType::Read);
+      ENVOY_LOG(trace, "after calling event callback, fd = {}", fd_);
     }
   } else {
     ENVOY_LOG(trace, "call event callback since result = {}, io_uring_socket_type = {}", read_param_->result_, ioUringSocketTypeStr());
