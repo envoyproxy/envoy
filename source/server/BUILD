@@ -579,6 +579,7 @@ envoy_cc_library(
         ":guarddog_lib",
         ":listener_hooks_lib",
         ":listener_manager_lib",
+        ":regex_engine_lib",
         ":ssl_context_manager_lib",
         ":worker_lib",
         "//envoy/event:dispatcher_interface",
@@ -704,5 +705,15 @@ envoy_cc_library(
     deps = [
         "//envoy/server:filter_config_interface",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "regex_engine_lib",
+    srcs = ["regex_engine.cc"],
+    hdrs = ["regex_engine.h"],
+    deps = [
+        "//source/common/common:regex_lib",
+        "//source/common/config:utility_lib",
     ],
 )

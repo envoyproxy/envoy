@@ -633,6 +633,7 @@ public:
   MOCK_METHOD(const HttpConnectionManagerProto::ProxyStatusConfig*, proxyStatusConfig, (), (const));
   MOCK_METHOD(HeaderValidatorPtr, makeHeaderValidator,
               (Protocol protocol, StreamInfo::StreamInfo& stream_info));
+  MOCK_METHOD(bool, appendXForwardedPort, (), (const));
 
   std::unique_ptr<Http::InternalAddressConfig> internal_address_config_ =
       std::make_unique<DefaultInternalAddressConfig>();

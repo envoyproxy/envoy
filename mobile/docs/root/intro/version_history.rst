@@ -10,6 +10,7 @@ Breaking changes:
 - build: building on macOS now requires Xcode 14.1. (:issue:`#2664 <2664>`)
 - iOS: remove experimental option to force all connections to use IPv6.
 - kotlin: always use ``getaddrinfo`` DNS resolver. Remove ``addDNSFallbackNameservers``, ``enableDNSFilterUnroutableFamilies``, and ``enableDNSUseSystemResolver`` methods from the Kotlin engine builder. (:issue:`#2618 <2618>`)
+- Envoy Mobile's release builds compile without admin support by default. (``--define=admin_functionality=disabled``) (:issue`#2693 <2693>`)
 
 Bugfixes:
 

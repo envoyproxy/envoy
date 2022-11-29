@@ -79,8 +79,16 @@ COVERAGE_DIR="${SRCDIR}"/generated/coverage && [[ ${FUZZ_COVERAGE} == "true" ]] 
 rm -rf "${COVERAGE_DIR}"
 mkdir -p "${COVERAGE_DIR}"
 
-COVERAGE_DATA="${COVERAGE_DIR}/coverage.dat"
-cp bazel-out/_coverage/_coverage_report.dat "${COVERAGE_DATA}"
+if [[ ! -e bazel-out/_coverage/_coverage_report.dat ]]; then
+    echo "No coverage report found (bazel-out/_coverage/_coverage_report.dat)" >&2
+    exit 1
+elif [[ ! -s bazel-out/_coverage/_coverage_report.dat ]]; then
+    echo "Coverage report is empty (bazel-out/_coverage/_coverage_report.dat)" >&2
+    exit 1
+else
+    COVERAGE_DATA="${COVERAGE_DIR}/coverage.dat"
+    cp bazel-out/_coverage/_coverage_report.dat "${COVERAGE_DATA}"
+fi
 
 COVERAGE_VALUE="$(genhtml --prefix "${PWD}" --output "${COVERAGE_DIR}" "${COVERAGE_DATA}" | tee /dev/stderr | grep lines... | cut -d ' ' -f 4)"
 COVERAGE_VALUE=${COVERAGE_VALUE%?}

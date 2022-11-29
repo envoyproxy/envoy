@@ -318,7 +318,10 @@ public:
   }
   void addSocketFactory(Network::ListenSocketFactoryPtr&& socket_factory);
   void setSocketAndOptions(const Network::SocketSharedPtr& socket);
-  const Network::Socket::OptionsSharedPtr& listenSocketOptions() { return listen_socket_options_; }
+  const Network::Socket::OptionsSharedPtr& listenSocketOptions(uint32_t address_index) {
+    ASSERT(listen_socket_options_list_.size() > address_index);
+    return listen_socket_options_list_[address_index];
+  }
   const std::string& versionInfo() const { return version_info_; }
   bool reusePort() const { return reuse_port_; }
   static bool getReusePortOrDefault(Server::Instance& server,
@@ -380,10 +383,9 @@ public:
     return config().traffic_direction();
   }
 
-  void ensureSocketOptions() {
-    if (!listen_socket_options_) {
-      listen_socket_options_ =
-          std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
+  void ensureSocketOptions(Network::Socket::OptionsSharedPtr& options) {
+    if (options == nullptr) {
+      options = std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
     }
   }
 
@@ -450,7 +452,8 @@ private:
   void buildUdpListenerWorkerRouter(const Network::Address::Instance& address,
                                     uint32_t concurrency);
   void buildUdpListenerFactory(uint32_t concurrency);
-  void buildListenSocketOptions();
+  void buildListenSocketOptions(std::vector<std::reference_wrapper<const Protobuf::RepeatedPtrField<
+                                    envoy::config::core::v3::SocketOption>>>& address_opts_list);
   void createListenerFilterFactories();
   void validateFilterChains();
   void buildFilterChains();
@@ -461,9 +464,10 @@ private:
   void checkIpv4CompatAddress(const Network::Address::InstanceConstSharedPtr& address,
                               const envoy::config::core::v3::Address& proto_address);
 
-  void addListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) {
-    ensureSocketOptions();
-    Network::Socket::appendOptions(listen_socket_options_, options);
+  void addListenSocketOptions(Network::Socket::OptionsSharedPtr& options,
+                              const Network::Socket::OptionsSharedPtr& append_options) {
+    ensureSocketOptions(options);
+    Network::Socket::appendOptions(options, append_options);
   }
 
   ListenerManagerImpl& parent_;
@@ -495,7 +499,8 @@ private:
   std::vector<AccessLog::InstanceSharedPtr> access_logs_;
   const envoy::config::listener::v3::Listener config_;
   const std::string version_info_;
-  Network::Socket::OptionsSharedPtr listen_socket_options_;
+  // Using std::vector instead of hash map for supporting multiple zero port addresses.
+  std::vector<Network::Socket::OptionsSharedPtr> listen_socket_options_list_;
   const std::chrono::milliseconds listener_filters_timeout_;
   const bool continue_on_listener_filters_timeout_;
   std::shared_ptr<UdpListenerConfigImpl> udp_listener_config_;
