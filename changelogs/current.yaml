@@ -43,6 +43,9 @@ minor_behavior_changes:
 - area: rate_limit
   change: |
     add ``MONTH`` and ``YEAR`` to the unit of time for rate limit.
+- area: jwt_authn
+  change: |
+    adjust the refetch time for remote_jwks async_fetch feature. For a good fetch, refetch 5 seconds before jwks cache duration. For a failed fetch, refetch time can be specified by :ref:`failed_refetch_duration <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwksAsyncFetch.failed_refetch_duration>` with default 1 second.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
