@@ -3,10 +3,8 @@
 namespace Envoy {
 namespace Platform {
 
-RequestHeadersBuilder::RequestHeadersBuilder(RequestMethod request_method,
-                                             std::string scheme,
-                                             std::string authority,
-                                             std::string path) {
+RequestHeadersBuilder::RequestHeadersBuilder(RequestMethod request_method, std::string scheme,
+                                             std::string authority, std::string path) {
   this->internalSet(":method", {requestMethodToString(request_method)});
   this->internalSet(":scheme", {std::move(scheme)});
   this->internalSet(":authority", {std::move(authority)});

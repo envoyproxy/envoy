@@ -56,63 +56,53 @@ public:
                     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                     SSL_CTX& ssl_ctx,
                     const CertValidator::ExtraValidationContext& validation_context, bool is_server,
-                    absl::string_view host_name) override;
-  // As CA path will not be configured, make sure the return value won’t be SSL_VERIFY_NONE because
-  // of that, so that doVerifyCertChain() will be called from the TLS stack.
-  int initializeSslContexts(std::vector<SSL_CTX*> contexts,
-                            bool handshaker_provides_certificates) override;
+                    absl::string_view hostname) override;
+  // Returns SSL_VERIFY_PEER so that doVerifyCertChain() will be called from the TLS stack.
+  int initializeSslContexts(std::vector<SSL_CTX*> /*contexts*/,
+                            bool /*handshaker_provides_certificates*/) override {
+    return SSL_VERIFY_PEER;
+  }
 
 private:
   class PendingValidation {
   public:
     PendingValidation(PlatformBridgeCertValidator& parent, std::vector<envoy_data> certs,
-                      absl::string_view host_name,
-                      const Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
+                      absl::string_view hostname, std::vector<std::string> subject_alt_names,
                       Ssl::ValidateResultCallbackPtr result_callback)
-        : parent_(parent), certs_(std::move(certs)), host_name_(host_name),
-          result_callback_(std::move(result_callback)),
-          transport_socket_options_(std::move(transport_socket_options)) {}
+        : parent_(parent), certs_(std::move(certs)), hostname_(hostname),
+          subject_alt_names_(std::move(subject_alt_names)),
+          result_callback_(std::move(result_callback)) {}
 
+    // Ensure that this class is never moved or copied to guarantee pointer stability.
+    PendingValidation(const PendingValidation&) = delete;
+    PendingValidation(PendingValidation&&) = delete;
+
+    // Calls into platform APIs in a stand-alone thread to verify the given certs.
+    // Once the validation is done, the result will be posted back to the current
+    // thread to trigger callback and update verify stats.
     void verifyCertsByPlatform();
 
     void postVerifyResultAndCleanUp(bool success, absl::string_view error_details,
                                     uint8_t tls_alert, OptRef<Stats::Counter> error_counter);
 
-    struct Hash {
-      size_t operator()(const PendingValidation& p) const {
-        return reinterpret_cast<size_t>(p.result_callback_.get());
-      }
-    };
-    struct Eq {
-      bool operator()(const PendingValidation& a, const PendingValidation& b) const {
-        return a.result_callback_.get() == b.result_callback_.get();
-      }
-    };
-
   private:
-    Event::SchedulableCallbackPtr next_iteration_callback_;
     PlatformBridgeCertValidator& parent_;
-    std::vector<envoy_data> certs_;
-    std::string host_name_;
+    const std::vector<envoy_data> certs_;
+    const std::string hostname_;
+    const std::vector<std::string> subject_alt_names_;
     Ssl::ValidateResultCallbackPtr result_callback_;
-    const Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   };
 
-  // Calls into platform APIs in a stand-alone thread to verify the given certs.
-  // Once the validation is done, the result will be posted back to the current
-  // thread to trigger callback and update verify stats.
-  void verifyCertChainByPlatform(std::vector<envoy_data>& cert_chain, const std::string& host_name,
+  void verifyCertChainByPlatform(const std::vector<envoy_data>& cert_chain,
+                                 const std::string& hostname,
                                  const std::vector<std::string>& subject_alt_names,
                                  PendingValidation& pending_validation);
 
-  const Envoy::Ssl::CertificateValidationContextConfig* config_;
-  SslStats& stats_;
-  bool allow_untrusted_certificate_ = false;
-  // latches the platform extension API.
+  const bool allow_untrusted_certificate_;
   const envoy_cert_validator* platform_validator_;
+  SslStats& stats_;
   absl::flat_hash_map<std::thread::id, std::thread> validation_threads_;
-  absl::flat_hash_set<PendingValidation, PendingValidation::Hash, PendingValidation::Eq>
-      validations_;
+  absl::flat_hash_set<std::unique_ptr<PendingValidation>> validations_;
   std::shared_ptr<size_t> alive_indicator_{new size_t(1)};
 };
 

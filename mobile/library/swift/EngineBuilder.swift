@@ -487,6 +487,9 @@ open class EngineBuilder: NSObject {
   /// used for development/debugging purposes only. Enabling it in production may open
   /// your app to security vulnerabilities.
   ///
+  /// Note this will not work with the default production build, as it builds with admin
+  /// functionality disabled via --define=admin_functionality=disabled
+  ///
   /// - returns: This builder.
   @discardableResult
   public func enableAdminInterface() -> Self {
