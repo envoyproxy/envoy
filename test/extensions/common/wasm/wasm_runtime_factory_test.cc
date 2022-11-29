@@ -16,9 +16,7 @@ public:
   std::string name() const override { return "envoy.wasm.runtime.mock"; }
 };
 
-class WasmRuntimeFactoryTest : public testing::Test {};
-
-TEST_F(WasmRuntimeFactoryTest, DestructFactory) {
+TEST(WasmRuntimeFactoryTest, DestructFactory) {
   EXPECT_NO_THROW({
     auto factory = new FakeRuntimeFactory();
     delete factory;
