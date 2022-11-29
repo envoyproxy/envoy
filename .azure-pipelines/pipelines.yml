@@ -72,7 +72,7 @@ stages:
         fi
 
         echo "Comparing changes ${CHANGE_TARGET}...HEAD"
-        CHANGED_PATHS="$(git diff --quiet --name-only ${CHANGE_TARGET}...HEAD | cut -d/ -f1 | sort -u | jq -R 'split("\n")')"
+        CHANGED_PATHS="$(git diff --name-only ${CHANGE_TARGET}...HEAD | cut -d/ -f1 | sort -u | jq -R 'split("\n")')"
         CHANGED_PATH_COUNT=$(echo $CHANGED_PATHS | jq '. | length')
         CHANGED_MOBILE_ONLY=false
         CHANGED_DOCS_ONLY=false
