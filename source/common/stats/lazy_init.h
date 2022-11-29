@@ -30,6 +30,8 @@ public:
   inline StatsStructType& operator*() { return *internal_stats_.get(ctor_); }
 
 private:
+  // TODO(stevenzzzz, jmarantz): Clean up this ctor_ by moving ownership to AtomicPtr, and drop it
+  // when the nested object is created.
   std::function<StatsStructType*()> ctor_;
   Thread::AtomicPtr<StatsStructType, Thread::AtomicPtrAllocMode::DeleteOnDestruct>
       internal_stats_{};
