@@ -51,9 +51,12 @@ def envoy_copts(repository, test = False):
                # debugging info detailing some 1600 test binaries would be wasteful.
                # targets listed in order from generic to increasing specificity.
                # Bazel adds an implicit -DNDEBUG for opt targets.
-               repository + "//bazel:opt_build": [] if test else ["-ggdb3"],
+               #
+               # The GDB currently in the CI build container chokes on dwarf-5, so
+               # force dwarf-4.
+               repository + "//bazel:opt_build": [] if test else ["-ggdb3", "-gdwarf-4"],
                repository + "//bazel:fastbuild_build": [],
-               repository + "//bazel:dbg_build": ["-ggdb3"],
+               repository + "//bazel:dbg_build": ["-ggdb3", "-gdwarf-4"],
                repository + "//bazel:windows_opt_build": [] if test else ["-Z7"],
                repository + "//bazel:windows_fastbuild_build": [],
                repository + "//bazel:windows_dbg_build": [],

@@ -65,7 +65,6 @@ build:sanitizer --test_tag_filters=-no_san
 build:clang --action_env=BAZEL_COMPILER=clang
 build:clang --action_env=CC=clang --action_env=CXX=clang++
 build:clang --linkopt=-fuse-ld=lld
-build:clang --copt=-gdwarf-4
 
 # Flags for Clang + PCH
 build:clang-pch --spawn_strategy=local
