@@ -26,7 +26,7 @@ public:
     fin_sent_ = end_stream;
   }
   // Log this stream using available stream info and access loggers.
-  void doDeferredLog();
+  void maybeDoDeferredLog();
   // Add a pointer to stream info that should be logged. There can be
   // multiple in case of a recreated stream (e.g. internal redirect)
   void addStreamInfo(std::shared_ptr<StreamInfo::StreamInfo> stream_info) {

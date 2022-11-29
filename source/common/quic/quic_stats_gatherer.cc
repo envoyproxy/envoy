@@ -9,11 +9,11 @@ void QuicStatsGatherer::OnPacketAcked(int acked_bytes,
                                       quic::QuicTime::Delta /* delta_largest_observed */) {
   bytes_outstanding_ -= acked_bytes;
   if (bytes_outstanding_ == 0 && fin_sent_ && !logging_done_) {
-    doDeferredLog();
+    maybeDoDeferredLog();
   }
 }
 
-void QuicStatsGatherer::doDeferredLog() {
+void QuicStatsGatherer::maybeDoDeferredLog() {
   logging_done_ = true;
   for (const std::shared_ptr<StreamInfo::StreamInfo>& stream_info : stream_info_) {
     if (!stream_info->deferredLoggingInfo().has_value()) {
