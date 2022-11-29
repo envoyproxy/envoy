@@ -3,7 +3,7 @@ name: release_validation
 on:
   push:
     branches:
-      - main
+    - main
     paths:
     - 'mobile/**'
     - '.github/workflows/**'
