@@ -146,11 +146,7 @@ class IoUringHandler;
 class IoUringSocket;
 
 struct Request {
-  absl::optional<std::reference_wrapper<IoUringHandler>> io_uring_handler_{absl::nullopt};
   RequestType type_{RequestType::Unknown};
-  struct iovec* iov_{nullptr};
-  os_fd_t fd_{-1};
-  std::unique_ptr<uint8_t[]> buf_{};
   absl::optional<std::reference_wrapper<IoUringSocket>> io_uring_socket_{absl::nullopt};
 };
 
