@@ -602,8 +602,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
   }
 
   if (!route.route().rate_limits().empty()) {
-    rate_limit_policy_ = std::make_unique<RateLimitPolicyImpl>(
-        route.route().rate_limits(), validator);
+    rate_limit_policy_ =
+        std::make_unique<RateLimitPolicyImpl>(route.route().rate_limits(), validator);
   }
 
   // Returns true if include_vh_rate_limits is explicitly set to true otherwise it defaults to false
@@ -1703,8 +1703,8 @@ VirtualHostImpl::VirtualHostImpl(
   }
 
   if (!virtual_host.rate_limits().empty()) {
-    rate_limit_policy_ = std::make_unique<RateLimitPolicyImpl>(
-        virtual_host.rate_limits(), validator);
+    rate_limit_policy_ =
+        std::make_unique<RateLimitPolicyImpl>(virtual_host.rate_limits(), validator);
   }
 
   shadow_policies_.reserve(virtual_host.request_mirror_policies().size());
