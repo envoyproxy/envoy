@@ -140,6 +140,15 @@ TEST(HeaderMutationTest, BasicOrder) {
   }
 }
 
+TEST(HeaderMutationTest, Death) {
+  ScopedInjectableLoader<Regex::Engine> engine{std::make_unique<Regex::GoogleReEngine>()};
+
+  ProtoHeaderMutation proto_mutation;
+  proto_mutation.mutable_mutations()->Add();
+
+  EXPECT_DEATH(HeaderMutation{proto_mutation}, "unset oneof");
+}
+
 } // namespace
 } // namespace HeaderMutation
 } // namespace EarlyHeaderMutation
