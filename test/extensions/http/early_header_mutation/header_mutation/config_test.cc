@@ -28,13 +28,13 @@ TEST(FactoryTest, FactoryTest) {
   ASSERT_NE(factory, nullptr);
 
   const std::string config = R"EOF(
-  headers_to_remove:
-  - "flag-header"
-  headers_to_append:
-  - header:
-      key: "flag-header"
-      value: "%REQ(ANOTHER-FLAG-HEADER)%"
-    append_action: APPEND_IF_EXISTS_OR_ADD
+  mutations:
+  - remove: "flag-header"
+  - append:
+      header:
+        key: "flag-header"
+        value: "%REQ(ANOTHER-FLAG-HEADER)%"
+      append_action: APPEND_IF_EXISTS_OR_ADD
   )EOF";
 
   ProtoHeaderMutation proto_mutation;

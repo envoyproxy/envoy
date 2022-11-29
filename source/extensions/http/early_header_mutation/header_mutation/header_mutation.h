@@ -16,20 +16,29 @@ namespace Http {
 namespace EarlyHeaderMutation {
 namespace HeaderMutation {
 
+using HeaderAppendAction = envoy::config::core::v3::HeaderValueOption::HeaderAppendAction;
+using HeaderValueOption = envoy::config::core::v3::HeaderValueOption;
 using ProtoHeaderMutation =
     envoy::extensions::http::early_header_mutation::header_mutation::v3::HeaderMutation;
 
+class Mutation {
+public:
+  virtual ~Mutation() = default;
+
+  virtual void mutate(Envoy::Http::RequestHeaderMap& headers,
+                      const StreamInfo::StreamInfo& stream_info) const PURE;
+};
+using MutationPtr = std::unique_ptr<Mutation>;
+
 class HeaderMutation : public Envoy::Http::EarlyHeaderMutation {
 public:
-  HeaderMutation(const ProtoHeaderMutation& mutations) {
-    header_parser_ = Router::HeaderParser::configure(mutations.headers_to_append(),
-                                                     mutations.headers_to_remove());
-  }
+  HeaderMutation(const ProtoHeaderMutation& mutations);
+
   bool mutate(Envoy::Http::RequestHeaderMap& headers,
               const StreamInfo::StreamInfo& stream_info) const override;
 
 private:
-  Router::HeaderParserPtr header_parser_;
+  std::vector<MutationPtr> mutations_;
 };
 
 } // namespace HeaderMutation

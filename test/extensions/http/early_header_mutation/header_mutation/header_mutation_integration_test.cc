@@ -57,11 +57,12 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, HeaderMutationIntegrationTest,
 
 TEST_P(HeaderMutationIntegrationTest, TestHeaderMutation) {
   const std::string header_mutation_yaml = R"EOF(
-  headers_to_append:
-  - header:
-      key: "flag-header"
-      value: "%REQ(another-flag-header)%"
-    append_action: OVERWRITE_IF_EXISTS_OR_ADD
+  mutations:
+  - append:
+      header:
+        key: "flag-header"
+        value: "%REQ(ANOTHER-FLAG-HEADER)%"
+      append_action: OVERWRITE_IF_EXISTS_OR_ADD
   )EOF";
 
   initializeExtension(header_mutation_yaml);
