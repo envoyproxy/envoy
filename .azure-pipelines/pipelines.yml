@@ -373,7 +373,8 @@ stages:
       displayName: "Verify packages"
 
 - stage: check
-  dependsOn: ["linux_x64"]
+  dependsOn: ["env", "linux_x64"]
+  condition: or(eq(variables['PostSubmit'], true), and(ne(dependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(dependencies.env.repo.outputs['changed.docsOnly'], 'true')))
   jobs:
   - job: bazel
     displayName: "linux_x64"
