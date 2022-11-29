@@ -205,8 +205,13 @@ public:
     ReadParam param{pending_read_buf_, result};
     ENVOY_LOG(trace, "calling onRead callback, fd = {}, pending read buf size = {}, result = {}", fd_, pending_read_buf_.length(), result);
     io_uring_handler_.onRead(param);
-    ASSERT(pending_read_buf_.length() == 0);
-    if (read_req_ == nullptr && !is_closing_) {
+    if (pending_read_buf_.length() != 0 && is_disabled_) {
+      ENVOY_LOG(trace, "the pending result doesn't consume due to disable, fd = {}", fd_);
+      pending_result_ = pending_read_buf_.length();
+    }
+
+    //ASSERT(pending_read_buf_.length() == 0);
+    if (read_req_ == nullptr && !is_closing_ && !is_disabled_) {
       ENVOY_LOG(trace, "submit read request after previous read complete, fd = {}", fd_);
       submitReadRequest();
     }

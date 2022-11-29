@@ -114,11 +114,13 @@ IoUringSocketHandleImpl::readv(uint64_t max_length, Buffer::RawSlice* slices, ui
 
   if (read_param_->result_ == -EAGAIN) {
     ENVOY_LOG(debug, "read eagain");
+    ASSERT(read_param_->pending_read_buf_.length() == 0);
     return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
                               IoSocketError::deleteIoError)};
   }
 
   if (read_param_->result_ < 0) {
+    ASSERT(read_param_->pending_read_buf_.length() == 0);
     return {0, Api::IoErrorPtr(new IoSocketError(-read_param_->result_), IoSocketError::deleteIoError)};
   }
 
@@ -427,8 +429,10 @@ void IoUringSocketHandleImpl::enableFileEvents(uint32_t events) {
   }
 
   if (!(events & Event::FileReadyType::Read)) {
+    disabled_ = true;
     io_uring_socket_.ref().disable();
   } else {
+    disabled_ = false;
     io_uring_socket_.ref().enable();
   }
 }
@@ -518,6 +522,10 @@ void IoUringSocketHandleImpl::onRead(Io::ReadParam& param) {
     while (read_param_->pending_read_buf_.length() > 0) {
       ENVOY_LOG(trace, "calling event callback since pending read buf has {} size data, data = {}, io_uring_socket_type = {}, fd = {}", read_param_->pending_read_buf_.length(), read_param_->pending_read_buf_.toString(), ioUringSocketTypeStr(), fd_);
       cb_(Event::FileReadyType::Read);
+      if (disabled_ && read_param_->pending_read_buf_.length() > 0) {
+        ENVOY_LOG(trace, "The socket disabled, and we still left data, fd = {}", fd_);
+        break;
+      }
       ENVOY_LOG(trace, "after calling event callback, fd = {}", fd_);
     }
   } else {

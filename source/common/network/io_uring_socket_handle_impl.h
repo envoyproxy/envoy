@@ -106,6 +106,7 @@ private:
   int socket_v6only_;
   const absl::optional<int> domain_;
   OptRef<Io::IoUringSocket> io_uring_socket_{absl::nullopt};
+  bool disabled_{false};
 
   Event::FileReadyCb cb_;
 
