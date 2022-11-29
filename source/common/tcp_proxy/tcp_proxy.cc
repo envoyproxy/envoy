@@ -576,7 +576,13 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
     Server::Configuration::FactoryContext& context)
     : use_post_(config_message.use_post()),
       header_parser_(Envoy::Router::HeaderParser::configure(config_message.headers_to_add())),
-      propagate_response_headers_(config_message.propagate_response_headers()) {
+      propagate_response_headers_(config_message.propagate_response_headers()),
+      post_path_(config_message.post_path()) {
+  if (!post_path_.empty() && !use_post_) {
+    throw EnvoyException("Can't set a post path when POST method isn't used");
+  }
+  post_path_ = post_path_.empty() ? "/" : post_path_;
+
   envoy::config::core::v3::SubstitutionFormatString substitution_format_config;
   substitution_format_config.mutable_text_format_source()->set_inline_string(
       config_message.hostname());

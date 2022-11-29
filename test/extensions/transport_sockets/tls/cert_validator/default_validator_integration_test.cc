@@ -5,6 +5,7 @@
 #include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/integration/integration.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gtest/gtest.h"
 
@@ -49,6 +50,9 @@ INSTANTIATE_TEST_SUITE_P(
                         envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3)),
     SslCertValidatorIntegrationTest::ipClientVersionTestParamsToString);
 
+// Test Config:
+//   peer certificate chain: leaf cert -> level 2 intermediate -> level 1 intermediate -> root
+//   trust ca certificate chain: level-2 intermediate -> level-1 intermediate
 // Default case, certificate is accepted
 TEST_P(SslCertValidatorIntegrationTest, CertValidated) {
   config_helper_.addSslConfig(ConfigHelper::ServerSslOptions()
@@ -64,8 +68,94 @@ TEST_P(SslCertValidatorIntegrationTest, CertValidated) {
   codec->close();
 }
 
-// With verify-depth set, certificate validation fails
-TEST_P(SslCertValidatorIntegrationTest, CertValidationFailed) {
+// Test Config:
+//   peer certificate chain: leaf cert -> level-2 intermediate -> level-1 intermediate -> root
+//   trust ca certificate chain: level-2 intermediate -> level-1 intermediate
+// With verify-depth set, certificate validation succeeds since we allow partial chain
+TEST_P(SslCertValidatorIntegrationTest, CertValidatedWithVerifyDepth) {
+  config_helper_.addSslConfig(ConfigHelper::ServerSslOptions()
+                                  .setRsaCert(true)
+                                  .setTlsV13(true)
+                                  .setClientWithIntermediateCert(true)
+                                  .setVerifyDepth(1));
+  initialize();
+  auto conn = makeSslClientConnection({});
+  IntegrationCodecClientPtr codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
+  ASSERT_TRUE(codec->connected());
+  test_server_->waitForCounterGe(listenerStatPrefix("ssl.handshake"), 1);
+  EXPECT_EQ(test_server_->counter(listenerStatPrefix("ssl.fail_verify_error"))->value(), 0);
+  codec->close();
+}
+
+// Test Config:
+//   peer certificate chain: leaf cert -> level-2 intermediate -> level-1 intermediate -> root
+//   trust ca certificate chain: root
+// With only root trusted, certificate validation succeeds without setting max depth since the
+// default value is 100
+TEST_P(SslCertValidatorIntegrationTest, CertValidationSucceedNoDepthWithTrustRootOnly) {
+  config_helper_.addSslConfig(ConfigHelper::ServerSslOptions()
+                                  .setRsaCert(true)
+                                  .setTlsV13(true)
+                                  .setClientWithIntermediateCert(true)
+                                  .setTrustRootOnly(true));
+  initialize();
+  auto conn = makeSslClientConnection({});
+  IntegrationCodecClientPtr codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
+  ASSERT_TRUE(codec->connected());
+  test_server_->waitForCounterGe(listenerStatPrefix("ssl.handshake"), 1);
+  EXPECT_EQ(test_server_->counter(listenerStatPrefix("ssl.fail_verify_error"))->value(), 0);
+  codec->close();
+}
+
+// Test Config:
+//   peer certificate chain: leaf cert -> level-2 intermediate -> level-1 intermediate -> root
+//   trust ca certificate chain: root
+// With only root trusted, certificate validation succeeds because root ca is in depth 3 and max
+// depth is 3
+TEST_P(SslCertValidatorIntegrationTest, CertValidationSucceedDepthWithTrustRootOnly) {
+  config_helper_.addSslConfig(ConfigHelper::ServerSslOptions()
+                                  .setRsaCert(true)
+                                  .setTlsV13(true)
+                                  .setClientWithIntermediateCert(true)
+                                  .setTrustRootOnly(true)
+                                  .setVerifyDepth(3));
+  initialize();
+  auto conn = makeSslClientConnection({});
+  IntegrationCodecClientPtr codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
+  ASSERT_TRUE(codec->connected());
+  test_server_->waitForCounterGe(listenerStatPrefix("ssl.handshake"), 1);
+  EXPECT_EQ(test_server_->counter(listenerStatPrefix("ssl.fail_verify_error"))->value(), 0);
+  codec->close();
+}
+
+// Test Config:
+//   peer certificate chain: leaf cert -> level-2 intermediate -> level-1 intermediate -> root
+//   trust ca certificate chain: root
+// With only root ca trusted, certificate validation is expected to fail because root ca is in depth
+// 3 while max depth is 2
+TEST_P(SslCertValidatorIntegrationTest, CertValidationFailedDepthWithTrustRootOnly) {
+  config_helper_.addSslConfig(ConfigHelper::ServerSslOptions()
+                                  .setRsaCert(true)
+                                  .setTlsV13(true)
+                                  .setClientWithIntermediateCert(true)
+                                  .setTrustRootOnly(true)
+                                  .setVerifyDepth(2));
+  initialize();
+  auto conn = makeSslClientConnection({});
+  IntegrationCodecClientPtr codec = makeRawHttpConnection(std::move(conn), absl::nullopt);
+  test_server_->waitForCounterGe(listenerStatPrefix("ssl.fail_verify_error"), 1);
+  ASSERT_TRUE(codec->waitForDisconnect());
+}
+
+// Test Config:
+//   peer certificate chain: leaf cert -> level-2 intermediate -> level-1 intermediate -> root
+//   trust ca certificate chain: level-2 intermediate -> level-1 intermediate
+// With verify-depth set, certificate validation is expected to fail since we disallow partial chain
+// by setting runtime flag.
+TEST_P(SslCertValidatorIntegrationTest,
+       CertValidationFailedWithVerifyDepthAndPaitialChainDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_intermediate_ca", "false"}});
   config_helper_.addSslConfig(ConfigHelper::ServerSslOptions()
                                   .setRsaCert(true)
                                   .setTlsV13(true)

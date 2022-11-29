@@ -101,7 +101,7 @@ public:
     typed_config:
         "@type": "type.googleapis.com/envoy.extensions.filters.http.cache.v3.CacheConfig"
         typed_config:
-           "@type": "type.googleapis.com/envoy.extensions.cache.simple_http_cache.v3.SimpleHttpCacheConfig"
+           "@type": "type.googleapis.com/envoy.extensions.http.cache.simple_http_cache.v3.SimpleHttpCacheConfig"
     )EOF"};
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
   OptRef<const std::string> empty_body_;

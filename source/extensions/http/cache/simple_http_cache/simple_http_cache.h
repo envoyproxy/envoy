@@ -7,9 +7,6 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/synchronization/mutex.h"
 
-// included to make code_format happy
-#include "envoy/extensions/cache/simple_http_cache/v3/config.pb.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {

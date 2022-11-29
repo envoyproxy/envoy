@@ -3,6 +3,7 @@
 
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/test_time.h"
+#include "test/test_common/utility.h"
 
 using testing::HasSubstr;
 
@@ -464,7 +465,7 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutUnconfiguredDoesNotTriggerOnBod
 }
 
 TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutTriggersOnRawIncompleteRequestWithHeaders) {
-  if (GetParam().http1_implementation == Http1Impl::BalsaParser) {
+  if (GetParam().http1_implementation == Http1ParserImpl::BalsaParser) {
     // TODO(#21245): Re-enable this test for BalsaParser.
     return;
   }
