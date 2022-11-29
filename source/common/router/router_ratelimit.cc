@@ -350,10 +350,13 @@ void RateLimitPolicyEntryImpl::populateLocalDescriptors(
   }
 }
 
+RateLimitPolicyImpl::RateLimitPolicyImpl()
+    : rate_limit_entries_reference_(RateLimitPolicyImpl::MAX_STAGE_NUMBER + 1) {}
+
 RateLimitPolicyImpl::RateLimitPolicyImpl(
     const Protobuf::RepeatedPtrField<envoy::config::route::v3::RateLimit>& rate_limits,
     ProtobufMessage::ValidationVisitor& validator)
-    : rate_limit_entries_reference_(RateLimitPolicyImpl::MAX_STAGE_NUMBER + 1) {
+    : RateLimitPolicyImpl() {
   for (const auto& rate_limit : rate_limits) {
     std::unique_ptr<RateLimitPolicyEntry> rate_limit_policy_entry(
         new RateLimitPolicyEntryImpl(rate_limit, validator));
