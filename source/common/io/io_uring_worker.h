@@ -168,11 +168,21 @@ public:
         return;
       }
 
+      if (is_closing_) {
+        ENVOY_LOG(trace, "the connection is closing, drop the remote close event, fd = {}", fd_);
+        return;
+      }
+
       ReadParam param{pending_read_buf_, result};
       io_uring_handler_.onRead(param);
       return;
     }
 
+    if (is_closing_) {
+      ENVOY_LOG(trace, "the connection is closing, drop the read data, fd = {}", fd_);
+      return;
+    }
+  
     // If iouring_read_buf_ is nullptr, it means there is pending data.
     if (iouring_read_buf_ != nullptr) {
       Buffer::BufferFragment* fragment = new Buffer::BufferFragmentImpl(
