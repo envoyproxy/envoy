@@ -343,7 +343,7 @@ HdsCluster::HdsCluster(Server::Configuration::ServerFactoryContext& server_conte
   socket_match_hash_ = RepeatedPtrUtil::hash(cluster_.transport_socket_matches());
 
   info_ = info_factory.createClusterInfo(
-      {server_context, cluster_, bind_config_, stats_, ssl_context_manager_, added_via_api_, tls});
+      {server_context, cluster_, bind_config, stats_, ssl_context_manager_, added_via_api_, tls});
 
   // Temporary structure to hold Host pointers grouped by locality, to build
   // initial_hosts_per_locality_.
