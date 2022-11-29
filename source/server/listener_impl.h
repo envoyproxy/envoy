@@ -383,11 +383,9 @@ public:
     return config().traffic_direction();
   }
 
-  void ensureSocketOptions(uint32_t address_index) {
-    ASSERT(listen_socket_options_list_.size() > address_index);
-    if (listen_socket_options_list_[address_index] == nullptr) {
-      listen_socket_options_list_[address_index] =
-          std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
+  void ensureSocketOptions(Network::Socket::OptionsSharedPtr& options) {
+    if (options == nullptr) {
+      options = std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
     }
   }
 
@@ -466,11 +464,10 @@ private:
   void checkIpv4CompatAddress(const Network::Address::InstanceConstSharedPtr& address,
                               const envoy::config::core::v3::Address& proto_address);
 
-  void addListenSocketOptions(uint32_t address_index,
-                              const Network::Socket::OptionsSharedPtr& options) {
-    ASSERT(listen_socket_options_list_.size() > address_index);
-    ensureSocketOptions(address_index);
-    Network::Socket::appendOptions(listen_socket_options_list_[address_index], options);
+  void addListenSocketOptions(Network::Socket::OptionsSharedPtr& options,
+                              const Network::Socket::OptionsSharedPtr& append_options) {
+    ensureSocketOptions(options);
+    Network::Socket::appendOptions(options, append_options);
   }
 
   ListenerManagerImpl& parent_;
