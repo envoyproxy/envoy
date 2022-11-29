@@ -137,6 +137,7 @@ public:
       Server::Configuration::FactoryContext& context);
   std::string host(const StreamInfo::StreamInfo& stream_info) const override;
   bool usePost() const override { return use_post_; }
+  const std::string& postPath() const override { return post_path_; }
   Envoy::Http::HeaderEvaluator& headerEvaluator() const override { return *header_parser_; }
   void
   propagateResponseHeaders(Http::ResponseHeaderMapPtr&& headers,
@@ -147,6 +148,7 @@ private:
   std::unique_ptr<Envoy::Router::HeaderParser> header_parser_;
   Formatter::FormatterPtr hostname_fmt_;
   const bool propagate_response_headers_;
+  std::string post_path_;
 };
 
 /**

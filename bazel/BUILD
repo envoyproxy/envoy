@@ -344,6 +344,11 @@ config_setting(
 )
 
 config_setting(
+    name = "disable_logging",
+    values = {"define": "enable_logging=disabled"},
+)
+
+config_setting(
     name = "disable_admin_functionality",
     values = {"define": "admin_functionality=disabled"},
 )
