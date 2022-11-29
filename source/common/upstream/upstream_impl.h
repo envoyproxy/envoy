@@ -209,7 +209,6 @@ public:
   Network::UpstreamTransportSocketFactory&
   resolveTransportSocketFactory(const Network::Address::InstanceConstSharedPtr& dest_address,
                                 const envoy::config::core::v3::Metadata* metadata) const;
-  MonotonicTime creationTime() const override { return creation_time_; }
   absl::optional<MonotonicTime> lastHcPassTime() const override { return last_hc_pass_time_; }
 
   void setAddressList(const std::vector<Network::Address::InstanceConstSharedPtr>& address_list) {

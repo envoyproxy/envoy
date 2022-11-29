@@ -1381,7 +1381,6 @@ TEST_F(HostImplTest, HostnameCanaryAndLocality) {
   locality.set_region("oceania");
   locality.set_zone("hello");
   locality.set_sub_zone("world");
-  simTime().advanceTimeWait(std::chrono::seconds(1));
   HostImpl host(cluster.info_, "lyft.com", Network::Utility::resolveUrl("tcp://10.0.0.1:1234"),
                 std::make_shared<const envoy::config::core::v3::Metadata>(metadata), 1, locality,
                 envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
@@ -1393,12 +1392,6 @@ TEST_F(HostImplTest, HostnameCanaryAndLocality) {
   EXPECT_EQ("hello", host.locality().zone());
   EXPECT_EQ("world", host.locality().sub_zone());
   EXPECT_EQ(1, host.priority());
-  EXPECT_FALSE(host.lastHcPassTime());
-  EXPECT_EQ(std::chrono::milliseconds(1000),
-            std::chrono::time_point_cast<std::chrono::milliseconds>(host.creationTime())
-                .time_since_epoch());
-  host.canary(false);
-  EXPECT_FALSE(host.canary());
 }
 
 TEST_F(HostImplTest, CreateConnection) {

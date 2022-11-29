@@ -26,12 +26,8 @@ static constexpr HostUtility::HostStatusSet HealthyStatus =
 TEST(HostUtilityTest, All) {
   auto cluster = std::make_shared<NiceMock<MockClusterInfo>>();
   auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
-  auto time_ms = std::chrono::milliseconds(5);
-  ON_CALL(*time_source, monotonicTime()).WillByDefault(Return(MonotonicTime(time_ms)));
   HostSharedPtr host = makeTestHost(cluster, "tcp://127.0.0.1:80", *time_source);
   EXPECT_EQ("healthy", HostUtility::healthFlagsToString(*host));
-  EXPECT_EQ(time_ms, std::chrono::time_point_cast<std::chrono::milliseconds>(host->creationTime())
-                         .time_since_epoch());
 
   host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   EXPECT_EQ("/failed_active_hc", HostUtility::healthFlagsToString(*host));

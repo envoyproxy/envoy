@@ -198,11 +198,6 @@ public:
   virtual void priority(uint32_t) PURE;
 
   /**
-   * @return timestamp in milliseconds of when host was created.
-   */
-  virtual MonotonicTime creationTime() const PURE;
-
-  /**
    * @return timestamp of when host has transitioned from unhealthy to
    *         healthy state via an active healthchecking.
    */

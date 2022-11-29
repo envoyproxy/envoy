@@ -120,7 +120,6 @@ public:
     // Should never be called since real hosts are used only for forwarding.
     return nullptr;
   }
-  MonotonicTime creationTime() const override { return logical_host_->creationTime(); }
   absl::optional<MonotonicTime> lastHcPassTime() const override {
     return logical_host_->lastHcPassTime();
   }

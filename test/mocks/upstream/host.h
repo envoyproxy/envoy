@@ -102,7 +102,6 @@ public:
   MOCK_METHOD(const envoy::config::core::v3::Locality&, locality, (), (const));
   MOCK_METHOD(uint32_t, priority, (), (const));
   MOCK_METHOD(void, priority, (uint32_t));
-  MOCK_METHOD(MonotonicTime, creationTime, (), (const));
   MOCK_METHOD(absl::optional<MonotonicTime>, lastHcPassTime, (), (const));
   Stats::StatName localityZoneStatName() const override {
     Stats::SymbolTable& symbol_table = *symbol_table_;
@@ -215,7 +214,6 @@ public:
   MOCK_METHOD(uint32_t, priority, (), (const));
   MOCK_METHOD(void, priority, (uint32_t));
   MOCK_METHOD(bool, warmed, (), (const));
-  MOCK_METHOD(MonotonicTime, creationTime, (), (const));
   MOCK_METHOD(absl::optional<MonotonicTime>, lastHcPassTime, (), (const));
 
   testing::NiceMock<MockClusterInfo> cluster_;
