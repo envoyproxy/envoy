@@ -6,8 +6,10 @@
 
 #include "gtest/gtest.h"
 #include "library/cc/bridge_utility.h"
+#include "library/cc/log_level.h"
 #include "library/common/config/internal.h"
 #include "library/common/http/header_utility.h"
+#include "spdlog/spdlog.h"
 
 namespace Envoy {
 namespace {
@@ -52,6 +54,31 @@ std::string defaultConfig() {
   return config_str;
 }
 
+// Gets the spdlog level from the test options and converts it to the Platform::LogLevel used by
+// the Envoy Mobile engine.
+Platform::LogLevel getPlatformLogLevelFromOptions() {
+  switch (TestEnvironment::getOptions().logLevel()) {
+  case spdlog::level::level_enum::trace:
+    return Platform::LogLevel::trace;
+  case spdlog::level::level_enum::debug:
+    return Platform::LogLevel::debug;
+  case spdlog::level::level_enum::info:
+    return Platform::LogLevel::info;
+  case spdlog::level::level_enum::warn:
+    return Platform::LogLevel::warn;
+  case spdlog::level::level_enum::err:
+    return Platform::LogLevel::error;
+  case spdlog::level::level_enum::critical:
+    return Platform::LogLevel::critical;
+  case spdlog::level::level_enum::off:
+    return Platform::LogLevel::off;
+  default:
+    ENVOY_LOG_MISC(warn, "Couldn't map spdlog level {}. Using `info` level.",
+                   TestEnvironment::getOptions().logLevel());
+    return Platform::LogLevel::info;
+  }
+}
+
 } // namespace
 
 BaseClientIntegrationTest::BaseClientIntegrationTest(Network::Address::IpVersion ip_version)
@@ -61,6 +88,8 @@ BaseClientIntegrationTest::BaseClientIntegrationTest(Network::Address::IpVersion
   use_lds_ = false;
   autonomous_upstream_ = true;
   defer_listener_finalization_ = true;
+
+  addLogLevel(getPlatformLogLevelFromOptions());
 }
 
 void BaseClientIntegrationTest::initialize() {
