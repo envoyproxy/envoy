@@ -20,6 +20,7 @@
 #include "source/common/network/utility.h"
 #include "source/extensions/transport_sockets/tls/context_config_impl.h"
 #include "source/extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/server/proto_descriptors.h"
 
 #include "test/integration/utility.h"
 #include "test/test_common/environment.h"
@@ -47,6 +48,7 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
       version_(version), upstream_address_fn_(upstream_address_fn),
       config_helper_(version, *api_, config),
       default_log_level_(TestEnvironment::getOptions().logLevel()) {
+  Envoy::Server::validateProtoDescriptors();
   // This is a hack, but there are situations where we disconnect fake upstream connections and
   // then we expect the server connection pool to get the disconnect before the next test starts.
   // This does not always happen. This pause should allow the server to pick up the disconnect
@@ -64,6 +66,11 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
   // Allow extension lookup by name in the integration tests.
   config_helper_.addRuntimeOverride("envoy.reloadable_features.no_extension_lookup_by_name",
                                     "false");
+
+#ifndef ENVOY_ADMIN_FUNCTIONALITY
+  config_helper_.addConfigModifier(
+      [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void { bootstrap.clear_admin(); });
+#endif
 }
 
 BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
@@ -100,9 +107,11 @@ void BaseIntegrationTest::initialize() {
   createXdsUpstream();
   createEnvoy();
 
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
   if (!skip_tag_extraction_rule_check_) {
     checkForMissingTagExtractionRules();
   }
+#endif
 }
 
 Network::DownstreamTransportSocketFactoryPtr
@@ -305,9 +314,11 @@ absl::optional<uint64_t> BaseIntegrationTest::waitForNextRawUpstreamConnection(
 IntegrationTcpClientPtr
 BaseIntegrationTest::makeTcpConnection(uint32_t port,
                                        const Network::ConnectionSocket::OptionsSharedPtr& options,
-                                       Network::Address::InstanceConstSharedPtr source_address) {
+                                       Network::Address::InstanceConstSharedPtr source_address,
+                                       absl::string_view destination_address) {
   return std::make_unique<IntegrationTcpClient>(*dispatcher_, *mock_buffer_factory_, port, version_,
-                                                enableHalfClose(), options, source_address);
+                                                enableHalfClose(), options, source_address,
+                                                destination_address);
 }
 
 void BaseIntegrationTest::registerPort(const std::string& key, uint32_t port) {
@@ -330,6 +341,33 @@ void BaseIntegrationTest::setUpstreamAddress(
   auto* socket_address = endpoint.mutable_endpoint()->mutable_address()->mutable_socket_address();
   socket_address->set_address(Network::Test::getLoopbackAddressString(version_));
   socket_address->set_port_value(fake_upstreams_[upstream_index]->localAddress()->ip()->port());
+}
+
+bool BaseIntegrationTest::getSocketOption(const std::string& listener_name, int level, int optname,
+                                          void* optval, socklen_t* optlen, int address_index) {
+  bool listeners_ready = false;
+  absl::Mutex l;
+  std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners;
+  test_server_->server().dispatcher().post([&]() {
+    listeners = test_server_->server().listenerManager().listeners();
+    l.Lock();
+    listeners_ready = true;
+    l.Unlock();
+  });
+  l.LockWhen(absl::Condition(&listeners_ready));
+  l.Unlock();
+
+  for (auto& listener : listeners) {
+    if (listener.get().name() == listener_name) {
+      auto& socket_factory = listener.get().listenSocketFactories()[address_index];
+      auto socket = socket_factory->getListenSocket(0);
+      if (socket->getSocketOption(level, optname, optval, optlen).return_value_ != 0) {
+        return false;
+      }
+      return true;
+    }
+  }
+  return false;
 }
 
 void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>& port_names,
@@ -360,15 +398,17 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
       }
     }
   }
-  const auto admin_addr =
-      test_server->server().admin().socket().connectionInfoProvider().localAddress();
-  if (admin_addr->type() == Network::Address::Type::Ip) {
-    registerPort("admin", admin_addr->ip()->port());
+  if (test_server->server().admin().has_value()) {
+    const auto admin_addr =
+        test_server->server().admin()->socket().connectionInfoProvider().localAddress();
+    if (admin_addr->type() == Network::Address::Type::Ip) {
+      registerPort("admin", admin_addr->ip()->port());
+    }
   }
 }
 
 std::string getListenerDetails(Envoy::Server::Instance& server) {
-  const auto& cbs_maps = server.admin().getConfigTracker().getCallbacksMap();
+  const auto& cbs_maps = server.admin()->getConfigTracker().getCallbacksMap();
   ProtobufTypes::MessagePtr details = cbs_maps.at("listeners")(Matchers::UniversalStringMatcher());
   auto listener_info = Protobuf::down_cast<envoy::admin::v3::ListenersConfigDump>(*details);
   return MessageUtil::getYamlStringFromMessage(listener_info.dynamic_listeners(0).error_state());
@@ -389,7 +429,7 @@ void BaseIntegrationTest::createGeneratedApiTestServer(
       bootstrap_path, version_, on_server_ready_function_, on_server_init_function_,
       deterministic_value_, timeSystem(), *api_, defer_listener_finalization_, process_object_,
       validator_config, concurrency_, drain_time_, drain_strategy_, proxy_buffer_factory_,
-      use_real_stats_);
+      use_real_stats_, use_bootstrap_node_metadata_);
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0 &&
       !defer_listener_finalization_) {
 
@@ -468,38 +508,25 @@ void BaseIntegrationTest::useListenerAccessLog(absl::string_view format) {
   ASSERT_TRUE(config_helper_.setListenerAccessLog(listener_access_log_name_, format));
 }
 
-// Assuming logs are newline delineated, return the start index of the nth entry.
-// If there are not n entries, it will return file.length() (end of the string
-// index)
-size_t entryIndex(const std::string& file, uint32_t entry) {
-  size_t index = 0;
-  for (uint32_t i = 0; i < entry; ++i) {
-    index = file.find('\n', index);
-    if (index == std::string::npos || index == file.length()) {
-      return file.length();
-    }
-    ++index;
-  }
-  return index;
-}
-
 std::string BaseIntegrationTest::waitForAccessLog(const std::string& filename, uint32_t entry,
                                                   bool allow_excess_entries) {
   // Wait a max of 1s for logs to flush to disk.
   std::string contents;
   for (int i = 0; i < 1000; ++i) {
     contents = TestEnvironment::readFileToStringForTest(filename);
-    size_t index = entryIndex(contents, entry);
-    if (contents.length() > index) {
-      if (!allow_excess_entries) {
-        EXPECT_EQ(contents.length(), entryIndex(contents, entry + 1))
-            << "Waiting for entry " << entry << " but it was not the last entry";
-      }
-      return contents.substr(index);
+    std::vector<std::string> entries = absl::StrSplit(contents, '\n', absl::SkipEmpty());
+    if (entries.size() >= entry + 1) {
+      // Often test authors will waitForAccessLog() for multiple requests, and
+      // not increment the entry number for the second wait. Guard against that.
+      EXPECT_TRUE(allow_excess_entries || entries.size() == entry + 1)
+          << "Waiting for entry index " << entry << " but it was not the last entry as there were "
+          << entries.size() << "\n"
+          << contents;
+      return entries[entry];
     }
     absl::SleepFor(absl::Milliseconds(1));
   }
-  RELEASE_ASSERT(0, absl::StrCat("Timed out waiting for access log. Found: ", contents));
+  RELEASE_ASSERT(0, absl::StrCat("Timed out waiting for access log. Found: '", contents, "'"));
   return "";
 }
 

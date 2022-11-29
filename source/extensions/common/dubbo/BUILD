@@ -42,7 +42,6 @@ envoy_cc_library(
     deps = [
         ":message_lib",
         "//source/common/buffer:buffer_lib",
-        "//source/common/http:header_map_lib",
     ],
 )
 
@@ -58,7 +57,6 @@ envoy_cc_library(
     deps = [
         ":hessian2_utils_lib",
         "//source/common/buffer:buffer_lib",
-        "//source/common/http:header_map_lib",
     ],
 )
 

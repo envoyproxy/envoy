@@ -1076,7 +1076,7 @@ TEST_P(MultiplexedIntegrationTest, DEPRECATED_FEATURE_TEST(GrpcRequestTimeoutMix
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("via_upstream\n"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("via_upstream"));
 }
 
 TEST_P(MultiplexedIntegrationTest, GrpcRequestTimeout) {
@@ -1737,30 +1737,23 @@ TEST_P(MultiplexedRingHashIntegrationTest, CookieRoutingWithCookieWithTtlSet) {
 
 struct FrameIntegrationTestParam {
   Network::Address::IpVersion ip_version;
-  bool enable_new_codec_wrapper;
 };
 
 std::string
 frameIntegrationTestParamToString(const testing::TestParamInfo<FrameIntegrationTestParam>& params) {
   const bool is_ipv4 = params.param.ip_version == Network::Address::IpVersion::v4;
-  const bool new_codec_wrapper = params.param.enable_new_codec_wrapper;
-  return absl::StrCat(is_ipv4 ? "IPv4" : "IPv6", new_codec_wrapper ? "WrappedNghttp2" : "Nghttp2");
+  return is_ipv4 ? "IPv4" : "IPv6";
 }
 
 class Http2FrameIntegrationTest : public testing::TestWithParam<FrameIntegrationTestParam>,
                                   public Http2RawFrameIntegrationTest {
 public:
-  Http2FrameIntegrationTest() : Http2RawFrameIntegrationTest(GetParam().ip_version) {
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
-                                      GetParam().enable_new_codec_wrapper ? "true" : "false");
-  }
+  Http2FrameIntegrationTest() : Http2RawFrameIntegrationTest(GetParam().ip_version) {}
 
   static std::vector<FrameIntegrationTestParam> testParams() {
     std::vector<FrameIntegrationTestParam> v;
     for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
-      for (bool enable_new_codec_wrapper : {false, true}) {
-        v.push_back({ip_version, enable_new_codec_wrapper});
-      }
+      v.push_back({ip_version});
     }
     return v;
   }

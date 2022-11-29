@@ -21,7 +21,7 @@ option java_generic_services = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 option (xds.annotations.v3.file_status).work_in_progress = true;
 
-// [#protodoc-title: External Processing Service]
+// [#protodoc-title: External processing service]
 
 // A service that can access and modify HTTP requests and responses
 // as part of a filter chain.

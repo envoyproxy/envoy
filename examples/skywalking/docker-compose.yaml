@@ -1,0 +1,124 @@
+version: "3.8"
+services:
+
+  envoy-front-proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile-envoy
+      args:
+        ENVOY_CONFIG: envoy-front-proxy.yaml
+    depends_on:
+      skywalking-ui:
+        condition: service_healthy
+      envoy-1:
+        condition: service_started
+      envoy-2:
+        condition: service_started
+    ports:
+    - "${PORT_PROXY:-10000}:10000"
+
+  envoy-1:
+    build:
+      context: .
+      dockerfile: Dockerfile-envoy
+      args:
+        ENVOY_CONFIG: envoy-1.yaml
+    depends_on:
+      skywalking-ui:
+        condition: service_healthy
+      service-1:
+        condition: service_healthy
+      envoy-2:
+        condition: service_started
+
+  envoy-2:
+    build:
+      context: .
+      dockerfile: Dockerfile-envoy
+      args:
+        ENVOY_CONFIG: envoy-2.yaml
+    depends_on:
+      skywalking-ui:
+        condition: service_healthy
+      service-2:
+        condition: service_healthy
+
+  service-1:
+    build:
+      context: ../shared/flask
+    volumes:
+    - ./service.py:/code/service.py
+    environment:
+    - SERVICE_NAME=1
+    healthcheck:
+      test: ["CMD", "nc", "-zv", "localhost", "8000"]
+
+  service-2:
+    build:
+      context: ../shared/flask
+    volumes:
+    - ./service.py:/code/service.py
+    environment:
+    - SERVICE_NAME=2
+    healthcheck:
+      test: ["CMD", "nc", "-zv", "localhost", "8000"]
+
+  # Skywalking components.
+  elasticsearch:
+    build:
+      context: .
+      dockerfile: Dockerfile-elasticsearch
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    environment:
+      discovery.type: single-node
+      ingest.geoip.downloader.enabled: "false"
+      # NB: This setting is for demo purposes only, you are strongly advised to configure
+      #   Elasticsearch with security enabled
+      xpack.security.enabled: "false"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+
+  skywalking-oap:
+    build:
+      context: .
+      dockerfile: Dockerfile-skywalking-oap
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    environment:
+      SW_HEALTH_CHECKER: default
+      SW_STORAGE: elasticsearch
+      SW_STORAGE_ES_CLUSTER_NODES: elasticsearch:9200
+    healthcheck:
+      test: ["CMD-SHELL", "/skywalking/bin/swctl health"]
+      interval: 10s
+      timeout: 120s
+      retries: 10
+      start_period: 10s
+    restart: on-failure
+
+  skywalking-ui:
+    build:
+      context: .
+      dockerfile: Dockerfile-skywalking-ui
+    healthcheck:
+      test: ["CMD-SHELL", 'curl --silent --fail http://localhost:8080/graphql -X POST -H "Content-Type:application/json" -d "{ \"query\": \"query version { version }\"}" || exit 1']
+      interval: 5s
+      timeout: 10s
+      retries: 10
+      start_period: 10s
+    depends_on:
+      skywalking-oap:
+        condition: service_healthy
+    ports:
+    - "${PORT_UI:-8080}:8080"
+    environment:
+      SW_OAP_ADDRESS: http://skywalking-oap:12800
+      SW_HEALTH_CHECKER: default

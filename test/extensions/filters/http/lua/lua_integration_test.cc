@@ -249,8 +249,12 @@ typed_config:
 
   initializeFilter(FILTER_AND_CODE, "foo");
   std::string response;
+
+#ifndef ENVOY_ENABLE_UHV
+  // TODO(#23287) - Determine HTTP/0.9 and HTTP/1.0 support within UHV
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.0\r\n\r\n", &response, true);
   EXPECT_TRUE(response.find("HTTP/1.1 426 Upgrade Required\r\n") == 0);
+#endif
 
   response = "";
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.1\r\n\r\n", &response, true);

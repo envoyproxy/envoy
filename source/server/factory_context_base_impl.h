@@ -9,7 +9,7 @@ class FactoryContextBaseImpl : public Configuration::FactoryContextBase {
 public:
   FactoryContextBaseImpl(const Server::Options& options, Event::Dispatcher& main_thread_dispatcher,
                          Api::Api& api, const LocalInfo::LocalInfo& local_info,
-                         Server::Admin& admin, Runtime::Loader& runtime,
+                         OptRef<Server::Admin> admin, Runtime::Loader& runtime,
                          Singleton::Manager& singleton_manager,
                          ProtobufMessage::ValidationVisitor& validation_visitor,
                          Stats::Store& scope, ThreadLocal::Instance& local)
@@ -30,7 +30,7 @@ public:
   Event::Dispatcher& mainThreadDispatcher() override { return main_thread_dispatcher_; };
   Api::Api& api() override { return api_; };
   const LocalInfo::LocalInfo& localInfo() const override { return local_info_; };
-  Server::Admin& admin() override { return admin_; };
+  OptRef<Server::Admin> admin() override { return admin_; };
   Envoy::Runtime::Loader& runtime() override { return runtime_; };
   Singleton::Manager& singletonManager() override { return singleton_manager_; };
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
@@ -45,7 +45,7 @@ private:
   Event::Dispatcher& main_thread_dispatcher_;
   Api::Api& api_;
   const LocalInfo::LocalInfo& local_info_;
-  Server::Admin& admin_;
+  OptRef<Server::Admin> admin_;
   Runtime::Loader& runtime_;
   Singleton::Manager& singleton_manager_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;

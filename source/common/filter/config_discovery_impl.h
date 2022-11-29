@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/config/core/v3/extension.pb.validate.h"
 #include "envoy/config/extension_config_provider.h"
@@ -7,6 +8,7 @@
 #include "envoy/filter/config_provider_manager.h"
 #include "envoy/http/filter.h"
 #include "envoy/protobuf/message_validator.h"
+#include "envoy/server/admin.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/singleton/instance.h"
 #include "envoy/stats/scope.h"
@@ -307,6 +309,8 @@ public:
   const std::string& lastTypeUrl() { return last_type_url_; }
   const std::string& lastVersionInfo() { return last_version_info_; }
   const std::string& lastFactoryName() { return last_factory_name_; }
+  const SystemTime& lastUpdated() { return last_updated_; }
+
   void incrementConflictCounter();
 
 private:
@@ -327,6 +331,7 @@ private:
   std::string last_type_url_;
   std::string last_version_info_;
   std::string last_factory_name_;
+  SystemTime last_updated_;
   Server::Configuration::ServerFactoryContext& factory_context_;
 
   Init::SharedTargetImpl init_target_;
@@ -387,9 +392,47 @@ protected:
                                          absl::string_view type_url) const;
   void validateProtoConfigTypeUrl(const std::string& type_url,
                                   const absl::flat_hash_set<std::string>& require_type_urls) const;
+  // Return the config dump map key string for the corresponding ECDS filter type.
+  virtual const std::string getConfigDumpType() const PURE;
 
 private:
+  void setupEcdsConfigDumpCallbacks(OptRef<Server::Admin> admin) {
+    if (!admin.has_value()) {
+      return;
+    }
+    if (config_tracker_entry_ == nullptr) {
+      config_tracker_entry_ = admin->getConfigTracker().add(
+          getConfigDumpType(), [this](const Matchers::StringMatcher& name_matcher) {
+            return dumpEcdsFilterConfigs(name_matcher);
+          });
+    }
+  }
+
+  ProtobufTypes::MessagePtr dumpEcdsFilterConfigs(const Matchers::StringMatcher& name_matcher) {
+    auto config_dump = std::make_unique<envoy::admin::v3::EcdsConfigDump>();
+    for (const auto& subscription : subscriptions_) {
+      const auto& ecds_filter = subscription.second.lock();
+      if (!ecds_filter || !name_matcher.match(ecds_filter->name())) {
+        continue;
+      }
+      // Put the filter info into a typed extension proto.
+      envoy::config::core::v3::TypedExtensionConfig filter_config;
+      filter_config.set_name(ecds_filter->name());
+      if (ecds_filter->lastConfig()) {
+        filter_config.mutable_typed_config()->PackFrom(*ecds_filter->lastConfig());
+      }
+      // Set up the config dump proto.
+      auto& filter_config_dump = *config_dump->mutable_ecds_filters()->Add();
+      filter_config_dump.mutable_ecds_filter()->PackFrom(filter_config);
+      filter_config_dump.set_version_info(ecds_filter->lastVersionInfo());
+      TimestampUtil::systemClockToTimestamp(ecds_filter->lastUpdated(),
+                                            *(filter_config_dump.mutable_last_updated()));
+    }
+    return config_dump;
+  }
+
   absl::flat_hash_map<std::string, std::weak_ptr<FilterConfigSubscription>> subscriptions_;
+  Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
   friend class FilterConfigSubscription;
 };
 
@@ -405,20 +448,13 @@ public:
       const envoy::config::core::v3::ExtensionConfigSource& config_source,
       const std::string& filter_config_name,
       Server::Configuration::ServerFactoryContext& server_context, FactoryCtx& factory_context,
-      const std::string& stat_prefix, bool last_filter_in_filter_chain,
-      const std::string& filter_chain_type,
+      bool last_filter_in_filter_chain, const std::string& filter_chain_type,
       const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher) override {
     std::string subscription_stat_prefix;
     absl::string_view provider_stat_prefix;
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.top_level_ecds_stats")) {
-      subscription_stat_prefix =
-          absl::StrCat("extension_config_discovery.", statPrefix(), filter_config_name, ".");
-      provider_stat_prefix = subscription_stat_prefix;
-    } else {
-      subscription_stat_prefix =
-          absl::StrCat(stat_prefix, "extension_config_discovery.", filter_config_name, ".");
-      provider_stat_prefix = stat_prefix;
-    }
+    subscription_stat_prefix =
+        absl::StrCat("extension_config_discovery.", statPrefix(), filter_config_name, ".");
+    provider_stat_prefix = subscription_stat_prefix;
 
     auto subscription = getSubscription(config_source.config_source(), filter_config_name,
                                         server_context, subscription_stat_prefix);
@@ -535,6 +571,7 @@ protected:
     Config::Utility::validateTerminalFilters(filter_config_name, filter_type, filter_chain_type,
                                              is_terminal_filter, last_filter_in_filter_chain);
   }
+  const std::string getConfigDumpType() const override { return "ecds_filter_http"; }
 };
 
 // HTTP filter
@@ -561,6 +598,7 @@ protected:
     Config::Utility::validateTerminalFilters(filter_config_name, filter_type, filter_chain_type,
                                              is_terminal_filter, last_filter_in_filter_chain);
   }
+  const std::string getConfigDumpType() const override { return "ecds_filter_upstream_http"; }
 };
 
 // TCP listener filter
@@ -571,6 +609,9 @@ class TcpListenerFilterConfigProviderManagerImpl
           TcpListenerDynamicFilterConfigProviderImpl> {
 public:
   absl::string_view statPrefix() const override { return "tcp_listener_filter."; }
+
+protected:
+  const std::string getConfigDumpType() const override { return "ecds_filter_tcp_listener"; }
 };
 
 // UDP listener filter
@@ -581,6 +622,9 @@ class UdpListenerFilterConfigProviderManagerImpl
           UdpListenerDynamicFilterConfigProviderImpl> {
 public:
   absl::string_view statPrefix() const override { return "udp_listener_filter."; }
+
+protected:
+  const std::string getConfigDumpType() const override { return "ecds_filter_udp_listener"; }
 };
 
 } // namespace Filter

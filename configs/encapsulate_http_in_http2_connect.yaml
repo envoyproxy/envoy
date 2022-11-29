@@ -1,9 +1,9 @@
 # This configuration takes incoming HTTP requests on port 10000 and encapsulates it in a CONNECT
 # request which is sent upstream port 10001.
 bootstrap_extensions:
-  - name: envoy.bootstrap.internal_listener
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.bootstrap.internal_listener.v3.InternalListener
+- name: envoy.bootstrap.internal_listener
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.bootstrap.internal_listener.v3.InternalListener
 static_resources:
   listeners:
   - name: http

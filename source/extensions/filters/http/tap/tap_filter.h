@@ -59,8 +59,9 @@ public:
   FilterConfigImpl(const envoy::extensions::filters::http::tap::v3::Tap& proto_config,
                    const std::string& stats_prefix,
                    Extensions::Common::Tap::TapConfigFactoryPtr&& config_factory,
-                   Stats::Scope& scope, Server::Admin& admin, Singleton::Manager& singleton_manager,
-                   ThreadLocal::SlotAllocator& tls, Event::Dispatcher& main_thread_dispatcher);
+                   Stats::Scope& scope, OptRef<Server::Admin> admin,
+                   Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
+                   Event::Dispatcher& main_thread_dispatcher);
 
   // FilterConfig
   HttpTapConfigSharedPtr currentConfig() override;

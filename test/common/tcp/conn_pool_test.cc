@@ -224,6 +224,9 @@ public:
   }
 
   void initialize() {
+    ON_CALL(*cluster_->upstream_local_address_selector_, getUpstreamLocalAddress(_, _))
+        .WillByDefault(
+            Return(Upstream::UpstreamLocalAddress({cluster_->source_address_, options_})));
     conn_pool_ = std::make_unique<ConnPoolBase>(dispatcher_, host_, upstream_ready_cb_, options_,
                                                 transport_socket_options_);
   }
@@ -1055,7 +1058,6 @@ TEST_F(TcpConnPoolImplTest, TestIdleTimeout) {
   c1.releaseConn();
   conn_pool_->test_conns_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
 
-  testing::MockFunction<void()> drained_callback;
   EXPECT_CALL(idle_callback, Call());
   conn_pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
   EXPECT_CALL(*conn_pool_, onConnDestroyedForTest());

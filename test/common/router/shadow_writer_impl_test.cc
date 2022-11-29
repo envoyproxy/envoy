@@ -31,14 +31,16 @@ public:
         .WillOnce(ReturnRef(cm_.thread_local_cluster_.async_client_));
     auto options = Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(5));
     EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, options))
-        .WillOnce(Invoke(
-            [&](Http::RequestMessagePtr& inner_message, Http::AsyncClient::Callbacks& callbacks,
-                const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-              EXPECT_EQ(message, inner_message);
-              EXPECT_EQ(shadowed_host, message->headers().getHostValue());
-              callback_ = &callbacks;
-              return &request_;
-            }));
+        .WillOnce(Invoke([&](Http::RequestMessagePtr& inner_message,
+                             Http::AsyncClient::Callbacks& callbacks,
+                             const Http::AsyncClient::RequestOptions& inner_options)
+                             -> Http::AsyncClient::Request* {
+          EXPECT_EQ(message, inner_message);
+          EXPECT_EQ(shadowed_host, message->headers().getHostValue());
+          EXPECT_TRUE(inner_options.is_shadow);
+          callback_ = &callbacks;
+          return &request_;
+        }));
     writer_.shadow("foo", std::move(message), options);
   }
 

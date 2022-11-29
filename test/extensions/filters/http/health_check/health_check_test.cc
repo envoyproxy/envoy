@@ -71,9 +71,9 @@ public:
   public:
     MockHealthCheckCluster(uint64_t membership_total, uint64_t membership_healthy,
                            uint64_t membership_degraded = 0) {
-      info()->stats().membership_total_.set(membership_total);
-      info()->stats().membership_healthy_.set(membership_healthy);
-      info()->stats().membership_degraded_.set(membership_degraded);
+      info()->endpointStats().membership_total_.set(membership_total);
+      info()->endpointStats().membership_healthy_.set(membership_healthy);
+      info()->endpointStats().membership_degraded_.set(membership_degraded);
     }
   };
 };

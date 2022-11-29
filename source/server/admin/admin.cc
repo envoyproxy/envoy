@@ -196,7 +196,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                         "Render text_readouts as new gaugues with value 0 (increases Prometheus "
                         "data size)"},
                        {ParamDescriptor::Type::String, "filter",
-                        "Regular expression (ecmascript) for filtering stats"}}),
+                        "Regular expression (Google re2) for filtering stats"}}),
           makeHandler("/stats/recentlookups", "Show recent stat-name lookups",
                       MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookups), false, false),
           makeHandler("/stats/recentlookups/clear", "clear list of stat-name lookups and counter",
@@ -261,11 +261,12 @@ bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
   return true;
 }
 
-void AdminImpl::createFilterChain(Http::FilterChainManager& manager) const {
+bool AdminImpl::createFilterChain(Http::FilterChainManager& manager, bool) const {
   Http::FilterFactoryCb factory = [this](Http::FilterChainFactoryCallbacks& callbacks) {
     callbacks.addStreamFilter(std::make_shared<AdminFilter>(createRequestFunction()));
   };
   manager.applyFilterFactoryCb({}, factory);
+  return true;
 }
 
 namespace {

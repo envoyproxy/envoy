@@ -1068,28 +1068,24 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPostWithHttpBody) {
   EXPECT_EQ("/bookstore.Bookstore/PostBody", request_headers.get_(":path"));
   EXPECT_EQ("trailers", request_headers.get_("te"));
 
-  Grpc::Decoder decoder;
-  std::vector<Grpc::Frame> frames;
-
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true))
-      .Times(testing::AtLeast(1))
-      .WillRepeatedly(testing::Invoke([&decoder, &frames](Buffer::Instance& data, bool end_stream) {
-        EXPECT_TRUE(end_stream);
-        decoder.decode(data, frames);
-      }));
-
   Buffer::OwnedImpl buffer;
   buffer.add("hello");
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_.decodeData(buffer, false));
+  // Data is buffered up until EOS.
   EXPECT_EQ(buffer.length(), 0);
-  EXPECT_EQ(frames.size(), 0);
+
   buffer.add(" ");
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_.decodeData(buffer, false));
+  // Data is buffered up until EOS.
   EXPECT_EQ(buffer.length(), 0);
-  EXPECT_EQ(frames.size(), 0);
+
   buffer.add("world!");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(buffer, true));
-  EXPECT_EQ(buffer.length(), 0);
+
+  // decodeData with EOS will output the grpc frame.
+  std::vector<Grpc::Frame> frames;
+  Grpc::Decoder decoder;
+  decoder.decode(buffer, frames);
   ASSERT_EQ(frames.size(), 1);
 
   bookstore::EchoBodyRequest expected_request;
@@ -1189,48 +1185,27 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamPostWithHttpBody) {
   EXPECT_EQ("/bookstore.Bookstore/StreamBody", request_headers.get_(":path"));
   EXPECT_EQ("trailers", request_headers.get_("te"));
 
-  Grpc::Decoder decoder;
-  std::vector<Grpc::Frame> frames;
+  // For client_streaming, each buffer is packaged into a grpc frame.
+  for (const auto& text : std::vector<std::string>{"first", " ", "last"}) {
+    Buffer::OwnedImpl buffer;
+    buffer.add(text);
+    EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(buffer, (text == "last")));
 
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true))
-      .Times(testing::AtLeast(2))
-      .WillRepeatedly(testing::Invoke([&decoder, &frames](Buffer::Instance& data, bool end_stream) {
-        EXPECT_TRUE(end_stream);
-        decoder.decode(data, frames);
-      }));
+    Grpc::Decoder decoder;
+    std::vector<Grpc::Frame> frames;
+    decoder.decode(buffer, frames);
+    EXPECT_EQ(frames.size(), 1);
 
-  Buffer::OwnedImpl buffer;
-  buffer.add("hello");
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(buffer, false));
-  EXPECT_EQ(buffer.length(), 0);
-  EXPECT_EQ(frames.size(), 1);
-  buffer.add(" ");
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(buffer, false));
-  EXPECT_EQ(buffer.length(), 0);
-  EXPECT_EQ(frames.size(), 2);
-  buffer.add("world!");
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(buffer, true));
-  EXPECT_EQ(buffer.length(), 0);
-  ASSERT_EQ(frames.size(), 3);
-
-  bookstore::EchoBodyRequest expected_request;
-  bookstore::EchoBodyRequest request;
-
-  expected_request.set_arg("hi");
-  expected_request.mutable_nested()->mutable_content()->set_content_type("text/plain");
-  expected_request.mutable_nested()->mutable_content()->set_data("hello");
-  request.ParseFromString(frames[0].data_->toString());
-  EXPECT_THAT(request, ProtoEq(expected_request));
-
-  expected_request.Clear();
-  expected_request.mutable_nested()->mutable_content()->set_data(" ");
-  request.ParseFromString(frames[1].data_->toString());
-  EXPECT_THAT(request, ProtoEq(expected_request));
-
-  expected_request.Clear();
-  expected_request.mutable_nested()->mutable_content()->set_data("world!");
-  request.ParseFromString(frames[2].data_->toString());
-  EXPECT_THAT(request, ProtoEq(expected_request));
+    bookstore::EchoBodyRequest expected_request;
+    if (text == "first") {
+      expected_request.set_arg("hi");
+      expected_request.mutable_nested()->mutable_content()->set_content_type("text/plain");
+    }
+    expected_request.mutable_nested()->mutable_content()->set_data(text);
+    bookstore::EchoBodyRequest request;
+    request.ParseFromString(frames[0].data_->toString());
+    EXPECT_THAT(request, ProtoEq(expected_request));
+  }
 }
 
 // Streaming requests with HTTP bodies do not internally buffer any data.
@@ -1242,18 +1217,13 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamPostWithHttpBodyNoBuffer) 
       {":method", "POST"}, {":path", "/streamBody?arg=hi"}, {"content-type", "text/plain"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
 
-  Buffer::OwnedImpl buffer;
-  buffer.add("123");
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(buffer, false));
-  EXPECT_EQ(buffer.length(), 0);
-  buffer.add("456");
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(buffer, false));
-  EXPECT_EQ(buffer.length(), 0);
-
-  // Does NOT exceed limit.
-  buffer.add("789");
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(buffer, true));
-  EXPECT_EQ(buffer.length(), 0);
+  // For client_streaming, each buffer is packaged into a grpc frame.
+  for (const auto& text : std::vector<std::string>{"first", " ", "last"}) {
+    Buffer::OwnedImpl buffer;
+    buffer.add(text);
+    EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(buffer, (text == "last")));
+    EXPECT_GT(buffer.length(), 0);
+  }
 
   EXPECT_EQ(decoder_callbacks_.details(), "");
 }

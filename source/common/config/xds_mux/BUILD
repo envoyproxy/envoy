@@ -31,6 +31,7 @@ envoy_cc_library(
         "//source/common/config:api_version_lib",
         "//source/common/config:decoded_resource_lib",
         "//source/common/config:utility_lib",
+        "//source/common/config:xds_source_id_lib",
         "//source/common/grpc:common_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
@@ -42,6 +43,7 @@ envoy_cc_library(
     hdrs = ["subscription_state.h"],
     deps = [
         "//envoy/config:subscription_interface",
+        "//envoy/config:xds_resources_delegate_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/local_info:local_info_interface",
         "//source/common/common:minimal_logger_lib",

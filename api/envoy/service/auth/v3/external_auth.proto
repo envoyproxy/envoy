@@ -20,7 +20,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/service/auth/v
 option java_generic_services = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Authorization Service ]
+// [#protodoc-title: Authorization service]
 
 // The authorization service request messages used by external authorization :ref:`network filter
 // <config_network_filters_ext_authz>` and :ref:`HTTP filter <config_http_filters_ext_authz>`.

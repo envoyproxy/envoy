@@ -26,8 +26,7 @@ void SipHeader::parseHeader() {
     header = header.substr(0, found);
   }
   // Has message Type in header
-  // Eg: Route: <sip:test@pcsf-cfed.cncs.svc.cluster.local;role=anch;lr;transport=udp; \
-  // x-suri=sip:scscf-internal.cncs.svc.cluster.local:5060;ep=10.0.0.1>
+  // Eg: Route: <sip:test@cncs.svc.cluster.local;role=anch;lr;transport=udp>
   if (std::size_t found = header.find(": "); found != absl::string_view::npos) {
     header = header.substr(found + 2);
   }

@@ -99,6 +99,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "sotw_subscription_state_test",
     srcs = ["sotw_subscription_state_test.cc"],
+    external_deps = ["abseil_flat_hash_set"],
     deps = [
         "//source/common/config:resource_name_lib",
         "//source/common/config/xds_mux:sotw_subscription_state_lib",

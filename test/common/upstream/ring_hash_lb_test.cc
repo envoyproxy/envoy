@@ -58,8 +58,7 @@ class RingHashLoadBalancerTest : public Event::TestUsingSimulatedTime,
                                  public testing::TestWithParam<bool> {
 public:
   RingHashLoadBalancerTest()
-      : stat_names_(stats_store_.symbolTable()),
-        stats_(ClusterInfoImpl::generateStats(stats_store_, stat_names_)) {}
+      : stat_names_(stats_store_.symbolTable()), stats_(stat_names_, stats_store_) {}
 
   void init() {
     lb_ = std::make_unique<RingHashLoadBalancer>(priority_set_, stats_, stats_store_, runtime_,
@@ -76,8 +75,8 @@ public:
   MockHostSet& failover_host_set_ = *priority_set_.getMockHostSet(1);
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   Stats::IsolatedStoreImpl stats_store_;
-  ClusterStatNames stat_names_;
-  ClusterStats stats_;
+  ClusterLbStatNames stat_names_;
+  ClusterLbStats stats_;
   absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig> config_;
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -115,26 +114,6 @@ TEST_P(RingHashLoadBalancerTest, BaseMethods) {
   auto mock_host = std::make_shared<NiceMock<MockHost>>();
   EXPECT_FALSE(lb_->selectExistingConnection(nullptr, *mock_host, hash_key).has_value());
 };
-
-TEST_P(RingHashLoadBalancerTest, SelectOverrideHost) {
-  init();
-
-  NiceMock<Upstream::MockLoadBalancerContext> context;
-
-  auto mock_host = std::make_shared<NiceMock<MockHost>>();
-  EXPECT_CALL(*mock_host, health()).WillOnce(Return(Host::Health::Degraded));
-
-  LoadBalancerContext::OverrideHost expected_host{"1.2.3.4"};
-  EXPECT_CALL(context, overrideHostToSelect()).WillOnce(Return(absl::make_optional(expected_host)));
-
-  // Mock membership update and update host map shared pointer in the lb.
-  auto host_map = std::make_shared<HostMap>();
-  host_map->insert({"1.2.3.4", mock_host});
-  priority_set_.cross_priority_host_map_ = host_map;
-  host_set_.runCallbacks({}, {});
-
-  EXPECT_EQ(mock_host, lb_->factory()->create()->chooseHost(&context));
-}
 
 // Test for thread aware load balancer destructed before load balancer factory. After CDS removes a
 // cluster, the operation does not immediately reach the worker thread. There may be cases where the

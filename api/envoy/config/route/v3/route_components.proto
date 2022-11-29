@@ -142,8 +142,16 @@ message VirtualHost {
     items {string {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}}
   }];
 
-  // Indicates that the virtual host has a CORS policy.
-  CorsPolicy cors = 8;
+  // Indicates that the virtual host has a CORS policy. This field is ignored if related cors policy is
+  // found in the
+  // :ref:`VirtualHost.typed_per_filter_config<envoy_v3_api_field_config.route.v3.VirtualHost.typed_per_filter_config>`.
+  //
+  // .. attention::
+  //
+  //   This option has been deprecated. Please use
+  //   :ref:`VirtualHost.typed_per_filter_config<envoy_v3_api_field_config.route.v3.VirtualHost.typed_per_filter_config>`
+  //   to configure the CORS HTTP filter.
+  CorsPolicy cors = 8 [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // The per_filter_config field can be used to provide virtual host-specific configurations for filters.
   // The key should match the :ref:`filter config name
@@ -641,6 +649,14 @@ message RouteMatch {
   repeated type.matcher.v3.MetadataMatcher dynamic_metadata = 13;
 }
 
+// Cors policy configuration.
+//
+// .. attention::
+//
+//   This message has been deprecated. Please use
+//   :ref:`CorsPolicy in filter extension <envoy_v3_api_msg_extensions.filters.http.cors.v3.CorsPolicy>`
+//   as as alternative.
+//
 // [#next-free-field: 13]
 message CorsPolicy {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.CorsPolicy";
@@ -1252,8 +1268,17 @@ message RouteAction {
   // ignoring the rest of the hash policy list.
   repeated HashPolicy hash_policy = 15;
 
-  // Indicates that the route has a CORS policy.
-  CorsPolicy cors = 17;
+  // Indicates that the route has a CORS policy. This field is ignored if related cors policy is
+  // found in the :ref:`Route.typed_per_filter_config<envoy_v3_api_field_config.route.v3.Route.typed_per_filter_config>` or
+  // :ref:`WeightedCluster.ClusterWeight.typed_per_filter_config<envoy_v3_api_field_config.route.v3.WeightedCluster.ClusterWeight.typed_per_filter_config>`.
+  //
+  // .. attention::
+  //
+  //   This option has been deprecated. Please use
+  //   :ref:`Route.typed_per_filter_config<envoy_v3_api_field_config.route.v3.Route.typed_per_filter_config>` or
+  //   :ref:`WeightedCluster.ClusterWeight.typed_per_filter_config<envoy_v3_api_field_config.route.v3.WeightedCluster.ClusterWeight.typed_per_filter_config>`
+  //   to configure the CORS HTTP filter.
+  CorsPolicy cors = 17 [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Deprecated by :ref:`grpc_timeout_header_max <envoy_v3_api_field_config.route.v3.RouteAction.MaxStreamDuration.grpc_timeout_header_max>`
   // If present, and the request is a gRPC request, use the

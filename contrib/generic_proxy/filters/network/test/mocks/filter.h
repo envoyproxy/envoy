@@ -68,12 +68,23 @@ public:
   MOCK_METHOD(void, addFilter, (StreamFilterSharedPtr filter));
 };
 
+class MockFilterChainManager : public FilterChainManager {
+public:
+  MockFilterChainManager();
+
+  MOCK_METHOD(void, applyFilterFactoryCb, (FilterContext context, FilterFactoryCb& factory));
+
+  testing::NiceMock<MockFilterChainFactoryCallbacks> callbacks_;
+  std::vector<FilterContext> contexts_;
+};
+
 template <class Base> class MockStreamFilterCallbacks : public Base {
 public:
   MOCK_METHOD(Envoy::Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(const CodecFactory&, downstreamCodec, ());
   MOCK_METHOD(void, resetStream, ());
   MOCK_METHOD(const RouteEntry*, routeEntry, (), (const));
+  MOCK_METHOD(const RouteSpecificFilterConfig*, perFilterConfig, (), (const));
 };
 
 class MockDecoderFilterCallback : public MockStreamFilterCallbacks<DecoderFilterCallback> {

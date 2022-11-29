@@ -16,74 +16,23 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace GenericProxy {
 
-CodecFactoryPtr FilterConfig::codecFactoryFromProto(
-    const envoy::config::core::v3::TypedExtensionConfig& codec_config,
-    Envoy::Server::Configuration::FactoryContext& context) {
-  auto& factory = Config::Utility::getAndCheckFactory<CodecFactoryConfig>(codec_config);
-
-  ProtobufTypes::MessagePtr message = factory.createEmptyConfigProto();
-  Envoy::Config::Utility::translateOpaqueConfig(codec_config.typed_config(),
-                                                context.messageValidationVisitor(), *message);
-  return factory.createFactory(*message, context);
-}
-
-RouteMatcherPtr
-FilterConfig::routeMatcherFromProto(const RouteConfiguration& route_config,
-                                    Envoy::Server::Configuration::FactoryContext& context) {
-  return std::make_unique<RouteMatcherImpl>(route_config, context);
-}
-
-std::vector<FilterFactoryCb> FilterConfig::filtersFactoryFromProto(
-    const ProtobufWkt::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>& filters,
-    const std::string stats_prefix, Envoy::Server::Configuration::FactoryContext& context) {
-
-  std::vector<FilterFactoryCb> factories;
-  bool has_terminal_filter = false;
-  std::string terminal_filter_name;
-  for (const auto& filter : filters) {
-    if (has_terminal_filter) {
-      throw EnvoyException(fmt::format("Terminal filter: {} must be the last generic L7 filter",
-                                       terminal_filter_name));
-    }
-
-    auto& factory = Config::Utility::getAndCheckFactory<NamedFilterConfigFactory>(filter);
-
-    ProtobufTypes::MessagePtr message = factory.createEmptyConfigProto();
-    ASSERT(message != nullptr);
-    Envoy::Config::Utility::translateOpaqueConfig(filter.typed_config(),
-                                                  context.messageValidationVisitor(), *message);
-
-    factories.push_back(factory.createFilterFactoryFromProto(*message, stats_prefix, context));
-
-    if (factory.isTerminalFilter()) {
-      terminal_filter_name = filter.name();
-      has_terminal_filter = true;
-    }
-  }
-
-  if (!has_terminal_filter) {
-    throw EnvoyException("A terminal L7 filter is necessary for generic proxy");
-  }
-  return factories;
-}
-
 ActiveStream::ActiveStream(Filter& parent, RequestPtr request)
     : parent_(parent), downstream_request_stream_(std::move(request)) {}
 
 ActiveStream::~ActiveStream() {
   for (auto& filter : decoder_filters_) {
-    filter->onDestroy();
+    filter->filter_->onDestroy();
   }
   for (auto& filter : encoder_filters_) {
     if (filter->isDualFilter()) {
       continue;
     }
-    filter->onDestroy();
+    filter->filter_->onDestroy();
   }
 }
 
 Envoy::Event::Dispatcher& ActiveStream::dispatcher() { return parent_.connection().dispatcher(); }
-const CodecFactory& ActiveStream::downstreamCodec() { return *parent_.config_->codec_factory_; }
+const CodecFactory& ActiveStream::downstreamCodec() { return parent_.config_->codecFactory(); }
 void ActiveStream::resetStream() {
   if (active_stream_reset_) {
     return;
@@ -112,13 +61,13 @@ void ActiveStream::continueDecoding() {
   }
 
   if (cached_route_entry_ == nullptr) {
-    cached_route_entry_ = parent_.config_->route_matcher_->routeEntry(*downstream_request_stream_);
+    cached_route_entry_ = parent_.config_->routeEntry(*downstream_request_stream_);
   }
 
   ASSERT(downstream_request_stream_ != nullptr);
   for (; next_decoder_filter_index_ < decoder_filters_.size();) {
-    auto status =
-        decoder_filters_[next_decoder_filter_index_]->onStreamDecoded(*downstream_request_stream_);
+    auto status = decoder_filters_[next_decoder_filter_index_]->filter_->onStreamDecoded(
+        *downstream_request_stream_);
     next_decoder_filter_index_++;
     if (status == FilterStatus::StopIteration) {
       break;
@@ -143,7 +92,7 @@ void ActiveStream::continueEncoding() {
 
   ASSERT(local_or_upstream_response_stream_ != nullptr);
   for (; next_encoder_filter_index_ < encoder_filters_.size();) {
-    auto status = encoder_filters_[next_encoder_filter_index_]->onStreamEncoded(
+    auto status = encoder_filters_[next_encoder_filter_index_]->filter_->onStreamEncoded(
         *local_or_upstream_response_stream_);
     next_encoder_filter_index_++;
     if (status == FilterStatus::StopIteration) {
@@ -161,6 +110,13 @@ void ActiveStream::onEncodingSuccess(Buffer::Instance& buffer, bool close_connec
   ASSERT(parent_.connection().state() == Network::Connection::State::Open);
   parent_.deferredStream(*this);
   parent_.connection().write(buffer, close_connection);
+}
+
+void ActiveStream::initializeFilterChain(FilterChainFactory& factory) {
+  factory.createFilterChain(*this);
+  // Reverse the encoder filter chain so that the first encoder filter is the last filter in the
+  // chain.
+  std::reverse(encoder_filters_.begin(), encoder_filters_.end());
 }
 
 Envoy::Network::FilterStatus Filter::onData(Envoy::Buffer::Instance& data, bool) {
@@ -188,8 +144,8 @@ void Filter::newDownstreamRequest(RequestPtr request) {
   auto raw_stream = stream.get();
   LinkedList::moveIntoList(std::move(stream), active_streams_);
 
-  config_->createFilterChain(*raw_stream);
-
+  // Initialize filter chian.
+  raw_stream->initializeFilterChain(*config_);
   // Start request.
   raw_stream->continueDecoding();
 }

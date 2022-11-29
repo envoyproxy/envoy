@@ -23,6 +23,32 @@ public:
     fake_upstreams_.clear();
   }
 
+  void addDfpConfig() {
+    const std::string filter =
+        R"EOF(name: dynamic_forward_proxy
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig
+  dns_cache_config:
+    name: foo
+)EOF";
+    config_helper_.prependFilter(filter);
+
+    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      const std::string cluster_type_config =
+          R"EOF(
+name: envoy.clusters.dynamic_forward_proxy
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
+  dns_cache_config:
+    name: foo
+)EOF";
+      TestUtility::loadFromYaml(cluster_type_config, *cluster->mutable_cluster_type());
+      cluster->clear_load_assignment();
+      cluster->set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
+    });
+  }
+
   void initialize() override {
     TestEnvironment::writeStringToFileForTest("alt_svc_cache.txt", "");
     config_helper_.addFilter("{ name: header-to-proxy-filter }");
@@ -61,6 +87,7 @@ public:
 
       ConfigHelper::HttpProtocolOptions protocol_options;
       protocol_options.mutable_upstream_http_protocol_options()->set_auto_sni(true);
+      protocol_options.mutable_upstream_http_protocol_options()->set_auto_san_validation(true);
       if (upstream_tls_) {
         protocol_options.mutable_auto_config();
       } else {
@@ -96,8 +123,9 @@ public:
   void stripConnectUpgradeAndRespond() {
     // Strip the CONNECT upgrade.
     std::string prefix_data;
+    const std::string hostname(default_request_headers_.getHostValue());
     ASSERT_TRUE(fake_upstream_connection_->waitForInexactRawData("\r\n\r\n", &prefix_data));
-    EXPECT_EQ("CONNECT sni.lyft.com:443 HTTP/1.1\r\n\r\n", prefix_data);
+    EXPECT_EQ(absl::StrCat("CONNECT ", hostname, ":443 HTTP/1.1\r\n\r\n"), prefix_data);
 
     // Ship the CONNECT response.
     fake_upstream_connection_->writeRawData("HTTP/1.1 200 OK\r\n\r\n");
@@ -406,8 +434,78 @@ TEST_P(Http11ConnectHttpIntegrationTest, TestHttp3) {
 
 #endif
 
-// TODO(alyssawilk) test with Dynamic Forward Proxy, and make sure we will skip the DNS lookup in
-// case DNS to those endpoints is disallowed.
+TEST_P(Http11ConnectHttpIntegrationTest, DfpNoProxyAddress) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  addDfpConfig();
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  // Set the host to a domain which does not exist.
+  default_request_headers_.setHost("doesnotexist.lyft.com");
+
+  // Without the proxy header set, the filter will fail the request due to DNS resolution failure.
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("dns_resolution_failure"));
+}
+
+TEST_P(Http11ConnectHttpIntegrationTest, DfpWithProxyAddress) {
+  addDfpConfig();
+
+  initialize();
+
+  // Point at the second fake upstream. Envoy doesn't actually know about this one.
+  absl::string_view second_upstream_address(fake_upstreams_[1]->localAddress()->asStringView());
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  // Set the host to a domain which does not exist.
+  default_request_headers_.setHost("doesnotexist.lyft.com");
+  // The connect-proxy header will be stripped by the header-to-proxy-filter and inserted as
+  // metadata.
+  default_request_headers_.setCopy(Envoy::Http::LowerCaseString("connect-proxy"),
+                                   second_upstream_address);
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  // The request should be sent to fake upstream 1, as DNS lookup is bypassed due to the
+  // connect-proxy header.
+  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  stripConnectUpgradeAndRespond();
+
+  ASSERT_TRUE(fake_upstream_connection_->readDisable(false));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  // Wait for the encapsulated response to be received.
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+TEST_P(Http11ConnectHttpIntegrationTest, DfpWithProxyAddressLegacy) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.skip_dns_lookup_for_proxied_requests", "false");
+
+  addDfpConfig();
+
+  initialize();
+
+  // Point at the second fake upstream. Envoy doesn't actually know about this one.
+  absl::string_view second_upstream_address(fake_upstreams_[1]->localAddress()->asStringView());
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  // Set the host to a domain which does not exist.
+  default_request_headers_.setHost("doesnotexist.lyft.com");
+  // The connect-proxy header will be stripped by the header-to-proxy-filter and inserted as
+  // metadata.
+  default_request_headers_.setCopy(Envoy::Http::LowerCaseString("connect-proxy"),
+                                   second_upstream_address);
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  // Wait for the encapsulated response to be received.
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+}
 
 } // namespace
 } // namespace Envoy

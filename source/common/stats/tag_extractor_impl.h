@@ -80,8 +80,14 @@ public:
               << std::endl;
   }
 #endif
-  std::string name() const override { return name_; }
+  absl::string_view name() const override { return name_; }
   absl::string_view prefixToken() const override { return prefix_; }
+  bool otherExtractorWithSameNameExists() const override {
+    return other_extractor_with_same_name_exists_;
+  }
+  void setOtherExtractorWithSameNameExists(bool e) override {
+    other_extractor_with_same_name_exists_ = e;
+  }
 
   /**
    * @param stat_name The stat name
@@ -105,11 +111,12 @@ protected:
    * @param tags the list of tags
    * @return a reference to the value of the tag that was added.
    */
-  std::string& addTag(std::vector<Tag>& tags) const;
+  std::string& addTagReturningValueRef(std::vector<Tag>& tags) const;
 
   const std::string name_;
   std::string prefix_; // non-const so TagExtractorTokensImpl can override in its constructor.
   const std::string substr_;
+  bool other_extractor_with_same_name_exists_{false};
 
   PERF_TAG_COUNTERS;
 };
@@ -161,6 +168,21 @@ private:
 
   const std::vector<std::string> tokens_;
   const uint32_t match_index_;
+};
+
+/**
+ * Implements a tag with a fixed value. These are added unconditionally, but
+ * participate in duplicate reduction.
+ */
+class TagExtractorFixedImpl : public TagExtractorImplBase {
+public:
+  TagExtractorFixedImpl(absl::string_view name, absl::string_view value);
+
+  bool extractTag(TagExtractionContext& context, std::vector<Tag>& tags,
+                  IntervalSet<size_t>& remove_characters) const override;
+
+private:
+  const std::string value_;
 };
 
 } // namespace Stats

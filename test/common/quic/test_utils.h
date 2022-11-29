@@ -75,8 +75,11 @@ public:
                        EnvoyQuicServerConnection* connection, Event::Dispatcher& dispatcher,
                        uint32_t send_buffer_limit)
       : quic::QuicSpdySession(connection, /*visitor=*/nullptr, config, supported_versions),
-        QuicFilterManagerConnectionImpl(*connection, connection->connection_id(), dispatcher,
-                                        send_buffer_limit, {nullptr}),
+        QuicFilterManagerConnectionImpl(
+            *connection, connection->connection_id(), dispatcher, send_buffer_limit, {nullptr},
+            std::make_unique<StreamInfo::StreamInfoImpl>(
+                dispatcher.timeSource(),
+                connection->connectionSocket()->connectionInfoProviderSharedPtr())),
         crypto_stream_(std::make_unique<TestQuicCryptoStream>(this)) {}
 
   void Initialize() override {
