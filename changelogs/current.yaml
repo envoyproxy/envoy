@@ -28,7 +28,7 @@ minor_behavior_changes:
     add a completion callback to updateHeaders interface. Any external cache implementations will need to update to match this new interface. See changes to simple_http_cache in PR#23666 for example.
 - area: http filters
   change: |
-    change ``StreamEncoderFilter::encode1xxHeaders`` to use its own enum class ``Http::Filter1xxHeadersStatus``. Prior we shared the same enum class for general headers, but the implementation did not support most of them.
+    change ``StreamEncoderFilter::encode1xxHeaders`` to use its own enum class ``Http::Filter1xxHeadersStatus``. Previously we shared the same enum class for general headers, but the implementation did not support most of them.
 - area: oauth2
   change: |
     Requests which match the passthrough header now have their own metric ``oauth_passthrough`` and aren't included in ``oauth_success`` anymore.
