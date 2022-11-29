@@ -147,11 +147,20 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
         Utility::appendXff(request_headers, *connection.connectionInfoProvider().remoteAddress());
       }
     }
-    // If the prior hop is not a trusted proxy, overwrite any x-forwarded-proto value it set as
-    // untrusted. Alternately if no x-forwarded-proto header exists, add one.
+    // If the prior hop is not a trusted proxy, overwrite any
+    // x-forwarded-proto/x-forwarded-port value it set as untrusted. Alternately if no
+    // x-forwarded-proto/x-forwarded-port header exists, add one if configured.
     if (xff_num_trusted_hops == 0 || request_headers.ForwardedProto() == nullptr) {
       request_headers.setReferenceForwardedProto(
           connection.ssl() ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http);
+    }
+    if (config.appendXForwardedPort() &&
+        (xff_num_trusted_hops == 0 || request_headers.ForwardedPort() == nullptr)) {
+      const Envoy::Network::Address::Ip* ip =
+          connection.streamInfo().downstreamAddressProvider().localAddress()->ip();
+      if (ip) {
+        request_headers.setForwardedPort(ip->port());
+      }
     }
   } else {
     // If we are not using remote address, attempt to pull a valid IPv4 or IPv6 address out of XFF
@@ -182,6 +191,16 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
   if (!request_headers.ForwardedProto()) {
     request_headers.setReferenceForwardedProto(connection.ssl() ? Headers::get().SchemeValues.Https
                                                                 : Headers::get().SchemeValues.Http);
+  }
+
+  // Usually, the x-forwarded-port header comes with x-forwarded-proto header. If the
+  // x-forwarded-proto header is not set, set it here if append-x-forwarded-port is configured.
+  if (config.appendXForwardedPort() && !request_headers.ForwardedPort()) {
+    const Envoy::Network::Address::Ip* ip =
+        connection.streamInfo().downstreamAddressProvider().localAddress()->ip();
+    if (ip) {
+      request_headers.setForwardedPort(ip->port());
+    }
   }
 
   if (config.schemeToSet().has_value()) {

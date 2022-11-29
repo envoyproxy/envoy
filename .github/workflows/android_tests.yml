@@ -3,7 +3,7 @@ name: android_tests
 on:
   push:
     branches:
-      - main
+    - main
     paths:
     - 'mobile/**'
     - '.github/workflows/**'
@@ -20,35 +20,35 @@ jobs:
     runs-on: macos-12
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v1
-        with:
-          submodules: true
-      - id: check_context
-        name: 'Check whether to run'
-        run: |
-          if git rev-parse --abbrev-ref HEAD | grep -q ^main$ || git diff --name-only origin/main | grep -qe common/ -e java/ -e kotlin/ -e bazel/ -e ^\.bazelrc$ -e ^envoy$ -e ^WORKSPACE$ -e ^.github/workflows/android_tests.yml$ ; then
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+    - id: check_context
+      name: 'Check whether to run'
+      run: |
+        if git rev-parse --abbrev-ref HEAD | grep -q ^main$ || git diff --name-only origin/main | grep -qe common/ -e java/ -e kotlin/ -e bazel/ -e ^\.bazelrc$ -e ^envoy$ -e ^WORKSPACE$ -e ^.github/workflows/android_tests.yml$ ; then
             echo "Tests will run."
             echo "run_tests=true" >> $GITHUB_OUTPUT
           else
             echo "Skipping tests."
             echo "run_tests=false" >> $GITHUB_OUTPUT
           fi
-      - name: 'Java setup'
-        if: steps.check_context.outputs.run_tests == 'true'
-        uses: actions/setup-java@v1
-        with:
-          java-version: '8'
-          java-package: jdk
-          architecture: x64
-      - name: 'Install dependencies'
-        if: steps.check_context.outputs.run_tests == 'true'
-        run: cd mobile && ./ci/mac_ci_setup.sh
-      - name: 'Run Kotlin library tests'
-        if: steps.check_context.outputs.run_tests == 'true'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          cd mobile && ./bazelw test \
+    - name: 'Java setup'
+      if: steps.check_context.outputs.run_tests == 'true'
+      uses: actions/setup-java@v1
+      with:
+        java-version: '8'
+        java-package: jdk
+        architecture: x64
+    - name: 'Install dependencies'
+      if: steps.check_context.outputs.run_tests == 'true'
+      run: cd mobile && ./ci/mac_ci_setup.sh
+    - name: 'Run Kotlin library tests'
+      if: steps.check_context.outputs.run_tests == 'true'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        cd mobile && ./bazelw test \
             --test_output=all \
             --build_tests_only \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
@@ -59,35 +59,35 @@ jobs:
     runs-on: macos-12
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v1
-        with:
-          submodules: true
-      - id: check_context
-        name: 'Check whether to run'
-        run: |
-          if git rev-parse --abbrev-ref HEAD | grep -q ^main$ || git diff --name-only origin/main | grep -qe common/ -e java/ -e kotlin/ -e bazel/ -e ^\.bazelrc$ -e ^envoy$ -e ^WORKSPACE$ -e ^.github/workflows/android_tests.yml$ ; then
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+    - id: check_context
+      name: 'Check whether to run'
+      run: |
+        if git rev-parse --abbrev-ref HEAD | grep -q ^main$ || git diff --name-only origin/main | grep -qe common/ -e java/ -e kotlin/ -e bazel/ -e ^\.bazelrc$ -e ^envoy$ -e ^WORKSPACE$ -e ^.github/workflows/android_tests.yml$ ; then
             echo "Tests will run."
             echo "run_tests=true" >> $GITHUB_OUTPUT
           else
             echo "Skipping tests."
             echo "run_tests=false" >> $GITHUB_OUTPUT
           fi
-      - name: 'Java setup'
-        if: steps.check_context.outputs.run_tests == 'true'
-        uses: actions/setup-java@v1
-        with:
-          java-version: '8'
-          java-package: jdk
-          architecture: x64
-      - name: 'Install dependencies'
-        if: steps.check_context.outputs.run_tests == 'true'
-        run: cd mobile && ./ci/mac_ci_setup.sh
-      - name: 'Run Java library tests'
-        if: steps.check_context.outputs.run_tests == 'true'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          cd mobile && ./bazelw test \
+    - name: 'Java setup'
+      if: steps.check_context.outputs.run_tests == 'true'
+      uses: actions/setup-java@v1
+      with:
+        java-version: '8'
+        java-package: jdk
+        architecture: x64
+    - name: 'Install dependencies'
+      if: steps.check_context.outputs.run_tests == 'true'
+      run: cd mobile && ./ci/mac_ci_setup.sh
+    - name: 'Run Java library tests'
+      if: steps.check_context.outputs.run_tests == 'true'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        cd mobile && ./bazelw test \
             --test_output=all \
             --build_tests_only \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
@@ -106,37 +106,37 @@ jobs:
         CC: /opt/llvm/bin/clang
         CXX: /opt/llvm/bin/clang++
     steps:
-      - uses: actions/checkout@v1
-        with:
-          submodules: true
-      - name: Add safe directory
-        run: git config --global --add safe.directory /__w/envoy/envoy
-      - id: check_context
-        name: 'Check whether to run'
-        run: |
-          if git rev-parse --abbrev-ref HEAD | grep -q ^main$ || git diff --name-only origin/main | grep -qe common/ -e java/ -e kotlin/ -e bazel/ -e ^\.bazelrc$ -e ^envoy$ -e ^WORKSPACE$ -e ^.github/workflows/android_tests.yml$ ; then
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+    - name: Add safe directory
+      run: git config --global --add safe.directory /__w/envoy/envoy
+    - id: check_context
+      name: 'Check whether to run'
+      run: |
+        if git rev-parse --abbrev-ref HEAD | grep -q ^main$ || git diff --name-only origin/main | grep -qe common/ -e java/ -e kotlin/ -e bazel/ -e ^\.bazelrc$ -e ^envoy$ -e ^WORKSPACE$ -e ^.github/workflows/android_tests.yml$ ; then
             echo "Tests will run."
             echo "run_tests=true" >> $GITHUB_OUTPUT
           else
             echo "Skipping tests."
             echo "run_tests=false" >> $GITHUB_OUTPUT
           fi
-      - name: 'Java setup'
-        if: steps.check_context.outputs.run_tests == 'true'
-        uses: actions/setup-java@v1
-        with:
-          java-version: '8'
-          java-package: jdk
-          architecture: x64
-      - name: 'Install dependencies'
-        if: steps.check_context.outputs.run_tests == 'true'
-        run: cd mobile && ./ci/linux_ci_setup.sh
-      - name: 'Run Kotlin library integration tests'
-        if: steps.check_context.outputs.run_tests == 'true'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          cd mobile && ./bazelw test \
+    - name: 'Java setup'
+      if: steps.check_context.outputs.run_tests == 'true'
+      uses: actions/setup-java@v1
+      with:
+        java-version: '8'
+        java-package: jdk
+        architecture: x64
+    - name: 'Install dependencies'
+      if: steps.check_context.outputs.run_tests == 'true'
+      run: cd mobile && ./ci/linux_ci_setup.sh
+    - name: 'Run Kotlin library integration tests'
+      if: steps.check_context.outputs.run_tests == 'true'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        cd mobile && ./bazelw test \
             --test_output=all \
             --build_tests_only \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux-clang") \

@@ -3,7 +3,7 @@ name: core
 on:
   push:
     branches:
-      - main
+    - main
     paths:
     - 'mobile/**'
     - '.github/workflows/**'
@@ -18,16 +18,16 @@ jobs:
     runs-on: macos-12
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v1
-        with:
-          submodules: true
-      - name: 'Install dependencies'
-        run: cd mobile && ./ci/mac_ci_setup.sh
-      - name: 'Run tests'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          cd mobile && ./bazelw test \
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+    - name: 'Install dependencies'
+      run: cd mobile && ./ci/mac_ci_setup.sh
+    - name: 'Run tests'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        cd mobile && ./bazelw test \
             --test_output=all \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \

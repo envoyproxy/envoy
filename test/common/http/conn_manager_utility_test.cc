@@ -2060,5 +2060,82 @@ TEST_F(ConnectionManagerUtilityTest, KeepFragmentFromPathWithBothOverrides) {
   EXPECT_EQ(header_map_with_fragment2.getPathValue(), "/baz/%23fragment");
 }
 
+// Verify when append_x_forwarded_port is turned on, the x-forwarded-port header should be appended.
+TEST_F(ConnectionManagerUtilityTest, AppendXForwardedPort) {
+  ON_CALL(config_, appendXForwardedPort()).WillByDefault(Return(true));
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080));
+  TestRequestHeaderMapImpl headers;
+
+  callMutateRequestHeaders(headers, Protocol::Http2);
+  EXPECT_EQ("8080", headers.getForwardedPortValue());
+}
+
+// Verify when append_x_forwarded_port is not turned on, the x-forwarded-port header should not be
+// appended.
+TEST_F(ConnectionManagerUtilityTest, DoNotAppendXForwardedPort) {
+  ON_CALL(config_, appendXForwardedPort()).WillByDefault(Return(false));
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080));
+  TestRequestHeaderMapImpl headers;
+
+  callMutateRequestHeaders(headers, Protocol::Http2);
+  EXPECT_EQ("", headers.getForwardedPortValue());
+}
+
+// Verify when the x-forwarded-port header has been set, the x-forwarded-port header should not be
+// appended.
+TEST_F(ConnectionManagerUtilityTest, IgnoreAppendingXForwardedPortIfHasBeenSet) {
+  ON_CALL(config_, appendXForwardedPort()).WillByDefault(Return(true));
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080));
+  TestRequestHeaderMapImpl headers{{"x-forwarded-port", "8081"}};
+
+  callMutateRequestHeaders(headers, Protocol::Http2);
+  EXPECT_EQ("8081", headers.getForwardedPortValue());
+}
+
+// Verify when append_x_forwarded_port is turned on, the x-forwarded-port header from trusted hop
+// will be preserved.
+TEST_F(ConnectionManagerUtilityTest, PreserveXForwardedPortFromTrustedHop) {
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(1));
+  ON_CALL(config_, appendXForwardedPort()).WillByDefault(Return(true));
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080));
+  TestRequestHeaderMapImpl headers{{"x-forwarded-port", "80"}};
+
+  callMutateRequestHeaders(headers, Protocol::Http2);
+  EXPECT_EQ("80", headers.getForwardedPortValue());
+}
+
+// Verify when append_x_forwarded_port is turned on, the x-forwarded-port header from untrusted hop
+// will be overwritten.
+TEST_F(ConnectionManagerUtilityTest, OverwriteXForwardedPortFromUntrustedHop) {
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(0));
+  ON_CALL(config_, appendXForwardedPort()).WillByDefault(Return(true));
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080));
+  TestRequestHeaderMapImpl headers{{"x-forwarded-port", "80"}};
+
+  callMutateRequestHeaders(headers, Protocol::Http2);
+  EXPECT_EQ("8080", headers.getForwardedPortValue());
+}
+
+// Verify when append_x_forwarded_port is not turned on, the x-forwarded-port header from untrusted
+// hop will not be overwritten.
+TEST_F(ConnectionManagerUtilityTest, DoNotOverwriteXForwardedPortFromUntrustedHop) {
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(0));
+  ON_CALL(config_, appendXForwardedPort()).WillByDefault(Return(false));
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080));
+  TestRequestHeaderMapImpl headers{{"x-forwarded-port", "80"}};
+
+  callMutateRequestHeaders(headers, Protocol::Http2);
+  EXPECT_EQ("80", headers.getForwardedPortValue());
+}
+
 } // namespace Http
 } // namespace Envoy

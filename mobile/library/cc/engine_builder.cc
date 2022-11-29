@@ -70,8 +70,7 @@ EngineBuilder& EngineBuilder::addDnsQueryTimeoutSeconds(int dns_query_timeout_se
   return *this;
 }
 
-EngineBuilder&
-EngineBuilder::addDnsPreresolveHostnames(std::string dns_preresolve_hostnames) {
+EngineBuilder& EngineBuilder::addDnsPreresolveHostnames(std::string dns_preresolve_hostnames) {
   this->dns_preresolve_hostnames_ = std::move(dns_preresolve_hostnames);
   return *this;
 }
@@ -207,8 +206,7 @@ EngineBuilder& EngineBuilder::addStringAccessor(std::string name,
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addNativeFilter(std::string name,
-                                              std::string typed_config) {
+EngineBuilder& EngineBuilder::addNativeFilter(std::string name, std::string typed_config) {
   native_filter_chain_.emplace_back(std::move(name), std::move(typed_config));
   return *this;
 }
