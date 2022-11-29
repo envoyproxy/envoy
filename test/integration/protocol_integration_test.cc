@@ -1629,11 +1629,6 @@ TEST_P(DownstreamProtocolIntegrationTest, ValidZeroLengthContent) {
 // Test we're following https://tools.ietf.org/html/rfc7230#section-3.3.2
 // as best we can.
 TEST_P(ProtocolIntegrationTest, 304WithBody) {
-  if (GetParam().http1_implementation == Http1ParserImpl::BalsaParser) {
-    // TODO(#21245): Re-enable this test for BalsaParser.
-    return;
-  }
-
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1656,7 +1651,10 @@ TEST_P(ProtocolIntegrationTest, 304WithBody) {
     ASSERT_FALSE(response->complete());
   }
 
-  upstream_request_->encodeData(2, true);
+  // Note that at this point the parser is expecting a new response, and it
+  // signals an error because it cannot parse the received data as a valid
+  // status line.
+  upstream_request_->encodeData("aa\r\n", true);
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
     // Any body sent after the request is considered complete will not be handled as part of the
     // active request, but will be flagged as a protocol error for the no-longer-associated
