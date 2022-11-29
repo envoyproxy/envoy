@@ -25,7 +25,7 @@ use(
       "auto_assign": True,
     },
     {
-      "owner": "envoyproxy/mobile-maintainers!",
+      "owner": "envoyproxy/mobile-maintainers",
       "path": "(mobile/)",
       "label": "mobile",
       "github_status_label": "changes to Envoy Mobile",
