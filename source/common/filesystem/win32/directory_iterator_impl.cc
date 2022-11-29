@@ -43,7 +43,10 @@ DirectoryIteratorImpl& DirectoryIteratorImpl::operator++() {
 }
 
 DirectoryEntry DirectoryIteratorImpl::makeEntry(const WIN32_FIND_DATA& find_data) {
-  uint64_t size = static_cast<uint64_t>(find_data.nFileSizeHigh) << 32 + find_data.nFileSizeLow;
+  LARGE_INTEGER file_size;
+  file_size.LowPart = find_data.nFileSizeLow;
+  file_size.HighPart = find_data.nFileSizeHigh;
+  uint64_t size = static_cast<uint64_t>(file_size.QuadPart);
   if ((find_data.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) &&
       !(find_data.dwReserved0 & IO_REPARSE_TAG_SYMLINK)) {
     // The file is reparse point and not a symlink, so it can't be
