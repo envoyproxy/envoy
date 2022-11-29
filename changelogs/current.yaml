@@ -147,6 +147,9 @@ new_features:
     added :ref:`generic rds support <envoy_v3_api_field_extensions.filters.network.generic_proxy.v3.GenericProxy.generic_rds>`.
 - area: listener
   change: |
+    added a new field :ref:`socket_options <envoy_v3_api_field_config.listener.v3.AdditionalAddress.socket_options>` to the AdditionalAddress, allowing specifying discrete socket options for each listen address.
+- area: listener
+  change: |
     added ``continueFilterChain()`` and ``dispatcher()`` methods to the ``ListenerFilterCallback``. This allows listener filters to continue listener filter iteration after stopping iteration e.g. if the listener filter depends on an async process.
 - area: thrift_proxy
   change: |
