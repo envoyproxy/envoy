@@ -19,20 +19,13 @@ static const int SecondsPerDay = 86400;
 std::vector<absl::string_view> UberFilterFuzzer::filterNames() {
   // Add filters that are in the process of being or are robust against untrusted downstream
   // traffic.
+  static const std::vector<std::string> supported_filter_names = {
+    {{FILTERS}}
+  };
   static std::vector<absl::string_view> filter_names;
   if (filter_names.empty()) {
     const auto factories = Registry::FactoryRegistry<
         Server::Configuration::NamedNetworkFilterConfigFactory>::factories();
-    const std::vector<absl::string_view> supported_filter_names = {
-        NetworkFilterNames::get().ClientSslAuth, NetworkFilterNames::get().ExtAuthorization,
-        NetworkFilterNames::get().EnvoyMobileHttpConnectionManager,
-        // A dedicated http_connection_manager fuzzer can be found in
-        // test/common/http/conn_manager_impl_fuzz_test.cc
-        NetworkFilterNames::get().HttpConnectionManager, NetworkFilterNames::get().LocalRateLimit,
-        NetworkFilterNames::get().RateLimit, NetworkFilterNames::get().Rbac,
-        // TODO(asraa): Remove when fuzzer sets up connections for TcpProxy properly.
-        // NetworkFilterNames::get().TcpProxy,
-    };
     // Check whether each filter is loaded into Envoy.
     // Some customers build Envoy without some filters. When they run fuzzing, the use of a filter
     // that does not exist will cause fatal errors.
