@@ -48,6 +48,19 @@ message ZoneAwareLbConfig {
 message LocalityWeightedLbConfig {
 }
 
+// [#next-free-field: 6]
+message LocalityLbConfig {
+  oneof locality_config_specifier {
+    option (validate.required) = true;
+
+    // Configration for local zone aware load balancing.
+    ZoneAwareLbConfig zone_aware_lb_config = 4;
+
+    // Enable locality weighted load balancing.
+    LocalityWeightedLbConfig locality_weighted_lb_config = 5;
+  }
+}
+
 // Configuration for :ref:`slow start mode <arch_overview_load_balancing_slow_start>`.
 message SlowStartConfig {
   // Represents the size of slow start window.
