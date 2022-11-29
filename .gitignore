@@ -4,6 +4,7 @@
 !\.bazelci
 !\.bazelignore
 !\.bazelrc
+!\.bazelproject
 !\.bazelversion
 !\.clang-format
 !\.clang-tidy
