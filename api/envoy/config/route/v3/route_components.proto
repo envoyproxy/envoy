@@ -2000,6 +2000,7 @@ message RateLimit {
     // .. code-block:: cpp
     //
     //   ("<descriptor_key>", "<value_queried_from_metadata>")
+    // [#next-free-field: 6]
     message MetaData {
       enum Source {
         // Query :ref:`dynamic metadata <well_known_dynamic_metadata>`
