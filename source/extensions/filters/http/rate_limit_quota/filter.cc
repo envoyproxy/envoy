@@ -15,12 +15,8 @@ void RateLimitQuotaFilter::setDecoderFilterCallbacks(
 // TODO(tyxia) Mostly are example/boilerplate code, polish implementation here.
 Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                               bool) {
-  // Start the stream on the first request.
-  auto start_stream = rate_limit_client_->startStream(callbacks_->streamInfo());
-  if (!start_stream.ok()) {
-    // TODO(tyxia) Consider adding the log.
-    return Envoy::Http::FilterHeadersStatus::Continue;
-  }
+  // TODO(tyxia) Create the rate limit gRPC client and start the stream on the first request.
+
   absl::StatusOr<BucketId> match_result = requestMatching(headers);
 
   // Request is not matched by any matchers. In this case, requests are ALLOWED by default (i.e.,
@@ -44,12 +40,10 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
   // Otherwise, send the request to RLQS server for the quota assignment and insert the bucket_id to
   // the map.
 
-  rate_limit_client_->rateLimit(*this);
-
   return Envoy::Http::FilterHeadersStatus::Continue;
 }
 
-void RateLimitQuotaFilter::onDestroy() { rate_limit_client_->closeStream(); }
+void RateLimitQuotaFilter::onDestroy() {}
 
 void RateLimitQuotaFilter::createMatcher() {
   RateLimitOnMactchActionContext context;

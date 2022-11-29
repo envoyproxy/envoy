@@ -91,10 +91,8 @@ class RateLimitQuotaFilter : public Http::PassThroughFilter,
                              public Logger::Loggable<Logger::Id::filter> {
 public:
   RateLimitQuotaFilter(FilterConfigConstSharedPtr config,
-                       Server::Configuration::FactoryContext& factory_context,
-                       RateLimitClientPtr client)
-      : config_(std::move(config)), rate_limit_client_(std::move(client)),
-        factory_context_(factory_context) {
+                       Server::Configuration::FactoryContext& factory_context)
+      : config_(std::move(config)), factory_context_(factory_context) {
     createMatcher();
   }
 
@@ -104,7 +102,7 @@ public:
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
   // RateLimitQuota::RateLimitQuotaCallbacks
-  void onReceive(envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse*) override {}
+  void onQuotaResponse(envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse&) override {}
 
   // Perform request matching. It returns the generated bucket ids if the matching succeeded and
   // returns the error status otherwise.
@@ -117,7 +115,6 @@ private:
   void createMatcher();
 
   FilterConfigConstSharedPtr config_;
-  RateLimitClientPtr rate_limit_client_;
   Server::Configuration::FactoryContext& factory_context_;
   Http::StreamDecoderFilterCallbacks* callbacks_ = nullptr;
   RateLimitQuotaValidationVisitor visitor_ = {};

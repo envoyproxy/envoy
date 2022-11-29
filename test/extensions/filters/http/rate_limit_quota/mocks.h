@@ -16,8 +16,8 @@ public:
   MockRateLimitQuotaCallbacks() = default;
   ~MockRateLimitQuotaCallbacks() override = default;
 
-  MOCK_METHOD(void, onReceive,
-              (envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse * response));
+  MOCK_METHOD(void, onQuotaResponse,
+              (envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse & response));
 };
 
 } // namespace RateLimitQuota
