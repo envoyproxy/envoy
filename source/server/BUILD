@@ -453,6 +453,7 @@ envoy_cc_library(
         "listener_manager_impl.h",
     ],
     deps = [
+        ":listener_manager_factory_lib",
         "active_raw_udp_listener_config",
         ":configuration_lib",
         ":drain_manager_lib",
@@ -504,6 +505,7 @@ envoy_cc_library(
         "//source/common/quic:udp_gso_batch_writer_lib",
         "//source/extensions/udp_packet_writer/gso:config",
     ]),
+    alwayslink = True,
 )
 
 envoy_cc_library(
@@ -561,6 +563,15 @@ envoy_cc_library(
     hdrs = ["factory_context_base_impl.h"],
     deps = [
         "//envoy/server:factory_context_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "listener_manager_factory_lib",
+    hdrs = ["listener_manager_factory.h"],
+    deps = [
+        "//envoy/server:factory_context_interface",
+        "//envoy/server:listener_manager_interface",
     ],
 )
 

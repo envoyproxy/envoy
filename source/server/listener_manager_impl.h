@@ -24,6 +24,7 @@
 #include "source/server/filter_chain_manager_impl.h"
 #include "source/server/lds_api.h"
 #include "source/server/listener_impl.h"
+#include "source/server/listener_manager_factory.h"
 
 namespace Envoy {
 namespace Server {
@@ -351,6 +352,18 @@ private:
   ProtobufMessage::ValidationVisitor& validator_;
   ListenerComponentFactory& listener_component_factory_;
   Configuration::TransportSocketFactoryContextImpl& factory_context_;
+};
+
+class DefaultListenerManagerFactoryImpl : public ListenerManagerFactory {
+public:
+  std::unique_ptr<ListenerManager>
+  createListenerManager(Instance& server, std::unique_ptr<ListenerComponentFactory>&& factory,
+                        WorkerFactory& worker_factory, bool enable_dispatcher_stats,
+                        Quic::QuicStatNames& quic_stat_names) override {
+    return std::make_unique<ListenerManagerImpl>(server, std::move(factory), worker_factory,
+                                                 enable_dispatcher_stats, quic_stat_names);
+  }
+  std::string name() const override { return "envoy.listener_manager_impl.default"; }
 };
 
 } // namespace Server

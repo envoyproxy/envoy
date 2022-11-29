@@ -1134,5 +1134,7 @@ ApiListenerOptRef ListenerManagerImpl::apiListener() {
   return api_listener_ ? ApiListenerOptRef(std::ref(*api_listener_)) : absl::nullopt;
 }
 
+REGISTER_FACTORY(DefaultListenerManagerFactoryImpl, ListenerManagerFactory);
+
 } // namespace Server
 } // namespace Envoy

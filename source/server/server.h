@@ -45,7 +45,6 @@
 #endif
 #include "source/server/configuration_impl.h"
 #include "source/server/listener_hooks.h"
-#include "source/server/listener_manager_impl.h"
 #include "source/server/overload_manager_impl.h"
 #include "source/server/worker_impl.h"
 

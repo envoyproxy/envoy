@@ -25,8 +25,6 @@
 namespace Envoy {
 namespace Server {
 
-class ListenerManagerImpl;
-
 /**
  * Base class all ApiListeners.
  */
