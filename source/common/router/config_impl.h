@@ -210,6 +210,9 @@ private:
 };
 using CorsPolicyImpl = CorsPolicyImplBase<envoy::config::route::v3::CorsPolicy>;
 
+using RetryPolicyConstOptRef = const OptRef<const envoy::config::route::v3::RetryPolicy>;
+using HedgePolicyConstOptRef = const OptRef<const envoy::config::route::v3::HedgePolicy>;
+
 class ConfigImpl;
 /**
  * Holds all routing configuration for an entire virtual host.
@@ -241,11 +244,17 @@ public:
   bool includeAttemptCountInRequest() const override { return include_attempt_count_in_request_; }
   bool includeAttemptCountInResponse() const override { return include_attempt_count_in_response_; }
   const std::vector<ShadowPolicyPtr>& shadowPolicies() const { return shadow_policies_; }
-  const absl::optional<envoy::config::route::v3::RetryPolicy>& retryPolicy() const {
-    return retry_policy_;
+  RetryPolicyConstOptRef retryPolicy() const {
+    if (retry_policy_ != nullptr) {
+      return *retry_policy_;
+    }
+    return absl::nullopt;
   }
-  const absl::optional<envoy::config::route::v3::HedgePolicy>& hedgePolicy() const {
-    return hedge_policy_;
+  HedgePolicyConstOptRef hedgePolicy() const {
+    if (hedge_policy_ != nullptr) {
+      return *hedge_policy_;
+    }
+    return absl::nullopt;
   }
   uint32_t retryShadowBufferLimit() const override { return retry_shadow_buffer_limit_; }
 
@@ -313,8 +322,8 @@ private:
   uint32_t retry_shadow_buffer_limit_{std::numeric_limits<uint32_t>::max()};
   const bool include_attempt_count_in_request_;
   const bool include_attempt_count_in_response_;
-  absl::optional<envoy::config::route::v3::RetryPolicy> retry_policy_;
-  absl::optional<envoy::config::route::v3::HedgePolicy> hedge_policy_;
+  std::unique_ptr<envoy::config::route::v3::RetryPolicy> retry_policy_;
+  std::unique_ptr<envoy::config::route::v3::HedgePolicy> hedge_policy_;
   std::unique_ptr<const CatchAllVirtualCluster> virtual_cluster_catch_all_;
   Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher_;
 };
@@ -387,6 +396,7 @@ private:
   ProtobufMessage::ValidationVisitor* validation_visitor_{};
   std::vector<Upstream::RetryOptionsPredicateConstSharedPtr> retry_options_predicates_;
 };
+using DefaultRetryPolicy = ConstSingleton<RetryPolicyImpl>;
 
 /**
  * Implementation of ShadowPolicy that reads from the proto route config.
@@ -432,6 +442,7 @@ private:
   const envoy::type::v3::FractionalPercent additional_request_chance_;
   const bool hedge_on_per_try_timeout_;
 };
+using DefaultHedgePolicy = ConstSingleton<HedgePolicyImpl>;
 
 /**
  * Implementation of Decorator that reads from the proto route decorator.
@@ -518,6 +529,7 @@ private:
   std::vector<std::pair<InternalRedirectPredicateFactory*, ProtobufTypes::MessagePtr>>
       predicate_factories_;
 };
+using DefaultInternalRedirectPolicy = ConstSingleton<InternalRedirectPolicyImpl>;
 
 /**
  * Base implementation for all route entries.
@@ -575,7 +587,12 @@ public:
                                                   bool do_formatting = true) const override;
   const Http::HashPolicy* hashPolicy() const override { return hash_policy_.get(); }
 
-  const HedgePolicy& hedgePolicy() const override { return hedge_policy_; }
+  const HedgePolicy& hedgePolicy() const override {
+    if (hedge_policy_ != nullptr) {
+      return *hedge_policy_;
+    }
+    return DefaultHedgePolicy::get();
+  }
 
   const MetadataMatchCriteria* metadataMatchCriteria() const override {
     return metadata_match_criteria_.get();
@@ -585,9 +602,17 @@ public:
   }
   Upstream::ResourcePriority priority() const override { return priority_; }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
-  const RetryPolicy& retryPolicy() const override { return retry_policy_; }
+  const RetryPolicy& retryPolicy() const override {
+    if (retry_policy_ != nullptr) {
+      return *retry_policy_;
+    }
+    return DefaultRetryPolicy::get();
+  }
   const InternalRedirectPolicy& internalRedirectPolicy() const override {
-    return internal_redirect_policy_;
+    if (internal_redirect_policy_ != nullptr) {
+      return *internal_redirect_policy_;
+    }
+    return DefaultInternalRedirectPolicy::get();
   }
 
   const PathMatcherSharedPtr& pathMatcher() const override { return path_matcher_; }
@@ -945,17 +970,17 @@ private:
 
   bool evaluateTlsContextMatch(const StreamInfo::StreamInfo& stream_info) const;
 
-  HedgePolicyImpl
-  buildHedgePolicy(const absl::optional<envoy::config::route::v3::HedgePolicy>& vhost_hedge_policy,
+  std::unique_ptr<HedgePolicyImpl>
+  buildHedgePolicy(HedgePolicyConstOptRef vhost_hedge_policy,
                    const envoy::config::route::v3::RouteAction& route_config) const;
 
-  RetryPolicyImpl
-  buildRetryPolicy(const absl::optional<envoy::config::route::v3::RetryPolicy>& vhost_retry_policy,
+  std::unique_ptr<RetryPolicyImpl>
+  buildRetryPolicy(RetryPolicyConstOptRef vhost_retry_policy,
                    const envoy::config::route::v3::RouteAction& route_config,
                    ProtobufMessage::ValidationVisitor& validation_visitor,
                    Server::Configuration::ServerFactoryContext& factory_context) const;
 
-  InternalRedirectPolicyImpl
+  std::unique_ptr<InternalRedirectPolicyImpl>
   buildInternalRedirectPolicy(const envoy::config::route::v3::RouteAction& route_config,
                               ProtobufMessage::ValidationVisitor& validator,
                               absl::string_view current_route_name) const;
@@ -1008,9 +1033,9 @@ private:
   const bool using_new_timeouts_;
   const std::string prefix_rewrite_redirect_;
   const bool strip_query_;
-  const HedgePolicyImpl hedge_policy_;
-  const RetryPolicyImpl retry_policy_;
-  const InternalRedirectPolicyImpl internal_redirect_policy_;
+  std::unique_ptr<const HedgePolicyImpl> hedge_policy_;
+  std::unique_ptr<const RetryPolicyImpl> retry_policy_;
+  std::unique_ptr<const InternalRedirectPolicyImpl> internal_redirect_policy_;
   const RateLimitPolicyImpl rate_limit_policy_;
   std::vector<ShadowPolicyPtr> shadow_policies_;
   const Upstream::ResourcePriority priority_;

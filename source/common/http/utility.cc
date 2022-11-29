@@ -1067,6 +1067,20 @@ Utility::AuthorityAttributes Utility::parseAuthority(absl::string_view host) {
   return {is_ip_address, host_to_resolve, port};
 }
 
+void Utility::validateCoreRetryPolicy(const envoy::config::core::v3::RetryPolicy& retry_policy) {
+  if (retry_policy.has_retry_back_off()) {
+    const auto& core_back_off = retry_policy.retry_back_off();
+
+    uint64_t base_interval_ms = PROTOBUF_GET_MS_REQUIRED(core_back_off, base_interval);
+    uint64_t max_interval_ms =
+        PROTOBUF_GET_MS_OR_DEFAULT(core_back_off, max_interval, base_interval_ms * 10);
+
+    if (max_interval_ms < base_interval_ms) {
+      throw EnvoyException("max_interval must be greater than or equal to the base_interval");
+    }
+  }
+}
+
 envoy::config::route::v3::RetryPolicy
 Utility::convertCoreToRouteRetryPolicy(const envoy::config::core::v3::RetryPolicy& retry_policy,
                                        const std::string& retry_on) {
@@ -1085,7 +1099,8 @@ Utility::convertCoreToRouteRetryPolicy(const envoy::config::core::v3::RetryPolic
         PROTOBUF_GET_MS_OR_DEFAULT(core_back_off, max_interval, base_interval_ms * 10);
 
     if (max_interval_ms < base_interval_ms) {
-      throw EnvoyException("max_interval must be greater than or equal to the base_interval");
+      ENVOY_BUG(false, "max_interval must be greater than or equal to the base_interval");
+      base_interval_ms = max_interval_ms / 2;
     }
   }
 
