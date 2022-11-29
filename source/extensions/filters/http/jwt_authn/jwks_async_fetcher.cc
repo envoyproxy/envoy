@@ -3,6 +3,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/tracing/http_tracer_impl.h"
 
+using envoy::extensions::filters::http::jwt_authn::v3::JwksAsyncFetch;
 using envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks;
 
 namespace Envoy {
@@ -11,8 +12,22 @@ namespace HttpFilters {
 namespace JwtAuthn {
 namespace {
 
-// Default cache expiration time in 5 minutes.
-constexpr int PubkeyCacheExpirationSec = 600;
+// Default cache expiration time in 10 minutes.
+constexpr std::chrono::seconds DefaultCacheExpirationSec{600};
+
+// Number of seconds to refetch before a cached jwks is expired.
+constexpr std::chrono::seconds RefetchBeforeExpiredSec{5};
+
+// Default number of seconds to refetch after a failed fetch.
+constexpr std::chrono::seconds DefaultRefetchAfterFailedSec{1};
+
+std::chrono::seconds getFailedRefetchDuration(const JwksAsyncFetch& async_fetch) {
+  if (async_fetch.has_failed_refetch_duration()) {
+    return std::chrono::seconds(
+        DurationUtil::durationToSeconds(async_fetch.failed_refetch_duration()));
+  }
+  return DefaultRefetchAfterFailedSec;
+}
 
 } // namespace
 
@@ -21,15 +36,26 @@ JwksAsyncFetcher::JwksAsyncFetcher(const RemoteJwks& remote_jwks,
                                    CreateJwksFetcherCb create_fetcher_fn,
                                    JwtAuthnFilterStats& stats, JwksDoneFetched done_fn)
     : remote_jwks_(remote_jwks), context_(context), create_fetcher_fn_(create_fetcher_fn),
-      stats_(stats), done_fn_(done_fn), cache_duration_(getCacheDuration(remote_jwks)),
+      stats_(stats), done_fn_(done_fn),
       debug_name_(absl::StrCat("Jwks async fetching url=", remote_jwks_.http_uri().uri())) {
   // if async_fetch is not enabled, do nothing.
   if (!remote_jwks_.has_async_fetch()) {
     return;
   }
 
-  cache_duration_timer_ =
-      context_.mainThreadDispatcher().createTimer([this]() -> void { fetch(); });
+  // Next refetch time should be: jwks_cache_duration - RefetchBeforeExpiredSec.
+  // Using RefetchBeforeExpiredSec is to avoid on_demand fetch.
+  // During the authentication, if jwks is not fetched or is expired, it will trigger
+  // an on-demand fetch. But async_fetch is preferred as it is done in the main thread
+  // and not need to block request processing but on-demand fetch is done in the worker
+  // thread and block request processing.
+  good_refetch_duration_ = getCacheDuration(remote_jwks);
+  if (good_refetch_duration_ > RefetchBeforeExpiredSec) {
+    good_refetch_duration_ = good_refetch_duration_ - RefetchBeforeExpiredSec;
+  }
+  failed_refetch_duration_ = getFailedRefetchDuration(remote_jwks.async_fetch());
+
+  refetch_timer_ = context_.mainThreadDispatcher().createTimer([this]() -> void { fetch(); });
 
   // For fast_listener, just trigger a fetch, not register with init_manager.
   if (remote_jwks_.async_fetch().fast_listener()) {
@@ -46,7 +72,7 @@ std::chrono::seconds JwksAsyncFetcher::getCacheDuration(const RemoteJwks& remote
   if (remote_jwks.has_cache_duration()) {
     return std::chrono::seconds(DurationUtil::durationToSeconds(remote_jwks.cache_duration()));
   }
-  return std::chrono::seconds(PubkeyCacheExpirationSec);
+  return DefaultCacheExpirationSec;
 }
 
 void JwksAsyncFetcher::fetch() {
@@ -64,13 +90,12 @@ void JwksAsyncFetcher::handleFetchDone() {
     init_target_->ready();
     init_target_.reset();
   }
-
-  cache_duration_timer_->enableTimer(cache_duration_);
 }
 
 void JwksAsyncFetcher::onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) {
   done_fn_(std::move(jwks));
   handleFetchDone();
+  refetch_timer_->enableTimer(good_refetch_duration_);
   stats_.jwks_fetch_success_.inc();
 
   // Note: not to free fetcher_ within onJwksSuccess or onJwksError function.
@@ -86,6 +111,7 @@ void JwksAsyncFetcher::onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) {
 void JwksAsyncFetcher::onJwksError(Failure) {
   ENVOY_LOG(warn, "{}: failed", debug_name_);
   handleFetchDone();
+  refetch_timer_->enableTimer(failed_refetch_duration_);
   stats_.jwks_fetch_failed_.inc();
 
   // Note: not to free fetcher_ in this function. Please see comment at onJwksSuccess.

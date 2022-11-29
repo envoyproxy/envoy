@@ -23,6 +23,7 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/test_runtime.h"
+#include "test/test_common/utility.h"
 
 #include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
@@ -42,14 +43,8 @@ namespace Envoy {
 namespace Http {
 namespace {
 
-// See https://github.com/envoyproxy/envoy/issues/21245.
-enum class ParserImpl {
-  HttpParser, // http-parser from node.js
-  BalsaParser // Balsa from QUICHE
-};
-
-std::string testParamToString(const ::testing::TestParamInfo<ParserImpl>& info) {
-  return info.param == ParserImpl::HttpParser ? "HttpParser" : "BalsaParser";
+std::string testParamToString(const ::testing::TestParamInfo<Http1ParserImpl>& info) {
+  return TestUtility::http1ParserImplToString(info.param);
 }
 
 std::string createHeaderFragment(int num_headers) {
@@ -81,12 +76,12 @@ Buffer::OwnedImpl createBufferWithNByteSlices(absl::string_view input, size_t ma
 }
 } // namespace
 
-class Http1CodecTestBase : public testing::TestWithParam<ParserImpl> {
+class Http1CodecTestBase : public testing::TestWithParam<Http1ParserImpl> {
 protected:
   Http1CodecTestBase() : parser_impl_(GetParam()) {}
 
   void SetUp() override {
-    if (parser_impl_ == ParserImpl::BalsaParser) {
+    if (parser_impl_ == Http1ParserImpl::BalsaParser) {
       scoped_runtime_.mergeValues({{"envoy.reloadable_features.http1_use_balsa_parser", "true"}});
     } else {
       scoped_runtime_.mergeValues({{"envoy.reloadable_features.http1_use_balsa_parser", "false"}});
@@ -98,7 +93,7 @@ protected:
   }
 
   TestScopedRuntime scoped_runtime_;
-  const ParserImpl parser_impl_;
+  const Http1ParserImpl parser_impl_;
   Stats::TestUtil::TestStore store_;
   Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
 };
@@ -448,7 +443,8 @@ void Http1ServerConnectionImplTest::testServerAllowChunkedContentLength(uint32_t
 }
 
 INSTANTIATE_TEST_SUITE_P(Parsers, Http1ServerConnectionImplTest,
-                         ::testing::Values(ParserImpl::HttpParser, ParserImpl::BalsaParser),
+                         ::testing::Values(Http1ParserImpl::HttpParser,
+                                           Http1ParserImpl::BalsaParser),
                          testParamToString);
 
 TEST_P(Http1ServerConnectionImplTest, EmptyHeader) {
@@ -980,7 +976,7 @@ TEST_P(Http1ServerConnectionImplTest, Http11InvalidRequest) {
 }
 
 TEST_P(Http1ServerConnectionImplTest, Http11InvalidTrailerPost) {
-  if (parser_impl_ == ParserImpl::BalsaParser) {
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
     // BalsaParser only validates trailers if `enable_trailers_` is set.
     codec_settings_.enable_trailers_ = true;
   }
@@ -1011,7 +1007,7 @@ TEST_P(Http1ServerConnectionImplTest, Http11InvalidTrailerPost) {
 }
 
 TEST_P(Http1ServerConnectionImplTest, Http11InvalidTrailersIgnored) {
-  if (parser_impl_ == ParserImpl::HttpParser) {
+  if (parser_impl_ == Http1ParserImpl::HttpParser) {
     // HttpParser signals error even if `enable_trailers_` is false.
     return;
   }
@@ -2225,7 +2221,7 @@ TEST_P(Http1ServerConnectionImplTest, TestSmugglingAllowChunkedContentLength100)
 
 TEST_P(Http1ServerConnectionImplTest,
        ShouldDumpParsedAndPartialHeadersWithoutAllocatingMemoryIfProcessingHeaders) {
-  if (parser_impl_ == ParserImpl::BalsaParser) {
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
     // TODO(#21245): Re-enable this test for BalsaParser.
     return;
   }
@@ -2264,7 +2260,7 @@ TEST_P(Http1ServerConnectionImplTest,
 }
 
 TEST_P(Http1ServerConnectionImplTest, ShouldDumpDispatchBufferWithoutAllocatingMemory) {
-  if (parser_impl_ == ParserImpl::BalsaParser) {
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
     // TODO(#21245): Re-enable this test for BalsaParser.
     return;
   }
@@ -2378,7 +2374,8 @@ void Http1ClientConnectionImplTest::testClientAllowChunkedContentLength(
 }
 
 INSTANTIATE_TEST_SUITE_P(Parsers, Http1ClientConnectionImplTest,
-                         ::testing::Values(ParserImpl::HttpParser, ParserImpl::BalsaParser),
+                         ::testing::Values(Http1ParserImpl::HttpParser,
+                                           Http1ParserImpl::BalsaParser),
                          testParamToString);
 
 TEST_P(Http1ClientConnectionImplTest, SimpleGet) {
@@ -3374,7 +3371,7 @@ TEST_P(Http1ServerConnectionImplTest, Utf8Path) {
   bool strict = true;
 #endif
 
-  if (parser_impl_ == ParserImpl::BalsaParser) {
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
     strict = true;
   }
 
@@ -3563,7 +3560,7 @@ TEST_P(Http1ClientConnectionImplTest, TestResponseSplitAllowChunkedLength100) {
 
 TEST_P(Http1ClientConnectionImplTest,
        ShouldDumpParsedAndPartialHeadersWithoutAllocatingMemoryIfProcessingHeaders) {
-  if (parser_impl_ == ParserImpl::BalsaParser) {
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
     // TODO(#21245): Re-enable this test for BalsaParser.
     return;
   }
@@ -3595,7 +3592,7 @@ TEST_P(Http1ClientConnectionImplTest,
 }
 
 TEST_P(Http1ClientConnectionImplTest, ShouldDumpDispatchBufferWithoutAllocatingMemory) {
-  if (parser_impl_ == ParserImpl::BalsaParser) {
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
     // TODO(#21245): Re-enable this test for BalsaParser.
     return;
   }
@@ -3782,6 +3779,25 @@ TEST_P(Http1ClientConnectionImplTest, ResponseHttpVersion) {
     EXPECT_TRUE(status.ok());
     EXPECT_EQ(http_version, codec_->protocol());
   }
+}
+
+// 304 responses must not have a body.
+TEST_P(Http1ClientConnectionImplTest, 304WithBody) {
+  initialize();
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
+
+  EXPECT_CALL(response_decoder, decodeHeaders_(_, true));
+  Buffer::OwnedImpl response("HTTP/1.1 304 Not Modified\r\n"
+                             "Content-Length: 2\r\n"
+                             "\r\n"
+                             "blah");
+  auto status = codec_->dispatch(response);
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ("http/1.1 protocol error: extraneous data after response complete", status.message());
 }
 
 } // namespace Http

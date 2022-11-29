@@ -20,6 +20,7 @@
 #include "source/common/network/utility.h"
 #include "source/extensions/transport_sockets/tls/context_config_impl.h"
 #include "source/extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/server/proto_descriptors.h"
 
 #include "test/integration/utility.h"
 #include "test/test_common/environment.h"
@@ -47,6 +48,7 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
       version_(version), upstream_address_fn_(upstream_address_fn),
       config_helper_(version, *api_, config),
       default_log_level_(TestEnvironment::getOptions().logLevel()) {
+  Envoy::Server::validateProtoDescriptors();
   // This is a hack, but there are situations where we disconnect fake upstream connections and
   // then we expect the server connection pool to get the disconnect before the next test starts.
   // This does not always happen. This pause should allow the server to pick up the disconnect

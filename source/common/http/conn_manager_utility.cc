@@ -38,8 +38,9 @@ absl::string_view getScheme(absl::string_view forwarded_proto, bool is_ssl) {
 } // namespace
 std::string ConnectionManagerUtility::determineNextProtocol(Network::Connection& connection,
                                                             const Buffer::Instance& data) {
-  if (!connection.nextProtocol().empty()) {
-    return connection.nextProtocol();
+  const std::string next_protocol = connection.nextProtocol();
+  if (!next_protocol.empty()) {
+    return next_protocol;
   }
 
   // See if the data we have so far shows the HTTP/2 prefix. We ignore the case where someone sends
