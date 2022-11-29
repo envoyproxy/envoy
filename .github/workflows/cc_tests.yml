@@ -3,7 +3,7 @@ name: cc_tests
 on:
   push:
     branches:
-      - main
+    - main
   pull_request:
 
 jobs:
@@ -14,16 +14,16 @@ jobs:
     container:
       image: envoyproxy/envoy-build-ubuntu:0a02a76af5951bf7f4c7029c0ea6d29d96c0f682
     steps:
-      - uses: actions/checkout@v1
-        with:
-          submodules: true
-      - name: Add safe directory
-        run: git config --global --add safe.directory /__w/envoy/envoy
-      - env:
-            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        name: 'Run tests'
-        run: |
-          cd mobile && ./bazelw test \
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+    - name: Add safe directory
+      run: git config --global --add safe.directory /__w/envoy/envoy
+    - env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      name: 'Run tests'
+      run: |
+        cd mobile && ./bazelw test \
             --action_env=LD_LIBRARY_PATH \
             --test_output=all \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux") \

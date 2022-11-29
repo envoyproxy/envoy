@@ -3,7 +3,7 @@ name: python_tests
 on:
   push:
     branches:
-      - main
+    - main
     paths:
     - 'mobile/**'
     - '.github/workflows/**'
@@ -20,27 +20,27 @@ jobs:
     container:
       image: envoyproxy/envoy-build-ubuntu:0a02a76af5951bf7f4c7029c0ea6d29d96c0f682
     steps:
-      - uses: actions/checkout@v1
-        with:
-          submodules: true
-      - name: Add safe directory
-        run: git config --global --add safe.directory /__w/envoy/envoy
-      - id: check_context
-        name: 'Check whether to run'
-        run: |
-          if git rev-parse --abbrev-ref HEAD | grep -q ^main$ || git diff --name-only origin/main | grep -qe common/ -e cc/ -e python/ -e bazel/ -e ^\.bazelrc$ -e ^envoy$ -e ^WORKSPACE$ -e ^.github/workflows/python_tests.yml$ ; then
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+    - name: Add safe directory
+      run: git config --global --add safe.directory /__w/envoy/envoy
+    - id: check_context
+      name: 'Check whether to run'
+      run: |
+        if git rev-parse --abbrev-ref HEAD | grep -q ^main$ || git diff --name-only origin/main | grep -qe common/ -e cc/ -e python/ -e bazel/ -e ^\.bazelrc$ -e ^envoy$ -e ^WORKSPACE$ -e ^.github/workflows/python_tests.yml$ ; then
             echo "Tests will run."
             echo "run_tests=true" >> $GITHUB_OUTPUT
           else
             echo "Skipping tests."
             echo "run_tests=false" >> $GITHUB_OUTPUT
           fi
-      - name: 'Run tests'
-        if: steps.check_context.outputs.run_tests == 'true'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          cd mobile && ./bazelw test \
+    - name: 'Run tests'
+      if: steps.check_context.outputs.run_tests == 'true'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        cd mobile && ./bazelw test \
             --action_env=LD_LIBRARY_PATH \
             --test_output=all \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux") \
