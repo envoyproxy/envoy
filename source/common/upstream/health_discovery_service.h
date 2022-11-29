@@ -83,7 +83,6 @@ private:
 
   Server::Configuration::ServerFactoryContext& server_context_;
   envoy::config::cluster::v3::Cluster cluster_;
-  const envoy::config::core::v3::BindConfig& bind_config_;
   Stats::Store& stats_;
   Ssl::ContextManager& ssl_context_manager_;
   bool added_via_api_;

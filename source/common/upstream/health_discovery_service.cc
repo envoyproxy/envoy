@@ -333,8 +333,8 @@ HdsCluster::HdsCluster(Server::Configuration::ServerFactoryContext& server_conte
                        const envoy::config::core::v3::BindConfig& bind_config, Stats::Store& stats,
                        Ssl::ContextManager& ssl_context_manager, bool added_via_api,
                        ClusterInfoFactory& info_factory, ThreadLocal::SlotAllocator& tls)
-    : server_context_(server_context), cluster_(std::move(cluster)), bind_config_(bind_config),
-      stats_(stats), ssl_context_manager_(ssl_context_manager), added_via_api_(added_via_api),
+    : server_context_(server_context), cluster_(std::move(cluster)), stats_(stats),
+      ssl_context_manager_(ssl_context_manager), added_via_api_(added_via_api),
       hosts_(new HostVector()), time_source_(server_context_.mainThreadDispatcher().timeSource()) {
   ENVOY_LOG(debug, "Creating an HdsCluster");
   priority_set_.getOrCreateHostSet(0);
