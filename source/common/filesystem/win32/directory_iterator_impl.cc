@@ -43,7 +43,7 @@ DirectoryIteratorImpl& DirectoryIteratorImpl::operator++() {
 }
 
 DirectoryEntry DirectoryIteratorImpl::makeEntry(const WIN32_FIND_DATA& find_data) {
-  LARGE_INTEGER file_size;
+  ULARGE_INTEGER file_size;
   file_size.LowPart = find_data.nFileSizeLow;
   file_size.HighPart = find_data.nFileSizeHigh;
   uint64_t size = static_cast<uint64_t>(file_size.QuadPart);
