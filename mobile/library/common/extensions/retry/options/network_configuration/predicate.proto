@@ -1,8 +1,0 @@
-syntax = "proto3";
-
-package envoymobile.extensions.retry.options.network_configuration;
-
-import "validate/validate.proto";
-
-message NetworkConfigurationOptionsPredicate {
-}

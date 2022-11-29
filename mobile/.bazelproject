@@ -1,7 +1,0 @@
-# Uncomment the examples you'd like to use!
-import examples/kotlin/hello_world/.bazelproject
-import examples/java/hello_world/.bazelproject
-import test/kotlin/apps/baseline/.bazelproject
-import test/kotlin/apps/experimental/.bazelproject
-
-android_sdk_platform: android-31
