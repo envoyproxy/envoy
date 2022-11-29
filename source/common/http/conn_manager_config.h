@@ -517,6 +517,11 @@ public:
    */
   virtual HeaderValidatorPtr makeHeaderValidator(Protocol protocol,
                                                  StreamInfo::StreamInfo& stream_info) PURE;
+
+  /**
+   * @return whether to append the x-forwarded-port header.
+   */
+  virtual bool appendXForwardedPort() const PURE;
 };
 } // namespace Http
 } // namespace Envoy

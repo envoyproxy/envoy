@@ -65,10 +65,12 @@ private:
   // The Jwks fetcher object
   Common::JwksFetcherPtr fetcher_;
 
-  // The cache duration.
-  const std::chrono::seconds cache_duration_;
-  // The timer to trigger fetch due to cache duration.
-  Envoy::Event::TimerPtr cache_duration_timer_;
+  // The next refetch duration after a good fetch.
+  std::chrono::seconds good_refetch_duration_;
+  // The next refetch duration after a failed fetch.
+  std::chrono::seconds failed_refetch_duration_;
+  // The timer to trigger a refetch.
+  Envoy::Event::TimerPtr refetch_timer_;
 
   // The init target.
   std::unique_ptr<Init::TargetImpl> init_target_;

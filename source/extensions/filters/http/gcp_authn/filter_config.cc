@@ -6,6 +6,8 @@
 #include "envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.pb.validate.h"
 #include "envoy/registry/registry.h"
 
+#include "source/common/http/utility.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -20,6 +22,12 @@ Http::FilterFactoryCb GcpAuthnFilterFactory::createFilterFactoryFromProtoTyped(
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.cache_config(), cache_size, 0) > 0) {
     token_cache = std::make_shared<TokenCache>(config.cache_config(), context);
   }
+  // config.retry_policy has an invalid case that could not be validated by the
+  // proto validation annotation. It has to be validated by the code.
+  if (config.has_retry_policy()) {
+    Http::Utility::validateCoreRetryPolicy(config.retry_policy());
+  }
+
   FilterConfigSharedPtr filter_config =
       std::make_shared<envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig>(
           config);

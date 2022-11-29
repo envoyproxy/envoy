@@ -70,7 +70,7 @@ int TestRunner::RunTests(int argc, char** argv) {
   ::testing::InitGoogleMock(&argc, argv);
   // We hold on to process_wide to provide RAII cleanup of process-wide
   // state.
-  ProcessWide process_wide;
+  ProcessWide process_wide(false);
   // Add a test-listener so we can call a hook where we can do a quiescence
   // check after each method. See
   // https://github.com/google/googletest/blob/master/googletest/docs/advanced.md

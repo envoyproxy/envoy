@@ -111,7 +111,7 @@ extern "C" {
 void register_apple_platform_cert_verifier() {
   envoy_cert_validator* api = (envoy_cert_validator*)safe_malloc(sizeof(envoy_cert_validator));
   api->validate_cert = verify_cert;
-  api->release_validator = NULL;
+  api->validation_cleanup = NULL;
   register_platform_api("platform_cert_validator", api);
 }
 
