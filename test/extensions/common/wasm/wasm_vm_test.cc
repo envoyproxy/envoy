@@ -5,6 +5,7 @@
 #include "source/extensions/common/wasm/wasm_vm.h"
 
 #include "test/test_common/environment.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -17,6 +18,7 @@ using proxy_wasm::WasmCallVoid; // NOLINT
 using proxy_wasm::WasmCallWord; // NOLINT
 using proxy_wasm::Word;         // NOLINT
 using testing::HasSubstr;       // NOLINT
+using testing::IsEmpty;         // NOLINT
 using testing::Return;          // NOLINT
 
 namespace Envoy {
@@ -41,23 +43,26 @@ proxy_wasm::RegisterNullVmPluginFactory register_test_null_vm_plugin("test_null_
   return plugin;
 });
 
-class NoneVmTest : public testing::Test {
-  void SetUp() override {
-    original_factories_ = Registry::FactoryRegistry<WasmRuntimeFactory>::factories();
+class ClearWasmRuntimeFactories {
+public:
+  ClearWasmRuntimeFactories() {
+    saved_factories_ = Registry::FactoryRegistry<WasmRuntimeFactory>::factories();
     Registry::FactoryRegistry<WasmRuntimeFactory>::factories().clear();
+    Registry::InjectFactory<WasmRuntimeFactory>::resetTypeMappings();
   }
-  void TearDown() override {
-    Registry::FactoryRegistry<WasmRuntimeFactory>::factories() = original_factories_;
+
+  ~ClearWasmRuntimeFactories() {
+    Registry::FactoryRegistry<WasmRuntimeFactory>::factories() = saved_factories_;
+    Registry::InjectFactory<WasmRuntimeFactory>::resetTypeMappings();
   }
 
 private:
-  absl::flat_hash_map<std::string, WasmRuntimeFactory*> original_factories_;
+  absl::flat_hash_map<std::string, WasmRuntimeFactory*> saved_factories_;
 };
 
-TEST_F(NoneVmTest, NoAvailableEngine) {
-  // When there is no registered factory, `first_wasm_engine_name` should be empty.
-  absl::string_view first_wasm_engine_name = getFirstAvailableWasmEngineName();
-  EXPECT_TRUE(first_wasm_engine_name.empty());
+TEST(WasmEngineTest, NoAvailableEngine) {
+  ClearWasmRuntimeFactories clear_factories;
+  EXPECT_THAT(getFirstAvailableWasmEngineName(), IsEmpty());
 }
 
 class BaseVmTest : public testing::Test {
