@@ -47,6 +47,7 @@ private:
   std::vector<struct io_uring_cqe*> cqes_;
   os_fd_t event_fd_{INVALID_SOCKET};
   std::vector<InjectedCompletion> injected_completions_;
+  std::vector<InjectedCompletion> current_injected_completions_;
 };
 
 } // namespace Io
