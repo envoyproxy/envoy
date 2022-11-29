@@ -15,6 +15,7 @@
 namespace Envoy {
 namespace Filesystem {
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 void PrintTo(const DirectoryEntry& entry, std::ostream* os) {
   *os << "{name=" << entry.name_ << ", type=" << static_cast<int>(entry.type_)
       << ", size=" << entry.size_bytes_ << "}";
