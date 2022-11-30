@@ -291,6 +291,7 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/clusters/logical_dns/ @UNOWNED @UNOWNED
 /*/extensions/clusters/common/ @UNOWNED @UNOWNED
 /*/extensions/clusters/eds/ @UNOWNED @UNOWNED
+/*/source/extensions/listener_managers/listener_manager @UNOWNED @UNOWNED
 
 # URL Pattern Match and Rewrite Library
 /*/extensions/path/uri_template_lib @alyssawilk @yanjunxiang-google

@@ -57,7 +57,6 @@ class ConfigTest {
 public:
   ConfigTest(const OptionsImpl& options)
       : api_(Api::createApiForTest(time_system_)), options_(options) {
-
     ON_CALL(*server_.server_factory_context_, api()).WillByDefault(ReturnRef(server_.api_));
     ON_CALL(server_, options()).WillByDefault(ReturnRef(options_));
     ON_CALL(server_, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));

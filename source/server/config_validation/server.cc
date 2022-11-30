@@ -102,9 +102,11 @@ void ValidationInstance::initialize(const Options& options,
   Configuration::InitialImpl initial_config(bootstrap_);
   initial_config.initAdminAccessLog(bootstrap_, *this);
   admin_ = std::make_unique<Server::ValidationAdmin>(initial_config.admin().address());
-  listener_manager_ = std::make_unique<ListenerManagerImpl>(
-      *this, std::make_unique<ValidationListenerComponentFactory>(*this), *this, false,
-      quic_stat_names_);
+  listener_manager_ =
+      Config::Utility::getAndCheckFactoryByName<ListenerManagerFactory>(
+          "envoy.listener_manager_impl.default")
+          .createListenerManager(*this, std::make_unique<ValidationListenerComponentFactory>(*this),
+                                 *this, false, quic_stat_names_);
   thread_local_.registerThread(*dispatcher_, true);
 
   Runtime::LoaderPtr runtime_ptr = component_factory.createRuntime(*this, initial_config);

@@ -531,6 +531,11 @@ envoy.filters.network.connection_limit:
   status: stable
   type_urls:
   - envoy.extensions.filters.network.connection_limit.v3.ConnectionLimit
+envoy.listener_manager_impl.default:
+  categories:
+  - envoy.listener_manager_impl
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
 envoy.filters.network.direct_response:
   categories:
   - envoy.filters.network
