@@ -122,7 +122,7 @@ message AttributeContext {
     // the URL path and query-string. No decoding is performed.
     string path = 4;
 
-    // The HTTP request ``Host`` or ``Authority`` header value.
+    // The HTTP request ``Host`` or ``:authority`` header value.
     string host = 5;
 
     // The HTTP URL scheme, such as ``http`` and ``https``.
