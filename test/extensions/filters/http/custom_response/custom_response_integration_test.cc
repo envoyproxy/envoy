@@ -17,7 +17,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace CustomResponse {
 
-using envoy::config::route::v3::Route;
 using envoy::config::route::v3::VirtualHost;
 using envoy::extensions::filters::http::custom_response::v3::CustomResponse;
 using LocalResponsePolicyProto =
@@ -182,6 +181,31 @@ TEST_P(CustomResponseIntegrationTest, CustomResponseNotConfigured) {
 
 // Verify we get the correct local custom response.
 TEST_P(CustomResponseIntegrationTest, LocalReply) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  default_request_headers_.setHost("original.host");
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, unauthorized_response_, 0);
+  // Verify that we get the modified status value.
+  EXPECT_EQ("499", response->headers().getStatusValue());
+  EXPECT_EQ("not allowed", response->body());
+  EXPECT_EQ(
+      "x-bar",
+      response->headers().get(::Envoy::Http::LowerCaseString("foo"))[0]->value().getStringView());
+}
+
+// Verify we get the correct local custom response.
+TEST_P(CustomResponseIntegrationTest, LocalReplyWithFormatter) {
+
+  modifyPolicy<LocalResponsePolicyProto>(
+      custom_response_filter_config_, "4xx_action", [](LocalResponsePolicyProto& policy) {
+        *policy.mutable_body_format() =
+            TestUtility::parseYaml<envoy::config::core::v3::SubstitutionFormatString>(R"EOF(
+json_format:
+  message: "%LOCAL_REPLY_BODY%"
+          )EOF");
+      });
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));

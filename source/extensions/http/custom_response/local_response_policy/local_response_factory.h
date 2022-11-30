@@ -14,7 +14,7 @@ class LocalResponseFactory
           envoy::extensions::http::custom_response::local_response_policy::v3::
               LocalResponsePolicy> {
 public:
-  ~LocalResponseFactory() override;
+  ~LocalResponseFactory() override = default;
 
   Extensions::HttpFilters::CustomResponse::PolicySharedPtr
   createPolicy(const Protobuf::Message& config,

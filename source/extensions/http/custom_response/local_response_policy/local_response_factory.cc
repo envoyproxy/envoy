@@ -10,8 +10,6 @@ namespace CustomResponse {
 using LocalResponsePolicyProto =
     envoy::extensions::http::custom_response::local_response_policy::v3::LocalResponsePolicy;
 
-LocalResponseFactory::~LocalResponseFactory() = default;
-
 Extensions::HttpFilters::CustomResponse::PolicySharedPtr
 LocalResponseFactory::createPolicy(const Protobuf::Message& config,
                                    Envoy::Server::Configuration::ServerFactoryContext& context,

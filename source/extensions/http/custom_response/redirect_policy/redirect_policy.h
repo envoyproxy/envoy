@@ -50,7 +50,6 @@ public:
                 Extensions::HttpFilters::CustomResponse::CustomResponseFilter&) const override;
 
   const std::string& host() const { return host_; }
-  const std::string& path() const { return path_; }
 
 private:
   std::unique_ptr<ModifyRequestHeadersAction> createModifyRequestHeadersAction(
