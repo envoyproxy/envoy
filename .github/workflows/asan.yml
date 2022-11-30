@@ -24,8 +24,6 @@ jobs:
         CXX: /opt/llvm/bin/clang++
     steps:
     - uses: actions/checkout@v1
-      with:
-        submodules: true
     - name: Add safe directory
       run: git config --global --add safe.directory /__w/envoy/envoy
     - id: check_context
