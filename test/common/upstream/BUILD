@@ -551,6 +551,7 @@ envoy_cc_test(
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         # TODO(mattklein123): Split this into 2 tests for each cluster.
+        "//source/extensions/clusters/common:logical_host_lib",
         "//source/extensions/clusters/static:static_cluster_lib",
         "//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",

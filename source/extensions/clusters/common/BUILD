@@ -12,6 +12,7 @@ envoy_cc_library(
     name = "logical_host_lib",
     srcs = ["logical_host.cc"],
     hdrs = ["logical_host.h"],
+    visibility = ["//visibility:public"],
     deps = [
         "//source/common/upstream:upstream_includes",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

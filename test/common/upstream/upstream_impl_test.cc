@@ -22,6 +22,7 @@
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/singleton/manager_impl.h"
+#include "source/extensions/clusters/common/logical_host.h"
 #include "source/extensions/clusters/static/static_cluster.h"
 #include "source/extensions/clusters/strict_dns/strict_dns_cluster.h"
 #include "source/server/transport_socket_config_impl.h"
@@ -1383,7 +1384,7 @@ TEST_F(HostImplTest, HostnameCanaryAndLocality) {
   locality.set_sub_zone("world");
   HostImpl host(cluster.info_, "lyft.com", Network::Utility::resolveUrl("tcp://10.0.0.1:1234"),
                 std::make_shared<const envoy::config::core::v3::Metadata>(metadata), 1, locality,
-                envoy::config::endpoint::v3::Endpoint::HostConstSharedPtr::default_instance(), 1,
+                envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
                 envoy::config::core::v3::UNKNOWN, simTime());
   EXPECT_EQ(cluster.info_.get(), &host.cluster());
   EXPECT_EQ("lyft.com", host.hostname());
@@ -1411,7 +1412,6 @@ TEST_F(HostImplTest, CreateConnection) {
       std::make_shared<const envoy::config::core::v3::Metadata>(metadata), 1, locality,
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
       envoy::config::core::v3::UNKNOWN, simTime());
-  EXPECT_TRUE(host->canCreateConnection(ResourcePriority::Default));
 
   testing::StrictMock<Event::MockDispatcher> dispatcher;
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options;
@@ -1620,22 +1620,22 @@ TEST_F(HostImplTest, HealthcheckHostname) {
   EXPECT_EQ("foo", descr.hostnameForHealthChecks());
 }
 
-// Test that hostname flag from the health check config propagates.
 TEST_F(HostImplTest, RealHostDescription) {
   MockClusterMockPrioritySet cluster;
-  envoy::config::core::v3::Metadata metadata;
-  Config::Metadata::mutableMetadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
-                                         Config::MetadataEnvoyLbKeys::get().CANARY)
-      .set_bool_value(true);
+  envoy::config::endpoint::v3::Endpoint::HealthCheckConfig hc_config;
+  hc_config.set_hostname("spotify.com");
   Network::Address::InstanceConstSharedPtr address =
       Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
-  auto host = std::make_shared<HostImpl>(
-      cluster.info_, "lyft.com", address,
-      std::make_shared<const envoy::config::core::v3::Metadata>(metadata), 1, envoy::config::core::v3::Locality::default_instance(),
-      envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
-      envoy::config::core::v3::UNKNOWN, simTime());
+  auto host = std::make_shared<HostImpl>(cluster.info_, "spotify.com", address,
+                                         std::make_shared<const envoy::config::core::v3::Metadata>(
+                                             envoy::config::core::v3::Metadata::default_instance()),
+                                         1, envoy::config::core::v3::Locality::default_instance(),
+                                         hc_config, 1, envoy::config::core::v3::UNKNOWN, simTime());
   RealHostDescription real_host(address, host);
-
+  EXPECT_EQ(1, real_host.priority());
+  EXPECT_TRUE(host->canCreateConnection(ResourcePriority::Default));
+  EXPECT_EQ("spotify.com", real_host.hostnameForHealthChecks());
+  EXPECT_FALSE(real_host.lastHcPassTime());
 }
 
 class StaticClusterImplTest : public testing::Test, public UpstreamImplTestBase {};
