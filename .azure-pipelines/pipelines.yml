@@ -86,11 +86,11 @@ stages:
         CHANGED_DOCS_ONLY=false
 
         CHANGED_MOBILE=$(echo $CHANGED_PATHS | jq '. as $A | "mobile" | IN($A[])')
-        if [[ $CHANGED_MOBILE == true && $CHANGED_PATH_COUNT -eq 1 ]]; then
+        if [[ $CHANGED_MOBILE == true && $CHANGED_PATH_COUNT -eq 2 ]]; then
             CHANGED_MOBILE_ONLY=true
         fi
         CHANGED_DOCS=$(echo $CHANGED_PATHS | jq '. as $A | "docs" | IN($A[])')
-        if [[ $CHANGED_DOCS == true && $CHANGED_PATH_COUNT -eq 1 ]]; then
+        if [[ $CHANGED_DOCS == true && $CHANGED_PATH_COUNT -eq 2 ]]; then
             CHANGED_DOCS_ONLY=true
         fi
 
@@ -286,7 +286,7 @@ stages:
         AZP_BRANCH: $(Build.SourceBranch)
 
 - stage: linux_x64
-  dependsOn: ["precheck"]
+  dependsOn: []  # "precheck"]
   # For post-submit builds, continue even if precheck fails
   condition: and(not(canceled()), or(succeeded(), eq(variables['PostSubmit'], true)))
   jobs:
@@ -300,7 +300,7 @@ stages:
         ciTarget: bazel.release
 
 - stage: linux_arm64
-  dependsOn: ["precheck"]
+  dependsOn: []  # "precheck"]
   # For post-submit builds, continue even if precheck fails
   condition: and(not(canceled()), or(succeeded(), eq(variables['PostSubmit'], true)))
   jobs:
@@ -385,7 +385,7 @@ stages:
       displayName: "Verify packages"
 
 - stage: check
-  dependsOn: ["env", "linux_x64"]
+  dependsOn: ["env"]  # , "linux_x64"]
   jobs:
   - job: bazel
     displayName: "linux_x64"
