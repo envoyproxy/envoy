@@ -2,6 +2,8 @@
 
 #include "envoy/registry/registry.h"
 
+#include "source/common/common/fmt.h"
+
 #include "contrib/golang/filters/http/source/common/dso/dso.h"
 #include "contrib/golang/filters/http/source/golang_filter.h"
 
@@ -16,12 +18,14 @@ Http::FilterFactoryCb GolangFilterConfig::createFilterFactoryFromProtoTyped(
 
   FilterConfigSharedPtr config = std::make_shared<FilterConfig>(proto_config);
 
-  handler_ = context.lifecycleNotifier().registerCallback(
-      Server::ServerLifecycleNotifier::Stage::PostInit,
-      [lib_id = config->soId(), lib_path = config->soPath()] {
-        Envoy::Dso::DsoInstanceManager::pub(lib_id, lib_path);
-        // ENVOY_LOG(info, "open golang library at postInit: {} {}", lib_id, lib_path);
-      });
+  ENVOY_LOG_MISC(info, "open golang library at parse config: {} {}", config->soId(),
+                 config->soPath());
+
+  auto res = Envoy::Dso::DsoInstanceManager::pub(config->soId(), config->soPath());
+  if (!res) {
+    throw EnvoyException(
+        fmt::format("golang_filter: open library failed: {} {}", config->soId(), config->soPath()));
+  }
 
   return [&context, config](Http::FilterChainFactoryCallbacks& callbacks) {
     auto filter =

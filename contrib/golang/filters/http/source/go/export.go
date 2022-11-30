@@ -37,26 +37,26 @@ import (
     _ "github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http"
 )
 
-//go:linkname moeNewHttpPluginConfig github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.moeNewHttpPluginConfig
-//export moeNewHttpPluginConfig
-func moeNewHttpPluginConfig(configPtr uint64, configLen uint64) uint64
+//go:linkname envoyGoFilterNewHttpPluginConfig github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.envoyGoFilterNewHttpPluginConfig
+//export envoyGoFilterNewHttpPluginConfig
+func envoyGoFilterNewHttpPluginConfig(configPtr uint64, configLen uint64) uint64
 
-//go:linkname moeDestroyHttpPluginConfig github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.moeDestroyHttpPluginConfig
-//export moeDestroyHttpPluginConfig
-func moeDestroyHttpPluginConfig(id uint64)
+//go:linkname envoyGoFilterDestroyHttpPluginConfig github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.envoyGoFilterDestroyHttpPluginConfig
+//export envoyGoFilterDestroyHttpPluginConfig
+func envoyGoFilterDestroyHttpPluginConfig(id uint64)
 
-//go:linkname moeMergeHttpPluginConfig github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.moeMergeHttpPluginConfig
-//export moeMergeHttpPluginConfig
-func moeMergeHttpPluginConfig(parentId uint64, childId uint64) uint64
+//go:linkname envoyGoFilterMergeHttpPluginConfig github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.envoyGoFilterMergeHttpPluginConfig
+//export envoyGoFilterMergeHttpPluginConfig
+func envoyGoFilterMergeHttpPluginConfig(parentId uint64, childId uint64) uint64
 
-//go:linkname moeOnHttpHeader github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.moeOnHttpHeader
-//export moeOnHttpHeader
-func moeOnHttpHeader(r *C.httpRequest, endStream, headerNum, headerBytes uint64) uint64
+//go:linkname envoyGoFilterOnHttpHeader github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.envoyGoFilterOnHttpHeader
+//export envoyGoFilterOnHttpHeader
+func envoyGoFilterOnHttpHeader(r *C.httpRequest, endStream, headerNum, headerBytes uint64) uint64
 
-//go:linkname moeOnHttpData github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.moeOnHttpData
-//export moeOnHttpData
-func moeOnHttpData(r *C.httpRequest, endStream, buffer, length uint64) uint64
+//go:linkname envoyGoFilterOnHttpData github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.envoyGoFilterOnHttpData
+//export envoyGoFilterOnHttpData
+func envoyGoFilterOnHttpData(r *C.httpRequest, endStream, buffer, length uint64) uint64
 
-//go:linkname moeOnHttpDestroy github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.moeOnHttpDestroy
-//export moeOnHttpDestroy
-func moeOnHttpDestroy(r *C.httpRequest, reason uint64)
+//go:linkname envoyGoFilterOnHttpDestroy github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.envoyGoFilterOnHttpDestroy
+//export envoyGoFilterOnHttpDestroy
+func envoyGoFilterOnHttpDestroy(r *C.httpRequest, reason uint64)

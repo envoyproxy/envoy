@@ -245,7 +245,7 @@ void Filter::onDestroy() {
     auto& state = getProcessorState();
     auto reason = state.isProcessingInGo() ? DestroyReason::Terminate : DestroyReason::Normal;
 
-    dynamic_lib_->moeOnHttpDestroy(req_, int(reason));
+    dynamic_lib_->envoyGoFilterOnHttpDestroy(req_, int(reason));
   } catch (...) {
     ENVOY_LOG(error, "golang filter onDestroy do destoryStream catch "
                      "unknown exception.");
@@ -289,8 +289,8 @@ GolangStatus Filter::doHeadersGo(ProcessorState& state, Http::RequestOrResponseH
 
     req_->phase = static_cast<int>(state.phase());
     headers_ = &headers;
-    auto status =
-        dynamic_lib_->moeOnHttpHeader(req_, end_stream ? 1 : 0, headers.size(), headers.byteSize());
+    auto status = dynamic_lib_->envoyGoFilterOnHttpHeader(req_, end_stream ? 1 : 0, headers.size(),
+                                                          headers.byteSize());
     return static_cast<GolangStatus>(status);
 
   } catch (const EnvoyException& e) {
@@ -330,8 +330,8 @@ bool Filter::doDataGo(ProcessorState& state, Buffer::Instance& data, bool end_st
   try {
     ASSERT(req_ != nullptr);
     req_->phase = static_cast<int>(state.phase());
-    auto status = dynamic_lib_->moeOnHttpData(req_, end_stream ? 1 : 0,
-                                              reinterpret_cast<uint64_t>(&buffer), buffer.length());
+    auto status = dynamic_lib_->envoyGoFilterOnHttpData(
+        req_, end_stream ? 1 : 0, reinterpret_cast<uint64_t>(&buffer), buffer.length());
 
     return state.handleDataGolangStatus(static_cast<GolangStatus>(status));
 
@@ -396,7 +396,8 @@ bool Filter::doTrailerGo(ProcessorState& state, Http::HeaderMap& trailers) {
   try {
     ASSERT(req_ != nullptr);
     req_->phase = static_cast<int>(state.phase());
-    auto status = dynamic_lib_->moeOnHttpHeader(req_, 1, trailers.size(), trailers.byteSize());
+    auto status =
+        dynamic_lib_->envoyGoFilterOnHttpHeader(req_, 1, trailers.size(), trailers.byteSize());
     done = state.handleTrailerGolangStatus(static_cast<GolangStatus>(status));
 
   } catch (const EnvoyException& e) {
@@ -766,7 +767,7 @@ uint64_t Filter::getMergedConfigId(ProcessorState& state) {
         route_config_list.push_back(dynamic_cast<const FilterConfigPerRoute*>(&cfg));
       });
 
-  ENVOY_LOG(error, "golang filter route config list length: {}.", route_config_list.size());
+  ENVOY_LOG(info, "golang filter route config list length: {}.", route_config_list.size());
 
   auto id = config_->getConfigId();
   for (auto it : route_config_list) {
@@ -784,7 +785,7 @@ FilterConfig::FilterConfig(
     : plugin_name_(proto_config.plugin_name()), so_id_(proto_config.library_id()),
       so_path_(proto_config.library_path()), plugin_config_(proto_config.plugin_config()) {
   ENVOY_LOG(info, "initilizing golang filter config");
-  // NP: dso may not loaded yet, can not invoke moeNewHttpPluginConfig yet.
+  // NP: dso may not loaded yet, can not invoke envoyGoFilterNewHttpPluginConfig yet.
 };
 
 uint64_t FilterConfig::getConfigId() {
@@ -804,7 +805,7 @@ uint64_t FilterConfig::getConfigId() {
   }
   auto ptr = reinterpret_cast<unsigned long long>(str.data());
   auto len = str.length();
-  config_id_ = dlib->moeNewHttpPluginConfig(ptr, len);
+  config_id_ = dlib->envoyGoFilterNewHttpPluginConfig(ptr, len);
   if (config_id_ == 0) {
     ENVOY_LOG(error, "invalid golang plugin config");
   }
@@ -814,7 +815,7 @@ uint64_t FilterConfig::getConfigId() {
 FilterConfigPerRoute::FilterConfigPerRoute(
     const envoy::extensions::filters::http::golang::v3alpha::ConfigsPerRoute& config,
     Server::Configuration::ServerFactoryContext&) {
-  // NP: dso may not loaded yet, can not invoke moeNewHttpPluginConfig yet.
+  // NP: dso may not loaded yet, can not invoke envoyGoFilterNewHttpPluginConfig yet.
   ENVOY_LOG(info, "initilizing per route golang filter config");
 
   for (const auto& it : config.plugins_config()) {
@@ -856,7 +857,7 @@ uint64_t RoutePluginConfig::getMergedConfigId(uint64_t parent_id, std::string so
     }
     auto ptr = reinterpret_cast<unsigned long long>(str.data());
     auto len = str.length();
-    config_id_ = dlib->moeNewHttpPluginConfig(ptr, len);
+    config_id_ = dlib->envoyGoFilterNewHttpPluginConfig(ptr, len);
     if (config_id_ == 0) {
       // TODO: throw error
       ENVOY_LOG(error, "invalid golang plugin config");
@@ -865,7 +866,7 @@ uint64_t RoutePluginConfig::getMergedConfigId(uint64_t parent_id, std::string so
     ENVOY_LOG(debug, "golang filter new plugin config, id: {}", config_id_);
   }
 
-  merged_config_id_ = dlib->moeMergeHttpPluginConfig(parent_id, config_id_);
+  merged_config_id_ = dlib->envoyGoFilterMergeHttpPluginConfig(parent_id, config_id_);
   if (merged_config_id_ == 0) {
     // TODO: throw error
     ENVOY_LOG(error, "invalid golang plugin config");
@@ -877,7 +878,6 @@ uint64_t RoutePluginConfig::getMergedConfigId(uint64_t parent_id, std::string so
 
 /* ProcessorState */
 ProcessorState& Filter::getProcessorState() {
-  ASSERT(req_ != nullptr);
   return enter_encoding_ ? dynamic_cast<ProcessorState&>(encoding_state_)
                          : dynamic_cast<ProcessorState&>(decoding_state_);
 };

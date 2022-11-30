@@ -93,37 +93,40 @@ typedef struct { // NOLINT(modernize-use-using)
 extern "C" {
 #endif
 
-// go:linkname moeNewHttpPluginConfig
-// github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.moeNewHttpPluginConfig
-extern GoUint64 moeNewHttpPluginConfig(GoUint64 configPtr,  // NOLINT(readability-identifier-naming)
-                                       GoUint64 configLen); // NOLINT(readability-identifier-naming)
+// go:linkname envoyGoFilterNewHttpPluginConfig
+// github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.envoyGoFilterNewHttpPluginConfig
+extern GoUint64
+envoyGoFilterNewHttpPluginConfig(GoUint64 configPtr,  // NOLINT(readability-identifier-naming)
+                                 GoUint64 configLen); // NOLINT(readability-identifier-naming)
 
-// go:linkname moeDestroyHttpPluginConfig
-// github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.moeDestroyHttpPluginConfig
-extern void moeDestroyHttpPluginConfig(GoUint64 id);
+// go:linkname envoyGoFilterDestroyHttpPluginConfig
+// github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.envoyGoFilterDestroyHttpPluginConfig
+extern void envoyGoFilterDestroyHttpPluginConfig(GoUint64 id);
 
-// go:linkname moeMergeHttpPluginConfig
-// github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.moeMergeHttpPluginConfig
-extern GoUint64 moeMergeHttpPluginConfig(GoUint64 parentId, // NOLINT(readability-identifier-naming)
-                                         GoUint64 childId); // NOLINT(readability-identifier-naming)
+// go:linkname envoyGoFilterMergeHttpPluginConfig
+// github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.envoyGoFilterMergeHttpPluginConfig
+extern GoUint64
+envoyGoFilterMergeHttpPluginConfig(GoUint64 parentId, // NOLINT(readability-identifier-naming)
+                                   GoUint64 childId); // NOLINT(readability-identifier-naming)
 
-// go:linkname moeOnHttpHeader
-// github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.moeOnHttpHeader
-extern GoUint64 moeOnHttpHeader(httpRequest* r,
-                                GoUint64 endStream,    // NOLINT(readability-identifier-naming)
-                                GoUint64 headerNum,    // NOLINT(readability-identifier-naming)
-                                GoUint64 headerBytes); // NOLINT(readability-identifier-naming)
+// go:linkname envoyGoFilterOnHttpHeader
+// github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.envoyGoFilterOnHttpHeader
+extern GoUint64
+envoyGoFilterOnHttpHeader(httpRequest* r,
+                          GoUint64 endStream,    // NOLINT(readability-identifier-naming)
+                          GoUint64 headerNum,    // NOLINT(readability-identifier-naming)
+                          GoUint64 headerBytes); // NOLINT(readability-identifier-naming)
 
-// go:linkname moeOnHttpData
-// github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.moeOnHttpData
-extern GoUint64 moeOnHttpData(httpRequest* r,
-                              GoUint64 endStream, // NOLINT(readability-identifier-naming)
-                              GoUint64 buffer,
-                              GoUint64 length); // NOLINT(readability-identifier-naming)
+// go:linkname envoyGoFilterOnHttpData
+// github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.envoyGoFilterOnHttpData
+extern GoUint64 envoyGoFilterOnHttpData(httpRequest* r,
+                                        GoUint64 endStream, // NOLINT(readability-identifier-naming)
+                                        GoUint64 buffer,
+                                        GoUint64 length); // NOLINT(readability-identifier-naming)
 
-// go:linkname moeOnHttpDestroy
-// github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.moeOnHttpDestroy
-extern void moeOnHttpDestroy(httpRequest* r, GoUint64 reason);
+// go:linkname envoyGoFilterOnHttpDestroy
+// github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.envoyGoFilterOnHttpDestroy
+extern void envoyGoFilterOnHttpDestroy(httpRequest* r, GoUint64 reason);
 
 #ifdef __cplusplus
 }

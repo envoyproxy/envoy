@@ -1,5 +1,7 @@
 #include "contrib/golang/filters/http/source/common/dso/dso.h"
 
+#include "source/common/common/assert.h"
+
 namespace Envoy {
 namespace Dso {
 
@@ -8,8 +10,8 @@ absl::Mutex DsoInstanceManager::mutex_ = {};
 
 bool DsoInstanceManager::pub(std::string dso_id, std::string dso_name) {
   if (getDsoInstanceByID(dso_id) != nullptr) {
-    ENVOY_LOG_MISC(error, "pub {} {} dso instance failed: already pub.", dso_id, dso_name);
-    return false;
+    ENVOY_LOG_MISC(warn, "pub {} {} dso instance failed: already pub.", dso_id, dso_name);
+    return true;
   }
 
   absl::WriterMutexLock lock(&DsoInstanceManager::mutex_);
@@ -61,62 +63,66 @@ DsoInstance::DsoInstance(const std::string dso_name) : dso_name_(dso_name) {
 
   loaded_ = true;
 
-  auto func = dlsym(handler_, "moeNewHttpPluginConfig");
+  auto func = dlsym(handler_, "envoyGoFilterNewHttpPluginConfig");
   if (func) {
-    moe_new_http_plugin_config_ = reinterpret_cast<GoUint64 (*)(GoUint64 p0, GoUint64 p1)>(func);
+    envoy_go_filter_new_http_plugin_config_ =
+        reinterpret_cast<GoUint64 (*)(GoUint64 p0, GoUint64 p1)>(func);
   } else {
     loaded_ = false;
-    ENVOY_LOG_MISC(error, "lib: {}, cannot find symbol: moeNewHttpPluginConfig, err: {}", dso_name,
-                   dlerror());
-  }
-
-  func = dlsym(handler_, "moeMergeHttpPluginConfig");
-  if (func) {
-    moe_merge_http_plugin_config_ = reinterpret_cast<GoUint64 (*)(GoUint64 p0, GoUint64 p1)>(func);
-  } else {
-    loaded_ = false;
-    ENVOY_LOG_MISC(error, "lib: {}, cannot find symbol: moeMergeHttpPluginConfig, err: {}",
+    ENVOY_LOG_MISC(error, "lib: {}, cannot find symbol: envoyGoFilterNewHttpPluginConfig, err: {}",
                    dso_name, dlerror());
   }
 
-  func = dlsym(handler_, "moeOnHttpHeader");
+  func = dlsym(handler_, "envoyGoFilterMergeHttpPluginConfig");
   if (func) {
-    moe_on_http_header_ =
+    envoy_go_filter_merge_http_plugin_config_ =
+        reinterpret_cast<GoUint64 (*)(GoUint64 p0, GoUint64 p1)>(func);
+  } else {
+    loaded_ = false;
+    ENVOY_LOG_MISC(error,
+                   "lib: {}, cannot find symbol: envoyGoFilterMergeHttpPluginConfig, err: {}",
+                   dso_name, dlerror());
+  }
+
+  func = dlsym(handler_, "envoyGoFilterOnHttpHeader");
+  if (func) {
+    envoy_go_filter_on_http_header_ =
         reinterpret_cast<GoUint64 (*)(httpRequest * p0, GoUint64 p1, GoUint64 p2, GoUint64 p3)>(
             func);
   } else {
     loaded_ = false;
-    ENVOY_LOG_MISC(error, "lib: {}, cannot find symbol: moeOnHttpHeader, err: {}", dso_name,
-                   dlerror());
+    ENVOY_LOG_MISC(error, "lib: {}, cannot find symbol: envoyGoFilterOnHttpHeader, err: {}",
+                   dso_name, dlerror());
   }
 
-  func = dlsym(handler_, "moeOnHttpData");
+  func = dlsym(handler_, "envoyGoFilterOnHttpData");
   if (func) {
-    moe_on_http_data_ =
+    envoy_go_filter_on_http_data_ =
         reinterpret_cast<GoUint64 (*)(httpRequest * p0, GoUint64 p1, GoUint64 p2, GoUint64 p3)>(
             func);
   } else {
     loaded_ = false;
-    ENVOY_LOG_MISC(error, "lib: {}, cannot find symbol: moeOnHttpDecodeData, err: {}", dso_name,
-                   dlerror());
+    ENVOY_LOG_MISC(error, "lib: {}, cannot find symbol: envoyGoFilterOnHttpDecodeData, err: {}",
+                   dso_name, dlerror());
   }
 
-  func = dlsym(handler_, "moeOnHttpDestroy");
+  func = dlsym(handler_, "envoyGoFilterOnHttpDestroy");
   if (func) {
-    moe_on_http_destroy_ = reinterpret_cast<void (*)(httpRequest * p0, GoUint64 p1)>(func);
+    envoy_go_filter_on_http_destroy_ =
+        reinterpret_cast<void (*)(httpRequest * p0, GoUint64 p1)>(func);
   } else {
     loaded_ = false;
-    ENVOY_LOG_MISC(error, "lib: {}, cannot find symbol: moeOnHttpDecodeDestroy, err: {}", dso_name,
-                   dlerror());
+    ENVOY_LOG_MISC(error, "lib: {}, cannot find symbol: envoyGoFilterOnHttpDecodeDestroy, err: {}",
+                   dso_name, dlerror());
   }
 }
 
 DsoInstance::~DsoInstance() {
-  moe_new_http_plugin_config_ = nullptr;
-  moe_merge_http_plugin_config_ = nullptr;
-  moe_on_http_header_ = nullptr;
-  moe_on_http_data_ = nullptr;
-  moe_on_http_destroy_ = nullptr;
+  envoy_go_filter_new_http_plugin_config_ = nullptr;
+  envoy_go_filter_merge_http_plugin_config_ = nullptr;
+  envoy_go_filter_on_http_header_ = nullptr;
+  envoy_go_filter_on_http_data_ = nullptr;
+  envoy_go_filter_on_http_destroy_ = nullptr;
 
   if (handler_ != nullptr) {
     dlclose(handler_);
@@ -124,31 +130,31 @@ DsoInstance::~DsoInstance() {
   }
 }
 
-GoUint64 DsoInstance::moeNewHttpPluginConfig(GoUint64 p0, GoUint64 p1) {
-  // TODO: use ASSERT instead
-  assert(moe_new_http_plugin_config_ != nullptr);
-  return moe_new_http_plugin_config_(p0, p1);
+GoUint64 DsoInstance::envoyGoFilterNewHttpPluginConfig(GoUint64 p0, GoUint64 p1) {
+  ASSERT(envoy_go_filter_new_http_plugin_config_ != nullptr);
+  return envoy_go_filter_new_http_plugin_config_(p0, p1);
 }
 
-GoUint64 DsoInstance::moeMergeHttpPluginConfig(GoUint64 p0, GoUint64 p1) {
-  // TODO: use ASSERT instead
-  assert(moe_merge_http_plugin_config_ != nullptr);
-  return moe_merge_http_plugin_config_(p0, p1);
+GoUint64 DsoInstance::envoyGoFilterMergeHttpPluginConfig(GoUint64 p0, GoUint64 p1) {
+  ASSERT(envoy_go_filter_merge_http_plugin_config_ != nullptr);
+  return envoy_go_filter_merge_http_plugin_config_(p0, p1);
 }
 
-GoUint64 DsoInstance::moeOnHttpHeader(httpRequest* p0, GoUint64 p1, GoUint64 p2, GoUint64 p3) {
-  assert(moe_on_http_header_ != nullptr);
-  return moe_on_http_header_(p0, p1, p2, p3);
+GoUint64 DsoInstance::envoyGoFilterOnHttpHeader(httpRequest* p0, GoUint64 p1, GoUint64 p2,
+                                                GoUint64 p3) {
+  ASSERT(envoy_go_filter_on_http_header_ != nullptr);
+  return envoy_go_filter_on_http_header_(p0, p1, p2, p3);
 }
 
-GoUint64 DsoInstance::moeOnHttpData(httpRequest* p0, GoUint64 p1, GoUint64 p2, GoUint64 p3) {
-  assert(moe_on_http_data_ != nullptr);
-  return moe_on_http_data_(p0, p1, p2, p3);
+GoUint64 DsoInstance::envoyGoFilterOnHttpData(httpRequest* p0, GoUint64 p1, GoUint64 p2,
+                                              GoUint64 p3) {
+  ASSERT(envoy_go_filter_on_http_data_ != nullptr);
+  return envoy_go_filter_on_http_data_(p0, p1, p2, p3);
 }
 
-void DsoInstance::moeOnHttpDestroy(httpRequest* p0, int p1) {
-  assert(moe_on_http_destroy_ != nullptr);
-  moe_on_http_destroy_(p0, GoUint64(p1));
+void DsoInstance::envoyGoFilterOnHttpDestroy(httpRequest* p0, int p1) {
+  ASSERT(envoy_go_filter_on_http_destroy_ != nullptr);
+  envoy_go_filter_on_http_destroy_(p0, GoUint64(p1));
 }
 
 } // namespace Dso

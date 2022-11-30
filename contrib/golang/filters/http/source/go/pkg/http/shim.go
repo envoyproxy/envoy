@@ -99,7 +99,7 @@ func getRequest(r *C.httpRequest) *httpRequest {
     return Requests.GetReq(r)
 }
 
-func moeOnHttpHeader(r *C.httpRequest, endStream, headerNum, headerBytes uint64) uint64 {
+func envoyGoFilterOnHttpHeader(r *C.httpRequest, endStream, headerNum, headerBytes uint64) uint64 {
     var req *httpRequest
     phase := api.EnvoyRequestPhase(r.phase)
     if phase == api.DecodeHeaderPhase {
@@ -134,7 +134,7 @@ func moeOnHttpHeader(r *C.httpRequest, endStream, headerNum, headerBytes uint64)
     return uint64(status)
 }
 
-func moeOnHttpData(r *C.httpRequest, endStream, buffer, length uint64) uint64 {
+func envoyGoFilterOnHttpData(r *C.httpRequest, endStream, buffer, length uint64) uint64 {
     req := getRequest(r)
 
     f := req.httpFilter
@@ -155,7 +155,7 @@ func moeOnHttpData(r *C.httpRequest, endStream, buffer, length uint64) uint64 {
     return uint64(status)
 }
 
-func moeOnHttpDestroy(r *C.httpRequest, reason uint64) {
+func envoyGoFilterOnHttpDestroy(r *C.httpRequest, reason uint64) {
     req := getRequest(r)
 
     v := api.DestroyReason(reason)

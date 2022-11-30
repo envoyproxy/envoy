@@ -46,7 +46,7 @@ var (
     configCache        = &sync.Map{} // uint64 -> *anypb.Any
 )
 
-func moeNewHttpPluginConfig(configPtr uint64, configLen uint64) uint64 {
+func envoyGoFilterNewHttpPluginConfig(configPtr uint64, configLen uint64) uint64 {
     buf := utils.BytesToSlice(configPtr, configLen)
     var any anypb.Any
     proto.Unmarshal(buf, &any)
@@ -61,11 +61,11 @@ func moeNewHttpPluginConfig(configPtr uint64, configLen uint64) uint64 {
     return configNum
 }
 
-func moeDestroyHttpPluginConfig(id uint64) {
+func envoyGoFilterDestroyHttpPluginConfig(id uint64) {
     configCache.Delete(id)
 }
 
-func moeMergeHttpPluginConfig(parentId uint64, childId uint64) uint64 {
+func envoyGoFilterMergeHttpPluginConfig(parentId uint64, childId uint64) uint64 {
     if httpFilterConfigParser != nil {
         parent, ok := configCache.Load(parentId)
         if !ok {

@@ -107,8 +107,8 @@ public:
                   Dso::DsoInstance* dynamic_lib)
       : config_(config), dynamic_lib_(dynamic_lib), decoding_state_(*this), encoding_state_(*this),
         context_(context), stream_id_(sid) {
-    (void)context_;
-    (void)stream_id_;
+    UNREFERENCED_PARAMETER(context_);
+    UNREFERENCED_PARAMETER(stream_id_);
   }
 
   // Http::StreamFilterBase

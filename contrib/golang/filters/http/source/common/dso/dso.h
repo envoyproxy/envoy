@@ -17,13 +17,13 @@ public:
   DsoInstance(const std::string dso_name);
   ~DsoInstance();
 
-  GoUint64 moeNewHttpPluginConfig(GoUint64 p0, GoUint64 p1);
-  GoUint64 moeMergeHttpPluginConfig(GoUint64 p0, GoUint64 p1);
+  GoUint64 envoyGoFilterNewHttpPluginConfig(GoUint64 p0, GoUint64 p1);
+  GoUint64 envoyGoFilterMergeHttpPluginConfig(GoUint64 p0, GoUint64 p1);
 
-  GoUint64 moeOnHttpHeader(httpRequest* p0, GoUint64 p1, GoUint64 p2, GoUint64 p3);
-  GoUint64 moeOnHttpData(httpRequest* p0, GoUint64 p1, GoUint64 p2, GoUint64 p3);
+  GoUint64 envoyGoFilterOnHttpHeader(httpRequest* p0, GoUint64 p1, GoUint64 p2, GoUint64 p3);
+  GoUint64 envoyGoFilterOnHttpData(httpRequest* p0, GoUint64 p1, GoUint64 p2, GoUint64 p3);
 
-  void moeOnHttpDestroy(httpRequest* p0, int p1);
+  void envoyGoFilterOnHttpDestroy(httpRequest* p0, int p1);
 
   bool loaded() { return loaded_; }
 
@@ -32,14 +32,15 @@ private:
   void* handler_{nullptr};
   bool loaded_{false};
 
-  GoUint64 (*moe_new_http_plugin_config_)(GoUint64 p0, GoUint64 p1) = {nullptr};
-  GoUint64 (*moe_merge_http_plugin_config_)(GoUint64 p0, GoUint64 p1) = {nullptr};
+  GoUint64 (*envoy_go_filter_new_http_plugin_config_)(GoUint64 p0, GoUint64 p1) = {nullptr};
+  GoUint64 (*envoy_go_filter_merge_http_plugin_config_)(GoUint64 p0, GoUint64 p1) = {nullptr};
 
-  GoUint64 (*moe_on_http_header_)(httpRequest* p0, GoUint64 p1, GoUint64 p2,
-                                  GoUint64 p3) = {nullptr};
-  GoUint64 (*moe_on_http_data_)(httpRequest* p0, GoUint64 p1, GoUint64 p2, GoUint64 p3) = {nullptr};
+  GoUint64 (*envoy_go_filter_on_http_header_)(httpRequest* p0, GoUint64 p1, GoUint64 p2,
+                                              GoUint64 p3) = {nullptr};
+  GoUint64 (*envoy_go_filter_on_http_data_)(httpRequest* p0, GoUint64 p1, GoUint64 p2,
+                                            GoUint64 p3) = {nullptr};
 
-  void (*moe_on_http_destroy_)(httpRequest* p0, GoUint64 p1) = {nullptr};
+  void (*envoy_go_filter_on_http_destroy_)(httpRequest* p0, GoUint64 p1) = {nullptr};
 };
 
 class DsoInstanceManager {

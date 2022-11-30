@@ -18,5 +18,6 @@ envoy_cc_library(
     ],
     deps = [
         "//source/common/common:minimal_logger_lib",
+        "//source/common/common:utility_lib",
     ],
 )
