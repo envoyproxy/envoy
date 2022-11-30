@@ -54,7 +54,7 @@ public:
   configure(const Protobuf::RepeatedPtrField<HeaderValueOption>& headers_to_add,
             const Protobuf::RepeatedPtrField<std::string>& headers_to_remove);
 
-  static HeaderParser& defaultParser() {
+  static const HeaderParser& defaultParser() {
     static HeaderParser* instance = new HeaderParser();
     return *instance;
   }
