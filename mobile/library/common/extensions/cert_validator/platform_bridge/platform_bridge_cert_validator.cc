@@ -53,6 +53,11 @@ ValidationResults PlatformBridgeCertValidator::doVerifyCertChain(
   if (callback == nullptr) {
     callback = ssl_extended_info->createValidateResultCallback();
   }
+  if (callback == nullptr) {
+    IS_ENVOY_BUG("No callback specified");
+    const char* error = "verify cert chain failed: no callback specified.";
+    return {ValidationResults::ValidationStatus::Failed, absl::nullopt, error};
+  }
 
   std::vector<envoy_data> certs;
   for (uint64_t i = 0; i < sk_X509_num(&cert_chain); i++) {
