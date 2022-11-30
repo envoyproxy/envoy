@@ -232,8 +232,6 @@ envoy_cc_benchmark_binary(
     external_deps = [
         "benchmark",
     ],
-        copts = ["opt",
-        ],
     deps = [
         ":real_thread_test_base",
         "//source/common/common:random_generator_lib",
