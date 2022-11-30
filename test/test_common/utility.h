@@ -551,13 +551,17 @@ public:
     return "UnknownHttp1Impl";
   }
 
+  static std::string ipVersionToString(Network::Address::IpVersion ip_version) {
+    return ip_version == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6";
+  }
+
   // Allows pretty printed test names for TEST_P using TestEnvironment::getIpVersionsForTest().
   //
   // Tests using this will be of the form IpVersions/SslSocketTest.HalfClose/IPv4
   // instead of IpVersions/SslSocketTest.HalfClose/1
   static std::string
   ipTestParamsToString(const ::testing::TestParamInfo<Network::Address::IpVersion>& params) {
-    return params.param == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6";
+    return ipVersionToString(params.param);
   }
 
   /**

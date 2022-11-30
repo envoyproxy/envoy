@@ -19,8 +19,6 @@ jobs:
     timeout-minutes: 120
     steps:
     - uses: actions/checkout@v1
-      with:
-        submodules: true
     - id: check_context
       name: 'Check whether to run'
       run: |
@@ -52,8 +50,6 @@ jobs:
     timeout-minutes: 120
     steps:
     - uses: actions/checkout@v1
-      with:
-        submodules: true
     - id: check_context
       name: 'Check whether to run'
       run: |
