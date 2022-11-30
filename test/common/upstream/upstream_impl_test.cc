@@ -1383,7 +1383,7 @@ TEST_F(HostImplTest, HostnameCanaryAndLocality) {
   locality.set_sub_zone("world");
   HostImpl host(cluster.info_, "lyft.com", Network::Utility::resolveUrl("tcp://10.0.0.1:1234"),
                 std::make_shared<const envoy::config::core::v3::Metadata>(metadata), 1, locality,
-                envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
+                envoy::config::endpoint::v3::Endpoint::HostConstSharedPtr::default_instance(), 1,
                 envoy::config::core::v3::UNKNOWN, simTime());
   EXPECT_EQ(cluster.info_.get(), &host.cluster());
   EXPECT_EQ("lyft.com", host.hostname());
@@ -1618,6 +1618,24 @@ TEST_F(HostImplTest, HealthcheckHostname) {
                             envoy::config::core::v3::Locality().default_instance(), config, 1,
                             simTime());
   EXPECT_EQ("foo", descr.hostnameForHealthChecks());
+}
+
+// Test that hostname flag from the health check config propagates.
+TEST_F(HostImplTest, RealHostDescription) {
+  MockClusterMockPrioritySet cluster;
+  envoy::config::core::v3::Metadata metadata;
+  Config::Metadata::mutableMetadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
+                                         Config::MetadataEnvoyLbKeys::get().CANARY)
+      .set_bool_value(true);
+  Network::Address::InstanceConstSharedPtr address =
+      Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
+  auto host = std::make_shared<HostImpl>(
+      cluster.info_, "lyft.com", address,
+      std::make_shared<const envoy::config::core::v3::Metadata>(metadata), 1, envoy::config::core::v3::Locality::default_instance(),
+      envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
+      envoy::config::core::v3::UNKNOWN, simTime());
+  RealHostDescription real_host(address, host);
+
 }
 
 class StaticClusterImplTest : public testing::Test, public UpstreamImplTestBase {};
