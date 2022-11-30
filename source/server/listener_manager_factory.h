@@ -1,6 +1,11 @@
 #pragma once
 
 #include "envoy/config/typed_config.h"
+#include "envoy/server/instance.h"
+#include "envoy/server/listener_manager.h"
+#include "envoy/server/worker.h"
+
+#include "source/common/quic/quic_stat_names.h"
 
 namespace Envoy {
 namespace Server {
