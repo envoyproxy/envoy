@@ -47,10 +47,10 @@ public:
   const bool lazy_init_;
   const uint64_t num_clusters_;
   Stats::Store& stat_store_;
-  Upstream::ClusterTrafficStatNames stat_names_;
   std::vector<Stats::ScopeSharedPtr> scopes_;
   std::vector<std::shared_ptr<Stats::LazyInit<ClusterTrafficStats>>> lazy_stats_;
   std::vector<std::shared_ptr<ClusterTrafficStats>> normal_stats_;
+  Upstream::ClusterTrafficStatNames stat_names_;
 };
 
 // Benchmark no-lazy-init on stats, the lazy init version is much faster since no allocation.
@@ -64,7 +64,7 @@ void benchmarkLazyInitCreation(::benchmark::State& state) {
 }
 
 BENCHMARK(benchmarkLazyInitCreation)
-    ->ArgsProduct({{0, 1}, {1000, 10000, 20000, 100000}})
+    ->ArgsProduct({{0, 1}, {1000, 10000, 20000}})
     ->Unit(::benchmark::kMillisecond);
 
 // Benchmark lazy-init of stats in same thread, mimics main thread creation.
@@ -78,7 +78,7 @@ void benchmarkLazyInitCreationInstantiateSameThread(::benchmark::State& state) {
 }
 
 BENCHMARK(benchmarkLazyInitCreationInstantiateSameThread)
-    ->ArgsProduct({{0, 1}, {1000, 10000, 20000, 100000}})
+    ->ArgsProduct({{0, 1}, {1000, 10000, 20000}})
     ->Unit(::benchmark::kMillisecond);
 
 class MultiThreadLazyinitStatsTest : public ThreadLocalRealThreadsTestBase,
@@ -87,12 +87,11 @@ public:
   MultiThreadLazyinitStatsTest(bool lazy, const uint64_t n_clusters)
       : ThreadLocalRealThreadsTestBase(5),
         LazyInitStatsBenchmarkBase(lazy, n_clusters, *ThreadLocalRealThreadsTestBase::store_) {}
-  ProcessWide process_wide_; // Process-wide state setup/teardown (excluding grpc).
 };
 
 // Benchmark lazy-init stats in different worker threads, mimics worker threads creation.
 void benchmarkLazyInitCreationInstantiateOnWorkerThreads(::benchmark::State& state) {
-
+  ProcessWide process_wide_; // Process-wide state setup/teardown (excluding grpc).
   MultiThreadLazyinitStatsTest test(state.range(0) == 1, state.range(1));
 
   for (auto _ : state) {           // NOLINT: Silences warning about dead store
@@ -121,11 +120,12 @@ void benchmarkLazyInitCreationInstantiateOnWorkerThreads(::benchmark::State& sta
 }
 
 BENCHMARK(benchmarkLazyInitCreationInstantiateOnWorkerThreads)
-    ->ArgsProduct({{0, 1}, {1000, 10000, 20000, 100000}})
+    ->ArgsProduct({{0, 1}, {1000, 10000, 20000}})
     ->Unit(::benchmark::kMillisecond);
 
 // Benchmark mimics that worker threads inc the stats.
 void benchmarkLazyInitStatsAccess(::benchmark::State& state) {
+  ProcessWide process_wide_; // Process-wide state setup/teardown (excluding grpc).
   MultiThreadLazyinitStatsTest test(state.range(0) == 1, state.range(1));
 
   for (auto _ : state) {           // NOLINT: Silences warning about dead store
@@ -148,7 +148,7 @@ void benchmarkLazyInitStatsAccess(::benchmark::State& state) {
 }
 
 BENCHMARK(benchmarkLazyInitStatsAccess)
-    ->ArgsProduct({{0, 1}, {1000, 10000, 20000, 100000}})
+    ->ArgsProduct({{0, 1}, {1000, 10000, 20000}})
     ->Unit(::benchmark::kMillisecond);
 
 } // namespace Stats
