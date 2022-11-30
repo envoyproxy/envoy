@@ -261,6 +261,7 @@ public:
 
   /**
    * NOTE: This may throw exception std::out_of_range if type or key doesn't exist.
+   * use contains(type, key) to check exist first.
    */
   V& at(const T& type, const K& key) { return caches_.at(type).at(key); }
   Cache<K, V>& at(const T& type) { return caches_.at(type); }

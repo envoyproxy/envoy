@@ -32,13 +32,9 @@ void TrafficRoutingAssistantHandler::updateTrafficRoutingAssistant(
     const std::string& type, const std::string& key, const std::string& val,
     const absl::optional<TraContextMap> context) {
 
-  bool should_update_tra = false;
-  try {
-    if (cache_manager_.at(type, key) != val) {
-      should_update_tra = true;
-    }
-  } catch (std::out_of_range) {
-    should_update_tra = true;
+  bool should_update_tra = true;
+  if (cache_manager_.contains(type, key) && (cache_manager_.at(type, key) == val)) {
+    should_update_tra = false;
   }
 
   if (should_update_tra) {
@@ -54,11 +50,10 @@ void TrafficRoutingAssistantHandler::updateTrafficRoutingAssistant(
 QueryStatus TrafficRoutingAssistantHandler::retrieveTrafficRoutingAssistant(
     const std::string& type, const std::string& key, const absl::optional<TraContextMap> context,
     SipFilters::DecoderFilterCallbacks& activetrans, std::string& host) {
-  try {
+
+  if (cache_manager_.contains(type, key)) {
     host = cache_manager_.at(type, key);
     return QueryStatus::Continue;
-  } catch (std::out_of_range) {
-    // type, key doesn't exist, continue
   }
 
   if (activetrans.metadata()->affinityIteration()->query()) {
