@@ -56,6 +56,9 @@ bug_fixes:
 - area: validation
   change: |
     fixed a crash which could happen when optional ``engine_type`` is not provided in regex.
+- area: upstream
+  change: |
+    fixed a bug when specify both a single address in bootstrap and cluster upstream binding config but with a different IP version. It should be allowed but it is rejected.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
