@@ -231,6 +231,13 @@ envoy.filters.http.cdn_loop:
   status: alpha
   type_urls:
   - envoy.extensions.filters.http.cdn_loop.v3.CdnLoopConfig
+envoy.filters.http.geoip:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.geoip.v3.GeoipConfig
 envoy.filters.http.upstream_codec:
   categories:
   - envoy.filters.http.upstream
