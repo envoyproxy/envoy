@@ -1433,8 +1433,9 @@ virtual_hosts:
                 - match:
                     prefix: /
                     headers:
-                    - name: "x-match-header"
-                      exact_match: "matched"
+                    - name: x-match-header
+                      string_match:
+                        exact: matched
                   route:
                     cluster: root_ww2
                   request_headers_to_add:

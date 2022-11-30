@@ -2139,7 +2139,9 @@ message RateLimit {
 //
 //     {
 //       "name": ":method",
-//       "exact_match": "POST"
+//       "string_match": {
+//         "exact": "POST"
+//       }
 //     }
 //
 // .. attention::
