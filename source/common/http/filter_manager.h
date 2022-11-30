@@ -43,11 +43,13 @@ struct ActiveStreamFilterBase;
  */
 struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
                                 Logger::Loggable<Logger::Id::http> {
-  ActiveStreamFilterBase(FilterManager& parent, bool dual_filter, FilterContext filter_context)
+  ActiveStreamFilterBase(FilterManager& parent, bool is_encoder_decoder_filter,
+                         FilterContext filter_context)
       : parent_(parent), iteration_state_(IterationState::Continue),
         filter_context_(std::move(filter_context)), iterate_from_current_filter_(false),
         headers_continued_(false), continued_1xx_headers_(false), end_stream_(false),
-        dual_filter_(dual_filter), decode_headers_called_(false), encode_headers_called_(false) {}
+        is_encoder_decoder_filter_(is_encoder_decoder_filter), decode_headers_called_(false),
+        encode_headers_called_(false) {}
 
   // Functions in the following block are called after the filter finishes processing
   // corresponding data. Those functions handle state updates and data storage (if needed)
@@ -157,7 +159,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   bool continued_1xx_headers_ : 1;
   // If true, end_stream is called for this filter.
   bool end_stream_ : 1;
-  const bool dual_filter_ : 1;
+  const bool is_encoder_decoder_filter_ : 1;
   bool decode_headers_called_ : 1;
   bool encode_headers_called_ : 1;
 };
@@ -169,8 +171,8 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
                                    public StreamDecoderFilterCallbacks,
                                    LinkedObject<ActiveStreamDecoderFilter> {
   ActiveStreamDecoderFilter(FilterManager& parent, StreamDecoderFilterSharedPtr filter,
-                            bool dual_filter, FilterContext filter_context)
-      : ActiveStreamFilterBase(parent, dual_filter, std::move(filter_context)),
+                            bool is_encoder_decoder_filter, FilterContext filter_context)
+      : ActiveStreamFilterBase(parent, is_encoder_decoder_filter, std::move(filter_context)),
         handle_(std::move(filter)) {
     handle_->setDecoderFilterCallbacks(*this);
   }
@@ -263,8 +265,8 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
                                    public StreamEncoderFilterCallbacks,
                                    LinkedObject<ActiveStreamEncoderFilter> {
   ActiveStreamEncoderFilter(FilterManager& parent, StreamEncoderFilterSharedPtr filter,
-                            bool dual_filter, FilterContext filter_context)
-      : ActiveStreamFilterBase(parent, dual_filter, std::move(filter_context)),
+                            bool is_encoder_decoder_filter, FilterContext filter_context)
+      : ActiveStreamFilterBase(parent, is_encoder_decoder_filter, std::move(filter_context)),
         handle_(std::move(filter)) {
     handle_->setEncoderFilterCallbacks(*this);
   }
@@ -675,7 +677,7 @@ public:
 
     for (auto& filter : encoder_filters_) {
       // Do not call onStreamComplete twice for dual registered filters.
-      if (!filter->dual_filter_) {
+      if (!filter->is_encoder_decoder_filter_) {
         filter->handle_->onStreamComplete();
       }
     }
@@ -690,7 +692,7 @@ public:
 
     for (auto& filter : encoder_filters_) {
       // Do not call on destroy twice for dual registered filters.
-      if (!filter->dual_filter_) {
+      if (!filter->is_encoder_decoder_filter_) {
         filter->handle_->onDestroy();
       }
     }
