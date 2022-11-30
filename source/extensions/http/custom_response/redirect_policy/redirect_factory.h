@@ -13,8 +13,6 @@ class RedirectFactory
     : public Extensions::HttpFilters::CustomResponse::PolicyMatchActionFactory<
           envoy::extensions::http::custom_response::redirect_policy::v3::RedirectPolicy> {
 public:
-  ~RedirectFactory() override;
-
   Extensions::HttpFilters::CustomResponse::PolicySharedPtr
   createPolicy(const Protobuf::Message& config,
                Envoy::Server::Configuration::ServerFactoryContext& server,

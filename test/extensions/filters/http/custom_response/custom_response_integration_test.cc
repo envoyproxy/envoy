@@ -45,8 +45,7 @@ public:
     // Add a virtual host corresponding to redirected route for
     // gateway_error_action in kDefaultConfig. Note that the redirect policy
     // overwrites the response code specified here.
-    config_helper_.addVirtualHost(
-        TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(R"EOF(
+    config_helper_.addVirtualHost(TestUtility::parseYaml<VirtualHost>(R"EOF(
     name: foo
     domains: ["foo.example"]
     routes:
@@ -331,7 +330,7 @@ TEST_P(CustomResponseIntegrationTest, OnlyRouteSpecificFilter) {
 // Verify that the route specific filter is picked if specified.
 TEST_P(CustomResponseIntegrationTest, NoRecursion) {
   // Make the redirect policy response for gateway_error policy return 401
-  config_helper_.addVirtualHost(TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(R"EOF(
+  config_helper_.addVirtualHost(TestUtility::parseYaml<VirtualHost>(R"EOF(
     name: fo1
     domains: ["fo1.example"]
     routes:
@@ -537,7 +536,7 @@ typed_config:
 // header.
 TEST_P(CustomResponseIntegrationTest, RouteHeaderMatch) {
   // Add route with header matcher
-  config_helper_.addVirtualHost(TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(R"EOF(
+  config_helper_.addVirtualHost(TestUtility::parseYaml<VirtualHost>(R"EOF(
     name: cer-only-host
     domains: ["host.with.route.with.header.matcher"]
     routes:
