@@ -51,6 +51,7 @@ envoy_cc_test(
     srcs = ["golang_integration_test.cc"],
     data = [
         "//contrib/golang/filters/http/test/test_data/echo:filter.so",
+        "//contrib/golang/filters/http/test/test_data/passthrough:filter.so",
     ],
     env = {"GODEBUG": "cgocheck=0"},
     deps = [
