@@ -1741,8 +1741,7 @@ struct FrameIntegrationTestParam {
 
 std::string
 frameIntegrationTestParamToString(const testing::TestParamInfo<FrameIntegrationTestParam>& params) {
-  const bool is_ipv4 = params.param.ip_version == Network::Address::IpVersion::v4;
-  return is_ipv4 ? "IPv4" : "IPv6";
+  return TestUtility::ipVersionToString(params.param.ip_version);
 }
 
 class Http2FrameIntegrationTest : public testing::TestWithParam<FrameIntegrationTestParam>,
