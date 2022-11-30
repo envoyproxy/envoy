@@ -484,7 +484,7 @@ Specify whether to use platform provided certificate validation interfaces. Curr
 ``enableProxying``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 Specify whether to respect system Proxy settings when establishing connections.
-Available on Andorid only.
+Available on Android only.
 
 **Example**::
 

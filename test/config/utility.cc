@@ -1408,16 +1408,23 @@ void ConfigHelper::initializeTls(
   } else {
     if (options.client_with_intermediate_cert_) {
       validation_context->add_verify_certificate_hash(TEST_CLIENT2_CERT_HASH);
-      std::string cert_yaml = R"EOF(
+      std::string cert_yaml;
+      if (options.trust_root_only_) {
+        cert_yaml = R"EOF(
         trusted_ca:
-          filename: "{{ test_rundir }}/test/config/integration/certs/intermediate_ca_cert_chain.pem"
+          filename: "{{ test_rundir }}/test/config/integration/certs/cacert.pem"
       )EOF";
-      if (options.max_verify_depth_) {
-        cert_yaml += R"EOF(
-        max_verify_depth: 1
+      } else {
+        cert_yaml = R"EOF(
+        trusted_ca:
+          filename: "{{ test_rundir }}/test/config/integration/certs/intermediate_partial_ca_cert_chain.pem"
       )EOF";
       }
       TestUtility::loadFromYaml(TestEnvironment::substitute(cert_yaml), *validation_context);
+      if (options.max_verify_depth_.has_value()) {
+        validation_context->mutable_max_verify_depth()->set_value(
+            options.max_verify_depth_.value());
+      }
     } else {
       validation_context->mutable_trusted_ca()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));

@@ -11,6 +11,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/singleton/manager_impl.h"
 #include "source/common/version/version.h"
+#include "source/server/regex_engine.h"
 #include "source/server/ssl_context_manager.h"
 
 namespace Envoy {
@@ -82,6 +83,10 @@ void ValidationInstance::initialize(const Options& options,
   InstanceUtil::loadBootstrapConfig(bootstrap_, options,
                                     messageValidationContext().staticValidationVisitor(), *api_);
 
+  // Inject regex engine to singleton.
+  Regex::EnginePtr regex_engine = createRegexEngine(
+      bootstrap_, messageValidationContext().staticValidationVisitor(), serverFactoryContext());
+
   Config::Utility::createTagProducer(bootstrap_, options_.statsTags());
   if (!bootstrap_.node().user_agent_build_version().has_version()) {
     *bootstrap_.mutable_node()->mutable_user_agent_build_version() = VersionInfo::buildVersion();
@@ -97,8 +102,9 @@ void ValidationInstance::initialize(const Options& options,
   Configuration::InitialImpl initial_config(bootstrap_);
   initial_config.initAdminAccessLog(bootstrap_, *this);
   admin_ = std::make_unique<Server::ValidationAdmin>(initial_config.admin().address());
-  listener_manager_ =
-      std::make_unique<ListenerManagerImpl>(*this, *this, *this, false, quic_stat_names_);
+  listener_manager_ = std::make_unique<ListenerManagerImpl>(
+      *this, std::make_unique<ValidationListenerComponentFactory>(*this), *this, false,
+      quic_stat_names_);
   thread_local_.registerThread(*dispatcher_, true);
 
   Runtime::LoaderPtr runtime_ptr = component_factory.createRuntime(*this, initial_config);

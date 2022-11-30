@@ -16,9 +16,11 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/matchers.h"
+#include "source/common/common/utility.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/runtime/runtime_protos.h"
+#include "source/extensions/filters/common/ext_authz/check_request_utils.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz_http_impl.h"
@@ -94,6 +96,29 @@ public:
         destination_labels_[labels_it.first] = labels_it.second.string_value();
       }
     }
+
+    if (config.has_allowed_headers() &&
+        config.http_service().authorization_request().has_allowed_headers()) {
+      ExceptionUtil::throwEnvoyException("Invalid duplicate configuration for allowed_headers.");
+    }
+
+    // An unset request_headers_matchers_ means that all client request headers are allowed through
+    // to the authz server; this is to preserve backwards compatibility when introducing
+    // allowlisting of request headers for gRPC authz servers. Pre-existing support is for
+    // HTTP authz servers only and defaults to blocking all but a few headers (i.e. Authorization,
+    // Method, Path and Host).
+    if (config.has_grpc_service() && config.has_allowed_headers()) {
+      request_header_matchers_ = Filters::Common::ExtAuthz::CheckRequestUtils::toRequestMatchers(
+          config.allowed_headers(), false);
+    } else if (config.has_http_service()) {
+      if (config.http_service().authorization_request().has_allowed_headers()) {
+        request_header_matchers_ = Filters::Common::ExtAuthz::CheckRequestUtils::toRequestMatchers(
+            config.http_service().authorization_request().allowed_headers(), true);
+      } else {
+        request_header_matchers_ = Filters::Common::ExtAuthz::CheckRequestUtils::toRequestMatchers(
+            config.allowed_headers(), true);
+      }
+    }
   }
 
   bool allowPartialMessage() const { return allow_partial_message_; }
@@ -141,6 +166,10 @@ public:
 
   bool includePeerCertificate() const { return include_peer_certificate_; }
   const LabelsMap& destinationLabels() const { return destination_labels_; }
+
+  const Filters::Common::ExtAuthz::MatcherSharedPtr& requestHeaderMatchers() const {
+    return request_header_matchers_;
+  }
 
 private:
   static Http::Code toErrorCode(uint64_t status) {
@@ -192,6 +221,8 @@ private:
 
   // The stats for the filter.
   ExtAuthzFilterStats stats_;
+
+  Filters::Common::ExtAuthz::MatcherSharedPtr request_header_matchers_;
 
 public:
   // TODO(nezdolik): deprecate cluster scope stats counters in favor of filter scope stats
