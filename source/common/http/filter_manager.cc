@@ -535,7 +535,7 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
     ENVOY_STREAM_LOG(trace, "decode headers called: filter={} status={}", *this,
                      (*entry)->filter_context_.config_name, static_cast<uint64_t>(status));
 
-    (*entry)->decode_headers_called_ = true;
+    (*entry)->processed_headers_ = true;
 
     const auto continue_iteration = (*entry)->commonHandleAfterHeadersCallback(status, end_stream);
     ENVOY_BUG(!continue_iteration || !state_.local_complete_,
@@ -781,7 +781,7 @@ void FilterManager::decodeMetadata(ActiveStreamDecoderFilter* filter, MetadataMa
     // If the filter pointed by entry hasn't returned from decodeHeaders, stores newly added
     // metadata in case decodeHeaders returns StopAllIteration. The latter can happen when headers
     // callbacks generate new metadata.
-    if (!(*entry)->decode_headers_called_ || (*entry)->stoppedAll()) {
+    if (!(*entry)->processed_headers_ || (*entry)->stoppedAll()) {
       Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
       (*entry)->getSavedRequestMetadata()->emplace_back(std::move(metadata_map_ptr));
       return;
@@ -1057,7 +1057,7 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
     ENVOY_STREAM_LOG(trace, "encode headers called: filter={} status={}", *this,
                      (*entry)->filter_context_.config_name, static_cast<uint64_t>(status));
 
-    (*entry)->encode_headers_called_ = true;
+    (*entry)->processed_headers_ = true;
 
     const auto continue_iteration = (*entry)->commonHandleAfterHeadersCallback(status, end_stream);
 
@@ -1120,7 +1120,7 @@ void FilterManager::encodeMetadata(ActiveStreamEncoderFilter* filter,
     // If the filter pointed by entry hasn't returned from encodeHeaders, stores newly added
     // metadata in case encodeHeaders returns StopAllIteration. The latter can happen when headers
     // callbacks generate new metadata.
-    if (!(*entry)->encode_headers_called_ || (*entry)->stoppedAll()) {
+    if (!(*entry)->processed_headers_ || (*entry)->stoppedAll()) {
       (*entry)->getSavedResponseMetadata()->emplace_back(std::move(metadata_map_ptr));
       return;
     }
