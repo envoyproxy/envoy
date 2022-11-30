@@ -83,8 +83,8 @@ public:
 
 protected:
   GrpcAccessLogClient(const Grpc::RawAsyncClientSharedPtr& client,
-                               const Protobuf::MethodDescriptor& service_method,
-                               OptRef<const envoy::config::core::v3::RetryPolicy> retry_policy)
+                      const Protobuf::MethodDescriptor& service_method,
+                      OptRef<const envoy::config::core::v3::RetryPolicy> retry_policy)
       : client_(client), service_method_(service_method),
         opts_(createRequestOptionsForRetry(retry_policy)) {}
 
@@ -115,16 +115,14 @@ public:
   UnaryGrpcAccessLogClient(const Grpc::RawAsyncClientSharedPtr& client,
                            const Protobuf::MethodDescriptor& service_method,
                            OptRef<const envoy::config::core::v3::RetryPolicy> retry_policy)
-      : GrpcAccessLogClient<LogRequest, LogResponse>(client, service_method,
-                                                              retry_policy) {}
+      : GrpcAccessLogClient<LogRequest, LogResponse>(client, service_method, retry_policy) {}
 
   bool isConnected() override { return false; }
 
   bool log(const LogRequest& request) override {
     GrpcAccessLogClient<LogRequest, LogResponse>::client_->send(
-        GrpcAccessLogClient<LogRequest, LogResponse>::service_method_, request,
-        request_cb_, Tracing::NullSpan::instance(),
-        GrpcAccessLogClient<LogRequest, LogResponse>::opts_);
+        GrpcAccessLogClient<LogRequest, LogResponse>::service_method_, request, request_cb_,
+        Tracing::NullSpan::instance(), GrpcAccessLogClient<LogRequest, LogResponse>::opts_);
     return true;
   }
 
@@ -143,10 +141,9 @@ template <typename LogRequest, typename LogResponse>
 class StreamingGrpcAccessLogClient : public GrpcAccessLogClient<LogRequest, LogResponse> {
 public:
   StreamingGrpcAccessLogClient(const Grpc::RawAsyncClientSharedPtr& client,
-                      const Protobuf::MethodDescriptor& service_method,
-                      OptRef<const envoy::config::core::v3::RetryPolicy> retry_policy)
-      : GrpcAccessLogClient<LogRequest, LogResponse>(client, service_method,
-                                                              retry_policy) {}
+                               const Protobuf::MethodDescriptor& service_method,
+                               OptRef<const envoy::config::core::v3::RetryPolicy> retry_policy)
+      : GrpcAccessLogClient<LogRequest, LogResponse>(client, service_method, retry_policy) {}
 
 public:
   struct LocalStream : public Grpc::AsyncStreamCallbacks<LogResponse> {
