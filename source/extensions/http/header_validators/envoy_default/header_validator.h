@@ -4,6 +4,7 @@
 #include "envoy/http/header_validator.h"
 
 #include "source/common/http/headers.h"
+#include "source/extensions/http/header_validators/envoy_default/path_normalizer.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -135,6 +136,7 @@ protected:
   ::Envoy::Http::Protocol protocol_;
   StreamInfo::StreamInfo& stream_info_;
   const ::Envoy::Http::HeaderValues& header_values_;
+  const PathNormalizer path_normalizer_;
 };
 
 struct UhvResponseCodeDetailValues {

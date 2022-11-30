@@ -26,8 +26,7 @@ constexpr char UnexpectedHeaderValue[] = "Unexpected header value";
 
 std::string ipAndDeferredProcessingParamsToString(
     const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>>& p) {
-  return fmt::format("{}_{}",
-                     std::get<0>(p.param) == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
+  return fmt::format("{}_{}", TestUtility::ipVersionToString(std::get<0>(p.param)),
                      std::get<1>(p.param) ? "WithDeferredProcessing" : "NoDeferredProcessing");
 }
 
