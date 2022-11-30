@@ -31,8 +31,9 @@ build --action_env=PATH --host_action_env=PATH
 build --enable_platform_specific_config
 build --test_summary=terse
 
-# TODO(keith): Remove once this is the default
+# TODO(keith): Remove once these 2 are the default
 build --incompatible_config_setting_private_default_visibility
+build --incompatible_enforce_config_setting_visibility
 
 # Allow tags to influence execution requirements
 common --experimental_allow_tags_propagation
