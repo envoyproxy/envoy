@@ -105,11 +105,8 @@ std::unique_ptr<ModifyRequestHeadersAction> RedirectPolicy::createModifyRequestH
 
   ::Envoy::Http::Utility::Url absolute_url;
   const std::string uri(absl::StrCat(host_, path_));
-  if (!absolute_url.initialize(uri, false)) {
-    IS_ENVOY_BUG(absl::StrCat("Redirect for custom response failed: invalid location {}",
-                              absl::StrCat(host_, path_)));
-    return ::Envoy::Http::FilterHeadersStatus::Continue;
-  }
+  RELEASE_ASSERT(absolute_url.initialize(uri, false),
+                 "uri should not be invalid as this was already validated during config load");
   // Don't change the scheme from the original request
   const bool scheme_is_http = schemeIsHttp(*downstream_headers, decoder_callbacks->connection());
 

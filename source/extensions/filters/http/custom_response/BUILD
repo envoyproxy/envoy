@@ -44,6 +44,7 @@ envoy_cc_extension(
         "//source/common/http:header_map_lib",
         "//source/common/http/matching:data_impl_lib",
         "//source/common/http/matching:inputs_lib",
+        "//source/common/http/matching:status_code_input_lib",
         "//source/common/matcher:matcher_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/filters/http/common:factory_base_lib",

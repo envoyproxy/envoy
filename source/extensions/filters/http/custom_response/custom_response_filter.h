@@ -47,7 +47,7 @@ public:
   CustomResponseFilter(std::shared_ptr<FilterConfig> config) : config_{std::move(config)} {}
 
 private:
-  std::shared_ptr<const FilterConfig> config_;
+  const std::shared_ptr<const FilterConfig> config_;
   ::Envoy::Http::RequestHeaderMap* downstream_headers_ = nullptr;
   bool on_local_reply_called_ = false;
 };
