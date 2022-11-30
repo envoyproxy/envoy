@@ -72,7 +72,8 @@ stages:
         fi
 
         echo "Comparing changes ${CHANGE_TARGET}...HEAD"
-        CHANGED_PATHS="$(git diff --name-only ${CHANGE_TARGET}...HEAD | cut -d/ -f1 | sort -u | jq -R 'split("\n")')"
+        CHANGED_PATHS="$(git diff --name-only ${CHANGE_TARGET}...HEAD | cut -d/ -f1 | sort -u | jq -sR 'rtrimstr("\n") | split("\n")')"
+        echo "$CHANGED_PATHS" | jq '.'
         CHANGED_PATH_COUNT=$(echo $CHANGED_PATHS | jq '. | length')
         CHANGED_MOBILE_ONLY=false
         CHANGED_DOCS_ONLY=false
@@ -91,6 +92,10 @@ stages:
       displayName: "Detect repo changes"
       workingDirectory: $(Build.SourcesDirectory)
       name: changed
+    - bash: |
+        echo "env.outputs['changed.mobileOnly']: $(changed.mobileOnly)"
+        echo "env.outputs['changed.docsOnly']: $(changed.docsOnly)"
+      displayName: "Print build environment"
 
 - stage: precheck
   dependsOn: ["env"]
@@ -374,11 +379,12 @@ stages:
 
 - stage: check
   dependsOn: ["env", "linux_x64"]
-  condition: or(eq(variables['PostSubmit'], true), and(ne(dependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(dependencies.env.repo.outputs['changed.docsOnly'], 'true')))
   jobs:
   - job: bazel
     displayName: "linux_x64"
     dependsOn: []
+    # Skip checks if only mobile/ or docs/ have changed.
+    condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'))
     strategy:
       maxParallel: 3
       matrix:
@@ -410,6 +416,8 @@ stages:
   - job: coverage
     displayName: "linux_x64"
     dependsOn: []
+    # Skip checks if only mobile/ or docs/ have changed.
+    condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'))
     timeoutInMinutes: 180
     pool: "x64-large"
     strategy:
