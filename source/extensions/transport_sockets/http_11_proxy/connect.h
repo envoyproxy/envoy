@@ -19,7 +19,7 @@ namespace Http11Connect {
 class UpstreamHttp11ConnectSocket : public TransportSockets::PassthroughSocket,
                                     public Logger::Loggable<Logger::Id::connection> {
 public:
-  static bool isValidConnectResponse(Buffer::Instance& buffer);
+  static bool isValidConnectResponse(absl::string_view data, bool& error, unsigned long& len);
 
   UpstreamHttp11ConnectSocket(Network::TransportSocketPtr&& transport_socket,
                               Network::TransportSocketOptionsConstSharedPtr options);

@@ -348,10 +348,6 @@ TEST_P(Http11ConnectTest, InvalidResponse) {
         return Api::IoCallUint64Result(initial_data.length(),
                                        Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
       }));
-  absl::optional<uint64_t> expected_bytes(connect.length());
-  EXPECT_CALL(io_handle_, read(_, expected_bytes))
-      .WillOnce(Return(ByMove(Api::IoCallUint64Result(
-          connect.length(), Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
 
   EXPECT_CALL(*inner_socket_, doRead(_)).Times(0);
 
@@ -386,25 +382,32 @@ TEST_F(SocketFactoryTest, CreateSocketReturnsNullWhenInnerFactoryReturnsNull) {
 }
 
 TEST(ParseTest, TestValidResponse) {
+  unsigned long len;
+  bool error;
   {
-    Buffer::OwnedImpl buffer("HTTP/1.0 200 OK\r\n\r\n");
-    ASSERT_TRUE(UpstreamHttp11ConnectSocket::isValidConnectResponse(buffer));
-    EXPECT_EQ(buffer.length(), 0);
+    std::string response("HTTP/1.0 200 OK\r\n\r\n");
+    ASSERT_TRUE(UpstreamHttp11ConnectSocket::isValidConnectResponse(response, error, len));
+    EXPECT_EQ(response.length(), len);
   }
   {
-    Buffer::OwnedImpl buffer("HTTP/1.0 200 OK\r\nFoo: Bar\r\n\r\n");
-    ASSERT_TRUE(UpstreamHttp11ConnectSocket::isValidConnectResponse(buffer));
-    EXPECT_EQ(buffer.length(), 0);
+    std::string response("HTTP/1.0 200 OK\n\r\n");
+    ASSERT_TRUE(UpstreamHttp11ConnectSocket::isValidConnectResponse(response, error, len));
+    EXPECT_EQ(response.length(), len);
   }
   {
-    Buffer::OwnedImpl buffer("HTTP/1.1   200  OK \r\n\r\nasdf");
-    ASSERT_TRUE(UpstreamHttp11ConnectSocket::isValidConnectResponse(buffer));
-    EXPECT_EQ(buffer.length(), 4);
-    EXPECT_EQ(buffer.toString(), "asdf");
+    std::string response("HTTP/1.0 200 OK\r\nFoo: Bar\r\n\r\n");
+    ASSERT_TRUE(UpstreamHttp11ConnectSocket::isValidConnectResponse(response, error, len));
+    EXPECT_EQ(response.length(), len);
   }
   {
-    Buffer::OwnedImpl buffer("HTTP/1.0 300 OK\r\n\r\n");
-    ASSERT_FALSE(UpstreamHttp11ConnectSocket::isValidConnectResponse(buffer));
+    std::string response("HTTP/1.1   200  OK \r\n\r\nasdf");
+    ASSERT_TRUE(UpstreamHttp11ConnectSocket::isValidConnectResponse(response, error, len));
+    EXPECT_EQ(response.length(), len + 4);
+  }
+  {
+    std::string response("HTTP/1.0 300 OK\r\n\r\n");
+    ASSERT_FALSE(UpstreamHttp11ConnectSocket::isValidConnectResponse(response, error, len));
+    EXPECT_TRUE(error);
   }
 }
 
