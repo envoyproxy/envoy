@@ -38,6 +38,9 @@ build --incompatible_enforce_config_setting_visibility
 # Allow tags to influence execution requirements
 common --experimental_allow_tags_propagation
 
+# TODO(keith): Remove once https://github.com/envoyproxy/envoy/pull/24270 lands
+build --incompatible_enforce_config_setting_visibility=false
+
 # Enable position independent code (this is the default on macOS and Windows)
 # (Workaround for https://github.com/bazelbuild/rules_foreign_cc/issues/421)
 build:linux --copt=-fPIC
