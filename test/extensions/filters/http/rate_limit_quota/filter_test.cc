@@ -245,7 +245,7 @@ TEST_F(FilterTest, RequestMatchingFailedWithOnNoMatchConfigured) {
   EXPECT_EQ(match.value().bucket().size(), 0);
 }
 
-TEST_F(FilterTest, decodeHeaderSucceeded) {
+TEST_F(FilterTest, DecodeHeaderSucceeded) {
   addMatcherConfigAndCreateFilter(MatcherConfigType::Valid);
   // Define the key value pairs that is used to build the bucket_id dynamically via `custom_value`
   // in the config.
