@@ -87,6 +87,18 @@ public:
   MultiThreadLazyinitStatsTest(bool lazy, const uint64_t n_clusters)
       : ThreadLocalRealThreadsTestBase(5),
         LazyInitStatsBenchmarkBase(lazy, n_clusters, *ThreadLocalRealThreadsTestBase::store_) {}
+
+  ~MultiThreadLazyinitStatsTest() {
+    shutdownThreading();
+    // First, wait for the main-dispatcher to initiate the cross-thread TLS cleanup.
+    mainDispatchBlock();
+
+    // Next, wait for all the worker threads to complete their TLS cleanup.
+    tlsBlock();
+
+    // Finally, wait for the final central-cache cleanup, which occurs on the main thread.
+    mainDispatchBlock();
+  }
 };
 
 // Benchmark lazy-init stats in different worker threads, mimics worker threads creation.
