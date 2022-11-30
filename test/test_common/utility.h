@@ -542,7 +542,17 @@ public:
 
   // Allows pretty printed test names.
   static std::string http1ParserImplToString(Http1ParserImpl impl) {
-    return impl == Http1ParserImpl::HttpParser ? "HttpParser" : "BalsaParser";
+    switch (impl) {
+    case Http1ParserImpl::HttpParser:
+      return "HttpParser";
+    case Http1ParserImpl::BalsaParser:
+      return "BalsaParser";
+    }
+    return "UnknownHttp1Impl";
+  }
+
+  static std::string ipVersionToString(Network::Address::IpVersion ip_version) {
+    return ip_version == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6";
   }
 
   // Allows pretty printed test names for TEST_P using TestEnvironment::getIpVersionsForTest().
@@ -551,7 +561,7 @@ public:
   // instead of IpVersions/SslSocketTest.HalfClose/1
   static std::string
   ipTestParamsToString(const ::testing::TestParamInfo<Network::Address::IpVersion>& params) {
-    return params.param == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6";
+    return ipVersionToString(params.param);
   }
 
   /**

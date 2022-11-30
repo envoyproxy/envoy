@@ -183,9 +183,7 @@ UpstreamLocalAddressSelectorImpl::UpstreamLocalAddressSelectorImpl(
   if (cluster_config.has_upstream_bind_config()) {
     parseBindConfig(cluster_config.name(), cluster_config.upstream_bind_config(),
                     base_socket_options_, cluster_socket_options_);
-  }
-
-  if (bootstrap_bind_config.has_value()) {
+  } else if (bootstrap_bind_config.has_value()) {
     parseBindConfig("", *bootstrap_bind_config, base_socket_options_, cluster_socket_options_);
   }
 }

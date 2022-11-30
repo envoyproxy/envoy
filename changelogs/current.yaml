@@ -34,12 +34,18 @@ minor_behavior_changes:
 - area: cache_filter
   change: |
     add a completion callback to updateHeaders interface. Any external cache implementations will need to update to match this new interface. See changes to simple_http_cache in PR#23666 for example.
+- area: cache_filter
+  change: |
+    api path of work-in-progress extension changed from ``api/extensions/cache/simple_http_cache`` to ``api/extensions/http/cache/simple_http_cache``, and source code moved, to match extension category.
 - area: oauth2
   change: |
     Requests which match the passthrough header now have their own metric ``oauth_passthrough`` and aren't included in ``oauth_success`` anymore.
 - area: rate_limit
   change: |
     add ``MONTH`` and ``YEAR`` to the unit of time for rate limit.
+- area: jwt_authn
+  change: |
+    adjust the refetch time for remote_jwks async_fetch feature. For a good fetch, refetch 5 seconds before jwks cache duration. For a failed fetch, refetch time can be specified by :ref:`failed_refetch_duration <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwksAsyncFetch.failed_refetch_duration>` with default 1 second.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -69,6 +75,12 @@ bug_fixes:
 - area: validation
   change: |
     fixed a crash which could happen when optional ``engine_type`` is not provided in regex.
+- area: upstream
+  change: |
+    fixed a bug when specify both a single address in bootstrap and cluster upstream binding config but with a different IP version. It should be allowed but it is rejected.
+- area: jwt_authn
+  change: |
+    fix a bug that jwt_cache breaks the :ref:`provider_and_audiences <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtRequirement.provider_and_audiences>` JWT requirement.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -110,6 +122,12 @@ removed_config_or_runtime:
     removed ``envoy.reloadable_features.do_not_await_headers_on_upstream_timeout_to_emit_stats`` and legacy code paths.
 
 new_features:
+- area: tls
+  change: |
+    added support for SNI-based cert selection in tls downstream transport socket. Detailed documentation is available :ref:`cert selection<arch_overview_ssl_cert_select>`.
+    New config option :ref:`full_scan_certs_on_sni_mismatch <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.full_scan_certs_on_sni_mismatch>`
+    is introduced to disable or enable full scan when no cert matches to SNI, defaults to false.
+    New runtime flag ``envoy.reloadable_features.no_full_scan_certs_on_sni_mismatch`` can be used for override the default value.
 - area: build
   change: |
     added an option ``--define=library_autolink=disabled`` to disable autolinking libraries.
@@ -138,6 +156,9 @@ new_features:
     added :ref:`generic rds support <envoy_v3_api_field_extensions.filters.network.generic_proxy.v3.GenericProxy.generic_rds>`.
 - area: listener
   change: |
+    added a new field :ref:`socket_options <envoy_v3_api_field_config.listener.v3.AdditionalAddress.socket_options>` to the AdditionalAddress, allowing specifying discrete socket options for each listen address.
+- area: listener
+  change: |
     added ``continueFilterChain()`` and ``dispatcher()`` methods to the ``ListenerFilterCallback``. This allows listener filters to continue listener filter iteration after stopping iteration e.g. if the listener filter depends on an async process.
 - area: thrift_proxy
   change: |
@@ -145,6 +166,9 @@ new_features:
 - area: udp_proxy
   change: |
     added support for :ref:`proxy_access_log <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.proxy_access_log>`.
+- area: tcp_proxy
+  change: |
+    added new config :ref:`post_path field <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.post_path>` to specifiy a custom path for HTTP tunneling with POST method.
 - area: health_check
   change: |
     added an optional bool flag :ref:`disable_active_health_check <envoy_v3_api_field_config.endpoint.v3.Endpoint.HealthCheckConfig.disable_active_health_check>` to disable the active health check for the endpoint.
@@ -166,7 +190,9 @@ new_features:
 - area: jwt_authn
   change: |
     added support for copying jwt claims to http headers.
-
+- area: http
+  change: |
+    added :ref:`append_x_forwarded_port <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.append_x_forwarded_port>` to append the ``x-forwarded-port`` header to HTTP upstream requests.
 - area: ext_authz
   change: |
     added support to allowlist headers included in the check request to gRPC authorization server (previously only available for HTTP authorization server).
