@@ -88,11 +88,11 @@ stages:
         CHANGED_EXAMPLES_ONLY=false
 
         CHANGED_MOBILE=$(echo $CHANGED_PATHS | jq '. as $A | "mobile" | IN($A[])')
-        if [[ $CHANGED_MOBILE == true && $CHANGED_PATH_COUNT -eq 1 ]]; then
+        if [[ $CHANGED_MOBILE == true && $CHANGED_PATH_COUNT -eq 2 ]]; then
             CHANGED_MOBILE_ONLY=true
         fi
         CHANGED_DOCS=$(echo $CHANGED_PATHS | jq '. as $A | "docs" | IN($A[])')
-        if [[ $CHANGED_DOCS == true && $CHANGED_PATH_COUNT -eq 1 ]]; then
+        if [[ $CHANGED_DOCS == true && $CHANGED_PATH_COUNT -eq 2 ]]; then
             CHANGED_DOCS_ONLY=true
         fi
         CHANGED_EXAMPLES=$(echo $CHANGED_PATHS | jq '. as $A | "examples" | IN($A[])')
@@ -294,7 +294,7 @@ stages:
         AZP_BRANCH: $(Build.SourceBranch)
 
 - stage: linux_x64
-  dependsOn: ["env", "precheck"]
+  dependsOn: ["env"]  # "precheck"]
   # For post-submit builds, continue even if precheck fails
   condition: and(not(canceled()), or(succeeded(), eq(variables['PostSubmit'], true)))
   jobs:
@@ -323,7 +323,7 @@ stages:
         echo "linux_x64 released"
 
 - stage: linux_arm64
-  dependsOn: ["env", "precheck"]
+  dependsOn: ["env"]  # "precheck"]
   # For post-submit builds, continue even if precheck fails
   condition: and(not(canceled()), or(succeeded(), eq(variables['PostSubmit'], true)))
   jobs:
@@ -444,7 +444,7 @@ stages:
         echo "checks complete"
 
 - stage: check
-  dependsOn: ["env", "linux_x64"]
+  dependsOn: ["env"]  # , "linux_x64"]
   jobs:
   - job: bazel
     displayName: "linux_x64"
