@@ -21,7 +21,7 @@ std::string genSoPath(std::string name) {
 TEST(DsoInstanceTest, SimpleAPI) {
   auto path = genSoPath("simple.so");
   DsoInstance* dso = new DsoInstance(path);
-  EXPECT_EQ(dso->moeNewHttpPluginConfig(0, 0), 100);
+  EXPECT_EQ(dso->envoyGoFilterNewHttpPluginConfig(0, 0), 100);
   delete dso;
 }
 
@@ -43,7 +43,7 @@ TEST(DsoInstanceManagerTest, Pub) {
 
   // second time pub
   res = DsoInstanceManager::pub(id, path);
-  EXPECT_EQ(res, false);
+  EXPECT_EQ(res, true);
 }
 
 } // namespace
