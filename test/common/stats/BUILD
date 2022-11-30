@@ -246,8 +246,8 @@ envoy_cc_benchmark_binary(
 
 envoy_benchmark_test(
     name = "lazyinit_stats_benchmark_test",
-    benchmark_binary = "lazyinit_stats_benchmark",
     size = "large",
+    benchmark_binary = "lazyinit_stats_benchmark",
 )
 
 envoy_benchmark_test(
