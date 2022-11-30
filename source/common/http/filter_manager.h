@@ -1005,6 +1005,10 @@ private:
       // Used to indicate that we're processing the final [En|De]codeData frame,
       // i.e. end_stream = true
       static constexpr uint32_t LastDataFrame = 0x80;
+
+      // Masks for filter call state.
+      static constexpr uint32_t IsDecodingMask = DecodeHeaders | DecodeData | DecodeTrailers;
+      static constexpr uint32_t IsEncodingMask = EncodeHeaders | Encode1xxHeaders | EncodeData | EncodeTrailers;
     };
   // clang-format on
 
