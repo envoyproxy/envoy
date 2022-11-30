@@ -48,8 +48,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
       : parent_(parent), iteration_state_(IterationState::Continue),
         filter_context_(std::move(filter_context)), iterate_from_current_filter_(false),
         headers_continued_(false), continued_1xx_headers_(false), end_stream_(false),
-        is_encoder_decoder_filter_(is_encoder_decoder_filter), decode_headers_called_(false),
-        encode_headers_called_(false) {}
+        is_encoder_decoder_filter_(is_encoder_decoder_filter), processed_headers_(false) {}
 
   // Functions in the following block are called after the filter finishes processing
   // corresponding data. Those functions handle state updates and data storage (if needed)
@@ -160,8 +159,8 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   // If true, end_stream is called for this filter.
   bool end_stream_ : 1;
   const bool is_encoder_decoder_filter_ : 1;
-  bool decode_headers_called_ : 1;
-  bool encode_headers_called_ : 1;
+  // If true, the filter has processed headers.
+  bool processed_headers_ : 1;
 };
 
 /**
