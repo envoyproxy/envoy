@@ -15,15 +15,13 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Http11Connect {
 
-bool UpstreamHttp11ConnectSocket::isValidConnectResponse(absl::string_view data, bool& error,
-                                                         unsigned long& len) {
+bool UpstreamHttp11ConnectSocket::isValidConnectResponse(absl::string_view data,
+                                                         bool& headers_complete,
+                                                         size_t& bytes_processed) {
   SelfContainedParser parser;
 
-  len = parser.parser().execute(data.data(), data.length());
-  if (parser.parser().getStatus() == Http::Http1::ParserStatus::Error ||
-      parser.parser().statusCode() != 200) {
-    error = true;
-  }
+  bytes_processed = parser.parser().execute(data.data(), data.length());
+  headers_complete = parser.headersComplete();
 
   return parser.parser().getStatus() != Http::Http1::ParserStatus::Error &&
          parser.headersComplete() && parser.parser().statusCode() == 200;
@@ -69,35 +67,36 @@ Network::IoResult UpstreamHttp11ConnectSocket::doRead(Buffer::Instance& buffer) 
       return {Network::PostIoAction::Close, 0, false};
     }
     absl::string_view peek_data(peek_buf, result.return_value_);
-    unsigned long len = 0;
-    bool error = false;
-    bool is_valid_connect_response = isValidConnectResponse(peek_data, error, len);
+    size_t bytes_processed = 0;
+    bool headers_complete = false;
+    bool is_valid_connect_response =
+        isValidConnectResponse(peek_data, headers_complete, bytes_processed);
 
-    if (error) {
-      ENVOY_CONN_LOG(trace, "Response does not appear to be a successful CONNECT upgrade",
-                     callbacks_->connection());
-      return {Network::PostIoAction::Close, 0, false};
-    }
-    if (!is_valid_connect_response && len == 200) {
-      ENVOY_CONN_LOG(trace, "failed to receive CONNECT headers within {} bytes",
-                     callbacks_->connection(), MAX_RESPONSE_HEADER_SIZE);
-      return {Network::PostIoAction::Close, 0, false};
-    }
-    if (!is_valid_connect_response) {
+    if (!headers_complete) {
+      if (peek_data.size() == MAX_RESPONSE_HEADER_SIZE) {
+        ENVOY_CONN_LOG(trace, "failed to receive CONNECT headers within {} bytes",
+                       callbacks_->connection(), MAX_RESPONSE_HEADER_SIZE);
+        return {Network::PostIoAction::Close, 0, false};
+      }
       ENVOY_CONN_LOG(trace, "Incomplete CONECT header: {} bytes received", callbacks_->connection(),
                      peek_data.size());
       return Network::IoResult{Network::PostIoAction::KeepOpen, 0, false};
     }
+    if (!is_valid_connect_response) {
+      ENVOY_CONN_LOG(trace, "Response does not appear to be a successful CONNECT upgrade",
+                     callbacks_->connection());
+      return {Network::PostIoAction::Close, 0, false};
+    }
 
-    result = callbacks_->ioHandle().read(buffer, len);
-    if (!result.ok() || result.return_value_ != len) {
+    result = callbacks_->ioHandle().read(buffer, bytes_processed);
+    if (!result.ok() || result.return_value_ != bytes_processed) {
       ENVOY_CONN_LOG(trace, "failed to drain CONNECT header", callbacks_->connection());
       return {Network::PostIoAction::Close, 0, false};
     }
-    buffer.drain(len);
+    buffer.drain(bytes_processed);
 
     ENVOY_CONN_LOG(trace, "Successfully stripped {} bytes of CONNECT header",
-                   callbacks_->connection(), len);
+                   callbacks_->connection(), bytes_processed);
     need_to_strip_connect_response_ = false;
   }
   return transport_socket_->doRead(buffer);
