@@ -16,7 +16,6 @@ void RateLimitQuotaFilter::setDecoderFilterCallbacks(
 Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                               bool) {
   // TODO(tyxia) Create the rate limit gRPC client and start the stream on the first request.
-
   absl::StatusOr<BucketId> match_result = requestMatching(headers);
 
   // Request is not matched by any matchers. In this case, requests are ALLOWED by default (i.e.,
@@ -25,25 +24,22 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
     return Envoy::Http::FilterHeadersStatus::Continue;
   }
 
-  BucketId bucket_id = match_result.value();
   // Request is not matched by any matcher but the `on_no_match` field is configured. In this
   // case, the request is matched to catch-all bucket and is DENIED by default.
   // TODO(tyxia) Think about the way of representing DENIED and ALLOWED here.
-  if (bucket_id.bucket().empty()) {
+  if (match_result.value().bucket().empty()) {
     return Envoy::Http::FilterHeadersStatus::Continue;
   }
 
   // Request has been matched and the corresponding bucket id has been generated successfully.
   // Retrieve the quota assignment, if the entry with specific `bucket_id` is found.
-  if (quota_assignment_map_.find(bucket_id) != quota_assignment_map_.end()) {
+  if (quota_assignment_map_.find(match_result.value()) != quota_assignment_map_.end()) {
   }
   // Otherwise, send the request to RLQS server for the quota assignment and insert the bucket_id to
   // the map.
 
   return Envoy::Http::FilterHeadersStatus::Continue;
 }
-
-void RateLimitQuotaFilter::onDestroy() {}
 
 void RateLimitQuotaFilter::createMatcher() {
   RateLimitOnMactchActionContext context;

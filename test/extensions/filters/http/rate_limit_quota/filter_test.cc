@@ -168,6 +168,13 @@ public:
     }
   }
 
+  void buildCustomHeader(const absl::flat_hash_map<std::string, std::string>& custom_value_pairs) {
+    // Add custom_value_pairs to the request header for exact value_match in the predicate.
+    for (auto const& pair : custom_value_pairs) {
+      default_headers_.addCopy(pair.first, pair.second);
+    }
+  }
+
   NiceMock<MockFactoryContext> context_;
   NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
 
@@ -193,10 +200,7 @@ TEST_F(FilterTest, RequestMatchingSucceeded) {
   absl::flat_hash_map<std::string, std::string> custom_value_pairs = {{"environment", "staging"},
                                                                       {"group", "envoy"}};
 
-  // Add custom_value_pairs to the request header for exact value_match in the predicate.
-  for (auto const& pair : custom_value_pairs) {
-    default_headers_.addCopy(pair.first, pair.second);
-  }
+  buildCustomHeader(custom_value_pairs);
 
   // The expected bucket ids has one additional pair that is built statically via `string_value`
   // from the config.
@@ -239,6 +243,17 @@ TEST_F(FilterTest, RequestMatchingFailedWithOnNoMatchConfigured) {
   EXPECT_TRUE(match.ok());
   // Empty BucketId is expected to be returned here.
   EXPECT_EQ(match.value().bucket().size(), 0);
+}
+
+TEST_F(FilterTest, decodeHeaderSucceeded) {
+  addMatcherConfigAndCreateFilter(MatcherConfigType::Valid);
+  // Define the key value pairs that is used to build the bucket_id dynamically via `custom_value`
+  // in the config.
+  absl::flat_hash_map<std::string, std::string> custom_value_pairs = {{"environment", "staging"},
+                                                                      {"group", "envoy"}};
+  buildCustomHeader(custom_value_pairs);
+  Http::FilterHeadersStatus status = filter_->decodeHeaders(default_headers_, false);
+  EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::Continue);
 }
 
 } // namespace
