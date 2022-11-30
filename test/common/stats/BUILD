@@ -232,6 +232,8 @@ envoy_cc_benchmark_binary(
     external_deps = [
         "benchmark",
     ],
+        copts = ["opt",
+        ],
     deps = [
         ":real_thread_test_base",
         "//source/common/common:random_generator_lib",
@@ -247,6 +249,7 @@ envoy_cc_benchmark_binary(
 envoy_benchmark_test(
     name = "lazyinit_stats_benchmark_test",
     benchmark_binary = "lazyinit_stats_benchmark",
+    size = "large",
 )
 
 envoy_benchmark_test(
