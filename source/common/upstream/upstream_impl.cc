@@ -181,9 +181,7 @@ UpstreamLocalAddressSelectorImpl::UpstreamLocalAddressSelectorImpl(
   if (cluster_config.upstream_bind_config().has_source_address()) {
     parseBindConfig(cluster_config.name(), cluster_config.upstream_bind_config(),
                     base_socket_options_, cluster_socket_options_);
-  }
-
-  if (bootstrap_bind_config.has_source_address()) {
+  } else if (bootstrap_bind_config.has_source_address()) {
     parseBindConfig("", bootstrap_bind_config, base_socket_options_, cluster_socket_options_);
   }
 }
