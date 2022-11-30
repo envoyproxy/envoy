@@ -15,7 +15,8 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Http11Connect {
 
-bool UpstreamHttp11ConnectSocket::isValidConnectResponse(absl::string_view data, bool& error, unsigned long& len) {
+bool UpstreamHttp11ConnectSocket::isValidConnectResponse(absl::string_view data, bool& error,
+                                                         unsigned long& len) {
   SelfContainedParser parser;
 
   len = parser.parser().execute(data.data(), data.length());
@@ -83,8 +84,8 @@ Network::IoResult UpstreamHttp11ConnectSocket::doRead(Buffer::Instance& buffer) 
       return {Network::PostIoAction::Close, 0, false};
     }
     if (!is_valid_connect_response) {
-      ENVOY_CONN_LOG(trace, "Incomplete CONECT header: {} bytes received",
-                     callbacks_->connection(), peek_data.size());
+      ENVOY_CONN_LOG(trace, "Incomplete CONECT header: {} bytes received", callbacks_->connection(),
+                     peek_data.size());
       return Network::IoResult{Network::PostIoAction::KeepOpen, 0, false};
     }
 
@@ -95,7 +96,8 @@ Network::IoResult UpstreamHttp11ConnectSocket::doRead(Buffer::Instance& buffer) 
     }
     buffer.drain(len);
 
-    ENVOY_CONN_LOG(trace, "Successfully stripped {} bytes of CONNECT header", callbacks_->connection(), len);
+    ENVOY_CONN_LOG(trace, "Successfully stripped {} bytes of CONNECT header",
+                   callbacks_->connection(), len);
     need_to_strip_connect_response_ = false;
   }
   return transport_socket_->doRead(buffer);
