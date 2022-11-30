@@ -4,6 +4,8 @@ package envoy.config.trace.v3;
 
 import "envoy/config/core/v3/grpc_service.proto";
 
+import "opentelemetry/proto/common/v1/common.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -25,4 +27,9 @@ message OpenTelemetryConfig {
   // The name for the service. This will be populated in the ResourceSpan Resource attributes.
   // If it is not provided, it will default to "unknown_service:envoy".
   string service_name = 2;
+
+  // OpenTelemetry `Resource <https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/trace/v1/trace.proto#L51>`_
+  // attributes are filled with Envoy node info.
+  // Example: ``resource_attributes { values { key: "region" value { string_value: "cn-north-7" } } }``.
+  opentelemetry.proto.common.v1.KeyValueList resource_attributes = 3;
 }

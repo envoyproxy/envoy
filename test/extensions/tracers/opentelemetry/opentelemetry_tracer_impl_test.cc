@@ -59,6 +59,24 @@ public:
     setup(opentelemetry_config);
   }
 
+  void setupValidDriverWithResourceAttributes() {
+    const std::string yaml_string = R"EOF(
+    grpc_service:
+      envoy_grpc:
+        cluster_name: fake-cluster
+      timeout: 0.250s
+    resource_attributes:
+      values:
+      - key: host_name
+        value:
+          string_value: fake_host_name
+    )EOF";
+    envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+    TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+
+    setup(opentelemetry_config);
+  }
+
 protected:
   const std::string operation_name_{"test"};
   NiceMock<Envoy::Server::Configuration::MockTracerFactoryContext> context_;
@@ -74,6 +92,11 @@ protected:
 
 TEST_F(OpenTelemetryDriverTest, InitializeDriverValidConfig) {
   setupValidDriver();
+  EXPECT_NE(driver_, nullptr);
+}
+
+TEST_F(OpenTelemetryDriverTest, InitializeDriverValidConfigWithResourceAttributes) {
+  setupValidDriverWithResourceAttributes();
   EXPECT_NE(driver_, nullptr);
 }
 
@@ -133,6 +156,95 @@ resource_spans:
       key: "service.name"
       value:
         string_value: "unknown_service:envoy"
+  scope_spans:
+    spans:
+      trace_id: "AAA"
+      span_id: "AAA"
+      name: "test"
+      kind: SPAN_KIND_SERVER
+      start_time_unix_nano: {}
+      end_time_unix_nano: {}
+      trace_state: "test=foo"
+  )";
+  opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest request_proto;
+  SystemTime timestamp = time_system_.systemTime();
+  int64_t timestamp_ns = std::chrono::nanoseconds(timestamp.time_since_epoch()).count();
+  TestUtility::loadFromYaml(fmt::format(request_yaml, timestamp_ns, timestamp_ns), request_proto);
+  auto* expected_span =
+      request_proto.mutable_resource_spans(0)->mutable_scope_spans(0)->mutable_spans(0);
+  expected_span->set_trace_id(absl::HexStringToBytes(trace_id_hex));
+  expected_span->set_span_id(absl::HexStringToBytes(absl::StrCat(Hex::uint64ToHex(new_span_id))));
+  expected_span->set_parent_span_id(
+      absl::HexStringToBytes(absl::StrCat(Hex::uint64ToHex(parent_span_id))));
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
+      .Times(1)
+      .WillRepeatedly(Return(1));
+  EXPECT_CALL(*mock_stream_ptr_,
+              sendMessageRaw_(Grpc::ProtoBufferEqIgnoreRepeatedFieldOrdering(request_proto), _));
+  span->finishSpan();
+  EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
+}
+
+TEST_F(OpenTelemetryDriverTest, ParseSpanContextFromHeadersTestWitResourceAttributes) {
+  // Set up driver
+  setupValidDriverWithResourceAttributes();
+
+  // Add the OTLP headers to the request headers
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
+  // traceparent header is "version-trace_id-parent_id-trace_flags"
+  // See https://w3c.github.io/trace-context/#traceparent-header
+  const std::string version = "00";
+  const uint64_t trace_id_high = 0;
+  const uint64_t trace_id_low = 1;
+  const std::string trace_id_hex =
+      absl::StrCat(Hex::uint64ToHex(trace_id_high), Hex::uint64ToHex(trace_id_low));
+  const uint64_t parent_span_id = 2;
+  const std::string trace_flags = "01";
+  const std::vector<std::string> v = {version, trace_id_hex, Hex::uint64ToHex(parent_span_id),
+                                      trace_flags};
+  const std::string parent_trace_header = absl::StrJoin(v, "-");
+  request_headers.addReferenceKey(OpenTelemetryConstants::get().TRACE_PARENT, parent_trace_header);
+  // Also add tracestate.
+  request_headers.addReferenceKey(OpenTelemetryConstants::get().TRACE_STATE, "test=foo");
+
+  // Mock the random call for generating span ID so we can check it later.
+  const uint64_t new_span_id = 3;
+  NiceMock<Random::MockRandomGenerator>& mock_random_generator_ =
+      context_.server_factory_context_.api_.random_;
+  ON_CALL(mock_random_generator_, random()).WillByDefault(Return(new_span_id));
+
+  Tracing::SpanPtr span =
+      driver_->startSpan(mock_tracing_config_, request_headers, operation_name_,
+                         time_system_.systemTime(), {Tracing::Reason::Sampling, true});
+
+  EXPECT_EQ(span->getTraceIdAsHex(), trace_id_hex);
+
+  // Remove headers, then inject context into header from the span.
+  request_headers.remove(OpenTelemetryConstants::get().TRACE_PARENT);
+  request_headers.remove(OpenTelemetryConstants::get().TRACE_STATE);
+  span->injectContext(request_headers, nullptr);
+
+  auto sampled_entry = request_headers.get(OpenTelemetryConstants::get().TRACE_PARENT);
+  EXPECT_EQ(sampled_entry.size(), 1);
+  EXPECT_EQ(
+      sampled_entry[0]->value().getStringView(),
+      absl::StrJoin({version, trace_id_hex, Hex::uint64ToHex(new_span_id), trace_flags}, "-"));
+
+  auto sampled_tracestate_entry = request_headers.get(OpenTelemetryConstants::get().TRACE_STATE);
+  EXPECT_EQ(sampled_tracestate_entry.size(), 1);
+  EXPECT_EQ(sampled_tracestate_entry[0]->value().getStringView(), "test=foo");
+  const std::string request_yaml = R"(
+resource_spans:
+  resource:
+    attributes:
+      - key: "service.name"
+        value:
+          string_value: "unknown_service:envoy"
+      - key: "host_name"
+        value:
+          string_value: "fake_host_name"
   scope_spans:
     spans:
       trace_id: "AAA"
