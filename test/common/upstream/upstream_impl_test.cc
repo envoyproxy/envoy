@@ -1411,6 +1411,7 @@ TEST_F(HostImplTest, CreateConnection) {
       std::make_shared<const envoy::config::core::v3::Metadata>(metadata), 1, locality,
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
       envoy::config::core::v3::UNKNOWN, simTime());
+  EXPECT_TRUE(host->canCreateConnection(ResourcePriority::Default));
 
   testing::StrictMock<Event::MockDispatcher> dispatcher;
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options;
