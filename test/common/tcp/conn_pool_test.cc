@@ -135,10 +135,14 @@ public:
     TestConnection& test_conn = test_conns_.back();
     test_conn.connection_ = new NiceMock<Network::MockClientConnection>();
     test_conn.connect_timer_ = new NiceMock<Event::MockTimer>(&mock_dispatcher_);
+
+    Event::MockDispatcher* dispatcher =
+        static_cast<Event::MockDispatcher*>(&(test_conn.connection_->dispatcher()));
     if (has_idle_timers_) {
-      Event::MockDispatcher* dispatcher =
-          static_cast<Event::MockDispatcher*>(&(test_conn.connection_->dispatcher()));
       test_conn.idle_timer_ = new NiceMock<Event::MockTimer>(dispatcher);
+    } else {
+      // No idle timeout when idle timeout is not configured.
+      EXPECT_CALL(*dispatcher, createTimer_(_)).Times(0);
     }
 
     EXPECT_CALL(mock_dispatcher_, createClientConnection_(_, _, _, options_))
@@ -422,22 +426,37 @@ TEST_F(TcpConnPoolImplTest, DrainConnections) {
  */
 TEST_F(TcpConnPoolImplTest, IdleTimerCloseConnections) {
   initialize();
-  cluster_->resetResourceManager(2, 1024, 1024, 1, 1);
+  cluster_->resetResourceManager(1, 1024, 1024, 1, 1);
   conn_pool_->setupIdleTimers();
 
   ActiveTestConn c1(*this, 0, ActiveTestConn::Type::CreateConnection);
 
   EXPECT_CALL(*conn_pool_, onConnReleasedForTest());
-  c1.releaseConn();
+  auto idle_timer = conn_pool_->test_conns_[0].idle_timer_;
+  // The connection is active.
+  EXPECT_FALSE(idle_timer->enabled());
 
+  c1.releaseConn();
+  // The connection is idle, which enables idle timer.
+  EXPECT_TRUE(idle_timer->enabled());
   {
     EXPECT_CALL(*conn_pool_, onConnDestroyedForTest());
 
-    conn_pool_->test_conns_[0].idle_timer_->invokeCallback();
+    auto connection = conn_pool_->test_conns_[0].connection_;
+    EXPECT_CALL(*connection, close(Network::ConnectionCloseType::NoFlush))
+        .WillOnce(Invoke([&](Network::ConnectionCloseType) -> void {
+          // idle timer is disabled.
+          EXPECT_FALSE(idle_timer->enabled());
+          connection->raiseEvent(Network::ConnectionEvent::LocalClose);
+        }));
+    idle_timer->invokeCallback();
     dispatcher_.clearDeferredDeleteList();
   }
+
+  // Note that this is pool level idle instead of client/connection level.
   EXPECT_TRUE(conn_pool_->isIdle());
-  // stats
+
+  EXPECT_EQ(1U, cluster_->stats_.upstream_cx_idle_timeout_.value());
 }
 
 /**

@@ -51,6 +51,12 @@ ActiveTcpClient::~ActiveTcpClient() {
   }
 }
 
+void ActiveTcpClient::close() {
+  ENVOY_CONN_LOG(trace, "close", *this);
+  disableIdleTimer();
+  connection_->close(Network::ConnectionCloseType::NoFlush);
+}
+
 void ActiveTcpClient::clearCallbacks() {
   if (state() == Envoy::ConnectionPool::ActiveClient::State::Busy && parent_.hasPendingStreams()) {
     auto* pool = &parent_;
@@ -99,6 +105,7 @@ void ActiveTcpClient::onIdleTimeout() {
 
 void ActiveTcpClient::disableIdleTimer() {
   if (idle_timer_ != nullptr) {
+    ENVOY_CONN_LOG(trace, "disable idle timer", *this);
     idle_timer_->disableTimer();
   }
 }
@@ -106,6 +113,7 @@ void ActiveTcpClient::disableIdleTimer() {
 void ActiveTcpClient::resetIdleTimer() {
   if (idle_timer_ != nullptr) {
     ASSERT(idle_timeout_.has_value());
+    ENVOY_CONN_LOG(trace, "enable idle timer", *this);
     idle_timer_->enableTimer(idle_timeout_.value());
   }
 }
