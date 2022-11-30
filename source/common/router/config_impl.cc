@@ -531,15 +531,13 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                           validator),
       route_name_(route.name()), time_source_(factory_context.mainThreadDispatcher().timeSource()),
       random_value_header_name_(route.route().weighted_clusters().header_name()) {
-  if (!route.request_headers_to_add().empty() ||
-      !route.request_headers_to_remove().empty()) {
-    request_headers_parser_ = HeaderParser::configure(
-        route.request_headers_to_add(), route.request_headers_to_remove());
+  if (!route.request_headers_to_add().empty() || !route.request_headers_to_remove().empty()) {
+    request_headers_parser_ =
+        HeaderParser::configure(route.request_headers_to_add(), route.request_headers_to_remove());
   }
-  if (!route.response_headers_to_add().empty() ||
-      !route.response_headers_to_remove().empty()) {
-    response_headers_parser_ = HeaderParser::configure(
-        route.response_headers_to_add(), route.response_headers_to_remove());
+  if (!route.response_headers_to_add().empty() || !route.response_headers_to_remove().empty()) {
+    response_headers_parser_ = HeaderParser::configure(route.response_headers_to_add(),
+                                                       route.response_headers_to_remove());
   }
 
   if (route.route().has_metadata_match()) {
@@ -1427,16 +1425,13 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
                           validator),
       host_rewrite_(cluster.host_rewrite_literal()),
       cluster_header_name_(cluster.cluster_header()) {
-  if (!cluster.request_headers_to_add().empty() ||
-      !cluster.request_headers_to_remove().empty()) {
-    request_headers_parser_ = HeaderParser::configure(
-        cluster.request_headers_to_add(), cluster.request_headers_to_remove());
+  if (!cluster.request_headers_to_add().empty() || !cluster.request_headers_to_remove().empty()) {
+    request_headers_parser_ = HeaderParser::configure(cluster.request_headers_to_add(),
+                                                      cluster.request_headers_to_remove());
   }
-  if (!cluster.response_headers_to_add().empty() ||
-      !cluster.response_headers_to_remove().empty()) {
-    response_headers_parser_ =
-        HeaderParser::configure(cluster.response_headers_to_add(),
-                                cluster.response_headers_to_remove());
+  if (!cluster.response_headers_to_add().empty() || !cluster.response_headers_to_remove().empty()) {
+    response_headers_parser_ = HeaderParser::configure(cluster.response_headers_to_add(),
+                                                       cluster.response_headers_to_remove());
   }
 
   if (cluster.has_metadata_match()) {
@@ -1693,15 +1688,13 @@ VirtualHostImpl::VirtualHostImpl(
                                  factory_context.routerContext().virtualClusterStatNames()) {
   if (!virtual_host.request_headers_to_add().empty() ||
       !virtual_host.request_headers_to_remove().empty()) {
-    request_headers_parser_ =
-        HeaderParser::configure(virtual_host.request_headers_to_add(),
-                                virtual_host.request_headers_to_remove());
+    request_headers_parser_ = HeaderParser::configure(virtual_host.request_headers_to_add(),
+                                                      virtual_host.request_headers_to_remove());
   }
   if (!virtual_host.response_headers_to_add().empty() ||
       !virtual_host.response_headers_to_remove().empty()) {
-    response_headers_parser_ =
-        HeaderParser::configure(virtual_host.response_headers_to_add(),
-                                virtual_host.response_headers_to_remove());
+    response_headers_parser_ = HeaderParser::configure(virtual_host.response_headers_to_add(),
+                                                       virtual_host.response_headers_to_remove());
   }
 
   switch (virtual_host.require_tls()) {
@@ -2074,15 +2067,13 @@ ConfigImpl::ConfigImpl(const envoy::config::route::v3::RouteConfiguration& confi
     internal_only_headers_.push_back(Http::LowerCaseString(header));
   }
 
-  if (!config.request_headers_to_add().empty() ||
-      !config.request_headers_to_remove().empty()) {
-    request_headers_parser_ = HeaderParser::configure(
-        config.request_headers_to_add(), config.request_headers_to_remove());
+  if (!config.request_headers_to_add().empty() || !config.request_headers_to_remove().empty()) {
+    request_headers_parser_ = HeaderParser::configure(config.request_headers_to_add(),
+                                                      config.request_headers_to_remove());
   }
-  if (!config.response_headers_to_add().empty() ||
-      !config.response_headers_to_remove().empty()) {
-    response_headers_parser_ = HeaderParser::configure(
-        config.response_headers_to_add(), config.response_headers_to_remove());
+  if (!config.response_headers_to_add().empty() || !config.response_headers_to_remove().empty()) {
+    response_headers_parser_ = HeaderParser::configure(config.response_headers_to_add(),
+                                                       config.response_headers_to_remove());
   }
 }
 
