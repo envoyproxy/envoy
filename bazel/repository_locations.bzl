@@ -926,7 +926,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "eea0f59c28a9241156a47d7a8e32db9122f3d50b505fae0f33de6ce4d9b61834",
         urls = ["https://github.com/bazelbuild/rules_pkg/releases/download/{version}/rules_pkg-{version}.tar.gz"],
         use_category = ["build"],
-        release_date = "2022-11-02",
+        release_date = "2022-11-03",
         license = "Apache-2.0",
         license_url = "https://github.com/bazelbuild/rules_pkg/blob/{version}/LICENSE",
     ),
