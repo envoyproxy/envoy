@@ -51,7 +51,7 @@ DirectoryEntry DirectoryIteratorImpl::makeEntry(const WIN32_FIND_DATA& find_data
       !(find_data.dwReserved0 & IO_REPARSE_TAG_SYMLINK)) {
     // The file is reparse point and not a symlink, so it can't be
     // a regular file or a directory
-    return {std::string(find_data.cFileName), FileType::Other, size};
+    return {std::string(find_data.cFileName), FileType::Other, 0};
   } else if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
     return {std::string(find_data.cFileName), FileType::Directory, 0};
   } else {

@@ -193,13 +193,13 @@ TEST_F(DirectoryTest, DirectoryWithSymlinkToFile) {
   addFileWithContents("file", contents);
   addSymlinks({{"file", "link"}});
 
-  const EntrySet expected = {
-      {".", FileType::Directory, 0},
-      {"..", FileType::Directory, 0},
-      {"file", FileType::Regular, contents.size()},
-      {"link", FileType::Regular, contents.size()},
-  };
-  EXPECT_EQ(expected, getDirectoryContents(dir_path_, false));
+  const EntrySet result = getDirectoryContents(dir_path_, false);
+  EXPECT_THAT(result,
+              testing::Contains(DirectoryEntry{"file", FileType::Regular, contents.size()}));
+  // Validate without size for link, as it may be 0 or file-size depending on OS.
+  EXPECT_THAT(result, testing::Contains(testing::AllOf(
+                          testing::Field(&DirectoryEntry::name_, "link"),
+                          testing::Field(&DirectoryEntry::type_, FileType::Regular))));
 }
 
 // Test that a symlink to a directory has type FileType::Directory

@@ -72,8 +72,7 @@ DirectoryEntry DirectoryIteratorImpl::makeEntry(absl::string_view filename) cons
     return DirectoryEntry{std::string{filename}, FileType::Regular,
                           static_cast<uint64_t>(stat_buf.st_size)};
   } else {
-    return DirectoryEntry{std::string{filename}, FileType::Other,
-                          static_cast<uint64_t>(stat_buf.st_size)};
+    return DirectoryEntry{std::string{filename}, FileType::Other, 0};
   }
 }
 
