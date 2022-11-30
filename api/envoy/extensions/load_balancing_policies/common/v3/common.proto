@@ -20,44 +20,43 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Common configuration for two or more load balancing policy extensions]
 // [#not-implemented-hide:]
 
-// Configuration for :ref:`zone aware routing
-// <arch_overview_load_balancing_zone_aware_routing>`.
-message ZoneAwareLbConfig {
-  // Configures percentage of requests that will be considered for zone aware routing
-  // if zone aware routing is configured. If not specified, the default is 100%.
-  // * :ref:`runtime values <config_cluster_manager_cluster_runtime_zone_routing>`.
-  // * :ref:`Zone aware routing support <arch_overview_load_balancing_zone_aware_routing>`.
-  type.v3.Percent routing_enabled = 1;
-
-  // Configures minimum upstream cluster size required for zone aware routing
-  // If upstream cluster size is less than specified, zone aware routing is not performed
-  // even if zone aware routing is configured. If not specified, the default is 6.
-  // * :ref:`runtime values <config_cluster_manager_cluster_runtime_zone_routing>`.
-  // * :ref:`Zone aware routing support <arch_overview_load_balancing_zone_aware_routing>`.
-  google.protobuf.UInt64Value min_cluster_size = 2;
-
-  // If set to true, Envoy will not consider any hosts when the cluster is in :ref:`panic
-  // mode<arch_overview_load_balancing_panic_threshold>`. Instead, the cluster will fail all
-  // requests as if all hosts are unhealthy. This can help avoid potentially overwhelming a
-  // failing service.
-  bool fail_traffic_on_panic = 3;
-}
-
-// Configuration for :ref:`locality weighted load balancing
-// <arch_overview_load_balancing_locality_weighted_lb>`
-message LocalityWeightedLbConfig {
-}
-
-// [#next-free-field: 6]
 message LocalityLbConfig {
+  // Configuration for :ref:`zone aware routing
+  // <arch_overview_load_balancing_zone_aware_routing>`.
+  message ZoneAwareLbConfig {
+    // Configures percentage of requests that will be considered for zone aware routing
+    // if zone aware routing is configured. If not specified, the default is 100%.
+    // * :ref:`runtime values <config_cluster_manager_cluster_runtime_zone_routing>`.
+    // * :ref:`Zone aware routing support <arch_overview_load_balancing_zone_aware_routing>`.
+    type.v3.Percent routing_enabled = 1;
+
+    // Configures minimum upstream cluster size required for zone aware routing
+    // If upstream cluster size is less than specified, zone aware routing is not performed
+    // even if zone aware routing is configured. If not specified, the default is 6.
+    // * :ref:`runtime values <config_cluster_manager_cluster_runtime_zone_routing>`.
+    // * :ref:`Zone aware routing support <arch_overview_load_balancing_zone_aware_routing>`.
+    google.protobuf.UInt64Value min_cluster_size = 2;
+
+    // If set to true, Envoy will not consider any hosts when the cluster is in :ref:`panic
+    // mode<arch_overview_load_balancing_panic_threshold>`. Instead, the cluster will fail all
+    // requests as if all hosts are unhealthy. This can help avoid potentially overwhelming a
+    // failing service.
+    bool fail_traffic_on_panic = 3;
+  }
+
+  // Configuration for :ref:`locality weighted load balancing
+  // <arch_overview_load_balancing_locality_weighted_lb>`
+  message LocalityWeightedLbConfig {
+  }
+
   oneof locality_config_specifier {
     option (validate.required) = true;
 
-    // Configration for local zone aware load balancing.
-    ZoneAwareLbConfig zone_aware_lb_config = 4;
+    // Configuration for local zone aware load balancing.
+    ZoneAwareLbConfig zone_aware_lb_config = 1;
 
     // Enable locality weighted load balancing.
-    LocalityWeightedLbConfig locality_weighted_lb_config = 5;
+    LocalityWeightedLbConfig locality_weighted_lb_config = 2;
   }
 }
 
