@@ -33,7 +33,7 @@ void TrafficRoutingAssistantHandler::updateTrafficRoutingAssistant(
     const absl::optional<TraContextMap> context) {
 
   bool should_update_tra = true;
-  if (cache_manager_.contains(type, key) && (cache_manager_.at(type, key) == val)) {
+  if (cache_manager_.at(type, key) == val) {
     should_update_tra = false;
   }
 
@@ -51,8 +51,8 @@ QueryStatus TrafficRoutingAssistantHandler::retrieveTrafficRoutingAssistant(
     const std::string& type, const std::string& key, const absl::optional<TraContextMap> context,
     SipFilters::DecoderFilterCallbacks& activetrans, std::string& host) {
 
-  if (cache_manager_.contains(type, key)) {
-    host = cache_manager_.at(type, key);
+  host = cache_manager_.at(type, key);
+  if (!host.empty()) {
     return QueryStatus::Continue;
   }
 
@@ -72,7 +72,7 @@ QueryStatus TrafficRoutingAssistantHandler::retrieveTrafficRoutingAssistant(
 
 void TrafficRoutingAssistantHandler::deleteTrafficRoutingAssistant(
     const std::string& type, const std::string& key, const absl::optional<TraContextMap> context) {
-  cache_manager_[type].erase(key);
+  cache_manager_.erase(type, key);
   if (traClient()) {
     traClient()->deleteTrafficRoutingAssistant(type, key, context, Tracing::NullSpan::instance(),
                                                stream_info_);
@@ -112,7 +112,7 @@ void TrafficRoutingAssistantHandler::complete(const TrafficRoutingAssistant::Res
               // TODO For skey case, no need to add to local cache. This will be controlled by
               // config cache->add_query_to_cache.
               if (message_type != "skey") {
-                cache_manager_[message_type].emplace(item.first, item.second);
+                cache_manager_.insertCache(message_type, item.first, item.second);
               }
               metadata->setDestination(item.second);
               return parent_.continueHandling(metadata, decoder_event_handler);
@@ -142,7 +142,7 @@ void TrafficRoutingAssistantHandler::complete(const TrafficRoutingAssistant::Res
             .data();
     for (auto& item : data) {
       ENVOY_LOG(debug, "TRA UPDATE {}: {}={}", message_type, item.first, item.second);
-      cache_manager_[message_type].emplace(item.first, item.second);
+      cache_manager_.insertCache(message_type, item.first, item.second);
     }
     break;
   }
