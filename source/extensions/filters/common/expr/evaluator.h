@@ -23,7 +23,7 @@ using BuilderPtr = std::unique_ptr<Builder>;
 using Expression = google::api::expr::runtime::CelExpression;
 using ExpressionPtr = std::unique_ptr<Expression>;
 
-// Base class for the activations used by the CEL evaluator to look up attributes.
+// Base class for the context used by the CEL evaluator to look up attributes.
 class StreamActivation : public google::api::expr::runtime::BaseActivation {
 public:
   StreamActivation(const StreamInfo::StreamInfo& info,
