@@ -41,7 +41,10 @@ TEST_F(ProtocolConstraintsTest, OutboundControlFrameFlood) {
   EXPECT_TRUE(isBufferFloodError(constraints.status()));
   EXPECT_EQ("Too many control frames in the outbound queue.", constraints.status().message());
   EXPECT_EQ(1, stats_store_.counter("http2.outbound_control_flood").value());
-  EXPECT_EQ(3, stats_store_.gauge("http2.outbound_control_frames_active",  Stats::Gauge::ImportMode::Accumulate).value());
+  EXPECT_EQ(3,
+            stats_store_
+                .gauge("http2.outbound_control_frames_active", Stats::Gauge::ImportMode::Accumulate)
+                .value());
 }
 
 TEST_F(ProtocolConstraintsTest, OutboundFrameFlood) {
@@ -59,7 +62,9 @@ TEST_F(ProtocolConstraintsTest, OutboundFrameFlood) {
   EXPECT_TRUE(isBufferFloodError(constraints.status()));
   EXPECT_EQ("Too many frames in the outbound queue.", constraints.status().message());
   EXPECT_EQ(1, stats_store_.counter("http2.outbound_flood").value());
-  EXPECT_EQ(6, stats_store_.gauge("http2.outbound_frames_active",  Stats::Gauge::ImportMode::Accumulate).value());
+  EXPECT_EQ(6,
+            stats_store_.gauge("http2.outbound_frames_active", Stats::Gauge::ImportMode::Accumulate)
+                .value());
 }
 
 // Verify that the `status()` method reflects the first violation and is not modified by subsequent
