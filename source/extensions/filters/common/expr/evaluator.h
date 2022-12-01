@@ -16,16 +16,43 @@ namespace Filters {
 namespace Common {
 namespace Expr {
 
-using Activation = google::api::expr::runtime::Activation;
+using Activation = google::api::expr::runtime::BaseActivation;
 using ActivationPtr = std::unique_ptr<Activation>;
 using Builder = google::api::expr::runtime::CelExpressionBuilder;
 using BuilderPtr = std::unique_ptr<Builder>;
 using Expression = google::api::expr::runtime::CelExpression;
 using ExpressionPtr = std::unique_ptr<Expression>;
 
+// Base class for the activations used by the CEL evaluator to look up attributes.
+class StreamActivation : public google::api::expr::runtime::BaseActivation {
+public:
+  StreamActivation(const StreamInfo::StreamInfo& info,
+                   const Http::RequestHeaderMap* request_headers,
+                   const Http::ResponseHeaderMap* response_headers,
+                   const Http::ResponseTrailerMap* response_trailers)
+      : activation_info_(&info), activation_request_headers_(request_headers),
+        activation_response_headers_(response_headers),
+        activation_response_trailers_(response_trailers) {}
+
+  StreamActivation() = default;
+
+  absl::optional<CelValue> FindValue(absl::string_view name, Protobuf::Arena* arena) const override;
+  std::vector<const google::api::expr::runtime::CelFunction*>
+  FindFunctionOverloads(absl::string_view) const override {
+    return {};
+  }
+
+protected:
+  void resetActivation() const;
+  mutable const StreamInfo::StreamInfo* activation_info_{nullptr};
+  mutable const Http::RequestHeaderMap* activation_request_headers_{nullptr};
+  mutable const Http::ResponseHeaderMap* activation_response_headers_{nullptr};
+  mutable const Http::ResponseTrailerMap* activation_response_trailers_{nullptr};
+};
+
 // Creates an activation providing the common context attributes.
 // The activation lazily creates wrappers during an evaluation using the evaluation arena.
-ActivationPtr createActivation(Protobuf::Arena& arena, const StreamInfo::StreamInfo& info,
+ActivationPtr createActivation(const StreamInfo::StreamInfo& info,
                                const Http::RequestHeaderMap* request_headers,
                                const Http::ResponseHeaderMap* response_headers,
                                const Http::ResponseTrailerMap* response_trailers);
