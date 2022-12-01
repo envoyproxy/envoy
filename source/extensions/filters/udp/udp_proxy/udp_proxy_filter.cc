@@ -346,11 +346,26 @@ void UdpProxyFilter::ActiveSession::write(const Buffer::Instance& buffer) {
   idle_timer_->enableTimer(cluster_.filter_.config_->sessionTimeout());
 
   // NOTE: On the first write, a local ephemeral port is bound, and thus this write can fail due to
-  //       port exhaustion.
+  //       port exhaustion. To avoid exhaustion, UDP sockets will be connected and associated with
+  //       a 4-tuple including the local IP, and the UDP port may be reused for multiple
+  //       connections unless use_original_src_ip_ is set. When use_original_src_ip_ is set, the
+  //       socket should not be connected since the source IP will be changed.
   // NOTE: We do not specify the local IP to use for the sendmsg call if use_original_src_ip_ is not
   //       set. We allow the OS to select the right IP based on outbound routing rules if
   //       use_original_src_ip_ is not set, else use downstream peer IP as local IP.
   const Network::Address::Ip* local_ip = use_original_src_ip_ ? addresses_.peer_->ip() : nullptr;
+  if (!use_original_src_ip_ && !skip_connect_) {
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_proxy_connect")) {
+      Api::SysCallIntResult rc = socket_->ioHandle().connect(host_->address());
+      if (SOCKET_FAILURE(rc.return_value_)) {
+        ENVOY_LOG(debug, "cannot connect: ({}) {}", rc.errno_, errorDetails(rc.errno_));
+        cluster_.cluster_stats_.sess_tx_errors_.inc();
+        return;
+      }
+    }
+
+    skip_connect_ = true;
+  }
   Api::IoCallUint64Result rc =
       Network::Utility::writeToSocket(socket_->ioHandle(), buffer, local_ip, *host_->address());
   if (!rc.ok()) {

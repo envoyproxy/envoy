@@ -54,27 +54,19 @@ public:
 
 class ClusterFactoryTestBase {
 protected:
-  ClusterFactoryTestBase() : api_(Api::createApiForTest(stats_)) {
+  ClusterFactoryTestBase() {
     outlier_event_logger_ = std::make_shared<Outlier::MockEventLogger>();
     dns_resolver_ = std::make_shared<Network::MockDnsResolver>();
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
-  NiceMock<Server::MockAdmin> admin_;
   Ssl::MockContextManager ssl_context_manager_;
   NiceMock<MockClusterManager> cm_;
-  const NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  NiceMock<Event::MockDispatcher> dispatcher_;
-  NiceMock<Runtime::MockLoader> runtime_;
   Stats::TestUtil::TestStore stats_;
-  Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
-  NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
-  Api::ApiPtr api_;
   Network::DnsResolverSharedPtr dns_resolver_;
   AccessLog::MockAccessLogManager log_manager_;
   Outlier::EventLoggerSharedPtr outlier_event_logger_;
-  Server::MockOptions options_;
 };
 
 class TestStaticClusterImplTest : public testing::Test, public ClusterFactoryTestBase {};

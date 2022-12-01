@@ -43,6 +43,12 @@ void TcpUpstream::addBytesSentCallback(Network::Connection::BytesSentCb cb) {
   upstream_conn_data_->connection().addBytesSentCallback(cb);
 }
 
+bool TcpUpstream::startUpstreamSecureTransport() {
+  return (upstream_conn_data_ == nullptr)
+             ? false
+             : upstream_conn_data_->connection().startSecureTransport();
+}
+
 Tcp::ConnectionPool::ConnectionData*
 TcpUpstream::onDownstreamEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose) {
@@ -59,7 +65,7 @@ TcpUpstream::onDownstreamEvent(Network::ConnectionEvent event) {
 
 HttpUpstream::HttpUpstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
                            const TunnelingConfigHelper& config,
-                           const StreamInfo::StreamInfo& downstream_info)
+                           StreamInfo::StreamInfo& downstream_info)
     : config_(config), downstream_info_(downstream_info), response_decoder_(*this),
       upstream_callbacks_(callbacks) {}
 
@@ -197,9 +203,9 @@ HttpConnPool::HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
                            Upstream::LoadBalancerContext* context,
                            const TunnelingConfigHelper& config,
                            Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
-                           Http::CodecType type)
+                           Http::CodecType type, StreamInfo::StreamInfo& downstream_info)
     : config_(config), type_(type), upstream_callbacks_(upstream_callbacks),
-      downstream_info_(context->downstreamConnection()->streamInfo()) {
+      downstream_info_(downstream_info) {
   absl::optional<Http::Protocol> protocol;
   if (type_ == Http::CodecType::HTTP3) {
     protocol = Http::Protocol::Http3;
@@ -259,7 +265,7 @@ void HttpConnPool::onGenericPoolReady(Upstream::HostDescriptionConstSharedPtr& h
 
 Http2Upstream::Http2Upstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
                              const TunnelingConfigHelper& config,
-                             const StreamInfo::StreamInfo& downstream_info)
+                             StreamInfo::StreamInfo& downstream_info)
     : HttpUpstream(callbacks, config, downstream_info) {}
 
 bool Http2Upstream::isValidResponse(const Http::ResponseHeaderMap& headers) {
@@ -303,7 +309,7 @@ void Http2Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, boo
 
 Http1Upstream::Http1Upstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
                              const TunnelingConfigHelper& config,
-                             const StreamInfo::StreamInfo& downstream_info)
+                             StreamInfo::StreamInfo& downstream_info)
     : HttpUpstream(callbacks, config, downstream_info) {}
 
 void Http1Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, bool) {

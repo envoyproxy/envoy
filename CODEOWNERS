@@ -236,6 +236,7 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/access_loggers/file @wbpcode @cpakulski @giantcroc
 # Stateful session
 /*/extensions/http/stateful_session/cookie @wbpcode @cpakulski
+/*/extensions/http/stateful_session/header @ramaraochavali @wbpcode @cpakulski
 /*/extensions/filters/http/stateful_session @wbpcode @cpakulski
 # tracers
 /*/extensions/tracers/zipkin @wbpcode @Shikugawa @suniltheta @basvanbeek
@@ -259,6 +260,7 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/http/header_validators/envoy_default @yanavlasov @alyssawilk
 # Thrift
 /*/extensions/filters/network/thrift_proxy @zuercher @JuniorHsu
+/*/extensions/health_checkers/thrift @zuercher @JuniorHsu
 # IP tagging
 /*/extensions/filters/http/ip_tagging @alyssawilk @JuniorHsu
 # Header to metadata

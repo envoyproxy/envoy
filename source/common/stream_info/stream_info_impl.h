@@ -334,6 +334,9 @@ struct StreamInfoImpl : public StreamInfo {
     start_time_monotonic_ = info.startTimeMonotonic();
   }
 
+  void setIsShadow(bool is_shadow) { is_shadow_ = is_shadow; }
+  bool isShadow() const override { return is_shadow_; }
+
   TimeSource& time_source_;
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
@@ -386,6 +389,7 @@ private:
   // Default construct the object because upstream stream is not constructed in some cases.
   BytesMeterSharedPtr upstream_bytes_meter_{std::make_shared<BytesMeter>()};
   BytesMeterSharedPtr downstream_bytes_meter_;
+  bool is_shadow_{false};
 };
 
 } // namespace StreamInfo

@@ -1076,7 +1076,7 @@ TEST_P(MultiplexedIntegrationTest, DEPRECATED_FEATURE_TEST(GrpcRequestTimeoutMix
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("via_upstream\n"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("via_upstream"));
 }
 
 TEST_P(MultiplexedIntegrationTest, GrpcRequestTimeout) {

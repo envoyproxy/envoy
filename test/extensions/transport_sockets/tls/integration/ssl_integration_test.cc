@@ -399,7 +399,7 @@ typed_config:
   const auto* socket = dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
       connection->ssl().get());
   ASSERT(socket);
-  while (socket->state() != Ssl::SocketState::HandshakeInProgress) {
+  while (socket->state() == Ssl::SocketState::PreHandshake) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   ASSERT_EQ(connection->state(), Network::Connection::State::Open);
@@ -422,6 +422,13 @@ typed_config:
   "@type": type.googleapis.com/test.common.config.DummyConfig
   )EOF"),
                             *custom_validator_config);
+  auto* cert_validator_factory =
+      Registry::FactoryRegistry<Extensions::TransportSockets::Tls::CertValidatorFactory>::
+          getFactory("envoy.tls.cert_validator.timed_cert_validator");
+  static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
+      ->resetForTest();
+  static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
+      ->setValidationTimeOutMs(std::chrono::milliseconds(1000));
   initialize();
   Network::Address::InstanceConstSharedPtr address = getSslAddress(version_, lookupPort("http"));
   auto client_transport_socket_factory_ptr = createClientSslTransportSocketFactory(
@@ -436,7 +443,7 @@ typed_config:
   const auto* socket = dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
       connection->ssl().get());
   ASSERT(socket);
-  while (socket->state() != Ssl::SocketState::HandshakeInProgress) {
+  while (socket->state() == Ssl::SocketState::PreHandshake) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   Envoy::Ssl::ClientContextSharedPtr client_ssl_ctx =
@@ -468,6 +475,13 @@ typed_config:
   "@type": type.googleapis.com/test.common.config.DummyConfig
   )EOF"),
                             *custom_validator_config);
+  auto* cert_validator_factory =
+      Registry::FactoryRegistry<Extensions::TransportSockets::Tls::CertValidatorFactory>::
+          getFactory("envoy.tls.cert_validator.timed_cert_validator");
+  static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
+      ->resetForTest();
+  static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
+      ->setValidationTimeOutMs(std::chrono::milliseconds(1000));
   initialize();
   Network::Address::InstanceConstSharedPtr address = getSslAddress(version_, lookupPort("http"));
   auto client_transport_socket_factory_ptr = createClientSslTransportSocketFactory(
@@ -482,7 +496,7 @@ typed_config:
   const auto* socket = dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
       connection->ssl().get());
   ASSERT(socket);
-  while (socket->state() != Ssl::SocketState::HandshakeInProgress) {
+  while (socket->state() == Ssl::SocketState::PreHandshake) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   Envoy::Ssl::ClientContextSharedPtr client_ssl_ctx =

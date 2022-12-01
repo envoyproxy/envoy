@@ -16,6 +16,7 @@
 !\.gitignore
 !\.python-version
 !\.style.yapf
+!\.yamllint
 !\.yapfignore
 !\.zuul
 !\.zuul.yaml

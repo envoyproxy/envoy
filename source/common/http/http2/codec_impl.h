@@ -270,6 +270,7 @@ protected:
       return parent_.connection_.connectionInfoProvider();
     }
     absl::string_view responseDetails() override { return details_; }
+    Buffer::BufferMemoryAccountSharedPtr account() const override { return buffer_memory_account_; }
     void setAccount(Buffer::BufferMemoryAccountSharedPtr account) override;
 
     // ScopeTrackedObject

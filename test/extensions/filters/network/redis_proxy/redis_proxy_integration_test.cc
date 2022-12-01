@@ -1210,5 +1210,114 @@ TEST_P(RedisProxyWithFaultInjectionIntegrationTest, DelayFault) {
   EXPECT_EQ(1, test_server_->counter("redis.redis_stats.command.set.delay_fault")->value());
 }
 
+// This test sends a MULTI Redis command from a fake
+// downstream client to the envoy proxy. Envoy will respond
+// with an OK.
+
+TEST_P(RedisProxyIntegrationTest, SendMulti) {
+  initialize();
+  simpleProxyResponse(makeBulkStringArray({"multi"}), "+OK\r\n");
+}
+
+// This test sends a nested MULTI Redis command from a fake
+// downstream client to the envoy proxy. Envoy will respond with an
+// error.
+
+TEST_P(RedisProxyIntegrationTest, SendNestedMulti) {
+  initialize();
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+
+  proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
+  proxyResponseStep(makeBulkStringArray({"multi"}), "-MULTI calls can not be nested\r\n",
+                    redis_client);
+
+  redis_client->close();
+}
+
+// This test sends an EXEC command without a MULTI command
+// preceding it. The proxy responds with an error.
+
+TEST_P(RedisProxyIntegrationTest, ExecWithoutMulti) {
+  initialize();
+  simpleProxyResponse(makeBulkStringArray({"exec"}), "-EXEC without MULTI\r\n");
+}
+
+// This test sends an DISCARD command without a MULTI command
+// preceding it. The proxy responds with an error.
+
+TEST_P(RedisProxyIntegrationTest, DiscardWithoutMulti) {
+  initialize();
+  simpleProxyResponse(makeBulkStringArray({"discard"}), "-DISCARD without MULTI\r\n");
+}
+
+// This test executes an empty transaction. The proxy responds
+// with an empty array.
+
+TEST_P(RedisProxyIntegrationTest, ExecuteEmptyTransaction) {
+  initialize();
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+
+  proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
+  proxyResponseStep(makeBulkStringArray({"exec"}), "*0\r\n", redis_client);
+
+  redis_client->close();
+}
+
+// This test discards an empty transaction. The proxy responds
+// with an OK.
+
+TEST_P(RedisProxyIntegrationTest, DiscardEmptyTransaction) {
+  initialize();
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+
+  proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
+  proxyResponseStep(makeBulkStringArray({"discard"}), "+OK\r\n", redis_client);
+
+  redis_client->close();
+}
+
+// This test tries to insert a multi-key command in a transaction, which is not
+// supported. The proxy responds with an error.
+
+TEST_P(RedisProxyIntegrationTest, MultiKeyCommandInTransaction) {
+  initialize();
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+
+  proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
+  proxyResponseStep(makeBulkStringArray({"mget", "foo1", "foo2"}),
+                    "-'mget' command is not supported within transaction\r\n", redis_client);
+
+  redis_client->close();
+}
+
+// This test verifies that a multi command is sent before the first
+// simple command of the transaction.
+
+TEST_P(RedisProxyWithCommandStatsIntegrationTest, SendMultiBeforeCommandInTransaction) {
+  initialize();
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+
+  proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
+
+  std::string request = makeBulkStringArray({"set", "foo", "bar"});
+  ASSERT_TRUE(redis_client->write(request));
+
+  // The upstream will receive a MULTI command before the SET command.
+  FakeUpstreamPtr& upstream = fake_upstreams_[0];
+  FakeRawConnectionPtr fake_upstream_connection;
+  std::string auth_username = "";
+  std::string auth_password = "";
+  std::string upstream_request =
+      makeBulkStringArray({"MULTI"}) + makeBulkStringArray({"set", "foo", "bar"});
+  std::string upstream_response = "";
+  expectUpstreamRequestResponse(upstream, upstream_request, upstream_response,
+                                fake_upstream_connection, auth_username, auth_password);
+
+  EXPECT_TRUE(fake_upstream_connection->close());
+  redis_client->close();
+}
+
+// TODO: Add full transaction test.
+
 } // namespace
 } // namespace Envoy

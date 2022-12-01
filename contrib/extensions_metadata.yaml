@@ -88,6 +88,11 @@ envoy.regex_engines.hyperscan:
   - envoy.regex_engines
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+envoy.xds_delegates.kv_store:
+  categories:
+  - envoy.xds_delegates
+  security_posture: data_plane_agnostic
+  status: wip
 envoy.filters.network.generic_proxy:
   categories:
   - envoy.filters.network

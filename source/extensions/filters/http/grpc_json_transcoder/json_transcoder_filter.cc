@@ -217,10 +217,14 @@ JsonTranscoderConfig::JsonTranscoderConfig(
   path_matcher_ = pmb.Build();
 
   const auto& print_config = proto_config.print_options();
-  print_options_.add_whitespace = print_config.add_whitespace();
-  print_options_.always_print_primitive_fields = print_config.always_print_primitive_fields();
-  print_options_.always_print_enums_as_ints = print_config.always_print_enums_as_ints();
-  print_options_.preserve_proto_field_names = print_config.preserve_proto_field_names();
+  response_translate_options_.json_print_options.add_whitespace = print_config.add_whitespace();
+  response_translate_options_.json_print_options.always_print_primitive_fields =
+      print_config.always_print_primitive_fields();
+  response_translate_options_.json_print_options.always_print_enums_as_ints =
+      print_config.always_print_enums_as_ints();
+  response_translate_options_.json_print_options.preserve_proto_field_names =
+      print_config.preserve_proto_field_names();
+  response_translate_options_.stream_newline_delimited = print_config.stream_newline_delimited();
 
   match_incoming_request_route_ = proto_config.match_incoming_request_route();
   ignore_unknown_query_parameters_ = proto_config.ignore_unknown_query_parameters();
@@ -386,7 +390,7 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
       Grpc::Common::typeUrl(method_info->descriptor_->output_type()->full_name());
   ResponseToJsonTranslatorPtr response_translator{new ResponseToJsonTranslator(
       type_helper_->Resolver(), response_type_url, method_info->descriptor_->server_streaming(),
-      &response_input, {print_options_, false})};
+      &response_input, response_translate_options_)};
 
   transcoder = std::make_unique<TranscoderImpl>(std::move(request_translator),
                                                 std::move(json_request_translator),
@@ -414,7 +418,7 @@ JsonTranscoderConfig::translateProtoMessageToJson(const Protobuf::Message& messa
                                                   std::string* json_out) const {
   return ProtobufUtil::BinaryToJsonString(
       type_helper_->Resolver(), Grpc::Common::typeUrl(message.GetDescriptor()->full_name()),
-      message.SerializeAsString(), json_out, print_options_);
+      message.SerializeAsString(), json_out, response_translate_options_.json_print_options);
 }
 
 JsonTranscoderFilter::JsonTranscoderFilter(const JsonTranscoderConfig& config) : config_(config) {}
@@ -525,12 +529,11 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
   } else if (end_stream) {
     request_in_.finish();
 
+    Buffer::OwnedImpl data;
+    readToBuffer(*transcoder_->RequestOutput(), data);
     if (checkAndRejectIfRequestTranscoderFailed(RcDetails::get().GrpcTranscodeFailedEarly)) {
       return Http::FilterHeadersStatus::StopIteration;
     }
-
-    Buffer::OwnedImpl data;
-    readToBuffer(*transcoder_->RequestOutput(), data);
 
     if (data.length() > 0) {
       ENVOY_STREAM_LOG(debug, "adding initial data during decodeHeaders, transcoded data size={}",
@@ -830,11 +833,10 @@ bool JsonTranscoderFilter::readToBuffer(Protobuf::io::ZeroCopyInputStream& strea
   const void* out;
   int size;
   while (stream.Next(&out, &size)) {
-    data.add(out, size);
-
     if (size == 0) {
       return true;
     }
+    data.add(out, size);
   }
   return false;
 }

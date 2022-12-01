@@ -335,8 +335,6 @@ private:
 
 using BytesMeterSharedPtr = std::shared_ptr<BytesMeter>;
 
-// TODO(alyssawilk) after landing this, remove all the duplicate getters and
-// setters from StreamInfo.
 class UpstreamInfo {
 public:
   virtual ~UpstreamInfo() = default;
@@ -742,6 +740,8 @@ public:
    * @param downstream_bytes_meter, the bytes meter for downstream http stream.
    */
   virtual void setDownstreamBytesMeter(const BytesMeterSharedPtr& downstream_bytes_meter) PURE;
+
+  virtual bool isShadow() const PURE;
 
   static void syncUpstreamAndDownstreamBytesMeter(StreamInfo& downstream_info,
                                                   StreamInfo& upstream_info) {

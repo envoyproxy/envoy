@@ -236,6 +236,10 @@ private:
     // packets from the upstream host. Note that a a local ephemeral port is bound on the first
     // write to the upstream host.
     const Network::SocketPtr socket_;
+    // The socket should be connected to avoid port exhaustion unless runtime guard
+    // envoy.reloadable_features.udp_proxy_connect is unset or use_original_src_ip_ is set. If it
+    // is true, there will be no calling `connect()` on the socket.
+    bool skip_connect_{};
 
     UdpProxySessionStats session_stats_{};
     absl::optional<StreamInfo::StreamInfoImpl> udp_sess_stats_;

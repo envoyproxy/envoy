@@ -55,7 +55,6 @@ steps:
       BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
     ${{ if eq(parameters.rbe, false) }}:
       BAZEL_BUILD_EXTRA_OPTIONS: "${{ parameters.bazelBuildExtraOptions }}"
-      BAZEL_REMOTE_CACHE: $(LocalBuildCache)
 
   displayName: "Run CI script ${{ parameters.ciTarget }}"
 

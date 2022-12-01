@@ -43,6 +43,12 @@ public:
         version, absl::nullopt));
   }
 
+  static DecodedResourceImplPtr
+  fromResource(OpaqueResourceDecoder& resource_decoder,
+               const envoy::service::discovery::v3::Resource& resource) {
+    return std::make_unique<DecodedResourceImpl>(resource_decoder, resource);
+  }
+
   DecodedResourceImpl(OpaqueResourceDecoder& resource_decoder,
                       const envoy::service::discovery::v3::Resource& resource)
       : DecodedResourceImpl(resource_decoder, resource.name(), resource.aliases(),

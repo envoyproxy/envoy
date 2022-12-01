@@ -16,6 +16,7 @@ envoy_cc_library(
     deps = [
         "//envoy/http:filter_interface",
         "//source/common/http:header_utility_lib",
+        "//source/common/network:filter_state_proxy_info_lib",
         "//source/common/stream_info:upstream_address_lib",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_interface",
         "//source/extensions/filters/http/common:pass_through_filter_lib",

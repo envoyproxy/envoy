@@ -40,3 +40,13 @@ git diff-index --quiet HEAD -- || {
 }
 echo "BUILD_SCM_STATUS ${tree_status}"
 echo "STABLE_BUILD_SCM_STATUS ${tree_status}"
+
+git_branch=$(git rev-parse --abbrev-ref HEAD)
+echo "BUILD_SCM_BRANCH ${git_branch}"
+
+git_remote=$(git remote get-url origin)
+if [[ -n "$git_remote" ]]; then
+    echo "BUILD_SCM_REMOTE ${git_remote}"
+fi
+
+

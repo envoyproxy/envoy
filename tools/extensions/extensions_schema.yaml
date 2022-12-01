@@ -99,6 +99,7 @@ categories:
 - envoy.upstreams
 - envoy.udp_packet_writer
 - envoy.wasm.runtime
+- envoy.xds_delegates
 - envoy.common.key_value
 - envoy.network.dns_resolver
 - envoy.network.connection_balance
@@ -112,6 +113,7 @@ categories:
 - envoy.filters.http.upstream
 - envoy.path.match
 - envoy.path.rewrite
+- envoy.tls_handshakers
 - envoy.certificate_providers
 
 status_values:

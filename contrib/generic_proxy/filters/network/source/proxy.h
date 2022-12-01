@@ -34,10 +34,15 @@ using RouteConfiguration =
 class Filter;
 class ActiveStream;
 
+struct NamedFilterFactoryCb {
+  std::string config_name_;
+  FilterFactoryCb callback_;
+};
+
 class FilterConfig : public FilterChainFactory {
 public:
   FilterConfig(const std::string& stat_prefix, CodecFactoryPtr codec, RouteMatcherPtr route_matcher,
-               std::vector<FilterFactoryCb> factories, Server::Configuration::FactoryContext&)
+               std::vector<NamedFilterFactoryCb> factories, Server::Configuration::FactoryContext&)
       : stat_prefix_(stat_prefix), codec_factory_(std::move(codec)),
         route_matcher_(std::move(route_matcher)), factories_(std::move(factories)) {}
 
@@ -52,9 +57,9 @@ public:
   }
 
   // FilterChainFactory
-  void createFilterChain(FilterChainFactoryCallbacks& callbacks) override {
-    for (const auto& factory : factories_) {
-      factory(callbacks);
+  void createFilterChain(FilterChainManager& manager) override {
+    for (auto& factory : factories_) {
+      manager.applyFilterFactoryCb({factory.config_name_}, factory.callback_);
     }
   }
 
@@ -67,7 +72,7 @@ public:
   static RouteMatcherPtr routeMatcherFromProto(const RouteConfiguration& route_config,
                                                Server::Configuration::FactoryContext& context);
 
-  static std::vector<FilterFactoryCb> filtersFactoryFromProto(
+  static std::vector<NamedFilterFactoryCb> filtersFactoryFromProto(
       const ProtobufWkt::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>& filters,
       const std::string stats_prefix, Server::Configuration::FactoryContext& context);
 
@@ -81,58 +86,136 @@ private:
 
   RouteMatcherPtr route_matcher_;
 
-  std::vector<FilterFactoryCb> factories_;
+  std::vector<NamedFilterFactoryCb> factories_;
 };
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
-class ActiveStream : public FilterChainFactoryCallbacks,
-                     public DecoderFilterCallback,
-                     public EncoderFilterCallback,
+class ActiveStream : public FilterChainManager,
                      public LinkedObject<ActiveStream>,
                      public Envoy::Event::DeferredDeletable,
                      public ResponseEncoderCallback,
                      Logger::Loggable<Envoy::Logger::Id::filter> {
 public:
+  class ActiveFilterBase : public virtual StreamFilterCallbacks {
+  public:
+    ActiveFilterBase(ActiveStream& parent, FilterContext context, bool is_dual)
+        : parent_(parent), context_(context), is_dual_(is_dual) {}
+
+    // StreamFilterCallbacks
+    Envoy::Event::Dispatcher& dispatcher() override { return parent_.dispatcher(); }
+    const CodecFactory& downstreamCodec() override { return parent_.downstreamCodec(); }
+    void resetStream() override { parent_.resetStream(); }
+    const RouteEntry* routeEntry() const override { return parent_.routeEntry(); }
+    const RouteSpecificFilterConfig* perFilterConfig() const override {
+      if (const auto* entry = parent_.routeEntry(); entry != nullptr) {
+        return entry->perFilterConfig(context_.config_name);
+      }
+      return nullptr;
+    }
+
+    bool isDualFilter() const { return is_dual_; }
+
+    ActiveStream& parent_;
+    FilterContext context_;
+    const bool is_dual_{};
+  };
+
+  class ActiveDecoderFilter : public ActiveFilterBase, public DecoderFilterCallback {
+  public:
+    ActiveDecoderFilter(ActiveStream& parent, FilterContext context, DecoderFilterSharedPtr filter,
+                        bool is_dual)
+        : ActiveFilterBase(parent, context, is_dual), filter_(std::move(filter)) {
+      filter_->setDecoderFilterCallbacks(*this);
+    }
+
+    // DecoderFilterCallback
+    void sendLocalReply(Status status, ResponseUpdateFunction&& func) override {
+      parent_.sendLocalReply(status, std::move(func));
+    }
+    void continueDecoding() override { parent_.continueDecoding(); }
+    void upstreamResponse(ResponsePtr response) override {
+      parent_.upstreamResponse(std::move(response));
+    }
+    void completeDirectly() override { parent_.completeDirectly(); }
+
+    DecoderFilterSharedPtr filter_;
+  };
+  using ActiveDecoderFilterPtr = std::unique_ptr<ActiveDecoderFilter>;
+
+  class ActiveEncoderFilter : public ActiveFilterBase, public EncoderFilterCallback {
+  public:
+    ActiveEncoderFilter(ActiveStream& parent, FilterContext context, EncoderFilterSharedPtr filter,
+                        bool is_dual)
+        : ActiveFilterBase(parent, context, is_dual), filter_(std::move(filter)) {
+      filter_->setEncoderFilterCallbacks(*this);
+    }
+
+    // EncoderFilterCallback
+    void continueEncoding() override { parent_.continueEncoding(); }
+
+    EncoderFilterSharedPtr filter_;
+  };
+  using ActiveEncoderFilterPtr = std::unique_ptr<ActiveEncoderFilter>;
+
+  class FilterChainFactoryCallbacksHelper : public FilterChainFactoryCallbacks {
+  public:
+    FilterChainFactoryCallbacksHelper(ActiveStream& parent, FilterContext context)
+        : parent_(parent), context_(context) {}
+
+    // FilterChainFactoryCallbacks
+    void addDecoderFilter(DecoderFilterSharedPtr filter) override {
+      parent_.addDecoderFilter(
+          std::make_unique<ActiveDecoderFilter>(parent_, context_, std::move(filter), false));
+    }
+    void addEncoderFilter(EncoderFilterSharedPtr filter) override {
+      parent_.addEncoderFilter(
+          std::make_unique<ActiveEncoderFilter>(parent_, context_, std::move(filter), false));
+    }
+    void addFilter(StreamFilterSharedPtr filter) override {
+      parent_.addDecoderFilter(
+          std::make_unique<ActiveDecoderFilter>(parent_, context_, filter, true));
+      parent_.addEncoderFilter(
+          std::make_unique<ActiveEncoderFilter>(parent_, context_, std::move(filter), true));
+    }
+
+  private:
+    ActiveStream& parent_;
+    FilterContext context_;
+  };
+
   ActiveStream(Filter& parent, RequestPtr request);
   ~ActiveStream() override;
 
-  // FilterChainFactoryCallbacks
-  void addDecoderFilter(DecoderFilterSharedPtr filter) override {
-    filter->setDecoderFilterCallbacks(*this);
+  void addDecoderFilter(ActiveDecoderFilterPtr filter) {
     decoder_filters_.emplace_back(std::move(filter));
   }
-  void addEncoderFilter(EncoderFilterSharedPtr filter) override {
-    filter->setEncoderFilterCallbacks(*this);
-    encoder_filters_.emplace_back(std::move(filter));
-  }
-  void addFilter(StreamFilterSharedPtr filter) override {
-    filter->setDecoderFilterCallbacks(*this);
-    filter->setEncoderFilterCallbacks(*this);
-
-    decoder_filters_.push_back(filter);
+  void addEncoderFilter(ActiveEncoderFilterPtr filter) {
     encoder_filters_.emplace_back(std::move(filter));
   }
 
-  // StreamFilterCallbacks
-  Envoy::Event::Dispatcher& dispatcher() override;
-  const CodecFactory& downstreamCodec() override;
-  void resetStream() override;
-  const RouteEntry* routeEntry() const override { return cached_route_entry_.get(); }
+  Envoy::Event::Dispatcher& dispatcher();
+  const CodecFactory& downstreamCodec();
+  void resetStream();
+  const RouteEntry* routeEntry() const { return cached_route_entry_.get(); }
 
-  // DecoderFilterCallback
-  void sendLocalReply(Status status, ResponseUpdateFunction&&) override;
-  void continueDecoding() override;
-  void upstreamResponse(ResponsePtr response) override;
-  void completeDirectly() override;
+  void sendLocalReply(Status status, ResponseUpdateFunction&&);
+  void continueDecoding();
+  void upstreamResponse(ResponsePtr response);
+  void completeDirectly();
 
-  // EncoderFilterCallback
-  void continueEncoding() override;
+  void continueEncoding();
+
+  // FilterChainManager
+  void applyFilterFactoryCb(FilterContext context, FilterFactoryCb& factory) override {
+    FilterChainFactoryCallbacksHelper callbacks(*this, context);
+    factory(callbacks);
+  }
 
   // ResponseEncoderCallback
   void onEncodingSuccess(Buffer::Instance& buffer, bool close_connection) override;
 
-  std::vector<DecoderFilterSharedPtr>& decoderFiltersForTest() { return decoder_filters_; }
-  std::vector<EncoderFilterSharedPtr>& encoderFiltersForTest() { return encoder_filters_; }
+  std::vector<ActiveDecoderFilterPtr>& decoderFiltersForTest() { return decoder_filters_; }
+  std::vector<ActiveEncoderFilterPtr>& encoderFiltersForTest() { return encoder_filters_; }
   size_t nextDecoderFilterIndexForTest() { return next_decoder_filter_index_; }
   size_t nextEncoderFilterIndexForTest() { return next_encoder_filter_index_; }
 
@@ -146,10 +229,10 @@ private:
 
   RouteEntryConstSharedPtr cached_route_entry_;
 
-  std::vector<DecoderFilterSharedPtr> decoder_filters_;
+  std::vector<ActiveDecoderFilterPtr> decoder_filters_;
   size_t next_decoder_filter_index_{0};
 
-  std::vector<EncoderFilterSharedPtr> encoder_filters_;
+  std::vector<ActiveEncoderFilterPtr> encoder_filters_;
   size_t next_encoder_filter_index_{0};
 };
 using ActiveStreamPtr = std::unique_ptr<ActiveStream>;

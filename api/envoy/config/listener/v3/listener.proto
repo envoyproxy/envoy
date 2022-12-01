@@ -36,6 +36,16 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // The additional address the listener is listening on.
 message AdditionalAddress {
   core.v3.Address address = 1;
+
+  // [#not-implemented-hide:]
+  // Additional socket options that may not be present in Envoy source code or
+  // precompiled binaries. If specified, this will override the
+  // :ref:`socket_options <envoy_v3_api_field_config.listener.v3.Listener.socket_options>`
+  // in the listener. If specified with no
+  // :ref:`socket_options <envoy_v3_api_field_config.core.v3.SocketOptionsOverride.socket_options>`
+  // or an empty list of :ref:`socket_options <envoy_v3_api_field_config.core.v3.SocketOptionsOverride.socket_options>`,
+  // it means no socket option will apply.
+  core.v3.SocketOptionsOverride socket_options = 2;
 }
 
 // Listener list collections. Entries are ``Listener`` resources or references.

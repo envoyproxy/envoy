@@ -58,7 +58,7 @@ envoy.bootstrap.internal_listener:
   categories:
   - envoy.bootstrap
   security_posture: unknown
-  status: wip
+  status: alpha
   type_urls:
   - envoy.extensions.bootstrap.internal_listener.v3.InternalListener
 envoy.bootstrap.wasm:
@@ -234,6 +234,7 @@ envoy.filters.http.cors:
   status: stable
   type_urls:
   - envoy.extensions.filters.http.cors.v3.Cors
+  - envoy.extensions.filters.http.cors.v3.CorsPolicy
 envoy.filters.http.csrf:
   categories:
   - envoy.filters.http
@@ -686,6 +687,13 @@ envoy.health_checkers.redis:
   status: stable
   type_urls:
   - envoy.extensions.health_checkers.redis.v3.Redis
+envoy.health_checkers.thrift:
+  categories:
+  - envoy.health_checkers
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.health_checkers.thrift.v3.Thrift
 envoy.http.original_ip_detection.custom_header:
   categories:
   - envoy.http.original_ip_detection
@@ -739,7 +747,7 @@ envoy.io_socket.user_space:
   categories:
   - envoy.io_socket
   security_posture: unknown
-  status: wip
+  status: alpha
   undocumented: true
 envoy.matching.common_inputs.environment_variable:
   categories:
@@ -984,7 +992,7 @@ envoy.transport_sockets.internal_upstream:
   categories:
   - envoy.transport_sockets.upstream
   security_posture: unknown
-  status: wip
+  status: alpha
   type_urls:
   - envoy.extensions.transport_sockets.internal_upstream.v3.InternalUpstreamTransport
 envoy.transport_sockets.raw_buffer:
@@ -1142,6 +1150,13 @@ envoy.http.stateful_session.cookie:
   status: alpha
   type_urls:
   - envoy.extensions.http.stateful_session.cookie.v3.CookieBasedSessionState
+envoy.http.stateful_session.header:
+  categories:
+  - envoy.http.stateful_session
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.http.stateful_session.header.v3.HeaderBasedSessionState
 envoy.matching.inputs.request_headers:
   categories:
   - envoy.matching.http.input

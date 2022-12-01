@@ -1269,9 +1269,15 @@ TEST(HeaderParser, TestMetadataTranslator) {
       {"%UPSTREAM_METADATA([\"a\", \"b\",\"c\"])% %UPSTREAM_METADATA([\"d\", \"e\"])%",
        "%UPSTREAM_METADATA(a:b:c)% %UPSTREAM_METADATA(d:e)%"},
       {"%DYNAMIC_METADATA([\"a\", \"b\",\"c\"])%", "%DYNAMIC_METADATA(a:b:c)%"},
-      {"%UPSTREAM_METADATA([\"a\", \"b\",\"c\"])% %DYNAMIC_METADATA([\"d\", \"e\"])%",
-       "%UPSTREAM_METADATA(a:b:c)% %DYNAMIC_METADATA(d:e)%"},
-      {"nothing to translate", "nothing to translate"}};
+      {"%UPSTREAM_METADATA([\"a\", \"b\",\"c\"])% LEAVE_IT %DYNAMIC_METADATA([\"d\", \"e\"])%",
+       "%UPSTREAM_METADATA(a:b:c)% LEAVE_IT %DYNAMIC_METADATA(d:e)%"},
+      // The following test cases contain parts which should not be translated.
+      {"nothing to translate", "nothing to translate"},
+      {"%UPSTREAM_METADATA([\"a\", \"b\")%", "%UPSTREAM_METADATA([\"a\", \"b\")%"},
+      {"%UPSTREAM_METADATA([\"a\", \"b\"]])%", "%UPSTREAM_METADATA([\"a\", \"b\"]])%"},
+      {"%UPSTREAM_METADATA([\"a\", \"b\",\"c\"])% %DYNAMIC_METADATA([\"d\", \"e\")%",
+       "%UPSTREAM_METADATA(a:b:c)% %DYNAMIC_METADATA([\"d\", \"e\")%"},
+      {"UPSTREAM_METADATA([\"a\", \"b\"])%", "UPSTREAM_METADATA([\"a\", \"b\"])%"}};
 
   for (const auto& test_case : test_cases) {
     EXPECT_EQ(test_case.expected_output_, HeaderParser::translateMetadataFormat(test_case.input_));
@@ -1283,6 +1289,7 @@ TEST(HeaderParser, TestMetadataTranslator) {
 TEST(HeaderParser, TestMetadataTranslatorExceptions) {
   static const std::string test_cases[] = {
       "%UPSTREAM_METADATA([\"a\" - \"b\"])%",
+      "%UPSTREAM_METADATA(\t [ \t\t ] \t)%",
   };
   for (const auto& test_case : test_cases) {
     EXPECT_EQ(test_case, HeaderParser::translateMetadataFormat(test_case));

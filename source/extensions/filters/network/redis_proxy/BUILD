@@ -18,6 +18,7 @@ envoy_cc_library(
     hdrs = ["command_splitter.h"],
     deps = [
         "//envoy/event:dispatcher_interface",
+        "//source/extensions/filters/network/common/redis:client_interface",
         "//source/extensions/filters/network/common/redis:codec_interface",
     ],
 )

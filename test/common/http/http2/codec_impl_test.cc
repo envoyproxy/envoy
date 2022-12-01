@@ -4280,6 +4280,40 @@ TEST_P(Http2CodecImplTest, ChunkProcessingShouldNotScheduleIfReadDisabled) {
   }
 }
 
+TEST_P(Http2CodecImplTest, CheckHeaderPaddedWhitespaceValidation) {
+  // Per https://datatracker.ietf.org/doc/html/rfc9113#section-8.2.1,
+  // leading & trailing whitespace characters in headers are not valid, but this is a new
+  // validation and may break existing deployments.
+  stream_error_on_invalid_http_messaging_ = true;
+  initialize();
+
+  std::string header_value{" foo "};
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  HeaderString header_string("bar");
+  setHeaderStringUnvalidated(header_string, header_value);
+  request_headers.addViaMove(HeaderString(absl::string_view("bar")), std::move(header_string));
+
+  MockResponseDecoder response_decoder;
+  RequestEncoder* request_encoder = &client_->newStream(response_decoder);
+  StreamEncoder* response_encoder;
+  MockStreamCallbacks server_stream_callbacks;
+  MockRequestDecoder request_decoder;
+
+  EXPECT_CALL(server_callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder = &encoder;
+        encoder.getStream().addCallbacks(server_stream_callbacks);
+        return request_decoder;
+      }));
+
+  // Codec should accept request with padded header value
+  EXPECT_CALL(request_decoder, decodeHeaders_(_, true));
+  EXPECT_TRUE(request_encoder->encodeHeaders(request_headers, true).ok());
+  EXPECT_CALL(server_stream_callbacks, onResetStream(_, _)).Times(0);
+  driveToCompletion();
+}
+
 TEST_P(Http2CodecImplTest, CheckHeaderValueValidation) {
   // Valid characters in HTTP headers per https://www.rfc-editor.org/rfc/rfc7230#section-3.2
   // However this does not allow obsolete line folding

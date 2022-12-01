@@ -16,11 +16,13 @@ variables:
   value: true
 - name: isMain
   value: $[eq(variables['Build.SourceBranch'], 'refs/heads/main')]
-- name: isRelease
+- name: isReleaseBranch
   value: $[startsWith(variables['Build.SourceBranch'], 'refs/heads/release/v')]
+- name: isTaggedRelease
+  value: $[startsWith(variables['Build.SourceBranch'], 'refs/tags/v')]
 - name: isStableBranch
   # A release branch can be either `main` or a `release/v1.x` stable branch
-  value: $[or(eq(variables['isMain'], 'true'), eq(variables['isRelease'], 'true'))]
+  value: $[or(eq(variables['isMain'], 'true'), eq(variables['isReleaseBranch'], 'true'))]
 
 stages:
 - stage: precheck
@@ -339,7 +341,7 @@ stages:
   - job: coverage
     displayName: "linux_x64"
     dependsOn: []
-    timeoutInMinutes: 120
+    timeoutInMinutes: 180
     pool: "x64-large"
     strategy:
       maxParallel: 2
@@ -505,6 +507,74 @@ stages:
       condition: eq(variables['isDev'], 'false')
       env:
         GITHUB_TOKEN: $(GitHubPublicRepoOnlyAccessToken)
+
+  - job: assets
+    dependsOn: []
+    condition: eq(variables['isTaggedRelease'], 'true')
+    pool:
+      vmImage: "ubuntu-20.04"
+    steps:
+    - task: DownloadBuildArtifacts@0
+      inputs:
+        buildType: current
+        artifactName: "bazel.release"
+        itemPattern: "bazel.release/envoy_binary.tar.gz"
+        downloadType: single
+        targetPath: $(Build.StagingDirectory)
+    - task: DownloadBuildArtifacts@0
+      inputs:
+        buildType: current
+        artifactName: "bazel.release"
+        itemPattern: "bazel.release/envoy-contrib_binary.tar.gz"
+        downloadType: single
+        targetPath: $(Build.StagingDirectory)
+    - task: DownloadBuildArtifacts@0
+      inputs:
+        buildType: current
+        artifactName: "bazel.release.arm64"
+        itemPattern: "bazel.release.arm64/envoy_binary.tar.gz"
+        downloadType: single
+        targetPath: $(Build.StagingDirectory)
+    - task: DownloadBuildArtifacts@0
+      inputs:
+        buildType: current
+        artifactName: "bazel.release.arm64"
+        itemPattern: "bazel.release.arm64/envoy-contrib_binary.tar.gz"
+        downloadType: single
+        targetPath: $(Build.StagingDirectory)
+
+    - task: DownloadSecureFile@1
+      name: MaintainerGPGKey
+      displayName: 'Download maintainer GPG key'
+      inputs:
+        secureFile: 'maintainer.gpg.key'
+
+    - bash: |
+        set -e
+
+        VERSION="$(cat VERSION.txt)"
+
+        mkdir -p linux/amd64 linux/arm64 publish
+
+        # linux/amd64
+        tar zxf $(Build.StagingDirectory)/bazel.release/envoy_binary.tar.gz -C ./linux/amd64
+        tar zxf $(Build.StagingDirectory)/bazel.release/envoy-contrib_binary.tar.gz -C ./linux/amd64
+        cp -a linux/amd64/build_envoy_release_stripped/envoy "publish/envoy-${VERSION}-linux-x86_64"
+        cp -a linux/amd64/build_envoy-contrib_release_stripped/envoy "publish/envoy-contrib-${VERSION}-linux-x86_64"
+
+        # linux/arm64
+        tar zxf $(Build.StagingDirectory)/bazel.release.arm64/envoy_binary.tar.gz -C ./linux/arm64
+        tar zxf $(Build.StagingDirectory)/bazel.release.arm64/envoy-contrib_binary.tar.gz -C ./linux/arm64
+        cp -a linux/arm64/build_envoy_release_stripped/envoy "publish/envoy-${VERSION}-linux-aarch_64"
+        cp -a linux/arm64/build_envoy-contrib_release_stripped/envoy "publish/envoy-contrib-${VERSION}-linux-aarch_64"
+
+        echo "$MAINTAINER_GPG_KEY_PASSPHRASE" | gpg --batch --yes --passphrase-fd 0 --import "$(MaintainerGPGKey.secureFilePath)"
+
+        ci/publish_github_assets.sh "v${VERSION}" "${PWD}/publish"
+      workingDirectory: $(Build.SourcesDirectory)
+      env:
+        GITHUB_TOKEN: $(GitHubPublicRepoOnlyAccessToken)
+        MAINTAINER_GPG_KEY_PASSPHRASE: $(MaintainerGPGKeyPassphrase)
 
 - stage: verify
   dependsOn: ["docker"]

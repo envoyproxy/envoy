@@ -526,12 +526,15 @@ private:
                        absl::optional<uint32_t> overprovisioning_factor,
                        HostMapConstSharedPtr cross_priority_host_map);
 
-      // Drains any connection pools associated with the removed hosts.
+      // Drains any connection pools associated with the removed hosts. All connections will be
+      // closed gracefully and no new connections will be created.
       void drainConnPools(const HostVector& hosts_removed);
-      // Drains idle clients in connection pools for all hosts.
+      // Drains any connection pools associated with the all hosts. All connections will be
+      // closed gracefully and no new connections will be created.
       void drainConnPools();
-      // Drain all clients in connection pools for all hosts.
-      void drainAllConnPools(DrainConnectionsHostPredicate predicate);
+      // Drain any connection pools associated with the hosts filtered by the predicate.
+      void drainConnPools(DrainConnectionsHostPredicate predicate,
+                          ConnectionPool::DrainBehavior behavior);
 
     private:
       Http::ConnectionPool::Instance*
@@ -567,15 +570,12 @@ private:
     ThreadLocalClusterManagerImpl(ClusterManagerImpl& parent, Event::Dispatcher& dispatcher,
                                   const absl::optional<LocalClusterParams>& local_cluster_params);
     ~ThreadLocalClusterManagerImpl() override;
-    // TODO(junr03): clean up drainConnPools vs drainAllConnPools once ConnPoolImplBase::startDrain
-    // and
-    // ConnPoolImplBase::drainConnections() get cleaned up. The code in onHostHealthFailure and the
-    // code in ThreadLocalClusterManagerImpl::drainConnPools(const HostVector& hosts) is very
-    // similar and can be merged in a similar fashion to the ConnPoolImplBase case.
-    void drainConnPools(const HostVector& hosts);
-    void drainConnPools(HostSharedPtr old_host, ConnPoolsContainer& container);
-    void drainTcpConnPools(TcpConnPoolsContainer& container);
-    void drainAllConnPoolsWorker(const HostSharedPtr& host);
+
+    // Drain or close connections of host. If no drain behavior is provided then closing will
+    // be immediate.
+    void drainOrCloseConnPools(const HostSharedPtr& host,
+                               absl::optional<ConnectionPool::DrainBehavior> drain_behavior);
+
     void httpConnPoolIsIdle(HostConstSharedPtr host, ResourcePriority priority,
                             const std::vector<uint8_t>& hash_key);
     void tcpConnPoolIsIdle(HostConstSharedPtr host, const std::vector<uint8_t>& hash_key);

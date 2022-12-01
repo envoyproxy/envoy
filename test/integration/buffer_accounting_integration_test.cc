@@ -237,6 +237,91 @@ TEST_P(Http2BufferWatermarksTest, ShouldCreateFourBuffersPerAccount) {
   EXPECT_TRUE(buffer_factory_->waitUntilExpectedNumberOfAccountsAndBoundBuffers(0, 0));
 }
 
+TEST_P(Http2BufferWatermarksTest, AccountsAndInternalRedirect) {
+  const Http::TestResponseHeaderMapImpl redirect_response{
+      {":status", "302"}, {"content-length", "0"}, {"location", "http://authority2/new/url"}};
+
+  auto handle = config_helper_.createVirtualHost("handle.internal.redirect");
+  handle.mutable_routes(0)->set_name("redirect");
+  handle.mutable_routes(0)->mutable_route()->mutable_internal_redirect_policy();
+  config_helper_.addVirtualHost(handle);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  default_request_headers_.setHost("handle.internal.redirect");
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  waitForNextUpstreamRequest();
+
+  if (streamBufferAccounting()) {
+    EXPECT_EQ(buffer_factory_->numAccountsCreated(), 1);
+  } else {
+    EXPECT_EQ(buffer_factory_->numAccountsCreated(), 0);
+  }
+
+  upstream_request_->encodeHeaders(redirect_response, true);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+
+  if (streamBufferAccounting()) {
+    EXPECT_EQ(buffer_factory_->numAccountsCreated(), 1) << printAccounts();
+    EXPECT_TRUE(buffer_factory_->waitForExpectedAccountUnregistered(1)) << printAccounts();
+  } else {
+    EXPECT_EQ(buffer_factory_->numAccountsCreated(), 0);
+    EXPECT_TRUE(buffer_factory_->waitForExpectedAccountUnregistered(0));
+  }
+}
+
+TEST_P(Http2BufferWatermarksTest, AccountsAndInternalRedirectWithRequestBody) {
+  const Http::TestResponseHeaderMapImpl redirect_response{
+      {":status", "302"}, {"content-length", "0"}, {"location", "http://authority2/new/url"}};
+
+  auto handle = config_helper_.createVirtualHost("handle.internal.redirect");
+  handle.mutable_routes(0)->set_name("redirect");
+  handle.mutable_routes(0)->mutable_route()->mutable_internal_redirect_policy();
+  config_helper_.addVirtualHost(handle);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  default_request_headers_.setHost("handle.internal.redirect");
+  default_request_headers_.setMethod("POST");
+
+  const std::string request_body = "foobarbizbaz";
+  buffer_factory_->setExpectedAccountBalance(request_body.size(), 1);
+
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeRequestWithBody(default_request_headers_, request_body);
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(redirect_response, true);
+
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+
+  if (streamBufferAccounting()) {
+    EXPECT_EQ(buffer_factory_->numAccountsCreated(), 1) << printAccounts();
+    EXPECT_TRUE(buffer_factory_->waitForExpectedAccountUnregistered(1)) << printAccounts();
+    EXPECT_TRUE(
+        buffer_factory_->waitForExpectedAccountBalanceWithTimeout(TestUtility::DefaultTimeout))
+        << "buffer total: " << buffer_factory_->totalBufferSize()
+        << " buffer max: " << buffer_factory_->maxBufferSize() << printAccounts();
+  } else {
+    EXPECT_EQ(buffer_factory_->numAccountsCreated(), 0);
+    EXPECT_TRUE(buffer_factory_->waitForExpectedAccountUnregistered(0));
+  }
+}
+
 TEST_P(Http2BufferWatermarksTest, ShouldTrackAllocatedBytesToUpstream) {
   const int num_requests = 5;
   const uint32_t request_body_size = 4096;

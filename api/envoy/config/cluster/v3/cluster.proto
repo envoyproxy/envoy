@@ -1224,15 +1224,6 @@ message LoadBalancingPolicy {
   repeated Policy policies = 1;
 }
 
-// An extensible structure containing the address Envoy should bind to when
-// establishing upstream connections.
-message UpstreamBindConfig {
-  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.UpstreamBindConfig";
-
-  // The address Envoy should bind to when establishing upstream connections.
-  core.v3.Address source_address = 1;
-}
-
 message UpstreamConnectionOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.UpstreamConnectionOptions";

@@ -463,3 +463,11 @@ envoy_cc_test(
         "//source/common/common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "union_string_test",
+    srcs = ["union_string_test.cc"],
+    deps = [
+        "//envoy/common:union_string",
+    ],
+)

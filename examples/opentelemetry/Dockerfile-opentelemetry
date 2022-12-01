@@ -1,0 +1,11 @@
+FROM alpine:3.13@sha256:100448e45467d4f3838fc8d95faab2965e22711b6edf67bbd8ec9c07f612b553 as otelc_curl
+RUN apk --update add curl
+
+FROM otel/opentelemetry-collector:latest@sha256:3fe065c828e718b464af35d79cf9017d0f4ca3c0e6f444c515d0ff36c020d41c
+
+COPY --from=otelc_curl / /
+
+COPY ./otel-collector-config.yaml /etc/otel-collector-config.yaml
+USER 0
+RUN chmod o+r /etc/otel-collector-config.yaml
+USER nobody

@@ -10,12 +10,12 @@ jobs:
     strategy:
       fail-fast: false
 
-    # CodeQL runs on ubuntu-latest and windows-latest
-    runs-on: ubuntu-latest
+    # CodeQL runs on ubuntu-20.04
+    runs-on: ubuntu-20.04
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b
+      uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8
       with:
         # We must fetch at least the immediate parents so that if this is
         # a pull request then we can checkout the head.
@@ -28,7 +28,7 @@ jobs:
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@904260d7d935dff982205cbdb42025ce30b7a34f
+      uses: github/codeql-action/init@807578363a7869ca324a79039e6db9c843e0e100
       # Override language selection by uncommenting this and choosing your languages
       with:
         languages: cpp
@@ -55,4 +55,4 @@ jobs:
         git clean -xdf
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@904260d7d935dff982205cbdb42025ce30b7a34f
+      uses: github/codeql-action/analyze@807578363a7869ca324a79039e6db9c843e0e100

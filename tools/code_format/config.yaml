@@ -165,6 +165,7 @@ paths:
   # Files in these paths can use MessageLite::SerializeAsString
   serialize_as_string:
     include:
+    - contrib/config/source/kv_store_xds_delegate.cc
     - source/common/protobuf/utility.cc
     - source/extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.cc
     - test/common/grpc/codec_fuzz_test.cc
@@ -184,7 +185,6 @@ paths:
     - source/common/common/regex.cc
     - source/common/common/utility.cc
     - source/common/formatter/substitution_formatter.cc
-    - source/common/router/header_parser_utils.cc
     - source/common/stats/tag_extractor_impl.h
     - source/common/stats/tag_extractor_impl.cc
     - source/common/version/version.cc
@@ -293,6 +293,7 @@ visibility_excludes:
 - source/extensions/early_data/BUILD
 - source/extensions/filters/http/buffer/BUILD
 - source/extensions/filters/network/common/BUILD
+- source/extensions/http/header_validators/envoy_default/BUILD
 - source/extensions/transport_sockets/common/BUILD
 - source/extensions/udp_packet_writer/default/BUILD
 - source/extensions/udp_packet_writer/gso/BUILD

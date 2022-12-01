@@ -13,11 +13,12 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/loa
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Round Robin Load Balancing Policy]
+// [#not-implemented-hide:]
 
 // This configuration allows the built-in ROUND_ROBIN LB policy to be configured via the LB policy
 // extension point. See the :ref:`load balancing architecture overview
 // <arch_overview_load_balancing_types>` for more information.
-// [#extension: envoy.clusters.lb_policy]
+// [#extension: envoy.load_balancing_policies]
 message RoundRobin {
   // Configuration for slow start mode.
   // If this configuration is not set, slow start will not be not enabled.

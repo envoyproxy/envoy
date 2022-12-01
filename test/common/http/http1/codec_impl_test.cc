@@ -5,6 +5,7 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/extensions/http/header_validators/envoy_default/v3/header_validator.pb.h"
 #include "envoy/http/codec.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -13,6 +14,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/http1/codec_impl.h"
 #include "source/common/runtime/runtime_impl.h"
+#include "source/extensions/http/header_validators/envoy_default/http1_header_validator.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/buffer/mocks.h"
@@ -160,11 +162,24 @@ public:
     response_encoder->encodeHeaders(TestResponseHeaderMapImpl{{":status", "200"}}, true);
   }
 
+  void createHeaderValidator() {
+    if (codec_settings_.allow_chunked_length_) {
+      header_validator_config_.mutable_http1_protocol_options()->set_allow_chunked_length(true);
+    }
+    header_validator_ =
+        std::make_unique<Extensions::Http::HeaderValidators::EnvoyDefault::Http1HeaderValidator>(
+            header_validator_config_, Protocol::Http11, stream_info_);
+  }
+
 protected:
   uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
   uint32_t max_request_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_{envoy::config::core::v3::HttpProtocolOptions::ALLOW};
+  envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
+      header_validator_config_;
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
+  HeaderValidatorPtr header_validator_;
 };
 
 void Http1ServerConnectionImplTest::expect400(Buffer::OwnedImpl& buffer,
@@ -341,6 +356,7 @@ void Http1ServerConnectionImplTest::testRequestHeadersAccepted(std::string heade
 void Http1ServerConnectionImplTest::testServerAllowChunkedContentLength(uint32_t content_length,
                                                                         bool allow_chunked_length) {
   codec_settings_.allow_chunked_length_ = allow_chunked_length;
+  createHeaderValidator();
   codec_ = std::make_unique<Http1::ServerConnectionImpl>(
       connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
       max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
@@ -355,39 +371,79 @@ void Http1ServerConnectionImplTest::testServerAllowChunkedContentLength(uint32_t
       }));
 
   TestRequestHeaderMapImpl expected_headers{
+      {":authority", "foo"},
       {":path", "/"},
       {":method", "POST"},
       {"transfer-encoding", "chunked"},
   };
   Buffer::OwnedImpl expected_data("Hello World");
+  std::string response;
 
   if (allow_chunked_length) {
+#ifdef ENVOY_ENABLE_UHV
+    // Header validation is done by the HCM when header map is fully parsed.
+    EXPECT_CALL(decoder, decodeHeaders_(_, _))
+        .WillOnce(Invoke([this, &expected_headers](RequestHeaderMapPtr& headers, bool) -> void {
+          auto result = header_validator_->validateRequestHeaderMap(*headers);
+          EXPECT_THAT(headers, HeaderMapEqualIgnoreOrder(&expected_headers));
+          ASSERT_TRUE(result.ok());
+        }));
+#else
     EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
+#endif
     EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false));
     EXPECT_CALL(decoder, decodeData(_, true));
   } else {
+#ifdef ENVOY_ENABLE_UHV
+    // Header validation is done by the HCM when header map is fully parsed.
+    // This callback approximates handling of header validation error, when HCM calls
+    // sendLocalReply and closes network connection (based on the
+    // stream_error_on_invalid_http_message flag, which in this test is assumed to equal false).
+    EXPECT_CALL(decoder, decodeHeaders_(_, _))
+        .WillOnce(Invoke([this, &response_encoder](RequestHeaderMapPtr& headers, bool) -> void {
+          auto result = header_validator_->validateRequestHeaderMap(*headers);
+          ASSERT_FALSE(result.ok());
+          response_encoder->encodeHeaders(TestResponseHeaderMapImpl{{":status", "400"},
+                                                                    {"connection", "close"},
+                                                                    {"content-length", "0"}},
+                                          true);
+          response_encoder->getStream().resetStream(StreamResetReason::LocalReset);
+          connection_.state_ = Network::Connection::State::Closing;
+        }));
+    ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&response));
+#else
     EXPECT_CALL(decoder, decodeHeaders_(_, _)).Times(0);
+    EXPECT_CALL(decoder, sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _,
+                                        "http1.content_length_and_chunked_not_allowed"));
+#endif
     EXPECT_CALL(decoder, decodeData(_, _)).Times(0);
-    EXPECT_CALL(decoder, sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, _));
   }
 
-  Buffer::OwnedImpl buffer(
-      fmt::format("POST / HTTP/1.1\r\ntransfer-encoding: chunked\r\ncontent-length: {}\r\n\r\n"
-                  "6\r\nHello \r\n"
-                  "5\r\nWorld\r\n"
-                  "0\r\n\r\n",
-                  content_length));
+  Buffer::OwnedImpl buffer(fmt::format(
+      "POST / HTTP/1.1\r\nHost: foo\r\ntransfer-encoding: chunked\r\ncontent-length: {}\r\n\r\n"
+      "6\r\nHello \r\n"
+      "5\r\nWorld\r\n"
+      "0\r\n\r\n",
+      content_length));
 
   auto status = codec_->dispatch(buffer);
 
   if (allow_chunked_length) {
     EXPECT_TRUE(status.ok());
   } else {
+#ifdef ENVOY_ENABLE_UHV
+    // With header validator enabled, request and connection are rejected at the HCM level and
+    // the codec no longer reports a parsing error from the dispatch call.
+    EXPECT_EQ("HTTP/1.1 400 Bad Request\r\nconnection: close\r\ncontent-length: 0\r\n\r\n",
+              response);
+    EXPECT_TRUE(status.ok());
+#else
     EXPECT_TRUE(isCodecProtocolError(status));
     EXPECT_EQ(status.message(),
               "http/1.1 protocol error: both 'Content-Length' and 'Transfer-Encoding' are set.");
     EXPECT_EQ("http1.content_length_and_chunked_not_allowed",
               response_encoder->getStream().responseDetails());
+#endif
   }
 }
 
@@ -2279,8 +2335,10 @@ protected:
   uint32_t max_response_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
 };
 
-void Http1ClientConnectionImplTest::testClientAllowChunkedContentLength(uint32_t content_length,
-                                                                        bool allow_chunked_length) {
+void Http1ClientConnectionImplTest::testClientAllowChunkedContentLength(
+    [[maybe_unused]] uint32_t content_length, [[maybe_unused]] bool allow_chunked_length) {
+// Response validation is not implemented in UHV yet
+#ifndef ENVOY_ENABLE_UHV
   codec_settings_.allow_chunked_length_ = allow_chunked_length;
   codec_ = std::make_unique<Http1::ClientConnectionImpl>(
       connection_, http1CodecStats(), callbacks_, codec_settings_, max_response_headers_count_);
@@ -2318,6 +2376,7 @@ void Http1ClientConnectionImplTest::testClientAllowChunkedContentLength(uint32_t
     EXPECT_EQ(status.message(),
               "http/1.1 protocol error: both 'Content-Length' and 'Transfer-Encoding' are set.");
   };
+#endif
 }
 
 INSTANTIATE_TEST_SUITE_P(Parsers, Http1ClientConnectionImplTest,
@@ -3340,36 +3399,37 @@ TEST_P(Http1ServerConnectionImplTest, PipedRequestWithMutipleEvent) {
 }
 
 TEST_P(Http1ServerConnectionImplTest, Utf8Path) {
-  if (parser_impl_ == ParserImpl::BalsaParser) {
-    // TODO(#21245): Re-enable this test for BalsaParser.
-    return;
-  }
-
   initialize();
 
   MockRequestDecoder decoder;
   Buffer::OwnedImpl buffer("GET /δ¶/δt/pope?q=1#narf HXXP/1.1\r\n\r\n");
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
 #ifdef ENVOY_ENABLE_UHV
-  // permissive
-  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
-
-  TestRequestHeaderMapImpl expected_headers{
-      {":path", "/δ¶/δt/pope?q=1#narf"},
-      {":method", "GET"},
-  };
-  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
-
-  auto status = codec_->dispatch(buffer);
-  EXPECT_TRUE(status.ok());
-  EXPECT_EQ(0U, buffer.length());
+  bool strict = false;
 #else
-  // strict
-  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
-
-  EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
-  auto status = codec_->dispatch(buffer);
-  EXPECT_TRUE(isCodecProtocolError(status));
+  bool strict = true;
 #endif
+
+  if (parser_impl_ == ParserImpl::BalsaParser) {
+    strict = true;
+  }
+
+  if (strict) {
+    EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
+    auto status = codec_->dispatch(buffer);
+    EXPECT_TRUE(isCodecProtocolError(status));
+  } else {
+    TestRequestHeaderMapImpl expected_headers{
+        {":path", "/δ¶/δt/pope?q=1#narf"},
+        {":method", "GET"},
+    };
+    EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
+
+    auto status = codec_->dispatch(buffer);
+    EXPECT_TRUE(status.ok());
+    EXPECT_EQ(0U, buffer.length());
+  }
 }
 
 // Tests that incomplete response headers of 80 kB header value fails.

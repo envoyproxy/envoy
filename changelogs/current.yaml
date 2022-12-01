@@ -2,140 +2,15 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
-- area: build
-  change: |
-    official released binary is now built on Ubuntu 20.04, requires glibc >= 2.30.
-- area: stats http local_rate_limit
-  change: |
-    Fixed metric tag extraction so that :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.stat_prefix>`
-    is properly extracted. This changes the Prometheus name from
-    envoy_http_local_rate_limit_myprefix_rate_limited{} to envoy_http_local_rate_limit_rate_limited{envoy_local_http_ratelimit_prefix="myprefix"}.
-- area: stats network local_rate_limit
-  change: |
-    Fixed metric tag extraction so that :ref:`stat_prefix <envoy_v3_api_field_extensions.filters.network.local_ratelimit.v3.LocalRateLimit.stat_prefix>`
-    is properly extracted. This changes the Prometheus name from
-    envoy_local_rate_limit_myprefix_rate_limited{} to envoy_local_rate_limit_rate_limited{envoy_local_ratelimit_prefix="myprefix"}.
-- area: http
-  change: |
-    Envoy no longer adds ``content-length: 0`` header when proxying UPGRADE requests without ``content-length`` and ``transfer-encoding`` headers.
-    This behavior change can be reverted by setting the ``envoy.reloadable_features.http_skip_adding_content_length_to_upgrade`` runtime flag to false.
-- area: tls
-  change: |
-    Change TLS and QUIC transport sockets to support asynchronous cert validation extension. This behavior change can be reverted by setting runtime guard ``envoy.reloadable_features.tls_async_cert_validation`` to false.
-- area: http
-  change: |
-    For HTTP/2 and HTTP/3 codecs, all clients now continue sending data upstream after receiving an end of the server
-    stream. This supports the server half-close semantics for TCP tunneling with CONNECT as well as bi-directional
-    streaming calls. This behavior change can be reverted by setting the
-    ``envoy.reloadable_features.http_response_half_close`` runtime flag to false.
-- area: original_dst
-  change: |
-    ORIGINAL_DST cluster will not attempt to remove and drain the stale hosts during cleanup if they are still used by
-    the connection pools. For HTTP pools, please set :ref:`idle_timeout <faq_configuration_connection_timeouts>` to
-    limit the duration of the upstream connections (the default value is 1h, and the recommended value is 5min). This
-    behavior change can be reverted by setting runtime guard
-    ``envoy.reloadable_features.original_dst_rely_on_idle_timeout``.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
-- area: logging
-  change: |
-    changed the ``UPSTREAM_REMOTE_ADDRESS``, ``UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT``, and ``UPSTREAM_REMOTE_PORT`` fields to log based on the actual upstream connection rather than the upstream host. This fixes a bug where the address components were not consistently correct for Happy Eyeballs connections and proxied connections, but also means in cases where the host was selected but a connection was not established, the fields will be absent. This change can be temporarily reverted by setting the runtime guard ``envoy.reloadable_features.correct_remote_address`` to false.
-- area: resource_monitors
-  change: |
-    changed behavior of the fixed heap monitor to count pages allocated to TCMalloc as free memory if it's not used by Envoy. This change can be reverted temporarily by setting the runtime guard ``envoy.reloadable_features.do_not_count_mapped_pages_as_free`` to true.
-- area: prometheus_stats
-  change: |
-    removed blank line for being compatible with OpenMetrics.
-- area: quic
-  change: |
-    changed the timing of QUIC connection writing data in response to incoming packets in non-Windowns platforms. This change can be reverted by setting runtime guard ``envoy.reloadable_features.quic_defer_send_in_response_to_packet`` to false.
-- area: original_dst
-  change: |
-    transparent listener can use original_dst filter without nf_conntrack enabled.
-- area: cache_filter
-  change: |
-    added a completion callback to insertHeaders and insertTrailers in cache interface. Any external cache implementation extensions will need to also add this callback, and call it on completion.
-- area: local_ratelimit
-  change: |
-    added :ref:`virtual host level configuration <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.vh_rate_limits>` support for the local ratelimit filter.
-- area: health_check
-  change: |
-    support custom health check address via :ref:`health_check_config <envoy_v3_api_msg_config.endpoint.v3.endpoint.healthcheckconfig>`.
-- area: http
-  change: |
-    changed the filter callback interfaces to make sure that downstream-only functionality is explicit.
-  change: |
-    the upstream remote address is now available to downstream filters via the ``upstreamRemoteAddress`` function.
-- area: stats
-  change: |
-    Default tag extraction rules were changed for ``worker_id`` extraction. Previously, ``worker_`` was removed from the original name during the extraction. This
-    led to the same base stat name for both the per-worker and overall stat. For instance, in prometheus stats, the following stats were produced: ::
-
-      envoy_listener_downstream_cx_total{} 2.
-      envoy_listener_downstream_cx_total{envoy_worker_id="0"} 1.
-      envoy_listener_downstream_cx_total{envoy_worker_id="1"} 1.
-
-    This resulted in ``sum(envoy_listener_downstream_cx_total)`` producing 4, even though there are only 2 connections.
-    The new behavior results in stats such as this: ::
-
-      envoy_listener_downstream_cx_total{} 2.
-      envoy_listener_worker_downstream_cx_total{envoy_worker_id="0"} 1.
-      envoy_listener_worker_downstream_cx_total{envoy_worker_id="1"} 1.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
-- area: http
-  change: |
-    fixed a bug with internal redirects not being performed for drained connections.
-- area: listener
-  change: |
-    fixed a bug that doesn't handle of an update for a listener with IPv4-mapped address correctly, and that will lead to a memory leak.
-- area: transport_socket
-  change: |
-    fixed a bug that prevented the tcp stats to be retrieved when running on kernels different than the kernel where Envoy was built.
-- area: logger
-  change: |
-    added the %j and %_ format support for fine-grain loggers to make it consistant with default loggers.
-- area: router
-  change: |
-    fixed edge-case interaction between weighted clusters, cluster headers and (request|response)_headers_to_(add|remove).
-- area: upstream
-  change: |
-    fixed a bug where custom transport socket hashes might not be respected by wrapper passthrough sockets. This change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.fix_hash_key`` to false.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
-- area: auto_config
-  change: |
-    removed ``envoy.reloadable_features.correctly_validate_alpn`` and legacy code paths.
-- area: grpc
-  change: |
-    remove ``envoy.reloadable_features.enable_grpc_async_client_cache`` and legacy code paths.
-- area: hcm
-  change: |
-    removed ``envoy.reloadable_features.handle_stream_reset_during_hcm_encoding`` and legacy code paths.
-- area: http
-  change: |
-    removed ``envoy.reloadable_features.proxy_120_103`` and legacy code paths.
-- area: http
-  change: |
-    removed ``envoy.reloadable_features.http2_allow_capacity_increase_by_settings`` and legacy code paths.
-- area: http
-  change: |
-    removed ``envoy.reloadable_features.sanitize_http_header_referer`` and legacy code paths.
-- area: lightstep
-  change: |
-    removed the Lightstep tracer integration, making way for the native OpenTelemetry integration.
-- area: listener
-  change: |
-    removed ``envoy.reloadable_features.internal_address`` and legacy code paths.
-- area: router
-  change: |
-    removed ``envoy.reloadable_features.update_expected_rq_timeout_on_retry`` and legacy code paths.
-- area: tracing
-  change: |
-    removed ``envoy.reloadable_features.update_grpc_response_error_tag`` and legacy code paths.
 
 new_features:
 - area: header_formatters
@@ -248,12 +123,3 @@ new_features:
     added support for SNI-based cert selection in tls downstream transport socket. Detailed documentation is available :ref:`cert selection<arch_overview_ssl_cert_select>`.
 
 deprecated:
-- area: http
-  change: |
-    deprecated :ref:`append <envoy_v3_api_field_config.core.v3.HeaderValueOption.append>` and please use
-    :ref:`append_action <envoy_v3_api_field_config.core.v3.HeaderValueOption.append_action>` first.
-- area: router
-  change: |
-    deprecated :ref:`total weight <envoy_v3_api_field_config.route.v3.WeightedCluster.total_weight>` for weighted
-    clusters. The sum of the :ref:`clusters' weights <envoy_v3_api_field_config.route.v3.WeightedCluster.ClusterWeight.weight>`
-    will be used as the total weight.

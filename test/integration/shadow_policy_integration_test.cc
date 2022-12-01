@@ -1,3 +1,5 @@
+#include "envoy/extensions/access_loggers/file/v3/file.pb.h"
+
 #include "test/integration/filters/repick_cluster_filter.h"
 #include "test/integration/http_integration.h"
 
@@ -144,6 +146,24 @@ TEST_P(ShadowPolicyIntegrationTest, OriginalClusterWithAddBody) {
 }
 
 TEST_P(ShadowPolicyIntegrationTest, MirrorClusterWithAddBody) {
+  auto log_file = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) {
+        auto* typed_config =
+            hcm.mutable_http_filters(hcm.http_filters_size() - 1)->mutable_typed_config();
+
+        envoy::extensions::filters::http::router::v3::Router router_config;
+        auto* upstream_log_config = router_config.add_upstream_log();
+        upstream_log_config->set_name("accesslog");
+        envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+        access_log_config.set_path(log_file);
+        access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+            "%REQ(CONTENT-LENGTH)%\n");
+        upstream_log_config->mutable_typed_config()->PackFrom(access_log_config);
+        typed_config->PackFrom(router_config);
+      });
+
   intitialConfigSetup("cluster_1", "");
   cluster_with_custom_filter_ = 1;
   filter_name_ = "add-body-filter";
@@ -152,6 +172,14 @@ TEST_P(ShadowPolicyIntegrationTest, MirrorClusterWithAddBody) {
   sendRequestAndValidateResponse();
   EXPECT_EQ(upstream_headers_->getContentLengthValue(), "");
   EXPECT_EQ(mirror_headers_->getContentLengthValue(), "4");
+
+  std::string log1 = waitForAccessLog(log_file, 0, true);
+  std::string log2 = waitForAccessLog(log_file, 1);
+  EXPECT_TRUE((log1 == "4" && log2 == "-") || (log1 == "-" && log2 == "4"));
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_rq_total")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.upstream_rq_total")->value());
+  EXPECT_EQ(1, test_server_->counter("http.config_test.rq_total")->value());
+  EXPECT_EQ(1, test_server_->counter("http.async-client.rq_total")->value());
 }
 
 } // namespace

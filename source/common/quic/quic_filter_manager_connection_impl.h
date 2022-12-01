@@ -53,13 +53,14 @@ public:
   void close(Network::ConnectionCloseType type) override;
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
   std::string nextProtocol() const override { return EMPTY_STRING; }
-  void noDelay(bool /*enable*/) override {
-    // No-op. TCP_NODELAY doesn't apply to UDP.
-  }
+  // No-op. TCP_NODELAY doesn't apply to UDP.
+  void noDelay(bool /*enable*/) override {}
   // Neither readDisable nor detectEarlyCloseWhenReadDisabled are supported for QUIC.
   // Crash in debug mode if they are called.
-  void readDisable(bool /*disable*/) override { ASSERT(false); }
-  void detectEarlyCloseWhenReadDisabled(bool /*value*/) override { ASSERT(false); }
+  void readDisable(bool /*disable*/) override { IS_ENVOY_BUG("Unexpected call to readDisable"); }
+  void detectEarlyCloseWhenReadDisabled(bool /*value*/) override {
+    IS_ENVOY_BUG("Unexpected call to detectEarlyCloseWhenReadDisabled");
+  }
   bool readEnabled() const override { return true; }
   Network::ConnectionInfoSetter& connectionInfoSetter() override {
     ENVOY_BUG(network_connection_ && network_connection_->connectionSocket(),
@@ -77,9 +78,9 @@ public:
     }
     return network_connection_->connectionSocket()->connectionInfoProviderSharedPtr();
   }
+  // Unix domain socket is not supported.
   absl::optional<Network::Connection::UnixDomainSocketPeerCredentials>
   unixSocketPeerCredentials() const override {
-    // Unix domain socket is not supported.
     return absl::nullopt;
   }
   void setConnectionStats(const Network::Connection::ConnectionStats& stats) override {

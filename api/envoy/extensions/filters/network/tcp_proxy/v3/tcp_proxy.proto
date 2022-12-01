@@ -99,6 +99,10 @@ message TcpProxy {
     // Neither ``:-prefixed`` pseudo-headers nor the Host: header can be overridden.
     repeated config.core.v3.HeaderValueOption headers_to_add = 3
         [(validate.rules).repeated = {max_items: 1000}];
+
+    // Save the response headers to the downstream info filter state for consumption
+    // by the network filters. The filter state key is ``envoy.tcp_proxy.propagate_response_headers``.
+    bool propagate_response_headers = 4;
   }
 
   message OnDemand {

@@ -1,5 +1,5 @@
-Quic Extensions
-=================
+Quic extensions
+===============
 
 .. toctree::
   :glob:

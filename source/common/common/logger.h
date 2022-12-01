@@ -66,6 +66,7 @@ namespace Logger {
   FUNCTION(misc)                                                                                   \
   FUNCTION(mongo)                                                                                  \
   FUNCTION(multi_connection)                                                                       \
+  FUNCTION(oauth2)                                                                                 \
   FUNCTION(quic)                                                                                   \
   FUNCTION(quic_stream)                                                                            \
   FUNCTION(pool)                                                                                   \
