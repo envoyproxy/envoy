@@ -205,6 +205,7 @@ public:
   }
 
   bool contains(const K& key) { return cache_.find(key) != cache_.end(); }
+
   V& at(const K& key) {
     auto it = cache_.find(key);
     if (it != cache_.cend()) {
