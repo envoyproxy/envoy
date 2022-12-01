@@ -226,6 +226,11 @@ SysCallIntResult OsSysCallsImpl::stat(const char* pathname, struct stat* buf) {
   return {rc, rc != -1 ? 0 : errno};
 }
 
+SysCallIntResult OsSysCallsImpl::fstat(os_fd_t fd, struct stat* buf) {
+  const int rc = ::fstat(fd, buf);
+  return {rc, rc != -1 ? 0 : errno};
+}
+
 SysCallIntResult OsSysCallsImpl::setsockopt(os_fd_t sockfd, int level, int optname,
                                             const void* optval, socklen_t optlen) {
   const int rc = ::setsockopt(sockfd, level, optname, static_cast<const char*>(optval), optlen);
