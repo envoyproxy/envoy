@@ -42,12 +42,18 @@ message FileSystemHttpCacheConfig {
 
   // The maximum size of the cache in bytes - when reached, another entry is removed.
   //
+  // This is measured as the sum of file sizes, such that it includes headers, trailers,
+  // and metadata, but does not include e.g. file system overhead and block size padding.
+  //
   // If unset there is no limit except file system failure.
   //
   // [#not-implemented-hide:]
   google.protobuf.UInt64Value max_cache_size_bytes = 3;
 
   // The maximum size of a cache entry in bytes - larger responses will not be cached.
+  //
+  // This is measured as the file size for the cache entry, such that it includes
+  // headers, trailers, and metadata.
   //
   // If unset there is no limit.
   //
