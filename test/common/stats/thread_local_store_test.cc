@@ -2028,8 +2028,7 @@ TEST_F(StatsThreadLocalStoreTest, SetSinkPredicates) {
   // Create text readouts
   for (uint64_t idx = 0; idx < num_stats; ++idx) {
     auto stat_name = pool.add(absl::StrCat("text_readout.", idx));
-    scope_.textReadoutFromStatName(stat_name).set(
-        absl::StrCat("text_readout.", idx));
+    scope_.textReadoutFromStatName(stat_name).set(store_->symbolTable().toString(stat_name));
   }
 
   uint32_t num_sinked_counters = 0, num_sinked_gauges = 0, num_sinked_text_readouts = 0;
@@ -2043,7 +2042,7 @@ TEST_F(StatsThreadLocalStoreTest, SetSinkPredicates) {
                              [&num_sinked_gauges](Gauge&) { ++num_sinked_gauges; });
   EXPECT_EQ(expected_sinked_stats, num_sinked_gauges);
 
-  store_->forEachSinkedTextReadout( check_expected_size, [&num_sinked_text_readouts](TextReadout&) {
+  store_->forEachSinkedTextReadout(check_expected_size, [&num_sinked_text_readouts](TextReadout&) {
     ++num_sinked_text_readouts;
   });
   EXPECT_EQ(expected_sinked_stats, num_sinked_text_readouts);
