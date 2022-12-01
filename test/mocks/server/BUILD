@@ -241,6 +241,7 @@ envoy_cc_mock(
     hdrs = ["transport_socket_factory_context.h"],
     deps = [
         "//envoy/server:tracer_config_interface",
+        "//source/common/certificate_provider:certificate_provider_manager_impl_lib",
         "//source/common/secret:secret_manager_impl_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/api:api_mocks",

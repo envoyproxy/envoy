@@ -146,15 +146,14 @@ void DispatcherImpl::clearDeferredDeleteList() {
   deferred_deleting_ = false;
 }
 
-Network::ServerConnectionPtr
-DispatcherImpl::createServerConnection(Network::ConnectionSocketPtr&& socket,
-                                       Network::TransportSocketPtr&& transport_socket,
-                                       StreamInfo::StreamInfo& stream_info,
-                                       const Network::DownstreamTransportSocketFactory& transport_socket_factory) {
+Network::ServerConnectionPtr DispatcherImpl::createServerConnection(
+    Network::ConnectionSocketPtr&& socket, Network::TransportSocketPtr&& transport_socket,
+    StreamInfo::StreamInfo& stream_info,
+    const Network::DownstreamTransportSocketFactory& transport_socket_factory) {
   ASSERT(isThreadSafe());
-  return std::make_unique<Network::ServerConnectionImpl>(
-      *this, std::move(socket), std::move(transport_socket), stream_info,
-      transport_socket_factory, true);
+  return std::make_unique<Network::ServerConnectionImpl>(*this, std::move(socket),
+                                                         std::move(transport_socket), stream_info,
+                                                         transport_socket_factory, true);
 }
 
 Network::ClientConnectionPtr DispatcherImpl::createClientConnection(

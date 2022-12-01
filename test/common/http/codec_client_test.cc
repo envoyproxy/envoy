@@ -318,7 +318,8 @@ public:
     EXPECT_CALL(listener_callbacks_, onAccept_(_))
         .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
           upstream_connection_ = dispatcher_->createServerConnection(
-              std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
+              std::move(socket), Network::Test::createRawBufferSocket(), stream_info_,
+              transport_factory_);
           upstream_connection_->addConnectionCallbacks(upstream_callbacks_);
 
           expected_callbacks--;
@@ -380,6 +381,7 @@ protected:
   NiceMock<MockRequestEncoder> inner_encoder_;
   NiceMock<MockResponseDecoder> outer_decoder_;
   StreamInfo::StreamInfoImpl stream_info_;
+  NiceMock<Network::MockDownstreamTransportSocketFactory> transport_factory_;
 };
 
 // Send a block of data from upstream, and ensure it is received by the codec.

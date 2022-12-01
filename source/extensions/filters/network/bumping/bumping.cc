@@ -64,9 +64,7 @@ BumpingStats Config::generateStats(Stats::Scope& scope) {
   return {ALL_BUMPING_STATS(POOL_COUNTER(scope))};
 }
 
-RouteConstSharedPtr Config::getRoute() {
-  return default_route_;
-}
+RouteConstSharedPtr Config::getRoute() { return default_route_; }
 
 Filter::Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager)
     : config_(config), cluster_manager_(cluster_manager),
@@ -80,7 +78,7 @@ Filter::~Filter() {
   }
 
   ASSERT(generic_conn_pool_ == nullptr);
-  //ASSERT(upstream_ == nullptr);
+  // ASSERT(upstream_ == nullptr);
 }
 
 void Filter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
@@ -146,10 +144,8 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
   auto& downstream_connection = read_callbacks_->connection();
   auto& filter_state = downstream_connection.streamInfo().filterState();
   // Set transport socket SNI of upstream with downstream SNI
-  transport_socket_options_ =
-      Network::TransportSocketOptionsUtility::fromFilterState(
-        *filter_state,
-        downstream_connection.requestedServerName());
+  transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
+      *filter_state, downstream_connection.requestedServerName());
 
   if (auto typed_state = filter_state->getDataReadOnly<Network::UpstreamSocketOptionsFilterState>(
           Network::UpstreamSocketOptionsFilterState::key());
@@ -183,8 +179,9 @@ bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster) {
     return false;
   }
 
-  generic_conn_pool_ = factory->createGenericConnPool(
-      cluster, TcpProxy::TunnelingConfigHelperOptConstRef(), this, *upstream_callbacks_, getStreamInfo());
+  generic_conn_pool_ =
+      factory->createGenericConnPool(cluster, TcpProxy::TunnelingConfigHelperOptConstRef(), this,
+                                     *upstream_callbacks_, getStreamInfo());
   if (generic_conn_pool_) {
     connecting_ = true;
     connect_attempts_++;
@@ -202,7 +199,7 @@ void Filter::onGenericPoolFailure(ConnectionPool::PoolFailureReason reason,
                                   Upstream::HostDescriptionConstSharedPtr host) {
   generic_conn_pool_.reset();
   read_callbacks_->upstreamHost(host);
-  //TODO fix potential segmentation fault issue here
+  // TODO fix potential segmentation fault issue here
   getStreamInfo().upstreamInfo()->setUpstreamHost(host);
   getStreamInfo().upstreamInfo()->setUpstreamTransportFailureReason(failure_reason);
 
@@ -228,18 +225,18 @@ void Filter::onGenericPoolReady(StreamInfo::StreamInfo*,
 
   // Request mimick cert from local certificate provider.
   requestCertificate(info);
-  //upstream_ = std::move(upstream);
+  // upstream_ = std::move(upstream);
   generic_conn_pool_.reset();
   onUpstreamConnection();
 }
 
 void Filter::requestCertificate(Ssl::ConnectionInfoConstSharedPtr info) {
-  ENVOY_CONN_LOG(info, "sni: {}", read_callbacks_->connection(), read_callbacks_->connection().requestedServerName());
+  ENVOY_CONN_LOG(info, "sni: {}", read_callbacks_->connection(),
+                 read_callbacks_->connection().requestedServerName());
   config_->main_dispatcher_.post([this, info]() {
     this->on_demand_handle_ = config_->tls_certificate_provider_->addOnDemandUpdateCallback(
         std::string(read_callbacks_->connection().requestedServerName()),
-        std::make_shared<BumpingMetadata>(info),
-        read_callbacks_->connection().dispatcher(), *this);
+        std::make_shared<BumpingMetadata>(info), read_callbacks_->connection().dispatcher(), *this);
   });
 }
 
@@ -256,7 +253,7 @@ Network::FilterStatus Filter::onData(Buffer::Instance&, bool) {
 }
 
 Network::FilterStatus Filter::onNewConnection() {
-  //ASSERT(upstream_ == nullptr);
+  // ASSERT(upstream_ == nullptr);
   route_ = pickRoute();
   return establishUpstreamConnection();
 }
@@ -272,7 +269,7 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
 
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
-    //upstream_.reset();
+    // upstream_.reset();
 
     if (connecting) {
       if (event == Network::ConnectionEvent::RemoteClose) {
@@ -301,10 +298,10 @@ void Filter::onCacheHit(const std::string) const {
 
 void Filter::onCacheMiss(const std::string) const {
   // Recreate transport socket to use newly generate certificate
-  try{
-    dynamic_cast<Envoy::Network::ServerConnectionImpl&>(read_callbacks_->connection()).refreshTransportSocket();
-  }
-  catch(std::bad_cast exp) {
+  try {
+    dynamic_cast<Envoy::Network::ServerConnectionImpl&>(read_callbacks_->connection())
+        .refreshTransportSocket();
+  } catch (std::bad_cast exp) {
     ENVOY_CONN_LOG(warn, "connection cast failed in bumping filter", read_callbacks_->connection());
   }
   // Re-enable downstream reads and writes

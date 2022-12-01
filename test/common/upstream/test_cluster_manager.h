@@ -119,6 +119,9 @@ public:
 
   Secret::SecretManager& secretManager() override { return secret_manager_; }
   Singleton::Manager& singletonManager() override { return singleton_manager_; }
+  CertificateProvider::CertificateProviderManager& certificateProviderManager() override {
+    return certificate_provider_manager_;
+  }
 
   MOCK_METHOD(ClusterManager*, clusterManagerFromProto_,
               (const envoy::config::bootstrap::v3::Bootstrap& bootstrap));
@@ -148,6 +151,7 @@ public:
   NiceMock<Secret::MockSecretManager> secret_manager_;
   NiceMock<AccessLog::MockAccessLogManager>& log_manager_ = server_context_.access_log_manager_;
   Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
+  NiceMock<CertificateProvider::MockCertificateProviderManager> certificate_provider_manager_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   NiceMock<Random::MockRandomGenerator> random_;
   Api::ApiPtr api_;

@@ -133,8 +133,10 @@ TEST_F(SecretManagerImplTest, CertificateValidationContextSecretLoadSuccess) {
 
   ASSERT_EQ(secret_manager->findStaticCertificateValidationContextProvider("undefined"), nullptr);
   ASSERT_NE(secret_manager->findStaticCertificateValidationContextProvider("abc.com"), nullptr);
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
   Ssl::CertificateValidationContextConfigImpl cvc_config(
-      *secret_manager->findStaticCertificateValidationContextProvider("abc.com")->secret(), *api_);
+      *secret_manager->findStaticCertificateValidationContextProvider("abc.com")->secret(), *api_,
+      ctx);
   const std::string cert_pem =
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
@@ -530,7 +532,7 @@ validation_context:
   secret_context.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
       decoded_resources_2.refvec_, "validation-context-v1");
   Ssl::CertificateValidationContextConfigImpl cert_validation_context(
-      *context_secret_provider->secret(), *api_);
+      *context_secret_provider->secret(), *api_, ctx);
   EXPECT_EQ("DUMMY_INLINE_STRING_TRUSTED_CA", cert_validation_context.caCert());
   const std::string updated_config_dump = R"EOF(
 dynamic_active_secrets:
@@ -1148,8 +1150,10 @@ TEST_F(SecretManagerImplTest, DeprecatedSanMatcher) {
 
   ASSERT_EQ(secret_manager->findStaticCertificateValidationContextProvider("undefined"), nullptr);
   ASSERT_NE(secret_manager->findStaticCertificateValidationContextProvider("abc.com"), nullptr);
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
   Ssl::CertificateValidationContextConfigImpl cvc_config(
-      *secret_manager->findStaticCertificateValidationContextProvider("abc.com")->secret(), *api_);
+      *secret_manager->findStaticCertificateValidationContextProvider("abc.com")->secret(), *api_,
+      ctx);
   EXPECT_EQ(cvc_config.subjectAltNameMatchers().size(), 4);
   EXPECT_EQ("example.foo", cvc_config.subjectAltNameMatchers()[0].matcher().exact());
   EXPECT_EQ(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::DNS,

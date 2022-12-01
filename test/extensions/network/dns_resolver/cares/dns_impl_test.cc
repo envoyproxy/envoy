@@ -342,7 +342,8 @@ public:
 
   void onAccept(ConnectionSocketPtr&& socket) override {
     Network::ConnectionPtr new_connection = dispatcher_.createServerConnection(
-        std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
+        std::move(socket), Network::Test::createRawBufferSocket(), stream_info_,
+        transport_factory_);
     TestDnsServerQuery* query =
         new TestDnsServerQuery(std::move(new_connection), hosts_a_, hosts_aaaa_, cnames_,
                                record_ttl_, refused_, error_on_a_, error_on_aaaa_);
@@ -382,6 +383,7 @@ private:
   // over.
   std::vector<std::unique_ptr<TestDnsServerQuery>> queries_;
   StreamInfo::StreamInfoImpl stream_info_;
+  NiceMock<Network::MockDownstreamTransportSocketFactory> transport_factory_;
 };
 
 } // namespace

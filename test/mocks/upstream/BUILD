@@ -237,6 +237,7 @@ envoy_cc_mock(
     srcs = ["cluster_manager_factory.cc"],
     hdrs = ["cluster_manager_factory.h"],
     deps = [
+        "//envoy/certificate_provider:certificate_provider_manager_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/singleton:manager_impl_lib",
         "//test/mocks/secret:secret_mocks",

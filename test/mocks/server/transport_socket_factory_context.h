@@ -2,6 +2,7 @@
 
 #include "envoy/server/transport_socket_config.h"
 
+#include "source/common/certificate_provider/certificate_provider_manager_impl.h"
 #include "source/common/secret/secret_manager_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
@@ -39,6 +40,7 @@ public:
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
   MOCK_METHOD(Api::Api&, api, ());
   MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, ());
+  MOCK_METHOD(CertificateProvider::CertificateProviderManager&, certificateProviderManager, ());
 
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   testing::NiceMock<Api::MockApi> api_;
@@ -49,6 +51,7 @@ public:
   std::unique_ptr<Secret::SecretManager> secret_manager_;
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   Singleton::ManagerImpl singleton_manager_;
+  CertificateProvider::CertificateProviderManagerImpl certificate_provider_manager_;
 };
 } // namespace Configuration
 } // namespace Server

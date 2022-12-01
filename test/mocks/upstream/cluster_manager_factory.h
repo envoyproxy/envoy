@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/certificate_provider/certificate_provider_manager.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/singleton/manager_impl.h"
@@ -10,9 +11,23 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace Envoy {
-namespace Upstream {
 using ::testing::NiceMock;
+namespace Envoy {
+namespace CertificateProvider {
+class MockCertificateProviderManager : public CertificateProviderManager {
+public:
+  MockCertificateProviderManager();
+  ~MockCertificateProviderManager() override;
+
+  MOCK_METHOD(void, addCertificateProvider,
+              (absl::string_view name, const envoy::config::core::v3::TypedExtensionConfig& config,
+               Server::Configuration::TransportSocketFactoryContext& factory_context));
+
+  MOCK_METHOD(CertificateProviderSharedPtr, getCertificateProvider, (absl::string_view name));
+};
+} // namespace CertificateProvider
+
+namespace Upstream {
 class MockClusterManagerFactory : public ClusterManagerFactory {
 public:
   MockClusterManagerFactory();
@@ -20,6 +35,9 @@ public:
 
   Secret::MockSecretManager& secretManager() override { return secret_manager_; };
   Singleton::Manager& singletonManager() override { return singleton_manager_; }
+  CertificateProvider::CertificateProviderManager& certificateProviderManager() override {
+    return certificate_provider_manager_;
+  }
 
   MOCK_METHOD(ClusterManagerPtr, clusterManagerFromProto,
               (const envoy::config::bootstrap::v3::Bootstrap& bootstrap));
@@ -50,6 +68,7 @@ public:
 private:
   NiceMock<Secret::MockSecretManager> secret_manager_;
   Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
+  NiceMock<CertificateProvider::MockCertificateProviderManager> certificate_provider_manager_;
 };
 } // namespace Upstream
 } // namespace Envoy

@@ -62,11 +62,10 @@ public:
   TimeSource& timeSource() override { return time_source_; }
   void initializeStats(Stats::Scope& scope, const absl::optional<std::string>& prefix) override;
   void clearDeferredDeleteList() override;
-  Network::ServerConnectionPtr
-  createServerConnection(Network::ConnectionSocketPtr&& socket,
-                         Network::TransportSocketPtr&& transport_socket,
-                         StreamInfo::StreamInfo& stream_info,
-                         const Network::DownstreamTransportSocketFactory& transport_socket_factory) override;
+  Network::ServerConnectionPtr createServerConnection(
+      Network::ConnectionSocketPtr&& socket, Network::TransportSocketPtr&& transport_socket,
+      StreamInfo::StreamInfo& stream_info,
+      const Network::DownstreamTransportSocketFactory& transport_socket_factory) override;
   Network::ClientConnectionPtr createClientConnection(
       Network::Address::InstanceConstSharedPtr address,
       Network::Address::InstanceConstSharedPtr source_address,

@@ -43,8 +43,8 @@ public:
   }
   Network::ServerConnectionPtr
   createServerConnection(Network::ConnectionSocketPtr&& socket,
-                         Network::TransportSocketPtr&& transport_socket,
-                         StreamInfo::StreamInfo&) override {
+                         Network::TransportSocketPtr&& transport_socket, StreamInfo::StreamInfo&,
+                         const Network::DownstreamTransportSocketFactory&) override {
     // The caller expects both the socket and the transport socket to be moved.
     socket.reset();
     transport_socket.reset();

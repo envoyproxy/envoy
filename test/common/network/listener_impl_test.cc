@@ -33,6 +33,7 @@ static void errorCallbackTest(Address::IpVersion version) {
   Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
   NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Network::MockDownstreamTransportSocketFactory> transport_factory;
 
   auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
       Network::Test::getCanonicalLoopbackAddress(version));
@@ -49,7 +50,8 @@ static void errorCallbackTest(Address::IpVersion version) {
   EXPECT_CALL(listener_callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
         Network::ConnectionPtr conn = dispatcher->createServerConnection(
-            std::move(accepted_socket), Network::Test::createRawBufferSocket(), stream_info);
+            std::move(accepted_socket), Network::Test::createRawBufferSocket(), stream_info,
+            transport_factory);
         client_connection->close(ConnectionCloseType::NoFlush);
         conn->close(ConnectionCloseType::NoFlush);
         socket->close();
@@ -89,6 +91,7 @@ TEST_P(TcpListenerImplTest, UseActualDst) {
   Network::MockTcpListenerCallbacks listener_callbacks1;
   Random::MockRandomGenerator random_generator;
   NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Network::MockDownstreamTransportSocketFactory> transport_factory;
 
   // Do not redirect since use_original_dst is false.
   Network::TestTcpListenerImpl listener(dispatcherImpl(), random_generator, runtime, socket,
@@ -109,7 +112,8 @@ TEST_P(TcpListenerImplTest, UseActualDst) {
   EXPECT_CALL(listener_callbacks1, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
         Network::ConnectionPtr conn = dispatcher_->createServerConnection(
-            std::move(accepted_socket), Network::Test::createRawBufferSocket(), stream_info);
+            std::move(accepted_socket), Network::Test::createRawBufferSocket(), stream_info,
+            transport_factory);
         EXPECT_EQ(*conn->connectionInfoProvider().localAddress(),
                   *socket->connectionInfoProvider().localAddress());
         client_connection->close(ConnectionCloseType::NoFlush);
@@ -123,6 +127,7 @@ TEST_P(TcpListenerImplTest, UseActualDst) {
 TEST_P(TcpListenerImplTest, GlobalConnectionLimitEnforcement) {
   // Required to manipulate runtime values when there is no test server.
   TestScopedRuntime scoped_runtime;
+  NiceMock<Network::MockDownstreamTransportSocketFactory> transport_factory;
 
   scoped_runtime.mergeValues({{"overload.global_downstream_max_connections", "2"}});
   auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
@@ -137,7 +142,8 @@ TEST_P(TcpListenerImplTest, GlobalConnectionLimitEnforcement) {
   EXPECT_CALL(listener_callbacks, onAccept_(_))
       .WillRepeatedly(Invoke([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
         server_connections.emplace_back(dispatcher_->createServerConnection(
-            std::move(accepted_socket), Network::Test::createRawBufferSocket(), stream_info));
+            std::move(accepted_socket), Network::Test::createRawBufferSocket(), stream_info,
+            transport_factory));
         dispatcher_->exit();
       }));
 
@@ -188,6 +194,7 @@ TEST_P(TcpListenerImplTest, GlobalConnectionLimitEnforcement) {
 TEST_P(TcpListenerImplTest, GlobalConnectionLimitListenerOptOut) {
   // Required to manipulate runtime values when there is no test server.
   TestScopedRuntime scoped_runtime;
+  NiceMock<Network::MockDownstreamTransportSocketFactory> transport_factory;
 
   scoped_runtime.mergeValues({{"overload.global_downstream_max_connections", "1"}});
   auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
@@ -202,7 +209,8 @@ TEST_P(TcpListenerImplTest, GlobalConnectionLimitListenerOptOut) {
   EXPECT_CALL(listener_callbacks, onAccept_(_))
       .WillRepeatedly(Invoke([&](Network::ConnectionSocketPtr& accepted_socket) -> void {
         server_connections.emplace_back(dispatcher_->createServerConnection(
-            std::move(accepted_socket), Network::Test::createRawBufferSocket(), stream_info));
+            std::move(accepted_socket), Network::Test::createRawBufferSocket(), stream_info,
+            transport_factory));
         dispatcher_->exit();
       }));
 
@@ -238,6 +246,7 @@ TEST_P(TcpListenerImplTest, WildcardListenerUseActualDst) {
   Network::MockTcpListenerCallbacks listener_callbacks;
   Random::MockRandomGenerator random_generator;
   NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Network::MockDownstreamTransportSocketFactory> transport_factory;
   // Do not redirect since use_original_dst is false.
   Network::TestTcpListenerImpl listener(dispatcherImpl(), random_generator, runtime, socket,
                                         listener_callbacks, true, false);
@@ -254,7 +263,8 @@ TEST_P(TcpListenerImplTest, WildcardListenerUseActualDst) {
   EXPECT_CALL(listener_callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         Network::ConnectionPtr conn = dispatcher_->createServerConnection(
-            std::move(socket), Network::Test::createRawBufferSocket(), stream_info);
+            std::move(socket), Network::Test::createRawBufferSocket(), stream_info,
+            transport_factory);
         EXPECT_EQ(*conn->connectionInfoProvider().localAddress(), *local_dst_address);
         client_connection->close(ConnectionCloseType::NoFlush);
         conn->close(ConnectionCloseType::NoFlush);
@@ -280,6 +290,7 @@ TEST_P(TcpListenerImplTest, WildcardListenerIpv4Compat) {
   Network::MockTcpListenerCallbacks listener_callbacks;
   Random::MockRandomGenerator random_generator;
   NiceMock<Runtime::MockLoader> runtime;
+  NiceMock<Network::MockDownstreamTransportSocketFactory> transport_factory;
 
   ASSERT_TRUE(socket->connectionInfoProvider().localAddress()->ip()->isAnyAddress());
 
@@ -302,7 +313,8 @@ TEST_P(TcpListenerImplTest, WildcardListenerIpv4Compat) {
   EXPECT_CALL(listener_callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         Network::ConnectionPtr conn = dispatcher_->createServerConnection(
-            std::move(socket), Network::Test::createRawBufferSocket(), stream_info);
+            std::move(socket), Network::Test::createRawBufferSocket(), stream_info,
+            transport_factory);
         EXPECT_EQ(conn->connectionInfoProvider().localAddress()->ip()->version(),
                   conn->connectionInfoProvider().remoteAddress()->ip()->version());
         EXPECT_EQ(conn->connectionInfoProvider().localAddress()->asString(),

@@ -22,6 +22,8 @@ MockClientContextConfig::MockClientContextConfig() {
   ON_CALL(*this, tlsKeyLogLocal()).WillByDefault(testing::ReturnRef(iplist_));
   ON_CALL(*this, tlsKeyLogRemote()).WillByDefault(testing::ReturnRef(iplist_));
   ON_CALL(*this, tlsKeyLogPath()).WillByDefault(testing::ReturnRef(path_));
+  ON_CALL(*this, certProviderCaps())
+      .WillByDefault(testing::Return(certificate_provider_capabilities_));
 }
 MockClientContextConfig::~MockClientContextConfig() = default;
 

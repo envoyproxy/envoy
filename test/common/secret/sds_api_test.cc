@@ -617,7 +617,8 @@ TEST_F(SdsApiTest, DynamicCertificateValidationContextUpdateSuccess) {
   initialize();
   subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, "");
 
-  Ssl::CertificateValidationContextConfigImpl cvc_config(*sds_api.secret(), *api_);
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
+  Ssl::CertificateValidationContextConfigImpl cvc_config(*sds_api.secret(), *api_, ctx);
   const std::string ca_cert =
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(ca_cert)),
@@ -693,7 +694,8 @@ TEST_F(SdsApiTest, DefaultCertificateValidationContextTest) {
   envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext merged_cvc =
       default_cvc;
   merged_cvc.MergeFrom(*sds_api.secret());
-  Ssl::CertificateValidationContextConfigImpl cvc_config(merged_cvc, *api_);
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
+  Ssl::CertificateValidationContextConfigImpl cvc_config(merged_cvc, *api_, ctx);
   // Verify that merging CertificateValidationContext applies logical OR to bool
   // field.
   EXPECT_TRUE(cvc_config.allowExpiredCertificate());

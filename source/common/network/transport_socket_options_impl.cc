@@ -69,9 +69,9 @@ TransportSocketOptionsUtility::fromFilterState(const StreamInfo::FilterState& fi
   if (sni.size()) {
     server_name = sni;
     needs_transport_socket_options = true;
-  }
-  else if (auto typed_data = filter_state.getDataReadOnly<UpstreamServerName>(UpstreamServerName::key());
-           typed_data != nullptr) {
+  } else if (auto typed_data =
+                 filter_state.getDataReadOnly<UpstreamServerName>(UpstreamServerName::key());
+             typed_data != nullptr) {
     server_name = typed_data->value();
     needs_transport_socket_options = true;
   }

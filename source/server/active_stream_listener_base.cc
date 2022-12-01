@@ -41,8 +41,9 @@ void ActiveStreamListenerBase::newConnection(Network::ConnectionSocketPtr&& sock
   }
   stream_info->setFilterChainName(filter_chain->name());
   auto transport_socket = filter_chain->transportSocketFactory().createDownstreamTransportSocket();
-  auto server_conn_ptr = dispatcher().createServerConnection(
-      std::move(socket), std::move(transport_socket), *stream_info, filter_chain->transportSocketFactory());
+  auto server_conn_ptr =
+      dispatcher().createServerConnection(std::move(socket), std::move(transport_socket),
+                                          *stream_info, filter_chain->transportSocketFactory());
   if (const auto timeout = filter_chain->transportSocketConnectTimeout();
       timeout != std::chrono::milliseconds::zero()) {
     server_conn_ptr->setTransportSocketConnectTimeout(

@@ -501,7 +501,6 @@ TEST_F(SslContextImplTest, AtMostOneRsaCertSameWildcardDNSSan) {
 }
 
 // Multiple RSA certificates with different exact DNS SAN are acceptable.
->>>>>>> 9653024634... tls: SNI-based cert selection during TLS handshake (#22036)
 TEST_F(SslContextImplTest, AcceptableMultipleRsaCerts) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   const std::string tls_context_yaml = R"EOF(

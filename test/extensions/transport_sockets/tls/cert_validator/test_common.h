@@ -89,6 +89,12 @@ public:
 
   absl::optional<uint32_t> maxVerifyDepth() const override { return max_verify_depth_; }
 
+  Envoy::CertificateProvider::CertificateProviderSharedPtr caProvider() const override {
+    return ca_provider_instance_;
+  }
+
+  void setCAUpdateCallback(std::function<void()> /*callback*/) override{};
+
 private:
   bool allow_expired_certificate_{false};
   Api::ApiPtr api_;
@@ -98,6 +104,9 @@ private:
   const std::string ca_cert_;
   const std::string ca_cert_path_{"TEST_CA_CERT_PATH"};
   const absl::optional<uint32_t> max_verify_depth_{absl::nullopt};
+  Envoy::CertificateProvider::CertificateProviderSharedPtr ca_provider_instance_;
+  std::string ca_provider_cert_name_;
+  Envoy::Common::CallbackHandlePtr ca_update_callback_handle_;
 };
 
 } // namespace Tls
