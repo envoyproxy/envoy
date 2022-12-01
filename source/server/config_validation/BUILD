@@ -99,6 +99,7 @@ envoy_cc_library(
         "//source/common/stats:stats_lib",
         "//source/common/thread_local:thread_local_lib",
         "//source/common/version:version_lib",
+        "//source/extensions/listener_managers/listener_manager:listener_manager_lib",
         "//source/server:configuration_lib",
         "//source/server:server_lib",
         "//source/server/admin:admin_lib",

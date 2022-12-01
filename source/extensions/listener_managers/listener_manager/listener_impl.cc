@@ -301,9 +301,7 @@ Stats::Scope& ListenerFactoryContextBaseImpl::listenerScope() { return *listener
 bool ListenerFactoryContextBaseImpl::isQuicListener() const { return is_quic_; }
 Network::DrainDecision& ListenerFactoryContextBaseImpl::drainDecision() { return *this; }
 Server::DrainManager& ListenerFactoryContextBaseImpl::drainManager() { return *drain_manager_; }
-
-// Must be overridden
-Init::Manager& ListenerFactoryContextBaseImpl::initManager() { PANIC("not implemented"); }
+Init::Manager& ListenerFactoryContextBaseImpl::initManager() { return server_.initManager(); }
 
 ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
                            const std::string& version_info, ListenerManagerImpl& parent,
@@ -774,11 +772,10 @@ void ListenerImpl::buildConnectionBalancer(const Network::Address::Instance& add
     // Not in place listener update.
     if (config_.has_connection_balance_config()) {
       switch (config_.connection_balance_config().balance_type_case()) {
-      case envoy::config::listener::v3::Listener_ConnectionBalanceConfig::kExactBalance: {
+      case envoy::config::listener::v3::Listener_ConnectionBalanceConfig::kExactBalance:
         connection_balancers_.emplace(address.asString(),
                                       std::make_shared<Network::ExactConnectionBalancerImpl>());
         break;
-      }
       case envoy::config::listener::v3::Listener_ConnectionBalanceConfig::kExtendBalance: {
         const std::string connection_balance_library_type{TypeUtil::typeUrlToDescriptorFullName(
             config_.connection_balance_config().extend_balance().typed_config().type_url())};

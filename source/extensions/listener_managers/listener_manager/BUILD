@@ -23,6 +23,7 @@ envoy_cc_extension(
     # to ensure that listener code doesn't leak back into Envoy Mobile.
     extra_visibility = [
         "//source/server/admin:__subpackages__",
+        "//source/server/config_validation:__subpackages__",
         "//test:__subpackages__",
     ],
     deps = [
