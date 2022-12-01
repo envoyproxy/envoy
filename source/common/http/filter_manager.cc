@@ -112,19 +112,21 @@ void ActiveStreamFilterBase::commonContinue() {
   iterate_from_current_filter_ = false;
 }
 
-bool ActiveStreamFilterBase::commonHandleAfter1xxHeadersCallback(FilterHeadersStatus status) {
+bool ActiveStreamFilterBase::commonHandleAfter1xxHeadersCallback(Filter1xxHeadersStatus status) {
   ASSERT(parent_.state_.has_1xx_headers_);
   ASSERT(!continued_1xx_headers_);
   ASSERT(canIterate());
 
-  if (status == FilterHeadersStatus::StopIteration) {
-    iteration_state_ = IterationState::StopSingleIteration;
-    return false;
-  } else {
-    ASSERT(status == FilterHeadersStatus::Continue);
+  switch (status) {
+  case Filter1xxHeadersStatus::Continue:
     continued_1xx_headers_ = true;
     return true;
+  case Filter1xxHeadersStatus::StopIteration:
+    iteration_state_ = IterationState::StopSingleIteration;
+    return false;
   }
+
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 bool ActiveStreamFilterBase::commonHandleAfterHeadersCallback(FilterHeadersStatus status,
@@ -999,7 +1001,7 @@ void FilterManager::encode1xxHeaders(ActiveStreamEncoderFilter* filter,
   for (; entry != encoder_filters_.end(); entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::Encode1xxHeaders));
     state_.filter_call_state_ |= FilterCallState::Encode1xxHeaders;
-    FilterHeadersStatus status = (*entry)->handle_->encode1xxHeaders(headers);
+    Filter1xxHeadersStatus status = (*entry)->handle_->encode1xxHeaders(headers);
     state_.filter_call_state_ &= ~FilterCallState::Encode1xxHeaders;
     ENVOY_STREAM_LOG(trace, "encode 1xx continue headers called: filter={} status={}", *this,
                      (*entry)->filter_context_.config_name, static_cast<uint64_t>(status));

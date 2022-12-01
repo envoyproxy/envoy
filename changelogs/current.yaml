@@ -37,9 +37,15 @@ minor_behavior_changes:
 - area: cache_filter
   change: |
     api path of work-in-progress extension changed from ``api/extensions/cache/simple_http_cache`` to ``api/extensions/http/cache/simple_http_cache``, and source code moved, to match extension category.
+- area: http filters
+  change: |
+    change ``StreamEncoderFilter::encode1xxHeaders`` to use its own enum class ``Http::Filter1xxHeadersStatus``. Previously we shared the same enum class for general headers, but the implementation did not support most of them.
 - area: oauth2
   change: |
     Requests which match the passthrough header now have their own metric ``oauth_passthrough`` and aren't included in ``oauth_success`` anymore.
+- area: upstream
+  change: |
+    detailed health status is used for override host selection. This behavior can be reverted by setting runtime flag ``envoy.reloadable_features.validate_detailed_override_host_statuses`` to false.
 - area: rate_limit
   change: |
     add ``MONTH`` and ``YEAR`` to the unit of time for rate limit.
@@ -72,6 +78,9 @@ bug_fixes:
 - area: http
   change: |
     fixed a bug where Utility::PercentEncoding::encode() encodes some characters incorrectly because it was treating the value as negative.
+- area: upstream
+  change: |
+    fixed a bug that only coarse health status is used for override host selection.
 - area: validation
   change: |
     fixed a crash which could happen when optional ``engine_type`` is not provided in regex.
