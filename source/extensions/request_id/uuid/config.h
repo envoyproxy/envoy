@@ -80,6 +80,8 @@ public:
   }
 };
 
+DECLARE_FACTORY(UUIDRequestIDExtensionFactory);
+
 } // namespace RequestId
 } // namespace Extensions
 } // namespace Envoy

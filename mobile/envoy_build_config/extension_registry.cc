@@ -1,5 +1,6 @@
 #include "extension_registry.h"
 
+#include "source/extensions/request_id/uuid/config.h"
 #include "source/common/network/default_client_connection_factory.h"
 #include "source/common/network/socket_interface_impl.h"
 #include "source/common/router/upstream_codec_filter.h"
@@ -73,6 +74,7 @@ void ExtensionRegistry::registerFactories() {
   ExtensionRegistryPlatformAdditions::registerFactories();
   Router::forceRegisterUpstreamCodecFilterFactory();
   Envoy::Network::forceRegisterGetAddrInfoDnsResolverFactory();
+  Envoy::Extensions::RequestId::forceRegisterUUIDRequestIDExtensionFactory();
 
   // TODO: add a "force initialize" function to the upstream code, or clean up the upstream code
   // in such a way that does not depend on the statically initialized variable.

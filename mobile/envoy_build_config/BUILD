@@ -34,6 +34,7 @@ envoy_cc_library(
         "@envoy//source/extensions/transport_sockets/raw_buffer:config",
         "@envoy//source/extensions/transport_sockets/tls:config",
         "@envoy//source/extensions/transport_sockets/tls/cert_validator:cert_validator_lib",
+        "@envoy//source/extensions/request_id/uuid:config",
         "@envoy//source/extensions/upstreams/http/generic:config",
         "@envoy_mobile//library/common/extensions/cert_validator/platform_bridge:config",
         "@envoy_mobile//library/common/extensions/filters/http/assertion:config",
