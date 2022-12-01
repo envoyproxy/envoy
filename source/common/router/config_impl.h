@@ -1265,11 +1265,10 @@ public:
   }
 };
 
-// Similar to RouteMatchAction, but accepts v3::RouteMatchAction instead of v3::Route.
-class RouteGenericMatchAction
-    : public Matcher::ActionBase<envoy::config::route::v3::RouteMatchAction> {
+// Similar to RouteMatchAction, but accepts v3::RouteListAction instead of v3::Route.
+class RouteListMatchAction : public Matcher::ActionBase<envoy::config::route::v3::RouteListAction> {
 public:
-  explicit RouteGenericMatchAction(std::vector<RouteEntryImplBaseConstSharedPtr> routes)
+  explicit RouteListMatchAction(std::vector<RouteEntryImplBaseConstSharedPtr> routes)
       : routes_(std::move(routes)) {}
 
   const std::vector<RouteEntryImplBaseConstSharedPtr>& routes() const { return routes_; }
@@ -1278,15 +1277,15 @@ private:
   const std::vector<RouteEntryImplBaseConstSharedPtr> routes_;
 };
 
-// Registered factory for RouteGenericMatchAction.
-class RouteGenericMatchActionFactory : public Matcher::ActionFactory<RouteActionContext> {
+// Registered factory for RouteListMatchAction.
+class RouteListMatchActionFactory : public Matcher::ActionFactory<RouteActionContext> {
 public:
   Matcher::ActionFactoryCb
   createActionFactoryCb(const Protobuf::Message& config, RouteActionContext& context,
                         ProtobufMessage::ValidationVisitor& validation_visitor) override;
   std::string name() const override { return "route_match_action"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::config::route::v3::RouteMatchAction>();
+    return std::make_unique<envoy::config::route::v3::RouteListAction>();
   }
 };
 
