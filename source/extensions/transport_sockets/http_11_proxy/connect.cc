@@ -15,12 +15,12 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Http11Connect {
 
-bool UpstreamHttp11ConnectSocket::isValidConnectResponse(absl::string_view data,
+bool UpstreamHttp11ConnectSocket::isValidConnectResponse(absl::string_view response_payload,
                                                          bool& headers_complete,
                                                          size_t& bytes_processed) {
   SelfContainedParser parser;
 
-  bytes_processed = parser.parser().execute(data.data(), data.length());
+  bytes_processed = parser.parser().execute(response_payload.data(), response_payload.length());
   headers_complete = parser.headersComplete();
 
   return parser.parser().getStatus() != Http::Http1::ParserStatus::Error &&
@@ -78,8 +78,8 @@ Network::IoResult UpstreamHttp11ConnectSocket::doRead(Buffer::Instance& buffer) 
                        callbacks_->connection(), MAX_RESPONSE_HEADER_SIZE);
         return {Network::PostIoAction::Close, 0, false};
       }
-      ENVOY_CONN_LOG(trace, "Incomplete CONECT header: {} bytes received", callbacks_->connection(),
-                     peek_data.size());
+      ENVOY_CONN_LOG(trace, "Incomplete CONNECT header: {} bytes received",
+                     callbacks_->connection(), peek_data.size());
       return Network::IoResult{Network::PostIoAction::KeepOpen, 0, false};
     }
     if (!is_valid_connect_response) {
