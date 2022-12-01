@@ -1,0 +1,32 @@
+version: 2.1
+
+executors:
+  ubuntu-build:
+    description: "A regular build executor based on ubuntu image"
+    docker:
+      - image: envoyproxy/envoy-build-ubuntu:0a02a76af5951bf7f4c7029c0ea6d29d96c0f682
+    # TODO(mattklein123): Get xlarge class enabled
+    resource_class: medium
+    working_directory: /source
+
+jobs:
+  docs:
+    executor: ubuntu-build
+    steps:
+      - checkout
+      - run: mobile/docs/build.sh
+      - add_ssh_keys:
+          fingerprints:
+            - "a2:f7:59:f0:01:8b:91:31:ab:0c:3f:9f:25:4c:1e:e5"
+      - run: mobile/docs/publish.sh
+      - store_artifacts:
+          path: generated/docs
+
+workflows:
+  version: 2
+  all:
+    jobs:
+      - docs:
+          filters:
+            tags:
+              only: /^v.*/
