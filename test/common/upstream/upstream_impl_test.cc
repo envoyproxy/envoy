@@ -2799,6 +2799,27 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
                                    .address_->ip()
                                    ->addressAsString());
   }
+
+  {
+    // The bootstrap config using IPv6 address and the cluster config using IPv4 address, ensure
+    // the bootstrap config will be ignored.
+    server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("2001::1");
+    config.mutable_upstream_bind_config()->clear_extra_source_addresses();
+    Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
+        "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
+    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+        server_context_, ssl_context_manager_, *scope, server_context_.cluster_manager_, stats_,
+        validation_visitor_);
+    StaticClusterImpl cluster(server_context_, config, runtime_, factory_context, std::move(scope),
+                              false);
+    Network::Address::InstanceConstSharedPtr v6_remote_address =
+        std::make_shared<Network::Address::Ipv6Instance>("2001::3", 80, nullptr);
+    EXPECT_EQ(cluster_address, cluster.info()
+                                   ->getUpstreamLocalAddressSelector()
+                                   ->getUpstreamLocalAddress(v6_remote_address, nullptr)
+                                   .address_->ip()
+                                   ->addressAsString());
+  }
 }
 
 TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourceAddress) {

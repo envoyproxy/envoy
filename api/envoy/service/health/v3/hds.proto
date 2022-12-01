@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.service.health.v3;
 
 import "envoy/config/cluster/v3/cluster.proto";
+import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/health_check.proto";
 import "envoy/config/endpoint/v3/endpoint_components.proto";
@@ -162,6 +163,7 @@ message LocalityEndpoints {
 // health checks to support statistics reporting, logging and debugging by the
 // Envoy instance (outside of HDS). For maximum usefulness, it should match the
 // same cluster structure as that provided by EDS.
+// [#next-free-field: 6]
 message ClusterHealthCheck {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.discovery.v2.ClusterHealthCheck";
@@ -176,6 +178,10 @@ message ClusterHealthCheck {
   // on connection when health checking. For more details, see
   // :ref:`config.cluster.v3.Cluster.transport_socket_matches <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket_matches>`.
   repeated config.cluster.v3.Cluster.TransportSocketMatch transport_socket_matches = 4;
+
+  // Optional configuration used to bind newly established upstream connections.
+  // If the address and port are empty, no bind will be performed.
+  config.core.v3.BindConfig upstream_bind_config = 5;
 }
 
 message HealthCheckSpecifier {
