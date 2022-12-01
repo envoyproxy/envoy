@@ -39,7 +39,6 @@ ValidationResults PlatformBridgeCertValidator::doVerifyCertChain(
     SSL_CTX& /*ssl_ctx*/, const CertValidator::ExtraValidationContext& /*validation_context*/,
     bool is_server, absl::string_view hostname) {
   ASSERT(!is_server);
-  ASSERT(callback);
   if (sk_X509_num(&cert_chain) == 0) {
     const char* error = "verify cert chain failed: empty cert chain.";
     stats_.fail_verify_error_.inc();
