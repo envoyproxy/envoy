@@ -68,7 +68,8 @@ public:
    * should provide at least one tls certificate.
    * @return Identity certificates used for handshake
    */
-  virtual std::vector<std::reference_wrapper<const envoy::extensions::transport_sockets::tls::v3::TlsCertificate>>
+  virtual std::vector<
+      std::reference_wrapper<const envoy::extensions::transport_sockets::tls::v3::TlsCertificate>>
   tlsCertificates(const std::string& cert_name) const PURE;
 
   /**

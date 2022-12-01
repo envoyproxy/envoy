@@ -368,3 +368,4 @@ certificate_provider_instances:
           q5sGxGrC1RECGB5Zwx2S2ZY=
           -----END PRIVATE KEY-----
       expiration_time: "2023-10-30T08:42:46Z"  # UTC time
+      cache_size: 3

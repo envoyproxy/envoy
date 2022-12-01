@@ -10,10 +10,11 @@ namespace Extensions {
 namespace CertificateProviders {
 namespace LocalCertificate {
 
-Provider::Provider(const envoy::extensions::certificate_providers::local_certificate::v3::LocalCertificate& config,
-                   Server::Configuration::TransportSocketFactoryContext& factory_context,
-                   Api::Api& api)
-    : main_thread_dispatcher_(factory_context.mainThreadDispatcher()) {
+Provider::Provider(
+    const envoy::extensions::certificate_providers::local_certificate::v3::LocalCertificate& config,
+    Server::Configuration::TransportSocketFactoryContext& factory_context, Api::Api& api)
+    : main_thread_dispatcher_(factory_context.mainThreadDispatcher()),
+      cache_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, cache_size, CacheDefaultSize)) {
   ca_cert_ = Config::DataSource::read(config.rootca_cert(), true, api);
   ca_key_ = Config::DataSource::read(config.rootca_key(), true, api);
   default_identity_cert_ = Config::DataSource::read(config.default_identity_cert(), true, api);
@@ -26,13 +27,17 @@ Provider::Provider(const envoy::extensions::certificate_providers::local_certifi
   }
 
   // Generate TLSCertificate
-  envoy::extensions::transport_sockets::tls::v3::TlsCertificate* tls_certificate = new envoy::extensions::transport_sockets::tls::v3::TlsCertificate();
+  envoy::extensions::transport_sockets::tls::v3::TlsCertificate* tls_certificate =
+      new envoy::extensions::transport_sockets::tls::v3::TlsCertificate();
   tls_certificate->mutable_certificate_chain()->set_inline_string(default_identity_cert_);
   tls_certificate->mutable_private_key()->set_inline_string(default_identity_key_);
   // Update certificates_ map
   {
     absl::WriterMutexLock writer_lock{&certificates_lock_};
-    certificates_.try_emplace("default", tls_certificate);
+    if (cache_size_ != CacheDefaultSize) {
+      certificates_.setMaxSize(cache_size_);
+    }
+    certificates_.insert("default", tls_certificate);
   }
 }
 
@@ -44,14 +49,12 @@ Envoy::CertificateProvider::CertificateProvider::Capabilities Provider::capabili
 
 const std::string Provider::trustedCA(const std::string&) const { return ""; }
 
-std::vector<std::reference_wrapper<const envoy::extensions::transport_sockets::tls::v3::TlsCertificate>>
+std::vector<
+    std::reference_wrapper<const envoy::extensions::transport_sockets::tls::v3::TlsCertificate>>
 Provider::tlsCertificates(const std::string&) const {
-  std::vector<std::reference_wrapper<const envoy::extensions::transport_sockets::tls::v3::TlsCertificate>> result;
+
   absl::ReaderMutexLock reader_lock{&certificates_lock_};
-  for (auto [_, value] : certificates_) {
-    result.push_back(*value);
-  }
-  return result;
+  return certificates_.getCertificates();
 }
 
 Envoy::CertificateProvider::OnDemandUpdateHandlePtr Provider::addOnDemandUpdateCallback(
@@ -59,8 +62,8 @@ Envoy::CertificateProvider::OnDemandUpdateHandlePtr Provider::addOnDemandUpdateC
     Event::Dispatcher& thread_local_dispatcher,
     Envoy::CertificateProvider::OnDemandUpdateCallbacks& callback) {
 
-  auto handle = std::make_unique<OnDemandUpdateHandleImpl>(
-      on_demand_update_callbacks_, sni, callback);
+  auto handle =
+      std::make_unique<OnDemandUpdateHandleImpl>(on_demand_update_callbacks_, sni, callback);
 
   // TODO: we need to improve this cache_hit check
   // It is possible that two SNIs use the same cert, so they share the same SANs.
@@ -68,18 +71,21 @@ Envoy::CertificateProvider::OnDemandUpdateHandlePtr Provider::addOnDemandUpdateC
   // since we do not allow duplicated SANs.
   // We need to align this cache_hit with current transport socket behavior
   bool cache_hit = [&]() {
-    absl::ReaderMutexLock reader_lock{&certificates_lock_};
-    auto it = certificates_.find(sni);
-    return it != certificates_.end() ? true : false;
+    // Lookup may change the content of LRU cache, a write lock is needed to prevent
+    // multiple threads to access the cache.
+    absl::ReaderMutexLock writer_lock{&certificates_lock_};
+    return certificates_.is_in_cache(sni);
   }();
 
   if (cache_hit) {
+    ENVOY_LOG(debug, "Cache hit for {}", sni);
     // Cache hit, run on-demand update callback directly
     runOnDemandUpdateCallback(sni, thread_local_dispatcher, true);
   } else {
     // Cache miss, generate self-signed cert
     main_thread_dispatcher_.post([sni, metadata, &thread_local_dispatcher, this] {
-      signCertificate(sni, metadata, thread_local_dispatcher); });
+      signCertificate(sni, metadata, thread_local_dispatcher);
+    });
   }
   return handle;
 }
@@ -161,9 +167,8 @@ void Provider::signCertificate(const std::string sni,
   // Update certificates_ map
   {
     absl::WriterMutexLock writer_lock{&certificates_lock_};
-    certificates_.try_emplace(sni, tls_certificate);
+    certificates_.insert(sni, tls_certificate);
   }
-
   runAddUpdateCallback();
   runOnDemandUpdateCallback(sni, thread_local_dispatcher, false);
 }
