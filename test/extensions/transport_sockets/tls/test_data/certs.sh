@@ -154,6 +154,10 @@ generate_x509_cert no_san ca
 # Concatenate no_san_cert.pem and Test Intermediate CA (intermediate_ca_cert.pem) to create valid certificate chain.
 cat no_san_cert.pem intermediate_ca_cert.pem > no_san_chain.pem
 
+# Generate no_san_cn_cert.pem
+generate_rsa_key no_san_cn
+generate_x509_cert no_san_cn ca
+
 # Generate san_dns_cert.pem.
 generate_rsa_key san_dns
 generate_x509_cert san_dns ca
@@ -181,6 +185,10 @@ cp -f san_dns_cert.cfg san_dns4_cert.cfg
 generate_rsa_key san_dns4
 generate_x509_cert san_dns4 intermediate_ca
 rm -f san_dns4_cert.cfg
+
+# Generate san_wildcard_dns_cert.pem
+generate_rsa_key san_wildcard_dns
+generate_x509_cert san_wildcard_dns ca
 
 # Generate san_multiple_dns_cert.pem.
 generate_rsa_key san_multiple_dns

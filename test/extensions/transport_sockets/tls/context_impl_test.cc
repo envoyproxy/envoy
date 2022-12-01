@@ -500,7 +500,8 @@ TEST_F(SslContextImplTest, AtMostOneRsaCertSameWildcardDNSSan) {
                           "SAN entry or Subject CN");
 }
 
-// Multiple RSA certificates with different exact DNS SAN are acceptable
+// Multiple RSA certificates with different exact DNS SAN are acceptable.
+>>>>>>> 9653024634... tls: SNI-based cert selection during TLS handshake (#22036)
 TEST_F(SslContextImplTest, AcceptableMultipleRsaCerts) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   const std::string tls_context_yaml = R"EOF(
@@ -543,7 +544,7 @@ TEST_F(SslContextImplTest, AtMostOneEcdsaCert) {
                           "SAN entry or Subject CN");
 }
 
-// Multiple ECDSA certificates with different exact DNS SAN are acceptable
+// Multiple ECDSA certificates with different exact DNS SAN are acceptable.
 TEST_F(SslContextImplTest, AcceptableMultipleEcdsaCerts) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   const std::string tls_context_yaml = R"EOF(
@@ -563,23 +564,43 @@ TEST_F(SslContextImplTest, AcceptableMultipleEcdsaCerts) {
   EXPECT_NO_THROW(loadConfig(server_context_config));
 }
 
-// CN is not used if SANs are present
-TEST_F(SslContextImplTest, CertSansAndCN) {
+// One cert which contains one of the SAN values in the CN is acceptable, because CN is not used if
+// SANs are present.
+TEST_F(SslContextImplTest, CertDuplicatedSansAndCN) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-  // no_san_cn_2_cert's CN: server2.example.com
-  // san_multiple_dns_1_cert's CN: server2.example.com
+  // san_multiple_dns_1_cert's CN: server1.example.com
   // san_multiple_dns_1_cert's SAN: DNS.1 = *.example.com DNS.2 = server1.example.com
   const std::string tls_context_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
     - certificate_chain:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cn_2_cert.pem"
-      private_key:
-        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cn_2_key.pem"
-    - certificate_chain:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_1_cert.pem"
       private_key:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_1_key.pem"
+  )EOF";
+  TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
+  ServerContextConfigImpl server_context_config(tls_context, factory_context_);
+  EXPECT_NO_THROW(loadConfig(server_context_config));
+}
+
+// Multiple certificates with duplicated CN is acceptable, because CN is not used if SANs are
+// present.
+TEST_F(SslContextImplTest, MultipleCertsSansAndCN) {
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  // no_san_cn_cert's CN: server1.example.com
+  // san_wildcard_dns_cert's CN: server1.example.com
+  // san_wildcard_dns_cert's SAN: DNS.1 = *.example.com
+  const std::string tls_context_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cn_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cn_key.pem"
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_wildcard_dns_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_wildcard_dns_key.pem"
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
   ServerContextConfigImpl server_context_config(tls_context, factory_context_);
