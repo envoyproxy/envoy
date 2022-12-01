@@ -31,6 +31,9 @@ build --action_env=PATH --host_action_env=PATH
 build --enable_platform_specific_config
 build --test_summary=terse
 
+# TODO(keith): Remove once this is the default
+build --incompatible_config_setting_private_default_visibility
+
 # Allow tags to influence execution requirements
 common --experimental_allow_tags_propagation
 
@@ -159,7 +162,7 @@ build:libc++ --action_env=BAZEL_LINKOPTS=-lm:-pthread
 build:libc++ --define force_libcpp=enabled
 
 # Optimize build for binary size reduction.
-build:sizeopt -c opt --copt -Os --linkopt=-Wl,--gc-sections --linkopt=-Wl,--dead_strip
+build:sizeopt -c opt --copt -Os
 
 # Test options
 build --test_env=HEAPCHECK=normal --test_env=PPROF_PATH
@@ -377,7 +380,6 @@ build:windows --define tcmalloc=disabled
 build:windows --define wasm=disabled
 build:windows --define manual_stamp=manual_stamp
 build:windows --cxxopt="/std:c++17"
-build:windows --output_groups=+pdb_file
 
 # TODO(wrowe,sunjayBhatia): Resolve bugs upstream in curl and rules_foreign_cc
 # See issue https://github.com/bazelbuild/rules_foreign_cc/issues/301

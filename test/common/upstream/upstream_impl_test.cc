@@ -420,7 +420,7 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
   EXPECT_EQ(1U, cluster.info()->resourceManager(ResourcePriority::Default).maxConnectionsPerHost());
   EXPECT_EQ(990U, cluster.info()->resourceManager(ResourcePriority::High).maxConnectionsPerHost());
 
-  cluster.info()->stats().upstream_rq_total_.inc();
+  cluster.info()->trafficStats().upstream_rq_total_.inc();
   EXPECT_EQ(1UL, stats_.counter("cluster.name.upstream_rq_total").value());
 
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.maintenance_mode.name", 0));
@@ -673,6 +673,73 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalAfterHcFail) {
   }
 }
 
+TEST_F(StrictDnsClusterImplTest, HostUpdateWithDisabledACEndpoint) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+                health_check_config:
+                  disable_active_health_check: true
+  )EOF";
+
+  ResolverData resolver(*dns_resolver_, server_context_.dispatcher_);
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+  Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
+  Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+      server_context_, ssl_context_manager_, *scope, server_context_.cluster_manager_, stats_,
+      validation_visitor_);
+  StrictDnsClusterImpl cluster(server_context_, cluster_config, runtime_, dns_resolver_,
+                               factory_context, std::move(scope), false);
+  std::shared_ptr<MockHealthChecker> health_checker(new MockHealthChecker());
+  EXPECT_CALL(*health_checker, start());
+  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
+  cluster.setHealthChecker(health_checker);
+  ReadyWatcher initialized;
+  cluster.initialize([&initialized]() { initialized.ready(); });
+  EXPECT_CALL(initialized, ready());
+
+  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
+  EXPECT_CALL(*resolver.timer_, enableTimer(_, _)).Times(2);
+  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+                         TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
+
+  {
+    const auto& hosts = cluster.prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(2UL, hosts.size());
+    EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+    EXPECT_FALSE(hosts[1]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+
+    EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+    EXPECT_EQ(2UL, cluster.info()->endpointStats().membership_healthy_.value());
+    EXPECT_EQ(0UL, cluster.info()->endpointStats().membership_degraded_.value());
+  }
+
+  // Re-resolve the DNS name with only one record, we should have 1 host.
+  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Success,
+                         TestUtility::makeDnsResponse({"127.0.0.1"}));
+
+  {
+    const auto& hosts = cluster.prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(1UL, hosts.size());
+    EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
+    EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+    EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+    EXPECT_EQ(1UL, cluster.info()->endpointStats().membership_healthy_.value());
+    EXPECT_EQ(0UL, cluster.info()->endpointStats().membership_degraded_.value());
+  }
+}
+
 TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   // gmock matches in LIFO order which is why these are swapped.
   ResolverData resolver3(*dns_resolver_, server_context_.dispatcher_);
@@ -770,7 +837,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   EXPECT_EQ(3U, cluster.info()->maxRequestsPerConnection());
   EXPECT_EQ(0U, cluster.info()->http2Options().hpack_table_size().value());
 
-  cluster.info()->stats().upstream_rq_total_.inc();
+  cluster.info()->trafficStats().upstream_rq_total_.inc();
   EXPECT_EQ(1UL, stats_.counter("cluster.name.upstream_rq_total").value());
 
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.maintenance_mode.name", 0));
@@ -1507,6 +1574,16 @@ TEST_F(HostImplTest, HealthStatus) {
   EXPECT_EQ(Host::HealthStatus::DEGRADED, host->healthStatus());
 }
 
+TEST_F(HostImplTest, SkipActiveHealthCheckFlag) {
+  MockClusterMockPrioritySet cluster;
+  HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", simTime(), 1);
+
+  // To begin with, the default setting is false.
+  EXPECT_EQ(false, host->disableActiveHealthCheck());
+  host->setDisableActiveHealthCheck(true);
+  EXPECT_EQ(true, host->disableActiveHealthCheck());
+}
+
 // Test that it's not possible to do a HostDescriptionImpl with a unix
 // domain socket host and a health check config with non-zero port.
 // This is a regression test for oss-fuzz issue
@@ -1572,6 +1649,8 @@ TEST_F(StaticClusterImplTest, InitialHosts) {
   cluster.initialize([] {});
 
   EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  const auto& hosts = cluster.prioritySet().hostSetsPerPriority()[0]->hosts();
+  EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
   EXPECT_EQ("", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
   EXPECT_FALSE(cluster.info()->addedViaApi());
 }
@@ -1859,7 +1938,7 @@ TEST_F(StaticClusterImplTest, AltStatName) {
                             std::move(scope), false);
   cluster.initialize([] {});
   // Increment a stat and verify it is emitted with alt_stat_name
-  cluster.info()->stats().upstream_rq_total_.inc();
+  cluster.info()->trafficStats().upstream_rq_total_.inc();
   EXPECT_EQ(1UL, stats_.counter("cluster.staticcluster_stats.upstream_rq_total").value());
 }
 
@@ -2018,7 +2097,7 @@ TEST_F(StaticClusterImplTest, OutlierDetector) {
   cluster.initialize([] {});
 
   EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(2UL, cluster.info()->stats().membership_healthy_.value());
+  EXPECT_EQ(2UL, cluster.info()->endpointStats().membership_healthy_.value());
 
   // Set a single host as having failed and fire outlier detector callbacks. This should result
   // in only a single healthy host.
@@ -2028,7 +2107,7 @@ TEST_F(StaticClusterImplTest, OutlierDetector) {
       Host::HealthFlag::FAILED_OUTLIER_CHECK);
   detector->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
   EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(1UL, cluster.info()->stats().membership_healthy_.value());
+  EXPECT_EQ(1UL, cluster.info()->endpointStats().membership_healthy_.value());
   EXPECT_NE(cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts()[0],
             cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
 
@@ -2037,7 +2116,7 @@ TEST_F(StaticClusterImplTest, OutlierDetector) {
       Host::HealthFlag::FAILED_OUTLIER_CHECK);
   detector->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
   EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(2UL, cluster.info()->stats().membership_healthy_.value());
+  EXPECT_EQ(2UL, cluster.info()->endpointStats().membership_healthy_.value());
 }
 
 TEST_F(StaticClusterImplTest, HealthyStat) {
@@ -2082,8 +2161,8 @@ TEST_F(StaticClusterImplTest, HealthyStat) {
 
   EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(0UL, cluster.info()->stats().membership_healthy_.value());
-  EXPECT_EQ(0UL, cluster.info()->stats().membership_degraded_.value());
+  EXPECT_EQ(0UL, cluster.info()->endpointStats().membership_healthy_.value());
+  EXPECT_EQ(0UL, cluster.info()->endpointStats().membership_degraded_.value());
 
   cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagClear(
       Host::HealthFlag::FAILED_ACTIVE_HC);
@@ -2099,46 +2178,46 @@ TEST_F(StaticClusterImplTest, HealthyStat) {
       Host::HealthFlag::FAILED_OUTLIER_CHECK);
   outlier_detector->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
   EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(1UL, cluster.info()->stats().membership_healthy_.value());
-  EXPECT_EQ(0UL, cluster.info()->stats().membership_degraded_.value());
+  EXPECT_EQ(1UL, cluster.info()->endpointStats().membership_healthy_.value());
+  EXPECT_EQ(0UL, cluster.info()->endpointStats().membership_degraded_.value());
 
   cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagSet(
       Host::HealthFlag::FAILED_ACTIVE_HC);
   health_checker->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0],
                                HealthTransition::Changed);
   EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(1UL, cluster.info()->stats().membership_healthy_.value());
-  EXPECT_EQ(0UL, cluster.info()->stats().membership_degraded_.value());
+  EXPECT_EQ(1UL, cluster.info()->endpointStats().membership_healthy_.value());
+  EXPECT_EQ(0UL, cluster.info()->endpointStats().membership_degraded_.value());
 
   cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagClear(
       Host::HealthFlag::FAILED_OUTLIER_CHECK);
   outlier_detector->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
   EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(1UL, cluster.info()->stats().membership_healthy_.value());
-  EXPECT_EQ(0UL, cluster.info()->stats().membership_degraded_.value());
+  EXPECT_EQ(1UL, cluster.info()->endpointStats().membership_healthy_.value());
+  EXPECT_EQ(0UL, cluster.info()->endpointStats().membership_degraded_.value());
 
   cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagClear(
       Host::HealthFlag::FAILED_ACTIVE_HC);
   health_checker->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0],
                                HealthTransition::Changed);
   EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(2UL, cluster.info()->stats().membership_healthy_.value());
-  EXPECT_EQ(0UL, cluster.info()->stats().membership_degraded_.value());
+  EXPECT_EQ(2UL, cluster.info()->endpointStats().membership_healthy_.value());
+  EXPECT_EQ(0UL, cluster.info()->endpointStats().membership_degraded_.value());
 
   cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagSet(
       Host::HealthFlag::FAILED_OUTLIER_CHECK);
   outlier_detector->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
   EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(1UL, cluster.info()->stats().membership_healthy_.value());
-  EXPECT_EQ(0UL, cluster.info()->stats().membership_degraded_.value());
+  EXPECT_EQ(1UL, cluster.info()->endpointStats().membership_healthy_.value());
+  EXPECT_EQ(0UL, cluster.info()->endpointStats().membership_degraded_.value());
 
   cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagSet(
       Host::HealthFlag::FAILED_ACTIVE_HC);
   health_checker->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1],
                                HealthTransition::Changed);
   EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(0UL, cluster.info()->stats().membership_healthy_.value());
-  EXPECT_EQ(0UL, cluster.info()->stats().membership_degraded_.value());
+  EXPECT_EQ(0UL, cluster.info()->endpointStats().membership_healthy_.value());
+  EXPECT_EQ(0UL, cluster.info()->endpointStats().membership_degraded_.value());
 
   cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagSet(
       Host::HealthFlag::DEGRADED_ACTIVE_HC);
@@ -2148,8 +2227,8 @@ TEST_F(StaticClusterImplTest, HealthyStat) {
                                HealthTransition::Changed);
   EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->degradedHosts().size());
-  EXPECT_EQ(0UL, cluster.info()->stats().membership_healthy_.value());
-  EXPECT_EQ(1UL, cluster.info()->stats().membership_degraded_.value());
+  EXPECT_EQ(0UL, cluster.info()->endpointStats().membership_healthy_.value());
+  EXPECT_EQ(1UL, cluster.info()->endpointStats().membership_degraded_.value());
 
   // Mark the endpoint as unhealthy. This should decrement the degraded stat.
   cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagSet(
@@ -2158,8 +2237,8 @@ TEST_F(StaticClusterImplTest, HealthyStat) {
                                HealthTransition::Changed);
   EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->degradedHosts().size());
-  EXPECT_EQ(0UL, cluster.info()->stats().membership_healthy_.value());
-  EXPECT_EQ(0UL, cluster.info()->stats().membership_degraded_.value());
+  EXPECT_EQ(0UL, cluster.info()->endpointStats().membership_healthy_.value());
+  EXPECT_EQ(0UL, cluster.info()->endpointStats().membership_degraded_.value());
 
   // Go back to degraded.
   cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagClear(
@@ -2168,8 +2247,8 @@ TEST_F(StaticClusterImplTest, HealthyStat) {
                                HealthTransition::Changed);
   EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->degradedHosts().size());
-  EXPECT_EQ(0UL, cluster.info()->stats().membership_healthy_.value());
-  EXPECT_EQ(1UL, cluster.info()->stats().membership_degraded_.value());
+  EXPECT_EQ(0UL, cluster.info()->endpointStats().membership_healthy_.value());
+  EXPECT_EQ(1UL, cluster.info()->endpointStats().membership_degraded_.value());
 
   // Then go healthy.
   cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagClear(
@@ -2178,8 +2257,72 @@ TEST_F(StaticClusterImplTest, HealthyStat) {
                                HealthTransition::Changed);
   EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->degradedHosts().size());
-  EXPECT_EQ(1UL, cluster.info()->stats().membership_healthy_.value());
-  EXPECT_EQ(0UL, cluster.info()->stats().membership_degraded_.value());
+  EXPECT_EQ(1UL, cluster.info()->endpointStats().membership_healthy_.value());
+  EXPECT_EQ(0UL, cluster.info()->endpointStats().membership_degraded_.value());
+}
+
+TEST_F(StaticClusterImplTest, InitialHostsDisableHC) {
+  const std::string yaml = R"EOF(
+    name: staticcluster
+    connect_timeout: 0.25s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 10.0.0.1
+                    port_value: 11001
+                health_check_config:
+                  disable_active_health_check: true
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 10.0.0.1
+                    port_value: 11002
+  )EOF";
+
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+  Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
+  Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+      server_context_, ssl_context_manager_, *scope, server_context_.cluster_manager_, stats_,
+      validation_visitor_);
+  StaticClusterImpl cluster(server_context_, cluster_config, runtime_, factory_context,
+                            std::move(scope), false);
+
+  Outlier::MockDetector* outlier_detector = new NiceMock<Outlier::MockDetector>();
+  cluster.setOutlierDetector(Outlier::DetectorSharedPtr{outlier_detector});
+
+  std::shared_ptr<MockHealthChecker> health_checker(new NiceMock<MockHealthChecker>());
+  cluster.setHealthChecker(health_checker);
+
+  ReadyWatcher initialized;
+  cluster.initialize([&initialized] { initialized.ready(); });
+
+  // The endpoint with disabled active health check should not be set FAILED_ACTIVE_HC
+  // at beginning.
+  const auto& hosts = cluster.prioritySet().hostSetsPerPriority()[0]->hosts();
+  EXPECT_EQ(2UL, hosts.size());
+  EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+  EXPECT_TRUE(hosts[1]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+
+  // The endpoint with disabled active health check is considered healthy.
+  EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(1UL, cluster.info()->endpointStats().membership_healthy_.value());
+  EXPECT_EQ(0UL, cluster.info()->endpointStats().membership_degraded_.value());
+
+  // Perform a health check for the second host, and then the initialization is finished.
+  EXPECT_CALL(initialized, ready());
+  cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagClear(
+      Host::HealthFlag::FAILED_ACTIVE_HC);
+  health_checker->runCallbacks(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0],
+                               HealthTransition::Changed);
+  EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
 }
 
 TEST_F(StaticClusterImplTest, UrlConfig) {
@@ -2653,6 +2796,27 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
     EXPECT_EQ(cluster_address, cluster.info()
                                    ->getUpstreamLocalAddressSelector()
                                    ->getUpstreamLocalAddress(remote_address, nullptr)
+                                   .address_->ip()
+                                   ->addressAsString());
+  }
+
+  {
+    // The bootstrap config using IPv6 address and the cluster config using IPv4 address, ensure
+    // the bootstrap config will be ignored.
+    server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("2001::1");
+    config.mutable_upstream_bind_config()->clear_extra_source_addresses();
+    Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
+        "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
+    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+        server_context_, ssl_context_manager_, *scope, server_context_.cluster_manager_, stats_,
+        validation_visitor_);
+    StaticClusterImpl cluster(server_context_, config, runtime_, factory_context, std::move(scope),
+                              false);
+    Network::Address::InstanceConstSharedPtr v6_remote_address =
+        std::make_shared<Network::Address::Ipv6Instance>("2001::3", 80, nullptr);
+    EXPECT_EQ(cluster_address, cluster.info()
+                                   ->getUpstreamLocalAddressSelector()
+                                   ->getUpstreamLocalAddress(v6_remote_address, nullptr)
                                    .address_->ip()
                                    ->addressAsString());
   }

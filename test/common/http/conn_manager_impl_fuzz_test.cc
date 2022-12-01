@@ -73,7 +73,7 @@ public:
     encoder_filter_ = new NiceMock<MockStreamEncoderFilter>();
 
     EXPECT_CALL(filter_factory_, createFilterChain(_))
-        .WillOnce(Invoke([this](FilterChainManager& manager) -> void {
+        .WillOnce(Invoke([this](FilterChainManager& manager) -> bool {
           FilterFactoryCb decoder_filter_factory = [this](FilterChainFactoryCallbacks& callbacks) {
             callbacks.addStreamDecoderFilter(StreamDecoderFilterSharedPtr{decoder_filter_});
           };
@@ -83,6 +83,7 @@ public:
 
           manager.applyFilterFactoryCb({}, decoder_filter_factory);
           manager.applyFilterFactoryCb({}, encoder_filter_factory);
+          return true;
         }));
     EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
         .WillOnce(Invoke([this](StreamDecoderFilterCallbacks& callbacks) -> void {
@@ -93,8 +94,7 @@ public:
     EXPECT_CALL(filter_factory_, createUpgradeFilterChain("WebSocket", _, _))
         .WillRepeatedly(Invoke([&](absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
                                    FilterChainManager& manager) -> bool {
-          filter_factory_.createFilterChain(manager);
-          return true;
+          return filter_factory_.createFilterChain(manager);
         }));
   }
 
@@ -220,6 +220,7 @@ public:
     // be changed too
     return nullptr;
   }
+  bool appendXForwardedPort() const override { return false; }
 
   const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
       config_;

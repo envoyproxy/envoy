@@ -28,12 +28,12 @@ namespace Envoy {
 namespace Router {
 
 void UpstreamCodecFilter::onBelowWriteBufferLowWatermark() {
-  callbacks_->clusterInfo()->stats().upstream_flow_control_resumed_reading_total_.inc();
+  callbacks_->clusterInfo()->trafficStats().upstream_flow_control_resumed_reading_total_.inc();
   callbacks_->upstreamCallbacks()->upstream()->readDisable(false);
 }
 
 void UpstreamCodecFilter::onAboveWriteBufferHighWatermark() {
-  callbacks_->clusterInfo()->stats().upstream_flow_control_paused_reading_total_.inc();
+  callbacks_->clusterInfo()->trafficStats().upstream_flow_control_paused_reading_total_.inc();
   callbacks_->upstreamCallbacks()->upstream()->readDisable(true);
 }
 

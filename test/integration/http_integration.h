@@ -11,6 +11,7 @@
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/utility.h"
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "quiche/quic/core/deterministic_connection_id_generator.h"
@@ -137,7 +138,8 @@ public:
   ~HttpIntegrationTest() override;
 
   void initialize() override;
-  void setupHttp2Overrides(Http2Impl implementation);
+  void setupHttp1ImplOverrides(Http1ParserImpl http1_implementation);
+  void setupHttp2ImplOverrides(Http2Impl http2_implementation);
 
 protected:
   void useAccessLog(absl::string_view format = "",

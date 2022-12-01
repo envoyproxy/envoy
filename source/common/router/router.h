@@ -12,10 +12,12 @@
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
+#include "envoy/http/filter_factory.h"
 #include "envoy/http/stateful_session.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/router/shadow_writer.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
@@ -30,6 +32,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
+#include "source/common/http/filter_chain_helper.h"
 #include "source/common/http/utility.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/router/context_impl.h"
@@ -37,6 +40,7 @@
 #include "source/common/stats/symbol_table.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/upstream_http_factory_context_impl.h"
 
 namespace Envoy {
 namespace Router {
@@ -195,7 +199,7 @@ public:
 /**
  * Configuration for the router filter.
  */
-class FilterConfig {
+class FilterConfig : Http::FilterChainFactory {
 public:
   FilterConfig(Stats::StatName stat_prefix, const LocalInfo::LocalInfo& local_info,
                Stats::Scope& scope, Upstream::ClusterManager& cm, Runtime::Loader& runtime,
@@ -235,7 +239,43 @@ public:
     for (const auto& upstream_log : config.upstream_log()) {
       upstream_logs_.push_back(AccessLog::AccessLogFactory::fromProto(upstream_log, context));
     }
+    if (config.upstream_http_filters_size() > 0) {
+      auto& server_factory_ctx = context.getServerFactoryContext();
+      const Http::FilterChainUtility::FiltersList& upstream_http_filters =
+          config.upstream_http_filters();
+      std::shared_ptr<Http::UpstreamFilterConfigProviderManager> filter_config_provider_manager =
+          Http::FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(
+              server_factory_ctx);
+      std::string prefix = context.scope().symbolTable().toString(context.scope().prefix());
+      upstream_ctx_ = std::make_unique<Upstream::UpstreamHttpFactoryContextImpl>(
+          server_factory_ctx, context.initManager(), context.scope());
+      Http::FilterChainHelper<Server::Configuration::UpstreamHttpFactoryContext,
+                              Server::Configuration::UpstreamHttpFilterConfigFactory>
+          helper(*filter_config_provider_manager, server_factory_ctx, *upstream_ctx_, prefix);
+      helper.processFilters(upstream_http_filters, "router upstream http", "router upstream http",
+                            upstream_http_filter_factories_);
+    }
   }
+
+  bool createFilterChain(Http::FilterChainManager& manager,
+                         bool only_create_if_configured = false) const override {
+    // Currently there is no default filter chain, so only_create_if_configured true doesn't make
+    // sense.
+    ASSERT(!only_create_if_configured);
+    if (upstream_http_filter_factories_.empty()) {
+      return false;
+    }
+    Http::FilterChainUtility::createFilterChainForFactories(manager,
+                                                            upstream_http_filter_factories_);
+    return true;
+  }
+
+  bool createUpgradeFilterChain(absl::string_view, const UpgradeMap*,
+                                Http::FilterChainManager&) const override {
+    // Upgrade filter chains not yet supported for upstream filters.
+    return false;
+  }
+
   using HeaderVector = std::vector<Http::LowerCaseString>;
   using HeaderVectorPtr = std::unique_ptr<HeaderVector>;
 
@@ -261,6 +301,8 @@ public:
   Http::Context& http_context_;
   Stats::StatName zone_name_;
   Stats::StatName empty_stat_name_;
+  std::unique_ptr<Server::Configuration::UpstreamHttpFactoryContext> upstream_ctx_;
+  Http::FilterChainUtility::FilterFactoriesList upstream_http_filter_factories_;
 
 private:
   ShadowWriterPtr shadow_writer_;

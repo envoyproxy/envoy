@@ -72,7 +72,7 @@ public:
   AccessLog::AccessLogManager& logManager() override { return server_context_.accessLogManager(); }
   const LocalInfo::LocalInfo& localInfo() const override { return server_context_.localInfo(); }
   const Server::Options& options() override { return server_context_.options(); }
-  Server::Admin& admin() override { return server_context_.admin(); }
+  OptRef<Server::Admin> admin() override { return server_context_.admin(); }
   Api::Api& api() override { return server_context_.api(); }
   Singleton::Manager& singletonManager() override { return server_context_.singletonManager(); }
 

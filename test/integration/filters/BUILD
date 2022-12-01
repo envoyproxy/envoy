@@ -52,6 +52,21 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "add_header_filter_config_lib",
+    srcs = ["add_header_filter.cc"],
+    deps = [
+        ":common_lib",
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//source/extensions/filters/http/common:factory_base_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+    ],
+    alwayslink = 1,
+)
+
+envoy_cc_test_library(
     name = "header_to_proxy_filter_lib",
     srcs = [
         "header_to_proxy_filter.cc",

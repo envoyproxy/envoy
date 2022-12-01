@@ -393,12 +393,6 @@ def _com_github_intel_qatlib():
     external_http_archive(
         name = "com_github_intel_qatlib",
         build_file_content = BUILD_ALL_CONTENT,
-        patch_args = ["-p1"],
-        patches = [
-            "@envoy//bazel/foreign_cc:qatlib-0001-qat-Enable-disable-systemd-support-with-configure.ac.patch",
-            "@envoy//bazel/foreign_cc:qatlib-0002-qatlib-Remove-remaining-shared-flags.patch",
-            "@envoy//bazel/foreign_cc:qatlib-0003-configure-Check-if-pkg-config-is-installed-before-us.patch",
-        ],
     )
 
 def _com_github_jbeder_yaml_cpp():

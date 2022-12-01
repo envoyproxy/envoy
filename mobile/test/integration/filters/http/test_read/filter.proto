@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+package envoymobile.test.integration.filters.http.test_read;
+
+import "validate/validate.proto";
+
+message TestRead {
+}

@@ -4,10 +4,6 @@ load(
     "envoy_package",
     "envoy_select_enable_http3",
 )
-load(
-    "@envoy_build_config//:extensions_build_config.bzl",
-    "LEGACY_ALWAYSLINK",
-)
 
 licenses(["notice"])  # Apache 2
 
@@ -250,6 +246,7 @@ envoy_cc_library(
     deps = [
         "//envoy/upstream:load_balancer_interface",
         "//envoy/upstream:upstream_interface",
+        "//source/common/runtime:runtime_lib",
     ],
 )
 
@@ -406,62 +403,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "eds_lib",
-    srcs = ["eds.cc"],
-    hdrs = ["eds.h"],
-    deps = [
-        ":cluster_factory_lib",
-        ":leds_lib",
-        ":upstream_includes",
-        "//envoy/config:grpc_mux_interface",
-        "//envoy/config:subscription_factory_interface",
-        "//envoy/config:subscription_interface",
-        "//envoy/local_info:local_info_interface",
-        "//envoy/secret:secret_manager_interface",
-        "//envoy/upstream:cluster_factory_interface",
-        "//envoy/upstream:locality_lib",
-        "//source/common/config:api_version_lib",
-        "//source/common/config:decoded_resource_lib",
-        "//source/common/config:metadata_lib",
-        "//source/common/config:subscription_base_interface",
-        "//source/common/config:subscription_factory_lib",
-        "//source/common/config:utility_lib",
-        "//source/common/network:address_lib",
-        "//source/common/network:resolver_lib",
-        "//source/common/network:utility_lib",
-        "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
-        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
-    ],
-    alwayslink = LEGACY_ALWAYSLINK,
-)
-
-envoy_cc_library(
-    name = "leds_lib",
-    srcs = ["leds.cc"],
-    hdrs = ["leds.h"],
-    deps = [
-        ":upstream_includes",
-        "//envoy/config:grpc_mux_interface",
-        "//envoy/config:subscription_factory_interface",
-        "//envoy/config:subscription_interface",
-        "//envoy/local_info:local_info_interface",
-        "//source/common/config:decoded_resource_lib",
-        "//source/common/config:subscription_base_interface",
-        "//source/common/config:subscription_factory_lib",
-        "//source/common/config:utility_lib",
-        "//source/common/network:address_lib",
-        "//source/common/network:resolver_lib",
-        "//source/common/network:utility_lib",
-        "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
     name = "subset_lb_lib",
     srcs = ["subset_lb.cc"],
     hdrs = ["subset_lb.h"],
@@ -486,7 +427,7 @@ envoy_cc_library(
     name = "upstream_lib",
     srcs = ["upstream_impl.cc"],
     deps = [
-        ":eds_lib",
+        ":cluster_factory_lib",
         ":health_checker_lib",
         # TODO(mattklein123): Move the clusters to extensions so they can be compiled out.
         ":upstream_includes",
@@ -641,5 +582,15 @@ envoy_cc_library(
         "//source/common/stats:stats_lib",
         "//source/server:transport_socket_config_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "upstream_http_factory_context_lib",
+    hdrs = ["upstream_http_factory_context_impl.h"],
+    deps = [
+        "//envoy/init:manager_interface",
+        "//envoy/server:factory_context_interface",
+        "//envoy/stats:stats_interface",
     ],
 )

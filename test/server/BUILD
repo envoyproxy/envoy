@@ -6,6 +6,7 @@ load(
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
+    "envoy_select_admin_functionality",
     "envoy_select_hot_restart",
 )
 load("//source/extensions:all_extensions.bzl", "envoy_all_extensions")
@@ -416,7 +417,7 @@ filegroup(
 
 envoy_cc_test(
     name = "server_test",
-    srcs = ["server_test.cc"],
+    srcs = envoy_select_admin_functionality(["server_test.cc"]),
     data = [
         ":runtime_test_data",
         ":server_test_data",

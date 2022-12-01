@@ -53,7 +53,7 @@ public:
   using LazyCreateDnsResolver = std::function<Network::DnsResolverSharedPtr()>;
 
   ProdClusterManagerFactory(
-      Server::Configuration::ServerFactoryContext& server_context, Server::Admin& admin,
+      Server::Configuration::ServerFactoryContext& server_context, OptRef<Server::Admin> admin,
       Runtime::Loader& runtime, Stats::Store& stats, ThreadLocal::Instance& tls,
       LazyCreateDnsResolver dns_resolver_fn, Ssl::ContextManager& ssl_context_manager,
       Event::Dispatcher& main_thread_dispatcher, const LocalInfo::LocalInfo& local_info,
@@ -108,7 +108,7 @@ protected:
   Http::Context& http_context_;
   Grpc::Context& grpc_context_;
   Router::Context& router_context_;
-  Server::Admin& admin_;
+  OptRef<Server::Admin> admin_;
   Stats::Store& stats_;
   ThreadLocal::Instance& tls_;
   LazyCreateDnsResolver dns_resolver_fn_;
@@ -248,7 +248,7 @@ public:
                      ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                      const LocalInfo::LocalInfo& local_info,
                      AccessLog::AccessLogManager& log_manager,
-                     Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
+                     Event::Dispatcher& main_thread_dispatcher, OptRef<Server::Admin> admin,
                      ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
                      Http::Context& http_context, Grpc::Context& grpc_context,
                      Router::Context& router_context, const Server::Instance& server);
@@ -328,7 +328,14 @@ public:
   void
   initializeSecondaryClusters(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override;
 
-  const ClusterStatNames& clusterStatNames() const override { return cluster_stat_names_; }
+  const ClusterTrafficStatNames& clusterStatNames() const override { return cluster_stat_names_; }
+  const ClusterConfigUpdateStatNames& clusterConfigUpdateStatNames() const override {
+    return cluster_config_update_stat_names_;
+  }
+  const ClusterLbStatNames& clusterLbStatNames() const override { return cluster_lb_stat_names_; }
+  const ClusterEndpointStatNames& clusterEndpointStatNames() const override {
+    return cluster_endpoint_stat_names_;
+  }
   const ClusterLoadReportStatNames& clusterLoadReportStatNames() const override {
     return cluster_load_report_stat_names_;
   }
@@ -558,8 +565,19 @@ private:
       // be shared across its hosts.
       Http::PersistentQuicInfoPtr quic_info_;
 
-      // Expected override host statues. Every bit in the OverrideHostStatus represent an enum value
-      // of Host::Health. The specific correspondence is shown below:
+      // Expected override host statues. Every bit in the HostStatusSet represent an enum value
+      // of envoy::config::core::v3::HealthStatus. The specific correspondence is shown below:
+      //
+      // * 0b000001: envoy::config::core::v3::HealthStatus::UNKNOWN
+      // * 0b000010: envoy::config::core::v3::HealthStatus::HEALTHY
+      // * 0b000100: envoy::config::core::v3::HealthStatus::UNHEALTHY
+      // * 0b001000: envoy::config::core::v3::HealthStatus::DRAINING
+      // * 0b010000: envoy::config::core::v3::HealthStatus::TIMEOUT
+      // * 0b100000: envoy::config::core::v3::HealthStatus::DEGRADED
+      //
+      // If runtime flag `envoy.reloadable_features.validate_detailed_override_host_statuses` is
+      // disabled, the old coarse health status Host::Health will be used. The specific
+      // correspondence is shown below:
       //
       // * 0b001: Host::Health::Unhealthy
       // * 0b010: Host::Health::Degraded
@@ -781,7 +799,10 @@ private:
   Event::Dispatcher& dispatcher_;
   Http::Context& http_context_;
   Router::Context& router_context_;
-  ClusterStatNames cluster_stat_names_;
+  ClusterTrafficStatNames cluster_stat_names_;
+  ClusterConfigUpdateStatNames cluster_config_update_stat_names_;
+  ClusterLbStatNames cluster_lb_stat_names_;
+  ClusterEndpointStatNames cluster_endpoint_stat_names_;
   ClusterLoadReportStatNames cluster_load_report_stat_names_;
   ClusterCircuitBreakersStatNames cluster_circuit_breakers_stat_names_;
   ClusterRequestResponseSizeStatNames cluster_request_response_size_stat_names_;

@@ -208,13 +208,12 @@ public:
     const auto transport_api_version = api_config_source.transport_api_version();
     ASSERT_IS_MAIN_OR_TEST_THREAD();
     if (transport_api_version != envoy::config::core::v3::ApiVersion::V3) {
-      const ApiVersion version = ApiVersionInfo::apiVersion();
       const std::string& warning = fmt::format(
           "V2 (and AUTO) xDS transport protocol versions are deprecated in {}. "
           "The v2 xDS major version has been removed and is no longer supported. "
           "You may be missing explicit V3 configuration of the transport API version, "
-          "see the advice in https://www.envoyproxy.io/docs/envoy/v{}.{}.{}/faq/api/envoy_v3.",
-          api_config_source.DebugString(), version.major, version.minor, version.patch);
+          "see the advice in https://www.envoyproxy.io/docs/envoy/latest/faq/api/envoy_v3.",
+          api_config_source.DebugString());
       ENVOY_LOG_MISC(warn, warning);
       throw DeprecatedMajorVersionException(warning);
     }
