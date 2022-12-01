@@ -354,7 +354,7 @@ class UpstreamSSLDisabledPostgresIntegrationTest : public UpstreamSSLBaseIntegra
 public:
   // Disable downstream SSL and upstream SSL.
   UpstreamSSLDisabledPostgresIntegrationTest()
-      : UpstreamSSLBaseIntegrationTest(std::make_tuple("upstream_ssl: SSL_DISABLE", "")) {}
+      : UpstreamSSLBaseIntegrationTest(std::make_tuple("upstream_ssl: DISABLE", "")) {}
 };
 
 // Verify that postgres filter does not send any additional messages when
@@ -384,11 +384,11 @@ TEST_P(UpstreamSSLDisabledPostgresIntegrationTest, BasicConnectivityTest) {
 INSTANTIATE_TEST_SUITE_P(IpVersions, UpstreamSSLDisabledPostgresIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
-// Base class for parameterized tests with SSL_REQUIRE option for upstream SSL.
+// Base class for parameterized tests with REQUIRE option for upstream SSL.
 class UpstreamSSLRequirePostgresIntegrationTest : public UpstreamSSLBaseIntegrationTest {
 public:
   UpstreamSSLRequirePostgresIntegrationTest()
-      : UpstreamSSLBaseIntegrationTest(std::make_tuple("upstream_ssl: SSL_REQUIRE",
+      : UpstreamSSLBaseIntegrationTest(std::make_tuple("upstream_ssl: REQUIRE",
                                                        R"EOF(transport_socket:
       name: "starttls"
       typed_config:

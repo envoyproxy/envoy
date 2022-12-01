@@ -23,11 +23,11 @@ message PostgresProxy {
   // Upstream SSL operational modes.
   enum SSLMode {
     // Do not encrypt upstream connection to the server.
-    SSL_DISABLE = 0;
+    DISABLE = 0;
 
     // Establish upstream SSL connection to the server. If the server does not
     // accept the request for SSL connection, the session is terminated.
-    SSL_REQUIRE = 1;
+    REQUIRE = 1;
   }
 
   // The human readable prefix to use when emitting :ref:`statistics
