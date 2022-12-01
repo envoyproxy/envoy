@@ -169,7 +169,6 @@ paths:
     include:
     - contrib/config/source/kv_store_xds_delegate.cc
     - source/common/protobuf/utility.cc
-    - source/extensions/http/cache/file_system_http_cache/cache_file_header_proto_util.cc
     - source/extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.cc
     - source/extensions/http/cache/file_system_http_cache/cache_file_header_proto_util.cc
     - test/common/grpc/codec_fuzz_test.cc
