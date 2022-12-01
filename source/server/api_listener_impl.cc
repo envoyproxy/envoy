@@ -7,8 +7,7 @@
 #include "source/common/network/resolver_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/network/http_connection_manager/config.h"
-#include "source/server/drain_manager_impl.h"
-#include "source/server/listener_manager_impl.h"
+#include "source/server/filter_chain_manager_impl.h"
 
 namespace Envoy {
 namespace Server {
@@ -18,13 +17,12 @@ bool isQuic(const envoy::config::listener::v3::Listener& config) {
 }
 
 ApiListenerImplBase::ApiListenerImplBase(const envoy::config::listener::v3::Listener& config,
-                                         ListenerManagerImpl& parent, const std::string& name)
-    : config_(config), parent_(parent), name_(name),
+                                         Server::Instance& server, const std::string& name)
+    : config_(config), name_(name),
       address_(Network::Address::resolveProtoAddress(config.address())),
-      global_scope_(parent_.server_.stats().createScope("")),
-      listener_scope_(parent_.server_.stats().createScope(fmt::format("listener.api.{}.", name_))),
-      factory_context_(parent_.server_, config_, *this, *global_scope_, *listener_scope_,
-                       isQuic(config)),
+      global_scope_(server.stats().createScope("")),
+      listener_scope_(server.stats().createScope(fmt::format("listener.api.{}.", name_))),
+      factory_context_(server, config_, *this, *global_scope_, *listener_scope_, isQuic(config)),
       read_callbacks_(SyntheticReadCallbacks(*this)) {}
 
 void ApiListenerImplBase::SyntheticReadCallbacks::SyntheticConnection::raiseConnectionEvent(
@@ -35,8 +33,8 @@ void ApiListenerImplBase::SyntheticReadCallbacks::SyntheticConnection::raiseConn
 }
 
 HttpApiListener::HttpApiListener(const envoy::config::listener::v3::Listener& config,
-                                 ListenerManagerImpl& parent, const std::string& name)
-    : ApiListenerImplBase(config, parent, name) {
+                                 Server::Instance& server, const std::string& name)
+    : ApiListenerImplBase(config, server, name) {
   if (config.api_listener().api_listener().type_url() ==
       absl::StrCat("type.googleapis.com/",
                    envoy::extensions::filters::network::http_connection_manager::v3::

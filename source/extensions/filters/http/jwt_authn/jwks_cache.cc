@@ -9,6 +9,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/config/datasource.h"
+#include "source/common/http/utility.h"
 
 #include "absl/container/node_hash_map.h"
 #include "jwt_verify_lib/check_audience.h"
@@ -30,6 +31,12 @@ public:
                CreateJwksFetcherCb fetcher_cb, JwtAuthnFilterStats& stats)
       : jwt_provider_(jwt_provider), time_source_(context.timeSource()),
         tls_(context.threadLocal()) {
+
+    // remote_jwks.retry_policy has an invalid case that could not be validated by the
+    // proto validation annotation. It has to be validated by the code.
+    if (jwt_provider_.has_remote_jwks() && jwt_provider_.remote_jwks().has_retry_policy()) {
+      Http::Utility::validateCoreRetryPolicy(jwt_provider_.remote_jwks().retry_policy());
+    }
 
     std::vector<std::string> audiences;
     for (const auto& aud : jwt_provider_.audiences()) {
