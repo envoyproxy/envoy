@@ -30,8 +30,8 @@ namespace Http2 {
   COUNTER(tx_flush_timeout)                                                                        \
   COUNTER(tx_reset)                                                                                \
   COUNTER(keepalive_timeout)                                                                       \
-  GAUGE(outbound_frames_active, Accumulate)                                                               \
-  GAUGE(outbound_control_frames_active, Accumulate)                                                       \
+  GAUGE(outbound_frames_active, Accumulate)                                                        \
+  GAUGE(outbound_control_frames_active, Accumulate)                                                \
   GAUGE(streams_active, Accumulate)                                                                \
   GAUGE(pending_send_bytes, Accumulate)                                                            \
   GAUGE(deferred_stream_close, Accumulate)
