@@ -48,7 +48,6 @@ public:
 
   ValidationResults
   doVerifyCertChain(STACK_OF(X509)& cert_chain, Ssl::ValidateResultCallbackPtr callback,
-                    Ssl::SslExtendedSocketInfo* ssl_extended_info,
                     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                     SSL_CTX& ssl, const CertValidator::ExtraValidationContext& validation_context,
                     bool is_server, absl::string_view host_name) override;
@@ -108,11 +107,12 @@ public:
                                   const std::vector<SanMatcherPtr>& subject_alt_name_matchers);
 
 private:
-  bool verifyCertAndUpdateStatus(Ssl::SslExtendedSocketInfo* ssl_extended_info, X509* leaf_cert,
+  bool verifyCertAndUpdateStatus(Envoy::Ssl::ClientValidationStatus* detailed_status,
+                                 Ssl::SslExtendedSocketInfo* ssl_extended_info, X509* leaf_cert,
                                  const Network::TransportSocketOptions* transport_socket_options,
                                  std::string* error_details, uint8_t* out_alert);
 
-  void onVerifyError(Ssl::SslExtendedSocketInfo* ssl_extended_info, absl::string_view error);
+  void onVerifyError(absl::string_view error);
 
   const Envoy::Ssl::CertificateValidationContextConfig* config_;
   SslStats& stats_;

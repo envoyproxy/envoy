@@ -35,28 +35,23 @@ PlatformBridgeCertValidator::~PlatformBridgeCertValidator() {
 
 ValidationResults PlatformBridgeCertValidator::doVerifyCertChain(
     STACK_OF(X509) & cert_chain, Ssl::ValidateResultCallbackPtr callback,
-    Ssl::SslExtendedSocketInfo* ssl_extended_info,
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
     SSL_CTX& /*ssl_ctx*/, const CertValidator::ExtraValidationContext& /*validation_context*/,
     bool is_server, absl::string_view hostname) {
   ASSERT(!is_server);
+  ASSERT(callback);
   if (sk_X509_num(&cert_chain) == 0) {
-    if (ssl_extended_info) {
-      ssl_extended_info->setCertificateValidationStatus(
-          Envoy::Ssl::ClientValidationStatus::NotValidated);
-    }
     const char* error = "verify cert chain failed: empty cert chain.";
     stats_.fail_verify_error_.inc();
     ENVOY_LOG(debug, error);
-    return {ValidationResults::ValidationStatus::Failed, absl::nullopt, error};
-  }
-  if (callback == nullptr) {
-    callback = ssl_extended_info->createValidateResultCallback();
+    return {ValidationResults::ValidationStatus::Failed,
+            Envoy::Ssl::ClientValidationStatus::NotValidated, absl::nullopt, error};
   }
   if (callback == nullptr) {
     IS_ENVOY_BUG("No callback specified");
     const char* error = "verify cert chain failed: no callback specified.";
-    return {ValidationResults::ValidationStatus::Failed, absl::nullopt, error};
+    return {ValidationResults::ValidationStatus::Failed,
+            Envoy::Ssl::ClientValidationStatus::NotValidated, absl::nullopt, error};
   }
 
   std::vector<envoy_data> certs;
@@ -94,8 +89,8 @@ ValidationResults PlatformBridgeCertValidator::doVerifyCertChain(
                                        std::string(host), std::move(subject_alt_names), this);
   std::thread::id thread_id = job.validation_thread_.get_id();
   validation_jobs_[thread_id] = std::move(job);
-
-  return {ValidationResults::ValidationStatus::Pending, absl::nullopt, absl::nullopt};
+  return {ValidationResults::ValidationStatus::Pending,
+          Envoy::Ssl::ClientValidationStatus::NotValidated, absl::nullopt, absl::nullopt};
 }
 
 void PlatformBridgeCertValidator::verifyCertChainByPlatform(
@@ -172,17 +167,21 @@ void PlatformBridgeCertValidator::onVerificationComplete(std::thread::id thread_
   ValidationJob& job = job_handle.mapped();
   job.validation_thread_.join();
 
+  Ssl::ClientValidationStatus detailed_status = Envoy::Ssl::ClientValidationStatus::NotValidated;
   switch (failure_type) {
   case ValidationFailureType::SUCCESS:
+    detailed_status = Envoy::Ssl::ClientValidationStatus::Validated;
     break;
   case ValidationFailureType::FAIL_VERIFY_ERROR:
+    detailed_status = Envoy::Ssl::ClientValidationStatus::Failed;
     stats_.fail_verify_error_.inc();
   case ValidationFailureType::FAIL_VERIFY_SAN:
+    detailed_status = Envoy::Ssl::ClientValidationStatus::Failed;
     stats_.fail_verify_san_.inc();
   }
 
-  job.result_callback_->onCertValidationResult(allow_untrusted_certificate_ || success, error,
-                                               tls_alert);
+  job.result_callback_->onCertValidationResult(allow_untrusted_certificate_ || success,
+                                               detailed_status, error, tls_alert);
   ENVOY_LOG(trace,
             "Finished platform cert validation for {}, post result callback to network thread",
             hostname);
