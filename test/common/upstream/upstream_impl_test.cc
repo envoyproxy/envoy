@@ -22,7 +22,6 @@
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/singleton/manager_impl.h"
-#include "source/extensions/clusters/common/logical_host.h"
 #include "source/extensions/clusters/static/static_cluster.h"
 #include "source/extensions/clusters/strict_dns/strict_dns_cluster.h"
 #include "source/server/transport_socket_config_impl.h"
@@ -1618,24 +1617,6 @@ TEST_F(HostImplTest, HealthcheckHostname) {
                             envoy::config::core::v3::Locality().default_instance(), config, 1,
                             simTime());
   EXPECT_EQ("foo", descr.hostnameForHealthChecks());
-}
-
-TEST_F(HostImplTest, RealHostDescription) {
-  MockClusterMockPrioritySet cluster;
-  envoy::config::endpoint::v3::Endpoint::HealthCheckConfig hc_config;
-  hc_config.set_hostname("spotify.com");
-  Network::Address::InstanceConstSharedPtr address =
-      Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
-  auto host = std::make_shared<HostImpl>(cluster.info_, "spotify.com", address,
-                                         std::make_shared<const envoy::config::core::v3::Metadata>(
-                                             envoy::config::core::v3::Metadata::default_instance()),
-                                         1, envoy::config::core::v3::Locality::default_instance(),
-                                         hc_config, 1, envoy::config::core::v3::UNKNOWN, simTime());
-  RealHostDescription real_host(address, host);
-  EXPECT_EQ(1, real_host.priority());
-  EXPECT_TRUE(host->canCreateConnection(ResourcePriority::Default));
-  EXPECT_EQ("spotify.com", real_host.hostnameForHealthChecks());
-  EXPECT_FALSE(real_host.lastHcPassTime());
 }
 
 class StaticClusterImplTest : public testing::Test, public UpstreamImplTestBase {};
