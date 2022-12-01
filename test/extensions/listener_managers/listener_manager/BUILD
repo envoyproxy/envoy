@@ -9,7 +9,6 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-# TODO(alyssar): describe this package.
 envoy_cc_test_library(
     name = "listener_manager_impl_test_lib",
     hdrs = ["listener_manager_impl_test.h"],
