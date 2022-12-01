@@ -17,7 +17,7 @@ jobs:
       - run: mobile/docs/build.sh
       - add_ssh_keys:
           fingerprints:
-            - "a2:f7:59:f0:01:8b:91:31:ab:0c:3f:9f:25:4c:1e:e5"
+            - "33:78:4d:5c:bd:62:2e:43:9d:79:2c:3e:dc:45:c0:98"
       - run: mobile/docs/publish.sh
       - store_artifacts:
           path: generated/docs
