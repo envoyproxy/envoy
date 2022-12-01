@@ -114,6 +114,7 @@ contributors to envoy-setec and relevant Slack channels from:
 * Dmitry Rozhkov ([rojkov](https://github.com/rojkov)) (dmitry.rozhkov@intel.com)
 * Michael Rebello ([rebello95](https://github.com/rebello95)) (mrebello@lyft.com)
 * Alan Chiu ([buildbreaker](https://github.com/buildbreaker)) (achiu@lyft.com)
+* Charles Le Borgne ([carloseltuerto](https://github.com/carloseltuerto)) (cleborgne@google.com)
 
 # Friends of Envoy
 
@@ -126,5 +127,3 @@ matter expert reviews. Feel free to loop them in as needed.
   * External dependencies, Envoy's supply chain and documentation.
 * Cerek Hillen ([crockeo](https://github.com/crockeo)) (chillen@lyft.com)
   * Python and C++ platform bindings.
-* Charles Le Borgne ([carloseltuerto](https://github.com/carloseltuerto)) (cleborgne@google.com)
-  * Cronet API shim aka "Cronvoy".
