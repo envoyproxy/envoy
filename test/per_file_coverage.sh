@@ -53,6 +53,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/http/lua:96.4"
 "source/extensions/filters/http/oauth2:96.0"
 "source/extensions/filters/http/wasm:1.9"
+"source/extensions/filters/http/rate_limit_quota:70" # TODO(tyxia) WIP. Improve coverage as development continues
 "source/extensions/filters/listener:95.9"
 "source/extensions/filters/listener/http_inspector:95.8"
 "source/extensions/filters/listener/original_dst:82.4"
