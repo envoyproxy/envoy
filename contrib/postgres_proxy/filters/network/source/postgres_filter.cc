@@ -235,14 +235,8 @@ bool PostgresFilter::onSSLRequest() {
 }
 
 bool PostgresFilter::shouldEncryptUpstream() const {
-  if ((config_->upstream_ssl_ ==
-       envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::SSL_REQUIRE) ||
-      (config_->upstream_ssl_ ==
-       envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::SSL_PREFER)) {
-    return true;
-  }
-
-  return false;
+  return (config_->upstream_ssl_ ==
+          envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::SSL_REQUIRE);
 }
 
 void PostgresFilter::sendUpstream(Buffer::Instance& data) {

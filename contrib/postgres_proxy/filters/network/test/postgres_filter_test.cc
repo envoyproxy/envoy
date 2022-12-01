@@ -427,30 +427,6 @@ TEST_F(PostgresFilterTest, UpstreamSSL) {
   EXPECT_CALL(connection_, close(_));
   filter_->encryptUpstream(false, data_);
   ASSERT_EQ(2, filter_->getStats().sessions_upstream_ssl_failed_.value());
-
-  // Configure upstream SSL to be preferred. If the upstream server does not agree for SSL or
-  // converting upstream transport socket to secure mode fails, the filter continues with
-  // connection without encryption.
-  filter_->getConfig()->upstream_ssl_ =
-      envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::SSL_PREFER;
-  ASSERT_TRUE(filter_->shouldEncryptUpstream());
-  // Simulate that upstream server agreed for SSL and conversion of upstream Transport socket was
-  // successful.
-  EXPECT_CALL(filter_callbacks_, startUpstreamSecureTransport()).WillOnce(testing::Return(true));
-  filter_->encryptUpstream(true, data_);
-  ASSERT_EQ(2, filter_->getStats().sessions_upstream_ssl_success_.value());
-  // Simulate that upstream server agreed for SSL but conversion of upstream Transport socket
-  // failed.
-  EXPECT_CALL(filter_callbacks_, startUpstreamSecureTransport()).WillOnce(testing::Return(false));
-  EXPECT_CALL(connection_, close(_)).Times(0);
-  filter_->encryptUpstream(true, data_);
-  ASSERT_EQ(3, filter_->getStats().sessions_upstream_ssl_failed_.value());
-  // Simulate that upstream server does not agree for SSL. Filter should close the connection to
-  // downstream client.
-  EXPECT_CALL(filter_callbacks_, startUpstreamSecureTransport()).Times(0);
-  EXPECT_CALL(connection_, close(_)).Times(0);
-  filter_->encryptUpstream(false, data_);
-  ASSERT_EQ(4, filter_->getStats().sessions_upstream_ssl_failed_.value());
 }
 
 } // namespace PostgresProxy

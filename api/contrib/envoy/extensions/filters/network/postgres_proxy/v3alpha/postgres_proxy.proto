@@ -28,11 +28,6 @@ message PostgresProxy {
     // Establish upstream SSL connection to the server. If the server does not
     // accept the request for SSL connection, the session is terminated.
     SSL_REQUIRE = 1;
-
-    // Try to establish upstream SSL connection to the server. If the server does not
-    // accept the request for SSL or Envoy cannot successfully establish secure connection
-    // to upstream, the session continues in clear-text.
-    SSL_PREFER = 2;
   }
 
   // The human readable prefix to use when emitting :ref:`statistics
