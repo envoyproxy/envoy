@@ -2070,6 +2070,61 @@ filter_chains:
   testListenerUpdateWithSocketOptionsChangeDeprecatedBehavior(listener_origin, listener_updated);
 }
 
+TEST_P(ListenerManagerImplTest,
+       UpdateListenerWithDifferentSocketOptionsWithMultiAddressesDeprecatedBehavior) {
+  const std::string listener_origin = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 5678
+  socket_options:
+    socket_options:
+    - level: 1
+      name: 9
+      int_value: 2
+enable_reuse_port: true
+socket_options:
+    - level: 1
+      name: 9
+      int_value: 1
+filter_chains:
+- filters: []
+  )EOF";
+
+  const std::string listener_updated = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 5678
+  socket_options:
+    socket_options:
+    - level: 1
+      name: 9
+      int_value: 3
+enable_reuse_port: true
+socket_options:
+    - level: 1
+      name: 9
+      int_value: 1
+filter_chains:
+- filters: []
+  )EOF";
+  testListenerUpdateWithSocketOptionsChangeDeprecatedBehavior(listener_origin, listener_updated,
+                                                              true);
+}
+
 // The socket options update is only available when enable_reuse_port as true.
 // Linux is the only platform allowing the enable_reuse_port as true.
 #ifdef __linux__
@@ -2104,6 +2159,61 @@ filter_chains:
 - filters: []
   )EOF";
   testListenerUpdateWithSocketOptionsChange(listener_origin, listener_updated);
+}
+#endif
+
+#ifdef __linux__
+TEST_P(ListenerManagerImplTest, UpdateListenerWithDifferentSocketOptionsWithMultiAddresses) {
+  const std::string listener_origin = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 5678
+  socket_options:
+    socket_options:
+    - level: 1
+      name: 9
+      int_value: 2
+enable_reuse_port: true
+socket_options:
+    - level: 1
+      name: 9
+      int_value: 1
+filter_chains:
+- filters: []
+  )EOF";
+
+  const std::string listener_updated = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 5678
+  socket_options:
+    socket_options:
+    - level: 1
+      name: 9
+      int_value: 3
+enable_reuse_port: true
+socket_options:
+    - level: 1
+      name: 9
+      int_value: 1
+filter_chains:
+- filters: []
+  )EOF";
+  testListenerUpdateWithSocketOptionsChange(listener_origin, listener_updated, true);
 }
 #endif
 
@@ -6017,6 +6127,163 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, LiteralSockoptListenerEnabled) {
       /* expected_sockopt_level */ 4,
       /* expected_sockopt_name */ 5,
       /* expected_value */ 6);
+  addOrUpdateListener(listener);
+  EXPECT_EQ(1U, manager_->listeners().size());
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest,
+       LiteralSockoptListenerEnabledWithMultiAddressesNoOverrideOpts) {
+  const envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
+    name: SockoptsListener
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1111 }
+    additional_addresses:
+    - address:
+        socket_address: { address: 127.0.0.1, port_value: 2222 }
+    enable_reuse_port: false
+    filter_chains:
+    - filters: []
+      name: foo
+    socket_options: [
+      # The socket goes through socket() and bind() but never listen(), so if we
+      # ever saw (7, 8, 9) being applied it would cause a EXPECT_CALL failure.
+      { level: 1, name: 2, int_value: 3, state: STATE_PREBIND },
+      { level: 4, name: 5, int_value: 6, state: STATE_BOUND },
+      { level: 7, name: 8, int_value: 9, state: STATE_LISTENING },
+    ]
+  )EOF");
+
+  // Second address.
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                           /* expected_num_options */ 3,
+                           ListenerComponentFactory::BindType::NoReusePort);
+  // First address.
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                           /* expected_num_options */ 3,
+                           ListenerComponentFactory::BindType::NoReusePort);
+
+  expectSetsockopt(
+      /* expected_sockopt_level */ 1,
+      /* expected_sockopt_name */ 2,
+      /* expected_value */ 3,
+      /* expected_num_calls */ 2);
+  expectSetsockopt(
+      /* expected_sockopt_level */ 4,
+      /* expected_sockopt_name */ 5,
+      /* expected_value */ 6,
+      /* expected_num_calls */ 2);
+
+  addOrUpdateListener(listener);
+  EXPECT_EQ(1U, manager_->listeners().size());
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest,
+       LiteralSockoptListenerEnabledWithMultiAddressesOverrideOpts) {
+  const envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
+    name: SockoptsListener
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1111 }
+    additional_addresses:
+    - address:
+        socket_address: { address: 127.0.0.1, port_value: 2222 }
+      socket_options:
+        socket_options: [
+          # The socket goes through socket() and bind() but never listen(), so if we
+          # ever saw (7, 8, 9) being applied it would cause a EXPECT_CALL failure.
+          { level: 11, name: 12, int_value: 13, state: STATE_PREBIND },
+          { level: 14, name: 15, int_value: 16, state: STATE_BOUND },
+          { level: 17, name: 18, int_value: 19, state: STATE_LISTENING },
+        ]
+    enable_reuse_port: false
+    filter_chains:
+    - filters: []
+      name: foo
+    socket_options: [
+      # The socket goes through socket() and bind() but never listen(), so if we
+      # ever saw (7, 8, 9) being applied it would cause a EXPECT_CALL failure.
+      { level: 1, name: 2, int_value: 3, state: STATE_PREBIND },
+      { level: 4, name: 5, int_value: 6, state: STATE_BOUND },
+      { level: 7, name: 8, int_value: 9, state: STATE_LISTENING },
+    ]
+  )EOF");
+
+  // Second address.
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                           /* expected_num_options */ 3,
+                           ListenerComponentFactory::BindType::NoReusePort);
+  // First address.
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                           /* expected_num_options */ 3,
+                           ListenerComponentFactory::BindType::NoReusePort);
+
+  // First address' prebind options.
+  expectSetsockopt(
+      /* expected_sockopt_level */ 1,
+      /* expected_sockopt_name */ 2,
+      /* expected_value */ 3);
+  // Second address' prebind options.
+  expectSetsockopt(
+      /* expected_sockopt_level */ 11,
+      /* expected_sockopt_name */ 12,
+      /* expected_value */ 13);
+  // First address' bind options.
+  expectSetsockopt(
+      /* expected_sockopt_level */ 4,
+      /* expected_sockopt_name */ 5,
+      /* expected_value */ 6);
+  // Second address' bind options.
+  expectSetsockopt(
+      /* expected_sockopt_level */ 14,
+      /* expected_sockopt_name */ 15,
+      /* expected_value */ 16);
+  addOrUpdateListener(listener);
+  EXPECT_EQ(1U, manager_->listeners().size());
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest,
+       LiteralSockoptListenerEnabledWithMultiAddressesEmptyOverrideOpts) {
+  const envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
+    name: SockoptsListener
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1111 }
+    additional_addresses:
+    - address:
+        socket_address: { address: 127.0.0.1, port_value: 2222 }
+      socket_options:
+        socket_options: [ ]
+    enable_reuse_port: false
+    filter_chains:
+    - filters: []
+      name: foo
+    socket_options: [
+      # The socket goes through socket() and bind() but never listen(), so if we
+      # ever saw (7, 8, 9) being applied it would cause a EXPECT_CALL failure.
+      { level: 1, name: 2, int_value: 3, state: STATE_PREBIND },
+      { level: 4, name: 5, int_value: 6, state: STATE_BOUND },
+      { level: 7, name: 8, int_value: 9, state: STATE_LISTENING },
+    ]
+  )EOF");
+
+  // Second address.
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                           /* expected_num_options */ 0,
+                           ListenerComponentFactory::BindType::NoReusePort);
+  // First address.
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                           /* expected_num_options */ 3,
+                           ListenerComponentFactory::BindType::NoReusePort);
+
+  // First address' prebind options.
+  expectSetsockopt(
+      /* expected_sockopt_level */ 1,
+      /* expected_sockopt_name */ 2,
+      /* expected_value */ 3);
+  // First address' bind options.
+  expectSetsockopt(
+      /* expected_sockopt_level */ 4,
+      /* expected_sockopt_name */ 5,
+      /* expected_value */ 6);
+
   addOrUpdateListener(listener);
   EXPECT_EQ(1U, manager_->listeners().size());
 }

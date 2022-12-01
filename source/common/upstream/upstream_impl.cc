@@ -49,7 +49,6 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/upstream/cluster_factory_impl.h"
-#include "source/common/upstream/eds.h"
 #include "source/common/upstream/health_checker_impl.h"
 #include "source/extensions/filters/network/http_connection_manager/config.h"
 #include "source/server/transport_socket_config_impl.h"
@@ -182,9 +181,7 @@ UpstreamLocalAddressSelectorImpl::UpstreamLocalAddressSelectorImpl(
   if (cluster_config.upstream_bind_config().has_source_address()) {
     parseBindConfig(cluster_config.name(), cluster_config.upstream_bind_config(),
                     base_socket_options_, cluster_socket_options_);
-  }
-
-  if (bootstrap_bind_config.has_source_address()) {
+  } else if (bootstrap_bind_config.has_source_address()) {
     parseBindConfig("", bootstrap_bind_config, base_socket_options_, cluster_socket_options_);
   }
 }
@@ -1133,6 +1130,7 @@ ClusterInfoImpl::ClusterInfoImpl(
 
   if (http_protocol_options_) {
     Http::FilterChainUtility::FiltersList http_filters = http_protocol_options_->http_filters_;
+    has_configured_http_filters_ = !http_filters.empty();
     if (http_filters.empty()) {
       auto* codec_filter = http_filters.Add();
       codec_filter->set_name("envoy.filters.http.upstream_codec");

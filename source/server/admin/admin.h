@@ -112,7 +112,7 @@ public:
                                     Network::UdpReadFilterCallbacks&) override {}
 
   // Http::FilterChainFactory
-  void createFilterChain(Http::FilterChainManager& manager) const override;
+  bool createFilterChain(Http::FilterChainManager& manager, bool) const override;
   bool createUpgradeFilterChain(absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
                                 Http::FilterChainManager&) const override {
     return false;
@@ -214,6 +214,7 @@ public:
     // TODO(yanavlasov): admin interface should use the default validator
     return nullptr;
   }
+  bool appendXForwardedPort() const override { return false; }
 
 private:
   friend class AdminTestingPeer;

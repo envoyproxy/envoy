@@ -16,8 +16,8 @@
 #include "contrib/envoy/extensions/filters/network/generic_proxy/v3/generic_proxy.pb.h"
 #include "contrib/envoy/extensions/filters/network/generic_proxy/v3/generic_proxy.pb.validate.h"
 #include "contrib/envoy/extensions/filters/network/generic_proxy/v3/route.pb.h"
-#include "contrib/generic_proxy/filters/network/source/interface/codec.h"
 #include "contrib/generic_proxy/filters/network/source/interface/filter.h"
+#include "contrib/generic_proxy/filters/network/source/interface/proxy_config.h"
 #include "contrib/generic_proxy/filters/network/source/interface/route.h"
 #include "contrib/generic_proxy/filters/network/source/interface/stream.h"
 #include "contrib/generic_proxy/filters/network/source/rds.h"
@@ -41,25 +41,21 @@ struct NamedFilterFactoryCb {
   FilterFactoryCb callback_;
 };
 
-class FilterConfig : public FilterChainFactory {
+class FilterConfigImpl : public FilterConfig {
 public:
-  FilterConfig(const std::string& stat_prefix, CodecFactoryPtr codec,
-               Rds::RouteConfigProviderSharedPtr route_config_provider,
-               std::vector<NamedFilterFactoryCb> factories)
+  FilterConfigImpl(const std::string& stat_prefix, CodecFactoryPtr codec,
+                   Rds::RouteConfigProviderSharedPtr route_config_provider,
+                   std::vector<NamedFilterFactoryCb> factories)
       : stat_prefix_(stat_prefix), codec_factory_(std::move(codec)),
         route_config_provider_(std::move(route_config_provider)), factories_(std::move(factories)) {
   }
 
-  FilterConfig(const ProxyConfig& config, Server::Configuration::FactoryContext& context,
-               RouteConfigProviderManager& route_config_provider_manager)
-      : FilterConfig(config.stat_prefix(), codecFactoryFromProto(config.codec_config(), context),
-                     routeConfigProviderFromProto(config, context, route_config_provider_manager),
-                     filtersFactoryFromProto(config.filters(), config.stat_prefix(), context)) {}
-
-  RouteEntryConstSharedPtr routeEntry(const Request& request) const {
+  // FilterConfig
+  RouteEntryConstSharedPtr routeEntry(const Request& request) const override {
     auto config = std::static_pointer_cast<const RouteMatcher>(route_config_provider_->config());
     return config->routeEntry(request);
   }
+  const CodecFactory& codecFactory() const override { return *codec_factory_; }
 
   // FilterChainFactory
   void createFilterChain(FilterChainManager& manager) override {
@@ -67,21 +63,6 @@ public:
       manager.applyFilterFactoryCb({factory.config_name_}, factory.callback_);
     }
   }
-
-  const CodecFactory& codecFactory() { return *codec_factory_; }
-
-  static CodecFactoryPtr
-  codecFactoryFromProto(const envoy::config::core::v3::TypedExtensionConfig& codec_config,
-                        Server::Configuration::FactoryContext& context);
-
-  static Rds::RouteConfigProviderSharedPtr
-  routeConfigProviderFromProto(const ProxyConfig& config,
-                               Server::Configuration::FactoryContext& context,
-                               RouteConfigProviderManager& route_config_provider_manager);
-
-  static std::vector<NamedFilterFactoryCb> filtersFactoryFromProto(
-      const ProtobufWkt::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>& filters,
-      const std::string stats_prefix, Server::Configuration::FactoryContext& context);
 
 private:
   friend class ActiveStream;
@@ -95,7 +76,6 @@ private:
 
   std::vector<NamedFilterFactoryCb> factories_;
 };
-using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
 class ActiveStream : public FilterChainManager,
                      public LinkedObject<ActiveStream>,
@@ -251,8 +231,7 @@ class Filter : public Envoy::Network::ReadFilter,
                public Envoy::Logger::Loggable<Envoy::Logger::Id::filter>,
                public RequestDecoderCallback {
 public:
-  Filter(FilterConfigSharedPtr config, Server::Configuration::FactoryContext& context)
-      : config_(std::move(config)), context_(context) {
+  Filter(FilterConfigSharedPtr config) : config_(std::move(config)) {
     decoder_ = config_->codecFactory().requestDecoder();
     decoder_->setDecoderCallback(*this);
     response_encoder_ = config_->codecFactory().responseEncoder();
@@ -291,8 +270,6 @@ public:
     return callbacks_->connection();
   }
 
-  Server::Configuration::FactoryContext& factoryContext() { return context_; }
-
   void newDownstreamRequest(RequestPtr request);
   void deferredStream(ActiveStream& stream);
 
@@ -318,8 +295,6 @@ private:
   MessageCreatorPtr creator_;
 
   Buffer::OwnedImpl response_buffer_;
-
-  Server::Configuration::FactoryContext& context_;
 
   std::list<ActiveStreamPtr> active_streams_;
 };

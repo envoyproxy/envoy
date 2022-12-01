@@ -177,7 +177,9 @@ public:
   MOCK_METHOD(std::vector<Http::Protocol>, upstreamHttpProtocol, (absl::optional<Http::Protocol>),
               (const));
 
-  MOCK_METHOD(void, createFilterChain, (Http::FilterChainManager & manager), (const));
+  MOCK_METHOD(bool, createFilterChain,
+              (Http::FilterChainManager & manager, bool only_create_if_configured),
+              (const, override));
   MOCK_METHOD(bool, createUpgradeFilterChain,
               (absl::string_view upgrade_type,
                const Http::FilterChainFactory::UpgradeMap* upgrade_map,

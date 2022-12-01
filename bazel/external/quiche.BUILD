@@ -110,7 +110,9 @@ envoy_cc_test(
     deps = [
         ":http2_adapter_callback_visitor",
         ":http2_adapter_mock_nghttp2_callbacks",
+        ":http2_adapter_nghttp2_adapter",
         ":http2_adapter_nghttp2_test_utils",
+        ":http2_adapter_test_frame_sequence",
         ":http2_adapter_test_utils",
         ":quiche_common_platform_test",
     ],

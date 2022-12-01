@@ -55,6 +55,7 @@
 #include "source/common/upstream/outlier_detection_impl.h"
 #include "source/common/upstream/resource_manager_impl.h"
 #include "source/common/upstream/transport_socket_match_impl.h"
+#include "source/common/upstream/upstream_http_factory_context_impl.h"
 #include "source/extensions/upstreams/http/config.h"
 #include "source/server/transport_socket_config_impl.h"
 
@@ -676,25 +677,6 @@ protected:
   mutable HostMapSharedPtr mutable_cross_priority_host_map_;
 };
 
-class UpstreamHttpFactoryContextImpl : public Server::Configuration::UpstreamHttpFactoryContext {
-public:
-  UpstreamHttpFactoryContextImpl(Server::Configuration::ServerFactoryContext& context,
-                                 Init::Manager& init_manager, Stats::Scope& scope)
-      : server_context_(context), init_manager_(init_manager), scope_(scope) {}
-
-  Server::Configuration::ServerFactoryContext& getServerFactoryContext() const override {
-    return server_context_;
-  }
-
-  Init::Manager& initManager() override { return init_manager_; }
-  Stats::Scope& scope() override { return scope_; }
-
-private:
-  Server::Configuration::ServerFactoryContext& server_context_;
-  Init::Manager& init_manager_;
-  Stats::Scope& scope_;
-};
-
 /**
  * Implementation of ClusterInfo that reads from JSON.
  */
@@ -856,8 +838,13 @@ public:
   upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const override;
 
   // Http::FilterChainFactory
-  void createFilterChain(Http::FilterChainManager& manager) const override {
+  bool createFilterChain(Http::FilterChainManager& manager,
+                         bool only_create_if_configured) const override {
+    if (!has_configured_http_filters_ && only_create_if_configured) {
+      return false;
+    }
     Http::FilterChainUtility::createFilterChainForFactories(manager, http_filter_factories_);
+    return true;
   }
   bool createUpgradeFilterChain(absl::string_view, const UpgradeMap*,
                                 Http::FilterChainManager&) const override {
@@ -952,6 +939,8 @@ private:
   const std::unique_ptr<Server::Configuration::CommonFactoryContext> factory_context_;
   std::vector<Network::FilterFactoryCb> filter_factories_;
   Http::FilterChainUtility::FilterFactoriesList http_filter_factories_;
+  // true iff the cluster proto specified upstream http filters.
+  bool has_configured_http_filters_{false};
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   mutable Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;

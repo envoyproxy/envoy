@@ -56,6 +56,8 @@
 #include "source/server/connection_handler_impl.h"
 #include "source/server/guarddog_impl.h"
 #include "source/server/listener_hooks.h"
+#include "source/server/listener_manager_factory.h"
+#include "source/server/regex_engine.h"
 #include "source/server/ssl_context_manager.h"
 
 namespace Envoy {
@@ -102,8 +104,7 @@ InstanceImpl::InstanceImpl(
                           store),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
       handler_(new ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
-      listener_component_factory_(*this), worker_factory_(thread_local_, *api_, hooks),
-      terminated_(false),
+      worker_factory_(thread_local_, *api_, hooks), terminated_(false),
       mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
                                                   : nullptr),
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
@@ -463,19 +464,8 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   // Initialize the regex engine and inject to singleton.
   // Needs to happen before stats store initialization because the stats
   // matcher config can include regexes.
-  if (bootstrap_.has_default_regex_engine()) {
-    const auto& default_regex_engine = bootstrap_.default_regex_engine();
-    Regex::EngineFactory& factory =
-        Config::Utility::getAndCheckFactory<Regex::EngineFactory>(default_regex_engine);
-    auto config = Config::Utility::translateAnyToFactoryConfig(
-        default_regex_engine.typed_config(), messageValidationContext().staticValidationVisitor(),
-        factory);
-    regex_engine_ = factory.createEngine(*config, serverFactoryContext());
-  } else {
-    regex_engine_ = std::make_shared<Regex::GoogleReEngine>();
-  }
-  Regex::EngineSingleton::clear();
-  Regex::EngineSingleton::initialize(regex_engine_.get());
+  regex_engine_ = createRegexEngine(
+      bootstrap_, messageValidationContext().staticValidationVisitor(), serverFactoryContext());
 
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
   // stats.
@@ -634,8 +624,10 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
 
   // Workers get created first so they register for thread local updates.
   listener_manager_ =
-      std::make_unique<ListenerManagerImpl>(*this, listener_component_factory_, worker_factory_,
-                                            bootstrap_.enable_dispatcher_stats(), quic_stat_names_);
+      Config::Utility::getAndCheckFactoryByName<ListenerManagerFactory>(
+          "envoy.listener_manager_impl.default")
+          .createListenerManager(*this, nullptr, worker_factory_,
+                                 bootstrap_.enable_dispatcher_stats(), quic_stat_names_);
 
   // The main thread is also registered for thread local updates so that code that does not care
   // whether it runs on the main thread or on workers can still use TLS.

@@ -439,7 +439,7 @@ TEST(DubboCodecFactoryConfigTest, DubboCodecFactoryConfigTest) {
 
   Server::Configuration::MockFactoryContext context;
 
-  EXPECT_NE(nullptr, config.createFactory(*proto_config, context));
+  EXPECT_NE(nullptr, config.createCodecFactory(*proto_config, context));
 }
 
 } // namespace

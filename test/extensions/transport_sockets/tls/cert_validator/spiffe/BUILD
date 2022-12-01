@@ -47,5 +47,6 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/transport_sockets/tls/cert_validator/spiffe:config",
         "//test/integration:http_integration_lib",
+        "//test/test_common:utility_lib",
     ],
 )

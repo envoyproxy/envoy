@@ -1123,25 +1123,25 @@ RouteEntryImplBase::parseOpaqueConfig(const envoy::config::route::v3::Route& rou
   return ret;
 }
 
-HedgePolicyImpl RouteEntryImplBase::buildHedgePolicy(
-    const absl::optional<envoy::config::route::v3::HedgePolicy>& vhost_hedge_policy,
+std::unique_ptr<HedgePolicyImpl> RouteEntryImplBase::buildHedgePolicy(
+    HedgePolicyConstOptRef vhost_hedge_policy,
     const envoy::config::route::v3::RouteAction& route_config) const {
   // Route specific policy wins, if available.
   if (route_config.has_hedge_policy()) {
-    return HedgePolicyImpl(route_config.hedge_policy());
+    return std::make_unique<HedgePolicyImpl>(route_config.hedge_policy());
   }
 
   // If not, we fall back to the virtual host policy if there is one.
-  if (vhost_hedge_policy) {
-    return HedgePolicyImpl(vhost_hedge_policy.value());
+  if (vhost_hedge_policy.has_value()) {
+    return std::make_unique<HedgePolicyImpl>(*vhost_hedge_policy);
   }
 
   // Otherwise, an empty policy will do.
-  return HedgePolicyImpl();
+  return nullptr;
 }
 
-RetryPolicyImpl RouteEntryImplBase::buildRetryPolicy(
-    const absl::optional<envoy::config::route::v3::RetryPolicy>& vhost_retry_policy,
+std::unique_ptr<RetryPolicyImpl> RouteEntryImplBase::buildRetryPolicy(
+    RetryPolicyConstOptRef vhost_retry_policy,
     const envoy::config::route::v3::RouteAction& route_config,
     ProtobufMessage::ValidationVisitor& validation_visitor,
     Server::Configuration::ServerFactoryContext& factory_context) const {
@@ -1149,24 +1149,26 @@ RetryPolicyImpl RouteEntryImplBase::buildRetryPolicy(
       factory_context.singletonManager());
   // Route specific policy wins, if available.
   if (route_config.has_retry_policy()) {
-    return RetryPolicyImpl(route_config.retry_policy(), validation_visitor, retry_factory_context);
+    return std::make_unique<RetryPolicyImpl>(route_config.retry_policy(), validation_visitor,
+                                             retry_factory_context);
   }
 
   // If not, we fallback to the virtual host policy if there is one.
-  if (vhost_retry_policy) {
-    return RetryPolicyImpl(vhost_retry_policy.value(), validation_visitor, retry_factory_context);
+  if (vhost_retry_policy.has_value()) {
+    return std::make_unique<RetryPolicyImpl>(*vhost_retry_policy, validation_visitor,
+                                             retry_factory_context);
   }
 
   // Otherwise, an empty policy will do.
-  return RetryPolicyImpl();
+  return nullptr;
 }
 
-InternalRedirectPolicyImpl RouteEntryImplBase::buildInternalRedirectPolicy(
+std::unique_ptr<InternalRedirectPolicyImpl> RouteEntryImplBase::buildInternalRedirectPolicy(
     const envoy::config::route::v3::RouteAction& route_config,
     ProtobufMessage::ValidationVisitor& validator, absl::string_view current_route_name) const {
   if (route_config.has_internal_redirect_policy()) {
-    return InternalRedirectPolicyImpl(route_config.internal_redirect_policy(), validator,
-                                      current_route_name);
+    return std::make_unique<InternalRedirectPolicyImpl>(route_config.internal_redirect_policy(),
+                                                        validator, current_route_name);
   }
   envoy::config::route::v3::InternalRedirectPolicy policy_config;
   switch (route_config.internal_redirect_action()) {
@@ -1175,12 +1177,12 @@ InternalRedirectPolicyImpl RouteEntryImplBase::buildInternalRedirectPolicy(
   case envoy::config::route::v3::RouteAction::PASS_THROUGH_INTERNAL_REDIRECT:
     FALLTHRU;
   default:
-    return InternalRedirectPolicyImpl();
+    return nullptr;
   }
   if (route_config.has_max_internal_redirects()) {
     *policy_config.mutable_max_internal_redirects() = route_config.max_internal_redirects();
   }
-  return InternalRedirectPolicyImpl{policy_config, validator, current_route_name};
+  return std::make_unique<InternalRedirectPolicyImpl>(policy_config, validator, current_route_name);
 }
 PathRewriterSharedPtr
 RouteEntryImplBase::buildPathRewriter(envoy::config::route::v3::Route route,
@@ -1693,10 +1695,12 @@ VirtualHostImpl::VirtualHostImpl(
 
   // Retry and Hedge policies must be set before routes, since they may use them.
   if (virtual_host.has_retry_policy()) {
-    retry_policy_ = virtual_host.retry_policy();
+    retry_policy_ = std::make_unique<envoy::config::route::v3::RetryPolicy>();
+    retry_policy_->CopyFrom(virtual_host.retry_policy());
   }
   if (virtual_host.has_hedge_policy()) {
-    hedge_policy_ = virtual_host.hedge_policy();
+    hedge_policy_ = std::make_unique<envoy::config::route::v3::HedgePolicy>();
+    hedge_policy_->CopyFrom(virtual_host.hedge_policy());
   }
 
   shadow_policies_.reserve(virtual_host.request_mirror_policies().size());

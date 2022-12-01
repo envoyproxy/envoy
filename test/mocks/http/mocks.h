@@ -203,7 +203,10 @@ public:
   ~MockFilterChainFactory() override;
 
   // Http::FilterChainFactory
-  MOCK_METHOD(void, createFilterChain, (FilterChainManager & manager), (const));
+  bool createFilterChain(FilterChainManager& manager, bool) const override {
+    return createFilterChain(manager);
+  }
+  MOCK_METHOD(bool, createFilterChain, (FilterChainManager & manager), (const));
   MOCK_METHOD(bool, createUpgradeFilterChain,
               (absl::string_view upgrade_type, const FilterChainFactory::UpgradeMap* upgrade_map,
                FilterChainManager& manager),
@@ -630,6 +633,7 @@ public:
   MOCK_METHOD(const HttpConnectionManagerProto::ProxyStatusConfig*, proxyStatusConfig, (), (const));
   MOCK_METHOD(HeaderValidatorPtr, makeHeaderValidator,
               (Protocol protocol, StreamInfo::StreamInfo& stream_info));
+  MOCK_METHOD(bool, appendXForwardedPort, (), (const));
 
   std::unique_ptr<Http::InternalAddressConfig> internal_address_config_ =
       std::make_unique<DefaultInternalAddressConfig>();

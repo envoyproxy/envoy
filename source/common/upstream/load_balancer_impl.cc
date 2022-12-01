@@ -356,6 +356,7 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
     : LoadBalancerBase(priority_set, stats, runtime, random, common_config),
       local_priority_set_(local_priority_set),
+      locality_weighted_balancing_(common_config.has_locality_weighted_lb_config()),
       routing_enabled_(PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
           common_config.zone_aware_lb_config(), routing_enabled, 100, 100)),
       min_cluster_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(common_config.zone_aware_lb_config(),
@@ -635,21 +636,29 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context, uint64_
   }
 
   // If we're doing locality weighted balancing, pick locality.
-  absl::optional<uint32_t> locality;
-  if (host_availability == HostAvailability::Degraded) {
-    locality = host_set.chooseDegradedLocality();
-  } else {
-    locality = host_set.chooseHealthyLocality();
-  }
-
-  if (locality.has_value()) {
-    auto source_type = localitySourceType(host_availability);
-    if (!source_type) {
-      return absl::nullopt;
+  //
+  // The chooseDegradedLocality or chooseHealthyLocality may return valid locality index
+  // when the locality_weighted_lb_config is set or load balancing policy extension is used.
+  // This if statement is to make sure we only do locality weighted balancing when the
+  // locality_weighted_lb_config is set explicitly even the hostSourceToUse is called in the
+  // load balancing policy extensions.
+  if (locality_weighted_balancing_) {
+    absl::optional<uint32_t> locality;
+    if (host_availability == HostAvailability::Degraded) {
+      locality = host_set.chooseDegradedLocality();
+    } else {
+      locality = host_set.chooseHealthyLocality();
     }
-    hosts_source.source_type_ = source_type.value();
-    hosts_source.locality_index_ = locality.value();
-    return hosts_source;
+
+    if (locality.has_value()) {
+      auto source_type = localitySourceType(host_availability);
+      if (!source_type) {
+        return absl::nullopt;
+      }
+      hosts_source.source_type_ = source_type.value();
+      hosts_source.locality_index_ = locality.value();
+      return hosts_source;
+    }
   }
 
   // If we've latched that we can't do priority-based routing, return healthy or degraded hosts

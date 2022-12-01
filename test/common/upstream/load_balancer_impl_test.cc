@@ -619,11 +619,16 @@ TEST_F(ZoneAwareLoadBalancerBaseTest, BaseMethods) {
 
 class RoundRobinLoadBalancerTest : public LoadBalancerTestBase {
 public:
-  void init(bool need_local_cluster) {
+  void init(bool need_local_cluster, bool locality_weight_aware = false) {
     if (need_local_cluster) {
       local_priority_set_ = std::make_shared<PrioritySetImpl>();
       local_priority_set_->getOrCreateHostSet(0);
     }
+
+    if (locality_weight_aware) {
+      common_config_.mutable_locality_weighted_lb_config();
+    }
+
     lb_ = std::make_shared<RoundRobinLoadBalancer>(priority_set_, local_priority_set_.get(), stats_,
                                                    runtime_, random_, common_config_,
                                                    round_robin_lb_config_, simTime());
@@ -921,7 +926,7 @@ TEST_P(RoundRobinLoadBalancerTest, Locality) {
   hostSet().hosts_ = *hosts;
   hostSet().healthy_hosts_ = *hosts;
   hostSet().healthy_hosts_per_locality_ = hosts_per_locality;
-  init(false);
+  init(false, true);
   // chooseHealthyLocality() return value determines which locality we use.
   EXPECT_CALL(hostSet(), chooseHealthyLocality()).WillOnce(Return(0));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
@@ -960,7 +965,7 @@ TEST_P(RoundRobinLoadBalancerTest, DegradedLocality) {
   hostSet().hosts_per_locality_ = hosts_per_locality;
   hostSet().healthy_hosts_per_locality_ = healthy_hosts_per_locality;
   hostSet().degraded_hosts_per_locality_ = degraded_hosts_per_locality;
-  init(false);
+  init(false, true);
 
   EXPECT_CALL(random_, random()).WillOnce(Return(50)).WillOnce(Return(0));
   // Since we're split between healthy and degraded, the LB should call into both

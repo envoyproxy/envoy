@@ -81,7 +81,7 @@ envoy.extensions.http.cache.simple:
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: wip
   type_urls:
-  - envoy.extensions.cache.simple_http_cache.v3.SimpleHttpCacheConfig
+  - envoy.extensions.http.cache.simple_http_cache.v3.SimpleHttpCacheConfig
 envoy.clusters.aggregate:
   categories:
   - envoy.clusters
@@ -103,6 +103,11 @@ envoy.clusters.strict_dns:
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
 envoy.clusters.original_dst:
+  categories:
+  - envoy.clusters
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+envoy.clusters.eds:
   categories:
   - envoy.clusters
   security_posture: robust_to_untrusted_downstream_and_upstream
@@ -382,7 +387,7 @@ envoy.filters.http.jwt_authn:
   categories:
   - envoy.filters.http
   security_posture: robust_to_untrusted_downstream
-  status: alpha
+  status: stable
   type_urls:
   - envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication
   - envoy.extensions.filters.http.jwt_authn.v3.PerRouteConfig
@@ -438,6 +443,15 @@ envoy.filters.http.ratelimit:
   type_urls:
   - envoy.extensions.filters.http.ratelimit.v3.RateLimit
   - envoy.extensions.filters.http.ratelimit.v3.RateLimitPerRoute
+envoy.filters.http.rate_limit_quota:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaFilterConfig
+  - envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaOverride
+  - envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
 envoy.filters.http.rbac:
   categories:
   - envoy.filters.http

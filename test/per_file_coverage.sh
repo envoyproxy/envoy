@@ -8,10 +8,11 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/api/posix:81.3"
 "source/common/common:96.2"
 "source/common/common/posix:92.7"
-"source/common/config:96.5"
+"source/common/config:96.4"
 "source/common/crypto:0.0"
 "source/common/event:94.1" # Emulated edge events guards don't report LCOV
 "source/common/filesystem/posix:95.5"
+"source/common/filter:95.6" # Upstream HTTP filter tests are needed
 "source/common/http:96.1"
 "source/common/http/http2:94.8"
 "source/common/io:98.0"
@@ -33,9 +34,11 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/upstream:96.0"
 "source/common/watchdog:58.6" # Death tests don't report LCOV
 "source/exe:92.6"
-"source/extensions/common:95.8"
+"source/extensions/access_loggers/wasm:93.5"
+"source/extensions/clusters/common:68.2"
+"source/extensions/common:92.9"
 "source/extensions/common/tap:92.9"
-"source/extensions/common/wasm:94.7" # flaky: be careful adjusting
+"source/extensions/common/wasm:87.5" # flaky: be careful adjusting
 "source/extensions/common/wasm/ext:92.0"
 "source/extensions/filters/common:96.1"
 "source/extensions/filters/common/expr:96.2"
@@ -43,14 +46,13 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/common/lua:96.5"
 "source/extensions/filters/common/rbac:88.1"
 "source/extensions/filters/http/aws_lambda:96.2"
-"source/extensions/filters/http/cache:93.4"
-"source/extensions/filters/http/cache/simple_http_cache:96.0"
+"source/extensions/filters/http/cache:93.3"
 "source/extensions/filters/http/grpc_json_transcoder:94.7"
 "source/extensions/filters/http/ip_tagging:87.0"
 "source/extensions/filters/http/kill_request:91.7" # Death tests don't report LCOV
 "source/extensions/filters/http/lua:96.4"
 "source/extensions/filters/http/oauth2:96.0"
-"source/extensions/filters/http/wasm:95.8"
+"source/extensions/filters/http/wasm:1.9"
 "source/extensions/filters/listener:95.9"
 "source/extensions/filters/listener/http_inspector:95.8"
 "source/extensions/filters/listener/original_dst:82.4"
@@ -62,11 +64,14 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/network/sni_cluster:88.9"
 "source/extensions/filters/network/sni_dynamic_forward_proxy:95.2"
 "source/extensions/filters/network/thrift_proxy/router:96.4"
-"source/extensions/filters/network/wasm:95.7"
+"source/extensions/filters/network/thrift_proxy/filters/payload_to_metadata:96.2"
+"source/extensions/filters/network/wasm:76.9"
 "source/extensions/filters/udp:96.4"
 "source/extensions/filters/udp/dns_filter:96.1"
 "source/extensions/health_checkers:95.7"
 "source/extensions/health_checkers/redis:95.7"
+"source/extensions/http/cache:96.5"
+"source/extensions/http/cache/simple_http_cache:95.9"
 "source/extensions/io_socket:96.2"
 "source/extensions/io_socket/user_space:96.2"
 "source/extensions/network/dns_resolver/getaddrinfo:96.3"
@@ -93,7 +98,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/watchdog:83.3" # Death tests within extensions
 "source/extensions/watchdog/profile_action:83.3"
 "source/server:93.3" # flaky: be careful adjusting. See https://github.com/envoyproxy/envoy/issues/15239
-"source/server/admin:97.5"
+"source/server/admin:97.4"
 "source/server/admin:profiler-lib:83"
 "source/server/config_validation:74.8"
 )

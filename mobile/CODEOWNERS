@@ -1,0 +1,5 @@
+# @envoyproxy/envoy-mobile-maintainers owns everything by default.
+
+# Cronet fork and Cronvoy sources + tests
+library/java/org/chromium/net @buildbreaker @goaway @DavidSchinazi @carloseltuerto
+test/java/org/chromium/net @buildbreaker @goaway @DavidSchinazi @carloseltuerto

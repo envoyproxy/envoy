@@ -50,7 +50,6 @@ void recordLatestDataFilter(const typename FilterList<T>::iterator current_filte
 } // namespace
 
 void ActiveStreamFilterBase::commonContinue() {
-  // TODO(mattklein123): Raise an error if this is called during a callback.
   if (!canContinue()) {
     ENVOY_STREAM_LOG(trace, "cannot continue filter chain: filter={}", *this,
                      static_cast<const void*>(this));
@@ -536,7 +535,7 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
     ENVOY_STREAM_LOG(trace, "decode headers called: filter={} status={}", *this,
                      (*entry)->filter_context_.config_name, static_cast<uint64_t>(status));
 
-    (*entry)->decode_headers_called_ = true;
+    (*entry)->processed_headers_ = true;
 
     const auto continue_iteration = (*entry)->commonHandleAfterHeadersCallback(status, end_stream);
     ENVOY_BUG(!continue_iteration || !state_.local_complete_,
@@ -782,7 +781,7 @@ void FilterManager::decodeMetadata(ActiveStreamDecoderFilter* filter, MetadataMa
     // If the filter pointed by entry hasn't returned from decodeHeaders, stores newly added
     // metadata in case decodeHeaders returns StopAllIteration. The latter can happen when headers
     // callbacks generate new metadata.
-    if (!(*entry)->decode_headers_called_ || (*entry)->stoppedAll()) {
+    if (!(*entry)->processed_headers_ || (*entry)->stoppedAll()) {
       Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
       (*entry)->getSavedRequestMetadata()->emplace_back(std::move(metadata_map_ptr));
       return;
@@ -922,20 +921,14 @@ void DownstreamFilterManager::sendLocalReplyViaFilterChain(
           },
           [this](ResponseHeaderMap& response_headers, Code& code, std::string& body,
                  absl::string_view& content_type) -> void {
-            // TODO(snowp): This &get() business isn't nice, rework LocalReply and others to accept
-            // opt refs.
             local_reply_.rewrite(filter_manager_callbacks_.requestHeaders().ptr(), response_headers,
                                  streamInfo(), code, body, content_type);
           },
           [this, modify_headers](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
             filter_manager_callbacks_.setResponseHeaders(std::move(headers));
-            // TODO: Start encoding from the last decoder filter that saw the
-            // request instead.
             encodeHeaders(nullptr, filter_manager_callbacks_.responseHeaders().ref(), end_stream);
           },
           [this](Buffer::Instance& data, bool end_stream) -> void {
-            // TODO: Start encoding from the last decoder filter that saw the
-            // request instead.
             encodeData(nullptr, data, end_stream,
                        FilterManager::FilterIterationStartState::CanStartFromCurrent);
           }},
@@ -1064,7 +1057,7 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
     ENVOY_STREAM_LOG(trace, "encode headers called: filter={} status={}", *this,
                      (*entry)->filter_context_.config_name, static_cast<uint64_t>(status));
 
-    (*entry)->encode_headers_called_ = true;
+    (*entry)->processed_headers_ = true;
 
     const auto continue_iteration = (*entry)->commonHandleAfterHeadersCallback(status, end_stream);
 
@@ -1127,7 +1120,7 @@ void FilterManager::encodeMetadata(ActiveStreamEncoderFilter* filter,
     // If the filter pointed by entry hasn't returned from encodeHeaders, stores newly added
     // metadata in case encodeHeaders returns StopAllIteration. The latter can happen when headers
     // callbacks generate new metadata.
-    if (!(*entry)->encode_headers_called_ || (*entry)->stoppedAll()) {
+    if (!(*entry)->processed_headers_ || (*entry)->stoppedAll()) {
       (*entry)->getSavedResponseMetadata()->emplace_back(std::move(metadata_map_ptr));
       return;
     }
