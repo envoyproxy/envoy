@@ -237,9 +237,15 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
   EXPECT_EQ(&c1, &scope_.counterFromString("c1"));
   StatNameManagedStorage c1_name("c1", symbol_table_);
   c1.add(100);
+
   auto found_counter = scope_.findCounter(c1_name.statName());
   ASSERT_TRUE(found_counter.has_value());
   EXPECT_EQ(&c1, &found_counter->get());
+
+  auto found_counter_in_store = store_->findCounter(c1_name.statName());
+  ASSERT_TRUE(found_counter_in_store.has_value());
+  EXPECT_EQ(&c1, &found_counter_in_store->get());
+
   EXPECT_EQ(100, found_counter->get().value());
   c1.add(100);
   EXPECT_EQ(200, found_counter->get().value());
@@ -248,9 +254,15 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
   EXPECT_EQ(&g1, &scope_.gaugeFromString("g1", Gauge::ImportMode::Accumulate));
   StatNameManagedStorage g1_name("g1", symbol_table_);
   g1.set(100);
+
   auto found_gauge = scope_.findGauge(g1_name.statName());
   ASSERT_TRUE(found_gauge.has_value());
   EXPECT_EQ(&g1, &found_gauge->get());
+
+  auto found_gauge_in_store = store_->findGauge(g1_name.statName());
+  ASSERT_TRUE(found_gauge_in_store.has_value());
+  EXPECT_EQ(&g1, &found_gauge_in_store->get());
+
   EXPECT_EQ(100, found_gauge->get().value());
   g1.set(0);
   EXPECT_EQ(0, found_gauge->get().value());
@@ -258,12 +270,25 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
   Histogram& h1 = scope_.histogramFromString("h1", Histogram::Unit::Unspecified);
   EXPECT_EQ(&h1, &scope_.histogramFromString("h1", Histogram::Unit::Unspecified));
   StatNameManagedStorage h1_name("h1", symbol_table_);
+
   auto found_histogram = scope_.findHistogram(h1_name.statName());
   ASSERT_TRUE(found_histogram.has_value());
   EXPECT_EQ(&h1, &found_histogram->get());
 
+  auto found_histogram_in_store = store_->findHistogram(h1_name.statName());
+  ASSERT_TRUE(found_histogram_in_store.has_value());
+  EXPECT_EQ(&h1, &found_histogram_in_store->get());
+
   TextReadout& t1 = scope_.textReadoutFromString("t1");
   EXPECT_EQ(&t1, &scope_.textReadoutFromString("t1"));
+
+  auto found_text_readout = scope_.findTextReadout(t1.statName());
+  ASSERT_TRUE(found_text_readout.has_value());
+  EXPECT_EQ(&t1, &found_text_readout->get());
+
+  auto found_text_readout_in_store = store_->findTextReadout(t1.statName());
+  ASSERT_TRUE(found_text_readout_in_store.has_value());
+  EXPECT_EQ(&t1, &found_text_readout_in_store->get());
 
   EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 200));
   h1.recordValue(200);
@@ -834,6 +859,10 @@ TEST_F(LookupWithStatNameTest, NotFound) {
   EXPECT_FALSE(scope_.findGauge(not_found));
   EXPECT_FALSE(scope_.findHistogram(not_found));
   EXPECT_FALSE(scope_.findTextReadout(not_found));
+  EXPECT_FALSE(store_->findCounter(not_found));
+  EXPECT_FALSE(store_->findGauge(not_found));
+  EXPECT_FALSE(store_->findHistogram(not_found));
+  EXPECT_FALSE(store_->findTextReadout(not_found));
 }
 
 class StatsMatcherTLSTest : public StatsThreadLocalStoreTest {
@@ -1962,6 +1991,62 @@ TEST_F(HistogramThreadTest, ScopeOverlap) {
 
   shutdownThreading();
   scope_.histogramFromString("histogram_after_shutdown", Histogram::Unit::Unspecified);
+}
+
+class TestSinkPredicates : public Stats::SinkPredicates {
+public:
+  bool includeCounter(const Stats::Counter&) override { return (++num_counters_) % 10 == 0; }
+  bool includeGauge(const Stats::Gauge&) override { return (++num_gauges_) % 10 == 0; }
+  bool includeTextReadout(const Stats::TextReadout&) override {
+    return (++num_text_readouts_) % 10 == 0;
+  }
+
+private:
+  size_t num_counters_ = 0;
+  size_t num_gauges_ = 0;
+  size_t num_text_readouts_ = 0;
+};
+
+TEST_F(StatsThreadLocalStoreTest, SetSinkPredicates) {
+  constexpr int num_stats = 20;
+  static constexpr int expected_sinked_stats = 2; // 10% of 20.
+  StatNamePool pool(store_->symbolTable());
+
+  store_->setSinkPredicates(std::make_unique<TestSinkPredicates>());
+
+  // Create counters
+  for (uint64_t idx = 0; idx < num_stats; ++idx) {
+    auto stat_name = pool.add(absl::StrCat("counter.", idx));
+    scope_.counterFromStatName(stat_name).inc();
+  }
+  // Create gauges
+  for (uint64_t idx = 0; idx < num_stats; ++idx) {
+    auto stat_name = pool.add(absl::StrCat("gauge.", idx));
+    scope_.gaugeFromStatName(stat_name, Stats::Gauge::ImportMode::NeverImport).set(idx);
+  }
+
+  // Create text readouts
+  for (uint64_t idx = 0; idx < num_stats; ++idx) {
+    auto stat_name = pool.add(absl::StrCat("text_readout.", idx));
+    scope_.textReadoutFromStatName(stat_name).set(
+        absl::StrCat("text_readout.", idx));
+  }
+
+  uint32_t num_sinked_counters = 0, num_sinked_gauges = 0, num_sinked_text_readouts = 0;
+  auto check_expected_size = [](size_t size) { EXPECT_EQ(expected_sinked_stats, size); };
+
+  store_->forEachSinkedCounter(check_expected_size,
+                               [&num_sinked_counters](Counter&) { ++num_sinked_counters; });
+  EXPECT_EQ(expected_sinked_stats, num_sinked_counters);
+
+  store_->forEachSinkedGauge(check_expected_size,
+                             [&num_sinked_gauges](Gauge&) { ++num_sinked_gauges; });
+  EXPECT_EQ(expected_sinked_stats, num_sinked_gauges);
+
+  store_->forEachSinkedTextReadout( check_expected_size, [&num_sinked_text_readouts](TextReadout&) {
+    ++num_sinked_text_readouts;
+  });
+  EXPECT_EQ(expected_sinked_stats, num_sinked_text_readouts);
 }
 
 } // namespace Stats

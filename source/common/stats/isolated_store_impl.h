@@ -12,7 +12,6 @@
 #include "source/common/stats/allocator_impl.h"
 #include "source/common/stats/null_counter.h"
 #include "source/common/stats/null_gauge.h"
-#include "source/common/stats/store_impl.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/common/stats/tag_utility.h"
 #include "source/common/stats/utility.h"
@@ -129,7 +128,7 @@ private:
 // Isolated implementation of Stats::Store. This class is not thread-safe by
 // itself, but a thread-safe wrapper can be built, e.g. TestIsolatedStoreImpl
 // in test/integration/server.h.
-class IsolatedStoreImpl : public StoreImpl {
+class IsolatedStoreImpl : public Store {
 public:
   IsolatedStoreImpl();
   explicit IsolatedStoreImpl(SymbolTable& symbol_table);

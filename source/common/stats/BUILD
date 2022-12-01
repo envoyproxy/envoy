@@ -63,7 +63,6 @@ envoy_cc_library(
         ":null_gauge_lib",
         ":null_text_readout_lib",
         ":stats_lib",
-        ":store_impl_lib",
         ":tag_utility_lib",
         "//envoy/stats:stats_macros",
         "//source/common/stats:allocator_lib",
@@ -128,15 +127,6 @@ envoy_cc_library(
     hdrs = ["recent_lookups.h"],
     deps = [
         "//source/common/common:assert_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "store_impl_lib",
-    hdrs = ["store_impl.h"],
-    deps = [
-        ":symbol_table_lib",
-        "//envoy/stats:stats_interface",
     ],
 )
 
