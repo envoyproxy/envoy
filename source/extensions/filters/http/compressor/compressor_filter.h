@@ -8,6 +8,8 @@
 #include "source/common/runtime/runtime_protos.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
+#include "absl/types/optional.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -163,14 +165,14 @@ using CompressorFilterConfigSharedPtr = std::shared_ptr<CompressorFilterConfig>;
 class CompressorPerRouteFilterConfig : public Router::RouteSpecificFilterConfig {
 public:
   CompressorPerRouteFilterConfig(
-      const envoy::extensions::filters::http::compressor::v3::CompressorPerRoute& config)
-      : config_(config) {}
-  const envoy::extensions::filters::http::compressor::v3::CompressorPerRoute& config() const {
-    return config_;
-  }
+      const envoy::extensions::filters::http::compressor::v3::CompressorPerRoute& config);
+
+  // If a value is present, that value overrides
+  // ResponseDirectionConfig::compressionEnabled.
+  absl::optional<bool> responseCompressionEnabled() const { return response_compression_enabled_; }
 
 private:
-  const envoy::extensions::filters::http::compressor::v3::CompressorPerRoute config_;
+  absl::optional<bool> response_compression_enabled_;
 };
 
 /**

@@ -250,10 +250,11 @@ TEST_P(CompresorFilterEnablementTest, DecodeHeadersWithRuntimeDisabled) {
     per_route_proto.set_disabled(true);
     break;
   }
-  CompressorPerRouteFilterConfig per_route_config(per_route_proto);
+  std::unique_ptr<CompressorPerRouteFilterConfig> per_route_config;
   if (use_per_route_proto) {
+    per_route_config = std::make_unique<CompressorPerRouteFilterConfig>(per_route_proto);
     ON_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
-        .WillByDefault(Return(&per_route_config));
+        .WillByDefault(Return(per_route_config.get()));
   }
 
   doRequestNoCompression({{":method", "get"}, {"accept-encoding", "deflate, test"}});

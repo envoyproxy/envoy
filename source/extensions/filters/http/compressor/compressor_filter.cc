@@ -166,6 +166,24 @@ Envoy::Compression::Compressor::CompressorPtr CompressorFilterConfig::makeCompre
 CompressorFilter::CompressorFilter(const CompressorFilterConfigSharedPtr config)
     : config_(std::move(config)) {}
 
+CompressorPerRouteFilterConfig::CompressorPerRouteFilterConfig(
+    const envoy::extensions::filters::http::compressor::v3::CompressorPerRoute& config) {
+  switch (config.override_case()) {
+  case CompressorPerRoute::kDisabled:
+    response_compression_enabled_ = false;
+    break;
+  case CompressorPerRoute::kOverrides:
+    if (config.overrides().has_response_direction_config()) {
+      response_compression_enabled_ = true;
+    }
+    break;
+  case CompressorPerRoute::OVERRIDE_NOT_SET:
+    // This can't happen, because the `override` oneof has a `validate.required` PGV constraint,
+    // which is checked in `CommonFactoryBase::createRouteSpecificFilterConfig`.
+    PANIC_DUE_TO_CORRUPT_ENUM;
+  }
+}
+
 Http::FilterHeadersStatus CompressorFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                           bool end_stream) {
   const Http::HeaderEntry* accept_encoding = headers.getInline(accept_encoding_handle.handle());
@@ -612,22 +630,9 @@ bool CompressorFilter::compressionEnabled(
   const CompressorPerRouteFilterConfig* per_route_config =
       Http::Utility::resolveMostSpecificPerFilterConfig<CompressorPerRouteFilterConfig>(
           decoder_callbacks_);
-  if (per_route_config) {
-    switch (per_route_config->config().override_case()) {
-    case CompressorPerRoute::kDisabled:
-      return false;
-    case CompressorPerRoute::kOverrides:
-      if (per_route_config->config().overrides().has_response_direction_config()) {
-        return true;
-      }
-      break;
-    case CompressorPerRoute::OVERRIDE_NOT_SET:
-      // This can't happen, because the `override` oneof has a `validate.required` PGV constraint,
-      // which is checked in `CommonFactoryBase::createRouteSpecificFilterConfig`.
-      PANIC_DUE_TO_CORRUPT_ENUM;
-    }
-  }
-  return config.compressionEnabled();
+  return per_route_config && per_route_config->responseCompressionEnabled().has_value()
+             ? *per_route_config->responseCompressionEnabled()
+             : config.compressionEnabled();
 }
 
 } // namespace Compressor
