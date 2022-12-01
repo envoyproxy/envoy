@@ -4,7 +4,7 @@
 #include "envoy/server/instance.h"
 
 #include "source/common/event/real_time_system.h"
-#include "source/exe/main_common.h"
+#include "source/exe/main_common_base.h"
 #include "source/exe/platform_impl.h"
 #include "source/server/listener_hooks.h"
 #include "source/server/options_impl.h"
@@ -23,7 +23,10 @@ namespace Envoy {
 class EngineCommon {
 public:
   EngineCommon(int argc, const char* const* argv);
-  bool run() { return base_.run(); }
+  bool run() {
+    base_.runServer();
+    return true;
+  }
 
   /**
    * @return a pointer to the server instance, or nullptr if initialized into
@@ -38,7 +41,7 @@ private:
   Envoy::SignalAction handle_sigs_;
   Envoy::TerminateHandler log_on_terminate_;
 #endif
-
+  PlatformImpl platform_impl_;
   Thread::MainThread register_main_thread_;
   Envoy::OptionsImpl options_;
   Event::RealTimeSystem real_time_system_; // NO_CHECK_FORMAT(real_time)

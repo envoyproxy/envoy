@@ -62,10 +62,35 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "main_common_base_lib",
+    srcs = ["main_common_base.cc"],
+    hdrs = ["main_common_base.h"],
+    deps = [
+        ":envoy_common_lib",
+        ":platform_impl_lib",
+        ":process_wide_lib",
+        "//source/common/thread_local:thread_local_lib",
+        "//source/common/api:os_sys_calls_lib",
+        "//source/common/common:compiler_requirements_lib",
+        "//source/common/common:perf_annotation_lib",
+        "//source/common/grpc:google_grpc_context_lib",
+        "//source/server:hot_restart_lib",
+        "//source/server:hot_restart_nop_lib",
+    ] + select({
+        "//bazel:disable_signal_trace": [],
+        "//conditions:default": [
+            "//source/common/signal:sigaction_lib",
+            ":terminate_handler_lib",
+        ],
+    }),
+)
+
+envoy_cc_library(
     name = "main_common_lib",
     srcs = ["main_common.cc"],
     hdrs = ["main_common.h"],
     deps = [
+        ":main_common_base_lib",
         ":envoy_common_lib",
         ":platform_impl_lib",
         ":process_wide_lib",
@@ -94,6 +119,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "envoy_main_common_base_lib",
+    deps = [
+        ":main_common_base_lib",
+        "//source/common/version:version_linkstamp",
+    ],
+)
+
+envoy_cc_library(
     name = "envoy_common_with_core_extensions_lib",
     deps = [
                "//source/common/event:libevent_lib",
@@ -117,6 +150,8 @@ envoy_cc_library(
     srcs = ["main_common.cc"],
     hdrs = ["main_common.h"],
     deps = [
+        "//source/server/config_validation:server_lib",
+        ":main_common_base_lib",
         ":envoy_common_with_core_extensions_lib",
         ":platform_impl_lib",
         ":process_wide_lib",
@@ -127,7 +162,6 @@ envoy_cc_library(
         "//source/common/grpc:google_grpc_context_lib",
         "//source/server:hot_restart_lib",
         "//source/server:hot_restart_nop_lib",
-        "//source/server/config_validation:server_lib",
     ] + select({
         "//bazel:disable_signal_trace": [],
         "//conditions:default": [

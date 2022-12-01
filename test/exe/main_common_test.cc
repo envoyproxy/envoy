@@ -104,25 +104,22 @@ TEST_P(MainCommonTest, ConstructDestructHotRestartDisabledNoInit) {
   EXPECT_TRUE(main_common.run());
 }
 
-// This test verifies that validation can run from MainCommonBase, from a thread
-// other than the test thread. This is a desirable calling sequence in some
-// contexts. To make this work we must declare MainThread in MainCommonBase, in
-// addition to declaring it in MainCommon. There is no harm in double-declaring.
-TEST_P(MainCommonTest, ValidateUsingMainCommonBaseOutsideTestThread) {
+TEST_P(MainCommonTest, NoValidateFromMainCommonThread) {
   EXPECT_FALSE(Thread::MainThread::isMainThreadActive());
   const char* argv[] = {"envoy-static",       "--mode", "validate", "--config-path",
                         config_file_.c_str(), nullptr};
-  Envoy::OptionsImpl options(ARRAY_SIZE(argv) - 1, argv, &MainCommon::hotRestartVersion,
+  Envoy::OptionsImpl options(ARRAY_SIZE(argv) - 1, argv, &MainCommonBase::hotRestartVersion,
                              spdlog::level::info);
   std::unique_ptr<Thread::Thread> thread =
       Thread::threadFactoryForTest().createThread([&options]() {
+        PlatformImpl platform_impl;
         Event::TestRealTimeSystem real_time_system;
         DefaultListenerHooks default_listener_hooks;
         ProdComponentFactory prod_component_factory;
         MainCommonBase base(options, real_time_system, default_listener_hooks,
-                            prod_component_factory, std::make_unique<PlatformImpl>(),
+                            prod_component_factory, platform_impl,
                             std::make_unique<Random::RandomGeneratorImpl>(), nullptr);
-        EXPECT_TRUE(base.run());
+        EXPECT_DEATH(base.runServer(), "");
       });
   thread->join();
   EXPECT_FALSE(Thread::MainThread::isMainThreadActive());
@@ -174,14 +171,13 @@ TEST_P(MainCommonTest, EnableCoreDumpFails) {
 
   const auto args = std::vector<std::string>(
       {"envoy-static", "--use-dynamic-base-id", "-c", config_file_, "--enable-core-dump"});
-  OptionsImpl options(args, &MainCommon::hotRestartVersion, spdlog::level::info);
+  OptionsImpl options(args, &MainCommonBase::hotRestartVersion, spdlog::level::info);
 
   auto test = [&]() {
-    auto* platform_impl = new NiceMock<MockPlatformImpl>();
-    EXPECT_CALL(*platform_impl, enableCoreDump()).WillOnce(Return(false));
+    NiceMock<MockPlatformImpl> platform_impl;
+    EXPECT_CALL(platform_impl, enableCoreDump()).WillOnce(Return(false));
     MainCommonBase first(options, real_time_system, default_listener_hooks, prod_component_factory,
-                         std::unique_ptr<PlatformImpl>{platform_impl},
-                         std::make_unique<Random::RandomGeneratorImpl>(), nullptr);
+                         platform_impl, std::make_unique<Random::RandomGeneratorImpl>(), nullptr);
   };
 
   EXPECT_NO_THROW(test());
@@ -190,6 +186,7 @@ TEST_P(MainCommonTest, EnableCoreDumpFails) {
 
 // Test that an in-use base id triggers a retry and that we eventually give up.
 TEST_P(MainCommonTest, RetryDynamicBaseIdFails) {
+  PlatformImpl platform_impl;
 #ifdef ENVOY_HOT_RESTART
   Event::TestRealTimeSystem real_time_system;
   DefaultListenerHooks default_listener_hooks;
@@ -199,9 +196,9 @@ TEST_P(MainCommonTest, RetryDynamicBaseIdFails) {
 
   const auto first_args = std::vector<std::string>({"envoy-static", "--use-dynamic-base-id", "-c",
                                                     config_file_, "--base-id-path", base_id_path});
-  OptionsImpl first_options(first_args, &MainCommon::hotRestartVersion, spdlog::level::info);
+  OptionsImpl first_options(first_args, &MainCommonBase::hotRestartVersion, spdlog::level::info);
   MainCommonBase first(first_options, real_time_system, default_listener_hooks,
-                       prod_component_factory, std::make_unique<PlatformImpl>(),
+                       prod_component_factory, platform_impl,
                        std::make_unique<Random::RandomGeneratorImpl>(), nullptr);
 
   const std::string base_id_str = TestEnvironment::readFileToStringForTest(base_id_path);
@@ -213,10 +210,10 @@ TEST_P(MainCommonTest, RetryDynamicBaseIdFails) {
 
   const auto second_args =
       std::vector<std::string>({"envoy-static", "--use-dynamic-base-id", "-c", config_file_});
-  OptionsImpl second_options(second_args, &MainCommon::hotRestartVersion, spdlog::level::info);
+  OptionsImpl second_options(second_args, &MainCommonBase::hotRestartVersion, spdlog::level::info);
 
   EXPECT_THROW_WITH_MESSAGE(MainCommonBase(second_options, real_time_system, default_listener_hooks,
-                                           prod_component_factory, std::make_unique<PlatformImpl>(),
+                                           prod_component_factory, platform_impl,
                                            std::unique_ptr<Random::RandomGenerator>{mock_rng},
                                            nullptr),
                             EnvoyException, "unable to select a dynamic base id");
