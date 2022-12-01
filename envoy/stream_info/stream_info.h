@@ -462,7 +462,7 @@ public:
   virtual absl::optional<Http::Protocol> upstreamProtocol() const PURE;
 };
 
-struct DeferredLoggingInfo {
+struct DeferredLoggingHeadersAndTrailers {
   Http::RequestHeaderMapSharedPtr request_header_map = nullptr;
   Http::ResponseHeaderMapSharedPtr response_header_map = nullptr;
   Http::ResponseTrailerMapSharedPtr response_trailer_map = nullptr;
@@ -775,14 +775,16 @@ public:
   virtual void dumpState(std::ostream& os, int indent_level = 0) const PURE;
 
   /**
-   * @param deferredLoggingInfo request/response info for deferred logging.
+   * @param DeferredLoggingHeadersAndTrailers request/response info for deferred logging.
    */
-  virtual void setDeferredLoggingInfo(const DeferredLoggingInfo deferred_logging_info) PURE;
+  virtual void setDeferredLoggingHeadersAndTrailers(
+      const DeferredLoggingHeadersAndTrailers deferred_logging_headers_and_trailers) PURE;
 
   /**
    * @return request/response info for deferred logging.
    */
-  virtual const absl::optional<DeferredLoggingInfo>& deferredLoggingInfo() const PURE;
+  virtual const absl::optional<DeferredLoggingHeadersAndTrailers>&
+  deferredLoggingHeadersAndTrailers() const PURE;
 };
 
 // An enum representation of the Proxy-Status error space.

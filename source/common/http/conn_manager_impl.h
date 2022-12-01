@@ -207,8 +207,8 @@ private:
     std::list<AccessLog::InstanceSharedPtr> accessLogHandlers() override {
       return filter_manager_.accessLogHandlers();
     }
-    StreamInfo::DeferredLoggingInfo deferredLoggingInfo() {
-      StreamInfo::DeferredLoggingInfo info;
+    StreamInfo::DeferredLoggingHeadersAndTrailers DeferredLoggingHeadersAndTrailers() {
+      StreamInfo::DeferredLoggingHeadersAndTrailers info;
       if (requestHeaders()) {
         info.request_header_map = request_headers_;
       }
