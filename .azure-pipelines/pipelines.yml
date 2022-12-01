@@ -35,7 +35,7 @@ stages:
   #
   # To use a variable as a condition for a `stage` you can specify it as follows:
   #
-  # condition: and(not(canceled()), succeeded(), ne(dependencies.env.repo.outputs['changed.mobileOnly'], 'true'))
+  # condition: and(not(canceled()), succeeded(), ne(dependencies.env.outputs['repo.changed.mobileOnly'], 'true'))
   #
   # To use a variable as a condition for a `job` you can specify it as follows:
   #
