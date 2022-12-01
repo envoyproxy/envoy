@@ -6,40 +6,40 @@
 
 namespace Envoy {
 
-// Test happy path for open, pwrite, fstat, close, stat and unlink.
+// Test happy path for `open`, `pwrite`, `fstat`, `close`, `stat` and `unlink`.
 TEST(OsSyscallsTest, OpenPwriteFstatCloseStatUnlink) {
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
   std::string path{TestEnvironment::temporaryPath("envoy_test")};
   TestEnvironment::createPath(path);
   std::string file_path = path + "/file";
   absl::string_view file_contents = "12345";
-  // Test open
+  // Test `open`
   Api::SysCallIntResult open_result = os_syscalls.open(file_path.c_str(), O_CREAT | O_RDWR);
   EXPECT_NE(open_result.return_value_, -1);
   EXPECT_EQ(open_result.errno_, 0);
   os_fd_t fd = open_result.return_value_;
-  // Test write
+  // Test `write`
   Api::SysCallSizeResult write_result =
       os_syscalls.pwrite(fd, file_contents.begin(), file_contents.size(), 0);
   EXPECT_EQ(write_result.return_value_, file_contents.size());
   EXPECT_EQ(write_result.errno_, 0);
-  // Test fstat
+  // Test `fstat`
   struct stat fstat_value;
   Api::SysCallIntResult fstat_result = os_syscalls.fstat(fd, &fstat_value);
   EXPECT_EQ(fstat_result.return_value_, 0);
   EXPECT_EQ(fstat_result.errno_, 0);
   EXPECT_EQ(fstat_value.st_size, file_contents.size());
-  // Test close
+  // Test `close`
   Api::SysCallIntResult close_result = os_syscalls.close(fd);
   EXPECT_EQ(close_result.return_value_, 0);
   EXPECT_EQ(close_result.errno_, 0);
-  // Test stat
+  // Test `stat`
   struct stat stat_value;
   Api::SysCallIntResult stat_result = os_syscalls.stat(file_path.c_str(), &stat_value);
   EXPECT_EQ(stat_result.return_value_, 0);
   EXPECT_EQ(stat_result.errno_, 0);
   EXPECT_EQ(stat_value.st_size, file_contents.size());
-  // Test unlink
+  // Test `unlink`
   Api::SysCallIntResult unlink_result = os_syscalls.unlink(file_path.c_str());
   EXPECT_EQ(unlink_result.return_value_, 0);
   EXPECT_EQ(unlink_result.errno_, 0);
