@@ -184,7 +184,7 @@ bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster) {
   }
 
   generic_conn_pool_ = factory->createGenericConnPool(
-      cluster, TcpProxy::TunnelingConfigHelperOptConstRef(), this, *upstream_callbacks_);
+      cluster, TcpProxy::TunnelingConfigHelperOptConstRef(), this, *upstream_callbacks_, getStreamInfo());
   if (generic_conn_pool_) {
     connecting_ = true;
     connect_attempts_++;
