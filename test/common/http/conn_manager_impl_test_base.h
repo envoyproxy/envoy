@@ -153,6 +153,7 @@ public:
                                          StreamInfo::StreamInfo& stream_info) override {
     return header_validator_factory_.create(protocol, stream_info);
   }
+  bool appendXForwardedPort() const override { return false; }
 
   // Simple helper to wrapper filter to the factory function.
   FilterFactoryCb createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr filter) {

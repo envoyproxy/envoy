@@ -49,6 +49,11 @@ protected:
   static constexpr absl::string_view allow_chunked_length_config = R"EOF(
     http1_protocol_options: {allow_chunked_length: true}
 )EOF";
+
+  static constexpr absl::string_view redirect_encoded_slash_config = R"EOF(
+    uri_path_normalization_options:
+      path_with_escaped_slashes_action: UNESCAPE_AND_REDIRECT
+    )EOF";
 };
 
 } // namespace EnvoyDefault
