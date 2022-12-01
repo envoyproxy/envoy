@@ -52,6 +52,7 @@ public:
   const Server::Options& options() override { return server_context_.options(); }
   AccessLog::AccessLogManager& accessLogManager() override {
     return server_context_.accessLogManager();
+  }
   CertificateProvider::CertificateProviderManager& certificateProviderManager() override {
     return cluster_manager_.clusterManagerFactory().certificateProviderManager();
   }
