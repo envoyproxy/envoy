@@ -20,8 +20,10 @@ elif [ -z "$CIRCLE_PULL_REQUEST" ] && [ "$CIRCLE_BRANCH" == "main" ]
 then
   PUBLISH_DIR="$CHECKOUT_DIR"/docs/envoy-mobile/latest
 else
-  echo "Ignoring docs push"
-  exit 0
+  # TODO(jpsim): Revert
+  PUBLISH_DIR="$CHECKOUT_DIR"/docs/envoy-mobile/latest
+  # echo "Ignoring docs push"
+  # exit 0
 fi
 
 echo 'cloning'
