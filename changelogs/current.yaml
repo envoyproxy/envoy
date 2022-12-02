@@ -210,7 +210,7 @@ new_features:
     added :ref:`append_x_forwarded_port <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.append_x_forwarded_port>` to append the ``x-forwarded-port`` header to HTTP upstream requests.
 - area: tcp
   change: |
-    added :ref:`tcp_pool_idle_timeout<envoy_v3_api_field_config.cluster.v3.Cluster.tcp_pool_idle_timeout>` to support per client idle timeout for tcp connection pool.
+    added :ref:`tcp_pool_idle_timeout<envoy_v3_api_field_config.cluster.v3.Cluster.tcp_pool_idle_timeout>` to support per client idle timeout for tcp connection pool. The timeout is guarded by ``envoy.reloadable_features.envoy_reloadable_features_tcp_pool_idle_timeout`` and timeout defaults to one hour if runtime flag is enabled.
 - area: ext_authz
   change: |
     added support to allowlist headers included in the check request to gRPC authorization server (previously only available for HTTP authorization server).
