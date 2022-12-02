@@ -512,7 +512,6 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
           buildRetryPolicy(vhost.retryPolicy(), route.route(), validator, factory_context)),
       internal_redirect_policy_(
           buildInternalRedirectPolicy(route.route(), validator, route.name())),
-      rate_limit_policy_(route.route().rate_limits(), validator),
       priority_(ConfigUtility::parsePriority(route.route().priority())),
       config_headers_(Http::HeaderUtility::buildHeaderDataVector(route.match().headers())),
       request_headers_parser_(HeaderParser::configure(route.request_headers_to_add(),
@@ -600,6 +599,11 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
   if (route.match().has_tls_context()) {
     tls_context_match_criteria_ =
         std::make_unique<TlsContextMatchCriteriaImpl>(route.match().tls_context());
+  }
+
+  if (!route.route().rate_limits().empty()) {
+    rate_limit_policy_ =
+        std::make_unique<RateLimitPolicyImpl>(route.route().rate_limits(), validator);
   }
 
   // Returns true if include_vh_rate_limits is explicitly set to true otherwise it defaults to false
@@ -1666,7 +1670,6 @@ VirtualHostImpl::VirtualHostImpl(
       vcluster_scope_(Stats::Utility::scopeFromStatNames(
           scope, {stat_name_storage_.statName(),
                   factory_context.routerContext().virtualClusterStatNames().vcluster_})),
-      rate_limit_policy_(virtual_host.rate_limits(), validator),
       global_route_config_(global_route_config),
       request_headers_parser_(HeaderParser::configure(virtual_host.request_headers_to_add(),
                                                       virtual_host.request_headers_to_remove())),
@@ -1699,6 +1702,11 @@ VirtualHostImpl::VirtualHostImpl(
   if (virtual_host.has_hedge_policy()) {
     hedge_policy_ = std::make_unique<envoy::config::route::v3::HedgePolicy>();
     hedge_policy_->CopyFrom(virtual_host.hedge_policy());
+  }
+
+  if (!virtual_host.rate_limits().empty()) {
+    rate_limit_policy_ =
+        std::make_unique<RateLimitPolicyImpl>(virtual_host.rate_limits(), validator);
   }
 
   shadow_policies_.reserve(virtual_host.request_mirror_policies().size());
