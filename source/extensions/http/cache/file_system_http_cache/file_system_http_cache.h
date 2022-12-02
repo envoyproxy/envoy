@@ -149,6 +149,11 @@ public:
     return async_file_manager_;
   }
 
+  // UpdateHeaders copies an existing cache entry to a new file. This value is
+  // the size of a copy-chunk. It's public for unit tests only, as the chunk size
+  // is totally irrelevant to the outward-facing API.
+  static const size_t max_update_headers_copy_chunk_size_;
+
 private:
   /**
    * Writes a vary node to disk for the given key. A vary node in the cache consists of

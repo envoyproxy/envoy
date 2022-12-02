@@ -46,6 +46,16 @@ void FileInsertContext::insertTrailers(const Http::ResponseTrailerMap& trailers,
   queue_->insertTrailers(queue_, trailers, insert_complete);
 }
 
+void FileInsertContext::onDestroy() { queue_->cancelIfIncomplete(queue_); }
+
+void InsertOperationQueue::cancelIfIncomplete(std::shared_ptr<InsertOperationQueue> p) {
+  absl::MutexLock lock(&mu_);
+  if (seen_end_stream_) {
+    return;
+  }
+  cancelInsert(p, "InsertContext destroyed prematurely");
+}
+
 void InsertOperationQueue::writeChunk(std::shared_ptr<InsertOperationQueue> p,
                                       QueuedFileChunk&& chunk) {
   mu_.AssertHeld();
@@ -109,6 +119,9 @@ void InsertOperationQueue::push(std::shared_ptr<InsertOperationQueue> p, QueuedF
     // Already cancelled, do nothing, return failure.
     chunk.done_callback(false);
     return;
+  }
+  if (chunk.end_stream) {
+    seen_end_stream_ = true;
   }
   if (!cancel_action_in_flight_) {
     writeChunk(p, std::move(chunk));
@@ -262,6 +275,7 @@ void InsertOperationQueue::commit(std::shared_ptr<InsertOperationQueue> p,
 }
 
 InsertOperationQueue::~InsertOperationQueue() {
+  std::cerr << "InsertOperationQueue destroyed" << std::endl;
   absl::MutexLock lock(&mu_);
   cancelInsert(nullptr, "destroyed before completion");
 }

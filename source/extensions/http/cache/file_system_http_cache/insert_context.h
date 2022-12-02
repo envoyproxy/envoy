@@ -105,6 +105,13 @@ public:
   void insertTrailers(std::shared_ptr<InsertOperationQueue> p,
                       const Http::ResponseTrailerMap& response_trailers,
                       InsertCallback insert_complete);
+
+  /**
+   * If seen_end_stream_ is not true (i.e. InsertContext has not yet delivered the
+   * entire response), cancel insertion. Called by InsertContext onDestroy.
+   */
+  void cancelIfIncomplete(std::shared_ptr<InsertOperationQueue> p);
+
   /**
    * Takes the mutex and calls cancelInsert.
    */
@@ -170,6 +177,7 @@ private:
   std::function<void(bool)> callback_in_flight_ ABSL_GUARDED_BY(mu_);
   CacheFileFixedBlock header_block_ ABSL_GUARDED_BY(mu_);
   CacheFileHeader header_proto_ ABSL_GUARDED_BY(mu_);
+  bool seen_end_stream_ ABSL_GUARDED_BY(mu_);
   // key_ may be updated to a varyKey during insertHeaders.
   Key key_ ABSL_GUARDED_BY(mu_);
   const std::shared_ptr<FileSystemHttpCache> cache_;
@@ -205,7 +213,8 @@ public:
                   bool end_stream) override;
   void insertTrailers(const Http::ResponseTrailerMap& trailers,
                       InsertCallback insert_complete) override;
-  void onDestroy() override {} // Destruction of queue_ and cleanup_ is all the cleanup.
+  void onDestroy() override;
+  ~FileInsertContext() override { std::cerr << "XXXXX FileInsertContext destroyed" << std::endl; };
 
 private:
   std::unique_ptr<FileLookupContext> lookup_context_;

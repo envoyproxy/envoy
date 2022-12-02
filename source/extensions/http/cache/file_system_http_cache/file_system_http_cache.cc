@@ -12,6 +12,11 @@ namespace HttpFilters {
 namespace Cache {
 namespace FileSystemHttpCache {
 
+// Copying in 128K chunks is an arbitrary choice for a reasonable balance of performance and
+// memory usage. Since UpdateHeaders is unlikely to be a common operation it is most likely
+// not worthwhile to carefully tune this.
+const size_t FileSystemHttpCache::max_update_headers_copy_chunk_size_ = 128 * 1024;
+
 void FileSystemHttpCache::writeVaryNodeToDisk(const Key& key,
                                               const Http::ResponseHeaderMap& response_headers,
                                               std::shared_ptr<Cleanup> cleanup) {
@@ -123,16 +128,15 @@ public:
 
   ~HeaderUpdateContext() {
     // For chaining the close actions in a file thread, the closes must be chained sequentially.
-    if (read_handle_ && write_handle_) {
+    // write_handle_ can only be set if read_handle_ is set, so this ordering is safe.
+    if (read_handle_) {
       read_handle_
           ->close([write_handle = write_handle_](absl::Status) {
-            write_handle->close([](absl::Status) {}).IgnoreError();
+            if (write_handle) {
+              write_handle->close([](absl::Status) {}).IgnoreError();
+            }
           })
           .IgnoreError();
-    } else if (read_handle_) {
-      read_handle_->close([](absl::Status) {}).IgnoreError();
-    } else if (write_handle_) {
-      write_handle_->close([](absl::Status) {}).IgnoreError();
     }
   }
 
@@ -220,11 +224,7 @@ private:
       linkNewFile(ctx);
       return;
     }
-    // Copying in 128K chunks is an arbitrary choice for a reasonable balance of performance and
-    // memory usage. Since UpdateHeaders is unlikely to be a common operation it is most likely
-    // not worthwhile to carefully tune this.
-    static const size_t max_copy_chunk = 128 * 1024;
-    sz = std::min(sz, max_copy_chunk);
+    sz = std::min(sz, FileSystemHttpCache::max_update_headers_copy_chunk_size_);
     auto queued = read_handle_->read(
         offset + header_size_difference_, sz,
         [ctx, offset, sz, this](absl::StatusOr<Buffer::InstancePtr> read_result) {
