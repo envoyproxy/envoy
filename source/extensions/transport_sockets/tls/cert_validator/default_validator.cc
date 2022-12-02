@@ -212,8 +212,8 @@ int DefaultCertValidator::doSynchronousVerifyCertChain(
     }
   }
   Envoy::Ssl::ClientValidationStatus detailed_status;
-  bool success = verifyCertAndUpdateStatus(&detailed_status, ssl_extended_info, &leaf_cert,
-                                           transport_socket_options, nullptr, nullptr);
+  bool success = verifyCertAndUpdateStatus(&detailed_status, &leaf_cert, transport_socket_options,
+                                           nullptr, nullptr);
   if (ssl_extended_info) {
     ssl_extended_info->setCertificateValidationStatus(detailed_status);
   }
@@ -225,8 +225,7 @@ int DefaultCertValidator::doSynchronousVerifyCertChain(
 }
 
 bool DefaultCertValidator::verifyCertAndUpdateStatus(
-    Envoy::Ssl::ClientValidationStatus* detailed_status,
-    Ssl::SslExtendedSocketInfo* ssl_extended_info, X509* leaf_cert,
+    Envoy::Ssl::ClientValidationStatus* detailed_status, X509* leaf_cert,
     const Network::TransportSocketOptions* transport_socket_options, std::string* error_details,
     uint8_t* out_alert) {
   Envoy::Ssl::ClientValidationStatus validated =
@@ -237,14 +236,6 @@ bool DefaultCertValidator::verifyCertAndUpdateStatus(
                         subject_alt_name_matchers_, error_details, out_alert);
 
   *detailed_status = validated;
-  if (ssl_extended_info) {
-    if (ssl_extended_info->certificateValidationStatus() ==
-        Envoy::Ssl::ClientValidationStatus::NotValidated) {
-      ssl_extended_info->setCertificateValidationStatus(validated);
-    } else if (validated != Envoy::Ssl::ClientValidationStatus::NotValidated) {
-      ssl_extended_info->setCertificateValidationStatus(validated);
-    }
-  }
 
   // If `trusted_ca` exists, it is already verified in the code above. Thus, we just need to make
   // sure the verification for other validation context configurations doesn't fail (i.e. either
@@ -366,9 +357,8 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
   std::string error_details;
   uint8_t tls_alert = SSL_AD_CERTIFICATE_UNKNOWN;
   Envoy::Ssl::ClientValidationStatus detailed_status;
-  const bool succeeded =
-      verifyCertAndUpdateStatus(&detailed_status, nullptr, leaf_cert,
-                                transport_socket_options.get(), &error_details, &tls_alert);
+  const bool succeeded = verifyCertAndUpdateStatus(
+      &detailed_status, leaf_cert, transport_socket_options.get(), &error_details, &tls_alert);
   return succeeded ? ValidationResults{ValidationResults::ValidationStatus::Successful,
                                        Envoy::Ssl::ClientValidationStatus::Validated, absl::nullopt,
                                        absl::nullopt}

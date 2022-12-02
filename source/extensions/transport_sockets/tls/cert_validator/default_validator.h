@@ -108,7 +108,7 @@ public:
 
 private:
   bool verifyCertAndUpdateStatus(Envoy::Ssl::ClientValidationStatus* detailed_status,
-                                 Ssl::SslExtendedSocketInfo* ssl_extended_info, X509* leaf_cert,
+                                 X509* leaf_cert,
                                  const Network::TransportSocketOptions* transport_socket_options,
                                  std::string* error_details, uint8_t* out_alert);
 
