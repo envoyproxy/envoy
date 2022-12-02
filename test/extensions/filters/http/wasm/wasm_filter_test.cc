@@ -151,7 +151,7 @@ TEST_P(WasmHttpFilterTest, HeadersOnlyRequestHeadersOnlyWithEnvVars) {
   EXPECT_EQ(filter().closeStream(static_cast<proxy_wasm::WasmStreamType>(9999)),
             proxy_wasm::WasmResult::BadArgument);
   Http::TestResponseHeaderMapImpl response_headers;
-  EXPECT_EQ(filter().encode1xxHeaders(response_headers), Http::FilterHeadersStatus::Continue);
+  EXPECT_EQ(filter().encode1xxHeaders(response_headers), Http::Filter1xxHeadersStatus::Continue);
   filter().onDestroy();
 }
 

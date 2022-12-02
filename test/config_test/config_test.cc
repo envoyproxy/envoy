@@ -163,10 +163,12 @@ public:
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   OptionsImpl options_;
   std::unique_ptr<Upstream::ProdClusterManagerFactory> cluster_manager_factory_;
-  NiceMock<Server::MockListenerComponentFactory> component_factory_;
+  std::unique_ptr<NiceMock<Server::MockListenerComponentFactory>> component_factory_ptr_{
+      std::make_unique<NiceMock<Server::MockListenerComponentFactory>>()};
+  NiceMock<Server::MockListenerComponentFactory>& component_factory_{*component_factory_ptr_};
   NiceMock<Server::MockWorkerFactory> worker_factory_;
-  Server::ListenerManagerImpl listener_manager_{server_, component_factory_, worker_factory_, false,
-                                                server_.quic_stat_names_};
+  Server::ListenerManagerImpl listener_manager_{server_, std::move(component_factory_ptr_),
+                                                worker_factory_, false, server_.quic_stat_names_};
   Random::RandomGeneratorImpl random_;
   std::shared_ptr<Runtime::MockSnapshot> snapshot_{
       std::make_shared<NiceMock<Runtime::MockSnapshot>>()};

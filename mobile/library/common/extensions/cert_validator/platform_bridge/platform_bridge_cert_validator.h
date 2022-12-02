@@ -64,45 +64,44 @@ public:
   }
 
 private:
-  class PendingValidation {
-  public:
-    PendingValidation(PlatformBridgeCertValidator& parent, std::vector<envoy_data> certs,
-                      absl::string_view hostname, std::vector<std::string> subject_alt_names,
-                      Ssl::ValidateResultCallbackPtr result_callback)
-        : parent_(parent), certs_(std::move(certs)), hostname_(hostname),
-          subject_alt_names_(std::move(subject_alt_names)),
-          result_callback_(std::move(result_callback)) {}
-
-    // Ensure that this class is never moved or copied to guarantee pointer stability.
-    PendingValidation(const PendingValidation&) = delete;
-    PendingValidation(PendingValidation&&) = delete;
-
-    // Calls into platform APIs in a stand-alone thread to verify the given certs.
-    // Once the validation is done, the result will be posted back to the current
-    // thread to trigger callback and update verify stats.
-    void verifyCertsByPlatform();
-
-    void postVerifyResultAndCleanUp(bool success, absl::string_view error_details,
-                                    uint8_t tls_alert, OptRef<Stats::Counter> error_counter);
-
-  private:
-    PlatformBridgeCertValidator& parent_;
-    const std::vector<envoy_data> certs_;
-    const std::string hostname_;
-    const std::vector<std::string> subject_alt_names_;
-    Ssl::ValidateResultCallbackPtr result_callback_;
+  enum class ValidationFailureType {
+    SUCCESS,
+    FAIL_VERIFY_ERROR,
+    FAIL_VERIFY_SAN,
   };
 
-  void verifyCertChainByPlatform(const std::vector<envoy_data>& cert_chain,
-                                 const std::string& hostname,
-                                 const std::vector<std::string>& subject_alt_names,
-                                 PendingValidation& pending_validation);
+  // Calls into platform APIs in a stand-alone thread to verify the given certs.
+  // Once the validation is done, the result will be posted back to the current
+  // thread to trigger callback and update verify stats.
+  // Must be called on the validation thread.
+  static void verifyCertChainByPlatform(const envoy_cert_validator* platform_validator,
+                                        Event::Dispatcher* dispatcher,
+                                        std::vector<envoy_data> cert_chain, std::string hostname,
+                                        std::vector<std::string> subject_alt_names,
+                                        PlatformBridgeCertValidator* parent);
+
+  // Must be called on the validation thread.
+  static void postVerifyResultAndCleanUp(bool success, std::string hostname,
+                                         absl::string_view error_details, uint8_t tls_alert,
+                                         ValidationFailureType failure_type,
+                                         const envoy_cert_validator* platform_validator,
+                                         Event::Dispatcher* dispatcher,
+                                         PlatformBridgeCertValidator* parent);
+
+  // Called when a pending verification completes. Must be invoked on the main thread.
+  void onVerificationComplete(std::thread::id thread_id, std::string hostname, bool success,
+                              std::string error_details, uint8_t tls_alert,
+                              ValidationFailureType failure_type);
+
+  struct ValidationJob {
+    Ssl::ValidateResultCallbackPtr result_callback_;
+    std::thread validation_thread_;
+  };
 
   const bool allow_untrusted_certificate_;
   const envoy_cert_validator* platform_validator_;
   SslStats& stats_;
-  absl::flat_hash_map<std::thread::id, std::thread> validation_threads_;
-  absl::flat_hash_set<std::unique_ptr<PendingValidation>> validations_;
+  absl::flat_hash_map<std::thread::id, ValidationJob> validation_jobs_;
   std::shared_ptr<size_t> alive_indicator_{new size_t(1)};
 };
 

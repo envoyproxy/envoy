@@ -9,8 +9,8 @@
 #include "envoy/network/filter.h"
 #include "envoy/network/socket.h"
 #include "envoy/server/api_listener.h"
-#include "envoy/server/drain_manager.h"
 #include "envoy/server/filter_config.h"
+#include "envoy/server/instance.h"
 #include "envoy/server/listener_manager.h"
 #include "envoy/stats/scope.h"
 
@@ -24,8 +24,6 @@
 
 namespace Envoy {
 namespace Server {
-
-class ListenerManagerImpl;
 
 /**
  * Base class all ApiListeners.
@@ -50,8 +48,8 @@ public:
   }
 
 protected:
-  ApiListenerImplBase(const envoy::config::listener::v3::Listener& config,
-                      ListenerManagerImpl& parent, const std::string& name);
+  ApiListenerImplBase(const envoy::config::listener::v3::Listener& config, Server::Instance& server,
+                      const std::string& name);
 
   // Synthetic class that acts as a stub Network::ReadFilterCallbacks.
   // TODO(junr03): if we are able to separate the Network Filter aspects of the
@@ -185,7 +183,6 @@ protected:
   };
 
   const envoy::config::listener::v3::Listener& config_;
-  ListenerManagerImpl& parent_;
   const std::string name_;
   Network::Address::InstanceConstSharedPtr address_;
   Stats::ScopeSharedPtr global_scope_;
@@ -200,7 +197,7 @@ protected:
  */
 class HttpApiListener : public ApiListenerImplBase {
 public:
-  HttpApiListener(const envoy::config::listener::v3::Listener& config, ListenerManagerImpl& parent,
+  HttpApiListener(const envoy::config::listener::v3::Listener& config, Server::Instance& server,
                   const std::string& name);
 
   // ApiListener
