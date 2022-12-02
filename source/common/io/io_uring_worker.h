@@ -234,7 +234,7 @@ public:
 
     write_req_ = nullptr;
     if (iovecs_ != nullptr) {
-      delete iovecs_;
+      delete[] iovecs_;
       iovecs_ = nullptr;
     }
 
