@@ -19,7 +19,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Local Certificate Provider]
 
 // [#extension: envoy.certificate_providers.local_certificate]
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message LocalCertificate {
   enum Pkey {
     UNSPECIFIED = 0;

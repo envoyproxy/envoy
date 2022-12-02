@@ -126,30 +126,30 @@ void Provider::signCertificate(const std::string sni,
   ca_key.reset(PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));
 
   // create a new CSR
-  X509_REQ* req = X509_REQ_new();
-  X509_REQ_set_version(req, 0);
-  setSubjectToCSR(metadata->connectionInfo()->subjectPeerCertificate().data(), req);
-  // creates a new, empty public-key object
-  EVP_PKEY* key = EVP_PKEY_new();
-  setPkeyToCSR(metadata, key, req);
+  bssl::UniquePtr<X509_REQ> req(X509_REQ_new());
+  X509_REQ_set_version(req.get(), 0);
+  setSubjectToCSR(metadata->connectionInfo()->subjectPeerCertificate().data(), req.get());
+  // creates a new, empty EVP_PKEY object to store public and private keys
+  bssl::UniquePtr<EVP_PKEY> key(EVP_PKEY_new());
+  setPkeyToCSR(metadata, key.get(), req.get());
   // create a new certificate,
-  X509* crt = X509_new();
-  X509_set_version(crt, X509_VERSION_3);
-  X509_set_issuer_name(crt, X509_get_subject_name(ca_cert.get()));
-  X509_set_subject_name(crt, X509_REQ_get_subject_name(req));
-  X509_set_pubkey(crt, X509_REQ_get_pubkey(req));
-  setSANs(metadata, crt);
-  setExpirationTime(metadata, crt);
-  X509_sign(crt, ca_key.get(), EVP_sha256());
+  bssl::UniquePtr<X509> crt(X509_new());
+  X509_set_version(crt.get(), X509_VERSION_3);
+  X509_set_issuer_name(crt.get(), X509_get_subject_name(ca_cert.get()));
+  X509_set_subject_name(crt.get(), X509_REQ_get_subject_name(req.get()));
+  X509_set_pubkey(crt.get(), X509_REQ_get_pubkey(req.get()));
+  setSANs(metadata, crt.get());
+  setExpirationTime(metadata, crt.get());
+  X509_sign(crt.get(), ca_key.get(), EVP_sha256());
   // convert certificate and key to string
   bssl::UniquePtr<BIO> buf(BIO_new(BIO_s_mem()));
-  PEM_write_bio_X509(buf.get(), crt);
+  PEM_write_bio_X509(buf.get(), crt.get());
   const uint8_t* output;
   size_t length;
   BIO_mem_contents(buf.get(), &output, &length);
   std::string cert_pem(reinterpret_cast<const char*>(output), length);
   buf.reset(BIO_new(BIO_s_mem()));
-  PEM_write_bio_PrivateKey(buf.get(), key, nullptr, nullptr, length, nullptr, nullptr);
+  PEM_write_bio_PrivateKey(buf.get(), key.get(), nullptr, nullptr, length, nullptr, nullptr);
   BIO_mem_contents(buf.get(), &output, &length);
   std::string key_pem(reinterpret_cast<const char*>(output), length);
 
@@ -167,7 +167,7 @@ void Provider::signCertificate(const std::string sni,
 }
 
 void Provider::setSubjectToCSR(absl::string_view subject, X509_REQ* req) {
-  X509_NAME* x509_name = X509_NAME_new();
+  bssl::UniquePtr<X509_NAME> x509_name(X509_NAME_new());
   // Parse the RFC 2253 format output of subjectPeerCertificate and set back to mimic cert.
   const std::string delim = ",";
   std::string item;
@@ -179,13 +179,13 @@ void Provider::setSubjectToCSR(absl::string_view subject, X509_REQ* req) {
     } else {
       absl::StrAppend(&item, v.substr(0, v.length()));
       std::vector<std::string> entries = absl::StrSplit(item, "=");
-      X509_NAME_add_entry_by_txt(x509_name, entries[0].c_str(), MBSTRING_ASC,
+      X509_NAME_add_entry_by_txt(x509_name.get(), entries[0].c_str(), MBSTRING_ASC,
                                  reinterpret_cast<const unsigned char*>(entries[1].c_str()), -1, -1,
                                  0);
       item.clear();
     }
   }
-  X509_REQ_set_subject_name(req, x509_name);
+  X509_REQ_set_subject_name(req, x509_name.get());
 }
 
 void Provider::setPkeyToCSR(Envoy::CertificateProvider::OnDemandUpdateMetadataPtr metadata,

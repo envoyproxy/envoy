@@ -38,6 +38,5 @@ message Bumping {
   google.protobuf.UInt32Value max_connect_attempts = 4 [(validate.rules).uint32 = {gte: 1}];
 
   // Certificate provider instance for fetching TLS certificates.
-  transport_sockets.tls.v3.CertificateProviderPluginInstance
-      tls_certificate_provider_instance = 5;
+  transport_sockets.tls.v3.CertificateProviderPluginInstance tls_certificate_provider_instance = 5;
 }
