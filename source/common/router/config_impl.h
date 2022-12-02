@@ -324,7 +324,7 @@ private:
   const bool include_attempt_count_in_response_;
   std::unique_ptr<envoy::config::route::v3::RetryPolicy> retry_policy_;
   std::unique_ptr<envoy::config::route::v3::HedgePolicy> hedge_policy_;
-  const CatchAllVirtualCluster virtual_cluster_catch_all_;
+  std::unique_ptr<const CatchAllVirtualCluster> virtual_cluster_catch_all_;
   Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher_;
 };
 

@@ -1677,9 +1677,7 @@ VirtualHostImpl::VirtualHostImpl(
       retry_shadow_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           virtual_host, per_request_buffer_limit_bytes, std::numeric_limits<uint32_t>::max())),
       include_attempt_count_in_request_(virtual_host.include_request_attempt_count()),
-      include_attempt_count_in_response_(virtual_host.include_attempt_count_in_response()),
-      virtual_cluster_catch_all_(*vcluster_scope_,
-                                 factory_context.routerContext().virtualClusterStatNames()) {
+      include_attempt_count_in_response_(virtual_host.include_attempt_count_in_response()) {
   switch (virtual_host.require_tls()) {
     PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::config::route::v3::VirtualHost::NONE:
@@ -1737,10 +1735,14 @@ VirtualHostImpl::VirtualHostImpl(
     }
   }
 
-  for (const auto& virtual_cluster : virtual_host.virtual_clusters()) {
-    virtual_clusters_.push_back(
-        VirtualClusterEntry(virtual_cluster, *vcluster_scope_,
-                            factory_context.routerContext().virtualClusterStatNames()));
+  if (!virtual_host.virtual_clusters().empty()) {
+    virtual_cluster_catch_all_ = std::make_unique<CatchAllVirtualCluster>(
+        *vcluster_scope_, factory_context.routerContext().virtualClusterStatNames());
+    for (const auto& virtual_cluster : virtual_host.virtual_clusters()) {
+      virtual_clusters_.push_back(
+          VirtualClusterEntry(virtual_cluster, *vcluster_scope_,
+                              factory_context.routerContext().virtualClusterStatNames()));
+    }
   }
 
   if (virtual_host.has_cors()) {
@@ -2008,7 +2010,7 @@ VirtualHostImpl::virtualClusterFromEntries(const Http::HeaderMap& headers) const
   }
 
   if (!virtual_clusters_.empty()) {
-    return &virtual_cluster_catch_all_;
+    return virtual_cluster_catch_all_.get();
   }
 
   return nullptr;
