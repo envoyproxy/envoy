@@ -15,7 +15,9 @@ namespace JwtAuthn {
   COUNTER(cors_preflight_bypassed)                                                                 \
   COUNTER(denied)                                                                                  \
   COUNTER(jwks_fetch_success)                                                                      \
-  COUNTER(jwks_fetch_failed)
+  COUNTER(jwks_fetch_failed)                                                                       \
+  COUNTER(jwt_cache_hit)                                                                           \
+  COUNTER(jwt_cache_miss)
 
 /**
  * Wrapper struct for jwt_authn filter stats. @see stats_macros.h

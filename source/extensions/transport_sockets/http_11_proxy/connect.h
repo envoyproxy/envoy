@@ -19,7 +19,13 @@ namespace Http11Connect {
 class UpstreamHttp11ConnectSocket : public TransportSockets::PassthroughSocket,
                                     public Logger::Loggable<Logger::Id::connection> {
 public:
-  static bool isValidConnectResponse(Buffer::Instance& buffer);
+  // Processes response_payload and returns true if it is a valid connect
+  // response with status code 200.
+  // @param response_payload the HTTP response bytes
+  // @param header_complete will be set to true if the response payload contains complete headers.
+  // @param bytes_processed will return how many bytes of response_payload were processed.
+  static bool isValidConnectResponse(absl::string_view response_payload, bool& headers_complete,
+                                     size_t& bytes_processed);
 
   UpstreamHttp11ConnectSocket(Network::TransportSocketPtr&& transport_socket,
                               Network::TransportSocketOptionsConstSharedPtr options);

@@ -64,5 +64,12 @@ void MockClusterManager::initializeThreadLocalClusters(
   }
 }
 
+envoy::config::core::v3::BindConfig& MockClusterManager::mutableBindConfig() {
+  if (!bind_config_.has_value()) {
+    bind_config_ = envoy::config::core::v3::BindConfig{};
+  }
+  return *bind_config_;
+}
+
 } // namespace Upstream
 } // namespace Envoy

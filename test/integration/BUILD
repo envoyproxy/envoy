@@ -772,6 +772,7 @@ envoy_cc_test_library(
         "//test/integration/filters:wait_for_whole_request_and_response_config_lib",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/test_common:registry_lib",
+        "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
@@ -790,6 +791,7 @@ envoy_cc_test_library(
         ":http_integration_lib",
         "//test/common/upstream:utility_lib",
         "//test/integration/filters:stream_info_to_headers_filter_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -805,6 +807,7 @@ envoy_cc_test(
         "//test/integration/filters:reset_idle_timer_filter_lib",
         "//test/integration/filters:set_route_filter_lib",
         "//test/test_common:test_time_lib",
+        "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
@@ -1165,6 +1168,7 @@ envoy_cc_test(
         "websocket_integration_test.cc",
         "websocket_integration_test.h",
     ],
+    shard_count = 4,
     deps = [
         ":http_protocol_integration_lib",
         "//source/common/http:header_map_lib",
@@ -1332,6 +1336,7 @@ envoy_cc_test(
         "//test/integration/filters:set_is_terminal_filter_lib",
         "//test/integration/filters:set_response_code_filter_config_proto_cc_proto",
         "//test/integration/filters:set_response_code_filter_lib",
+        "//test/integration/filters:test_listener_filter_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/common/matching/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",

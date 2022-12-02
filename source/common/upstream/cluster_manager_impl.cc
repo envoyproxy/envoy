@@ -289,8 +289,10 @@ ClusterManagerImpl::ClusterManagerImpl(
     const Server::Instance& server)
     : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls),
       random_(api.randomGenerator()),
-      bind_config_(bootstrap.cluster_manager().upstream_bind_config()), local_info_(local_info),
-      cm_stats_(generateStats(stats)),
+      bind_config_(bootstrap.cluster_manager().has_upstream_bind_config()
+                       ? absl::make_optional(bootstrap.cluster_manager().upstream_bind_config())
+                       : absl::nullopt),
+      local_info_(local_info), cm_stats_(generateStats(stats)),
       init_helper_(*this, [this](ClusterManagerCluster& cluster) { onClusterInit(cluster); }),
       time_source_(main_thread_dispatcher.timeSource()), dispatcher_(main_thread_dispatcher),
       http_context_(http_context), router_context_(router_context),

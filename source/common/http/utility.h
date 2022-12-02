@@ -578,6 +578,13 @@ struct AuthorityAttributes {
 AuthorityAttributes parseAuthority(absl::string_view host);
 
 /**
+ * It validates RetryPolicy defined in core api. It should be called at the main thread as
+ * it may throw exception.
+ * @param retry_policy core retry policy
+ */
+void validateCoreRetryPolicy(const envoy::config::core::v3::RetryPolicy& retry_policy);
+
+/**
  * It returns RetryPolicy defined in core api to route api.
  * @param retry_policy core retry policy
  * @param retry_on this specifies when retry should be invoked.
