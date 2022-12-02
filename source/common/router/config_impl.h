@@ -670,7 +670,7 @@ public:
     if (typed_metadata_ != nullptr) {
       return *typed_metadata_;
     }
-    static RouteTypedMetadata* defaultTypedMetadata =
+    static const RouteTypedMetadata* defaultTypedMetadata =
         new RouteTypedMetadata(DefaultMetadata::get());
     return *defaultTypedMetadata;
   }
@@ -1075,8 +1075,8 @@ private:
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
   uint32_t retry_shadow_buffer_limit_{std::numeric_limits<uint32_t>::max()};
-  std::unique_ptr<envoy::config::core::v3::Metadata> metadata_;
-  std::unique_ptr<RouteTypedMetadata> typed_metadata_;
+  std::unique_ptr<const envoy::config::core::v3::Metadata> metadata_;
+  std::unique_ptr<const RouteTypedMetadata> typed_metadata_;
   const bool match_grpc_;
   const std::vector<Envoy::Matchers::MetadataMatcher> dynamic_metadata_;
 
