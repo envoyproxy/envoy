@@ -1,6 +1,5 @@
 #include "extension_registry.h"
 
-#include "source/extensions/request_id/uuid/config.h"
 #include "source/common/network/default_client_connection_factory.h"
 #include "source/common/network/socket_interface_impl.h"
 #include "source/common/router/upstream_codec_filter.h"
@@ -18,6 +17,7 @@
 #include "source/extensions/http/header_formatters/preserve_case/config.h"
 #include "source/extensions/http/original_ip_detection/xff/config.h"
 #include "source/extensions/network/dns_resolver/getaddrinfo/getaddrinfo.h"
+#include "source/extensions/request_id/uuid/config.h"
 #include "source/extensions/stat_sinks/metrics_service/config.h"
 #include "source/extensions/transport_sockets/http_11_proxy/config.h"
 #include "source/extensions/transport_sockets/raw_buffer/config.h"
