@@ -757,7 +757,10 @@ TEST(Context, FilterStateAttributes) {
     auto value = wrapper[CelValue::CreateStringView(missing)];
     EXPECT_FALSE(value.has_value());
   }
-
+  {
+    auto value = wrapper[CelValue::CreateInt64(1)];
+    EXPECT_FALSE(value.has_value());
+  }
   {
     auto value = wrapper[CelValue::CreateStringView(key)];
     EXPECT_TRUE(value.has_value());
