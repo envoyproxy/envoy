@@ -1,4 +1,4 @@
-name: tsan
+name: mobile_tsan
 
 on:
   push:

@@ -1,4 +1,4 @@
-name: release_validation
+name: mobile_release_validation
 
 on:
   push:
