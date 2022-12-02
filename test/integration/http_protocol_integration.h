@@ -1,6 +1,7 @@
 #pragma once
 
 #include "test/integration/http_integration.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -10,6 +11,7 @@ struct HttpProtocolTestParams {
   Network::Address::IpVersion version;
   Http::CodecType downstream_protocol;
   Http::CodecType upstream_protocol;
+  Http1ParserImpl http1_implementation;
   Http2Impl http2_implementation;
   bool defer_processing_backedup_streams;
 };
@@ -56,7 +58,8 @@ public:
             GetParam().downstream_protocol, GetParam().version,
             ConfigHelper::httpProxyConfig(/*downstream_is_quic=*/GetParam().downstream_protocol ==
                                           Http::CodecType::HTTP3)) {
-    setupHttp2Overrides(GetParam().http2_implementation);
+    setupHttp1ImplOverrides(GetParam().http1_implementation);
+    setupHttp2ImplOverrides(GetParam().http2_implementation);
     config_helper_.addRuntimeOverride(Runtime::defer_processing_backedup_streams,
                                       GetParam().defer_processing_backedup_streams ? "true"
                                                                                    : "false");
@@ -67,17 +70,11 @@ public:
     setUpstreamProtocol(GetParam().upstream_protocol);
   }
 
-  enum class SkipOnStream { Upstream, Downstream, AnyStream };
-
-  bool skipForH2Uhv([[maybe_unused]] SkipOnStream stream) {
+  bool skipForH2Uhv() {
 #ifdef ENVOY_ENABLE_UHV
-    return GetParam().http2_implementation == Http2Impl::Oghttp2 &&
-           (stream == SkipOnStream::AnyStream ||
-            (stream == SkipOnStream::Downstream &&
-             downstreamProtocol() == Http::CodecType::HTTP2) ||
-            (stream == SkipOnStream::Upstream && upstreamProtocol() == Http::CodecType::HTTP2));
+    // Validation of upstream responses is not wired up yet
+    return GetParam().http2_implementation == Http2Impl::Oghttp2;
 #endif
-
     return false;
   }
 };
@@ -91,7 +88,8 @@ public:
             std::get<0>(GetParam()).downstream_protocol, std::get<0>(GetParam()).version,
             ConfigHelper::httpProxyConfig(std::get<0>(GetParam()).downstream_protocol ==
                                           Http::CodecType::HTTP3)) {
-    setupHttp2Overrides(std::get<0>(GetParam()).http2_implementation);
+    setupHttp1ImplOverrides(std::get<0>(GetParam()).http1_implementation);
+    setupHttp2ImplOverrides(std::get<0>(GetParam()).http2_implementation);
     config_helper_.addRuntimeOverride(
         Runtime::defer_processing_backedup_streams,
         std::get<0>(GetParam()).defer_processing_backedup_streams ? "true" : "false");

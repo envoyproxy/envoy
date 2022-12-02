@@ -5,13 +5,16 @@
 namespace Envoy {
 namespace Rds {
 
-RouteConfigProviderManager::RouteConfigProviderManager(Server::Admin& admin,
+RouteConfigProviderManager::RouteConfigProviderManager(OptRef<Server::Admin> admin,
                                                        const std::string& config_tracker_key,
                                                        ProtoTraits& proto_traits)
-    : config_tracker_entry_(admin.getConfigTracker().add(
-          config_tracker_key,
-          [this](const Matchers::StringMatcher& matcher) { return dumpRouteConfigs(matcher); })),
-      proto_traits_(proto_traits) {
+    : proto_traits_(proto_traits) {
+  if (!admin.has_value()) {
+    return;
+  }
+  config_tracker_entry_ = admin->getConfigTracker().add(
+      config_tracker_key,
+      [this](const Matchers::StringMatcher& matcher) { return dumpRouteConfigs(matcher); });
   // ConfigTracker keys must be unique. We are asserting that no one has stolen the "routes" key
   // from us, since the returned entry will be nullptr if the key already exists.
   RELEASE_ASSERT(config_tracker_entry_, "");

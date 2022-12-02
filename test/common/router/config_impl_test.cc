@@ -3270,7 +3270,6 @@ TEST_F(RouteMatcherTest, WeightedClusterHeader) {
             - match: { prefix: "/" }
               route:
                 weighted_clusters:
-                  total_weight: 100
                   clusters:
                     - cluster_header: some_header
                       weight: 30
@@ -3303,7 +3302,6 @@ TEST_F(RouteMatcherTest, WeightedClusterWithProvidedRandomValue) {
             - match: { prefix: "/" }
               route:
                 weighted_clusters:
-                  total_weight: 80
                   header_name: "x_random_value"
                   clusters:
                     - name: cluster1
@@ -5848,7 +5846,6 @@ virtual_hosts:
                 weight: 3000
               - name: cluster3
                 weight: 5000
-            total_weight: 10000
   - name: www3
     domains: ["www3.lyft.com"]
     routes:
@@ -5877,7 +5874,6 @@ virtual_hosts:
                 weight: 3000
               - name: cluster3
                 weight: 5000
-            total_weight: 10000
   )EOF";
 
   BazFactory baz_factory;
@@ -5920,8 +5916,10 @@ virtual_hosts:
     EXPECT_EQ("meh", route->typedMetadata().get<Baz>(baz_factory.name())->name);
     EXPECT_EQ("hello", route->decorator()->getOperation());
 
+    Http::TestRequestHeaderMapImpl request_headers;
     Http::TestResponseHeaderMapImpl response_headers;
     StreamInfo::MockStreamInfo stream_info;
+    EXPECT_CALL(stream_info, getRequestHeaders).WillRepeatedly(Return(&request_headers));
     route_entry->finalizeResponseHeaders(response_headers, stream_info);
     EXPECT_EQ(response_headers, Http::TestResponseHeaderMapImpl{});
   }
@@ -6145,7 +6143,7 @@ virtual_hosts:
                EnvoyException);
 }
 
-TEST_F(RouteMatcherTest, WeightedClustersSumOFWeightsNotEqualToMax) {
+TEST_F(RouteMatcherTest, WeightedClustersZeroSumOfWeights) {
   const std::string yaml = R"EOF(
 virtual_hosts:
   - name: www2
@@ -6154,19 +6152,33 @@ virtual_hosts:
       - match: { prefix: "/" }
         route:
           weighted_clusters:
-            total_weight: 99
             clusters:
               - name: cluster1
-                weight: 3
               - name: cluster2
-                weight: 3
-              - name: cluster3
-                weight: 3
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      "Sum of weights in the weighted_cluster should add up to 99");
+      "Field 'weight' is missing in: name: \"cluster1\"\n");
+
+  const std::string yaml2 = R"EOF(
+virtual_hosts:
+  - name: www2
+    domains: ["www.lyft.com"]
+    routes:
+      - match: { prefix: "/" }
+        route:
+          weighted_clusters:
+            clusters:
+              - name: cluster1
+                weight: 0
+              - name: cluster2
+                weight: 0
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml2), factory_context_, true),
+      EnvoyException, "Sum of weights in the weighted_cluster must be greater than 0.");
 }
 
 TEST_F(RouteMatcherTest, TestWeightedClusterWithMissingWeights) {
@@ -6285,6 +6297,52 @@ virtual_hosts:
   }
 }
 
+TEST_F(RouteMatcherTest, TestWeightedClusterClusterHeaderHeaderManipulation) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: www2
+    domains: ["www.lyft.com"]
+    routes:
+      - match: { prefix: "/" }
+        route:
+          weighted_clusters:
+            clusters:
+              - cluster_header: x-route-to-this-cluster
+                weight: 50
+                request_headers_to_add:
+                  - header:
+                      key: x-req-cluster
+                      value: cluster-adding-this-value
+                response_headers_to_add:
+                  - header:
+                      key: x-resp-cluster
+                      value: cluster-adding-this-value
+                response_headers_to_remove: [ "x-header-to-remove-cluster" ]
+                host_rewrite_literal: "new_host1"
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"cluster1"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+    headers.addCopy("x-route-to-this-cluster", "cluster1");
+    Http::TestResponseHeaderMapImpl resp_headers({{"x-header-to-remove-cluster", "value"}});
+    auto dynamic_route = config.route(headers, 0);
+    const RouteEntry* route = dynamic_route->routeEntry();
+    EXPECT_EQ("cluster1", route->clusterName());
+
+    route->finalizeRequestHeaders(headers, stream_info, true);
+    EXPECT_EQ("cluster-adding-this-value", headers.get_("x-req-cluster"));
+    EXPECT_EQ("new_host1", headers.getHostValue());
+
+    route->finalizeResponseHeaders(resp_headers, stream_info);
+    EXPECT_EQ("cluster-adding-this-value", resp_headers.get_("x-resp-cluster"));
+    EXPECT_FALSE(resp_headers.has("x-remove-cluster1"));
+  }
+}
+
 TEST_F(RouteMatcherTest, WeightedClusterInvalidConfigWithBothNameAndClusterHeader) {
   const std::string yaml = R"EOF(
       virtual_hosts:
@@ -6294,7 +6352,6 @@ TEST_F(RouteMatcherTest, WeightedClusterInvalidConfigWithBothNameAndClusterHeade
             - match: { prefix: "/" }
               route:
                 weighted_clusters:
-                  total_weight: 100
                   clusters:
                     - cluster_header: some_header
                       name: some_name
@@ -6319,7 +6376,6 @@ TEST_F(RouteMatcherTest, WeightedClusterInvalidConfigWithNoClusterSpecifier) {
             - match: { prefix: "/" }
               route:
                 weighted_clusters:
-                  total_weight: 30
                   clusters:
                    - weight:
                       30
@@ -6339,7 +6395,6 @@ TEST_F(RouteMatcherTest, WeightedClusterInvalidConfigWithInvalidHttpHeader) {
             - match: { prefix: "/" }
               route:
                 weighted_clusters:
-                  total_weight: 30
                   clusters:
                     - cluster_header: "test\r"
                       weight: 30
@@ -6616,7 +6671,7 @@ virtual_hosts:
   EXPECT_TRUE(config_ptr->route(headers, 0)->routeEntry()->includeVirtualHostRateLimits());
 }
 
-TEST_F(RoutePropertyTest, TestVHostCorsConfig) {
+TEST_F(RoutePropertyTest, DEPRECATED_FEATURE_TEST(TestVHostCorsConfig)) {
   const std::string yaml = R"EOF(
 virtual_hosts:
   - name: "default"
@@ -6678,7 +6733,7 @@ virtual_hosts:
   EXPECT_EQ(cors_policy->allowPrivateNetworkAccess(), true);
 }
 
-TEST_F(RoutePropertyTest, TestRouteCorsConfig) {
+TEST_F(RoutePropertyTest, DEPRECATED_FEATURE_TEST(TestRouteCorsConfig)) {
   const std::string yaml = R"EOF(
 virtual_hosts:
   - name: "default"
@@ -6926,11 +6981,17 @@ request_headers_to_add:
     value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT"
   )EOF";
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  EXPECT_THROW_WITH_MESSAGE(
-      TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-      EnvoyException,
-      "Invalid header configuration. Un-terminated variable expression "
-      "'DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT'");
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_header_formatter")) {
+    EXPECT_THROW_WITH_MESSAGE(
+        TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
+        EnvoyException,
+        "Invalid header configuration. Un-terminated variable expression "
+        "'DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT'");
+  } else {
+    EXPECT_THROW(
+        TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
+        EnvoyException);
+  }
 }
 
 TEST(MetadataMatchCriteriaImpl, Create) {
@@ -7637,6 +7698,22 @@ virtual_hosts:
             pattern:
               regex: /strip-query/([0-9]{4})/(.*)
             substitution: /\2/\1/baz
+      - match:
+          prefix: /prefix/
+        redirect:
+          regex_rewrite:
+            pattern:
+              regex: /foo/([0-9]{4})/(.*)
+            substitution: /\2/\1/baz
+      - match:
+          prefix: /prefix-strip-query/
+        redirect:
+          strip_query: true
+          regex_rewrite:
+            pattern:
+              regex: /strip-query/([0-9]{4})/(.*)
+            substitution: /\2/\1/baz
+
   )EOF";
 
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
@@ -7675,6 +7752,33 @@ virtual_hosts:
     const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
     redirect->rewritePathHeader(headers, true);
     EXPECT_EQ("http://redirect.lyft.com/bar/anything/1984/baz", redirect->newPath(headers));
+  }
+  // Regex rewrite using prefix, without query, no strip query
+  {
+    Http::TestRequestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/prefix/foo/1984/bar/anything", false, false);
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    redirect->rewritePathHeader(headers, true);
+    EXPECT_EQ("http://redirect.lyft.com/prefix/bar/anything/1984/baz", redirect->newPath(headers));
+  }
+  // Regex rewrite using prefix, with query, no strip query
+  {
+    Http::TestRequestHeaderMapImpl headers = genRedirectHeaders(
+        "redirect.lyft.com", "/prefix/foo/9000/endpoint?lang=eng&con=US", false, false);
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    redirect->rewritePathHeader(headers, true);
+    EXPECT_EQ("http://redirect.lyft.com/prefix/endpoint/9000/baz?lang=eng&con=US",
+              redirect->newPath(headers));
+  }
+  // Regex rewrite using prefix, with query, with strip query
+  {
+    Http::TestRequestHeaderMapImpl headers = genRedirectHeaders(
+        "redirect.lyft.com", "/prefix-strip-query/strip-query/9000/endpoint?lang=eng&con=US", false,
+        false);
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    redirect->rewritePathHeader(headers, true);
+    EXPECT_EQ("http://redirect.lyft.com/prefix-strip-query/endpoint/9000/baz",
+              redirect->newPath(headers));
   }
 }
 
@@ -8840,6 +8944,30 @@ virtual_hosts:
   EXPECT_TRUE(pattern_template_policy == nullptr);
 }
 
+TEST_F(RouteConfigurationV2, RouteMatcherExtensionAndPrefixRewrite) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: path_pattern
+    domains: ["*"]
+    routes:
+      - match:
+          path_match_policy:
+            name: envoy.path.match.uri_template.uri_template_matcher
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+              path_template:  "/bar/{country}/{hang}"
+        route:
+          cluster: some-cluster
+          prefix_rewrite: "!"
+
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"some-cluster"}, {});
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
+      EnvoyException, "Cannot use prefix_rewrite with matcher extension");
+}
+
 TEST_F(RouteConfigurationV2, TemplatePatternIsFilledFromConfigInRouteAction) {
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -8848,14 +8976,14 @@ virtual_hosts:
     routes:
       - match:
           path_match_policy:
-            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            name: envoy.path.match.uri_template.uri_template_matcher
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/bar/{country}/{lang}"
         route:
           cluster: some-cluster
           path_rewrite_policy:
-            name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
+            name: envoy.path.rewrite.uri_template.uri_template_rewriter
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
               path_template_rewrite: "/bar/{lang}/{country}"
@@ -8884,7 +9012,7 @@ virtual_hosts:
     routes:
       - match:
           path_match_policy:
-            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            name: envoy.path.match.uri_template.uri_template_matcher
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/rest/{lang}/{state}"
@@ -8916,7 +9044,7 @@ virtual_hosts:
     routes:
       - match:
           path_match_policy:
-            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            name: envoy.path.match.uri_template.uri_template_matcher
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/rest/{lang}/{state}"
@@ -8924,7 +9052,7 @@ virtual_hosts:
         route: { cluster: path-pattern-cluster-one}
       - match:
           path_match_policy:
-            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            name: envoy.path.match.uri_template.uri_template_matcher
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/boo/{go}/{fly}/{bat}"
@@ -8932,7 +9060,7 @@ virtual_hosts:
         route: { cluster: path-pattern-cluster-two}
       - match:
           path_match_policy:
-            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            name: envoy.path.match.uri_template.uri_template_matcher
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/foo/boo/{go}/{fly}/{bat}/{sno}"
@@ -8983,7 +9111,7 @@ virtual_hosts:
     routes:
       - match:
           path_match_policy:
-            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            name: envoy.path.match.uri_template.uri_template_matcher
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/rest/{one}/{two}"
@@ -8991,7 +9119,7 @@ virtual_hosts:
         route:
           cluster: "path-pattern-cluster-one"
           path_rewrite_policy:
-            name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
+            name: envoy.path.rewrite.uri_template.uri_template_rewriter
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
               path_template_rewrite: "/rest/{two}/{one}"
@@ -9017,7 +9145,7 @@ virtual_hosts:
     routes:
       - match:
           path_match_policy:
-            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            name: envoy.path.match.uri_template.uri_template_matcher
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/rest/{one=*}/{two}"
@@ -9025,7 +9153,7 @@ virtual_hosts:
         route:
           cluster: "path-pattern-cluster-one"
           path_rewrite_policy:
-            name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
+            name: envoy.path.rewrite.uri_template.uri_template_rewriter
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
               path_template_rewrite: "/{two}/{one}"
@@ -9051,7 +9179,7 @@ virtual_hosts:
     routes:
       - match:
           path_match_policy:
-            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            name: envoy.path.match.uri_template.uri_template_matcher
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/rest/{one}/{two}"
@@ -9059,13 +9187,13 @@ virtual_hosts:
         route:
           cluster: "path-pattern-cluster-one"
           path_rewrite_policy:
-            name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
+            name: envoy.path.rewrite.uri_template.uri_template_rewriter
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
               path_template_rewrite: "/{two}/{one}"
       - match:
           path_match_policy:
-            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            name: envoy.path.match.uri_template.uri_template_matcher
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/REST/{one}/{two}"
@@ -9073,7 +9201,7 @@ virtual_hosts:
         route:
           cluster: "path-pattern-cluster-one"
           path_rewrite_policy:
-            name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
+            name: envoy.path.rewrite.uri_template.uri_template_rewriter
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
               path_template_rewrite: "/TEST/{one}"
@@ -9106,7 +9234,7 @@ virtual_hosts:
     routes:
       - match:
           path_match_policy:
-            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            name: envoy.path.match.uri_template.uri_template_matcher
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/rest/{one/{two}"
@@ -9114,7 +9242,7 @@ virtual_hosts:
         route:
           cluster: "path-pattern-cluster-one"
           path_rewrite_policy:
-            name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
+            name: envoy.path.rewrite.uri_template.uri_template_rewriter
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
               path_template_rewrite: "/{two}/{one}"
@@ -9134,7 +9262,7 @@ virtual_hosts:
     routes:
       - match:
           path_match_policy:
-            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            name: envoy.path.match.uri_template.uri_template_matcher
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/rest/{one}/{two}"
@@ -9142,7 +9270,7 @@ virtual_hosts:
         route:
           cluster: "path-pattern-cluster-one"
           path_rewrite_policy:
-            name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
+            name: envoy.path.rewrite.uri_template.uri_template_rewriter
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
               path_template_rewrite: "/rest/{one}/{two}/{missing}"
@@ -9165,7 +9293,7 @@ virtual_hosts:
     routes:
       - match:
           path_match_policy:
-            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            name: envoy.path.match.uri_template.uri_template_matcher
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/rest/{on==e}/{two}"
@@ -9173,7 +9301,7 @@ virtual_hosts:
         route:
           cluster: "path-pattern-cluster-one"
           path_rewrite_policy:
-            name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
+            name: envoy.path.rewrite.uri_template.uri_template_rewriter
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
               path_template_rewrite: "/rest/{one}/{two}/{missing}"
@@ -9186,7 +9314,7 @@ virtual_hosts:
       EnvoyException, "path_match_policy.path_template /rest/{on==e}/{two} is invalid");
 }
 
-TEST_F(RouteMatcherTest, PatternMatchWildcardUnnamedVariable) {
+TEST_F(RouteMatcherTest, PatternMatchInvalidPlacedWildcard) {
   const std::string yaml = R"EOF(
 virtual_hosts:
   - name: path_pattern
@@ -9197,12 +9325,41 @@ virtual_hosts:
             name: envoy.path.match.uri_template.pattern_template_match_predicate
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
-              path_template: "/rest/*/{two}"
+              path_template: "/rest/{middlewildcard=**}/{two}"
           case_sensitive: false
         route:
           cluster: "path-pattern-cluster-one"
           path_rewrite_policy:
             name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
+              path_template_rewrite: "/rest/{middlewildcard=**}/{two}"
+  )EOF";
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
+      EnvoyException, "path_match_policy.path_template /rest/{middlewildcard=**}/{two} is invalid");
+}
+
+TEST_F(RouteMatcherTest, PatternMatchWildcardUnnamedVariable) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: path_pattern
+    domains: ["*"]
+    routes:
+      - match:
+          path_match_policy:
+            name: envoy.path.match.uri_template.uri_template_matcher
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+              path_template: "/rest/*/{two}"
+          case_sensitive: false
+        route:
+          cluster: "path-pattern-cluster-one"
+          path_rewrite_policy:
+            name: envoy.path.rewrite.uri_template.uri_template_rewriter
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
               path_template_rewrite: "/{two}"
@@ -9228,7 +9385,7 @@ virtual_hosts:
     routes:
       - match:
           path_match_policy:
-            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            name: envoy.path.match.uri_template.uri_template_matcher
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/rest/{one}/**"
@@ -9236,7 +9393,7 @@ virtual_hosts:
         route:
           cluster: "path-pattern-cluster-one"
           path_rewrite_policy:
-            name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
+            name: envoy.path.rewrite.uri_template.uri_template_rewriter
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
               path_template_rewrite: "/{one}"
@@ -9263,7 +9420,7 @@ virtual_hosts:
     routes:
       - match:
           path_match_policy:
-            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            name: envoy.path.match.uri_template.uri_template_matcher
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/rest/{one=*}/{last=**}"
@@ -9271,7 +9428,7 @@ virtual_hosts:
         route:
           cluster: "path-pattern-cluster-one"
           path_rewrite_policy:
-            name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
+            name: envoy.path.rewrite.uri_template.uri_template_rewriter
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
               path_template_rewrite: "/{last}"
@@ -9298,7 +9455,7 @@ virtual_hosts:
     routes:
       - match:
           path_match_policy:
-            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            name: envoy.path.match.uri_template.uri_template_matcher
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/rest/{one}/{middle=videos/*}/end"
@@ -9306,7 +9463,7 @@ virtual_hosts:
         route:
           cluster: "path-pattern-cluster-one"
           path_rewrite_policy:
-            name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
+            name: envoy.path.rewrite.uri_template.uri_template_rewriter
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
               path_template_rewrite: "/{middle}"
@@ -9333,7 +9490,7 @@ virtual_hosts:
     routes:
       - match:
           path_match_policy:
-            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            name: envoy.path.match.uri_template.uri_template_matcher
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/rest/{one}/{One}/end"
@@ -9341,7 +9498,7 @@ virtual_hosts:
         route:
           cluster: "path-pattern-cluster-one"
           path_rewrite_policy:
-            name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
+            name: envoy.path.rewrite.uri_template.uri_template_rewriter
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
               path_template_rewrite: "/{One}/{one}"
@@ -9368,7 +9525,7 @@ virtual_hosts:
     routes:
       - match:
           path_match_policy:
-            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            name: envoy.path.match.uri_template.uri_template_matcher
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
               path_template: "/rest/{one}/{two}/{three}/{four}/{five}/{six}"
@@ -9755,6 +9912,11 @@ virtual_hosts:
 
 TEST_F(PerFilterConfigsTest, RouteLocalTypedConfig) {
   const std::string yaml = R"EOF(
+typed_per_filter_config:
+  test.filter:
+    "@type": type.googleapis.com/google.protobuf.Timestamp
+    value:
+      seconds: 9090
 virtual_hosts:
   - name: bar
     domains: ["*"]
@@ -9774,12 +9936,17 @@ virtual_hosts:
 )EOF";
 
   factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
-  absl::InlinedVector<uint32_t, 3> expected_traveled_config({456, 123});
+  absl::InlinedVector<uint32_t, 3> expected_traveled_config({9090, 456, 123});
   checkEach(yaml, 123, expected_traveled_config, "test.filter");
 }
 
 TEST_F(PerFilterConfigsTest, RouteLocalTypedConfigWithDirectResponse) {
   const std::string yaml = R"EOF(
+typed_per_filter_config:
+  test.filter:
+    "@type": type.googleapis.com/google.protobuf.Timestamp
+    value:
+      seconds: 9090
 virtual_hosts:
   - name: bar
     domains: ["*"]
@@ -9800,12 +9967,17 @@ virtual_hosts:
 )EOF";
 
   factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
-  absl::InlinedVector<uint32_t, 3> expected_traveled_config({456, 123});
+  absl::InlinedVector<uint32_t, 3> expected_traveled_config({9090, 456, 123});
   checkEach(yaml, 123, expected_traveled_config, "test.filter");
 }
 
 TEST_F(PerFilterConfigsTest, WeightedClusterTypedConfig) {
   const std::string yaml = R"EOF(
+typed_per_filter_config:
+  test.filter:
+    "@type": type.googleapis.com/google.protobuf.Timestamp
+    value:
+      seconds: 9090
 virtual_hosts:
   - name: bar
     domains: ["*"]
@@ -9829,12 +10001,40 @@ virtual_hosts:
 )EOF";
 
   factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
-  absl::InlinedVector<uint32_t, 3> expected_traveled_config({1011, 789});
+  absl::InlinedVector<uint32_t, 3> expected_traveled_config({9090, 1011, 789});
   checkEach(yaml, 789, expected_traveled_config, "test.filter");
 }
 
+TEST_F(PerFilterConfigsTest, RouteConfigurationTypedConfig) {
+  const std::string yaml = R"EOF(
+typed_per_filter_config:
+  test.filter:
+    "@type": type.googleapis.com/google.protobuf.Timestamp
+    value:
+      seconds: 9090
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route:
+          weighted_clusters:
+            clusters:
+              - name: baz
+                weight: 100
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+  absl::InlinedVector<uint32_t, 3> expected_traveled_config({9090});
+  checkEach(yaml, 9090, expected_traveled_config, "test.filter");
+}
 TEST_F(PerFilterConfigsTest, WeightedClusterFallthroughTypedConfig) {
   const std::string yaml = R"EOF(
+typed_per_filter_config:
+  test.filter:
+    "@type": type.googleapis.com/google.protobuf.Timestamp
+    value:
+      seconds: 9090
 virtual_hosts:
   - name: bar
     domains: ["*"]
@@ -9858,7 +10058,7 @@ virtual_hosts:
 )EOF";
 
   factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
-  absl::InlinedVector<uint32_t, 3> expected_traveled_config({1415, 1213});
+  absl::InlinedVector<uint32_t, 3> expected_traveled_config({9090, 1415, 1213});
   checkEach(yaml, 1213, expected_traveled_config, "test.filter");
 }
 

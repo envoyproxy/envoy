@@ -182,6 +182,10 @@ void GoogleAsyncStreamImpl::initialize(bool /*buffer_body_for_retry*/) {
   ctxt_.set_deadline(abs_deadline);
   // Fill service-wide initial metadata.
   auto initial_metadata = Http::RequestHeaderMapImpl::create();
+  // TODO(cpakulski): Find a better way to access requestHeaders after runtime guard
+  // envoy_reloadable_features_unified_header_formatter runtime guard is deprecated
+  // and request headers are not stored in stream_info.
+  // Maybe put it to parent_context?
   parent_.metadata_parser_->evaluateHeaders(*initial_metadata, options_.parent_context.stream_info);
   callbacks_.onCreateInitialMetadata(*initial_metadata);
   initial_metadata->iterate([this](const Http::HeaderEntry& header) {

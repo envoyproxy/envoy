@@ -152,6 +152,9 @@ int Decoder::reassemble(Buffer::Instance& data) {
       Buffer::OwnedImpl message{};
       message.move(remaining_data, full_msg_len);
       onDataReady(message);
+
+      // Even the handle of current sip message hasn't finished(async handle),
+      // we use string of this buffer, so it can be drain safely.
       message.drain(message.length());
       full_msg_len = 0;
     }
@@ -227,7 +230,6 @@ Decoder::HeaderHandler::HeaderHandler(MessageHandler& parent)
                            {HeaderType::Via, &HeaderHandler::processVia},
                            {HeaderType::Route, &HeaderHandler::processRoute},
                            {HeaderType::Contact, &HeaderHandler::processContact},
-                           {HeaderType::Cseq, &HeaderHandler::processCseq},
                            {HeaderType::RRoute, &HeaderHandler::processRecordRoute},
                            {HeaderType::SRoute, &HeaderHandler::processServiceRoute},
                            {HeaderType::WAuth, &HeaderHandler::processWwwAuth},
@@ -237,7 +239,8 @@ Decoder::HeaderHandler::HeaderHandler(MessageHandler& parent)
 
 int Decoder::HeaderHandler::processPath(absl::string_view& header) {
   metadata()->deleteInstipOperation(rawOffset(), header);
-  metadata()->addEPOperation(rawOffset(), header, parent_.parent_.settings()->localServices());
+  metadata()->addEPOperation(rawOffset(), header, HeaderType::Path,
+                             parent_.parent_.settings()->localServices());
   return 0;
 }
 
@@ -247,7 +250,6 @@ int Decoder::HeaderHandler::processRoute(absl::string_view& header) {
     return 0;
   }
   setFirstRoute(false);
-  metadata()->parseHeader(HeaderType::Route);
   return 0;
 }
 
@@ -258,7 +260,8 @@ int Decoder::HeaderHandler::processRecordRoute(absl::string_view& header) {
 
   setFirstRecordRoute(false);
 
-  metadata()->addEPOperation(rawOffset(), header, parent_.parent_.settings()->localServices());
+  metadata()->addEPOperation(rawOffset(), header, HeaderType::RRoute,
+                             parent_.parent_.settings()->localServices());
   return 0;
 }
 
@@ -300,7 +303,8 @@ int Decoder::HeaderHandler::processPCookieIPMap(absl::string_view& header) {
 
 int Decoder::HeaderHandler::processContact(absl::string_view& header) {
   metadata()->deleteInstipOperation(rawOffset(), header);
-  metadata()->addEPOperation(rawOffset(), header, parent_.parent_.settings()->localServices());
+  metadata()->addEPOperation(rawOffset(), header, HeaderType::Contact,
+                             parent_.parent_.settings()->localServices());
   return 0;
 }
 
@@ -310,16 +314,8 @@ int Decoder::HeaderHandler::processServiceRoute(absl::string_view& header) {
   }
   setFirstServiceRoute(false);
 
-  metadata()->addEPOperation(rawOffset(), header, parent_.parent_.settings()->localServices());
-  return 0;
-}
-
-//
-// SUBSCRIBE Header Handler
-//
-int Decoder::SUBSCRIBEHeaderHandler::processEvent(absl::string_view& header) {
-  auto& parent = dynamic_cast<SUBSCRIBEHandler&>(this->parent_);
-  parent.setEventType(StringUtil::trim(header.substr(header.find("Event:") + strlen("Event:"))));
+  metadata()->addEPOperation(rawOffset(), header, HeaderType::SRoute,
+                             parent_.parent_.settings()->localServices());
   return 0;
 }
 
@@ -384,9 +380,6 @@ void Decoder::INVITEHandler::parseHeader(HeaderType& type, absl::string_view& he
 
 void Decoder::OK200Handler::parseHeader(HeaderType& type, absl::string_view& header) {
   switch (type) {
-  case HeaderType::Cseq:
-    handler_->processCseq(header);
-    break;
   case HeaderType::Contact:
     handler_->processContact(header);
     break;
@@ -437,9 +430,6 @@ void Decoder::GeneralHandler::parseHeader(HeaderType& type, absl::string_view& h
 
 void Decoder::SUBSCRIBEHandler::parseHeader(HeaderType& type, absl::string_view& header) {
   switch (type) {
-  case HeaderType::Event:
-    handler_->processEvent(header);
-    break;
   case HeaderType::Route:
     handler_->processRoute(header);
     break;
@@ -541,7 +531,8 @@ int Decoder::decode() {
       absl::string_view sip_line = msg.substr(0, crlf);
 
       metadata->addMsgHeader(HeaderType::TopLine, sip_line);
-      parseTopLine(sip_line);
+      metadata->setMsgType(sipMsgType(sip_line));
+      metadata->setMethodType(sipMethod(sip_line));
       current_header_ = HeaderType::Other;
 
       handler = MessageFactory::create(metadata->methodType(), *this);
@@ -582,15 +573,6 @@ int Decoder::HeaderHandler::processVia(absl::string_view& header) {
   metadata()->setTransactionId(header);
 
   setFirstVia(false);
-  return 0;
-}
-
-int Decoder::parseTopLine(absl::string_view& top_line) {
-  auto metadata = metadata_;
-  metadata->setMsgType(sipMsgType(top_line));
-  metadata->setMethodType(sipMethod(top_line));
-  metadata->parseHeader(HeaderType::TopLine);
-
   return 0;
 }
 

@@ -214,7 +214,7 @@ public:
   create(Upstream::HostConstSharedPtr, Event::Dispatcher&,
          const Extensions::NetworkFilters::Common::Redis::Client::Config&,
          const Extensions::NetworkFilters::Common::Redis::RedisCommandStatsSharedPtr&,
-         Stats::Scope&, const std::string& username, const std::string& password) override {
+         Stats::Scope&, const std::string& username, const std::string& password, bool) override {
     EXPECT_EQ(auth_username_, username);
     EXPECT_EQ(auth_password_, password);
     return Extensions::NetworkFilters::Common::Redis::Client::ClientPtr{create_()};

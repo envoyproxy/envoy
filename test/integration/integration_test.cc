@@ -121,6 +121,7 @@ TEST_P(IntegrationTest, BadPostListenSocketOption) {
 
 // Make sure we have correctly specified per-worker performance stats.
 TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
+  DISABLE_IF_ADMIN_DISABLED; // Uses admin stats
   concurrency_ = 2;
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
@@ -177,6 +178,7 @@ public:
 
 // Test extend balance.
 TEST_P(IntegrationTest, ConnectionBalanceFactory) {
+  DISABLE_IF_ADMIN_DISABLED; // Uses admin stats
   concurrency_ = 2;
 
   TestConnectionBalanceFactory factory;
@@ -496,42 +498,6 @@ TEST_P(IntegrationTest, EnvoyProxyingLate1xxWithEncoderFilter) {
   testEnvoyProxying1xx(false, true);
 }
 
-// When the runtime feature `http_100_continue_case_insensitive` is disabled, the "100-Continue"
-// (upper case C) is not counted as "100-continue". As a consequence, the response does not contain
-// the `100` status code as if Envoy does not see `expect` header.
-TEST_P(IntegrationTest, RuntimeFeature100ContinueCaseInsensitiveDisabled) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.http_100_continue_case_insensitive",
-                                    "false");
-
-  config_helper_.addConfigModifier(
-      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-              hcm) -> void { hcm.set_proxy_100_continue(false); });
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto encoder_decoder =
-      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                                                 {":path", "/dynamo/url"},
-                                                                 {":scheme", "http"},
-                                                                 {":authority", "sni.lyft.com"},
-                                                                 {"expect", "100-Continue"}});
-  request_encoder_ = &encoder_decoder.first;
-  auto response = std::move(encoder_decoder.second);
-
-  // Send all of the request data and wait for it to be received upstream.
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-  codec_client_->sendData(*request_encoder_, 10, true);
-  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-  upstream_request_->encodeHeaders(default_response_headers_, true);
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_TRUE(response->complete());
-
-  // The response contains the status code 200 but does not contain the status code 100.
-  EXPECT_EQ(nullptr, response->informationalHeaders());
-  EXPECT_EQ("200", response->headers().getStatusValue());
-}
-
 // Regression test for https://github.com/envoyproxy/envoy/issues/10923.
 TEST_P(IntegrationTest, EnvoyProxying1xxWithDecodeDataPause) {
   config_helper_.prependFilter(R"EOF(
@@ -830,6 +796,11 @@ TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
 }
 
 TEST_P(IntegrationTest, TestSmuggling) {
+#ifdef ENVOY_ENABLE_UHV
+  // TODO(#23289) - uniform handling of Transfer-Encoding validation between codec and UHV
+  return;
+#endif
+
   config_helper_.disableDelayClose();
   initialize();
 
@@ -957,6 +928,11 @@ TEST_P(IntegrationTest, TestServerAllowChunkedLength) {
 }
 
 TEST_P(IntegrationTest, TestClientAllowChunkedLength) {
+#ifdef ENVOY_ENABLE_UHV
+  // TODO(#23289) - uniform handling of Transfer-Encoding validation between codec and UHV
+  return;
+#endif
+
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1, "");
     if (fake_upstreams_[0]->httpType() == Http::CodecType::HTTP1) {
@@ -1067,6 +1043,11 @@ TEST_P(IntegrationTest, BadHeader) {
 }
 
 TEST_P(IntegrationTest, Http10Disabled) {
+#ifdef ENVOY_ENABLE_UHV
+  // TODO(#23287) - Determine HTTP/0.9 and HTTP/1.0 support within UHV
+  return;
+#endif
+
   initialize();
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.0\r\n\r\n", &response, true);
@@ -1074,6 +1055,11 @@ TEST_P(IntegrationTest, Http10Disabled) {
 }
 
 TEST_P(IntegrationTest, Http10DisabledWithUpgrade) {
+#ifdef ENVOY_ENABLE_UHV
+  // TODO(#23287) - Determine HTTP/0.9 and HTTP/1.0 support within UHV
+  return;
+#endif
+
   initialize();
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.0\r\nUpgrade: h2c\r\n\r\n",
@@ -1083,6 +1069,11 @@ TEST_P(IntegrationTest, Http10DisabledWithUpgrade) {
 
 // Turn HTTP/1.0 support on and verify 09 style requests work.
 TEST_P(IntegrationTest, Http09Enabled) {
+#ifdef ENVOY_ENABLE_UHV
+  // TODO(#23287) - Determine HTTP/0.9 and HTTP/1.0 support within UHV
+  return;
+#endif
+
   useAccessLog();
   autonomous_upstream_ = true;
   config_helper_.addConfigModifier(&setAllowHttp10WithDefaultHost);
@@ -1102,6 +1093,11 @@ TEST_P(IntegrationTest, Http09Enabled) {
 }
 
 TEST_P(IntegrationTest, Http09WithKeepalive) {
+#ifdef ENVOY_ENABLE_UHV
+  // TODO(#23287) - Determine HTTP/0.9 and HTTP/1.0 support within UHV
+  return;
+#endif
+
   useAccessLog();
   autonomous_upstream_ = true;
   config_helper_.addConfigModifier(&setAllowHttp10WithDefaultHost);
@@ -1118,6 +1114,11 @@ TEST_P(IntegrationTest, Http09WithKeepalive) {
 
 // Turn HTTP/1.0 support on and verify the request is proxied and the default host is sent upstream.
 TEST_P(IntegrationTest, Http10Enabled) {
+#ifdef ENVOY_ENABLE_UHV
+  // TODO(#23287) - Determine HTTP/0.9 and HTTP/1.0 support within UHV
+  return;
+#endif
+
   autonomous_upstream_ = true;
   config_helper_.addConfigModifier(&setAllowHttp10WithDefaultHost);
   initialize();
@@ -1319,6 +1320,11 @@ TEST_P(IntegrationTest, PipelineWithTrailers) {
 // an inline sendLocalReply to make sure the "kick" works under the call stack
 // of dispatch as well as when a response is proxied from upstream.
 TEST_P(IntegrationTest, PipelineInline) {
+#ifdef ENVOY_ENABLE_UHV
+  // TODO(#23287) - Determine HTTP/0.9 and HTTP/1.0 support within UHV
+  return;
+#endif
+
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) { hcm.mutable_stream_error_on_invalid_http_message()->set_value(true); });
@@ -2109,6 +2115,7 @@ TEST_P(IntegrationTest, Response204WithBody) {
 }
 
 TEST_P(IntegrationTest, QuitQuitQuit) {
+  DISABLE_IF_ADMIN_DISABLED; // Uses admin interface.
   initialize();
   test_server_->useAdminInterfaceToQuit(true);
 }
@@ -2459,6 +2466,148 @@ TEST_P(IntegrationTest, SetRouteToDelegatingRouteWithClusterOverride) {
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_override.upstream_cx_total")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_override.upstream_rq_200")->value());
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("cluster_override"));
+}
+
+ConfigHelper::HttpModifierFunction setAppendXForwardedPort(bool append_x_forwarded_port,
+                                                           bool use_remote_address = false,
+                                                           uint32_t xff_num_trusted_hops = 0) {
+  return
+      [append_x_forwarded_port, use_remote_address, xff_num_trusted_hops](
+          envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) {
+        hcm.mutable_use_remote_address()->set_value(use_remote_address);
+        hcm.set_xff_num_trusted_hops(xff_num_trusted_hops);
+        hcm.set_append_x_forwarded_port(append_x_forwarded_port);
+      };
+}
+
+// Verify when append_x_forwarded_port is turned on, the x-forwarded-port header should be appended.
+TEST_P(IntegrationTest, AppendXForwardedPort) {
+  config_helper_.addConfigModifier(setAppendXForwardedPort(true));
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":authority", "host"},
+                                     {"connection", "close"}});
+  waitForNextUpstreamRequest();
+  EXPECT_THAT(upstream_request_->headers(), Not(HeaderValueOf(Headers::get().ForwardedPort, "")));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), HttpStatusIs("200"));
+}
+
+// Verify when append_x_forwarded_port is not turned on, the x-forwarded-port header should not be
+// appended.
+TEST_P(IntegrationTest, DoNotAppendXForwardedPort) {
+  config_helper_.addConfigModifier(setAppendXForwardedPort(false));
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":authority", "host"},
+                                     {"connection", "close"}});
+  waitForNextUpstreamRequest();
+  EXPECT_THAT(upstream_request_->headers().ForwardedPort(), nullptr);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), HttpStatusIs("200"));
+}
+
+// Verify when the x-forwarded-port header has been set, the x-forwarded-port header should not be
+// appended.
+TEST_P(IntegrationTest, IgnoreAppendingXForwardedPortIfHasBeenSet) {
+  config_helper_.addConfigModifier(setAppendXForwardedPort(true));
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":authority", "host"},
+                                     {"connection", "close"},
+                                     {"x-forwarded-port", "8080"}});
+  waitForNextUpstreamRequest();
+  EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Headers::get().ForwardedPort, "8080"));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), HttpStatusIs("200"));
+}
+
+// Verify when append_x_forwarded_port is turned on, the x-forwarded-port header from trusted hop
+// will be preserved.
+TEST_P(IntegrationTest, PreserveXForwardedPortFromTrustedHop) {
+  config_helper_.addConfigModifier(setAppendXForwardedPort(true, true, 1));
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":authority", "host"},
+                                     {"connection", "close"},
+                                     {"x-forwarded-port", "80"}});
+  waitForNextUpstreamRequest();
+  EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Headers::get().ForwardedPort, "80"));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), HttpStatusIs("200"));
+}
+
+// Verify when append_x_forwarded_port is turned on, the x-forwarded-port header from untrusted hop
+// will be overwritten.
+TEST_P(IntegrationTest, OverwriteXForwardedPortFromUntrustedHop) {
+  config_helper_.addConfigModifier(setAppendXForwardedPort(true, true, 0));
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":authority", "host"},
+                                     {"connection", "close"},
+                                     {"x-forwarded-port", "80"}});
+  waitForNextUpstreamRequest();
+  EXPECT_THAT(upstream_request_->headers(), Not(HeaderValueOf(Headers::get().ForwardedPort, "80")));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), HttpStatusIs("200"));
+}
+
+// Verify when append_x_forwarded_port is not turned on, the x-forwarded-port header from untrusted
+// hop will not be overwritten.
+TEST_P(IntegrationTest, DoNotOverwriteXForwardedPortFromUntrustedHop) {
+  config_helper_.addConfigModifier(setAppendXForwardedPort(false, true, 0));
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":authority", "host"},
+                                     {"connection", "close"},
+                                     {"x-forwarded-port", "80"}});
+  waitForNextUpstreamRequest();
+  EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Headers::get().ForwardedPort, "80"));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), HttpStatusIs("200"));
 }
 
 } // namespace Envoy

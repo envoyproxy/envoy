@@ -24,7 +24,6 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/substitute.h"
@@ -104,7 +103,7 @@ public:
     }
 
     return filter_config_provider_manager_->createDynamicFilterConfigProvider(
-        config_source, name, factory_context_.getServerFactoryContext(), factory_context_, "xds.",
+        config_source, name, factory_context_.getServerFactoryContext(), factory_context_,
         last_filter_config, getFilterType(), getMatcher());
   }
 
@@ -281,32 +280,6 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, Basic) {
   }
 }
 
-TYPED_TEST(FilterConfigDiscoveryImplTestParameter, BasicDeprecatedStatPrefix) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.top_level_ecds_stats", "false"}});
-
-  InSequence s;
-  TypeParam config_discovery_test;
-  config_discovery_test.setup();
-  EXPECT_EQ("foo", config_discovery_test.provider_->name());
-  EXPECT_EQ(absl::nullopt, config_discovery_test.provider_->config());
-
-  const auto response = config_discovery_test.createResponse("1", "foo");
-  const auto decoded_resources =
-      TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
-
-  EXPECT_CALL(config_discovery_test.init_watcher_, ready());
-  config_discovery_test.callbacks_->onConfigUpdate(decoded_resources.refvec_,
-                                                   response.version_info());
-  EXPECT_NE(absl::nullopt, config_discovery_test.provider_->config());
-  EXPECT_EQ(1UL,
-            config_discovery_test.scope_.counter("xds.extension_config_discovery.foo.config_reload")
-                .value());
-  EXPECT_EQ(0UL,
-            config_discovery_test.scope_.counter("xds.extension_config_discovery.foo.config_fail")
-                .value());
-}
-
 TYPED_TEST(FilterConfigDiscoveryImplTestParameter, ConfigFailed) {
   InSequence s;
   TypeParam config_discovery_test;
@@ -459,8 +432,8 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, WrongDefaultConfig) {
   EXPECT_THROW_WITH_MESSAGE(
       config_discovery_test.filter_config_provider_manager_->createDynamicFilterConfigProvider(
           config_source, "foo", config_discovery_test.factory_context_.getServerFactoryContext(),
-          config_discovery_test.factory_context_, "xds.", true,
-          config_discovery_test.getFilterType(), config_discovery_test.getMatcher()),
+          config_discovery_test.factory_context_, true, config_discovery_test.getFilterType(),
+          config_discovery_test.getMatcher()),
       EnvoyException,
       "Error: cannot find filter factory foo for default filter "
       "configuration with type URL "
@@ -496,9 +469,9 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, TerminalFilterInvalid) {
       EnvoyException,
       "Error: terminal filter named foo of type envoy.filters.http.router must be the last filter "
       "in a http filter chain.");
-  EXPECT_EQ(0UL,
-            config_discovery_test.scope_.counter("xds.extension_config_discovery.foo.config_reload")
-                .value());
+  EXPECT_EQ(
+      0UL,
+      config_discovery_test.scope_.counter("extension_config_discovery.foo.config_reload").value());
 }
 
 // TCP listener filter matcher test.

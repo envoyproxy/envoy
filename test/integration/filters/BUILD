@@ -52,6 +52,21 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "add_header_filter_config_lib",
+    srcs = ["add_header_filter.cc"],
+    deps = [
+        ":common_lib",
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//source/extensions/filters/http/common:factory_base_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+    ],
+    alwayslink = 1,
+)
+
+envoy_cc_test_library(
     name = "header_to_proxy_filter_lib",
     srcs = [
         "header_to_proxy_filter.cc",
@@ -194,6 +209,23 @@ envoy_cc_test_library(
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
+        "//source/common/http:utility_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "async_inject_body_at_end_stream_filter_lib",
+    srcs = [
+        "async_inject_body_at_end_stream_filter.cc",
+    ],
+    deps = [
+        ":common_lib",
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//source/common/http:utility_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
     ],

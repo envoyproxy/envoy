@@ -86,6 +86,12 @@ service Bookstore {
       get: "/authors/{author}"
     };
   }
+  // Echo an Author to test enum encode/decode.
+  rpc EchoAuthor(Author) returns (Author) {
+    option (google.api.http) = {
+      post: "/echoAuthor"
+    };
+  }
   rpc GetIndex(google.protobuf.Empty) returns (google.api.HttpBody) {
     option (google.api.http) = {
       get: "/index"

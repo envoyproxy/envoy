@@ -164,7 +164,7 @@ protected:
 
   // This is called when the underlying socket is connected, not when the
   // connected event is raised.
-  virtual void onConnected() {}
+  virtual void onConnected();
 
   void setFailureReason(absl::string_view failure_reason);
   const std::string& failureReason() const { return failure_reason_; }
@@ -238,13 +238,13 @@ private:
 class ServerConnectionImpl : public ConnectionImpl, virtual public ServerConnection {
 public:
   ServerConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
-                       TransportSocketPtr&& transport_socket, StreamInfo::StreamInfo& stream_info,
-                       bool connected);
+                       TransportSocketPtr&& transport_socket, StreamInfo::StreamInfo& stream_info);
 
   // ServerConnection impl
   void setTransportSocketConnectTimeout(std::chrono::milliseconds timeout,
                                         Stats::Counter& timeout_stat) override;
   void raiseEvent(ConnectionEvent event) override;
+  bool initializeReadFilters() override;
 
 private:
   void onTransportSocketConnectTimeout();

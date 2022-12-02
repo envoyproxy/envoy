@@ -24,8 +24,8 @@ uint32_t getMaxStreams(const Upstream::ClusterInfo& cluster) {
 
 const Envoy::Ssl::ClientContextConfig&
 getConfig(Network::UpstreamTransportSocketFactory& transport_socket_factory) {
-  return dynamic_cast<Quic::QuicClientTransportSocketFactory&>(transport_socket_factory)
-      .clientContextConfig();
+  ASSERT(transport_socket_factory.clientContextConfig().has_value());
+  return transport_socket_factory.clientContextConfig().value();
 }
 
 std::string sni(const Network::TransportSocketOptionsConstSharedPtr& options,
@@ -39,9 +39,9 @@ std::string sni(const Network::TransportSocketOptionsConstSharedPtr& options,
 
 ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
                            Upstream::Host::CreateConnectionData& data)
-    : MultiplexedActiveClientBase(parent, getMaxStreams(parent.host()->cluster()),
-                                  getMaxStreams(parent.host()->cluster()),
-                                  parent.host()->cluster().stats().upstream_cx_http3_total_, data),
+    : MultiplexedActiveClientBase(
+          parent, getMaxStreams(parent.host()->cluster()), getMaxStreams(parent.host()->cluster()),
+          parent.host()->cluster().trafficStats().upstream_cx_http3_total_, data),
       async_connect_callback_(parent_.dispatcher().createSchedulableCallback([this]() {
         if (state() != Envoy::ConnectionPool::ActiveClient::State::Connecting) {
           return;
@@ -119,22 +119,25 @@ Http3ConnPoolImpl::createClientConnection(Quic::QuicStatNames& quic_stat_names,
                                           OptRef<Http::HttpServerPropertiesCache> rtt_cache,
                                           Stats::Scope& scope) {
   std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config =
-      dynamic_cast<Quic::QuicClientTransportSocketFactory&>(host_->transportSocketFactory())
-          .getCryptoConfig();
+      host_->transportSocketFactory().getCryptoConfig();
   if (crypto_config == nullptr) {
     return nullptr; // no secrets available yet.
   }
-  auto source_address_fn = host()->cluster().sourceAddressFn();
-  auto source_address = source_address_fn ? source_address_fn(host()->address()) : nullptr;
-  if (!source_address.get()) {
+
+  auto upstream_local_address_selector = host()->cluster().getUpstreamLocalAddressSelector();
+  auto upstream_local_address =
+      upstream_local_address_selector->getUpstreamLocalAddress(host()->address(), socketOptions());
+  auto source_address = upstream_local_address.address_;
+
+  if (source_address == nullptr) {
     auto host_address = host()->address();
     source_address = Network::Utility::getLocalAddress(host_address->ip()->version());
   }
-  Network::ConnectionSocket::OptionsSharedPtr socket_options =
-      Upstream::combineConnectionSocketOptions(host()->cluster(), socketOptions());
+
   return Quic::createQuicNetworkConnection(
       quic_info_, std::move(crypto_config), server_id_, dispatcher(), host()->address(),
-      source_address, quic_stat_names, rtt_cache, scope, socket_options, transportSocketOptions());
+      source_address, quic_stat_names, rtt_cache, scope, upstream_local_address.socket_options_,
+      transportSocketOptions(), connection_id_generator_);
 }
 
 std::unique_ptr<Http3ConnPoolImpl>
@@ -154,8 +157,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                             "Creating Http/3 client");
         // If there's no ssl context, the secrets are not loaded. Fast-fail by returning null.
         auto factory = &pool->host()->transportSocketFactory();
-        ASSERT(dynamic_cast<Quic::QuicClientTransportSocketFactory*>(factory) != nullptr);
-        if (static_cast<Quic::QuicClientTransportSocketFactory*>(factory)->sslCtx() == nullptr) {
+        if (factory->sslCtx() == nullptr) {
           ENVOY_LOG_EVERY_POW_2_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::pool),
                                           warn,
                                           "Failed to create Http/3 client. Transport socket "

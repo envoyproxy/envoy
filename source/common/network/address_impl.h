@@ -18,6 +18,13 @@ namespace Network {
 namespace Address {
 
 /**
+ * Check whether we are a) on Android or an Apple platform and b) configured via runtime to always
+ * use v6 sockets.
+ * This appears to be what Android OS does for all platform sockets.
+ */
+bool forceV6();
+
+/**
  * Convert an address in the form of the socket address struct defined by Posix, Linux, etc. into
  * a Network::Address::Instance and return a pointer to it. Raises an EnvoyException on failure.
  * @param ss a valid address with family AF_INET, AF_INET6 or AF_UNIX.
@@ -233,6 +240,7 @@ private:
     Ipv6Helper() { memset(&address_, 0, sizeof(address_)); }
     absl::uint128 address() const override;
     bool v6only() const override;
+    uint32_t scopeId() const override;
     uint32_t port() const;
     InstanceConstSharedPtr v4CompatibleAddress() const override;
 

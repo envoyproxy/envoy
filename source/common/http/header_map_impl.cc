@@ -19,30 +19,10 @@ namespace Envoy {
 namespace Http {
 
 namespace {
-// This includes the NULL (StringUtil::itoa technically only needs 21).
-constexpr size_t MaxIntegerLength{32};
 
 constexpr absl::string_view DelimiterForInlineHeaders{","};
 constexpr absl::string_view DelimiterForInlineCookies{"; "};
-
-void validateCapacity(uint64_t new_capacity) {
-  // If the resizing will cause buffer overflow due to hitting uint32_t::max, an OOM is likely
-  // imminent. Fast-fail rather than allow a buffer overflow attack (issue #1421)
-  RELEASE_ASSERT(new_capacity <= std::numeric_limits<uint32_t>::max(),
-                 "Trying to allocate overly large headers.");
-}
-
-absl::string_view getStrView(const VariantHeader& buffer) {
-  return absl::get<absl::string_view>(buffer);
-}
-
-InlineHeaderVector& getInVec(VariantHeader& buffer) {
-  return absl::get<InlineHeaderVector>(buffer);
-}
-
-const InlineHeaderVector& getInVec(const VariantHeader& buffer) {
-  return absl::get<InlineHeaderVector>(buffer);
-}
+const static int kMinHeadersForLazyMap = 3; // Optimal hard-coded value based on benchmarks.
 
 bool validatedLowerCaseString(absl::string_view str) {
   auto lower_case_str = LowerCaseString(str);
@@ -58,144 +38,16 @@ absl::string_view delimiterByHeader(const LowerCaseString& key) {
 
 } // namespace
 
-// Initialize as a Type::Inline
-HeaderString::HeaderString() : buffer_(InlineHeaderVector()) {
-  ASSERT((getInVec(buffer_).capacity()) >= MaxIntegerLength);
+// Initialize as a Type::Reference
+HeaderString::HeaderString(const LowerCaseString& ref_value) noexcept
+    : UnionStringBase(absl::string_view(ref_value.get().c_str(), ref_value.get().size())) {
   ASSERT(valid());
 }
 
-// Initialize as a Type::Reference
-HeaderString::HeaderString(const LowerCaseString& ref_value)
-    : buffer_(absl::string_view(ref_value.get().c_str(), ref_value.get().size())) {
-  ASSERT(valid());
-}
-
-// Initialize as a Type::Reference
-HeaderString::HeaderString(absl::string_view ref_value) : buffer_(ref_value) { ASSERT(valid()); }
-
-HeaderString::HeaderString(HeaderString&& move_value) noexcept
-    : buffer_(std::move(move_value.buffer_)) {
+HeaderString::HeaderString(UnionString&& move_value) noexcept {
+  buffer_ = std::move(move_value.storage());
   move_value.clear();
-  // Move constructor does not validate and relies on the source object validating its mutations.
-}
-
-bool HeaderString::valid() const { return validHeaderString(getStringView()); }
-
-void HeaderString::append(const char* data, uint32_t data_size) {
-  // Make sure the requested memory allocation is below uint32_t::max
-  const uint64_t new_capacity = static_cast<uint64_t>(data_size) + size();
-  validateCapacity(new_capacity);
-  ASSERT(validHeaderString(absl::string_view(data, data_size)));
-
-  switch (type()) {
-  case Type::Reference: {
-    // Rather than be too clever and optimize this uncommon case, we switch to
-    // Inline mode and copy.
-    const absl::string_view prev = getStrView(buffer_);
-    buffer_ = InlineHeaderVector();
-    // Assigning new_capacity to avoid resizing when appending the new data
-    getInVec(buffer_).reserve(new_capacity);
-    getInVec(buffer_).assign(prev.begin(), prev.end());
-    break;
-  }
-  case Type::Inline: {
-    getInVec(buffer_).reserve(new_capacity);
-    break;
-  }
-  }
-  getInVec(buffer_).insert(getInVec(buffer_).end(), data, data + data_size);
-}
-
-void HeaderString::rtrim() {
-  ASSERT(type() == Type::Inline);
-  absl::string_view original = getStringView();
-  absl::string_view rtrimmed = StringUtil::rtrim(original);
-  if (original.size() != rtrimmed.size()) {
-    getInVec(buffer_).resize(rtrimmed.size());
-  }
-}
-
-absl::string_view HeaderString::getStringView() const {
-  if (type() == Type::Reference) {
-    return getStrView(buffer_);
-  }
-  ASSERT(type() == Type::Inline);
-  return {getInVec(buffer_).data(), getInVec(buffer_).size()};
-}
-
-void HeaderString::clear() {
-  if (type() == Type::Inline) {
-    getInVec(buffer_).clear();
-  }
-}
-
-void HeaderString::setCopy(const char* data, uint32_t size) {
-  ASSERT(validHeaderString(absl::string_view(data, size)));
-
-  if (!absl::holds_alternative<InlineHeaderVector>(buffer_)) {
-    // Switching from Type::Reference to Type::Inline
-    buffer_ = InlineHeaderVector();
-  }
-
-  getInVec(buffer_).reserve(size);
-  getInVec(buffer_).assign(data, data + size);
   ASSERT(valid());
-}
-
-void HeaderString::setCopy(absl::string_view view) {
-  this->setCopy(view.data(), static_cast<uint32_t>(view.size()));
-}
-
-void HeaderString::setInteger(uint64_t value) {
-  // Initialize the size to the max length, copy the actual data, and then
-  // reduce the size (but not the capacity) as needed
-  // Note: instead of using the inner_buffer, attempted the following:
-  // resize buffer_ to MaxIntegerLength, apply StringUtil::itoa to the buffer_.data(), and then
-  // resize buffer_ to int_length (the number of digits in value).
-  // However it was slower than the following approach.
-  char inner_buffer[MaxIntegerLength];
-  const uint32_t int_length = StringUtil::itoa(inner_buffer, MaxIntegerLength, value);
-
-  if (type() == Type::Reference) {
-    // Switching from Type::Reference to Type::Inline
-    buffer_ = InlineHeaderVector();
-  }
-  ASSERT((getInVec(buffer_).capacity()) > MaxIntegerLength);
-  getInVec(buffer_).assign(inner_buffer, inner_buffer + int_length);
-}
-
-void HeaderString::setReference(absl::string_view ref_value) {
-  buffer_ = ref_value;
-  ASSERT(valid());
-}
-
-void HeaderString::setCopyUnvalidatedForTestOnly(absl::string_view view) {
-  if (!absl::holds_alternative<InlineHeaderVector>(buffer_)) {
-    // Switching from Type::Reference to Type::Inline
-    buffer_ = InlineHeaderVector();
-  }
-
-  getInVec(buffer_).reserve(view.size());
-  getInVec(buffer_).assign(view.data(), view.data() + view.size());
-}
-
-uint32_t HeaderString::size() const {
-  if (type() == Type::Reference) {
-    return getStrView(buffer_).size();
-  }
-  ASSERT(type() == Type::Inline);
-  return getInVec(buffer_).size();
-}
-
-HeaderString::Type HeaderString::type() const {
-  // buffer_.index() is correlated with the order of Reference and Inline in the
-  // enum.
-  ASSERT(buffer_.index() == 0 || buffer_.index() == 1);
-  ASSERT((buffer_.index() == 0 && absl::holds_alternative<absl::string_view>(buffer_)) ||
-         (buffer_.index() != 0));
-  ASSERT((buffer_.index() == 1 && absl::holds_alternative<InlineHeaderVector>(buffer_)) ||
-         (buffer_.index() != 1));
-  return Type(buffer_.index());
 }
 
 // Specialization needed for HeaderMapImpl::HeaderList::insert() when key is LowerCaseString.
@@ -207,7 +59,7 @@ template <> bool HeaderMapImpl::HeaderList::isPseudoHeader(const LowerCaseString
 
 bool HeaderMapImpl::HeaderList::maybeMakeMap() {
   if (lazy_map_.empty()) {
-    if (headers_.size() < lazy_map_min_size_) {
+    if (headers_.size() < kMinHeadersForLazyMap) {
       return false;
     }
     // Add all entries from the list into the map.

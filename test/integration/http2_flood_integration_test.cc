@@ -39,11 +39,11 @@ bool deferredProcessing(std::tuple<Network::Address::IpVersion, bool, bool> para
 
 std::string testParamsToString(
     const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool, bool>> params) {
-  const bool is_v4 = (std::get<0>(params.param) == Network::Address::IpVersion::v4);
   const bool http2_new_codec_wrapper = std::get<1>(params.param);
-  return absl::StrCat(
-      is_v4 ? "IPv4" : "IPv6", http2_new_codec_wrapper ? "WrappedHttp2" : "BareHttp2",
-      deferredProcessing(params.param) ? "WithDeferredProcessing" : "NoDeferredProcessing");
+  return absl::StrCat(TestUtility::ipVersionToString(std::get<0>(params.param)),
+                      http2_new_codec_wrapper ? "WrappedHttp2" : "BareHttp2",
+                      deferredProcessing(params.param) ? "WithDeferredProcessing"
+                                                       : "NoDeferredProcessing");
 }
 
 // It is important that the new socket interface is installed before any I/O activity starts and
@@ -1482,9 +1482,12 @@ TEST_P(Http2FloodMitigationTest, RequestMetadata) {
       {"header_key1", "header_value1"},
       {"header_key2", "header_value2"},
   };
+  Http::MetadataMapVector metadata_map_vector;
+  metadata_map_vector.push_back(std::make_unique<Http::MetadataMap>(metadata_map));
   for (uint32_t frame = 0; frame < AllFrameFloodLimit + 1; ++frame) {
-    codec_client_->sendMetadata(*request_encoder_, metadata_map);
+    request_encoder_->encodeMetadata(metadata_map_vector);
   }
+  codec_client_->connection()->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
 
   // Upstream connection should be disconnected
   // Downstream client should receive 503 since upstream did not send response headers yet

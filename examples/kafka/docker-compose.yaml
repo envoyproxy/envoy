@@ -27,9 +27,10 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      # Listener value needs to be equal to cluster value in Envoy config
-      # (will receive payloads from Envoy).
-      KAFKA_LISTENER: INTERNAL://kafka-server:9092,EXTERNAL://proxy:10000
+      # This Kafka server instance sets up two listener sockets:
+      # - external one for client traffic (this traffic will go through Envoy proxy),
+      # - internal one for cluster traffic (if we add more brokers).
+      KAFKA_LISTENERS: INTERNAL://kafka-server:9092,EXTERNAL://kafka-server:10000
       # Advertised listener value needs to be equal to Envoy's listener
       # (will make clients discovering this broker talk to it through Envoy).
       KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka-server:9092,EXTERNAL://proxy:10000

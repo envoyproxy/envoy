@@ -105,10 +105,13 @@ public:
                                 const Headers& headers_to_remove = Headers{}) {
     auto conn = makeClientConnection(lookupPort("http"));
     codec_client_ = makeHttpConnection(std::move(conn));
-    Http::TestRequestHeaderMapImpl headers{{":method", "POST"},     {":path", "/test"},
-                                           {":scheme", "http"},     {":authority", "host"},
-                                           {"x-duplicate", "one"},  {"x-duplicate", "two"},
-                                           {"x-duplicate", "three"}};
+    Http::TestRequestHeaderMapImpl headers{
+        {":method", "POST"},           {":path", "/test"},
+        {":scheme", "http"},           {":authority", "host"},
+        {"x-duplicate", "one"},        {"x-duplicate", "two"},
+        {"x-duplicate", "three"},      {"allowed-prefix-one", "one"},
+        {"allowed-prefix-two", "two"}, {"not-allowed", "nope"},
+        {"regex-food", "food"},        {"regex-fool", "fool"}};
 
     // Initialize headers to append. If the authorization server returns any matching keys with one
     // of value in headers_to_add, the header entry from authorization server replaces the one in
@@ -160,8 +163,14 @@ public:
     EXPECT_EQ("value_1", attributes->destination().labels().at("label_1"));
     EXPECT_EQ("value_2", attributes->destination().labels().at("label_2"));
 
-    // Duplicate headers in the check request should be merged.
+    // verify headers in check request, making sure that duplicate headers
+    // are merged.
+    EXPECT_EQ("one", (*http_request->mutable_headers())["allowed-prefix-one"]);
+    EXPECT_EQ("two", (*http_request->mutable_headers())["allowed-prefix-two"]);
     EXPECT_EQ("one,two,three", (*http_request->mutable_headers())["x-duplicate"]);
+    EXPECT_EQ("food", (*http_request->mutable_headers())["regex-food"]);
+    EXPECT_EQ("fool", (*http_request->mutable_headers())["regex-fool"]);
+    EXPECT_FALSE(http_request->headers().contains("not-allowed"));
 
     // Clear fields which are not relevant.
     attributes->clear_source();
@@ -437,6 +446,14 @@ attributes:
   const uint64_t max_request_bytes_ = 1024;
   envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config_{};
   const std::string base_filter_config_ = R"EOF(
+    allowed_headers:
+      patterns:
+      - exact: X-Case-Sensitive-Header
+      - exact: x-duplicate
+      - prefix: allowed-prefix
+      - safe_regex:
+          regex: regex-foo.?
+
     with_request_body:
       max_request_bytes: 1024
       allow_partial_message: true
@@ -453,29 +470,27 @@ public:
     addFakeUpstream(Http::CodecType::HTTP1);
   }
 
-  // By default, HTTP Service uses case sensitive string matcher.
-  void disableCaseSensitiveStringMatcher() {
-    config_helper_.addRuntimeOverride(
-        "envoy.reloadable_features.ext_authz_http_service_enable_case_sensitive_string_matcher",
-        "false");
-  }
-
   void initiateClientConnection() {
     auto conn = makeClientConnection(lookupPort("http"));
     codec_client_ = makeHttpConnection(std::move(conn));
-    response_ = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
-        {":method", "GET"},
-        {":path", "/"},
-        {":scheme", "http"},
-        {":authority", "host"},
-        {"x-case-sensitive-header", case_sensitive_header_value_},
-        {"baz", "foo"},
-        {"bat", "foo"},
-        {"remove-me", "upstream-should-not-see-me"},
-        {"x-duplicate", "one"},
-        {"x-duplicate", "two"},
-        {"x-duplicate", "three"},
-    });
+    response_ = codec_client_->makeHeaderOnlyRequest(
+        Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                       {":path", "/"},
+                                       {":scheme", "http"},
+                                       {":authority", "host"},
+                                       {"x-case-sensitive-header", case_sensitive_header_value_},
+                                       {"baz", "foo"},
+                                       {"bat", "foo"},
+                                       {"remove-me", "upstream-should-not-see-me"},
+                                       {"x-duplicate", "one"},
+                                       {"x-duplicate", "two"},
+                                       {"x-duplicate", "three"},
+                                       {"allowed-prefix-one", "one"},
+                                       {"allowed-prefix-two", "two"},
+                                       {"not-allowed", "nope"},
+                                       {"authorization", "legit"},
+                                       {"regex-food", "food"},
+                                       {"regex-fool", "fool"}});
   }
 
   void waitForExtAuthzRequest() {
@@ -492,6 +507,29 @@ public:
         ext_authz_request_->headers().get(Http::LowerCaseString(std::string("x-duplicate")));
     EXPECT_EQ(1, duplicate.size());
     EXPECT_EQ("one,two,three", duplicate[0]->value().getStringView());
+    EXPECT_EQ("one", ext_authz_request_->headers()
+                         .get(Http::LowerCaseString(std::string("allowed-prefix-one")))[0]
+                         ->value()
+                         .getStringView());
+    EXPECT_EQ("two", ext_authz_request_->headers()
+                         .get(Http::LowerCaseString(std::string("allowed-prefix-two")))[0]
+                         ->value()
+                         .getStringView());
+    EXPECT_EQ("legit", ext_authz_request_->headers()
+                           .get(Http::LowerCaseString(std::string("authorization")))[0]
+                           ->value()
+                           .getStringView());
+    EXPECT_TRUE(ext_authz_request_->headers()
+                    .get(Http::LowerCaseString(std::string("not-allowed")))
+                    .empty());
+    EXPECT_EQ("food", ext_authz_request_->headers()
+                          .get(Http::LowerCaseString(std::string("regex-food")))[0]
+                          ->value()
+                          .getStringView());
+    EXPECT_EQ("fool", ext_authz_request_->headers()
+                          .get(Http::LowerCaseString(std::string("regex-fool")))[0]
+                          ->value()
+                          .getStringView());
 
     // Send back authorization response with "baz" and "bat" headers.
     // Also add multiple values "append-foo" and "append-bar" for key "x-append-bat".
@@ -517,13 +555,18 @@ public:
     cleanupUpstreamAndDownstream();
   }
 
-  void initializeConfig() {
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+  void initializeConfig(bool legacy_allowed_headers = true) {
+    config_helper_.addConfigModifier([this, legacy_allowed_headers](
+                                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
       ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       ext_authz_cluster->set_name("ext_authz");
 
-      TestUtility::loadFromYaml(default_config_, proto_config_);
+      if (legacy_allowed_headers) {
+        TestUtility::loadFromYaml(legacy_default_config_, proto_config_);
+      } else {
+        TestUtility::loadFromYaml(default_config_, proto_config_);
+      }
       envoy::config::listener::v3::Filter ext_authz_filter;
       ext_authz_filter.set_name("envoy.filters.http.ext_authz");
       ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
@@ -532,8 +575,8 @@ public:
     });
   }
 
-  void setup() {
-    initializeConfig();
+  void setup(bool legacy_allowed_headers = true) {
+    initializeConfig(legacy_allowed_headers);
 
     HttpIntegrationTest::initialize();
 
@@ -593,7 +636,7 @@ public:
   IntegrationStreamDecoderPtr response_;
   const Http::LowerCaseString case_sensitive_header_name_{"x-case-sensitive-header"};
   const std::string case_sensitive_header_value_{"Case-Sensitive"};
-  const std::string default_config_ = R"EOF(
+  const std::string legacy_default_config_ = R"EOF(
   transport_api_version: V3
   http_service:
     server_uri:
@@ -606,6 +649,9 @@ public:
         patterns:
         - exact: X-Case-Sensitive-Header
         - exact: x-duplicate
+        - prefix: allowed-prefix
+        - safe_regex:
+            regex: regex-foo.?
 
     authorization_response:
       allowed_upstream_headers:
@@ -618,6 +664,32 @@ public:
         - exact: bat
         - prefix: x-append
 
+  failure_mode_allow: true
+  )EOF";
+  const std::string default_config_ = R"EOF(
+  transport_api_version: V3
+  allowed_headers:
+    patterns:
+    - exact: X-Case-Sensitive-Header
+    - exact: x-duplicate
+    - prefix: allowed-prefix
+    - safe_regex:
+        regex: regex-foo.?
+
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 300s
+    authorization_response:
+      allowed_upstream_headers:
+        patterns:
+        - exact: baz
+        - prefix: x-success
+      allowed_upstream_headers_to_append:
+        patterns:
+        - exact: bat
+        - prefix: x-append
   failure_mode_allow: true
   )EOF";
 };
@@ -725,14 +797,17 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ExtAuthzHttpIntegrationTest,
                          ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-// Verifies that by default HTTP service uses the case-sensitive string matcher.
-TEST_P(ExtAuthzHttpIntegrationTest, DefaultCaseSensitiveStringMatcher) {
+// Verifies that by default HTTP service uses the case-sensitive string matcher
+// (uses legacy config for allowed_headers).
+TEST_P(ExtAuthzHttpIntegrationTest,
+       DEPRECATED_FEATURE_TEST(LegacyDefaultCaseSensitiveStringMatcher)) {
   setup();
   const auto header_entry = ext_authz_request_->headers().get(case_sensitive_header_name_);
   ASSERT_TRUE(header_entry.empty());
 }
 
-TEST_P(ExtAuthzHttpIntegrationTest, DirectReponse) {
+// (uses legacy config for allowed_headers).
+TEST_P(ExtAuthzHttpIntegrationTest, DEPRECATED_FEATURE_TEST(LegacyDirectReponse)) {
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) {
@@ -752,7 +827,8 @@ TEST_P(ExtAuthzHttpIntegrationTest, DirectReponse) {
   EXPECT_EQ("204", response_->headers().Status()->value().getStringView());
 }
 
-TEST_P(ExtAuthzHttpIntegrationTest, RedirectResponse) {
+// (uses legacy config for allowed_headers).
+TEST_P(ExtAuthzHttpIntegrationTest, DEPRECATED_FEATURE_TEST(LegacyRedirectResponse)) {
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) {
@@ -763,6 +839,57 @@ TEST_P(ExtAuthzHttpIntegrationTest, RedirectResponse) {
       });
 
   initializeConfig();
+  HttpIntegrationTest::initialize();
+  initiateClientConnection();
+  waitForExtAuthzRequest();
+
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_TRUE(response_->complete());
+  EXPECT_EQ("301", response_->headers().Status()->value().getStringView());
+  EXPECT_EQ("http://host/redirect", response_->headers().getLocationValue());
+}
+
+// Verifies that by default HTTP service uses the case-sensitive string matcher
+// (uses new config for allowed_headers).
+TEST_P(ExtAuthzHttpIntegrationTest, DefaultCaseSensitiveStringMatcher) {
+  setup(false);
+  const auto header_entry = ext_authz_request_->headers().get(case_sensitive_header_name_);
+  ASSERT_TRUE(header_entry.empty());
+}
+
+// (uses new config for allowed_headers).
+TEST_P(ExtAuthzHttpIntegrationTest, DirectReponse) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* virtual_hosts = hcm.mutable_route_config()->mutable_virtual_hosts(0);
+        virtual_hosts->mutable_routes(0)->clear_route();
+        envoy::config::route::v3::Route* route = virtual_hosts->mutable_routes(0);
+        route->mutable_direct_response()->set_status(204);
+      });
+
+  initializeConfig(false);
+  HttpIntegrationTest::initialize();
+  initiateClientConnection();
+  waitForExtAuthzRequest();
+
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_TRUE(response_->complete());
+  EXPECT_EQ("204", response_->headers().Status()->value().getStringView());
+}
+
+// (uses new config for allowed_headers).
+TEST_P(ExtAuthzHttpIntegrationTest, RedirectResponse) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* virtual_hosts = hcm.mutable_route_config()->mutable_virtual_hosts(0);
+        virtual_hosts->mutable_routes(0)->clear_route();
+        envoy::config::route::v3::Route* route = virtual_hosts->mutable_routes(0);
+        route->mutable_redirect()->set_path_redirect("/redirect");
+      });
+
+  initializeConfig(false);
   HttpIntegrationTest::initialize();
   initiateClientConnection();
   waitForExtAuthzRequest();

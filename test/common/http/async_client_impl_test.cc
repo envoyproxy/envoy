@@ -12,6 +12,7 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/router/context_impl.h"
+#include "source/common/router/upstream_codec_filter.h"
 
 #include "test/common/http/common.h"
 #include "test/mocks/buffer/mocks.h"
@@ -53,14 +54,6 @@ public:
     message_->headers().setPath("/");
     ON_CALL(*cm_.thread_local_cluster_.conn_pool_.host_, locality())
         .WillByDefault(ReturnRef(envoy::config::core::v3::Locality().default_instance()));
-    ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, createFilterChain(_))
-        .WillByDefault(Invoke([&](Http::FilterChainManager& manager) -> void {
-          Http::FilterFactoryCb factory_cb =
-              [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-            callbacks.addStreamDecoderFilter(std::make_shared<Router::UpstreamCodecFilter>());
-          };
-          manager.applyFilterFactoryCb({}, factory_cb);
-        }));
     cm_.initializeThreadLocalClusters({"fake_cluster"});
     HttpTestUtility::addDefaultHeaders(headers_);
   }

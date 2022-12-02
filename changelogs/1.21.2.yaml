@@ -7,4 +7,3 @@ minor_behavior_changes:
 - area: perf
   change: |
     ssl contexts are now tracked without scan based garbage collection and greatly improved the performance on secret update.
-

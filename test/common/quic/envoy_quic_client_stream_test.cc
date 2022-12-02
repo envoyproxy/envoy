@@ -13,6 +13,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "quiche/quic/core/crypto/null_encrypter.h"
+#include "quiche/quic/core/deterministic_connection_id_generator.h"
 
 namespace Envoy {
 namespace Quic {
@@ -39,7 +40,7 @@ public:
         quic_connection_(new EnvoyQuicClientConnection(
             quic::test::TestConnectionId(), connection_helper_, alarm_factory_, &writer_,
             /*owns_writer=*/false, {quic_version_}, *dispatcher_,
-            createConnectionSocket(peer_addr_, self_addr_, nullptr))),
+            createConnectionSocket(peer_addr_, self_addr_, nullptr), connection_id_generator_)),
         quic_session_(quic_config_, {quic_version_},
                       std::unique_ptr<EnvoyQuicClientConnection>(quic_connection_), *dispatcher_,
                       quic_config_.GetInitialStreamFlowControlWindowToSend() * 2,
@@ -69,7 +70,7 @@ public:
 
   void SetUp() override {
     quic_session_.Initialize();
-    quic_connection_->setEnvoyConnection(quic_session_);
+    quic_connection_->setEnvoyConnection(quic_session_, quic_session_);
     quic_connection_->SetEncrypter(
         quic::ENCRYPTION_FORWARD_SECURE,
         std::make_unique<quic::NullEncrypter>(quic::Perspective::IS_CLIENT));
@@ -134,6 +135,8 @@ protected:
   Network::Address::InstanceConstSharedPtr peer_addr_;
   Network::Address::InstanceConstSharedPtr self_addr_;
   MockDelegate delegate_;
+  quic::DeterministicConnectionIdGenerator connection_id_generator_{
+      quic::kQuicDefaultConnectionIdLength};
   EnvoyQuicClientConnection* quic_connection_;
   TestQuicCryptoClientStreamFactory crypto_stream_factory_;
   MockEnvoyQuicClientSession quic_session_;

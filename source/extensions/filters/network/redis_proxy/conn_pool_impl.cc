@@ -33,6 +33,8 @@ const Common::Redis::RespValue& getRequest(const RespVariant& request) {
     return *(absl::get<Common::Redis::RespValueConstSharedPtr>(request));
   }
 }
+
+static uint16_t default_port = 6379;
 } // namespace
 
 InstanceImpl::InstanceImpl(
@@ -42,34 +44,37 @@ InstanceImpl::InstanceImpl(
         config,
     Api::Api& api, Stats::ScopeSharedPtr&& stats_scope,
     const Common::Redis::RedisCommandStatsSharedPtr& redis_command_stats,
-    Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager)
+    Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager,
+    const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache)
     : cluster_name_(cluster_name), cm_(cm), client_factory_(client_factory),
       tls_(tls.allocateSlot()), config_(new Common::Redis::Client::ConfigImpl(config)), api_(api),
       stats_scope_(std::move(stats_scope)),
       redis_command_stats_(redis_command_stats), redis_cluster_stats_{REDIS_CLUSTER_STATS(
                                                      POOL_COUNTER(*stats_scope_))},
-      refresh_manager_(std::move(refresh_manager)) {}
+      refresh_manager_(std::move(refresh_manager)), dns_cache_(dns_cache) {}
 
 void InstanceImpl::init() {
   // Note: `this` and `cluster_name` have a a lifetime of the filter.
   // That may be shorter than the tls callback if the listener is torn down shortly after it is
   // created. We use a weak pointer to make sure this object outlives the tls callbacks.
   std::weak_ptr<InstanceImpl> this_weak_ptr = this->shared_from_this();
-  tls_->set(
-      [this_weak_ptr](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-        if (auto this_shared_ptr = this_weak_ptr.lock()) {
-          return std::make_shared<ThreadLocalPool>(this_shared_ptr, dispatcher,
-                                                   this_shared_ptr->cluster_name_);
-        }
-        return nullptr;
-      });
+  tls_->set([this_weak_ptr](
+                Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    if (auto this_shared_ptr = this_weak_ptr.lock()) {
+      return std::make_shared<ThreadLocalPool>(
+          this_shared_ptr, dispatcher, this_shared_ptr->cluster_name_, this_shared_ptr->dns_cache_);
+    }
+    return nullptr;
+  });
 }
 
 // This method is always called from a InstanceSharedPtr we don't have to worry about tls_->getTyped
 // failing due to InstanceImpl going away.
 Common::Redis::Client::PoolRequest*
-InstanceImpl::makeRequest(const std::string& key, RespVariant&& request, PoolCallbacks& callbacks) {
-  return tls_->getTyped<ThreadLocalPool>().makeRequest(key, std::move(request), callbacks);
+InstanceImpl::makeRequest(const std::string& key, RespVariant&& request, PoolCallbacks& callbacks,
+                          Common::Redis::Client::Transaction& transaction) {
+  return tls_->getTyped<ThreadLocalPool>().makeRequest(key, std::move(request), callbacks,
+                                                       transaction);
 }
 
 // This method is always called from a InstanceSharedPtr we don't have to worry about tls_->getTyped
@@ -81,10 +86,11 @@ InstanceImpl::makeRequestToHost(const std::string& host_address,
   return tls_->getTyped<ThreadLocalPool>().makeRequestToHost(host_address, request, callbacks);
 }
 
-InstanceImpl::ThreadLocalPool::ThreadLocalPool(std::shared_ptr<InstanceImpl> parent,
-                                               Event::Dispatcher& dispatcher,
-                                               std::string cluster_name)
+InstanceImpl::ThreadLocalPool::ThreadLocalPool(
+    std::shared_ptr<InstanceImpl> parent, Event::Dispatcher& dispatcher, std::string cluster_name,
+    const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache)
     : parent_(parent), dispatcher_(dispatcher), cluster_name_(std::move(cluster_name)),
+      dns_cache_(dns_cache),
       drain_timer_(dispatcher.createTimer([this]() -> void { drainClients(); })),
       is_redis_cluster_(false), client_factory_(parent->client_factory_), config_(parent->config_),
       stats_scope_(parent->stats_scope_), redis_command_stats_(parent->redis_command_stats_),
@@ -235,7 +241,7 @@ InstanceImpl::ThreadLocalPool::threadLocalActiveClient(Upstream::HostConstShared
     client->host_ = host;
     client->redis_client_ =
         client_factory_.create(host, dispatcher_, *config_, redis_command_stats_, *(stats_scope_),
-                               auth_username_, auth_password_);
+                               auth_username_, auth_password_, false);
     client->redis_client_->addConnectionCallbacks(*client);
   }
   return client;
@@ -243,26 +249,47 @@ InstanceImpl::ThreadLocalPool::threadLocalActiveClient(Upstream::HostConstShared
 
 Common::Redis::Client::PoolRequest*
 InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key, RespVariant&& request,
-                                           PoolCallbacks& callbacks) {
+                                           PoolCallbacks& callbacks,
+                                           Common::Redis::Client::Transaction& transaction) {
   if (cluster_ == nullptr) {
     ASSERT(client_map_.empty());
     ASSERT(host_set_member_update_cb_handle_ == nullptr);
     return nullptr;
   }
 
-  Clusters::Redis::RedisLoadBalancerContextImpl lb_context(key, config_->enableHashtagging(),
-                                                           is_redis_cluster_, getRequest(request),
-                                                           config_->readPolicy());
+  Clusters::Redis::RedisLoadBalancerContextImpl lb_context(
+      key, config_->enableHashtagging(), is_redis_cluster_, getRequest(request),
+      transaction.active_ ? Common::Redis::Client::ReadPolicy::Primary : config_->readPolicy());
+
   Upstream::HostConstSharedPtr host = cluster_->loadBalancer().chooseHost(&lb_context);
   if (!host) {
     ENVOY_LOG(debug, "host not found: '{}'", key);
     return nullptr;
   }
-  pending_requests_.emplace_back(*this, std::move(request), callbacks);
+
+  // If there is an active transaction, establish a new connection if necessary.
+  if (transaction.active_ && !transaction.connection_established_) {
+    transaction.client_ =
+        client_factory_.create(host, dispatcher_, *config_, redis_command_stats_, *(stats_scope_),
+                               auth_username_, auth_password_, true);
+    if (transaction.connection_cb_) {
+      transaction.client_->addConnectionCallbacks(*transaction.connection_cb_);
+    }
+    transaction.connection_established_ = true;
+  }
+
+  pending_requests_.emplace_back(*this, std::move(request), callbacks, host);
   PendingRequest& pending_request = pending_requests_.back();
-  ThreadLocalActiveClientPtr& client = this->threadLocalActiveClient(host);
-  pending_request.request_handler_ = client->redis_client_->makeRequest(
-      getRequest(pending_request.incoming_request_), pending_request);
+
+  if (!transaction.active_) {
+    pending_request.request_handler_ =
+        this->threadLocalActiveClient(host)->redis_client_->makeRequest(
+            getRequest(pending_request.incoming_request_), pending_request);
+  } else {
+    pending_request.request_handler_ = transaction.client_->makeRequest(
+        getRequest(pending_request.incoming_request_), pending_request);
+  }
+
   if (pending_request.request_handler_) {
     return &pending_request;
   } else {
@@ -376,11 +403,14 @@ void InstanceImpl::ThreadLocalActiveClient::onEvent(Network::ConnectionEvent eve
 
 InstanceImpl::PendingRequest::PendingRequest(InstanceImpl::ThreadLocalPool& parent,
                                              RespVariant&& incoming_request,
-                                             PoolCallbacks& pool_callbacks)
+                                             PoolCallbacks& pool_callbacks,
+                                             Upstream::HostConstSharedPtr& host)
     : parent_(parent), incoming_request_(std::move(incoming_request)),
-      pool_callbacks_(pool_callbacks) {}
+      pool_callbacks_(pool_callbacks), host_(host) {}
 
 InstanceImpl::PendingRequest::~PendingRequest() {
+  cache_load_handle_.reset();
+
   if (request_handler_) {
     request_handler_->cancel();
     request_handler_ = nullptr;
@@ -403,9 +433,73 @@ void InstanceImpl::PendingRequest::onFailure() {
   parent_.onRequestCompleted();
 }
 
-bool InstanceImpl::PendingRequest::onRedirection(Common::Redis::RespValuePtr&& value,
+void InstanceImpl::PendingRequest::onRedirection(Common::Redis::RespValuePtr&& value,
                                                  const std::string& host_address,
                                                  bool ask_redirection) {
+  if (!parent_.dns_cache_) {
+    doRedirection(std::move(value), host_address, ask_redirection);
+    return;
+  }
+
+  resp_value_ = std::move(value);
+  ask_redirection_ = ask_redirection;
+  auto result = parent_.dns_cache_->loadDnsCacheEntry(host_address, default_port, false, *this);
+  cache_load_handle_ = std::move(result.handle_);
+
+  switch (result.status_) {
+  case Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus::InCache: {
+    ASSERT(cache_load_handle_ == nullptr);
+    if (!result.host_info_.has_value() || !result.host_info_.value()->address()) {
+      ENVOY_LOG(debug, "DNS entry for '{}' was in cache but did not contain an address",
+                host_address);
+      auto host = host_;
+      onResponse(std::move(resp_value_));
+      host->cluster().trafficStats().upstream_internal_redirect_failed_total_.inc();
+    } else {
+      doRedirection(std::move(resp_value_),
+                    formatAddress(*result.host_info_.value()->address()->ip()), ask_redirection_);
+    }
+    return;
+  }
+  case Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus::Loading:
+    ASSERT(cache_load_handle_ != nullptr);
+    return;
+  case Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus::Overflow:
+    ASSERT(cache_load_handle_ == nullptr);
+    ENVOY_LOG(debug, "DNS lookup for '{}' was not performed due to an overflow in the cache",
+              host_address);
+    auto host = host_;
+    onResponse(std::move(resp_value_));
+    host->cluster().trafficStats().upstream_internal_redirect_failed_total_.inc();
+    return;
+  }
+  PANIC_DUE_TO_CORRUPT_ENUM;
+}
+
+std::string InstanceImpl::PendingRequest::formatAddress(const Envoy::Network::Address::Ip& ip) {
+  return fmt::format("{}:{}", ip.addressAsString(), ip.port());
+}
+void InstanceImpl::PendingRequest::onLoadDnsCacheComplete(
+    const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) {
+  cache_load_handle_.reset();
+
+  if (!host_info || !host_info->address()) {
+    ENVOY_LOG(debug, "DNS lookup failed");
+    auto host = host_;
+    onResponse(std::move(resp_value_));
+    host->cluster().trafficStats().upstream_internal_redirect_failed_total_.inc();
+  } else {
+    doRedirection(std::move(resp_value_), formatAddress(*host_info->address()->ip()),
+                  ask_redirection_);
+  }
+}
+
+void InstanceImpl::PendingRequest::doRedirection(Common::Redis::RespValuePtr&& value,
+                                                 const std::string& host_address,
+                                                 bool ask_redirection) {
+  // This request might go away, so keep a copy of host.
+  auto host = host_;
+
   // Prepend request with an asking command if redirected via an ASK error. The returned handle is
   // not important since there is no point in being able to cancel the request. The use of
   // null_pool_callbacks ensures the transparent filtering of the Redis server's response to the
@@ -415,15 +509,17 @@ bool InstanceImpl::PendingRequest::onRedirection(Common::Redis::RespValuePtr&& v
       !parent_.makeRequestToHost(host_address, Common::Redis::Utility::AskingRequest::instance(),
                                  null_client_callbacks)) {
     onResponse(std::move(value));
-    return false;
-  }
-  request_handler_ = parent_.makeRequestToHost(host_address, getRequest(incoming_request_), *this);
-  if (!request_handler_) {
-    onResponse(std::move(value));
-    return false;
+    host->cluster().trafficStats().upstream_internal_redirect_failed_total_.inc();
   } else {
-    parent_.refresh_manager_->onRedirection(parent_.cluster_name_);
-    return true;
+    request_handler_ =
+        parent_.makeRequestToHost(host_address, getRequest(incoming_request_), *this);
+    if (!request_handler_) {
+      onResponse(std::move(value));
+      host->cluster().trafficStats().upstream_internal_redirect_failed_total_.inc();
+    } else {
+      parent_.refresh_manager_->onRedirection(parent_.cluster_name_);
+      host->cluster().trafficStats().upstream_internal_redirect_succeeded_total_.inc();
+    }
   }
 }
 

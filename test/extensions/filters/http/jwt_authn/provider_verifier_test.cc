@@ -11,6 +11,7 @@
 #include "gmock/gmock.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication;
+using envoy::extensions::filters::http::jwt_authn::v3::JwtRequirement;
 using ::google::jwt_verify::Status;
 using ::testing::Eq;
 using ::testing::NiceMock;
@@ -68,10 +69,14 @@ TEST_F(ProviderVerifierTest, TestOkJWT) {
   auto headers = Http::TestRequestHeaderMapImpl{
       {"Authorization", "Bearer " + std::string(GoodToken)},
       {"sec-istio-auth-userinfo", ""},
+      {"x-jwt-claim-sub", "value-to-be-replaced"},
+      {"x-jwt-claim-nested", "header-to-be-deleted"},
   };
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
   EXPECT_EQ(ExpectedPayloadValue, headers.get_("sec-istio-auth-userinfo"));
+  EXPECT_EQ("test@example.com", headers.get_("x-jwt-claim-sub"));
+  EXPECT_FALSE(headers.has("x-jwt-claim-nested"));
 }
 
 // Test to set the payload (hence dynamic metadata) with the header and payload extracted from the
@@ -140,10 +145,13 @@ TEST_F(ProviderVerifierTest, TestMissedJWT) {
 
   EXPECT_CALL(mock_cb_, onComplete(Status::JwtMissed));
 
-  auto headers = Http::TestRequestHeaderMapImpl{{"sec-istio-auth-userinfo", ""}};
+  auto headers = Http::TestRequestHeaderMapImpl{
+      {"sec-istio-auth-userinfo", ""}, {"x-jwt-claim-sub", ""}, {"x-jwt-claim-nested", ""}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
   EXPECT_FALSE(headers.has("sec-istio-auth-userinfo"));
+  EXPECT_FALSE(headers.has("x-jwt-claim-sub"));
+  EXPECT_FALSE(headers.has("x-jwt-claim-nested"));
 }
 
 // This test verifies that JWT must be issued by the provider specified in the requirement.
@@ -161,9 +169,15 @@ providers:
         uri: https://pubkey_server/pubkey_path
         cluster: pubkey_cluster
     forward_payload_header: example-auth-userinfo
+    claim_to_headers:
+    - header_name: x-jwt-claim-sub
+      claim_name: sub
   other_provider:
     issuer: other_issuer
     forward_payload_header: other-auth-userinfo
+    claim_to_headers:
+    - header_name: x-jwt-claim-issuer
+      claim_name: iss
 rules:
 - match:
     path: "/"
@@ -179,20 +193,24 @@ rules:
       {"Authorization", "Bearer " + std::string(GoodToken)},
       {"example-auth-userinfo", ""},
       {"other-auth-userinfo", ""},
+      {"x-jwt-claim-sub", ""},
+      {"x-jwt-claim-issuer", ""},
   };
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
   EXPECT_TRUE(headers.has("example-auth-userinfo"));
+  EXPECT_TRUE(headers.has("x-jwt-claim-sub"));
+  EXPECT_FALSE(headers.has("x-jwt-claim-issuer"));
   EXPECT_FALSE(headers.has("other-auth-userinfo"));
 }
 
 // This test verifies that JWT requirement can override audiences
 TEST_F(ProviderVerifierTest, TestRequiresProviderWithAudiences) {
   TestUtility::loadFromYaml(ExampleConfig, proto_config_);
-  auto* requires =
+  auto* provider_and_audiences =
       proto_config_.mutable_rules(0)->mutable_requires()->mutable_provider_and_audiences();
-  requires->set_provider_name("example_provider");
-  requires->add_audiences("invalid_service");
+  provider_and_audiences->set_provider_name("example_provider");
+  provider_and_audiences->add_audiences("invalid_service");
   createVerifier();
   MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
 
@@ -215,6 +233,69 @@ TEST_F(ProviderVerifierTest, TestRequiresNonexistentProvider) {
   proto_config_.mutable_rules(0)->mutable_requires()->set_provider_name("nosuchprovider");
 
   EXPECT_THROW(FilterConfigImpl(proto_config_, "", mock_factory_ctx_), EnvoyException);
+}
+
+class ProviderVerifiersJwtCacheTest : public ProviderVerifierTest,
+                                      public testing::WithParamInterface<bool> {};
+
+// Bool is for jwt_cache: with jwt_cache and without jwt_cache.
+INSTANTIATE_TEST_SUITE_P(ProviderVerifiersJwtCache, ProviderVerifiersJwtCacheTest,
+                         ::testing::Bool());
+
+// This test verifies that two JWT requirements with different audiences behave the same with
+// jwt_cache and without. The first requirement is checking audiences specified in the provider
+// which is "example_service". The second requirement is type "provider_and_audiences" and its
+// specified audiences is "other_service". The audience in the JWT token is "example_service". The
+// first requirement should work and the second one should fail.
+TEST_P(ProviderVerifiersJwtCacheTest, TestRequirementsWithAudiences) {
+  TestUtility::loadFromYaml(ExampleConfig, proto_config_);
+  // Turn on jwt_cache
+  if (GetParam()) {
+    (*proto_config_.mutable_providers())[std::string(ProviderName)]
+        .mutable_jwt_cache_config()
+        ->set_jwt_cache_size(1000);
+  }
+  createVerifier();
+
+  JwtRequirement require2;
+  auto* provider_and_audiences = require2.mutable_provider_and_audiences();
+  provider_and_audiences->set_provider_name("example_provider");
+  provider_and_audiences->add_audiences("other_service");
+  VerifierConstPtr verifier2 =
+      Verifier::create(require2, proto_config_.providers(), *filter_config_);
+
+  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
+
+  {
+    // First call, audience matched, so it is good.
+    EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
+      ASSERT_EQ(status, Status::Ok);
+    }));
+
+    auto headers =
+        Http::TestRequestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
+    verifier_->verify(Verifier::createContext(headers, parent_span_, &mock_cb_));
+  }
+
+  {
+    // Second call, audiences don't match, so it is rejected.
+    MockVerifierCallbacks mock_cb2;
+    EXPECT_CALL(mock_cb2, onComplete(_)).WillOnce(Invoke([](const Status& status) {
+      ASSERT_EQ(status, Status::JwtAudienceNotAllowed);
+    }));
+
+    auto headers =
+        Http::TestRequestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
+    verifier2->verify(Verifier::createContext(headers, parent_span_, &mock_cb2));
+  }
+
+  if (GetParam()) {
+    EXPECT_EQ(1U, filter_config_->stats().jwt_cache_hit_.value());
+    EXPECT_EQ(1U, filter_config_->stats().jwt_cache_miss_.value());
+  } else {
+    EXPECT_EQ(0U, filter_config_->stats().jwt_cache_hit_.value());
+    EXPECT_EQ(2U, filter_config_->stats().jwt_cache_miss_.value());
+  }
 }
 
 } // namespace

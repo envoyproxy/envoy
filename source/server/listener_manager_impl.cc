@@ -144,8 +144,8 @@ ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
         }
       }
       auto filter_config_provider = config_provider_manager.createDynamicFilterConfigProvider(
-          config_discovery, name, context.getServerFactoryContext(), context, "tcp_listener.",
-          false, "listener", createListenerFilterMatcher(proto_config));
+          config_discovery, name, context.getServerFactoryContext(), context, false, "listener",
+          createListenerFilterMatcher(proto_config));
       ret.push_back(std::move(filter_config_provider));
     } else {
       ENVOY_LOG(debug, "  config: {}",
@@ -277,18 +277,23 @@ DrainingFilterChainsManager::DrainingFilterChainsManager(ListenerImplPtr&& drain
       workers_pending_removal_(workers_pending_removal) {}
 
 ListenerManagerImpl::ListenerManagerImpl(Instance& server,
-                                         ListenerComponentFactory& listener_factory,
+                                         std::unique_ptr<ListenerComponentFactory>&& factory,
                                          WorkerFactory& worker_factory,
                                          bool enable_dispatcher_stats,
                                          Quic::QuicStatNames& quic_stat_names)
-    : server_(server), factory_(listener_factory),
+    : server_(server), factory_(std::move(factory)),
       scope_(server.stats().createScope("listener_manager.")), stats_(generateStats(*scope_)),
-      config_tracker_entry_(server.admin().getConfigTracker().add(
-          "listeners",
-          [this](const Matchers::StringMatcher& name_matcher) {
-            return dumpListenerConfigs(name_matcher);
-          })),
       enable_dispatcher_stats_(enable_dispatcher_stats), quic_stat_names_(quic_stat_names) {
+  if (!factory_) {
+    factory_ = std::make_unique<ProdListenerComponentFactory>(server);
+  }
+  if (server.admin().has_value()) {
+    config_tracker_entry_ = server.admin()->getConfigTracker().add(
+        "listeners", [this](const Matchers::StringMatcher& name_matcher) {
+          return dumpListenerConfigs(name_matcher);
+        });
+  }
+
   for (uint32_t i = 0; i < server.options().concurrency(); i++) {
     workers_.emplace_back(
         worker_factory.createWorker(i, server.overloadManager(), absl::StrCat("worker_", i)));
@@ -395,7 +400,7 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3:
     if (!api_listener_ && !added_via_api) {
       // TODO(junr03): dispatch to different concrete constructors when there are other
       // ApiListenerImplBase derived classes.
-      api_listener_ = std::make_unique<HttpApiListener>(config, *this, config.name());
+      api_listener_ = std::make_unique<HttpApiListener>(config, server_, config.name());
       return true;
     } else {
       ENVOY_LOG(warn, "listener {} can not be added because currently only one ApiListener is "
@@ -421,6 +426,30 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3:
   }
   error_state_tracker_.erase(it);
   return false;
+}
+
+void ListenerManagerImpl::setupSocketFactoryForListener(ListenerImpl& new_listener,
+                                                        const ListenerImpl& existing_listener) {
+  bool same_socket_options = true;
+  if (Runtime::runtimeFeatureEnabled(ENABLE_UPDATE_LISTENER_SOCKET_OPTIONS_RUNTIME_FLAG)) {
+    if (new_listener.reusePort() != existing_listener.reusePort()) {
+      throw EnvoyException(fmt::format("Listener {}: reuse port cannot be changed during an update",
+                                       new_listener.name()));
+    }
+
+    same_socket_options = existing_listener.socketOptionsEqual(new_listener);
+    if (!same_socket_options && new_listener.reusePort() == false) {
+      throw EnvoyException(fmt::format("Listener {}: doesn't support update any socket options "
+                                       "when the reuse port isn't enabled",
+                                       new_listener.name()));
+    }
+  }
+
+  if (!(existing_listener.hasCompatibleAddress(new_listener) && same_socket_options)) {
+    setNewOrDrainingSocketFactory(new_listener.name(), new_listener);
+  } else {
+    new_listener.cloneSocketFactoryFrom(existing_listener);
+  }
 }
 
 bool ListenerManagerImpl::addOrUpdateListenerInternal(
@@ -482,23 +511,15 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
 
   bool added = false;
   if (existing_warming_listener != warming_listeners_.end()) {
-    // In this case we can just replace inline.
     ASSERT(workers_started_);
     new_listener->debugLog("update warming listener");
-    if (!(*existing_warming_listener)->hasCompatibleAddress(*new_listener)) {
-      setNewOrDrainingSocketFactory(name, *new_listener);
-    } else {
-      new_listener->cloneSocketFactoryFrom(**existing_warming_listener);
-    }
+    setupSocketFactoryForListener(*new_listener, **existing_warming_listener);
+    // In this case we can just replace inline.
     *existing_warming_listener = std::move(new_listener);
   } else if (existing_active_listener != active_listeners_.end()) {
+    setupSocketFactoryForListener(*new_listener, **existing_active_listener);
     // In this case we have no warming listener, so what we do depends on whether workers
     // have been started or not.
-    if (!(*existing_active_listener)->hasCompatibleAddress(*new_listener)) {
-      setNewOrDrainingSocketFactory(name, *new_listener);
-    } else {
-      new_listener->cloneSocketFactoryFrom(**existing_active_listener);
-    }
     if (workers_started_) {
       new_listener->debugLog("add warming listener");
       warming_listeners_.emplace_back(std::move(new_listener));
@@ -938,7 +959,7 @@ ListenerFilterChainFactoryBuilder::ListenerFilterChainFactoryBuilder(
     ListenerImpl& listener,
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context)
     : listener_(listener), validator_(listener.validation_visitor_),
-      listener_component_factory_(listener.parent_.factory_), factory_context_(factory_context) {}
+      listener_component_factory_(*listener.parent_.factory_), factory_context_(factory_context) {}
 
 Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildFilterChain(
     const envoy::config::listener::v3::FilterChain& filter_chain,
@@ -1071,10 +1092,12 @@ void ListenerManagerImpl::createListenSocketFactory(ListenerImpl& listener) {
   TRY_ASSERT_MAIN_THREAD {
     Network::SocketCreationOptions creation_options;
     creation_options.mptcp_enabled_ = listener.mptcpEnabled();
-    for (auto& address : listener.addresses()) {
+    for (std::vector<Network::Address::InstanceConstSharedPtr>::size_type i = 0;
+         i < listener.addresses().size(); i++) {
       listener.addSocketFactory(std::make_unique<ListenSocketFactoryImpl>(
-          factory_, address, socket_type, listener.listenSocketOptions(), listener.name(),
-          listener.tcpBacklogSize(), bind_type, creation_options, server_.options().concurrency()));
+          *factory_, listener.addresses()[i], socket_type, listener.listenSocketOptions(i),
+          listener.name(), listener.tcpBacklogSize(), bind_type, creation_options,
+          server_.options().concurrency()));
     }
   }
   END_TRY
@@ -1110,6 +1133,8 @@ void ListenerManagerImpl::maybeCloseSocketsForListener(ListenerImpl& listener) {
 ApiListenerOptRef ListenerManagerImpl::apiListener() {
   return api_listener_ ? ApiListenerOptRef(std::ref(*api_listener_)) : absl::nullopt;
 }
+
+REGISTER_FACTORY(DefaultListenerManagerFactoryImpl, ListenerManagerFactory);
 
 } // namespace Server
 } // namespace Envoy

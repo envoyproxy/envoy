@@ -21,6 +21,8 @@ public:
       Server::Configuration::TransportSocketFactoryContext& context) override;
 };
 
+DECLARE_FACTORY(UpstreamHttp11ConnectSocketConfigFactory);
+
 } // namespace Http11Connect
 } // namespace TransportSockets
 } // namespace Extensions

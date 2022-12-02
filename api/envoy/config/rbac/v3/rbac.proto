@@ -5,6 +5,7 @@ package envoy.config.rbac.v3;
 import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/extension.proto";
 import "envoy/config/route/v3/route_components.proto";
+import "envoy/type/matcher/v3/filter_state.proto";
 import "envoy/type/matcher/v3/metadata.proto";
 import "envoy/type/matcher/v3/path.proto";
 import "envoy/type/matcher/v3/string.proto";
@@ -229,7 +230,7 @@ message Permission {
 
 // Principal defines an identity or a group of identities for a downstream
 // subject.
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 message Principal {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.rbac.v2.Principal";
 
@@ -303,6 +304,9 @@ message Principal {
 
     // Metadata that describes additional information about the principal.
     type.matcher.v3.MetadataMatcher metadata = 7;
+
+    // Identifies the principal using a filter state object.
+    type.matcher.v3.FilterStateMatcher filter_state = 12;
 
     // Negates matching the provided principal. For instance, if the value of
     // ``not_id`` would match, this principal would not match. Conversely, if the

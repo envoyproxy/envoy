@@ -13,10 +13,10 @@ EnvoyQuicServerConnection::EnvoyQuicServerConnection(
     quic::QuicConnectionHelperInterface& helper, quic::QuicAlarmFactory& alarm_factory,
     quic::QuicPacketWriter* writer, bool owns_writer,
     const quic::ParsedQuicVersionVector& supported_versions,
-    Network::ConnectionSocketPtr connection_socket)
+    Network::ConnectionSocketPtr connection_socket, quic::ConnectionIdGeneratorInterface& generator)
     : quic::QuicConnection(server_connection_id, initial_self_address, initial_peer_address,
                            &helper, &alarm_factory, writer, owns_writer,
-                           quic::Perspective::IS_SERVER, supported_versions),
+                           quic::Perspective::IS_SERVER, supported_versions, generator),
       QuicNetworkConnection(std::move(connection_socket)),
       defer_send_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.quic_defer_send_in_response_to_packet")) {
@@ -26,7 +26,7 @@ EnvoyQuicServerConnection::EnvoyQuicServerConnection(
     // UDP GSO sendmsg efficiency. But this optimization causes some test failures under Windows,
     // and Windows doesn't support GSO, do not apply this optimization on Windows.
     // TODO(#22976) Figure out if this is needed on Windows.
-    set_defer_send_in_response_to_packets(GetQuicFlag(FLAGS_quic_defer_send_in_response));
+    set_defer_send_in_response_to_packets(GetQuicFlag(quic_defer_send_in_response));
   }
 #endif
 }
@@ -47,19 +47,9 @@ bool EnvoyQuicServerConnection::OnPacketHeader(const quic::QuicPacketHeader& hea
   return true;
 }
 
-std::unique_ptr<quic::QuicSelfIssuedConnectionIdManager>
-EnvoyQuicServerConnection::MakeSelfIssuedConnectionIdManager() {
-  return std::make_unique<EnvoyQuicSelfIssuedConnectionIdManager>(
-      quic::kMinNumOfActiveConnectionIds, connection_id(), clock(), alarm_factory(), this,
-      context());
-}
-
-quic::QuicConnectionId EnvoyQuicSelfIssuedConnectionIdManager::GenerateNewConnectionId(
-    const quic::QuicConnectionId& old_connection_id) const {
-  quic::QuicConnectionId new_connection_id =
-      quic::QuicSelfIssuedConnectionIdManager::GenerateNewConnectionId(old_connection_id);
-  adjustNewConnectionIdForRoutine(new_connection_id, old_connection_id);
-  return new_connection_id;
+void EnvoyQuicServerConnection::OnCanWrite() {
+  quic::QuicConnection::OnCanWrite();
+  onWriteEventDone();
 }
 
 } // namespace Quic

@@ -19,6 +19,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "quiche/quic/core/crypto/null_encrypter.h"
+#include "quiche/quic/core/deterministic_connection_id_generator.h"
 #include "quiche/quic/test_tools/quic_connection_peer.h"
 #include "quiche/quic/test_tools/quic_session_peer.h"
 
@@ -39,10 +40,10 @@ public:
                                             POOL_GAUGE(listener_config_.listenerScope()),
                                             POOL_HISTOGRAM(listener_config_.listenerScope()))}),
         quic_connection_(connection_helper_, alarm_factory_, writer_,
-                         quic::ParsedQuicVersionVector{quic_version_}, *listener_config_.socket_),
+                         quic::ParsedQuicVersionVector{quic_version_}, *listener_config_.socket_,
+                         connection_id_generator_),
         quic_session_(quic_config_, {quic_version_}, &quic_connection_, *dispatcher_,
                       quic_config_.GetInitialStreamFlowControlWindowToSend() * 2),
-        stream_id_(4u),
         stats_(
             {ALL_HTTP3_CODEC_STATS(POOL_COUNTER_PREFIX(listener_config_.listenerScope(), "http3."),
                                    POOL_GAUGE_PREFIX(listener_config_.listenerScope(), "http3."))}),
@@ -172,9 +173,11 @@ protected:
   quic::QuicConfig quic_config_;
   testing::NiceMock<Network::MockListenerConfig> listener_config_;
   Server::ListenerStats listener_stats_;
+  quic::DeterministicConnectionIdGenerator connection_id_generator_{
+      quic::kQuicDefaultConnectionIdLength};
   testing::NiceMock<MockEnvoyQuicServerConnection> quic_connection_;
   MockEnvoyQuicSession quic_session_;
-  quic::QuicStreamId stream_id_;
+  quic::QuicStreamId stream_id_{4u};
   Http::Http3::CodecStats stats_;
   envoy::config::core::v3::Http3ProtocolOptions http3_options_;
   EnvoyQuicServerStream* quic_stream_;

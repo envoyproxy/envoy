@@ -23,6 +23,7 @@
 #include "source/common/network/connection_impl.h"
 #include "source/common/network/raw_buffer_socket.h"
 #include "source/common/router/context_impl.h"
+#include "source/common/router/upstream_codec_filter.h"
 #include "source/common/stats/symbol_table.h"
 
 #include "source/extensions/transport_sockets/tls/context_config_impl.h"
@@ -245,16 +246,7 @@ public:
       : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")),
         api_(Api::createApiForTest(*stats_store_, test_time_.timeSystem())),
         dispatcher_(api_->allocateDispatcher("test_thread")),
-        http_context_(stats_store_->symbolTable()), router_context_(stats_store_->symbolTable()) {
-    ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, createFilterChain(_))
-        .WillByDefault(Invoke([&](Http::FilterChainManager& manager) -> void {
-          Http::FilterFactoryCb factory_cb =
-              [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-            callbacks.addStreamDecoderFilter(std::make_shared<Router::UpstreamCodecFilter>());
-          };
-          manager.applyFilterFactoryCb({}, factory_cb);
-        }));
-  }
+        http_context_(stats_store_->symbolTable()), router_context_(stats_store_->symbolTable()) {}
 
   virtual void initialize() {
     if (fake_upstream_ == nullptr) {

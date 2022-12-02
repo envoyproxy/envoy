@@ -6,6 +6,7 @@ load(
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
+    "envoy_select_admin_functionality",
     "envoy_select_hot_restart",
 )
 load("//source/extensions:all_extensions.bzl", "envoy_all_extensions")
@@ -54,6 +55,7 @@ envoy_cc_test(
         "//source/common/http:context_lib",
         "//source/common/upstream:cluster_manager_lib",
         "//source/extensions/access_loggers/file:config",
+        "//source/extensions/clusters/static:static_cluster_lib",
         "//source/extensions/stat_sinks/statsd:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:configuration_lib",
@@ -283,6 +285,7 @@ envoy_cc_test_library(
         "//test/mocks/server:listener_component_factory_mocks",
         "//test/mocks/server:worker_factory_mocks",
         "//test/mocks/server:worker_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
@@ -368,6 +371,7 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:drain_manager_mocks",
         "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:simulated_time_system_lib",
@@ -413,7 +417,7 @@ filegroup(
 
 envoy_cc_test(
     name = "server_test",
-    srcs = ["server_test.cc"],
+    srcs = envoy_select_admin_functionality(["server_test.cc"]),
     data = [
         ":runtime_test_data",
         ":server_test_data",
@@ -422,6 +426,7 @@ envoy_cc_test(
     deps = [
         "//source/common/version:version_lib",
         "//source/extensions/access_loggers/file:config",
+        "//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
         "//source/extensions/filters/http/buffer:config",
         "//source/extensions/filters/http/grpc_http1_bridge:config",
         "//source/extensions/filters/http/health_check:config",
@@ -503,6 +508,7 @@ envoy_cc_benchmark_binary(
         "//test/test_common:environment_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
         # tranport socket config registration
         "//source/extensions/transport_sockets/tls:config",
     ],

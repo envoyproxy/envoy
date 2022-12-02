@@ -35,6 +35,7 @@
 #include "source/common/http/http_server_properties_cache_manager_impl.h"
 #include "source/common/quic/quic_stat_names.h"
 #include "source/common/upstream/cluster_discovery_manager.h"
+#include "source/common/upstream/host_utility.h"
 #include "source/common/upstream/load_stats_reporter.h"
 #include "source/common/upstream/od_cds_api_impl.h"
 #include "source/common/upstream/priority_conn_pool_map.h"
@@ -49,10 +50,12 @@ namespace Upstream {
  */
 class ProdClusterManagerFactory : public ClusterManagerFactory {
 public:
+  using LazyCreateDnsResolver = std::function<Network::DnsResolverSharedPtr()>;
+
   ProdClusterManagerFactory(
-      Server::Configuration::ServerFactoryContext& server_context, Server::Admin& admin,
+      Server::Configuration::ServerFactoryContext& server_context, OptRef<Server::Admin> admin,
       Runtime::Loader& runtime, Stats::Store& stats, ThreadLocal::Instance& tls,
-      Network::DnsResolverSharedPtr dns_resolver, Ssl::ContextManager& ssl_context_manager,
+      LazyCreateDnsResolver dns_resolver_fn, Ssl::ContextManager& ssl_context_manager,
       Event::Dispatcher& main_thread_dispatcher, const LocalInfo::LocalInfo& local_info,
       Secret::SecretManager& secret_manager, ProtobufMessage::ValidationContext& validation_context,
       Api::Api& api, Http::Context& http_context, Grpc::Context& grpc_context,
@@ -64,7 +67,7 @@ public:
                  singleton_manager, validation_context.staticValidationVisitor(), stats, tls),
         validation_context_(validation_context), http_context_(http_context),
         grpc_context_(grpc_context), router_context_(router_context), admin_(admin), stats_(stats),
-        tls_(tls), dns_resolver_(dns_resolver), ssl_context_manager_(ssl_context_manager),
+        tls_(tls), dns_resolver_fn_(dns_resolver_fn), ssl_context_manager_(ssl_context_manager),
         local_info_(local_info), secret_manager_(secret_manager), log_manager_(log_manager),
         quic_stat_names_(quic_stat_names),
         alternate_protocols_cache_manager_factory_(singleton_manager, tls_, {context_}),
@@ -105,10 +108,10 @@ protected:
   Http::Context& http_context_;
   Grpc::Context& grpc_context_;
   Router::Context& router_context_;
-  Server::Admin& admin_;
+  OptRef<Server::Admin> admin_;
   Stats::Store& stats_;
   ThreadLocal::Instance& tls_;
-  Network::DnsResolverSharedPtr dns_resolver_;
+  LazyCreateDnsResolver dns_resolver_fn_;
   Ssl::ContextManager& ssl_context_manager_;
   const LocalInfo::LocalInfo& local_info_;
   Secret::SecretManager& secret_manager_;
@@ -245,7 +248,7 @@ public:
                      ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                      const LocalInfo::LocalInfo& local_info,
                      AccessLog::AccessLogManager& log_manager,
-                     Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
+                     Event::Dispatcher& main_thread_dispatcher, OptRef<Server::Admin> admin,
                      ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
                      Http::Context& http_context, Grpc::Context& grpc_context,
                      Router::Context& router_context, const Server::Instance& server);
@@ -301,7 +304,9 @@ public:
     updateClusterCounts();
   }
 
-  const envoy::config::core::v3::BindConfig& bindConfig() const override { return bind_config_; }
+  const absl::optional<envoy::config::core::v3::BindConfig>& bindConfig() const override {
+    return bind_config_;
+  }
 
   Config::GrpcMuxSharedPtr adsMux() override { return ads_mux_; }
   Grpc::AsyncClientManager& grpcAsyncClientManager() override { return *async_client_manager_; }
@@ -325,7 +330,14 @@ public:
   void
   initializeSecondaryClusters(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override;
 
-  const ClusterStatNames& clusterStatNames() const override { return cluster_stat_names_; }
+  const ClusterTrafficStatNames& clusterStatNames() const override { return cluster_stat_names_; }
+  const ClusterConfigUpdateStatNames& clusterConfigUpdateStatNames() const override {
+    return cluster_config_update_stat_names_;
+  }
+  const ClusterLbStatNames& clusterLbStatNames() const override { return cluster_lb_stat_names_; }
+  const ClusterEndpointStatNames& clusterEndpointStatNames() const override {
+    return cluster_endpoint_stat_names_;
+  }
   const ClusterLoadReportStatNames& clusterLoadReportStatNames() const override {
     return cluster_load_report_stat_names_;
   }
@@ -444,7 +456,6 @@ private:
       const HostHandlePtr host_handle_;
       // This is a shared_ptr so we can keep it alive while cleaning up.
       std::shared_ptr<ConnPools> pools_;
-      bool draining_{false};
 
       // Protect from deletion while iterating through pools_. See comments and usage
       // in `ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools()`.
@@ -459,7 +470,6 @@ private:
       // Destroyed after pools.
       const HostHandlePtr host_handle_;
       ConnPools pools_;
-      bool draining_{false};
     };
 
     // Holds an unowned reference to a connection, and watches for Closed events. If the connection
@@ -521,12 +531,15 @@ private:
                        absl::optional<uint32_t> overprovisioning_factor,
                        HostMapConstSharedPtr cross_priority_host_map);
 
-      // Drains any connection pools associated with the removed hosts.
+      // Drains any connection pools associated with the removed hosts. All connections will be
+      // closed gracefully and no new connections will be created.
       void drainConnPools(const HostVector& hosts_removed);
-      // Drains idle clients in connection pools for all hosts.
+      // Drains any connection pools associated with the all hosts. All connections will be
+      // closed gracefully and no new connections will be created.
       void drainConnPools();
-      // Drain all clients in connection pools for all hosts.
-      void drainAllConnPools(DrainConnectionsHostPredicate predicate);
+      // Drain any connection pools associated with the hosts filtered by the predicate.
+      void drainConnPools(DrainConnectionsHostPredicate predicate,
+                          ConnectionPool::DrainBehavior behavior);
 
     private:
       Http::ConnectionPool::Instance*
@@ -536,6 +549,9 @@ private:
 
       Tcp::ConnectionPool::Instance* tcpConnPoolImpl(ResourcePriority priority,
                                                      LoadBalancerContext* context, bool peek);
+
+      HostConstSharedPtr chooseHost(LoadBalancerContext* context);
+      HostConstSharedPtr peekAnotherHost(LoadBalancerContext* context);
 
       ThreadLocalClusterManagerImpl& parent_;
       PrioritySetImpl priority_set_;
@@ -550,6 +566,28 @@ private:
       // Stores QUICHE specific objects which live through out the life time of the cluster and can
       // be shared across its hosts.
       Http::PersistentQuicInfoPtr quic_info_;
+
+      // Expected override host statues. Every bit in the HostStatusSet represent an enum value
+      // of envoy::config::core::v3::HealthStatus. The specific correspondence is shown below:
+      //
+      // * 0b000001: envoy::config::core::v3::HealthStatus::UNKNOWN
+      // * 0b000010: envoy::config::core::v3::HealthStatus::HEALTHY
+      // * 0b000100: envoy::config::core::v3::HealthStatus::UNHEALTHY
+      // * 0b001000: envoy::config::core::v3::HealthStatus::DRAINING
+      // * 0b010000: envoy::config::core::v3::HealthStatus::TIMEOUT
+      // * 0b100000: envoy::config::core::v3::HealthStatus::DEGRADED
+      //
+      // If runtime flag `envoy.reloadable_features.validate_detailed_override_host_statuses` is
+      // disabled, the old coarse health status Host::Health will be used. The specific
+      // correspondence is shown below:
+      //
+      // * 0b001: Host::Health::Unhealthy
+      // * 0b010: Host::Health::Degraded
+      // * 0b100: Host::Health::Healthy
+      //
+      // If multiple bit fields are set, it is acceptable as long as the status of override host is
+      // in any of these statuses.
+      const HostUtility::HostStatusSet override_host_statuses_{};
     };
 
     using ClusterEntryPtr = std::unique_ptr<ClusterEntry>;
@@ -562,15 +600,12 @@ private:
     ThreadLocalClusterManagerImpl(ClusterManagerImpl& parent, Event::Dispatcher& dispatcher,
                                   const absl::optional<LocalClusterParams>& local_cluster_params);
     ~ThreadLocalClusterManagerImpl() override;
-    // TODO(junr03): clean up drainConnPools vs drainAllConnPools once ConnPoolImplBase::startDrain
-    // and
-    // ConnPoolImplBase::drainConnections() get cleaned up. The code in onHostHealthFailure and the
-    // code in ThreadLocalClusterManagerImpl::drainConnPools(const HostVector& hosts) is very
-    // similar and can be merged in a similar fashion to the ConnPoolImplBase case.
-    void drainConnPools(const HostVector& hosts);
-    void drainConnPools(HostSharedPtr old_host, ConnPoolsContainer& container);
-    void drainTcpConnPools(TcpConnPoolsContainer& container);
-    void drainAllConnPoolsWorker(const HostSharedPtr& host);
+
+    // Drain or close connections of host. If no drain behavior is provided then closing will
+    // be immediate.
+    void drainOrCloseConnPools(const HostSharedPtr& host,
+                               absl::optional<ConnectionPool::DrainBehavior> drain_behavior);
+
     void httpConnPoolIsIdle(HostConstSharedPtr host, ResourcePriority priority,
                             const std::vector<uint8_t>& hash_key);
     void tcpConnPoolIsIdle(HostConstSharedPtr host, const std::vector<uint8_t>& hash_key);
@@ -747,7 +782,7 @@ protected:
 
 private:
   ClusterMap warming_clusters_;
-  envoy::config::core::v3::BindConfig bind_config_;
+  absl::optional<envoy::config::core::v3::BindConfig> bind_config_;
   Outlier::EventLoggerSharedPtr outlier_event_logger_;
   const LocalInfo::LocalInfo& local_info_;
   CdsApiPtr cds_api_;
@@ -766,7 +801,10 @@ private:
   Event::Dispatcher& dispatcher_;
   Http::Context& http_context_;
   Router::Context& router_context_;
-  ClusterStatNames cluster_stat_names_;
+  ClusterTrafficStatNames cluster_stat_names_;
+  ClusterConfigUpdateStatNames cluster_config_update_stat_names_;
+  ClusterLbStatNames cluster_lb_stat_names_;
+  ClusterEndpointStatNames cluster_endpoint_stat_names_;
   ClusterLoadReportStatNames cluster_load_report_stat_names_;
   ClusterCircuitBreakersStatNames cluster_circuit_breakers_stat_names_;
   ClusterRequestResponseSizeStatNames cluster_request_response_size_stat_names_;

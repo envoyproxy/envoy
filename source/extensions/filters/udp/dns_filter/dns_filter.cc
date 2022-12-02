@@ -169,6 +169,7 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
   } else {
     // In case client_config doesn't exist, create default DNS resolver factory and save it.
     dns_resolver_factory_ = &Network::createDefaultDnsResolverFactory(typed_dns_resolver_config_);
+    max_pending_lookups_ = 0;
   }
 }
 

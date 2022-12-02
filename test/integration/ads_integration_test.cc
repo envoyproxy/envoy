@@ -1245,10 +1245,11 @@ public:
     // stat_prefix 'ads_cluster'.
     skip_tag_extraction_rule_check_ = true;
 
-    if (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw ||
-        sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta) {
-      config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux", "true");
-    }
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux",
+                                      (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw ||
+                                       sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta)
+                                          ? "true"
+                                          : "false");
     create_xds_upstream_ = true;
     use_lds_ = false;
     sotw_or_delta_ = sotwOrDelta();
@@ -1299,10 +1300,11 @@ public:
     // 'ads_cluster'.
     skip_tag_extraction_rule_check_ = true;
 
-    if (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw ||
-        sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta) {
-      config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux", "true");
-    }
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux",
+                                      (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw ||
+                                       sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta)
+                                          ? "true"
+                                          : "false");
     create_xds_upstream_ = true;
     use_lds_ = false;
     sotw_or_delta_ = sotwOrDelta();
@@ -1499,10 +1501,11 @@ public:
     // 'ads_cluster'.
     skip_tag_extraction_rule_check_ = true;
 
-    if (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw ||
-        sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta) {
-      config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux", "true");
-    }
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux",
+                                      (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw ||
+                                       sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta)
+                                          ? "true"
+                                          : "false");
     create_xds_upstream_ = true;
     use_lds_ = false;
     sotw_or_delta_ = sotwOrDelta();

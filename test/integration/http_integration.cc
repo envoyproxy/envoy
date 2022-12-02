@@ -250,9 +250,10 @@ Network::ClientConnectionPtr HttpIntegrationTest::makeClientConnectionWithOption
   return Quic::createQuicNetworkConnection(
       *quic_connection_persistent_info_, quic_transport_socket_factory_ref.getCryptoConfig(),
       quic::QuicServerId(
-          quic_transport_socket_factory_ref.clientContextConfig().serverNameIndication(),
+          quic_transport_socket_factory_ref.clientContextConfig()->serverNameIndication(),
           static_cast<uint16_t>(port)),
-      *dispatcher_, server_addr, local_addr, quic_stat_names_, {}, stats_store_, options, nullptr);
+      *dispatcher_, server_addr, local_addr, quic_stat_names_, {}, stats_store_, options, nullptr,
+      connection_id_generator_);
 #else
   ASSERT(false, "running a QUIC integration test without compiling QUIC");
   return nullptr;
@@ -314,7 +315,7 @@ HttpIntegrationTest::HttpIntegrationTest(Http::CodecType downstream_protocol,
           downstream_protocol,
           [version](int) {
             return Network::Utility::parseInternetAddress(
-                Network::Test::getAnyAddressString(version), 0);
+                Network::Test::getLoopbackAddressString(version), 0);
           },
           version, config) {}
 
@@ -374,18 +375,23 @@ void HttpIntegrationTest::initialize() {
 #endif
 }
 
-void HttpIntegrationTest::setupHttp2Overrides(Http2Impl implementation) {
-  switch (implementation) {
-  case Http2Impl::Nghttp2:
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper", "false");
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_use_oghttp2", "false");
+void HttpIntegrationTest::setupHttp1ImplOverrides(Http1ParserImpl http1_implementation) {
+  switch (http1_implementation) {
+  case Http1ParserImpl::HttpParser:
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.http1_use_balsa_parser", "false");
     break;
-  case Http2Impl::WrappedNghttp2:
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper", "true");
+  case Http1ParserImpl::BalsaParser:
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.http1_use_balsa_parser", "true");
+    break;
+  }
+}
+
+void HttpIntegrationTest::setupHttp2ImplOverrides(Http2Impl http2_implementation) {
+  switch (http2_implementation) {
+  case Http2Impl::Nghttp2:
     config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_use_oghttp2", "false");
     break;
   case Http2Impl::Oghttp2:
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper", "true");
     config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_use_oghttp2", "true");
     break;
   }

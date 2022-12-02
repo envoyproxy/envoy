@@ -106,10 +106,11 @@ public:
 
     cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
         server_.admin(), server_.runtime(), server_.stats(), server_.threadLocal(),
-        server_.dnsResolver(), ssl_context_manager_, server_.dispatcher(), server_.localInfo(),
-        server_.secretManager(), server_.messageValidationContext(), *api_, server_.httpContext(),
-        server_.grpcContext(), server_.routerContext(), server_.accessLogManager(),
-        server_.singletonManager(), server_.options(), server_.quic_stat_names_, server_);
+        [this]() -> Network::DnsResolverSharedPtr { return this->server_.dnsResolver(); },
+        ssl_context_manager_, server_.dispatcher(), server_.localInfo(), server_.secretManager(),
+        server_.messageValidationContext(), *api_, server_.httpContext(), server_.grpcContext(),
+        server_.routerContext(), server_.accessLogManager(), server_.singletonManager(),
+        server_.options(), server_.quic_stat_names_, server_);
 
     ON_CALL(server_, clusterManager()).WillByDefault(Invoke([&]() -> Upstream::ClusterManager& {
       return *main_config.clusterManager();
@@ -162,10 +163,12 @@ public:
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   OptionsImpl options_;
   std::unique_ptr<Upstream::ProdClusterManagerFactory> cluster_manager_factory_;
-  NiceMock<Server::MockListenerComponentFactory> component_factory_;
+  std::unique_ptr<NiceMock<Server::MockListenerComponentFactory>> component_factory_ptr_{
+      std::make_unique<NiceMock<Server::MockListenerComponentFactory>>()};
+  NiceMock<Server::MockListenerComponentFactory>& component_factory_{*component_factory_ptr_};
   NiceMock<Server::MockWorkerFactory> worker_factory_;
-  Server::ListenerManagerImpl listener_manager_{server_, component_factory_, worker_factory_, false,
-                                                server_.quic_stat_names_};
+  Server::ListenerManagerImpl listener_manager_{server_, std::move(component_factory_ptr_),
+                                                worker_factory_, false, server_.quic_stat_names_};
   Random::RandomGeneratorImpl random_;
   std::shared_ptr<Runtime::MockSnapshot> snapshot_{
       std::make_shared<NiceMock<Runtime::MockSnapshot>>()};

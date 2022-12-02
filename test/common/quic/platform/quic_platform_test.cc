@@ -24,11 +24,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "quiche/common/platform/api/quiche_mem_slice.h"
-#include "quiche/common/platform/api/quiche_stream_buffer_allocator.h"
 #include "quiche/common/platform/api/quiche_system_event_loop.h"
 #include "quiche/common/quiche_mem_slice_storage.h"
-#include "quiche/epoll_server/fake_simple_epoll_server.h"
-#include "quiche/quic/core/quic_epoll_clock.h"
 #include "quiche/quic/platform/api/quic_bug_tracker.h"
 #include "quiche/quic/platform/api/quic_client_stats.h"
 #include "quiche/quic/platform/api/quic_expect_bug.h"
@@ -415,70 +412,12 @@ TEST_F(QuicPlatformTest, QuicTestOutput) {
   EXPECT_FALSE(QuicLoadTestOutput("nonexisting_file", &content));
 }
 
-TEST_F(QuicPlatformTest, ApproximateNowInUsec) {
-  epoll_server::test::FakeSimpleEpollServer epoll_server;
-  QuicEpollClock clock(&epoll_server);
-
-  epoll_server.set_now_in_usec(1000000);
-  EXPECT_EQ(1000000, (clock.ApproximateNow() - QuicTime::Zero()).ToMicroseconds());
-  EXPECT_EQ(1u, clock.WallNow().ToUNIXSeconds());
-  EXPECT_EQ(1000000u, clock.WallNow().ToUNIXMicroseconds());
-
-  epoll_server.AdvanceBy(5);
-  EXPECT_EQ(1000005, (clock.ApproximateNow() - QuicTime::Zero()).ToMicroseconds());
-  EXPECT_EQ(1u, clock.WallNow().ToUNIXSeconds());
-  EXPECT_EQ(1000005u, clock.WallNow().ToUNIXMicroseconds());
-
-  epoll_server.AdvanceBy(10 * 1000000);
-  EXPECT_EQ(11u, clock.WallNow().ToUNIXSeconds());
-  EXPECT_EQ(11000005u, clock.WallNow().ToUNIXMicroseconds());
-}
-
-TEST_F(QuicPlatformTest, NowInUsec) {
-  epoll_server::test::FakeSimpleEpollServer epoll_server;
-  QuicEpollClock clock(&epoll_server);
-
-  epoll_server.set_now_in_usec(1000000);
-  EXPECT_EQ(1000000, (clock.Now() - QuicTime::Zero()).ToMicroseconds());
-
-  epoll_server.AdvanceBy(5);
-  EXPECT_EQ(1000005, (clock.Now() - QuicTime::Zero()).ToMicroseconds());
-}
-
-TEST_F(QuicPlatformTest, MonotonicityWithRealEpollClock) {
-  epoll_server::SimpleEpollServer epoll_server;
-  QuicEpollClock clock(&epoll_server);
-
-  quic::QuicTime last_now = clock.Now();
-  for (int i = 0; i < 1e5; ++i) {
-    quic::QuicTime now = clock.Now();
-
-    ASSERT_LE(last_now, now);
-
-    last_now = now;
-  }
-}
-
-TEST_F(QuicPlatformTest, MonotonicityWithFakeEpollClock) {
-  quiche::FlagRegistry::getInstance();
-  epoll_server::test::FakeSimpleEpollServer epoll_server;
-  QuicEpollClock clock(&epoll_server);
-
-  epoll_server.set_now_in_usec(100);
-  quic::QuicTime last_now = clock.Now();
-
-  epoll_server.set_now_in_usec(90);
-  quic::QuicTime now = clock.Now();
-
-  ASSERT_EQ(last_now, now);
-}
-
 TEST_F(QuicPlatformTest, QuicFlags) {
   // Test that the flags which envoy explicitly overrides have the right value.
   EXPECT_TRUE(GetQuicReloadableFlag(quic_disable_version_draft_29));
   EXPECT_TRUE(GetQuicReloadableFlag(quic_default_to_bbr));
-  EXPECT_FALSE(GetQuicFlag(FLAGS_quic_header_size_limit_includes_overhead));
-  EXPECT_EQ(512 * 1024 * 1024, GetQuicFlag(FLAGS_quic_buffered_data_threshold));
+  EXPECT_FALSE(GetQuicFlag(quic_header_size_limit_includes_overhead));
+  EXPECT_EQ(512 * 1024 * 1024, GetQuicFlag(quic_buffered_data_threshold));
   {
     quiche::test::QuicheFlagSaver saver;
     EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
@@ -491,20 +430,20 @@ TEST_F(QuicPlatformTest, QuicFlags) {
     SetQuicRestartFlag(quic_testonly_default_false, true);
     EXPECT_TRUE(GetQuicRestartFlag(quic_testonly_default_false));
 
-    EXPECT_FALSE(GetQuicheFlag(FLAGS_quiche_oghttp2_debug_trace));
-    SetQuicheFlag(FLAGS_quiche_oghttp2_debug_trace, true);
-    EXPECT_TRUE(GetQuicheFlag(FLAGS_quiche_oghttp2_debug_trace));
+    EXPECT_FALSE(GetQuicheFlag(quiche_oghttp2_debug_trace));
+    SetQuicheFlag(quiche_oghttp2_debug_trace, true);
+    EXPECT_TRUE(GetQuicheFlag(quiche_oghttp2_debug_trace));
 
-    EXPECT_EQ(200, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
-    SetQuicFlag(FLAGS_quic_time_wait_list_seconds, 100);
-    EXPECT_EQ(100, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
+    EXPECT_EQ(200, GetQuicFlag(quic_time_wait_list_seconds));
+    SetQuicFlag(quic_time_wait_list_seconds, 100);
+    EXPECT_EQ(100, GetQuicFlag(quic_time_wait_list_seconds));
   }
 
   // Verify that the saver reset all the flags to their previous values.
   EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
   EXPECT_FALSE(GetQuicRestartFlag(quic_testonly_default_false));
-  EXPECT_EQ(200, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
-  EXPECT_FALSE(GetQuicheFlag(FLAGS_quiche_oghttp2_debug_trace));
+  EXPECT_EQ(200, GetQuicFlag(quic_time_wait_list_seconds));
+  EXPECT_FALSE(GetQuicheFlag(quiche_oghttp2_debug_trace));
 }
 
 TEST_F(QuicPlatformTest, UpdateReloadableFlags) {
@@ -515,20 +454,20 @@ TEST_F(QuicPlatformTest, UpdateReloadableFlags) {
 
   // Flip both flags to a non-default value.
   flag_registry.updateReloadableFlags(
-      {{"FLAGS_quic_reloadable_flag_quic_testonly_default_false", true},
-       {"FLAGS_quic_reloadable_flag_quic_testonly_default_true", false}});
+      {{"FLAGS_envoy_quic_reloadable_flag_quic_testonly_default_false", true},
+       {"FLAGS_envoy_quic_reloadable_flag_quic_testonly_default_true", false}});
   EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_false));
   EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_true));
 
   // Flip one flag back to a default value.
   flag_registry.updateReloadableFlags(
-      {{"FLAGS_quic_reloadable_flag_quic_testonly_default_false", false}});
+      {{"FLAGS_envoy_quic_reloadable_flag_quic_testonly_default_false", false}});
   EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
   EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_true));
 
   // Flip the other back to a default value.
   flag_registry.updateReloadableFlags(
-      {{"FLAGS_quic_reloadable_flag_quic_testonly_default_true", true}});
+      {{"FLAGS_envoy_quic_reloadable_flag_quic_testonly_default_true", true}});
   EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
   EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_true));
 }
@@ -569,20 +508,6 @@ protected:
   const std::string dir_path_;
   std::stack<std::string> files_to_remove_;
 };
-
-TEST_F(QuicPlatformTest, TestEnvoyQuicBufferAllocator) {
-  quiche::QuicheStreamBufferAllocator allocator;
-  Envoy::Stats::TestUtil::MemoryTest memory_test;
-  if (memory_test.mode() == Envoy::Stats::TestUtil::MemoryTest::Mode::Disabled) {
-    return;
-  }
-  char* p = allocator.New(1024);
-  EXPECT_NE(nullptr, p);
-  EXPECT_GT(memory_test.consumedBytes(), 0);
-  memset(p, 'a', 1024);
-  allocator.Delete(p);
-  EXPECT_EQ(memory_test.consumedBytes(), 0);
-}
 
 TEST_F(QuicPlatformTest, TestSystemEventLoop) {
   // These two interfaces are no-op in Envoy. The test just makes sure they

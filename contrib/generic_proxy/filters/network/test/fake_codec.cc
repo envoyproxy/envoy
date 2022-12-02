@@ -25,8 +25,8 @@ MessageCreatorPtr FakeStreamCodecFactory::messageCreator() const {
 }
 
 CodecFactoryPtr
-FakeStreamCodecFactoryConfig::createFactory(const Protobuf::Message&,
-                                            Envoy::Server::Configuration::FactoryContext&) {
+FakeStreamCodecFactoryConfig::createCodecFactory(const Protobuf::Message&,
+                                                 Envoy::Server::Configuration::FactoryContext&) {
   return std::make_unique<FakeStreamCodecFactory>();
 }
 

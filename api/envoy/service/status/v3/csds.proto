@@ -21,7 +21,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/service/status
 option java_generic_services = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Client Status Discovery Service (CSDS)]
+// [#protodoc-title: Client status discovery service (CSDS)]
 
 // CSDS is Client Status Discovery Service. It can be used to get the status of
 // an xDS-compliant client from the management server's point of view. It can
