@@ -220,5 +220,8 @@ new_features:
     :ref:`source_address <envoy_v3_api_field_config.core.v3.BindConfig.source_address>`. This allows setting
     :ref:`socket options <envoy_v3_api_field_config.core.v3.BindConfig.socket_options>` when using the default unspecified bind address
     is desired.
+- area: tracer
+  change: |
+    added :ref:`resource_attributes <envoy_v3_api_field_config.trace.v3.OpenTelemetryConfig.resource_attributes>` configuration to OpenTelemetry.
 
 deprecated:
