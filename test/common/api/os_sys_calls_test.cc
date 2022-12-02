@@ -20,6 +20,10 @@ TEST(OsSyscallsTest, OpenPwritePreadFstatCloseStatUnlink) {
   EXPECT_NE(open_result.return_value_, -1);
   EXPECT_EQ(open_result.errno_, 0);
   os_fd_t fd = open_result.return_value_;
+#ifdef WIN32
+  // pwrite and pread are not supported.
+  ::_write(fd, file_contents.begin(), 5);
+#else
   // Test `pwrite`
   Api::SysCallSizeResult write_result =
       os_syscalls.pwrite(fd, file_contents.begin(), file_contents.size(), 0);
@@ -32,6 +36,7 @@ TEST(OsSyscallsTest, OpenPwritePreadFstatCloseStatUnlink) {
   EXPECT_EQ(read_result.errno_, 0);
   absl::string_view read_buffer_view{read_buffer, sizeof(read_buffer)};
   EXPECT_EQ(file_contents, read_buffer_view);
+#endif
   // Test `fstat`
   struct stat fstat_value;
   Api::SysCallIntResult fstat_result = os_syscalls.fstat(fd, &fstat_value);

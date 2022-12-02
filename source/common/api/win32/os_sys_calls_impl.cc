@@ -144,30 +144,12 @@ SysCallSizeResult OsSysCallsImpl::readv(os_fd_t fd, const iovec* iov, int num_io
 
 SysCallSizeResult OsSysCallsImpl::pwrite(os_fd_t fd, const void* buffer, size_t length,
                                          off_t offset) const {
-  OVERLAPPED overlapped;
-  overlapped.Offset = offset;
-  overlapped.OffsetHigh = offset & 0xffffffff00000000;
-  overlapped.hEvent = 0;
-  DWORD length_written;
-  bool success = ::WriteFile(fd, buffer, length, &length_written, overlapped);
-  if (!success) {
-    return {-1, ::GetLastError()};
-  }
-  return {length_written, 0};
+  PANIC("not implemented");
 }
 
 SysCallSizeResult OsSysCallsImpl::pread(os_fd_t fd, void* buffer, size_t length,
                                         off_t offset) const {
-  OVERLAPPED overlapped;
-  overlapped.Offset = offset;
-  overlapped.OffsetHigh = offset & 0xffffffff00000000;
-  overlapped.hEvent = 0;
-  DWORD length_read;
-  bool success = ::ReadFile(fd, buffer, length, &length_read, overlapped);
-  if (!success) {
-    return {-1, ::GetLastError()};
-  }
-  return {length_read, 0};
+  PANIC("not implemented");
 }
 
 SysCallSizeResult OsSysCallsImpl::recv(os_fd_t socket, void* buffer, size_t length, int flags) {
