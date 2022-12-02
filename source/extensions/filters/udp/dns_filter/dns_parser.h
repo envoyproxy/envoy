@@ -73,7 +73,7 @@ public:
 };
 
 using DnsAnswerRecordPtr = std::unique_ptr<DnsAnswerRecord>;
-using DnsAnswerMap = std::unordered_multimap<std::string, DnsAnswerRecordPtr>;
+using DnsAnswerMap = std::multimap<std::string, DnsAnswerRecordPtr>;
 
 /**
  * DnsSrvRecord represents a single answer record for a service which is to be serialized and

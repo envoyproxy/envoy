@@ -237,7 +237,6 @@ bool DnsResponseValidator::validateDnsResponseObject(DnsQueryContextPtr& context
 
 bool DnsResponseValidator::parseAnswerRecords(DnsAnswerMap& answers, const uint16_t answer_count,
                                               const Buffer::InstancePtr& buffer, uint64_t& offset) {
-  answers.reserve(answer_count);
   for (auto index = 0; index < answer_count; index++) {
     ENVOY_LOG(trace, "Parsing [{}/{}] answers", index, answer_count);
     auto rec = parseDnsAnswerRecord(buffer, offset);
