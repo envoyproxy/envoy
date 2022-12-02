@@ -235,7 +235,7 @@ envoy.filters.http.geoip:
   categories:
   - envoy.filters.http
   security_posture: unknown
-  status: alpha
+  status: wip
   type_urls:
   - envoy.extensions.filters.http.geoip.v3.GeoipConfig
 envoy.filters.http.upstream_codec:

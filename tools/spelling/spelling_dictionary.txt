@@ -16,6 +16,7 @@ ARN
 ASAN
 ASCII
 ASM
+ASN
 ASSERTed
 ASSERTs
 AST
@@ -428,6 +429,7 @@ VH
 VHDS
 VLOG
 VM
+VPN
 WAITFORONE
 WASM
 WAVM
@@ -473,6 +475,8 @@ alls
 alphanumerics
 amongst
 anno
+anonymization
+anonymizing
 anys
 appmesh
 arg
@@ -739,6 +743,9 @@ gRPC
 gateway
 gcov
 genrule
+geolocation
+geoip
+Geoip
 getaddrinfo
 getaffinity
 gethostname
