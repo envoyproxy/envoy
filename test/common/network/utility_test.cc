@@ -153,10 +153,12 @@ TEST(NetworkUtility, ParseInternetAddress) {
   EXPECT_EQ(nullptr, Utility::parseInternetAddressNoThrow("0:0:0:0"));
   EXPECT_EQ(nullptr, Utility::parseInternetAddressNoThrow("fffff::"));
   EXPECT_EQ(nullptr, Utility::parseInternetAddressNoThrow("/foo"));
+
 #ifndef WIN32
   EXPECT_EQ(nullptr, Utility::parseInternetAddressNoThrow("[::]"));
   EXPECT_EQ(nullptr, Utility::parseInternetAddressNoThrow("[::1]:1"));
 #else
+  // TODO(#24326): make windows getaddrinfo more strict.
   EXPECT_EQ("[::]:0", Utility::parseInternetAddressNoThrow("[::]")->asString());
   EXPECT_EQ("[::1]:0", Utility::parseInternetAddressNoThrow("[::1]:1")->asString());
 #endif
@@ -231,6 +233,7 @@ TEST(NetworkUtility, ParseInternetAddressAndPort) {
   EXPECT_THROW(Utility::parseInternetAddressAndPort(""), EnvoyException);
   EXPECT_THROW(Utility::parseInternetAddressAndPort("::1"), EnvoyException);
   EXPECT_THROW(Utility::parseInternetAddressAndPort("::"), EnvoyException);
+
 #ifndef WIN32
   EXPECT_THROW(Utility::parseInternetAddressAndPort("[[::]]:1"), EnvoyException);
 #endif
@@ -246,6 +249,7 @@ TEST(NetworkUtility, ParseInternetAddressAndPort) {
   EXPECT_EQ(nullptr, Utility::parseInternetAddressAndPortNoThrow(""));
   EXPECT_EQ(nullptr, Utility::parseInternetAddressAndPortNoThrow("::1"));
   EXPECT_EQ(nullptr, Utility::parseInternetAddressAndPortNoThrow("::"));
+
 #ifndef WIN32
   EXPECT_EQ(nullptr, Utility::parseInternetAddressAndPortNoThrow("[[::]]:1"));
 #endif
