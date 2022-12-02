@@ -134,9 +134,9 @@ TagNameValues::TagNameValues() {
 
   // Extract ext_authz stat_prefix field
   // cluster.[<cluster>.]ext_authz.[<ext_authz_prefix>.]*
-  addRe2(EXT_AUTHZ_PREFIX, R"(^cluster\.(?:[^\.]+\.)?ext_authz\.((<TAG_VALUE>)\.))");
+  addTokenized(EXT_AUTHZ_PREFIX, "cluster.*.ext_authz.$.**");
   // http.[<http_conn_mgr_prefix>.]ext_authz.[<ext_authz_prefix>.]*
-  addRe2(EXT_AUTHZ_PREFIX, R"(^http\.(?:[^\.]+\.)?ext_authz\.((<TAG_VALUE>)\.))");
+  addTokenized(EXT_AUTHZ_PREFIX, "http.*.ext_authz.$.**");
 
   // http.(<stat_prefix>.)*
   addTokenized(HTTP_CONN_MANAGER_PREFIX, "http.$.**");

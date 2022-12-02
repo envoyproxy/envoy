@@ -20,6 +20,13 @@ behavior_changes:
 - area: build
   change: |
     moved the strict_dns, original_dst, logical_dns, static, and eds clusters to extensions. If you use these clusters and override extensions_build_config.bzl you will now need to include it explicitly.
+- area: stats http ext_authz 
+  change: |
+    Fixed ext_authz metric tag extraction so that :ref:`stat_prefix <envoy_v3_api_msg_extensions.filters.http.ext_authz.v3.ExtAuthz.stat_prefix>`
+    is properly extracted. This changes the Prometheus name from
+    envoy_http_ext_authz_prefixval_denied{} to envoy_http_ext_authz_denied{envoy_ext_authz_prefix="prefixval"}.
+    envoy_cluster_X_ext_authz_Y_denied follows the same pattern.
+    
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -32,9 +39,6 @@ minor_behavior_changes:
 - area: rate_limit
   change: |
     add ``MONTH`` and ``YEAR`` to the unit of time for rate limit.
-- area: stats
-  change: |
-    Properly extract the ext_authz stat-prefix as a tag when exporting prometheus metrics.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*

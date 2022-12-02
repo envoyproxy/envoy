@@ -138,7 +138,7 @@ public:
   // Request route given by the Router http filter
   const std::string ROUTE = "envoy.route";
   // Stats prefix for the ext_authz HTTP filter
-  const std::string EXT_AUTHZ_PREFIX = "envoy.auth_prefix";
+  const std::string EXT_AUTHZ_PREFIX = "envoy.ext_authz_prefix";
   // Listener manager worker id
   const std::string WORKER_ID = "envoy.worker_id";
   // Stats prefix for the Thrift Proxy network filter
