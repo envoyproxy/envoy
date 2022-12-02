@@ -26,26 +26,20 @@ public:
   virtual ~IoUring() = default;
 
   /**
-   * Registers an eventfd file descriptor for the ring and returns it.
+   * Registers an event for the ring.
    * It can be used for integration with event loops.
    */
-  virtual os_fd_t registerEventfd() PURE;
+  virtual void registerEvent(Event::Dispatcher& dispatcher, Event::FileTriggerType trigger) PURE;
 
   /**
-   * Resets the eventfd file descriptor for the ring.
+   * Resets the event for the ring.
    */
-  virtual void unregisterEventfd() PURE;
+  virtual void unregisterEvent() PURE;
 
   /**
-   * Returns true if an eventfd file descriptor is registered with the ring.
+   * Returns true if an event is registered with the ring.
    */
-  virtual bool isEventfdRegistered() const PURE;
-
-  /**
-   * Iterates over entries in the completion queue, calls the given callback for
-   * every entry and marks them consumed.
-   */
-  virtual void forEveryCompletion(CompletionCb completion_cb) PURE;
+  virtual bool isEventRegistered() const PURE;
 
   /**
    * Prepares an accept system call and puts it into the submission queue.
@@ -53,7 +47,8 @@ public:
    * and IoUringResult::Ok otherwise.
    */
   virtual IoUringResult prepareAccept(os_fd_t fd, struct sockaddr* remote_addr,
-                                      socklen_t* remote_addr_len, void* user_data) PURE;
+                                      socklen_t* remote_addr_len, void* user_data,
+                                      CompletionCb cb) PURE;
 
   /**
    * Prepares a connect system call and puts it into the submission queue.
@@ -62,7 +57,7 @@ public:
    */
   virtual IoUringResult prepareConnect(os_fd_t fd,
                                        const Network::Address::InstanceConstSharedPtr& address,
-                                       void* user_data) PURE;
+                                       void* user_data, CompletionCb cb) PURE;
 
   /**
    * Prepares a readv system call and puts it into the submission queue.
@@ -70,7 +65,7 @@ public:
    * and IoUringResult::Ok otherwise.
    */
   virtual IoUringResult prepareReadv(os_fd_t fd, const struct iovec* iovecs, unsigned nr_vecs,
-                                     off_t offset, void* user_data) PURE;
+                                     off_t offset, void* user_data, CompletionCb cb) PURE;
 
   /**
    * Prepares a writev system call and puts it into the submission queue.
@@ -78,21 +73,29 @@ public:
    * and IoUringResult::Ok otherwise.
    */
   virtual IoUringResult prepareWritev(os_fd_t fd, const struct iovec* iovecs, unsigned nr_vecs,
-                                      off_t offset, void* user_data) PURE;
+                                      off_t offset, void* user_data, CompletionCb cb) PURE;
 
   /**
    * Prepares a close system call and puts it into the submission queue.
    * Returns IoUringResult::Failed in case the submission queue is full already
    * and IoUringResult::Ok otherwise.
    */
-  virtual IoUringResult prepareClose(os_fd_t fd, void* user_data) PURE;
+  virtual IoUringResult prepareClose(os_fd_t fd, void* user_data, CompletionCb cb) PURE;
 
   /**
    * Prepares a cancellation and puts it into the submission queue.
    * Returns IoUringResult::Failed in case the submission queue is full already
    * and IoUringResult::Ok otherwise.
    */
-  virtual IoUringResult prepareCancel(void* cancelling_user_data, void* user_data) PURE;
+  virtual IoUringResult prepareCancel(void* cancelling_user_data, void* user_data,
+                                      CompletionCb cb) PURE;
+
+  /**
+   * Prepares a nop and puts it into the cubmission queue.
+   * Returns IoUringResult::Failed in case the submission queue is full already
+   * and IoUringResult::Ok otherwise.
+   */
+  virtual IoUringResult prepareNop(void* user_data, CompletionCb cb) PURE;
 
   /**
    * Submits the entries in the submission queue to the kernel using the
@@ -103,6 +106,17 @@ public:
    * with the forEveryCompletion() method and try again.
    */
   virtual IoUringResult submit() PURE;
+
+  /**
+   * Submits the entries in the submission queue to the kernel using the
+   * `io_uring_enter()` system call. The submission may be delayed if there is an incoming
+   * submission.
+   * Returns IoUringResult::Ok in case of success and may return
+   * IoUringResult::Busy if we over commit the number of requests. In the latter
+   * case the application should drain the completion queue by handling some completions
+   * with the forEveryCompletion() method and try again.
+   */
+  virtual IoUringResult trySubmit() PURE;
 };
 
 /**

@@ -19,10 +19,11 @@ using IoUringSocketHandleImplOptRef =
     absl::optional<std::reference_wrapper<IoUringSocketHandleImpl>>;
 
 struct Request {
-  IoUringSocketHandleImplOptRef iohandle_{absl::nullopt};
   RequestType type_{RequestType::Unknown};
   struct iovec* iov_{nullptr};
   std::unique_ptr<uint8_t[]> buf_{};
+  struct sockaddr remote_addr_ {};
+  socklen_t remote_addr_len_{sizeof(remote_addr_)};
 };
 
 /**
@@ -81,39 +82,10 @@ public:
   absl::optional<std::string> interfaceName() override;
 
 private:
-  // FileEventAdapter adapts `io_uring` to libevent.
-  class FileEventAdapter {
-  public:
-    FileEventAdapter(const uint32_t read_buffer_size, const Io::IoUringFactory& io_uring_factory,
-                     os_fd_t fd)
-        : read_buffer_size_(read_buffer_size), io_uring_factory_(io_uring_factory), fd_(fd) {}
-    void initialize(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
-                    Event::FileTriggerType trigger, uint32_t events);
-    IoHandlePtr accept(struct sockaddr* addr, socklen_t* addrlen);
-    void addAcceptRequest();
-
-  private:
-    void onFileEvent();
-    void onRequestCompletion(const Request& req, int32_t result);
-
-    const uint32_t read_buffer_size_;
-    const Io::IoUringFactory& io_uring_factory_;
-    os_fd_t fd_;
-    Event::FileReadyCb cb_;
-    Event::FileEventPtr file_event_{nullptr};
-    os_fd_t connection_fd_{INVALID_SOCKET};
-    bool is_accept_added_{false};
-    struct sockaddr remote_addr_;
-    socklen_t remote_addr_len_{sizeof(remote_addr_)};
-  };
-
+  Io::IoUring& ioUring();
+  void addAcceptRequest();
   void addReadRequest();
-  // Checks if the io handle is the one that registered eventfd with `io_uring`.
-  // An io handle can be a leader in two cases:
-  //   1. it's a server socket accepting new connections;
-  //   2. it's a client socket about to connect to a remote socket, but created
-  //      in a thread without properly initialized `io_uring`.
-  bool isLeader() const { return file_event_adapter_ != nullptr; }
+  void onRequestCompletion(Request* request, int32_t result);
 
   const uint32_t read_buffer_size_;
   const Io::IoUringFactory& io_uring_factory_;
@@ -121,14 +93,20 @@ private:
   int socket_v6only_;
   const absl::optional<int> domain_;
 
+  OptRef<Io::IoUring> io_uring_{absl::nullopt};
+  bool is_listener_{false};
   Event::FileReadyCb cb_;
+  os_fd_t connection_fd_{INVALID_SOCKET};
+  struct sockaddr connection_addr_;
+  socklen_t connection_addr_len_;
+  Request* accept_req_{nullptr};
+  int32_t connect_ret_{0};
   Buffer::OwnedImpl read_buf_;
-  int32_t bytes_to_read_{0};
+  int32_t read_ret_{0};
   Request* read_req_{nullptr};
   bool is_read_enabled_{true};
-  int32_t bytes_already_wrote_{0};
+  int32_t write_ret_{0};
   bool is_write_added_{false};
-  std::unique_ptr<FileEventAdapter> file_event_adapter_{nullptr};
   bool remote_closed_{false};
 };
 

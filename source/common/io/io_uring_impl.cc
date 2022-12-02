@@ -32,8 +32,12 @@ OptRef<IoUring> IoUringFactoryImpl::get() const {
 
 void IoUringFactoryImpl::onServerInitialized() {
   tls_.set([io_uring_size = io_uring_size_,
-            use_submission_queue_polling = use_submission_queue_polling_](Event::Dispatcher&) {
-    return std::make_shared<IoUringImpl>(io_uring_size, use_submission_queue_polling);
+            use_submission_queue_polling =
+                use_submission_queue_polling_](Event::Dispatcher& dispatcher) {
+    std::shared_ptr<IoUringImpl> io_uring =
+        std::make_shared<IoUringImpl>(io_uring_size, use_submission_queue_polling);
+    io_uring->registerEvent(dispatcher, Event::PlatformDefaultTriggerType);
+    return io_uring;
   });
 }
 
@@ -49,26 +53,160 @@ IoUringImpl::IoUringImpl(uint32_t io_uring_size, bool use_submission_queue_polli
   RELEASE_ASSERT(ret == 0, fmt::format("unable to initialize io_uring: {}", errorDetails(-ret)));
 }
 
-IoUringImpl::~IoUringImpl() { io_uring_queue_exit(&ring_); }
+IoUringImpl::~IoUringImpl() {
+  if (isEventRegistered()) {
+    unregisterEvent();
+  }
+  io_uring_queue_exit(&ring_);
+}
 
-os_fd_t IoUringImpl::registerEventfd() {
-  ASSERT(!isEventfdRegistered());
+void IoUringImpl::registerEvent(Event::Dispatcher& dispatcher, Event::FileTriggerType trigger) {
+  ASSERT(!isEventRegistered());
   event_fd_ = eventfd(0, 0);
   int res = io_uring_register_eventfd(&ring_, event_fd_);
   RELEASE_ASSERT(res == 0, fmt::format("unable to register eventfd: {}", errorDetails(-res)));
-  return event_fd_;
+  file_event_ = dispatcher.createFileEvent(
+      event_fd_, [this](uint32_t) { onFileEvent(); }, trigger, Event::FileReadyType::Read);
 }
 
-void IoUringImpl::unregisterEventfd() {
+void IoUringImpl::unregisterEvent() {
   int res = io_uring_unregister_eventfd(&ring_);
   RELEASE_ASSERT(res == 0, fmt::format("unable to unregister eventfd: {}", errorDetails(-res)));
+  file_event_.reset();
   SET_SOCKET_INVALID(event_fd_);
 }
 
-bool IoUringImpl::isEventfdRegistered() const { return SOCKET_VALID(event_fd_); }
+bool IoUringImpl::isEventRegistered() const { return SOCKET_VALID(event_fd_); }
 
-void IoUringImpl::forEveryCompletion(CompletionCb completion_cb) {
+IoUringResult IoUringImpl::prepareAccept(os_fd_t fd, struct sockaddr* remote_addr,
+                                         socklen_t* remote_addr_len, void* user_data,
+                                         CompletionCb cb) {
+  struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
+  if (sqe == nullptr) {
+    return IoUringResult::Failed;
+  }
+
+  io_uring_prep_accept(sqe, fd, remote_addr, remote_addr_len, 0);
+  if (user_data) {
+    io_uring_sqe_set_data(sqe, user_data);
+  }
+
+  cbs_[reinterpret_cast<uint64_t>(user_data)] = cb;
+  return IoUringResult::Ok;
+}
+
+IoUringResult IoUringImpl::prepareConnect(os_fd_t fd,
+                                          const Network::Address::InstanceConstSharedPtr& address,
+                                          void* user_data, CompletionCb cb) {
+  struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
+  if (sqe == nullptr) {
+    return IoUringResult::Failed;
+  }
+
+  io_uring_prep_connect(sqe, fd, address->sockAddr(), address->sockAddrLen());
+  if (user_data) {
+    io_uring_sqe_set_data(sqe, user_data);
+  }
+
+  cbs_[reinterpret_cast<uint64_t>(user_data)] = cb;
+  return IoUringResult::Ok;
+}
+
+IoUringResult IoUringImpl::prepareReadv(os_fd_t fd, const struct iovec* iovecs, unsigned nr_vecs,
+                                        off_t offset, void* user_data, CompletionCb cb) {
+  struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
+  if (sqe == nullptr) {
+    return IoUringResult::Failed;
+  }
+
+  io_uring_prep_readv(sqe, fd, iovecs, nr_vecs, offset);
+  if (user_data) {
+    io_uring_sqe_set_data(sqe, user_data);
+  }
+
+  cbs_[reinterpret_cast<uint64_t>(user_data)] = cb;
+  return IoUringResult::Ok;
+}
+
+IoUringResult IoUringImpl::prepareWritev(os_fd_t fd, const struct iovec* iovecs, unsigned nr_vecs,
+                                         off_t offset, void* user_data, CompletionCb cb) {
+  struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
+  if (sqe == nullptr) {
+    return IoUringResult::Failed;
+  }
+
+  io_uring_prep_writev(sqe, fd, iovecs, nr_vecs, offset);
+  if (user_data) {
+    io_uring_sqe_set_data(sqe, user_data);
+  }
+
+  cbs_[reinterpret_cast<uint64_t>(user_data)] = cb;
+  return IoUringResult::Ok;
+}
+
+IoUringResult IoUringImpl::prepareClose(os_fd_t fd, void* user_data, CompletionCb cb) {
+  struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
+  if (sqe == nullptr) {
+    return IoUringResult::Failed;
+  }
+
+  io_uring_prep_close(sqe, fd);
+  if (user_data) {
+    io_uring_sqe_set_data(sqe, user_data);
+  }
+
+  cbs_[reinterpret_cast<uint64_t>(user_data)] = cb;
+  return IoUringResult::Ok;
+}
+
+IoUringResult IoUringImpl::prepareCancel(void* cancelling_user_data, void* user_data,
+                                         CompletionCb cb) {
+  struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
+  if (sqe == nullptr) {
+    return IoUringResult::Failed;
+  }
+
+  io_uring_prep_cancel(sqe, cancelling_user_data, 0);
+  if (user_data) {
+    io_uring_sqe_set_data(sqe, user_data);
+  }
+
+  cbs_[reinterpret_cast<uint64_t>(user_data)] = cb;
+  return IoUringResult::Ok;
+}
+
+IoUringResult IoUringImpl::prepareNop(void* user_data, CompletionCb cb) {
+  struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
+  if (sqe == nullptr) {
+    return IoUringResult::Failed;
+  }
+
+  io_uring_prep_nop(sqe);
+  if (user_data) {
+    io_uring_sqe_set_data(sqe, user_data);
+  }
+
+  cbs_[reinterpret_cast<uint64_t>(user_data)] = cb;
+  return IoUringResult::Ok;
+}
+
+IoUringResult IoUringImpl::submit() {
+  int res = io_uring_submit(&ring_);
+  RELEASE_ASSERT(res >= 0 || res == -EBUSY, "unable to submit io_uring queue entries");
+  return res == -EBUSY ? IoUringResult::Busy : IoUringResult::Ok;
+}
+
+IoUringResult IoUringImpl::trySubmit() {
+  if (delay_submit_) {
+    return IoUringResult::Ok;
+  }
+
+  return submit();
+}
+
+void IoUringImpl::onFileEvent() {
   ASSERT(SOCKET_VALID(event_fd_));
+  delay_submit_ = true;
 
   eventfd_t v;
   int ret = eventfd_read(event_fd_, &v);
@@ -78,86 +216,18 @@ void IoUringImpl::forEveryCompletion(CompletionCb completion_cb) {
 
   for (unsigned i = 0; i < count; ++i) {
     struct io_uring_cqe* cqe = cqes_[i];
-    completion_cb(reinterpret_cast<void*>(cqe->user_data), cqe->res);
+    CompletionCb cb = cbs_[cqe->user_data];
+    if (cb == nullptr) {
+      ENVOY_LOG_MISC(warn, "ignore CQ without correspoding callback");
+      continue;
+    }
+
+    cb(reinterpret_cast<void*>(cqe->user_data), cqe->res);
+    cbs_.erase(cqe->user_data);
   }
   io_uring_cq_advance(&ring_, count);
-}
-
-IoUringResult IoUringImpl::prepareAccept(os_fd_t fd, struct sockaddr* remote_addr,
-                                         socklen_t* remote_addr_len, void* user_data) {
-  struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
-  if (sqe == nullptr) {
-    return IoUringResult::Failed;
-  }
-
-  io_uring_prep_accept(sqe, fd, remote_addr, remote_addr_len, 0);
-  io_uring_sqe_set_data(sqe, user_data);
-  return IoUringResult::Ok;
-}
-
-IoUringResult IoUringImpl::prepareConnect(os_fd_t fd,
-                                          const Network::Address::InstanceConstSharedPtr& address,
-                                          void* user_data) {
-  struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
-  if (sqe == nullptr) {
-    return IoUringResult::Failed;
-  }
-
-  io_uring_prep_connect(sqe, fd, address->sockAddr(), address->sockAddrLen());
-  io_uring_sqe_set_data(sqe, user_data);
-  return IoUringResult::Ok;
-}
-
-IoUringResult IoUringImpl::prepareReadv(os_fd_t fd, const struct iovec* iovecs, unsigned nr_vecs,
-                                        off_t offset, void* user_data) {
-  struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
-  if (sqe == nullptr) {
-    return IoUringResult::Failed;
-  }
-
-  io_uring_prep_readv(sqe, fd, iovecs, nr_vecs, offset);
-  io_uring_sqe_set_data(sqe, user_data);
-  return IoUringResult::Ok;
-}
-
-IoUringResult IoUringImpl::prepareWritev(os_fd_t fd, const struct iovec* iovecs, unsigned nr_vecs,
-                                         off_t offset, void* user_data) {
-  struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
-  if (sqe == nullptr) {
-    return IoUringResult::Failed;
-  }
-
-  io_uring_prep_writev(sqe, fd, iovecs, nr_vecs, offset);
-  io_uring_sqe_set_data(sqe, user_data);
-  return IoUringResult::Ok;
-}
-
-IoUringResult IoUringImpl::prepareClose(os_fd_t fd, void* user_data) {
-  struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
-  if (sqe == nullptr) {
-    return IoUringResult::Failed;
-  }
-
-  io_uring_prep_close(sqe, fd);
-  io_uring_sqe_set_data(sqe, user_data);
-  return IoUringResult::Ok;
-}
-
-IoUringResult IoUringImpl::prepareCancel(void* cancelling_user_data, void* user_data) {
-  struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
-  if (sqe == nullptr) {
-    return IoUringResult::Failed;
-  }
-
-  io_uring_prep_cancel(sqe, cancelling_user_data, 0);
-  io_uring_sqe_set_data(sqe, user_data);
-  return IoUringResult::Ok;
-}
-
-IoUringResult IoUringImpl::submit() {
-  int res = io_uring_submit(&ring_);
-  RELEASE_ASSERT(res >= 0 || res == -EBUSY, "unable to submit io_uring queue entries");
-  return res == -EBUSY ? IoUringResult::Busy : IoUringResult::Ok;
+  submit();
+  delay_submit_ = false;
 }
 
 } // namespace Io
