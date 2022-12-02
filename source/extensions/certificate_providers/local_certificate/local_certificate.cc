@@ -4,6 +4,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/config/datasource.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -22,7 +23,7 @@ Provider::Provider(
       cache_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, cache_size, CacheDefaultSize)) {
   ASSERT(main_thread_dispatcher_.isThreadSafe());
   if (config.has_expiration_time()) {
-    auto seconds = google::protobuf::util::TimeUtil::TimestampToSeconds(config.expiration_time());
+    auto seconds = Envoy::ProtobufUtil::TimeUtil::TimestampToSeconds(config.expiration_time());
     expiration_config_ = std::chrono::system_clock::from_time_t(static_cast<time_t>(seconds));
   }
 
@@ -65,9 +66,7 @@ Envoy::CertificateProvider::OnDemandUpdateHandlePtr Provider::addOnDemandUpdateC
   // if we generate two mimic certs for these SNIs, it can not pass the certs config check
   // since we do not allow duplicated SANs.
   // We need to align this cache_hit with current transport socket behavior
-  bool cache_hit = [&]() {
-    return certificates_.is_in_cache(sni);
-  }();
+  bool cache_hit = [&]() { return certificates_.is_in_cache(sni); }();
 
   if (cache_hit) {
     ENVOY_LOG(debug, "Cache hit for {}", sni);
@@ -276,7 +275,7 @@ void Provider::setExpirationTime(Envoy::CertificateProvider::OnDemandUpdateMetad
   X509_gmtime_adj(X509_get_notBefore(crt), 0);
   // Compare expiration_time config with upstream cert expiration. Use smaller
   // value of those two dates as expiration time of mimic cert.
-  auto now = std::chrono::system_clock::now();
+  auto now = main_thread_dispatcher_.timeSource().systemTime();
   auto cert_expiration = metadata->connectionInfo()->expirationPeerCertificate();
   uint64_t valid_seconds;
   if (expiration_config_) {

@@ -445,7 +445,8 @@ ServerContextConfigImpl::ServerContextConfigImpl(
   if (!capabilities().provides_certificates) {
     if ((config.common_tls_context().tls_certificates().size() +
          config.common_tls_context().tls_certificate_sds_secret_configs().size()) +
-         config.common_tls_context().has_tls_certificate_provider_instance() == 0) {
+            config.common_tls_context().has_tls_certificate_provider_instance() ==
+        0) {
       throw EnvoyException("No TLS certificates found for server context");
     } else if (!config.common_tls_context().tls_certificates().empty() &&
                !config.common_tls_context().tls_certificate_sds_secret_configs().empty()) {

@@ -24,6 +24,7 @@ envoy_cc_library(
         "//source/common/common:callback_impl_lib",
         "//source/common/common:logger_lib",
         "//source/common/config:datasource_lib",
+        "//source/common/protobuf",
         "@envoy_api//envoy/extensions/certificate_providers/local_certificate/v3:pkg_cc_proto",
     ],
 )
