@@ -1,6 +1,6 @@
 diff --git a/icu4c/source/common/BUILD.bazel b/icu4c/source/common/BUILD.bazel
 deleted file mode 100644
-index e385d3b..0000000
+index e385d3b243..0000000000
 --- a/icu4c/source/common/BUILD.bazel
 +++ /dev/null
 @@ -1,1213 +0,0 @@
@@ -1219,7 +1219,7 @@ index e385d3b..0000000
 -)
 diff --git a/icu4c/source/data/unidata/norm2/BUILD.bazel b/icu4c/source/data/unidata/norm2/BUILD.bazel
 deleted file mode 100644
-index 049e19b..0000000
+index 049e19bd41..0000000000
 --- a/icu4c/source/data/unidata/norm2/BUILD.bazel
 +++ /dev/null
 @@ -1,13 +0,0 @@
@@ -1238,7 +1238,7 @@ index 049e19b..0000000
 -])
 diff --git a/icu4c/source/i18n/BUILD.bazel b/icu4c/source/i18n/BUILD.bazel
 deleted file mode 100644
-index 2d85cdb..0000000
+index 2d85cdb180..0000000000
 --- a/icu4c/source/i18n/BUILD.bazel
 +++ /dev/null
 @@ -1,130 +0,0 @@
@@ -1373,9 +1373,26 @@ index 2d85cdb..0000000
 -    ],
 -)
 diff --git a/icu4c/source/icudefs.mk.in b/icu4c/source/icudefs.mk.in
-index 2c35816..4ad6f52 100644
+index 2c358167a8..b30f33b292 100644
 --- a/icu4c/source/icudefs.mk.in
 +++ b/icu4c/source/icudefs.mk.in
+@@ -50,13 +50,13 @@ SO_TARGET_VERSION_MAJOR = @LIB_VERSION_MAJOR@
+ # The ICU data external name is usually icudata; the entry point name is
+ # the version-dependent name (for no particular reason except it was easier
+ # to change the build this way). When building in common mode, the data
+-# name is the versioned platform-dependent one. 
++# name is the versioned platform-dependent one.
+ 
+ ICUDATA_DIR = @pkgicudatadir@/$(PACKAGE)$(ICULIBSUFFIX)/$(VERSION)
+ 
+ ICUDATA_BASENAME_VERSION = $(ICUPREFIX)dt@LIB_VERSION_MAJOR@
+-# the entry point is almost like the basename, but has the lib suffix.  
+-ICUDATA_ENTRY_POINT = $(ICUPREFIX)dt@ICULIBSUFFIXCNAME@@LIB_VERSION_MAJOR@ 
++# the entry point is almost like the basename, but has the lib suffix.
++ICUDATA_ENTRY_POINT = $(ICUPREFIX)dt@ICULIBSUFFIXCNAME@@LIB_VERSION_MAJOR@
+ ICUDATA_CHAR = @ICUDATA_CHAR@
+ ICUDATA_PLATFORM_NAME = $(ICUDATA_BASENAME_VERSION)$(ICUDATA_CHAR)
+ PKGDATA_LIBSTATICNAME = -L $(STATIC_PREFIX)$(ICUPREFIX)$(DATA_STUBNAME)$(ICULIBSUFFIX)
 @@ -117,7 +117,7 @@ EXEEXT = @EXEEXT@
  CC = @CC@
  CXX = @CXX@
@@ -1385,12 +1402,21 @@ index 2c35816..4ad6f52 100644
  RANLIB = @RANLIB@
  COMPILE_LINK_ENVVAR = @COMPILE_LINK_ENVVAR@
  UCLN_NO_AUTO_CLEANUP = @UCLN_NO_AUTO_CLEANUP@
+@@ -215,7 +215,7 @@ LIBICU = $(LIBPREFIX)$(ICUPREFIX)
+ ifneq ($(ENABLE_SHARED),YES)
+ STATIC_PREFIX_WHEN_USED = s
+ else
+-STATIC_PREFIX_WHEN_USED = 
++STATIC_PREFIX_WHEN_USED =
+ endif
+ 
+ # Static library prefix and file extension
 diff --git a/icu4c/source/stubdata/BUILD.bazel b/icu4c/source/stubdata/BUILD.bazel
 deleted file mode 100644
-index abb7351..0000000
+index 20344ef499..0000000000
 --- a/icu4c/source/stubdata/BUILD.bazel
 +++ /dev/null
-@@ -1,23 +0,0 @@
+@@ -1,24 +0,0 @@
 -# © 2021 and later: Unicode, Inc. and others.
 -# License & terms of use: http://www.unicode.org/copyright.html
 -
@@ -1409,6 +1435,7 @@ index abb7351..0000000
 -cc_library(
 -    name = "stubdata",
 -    srcs = ["stubdata.cpp"],
+-    hdrs = ["stubdata.h"],
 -    deps = ["//icu4c/source/common:headers"],
 -    local_defines = [
 -        "U_COMMON_IMPLEMENTATION",
@@ -1416,7 +1443,7 @@ index abb7351..0000000
 -)
 diff --git a/icu4c/source/tools/gennorm2/BUILD.bazel b/icu4c/source/tools/gennorm2/BUILD.bazel
 deleted file mode 100644
-index c602897..0000000
+index c602897baf..0000000000
 --- a/icu4c/source/tools/gennorm2/BUILD.bazel
 +++ /dev/null
 @@ -1,39 +0,0 @@
@@ -1461,7 +1488,7 @@ index c602897..0000000
 -)
 diff --git a/icu4c/source/tools/toolutil/BUILD.bazel b/icu4c/source/tools/toolutil/BUILD.bazel
 deleted file mode 100644
-index 276c857..0000000
+index 276c857f12..0000000000
 --- a/icu4c/source/tools/toolutil/BUILD.bazel
 +++ /dev/null
 @@ -1,126 +0,0 @@
@@ -1591,4 +1618,3 @@ index 276c857..0000000
 -        "//icu4c/source/i18n:headers",
 -    ],
 -)
-

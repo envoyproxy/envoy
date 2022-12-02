@@ -19,7 +19,7 @@ RouterTestBase::RouterTestBase(bool start_child_span, bool suppress_envoy_header
               ShadowWriterPtr{shadow_writer_}, true, start_child_span, suppress_envoy_headers,
               false, suppress_grpc_request_failure_code_stats, std::move(strict_headers_to_check),
               test_time_.timeSystem(), http_context_, router_context_),
-      router_(config_) {
+      router_(config_, config_.default_stats_) {
   router_.setDecoderFilterCallbacks(callbacks_);
   upstream_locality_.set_zone("to_az");
   cm_.initializeThreadLocalClusters({"fake_cluster"});
@@ -42,16 +42,6 @@ RouterTestBase::RouterTestBase(bool start_child_span, bool suppress_envoy_header
 
   EXPECT_CALL(callbacks_.route_->route_entry_.early_data_policy_, allowsEarlyDataForRequest(_))
       .WillRepeatedly(Invoke(Http::Utility::isSafeRequest));
-  // All router based tests will fail if the codec filter is not created in the
-  // filter chain. By default, create a filter chain with just a codec filter.
-  ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, createFilterChain(_))
-      .WillByDefault(Invoke([&](Http::FilterChainManager& manager) -> void {
-        Http::FilterFactoryCb factory_cb =
-            [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-          callbacks.addStreamDecoderFilter(std::make_shared<UpstreamCodecFilter>());
-        };
-        manager.applyFilterFactoryCb({}, factory_cb);
-      }));
 }
 
 void RouterTestBase::expectResponseTimerCreate() {

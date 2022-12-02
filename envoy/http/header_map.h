@@ -11,6 +11,7 @@
 
 #include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
+#include "envoy/common/union_string.h"
 #include "envoy/http/header_formatter.h"
 #include "envoy/tracing/trace_context.h"
 
@@ -98,147 +99,27 @@ private:
 using LowerCaseStrPairVector =
     std::vector<std::pair<const Http::LowerCaseString, const std::string>>;
 
-/**
- * Convenient type for an inline vector that will be used by HeaderString.
- */
-using InlineHeaderVector = absl::InlinedVector<char, 128>;
-
-/**
- * Convenient type for the underlying type of HeaderString that allows a variant
- * between string_view and the InlinedVector.
- */
-using VariantHeader = absl::variant<absl::string_view, InlineHeaderVector>;
-
-/**
- * This is a string implementation for use in header processing. It is heavily optimized for
- * performance. It supports 2 different types of storage and can switch between them:
- * 1) A reference.
- * 2) An InlinedVector (an optimized interned string for small strings, but allows heap
- * allocation if needed).
- */
-class HeaderString {
+class HeaderStringValidator {
 public:
-  /**
-   * Default constructor. Sets up for inline storage.
-   */
-  HeaderString();
+  bool operator()(absl::string_view view) { return validHeaderString(view); }
+};
+
+class HeaderString : public UnionStringBase<HeaderStringValidator> {
+public:
+  using UnionStringBase::UnionStringBase;
 
   /**
-   * Constructor for a string reference.
+   * Constructor for a lower case string reference.
    * @param ref_value MUST point to data that will live beyond the lifetime of any request/response
    *        using the string (since a codec may optimize for zero copy).
    */
-  explicit HeaderString(const LowerCaseString& ref_value);
+  explicit HeaderString(const LowerCaseString& ref_value) noexcept;
 
   /**
-   * Constructor for a string reference.
-   * @param ref_value MUST point to data that will live beyond the lifetime of any request/response
-   *        using the string (since a codec may optimize for zero copy).
+   * Constructor for normal UnionString instance.
+   * @param move_value moveable UnionString. The string value MUST be valid header string.
    */
-  explicit HeaderString(absl::string_view ref_value);
-
-  HeaderString(HeaderString&& move_value) noexcept;
-  ~HeaderString() = default;
-
-  /**
-   * Append data to an existing string. If the string is a reference string the reference data is
-   * not copied.
-   */
-  void append(const char* data, uint32_t size);
-
-  /**
-   * Transforms the inlined vector data using the given UnaryOperation (conforms
-   * to std::transform).
-   * @param unary_op the operations to be performed on each of the elements.
-   */
-  template <typename UnaryOperation> void inlineTransform(UnaryOperation&& unary_op) {
-    ASSERT(type() == Type::Inline);
-    std::transform(absl::get<InlineHeaderVector>(buffer_).begin(),
-                   absl::get<InlineHeaderVector>(buffer_).end(),
-                   absl::get<InlineHeaderVector>(buffer_).begin(), unary_op);
-  }
-
-  /**
-   * Trim trailing whitespaces from the HeaderString. Only supported by the "Inline" HeaderString
-   * representation.
-   */
-  void rtrim();
-
-  /**
-   * Get an absl::string_view. It will NOT be NUL terminated!
-   *
-   * @return an absl::string_view.
-   */
-  absl::string_view getStringView() const;
-
-  /**
-   * Return the string to a default state. Reference strings are not touched. Both inline/dynamic
-   * strings are reset to zero size.
-   */
-  void clear();
-
-  /**
-   * @return whether the string is empty or not.
-   */
-  bool empty() const { return size() == 0; }
-
-  // Looking for find? Use getStringView().find()
-
-  /**
-   * Set the value of the string by copying data into it. This overwrites any existing string.
-   */
-  void setCopy(const char* data, uint32_t size);
-
-  /**
-   * Set the value of the string by copying data into it. This overwrites any existing string.
-   */
-  void setCopy(absl::string_view view);
-
-  /**
-   * Set the value of the string to an integer. This overwrites any existing string.
-   */
-  void setInteger(uint64_t value);
-
-  /**
-   * Set the value of the string to a string reference.
-   * @param ref_value MUST point to data that will live beyond the lifetime of any request/response
-   *        using the string (since a codec may optimize for zero copy).
-   */
-  void setReference(absl::string_view ref_value);
-
-  /**
-   * @return whether the string is a reference or an InlinedVector.
-   */
-  bool isReference() const { return type() == Type::Reference; }
-
-  /**
-   * @return the size of the string, not including the null terminator.
-   */
-  uint32_t size() const;
-
-  bool operator==(const char* rhs) const {
-    return getStringView() == absl::NullSafeStringView(rhs);
-  }
-  bool operator==(absl::string_view rhs) const { return getStringView() == rhs; }
-  bool operator!=(const char* rhs) const {
-    return getStringView() != absl::NullSafeStringView(rhs);
-  }
-  bool operator!=(absl::string_view rhs) const { return getStringView() != rhs; }
-
-  // Test only method that does not have validation and allows setting arbitrary values.
-  void setCopyUnvalidatedForTestOnly(absl::string_view view);
-
-private:
-  enum class Type { Reference, Inline };
-
-  VariantHeader buffer_;
-
-  bool valid() const;
-
-  /**
-   * @return the type of backing storage for the string.
-   */
-  Type type() const;
+  explicit HeaderString(UnionString&& move_value) noexcept;
 };
 
 /**
@@ -324,7 +205,8 @@ private:
   HEADER_FUNC(EnvoyMaxRetries)                                                                     \
   HEADER_FUNC(EnvoyUpstreamRequestTimeoutMs)                                                       \
   HEADER_FUNC(EnvoyUpstreamRequestPerTryTimeoutMs)                                                 \
-  HEADER_FUNC(EnvoyUpstreamStreamDurationMs)
+  HEADER_FUNC(EnvoyUpstreamStreamDurationMs)                                                       \
+  HEADER_FUNC(ForwardedPort)
 
 #define INLINE_REQ_HEADERS(HEADER_FUNC)                                                            \
   INLINE_REQ_STRING_HEADERS(HEADER_FUNC)                                                           \

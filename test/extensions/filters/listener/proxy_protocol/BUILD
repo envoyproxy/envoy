@@ -71,6 +71,7 @@ envoy_extension_cc_test(
         "//source/common/buffer:buffer_lib",
         "//source/common/http:codec_client_lib",
         "//source/extensions/access_loggers/file:config",
+        "//source/extensions/clusters/original_dst:original_dst_cluster_lib",
         "//source/extensions/filters/listener/proxy_protocol:config",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//test/integration:http_integration_lib",

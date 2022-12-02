@@ -35,10 +35,11 @@ protected:
     // 'srds_cluster'.
     skip_tag_extraction_rule_check_ = true;
 
-    if (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw ||
-        sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta) {
-      config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux", "true");
-    }
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux",
+                                      (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw ||
+                                       sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta)
+                                          ? "true"
+                                          : "false");
   }
 
   ~ScopedRdsIntegrationTest() override { resetConnections(); }

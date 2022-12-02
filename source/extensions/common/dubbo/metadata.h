@@ -4,8 +4,6 @@
 #include <string>
 
 #include "source/common/common/assert.h"
-#include "source/common/common/empty_string.h"
-#include "source/common/http/header_map_impl.h"
 #include "source/extensions/common/dubbo/message.h"
 
 #include "absl/types/optional.h"

@@ -525,6 +525,7 @@ message Cluster {
   // Specific configuration for the
   // :ref:`Original Destination <arch_overview_load_balancing_types_original_destination>`
   // load balancing policy.
+  // [#extension: envoy.clusters.original_dst]
   message OriginalDstLbConfig {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.Cluster.OriginalDstLbConfig";
@@ -1222,15 +1223,6 @@ message LoadBalancingPolicy {
   // supports. This provides a mechanism for starting to use new LB policies that are not yet
   // supported by all clients.
   repeated Policy policies = 1;
-}
-
-// An extensible structure containing the address Envoy should bind to when
-// establishing upstream connections.
-message UpstreamBindConfig {
-  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.UpstreamBindConfig";
-
-  // The address Envoy should bind to when establishing upstream connections.
-  core.v3.Address source_address = 1;
 }
 
 message UpstreamConnectionOptions {

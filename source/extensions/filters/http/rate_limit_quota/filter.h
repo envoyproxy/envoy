@@ -132,11 +132,11 @@ public:
 
   // Http::PassThroughDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override;
-  void onDestroy() override;
+  void onDestroy() override { rate_limit_client_->closeStream(); };
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
   // RateLimitQuota::RateLimitQuotaCallbacks
-  void onReceive(envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse&) override {}
+  void onQuotaResponse(envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse&) override {}
 
   // Perform request matching. It returns the generated bucket ids if the matching succeeded and
   // returns the error status otherwise.
@@ -156,6 +156,7 @@ private:
   void createMatcher();
 
   FilterConfigConstSharedPtr config_;
+  // TODO(tyxia) Removed
   RateLimitClientPtr rate_limit_client_;
   Server::Configuration::FactoryContext& factory_context_;
   Http::StreamDecoderFilterCallbacks* callbacks_ = nullptr;

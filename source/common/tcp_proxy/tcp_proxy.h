@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -112,7 +113,23 @@ using RouteConstSharedPtr = std::shared_ptr<const Route>;
 using TunnelingConfig =
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig;
 
-class TunnelingConfigHelperImpl : public TunnelingConfigHelper {
+/**
+ * Response headers for the tunneling connections.
+ */
+class TunnelResponseHeaders : public StreamInfo::FilterState::Object {
+public:
+  TunnelResponseHeaders(Http::ResponseHeaderMapPtr&& response_headers)
+      : response_headers_(std::move(response_headers)) {}
+  const Http::ResponseHeaderMap& value() const { return *response_headers_; }
+  ProtobufTypes::MessagePtr serializeAsProto() const override;
+  static const std::string& key();
+
+private:
+  const Http::ResponseHeaderMapPtr response_headers_;
+};
+
+class TunnelingConfigHelperImpl : public TunnelingConfigHelper,
+                                  protected Logger::Loggable<Logger::Id::filter> {
 public:
   TunnelingConfigHelperImpl(
       const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig&
@@ -120,12 +137,18 @@ public:
       Server::Configuration::FactoryContext& context);
   std::string host(const StreamInfo::StreamInfo& stream_info) const override;
   bool usePost() const override { return use_post_; }
+  const std::string& postPath() const override { return post_path_; }
   Envoy::Http::HeaderEvaluator& headerEvaluator() const override { return *header_parser_; }
+  void
+  propagateResponseHeaders(Http::ResponseHeaderMapPtr&& headers,
+                           const StreamInfo::FilterStateSharedPtr& filter_state) const override;
 
 private:
   const bool use_post_;
   std::unique_ptr<Envoy::Router::HeaderParser> header_parser_;
   Formatter::FormatterPtr hostname_fmt_;
+  const bool propagate_response_headers_;
+  std::string post_path_;
 };
 
 /**
@@ -173,21 +196,24 @@ public:
                  Server::Configuration::FactoryContext& context);
     const TcpProxyStats& stats() { return stats_; }
     const absl::optional<std::chrono::milliseconds>& idleTimeout() { return idle_timeout_; }
-    const absl::optional<std::chrono::milliseconds>& maxDownstreamConnectinDuration() const {
+    const absl::optional<std::chrono::milliseconds>& maxDownstreamConnectionDuration() const {
       return max_downstream_connection_duration_;
+    }
+    const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() const {
+      return access_log_flush_interval_;
     }
     TunnelingConfigHelperOptConstRef tunnelingConfigHelper() {
       if (tunneling_config_helper_) {
-        return TunnelingConfigHelperOptConstRef(*tunneling_config_helper_);
+        return {*tunneling_config_helper_};
       } else {
-        return TunnelingConfigHelperOptConstRef();
+        return {};
       }
     }
     OnDemandConfigOptConstRef onDemandConfig() {
       if (on_demand_config_) {
-        return OnDemandConfigOptConstRef(*on_demand_config_);
+        return {*on_demand_config_};
       } else {
-        return OnDemandConfigOptConstRef();
+        return {};
       }
     }
 
@@ -201,6 +227,7 @@ public:
     const TcpProxyStats stats_;
     absl::optional<std::chrono::milliseconds> idle_timeout_;
     absl::optional<std::chrono::milliseconds> max_downstream_connection_duration_;
+    absl::optional<std::chrono::milliseconds> access_log_flush_interval_;
     std::unique_ptr<TunnelingConfigHelper> tunneling_config_helper_;
     std::unique_ptr<OnDemandConfig> on_demand_config_;
   };
@@ -228,7 +255,10 @@ public:
     return shared_config_->idleTimeout();
   }
   const absl::optional<std::chrono::milliseconds>& maxDownstreamConnectionDuration() const {
-    return shared_config_->maxDownstreamConnectinDuration();
+    return shared_config_->maxDownstreamConnectionDuration();
+  }
+  const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() const {
+    return shared_config_->accessLogFlushInterval();
   }
   // Return nullptr if there is no tunneling config.
   TunnelingConfigHelperOptConstRef tunnelingConfigHelper() {
@@ -251,6 +281,7 @@ public:
   }
   // This function must not be called if on demand is disabled.
   const OnDemandStats& onDemandStats() const { return shared_config_->onDemandConfig()->stats(); }
+  Random::RandomGenerator& randomGenerator() { return random_generator_; }
 
 private:
   struct SimpleRouteImpl : public Route {
@@ -337,6 +368,7 @@ public:
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
   Network::FilterStatus onNewConnection() override;
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
+  bool startUpstreamSecureTransport() override;
 
   // GenericConnectionPoolCallbacks
   void onGenericPoolReady(StreamInfo::StreamInfo* info, std::unique_ptr<GenericUpstream>&& upstream,
@@ -450,6 +482,9 @@ protected:
   void resetIdleTimer();
   void disableIdleTimer();
   void onMaxDownstreamConnectionDuration();
+  void onAccessLogFlushInterval();
+  void resetAccessLogFlushTimer();
+  void disableAccessLogFlushTimer();
 
   const ConfigSharedPtr config_;
   Upstream::ClusterManager& cluster_manager_;
@@ -458,6 +493,7 @@ protected:
   DownstreamCallbacks downstream_callbacks_;
   Event::TimerPtr idle_timer_;
   Event::TimerPtr connection_duration_timer_;
+  Event::TimerPtr access_log_flush_timer_;
 
   // A pointer to the on demand cluster lookup when lookup is in flight.
   Upstream::ClusterDiscoveryCallbackHandlePtr cluster_discovery_handle_;

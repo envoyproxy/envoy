@@ -119,9 +119,8 @@ public:
   MOCK_METHOD(void, setUpstreamClusterInfo, (const Upstream::ClusterInfoConstSharedPtr&));
   MOCK_METHOD(absl::optional<Upstream::ClusterInfoConstSharedPtr>, upstreamClusterInfo, (),
               (const));
-  MOCK_METHOD(const Http::RequestIdStreamInfoProvider*, getRequestIDProvider, (), (const));
-  MOCK_METHOD(void, setRequestIDProvider,
-              (const Http::RequestIdStreamInfoProviderSharedPtr& provider));
+  MOCK_METHOD(OptRef<const StreamIdProvider>, getStreamIdProvider, (), (const));
+  MOCK_METHOD(void, setStreamIdProvider, (StreamIdProviderSharedPtr provider));
   MOCK_METHOD(void, setTraceReason, (Tracing::Reason reason));
   MOCK_METHOD(Tracing::Reason, traceReason, (), (const));
   MOCK_METHOD(absl::optional<uint64_t>, connectionID, (), (const));
@@ -135,6 +134,7 @@ public:
   MOCK_METHOD(void, setUpstreamBytesMeter, (const BytesMeterSharedPtr&));
   MOCK_METHOD(void, setDownstreamBytesMeter, (const BytesMeterSharedPtr&));
   MOCK_METHOD(void, dumpState, (std::ostream & os, int indent_level), (const));
+  MOCK_METHOD(bool, isShadow, (), (const, override));
   Envoy::Event::SimulatedTimeSystem ts_;
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;

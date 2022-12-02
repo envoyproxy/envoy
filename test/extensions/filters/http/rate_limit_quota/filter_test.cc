@@ -30,6 +30,7 @@ using ::testing::NiceMock;
 constexpr char ValidMatcherConfig[] = R"EOF(
   matcher_list:
     matchers:
+      # Assign requests with header['env'] set to 'staging' to the bucket { name: 'staging' }
       predicate:
         single_predicate:
           input:
@@ -136,6 +137,15 @@ constexpr char OnNoMatchConfig[] = R"EOF(
 //           blanket_rule: ALLOW_ALL
 //       reporting_interval: 5s
 // )EOF";
+// constexpr char OnNoMatchConfig_deprecated[] = R"EOF(
+//   action:
+//     typed_config:
+//       '@type': type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
+//       no_assignment_behavior:
+//         fallback_rate_limit:
+//           blanket_rule: DENY_ALL
+//       reporting_interval: 60s
+// )EOF";
 
 const std::string GoogleGrpcConfig = R"EOF(
   rlqs_server:
@@ -232,6 +242,13 @@ public:
     }
   }
 
+  void buildCustomHeader(const absl::flat_hash_map<std::string, std::string>& custom_value_pairs) {
+    // Add custom_value_pairs to the request header for exact value_match in the predicate.
+    for (auto const& pair : custom_value_pairs) {
+      default_headers_.addCopy(pair.first, pair.second);
+    }
+  }
+
   NiceMock<MockFactoryContext> context_;
   NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
 
@@ -258,10 +275,7 @@ TEST_F(FilterTest, RequestMatchingSucceeded) {
   absl::flat_hash_map<std::string, std::string> custom_value_pairs = {{"environment", "staging"},
                                                                       {"group", "envoy"}};
 
-  // Add custom_value_pairs to the request header for exact value_match in the predicate.
-  for (auto const& pair : custom_value_pairs) {
-    default_headers_.addCopy(pair.first, pair.second);
-  }
+  buildCustomHeader(custom_value_pairs);
 
   // The expected bucket ids has one additional pair that is built statically via `string_value`
   // from the config.

@@ -39,7 +39,8 @@ message RouteAction {
   // Route metadata.
   config.core.v3.Metadata metadata = 3;
 
-  // Route level config for L7 generic filters. The key should always be the generic
-  // filter name.
+  // Route level config for L7 generic filters. The key should be the related :ref:`extension name
+  // <envoy_v3_api_field_config.core.v3.TypedExtensionConfig.name>` in the :ref:`generic filters
+  // <envoy_v3_api_field_extensions.filters.network.generic_proxy.v3.GenericProxy.filters>`.
   map<string, google.protobuf.Any> per_filter_config = 4;
 }

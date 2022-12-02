@@ -51,6 +51,10 @@ message Endpoint {
     //
     //   The form of the health check host address is expected to be a direct IP address.
     core.v3.Address address = 3;
+
+    // Optional flag to control if perform active health check for this endpoint.
+    // Active health check is enabled by default if there is a health checker.
+    bool disable_active_health_check = 4;
   }
 
   // The upstream host address.

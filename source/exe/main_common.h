@@ -45,6 +45,7 @@ public:
   // Will be null if options.mode() == Server::Mode::Validate
   Server::Instance* server() { return server_.get(); }
 
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
   using AdminRequestFn =
       std::function<void(const Http::ResponseHeaderMap& response_headers, absl::string_view body)>;
 
@@ -62,6 +63,7 @@ public:
   // semantics, rather than a handler callback.
   void adminRequest(absl::string_view path_and_query, absl::string_view method,
                     const AdminRequestFn& handler);
+#endif
 
 protected:
   std::unique_ptr<Server::Platform> platform_impl_;
@@ -106,6 +108,7 @@ public:
   // Only tests have a legitimate need for this today.
   Event::Dispatcher& dispatcherForTest() { return base_.server()->dispatcher(); }
 
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
   // Makes an admin-console request by path, calling handler() when complete.
   // The caller can initiate this from any thread, but it posts the request
   // onto the main thread, so the handler is called asynchronously.
@@ -119,6 +122,7 @@ public:
                     const MainCommonBase::AdminRequestFn& handler) {
     base_.adminRequest(path_and_query, method, handler);
   }
+#endif
 
   static std::string hotRestartVersion(bool hot_restart_enabled);
 

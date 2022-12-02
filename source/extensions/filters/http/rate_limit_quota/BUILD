@@ -70,7 +70,6 @@ envoy_cc_library(
     ],
 )
 
-
 envoy_cc_library(
     name = "quota_bucket",
     hdrs = ["quota_bucket.h"],

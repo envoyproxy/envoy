@@ -82,7 +82,33 @@ void RateLimitQuotaFilter::setDecoderFilterCallbacks(
 //   return Envoy::Http::FilterHeadersStatus::Continue;
 // }
 
-void RateLimitQuotaFilter::onDestroy() { rate_limit_client_->closeStream(); }
+// Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeaderMap& headers,
+//                                                               bool) {
+//   // TODO(tyxia) Create the rate limit gRPC client and start the stream on the first request.
+//   absl::StatusOr<BucketId> match_result = requestMatching(headers);
+
+//   // Request is not matched by any matchers. In this case, requests are ALLOWED by default (i.e.,
+//   // fail-open) and will not be reported to RLQS server.
+//   if (!match_result.ok()) {
+//     return Envoy::Http::FilterHeadersStatus::Continue;
+//   }
+
+//   // Request is not matched by any matcher but the `on_no_match` field is configured. In this
+//   // case, the request is matched to catch-all bucket and is DENIED by default.
+//   // TODO(tyxia) Think about the way of representing DENIED and ALLOWED here.
+//   if (match_result.value().bucket().empty()) {
+//     return Envoy::Http::FilterHeadersStatus::Continue;
+//   }
+
+//   // Request has been matched and the corresponding bucket id has been generated successfully.
+//   // Retrieve the quota assignment, if the entry with specific `bucket_id` is found.
+//   if (quota_assignment_.find(match_result.value()) != quota_assignment_.end()) {
+//   }
+//   // Otherwise, send the request to RLQS server for the quota assignment and insert the bucket_id to
+//   // the map.
+
+//   return Envoy::Http::FilterHeadersStatus::Continue;
+// }
 
 void RateLimitQuotaFilter::createMatcher() {
   RateLimitOnMactchActionContext context;
@@ -233,9 +259,6 @@ REGISTER_FACTORY(RateLimitOnMactchActionFactory,
 
 
 updated version using `requestMatching2` function which returns absl::StatusOr<Matcher::ActionPtr>
-
-
-
 
 *********************************************************************************************/
 Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeaderMap& headers,

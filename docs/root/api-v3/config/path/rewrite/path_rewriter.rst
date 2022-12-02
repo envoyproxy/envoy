@@ -1,5 +1,5 @@
-Path Rewriter
-=================
+Path rewriter
+=============
 
 .. toctree::
   :glob:

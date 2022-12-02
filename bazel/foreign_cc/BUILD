@@ -264,6 +264,7 @@ envoy_cmake(
         "BUILD_SHARED_LIBS": "off",
         "CURL_HIDDEN_SYMBOLS": "off",
         "CURL_USE_LIBSSH2": "off",
+        "CURL_USE_LIBPSL": "off",
         "CURL_BROTLI": "off",
         "CURL_USE_GSSAPI": "off",
         "HTTP_ONLY": "on",

@@ -80,6 +80,7 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/retry/host/previous_hosts @snowp @alyssawilk
 # HTTP caching extension
 /*/extensions/filters/http/cache @toddmgreer @jmarantz @penguingao @mpwarres @capoferro
+/*/extensions/http/cache/simple_http_cache @toddmgreer @jmarantz @penguingao @mpwarres @capoferro
 # aws_iam grpc credentials
 /*/extensions/grpc_credentials/aws_iam @lavignes @mattklein123 @tonya11en
 /*/extensions/common/aws @lavignes @mattklein123 @tonya11en
@@ -128,6 +129,7 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/resource_monitors/injected_resource @eziskind @htuch
 /*/extensions/resource_monitors/common @eziskind @htuch
 /*/extensions/resource_monitors/fixed_heap @eziskind @htuch
+/*/extensions/resource_monitors/downstream_connections @antoniovicente @nezdolik @mattklein123
 /*/extensions/retry/priority @snowp @alyssawilk
 /*/extensions/retry/priority/previous_priorities @snowp @alyssawilk
 /*/extensions/retry/host @snowp @alyssawilk
@@ -163,6 +165,8 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/matching/input_matchers/consistent_hashing @snowp @donyu
 # environment generic input
 /*/extensions/matching/common_inputs/environment @snowp @donyu
+# format string matching
+/*/extensions/matching/actions/format_string @kyessenov @UNOWNED
 # user space socket pair, event, connection and listener
 /*/extensions/io_socket/user_space @kyessenov @antoniovicente
 /*/extensions/bootstrap/internal_listener @kyessenov @adisuissa
@@ -192,8 +196,9 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 # Config Validators
 /*/extensions/config/validators/minimum_clusters @adisuissa @htuch
 # File system based extensions
-/*/extensions/common/async_files @mattklein123 @ravenblack
-/*/extensions/filters/http/file_system_buffer @mattklein123 @ravenblack
+/*/extensions/common/async_files @mattklein123 @ravenblackx
+/*/extensions/filters/http/file_system_buffer @mattklein123 @ravenblackx
+/*/extensions/http/cache/file_system_http_cache @jmarantz @ravenblackx
 # Google Cloud Platform Authentication Filter
 /*/extensions/filters/http/gcp_authn @tyxia @yanavlasov
 # DNS resolution
@@ -238,6 +243,7 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/access_loggers/file @wbpcode @cpakulski @giantcroc
 # Stateful session
 /*/extensions/http/stateful_session/cookie @wbpcode @cpakulski
+/*/extensions/http/stateful_session/header @ramaraochavali @wbpcode @cpakulski
 /*/extensions/filters/http/stateful_session @wbpcode @cpakulski
 # tracers
 /*/extensions/tracers/zipkin @wbpcode @Shikugawa @suniltheta @basvanbeek
@@ -261,6 +267,7 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/http/header_validators/envoy_default @yanavlasov @alyssawilk
 # Thrift
 /*/extensions/filters/network/thrift_proxy @zuercher @JuniorHsu
+/*/extensions/health_checkers/thrift @zuercher @JuniorHsu
 # IP tagging
 /*/extensions/filters/http/ip_tagging @alyssawilk @JuniorHsu
 # Header to metadata
@@ -278,10 +285,19 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/filters/common @UNOWNED @UNOWNED
 /*/extensions/filters/http/common @UNOWNED @UNOWNED
 /*/extensions/filters/network/common @UNOWNED @UNOWNED
+/*/extensions/clusters/static @UNOWNED @UNOWNED
+/*/extensions/clusters/strict_dns @UNOWNED @UNOWNED
+/*/extensions/clusters/original_dst @UNOWNED @UNOWNED
+/*/extensions/clusters/logical_dns/ @UNOWNED @UNOWNED
+/*/extensions/clusters/common/ @UNOWNED @UNOWNED
+/*/extensions/clusters/eds/ @UNOWNED @UNOWNED
 
 # URL Pattern Match and Rewrite Library
 /*/extensions/path/uri_template_lib @alyssawilk @yanjunxiang-google
 /*/extensions/path/uri_template_lib/proto @alyssawilk @yanjunxiang-google
+
+# mobile
+/mobile/ @jpsim @Augustyniak @RyanTheOptimist @alyssawilk @abeyad
 
 # Contrib
 /contrib/exe/ @mattklein123 @lizan
@@ -301,4 +317,4 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /contrib/language/ @diceride @diceride
 /contrib/dlb/ @mattklein123 @daixiang0
 /contrib/qat/ @ipuustin @VillePihlava
-/contrib/generic_proxy/ @wbpcode @zhaohuabing @rojkov @htuch
+/contrib/generic_proxy/ @wbpcode @soulxu @zhaohuabing @rojkov @htuch

@@ -1,9 +1,9 @@
 # This configuration terminates h2 CONNECT on port 10001 and then chains an HTTP filter that always responds with 200 using
 # an internal listener.
 bootstrap_extensions:
-  - name: envoy.bootstrap.internal_listener
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.bootstrap.internal_listener.v3.InternalListener
+- name: envoy.bootstrap.internal_listener
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.bootstrap.internal_listener.v3.InternalListener
 static_resources:
   listeners:
   - name: listener_0

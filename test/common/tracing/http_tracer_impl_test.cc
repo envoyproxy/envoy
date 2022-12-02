@@ -500,6 +500,8 @@ metadata:
   metadata_key: { key: m.host, path: [ { key: not-found } ] })EOF",
         false, ""}});
 
+  ON_CALL(stream_info, getRequestHeaders()).WillByDefault(Return(&request_headers));
+
   HttpTracerUtility::finalizeDownstreamSpan(span, &request_headers, nullptr, nullptr, stream_info,
                                             config);
 }

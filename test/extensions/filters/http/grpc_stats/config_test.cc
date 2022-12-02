@@ -79,7 +79,7 @@ TEST_F(GrpcStatsFilterConfigTest, StatsHttp2HeaderOnlyResponse) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 
   Http::TestResponseHeaderMapImpl continue_headers{{":status", "100"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(continue_headers));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(continue_headers));
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata_map));
 
@@ -112,6 +112,27 @@ TEST_F(GrpcStatsFilterConfigTest, StatsHttp2NormalResponse) {
   EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
                      ->statsScope()
                      .counterFromString("grpc.lyft.users.BadCompanions.GetBadCompanions.total")
+                     .value());
+  EXPECT_FALSE(stream_info_.filterState()->hasDataWithName("envoy.filters.http.grpc_stats"));
+}
+
+TEST_F(GrpcStatsFilterConfigTest, StatsReplaceDotsInGrpcServiceName) {
+  config_.mutable_stats_for_all_methods()->set_value(true);
+  config_.set_replace_dots_in_grpc_service_name(true);
+  initialize();
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", "application/grpc"},
+      {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
+
+  doRequestResponse(request_headers);
+
+  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
+                     ->statsScope()
+                     .counterFromString("grpc.lyft_users_BadCompanions.GetBadCompanions.success")
+                     .value());
+  EXPECT_EQ(1UL, decoder_callbacks_.clusterInfo()
+                     ->statsScope()
+                     .counterFromString("grpc.lyft_users_BadCompanions.GetBadCompanions.total")
                      .value());
   EXPECT_FALSE(stream_info_.filterState()->hasDataWithName("envoy.filters.http.grpc_stats"));
 }

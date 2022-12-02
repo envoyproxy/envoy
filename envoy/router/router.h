@@ -118,12 +118,21 @@ public:
 };
 
 /**
+ * All route specific config returned by the method at
+ *   NamedHttpFilterConfigFactory::createRouteSpecificFilterConfig
+ * should be derived from this class.
+ */
+class RouteSpecificFilterConfig {
+public:
+  virtual ~RouteSpecificFilterConfig() = default;
+};
+using RouteSpecificFilterConfigConstSharedPtr = std::shared_ptr<const RouteSpecificFilterConfig>;
+
+/**
  * CorsPolicy for Route and VirtualHost.
  */
-class CorsPolicy {
+class CorsPolicy : public RouteSpecificFilterConfig {
 public:
-  virtual ~CorsPolicy() = default;
-
   /**
    * @return std::vector<StringMatcherPtr>& access-control-allow-origin matchers.
    */
@@ -603,17 +612,6 @@ class RateLimitPolicy;
 class Config;
 
 /**
- * All route specific config returned by the method at
- *   NamedHttpFilterConfigFactory::createRouteSpecificFilterConfig
- * should be derived from this class.
- */
-class RouteSpecificFilterConfig {
-public:
-  virtual ~RouteSpecificFilterConfig() = default;
-};
-using RouteSpecificFilterConfigConstSharedPtr = std::shared_ptr<const RouteSpecificFilterConfig>;
-
-/**
  * Virtual host definition.
  */
 class VirtualHost {
@@ -659,6 +657,24 @@ public:
    *         rather than no limit applies.
    */
   virtual uint32_t retryShadowBufferLimit() const PURE;
+
+  /**
+   * This is a helper to get the route's per-filter config if it exists, up along the config
+   * hierarchy (Route --> VirtualHost --> RouteConfiguration). Or nullptr if none of them exist.
+   */
+  virtual const RouteSpecificFilterConfig*
+  mostSpecificPerFilterConfig(const std::string& name) const PURE;
+
+  /**
+   * Find all the available per route filter configs, invoking the callback with
+   * each config (if it is present). Iteration of the configs is in order of
+   * specificity. That means that the callback will be called first for a config on
+   * a route configuration, virtual host, route, and finally a route entry (weighted cluster). If
+   * a config is not present, the callback will not be invoked.
+   */
+  virtual void traversePerFilterConfig(
+      const std::string& filter_name,
+      std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const PURE;
 };
 
 /**
@@ -1176,14 +1192,14 @@ public:
   virtual const RouteTracing* tracingConfig() const PURE;
 
   /**
-   * This is a helper to get the route's per-filter config if it exists, otherwise the virtual
-   * host's. Or nullptr if none of them exist.
+   * This is a helper to get the route's per-filter config if it exists, up along the config
+   * hierarchy(Route --> VirtualHost --> RouteConfiguration). Or nullptr if none of them exist.
    */
   virtual const RouteSpecificFilterConfig*
   mostSpecificPerFilterConfig(const std::string& name) const PURE;
 
   /**
-   * Fold all the available per route filter configs, invoking the callback with each config (if
+   * Find all the available per route filter configs, invoking the callback with each config (if
    * it is present). Iteration of the configs is in order of specificity. That means that the
    * callback will be called first for a config on a Virtual host, then a route, and finally a route
    * entry (weighted cluster). If a config is not present, the callback will not be invoked.

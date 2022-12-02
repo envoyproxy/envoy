@@ -208,15 +208,6 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
   onUpstreamResponseHeaders(span, response_headers);
   onUpstreamResponseTrailers(span, response_trailers);
 
-  CustomTagContext ctx{request_headers, stream_info};
-
-  const CustomTagMap* custom_tag_map = tracing_config.customTags();
-  if (custom_tag_map) {
-    for (const auto& it : *custom_tag_map) {
-      it.second->applySpan(span, ctx);
-    }
-  }
-
   span.finishSpan();
 }
 
@@ -277,6 +268,13 @@ void HttpTracerUtility::setCommonTags(Span& span, const StreamInfo::StreamInfo& 
 
   if (!stream_info.responseCode() || Http::CodeUtility::is5xx(stream_info.responseCode().value())) {
     span.setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+  }
+
+  CustomTagContext ctx{stream_info.getRequestHeaders(), stream_info};
+  if (const CustomTagMap* custom_tag_map = tracing_config.customTags(); custom_tag_map) {
+    for (const auto& it : *custom_tag_map) {
+      it.second->applySpan(span, ctx);
+    }
   }
 }
 

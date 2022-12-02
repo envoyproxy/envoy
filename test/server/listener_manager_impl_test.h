@@ -19,6 +19,8 @@
 #include "test/mocks/server/listener_component_factory.h"
 #include "test/mocks/server/worker.h"
 #include "test/mocks/server/worker_factory.h"
+#include "test/mocks/stream_info/mocks.h"
+#include "test/server/utility.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_runtime.h"
@@ -28,6 +30,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::InSequence;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -65,18 +68,21 @@ public:
 
 protected:
   ListenerManagerImplTest()
-      : api_(Api::createApiForTest(server_.api_.random_)), use_matcher_(GetParam()) {}
+      : listener_factory_ptr_(std::make_unique<NiceMock<MockListenerComponentFactory>>()),
+        listener_factory_(*listener_factory_ptr_),
+        api_(Api::createApiForTest(server_.api_.random_)), use_matcher_(GetParam()) {}
 
   void SetUp() override {
     ON_CALL(server_, api()).WillByDefault(ReturnRef(*api_));
+    ON_CALL(*server_.server_factory_context_, api()).WillByDefault(ReturnRef(*api_));
     EXPECT_CALL(worker_factory_, createWorker_()).WillOnce(Return(worker_));
     ON_CALL(server_.validation_context_, staticValidationVisitor())
         .WillByDefault(ReturnRef(validation_visitor));
     ON_CALL(server_.validation_context_, dynamicValidationVisitor())
         .WillByDefault(ReturnRef(validation_visitor));
-    manager_ =
-        std::make_unique<ListenerManagerImpl>(server_, listener_factory_, worker_factory_,
-                                              enable_dispatcher_stats_, server_.quic_stat_names_);
+    manager_ = std::make_unique<ListenerManagerImpl>(server_, std::move(listener_factory_ptr_),
+                                                     worker_factory_, enable_dispatcher_stats_,
+                                                     server_.quic_stat_names_);
 
     // Use real filter loading by default.
     ON_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
@@ -224,8 +230,10 @@ protected:
           Network::Utility::parseInternetAddress(direct_source_address, source_port);
     }
     socket_->connection_info_provider_->setDirectRemoteAddressForTest(direct_remote_address_);
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
 
-    return manager_->listeners().back().get().filterChainManager().findFilterChain(*socket_);
+    return manager_->listeners().back().get().filterChainManager().findFilterChain(*socket_,
+                                                                                   stream_info);
   }
 
   /**
@@ -248,7 +256,8 @@ protected:
               EXPECT_TRUE(Network::Socket::applyOptions(options, *listener_factory_.socket_,
                                                         expected_state));
               return listener_factory_.socket_;
-            }));
+            }))
+        .RetiresOnSaturation();
   }
 
   /**
@@ -337,6 +346,128 @@ protected:
     return manager_->addOrUpdateListener(listener, version_info, added_via_api);
   }
 
+  void testListenerUpdateWithSocketOptionsChange(const std::string& origin,
+                                                 const std::string& updated,
+                                                 bool multiple_addresses = false) {
+    InSequence s;
+
+    EXPECT_CALL(*worker_, start(_, _));
+    manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+
+    auto socket = std::make_shared<testing::NiceMock<Network::MockListenSocket>>();
+
+    ListenerHandle* listener_origin = expectListenerCreate(true, true);
+    if (multiple_addresses) {
+      EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0))
+          .Times(2)
+          .WillRepeatedly(Return(socket));
+    } else {
+      EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0))
+          .WillOnce(Return(socket));
+    }
+    EXPECT_CALL(listener_origin->target_, initialize());
+    EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(origin)));
+    checkStats(__LINE__, 1, 0, 0, 1, 0, 0, 0);
+    EXPECT_CALL(*worker_, addListener(_, _, _, _));
+    listener_origin->target_.ready();
+    worker_->callAddCompletion();
+    EXPECT_EQ(1UL, manager_->listeners().size());
+    checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
+
+    ListenerHandle* listener_updated = expectListenerCreate(true, true);
+    if (multiple_addresses) {
+      EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0))
+          .Times(2)
+          .WillRepeatedly(Return(socket));
+    } else {
+      EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0))
+          .WillOnce(Return(socket));
+    }
+    EXPECT_CALL(listener_updated->target_, initialize());
+    EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(updated)));
+
+    // Should be both active and warming now.
+    EXPECT_EQ(1UL, manager_->listeners(ListenerManager::WARMING).size());
+    EXPECT_EQ(1UL, manager_->listeners(ListenerManager::ACTIVE).size());
+    checkStats(__LINE__, 1, 1, 0, 1, 1, 0, 0);
+
+    EXPECT_CALL(*listener_updated, onDestroy());
+    EXPECT_CALL(*listener_origin, onDestroy());
+  }
+
+  void testListenerUpdateWithSocketOptionsChangeRejected(const std::string& origin,
+                                                         const std::string& updated,
+                                                         const std::string& message) {
+    InSequence s;
+
+    EXPECT_CALL(*worker_, start(_, _));
+    manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+
+    auto socket = std::make_shared<testing::NiceMock<Network::MockListenSocket>>();
+
+    ListenerHandle* listener_origin = expectListenerCreate(true, true);
+    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0))
+        .WillOnce(Return(socket));
+    EXPECT_CALL(listener_origin->target_, initialize());
+    EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(origin)));
+    checkStats(__LINE__, 1, 0, 0, 1, 0, 0, 0);
+    EXPECT_CALL(*worker_, addListener(_, _, _, _));
+    listener_origin->target_.ready();
+    worker_->callAddCompletion();
+    EXPECT_EQ(1UL, manager_->listeners().size());
+    checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
+
+    ListenerHandle* listener_updated = expectListenerCreate(true, true);
+    EXPECT_CALL(*listener_updated, onDestroy());
+    EXPECT_THROW_WITH_MESSAGE(addOrUpdateListener(parseListenerFromV3Yaml(updated)), EnvoyException,
+                              message);
+
+    EXPECT_CALL(*listener_origin, onDestroy());
+  }
+
+  void testListenerUpdateWithSocketOptionsChangeDeprecatedBehavior(
+      const std::string& origin, const std::string& updated, bool multiple_addresses = false) {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.enable_update_listener_socket_options", "false"}});
+    InSequence s;
+
+    EXPECT_CALL(*worker_, start(_, _));
+    manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+
+    ListenerHandle* listener_origin = expectListenerCreate(true, true);
+    if (multiple_addresses) {
+      EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0)).Times(2);
+    } else {
+      EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+    }
+    EXPECT_CALL(listener_origin->target_, initialize());
+    EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(origin)));
+    checkStats(__LINE__, 1, 0, 0, 1, 0, 0, 0);
+    EXPECT_CALL(*worker_, addListener(_, _, _, _));
+    listener_origin->target_.ready();
+    worker_->callAddCompletion();
+    EXPECT_EQ(1UL, manager_->listeners().size());
+    checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
+
+    ListenerHandle* listener_updated = expectListenerCreate(true, true);
+    if (multiple_addresses) {
+      EXPECT_CALL(*listener_factory_.socket_, duplicate()).Times(2);
+    } else {
+      EXPECT_CALL(*listener_factory_.socket_, duplicate());
+    }
+    EXPECT_CALL(listener_updated->target_, initialize());
+    EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(updated)));
+
+    // Should be both active and warming now.
+    EXPECT_EQ(1UL, manager_->listeners(ListenerManager::WARMING).size());
+    EXPECT_EQ(1UL, manager_->listeners(ListenerManager::ACTIVE).size());
+    checkStats(__LINE__, 1, 1, 0, 1, 1, 0, 0);
+
+    EXPECT_CALL(*listener_updated, onDestroy());
+    EXPECT_CALL(*listener_origin, onDestroy());
+  }
+
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&os_sys_calls_};
   Api::OsSysCallsImpl os_sys_calls_actual_;
@@ -349,7 +480,8 @@ protected:
   std::shared_ptr<DumbInternalListenerRegistry> internal_registry_{
       std::make_shared<DumbInternalListenerRegistry>()};
 
-  NiceMock<MockListenerComponentFactory> listener_factory_;
+  std::unique_ptr<NiceMock<MockListenerComponentFactory>> listener_factory_ptr_;
+  NiceMock<MockListenerComponentFactory>& listener_factory_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
   MockWorker* worker_ = new MockWorker();
   NiceMock<MockWorkerFactory> worker_factory_;

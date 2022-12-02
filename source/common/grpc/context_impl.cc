@@ -1,10 +1,15 @@
 #include "source/common/grpc/context_impl.h"
 
 #include <cstdint>
+#include <memory>
 #include <string>
+#include <tuple>
+#include <utility>
 
 #include "source/common/grpc/common.h"
 #include "source/common/stats/utility.h"
+
+#include "absl/strings/str_replace.h"
 
 namespace Envoy {
 namespace Grpc {
@@ -94,6 +99,18 @@ ContextImpl::resolveDynamicServiceAndMethod(const Http::HeaderEntry* path) {
   // status) values in request_names_ might get changed, for example by routing rules (i.e.
   // "prefix_rewrite"), so we copy them here to preserve the initial value and get a proper stat
   Stats::Element service = Stats::DynamicSavedName(request_names->service_);
+  Stats::Element method = Stats::DynamicSavedName(request_names->method_);
+  return RequestStatNames{service, method};
+}
+
+absl::optional<ContextImpl::RequestStatNames>
+ContextImpl::resolveDynamicServiceAndMethodWithDotReplaced(const Http::HeaderEntry* path) {
+  absl::optional<Common::RequestNames> request_names = Common::resolveServiceAndMethod(path);
+  if (!request_names) {
+    return {};
+  }
+  Stats::Element service =
+      Stats::DynamicSavedName(absl::StrReplaceAll(request_names->service_, {{".", "_"}}));
   Stats::Element method = Stats::DynamicSavedName(request_names->method_);
   return RequestStatNames{service, method};
 }

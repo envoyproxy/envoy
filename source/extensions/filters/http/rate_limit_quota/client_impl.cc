@@ -159,19 +159,6 @@ RateLimitQuotaUsageReports buildReports(const std::vector<BucketId>& bucket_ids)
   return reports;
 }
 
-void RateLimitClientImpl::onRemoteClose(Grpc::Status::GrpcStatus status, const std::string&) {
-  // TODO(tyxia) Add implementation later.
-  stream_closed_ = true;
-  if (status == Grpc::Status::Ok) {
-
-  } else {
-    // TODO(tyxia) Here is only place where error happend???
-    // and onReceiveMessage is always success.???
-    // https://source.corp.google.com/piper///depot/google3/third_party/envoy/src/source/extensions/filters/http/ext_proc/client_impl.cc;rcl=478391678;l=52
-    // https://source.corp.google.com/piper///depot/google3/third_party/envoy/src/source/extensions/filters/http/ext_proc/ext_proc.cc;rcl=478391678;l=545
-  }
-}
-
 void RateLimitClientImpl::sendUsageReport(absl::optional<BucketId> bucket_id) {
   ASSERT(stream_ != nullptr);
   // TODO(tyxia) Build the report and handle end_stream later.
@@ -197,6 +184,12 @@ void RateLimitClientImpl::sendUsageReport(absl::optional<BucketId> bucket_id) {
 //    https://source.corp.google.com/piper///depot/google3/third_party/envoy/src/source/extensions/filters/http/jwt_authn/jwks_async_fetcher.cc;rcl=476782648;l=31
 // Optional funciton arg?? only first time need the bucket_id ???
 // Later, peridiocally send should be retrieved from the map
+
+
+void RateLimitClientImpl::onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) {
+  // TODO(tyxia) Add implementation later.
+  stream_closed_ = true;
+}
 
 void RateLimitClientImpl::rateLimit(RateLimitQuotaCallbacks& callbacks) {
   ASSERT(callbacks_ == nullptr);
@@ -231,8 +224,7 @@ absl::Status RateLimitClientImpl::startStream(const StreamInfo::StreamInfo& stre
 
 void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response) {
   ASSERT(callbacks_ != nullptr);
-
-  callbacks_->onReceive(*response.get());
+  callbacks_->onQuotaResponse(*response);
 }
 
 void RateLimitClientImpl::closeStream() {

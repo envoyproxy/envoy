@@ -118,12 +118,9 @@ if __name__ == "__main__":
     parser.add_argument('--exclude_contrib', action='store_true')
     parser.add_argument('--bazel', default='bazel')
     parser.add_argument(
-        'bazel_targets',
-        nargs='*',
-        default=[
+        'bazel_targets', nargs='*', default=[
             "//source/...",
             "//test/...",
-            "//tools/...",
             "//contrib/...",
         ])
     args = parser.parse_args()

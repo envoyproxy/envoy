@@ -64,8 +64,7 @@ FileImplPosix::FlagsAndMode FileImplPosix::translateFlag(FlagSet in) {
 
   if (in.test(File::Operation::Append)) {
     out |= O_APPEND;
-  } else if (in.test(File::Operation::Write) &&
-             Runtime::runtimeFeatureEnabled("envoy.reloadable_features.append_or_truncate")) {
+  } else if (in.test(File::Operation::Write)) {
     out |= O_TRUNC;
   }
 

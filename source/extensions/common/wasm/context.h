@@ -185,7 +185,7 @@ public:
   void setDecoderFilterCallbacks(Envoy::Http::StreamDecoderFilterCallbacks& callbacks) override;
 
   // Http::StreamEncoderFilter
-  Http::FilterHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap&) override;
+  Http::Filter1xxHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap&) override;
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override;
   Http::FilterDataStatus encodeData(::Envoy::Buffer::Instance& data, bool end_stream) override;
@@ -437,6 +437,7 @@ protected:
   bool buffering_response_body_ = false;
   bool end_of_stream_ = false;
   bool local_reply_sent_ = false;
+  bool local_reply_hold_ = false;
   ProtobufWkt::Struct temporary_metadata_;
 
   // MB: must be a node-type map as we take persistent references to the entries.

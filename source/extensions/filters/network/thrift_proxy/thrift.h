@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
+#include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.validate.h"
 #include "envoy/tcp/conn_pool.h"
 
 #include "source/common/common/assert.h"
@@ -103,6 +105,43 @@ public:
 };
 
 using ProtocolNames = ConstSingleton<ProtocolNameValues>;
+
+class ProtoUtils {
+public:
+  static TransportType
+  getTransportType(envoy::extensions::filters::network::thrift_proxy::v3::TransportType transport) {
+    switch (transport) {
+      PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+    case envoy::extensions::filters::network::thrift_proxy::v3::AUTO_TRANSPORT:
+      return TransportType::Auto;
+    case envoy::extensions::filters::network::thrift_proxy::v3::FRAMED:
+      return TransportType::Framed;
+    case envoy::extensions::filters::network::thrift_proxy::v3::UNFRAMED:
+      return TransportType::Unframed;
+    case envoy::extensions::filters::network::thrift_proxy::v3::HEADER:
+      return TransportType::Header;
+    }
+    PANIC_DUE_TO_CORRUPT_ENUM;
+  }
+
+  static ProtocolType
+  getProtocolType(envoy::extensions::filters::network::thrift_proxy::v3::ProtocolType protocol) {
+    switch (protocol) {
+      PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+    case envoy::extensions::filters::network::thrift_proxy::v3::AUTO_PROTOCOL:
+      return ProtocolType::Auto;
+    case envoy::extensions::filters::network::thrift_proxy::v3::BINARY:
+      return ProtocolType::Binary;
+    case envoy::extensions::filters::network::thrift_proxy::v3::LAX_BINARY:
+      return ProtocolType::LaxBinary;
+    case envoy::extensions::filters::network::thrift_proxy::v3::COMPACT:
+      return ProtocolType::Compact;
+    case envoy::extensions::filters::network::thrift_proxy::v3::TWITTER:
+      return ProtocolType::Twitter;
+    }
+    PANIC_DUE_TO_CORRUPT_ENUM;
+  }
+};
 
 /**
  * Thrift protocol message types.
