@@ -182,9 +182,12 @@ public:
     return buffer;
   }
 
-  Buffer::InstancePtr testHeaderProto() {
-    auto headers = makeCacheFileHeaderProto(key_, response_headers_, metadata_);
-    return std::make_unique<Buffer::OwnedImpl>(bufferFromProto(headers));
+  CacheFileHeader testHeaderProto() {
+    return makeCacheFileHeaderProto(key_, response_headers_, metadata_);
+  }
+
+  Buffer::InstancePtr testHeaderBuffer() {
+    return std::make_unique<Buffer::OwnedImpl>(bufferFromProto(testHeaderProto()));
   }
 
   void SetUp() override { initCache(); }
@@ -216,7 +219,7 @@ public:
       mock_async_file_manager_->nextActionCompletes(
           absl::StatusOr<Buffer::InstancePtr>(testHeaderBlock(0)));
       mock_async_file_manager_->nextActionCompletes(
-          absl::StatusOr<Buffer::InstancePtr>(testHeaderProto()));
+          absl::StatusOr<Buffer::InstancePtr>(testHeaderBuffer()));
     }
     // Consume the close from the queue that occurs when lookup context is destroyed.
     mock_async_file_manager_->nextActionCompletes(absl::OkStatus());
@@ -452,7 +455,7 @@ TEST_F(FileSystemHttpCacheTestWithMockFiles, FailedReadOfBodyInvalidatesTheCache
   mock_async_file_manager_->nextActionCompletes(
       absl::StatusOr<Buffer::InstancePtr>(testHeaderBlock(0)));
   mock_async_file_manager_->nextActionCompletes(
-      absl::StatusOr<Buffer::InstancePtr>(testHeaderProto()));
+      absl::StatusOr<Buffer::InstancePtr>(testHeaderBuffer()));
   // result should be populated.
   EXPECT_NE(result.cache_entry_status_, CacheEntryStatus::Unusable);
   EXPECT_CALL(*mock_async_file_handle_, read(_, _, _));
@@ -478,7 +481,7 @@ TEST_F(FileSystemHttpCacheTestWithMockFiles, FailedReadOfTrailersInvalidatesTheC
   mock_async_file_manager_->nextActionCompletes(
       absl::StatusOr<Buffer::InstancePtr>(testHeaderBlock(0)));
   mock_async_file_manager_->nextActionCompletes(
-      absl::StatusOr<Buffer::InstancePtr>(testHeaderProto()));
+      absl::StatusOr<Buffer::InstancePtr>(testHeaderBuffer()));
   // result should be populated.
   EXPECT_NE(result.cache_entry_status_, CacheEntryStatus::Unusable);
   EXPECT_CALL(*mock_async_file_handle_, read(_, 8, _));
@@ -510,7 +513,7 @@ TEST_F(FileSystemHttpCacheTestWithMockFiles, ReadWithMultipleBlocksWorksCorrectl
   mock_async_file_manager_->nextActionCompletes(
       absl::StatusOr<Buffer::InstancePtr>(testHeaderBlock(8)));
   mock_async_file_manager_->nextActionCompletes(
-      absl::StatusOr<Buffer::InstancePtr>(testHeaderProto()));
+      absl::StatusOr<Buffer::InstancePtr>(testHeaderBuffer()));
   EXPECT_CALL(*mock_async_file_handle_,
               read(CacheFileFixedBlock::offsetToHeaders() + headers_size_, 4, _));
   EXPECT_CALL(*mock_async_file_handle_,
@@ -700,6 +703,7 @@ TEST_F(FileSystemHttpCacheTestWithMockFiles, UpdateHeadersKeepsTryingIfUnlinkOri
       absl::UnknownError("Intentionally failed to unlink"));
   mock_async_file_manager_->nextActionCompletes(absl::StatusOr<Buffer::InstancePtr>(
       absl::UnknownError("Intentionally failed to read header block")));
+  mock_async_file_manager_->nextActionCompletes(absl::OkStatus()); // close read handle
   lookup_context->onDestroy();
   EXPECT_FALSE(update_success);
 }
@@ -727,8 +731,144 @@ TEST_F(FileSystemHttpCacheTestWithMockFiles, UpdateHeadersAbortsIfReadHeadersFai
       absl::StatusOr<Buffer::InstancePtr>(testHeaderBlock(0)));
   mock_async_file_manager_->nextActionCompletes(absl::StatusOr<Buffer::InstancePtr>(
       absl::UnknownError("Intentionally failed to read headers block")));
+  mock_async_file_manager_->nextActionCompletes(absl::OkStatus()); // close read handle
   lookup_context->onDestroy();
   EXPECT_FALSE(update_success);
+}
+
+TEST_F(FileSystemHttpCacheTestWithMockFiles, UpdateHeadersAbortsIfOpenForWriteFails) {
+  time_system_.advanceTimeWait(Seconds(3601));
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"},
+      {"date", formatter_.fromTime(time_system_.systemTime())},
+      {"x-whatever", "updated"},
+      {"cache-control", "public,max-age=3600"},
+  };
+  auto lookup_context = testLookupContext();
+  EXPECT_CALL(*mock_async_file_manager_, openExistingFile(_, _, _));
+  EXPECT_CALL(*mock_async_file_manager_, unlink(_, _));
+  EXPECT_CALL(*mock_async_file_handle_, read(0, CacheFileFixedBlock::size(), _));
+  EXPECT_CALL(*mock_async_file_handle_, read(CacheFileFixedBlock::size(), headers_size_, _));
+  EXPECT_CALL(*mock_async_file_manager_, createAnonymousFile(_, _));
+  bool update_success;
+  cache_->updateHeaders(*lookup_context, response_headers, {time_system_.systemTime()},
+                        [&update_success](bool success) { update_success = success; });
+  mock_async_file_manager_->nextActionCompletes(
+      absl::StatusOr<AsyncFileHandle>(mock_async_file_handle_));
+  mock_async_file_manager_->nextActionCompletes(absl::OkStatus());
+  mock_async_file_manager_->nextActionCompletes(
+      absl::StatusOr<Buffer::InstancePtr>(testHeaderBlock(0)));
+  mock_async_file_manager_->nextActionCompletes(
+      absl::StatusOr<Buffer::InstancePtr>(testHeaderBuffer()));
+  mock_async_file_manager_->nextActionCompletes(absl::StatusOr<AsyncFileHandle>(
+      absl::UnknownError("Intentionally failed to create file for write")));
+  mock_async_file_manager_->nextActionCompletes(absl::OkStatus()); // close read handle
+  lookup_context->onDestroy();
+  EXPECT_FALSE(update_success);
+}
+
+TEST_F(FileSystemHttpCacheTestWithMockFiles, UpdateHeadersAbortsIfWriteHeaderBlockFails) {
+  time_system_.advanceTimeWait(Seconds(3601));
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"},
+      {"date", formatter_.fromTime(time_system_.systemTime())},
+      {"x-whatever", "updated"},
+      {"cache-control", "public,max-age=3600"},
+  };
+  auto lookup_context = testLookupContext();
+  MockAsyncFileHandle write_handle =
+      std::make_shared<StrictMock<MockAsyncFileContext>>(mock_async_file_manager_);
+  EXPECT_CALL(*mock_async_file_manager_, openExistingFile(_, _, _));
+  EXPECT_CALL(*mock_async_file_manager_, unlink(_, _));
+  EXPECT_CALL(*mock_async_file_handle_, read(0, CacheFileFixedBlock::size(), _));
+  EXPECT_CALL(*mock_async_file_handle_, read(CacheFileFixedBlock::size(), headers_size_, _));
+  EXPECT_CALL(*mock_async_file_manager_, createAnonymousFile(_, _));
+  EXPECT_CALL(*write_handle, write(_, _, _));
+  bool update_success;
+  cache_->updateHeaders(*lookup_context, response_headers, {time_system_.systemTime()},
+                        [&update_success](bool success) { update_success = success; });
+  mock_async_file_manager_->nextActionCompletes(
+      absl::StatusOr<AsyncFileHandle>(mock_async_file_handle_));
+  mock_async_file_manager_->nextActionCompletes(absl::OkStatus());
+  mock_async_file_manager_->nextActionCompletes(
+      absl::StatusOr<Buffer::InstancePtr>(testHeaderBlock(0)));
+  mock_async_file_manager_->nextActionCompletes(
+      absl::StatusOr<Buffer::InstancePtr>(testHeaderBuffer()));
+  mock_async_file_manager_->nextActionCompletes(absl::StatusOr<AsyncFileHandle>(write_handle));
+  mock_async_file_manager_->nextActionCompletes(
+      absl::StatusOr<size_t>(absl::UnknownError("Intentionally failed to write header block")));
+  mock_async_file_manager_->nextActionCompletes(absl::OkStatus()); // close read handle
+  mock_async_file_manager_->nextActionCompletes(absl::OkStatus()); // close write handle
+  lookup_context->onDestroy();
+  EXPECT_FALSE(update_success);
+}
+
+TEST_F(FileSystemHttpCacheTestWithMockFiles, UpdateHeadersAbortsIfReadBodyFails) {
+  time_system_.advanceTimeWait(Seconds(3601));
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"},
+      {"date", formatter_.fromTime(time_system_.systemTime())},
+      {"x-whatever", "updated"},
+      {"cache-control", "public,max-age=3600"},
+  };
+  size_t updated_headers_size = headerProtoSize(mergeProtoWithHeadersAndMetadata(
+      testHeaderProto(), response_headers, {time_system_.systemTime()}));
+  size_t body_size = 64;
+  auto lookup_context = testLookupContext();
+  MockAsyncFileHandle write_handle =
+      std::make_shared<StrictMock<MockAsyncFileContext>>(mock_async_file_manager_);
+  EXPECT_CALL(*mock_async_file_manager_, openExistingFile(_, _, _));
+  EXPECT_CALL(*mock_async_file_manager_, unlink(_, _));
+  EXPECT_CALL(*mock_async_file_handle_, read(0, CacheFileFixedBlock::size(), _));
+  EXPECT_CALL(*mock_async_file_handle_, read(CacheFileFixedBlock::size(), headers_size_, _));
+  EXPECT_CALL(*mock_async_file_manager_, createAnonymousFile(_, _));
+  EXPECT_CALL(*write_handle, write(_, _, _));
+  EXPECT_CALL(*mock_async_file_handle_,
+              read(CacheFileFixedBlock::size() + headers_size_, body_size + trailers_size_, _));
+  bool update_success;
+  cache_->updateHeaders(*lookup_context, response_headers, {time_system_.systemTime()},
+                        [&update_success](bool success) { update_success = success; });
+  mock_async_file_manager_->nextActionCompletes(
+      absl::StatusOr<AsyncFileHandle>(mock_async_file_handle_));
+  mock_async_file_manager_->nextActionCompletes(absl::OkStatus());
+  mock_async_file_manager_->nextActionCompletes(
+      absl::StatusOr<Buffer::InstancePtr>(testHeaderBlock(body_size)));
+  mock_async_file_manager_->nextActionCompletes(
+      absl::StatusOr<Buffer::InstancePtr>(testHeaderBuffer()));
+  mock_async_file_manager_->nextActionCompletes(absl::StatusOr<AsyncFileHandle>(write_handle));
+  mock_async_file_manager_->nextActionCompletes(
+      absl::StatusOr<size_t>(updated_headers_size + CacheFileFixedBlock::size()));
+  mock_async_file_manager_->nextActionCompletes(
+      absl::StatusOr<Buffer::InstancePtr>(absl::UnknownError("intentionally failed body read")));
+  mock_async_file_manager_->nextActionCompletes(absl::OkStatus()); // close read handle
+  mock_async_file_manager_->nextActionCompletes(absl::OkStatus()); // close write handle
+  lookup_context->onDestroy();
+  EXPECT_FALSE(update_success);
+}
+
+TEST_F(FileSystemHttpCacheTestWithMockFiles, UpdateHeadersAbortsEarlyIfCacheEntryIsInProgress) {
+  auto lookup_context = testLookupContext();
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"},
+      {"date", formatter_.fromTime(time_system_.systemTime())},
+      {"x-whatever", "updated"},
+      {"cache-control", "public,max-age=3600"},
+  };
+  EXPECT_CALL(*mock_async_file_manager_, openExistingFile(_, _, _));
+  bool update_success;
+  cache_->updateHeaders(*lookup_context, response_headers, {time_system_.systemTime()},
+                        [&update_success](bool success) { update_success = success; });
+  // A second updateHeaders call for the same resource while the first is still operating
+  // should do nothing.
+  auto lookup_context_2 = testLookupContext();
+  cache_->updateHeaders(*lookup_context_2, response_headers, {time_system_.systemTime()},
+                        [&update_success](bool success) { update_success = success; });
+  mock_async_file_manager_->nextActionCompletes(
+      absl::StatusOr<AsyncFileHandle>(absl::UnknownError("intentionally failed to open file")));
+  lookup_context->onDestroy();
+  lookup_context_2->onDestroy();
+  // The file handle didn't actually get used in this test, but is expected to be closed.
+  EXPECT_OK(mock_async_file_handle_->close([](absl::Status) {}));
 }
 
 // TODO: a bunch more tests for coverage of updateHeaders

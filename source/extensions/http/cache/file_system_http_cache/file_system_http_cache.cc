@@ -181,7 +181,9 @@ private:
           }
           header_proto_ = mergeProtoWithHeadersAndMetadata(header_proto_, *response_headers_,
                                                            response_metadata_);
-          header_block_.setHeadersSize(headerProtoSize(header_proto_));
+          size_t new_header_size = headerProtoSize(header_proto_);
+          header_size_difference_ = header_block_.headerSize() - new_header_size;
+          header_block_.setHeadersSize(new_header_size);
           startWriting(ctx);
         });
     ASSERT(queued.ok());
@@ -194,31 +196,38 @@ private:
             return;
           }
           write_handle_ = std::move(create_result.value());
-          writeHeaderBlock(ctx);
+          writeHeaderBlockAndHeaders(ctx);
         });
   }
-  void writeHeaderBlock(std::shared_ptr<HeaderUpdateContext> ctx) {
+  void writeHeaderBlockAndHeaders(std::shared_ptr<HeaderUpdateContext> ctx) {
     Buffer::OwnedImpl buf;
     header_block_.serializeToBuffer(buf);
-    auto queued = write_handle_->write(buf, 0, [ctx, this](absl::StatusOr<size_t> write_result) {
-      if (!write_result.ok() || write_result.value() != CacheFileFixedBlock::size()) {
-        fail("failed to write header block", write_result.status());
-        return;
-      }
-      writeBody(ctx, CacheFileFixedBlock::size());
-    });
+    buf.add(bufferFromProto(header_proto_));
+    auto sz = buf.length();
+    auto queued =
+        write_handle_->write(buf, 0, [ctx, sz, this](absl::StatusOr<size_t> write_result) {
+          if (!write_result.ok() || write_result.value() != sz) {
+            fail("failed to write header block and headers", write_result.status());
+            return;
+          }
+          copyBodyAndTrailers(ctx, header_block_.offsetToBody());
+        });
     ASSERT(queued.ok());
   }
-  void writeBody(std::shared_ptr<HeaderUpdateContext> ctx, off_t offset) {
-    size_t sz = header_block_.offsetToHeaders() - offset;
+  void copyBodyAndTrailers(std::shared_ptr<HeaderUpdateContext> ctx, off_t offset) {
+    size_t sz = header_block_.offsetToEnd() - offset;
     if (sz == 0) {
-      writeHeaders(ctx);
+      linkNewFile(ctx);
       return;
     }
+    // Copying in 128K chunks is an arbitrary choice for a reasonable balance of performance and
+    // memory usage. Since UpdateHeaders is unlikely to be a common operation it is most likely
+    // not worthwhile to carefully tune this.
     static const size_t max_copy_chunk = 128 * 1024;
     sz = std::min(sz, max_copy_chunk);
     auto queued = read_handle_->read(
-        offset, sz, [ctx, offset, sz, this](absl::StatusOr<Buffer::InstancePtr> read_result) {
+        offset + header_size_difference_, sz,
+        [ctx, offset, sz, this](absl::StatusOr<Buffer::InstancePtr> read_result) {
           if (!read_result.ok() || read_result.value()->length() != sz) {
             fail("failed to read body chunk", read_result.status());
             return;
@@ -230,23 +239,10 @@ private:
                                        fail("failed to write body chunk", write_result.status());
                                        return;
                                      }
-                                     writeBody(ctx, offset + sz);
+                                     copyBodyAndTrailers(ctx, offset + sz);
                                    });
           ASSERT(queued.ok());
         });
-    ASSERT(queued.ok());
-  }
-  void writeHeaders(std::shared_ptr<HeaderUpdateContext> ctx) {
-    auto buf = bufferFromProto(header_proto_);
-    size_t sz = buf.length();
-    auto queued = write_handle_->write(buf, header_block_.offsetToHeaders(),
-                                       [ctx, sz, this](absl::StatusOr<size_t> write_result) {
-                                         if (!write_result.ok() || write_result.value() != sz) {
-                                           fail("failed to write headers", write_result.status());
-                                           return;
-                                         }
-                                         linkNewFile(ctx);
-                                       });
     ASSERT(queued.ok());
   }
   void linkNewFile(std::shared_ptr<HeaderUpdateContext> ctx) {
@@ -271,6 +267,7 @@ private:
   Http::ResponseHeaderMapPtr response_headers_;
   ResponseMetadata response_metadata_;
   CacheFileFixedBlock header_block_;
+  off_t header_size_difference_;
   CacheFileHeader header_proto_;
   AsyncFileHandle read_handle_;
   AsyncFileHandle write_handle_;
