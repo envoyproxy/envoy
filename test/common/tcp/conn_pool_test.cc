@@ -445,10 +445,15 @@ TEST_F(TcpConnPoolImplTest, IdleTimerCloseConnections) {
     auto connection = conn_pool_->test_conns_[0].connection_;
     EXPECT_CALL(*connection, close(Network::ConnectionCloseType::NoFlush))
         .WillOnce(Invoke([&](Network::ConnectionCloseType) -> void {
+          connection->raiseEvent(Network::ConnectionEvent::LocalClose);
           // idle timer is disabled.
           EXPECT_FALSE(idle_timer->enabled());
-          connection->raiseEvent(Network::ConnectionEvent::LocalClose);
         }));
+    // EXPECT_CALL(c1.callbacks_.callbacks_, onEvent(Network::ConnectionEvent::LocalClose))
+    //   .WillOnce(Invoke([&](Network::ConnectionEvent event) -> void {
+    //     EXPECT_EQ(Network::ConnectionEvent::LocalClose, event);
+    //     EXPECT_FALSE(idle_timer->enabled());
+    //   }));
     idle_timer->invokeCallback();
     dispatcher_.clearDeferredDeleteList();
   }
@@ -457,6 +462,72 @@ TEST_F(TcpConnPoolImplTest, IdleTimerCloseConnections) {
   EXPECT_TRUE(conn_pool_->isIdle());
 
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_idle_timeout_.value());
+}
+
+/**
+ * Verify idle timer is disable by remote close.
+ */
+TEST_F(TcpConnPoolImplTest, ConnectionRemoteCloseDisableIdleTimer) {
+  initialize();
+  cluster_->resetResourceManager(1, 1024, 1024, 1, 1);
+  conn_pool_->setupIdleTimers();
+
+  ActiveTestConn c1(*this, 0, ActiveTestConn::Type::CreateConnection);
+
+  EXPECT_CALL(*conn_pool_, onConnReleasedForTest());
+  auto idle_timer = conn_pool_->test_conns_[0].idle_timer_;
+  // The connection is active.
+  EXPECT_FALSE(idle_timer->enabled());
+
+  c1.releaseConn();
+  // The connection is idle, which enables idle timer.
+  EXPECT_TRUE(idle_timer->enabled());
+  {
+    EXPECT_CALL(*conn_pool_, onConnDestroyedForTest()).WillOnce(Invoke([&]() -> void {
+      // idle timer is disabled by remote close.
+      EXPECT_FALSE(idle_timer->enabled());
+    }));
+    ;
+
+    conn_pool_->test_conns_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+    dispatcher_.clearDeferredDeleteList();
+  }
+
+  // Note that this is pool level idle instead of client/connection level.
+  EXPECT_TRUE(conn_pool_->isIdle());
+}
+
+/**
+ * Verify idle timer is disable by local close.
+ */
+TEST_F(TcpConnPoolImplTest, ConnectionLocalCloseDisableIdleTimer) {
+  initialize();
+  cluster_->resetResourceManager(1, 1024, 1024, 1, 1);
+  conn_pool_->setupIdleTimers();
+
+  ActiveTestConn c1(*this, 0, ActiveTestConn::Type::CreateConnection);
+
+  EXPECT_CALL(*conn_pool_, onConnReleasedForTest());
+  auto idle_timer = conn_pool_->test_conns_[0].idle_timer_;
+  // The connection is active.
+  EXPECT_FALSE(idle_timer->enabled());
+
+  c1.releaseConn();
+  // The connection is idle, which enables idle timer.
+  EXPECT_TRUE(idle_timer->enabled());
+  {
+    EXPECT_CALL(*conn_pool_, onConnDestroyedForTest()).WillOnce(Invoke([&]() -> void {
+      // idle timer is disabled by local close.
+      EXPECT_FALSE(idle_timer->enabled());
+    }));
+    ;
+
+    conn_pool_->test_conns_[0].connection_->raiseEvent(Network::ConnectionEvent::LocalClose);
+    dispatcher_.clearDeferredDeleteList();
+  }
+
+  // Note that this is pool level idle instead of client/connection level.
+  EXPECT_TRUE(conn_pool_->isIdle());
 }
 
 /**

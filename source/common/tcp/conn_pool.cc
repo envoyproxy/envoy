@@ -53,7 +53,6 @@ ActiveTcpClient::~ActiveTcpClient() {
 
 void ActiveTcpClient::close() {
   ENVOY_CONN_LOG(trace, "close", *this);
-  disableIdleTimer();
   connection_->close(Network::ConnectionCloseType::NoFlush);
 }
 
@@ -80,12 +79,17 @@ void ActiveTcpClient::onEvent(Network::ConnectionEvent event) {
   ENVOY_BUG(event != Network::ConnectionEvent::ConnectedZeroRtt,
             "Unexpected 0-RTT event from the underlying TCP connection.");
   parent_.onConnectionEvent(*this, connection_->transportFailureReason(), event);
-  if (callbacks_) {
+
+  if (event == Network::ConnectionEvent::LocalClose ||
+      event == Network::ConnectionEvent::RemoteClose) {
+
+    ENVOY_CONN_LOG(trace, "on close event", *this);
+    disableIdleTimer();
+
     // Do not pass the Connected event to any session which registered during onEvent above.
     // Consumers of connection pool connections assume they are receiving already connected
     // connections.
-    if (event == Network::ConnectionEvent::LocalClose ||
-        event == Network::ConnectionEvent::RemoteClose) {
+    if (callbacks_) {
       if (tcp_connection_data_) {
         Envoy::Upstream::reportUpstreamCxDestroyActiveRequest(parent_.host(), event);
       }
