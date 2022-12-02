@@ -103,8 +103,7 @@ private:
     ::Envoy::CertificateProvider::OnDemandUpdateCallbacks& callbacks_;
   };
 
-  mutable absl::Mutex certificates_lock_;
-  CertCacheImpl certificates_ ABSL_GUARDED_BY(certificates_lock_);
+  CertCacheImpl certificates_;
 
   void runAddUpdateCallback();
   void runOnDemandUpdateCallback(const std::string& host,

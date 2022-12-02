@@ -149,12 +149,12 @@ public:
   virtual const std::string& sni() const PURE;
 
   /**
-   * @return pkey id, EVP_PKEY_EC or EVP_PKEY_RSA
+   * @return pkey id, it should be EVP_PKEY_EC or EVP_PKEY_RSA
    */
   virtual int pkeyTypePeerCertificate() const PURE;
 
   /**
-   * @return EC curve name or RSA size
+   * @return EC curve name id or RSA size
    */
   virtual int pkeySizePeerCertificate() const PURE;
 };

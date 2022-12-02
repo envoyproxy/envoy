@@ -42,8 +42,10 @@ message LocalCertificate {
   // Indicates the time at which the certificate expires.
   google.protobuf.Timestamp expiration_time = 5;
 
+  // The pkey type and size. If not specified, the type/size of original server cert will be copied.
+  // It supports RSA_2048, RSA_3072, RSA_4096, ECDSA_P256. Otherwise, defaults to RSA_2048.
   Pkey pkey = 6;
-  
+
   // The maximum number of hosts that the cache will hold. If not specified defaults to 1024.
   google.protobuf.UInt32Value cache_size = 7 [(validate.rules).uint32 = {gt: 0}];
 }

@@ -14,31 +14,27 @@ Provider::Provider(
     const envoy::extensions::certificate_providers::local_certificate::v3::LocalCertificate& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context, Api::Api& api)
     : main_thread_dispatcher_(factory_context.mainThreadDispatcher()),
+      ca_cert_(Config::DataSource::read(config.rootca_cert(), true, api)),
+      ca_key_(Config::DataSource::read(config.rootca_key(), true, api)),
+      default_identity_cert_(Config::DataSource::read(config.default_identity_cert(), true, api)),
+      default_identity_key_(Config::DataSource::read(config.default_identity_key(), true, api)),
+      pkey_(config.pkey()),
       cache_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, cache_size, CacheDefaultSize)) {
-  ca_cert_ = Config::DataSource::read(config.rootca_cert(), true, api);
-  ca_key_ = Config::DataSource::read(config.rootca_key(), true, api);
-  default_identity_cert_ = Config::DataSource::read(config.default_identity_cert(), true, api);
-  default_identity_key_ = Config::DataSource::read(config.default_identity_key(), true, api);
-  pkey_ = config.pkey();
-
+  ASSERT(main_thread_dispatcher_.isThreadSafe());
   if (config.has_expiration_time()) {
     auto seconds = google::protobuf::util::TimeUtil::TimestampToSeconds(config.expiration_time());
     expiration_config_ = std::chrono::system_clock::from_time_t(static_cast<time_t>(seconds));
   }
 
-  // Generate TLSCertificate
+  // Set cert cache size
+  certificates_.setMaxSize(cache_size_);
+
+  // Set default TLS Certificate
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* tls_certificate =
       new envoy::extensions::transport_sockets::tls::v3::TlsCertificate();
   tls_certificate->mutable_certificate_chain()->set_inline_string(default_identity_cert_);
   tls_certificate->mutable_private_key()->set_inline_string(default_identity_key_);
-  // Update certificates_ map
-  {
-    absl::WriterMutexLock writer_lock{&certificates_lock_};
-    if (cache_size_ != CacheDefaultSize) {
-      certificates_.setMaxSize(cache_size_);
-    }
-    certificates_.insert("default", tls_certificate);
-  }
+  certificates_.insert("default", tls_certificate);
 }
 
 Envoy::CertificateProvider::CertificateProvider::Capabilities Provider::capabilities() const {
@@ -52,8 +48,7 @@ const std::string Provider::trustedCA(const std::string&) const { return ""; }
 std::vector<
     std::reference_wrapper<const envoy::extensions::transport_sockets::tls::v3::TlsCertificate>>
 Provider::tlsCertificates(const std::string&) const {
-
-  absl::ReaderMutexLock reader_lock{&certificates_lock_};
+  ASSERT(main_thread_dispatcher_.isThreadSafe());
   return certificates_.getCertificates();
 }
 
@@ -61,7 +56,7 @@ Envoy::CertificateProvider::OnDemandUpdateHandlePtr Provider::addOnDemandUpdateC
     const std::string sni, ::Envoy::CertificateProvider::OnDemandUpdateMetadataPtr metadata,
     Event::Dispatcher& thread_local_dispatcher,
     Envoy::CertificateProvider::OnDemandUpdateCallbacks& callback) {
-
+  ASSERT(main_thread_dispatcher_.isThreadSafe());
   auto handle =
       std::make_unique<OnDemandUpdateHandleImpl>(on_demand_update_callbacks_, sni, callback);
 
@@ -71,9 +66,6 @@ Envoy::CertificateProvider::OnDemandUpdateHandlePtr Provider::addOnDemandUpdateC
   // since we do not allow duplicated SANs.
   // We need to align this cache_hit with current transport socket behavior
   bool cache_hit = [&]() {
-    // Lookup may change the content of LRU cache, a write lock is needed to prevent
-    // multiple threads to access the cache.
-    absl::ReaderMutexLock writer_lock{&certificates_lock_};
     return certificates_.is_in_cache(sni);
   }();
 
@@ -92,14 +84,19 @@ Envoy::CertificateProvider::OnDemandUpdateHandlePtr Provider::addOnDemandUpdateC
 
 Common::CallbackHandlePtr Provider::addUpdateCallback(const std::string&,
                                                       std::function<void()> callback) {
+  ASSERT(main_thread_dispatcher_.isThreadSafe());
   return update_callback_manager_.add(callback);
 }
 
-void Provider::runAddUpdateCallback() { update_callback_manager_.runCallbacks(); }
+void Provider::runAddUpdateCallback() {
+  ASSERT(main_thread_dispatcher_.isThreadSafe());
+  update_callback_manager_.runCallbacks();
+}
 
 void Provider::runOnDemandUpdateCallback(const std::string& host,
                                          Event::Dispatcher& thread_local_dispatcher,
                                          bool in_cache) {
+  ASSERT(main_thread_dispatcher_.isThreadSafe());
   auto host_it = on_demand_update_callbacks_.find(host);
   if (host_it != on_demand_update_callbacks_.end()) {
     for (auto* pending_callbacks : host_it->second) {
@@ -128,7 +125,6 @@ void Provider::signCertificate(const std::string sni,
   bssl::UniquePtr<EVP_PKEY> ca_key;
   ca_key.reset(PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));
 
-  /********* generate identity certificate locally *****/
   // create a new CSR
   X509_REQ* req = X509_REQ_new();
   X509_REQ_set_version(req, 0);
@@ -145,8 +141,7 @@ void Provider::signCertificate(const std::string sni,
   setSANs(metadata, crt);
   setExpirationTime(metadata, crt);
   X509_sign(crt, ca_key.get(), EVP_sha256());
-  /********* generate identity certificate locally *****/
-
+  // convert certificate and key to string
   bssl::UniquePtr<BIO> buf(BIO_new(BIO_s_mem()));
   PEM_write_bio_X509(buf.get(), crt);
   const uint8_t* output;
@@ -158,17 +153,15 @@ void Provider::signCertificate(const std::string sni,
   BIO_mem_contents(buf.get(), &output, &length);
   std::string key_pem(reinterpret_cast<const char*>(output), length);
 
-  // Generate TLSCertificate
+  // Generate TLS Certificate
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* tls_certificate =
       new envoy::extensions::transport_sockets::tls::v3::TlsCertificate();
   tls_certificate->mutable_certificate_chain()->set_inline_string(cert_pem);
   tls_certificate->mutable_private_key()->set_inline_string(key_pem);
 
   // Update certificates_ map
-  {
-    absl::WriterMutexLock writer_lock{&certificates_lock_};
-    certificates_.insert(sni, tls_certificate);
-  }
+  certificates_.insert(sni, tls_certificate);
+
   runAddUpdateCallback();
   runOnDemandUpdateCallback(sni, thread_local_dispatcher, false);
 }

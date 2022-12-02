@@ -56,6 +56,9 @@ public:
 
   virtual ~CertificateProvider() = default;
 
+  /**
+   * @return a struct with their capabilities. See Capabilities above.
+   */
   virtual Capabilities capabilities() const PURE;
 
   /**
