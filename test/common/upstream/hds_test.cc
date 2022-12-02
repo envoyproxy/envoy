@@ -320,6 +320,7 @@ TEST_F(HdsTest, TestHdsCluster) {
 
   auto* health_check = message->add_cluster_health_checks();
   health_check->set_cluster_name("test_cluster");
+  health_check->mutable_upstream_bind_config()->mutable_source_address()->set_address("1.1.1.1");
   auto* address = health_check->add_locality_endpoints()->add_endpoints()->mutable_address();
   address->mutable_socket_address()->set_address("127.0.0.2");
   address->mutable_socket_address()->set_port_value(1234);

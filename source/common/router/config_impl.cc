@@ -512,7 +512,6 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
           buildRetryPolicy(vhost.retryPolicy(), route.route(), validator, factory_context)),
       internal_redirect_policy_(
           buildInternalRedirectPolicy(route.route(), validator, route.name())),
-      rate_limit_policy_(route.route().rate_limits(), validator),
       priority_(ConfigUtility::parsePriority(route.route().priority())),
       config_headers_(Http::HeaderUtility::buildHeaderDataVector(route.match().headers())),
       retry_shadow_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
@@ -605,6 +604,11 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
   if (route.match().has_tls_context()) {
     tls_context_match_criteria_ =
         std::make_unique<TlsContextMatchCriteriaImpl>(route.match().tls_context());
+  }
+
+  if (!route.route().rate_limits().empty()) {
+    rate_limit_policy_ =
+        std::make_unique<RateLimitPolicyImpl>(route.route().rate_limits(), validator);
   }
 
   // Returns true if include_vh_rate_limits is explicitly set to true otherwise it defaults to false
@@ -1676,16 +1680,13 @@ VirtualHostImpl::VirtualHostImpl(
       vcluster_scope_(Stats::Utility::scopeFromStatNames(
           scope, {stat_name_storage_.statName(),
                   factory_context.routerContext().virtualClusterStatNames().vcluster_})),
-      rate_limit_policy_(virtual_host.rate_limits(), validator),
       global_route_config_(global_route_config),
       per_filter_configs_(virtual_host.typed_per_filter_config(), optional_http_filters,
                           factory_context, validator),
       retry_shadow_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           virtual_host, per_request_buffer_limit_bytes, std::numeric_limits<uint32_t>::max())),
       include_attempt_count_in_request_(virtual_host.include_request_attempt_count()),
-      include_attempt_count_in_response_(virtual_host.include_attempt_count_in_response()),
-      virtual_cluster_catch_all_(*vcluster_scope_,
-                                 factory_context.routerContext().virtualClusterStatNames()) {
+      include_attempt_count_in_response_(virtual_host.include_attempt_count_in_response()) {
   if (!virtual_host.request_headers_to_add().empty() ||
       !virtual_host.request_headers_to_remove().empty()) {
     request_headers_parser_ = HeaderParser::configure(virtual_host.request_headers_to_add(),
@@ -1696,7 +1697,6 @@ VirtualHostImpl::VirtualHostImpl(
     response_headers_parser_ = HeaderParser::configure(virtual_host.response_headers_to_add(),
                                                        virtual_host.response_headers_to_remove());
   }
-
   switch (virtual_host.require_tls()) {
     PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::config::route::v3::VirtualHost::NONE:
@@ -1718,6 +1718,11 @@ VirtualHostImpl::VirtualHostImpl(
   if (virtual_host.has_hedge_policy()) {
     hedge_policy_ = std::make_unique<envoy::config::route::v3::HedgePolicy>();
     hedge_policy_->CopyFrom(virtual_host.hedge_policy());
+  }
+
+  if (!virtual_host.rate_limits().empty()) {
+    rate_limit_policy_ =
+        std::make_unique<RateLimitPolicyImpl>(virtual_host.rate_limits(), validator);
   }
 
   shadow_policies_.reserve(virtual_host.request_mirror_policies().size());
@@ -1754,10 +1759,14 @@ VirtualHostImpl::VirtualHostImpl(
     }
   }
 
-  for (const auto& virtual_cluster : virtual_host.virtual_clusters()) {
-    virtual_clusters_.push_back(
-        VirtualClusterEntry(virtual_cluster, *vcluster_scope_,
-                            factory_context.routerContext().virtualClusterStatNames()));
+  if (!virtual_host.virtual_clusters().empty()) {
+    virtual_cluster_catch_all_ = std::make_unique<CatchAllVirtualCluster>(
+        *vcluster_scope_, factory_context.routerContext().virtualClusterStatNames());
+    for (const auto& virtual_cluster : virtual_host.virtual_clusters()) {
+      virtual_clusters_.push_back(
+          VirtualClusterEntry(virtual_cluster, *vcluster_scope_,
+                              factory_context.routerContext().virtualClusterStatNames()));
+    }
   }
 
   if (virtual_host.has_cors()) {
@@ -2025,7 +2034,7 @@ VirtualHostImpl::virtualClusterFromEntries(const Http::HeaderMap& headers) const
   }
 
   if (!virtual_clusters_.empty()) {
-    return &virtual_cluster_catch_all_;
+    return virtual_cluster_catch_all_.get();
   }
 
   return nullptr;
