@@ -950,23 +950,16 @@ void Filter::onResponseTimeout() {
     // We want to record the upstream timeouts and increase the stats counters in all the cases.
     // For example, we also want to record the stats in the case of BiDi streaming APIs where we
     // might have already seen the headers.
-    // If desired, the old behavior to not do any work for those upstream requests we've already
-    // seen the headers for can be achieved by overloading the runtime guard
-    // `do_not_await_headers_on_upstream_timeout_to_emit_stats` to false.
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.do_not_await_headers_on_upstream_timeout_to_emit_stats") ||
-        upstream_request->awaitingHeaders()) {
-      cluster_->trafficStats().upstream_rq_timeout_.inc();
-      if (request_vcluster_) {
-        request_vcluster_->stats().upstream_rq_timeout_.inc();
-      }
-      if (route_stats_context_.has_value()) {
-        route_stats_context_->stats().upstream_rq_timeout_.inc();
-      }
+    cluster_->trafficStats().upstream_rq_timeout_.inc();
+    if (request_vcluster_) {
+      request_vcluster_->stats().upstream_rq_timeout_.inc();
+    }
+    if (route_stats_context_.has_value()) {
+      route_stats_context_->stats().upstream_rq_timeout_.inc();
+    }
 
-      if (upstream_request->upstreamHost()) {
-        upstream_request->upstreamHost()->stats().rq_timeout_.inc();
-      }
+    if (upstream_request->upstreamHost()) {
+      upstream_request->upstreamHost()->stats().rq_timeout_.inc();
     }
 
     if (upstream_request->awaitingHeaders()) {
