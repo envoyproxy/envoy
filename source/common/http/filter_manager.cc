@@ -999,7 +999,7 @@ void FilterManager::encode1xxHeaders(ActiveStreamEncoderFilter* filter,
   for (; entry != encoder_filters_.end(); entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::Encode1xxHeaders));
     state_.filter_call_state_ |= FilterCallState::Encode1xxHeaders;
-    const FilterHeadersStatus status = (*entry)->handle_->encode1xxHeaders(headers);
+    const Filter1xxHeadersStatus status = (*entry)->handle_->encode1xxHeaders(headers);
     state_.filter_call_state_ &= ~FilterCallState::Encode1xxHeaders;
 
     ENVOY_STREAM_LOG(trace, "encode 1xx continue headers called: filter={} status={}", *this,
