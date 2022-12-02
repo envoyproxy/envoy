@@ -12,6 +12,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/crypto:0.0"
 "source/common/event:94.1" # Emulated edge events guards don't report LCOV
 "source/common/filesystem/posix:95.5"
+"source/common/filter:95.6" # Upstream HTTP filter tests are needed
 "source/common/http:96.1"
 "source/common/http/http2:94.8"
 "source/common/io:98.0"
@@ -52,6 +53,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/http/lua:96.4"
 "source/extensions/filters/http/oauth2:96.0"
 "source/extensions/filters/http/wasm:1.9"
+"source/extensions/filters/http/rate_limit_quota:70" # TODO(tyxia) WIP. Improve coverage as development continues
 "source/extensions/filters/listener:95.9"
 "source/extensions/filters/listener/http_inspector:95.8"
 "source/extensions/filters/listener/original_dst:82.4"

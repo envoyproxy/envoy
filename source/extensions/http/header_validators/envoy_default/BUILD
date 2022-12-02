@@ -13,10 +13,12 @@ envoy_cc_library(
     name = "header_validator_common",
     srcs = [
         "header_validator.cc",
+        "path_normalizer.cc",
     ],
     hdrs = [
         "character_tables.h",
         "header_validator.h",
+        "path_normalizer.h",
     ],
     visibility = [
         "//test/common/http/http1:__subpackages__",
@@ -45,6 +47,7 @@ envoy_cc_library(
         "//envoy/http:header_validator_interface",
         "//external:abseil_node_hash_set",
         "//source/common/http:headers_lib",
+        "//source/common/http:utility_lib",
     ],
 )
 

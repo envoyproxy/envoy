@@ -332,8 +332,10 @@ TEST_P(Http11ConnectTest, LongHeaders) {
   EXPECT_CALL(*inner_socket_, doRead(_)).Times(0);
 
   Buffer::OwnedImpl buffer("");
-  auto result = connect_socket_->doRead(buffer);
-  EXPECT_EQ(Network::PostIoAction::Close, result.action_);
+  EXPECT_LOG_CONTAINS("trace", "failed to receive CONNECT headers within 2000 bytes", {
+    auto result = connect_socket_->doRead(buffer);
+    EXPECT_EQ(Network::PostIoAction::Close, result.action_);
+  });
 }
 
 // If response is not 200 OK, read fails.
@@ -348,10 +350,6 @@ TEST_P(Http11ConnectTest, InvalidResponse) {
         return Api::IoCallUint64Result(initial_data.length(),
                                        Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
       }));
-  absl::optional<uint64_t> expected_bytes(connect.length());
-  EXPECT_CALL(io_handle_, read(_, expected_bytes))
-      .WillOnce(Return(ByMove(Api::IoCallUint64Result(
-          connect.length(), Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
 
   EXPECT_CALL(*inner_socket_, doRead(_)).Times(0);
 
@@ -386,25 +384,59 @@ TEST_F(SocketFactoryTest, CreateSocketReturnsNullWhenInnerFactoryReturnsNull) {
 }
 
 TEST(ParseTest, TestValidResponse) {
+  size_t bytes_processed;
+  bool headers_complete;
   {
-    Buffer::OwnedImpl buffer("HTTP/1.0 200 OK\r\n\r\n");
-    ASSERT_TRUE(UpstreamHttp11ConnectSocket::isValidConnectResponse(buffer));
-    EXPECT_EQ(buffer.length(), 0);
+    std::string response("HTTP/1.0 200 OK\r\n\r\n");
+    ASSERT_TRUE(UpstreamHttp11ConnectSocket::isValidConnectResponse(response, headers_complete,
+                                                                    bytes_processed));
+    EXPECT_EQ(response.length(), bytes_processed);
   }
   {
-    Buffer::OwnedImpl buffer("HTTP/1.0 200 OK\r\nFoo: Bar\r\n\r\n");
-    ASSERT_TRUE(UpstreamHttp11ConnectSocket::isValidConnectResponse(buffer));
-    EXPECT_EQ(buffer.length(), 0);
+    std::string response("HTTP/1.0 200 OK\n\r\n");
+    ASSERT_TRUE(UpstreamHttp11ConnectSocket::isValidConnectResponse(response, headers_complete,
+                                                                    bytes_processed));
+    EXPECT_EQ(response.length(), bytes_processed);
   }
   {
-    Buffer::OwnedImpl buffer("HTTP/1.1   200  OK \r\n\r\nasdf");
-    ASSERT_TRUE(UpstreamHttp11ConnectSocket::isValidConnectResponse(buffer));
-    EXPECT_EQ(buffer.length(), 4);
-    EXPECT_EQ(buffer.toString(), "asdf");
+    std::string response("HTTP/1.0 200 OK\n\n");
+    ASSERT_TRUE(UpstreamHttp11ConnectSocket::isValidConnectResponse(response, headers_complete,
+                                                                    bytes_processed));
+    EXPECT_EQ(response.length(), bytes_processed);
   }
   {
-    Buffer::OwnedImpl buffer("HTTP/1.0 300 OK\r\n\r\n");
-    ASSERT_FALSE(UpstreamHttp11ConnectSocket::isValidConnectResponse(buffer));
+    std::string response("HTTP/1.0 200 OK\r\n\n");
+    ASSERT_TRUE(UpstreamHttp11ConnectSocket::isValidConnectResponse(response, headers_complete,
+                                                                    bytes_processed));
+    EXPECT_EQ(response.length(), bytes_processed);
+  }
+  {
+    // Extra headers are OK.
+    std::string response("HTTP/1.0 200 OK\r\nFoo: Bar\r\n\r\n");
+    ASSERT_TRUE(UpstreamHttp11ConnectSocket::isValidConnectResponse(response, headers_complete,
+                                                                    bytes_processed));
+    EXPECT_EQ(response.length(), bytes_processed);
+  }
+  {
+    // Extra whitespace and extra payload are OK.
+    std::string response("HTTP/1.1   200  OK \r\n\r\nasdf");
+    ASSERT_TRUE(UpstreamHttp11ConnectSocket::isValidConnectResponse(response, headers_complete,
+                                                                    bytes_processed));
+    EXPECT_EQ(response.length(), bytes_processed + 4);
+  }
+  {
+    // 300 is not OK.
+    std::string response("HTTP/1.0 300 OK\r\n\r\n");
+    ASSERT_FALSE(UpstreamHttp11ConnectSocket::isValidConnectResponse(response, headers_complete,
+                                                                     bytes_processed));
+    EXPECT_TRUE(headers_complete);
+  }
+  {
+    // Only one CRLF: incomplete headers.
+    std::string response("HTTP/1.0 200 OK\r\n");
+    ASSERT_FALSE(UpstreamHttp11ConnectSocket::isValidConnectResponse(response, headers_complete,
+                                                                     bytes_processed));
+    EXPECT_FALSE(headers_complete);
   }
 }
 
