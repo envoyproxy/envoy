@@ -162,7 +162,8 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::writev(const Buffer::RawSlice* 
 }
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::write(Buffer::Instance& buffer) {
-  Buffer::RawSliceVector slices = buffer.getRawSlices();
+  constexpr uint64_t MaxSlices = 16;
+  Buffer::RawSliceVector slices = buffer.getRawSlices(MaxSlices);
   auto result = writev(slices.begin(), slices.size());
   if (result.return_value_ > 0) {
     buffer.drain(static_cast<uint64_t>(result.return_value_));
