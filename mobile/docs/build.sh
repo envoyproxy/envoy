@@ -3,20 +3,20 @@
 set -e
 
 # shellcheck disable=SC1091
-. envoy/tools/shell_utils.sh
+. tools/shell_utils.sh
 
 # We need to set ENVOY_DOCS_VERSION_STRING and ENVOY_DOCS_RELEASE_LEVEL for Sphinx.
 # We also validate that the tag and version match at this point if needed.
 
 # Docs for release tags are reserved for vX.Y.Z versions.
 # vX.Y.Z.ddmmyy do not publish tagged docs.
-VERSION_NUMBER=$(cat VERSION)
+VERSION_NUMBER=$(cat mobile/VERSION)
 if [[ -n "$CIRCLE_TAG" ]] && [[ "${VERSION_NUMBER}" =~ ^[0-9]+\.[0-9]+\.[0-9]$ ]]
 then
   # Check the git tag matches the version number in the VERSION file.
   if [ "v${VERSION_NUMBER}" != "${CIRCLE_TAG}" ]; then
     echo "Given git tag does not match the VERSION file content:"
-    echo "${CIRCLE_TAG} vs $(cat VERSION)"
+    echo "${CIRCLE_TAG} vs $(cat mobile/VERSION)"
     exit 1
   fi
   # Check the version_history.rst contains current release version.
