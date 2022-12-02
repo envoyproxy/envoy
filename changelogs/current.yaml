@@ -207,5 +207,12 @@ new_features:
     added support to allowlist headers included in the check request to gRPC authorization server (previously only available for HTTP authorization server).
     Pre-existing field :ref:`allowed_headers <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.AuthorizationRequest.allowed_headers>` is deprecated in favour
     of the new field :ref:`allowed_headers <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.allowed_headers>`.
+- area: upstream
+  change: |
+    allow configuring :ref:`cluster bind config <envoy_v3_api_field_config.cluster.v3.Cluster.upstream_bind_config>` and
+    :ref:`cluster manager bind config <envoy_v3_api_field_config.bootstrap.v3.ClusterManager.upstream_bind_config>` without specifying a
+    :ref:`source_address <envoy_v3_api_field_config.core.v3.BindConfig.source_address>`. This allows setting
+    :ref:`socket options <envoy_v3_api_field_config.core.v3.BindConfig.socket_options>` when using the default unspecified bind address
+    is desired.
 
 deprecated:
