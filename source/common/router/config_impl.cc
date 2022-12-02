@@ -520,7 +520,6 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                                                        route.response_headers_to_remove())),
       retry_shadow_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           route, per_request_buffer_limit_bytes, vhost.retryShadowBufferLimit())),
-      metadata_(route.metadata()), typed_metadata_(route.metadata()),
       match_grpc_(route.match().has_grpc()),
       dynamic_metadata_(route.match().dynamic_metadata().begin(),
                         route.match().dynamic_metadata().end()),
@@ -534,6 +533,10 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                           validator),
       route_name_(route.name()), time_source_(factory_context.mainThreadDispatcher().timeSource()),
       random_value_header_name_(route.route().weighted_clusters().header_name()) {
+  if (route.has_metadata()) {
+    metadata_ = std::make_unique<envoy::config::core::v3::Metadata>(route.metadata());
+    typed_metadata_ = std::make_unique<RouteTypedMetadata>(route.metadata());
+  }
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
