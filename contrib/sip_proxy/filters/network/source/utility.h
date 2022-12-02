@@ -206,12 +206,12 @@ public:
 
   bool contains(const K& key) { return cache_.find(key) != cache_.end(); }
 
-  V& at(const K& key) {
+  OptRef<V> at(const K& key) {
     auto it = cache_.find(key);
     if (it != cache_.cend()) {
-      return it->second.value_;
+      return OptRef<V>{it->second.value_};
     }
-    return empty_value_;
+    return absl::nullopt;
   }
 
   void erase(const K& key) {
@@ -234,8 +234,6 @@ private:
   std::map<K, Data> cache_;
   std::list<K> ring_buffer_;
   typename std::list<K>::iterator it_;
-
-  V empty_value_{};
 };
 
 template <typename T, typename K, typename V> class CacheManager {
@@ -267,12 +265,12 @@ public:
     return false;
   }
 
-  V& at(const T& type, const K& key) {
+  OptRef<V> at(const T& type, const K& key) {
     auto it_type = caches_.find(type);
     if (it_type != caches_.cend()) {
-      return it_type->second.at(key);
+      return OptRef<V>{it_type->second.at(key)};
     }
-    return empty_value_;
+    return absl::nullopt;
   }
 
   void erase(const T& type, const K& key) {
@@ -288,8 +286,6 @@ private:
   // Maximum size of each cache type.
   unsigned int max_size_;
   std::map<T, Cache<K, V>> caches_;
-
-  V empty_value_{};
 };
 
 } // namespace SipProxy

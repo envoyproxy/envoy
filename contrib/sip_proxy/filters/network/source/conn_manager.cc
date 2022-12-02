@@ -33,7 +33,9 @@ void TrafficRoutingAssistantHandler::updateTrafficRoutingAssistant(
     const absl::optional<TraContextMap> context) {
 
   bool should_update_tra = true;
-  if (cache_manager_.at(type, key) == val) {
+
+  auto cached_value = cache_manager_.at(type, key);
+  if (cached_value.has_value() && cached_value.value().get() == val) {
     should_update_tra = false;
   }
 
@@ -51,22 +53,23 @@ QueryStatus TrafficRoutingAssistantHandler::retrieveTrafficRoutingAssistant(
     const std::string& type, const std::string& key, const absl::optional<TraContextMap> context,
     SipFilters::DecoderFilterCallbacks& activetrans, std::string& host) {
 
-  host = cache_manager_.at(type, key);
-  if (!host.empty()) {
+  host = {};
+
+  auto cached_value = cache_manager_.at(type, key);
+  if (cached_value.has_value()) {
+    host = cached_value.value().get();
     return QueryStatus::Continue;
   }
 
   if (activetrans.metadata()->affinityIteration()->query()) {
-    parent_.pushIntoPendingList(type, key, activetrans, [&]() {
-      if (traClient()) {
+    if (traClient()) {
+      parent_.pushIntoPendingList(type, key, activetrans, [&]() {
         traClient()->retrieveTrafficRoutingAssistant(type, key, context,
                                                      Tracing::NullSpan::instance(), stream_info_);
-      }
-    });
-    host = "";
-    return QueryStatus::Pending;
+      });
+      return QueryStatus::Pending;
+    }
   }
-  host = "";
   return QueryStatus::Stop;
 }
 
@@ -148,7 +151,6 @@ void TrafficRoutingAssistantHandler::complete(const TrafficRoutingAssistant::Res
   }
   case TrafficRoutingAssistant::ResponseType::FailureResp: {
     ENVOY_LOG(trace, "TRA === FailureResp");
-
     break;
   }
   default:
