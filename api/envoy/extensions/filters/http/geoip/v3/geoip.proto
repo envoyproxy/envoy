@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.geoip.v3;
+
+import "envoy/config/core/v3/address.proto";
+
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.geoip.v3";
+option java_outer_classname = "GeoipProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/geoip/v3;geoipv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Geoip]
+// Geoip :ref:`configuration overview <config_http_filters_geoip>`.
+// [#extension: envoy.filters.http.geoip]
+
+message Geoip {
+
+  // This field is used to determine the origin client's IP address. If set to true, the rightmost
+  // address in the `x-forwarded-for` header will be used.
+  // Otherwise, the immediate downstream connection source address will be used.
+  bool use_xff = 1;
+
+  // The set of geolocation headers to add to request. Supported geolocation headers:
+  //
+  // - *x-geo-country*
+  // - *x-geo-city*
+  // - *x-geo-region*
+  // - *x-geo-asn*
+  // - *x-geo-anon-vpn*
+  // - *x-geo-anon-hosting*
+  // - *x-geo-anon-tor*
+  // - *x-geo-anon-proxy*
+  //
+  // If any of the configured headers are present in the incoming request, they will be overridden by Geoip filter.
+  repeated string geo_headers_to_add = 2 [(validate.rules).repeated = {min_items: 1}];
+
+  Provider provider = 3;
+
+  message Provider {
+    // The name of the geoip client to instantiate. The name must match a
+    // supported geoip client. Built-in clients:
+    //
+    // - *envoy.geoip_providers.maxmind*
+    string name = 1 [(validate.rules).string = {min_bytes: 1}];
+
+    // Geoip client specific configuration which depends on the client being instantiated.
+    // See the geoip clients for examples:
+    //
+    // - :ref:`LightstepConfig <envoy_api_msg_config.geoip.v3.MaxMindConfig>`
+    oneof config_type {
+      google.protobuf.Struct config = 2 [deprecated = true];
+
+      google.protobuf.Any typed_config = 3;
+    }
+  }
+
+}

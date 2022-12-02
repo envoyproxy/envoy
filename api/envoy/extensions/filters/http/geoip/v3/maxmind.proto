@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.geoip.v3;
+
+import "envoy/config/core/v3/base.proto";
+
+import "envoy/annotations/deprecation.proto";
+import "udpa/annotations/migrate.proto";
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.config.geoip.v3";
+option java_outer_classname = "MaxMindProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/geoip/v3;geoipv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: MaxMind geolocation provider]
+
+// Configuration for the MaxMind geolocation provider.
+// [#extension: envoy.geoip_providers.maxmind]
+// [#not-implemented-hide:]
+message MaxMindConfig {
+  // Directory path to MaxMind geolocation database.
+  string db_path = 1 [(validate.rules).string = {min_bytes: 1}];
+}
