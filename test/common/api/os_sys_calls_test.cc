@@ -21,8 +21,8 @@ TEST(OsSyscallsTest, OpenPwritePreadFstatCloseStatUnlink) {
   EXPECT_EQ(open_result.errno_, 0);
   os_fd_t fd = open_result.return_value_;
 #ifdef WIN32
-  // pwrite and pread are not supported.
-  ::_write(fd, file_contents.begin(), 5);
+  // pwrite and pread are not supported. Just write some bytes so we can still test stat.
+  EXPECT_EQ(file_contents.size(), ::_write(fd, file_contents.begin(), file_contents.size()));
 #else
   // Test `pwrite`
   Api::SysCallSizeResult write_result =
