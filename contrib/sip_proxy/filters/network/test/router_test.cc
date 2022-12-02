@@ -1,6 +1,5 @@
 #include <chrono>
-#include <cstddef>
-#include <memory>
+#include <type_traits>
 
 #include "envoy/tcp/conn_pool.h"
 
@@ -39,7 +38,9 @@ namespace Router {
 
 class SipRouterTest : public testing::Test {
 public:
-  SipRouterTest() = default;
+  SipRouterTest()
+      : router_filter_config_(std::make_shared<NiceMock<MockRouterFilterConfig>>()),
+        router_stats_(RouterFilterConfigImpl::generateStats("test", store_)){};
   ~SipRouterTest() override { delete (filter_); }
 
   void initializeTrans(const std::string& sip_protocol_options_yaml = "",
@@ -127,8 +128,8 @@ public:
     route_ = new NiceMock<MockRoute>();
     route_ptr_.reset(route_);
 
-    router_ =
-        std::make_unique<Router>(context_.clusterManager(), "test", context_.scope(), context_);
+    EXPECT_CALL(*router_filter_config_, stats()).WillRepeatedly(ReturnRef(router_stats_));
+    router_ = std::make_unique<Router>(router_filter_config_, context_.clusterManager(), context_);
 
     EXPECT_EQ(nullptr, router_->downstreamConnection());
 
@@ -136,19 +137,6 @@ public:
     EXPECT_CALL(callbacks_, transactionInfos()).WillOnce(Return(transaction_infos_));
     EXPECT_CALL(callbacks_, traHandler()).WillRepeatedly(Return(tra_handler_));
     router_->setDecoderFilterCallbacks(callbacks_);
-  }
-
-  void initializeRouterWithCallback() {
-    route_ = new NiceMock<MockRoute>();
-    route_ptr_.reset(route_);
-
-    router_ =
-        std::make_unique<Router>(context_.clusterManager(), "test", context_.scope(), context_);
-
-    EXPECT_CALL(callbacks_, transactionInfos()).WillOnce(Return(transaction_infos_));
-    router_->setDecoderFilterCallbacks(callbacks_);
-
-    EXPECT_EQ(nullptr, router_->downstreamConnection());
   }
 
   void initializeMetadata(MsgType msg_type, MethodType method = MethodType::Invite,
@@ -341,6 +329,9 @@ public:
   NiceMock<Random::MockRandomGenerator> random_;
   Stats::TestUtil::TestStore store_;
 
+  std::shared_ptr<NiceMock<MockRouterFilterConfig>> router_filter_config_;
+  RouterStats router_stats_;
+
   std::shared_ptr<TransactionInfos> transaction_infos_;
   std::shared_ptr<SipSettings> sip_settings_;
 
@@ -415,7 +406,7 @@ TEST_F(SipRouterTest, NoTcpConnPool) {
   try {
     startRequest(FilterStatus::Continue);
   } catch (const AppException& ex) {
-    EXPECT_EQ(1U, context_.scope().counterFromString("test.no_healthy_upstream").value());
+    EXPECT_EQ(1U, store_.counterFromString("test.no_healthy_upstream").value());
   }
 }
 
@@ -436,7 +427,7 @@ TEST_F(SipRouterTest, NoTcpConnPoolEmptyDest) {
   try {
     startRequest(FilterStatus::Continue);
   } catch (const AppException& ex) {
-    EXPECT_EQ(1U, context_.scope().counterFromString("test.no_healthy_upstream").value());
+    EXPECT_EQ(1U, store_.counterFromString("test.no_healthy_upstream").value());
   }
 }
 
@@ -500,7 +491,7 @@ TEST_F(SipRouterTest, CallNoRoute) {
   try {
     EXPECT_EQ(FilterStatus::StopIteration, router_->transportBegin(metadata_));
   } catch (const AppException& ex) {
-    EXPECT_EQ(1U, context_.scope().counterFromString("test.route_missing").value());
+    EXPECT_EQ(1U, store_.counterFromString("test.route_missing").value());
   }
 
   destroyRouterOutofRange();
@@ -522,7 +513,7 @@ TEST_F(SipRouterTest, CallNoCluster) {
   try {
     EXPECT_EQ(FilterStatus::StopIteration, router_->transportBegin(metadata_));
   } catch (const AppException& ex) {
-    EXPECT_EQ(1U, context_.scope().counterFromString("test.unknown_cluster").value());
+    EXPECT_EQ(1U, store_.counterFromString("test.unknown_cluster").value());
   }
 
   destroyRouter();
@@ -543,7 +534,7 @@ TEST_F(SipRouterTest, ClusterMaintenanceMode) {
   try {
     EXPECT_EQ(FilterStatus::StopIteration, router_->transportBegin(metadata_));
   } catch (const AppException& ex) {
-    EXPECT_EQ(1U, context_.scope().counterFromString("test.upstream_rq_maintenance_mode").value());
+    EXPECT_EQ(1U, store_.counterFromString("test.upstream_rq_maintenance_mode").value());
   }
   destroyRouter();
 }
@@ -657,7 +648,7 @@ TEST_F(SipRouterTest, CallWithExistingConnectionDefaultLoadBalance) {
 
 TEST_F(SipRouterTest, PoolFailure) {
   initializeTrans();
-  initializeRouterWithCallback();
+  initializeRouter();
   initializeTransaction();
   initializeMetadata(MsgType::Response);
   startRequest();
@@ -667,7 +658,7 @@ TEST_F(SipRouterTest, PoolFailure) {
 
 TEST_F(SipRouterTest, NextAffinityAfterPoolFailure) {
   initializeTrans();
-  initializeRouterWithCallback();
+  initializeRouter();
   initializeTransaction();
   initializeMetadata(MsgType::Response);
   startRequest();
@@ -679,7 +670,7 @@ TEST_F(SipRouterTest, NextAffinityAfterPoolFailure) {
 
 TEST_F(SipRouterTest, NewConnectionFailure) {
   initializeTrans();
-  initializeRouterWithCallback();
+  initializeRouter();
   initializeTransaction();
   EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_, newConnection(_))
       .WillOnce(

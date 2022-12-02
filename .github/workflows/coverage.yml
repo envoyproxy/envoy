@@ -51,7 +51,7 @@ jobs:
         cd mobile && tar -czvf coverage.tar.gz generated/coverage
     - name: 'Upload report'
       if: steps.check_context.outputs.run_coverage == 'true'
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: coverage.tar.gz
         path: coverage.tar.gz
