@@ -212,7 +212,7 @@ int DefaultCertValidator::doSynchronousVerifyCertChain(
     }
   }
   Envoy::Ssl::ClientValidationStatus detailed_status;
-  bool success = verifyCertAndUpdateStatus(&detailed_status, &leaf_cert, transport_socket_options,
+  bool success = verifyCertAndUpdateStatus(&leaf_cert, transport_socket_options, detailed_status,
                                            nullptr, nullptr);
   if (ssl_extended_info) {
     ssl_extended_info->setCertificateValidationStatus(detailed_status);
@@ -225,8 +225,10 @@ int DefaultCertValidator::doSynchronousVerifyCertChain(
 }
 
 bool DefaultCertValidator::verifyCertAndUpdateStatus(
-    Envoy::Ssl::ClientValidationStatus* detailed_status, X509* leaf_cert,
-    const Network::TransportSocketOptions* transport_socket_options, std::string* error_details,
+    X509* leaf_cert,
+    const Network::TransportSocketOptions* transport_socket_options,
+    Envoy::Ssl::ClientValidationStatus& detailed_status,
+    std::string* error_details,
     uint8_t* out_alert) {
   Envoy::Ssl::ClientValidationStatus validated =
       verifyCertificate(leaf_cert,
@@ -235,7 +237,7 @@ bool DefaultCertValidator::verifyCertAndUpdateStatus(
                             : std::vector<std::string>{},
                         subject_alt_name_matchers_, error_details, out_alert);
 
-  *detailed_status = validated;
+  detailed_status = validated;
 
   // If `trusted_ca` exists, it is already verified in the code above. Thus, we just need to make
   // sure the verification for other validation context configurations doesn't fail (i.e. either
@@ -334,7 +336,8 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
                                 SSL_CTX_get0_param(&ssl_ctx))) {
       OPENSSL_PUT_ERROR(SSL, ERR_R_X509_LIB);
       const char* error = "verify cert failed: init and setup X509_STORE_CTX";
-      onVerifyError(error);
+      stats_.fail_verify_error_.inc();
+      ENVOY_LOG(debug, error);
       return {ValidationResults::ValidationStatus::Failed,
               Envoy::Ssl::ClientValidationStatus::Failed, absl::nullopt, error};
     }
@@ -343,7 +346,8 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
     if (!verify_succeeded) {
       const std::string error =
           absl::StrCat("verify cert failed: ", Utility::getX509VerificationErrorInfo(ctx.get()));
-      onVerifyError(error);
+      stats_.fail_verify_error_.inc();
+      ENVOY_LOG(debug, error);
       if (allow_untrusted_certificate_) {
         return ValidationResults{ValidationResults::ValidationStatus::Successful,
                                  Envoy::Ssl::ClientValidationStatus::Failed, absl::nullopt,
@@ -358,18 +362,13 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
   uint8_t tls_alert = SSL_AD_CERTIFICATE_UNKNOWN;
   Envoy::Ssl::ClientValidationStatus detailed_status;
   const bool succeeded = verifyCertAndUpdateStatus(
-      &detailed_status, leaf_cert, transport_socket_options.get(), &error_details, &tls_alert);
+      leaf_cert, transport_socket_options.get(), detailed_status, &error_details, &tls_alert);
   return succeeded ? ValidationResults{ValidationResults::ValidationStatus::Successful,
                                        Envoy::Ssl::ClientValidationStatus::Validated, absl::nullopt,
                                        absl::nullopt}
                    : ValidationResults{ValidationResults::ValidationStatus::Failed,
                                        Envoy::Ssl::ClientValidationStatus::Validated, tls_alert,
                                        error_details};
-}
-
-void DefaultCertValidator::onVerifyError(absl::string_view error) {
-  stats_.fail_verify_error_.inc();
-  ENVOY_LOG(debug, error);
 }
 
 bool DefaultCertValidator::verifySubjectAltName(X509* cert,

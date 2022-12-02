@@ -107,12 +107,10 @@ public:
                                   const std::vector<SanMatcherPtr>& subject_alt_name_matchers);
 
 private:
-  bool verifyCertAndUpdateStatus(Envoy::Ssl::ClientValidationStatus* detailed_status,
-                                 X509* leaf_cert,
+  bool verifyCertAndUpdateStatus(X509* leaf_cert,
                                  const Network::TransportSocketOptions* transport_socket_options,
+                                 Envoy::Ssl::ClientValidationStatus& detailed_status,
                                  std::string* error_details, uint8_t* out_alert);
-
-  void onVerifyError(absl::string_view error);
 
   const Envoy::Ssl::CertificateValidationContextConfig* config_;
   SslStats& stats_;

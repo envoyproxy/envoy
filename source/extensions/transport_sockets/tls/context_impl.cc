@@ -514,6 +514,7 @@ ValidationResults ContextImpl::customVerifyCertChain(
       *cert_chain, extended_socket_info->createValidateResultCallback(), transport_socket_options,
       *SSL_get_SSL_CTX(ssl), {}, SSL_is_server(ssl), absl::NullSafeStringView(host_name));
   if (result.status != ValidationResults::ValidationStatus::Pending) {
+    extended_socket_info->setCertificateValidationStatus(result.detailed_status);
     extended_socket_info->onCertificateValidationCompleted(
         result.status == ValidationResults::ValidationStatus::Successful);
   }
