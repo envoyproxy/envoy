@@ -700,10 +700,11 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
 }
 
 bool RouteEntryImplBase::evaluateRuntimeMatch(const uint64_t random_value) const {
-  return !runtime_ ? true
-                   : loader_.snapshot().featureEnabled(runtime_->fractional_runtime_key_,
-                                                       runtime_->fractional_runtime_default_,
-                                                       random_value);
+  return runtime_ == nullptr
+             ? true
+             : loader_.snapshot().featureEnabled(runtime_->fractional_runtime_key_,
+                                                 runtime_->fractional_runtime_default_,
+                                                 random_value);
 }
 
 absl::string_view
@@ -890,18 +891,14 @@ RouteEntryImplBase::getResponseHeaderParsers(bool specificity_ascend) const {
                           specificity_ascend);
 }
 
-absl::optional<RouteEntryImplBase::RuntimeData>
+std::unique_ptr<const RuntimeData>
 RouteEntryImplBase::loadRuntimeData(const envoy::config::route::v3::RouteMatch& route_match) {
-  absl::optional<RuntimeData> runtime;
-  RuntimeData runtime_data;
-
   if (route_match.has_runtime_fraction()) {
-    runtime_data.fractional_runtime_default_ = route_match.runtime_fraction().default_value();
-    runtime_data.fractional_runtime_key_ = route_match.runtime_fraction().runtime_key();
-    return runtime_data;
+    return std::make_unique<const RuntimeData>(
+        {.fractional_runtime_default_ = route_match.runtime_fraction().default_value(),
+         .fractional_runtime_key_ = route_match.runtime_fraction().runtime_key()});
   }
-
-  return runtime;
+  return nullptr;
 }
 
 const std::string&
