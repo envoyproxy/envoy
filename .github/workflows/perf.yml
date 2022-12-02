@@ -29,7 +29,7 @@ jobs:
             --config=remote-ci-linux-clang \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //test/performance:test_binary_size
-    - uses: actions/upload-artifact@v2
+    - uses: actions/upload-artifact@v3
       with:
         name: sizecurrent
         path: mobile/bazel-bin/test/performance/test_binary_size
@@ -57,7 +57,7 @@ jobs:
             --config=remote-ci-linux-clang \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //test/performance:test_binary_size
-    - uses: actions/upload-artifact@v2
+    - uses: actions/upload-artifact@v3
       with:
         name: sizemain
         path: mobile/bazel-bin/test/performance/test_binary_size
