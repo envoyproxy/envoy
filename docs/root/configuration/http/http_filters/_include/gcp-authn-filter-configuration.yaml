@@ -57,7 +57,7 @@ static_resources:
         envoy.filters.http.gcp_authn:
           "@type": type.googleapis.com/envoy.extensions.filters.http.gcp_authn.v3.Audience
           url: http://test.com
-  # Cluster for fake metadata server.
+  # Cluster for GCE metadata server.
   - name: gcp_authn
     type: STRICT_DNS
     connect_timeout
