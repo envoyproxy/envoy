@@ -32,6 +32,7 @@
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 #include "nghttp2/nghttp2.h"
+#include "utility.h"
 
 namespace Envoy {
 namespace Http2 {
@@ -551,8 +552,109 @@ bool Utility::isWebSocketUpgradeRequest(const RequestHeaderMap& headers) {
                                  Http::Headers::get().UpgradeValues.WebSocket));
 }
 
+Utility::PreparedLocalReplyPtr Utility::prepareLocalReply(const EncodeFunctions& encode_functions,
+                                                          const LocalReplyData& local_reply_data) {
+  Code response_code = local_reply_data.response_code_;
+  std::string body_text(local_reply_data.body_text_);
+  absl::string_view content_type(Headers::get().ContentTypeValues.Text);
+
+  ResponseHeaderMapPtr response_headers{createHeaderMap<ResponseHeaderMapImpl>(
+      {{Headers::get().Status, std::to_string(enumToInt(response_code))}})};
+
+  if (encode_functions.modify_headers_) {
+    encode_functions.modify_headers_(*response_headers);
+  }
+  bool has_custom_content_type = false;
+  if (encode_functions.rewrite_) {
+    std::string content_type_value = std::string(response_headers->getContentTypeValue());
+    encode_functions.rewrite_(*response_headers, response_code, body_text, content_type);
+    has_custom_content_type = (content_type_value != response_headers->getContentTypeValue());
+  }
+
+  if (local_reply_data.is_grpc_) {
+    response_headers->setStatus(std::to_string(enumToInt(Code::OK)));
+    response_headers->setReferenceContentType(Headers::get().ContentTypeValues.Grpc);
+
+    if (response_headers->getGrpcStatusValue().empty()) {
+      response_headers->setGrpcStatus(std::to_string(
+          enumToInt(local_reply_data.grpc_status_
+                        ? local_reply_data.grpc_status_.value()
+                        : Grpc::Utility::httpToGrpcStatus(enumToInt(response_code)))));
+    }
+
+    if (!body_text.empty() && !local_reply_data.is_head_request_) {
+      // TODO(dio): Probably it is worth to consider caching the encoded message based on gRPC
+      // status.
+      // JsonFormatter adds a '\n' at the end. For header value, it should be removed.
+      // https://github.com/envoyproxy/envoy/blob/main/source/common/formatter/substitution_formatter.cc#L129
+      if (content_type == Headers::get().ContentTypeValues.Json &&
+          body_text[body_text.length() - 1] == '\n') {
+        body_text = body_text.substr(0, body_text.length() - 1);
+      }
+      response_headers->setGrpcMessage(PercentEncoding::encode(body_text));
+    }
+    // The `modify_headers` function may have added content-length, remove it.
+    response_headers->removeContentLength();
+    return PreparedLocalReplyPtr(new PreparedLocalReply{
+        local_reply_data.is_grpc_, local_reply_data.is_head_request_, std::move(response_headers),
+        std::move(body_text), encode_functions.encode_headers_, encode_functions.encode_data_});
+  }
+
+  if (!body_text.empty()) {
+    response_headers->setContentLength(body_text.size());
+    // If the content-type is not set, set it.
+    // Alternately if the `rewrite` function has changed body_text and the config didn't explicitly
+    // set a content type header, set the content type to be based on the changed body.
+    if (response_headers->ContentType() == nullptr ||
+        (body_text != local_reply_data.body_text_ && !has_custom_content_type)) {
+      response_headers->setReferenceContentType(content_type);
+    }
+  } else {
+    response_headers->removeContentLength();
+    response_headers->removeContentType();
+  }
+
+  return PreparedLocalReplyPtr(new PreparedLocalReply{
+      local_reply_data.is_grpc_, local_reply_data.is_head_request_, std::move(response_headers),
+      std::move(body_text), encode_functions.encode_headers_, encode_functions.encode_data_});
+}
+
+void Utility::encodeLocalReply(const bool& is_reset, PreparedLocalReplyPtr prepared_local_reply) {
+  ASSERT(prepared_local_reply != nullptr);
+  ResponseHeaderMapPtr response_headers{std::move(prepared_local_reply->response_headers_)};
+
+  if (prepared_local_reply->is_grpc_request_) {
+    // Trailers only response
+    prepared_local_reply->encode_headers_(std::move(response_headers), true);
+    return;
+  }
+
+  if (prepared_local_reply->is_head_request_) {
+    prepared_local_reply->encode_headers_(std::move(response_headers), true);
+    return;
+  }
+
+  const bool bodyless_response = prepared_local_reply->response_body_.empty();
+  prepared_local_reply->encode_headers_(std::move(response_headers), bodyless_response);
+  // encode_headers() may have changed the referenced is_reset so we need to test it
+  if (!bodyless_response && !is_reset) {
+    Buffer::OwnedImpl buffer(prepared_local_reply->response_body_);
+    prepared_local_reply->encode_data_(buffer, true);
+  }
+}
+
 void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode_functions,
                              const LocalReplyData& local_reply_data) {
+  // encode_headers() may reset the stream, so the stream must not be reset before calling it.
+  ASSERT(!is_reset);
+  PreparedLocalReplyPtr prepared_local_reply =
+      prepareLocalReply(encode_functions, local_reply_data);
+
+  encodeLocalReply(is_reset, std::move(prepared_local_reply));
+}
+
+void Utility::sendLocalReplyOld(const bool& is_reset, const EncodeFunctions& encode_functions,
+                                const LocalReplyData& local_reply_data) {
   // encode_headers() may reset the stream, so the stream must not be reset before calling it.
   ASSERT(!is_reset);
 
