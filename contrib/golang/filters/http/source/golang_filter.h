@@ -64,6 +64,8 @@ private:
   uint64_t merged_config_id_{0};
 };
 
+using RoutePluginConfigPtr = std::shared_ptr<RoutePluginConfig>;
+
 /**
  * Route configuration for the filter.
  */
@@ -74,14 +76,10 @@ public:
                        Server::Configuration::ServerFactoryContext&);
   uint64_t getPluginConfigId(uint64_t parent_id, std::string plugin_name, std::string so_id) const;
 
-  ~FilterConfigPerRoute() override {
-    for (const auto& it : plugins_config_) {
-      delete it.second;
-    }
-  }
+  ~FilterConfigPerRoute() override { plugins_config_.clear(); }
 
 private:
-  std::map<std::string, RoutePluginConfig*> plugins_config_;
+  std::map<std::string, RoutePluginConfigPtr> plugins_config_;
 };
 
 enum class DestroyReason {
@@ -104,7 +102,7 @@ class Filter : public Http::StreamFilter,
                public AccessLog::Instance {
 public:
   explicit Filter(Grpc::Context& context, FilterConfigSharedPtr config, uint64_t sid,
-                  Dso::DsoInstance* dynamic_lib)
+                  Dso::DsoInstancePtr dynamic_lib)
       : config_(config), dynamic_lib_(dynamic_lib), decoding_state_(*this), encoding_state_(*this),
         context_(context), stream_id_(sid) {
     UNREFERENCED_PARAMETER(context_);
@@ -193,7 +191,7 @@ private:
                               Grpc::Status::GrpcStatus grpc_status, absl::string_view details);
 
   const FilterConfigSharedPtr config_;
-  Dso::DsoInstance* dynamic_lib_;
+  Dso::DsoInstancePtr dynamic_lib_;
 
   Http::RequestOrResponseHeaderMap* headers_{nullptr};
   Http::HeaderMap* trailers_{nullptr};

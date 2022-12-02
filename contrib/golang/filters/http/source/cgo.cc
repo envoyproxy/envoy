@@ -8,6 +8,8 @@ namespace Golang {
 //
 // These functions may be invoked in another go thread,
 // which means may introduce race between go thread and envoy thread.
+// So we use the envoy's dispatcher in the filter to post it, and make it only executes in the envoy
+// thread.
 //
 
 absl::string_view copyGoString(void* str) {
@@ -124,6 +126,8 @@ void envoyGoFilterHttpGetStringValue(void* r, int id, void* value) {
 
 void envoyGoFilterHttpFinalize(void* r, int reason) {
   UNREFERENCED_PARAMETER(reason);
+  // req is used by go, so need to use raw memory and then it is safe to release at the gc finalize
+  // phase of the go object.
   auto req = reinterpret_cast<httpRequestInternal*>(r);
   delete req;
 }

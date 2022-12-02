@@ -281,6 +281,8 @@ GolangStatus Filter::doHeadersGo(ProcessorState& state, Http::RequestOrResponseH
 
   try {
     if (req_ == nullptr) {
+      // req is used by go, so need to use raw memory and then it is safe to release at the gc
+      // finalize phase of the go object.
       req_ = new httpRequestInternal(weak_from_this());
       req_->configId = getMergedConfigId(state);
       req_->plugin_name.data = config_->pluginName().data();
@@ -821,10 +823,10 @@ FilterConfigPerRoute::FilterConfigPerRoute(
   for (const auto& it : config.plugins_config()) {
     auto plugin_name = it.first;
     auto route_plugin = it.second;
-    auto conf = new RoutePluginConfig(route_plugin);
+    RoutePluginConfigPtr conf(new RoutePluginConfig(route_plugin));
     ENVOY_LOG(debug, "per route golang filter config, type_url: {}",
               route_plugin.config().type_url());
-    plugins_config_.insert({plugin_name, conf});
+    plugins_config_.insert({plugin_name, std::move(conf)});
   }
 }
 

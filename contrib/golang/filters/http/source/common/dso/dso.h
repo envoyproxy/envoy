@@ -2,6 +2,7 @@
 
 #include <dlfcn.h>
 
+#include <memory>
 #include <string>
 
 #include "source/common/common/logger.h"
@@ -43,16 +44,41 @@ private:
   void (*envoy_go_filter_on_http_destroy_)(httpRequest* p0, GoUint64 p1) = {nullptr};
 };
 
+using DsoInstancePtr = std::shared_ptr<DsoInstance>;
+
 class DsoInstanceManager {
 public:
+  /**
+   * Load the go plugin dynamic library.
+   * @param dso_id is unique ID for dynamic library.
+   * @param dso_name used to specify the absolute path of the dynamic library.
+   * @return false if pub are invalid. Otherwise, return true.
+   */
   static bool pub(std::string dso_id, std::string dso_name);
+
+  /**
+   * Unload the go plugin dynamic library.
+   * @param dso_id is unique ID for dynamic library.
+   * @return false if unpub are invalid. Otherwise, return true.
+   */
   static bool unpub(std::string dso_id);
-  static DsoInstance* getDsoInstanceByID(std::string dso_id);
+
+  /**
+   * Get the go plugin dynamic library.
+   * @param dso_id is unique ID for dynamic library.
+   * @return nullptr if get failed. Otherwise, return the DSO instance.
+   */
+  static DsoInstancePtr getDsoInstanceByID(std::string dso_id);
+
+  /**
+   * Get the full amount of dynamic library information.
+   * @return all so ids separated by commas.
+   */
   static std::string show();
 
 private:
   static absl::Mutex mutex_;
-  static std::map<std::string, DsoInstance*> dso_map_;
+  static std::map<std::string, DsoInstancePtr> dso_map_;
 };
 
 } // namespace Dso

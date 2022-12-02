@@ -20,9 +20,8 @@ std::string genSoPath(std::string name) {
 
 TEST(DsoInstanceTest, SimpleAPI) {
   auto path = genSoPath("simple.so");
-  DsoInstance* dso = new DsoInstance(path);
+  DsoInstancePtr dso(new DsoInstance(path));
   EXPECT_EQ(dso->envoyGoFilterNewHttpPluginConfig(0, 0), 100);
-  delete dso;
 }
 
 TEST(DsoInstanceManagerTest, Pub) {
