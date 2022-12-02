@@ -79,7 +79,6 @@ IoUringSocketHandleImpl::readv(uint64_t max_length, Buffer::RawSlice* slices, ui
   }
 
   if (bytes_to_read_ == 0 || read_req_ == nullptr) {
-    addReadRequest();
     return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
                                IoSocketError::deleteIoError)};
   }
