@@ -172,6 +172,20 @@ message Config {
 
 message RouterPlugin {
   // The extension_plugin_options field is used to provide extension options for plugin.
+  // Example
+  //
+  // .. code-block:: yaml
+  //
+  //   typed_per_filter_config:
+  //     envoy.filters.http.golang:
+  //       "@type": type.googleapis.com/envoy.extensions.filters.http.golang.v3alpha.ConfigsPerRoute
+  //       plugins_config:
+  //         plugin1:
+  //          extension_plugin_options:
+  //            disabled: true
+  //          config:
+  //            "@type": type.googleapis.com/golang.http.plugin1
+  //            xxx: xxx
   google.protobuf.Struct extension_plugin_options = 1;
 
   // The config field is used to setting plugin config.
