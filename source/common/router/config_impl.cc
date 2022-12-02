@@ -891,12 +891,13 @@ RouteEntryImplBase::getResponseHeaderParsers(bool specificity_ascend) const {
                           specificity_ascend);
 }
 
-std::unique_ptr<const RuntimeData>
+std::unique_ptr<const RouteEntryImplBase::RuntimeData>
 RouteEntryImplBase::loadRuntimeData(const envoy::config::route::v3::RouteMatch& route_match) {
   if (route_match.has_runtime_fraction()) {
-    return std::make_unique<const RuntimeData>(
-        {.fractional_runtime_default_ = route_match.runtime_fraction().default_value(),
-         .fractional_runtime_key_ = route_match.runtime_fraction().runtime_key()});
+    auto runtime_data = std::make_unique<RouteEntryImplBase::RuntimeData>();
+    runtime_data->fractional_runtime_default_ = route_match.runtime_fraction().default_value();
+    runtime_data->fractional_runtime_key_ = route_match.runtime_fraction().runtime_key();
+    return runtime_data;
   }
   return nullptr;
 }
