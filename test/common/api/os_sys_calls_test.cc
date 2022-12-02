@@ -1,3 +1,5 @@
+#include <fcntl.h>
+
 #include "source/common/api/os_sys_calls_impl.h"
 
 #include "test/test_common/environment.h"
