@@ -238,7 +238,12 @@ public:
   // Router::VirtualHost
   const CorsPolicy* corsPolicy() const override { return cors_policy_.get(); }
   Stats::StatName statName() const override { return stat_name_storage_.statName(); }
-  const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
+  const RateLimitPolicy& rateLimitPolicy() const override {
+    if (rate_limit_policy_ != nullptr) {
+      return *rate_limit_policy_;
+    }
+    return DefaultRateLimitPolicy::get();
+  }
   const Config& routeConfig() const override;
   const RouteSpecificFilterConfig* mostSpecificPerFilterConfig(const std::string&) const override;
   bool includeAttemptCountInRequest() const override { return include_attempt_count_in_request_; }
@@ -311,7 +316,7 @@ private:
   std::vector<RouteEntryImplBaseConstSharedPtr> routes_;
   std::vector<VirtualClusterEntry> virtual_clusters_;
   SslRequirements ssl_requirements_;
-  const RateLimitPolicyImpl rate_limit_policy_;
+  std::unique_ptr<const RateLimitPolicyImpl> rate_limit_policy_;
   std::vector<ShadowPolicyPtr> shadow_policies_;
   std::unique_ptr<const CorsPolicyImpl> cors_policy_;
   const ConfigImpl& global_route_config_; // See note in RouteEntryImplBase::clusterEntry() on why
@@ -324,7 +329,7 @@ private:
   const bool include_attempt_count_in_response_;
   std::unique_ptr<envoy::config::route::v3::RetryPolicy> retry_policy_;
   std::unique_ptr<envoy::config::route::v3::HedgePolicy> hedge_policy_;
-  const CatchAllVirtualCluster virtual_cluster_catch_all_;
+  std::unique_ptr<const CatchAllVirtualCluster> virtual_cluster_catch_all_;
   Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher_;
 };
 
@@ -601,7 +606,12 @@ public:
     return tls_context_match_criteria_.get();
   }
   Upstream::ResourcePriority priority() const override { return priority_; }
-  const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
+  const RateLimitPolicy& rateLimitPolicy() const override {
+    if (rate_limit_policy_ != nullptr) {
+      return *rate_limit_policy_;
+    }
+    return DefaultRateLimitPolicy::get();
+  }
   const RetryPolicy& retryPolicy() const override {
     if (retry_policy_ != nullptr) {
       return *retry_policy_;
@@ -1036,7 +1046,7 @@ private:
   std::unique_ptr<const HedgePolicyImpl> hedge_policy_;
   std::unique_ptr<const RetryPolicyImpl> retry_policy_;
   std::unique_ptr<const InternalRedirectPolicyImpl> internal_redirect_policy_;
-  const RateLimitPolicyImpl rate_limit_policy_;
+  std::unique_ptr<const RateLimitPolicyImpl> rate_limit_policy_;
   std::vector<ShadowPolicyPtr> shadow_policies_;
   const Upstream::ResourcePriority priority_;
   std::vector<Http::HeaderUtility::HeaderDataPtr> config_headers_;

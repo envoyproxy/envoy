@@ -106,6 +106,19 @@ enum class FilterHeadersStatus {
 };
 
 /**
+ * Return codes for encode on informative headers filter invocations.
+ */
+enum class Filter1xxHeadersStatus {
+  // Continue filter chain iteration.
+  Continue,
+  // Do not iterate for informative headers on any of the remaining filters in the chain.
+  //
+  // Returning FilterDataStatus::Continue from encodeData() or calling
+  // continueEncoding() MUST be called if continued filter iteration is desired.
+  StopIteration
+};
+
+/**
  * Return codes for encode/decode data filter invocations. The connection manager bases further
  * filter invocations on the return code of the previous filter.
  */
@@ -1013,10 +1026,10 @@ public:
    * This will only be invoked once per request.
    *
    * @param headers supplies the 1xx response headers to be encoded.
-   * @return FilterHeadersStatus determines how filter chain iteration proceeds.
+   * @return Filter1xxHeadersStatus determines how filter chain iteration proceeds.
    *
    */
-  virtual FilterHeadersStatus encode1xxHeaders(ResponseHeaderMap& headers) PURE;
+  virtual Filter1xxHeadersStatus encode1xxHeaders(ResponseHeaderMap& headers) PURE;
 
   /**
    * Called with headers to be encoded, optionally indicating end of stream.
