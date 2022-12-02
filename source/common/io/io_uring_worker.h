@@ -468,12 +468,18 @@ public:
 
 private:
   void onFileEvent();
+  void submit() {
+    if (!delay_submit_) {
+      io_uring_impl_.submit();
+    }
+  }
 
   IoUringImpl io_uring_impl_;
   Event::FileEventPtr file_event_{nullptr};
   Event::Dispatcher& dispatcher_;
 
   absl::flat_hash_map<os_fd_t, std::unique_ptr<IoUringSocket>> sockets_;
+  bool delay_submit_{false};
 };
 
 } // namespace Io
