@@ -162,14 +162,12 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::writev(const Buffer::RawSlice* 
 }
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::write(Buffer::Instance& buffer) {
-  // If buffer gets written and drained, the following writev will return bytes_already_wrote_
-  // directly.
-  if (bytes_already_wrote_ > 0) {
-    buffer.drain(static_cast<uint64_t>(bytes_already_wrote_));
-  }
-
   Buffer::RawSliceVector slices = buffer.getRawSlices();
-  return writev(slices.begin(), slices.size());
+  auto result = writev(slices.begin(), slices.size());
+  if (result.return_value_ > 0) {
+    buffer.drain(static_cast<uint64_t>(result.return_value_));
+  }
+  return result;
 }
 
 Api::IoCallUint64Result
