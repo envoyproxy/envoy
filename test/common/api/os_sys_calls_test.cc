@@ -8,8 +8,8 @@
 
 namespace Envoy {
 
-// Test happy path for `open`, `pwrite`, `fstat`, `close`, `stat` and `unlink`.
-TEST(OsSyscallsTest, OpenPwriteFstatCloseStatUnlink) {
+// Test happy path for `open`, `pwrite`, `pread`, `fstat`, `close`, `stat` and `unlink`.
+TEST(OsSyscallsTest, OpenPwritePreadFstatCloseStatUnlink) {
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
   std::string path{TestEnvironment::temporaryPath("envoy_test")};
   TestEnvironment::createPath(path);
@@ -20,11 +20,18 @@ TEST(OsSyscallsTest, OpenPwriteFstatCloseStatUnlink) {
   EXPECT_NE(open_result.return_value_, -1);
   EXPECT_EQ(open_result.errno_, 0);
   os_fd_t fd = open_result.return_value_;
-  // Test `write`
+  // Test `pwrite`
   Api::SysCallSizeResult write_result =
       os_syscalls.pwrite(fd, file_contents.begin(), file_contents.size(), 0);
   EXPECT_EQ(write_result.return_value_, file_contents.size());
   EXPECT_EQ(write_result.errno_, 0);
+  // Test `pread`
+  char read_buffer[5];
+  Api::SysCallSizeResult read_result = os_syscalls.pread(fd, read_buffer, sizeof(read_buffer), 0);
+  EXPECT_EQ(read_result.return_value_, sizeof(read_buffer));
+  EXPECT_EQ(read_result.errno_, 0);
+  absl::string_view read_buffer_view{read_buffer, sizeof(read_buffer)};
+  EXPECT_EQ(file_contents, read_buffer_view);
   // Test `fstat`
   struct stat fstat_value;
   Api::SysCallIntResult fstat_result = os_syscalls.fstat(fd, &fstat_value);
