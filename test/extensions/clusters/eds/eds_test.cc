@@ -2606,7 +2606,7 @@ TEST_F(EdsTest, MultiplexEdsWithUnsupportedApiTypeFallsbackToNonMultiplexedEds) 
                Cluster::InitializePhase::Secondary);
 }
 
-TEST_F(EdsTest, MultiplexEdsDisabledByDefault) {
+TEST_F(EdsTest, MultiplexEdsEnabledByDefault) {
   EXPECT_CALL(server_context_.cluster_manager_.multiplexed_subscription_factory_,
               subscriptionFromConfigSource(_, _, _, _, _, _));
   EXPECT_CALL(server_context_.cluster_manager_.subscription_factory_,
