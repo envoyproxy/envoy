@@ -21,8 +21,6 @@ jobs:
       image: envoyproxy/envoy-build-ubuntu:0a02a76af5951bf7f4c7029c0ea6d29d96c0f682
     steps:
     - uses: actions/checkout@v1
-    - name: Add safe directory
-      run: git config --global --add safe.directory /__w/envoy/envoy
     - id: check_context
       name: 'Check whether to run'
       run: |
