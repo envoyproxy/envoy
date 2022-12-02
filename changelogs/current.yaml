@@ -20,7 +20,7 @@ behavior_changes:
 - area: build
   change: |
     moved the strict_dns, original_dst, logical_dns, static, and eds clusters to extensions. If you use these clusters and override extensions_build_config.bzl you will now need to include it explicitly.
-- area: stats http ext_authz 
+- area: stats http ext_authz
   change: |
     Fixed ext_authz metric tag extraction so that :ref:`stat_prefix <envoy_v3_api_msg_extensions.filters.http.ext_authz.v3.ExtAuthz>`
     is properly extracted. This changes the Prometheus name from
