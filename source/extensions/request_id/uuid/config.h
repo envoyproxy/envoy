@@ -33,9 +33,11 @@ public:
                      const Envoy::Http::RequestHeaderMap& request_headers) override;
   absl::optional<absl::string_view>
   get(const Envoy::Http::RequestHeaderMap& request_headers) const override;
-  absl::optional<uint64_t> getInteger(const Envoy::Http::RequestHeaderMap& request_headers) const override;
+  absl::optional<uint64_t>
+  getInteger(const Envoy::Http::RequestHeaderMap& request_headers) const override;
   Tracing::Reason getTraceReason(const Envoy::Http::RequestHeaderMap& request_headers) override;
-  void setTraceReason(Envoy::Http::RequestHeaderMap& request_headers, Tracing::Reason status) override;
+  void setTraceReason(Envoy::Http::RequestHeaderMap& request_headers,
+                      Tracing::Reason status) override;
   bool useRequestIdForTraceSampling() const override { return use_request_id_for_trace_sampling_; }
 
 private:
