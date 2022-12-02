@@ -110,6 +110,11 @@ public:
       return *this;
     }
 
+    ServerSslOptions& setTrustRootOnly(bool trust_root_only) {
+      trust_root_only_ = trust_root_only;
+      return *this;
+    }
+
     bool allow_expired_certificate_{};
     envoy::config::core::v3::TypedExtensionConfig* custom_validator_config_;
     bool rsa_cert_{true};
@@ -129,6 +134,7 @@ public:
     std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
         san_matchers_{};
     bool client_with_intermediate_cert_{false};
+    bool trust_root_only_{false};
     absl::optional<uint32_t> max_verify_depth_{absl::nullopt};
   };
 
