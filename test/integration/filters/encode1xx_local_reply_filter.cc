@@ -13,11 +13,11 @@ namespace Envoy {
 // Test filter for local reply on the encode 1xx path.
 class Encode1xxLocalReplyFilter : public Http::PassThroughFilter {
 public:
-  Http::FilterHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap&) override {
+  Http::Filter1xxHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap&) override {
     encoder_callbacks_->sendLocalReply(Http::Code::InternalServerError,
                                        "Local Reply During encode1xxHeaders.", nullptr,
                                        absl::nullopt, "");
-    return Http::FilterHeadersStatus::Continue;
+    return Http::Filter1xxHeadersStatus::Continue;
   }
 };
 
