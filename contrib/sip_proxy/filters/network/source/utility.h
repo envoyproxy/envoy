@@ -211,7 +211,7 @@ public:
     if (it != cache_.cend()) {
       return OptRef<V>{it->second.value_};
     }
-    return absl::nullopt;
+    return {};
   }
 
   void erase(const K& key) {
@@ -270,7 +270,7 @@ public:
     if (it_type != caches_.cend()) {
       return OptRef<V>{it_type->second.at(key)};
     }
-    return absl::nullopt;
+    return {};
   }
 
   void erase(const T& type, const K& key) {
