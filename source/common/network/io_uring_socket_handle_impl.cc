@@ -104,13 +104,31 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::read(Buffer::Instance& buffer,
     return Api::ioCallUint64ResultNoError();
   }
 
-  Buffer::Reservation reservation = buffer.reserveForRead();
-  Api::IoCallUint64Result result = readv(std::min(reservation.length(), max_length),
-                                         reservation.slices(), reservation.numSlices());
-  uint64_t bytes_to_commit = result.ok() ? result.return_value_ : 0;
-  ASSERT(bytes_to_commit <= max_length);
-  reservation.commit(bytes_to_commit);
-  return result;
+  if (remote_closed_) {
+    return Api::ioCallUint64ResultNoError();
+  }
+
+  if (read_ret_ < 0) {
+    return {0, Api::IoErrorPtr(new IoSocketError(-read_ret_), IoSocketError::deleteIoError)};
+  }
+
+  if (read_ret_ == 0 || read_req_ == nullptr) {
+    return {0, Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
+                               IoSocketError::deleteIoError)};
+  }
+
+  uint64_t num_bytes_to_read = buffer.length();
+  buffer.move(read_buf_, max_length);
+  num_bytes_to_read = buffer.length() - num_bytes_to_read;
+  ASSERT(num_bytes_to_read <= max_length);
+  read_ret_ -= num_bytes_to_read;
+  if (read_ret_ == 0) {
+    read_ret_ = 0;
+    read_req_ = nullptr;
+    addReadRequest();
+  }
+
+  return {num_bytes_to_read, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError)};
 }
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::writev(const Buffer::RawSlice* slices,
