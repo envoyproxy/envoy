@@ -225,10 +225,8 @@ int DefaultCertValidator::doSynchronousVerifyCertChain(
 }
 
 bool DefaultCertValidator::verifyCertAndUpdateStatus(
-    X509* leaf_cert,
-    const Network::TransportSocketOptions* transport_socket_options,
-    Envoy::Ssl::ClientValidationStatus& detailed_status,
-    std::string* error_details,
+    X509* leaf_cert, const Network::TransportSocketOptions* transport_socket_options,
+    Envoy::Ssl::ClientValidationStatus& detailed_status, std::string* error_details,
     uint8_t* out_alert) {
   Envoy::Ssl::ClientValidationStatus validated =
       verifyCertificate(leaf_cert,
@@ -237,7 +235,10 @@ bool DefaultCertValidator::verifyCertAndUpdateStatus(
                             : std::vector<std::string>{},
                         subject_alt_name_matchers_, error_details, out_alert);
 
-  detailed_status = validated;
+  if (detailed_status == Envoy::Ssl::ClientValidationStatus::NotValidated ||
+      validated != Envoy::Ssl::ClientValidationStatus::NotValidated) {
+    detailed_status = validated;
+  }
 
   // If `trusted_ca` exists, it is already verified in the code above. Thus, we just need to make
   // sure the verification for other validation context configurations doesn't fail (i.e. either
@@ -361,8 +362,8 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
   std::string error_details;
   uint8_t tls_alert = SSL_AD_CERTIFICATE_UNKNOWN;
   Envoy::Ssl::ClientValidationStatus detailed_status;
-  const bool succeeded = verifyCertAndUpdateStatus(
-      leaf_cert, transport_socket_options.get(), detailed_status, &error_details, &tls_alert);
+  const bool succeeded = verifyCertAndUpdateStatus(leaf_cert, transport_socket_options.get(),
+                                                   detailed_status, &error_details, &tls_alert);
   return succeeded ? ValidationResults{ValidationResults::ValidationStatus::Successful,
                                        Envoy::Ssl::ClientValidationStatus::Validated, absl::nullopt,
                                        absl::nullopt}
