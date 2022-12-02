@@ -449,11 +449,6 @@ TEST_F(TcpConnPoolImplTest, IdleTimerCloseConnections) {
           // idle timer is disabled.
           EXPECT_FALSE(idle_timer->enabled());
         }));
-    // EXPECT_CALL(c1.callbacks_.callbacks_, onEvent(Network::ConnectionEvent::LocalClose))
-    //   .WillOnce(Invoke([&](Network::ConnectionEvent event) -> void {
-    //     EXPECT_EQ(Network::ConnectionEvent::LocalClose, event);
-    //     EXPECT_FALSE(idle_timer->enabled());
-    //   }));
     idle_timer->invokeCallback();
     dispatcher_.clearDeferredDeleteList();
   }

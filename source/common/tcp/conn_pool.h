@@ -220,6 +220,7 @@ public:
         std::make_unique<ActiveTcpClient::TcpConnectionData>(*tcp_client, *tcp_client->connection_);
     callbacks->onPoolReady(std::move(connection_data), tcp_client->real_host_description_);
 
+    // The tcp client is taken over. Stop the idle timer.
     if (!connection_data) {
       tcp_client->disableIdleTimer();
     }

@@ -51,10 +51,7 @@ ActiveTcpClient::~ActiveTcpClient() {
   }
 }
 
-void ActiveTcpClient::close() {
-  ENVOY_CONN_LOG(trace, "close", *this);
-  connection_->close(Network::ConnectionCloseType::NoFlush);
-}
+void ActiveTcpClient::close() { connection_->close(Network::ConnectionCloseType::NoFlush); }
 
 void ActiveTcpClient::clearCallbacks() {
   if (state() == Envoy::ConnectionPool::ActiveClient::State::Busy && parent_.hasPendingStreams()) {
@@ -82,8 +79,6 @@ void ActiveTcpClient::onEvent(Network::ConnectionEvent event) {
 
   if (event == Network::ConnectionEvent::LocalClose ||
       event == Network::ConnectionEvent::RemoteClose) {
-
-    ENVOY_CONN_LOG(trace, "on close event", *this);
     disableIdleTimer();
 
     // Do not pass the Connected event to any session which registered during onEvent above.
@@ -102,14 +97,12 @@ void ActiveTcpClient::onEvent(Network::ConnectionEvent event) {
 }
 
 void ActiveTcpClient::onIdleTimeout() {
-  ENVOY_CONN_LOG(debug, "idle timeout", *this);
   parent_.host()->cluster().trafficStats().upstream_cx_idle_timeout_.inc();
   close();
 }
 
 void ActiveTcpClient::disableIdleTimer() {
   if (idle_timer_ != nullptr) {
-    ENVOY_CONN_LOG(trace, "disable idle timer", *this);
     idle_timer_->disableTimer();
   }
 }
@@ -117,7 +110,6 @@ void ActiveTcpClient::disableIdleTimer() {
 void ActiveTcpClient::resetIdleTimer() {
   if (idle_timer_ != nullptr) {
     ASSERT(idle_timeout_.has_value());
-    ENVOY_CONN_LOG(trace, "enable idle timer", *this);
     idle_timer_->enableTimer(idle_timeout_.value());
   }
 }
