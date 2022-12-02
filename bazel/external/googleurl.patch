@@ -116,3 +116,30 @@ index f881c04..4e4f7df 100644
  // The annotation changed compiler output and increased binary size so disable
  // for official builds.
  // TODO(crbug.com/1320670): Remove when issue is resolved.
+
+# TODO(keith): Remove when https://quiche-review.googlesource.com/c/googleurl/+/11300/1 lands
+
+diff --git a/build_config/BUILD b/build_config/BUILD
+index 78ac01d..eeef238 100644
+--- a/build_config/BUILD
++++ b/build_config/BUILD
+@@ -5,11 +5,13 @@
+ config_setting(
+     name = "windows_x86_64",
+     values = {"cpu": "x64_windows"},
++    visibility = ["//visibility:public"],
+ )
+
+ bool_flag(
+     name = "system_icu",
+     build_setting_default = True,
++    visibility = ["//visibility:public"],
+ )
+
+ config_setting(
+@@ -17,4 +19,5 @@
+     flag_values = {
+         ":system_icu": "True",
+     },
++    visibility = ["//visibility:public"],
+ )

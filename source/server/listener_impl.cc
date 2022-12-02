@@ -318,8 +318,8 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)),
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
-      listener_tag_(parent_.factory_.nextListenerTag()), name_(name), added_via_api_(added_via_api),
-      workers_started_(workers_started), hash_(hash),
+      listener_tag_(parent_.factory_->nextListenerTag()), name_(name),
+      added_via_api_(added_via_api), workers_started_(workers_started), hash_(hash),
       tcp_backlog_size_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, tcp_backlog_size, ENVOY_TCP_BACKLOG_SIZE)),
       validation_visitor_(
@@ -336,7 +336,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       continue_on_listener_filters_timeout_(config.continue_on_listener_filters_timeout()),
       listener_factory_context_(std::make_shared<PerListenerFactoryContextImpl>(
           parent.server_, validation_visitor_, config, this, *this,
-          parent.factory_.createDrainManager(config.drain_type()))),
+          parent_.factory_->createDrainManager(config.drain_type()))),
       reuse_port_(getReusePortOrDefault(parent_.server_, config_, socket_type_)),
       cx_limit_runtime_key_("envoy.resource_limits.listener." + config_.name() +
                             ".connection_limit"),
@@ -702,11 +702,11 @@ void ListenerImpl::createListenerFilterFactories() {
   if (!config_.listener_filters().empty()) {
     switch (socket_type_) {
     case Network::Socket::Type::Datagram:
-      udp_listener_filter_factories_ = parent_.factory_.createUdpListenerFilterFactoryList(
+      udp_listener_filter_factories_ = parent_.factory_->createUdpListenerFilterFactoryList(
           config_.listener_filters(), *listener_factory_context_);
       break;
     case Network::Socket::Type::Stream:
-      listener_filter_factories_ = parent_.factory_.createListenerFilterFactoryList(
+      listener_filter_factories_ = parent_.factory_->createListenerFilterFactoryList(
           config_.listener_filters(), *listener_factory_context_);
       break;
     }
@@ -827,7 +827,7 @@ void ListenerImpl::buildOriginalDstListenerFilter() {
 
     Network::ListenerFilterFactoryCb callback = factory.createListenerFilterFactoryFromProto(
         Envoy::ProtobufWkt::Empty(), nullptr, *listener_factory_context_);
-    auto* cfg_provider_manager = parent_.factory_.getTcpListenerConfigProviderManager();
+    auto* cfg_provider_manager = parent_.factory_->getTcpListenerConfigProviderManager();
     auto filter_config_provider = cfg_provider_manager->createStaticFilterConfigProvider(
         callback, "envoy.filters.listener.original_dst");
     listener_filter_factories_.push_back(std::move(filter_config_provider));
@@ -847,7 +847,7 @@ void ListenerImpl::buildProxyProtocolListenerFilter() {
     Network::ListenerFilterFactoryCb callback = factory.createListenerFilterFactoryFromProto(
         envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol(), nullptr,
         *listener_factory_context_);
-    auto* cfg_provider_manager = parent_.factory_.getTcpListenerConfigProviderManager();
+    auto* cfg_provider_manager = parent_.factory_->getTcpListenerConfigProviderManager();
     auto filter_config_provider = cfg_provider_manager->createStaticFilterConfigProvider(
         callback, "envoy.filters.listener.proxy_protocol");
     listener_filter_factories_.push_back(std::move(filter_config_provider));

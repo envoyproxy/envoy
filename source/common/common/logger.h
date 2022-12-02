@@ -76,6 +76,7 @@ namespace Logger {
   FUNCTION(quic)                                                                                   \
   FUNCTION(quic_stream)                                                                            \
   FUNCTION(pool)                                                                                   \
+  FUNCTION(rate_limit_quota)                                                                       \
   FUNCTION(rbac)                                                                                   \
   FUNCTION(rds)                                                                                    \
   FUNCTION(redis)                                                                                  \
