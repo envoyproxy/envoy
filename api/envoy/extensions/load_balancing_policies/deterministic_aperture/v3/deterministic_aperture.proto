@@ -24,6 +24,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // the backends get divided as a fraction of their overlaps with each peer. The algorithm uses a
 // uniform random distribution to select a backend from the range of overlapping backends. This
 // along with P2C ensures uniform load distribution.
+// [#next-free-field: 7]
 message DeterministicApertureLbConfig {
   // Hash ring configuration for the internal ring for endpoints.
   // The hash function used to hash hosts onto the ketama ring.
