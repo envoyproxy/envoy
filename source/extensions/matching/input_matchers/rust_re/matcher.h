@@ -1,8 +1,10 @@
 #pragma once
 
 #include "envoy/matcher/matcher.h"
-#include "rust/cxx.h"
+
 #include "source/extensions/matching/input_matchers/rust_re/matcher.rs.h"
+
+#include "rust/cxx.h"
 
 namespace Envoy {
 namespace Extensions {

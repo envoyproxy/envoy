@@ -1,8 +1,8 @@
 // Copied from
 // https://cs.github.com/chromium/chromium/blob/42bd3d0802e90ca093450a2683ff2a104e10e48a/build/rust/std/remap_alloc.cc
 #include <stddef.h>
-#include <stdlib.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 extern "C" {
 
