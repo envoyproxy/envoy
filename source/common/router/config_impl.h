@@ -1300,6 +1300,30 @@ public:
   }
 };
 
+// Similar to RouteMatchAction, but accepts v3::RouteList instead of v3::Route.
+class RouteListMatchAction : public Matcher::ActionBase<envoy::config::route::v3::RouteList> {
+public:
+  explicit RouteListMatchAction(std::vector<RouteEntryImplBaseConstSharedPtr> routes)
+      : routes_(std::move(routes)) {}
+
+  const std::vector<RouteEntryImplBaseConstSharedPtr>& routes() const { return routes_; }
+
+private:
+  const std::vector<RouteEntryImplBaseConstSharedPtr> routes_;
+};
+
+// Registered factory for RouteListMatchAction.
+class RouteListMatchActionFactory : public Matcher::ActionFactory<RouteActionContext> {
+public:
+  Matcher::ActionFactoryCb
+  createActionFactoryCb(const Protobuf::Message& config, RouteActionContext& context,
+                        ProtobufMessage::ValidationVisitor& validation_visitor) override;
+  std::string name() const override { return "route_match_action"; }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<envoy::config::route::v3::RouteList>();
+  }
+};
+
 /**
  * Wraps the route configuration which matches an incoming request headers to a backend cluster.
  * This is split out mainly to help with unit testing.
