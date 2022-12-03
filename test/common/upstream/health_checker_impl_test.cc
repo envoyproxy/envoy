@@ -1665,7 +1665,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckSetsHealhtyDuringOutlierEje
           .time_since_epoch();
   // Last HC pass time is only updated when host transitions from unhealthy to healthy state.
   EXPECT_EQ(std::chrono::milliseconds(13000), last_hc_pass_time_ms);
-  // Active healthcheck succeded so Host's outlier check should be cleared.
+  // Active healthcheck succeeded so Host's outlier check should be cleared.
   EXPECT_FALSE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
       Host::HealthFlag::FAILED_OUTLIER_CHECK));
   // Host's health status should be Healthy.
