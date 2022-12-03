@@ -32,6 +32,8 @@ public:
   void insert(const std::string& key, std::unique_ptr<TokenType>&& token);
   TokenType* validateTokenAndReturn(const std::string& key, TokenType* const found_token);
 
+  uint64_t capacity() { return lru_cache_.maxSize(); }
+
   ~TokenCacheImpl() {
     // Remove all entries from the cache.
     lru_cache_.clear();
@@ -86,9 +88,15 @@ TokenType* TokenCacheImpl<TokenType>::validateTokenAndReturn(const std::string& 
                                                              TokenType* const found_token) {
   if constexpr (std::is_same<TokenType, JwtToken>::value) {
     ASSERT(found_token != nullptr);
-    // Verify the validness of the token by checking its expiration time field.
-    if (found_token->verifyTimeConstraint(DateUtil::nowToSeconds(time_source_)) ==
-        ::google::jwt_verify::Status::JwtExpired) {
+    // Verify the validness of the token by checking its expiration time field. Default clock skew
+    // is one minute and it could be configurable via config if it is needed in the future.
+    // Note: verifyTimeConstraint() interface is correct for the token consumer. However, as the
+    // token producer here, we should instead include the clock skew as the part of the `now` time
+    // up front to account for the clock skew on the consumer side where the token will be consumed.
+    // TODO(tyxia) Add test for token verification. It currently relies on the tests in jwt library.
+    if (found_token->verifyTimeConstraint(
+            DateUtil::nowToSeconds(time_source_) + ::google::jwt_verify::kClockSkewInSecond,
+            /*clock_skew=*/0) == ::google::jwt_verify::Status::JwtExpired) {
       // Remove the expired entry.
       lru_cache_.remove(key);
     } else {
