@@ -306,7 +306,7 @@ static void pass_headers(const char* method, envoy_headers headers, jobject j_co
   }
 
   env->DeleteLocalRef(jcls_JvmCallbackContext);
-  release_envoy_headers(headers);
+  // release_envoy_headers(headers);
 }
 
 // Platform callback implementation
@@ -329,11 +329,30 @@ static void* jvm_on_headers(const char* method, envoy_headers headers, bool end_
   // TODO: make this cast safer.
   jobject result = env->CallObjectMethod(j_context, jmid_onHeaders, (jlong)headers.length,
                                          end_stream ? JNI_TRUE : JNI_FALSE, j_stream_intel);
+  if (check_for_exception(env)) {
+    env->DeleteLocalRef(j_stream_intel);
+    env->DeleteLocalRef(jcls_JvmCallbackContext);
 
-  env->DeleteLocalRef(j_stream_intel);
-  env->DeleteLocalRef(jcls_JvmCallbackContext);
+    jclass jcls_object_array = env->FindClass("java/lang/Object");
+    jobjectArray result = env->NewObjectArray(2, jcls_object_array, NULL);
+    
+    jclass jcls_int = env->FindClass("java/lang/Integer");
+    jmethodID jmid_intInit = env->GetMethodID(jcls_int, "<init>", "(I)V");
+    jobject status = env->NewObject(jcls_int, jmid_intInit, 0);
+    env->SetObjectArrayElement(result, 0, status);
 
-  return result;
+    env->SetObjectArrayElement(result, 1, ToJavaArrayOfJObjects(env, headers));
+
+    env->DeleteLocalRef(jcls_object_array);
+    env->DeleteLocalRef(jcls_int);
+    
+    return result;
+  } else {
+    env->DeleteLocalRef(j_stream_intel);
+    env->DeleteLocalRef(jcls_JvmCallbackContext);
+
+    return result;
+  }
 }
 
 static void* jvm_on_response_headers(envoy_headers headers, bool end_stream,
@@ -713,6 +732,10 @@ static void* call_jvm_on_complete(envoy_stream_intel stream_intel,
   jlongArray j_final_stream_intel = native_final_stream_intel_to_array(env, final_stream_intel);
   jobject result =
       env->CallObjectMethod(j_context, jmid_onComplete, j_stream_intel, j_final_stream_intel);
+  if (env->ExceptionCheck() == JNI_TRUE) {
+    env->ExceptionDescribe();
+    env->ExceptionClear();
+  }
 
   env->DeleteLocalRef(j_stream_intel);
   env->DeleteLocalRef(j_final_stream_intel);
@@ -736,6 +759,10 @@ static void* call_jvm_on_error(envoy_error error, envoy_stream_intel stream_inte
 
   jobject result = env->CallObjectMethod(j_context, jmid_onError, error.error_code, j_error_message,
                                          error.attempt_count, j_stream_intel, j_final_stream_intel);
+  if (env->ExceptionCheck() == JNI_TRUE) {
+    env->ExceptionDescribe();
+    env->ExceptionClear();
+  }
 
   env->DeleteLocalRef(j_stream_intel);
   env->DeleteLocalRef(j_final_stream_intel);
@@ -768,6 +795,10 @@ static void* call_jvm_on_cancel(envoy_stream_intel stream_intel,
 
   jobject result =
       env->CallObjectMethod(j_context, jmid_onCancel, j_stream_intel, j_final_stream_intel);
+  if (env->ExceptionCheck() == JNI_TRUE) {
+    env->ExceptionDescribe();
+    env->ExceptionClear();
+  }
 
   env->DeleteLocalRef(j_stream_intel);
   env->DeleteLocalRef(j_final_stream_intel);

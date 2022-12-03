@@ -66,6 +66,17 @@ void jni_delete_const_global_ref(const void* context) {
   jni_delete_global_ref(const_cast<void*>(context));
 }
 
+bool check_for_exception(JNIEnv *env) {
+  if (env->ExceptionCheck() == JNI_TRUE) {
+    env->ExceptionDescribe();
+    env->ExceptionClear();
+    ENVOY_LOG_EVENT_TO_LOGGER(GET_MISC_LOGGER(), error, "jni_exception", "");
+    return true;
+  } else {
+    return false;
+  }
+}
+
 int unbox_integer(JNIEnv* env, jobject boxedInteger) {
   jclass jcls_Integer = env->FindClass("java/lang/Integer");
   jmethodID jmid_intValue = env->GetMethodID(jcls_Integer, "intValue", "()I");
@@ -276,6 +287,21 @@ envoy_map to_native_map(JNIEnv* env, jobjectArray entries) {
 
   envoy_map native_map = {length / 2, entry_array};
   return native_map;
+}
+
+jobjectArray ToJavaArrayOfJObjects(JNIEnv* env, envoy_map map) {
+  jclass jcls_byte_array = env->FindClass("java/lang/Object");
+  jobjectArray javaArray = env->NewObjectArray(2 * map.length, jcls_byte_array, nullptr);
+
+  for (envoy_map_size_t i = 0; i < map.length; i++) {
+    jbyteArray key = native_data_to_array(env, map.entries[i].key);
+    jbyteArray value = native_data_to_array(env, map.entries[i].value);
+
+    env->SetObjectArrayElement(javaArray, 2 * i, key);
+    env->SetObjectArrayElement(javaArray, 2 * i + 1, value);
+  }
+
+  return javaArray;
 }
 
 jobjectArray ToJavaArrayOfByteArray(JNIEnv* env, const std::vector<std::string>& v) {
