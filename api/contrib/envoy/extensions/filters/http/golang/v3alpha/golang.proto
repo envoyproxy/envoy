@@ -171,7 +171,6 @@ message Config {
 }
 
 message RouterPlugin {
-  // The extension_plugin_options field is used to provide extension options for plugin.
   // Example
   //
   // .. code-block:: yaml
@@ -181,15 +180,18 @@ message RouterPlugin {
   //       "@type": type.googleapis.com/envoy.extensions.filters.http.golang.v3alpha.ConfigsPerRoute
   //       plugins_config:
   //         plugin1:
-  //          extension_plugin_options:
-  //            disabled: true
-  //          config:
-  //            "@type": type.googleapis.com/golang.http.plugin1
-  //            xxx: xxx
-  google.protobuf.Struct extension_plugin_options = 1;
+  //          disabled: true
+  oneof override {
+    option (validate.required) = true;
 
-  // The config field is used to setting plugin config.
-  google.protobuf.Any config = 2;
+    // [#not-implemented-hide:]
+    // Disable the filter for this particular vhost or route.
+    // If disabled is specified in multiple per-filter-configs, the most specific one will be used.
+    bool disabled = 1 [(validate.rules).bool = {const: true}];
+
+    // The config field is used to setting per-route plugin config.
+    google.protobuf.Any config = 2;
+  }
 }
 
 message ConfigsPerRoute {
@@ -204,11 +206,7 @@ message ConfigsPerRoute {
   //       "@type": type.googleapis.com/envoy.extensions.filters.http.golang.v3alpha.ConfigsPerRoute
   //       plugins_config:
   //         plugin1:
-  //          extension_plugin_options:
-  //            disabled: true
-  //          config:
-  //            "@type": type.googleapis.com/golang.http.plugin1
-  //            xxx: xxx
+  //          disabled: true
   //         plugin2:
   //          config:
   //            "@type": type.googleapis.com/golang.http.plugin2
