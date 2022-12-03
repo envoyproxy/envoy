@@ -3,7 +3,6 @@ syntax = "proto3";
 package envoy.extensions.filters.http.golang.v3alpha;
 
 import "google/protobuf/any.proto";
-import "google/protobuf/struct.proto";
 
 import "xds/annotations/v3/status.proto";
 
