@@ -16,10 +16,12 @@
 #include "contrib/envoy/extensions/filters/network/generic_proxy/v3/generic_proxy.pb.h"
 #include "contrib/envoy/extensions/filters/network/generic_proxy/v3/generic_proxy.pb.validate.h"
 #include "contrib/envoy/extensions/filters/network/generic_proxy/v3/route.pb.h"
-#include "contrib/generic_proxy/filters/network/source/interface/codec.h"
 #include "contrib/generic_proxy/filters/network/source/interface/filter.h"
+#include "contrib/generic_proxy/filters/network/source/interface/proxy_config.h"
 #include "contrib/generic_proxy/filters/network/source/interface/route.h"
 #include "contrib/generic_proxy/filters/network/source/interface/stream.h"
+#include "contrib/generic_proxy/filters/network/source/rds.h"
+#include "contrib/generic_proxy/filters/network/source/rds_impl.h"
 #include "contrib/generic_proxy/filters/network/source/route.h"
 
 namespace Envoy {
@@ -39,22 +41,23 @@ struct NamedFilterFactoryCb {
   FilterFactoryCb callback_;
 };
 
-class FilterConfig : public FilterChainFactory {
+class FilterConfigImpl : public FilterConfig {
 public:
-  FilterConfig(const std::string& stat_prefix, CodecFactoryPtr codec, RouteMatcherPtr route_matcher,
-               std::vector<NamedFilterFactoryCb> factories, Server::Configuration::FactoryContext&)
+  FilterConfigImpl(const std::string& stat_prefix, CodecFactoryPtr codec,
+                   Rds::RouteConfigProviderSharedPtr route_config_provider,
+                   std::vector<NamedFilterFactoryCb> factories,
+                   Envoy::Server::Configuration::FactoryContext& context)
       : stat_prefix_(stat_prefix), codec_factory_(std::move(codec)),
-        route_matcher_(std::move(route_matcher)), factories_(std::move(factories)) {}
+        route_config_provider_(std::move(route_config_provider)), factories_(std::move(factories)),
+        drain_decision_(context.drainDecision()) {}
 
-  FilterConfig(const ProxyConfig& config, Server::Configuration::FactoryContext& context)
-      : FilterConfig(config.stat_prefix(), codecFactoryFromProto(config.codec_config(), context),
-                     routeMatcherFromProto(config.route_config(), context),
-                     filtersFactoryFromProto(config.filters(), config.stat_prefix(), context),
-                     context) {}
-
-  RouteEntryConstSharedPtr routeEntry(const Request& request) const {
-    return route_matcher_->routeEntry(request);
+  // FilterConfig
+  RouteEntryConstSharedPtr routeEntry(const Request& request) const override {
+    auto config = std::static_pointer_cast<const RouteMatcher>(route_config_provider_->config());
+    return config->routeEntry(request);
   }
+  const CodecFactory& codecFactory() const override { return *codec_factory_; }
+  const Network::DrainDecision& drainDecision() const override { return drain_decision_; }
 
   // FilterChainFactory
   void createFilterChain(FilterChainManager& manager) override {
@@ -62,19 +65,6 @@ public:
       manager.applyFilterFactoryCb({factory.config_name_}, factory.callback_);
     }
   }
-
-  const CodecFactory& codecFactory() { return *codec_factory_; }
-
-  static CodecFactoryPtr
-  codecFactoryFromProto(const envoy::config::core::v3::TypedExtensionConfig& codec_config,
-                        Server::Configuration::FactoryContext& context);
-
-  static RouteMatcherPtr routeMatcherFromProto(const RouteConfiguration& route_config,
-                                               Server::Configuration::FactoryContext& context);
-
-  static std::vector<NamedFilterFactoryCb> filtersFactoryFromProto(
-      const ProtobufWkt::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>& filters,
-      const std::string stats_prefix, Server::Configuration::FactoryContext& context);
 
 private:
   friend class ActiveStream;
@@ -84,11 +74,12 @@ private:
 
   CodecFactoryPtr codec_factory_;
 
-  RouteMatcherPtr route_matcher_;
+  Rds::RouteConfigProviderSharedPtr route_config_provider_;
 
   std::vector<NamedFilterFactoryCb> factories_;
+
+  const Network::DrainDecision& drain_decision_;
 };
-using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
 class ActiveStream : public FilterChainManager,
                      public LinkedObject<ActiveStream>,
@@ -193,6 +184,8 @@ public:
     encoder_filters_.emplace_back(std::move(filter));
   }
 
+  void initializeFilterChain(FilterChainFactory& factory);
+
   Envoy::Event::Dispatcher& dispatcher();
   const CodecFactory& downstreamCodec();
   void resetStream();
@@ -242,8 +235,8 @@ class Filter : public Envoy::Network::ReadFilter,
                public Envoy::Logger::Loggable<Envoy::Logger::Id::filter>,
                public RequestDecoderCallback {
 public:
-  Filter(FilterConfigSharedPtr config, Server::Configuration::FactoryContext& context)
-      : config_(std::move(config)), context_(context) {
+  Filter(FilterConfigSharedPtr config)
+      : config_(std::move(config)), drain_decision_(config_->drainDecision()) {
     decoder_ = config_->codecFactory().requestDecoder();
     decoder_->setDecoderCallback(*this);
     response_encoder_ = config_->codecFactory().responseEncoder();
@@ -282,8 +275,6 @@ public:
     return callbacks_->connection();
   }
 
-  Server::Configuration::FactoryContext& factoryContext() { return context_; }
-
   void newDownstreamRequest(RequestPtr request);
   void deferredStream(ActiveStream& stream);
 
@@ -295,22 +286,28 @@ public:
 
   void resetStreamsForUnexpectedError();
 
+  void mayBeDrainClose();
+
+protected:
+  // This will be called when drain decision is made and all active streams are handled.
+  // This is a virtual method so that it can be overridden by derived classes.
+  virtual void onDrainCloseAndNoActiveStreams();
+
+  Envoy::Network::ReadFilterCallbacks* callbacks_{nullptr};
+
 private:
   friend class ActiveStream;
 
   bool downstream_connection_closed_{};
 
-  Envoy::Network::ReadFilterCallbacks* callbacks_{nullptr};
-
   FilterConfigSharedPtr config_{};
+  const Network::DrainDecision& drain_decision_;
 
   RequestDecoderPtr decoder_;
   ResponseEncoderPtr response_encoder_;
   MessageCreatorPtr creator_;
 
   Buffer::OwnedImpl response_buffer_;
-
-  Server::Configuration::FactoryContext& context_;
 
   std::list<ActiveStreamPtr> active_streams_;
 };

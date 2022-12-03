@@ -243,7 +243,7 @@ void verifyImmediateMatch(const MatchTree<TestData>::MatchResult& result,
   EXPECT_EQ(nullptr, result.on_match_->matcher_);
   EXPECT_NE(result.on_match_->action_cb_, nullptr);
 
-  EXPECT_EQ(*static_cast<StringAction*>(result.on_match_->action_cb_().get()),
+  EXPECT_EQ(result.on_match_->action_cb_().get()->getTyped<StringAction>(),
             *stringValue(expected_value));
 }
 

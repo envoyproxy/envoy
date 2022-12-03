@@ -354,6 +354,11 @@ public:
   virtual void setFlushTimeout(std::chrono::milliseconds timeout) PURE;
 
   /**
+   * @return the account, if any, used by this stream.
+   */
+  virtual Buffer::BufferMemoryAccountSharedPtr account() const PURE;
+
+  /**
    * Sets the account for this stream, propagating it to all of its buffers.
    * @param the account to assign this stream.
    */

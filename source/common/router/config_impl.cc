@@ -512,7 +512,6 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
           buildRetryPolicy(vhost.retryPolicy(), route.route(), validator, factory_context)),
       internal_redirect_policy_(
           buildInternalRedirectPolicy(route.route(), validator, route.name())),
-      rate_limit_policy_(route.route().rate_limits(), validator),
       priority_(ConfigUtility::parsePriority(route.route().priority())),
       config_headers_(Http::HeaderUtility::buildHeaderDataVector(route.match().headers())),
       request_headers_parser_(HeaderParser::configure(route.request_headers_to_add(),
@@ -600,6 +599,11 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
   if (route.match().has_tls_context()) {
     tls_context_match_criteria_ =
         std::make_unique<TlsContextMatchCriteriaImpl>(route.match().tls_context());
+  }
+
+  if (!route.route().rate_limits().empty()) {
+    rate_limit_policy_ =
+        std::make_unique<RateLimitPolicyImpl>(route.route().rate_limits(), validator);
   }
 
   // Returns true if include_vh_rate_limits is explicitly set to true otherwise it defaults to false
@@ -960,6 +964,13 @@ absl::optional<std::string> RouteEntryImplBase::currentUrlPathAfterRewriteWithMa
   // TODO(perf): can we avoid the string copy for the common case?
   std::string path(headers.getPathValue());
   if (!rewrite.empty()) {
+    if (regex_rewrite_redirect_ != nullptr) {
+      // As the rewrite constant may contain the result of a regex rewrite for a redirect, we must
+      // replace the full path if this is the case. This is because the matched path does not need
+      // to correspond to the full path, e.g. in the case of prefix matches.
+      auto just_path(Http::PathUtil::removeQueryAndFragment(path));
+      return path.replace(0, just_path.size(), rewrite);
+    }
     ASSERT(case_sensitive_ ? absl::StartsWith(path, matched_path)
                            : absl::StartsWithIgnoreCase(path, matched_path));
     return path.replace(0, matched_path.size(), rewrite);
@@ -1116,25 +1127,25 @@ RouteEntryImplBase::parseOpaqueConfig(const envoy::config::route::v3::Route& rou
   return ret;
 }
 
-HedgePolicyImpl RouteEntryImplBase::buildHedgePolicy(
-    const absl::optional<envoy::config::route::v3::HedgePolicy>& vhost_hedge_policy,
+std::unique_ptr<HedgePolicyImpl> RouteEntryImplBase::buildHedgePolicy(
+    HedgePolicyConstOptRef vhost_hedge_policy,
     const envoy::config::route::v3::RouteAction& route_config) const {
   // Route specific policy wins, if available.
   if (route_config.has_hedge_policy()) {
-    return HedgePolicyImpl(route_config.hedge_policy());
+    return std::make_unique<HedgePolicyImpl>(route_config.hedge_policy());
   }
 
   // If not, we fall back to the virtual host policy if there is one.
-  if (vhost_hedge_policy) {
-    return HedgePolicyImpl(vhost_hedge_policy.value());
+  if (vhost_hedge_policy.has_value()) {
+    return std::make_unique<HedgePolicyImpl>(*vhost_hedge_policy);
   }
 
   // Otherwise, an empty policy will do.
-  return HedgePolicyImpl();
+  return nullptr;
 }
 
-RetryPolicyImpl RouteEntryImplBase::buildRetryPolicy(
-    const absl::optional<envoy::config::route::v3::RetryPolicy>& vhost_retry_policy,
+std::unique_ptr<RetryPolicyImpl> RouteEntryImplBase::buildRetryPolicy(
+    RetryPolicyConstOptRef vhost_retry_policy,
     const envoy::config::route::v3::RouteAction& route_config,
     ProtobufMessage::ValidationVisitor& validation_visitor,
     Server::Configuration::ServerFactoryContext& factory_context) const {
@@ -1142,24 +1153,26 @@ RetryPolicyImpl RouteEntryImplBase::buildRetryPolicy(
       factory_context.singletonManager());
   // Route specific policy wins, if available.
   if (route_config.has_retry_policy()) {
-    return RetryPolicyImpl(route_config.retry_policy(), validation_visitor, retry_factory_context);
+    return std::make_unique<RetryPolicyImpl>(route_config.retry_policy(), validation_visitor,
+                                             retry_factory_context);
   }
 
   // If not, we fallback to the virtual host policy if there is one.
-  if (vhost_retry_policy) {
-    return RetryPolicyImpl(vhost_retry_policy.value(), validation_visitor, retry_factory_context);
+  if (vhost_retry_policy.has_value()) {
+    return std::make_unique<RetryPolicyImpl>(*vhost_retry_policy, validation_visitor,
+                                             retry_factory_context);
   }
 
   // Otherwise, an empty policy will do.
-  return RetryPolicyImpl();
+  return nullptr;
 }
 
-InternalRedirectPolicyImpl RouteEntryImplBase::buildInternalRedirectPolicy(
+std::unique_ptr<InternalRedirectPolicyImpl> RouteEntryImplBase::buildInternalRedirectPolicy(
     const envoy::config::route::v3::RouteAction& route_config,
     ProtobufMessage::ValidationVisitor& validator, absl::string_view current_route_name) const {
   if (route_config.has_internal_redirect_policy()) {
-    return InternalRedirectPolicyImpl(route_config.internal_redirect_policy(), validator,
-                                      current_route_name);
+    return std::make_unique<InternalRedirectPolicyImpl>(route_config.internal_redirect_policy(),
+                                                        validator, current_route_name);
   }
   envoy::config::route::v3::InternalRedirectPolicy policy_config;
   switch (route_config.internal_redirect_action()) {
@@ -1168,12 +1181,12 @@ InternalRedirectPolicyImpl RouteEntryImplBase::buildInternalRedirectPolicy(
   case envoy::config::route::v3::RouteAction::PASS_THROUGH_INTERNAL_REDIRECT:
     FALLTHRU;
   default:
-    return InternalRedirectPolicyImpl();
+    return nullptr;
   }
   if (route_config.has_max_internal_redirects()) {
     *policy_config.mutable_max_internal_redirects() = route_config.max_internal_redirects();
   }
-  return InternalRedirectPolicyImpl{policy_config, validator, current_route_name};
+  return std::make_unique<InternalRedirectPolicyImpl>(policy_config, validator, current_route_name);
 }
 PathRewriterSharedPtr
 RouteEntryImplBase::buildPathRewriter(envoy::config::route::v3::Route route,
@@ -1657,7 +1670,6 @@ VirtualHostImpl::VirtualHostImpl(
       vcluster_scope_(Stats::Utility::scopeFromStatNames(
           scope, {stat_name_storage_.statName(),
                   factory_context.routerContext().virtualClusterStatNames().vcluster_})),
-      rate_limit_policy_(virtual_host.rate_limits(), validator),
       global_route_config_(global_route_config),
       request_headers_parser_(HeaderParser::configure(virtual_host.request_headers_to_add(),
                                                       virtual_host.request_headers_to_remove())),
@@ -1668,9 +1680,7 @@ VirtualHostImpl::VirtualHostImpl(
       retry_shadow_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           virtual_host, per_request_buffer_limit_bytes, std::numeric_limits<uint32_t>::max())),
       include_attempt_count_in_request_(virtual_host.include_request_attempt_count()),
-      include_attempt_count_in_response_(virtual_host.include_attempt_count_in_response()),
-      virtual_cluster_catch_all_(*vcluster_scope_,
-                                 factory_context.routerContext().virtualClusterStatNames()) {
+      include_attempt_count_in_response_(virtual_host.include_attempt_count_in_response()) {
   switch (virtual_host.require_tls()) {
     PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::config::route::v3::VirtualHost::NONE:
@@ -1686,10 +1696,17 @@ VirtualHostImpl::VirtualHostImpl(
 
   // Retry and Hedge policies must be set before routes, since they may use them.
   if (virtual_host.has_retry_policy()) {
-    retry_policy_ = virtual_host.retry_policy();
+    retry_policy_ = std::make_unique<envoy::config::route::v3::RetryPolicy>();
+    retry_policy_->CopyFrom(virtual_host.retry_policy());
   }
   if (virtual_host.has_hedge_policy()) {
-    hedge_policy_ = virtual_host.hedge_policy();
+    hedge_policy_ = std::make_unique<envoy::config::route::v3::HedgePolicy>();
+    hedge_policy_->CopyFrom(virtual_host.hedge_policy());
+  }
+
+  if (!virtual_host.rate_limits().empty()) {
+    rate_limit_policy_ =
+        std::make_unique<RateLimitPolicyImpl>(virtual_host.rate_limits(), validator);
   }
 
   shadow_policies_.reserve(virtual_host.request_mirror_policies().size());
@@ -1726,10 +1743,14 @@ VirtualHostImpl::VirtualHostImpl(
     }
   }
 
-  for (const auto& virtual_cluster : virtual_host.virtual_clusters()) {
-    virtual_clusters_.push_back(
-        VirtualClusterEntry(virtual_cluster, *vcluster_scope_,
-                            factory_context.routerContext().virtualClusterStatNames()));
+  if (!virtual_host.virtual_clusters().empty()) {
+    virtual_cluster_catch_all_ = std::make_unique<CatchAllVirtualCluster>(
+        *vcluster_scope_, factory_context.routerContext().virtualClusterStatNames());
+    for (const auto& virtual_cluster : virtual_host.virtual_clusters()) {
+      virtual_clusters_.push_back(
+          VirtualClusterEntry(virtual_cluster, *vcluster_scope_,
+                              factory_context.routerContext().virtualClusterStatNames()));
+    }
   }
 
   if (virtual_host.has_cors()) {
@@ -1870,19 +1891,29 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
     auto match = Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher_, data);
 
     if (match.result_) {
-      // The only possible action that can be used within the route matching context
-      // is the RouteMatchAction, so this must be true.
       const auto result = match.result_();
-      ASSERT(result->typeUrl() == RouteMatchAction::staticTypeUrl());
-      ASSERT(dynamic_cast<RouteMatchAction*>(result.get()));
-      const RouteMatchAction& route_action = static_cast<const RouteMatchAction&>(*result);
+      if (result->typeUrl() == RouteMatchAction::staticTypeUrl()) {
+        const RouteMatchAction& route_action = result->getTyped<RouteMatchAction>();
 
-      if (route_action.route()->matches(headers, stream_info, random_value)) {
-        return route_action.route();
+        if (route_action.route()->matches(headers, stream_info, random_value)) {
+          return route_action.route();
+        }
+
+        ENVOY_LOG(debug, "route was resolved but final route did not match incoming request");
+        return nullptr;
+      } else if (result->typeUrl() == RouteListMatchAction::staticTypeUrl()) {
+        const RouteListMatchAction& action = result->getTyped<RouteListMatchAction>();
+
+        for (const auto& route : action.routes()) {
+          if (route->matches(headers, stream_info, random_value)) {
+            return route;
+          }
+        }
+
+        ENVOY_LOG(debug, "route was resolved but final route list did not match incoming request");
+        return nullptr;
       }
-
-      ENVOY_LOG(debug, "route was resolved but final route did not match incoming request");
-      return nullptr;
+      PANIC("Action in router matcher should be Route or RouteList");
     }
 
     ENVOY_LOG(debug, "failed to match incoming request: {}", static_cast<int>(match.match_state_));
@@ -1999,7 +2030,7 @@ VirtualHostImpl::virtualClusterFromEntries(const Http::HeaderMap& headers) const
   }
 
   if (!virtual_clusters_.empty()) {
-    return &virtual_cluster_catch_all_;
+    return virtual_cluster_catch_all_.get();
   }
 
   return nullptr;
@@ -2146,6 +2177,23 @@ Matcher::ActionFactoryCb RouteMatchActionFactory::createActionFactoryCb(
   return [route]() { return std::make_unique<RouteMatchAction>(route); };
 }
 REGISTER_FACTORY(RouteMatchActionFactory, Matcher::ActionFactory<RouteActionContext>);
+
+Matcher::ActionFactoryCb RouteListMatchActionFactory::createActionFactoryCb(
+    const Protobuf::Message& config, RouteActionContext& context,
+    ProtobufMessage::ValidationVisitor& validation_visitor) {
+  const auto& route_config =
+      MessageUtil::downcastAndValidate<const envoy::config::route::v3::RouteList&>(
+          config, validation_visitor);
+
+  std::vector<RouteEntryImplBaseConstSharedPtr> routes;
+  for (const auto& route : route_config.routes()) {
+    routes.emplace_back(createAndValidateRoute(route, context.vhost, context.optional_http_filters,
+                                               context.factory_context, validation_visitor,
+                                               absl::nullopt));
+  }
+  return [routes]() { return std::make_unique<RouteListMatchAction>(routes); };
+}
+REGISTER_FACTORY(RouteListMatchActionFactory, Matcher::ActionFactory<RouteActionContext>);
 
 } // namespace Router
 } // namespace Envoy

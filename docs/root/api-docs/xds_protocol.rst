@@ -41,7 +41,7 @@ Protoc-Gen-Validate Annotations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The protobuf messages for the individual xDS resource types have annotations
-using `protoc-gen-validate <https://github.com/envoyproxy/protoc-gen-validate>`_
+using `protoc-gen-validate <https://github.com/bufbuild/protoc-gen-validate>`_
 (PGV), which indicate semantic constraints to be used to validate the contents
 of a resource when it is received by a client.
 

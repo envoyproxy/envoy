@@ -455,7 +455,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
                      status.message());
 
     if (status.code() == StatusCode::kNotFound &&
-        !config_.request_validation_options_.reject_unknown_method()) {
+        !per_route_config_->request_validation_options_.reject_unknown_method()) {
       ENVOY_STREAM_LOG(debug,
                        "Request is passed through without transcoding because it cannot be mapped "
                        "to a gRPC method.",
@@ -464,7 +464,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
     }
 
     if (status.code() == StatusCode::kInvalidArgument &&
-        !config_.request_validation_options_.reject_unknown_query_parameters()) {
+        !per_route_config_->request_validation_options_.reject_unknown_query_parameters()) {
       ENVOY_STREAM_LOG(debug,
                        "Request is passed through without transcoding because it contains unknown "
                        "query parameters.",
@@ -525,16 +525,15 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
   }
 
   if (end_stream && method_->request_type_is_http_body_) {
-    maybeSendHttpBodyRequestMessage();
+    maybeSendHttpBodyRequestMessage(nullptr);
   } else if (end_stream) {
     request_in_.finish();
 
+    Buffer::OwnedImpl data;
+    readToBuffer(*transcoder_->RequestOutput(), data);
     if (checkAndRejectIfRequestTranscoderFailed(RcDetails::get().GrpcTranscodeFailedEarly)) {
       return Http::FilterHeadersStatus::StopIteration;
     }
-
-    Buffer::OwnedImpl data;
-    readToBuffer(*transcoder_->RequestOutput(), data);
 
     if (data.length() > 0) {
       ENVOY_STREAM_LOG(debug, "adding initial data during decodeHeaders, transcoded data size={}",
@@ -561,7 +560,7 @@ Http::FilterDataStatus JsonTranscoderFilter::decodeData(Buffer::Instance& data, 
 
     // TODO(euroelessar): Upper bound message size for streaming case.
     if (end_stream || method_->descriptor_->client_streaming()) {
-      maybeSendHttpBodyRequestMessage();
+      maybeSendHttpBodyRequestMessage(&data);
     } else {
       // TODO(euroelessar): Avoid buffering if content length is already known.
       return Http::FilterDataStatus::StopIterationAndBuffer;
@@ -598,7 +597,7 @@ Http::FilterTrailersStatus JsonTranscoderFilter::decodeTrailers(Http::RequestTra
   }
 
   if (method_->request_type_is_http_body_) {
-    maybeSendHttpBodyRequestMessage();
+    maybeSendHttpBodyRequestMessage(nullptr);
   } else {
     request_in_.finish();
 
@@ -834,16 +833,15 @@ bool JsonTranscoderFilter::readToBuffer(Protobuf::io::ZeroCopyInputStream& strea
   const void* out;
   int size;
   while (stream.Next(&out, &size)) {
-    data.add(out, size);
-
     if (size == 0) {
       return true;
     }
+    data.add(out, size);
   }
   return false;
 }
 
-void JsonTranscoderFilter::maybeSendHttpBodyRequestMessage() {
+void JsonTranscoderFilter::maybeSendHttpBodyRequestMessage(Buffer::Instance* data) {
   if (first_request_sent_ && request_data_.length() == 0) {
     return;
   }
@@ -857,7 +855,11 @@ void JsonTranscoderFilter::maybeSendHttpBodyRequestMessage() {
 
   Envoy::Grpc::Encoder().prependFrameHeader(Envoy::Grpc::GRPC_FH_DEFAULT, message_payload);
 
-  decoder_callbacks_->addDecodedData(message_payload, true);
+  if (data) {
+    data->move(message_payload);
+  } else {
+    decoder_callbacks_->addDecodedData(message_payload, true);
+  }
 
   first_request_sent_ = true;
 }

@@ -136,7 +136,7 @@ public:
 
   std::vector<JwtLocationConstPtr> extract(const Http::RequestHeaderMap& headers) const override;
 
-  void sanitizePayloadHeaders(Http::HeaderMap& headers) const override;
+  void sanitizeHeaders(Http::HeaderMap& headers) const override;
 
 private:
   // add a header config
@@ -185,7 +185,7 @@ private:
   // The map of a cookie key to set of issuers specified the cookie.
   absl::btree_map<std::string, CookieLocationSpec> cookie_locations_;
 
-  std::vector<LowerCaseString> forward_payload_headers_;
+  std::vector<LowerCaseString> headers_to_sanitize_;
 };
 
 ExtractorImpl::ExtractorImpl(const JwtProvider& provider) { addProvider(provider); }
@@ -215,7 +215,11 @@ void ExtractorImpl::addProvider(const JwtProvider& provider) {
     addQueryParamConfig(provider.issuer(), JwtConstValues::get().AccessTokenParam);
   }
   if (!provider.forward_payload_header().empty()) {
-    forward_payload_headers_.emplace_back(provider.forward_payload_header());
+    headers_to_sanitize_.emplace_back(provider.forward_payload_header());
+  }
+
+  for (const auto& header_and_claim : provider.claim_to_headers()) {
+    headers_to_sanitize_.emplace_back(header_and_claim.header_name());
   }
 }
 
@@ -329,8 +333,8 @@ absl::string_view ExtractorImpl::extractJWT(absl::string_view value_str,
   return value_str.substr(starting, ending - starting);
 }
 
-void ExtractorImpl::sanitizePayloadHeaders(Http::HeaderMap& headers) const {
-  for (const auto& header : forward_payload_headers_) {
+void ExtractorImpl::sanitizeHeaders(Http::HeaderMap& headers) const {
+  for (const auto& header : headers_to_sanitize_) {
     headers.remove(header);
   }
 }

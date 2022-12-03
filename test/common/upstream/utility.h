@@ -89,12 +89,13 @@ inline HostSharedPtr makeTestHost(ClusterInfoConstSharedPtr cluster, const std::
 
 inline HostSharedPtr makeTestHost(ClusterInfoConstSharedPtr cluster, const std::string& url,
                                   TimeSource& time_source, uint32_t weight = 1,
-                                  uint32_t priority = 0) {
+                                  uint32_t priority = 0,
+                                  Host::HealthStatus status = Host::HealthStatus::UNKNOWN) {
   return std::make_shared<HostImpl>(
       cluster, "", Network::Utility::resolveUrl(url), nullptr, weight,
       envoy::config::core::v3::Locality(),
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), priority,
-      envoy::config::core::v3::UNKNOWN, time_source);
+      status, time_source);
 }
 
 inline HostSharedPtr makeTestHost(ClusterInfoConstSharedPtr cluster, const std::string& url,

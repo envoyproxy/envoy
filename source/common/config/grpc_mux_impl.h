@@ -170,7 +170,7 @@ private:
   void onDynamicContextUpdate(absl::string_view resource_type_url);
   // Must be invoked from the main or test thread.
   void loadConfigFromDelegate(const std::string& type_url,
-                              const std::vector<std::string>& resource_names);
+                              const absl::flat_hash_set<std::string>& resource_names);
   // Must be invoked from the main or test thread.
   void processDiscoveryResources(const std::vector<DecodedResourcePtr>& resources,
                                  ApiState& api_state, const std::string& type_url,

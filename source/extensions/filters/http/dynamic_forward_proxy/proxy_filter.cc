@@ -5,6 +5,8 @@
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
 
 #include "source/common/http/utility.h"
+#include "source/common/network/filter_state_proxy_info.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/upstream_address.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
 
@@ -61,6 +63,17 @@ void ProxyFilter::onDestroy() {
   circuit_breaker_.reset();
 }
 
+bool ProxyFilter::isProxying() {
+  if (!(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.skip_dns_lookup_for_proxied_requests"))) {
+    return false;
+  }
+  const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
+      decoder_callbacks_->streamInfo().filterState();
+  return filter_state && filter_state->hasData<Network::Http11ProxyInfoFilterState>(
+                             Network::Http11ProxyInfoFilterState::key());
+}
+
 Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   Router::RouteConstSharedPtr route = decoder_callbacks_->route();
   const Router::RouteEntry* route_entry;
@@ -81,6 +94,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   if (!cluster_type) {
     return Http::FilterHeadersStatus::Continue;
   }
+
   if (cluster_type->name() != "envoy.clusters.dynamic_forward_proxy") {
     ENVOY_STREAM_LOG(debug, "cluster_type->name(): {} ", *this->decoder_callbacks_,
                      cluster_type->name());
@@ -133,7 +147,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   //                     we can do better here, perhaps by checking the cache to see if anything
   //                     else is attached to it or something else?
   auto result = config_->cache().loadDnsCacheEntry(headers.Host()->value().getStringView(),
-                                                   default_port, *this);
+                                                   default_port, isProxying(), *this);
   cache_load_handle_ = std::move(result.handle_);
   if (cache_load_handle_ == nullptr) {
     circuit_breaker_.reset();
@@ -192,6 +206,11 @@ void ProxyFilter::addHostAddressToFilterState(
 }
 
 void ProxyFilter::onDnsResolutionFail() {
+  if (isProxying()) {
+    decoder_callbacks_->continueDecoding();
+    return;
+  }
+
   decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::DnsResolutionFailed);
   decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable,
                                      ResponseStrings::get().DnsResolutionFailure, nullptr,

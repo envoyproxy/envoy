@@ -3,8 +3,7 @@
 The Envoy header map implementation (`HeaderMapImpl`) has the following properties:
 * Headers are stored in a linked list (`HeaderList`) in the order they are added, with pseudo
   headers kept at the front of the list.
-* Once the number of headers is at least the runtime configured feature `envoy.http.headermap.lazy_map_min_size`,
-  the header map will also use a map (`HeaderLazyMap`), in addition to the linked list, for faster access to the headers.
+* Once there at at least 3 years, the header map will also use a map (`HeaderLazyMap`), in addition to the linked list, for faster access to the headers.
 * O(1) direct access is possible for common headers needed during data plane processing. This is
   provided by a table of pointers that reach directly into a linked list that is populated when
   headers are added or removed from the map. When O(1) headers are accessed by direct method

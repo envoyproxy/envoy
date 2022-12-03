@@ -80,7 +80,7 @@ public:
         Common::Redis::RedisCommandStats::createRedisCommandStats(stats_.symbolTable());
 
     client_ = ClientImpl::create(host_, dispatcher_, Common::Redis::EncoderPtr{encoder_}, *this,
-                                 *config_, redis_command_stats_, stats_);
+                                 *config_, redis_command_stats_, stats_, false);
     EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_cx_total_.value());
     EXPECT_EQ(1UL, host_->stats_.cx_total_.value());
     EXPECT_EQ(false, client_->active());
@@ -859,27 +859,21 @@ TEST_F(RedisClientImplTest, AskRedirection) {
     // The exact values of the hash slot and IP info are not important.
     response1->asString() = "ASK 1111 10.1.2.3:4321";
     // Simulate redirection failure.
-    EXPECT_CALL(callbacks1, onRedirection_(Ref(response1), "10.1.2.3:4321", true))
-        .WillOnce(Return(false));
+    EXPECT_CALL(callbacks1, onRedirection_(Ref(response1), "10.1.2.3:4321", true));
     EXPECT_CALL(*connect_or_op_timer_, enableTimer(_, _));
     EXPECT_CALL(host_->outlier_detector_,
                 putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response1));
 
-    EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_internal_redirect_failed_total_.value());
-
     Common::Redis::RespValuePtr response2(new Common::Redis::RespValue());
     response2->type(Common::Redis::RespType::Error);
     // The exact values of the hash slot and IP info are not important.
     response2->asString() = "ASK 2222 10.1.2.4:4321";
-    EXPECT_CALL(callbacks2, onRedirection_(Ref(response2), "10.1.2.4:4321", true))
-        .WillOnce(Return(true));
+    EXPECT_CALL(callbacks2, onRedirection_(Ref(response2), "10.1.2.4:4321", true));
     EXPECT_CALL(*connect_or_op_timer_, disableTimer());
     EXPECT_CALL(host_->outlier_detector_,
                 putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response2));
-
-    EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_internal_redirect_succeeded_total_.value());
   }));
   upstream_read_filter_->onData(fake_data, false);
 
@@ -922,27 +916,21 @@ TEST_F(RedisClientImplTest, MovedRedirection) {
     // The exact values of the hash slot and IP info are not important.
     response1->asString() = "MOVED 1111 10.1.2.3:4321";
     // Simulate redirection failure.
-    EXPECT_CALL(callbacks1, onRedirection_(Ref(response1), "10.1.2.3:4321", false))
-        .WillOnce(Return(false));
+    EXPECT_CALL(callbacks1, onRedirection_(Ref(response1), "10.1.2.3:4321", false));
     EXPECT_CALL(*connect_or_op_timer_, enableTimer(_, _));
     EXPECT_CALL(host_->outlier_detector_,
                 putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response1));
 
-    EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_internal_redirect_failed_total_.value());
-
     Common::Redis::RespValuePtr response2(new Common::Redis::RespValue());
     response2->type(Common::Redis::RespType::Error);
     // The exact values of the hash slot and IP info are not important.
     response2->asString() = "MOVED 2222 10.1.2.4:4321";
-    EXPECT_CALL(callbacks2, onRedirection_(Ref(response2), "10.1.2.4:4321", false))
-        .WillOnce(Return(true));
+    EXPECT_CALL(callbacks2, onRedirection_(Ref(response2), "10.1.2.4:4321", false));
     EXPECT_CALL(*connect_or_op_timer_, disableTimer());
     EXPECT_CALL(host_->outlier_detector_,
                 putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response2));
-
-    EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_internal_redirect_succeeded_total_.value());
   }));
   upstream_read_filter_->onData(fake_data, false);
 
@@ -1213,7 +1201,7 @@ TEST(RedisClientFactoryImplTest, Basic) {
   const std::string auth_username;
   const std::string auth_password;
   ClientPtr client = factory.create(host, dispatcher, config, redis_command_stats, stats_,
-                                    auth_username, auth_password);
+                                    auth_username, auth_password, false);
   client->close();
 }
 } // namespace Client

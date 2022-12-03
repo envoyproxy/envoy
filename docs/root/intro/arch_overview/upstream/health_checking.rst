@@ -25,6 +25,9 @@ unhealthy, successes required before marking a host healthy, etc.):
   it is considered a passing healthcheck. This allows the user to mark a Redis instance for
   maintenance by setting the specified key to any value and waiting for traffic to drain. See
   :ref:`redis_key <envoy_v3_api_msg_extensions.health_checkers.redis.v3.Redis>`.
+* **Thrift**: Envoy will send a Thrift request and expect a success response. The upstream host may
+  also respond with an exception to cause the health check to fail. See
+  :ref:`thrift <envoy_v3_api_msg_extensions.health_checkers.thrift.v3.Thrift>`.
 
 Health checks occur over the transport socket specified for the cluster. This implies that if a cluster is
 using a TLS-enabled transport socket, the health check will also occur over TLS. The

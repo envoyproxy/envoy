@@ -22,6 +22,7 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/macros.h"
 #include "source/common/common/utility.h"
+#include "source/common/config/metadata.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/network/application_protocol.h"
@@ -31,6 +32,7 @@
 #include "source/common/network/upstream_server_name.h"
 #include "source/common/network/upstream_socket_options_filter_state.h"
 #include "source/common/router/metadatamatchcriteria_impl.h"
+#include "source/common/stream_info/stream_id_provider_impl.h"
 
 namespace Envoy {
 namespace TcpProxy {
@@ -86,6 +88,12 @@ Config::SharedConfig::SharedConfig(
     const uint64_t connection_duration =
         DurationUtil::durationToMilliseconds(config.max_downstream_connection_duration());
     max_downstream_connection_duration_ = std::chrono::milliseconds(connection_duration);
+  }
+
+  if (config.has_access_log_flush_interval()) {
+    const uint64_t flush_interval =
+        DurationUtil::durationToMilliseconds(config.access_log_flush_interval());
+    access_log_flush_interval_ = std::chrono::milliseconds(flush_interval);
   }
 
   if (config.has_on_demand() && config.on_demand().has_odcds_config()) {
@@ -178,6 +186,10 @@ Filter::Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager
 }
 
 Filter::~Filter() {
+  // Disable access log flush timer if it is enabled.
+  disableAccessLogFlushTimer();
+
+  // Flush the final end stream access log entry.
   for (const auto& access_log : config_->accessLogs()) {
     access_log->log(nullptr, nullptr, nullptr, getStreamInfo());
   }
@@ -234,12 +246,12 @@ void Filter::readDisableUpstream(bool disable) {
   if (disable) {
     read_callbacks_->upstreamHost()
         ->cluster()
-        .stats()
+        .trafficStats()
         .upstream_flow_control_paused_reading_total_.inc();
   } else {
     read_callbacks_->upstreamHost()
         ->cluster()
-        .stats()
+        .trafficStats()
         .upstream_flow_control_resumed_reading_total_.inc();
   }
 }
@@ -377,7 +389,7 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
   // will never be released.
   if (!cluster->resourceManager(Upstream::ResourcePriority::Default).connections().canCreate()) {
     getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow);
-    cluster->stats().upstream_cx_overflow_.inc();
+    cluster->trafficStats().upstream_cx_overflow_.inc();
     onInitFailure(UpstreamFailureReason::ResourceLimitExceeded);
     return Network::FilterStatus::StopIteration;
   }
@@ -385,7 +397,7 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
   const uint32_t max_connect_attempts = config_->maxConnectAttempts();
   if (connect_attempts_ >= max_connect_attempts) {
     getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded);
-    cluster->stats().upstream_cx_connect_attempts_exceeded_.inc();
+    cluster->trafficStats().upstream_cx_connect_attempts_exceeded_.inc();
     onInitFailure(UpstreamFailureReason::ConnectFailed);
     return Network::FilterStatus::StopIteration;
   }
@@ -417,7 +429,7 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
 
   if (!maybeTunnel(*thread_local_cluster)) {
     // Either cluster is unknown or there are no healthy hosts. tcpConnPool() increments
-    // cluster->stats().upstream_cx_none_healthy in the latter case.
+    // cluster->trafficStats().upstream_cx_none_healthy in the latter case.
     getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoHealthyUpstream);
     onInitFailure(UpstreamFailureReason::NoHealthyUpstream);
   }
@@ -564,7 +576,13 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
     Server::Configuration::FactoryContext& context)
     : use_post_(config_message.use_post()),
       header_parser_(Envoy::Router::HeaderParser::configure(config_message.headers_to_add())),
-      propagate_response_headers_(config_message.propagate_response_headers()) {
+      propagate_response_headers_(config_message.propagate_response_headers()),
+      post_path_(config_message.post_path()) {
+  if (!post_path_.empty() && !use_post_) {
+    throw EnvoyException("Can't set a post path when POST method isn't used");
+  }
+  post_path_ = post_path_.empty() ? "/" : post_path_;
+
   envoy::config::core::v3::SubstitutionFormatString substitution_format_config;
   substitution_format_config.mutable_text_format_source()->set_inline_string(
       config_message.hostname());
@@ -623,10 +641,22 @@ Network::FilterStatus Filter::onNewConnection() {
     connection_duration_timer_->enableTimer(config_->maxDownstreamConnectionDuration().value());
   }
 
+  if (config_->accessLogFlushInterval().has_value()) {
+    access_log_flush_timer_ = read_callbacks_->connection().dispatcher().createTimer(
+        [this]() -> void { onAccessLogFlushInterval(); });
+    resetAccessLogFlushTimer();
+  }
+
+  // Set UUID for the connection. This is used for logging and tracing.
+  getStreamInfo().setStreamIdProvider(
+      std::make_shared<StreamInfo::StreamIdProviderImpl>(config_->randomGenerator().uuid()));
+
   ASSERT(upstream_ == nullptr);
   route_ = pickRoute();
   return establishUpstreamConnection();
 }
+
+bool Filter::startUpstreamSecureTransport() { return upstream_->startUpstreamSecureTransport(); }
 
 void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::LocalClose ||
@@ -750,6 +780,27 @@ void Filter::onMaxDownstreamConnectionDuration() {
   getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::DurationTimeout);
   config_->stats().max_downstream_connection_duration_.inc();
   read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+}
+
+void Filter::onAccessLogFlushInterval() {
+  for (const auto& access_log : config_->accessLogs()) {
+    access_log->log(nullptr, nullptr, nullptr, getStreamInfo());
+  }
+  resetAccessLogFlushTimer();
+}
+
+void Filter::resetAccessLogFlushTimer() {
+  if (access_log_flush_timer_ != nullptr) {
+    ASSERT(config_->accessLogFlushInterval().has_value());
+    access_log_flush_timer_->enableTimer(config_->accessLogFlushInterval().value());
+  }
+}
+
+void Filter::disableAccessLogFlushTimer() {
+  if (access_log_flush_timer_ != nullptr) {
+    access_log_flush_timer_->disableTimer();
+    access_log_flush_timer_.reset();
+  }
 }
 
 void Filter::resetIdleTimer() {

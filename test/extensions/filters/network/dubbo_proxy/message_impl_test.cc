@@ -31,20 +31,19 @@ TEST(ContextImplTest, ContextImplTest) {
 TEST(RpcInvocationImplAttachmentTest, RpcInvocationImplAttachmentTest) {
   auto map = std::make_unique<RpcInvocationImpl::Attachment::Map>();
 
-  map->toMutableUntypedMap()->emplace(std::make_unique<Hessian2::StringObject>("group"),
-                                      std::make_unique<Hessian2::StringObject>("fake_group"));
-  map->toMutableUntypedMap()->emplace(std::make_unique<Hessian2::StringObject>("fake_key"),
-                                      std::make_unique<Hessian2::StringObject>("fake_value"));
+  map->emplace(std::make_unique<Hessian2::StringObject>("group"),
+               std::make_unique<Hessian2::StringObject>("fake_group"));
+  map->emplace(std::make_unique<Hessian2::StringObject>("fake_key"),
+               std::make_unique<Hessian2::StringObject>("fake_value"));
 
-  map->toMutableUntypedMap()->emplace(std::make_unique<Hessian2::NullObject>(),
-                                      std::make_unique<Hessian2::LongObject>(0));
+  map->emplace(std::make_unique<Hessian2::NullObject>(), std::make_unique<Hessian2::LongObject>(0));
 
-  map->toMutableUntypedMap()->emplace(std::make_unique<Hessian2::StringObject>("map_key"),
-                                      std::make_unique<Hessian2::UntypedMapObject>());
+  map->emplace(std::make_unique<Hessian2::StringObject>("map_key"),
+               std::make_unique<Hessian2::UntypedMapObject>());
 
   RpcInvocationImpl::Attachment attachment(std::move(map), 23333);
 
-  EXPECT_EQ(4, attachment.attachment().toUntypedMap().value()->size());
+  EXPECT_EQ(4, attachment.attachment().toUntypedMap().value().get().size());
   // Only string type key/value pairs will be inserted to header map.
   EXPECT_EQ(2, attachment.headers().size());
 
@@ -59,17 +58,17 @@ TEST(RpcInvocationImplAttachmentTest, RpcInvocationImplAttachmentTest) {
   attachment.remove("fake_key");
   EXPECT_EQ(nullptr, attachment.lookup("fake_key"));
 
-  EXPECT_EQ(3, attachment.attachment().toUntypedMap().value()->size());
+  EXPECT_EQ(3, attachment.attachment().toUntypedMap().value().get().size());
   EXPECT_EQ(1, attachment.headers().size());
 
   // Test remove. Delete a key/value pair whose value type is map.
   attachment.remove("map_key");
-  EXPECT_EQ(2, attachment.attachment().toUntypedMap().value()->size());
+  EXPECT_EQ(2, attachment.attachment().toUntypedMap().value().get().size());
   EXPECT_EQ(1, attachment.headers().size());
 
   // Test insert.
   attachment.insert("test", "test_value");
-  EXPECT_EQ(3, attachment.attachment().toUntypedMap().value()->size());
+  EXPECT_EQ(3, attachment.attachment().toUntypedMap().value().get().size());
   EXPECT_EQ(2, attachment.headers().size());
 
   EXPECT_EQ("test_value", *attachment.lookup("test"));
@@ -102,8 +101,8 @@ TEST(RpcInvocationImplTest, RpcInvocationImplTest) {
   invo.setAttachmentLazyCallback([&set_attachment]() -> RpcInvocationImpl::AttachmentPtr {
     auto map = std::make_unique<RpcInvocationImpl::Attachment::Map>();
 
-    map->toMutableUntypedMap()->emplace(std::make_unique<Hessian2::StringObject>("group"),
-                                        std::make_unique<Hessian2::StringObject>("fake_group"));
+    map->emplace(std::make_unique<Hessian2::StringObject>("group"),
+                 std::make_unique<Hessian2::StringObject>("fake_group"));
 
     auto attach = std::make_unique<RpcInvocationImpl::Attachment>(std::move(map), 0);
 

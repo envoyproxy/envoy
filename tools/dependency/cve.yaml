@@ -1,4 +1,3 @@
-
 # We only look back a few years, since we shouldn't have any ancient deps.
 start_year: 2018
 

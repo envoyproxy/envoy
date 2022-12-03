@@ -9,6 +9,7 @@
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
+#include "absl/container/flat_hash_set.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -46,8 +47,8 @@ public:
   /**
    * Returns a list of xDS resources for the given source and names. The implementation is not
    * required to return all (or any) of the requested resources, but the resources it does return
-   * are required to be in the set of requested resources. An empty resource list will return all
-   * known resources from the given xDS source (i.e. the "wildcard").
+   * are required to be in the set of requested resources. An empty resource name set will return
+   * all known resources from the given xDS source (i.e. the "wildcard").
    *
    * This function is intended to only be called on xDS fetch startup, and allows the
    * implementation to return a set of resources to be loaded and used by the Envoy instance
@@ -55,11 +56,11 @@ public:
    *
    * @param source_id The xDS source for the requested resources.
    * @param resource_names The names of the requested resources.
-   * @return A set of xDS resources for the given source.
+   * @return A list of xDS resources for the given source.
    */
   virtual std::vector<envoy::service::discovery::v3::Resource>
   getResources(const XdsSourceId& source_id,
-               const std::vector<std::string>& resource_names) const PURE;
+               const absl::flat_hash_set<std::string>& resource_names) const PURE;
 
   /**
    * Invoked when SotW xDS configuration updates have been received from an xDS authority, have been

@@ -23,6 +23,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/test_time.h"
 
+#include "absl/strings/str_format.h"
 #include "absl/types/optional.h"
 
 #if defined(ENVOY_CONFIG_COVERAGE)
@@ -37,6 +38,14 @@
 #define DISABLE_UNDER_WINDOWS return
 #else
 #define DISABLE_UNDER_WINDOWS                                                                      \
+  do {                                                                                             \
+  } while (0)
+#endif
+
+#ifndef ENVOY_ADMIN_FUNCTIONALITY
+#define DISABLE_IF_ADMIN_DISABLED return
+#else
+#define DISABLE_IF_ADMIN_DISABLED                                                                  \
   do {                                                                                             \
   } while (0)
 #endif
@@ -88,6 +97,9 @@ public:
   void skipPortUsageValidation() { config_helper_.skipPortUsageValidation(); }
   // Make test more deterministic by using a fixed RNG value.
   void setDeterministicValue(uint64_t value = 0) { deterministic_value_ = value; }
+  // Get socket option for a specific listener's socket.
+  bool getSocketOption(const std::string& listener_name, int level, int optname, void* optval,
+                       socklen_t* optlen, int address_index = 0);
 
   Http::CodecType upstreamProtocol() const { return upstream_config_.upstream_protocol_; }
 
@@ -99,7 +111,8 @@ public:
   makeTcpConnection(uint32_t port,
                     const Network::ConnectionSocket::OptionsSharedPtr& options = nullptr,
                     Network::Address::InstanceConstSharedPtr source_address =
-                        Network::Address::InstanceConstSharedPtr());
+                        Network::Address::InstanceConstSharedPtr(),
+                    absl::string_view destination_address = "");
 
   // Test-wide port map.
   void registerPort(const std::string& key, uint32_t port);
@@ -505,6 +518,12 @@ protected:
 
   // If true, skip checking stats for missing tag-extraction rules.
   bool skip_tag_extraction_rule_check_{};
+
+  // By default, node metadata (node name, cluster name, locality) for the test server gets set to
+  // hard-coded values in the OptionsImpl ("node_name", "cluster_name", etc.). Set to true if your
+  // test specifies the node metadata in the Bootstrap configuration and that's what you want to use
+  // for node info in Envoy.
+  bool use_bootstrap_node_metadata_{false};
 
 private:
   // Configuration for the fake upstream.

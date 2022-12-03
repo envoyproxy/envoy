@@ -1,8 +1,10 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_fuzz_test",
     "envoy_cc_library",
     "envoy_cc_mock",
     "envoy_package",
+    "envoy_proto_library",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
@@ -196,6 +198,33 @@ envoy_extension_cc_test(
         ":test_common_lib",
         "//source/extensions/filters/http/jwt_authn:filter_config_lib",
         "//source/extensions/filters/http/jwt_authn:matchers_lib",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_proto_library(
+    name = "jwt_authn_fuzz_proto",
+    srcs = ["jwt_authn_fuzz.proto"],
+    deps = [
+        "//test/fuzz:common_proto",
+        "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "jwt_authn_fuzz_test",
+    srcs = ["jwt_authn_fuzz_test.cc"],
+    corpus = "jwt_authn_corpus",
+    deps = [
+        ":jwt_authn_fuzz_proto_cc_proto",
+        "//source/common/common:regex_lib",
+        "//source/common/router:string_accessor_lib",
+        "//source/extensions/filters/http/jwt_authn:filter_lib",
+        "//test/extensions/filters/http/common:mock_lib",
+        "//test/extensions/filters/http/common/fuzz:http_filter_fuzzer_lib",
+        "//test/fuzz:utility_lib",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",

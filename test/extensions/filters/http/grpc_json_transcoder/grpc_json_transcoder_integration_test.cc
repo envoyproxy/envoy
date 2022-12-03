@@ -26,8 +26,7 @@ constexpr char UnexpectedHeaderValue[] = "Unexpected header value";
 
 std::string ipAndDeferredProcessingParamsToString(
     const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>>& p) {
-  return fmt::format("{}_{}",
-                     std::get<0>(p.param) == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
+  return fmt::format("{}_{}", TestUtility::ipVersionToString(std::get<0>(p.param)),
                      std::get<1>(p.param) ? "WithDeferredProcessing" : "NoDeferredProcessing");
 }
 
@@ -200,13 +199,17 @@ protected:
       } else if (full_response) {
         EXPECT_EQ(response->body(), expected_response_body);
       } else {
-        EXPECT_TRUE(absl::StartsWith(response->body(), expected_response_body));
+        EXPECT_TRUE(absl::StartsWith(response->body(), expected_response_body))
+            << "Response mismatch. \nGot : " << response->body()
+            << "\nWant: " << expected_response_body;
       }
     }
 
     codec_client_->close();
-    ASSERT_TRUE(fake_upstream_connection_->close());
-    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+    if (fake_upstream_connection_) {
+      ASSERT_TRUE(fake_upstream_connection_->close());
+      ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+    }
   }
 
   // override configuration on per-route basis
@@ -296,6 +299,8 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, QueryParamsDecodedName) {
       },
       R"({"id":"20","theme":"Children"})");
 
+#ifndef ENVOY_ENABLE_UHV
+  // TODO(#23291) - UHV validate JSON-encoded gRPC query parameters
   // json_name = "search[decoded]", "search[decoded]" should work
   testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
@@ -308,6 +313,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, QueryParamsDecodedName) {
           {"content-type", "application/json"},
       },
       R"({"id":"20","theme":"Children"})");
+#endif
 
   // json_name = "search%5Bencoded%5D", "search[encode]" should fail.
   // It is tested in test case "DecodedQueryParameterWithEncodedJsonName"
@@ -825,6 +831,37 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryDelete) {
                                       {"content-length", "2"},
                                       {"grpc-status", "0"}},
       "{}");
+}
+
+TEST_P(GrpcJsonTranscoderIntegrationTest, WrongBindingType) {
+  HttpIntegrationTest::initialize();
+  // Http template is "/shelves/{shelf}/books/{book.id}" and field "book.id" is int64.
+  // But path is "/shelves/456/books/abc" and the {book.id} segment is a string.
+  // The request should be rejected with 400.
+
+  // The bug reported in https://github.com/envoyproxy/envoy/issues/22926 is:
+  // if the request body is not empty, the request is rejected as expected.
+  // Buf if the request body is empty, the request is not rejected, the book.id field is ignored.
+
+  // This test to verify the bug has been fixed. The request in both cases should be rejected.
+
+  // Request with a non-empty request body.
+  testTranscoding<bookstore::UpdateBookRequest, bookstore::Book>(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "PATCH"}, {":path", "/shelves/456/books/abc"}, {":authority", "host"}},
+      "{}", {}, {}, Status(),
+      Http::TestResponseHeaderMapImpl{{":status", "400"}, {"content-type", "text/plain"}},
+      "book.id: invalid value \"abc\" for type TYPE_INT64", false);
+
+  // The request with an empty request body.
+  // The request is rejected in decodeHeaders so upstream connection is not created.
+  // Here we need to pass "expect_connection_to_upstream=false".
+  testTranscoding<bookstore::UpdateBookRequest, bookstore::Book>(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "PATCH"}, {":path", "/shelves/456/books/abc"}, {":authority", "host"}},
+      "", {}, {}, Status(),
+      Http::TestResponseHeaderMapImpl{{":status", "400"}, {"content-type", "text/plain"}},
+      "book.id: invalid value \"abc\" for type TYPE_INT64", false, false, "", false);
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryPatch) {

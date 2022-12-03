@@ -4,7 +4,7 @@ static_resources:
       socket_address:
         address: "{{ ip_loopback_address }}"
         port_value: 0
-    enable_reuse_port: {{ enable_reuse_port }}
+    enable_reuse_port: "{{ enable_reuse_port }}"
     filter_chains:
     - filters:
       - name: http

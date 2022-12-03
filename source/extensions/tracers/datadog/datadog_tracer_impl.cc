@@ -30,6 +30,8 @@ Driver::Driver(const envoy::config::trace::v3::DatadogConfig& datadog_config,
   Config::Utility::checkCluster("envoy.tracers.datadog", datadog_config.collector_cluster(), cm_,
                                 /* allow_added_via_api */ true);
   cluster_ = datadog_config.collector_cluster();
+  hostname_ = !datadog_config.collector_hostname().empty() ? datadog_config.collector_hostname()
+                                                           : datadog_config.collector_cluster();
 
   // Default tracer options.
   tracer_options_.version = absl::StrCat("envoy ", Envoy::VersionInfo::version());
@@ -103,7 +105,7 @@ void TraceReporter::flushTraces() {
     Http::RequestMessagePtr message(new Http::RequestMessageImpl());
     message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
     message->headers().setReferencePath(encoder_->path());
-    message->headers().setReferenceHost(driver_.cluster());
+    message->headers().setReferenceHost(driver_.hostname());
     for (auto& h : encoder_->headers()) {
       message->headers().setReferenceKey(lower_case_headers_.at(h.first), h.second);
     }

@@ -234,8 +234,6 @@ void NewDeltaSubscriptionState::handleGoodResponse(
 
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.delta_xds_subscription_state_tracking_fix")) {
-    // The resources were successfully update internally, update the resource
-    // tracking state.
     const auto scoped_update = ttl_.scopedTtlUpdate();
     if (requested_resource_state_.contains(Wildcard)) {
       for (const auto& resource : message.resources()) {

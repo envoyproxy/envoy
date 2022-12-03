@@ -257,15 +257,15 @@ public:
 
 class FakeStreamCodecFactoryConfig : public CodecFactoryConfig {
 public:
-  CodecFactoryPtr createFactory(const Protobuf::Message& config,
-                                Envoy::Server::Configuration::FactoryContext& context) override;
+  // CodecFactoryConfig
+  CodecFactoryPtr
+  createCodecFactory(const Protobuf::Message& config,
+                     Envoy::Server::Configuration::FactoryContext& context) override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<ProtobufWkt::Struct>();
   }
-
-  std::set<std::string> configTypes() override { return {"envoy.generic_proxy.codec.fake.type"}; }
-
-  std::string name() const override { return "envoy.generic_proxy.codec.fake"; }
+  std::set<std::string> configTypes() override { return {"envoy.generic_proxy.codecs.fake.type"}; }
+  std::string name() const override { return "envoy.generic_proxy.codecs.fake"; }
 };
 
 } // namespace GenericProxy

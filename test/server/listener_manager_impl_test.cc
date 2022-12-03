@@ -872,24 +872,6 @@ TEST_P(ListenerManagerImplTest, RejectIpv4CompatOnIpv4Address) {
                             "ipv4_compat: 0.0.0.0:13333");
 }
 
-TEST_P(ListenerManagerImplTest, AcceptIpv4CompatOnIpv4Address) {
-  auto scoped_runtime_guard = std::make_unique<TestScopedRuntime>();
-  scoped_runtime_guard->mergeValues(
-      {{"envoy.reloadable_features.strict_check_on_ipv4_compat", "false"}});
-  const std::string yaml = R"EOF(
-    name: "foo"
-    address:
-      socket_address:
-        address: "0.0.0.0"
-        port_value: 13333
-        ipv4_compat: true
-    filter_chains:
-    - filters: []
-  )EOF";
-
-  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(yaml)));
-}
-
 TEST_P(ListenerManagerImplTest, RejectIpv4CompatOnNonIpv4MappedIpv6address) {
   const std::string yaml = R"EOF(
     name: "foo"
@@ -928,24 +910,6 @@ TEST_P(ListenerManagerImplTest, AcceptIpv4CompatOnNonCanonicalIpv6AnyAddress) {
     address:
       socket_address:
         address: "::0"
-        port_value: 13333
-        ipv4_compat: true
-    filter_chains:
-    - filters: []
-  )EOF";
-
-  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(yaml)));
-}
-
-TEST_P(ListenerManagerImplTest, AcceptIpv4CompatOnNonIpv4MappedIpv6address) {
-  auto scoped_runtime_guard = std::make_unique<TestScopedRuntime>();
-  scoped_runtime_guard->mergeValues(
-      {{"envoy.reloadable_features.strict_check_on_ipv4_compat", "false"}});
-  const std::string yaml = R"EOF(
-    name: "foo"
-    address:
-      socket_address:
-        address: "::1"
         port_value: 13333
         ipv4_compat: true
     filter_chains:
@@ -2071,6 +2035,412 @@ filter_chains:
 
   EXPECT_CALL(*listener_foo_update1, onDestroy());
   EXPECT_CALL(*listener_foo, onDestroy());
+}
+
+TEST_P(ListenerManagerImplTest, UpdateListenerWithDifferentSocketOptionsDeprecatedBehavior) {
+  const std::string listener_origin = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+enable_reuse_port: true
+socket_options:
+    - level: 1
+      name: 9
+      int_value: 1
+filter_chains:
+- filters: []
+  )EOF";
+
+  const std::string listener_updated = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+enable_reuse_port: true
+socket_options:
+    - level: 1
+      name: 9
+      int_value: 2
+filter_chains:
+- filters: []
+  )EOF";
+  testListenerUpdateWithSocketOptionsChangeDeprecatedBehavior(listener_origin, listener_updated);
+}
+
+TEST_P(ListenerManagerImplTest,
+       UpdateListenerWithDifferentSocketOptionsWithMultiAddressesDeprecatedBehavior) {
+  const std::string listener_origin = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 5678
+  socket_options:
+    socket_options:
+    - level: 1
+      name: 9
+      int_value: 2
+enable_reuse_port: true
+socket_options:
+    - level: 1
+      name: 9
+      int_value: 1
+filter_chains:
+- filters: []
+  )EOF";
+
+  const std::string listener_updated = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 5678
+  socket_options:
+    socket_options:
+    - level: 1
+      name: 9
+      int_value: 3
+enable_reuse_port: true
+socket_options:
+    - level: 1
+      name: 9
+      int_value: 1
+filter_chains:
+- filters: []
+  )EOF";
+  testListenerUpdateWithSocketOptionsChangeDeprecatedBehavior(listener_origin, listener_updated,
+                                                              true);
+}
+
+// The socket options update is only available when enable_reuse_port as true.
+// Linux is the only platform allowing the enable_reuse_port as true.
+#ifdef __linux__
+TEST_P(ListenerManagerImplTest, UpdateListenerWithDifferentSocketOptions) {
+  const std::string listener_origin = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+enable_reuse_port: true
+socket_options:
+    - level: 1
+      name: 9
+      int_value: 1
+filter_chains:
+- filters: []
+  )EOF";
+
+  const std::string listener_updated = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+enable_reuse_port: true
+socket_options:
+    - level: 1
+      name: 9
+      int_value: 2
+filter_chains:
+- filters: []
+  )EOF";
+  testListenerUpdateWithSocketOptionsChange(listener_origin, listener_updated);
+}
+#endif
+
+#ifdef __linux__
+TEST_P(ListenerManagerImplTest, UpdateListenerWithDifferentSocketOptionsWithMultiAddresses) {
+  const std::string listener_origin = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 5678
+  socket_options:
+    socket_options:
+    - level: 1
+      name: 9
+      int_value: 2
+enable_reuse_port: true
+socket_options:
+    - level: 1
+      name: 9
+      int_value: 1
+filter_chains:
+- filters: []
+  )EOF";
+
+  const std::string listener_updated = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 5678
+  socket_options:
+    socket_options:
+    - level: 1
+      name: 9
+      int_value: 3
+enable_reuse_port: true
+socket_options:
+    - level: 1
+      name: 9
+      int_value: 1
+filter_chains:
+- filters: []
+  )EOF";
+  testListenerUpdateWithSocketOptionsChange(listener_origin, listener_updated, true);
+}
+#endif
+
+// The socket options update is only available when enable_reuse_port as true.
+// Linux is the only platform allowing the enable_reuse_port as true.
+#ifdef __linux__
+TEST_P(ListenerManagerImplTest, UpdateListenerWithDifferentNumberOfSocketOptions) {
+  const std::string listener_origin = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+enable_reuse_port: true
+socket_options:
+    - level: 1
+      name: 9
+      int_value: 1
+filter_chains:
+- filters: []
+  )EOF";
+
+  const std::string listener_updated = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+enable_reuse_port: true
+filter_chains:
+- filters: []
+  )EOF";
+  testListenerUpdateWithSocketOptionsChange(listener_origin, listener_updated);
+}
+#endif
+
+// The socket options update is only available when enable_reuse_port as true.
+// Linux is the only platform allowing the enable_reuse_port as true.
+#ifdef __linux__
+TEST_P(ListenerManagerImplTest, UpdateListenerWithTransparentChange) {
+  const std::string listener_origin = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+enable_reuse_port: true
+filter_chains:
+- filters: []
+  )EOF";
+
+  const std::string listener_updated = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+enable_reuse_port: true
+transparent: true
+filter_chains:
+- filters: []
+  )EOF";
+  testListenerUpdateWithSocketOptionsChange(listener_origin, listener_updated);
+}
+#endif
+
+// The socket options update is only available when enable_reuse_port as true.
+// Linux is the only platform allowing the enable_reuse_port as true.
+#ifdef __linux__
+TEST_P(ListenerManagerImplTest, UpdateListenerWithFreeBindChange) {
+  const std::string listener_origin = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+enable_reuse_port: true
+filter_chains:
+- filters: []
+  )EOF";
+
+  const std::string listener_updated = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+enable_reuse_port: true
+freebind: true
+filter_chains:
+- filters: []
+  )EOF";
+  testListenerUpdateWithSocketOptionsChange(listener_origin, listener_updated);
+}
+#endif
+
+// The socket options update is only available when enable_reuse_port as true.
+// Linux is the only platform allowing the enable_reuse_port as true.
+#ifdef __linux__
+TEST_P(ListenerManagerImplTest, UpdateListenerWithTcpFastOpenQueueLengthChange) {
+  const std::string listener_origin = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+enable_reuse_port: true
+tcp_fast_open_queue_length: 10
+filter_chains:
+- filters: []
+  )EOF";
+
+  const std::string listener_updated = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+enable_reuse_port: true
+tcp_fast_open_queue_length: 20
+filter_chains:
+- filters: []
+  )EOF";
+  testListenerUpdateWithSocketOptionsChange(listener_origin, listener_updated);
+}
+#endif
+
+TEST_P(ListenerManagerImplTest, AddListenerWithSameAddressButDifferentSocketOptions) {
+  // Add and initialize foo listener.
+  const std::string listener_origin = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+socket_options:
+    - level: 1
+      name: 9
+      int_value: 1
+filter_chains:
+- filters: []
+  )EOF";
+
+  // Add new listener bar with same address as foo, but with different socket options
+  const std::string listener_updated = R"EOF(
+name: bar
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+socket_options:
+    - level: 1
+      name: 9
+      int_value: 2
+filter_chains:
+- filters: []
+  )EOF";
+
+  const std::string expected_error_message =
+      "error adding listener: 'bar' has duplicate address '127.0.0.1:1234' as existing listener";
+  testListenerUpdateWithSocketOptionsChangeRejected(listener_origin, listener_updated,
+                                                    expected_error_message);
+}
+
+// The socket options update is only available when enable_reuse_port as true.
+// Linux is the only platform allowing the enable_reuse_port as true.
+#ifdef __linux__
+TEST_P(ListenerManagerImplTest, UpdateListenerRejectReusePortUpdate) {
+  // Add and initialize foo listener and the default value of enable_reuse_port is true.
+  const std::string listener_origin = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+enable_reuse_port: true
+filter_chains:
+- filters: []
+  )EOF";
+
+  // update listener foo, with enable_reuse_port as false.
+  const std::string listener_updated = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+enable_reuse_port: false
+filter_chains:
+- filters: []
+  )EOF";
+
+  const std::string expected_error_message =
+      "Listener foo: reuse port cannot be changed during an update";
+  testListenerUpdateWithSocketOptionsChangeRejected(listener_origin, listener_updated,
+                                                    expected_error_message);
+}
+#endif
+
+// The deprecated behavior is the update of `enable_reuse_port` will be ignored and
+// listener update success.
+TEST_P(ListenerManagerImplTest, UpdateListenerReusePortUpdateDeprecatedBehavior) {
+  // Add and initialize foo listener and the default value of enable_reuse_port is true.
+  const std::string listener_origin = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+enable_reuse_port: true
+filter_chains:
+- filters: []
+  )EOF";
+
+  // update listener foo, with enable_reuse_port as false.
+  const std::string listener_updated = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+enable_reuse_port: false
+filter_chains:
+- filters: []
+  )EOF";
+
+  testListenerUpdateWithSocketOptionsChangeDeprecatedBehavior(listener_origin, listener_updated);
 }
 
 TEST_P(ListenerManagerImplTest, UpdateListenerWithCompatibleZeroPortAddresses) {
@@ -5757,6 +6127,163 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, LiteralSockoptListenerEnabled) {
       /* expected_sockopt_level */ 4,
       /* expected_sockopt_name */ 5,
       /* expected_value */ 6);
+  addOrUpdateListener(listener);
+  EXPECT_EQ(1U, manager_->listeners().size());
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest,
+       LiteralSockoptListenerEnabledWithMultiAddressesNoOverrideOpts) {
+  const envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
+    name: SockoptsListener
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1111 }
+    additional_addresses:
+    - address:
+        socket_address: { address: 127.0.0.1, port_value: 2222 }
+    enable_reuse_port: false
+    filter_chains:
+    - filters: []
+      name: foo
+    socket_options: [
+      # The socket goes through socket() and bind() but never listen(), so if we
+      # ever saw (7, 8, 9) being applied it would cause a EXPECT_CALL failure.
+      { level: 1, name: 2, int_value: 3, state: STATE_PREBIND },
+      { level: 4, name: 5, int_value: 6, state: STATE_BOUND },
+      { level: 7, name: 8, int_value: 9, state: STATE_LISTENING },
+    ]
+  )EOF");
+
+  // Second address.
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                           /* expected_num_options */ 3,
+                           ListenerComponentFactory::BindType::NoReusePort);
+  // First address.
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                           /* expected_num_options */ 3,
+                           ListenerComponentFactory::BindType::NoReusePort);
+
+  expectSetsockopt(
+      /* expected_sockopt_level */ 1,
+      /* expected_sockopt_name */ 2,
+      /* expected_value */ 3,
+      /* expected_num_calls */ 2);
+  expectSetsockopt(
+      /* expected_sockopt_level */ 4,
+      /* expected_sockopt_name */ 5,
+      /* expected_value */ 6,
+      /* expected_num_calls */ 2);
+
+  addOrUpdateListener(listener);
+  EXPECT_EQ(1U, manager_->listeners().size());
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest,
+       LiteralSockoptListenerEnabledWithMultiAddressesOverrideOpts) {
+  const envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
+    name: SockoptsListener
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1111 }
+    additional_addresses:
+    - address:
+        socket_address: { address: 127.0.0.1, port_value: 2222 }
+      socket_options:
+        socket_options: [
+          # The socket goes through socket() and bind() but never listen(), so if we
+          # ever saw (7, 8, 9) being applied it would cause a EXPECT_CALL failure.
+          { level: 11, name: 12, int_value: 13, state: STATE_PREBIND },
+          { level: 14, name: 15, int_value: 16, state: STATE_BOUND },
+          { level: 17, name: 18, int_value: 19, state: STATE_LISTENING },
+        ]
+    enable_reuse_port: false
+    filter_chains:
+    - filters: []
+      name: foo
+    socket_options: [
+      # The socket goes through socket() and bind() but never listen(), so if we
+      # ever saw (7, 8, 9) being applied it would cause a EXPECT_CALL failure.
+      { level: 1, name: 2, int_value: 3, state: STATE_PREBIND },
+      { level: 4, name: 5, int_value: 6, state: STATE_BOUND },
+      { level: 7, name: 8, int_value: 9, state: STATE_LISTENING },
+    ]
+  )EOF");
+
+  // Second address.
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                           /* expected_num_options */ 3,
+                           ListenerComponentFactory::BindType::NoReusePort);
+  // First address.
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                           /* expected_num_options */ 3,
+                           ListenerComponentFactory::BindType::NoReusePort);
+
+  // First address' prebind options.
+  expectSetsockopt(
+      /* expected_sockopt_level */ 1,
+      /* expected_sockopt_name */ 2,
+      /* expected_value */ 3);
+  // Second address' prebind options.
+  expectSetsockopt(
+      /* expected_sockopt_level */ 11,
+      /* expected_sockopt_name */ 12,
+      /* expected_value */ 13);
+  // First address' bind options.
+  expectSetsockopt(
+      /* expected_sockopt_level */ 4,
+      /* expected_sockopt_name */ 5,
+      /* expected_value */ 6);
+  // Second address' bind options.
+  expectSetsockopt(
+      /* expected_sockopt_level */ 14,
+      /* expected_sockopt_name */ 15,
+      /* expected_value */ 16);
+  addOrUpdateListener(listener);
+  EXPECT_EQ(1U, manager_->listeners().size());
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest,
+       LiteralSockoptListenerEnabledWithMultiAddressesEmptyOverrideOpts) {
+  const envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
+    name: SockoptsListener
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1111 }
+    additional_addresses:
+    - address:
+        socket_address: { address: 127.0.0.1, port_value: 2222 }
+      socket_options:
+        socket_options: [ ]
+    enable_reuse_port: false
+    filter_chains:
+    - filters: []
+      name: foo
+    socket_options: [
+      # The socket goes through socket() and bind() but never listen(), so if we
+      # ever saw (7, 8, 9) being applied it would cause a EXPECT_CALL failure.
+      { level: 1, name: 2, int_value: 3, state: STATE_PREBIND },
+      { level: 4, name: 5, int_value: 6, state: STATE_BOUND },
+      { level: 7, name: 8, int_value: 9, state: STATE_LISTENING },
+    ]
+  )EOF");
+
+  // Second address.
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                           /* expected_num_options */ 0,
+                           ListenerComponentFactory::BindType::NoReusePort);
+  // First address.
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                           /* expected_num_options */ 3,
+                           ListenerComponentFactory::BindType::NoReusePort);
+
+  // First address' prebind options.
+  expectSetsockopt(
+      /* expected_sockopt_level */ 1,
+      /* expected_sockopt_name */ 2,
+      /* expected_value */ 3);
+  // First address' bind options.
+  expectSetsockopt(
+      /* expected_sockopt_level */ 4,
+      /* expected_sockopt_name */ 5,
+      /* expected_value */ 6);
+
   addOrUpdateListener(listener);
   EXPECT_EQ(1U, manager_->listeners().size());
 }

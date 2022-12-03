@@ -79,4 +79,42 @@ void TestRootContext::onQueueReady(uint32_t) {
   }
 }
 
+class DupReplyContext : public Context {
+public:
+  explicit DupReplyContext(uint32_t id, RootContext* root) : Context(id, root) {}
+  FilterDataStatus onRequestBody(size_t body_buffer_length, bool end_of_stream) override;
+
+private:
+  EnvoyRootContext* root() { return static_cast<EnvoyRootContext*>(Context::root()); }
+};
+
+FilterDataStatus DupReplyContext::onRequestBody(size_t, bool) {
+  sendLocalResponse(200, "ok", "body", {});
+  sendLocalResponse(200, "not send", "body", {});
+  return FilterDataStatus::Continue;
+}
+
+class PanicReplyContext : public Context {
+public:
+  explicit PanicReplyContext(uint32_t id, RootContext* root) : Context(id, root) {}
+  FilterDataStatus onRequestBody(size_t body_buffer_length, bool end_of_stream) override;
+
+private:
+  EnvoyRootContext* root() { return static_cast<EnvoyRootContext*>(Context::root()); }
+};
+
+FilterDataStatus PanicReplyContext::onRequestBody(size_t, bool) {
+  sendLocalResponse(200, "not send", "body", {});
+  int* badptr = nullptr;
+  *badptr = 0;
+  return FilterDataStatus::Continue;
+}
+
+static RegisterContextFactory register_DupReplyContext(CONTEXT_FACTORY(DupReplyContext),
+                                                       ROOT_FACTORY(EnvoyRootContext),
+                                                       "send local reply twice");
+static RegisterContextFactory register_PanicReplyContext(CONTEXT_FACTORY(PanicReplyContext),
+                                                         ROOT_FACTORY(EnvoyRootContext),
+                                                         "panic after sending local reply");
+
 END_WASM_PLUGIN

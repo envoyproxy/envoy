@@ -22,6 +22,7 @@ envoy_cc_library(
         "//source/extensions/filters/network:well_known_names",
         "@envoy_api//envoy/extensions/filters/network/wasm/v3:pkg_cc_proto",
     ],
+    alwayslink = 1,
 )
 
 envoy_cc_extension(

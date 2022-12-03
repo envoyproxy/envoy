@@ -314,6 +314,11 @@ INSTANTIATE_TEST_SUITE_P(
     HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(ProxyingConnectIntegrationTest, ProxyConnectLegacy) {
+#ifdef ENVOY_ENABLE_UHV
+  // TODO(#23286) - add web socket support for H2 UHV
+  return;
+#endif
+
   config_helper_.addRuntimeOverride("envoy.reloadable_features.use_rfc_connect", "false");
 
   initialize();
