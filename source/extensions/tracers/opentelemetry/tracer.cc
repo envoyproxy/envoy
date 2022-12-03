@@ -132,6 +132,9 @@ void Tracer::flushSpans() {
   *resource->add_attributes() = key_value;
 
   for (const auto& pair : opentelemetry_config_.resource_attributes().values()) {
+    if (pair.key() == std::string{kServiceNameKey}) {
+      continue;
+    }
     *resource->add_attributes() = pair;
   }
 
