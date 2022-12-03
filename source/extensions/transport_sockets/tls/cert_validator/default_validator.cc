@@ -362,7 +362,8 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
   }
   std::string error_details;
   uint8_t tls_alert = SSL_AD_CERTIFICATE_UNKNOWN;
-  Envoy::Ssl::ClientValidationStatus detailed_status;
+  Envoy::Ssl::ClientValidationStatus detailed_status =
+      Envoy::Ssl::ClientValidationStatus::NotValidated;
   const bool succeeded = verifyCertAndUpdateStatus(leaf_cert, transport_socket_options.get(),
                                                    detailed_status, &error_details, &tls_alert);
   return succeeded ? ValidationResults{ValidationResults::ValidationStatus::Successful,
