@@ -211,7 +211,8 @@ int DefaultCertValidator::doSynchronousVerifyCertChain(
       return allow_untrusted_certificate_ ? 1 : ret;
     }
   }
-  Envoy::Ssl::ClientValidationStatus detailed_status;
+  Envoy::Ssl::ClientValidationStatus detailed_status =
+      Envoy::Ssl::ClientValidationStatus::NotValidated;
   bool success = verifyCertAndUpdateStatus(&leaf_cert, transport_socket_options, detailed_status,
                                            nullptr, nullptr);
   if (ssl_extended_info) {
