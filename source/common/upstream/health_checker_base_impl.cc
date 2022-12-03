@@ -298,7 +298,7 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess(bool degrade
       // bring it back to the pool after ejection period is over, If active health check succeeds,
       // we should treat this host as healthy.
       if (Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.prefer_actve_health_check_during_outlier_ejection_wait") &&
+              "envoy.reloadable_features.prefer_active_health_check_during_outlier_ejection_wait") &&
           host_->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
         host_->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
       }
