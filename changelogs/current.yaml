@@ -73,9 +73,6 @@ bug_fixes:
 - area: router
   change: |
     fixed a bug that doesn't handle of an update for a listener with IPv4-mapped address correctly, and that will lead to a memory leak.
-- area: listener
-  change: |
-    Add statistics for tracking current value for outbound_frames and outbound_control_frames.
 - area: transport_socket
     fixed a bug that incorrectly rewrote the path when using ``regex_rewrite`` for redirects matched on prefix.
 - area: oauth2
@@ -181,6 +178,9 @@ new_features:
 - area: listener
   change: |
     added ``continueFilterChain()`` and ``dispatcher()`` methods to the ``ListenerFilterCallback``. This allows listener filters to continue listener filter iteration after stopping iteration e.g. if the listener filter depends on an async process.
+- area: listener
+  change: |
+    add statistics for tracking current value for outbound_frames and outbound_control_frames.
 - area: thrift_proxy
   change: |
     added ``envoy.reloadable_features.thrift_allow_negative_field_ids`` to support negative field ids for legacy thrift service.
