@@ -1,5 +1,5 @@
-1.22.7 (Pending)
-================
+1.22.6 (November 30, 2022)
+==========================
 
 Incompatible Behavior Changes
 -----------------------------
@@ -13,9 +13,14 @@ Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
+* ci: assorted fixes.
+* dependencies: update curl, kafka, wasm to mitigate CVEs.
+* docker: update Docker images (``distroless`` -> ``4b22ca3c6``) to resolve CVE issues in container packages.
+
 Removed Config or Runtime
 -------------------------
 *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+
 
 New Features
 ------------
