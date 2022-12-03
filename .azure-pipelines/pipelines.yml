@@ -338,7 +338,7 @@ stages:
   - job: coverage
     displayName: "linux_x64"
     dependsOn: []
-    timeoutInMinutes: 120
+    timeoutInMinutes: 180
     pool: "x64-large"
     strategy:
       maxParallel: 2
