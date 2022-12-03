@@ -25,7 +25,7 @@ A simple example of configuring Golang HTTP filter that default `echo` go plugin
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.http.golang.v3alpha.Config
           library_id: echo-id
-          library_path: "contrib/golang/filters/http/source/go/libgolang.so"
+          library_path: "contrib/golang/filters/http/test/test_data/echo/filter.so"
           plugin_name: echo
 
 .. attention::
@@ -35,4 +35,5 @@ A simple example of configuring Golang HTTP filter that default `echo` go plugin
 Complete example
 ----------------
 
-A complete example using Docker is available in :repo:`/contrib/golang/filters/http/source/go` and run ``make build``.
+A complete example using Docker is available in :repo:`/contrib/golang/filters/http/test/test_data/echo` and run
+``bazel build //contrib/golang/filters/http/test/test_data/echo:filter.so``.
