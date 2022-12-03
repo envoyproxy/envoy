@@ -1392,7 +1392,7 @@ virtual_hosts:
       "cannot set both matcher and routes on virtual host");
 }
 
-// Validates using RouteListAction as the mapper action.
+// Validates using RouteList as the mapper action.
 TEST_F(RouteMatcherTest, TestRouteList) {
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -1412,7 +1412,7 @@ virtual_hosts:
             action:
               name: route
               typed_config:
-                "@type": type.googleapis.com/envoy.config.route.v3.RouteListAction
+                "@type": type.googleapis.com/envoy.config.route.v3.RouteList
                 routes:
                 - match:
                     prefix: /new_endpoint/foo/1

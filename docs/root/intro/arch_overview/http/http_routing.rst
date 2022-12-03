@@ -203,7 +203,7 @@ specify the route table. This is a more expressive matching engine than the orig
 for sublinear matching on arbitrary headers (unlike the original matching engine which could only
 do this for :authority in some cases).
 
-To use the generic matching tree, specify a matcher on a virtual host with a Route or RouteListAction
+To use the generic matching tree, specify a matcher on a virtual host with a Route or RouteList
 as the action:
 
 .. code-block:: yaml
@@ -248,7 +248,7 @@ as the action:
             action:
               name: route_list
               typed_config:
-                "@type": type.googleapis.com/envoy.config.route.v3.RouteListAction
+                "@type": type.googleapis.com/envoy.config.route.v3.RouteList
                 - match:
                     prefix: /
                     headers:

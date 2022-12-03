@@ -1290,8 +1290,8 @@ public:
   }
 };
 
-// Similar to RouteMatchAction, but accepts v3::RouteListAction instead of v3::Route.
-class RouteListMatchAction : public Matcher::ActionBase<envoy::config::route::v3::RouteListAction> {
+// Similar to RouteMatchAction, but accepts v3::RouteList instead of v3::Route.
+class RouteListMatchAction : public Matcher::ActionBase<envoy::config::route::v3::RouteList> {
 public:
   explicit RouteListMatchAction(std::vector<RouteEntryImplBaseConstSharedPtr> routes)
       : routes_(std::move(routes)) {}
@@ -1310,7 +1310,7 @@ public:
                         ProtobufMessage::ValidationVisitor& validation_visitor) override;
   std::string name() const override { return "route_match_action"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::config::route::v3::RouteListAction>();
+    return std::make_unique<envoy::config::route::v3::RouteList>();
   }
 };
 

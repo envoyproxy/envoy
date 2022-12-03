@@ -1903,7 +1903,7 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
         ENVOY_LOG(debug, "route was resolved but final route list did not match incoming request");
         return nullptr;
       }
-      PANIC("Action in router matcher should be Route or RouteListAction");
+      PANIC("Action in router matcher should be Route or RouteList");
     }
 
     ENVOY_LOG(debug, "failed to match incoming request: {}", static_cast<int>(match.match_state_));
@@ -2172,7 +2172,7 @@ Matcher::ActionFactoryCb RouteListMatchActionFactory::createActionFactoryCb(
     const Protobuf::Message& config, RouteActionContext& context,
     ProtobufMessage::ValidationVisitor& validation_visitor) {
   const auto& route_config =
-      MessageUtil::downcastAndValidate<const envoy::config::route::v3::RouteListAction&>(
+      MessageUtil::downcastAndValidate<const envoy::config::route::v3::RouteList&>(
           config, validation_visitor);
 
   std::vector<RouteEntryImplBaseConstSharedPtr> routes;
