@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-20.04
     timeout-minutes: 180
     container:
-      image: envoyproxy/envoy-build-ubuntu:0a02a76af5951bf7f4c7029c0ea6d29d96c0f682
+      image: envoyproxy/envoy-build-ubuntu:b0ff77ae3f25b0bf595f9b8bba46b489723ab446
       env:
         CC: /opt/llvm/bin/clang
         CXX: /opt/llvm/bin/clang++
