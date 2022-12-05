@@ -329,7 +329,9 @@ static void* jvm_on_headers(const char* method, const ManagedEnvoyHeaders& heade
   // TODO: make this cast safer.
   jobject result = env->CallObjectMethod(j_context, jmid_onHeaders, (jlong)headers.get().length,
                                          end_stream ? JNI_TRUE : JNI_FALSE, j_stream_intel);
-  if (check_exception(env)) {
+  // TODO(Augustyniak): Pass the name of the filter in here so that we can instrument the origin of the
+  // JNI exception better.
+  if (exception_check(env)) {
     env->DeleteLocalRef(j_stream_intel);
     env->DeleteLocalRef(jcls_JvmCallbackContext);
 
@@ -339,8 +341,11 @@ static void* jvm_on_headers(const char* method, const ManagedEnvoyHeaders& heade
     jclass jcls_int = env->FindClass("java/lang/Integer");
     jmethodID jmid_intInit = env->GetMethodID(jcls_int, "<init>", "(I)V");
     jobject status = env->NewObject(jcls_int, jmid_intInit, 0);
+    // Set status to "0" (FilterHeadersStatus::Continue). Signal that the intent 
+    // is to continue the iteration of the filter chain.
     env->SetObjectArrayElement(result, 0, status);
 
+    // Since the "on headers" call threw an exception set input headers as output headers.
     env->SetObjectArrayElement(result, 1, ToJavaArrayOfJObjects(env, headers));
 
     env->DeleteLocalRef(jcls_object_array);
@@ -515,6 +520,7 @@ static void* jvm_on_trailers(const char* method, envoy_headers trailers,
   jlongArray j_stream_intel = native_stream_intel_to_array(env, stream_intel);
   // Note: be careful of JVM types. Before we casted to jlong we were getting integer problems.
   // TODO: make this cast safer.
+  // TODO(Augustyniak): check for pending exceptions after returning from JNI call.
   jobject result =
       env->CallObjectMethod(j_context, jmid_onTrailers, (jlong)trailers.length, j_stream_intel);
 
@@ -735,10 +741,8 @@ static void* call_jvm_on_complete(envoy_stream_intel stream_intel,
   jlongArray j_final_stream_intel = native_final_stream_intel_to_array(env, final_stream_intel);
   jobject result =
       env->CallObjectMethod(j_context, jmid_onComplete, j_stream_intel, j_final_stream_intel);
-  if (env->ExceptionCheck() == JNI_TRUE) {
-    env->ExceptionDescribe();
-    env->ExceptionClear();
-  }
+
+  exception_check(env);
 
   env->DeleteLocalRef(j_stream_intel);
   env->DeleteLocalRef(j_final_stream_intel);
@@ -762,10 +766,7 @@ static void* call_jvm_on_error(envoy_error error, envoy_stream_intel stream_inte
 
   jobject result = env->CallObjectMethod(j_context, jmid_onError, error.error_code, j_error_message,
                                          error.attempt_count, j_stream_intel, j_final_stream_intel);
-  if (env->ExceptionCheck() == JNI_TRUE) {
-    env->ExceptionDescribe();
-    env->ExceptionClear();
-  }
+  exception_check(env);
 
   env->DeleteLocalRef(j_stream_intel);
   env->DeleteLocalRef(j_final_stream_intel);
@@ -798,10 +799,7 @@ static void* call_jvm_on_cancel(envoy_stream_intel stream_intel,
 
   jobject result =
       env->CallObjectMethod(j_context, jmid_onCancel, j_stream_intel, j_final_stream_intel);
-  if (env->ExceptionCheck() == JNI_TRUE) {
-    env->ExceptionDescribe();
-    env->ExceptionClear();
-  }
+  exception_check(env);
 
   env->DeleteLocalRef(j_stream_intel);
   env->DeleteLocalRef(j_final_stream_intel);

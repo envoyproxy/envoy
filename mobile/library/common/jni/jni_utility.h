@@ -51,7 +51,7 @@ void jni_delete_const_global_ref(const void* context);
  * 
  * @return Whether there was a pending JNI exception. 
  */
-bool check_exception(JNIEnv *env);
+bool exception_check(JNIEnv *env);
 
 int unbox_integer(JNIEnv* env, jobject boxedInteger);
 

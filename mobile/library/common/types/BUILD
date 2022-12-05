@@ -20,7 +20,7 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "managed_envoy_headers_lib",
+    name = "managed_types_lib",
     srcs = [
         "managed_envoy_headers.h",
     ],
