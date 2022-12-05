@@ -86,7 +86,7 @@ class ThrowingFilter: RequestFilter, ResponseFilter {
 }
 
 @RunWith(RobolectricTestRunner::class)
-class PerformHTTPRequestUsingProxy {
+class FilterThrowingExceptionTest {
   init {
     JniLibrary.loadTestLibrary()
   }
