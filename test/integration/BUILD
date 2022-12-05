@@ -721,6 +721,7 @@ envoy_cc_test_library(
         "//test/integration/filters:encode_headers_return_stop_all_filter_config_lib",
         "//test/integration/filters:modify_buffer_filter_config_lib",
         "//test/integration/filters:passthrough_filter_config_lib",
+        "//test/integration/filters:pause_filter_for_quic_lib",
         "//test/integration/filters:pause_filter_lib",
         "//test/integration/filters:wait_for_whole_request_and_response_config_lib",
         "//test/mocks/upstream:cluster_info_mocks",

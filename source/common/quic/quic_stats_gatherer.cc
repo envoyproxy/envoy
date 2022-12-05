@@ -15,22 +15,23 @@ void QuicStatsGatherer::OnPacketAcked(int acked_bytes,
 
 void QuicStatsGatherer::maybeDoDeferredLog() {
   logging_done_ = true;
-  for (const std::shared_ptr<StreamInfo::StreamInfo>& stream_info : stream_info_) {
-    if (!stream_info->deferredLoggingHeadersAndTrailers().has_value()) {
-      continue;
-    }
-    if (time_source_ != nullptr) {
-      stream_info->downstreamTiming().onLastDownstreamAckReceived(*time_source_);
-    }
-    auto request_headers =
-        stream_info->deferredLoggingHeadersAndTrailers()->request_header_map.get();
-    auto response_headers =
-        stream_info->deferredLoggingHeadersAndTrailers()->response_header_map.get();
-    auto response_trailers =
-        stream_info->deferredLoggingHeadersAndTrailers()->response_trailer_map.get();
-    for (const auto& log_handler : access_log_handlers_) {
-      log_handler->log(request_headers, response_headers, response_trailers, *stream_info);
-    }
+  if (stream_info_ == nullptr) {
+    return;
+  }
+  if (!stream_info_->deferredLoggingHeadersAndTrailers().has_value()) {
+    return;
+  }
+  if (time_source_ != nullptr) {
+    stream_info_->downstreamTiming().onLastDownstreamAckReceived(*time_source_);
+  }
+  auto request_headers =
+      stream_info_->deferredLoggingHeadersAndTrailers()->request_header_map.get();
+  auto response_headers =
+      stream_info_->deferredLoggingHeadersAndTrailers()->response_header_map.get();
+  auto response_trailers =
+      stream_info_->deferredLoggingHeadersAndTrailers()->response_trailer_map.get();
+  for (const auto& log_handler : access_log_handlers_) {
+    log_handler->log(request_headers, response_headers, response_trailers, *stream_info_);
   }
 }
 

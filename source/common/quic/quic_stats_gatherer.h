@@ -29,12 +29,10 @@ public:
   }
   // Log this stream using available stream info and access loggers.
   void maybeDoDeferredLog();
-  // Add a pointer to stream info that should be logged. There can be
-  // multiple in case of a recreated stream (e.g. internal redirect)
-  void addStreamInfo(std::shared_ptr<StreamInfo::StreamInfo> stream_info) {
-    if (stream_info != nullptr) {
-      stream_info_.push_back(stream_info);
-    }
+  // Add a pointer to stream info that should be logged. This can be overwritten
+  // in case of an internal redirect.
+  void setStreamInfo(std::shared_ptr<StreamInfo::StreamInfo> stream_info) {
+    stream_info_ = stream_info;
   }
   // Set list of pointers to access loggers.
   void setAccessLogHandlers(std::list<AccessLog::InstanceSharedPtr> handlers) {
@@ -44,7 +42,7 @@ public:
 private:
   uint64_t bytes_outstanding_ = 0;
   bool fin_sent_ = false;
-  std::list<std::shared_ptr<StreamInfo::StreamInfo>> stream_info_{};
+  std::shared_ptr<StreamInfo::StreamInfo> stream_info_ = nullptr;
   std::list<AccessLog::InstanceSharedPtr> access_log_handlers_{};
   Envoy::TimeSource* time_source_ = nullptr;
   bool logging_done_ = false;
