@@ -69,7 +69,6 @@ void jni_delete_const_global_ref(const void* context) {
 bool exception_check(JNIEnv* env) {
   if (env->ExceptionCheck() == JNI_TRUE) {
     jthrowable exception = env->ExceptionOccurred();
-    env->ExceptionDescribe();
     env->ExceptionClear();
 
     jclass jcls_throwable = env->FindClass("java/lang/Throwable");
