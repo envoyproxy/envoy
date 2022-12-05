@@ -1,4 +1,6 @@
-#include <fcntl.h>
+#ifdef WIN32
+#include <fcntl.h> // Needed for `O_CREAT` and `O_RDWR` on Win32.
+#endif
 
 #include "source/common/api/os_sys_calls_impl.h"
 
