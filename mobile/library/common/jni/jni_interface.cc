@@ -279,7 +279,8 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_recordHistogramValue(JNIEnv* en
 
 // JvmCallbackContext
 
-static void pass_headers(const char* method, const ManagedEnvoyHeaders& headers, jobject j_context) {
+static void pass_headers(const char* method, const Envoy::Types::ManagedEnvoyHeaders& headers,
+                         jobject j_context) {
   JNIEnv* env = get_env();
   jclass jcls_JvmCallbackContext = env->GetObjectClass(j_context);
   jmethodID jmid_passHeader = env->GetMethodID(jcls_JvmCallbackContext, method, "([B[BZ)V");
@@ -313,8 +314,8 @@ static void pass_headers(const char* method, const ManagedEnvoyHeaders& headers,
 // These methods call jvm methods which means the local references created will not be
 // released automatically. Manual bookkeeping is required for these methods.
 
-static void* jvm_on_headers(const char* method, const ManagedEnvoyHeaders& headers, bool end_stream,
-                            envoy_stream_intel stream_intel, void* context) {
+static void* jvm_on_headers(const char* method, const Envoy::Types::ManagedEnvoyHeaders& headers,
+                            bool end_stream, envoy_stream_intel stream_intel, void* context) {
   jni_log("[Envoy]", "jvm_on_headers");
   JNIEnv* env = get_env();
   jobject j_context = static_cast<jobject>(context);
@@ -329,19 +330,19 @@ static void* jvm_on_headers(const char* method, const ManagedEnvoyHeaders& heade
   // TODO: make this cast safer.
   jobject result = env->CallObjectMethod(j_context, jmid_onHeaders, (jlong)headers.get().length,
                                          end_stream ? JNI_TRUE : JNI_FALSE, j_stream_intel);
-  // TODO(Augustyniak): Pass the name of the filter in here so that we can instrument the origin of the
-  // JNI exception better.
+  // TODO(Augustyniak): Pass the name of the filter in here so that we can instrument the origin of
+  // the JNI exception better.
   if (exception_check(env)) {
     env->DeleteLocalRef(j_stream_intel);
     env->DeleteLocalRef(jcls_JvmCallbackContext);
 
     jclass jcls_object_array = env->FindClass("java/lang/Object");
     jobjectArray result = env->NewObjectArray(2, jcls_object_array, NULL);
-    
+
     jclass jcls_int = env->FindClass("java/lang/Integer");
     jmethodID jmid_intInit = env->GetMethodID(jcls_int, "<init>", "(I)V");
     jobject status = env->NewObject(jcls_int, jmid_intInit, 0);
-    // Set status to "0" (FilterHeadersStatus::Continue). Signal that the intent 
+    // Set status to "0" (FilterHeadersStatus::Continue). Signal that the intent
     // is to continue the iteration of the filter chain.
     env->SetObjectArrayElement(result, 0, status);
 
@@ -350,7 +351,7 @@ static void* jvm_on_headers(const char* method, const ManagedEnvoyHeaders& heade
 
     env->DeleteLocalRef(jcls_object_array);
     env->DeleteLocalRef(jcls_int);
-    
+
     return result;
   } else {
     env->DeleteLocalRef(j_stream_intel);
@@ -362,7 +363,7 @@ static void* jvm_on_headers(const char* method, const ManagedEnvoyHeaders& heade
 
 static void* jvm_on_response_headers(envoy_headers headers, bool end_stream,
                                      envoy_stream_intel stream_intel, void* context) {
-  const auto managed_headers = ManagedEnvoyHeaders(headers);                                      
+  const auto managed_headers = Envoy::Types::ManagedEnvoyHeaders(headers);
   return jvm_on_headers("onResponseHeaders", managed_headers, end_stream, stream_intel, context);
 }
 
@@ -370,7 +371,7 @@ static envoy_filter_headers_status
 jvm_http_filter_on_request_headers(envoy_headers input_headers, bool end_stream,
                                    envoy_stream_intel stream_intel, const void* context) {
   JNIEnv* env = get_env();
-  const auto headers = ManagedEnvoyHeaders(input_headers);
+  const auto headers = Envoy::Types::ManagedEnvoyHeaders(input_headers);
   jobjectArray result = static_cast<jobjectArray>(jvm_on_headers(
       "onRequestHeaders", headers, end_stream, stream_intel, const_cast<void*>(context)));
 
@@ -392,7 +393,7 @@ static envoy_filter_headers_status
 jvm_http_filter_on_response_headers(envoy_headers input_headers, bool end_stream,
                                     envoy_stream_intel stream_intel, const void* context) {
   JNIEnv* env = get_env();
-  const auto headers = ManagedEnvoyHeaders(input_headers);
+  const auto headers = Envoy::Types::ManagedEnvoyHeaders(input_headers);
   jobjectArray result = static_cast<jobjectArray>(jvm_on_headers(
       "onResponseHeaders", headers, end_stream, stream_intel, const_cast<void*>(context)));
 

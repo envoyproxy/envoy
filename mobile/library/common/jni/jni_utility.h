@@ -45,13 +45,13 @@ void jni_delete_global_ref(void* context);
 void jni_delete_const_global_ref(const void* context);
 
 /**
- * Checks whether there is a pending JNI exception and clear it if necessary. 
- * 
+ * Checks whether there is a pending JNI exception and clear it if necessary.
+ *
  * @param env, the JNI env pointer.
- * 
- * @return Whether there was a pending JNI exception. 
+ *
+ * @return Whether there was a pending JNI exception.
  */
-bool exception_check(JNIEnv *env);
+bool exception_check(JNIEnv* env);
 
 int unbox_integer(JNIEnv* env, jobject boxedInteger);
 
@@ -110,7 +110,7 @@ jbyteArray ToJavaByteArray(JNIEnv* env, const uint8_t* bytes, size_t len);
 
 jbyteArray ToJavaByteArray(JNIEnv* env, const std::string& str);
 
-jobjectArray ToJavaArrayOfObjectArray(JNIEnv* env, const ManagedEnvoyHeaders& map);
+jobjectArray ToJavaArrayOfObjectArray(JNIEnv* env, const Envoy::Types::ManagedEnvoyHeaders& map);
 
 void JavaArrayOfByteArrayToStringVector(JNIEnv* env, jobjectArray array,
                                         std::vector<std::string>* out);
