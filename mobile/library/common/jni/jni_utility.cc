@@ -77,8 +77,8 @@ bool exception_check(JNIEnv* env) {
     jstring jobj_exception_message = (jstring)env->CallObjectMethod(exception, jmid_getMessage);
     const char* exception_message = env->GetStringUTFChars(jobj_exception_message, nullptr);
 
-    ENVOY_LOG_EVENT_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::main), info,
-                              "jni_exception", std::string(exception_message));
+    // ENVOY_LOG_EVENT_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::main), info,
+    //                           "jni_exception", std::string(exception_message));
 
     env->ReleaseStringUTFChars(jobj_exception_message, exception_message);
     env->DeleteLocalRef(jcls_throwable);
