@@ -20,6 +20,10 @@ behavior_changes:
 - area: build
   change: |
     moved the strict_dns, original_dst, logical_dns, static, and eds clusters to extensions. If you use these clusters and override extensions_build_config.bzl you will now need to include it explicitly.
+- area: loadbalancing
+  change: |
+    When active HC is enabled per cluster, slow start calculation now starts after first passing HC. Cluster membership duration condition is dropped from slow start calculation.
+    Endpoint can now re-enter slow start if active HC is configured per cluster, on each "unhealthy -> healthy" state transition.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -37,12 +41,24 @@ minor_behavior_changes:
 - area: cache_filter
   change: |
     api path of work-in-progress extension changed from ``api/extensions/cache/simple_http_cache`` to ``api/extensions/http/cache/simple_http_cache``, and source code moved, to match extension category.
+- area: http filters
+  change: |
+    change ``StreamEncoderFilter::encode1xxHeaders`` to use its own enum class ``Http::Filter1xxHeadersStatus``. Previously we shared the same enum class for general headers, but the implementation did not support most of them. We also fixed ``StreamEncoderFilter::encode1xxHeaders`` to send local replies without trailing 1xx headers afterward.
 - area: oauth2
   change: |
     Requests which match the passthrough header now have their own metric ``oauth_passthrough`` and aren't included in ``oauth_success`` anymore.
+- area: upstream
+  change: |
+    detailed health status is used for override host selection. This behavior can be reverted by setting runtime flag ``envoy.reloadable_features.validate_detailed_override_host_statuses`` to false.
 - area: rate_limit
   change: |
     add ``MONTH`` and ``YEAR`` to the unit of time for rate limit.
+- area: router
+  change: |
+    Virtual cluster statistics are no longer created for routes without any ``virtual_clusters``. Previously statistics for a ``catch all`` virtual cluster were created, but never updated.
+- area: jwt_authn
+  change: |
+    adjust the refetch time for remote_jwks async_fetch feature. For a good fetch, refetch 5 seconds before jwks cache duration. For a failed fetch, refetch time can be specified by :ref:`failed_refetch_duration <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwksAsyncFetch.failed_refetch_duration>` with default 1 second.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -69,9 +85,18 @@ bug_fixes:
 - area: http
   change: |
     fixed a bug where Utility::PercentEncoding::encode() encodes some characters incorrectly because it was treating the value as negative.
+- area: upstream
+  change: |
+    fixed a bug that only coarse health status is used for override host selection.
 - area: validation
   change: |
     fixed a crash which could happen when optional ``engine_type`` is not provided in regex.
+- area: upstream
+  change: |
+    fixed a bug when specify both a single address in bootstrap and cluster upstream binding config but with a different IP version. It should be allowed but it is rejected.
+- area: jwt_authn
+  change: |
+    fix a bug that jwt_cache breaks the :ref:`provider_and_audiences <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtRequirement.provider_and_audiences>` JWT requirement.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -113,6 +138,12 @@ removed_config_or_runtime:
     removed ``envoy.reloadable_features.do_not_await_headers_on_upstream_timeout_to_emit_stats`` and legacy code paths.
 
 new_features:
+- area: tls
+  change: |
+    added support for SNI-based cert selection in tls downstream transport socket. Detailed documentation is available :ref:`cert selection<arch_overview_ssl_cert_select>`.
+    New config option :ref:`full_scan_certs_on_sni_mismatch <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.full_scan_certs_on_sni_mismatch>`
+    is introduced to disable or enable full scan when no cert matches to SNI, defaults to false.
+    New runtime flag ``envoy.reloadable_features.no_full_scan_certs_on_sni_mismatch`` can be used for override the default value.
 - area: build
   change: |
     added an option ``--define=library_autolink=disabled`` to disable autolinking libraries.
@@ -139,6 +170,9 @@ new_features:
 - area: generic_proxy
   change: |
     added :ref:`generic rds support <envoy_v3_api_field_extensions.filters.network.generic_proxy.v3.GenericProxy.generic_rds>`.
+- area: listener
+  change: |
+    added a new field :ref:`socket_options <envoy_v3_api_field_config.listener.v3.AdditionalAddress.socket_options>` to the AdditionalAddress, allowing specifying discrete socket options for each listen address.
 - area: listener
   change: |
     added ``continueFilterChain()`` and ``dispatcher()`` methods to the ``ListenerFilterCallback``. This allows listener filters to continue listener filter iteration after stopping iteration e.g. if the listener filter depends on an async process.
@@ -172,11 +206,26 @@ new_features:
 - area: jwt_authn
   change: |
     added support for copying jwt claims to http headers.
-
+- area: generic_proxy
+  change: |
+    added drain support to generic proxy to doing graceful closes on connections when possible.
+- area: http
+  change: |
+    added :ref:`append_x_forwarded_port <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.append_x_forwarded_port>` to append the ``x-forwarded-port`` header to HTTP upstream requests.
 - area: ext_authz
   change: |
     added support to allowlist headers included in the check request to gRPC authorization server (previously only available for HTTP authorization server).
     Pre-existing field :ref:`allowed_headers <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.AuthorizationRequest.allowed_headers>` is deprecated in favour
     of the new field :ref:`allowed_headers <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.allowed_headers>`.
+- area: router
+  change: |
+    added :ref:`RouteList <envoy_v3_api_msg_config.route.v3.RouteList>` to support route list in :ref:`VirtualHost.matcher <envoy_v3_api_field_config.route.v3.VirtualHost.matcher>`.
+- area: upstream
+  change: |
+    allow configuring :ref:`cluster bind config <envoy_v3_api_field_config.cluster.v3.Cluster.upstream_bind_config>` and
+    :ref:`cluster manager bind config <envoy_v3_api_field_config.bootstrap.v3.ClusterManager.upstream_bind_config>` without specifying a
+    :ref:`source_address <envoy_v3_api_field_config.core.v3.BindConfig.source_address>`. This allows setting
+    :ref:`socket options <envoy_v3_api_field_config.core.v3.BindConfig.socket_options>` when using the default unspecified bind address
+    is desired.
 
 deprecated:

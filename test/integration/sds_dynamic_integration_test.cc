@@ -55,10 +55,10 @@ struct TestParams {
 };
 
 std::string sdsTestParamsToString(const ::testing::TestParamInfo<TestParams>& p) {
-  return fmt::format(
-      "{}_{}_{}", p.param.ip_version == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
-      p.param.sds_grpc_type == Grpc::ClientType::GoogleGrpc ? "GoogleGrpc" : "EnvoyGrpc",
-      p.param.test_quic ? "UsesQuic" : "UsesTcp");
+  return fmt::format("{}_{}_{}", TestUtility::ipVersionToString(p.param.ip_version),
+                     p.param.sds_grpc_type == Grpc::ClientType::GoogleGrpc ? "GoogleGrpc"
+                                                                           : "EnvoyGrpc",
+                     p.param.test_quic ? "UsesQuic" : "UsesTcp");
 }
 
 std::vector<TestParams> getSdsTestsParams(bool disable_quic = false) {

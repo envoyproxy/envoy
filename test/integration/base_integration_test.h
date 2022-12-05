@@ -99,7 +99,7 @@ public:
   void setDeterministicValue(uint64_t value = 0) { deterministic_value_ = value; }
   // Get socket option for a specific listener's socket.
   bool getSocketOption(const std::string& listener_name, int level, int optname, void* optval,
-                       socklen_t* optlen);
+                       socklen_t* optlen, int address_index = 0);
 
   Http::CodecType upstreamProtocol() const { return upstream_config_.upstream_protocol_; }
 

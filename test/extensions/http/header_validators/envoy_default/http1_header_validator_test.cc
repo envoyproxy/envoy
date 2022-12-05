@@ -1,3 +1,4 @@
+#include "source/extensions/http/header_validators/envoy_default/error_codes.h"
 #include "source/extensions/http/header_validators/envoy_default/http1_header_validator.h"
 
 #include "test/extensions/http/header_validators/envoy_default/header_validator_test.h"
@@ -489,6 +490,38 @@ TEST_F(Http1HeaderValidatorTest, ValidateResponseHeaderMapDropUnderscoreHeaders)
 
   EXPECT_ACCEPT(uhv->validateResponseHeaderMap(headers));
   EXPECT_EQ(headers, ::Envoy::Http::TestResponseHeaderMapImpl({{":status", "200"}}));
+}
+
+TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapNormalizePath) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
+                                                  {":method", "GET"},
+                                                  {":path", "/./dir1/../dir2"},
+                                                  {":authority", "envoy.com"}};
+  auto uhv = createH1(empty_config);
+
+  EXPECT_TRUE(uhv->validateRequestHeaderMap(headers).ok());
+  EXPECT_EQ(headers.path(), "/dir2");
+}
+
+TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapRejectPath) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{
+      {":scheme", "https"}, {":method", "GET"}, {":path", "/.."}, {":authority", "envoy.com"}};
+  auto uhv = createH1(empty_config);
+  auto result = uhv->validateRequestHeaderMap(headers);
+  EXPECT_EQ(result.action(), HeaderValidator::RejectOrRedirectAction::Reject);
+  EXPECT_EQ(result.details(), UhvResponseCodeDetail::get().InvalidUrl);
+}
+
+TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapRedirectPath) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
+                                                  {":method", "GET"},
+                                                  {":path", "/dir1%2fdir2"},
+                                                  {":authority", "envoy.com"}};
+  auto uhv = createH1(redirect_encoded_slash_config);
+  auto result = uhv->validateRequestHeaderMap(headers);
+  EXPECT_EQ(result.action(), HeaderValidator::RejectOrRedirectAction::Redirect);
+  EXPECT_EQ(result.details(), "uhv.path_noramlization_redirect");
+  EXPECT_EQ(headers.path(), "/dir1/dir2");
 }
 
 } // namespace

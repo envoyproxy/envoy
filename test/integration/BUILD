@@ -417,6 +417,7 @@ envoy_cc_test(
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/buffer:config",
+        "//test/integration/filters:encode1xx_local_reply_config_lib",
         "//test/integration/filters:metadata_stop_all_filter_config_lib",
         "//test/integration/filters:on_local_reply_filter_config_lib",
         "//test/integration/filters:request_metadata_filter_config_lib",
@@ -1149,6 +1150,7 @@ envoy_cc_test(
         "websocket_integration_test.cc",
         "websocket_integration_test.h",
     ],
+    shard_count = 4,
     deps = [
         ":http_protocol_integration_lib",
         "//source/common/http:header_map_lib",

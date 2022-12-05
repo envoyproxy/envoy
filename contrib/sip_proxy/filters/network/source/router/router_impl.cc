@@ -1,7 +1,5 @@
 #include "contrib/sip_proxy/filters/network/source/router/router_impl.h"
 
-#include <memory>
-
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/logger.h"
@@ -10,7 +8,6 @@
 #include "source/common/router/metadatamatchcriteria_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
 
-#include "absl/strings/match.h"
 #include "contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/route.pb.h"
 #include "contrib/sip_proxy/filters/network/source/app_exception_impl.h"
 #include "contrib/sip_proxy/filters/network/source/conn_manager.h"
@@ -486,9 +483,12 @@ FilterStatus Router::messageEnd() {
   std::shared_ptr<Encoder> encoder = std::make_shared<EncoderImpl>();
   encoder->encode(metadata_, transport_buffer);
 
-  ENVOY_STREAM_LOG(trace, "send buffer : {} bytes\n{}", *callbacks_, transport_buffer.length(),
+  ENVOY_STREAM_LOG(debug, "send buffer : {} bytes\n{}", *callbacks_, transport_buffer.length(),
                    transport_buffer.toString());
 
+  callbacks_->stats()
+      .sipMethodCounter(metadata_->methodType(), SipMethodStatsSuffix::RequestProxied)
+      .inc();
   upstream_request_->write(transport_buffer, false);
   return FilterStatus::Continue;
 }
@@ -656,12 +656,6 @@ void UpstreamRequest::onUpstreamData(Buffer::Instance& data, bool end_stream) {
             conn_data_->connection().connectionInfoProvider().localAddress()->asStringView(),
             data.length());
 
-  if (!callbacks_) {
-    ENVOY_LOG(error, "There is no activeTrans, drain data.");
-    data.drain(data.length());
-    return;
-  }
-
   upstream_buffer_.move(data);
   auto response_decoder = std::make_unique<ResponseDecoder>(*this);
   response_decoder->onData(upstream_buffer_);
@@ -730,7 +724,10 @@ FilterStatus ResponseDecoder::transportBegin(MessageMetadataSharedPtr metadata) 
 }
 
 DecoderEventHandler& ResponseDecoder::newDecoderEventHandler(MessageMetadataSharedPtr metadata) {
-  UNREFERENCED_PARAMETER(metadata);
+  parent_.decoderFilterCallbacks()
+      .stats()
+      .sipMethodCounter(metadata->methodType(), SipMethodStatsSuffix::ResponseReceived)
+      .inc();
   return *this;
 }
 

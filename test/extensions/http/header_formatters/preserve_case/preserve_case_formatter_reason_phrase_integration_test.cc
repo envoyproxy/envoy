@@ -16,8 +16,7 @@ struct TestParams {
 };
 
 std::string testParamsToString(const ::testing::TestParamInfo<TestParams>& p) {
-  return fmt::format("{}_{}_{}",
-                     p.param.ip_version == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
+  return fmt::format("{}_{}_{}", TestUtility::ipVersionToString(p.param.ip_version),
                      TestUtility::http1ParserImplToString(p.param.parser_impl),
                      p.param.forward_reason_phrase ? "enabled" : "disabled");
 }

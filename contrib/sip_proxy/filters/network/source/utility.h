@@ -178,13 +178,14 @@ public:
   virtual ~Cache() = default;
 
   void emplace(const K& key, const V& value) {
-    if (contains(key)) {
-      if (it_ != cache_[key].it_) {
-        ring_buffer_.erase(cache_[key].it_);
+    auto it = cache_.find(key);
+    if (it != cache_.cend()) {
+      if (it_ != it->second.it_) {
+        ring_buffer_.erase(it->second.it_);
         auto new_it = ring_buffer_.insert(it_, key);
-        cache_[key].it_ = new_it;
+        it->second.it_ = new_it;
       }
-      cache_[key].value_ = value;
+      it->second.value_ = value;
     } else {
       if (!it_->empty()) {
         cache_.erase(*it_);
@@ -205,20 +206,23 @@ public:
 
   bool contains(const K& key) { return cache_.find(key) != cache_.end(); }
 
+  OptRef<V> at(const K& key) {
+    auto it = cache_.find(key);
+    if (it != cache_.cend()) {
+      return OptRef<V>{it->second.value_};
+    }
+    return {};
+  }
+
   void erase(const K& key) {
-    if (contains(key)) {
-      *(cache_[key].it_) = "";
-      cache_.erase(key);
+    auto it = cache_.find(key);
+    if (it != cache_.cend()) {
+      *(it->second.it_) = "";
+      cache_.erase(it);
     }
   }
 
-  V& operator[](const K& key) {
-    if (contains(key)) {
-      return cache_[key].value_;
-    } else {
-      return default_value_;
-    }
-  }
+  size_t size() { return cache_.size(); }
 
 private:
   struct Data {
@@ -230,8 +234,6 @@ private:
   std::map<K, Data> cache_;
   std::list<K> ring_buffer_;
   typename std::list<K>::iterator it_;
-
-  V default_value_{};
 };
 
 template <typename T, typename K, typename V> class CacheManager {
@@ -246,21 +248,38 @@ public:
   void initCache(const T& type, unsigned int max_size = 1024) { caches_.emplace(type, max_size); }
 
   void insertCache(const T& type, const K& key, const V& value) {
-    if (caches_.find(type) != caches_.end()) {
-      // TODO if (caches_.contains(type)) {
-      caches_[type].emplace(key, value);
+    auto it = caches_.find(type);
+    if (it != caches_.end()) {
+      it->second.emplace(key, value);
     } else {
-      caches_.emplace(type, max_size_);
-      caches_[type].emplace(key, value);
+      auto it_new = caches_.emplace(type, max_size_);
+      it_new.first->second.emplace(key, value);
     }
   }
 
   bool contains(const T& type, const K& key) {
-    // TODO return caches_.contains(type) && caches_[type].contains(key);
-    return caches_.find(type) != caches_.end() && caches_[type].contains(key);
+    auto it = caches_.find(type);
+    if (it != caches_.cend()) {
+      return it->second.contains(key);
+    }
+    return false;
   }
-  V& at(const T& type, const K& key) { return caches_[type][key]; }
-  Cache<K, V>& at(const T& type) { return caches_[type]; }
+
+  OptRef<V> at(const T& type, const K& key) {
+    auto it_type = caches_.find(type);
+    if (it_type != caches_.cend()) {
+      return OptRef<V>{it_type->second.at(key)};
+    }
+    return {};
+  }
+
+  void erase(const T& type, const K& key) {
+    auto it_type = caches_.find(type);
+    if (it_type != caches_.cend()) {
+      return it_type->second.erase(key);
+    }
+  }
+
   Cache<K, V>& operator[](const T& type) { return caches_[type]; }
 
 private:
