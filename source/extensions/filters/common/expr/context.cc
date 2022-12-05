@@ -311,12 +311,12 @@ absl::optional<CelValue> XDSWrapper::operator[](CelValue key) const {
   }
   auto value = key.StringOrDie().value();
   if (value == ClusterName) {
-    auto cluster_info = info_.upstreamClusterInfo();
+    const auto cluster_info = info_.upstreamClusterInfo();
     if (cluster_info && cluster_info.value()) {
       return CelValue::CreateString(&cluster_info.value()->name());
     }
   } else if (value == ClusterMetadata) {
-    auto cluster_info = info_.upstreamClusterInfo();
+    const auto cluster_info = info_.upstreamClusterInfo();
     if (cluster_info && cluster_info.value()) {
       return CelProtoWrapper::CreateMessage(&cluster_info.value()->metadata(), &arena_);
     }
@@ -329,7 +329,7 @@ absl::optional<CelValue> XDSWrapper::operator[](CelValue key) const {
       return CelProtoWrapper::CreateMessage(&info_.route()->metadata(), &arena_);
     }
   } else if (value == UpstreamHostMetadata) {
-    auto upstream_info = info_.upstreamInfo();
+    const auto upstream_info = info_.upstreamInfo();
     if (upstream_info && upstream_info->upstreamHost()) {
       return CelProtoWrapper::CreateMessage(upstream_info->upstreamHost()->metadata().get(),
                                             &arena_);

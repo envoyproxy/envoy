@@ -166,11 +166,11 @@ Data exchanged between filters is available as the following attributes:
 Note that these attributes may change during the life of a request as the data can be
 updated by filters at any point.
 
-XDS configuration attributes
+Configuration attributes
 ----------------------------
 
-xDS configuration related to the handling of the request or the connection is
-available as the following attributes:
+Configuration identifiers and metadata related to the handling of the request or the connection is available as the
+following attributes:
 
 .. csv-table::
    :header: Attribute, Type, Description

@@ -804,47 +804,47 @@ TEST(Context, XDSAttributes) {
   XDSWrapper wrapper(arena, info);
 
   {
-    auto value = wrapper[CelValue::CreateStringView(ClusterName)];
+    const auto value = wrapper[CelValue::CreateStringView(ClusterName)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsString());
     EXPECT_EQ("fake_cluster", value.value().StringOrDie().value());
   }
   {
-    auto value = wrapper[CelValue::CreateStringView(ClusterMetadata)];
+    const auto value = wrapper[CelValue::CreateStringView(ClusterMetadata)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsMessage());
     EXPECT_EQ(&cluster_info->metadata_, value.value().MessageOrDie());
   }
   {
-    auto value = wrapper[CelValue::CreateStringView(RouteName)];
+    const auto value = wrapper[CelValue::CreateStringView(RouteName)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsString());
     EXPECT_EQ("fake_route_name", value.value().StringOrDie().value());
   }
   {
-    auto value = wrapper[CelValue::CreateStringView(RouteMetadata)];
+    const auto value = wrapper[CelValue::CreateStringView(RouteMetadata)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsMessage());
     EXPECT_EQ(&route->metadata_, value.value().MessageOrDie());
   }
   {
-    auto value = wrapper[CelValue::CreateStringView(UpstreamHostMetadata)];
+    const auto value = wrapper[CelValue::CreateStringView(UpstreamHostMetadata)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsMessage());
     EXPECT_EQ(host_metadata.get(), value.value().MessageOrDie());
   }
   {
-    auto value = wrapper[CelValue::CreateStringView(FilterChainName)];
+    const auto value = wrapper[CelValue::CreateStringView(FilterChainName)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsString());
     EXPECT_EQ(chain_name, value.value().StringOrDie().value());
   }
   {
-    auto value = wrapper[CelValue::CreateStringView(XDS)];
+    const auto value = wrapper[CelValue::CreateStringView(XDS)];
     EXPECT_FALSE(value.has_value());
   }
   {
-    auto value = wrapper[CelValue::CreateInt64(5)];
+    const auto value = wrapper[CelValue::CreateInt64(5)];
     EXPECT_FALSE(value.has_value());
   }
 }
