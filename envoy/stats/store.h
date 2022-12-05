@@ -116,24 +116,32 @@ public:
   virtual void forEachScope(SizeFn f_size, StatFn<const Scope> f_stat) const PURE;
 
   /**
+   * TODO(#24007): rename this method to findCounterForTest.
+   *
    * @param The name of the stat, obtained from the SymbolTable.
    * @return a reference to a counter within the entire store, if it exists.
    */
   virtual CounterOptConstRef findCounter(StatName name) const PURE;
 
   /**
+   * TODO(#24007): rename this method to findGaugeForTest.
+   *
    * @param The name of the stat, obtained from the SymbolTable.
    * @return a reference to a gauge within the entire store, if it exists.
    */
   virtual GaugeOptConstRef findGauge(StatName name) const PURE;
 
   /**
+   * TODO(#24007): rename this method to findHistogramForTest.
+   *
    * @param The name of the stat, obtained from the SymbolTable.
    * @return a reference to a histogram within the entire store, if it exists.
    */
   virtual HistogramOptConstRef findHistogram(StatName name) const PURE;
 
   /**
+   * TODO(#24007): rename this method to findTextReadoutForTest.
+   *
    * @param The name of the stat, obtained from the SymbolTable.
    * @return a reference to a text readout within the entire store, if it exists.
    */
