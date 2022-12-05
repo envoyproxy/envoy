@@ -102,7 +102,7 @@ public:
   MOCK_METHOD(const envoy::config::core::v3::Locality&, locality, (), (const));
   MOCK_METHOD(uint32_t, priority, (), (const));
   MOCK_METHOD(void, priority, (uint32_t));
-  MOCK_METHOD(MonotonicTime, creationTime, (), (const));
+  MOCK_METHOD(absl::optional<MonotonicTime>, lastHcPassTime, (), (const));
   Stats::StatName localityZoneStatName() const override {
     Stats::SymbolTable& symbol_table = *symbol_table_;
     locality_zone_stat_name_ =
@@ -157,6 +157,10 @@ public:
     setOutlierDetector_(outlier_detector);
   }
 
+  void setLastHcPassTime(MonotonicTime last_hc_pass_time) override {
+    setLastHcPassTime_(last_hc_pass_time);
+  }
+
   Stats::StatName localityZoneStatName() const override {
     locality_zone_stat_name_ =
         std::make_unique<Stats::StatNameManagedStorage>(locality().zone(), *symbol_table_);
@@ -198,6 +202,7 @@ public:
   MOCK_METHOD(Outlier::DetectorHostMonitor&, outlierDetector, (), (const));
   MOCK_METHOD(void, setHealthChecker_, (HealthCheckHostMonitorPtr & health_checker));
   MOCK_METHOD(void, setOutlierDetector_, (Outlier::DetectorHostMonitorPtr & outlier_detector));
+  MOCK_METHOD(void, setLastHcPassTime_, (MonotonicTime & last_hc_pass_time));
   MOCK_METHOD(HostStats&, stats, (), (const));
   MOCK_METHOD(LoadMetricStats&, loadMetricStats, (), (const));
   MOCK_METHOD(uint32_t, weight, (), (const));
@@ -209,7 +214,7 @@ public:
   MOCK_METHOD(uint32_t, priority, (), (const));
   MOCK_METHOD(void, priority, (uint32_t));
   MOCK_METHOD(bool, warmed, (), (const));
-  MOCK_METHOD(MonotonicTime, creationTime, (), (const));
+  MOCK_METHOD(absl::optional<MonotonicTime>, lastHcPassTime, (), (const));
 
   testing::NiceMock<MockClusterInfo> cluster_;
   Network::UpstreamTransportSocketFactoryPtr socket_factory_;

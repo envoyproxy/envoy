@@ -221,6 +221,12 @@ public:
   virtual void setOutlierDetector(Outlier::DetectorHostMonitorPtr&& outlier_detector) PURE;
 
   /**
+   * Set the timestamp of when the host has transitioned from unhealthy to healthy state via an
+   * active healchecking.
+   */
+  virtual void setLastHcPassTime(MonotonicTime last_hc_pass_time) PURE;
+
+  /**
    * @return the current load balancing weight of the host, in the range 1-128 (see
    * envoy.api.v2.endpoint.Endpoint.load_balancing_weight).
    */

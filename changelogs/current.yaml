@@ -20,6 +20,10 @@ behavior_changes:
 - area: build
   change: |
     moved the strict_dns, original_dst, logical_dns, static, and eds clusters to extensions. If you use these clusters and override extensions_build_config.bzl you will now need to include it explicitly.
+- area: loadbalancing
+  change: |
+    When active HC is enabled per cluster, slow start calculation now starts after first passing HC. Cluster membership duration condition is dropped from slow start calculation.
+    Endpoint can now re-enter slow start if active HC is configured per cluster, on each "unhealthy -> healthy" state transition.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -39,7 +43,7 @@ minor_behavior_changes:
     api path of work-in-progress extension changed from ``api/extensions/cache/simple_http_cache`` to ``api/extensions/http/cache/simple_http_cache``, and source code moved, to match extension category.
 - area: http filters
   change: |
-    change ``StreamEncoderFilter::encode1xxHeaders`` to use its own enum class ``Http::Filter1xxHeadersStatus``. Previously we shared the same enum class for general headers, but the implementation did not support most of them.
+    change ``StreamEncoderFilter::encode1xxHeaders`` to use its own enum class ``Http::Filter1xxHeadersStatus``. Previously we shared the same enum class for general headers, but the implementation did not support most of them. We also fixed ``StreamEncoderFilter::encode1xxHeaders`` to send local replies without trailing 1xx headers afterward.
 - area: oauth2
   change: |
     Requests which match the passthrough header now have their own metric ``oauth_passthrough`` and aren't included in ``oauth_success`` anymore.
@@ -216,6 +220,9 @@ new_features:
 - area: attributes
   change: |
     added :ref:`attributes <arch_overview_attributes>` for looking up xDS configuration information.
+- area: router
+  change: |
+    added :ref:`RouteList <envoy_v3_api_msg_config.route.v3.RouteList>` to support route list in :ref:`VirtualHost.matcher <envoy_v3_api_field_config.route.v3.VirtualHost.matcher>`.
 - area: upstream
   change: |
     allow configuring :ref:`cluster bind config <envoy_v3_api_field_config.cluster.v3.Cluster.upstream_bind_config>` and
