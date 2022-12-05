@@ -9,7 +9,7 @@ jobs:
       issues: write  # for actions/stale to close stale issues
       pull-requests: write  # for actions/stale to close stale PRs
     name: Prune Stale
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     if: github.repository == 'envoyproxy/envoy'
 
     steps:
