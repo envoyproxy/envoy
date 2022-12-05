@@ -68,21 +68,8 @@ void jni_delete_const_global_ref(const void* context) {
 
 bool exception_check(JNIEnv* env) {
   if (env->ExceptionCheck() == JNI_TRUE) {
-    jthrowable exception = env->ExceptionOccurred();
     env->ExceptionClear();
-
-    jclass jcls_throwable = env->FindClass("java/lang/Throwable");
-    jmethodID jmid_getMessage =
-        env->GetMethodID(jcls_throwable, "getMessage", "()Ljava/lang/String;");
-    jstring jobj_exception_message = (jstring)env->CallObjectMethod(exception, jmid_getMessage);
-    const char* exception_message = env->GetStringUTFChars(jobj_exception_message, nullptr);
-
-    // ENVOY_LOG_EVENT_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::main), info,
-    //                           "jni_exception", std::string(exception_message));
-
-    env->ReleaseStringUTFChars(jobj_exception_message, exception_message);
-    env->DeleteLocalRef(jcls_throwable);
-
+    // TODO(Augustyniak): Log exception details.
     return true;
   } else {
     return false;
