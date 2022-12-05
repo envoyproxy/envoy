@@ -3,6 +3,7 @@
 #include <charconv>
 
 #include "source/extensions/http/header_validators/envoy_default/character_tables.h"
+#include "source/extensions/http/header_validators/envoy_default/error_codes.h"
 
 #include "absl/container/node_hash_set.h"
 

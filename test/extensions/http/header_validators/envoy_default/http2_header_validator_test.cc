@@ -1,4 +1,5 @@
 #include "source/extensions/http/header_validators/envoy_default/character_tables.h"
+#include "source/extensions/http/header_validators/envoy_default/error_codes.h"
 #include "source/extensions/http/header_validators/envoy_default/http2_header_validator.h"
 
 #include "test/extensions/http/header_validators/envoy_default/header_validator_test.h"
