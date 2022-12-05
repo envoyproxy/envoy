@@ -24,6 +24,7 @@ behavior_changes:
   change: |
     When active HC is enabled per cluster, slow start calculation now starts after first passing HC. Cluster membership duration condition is dropped from slow start calculation.
     Endpoint can now re-enter slow start if active HC is configured per cluster, on each "unhealthy -> healthy" state transition.
+
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
 - area: tls
@@ -33,6 +34,7 @@ minor_behavior_changes:
     a full chain.
     :ref:`trust_ca<envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.trusted_ca>`.
     This change can be reverted via the ``envoy.reloadable_features.enable_intermediate_ca``.
+
 - area: cache_filter
   change: |
     add a completion callback to updateHeaders interface. Any external cache implementations will need to update to match this new interface. See changes to simple_http_cache in PR#23666 for example.
@@ -57,6 +59,7 @@ minor_behavior_changes:
 - area: jwt_authn
   change: |
     adjust the refetch time for remote_jwks async_fetch feature. For a good fetch, refetch 5 seconds before jwks cache duration. For a failed fetch, refetch time can be specified by :ref:`failed_refetch_duration <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwksAsyncFetch.failed_refetch_duration>` with default 1 second.
+
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: aws_lambda
@@ -94,6 +97,7 @@ bug_fixes:
 - area: jwt_authn
   change: |
     fix a bug that jwt_cache breaks the :ref:`provider_and_audiences <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtRequirement.provider_and_audiences>` JWT requirement.
+
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 - area: eds
@@ -132,6 +136,7 @@ removed_config_or_runtime:
 - area: router
   change: |
     removed ``envoy.reloadable_features.do_not_await_headers_on_upstream_timeout_to_emit_stats`` and legacy code paths.
+
 new_features:
 - area: tls
   change: |
@@ -222,4 +227,5 @@ new_features:
     :ref:`source_address <envoy_v3_api_field_config.core.v3.BindConfig.source_address>`. This allows setting
     :ref:`socket options <envoy_v3_api_field_config.core.v3.BindConfig.socket_options>` when using the default unspecified bind address
     is desired.
+
 deprecated:
