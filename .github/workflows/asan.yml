@@ -1,4 +1,4 @@
-name: asan
+name: mobile_asan
 
 on:
   push:
