@@ -60,8 +60,7 @@ static_resources:
   # Cluster for GCE metadata server
   - name: gcp_authn
     type: STRICT_DNS
-    connect_timeout:
-      seconds: 5
+    connect_timeout: 5s
     dns_lookup_family: V4_ONLY
     load_assignment:
       cluster_name: "gcp_authn"
