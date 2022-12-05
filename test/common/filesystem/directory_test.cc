@@ -200,7 +200,7 @@ TEST_F(DirectoryTest, DirectoryWithSymlinkToFile) {
   const EntrySet result = getDirectoryContents(dir_path_, false);
   EXPECT_THAT(result,
               testing::Contains(DirectoryEntry{"file", FileType::Regular, contents.size()}));
-  // Validate without size for link, as it may be 0 or file-size depending on OS.
+  // Validate without size for link, as it may be nullopt or file-size depending on OS.
   EXPECT_THAT(result, testing::Contains(testing::AllOf(
                           testing::Field(&DirectoryEntry::name_, "link"),
                           testing::Field(&DirectoryEntry::type_, FileType::Regular))));
