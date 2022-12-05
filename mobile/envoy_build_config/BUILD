@@ -43,6 +43,7 @@ envoy_cc_library(
         "@envoy_mobile//library/common/extensions/filters/http/platform_bridge:config",
         "@envoy_mobile//library/common/extensions/filters/http/route_cache_reset:config",
         "@envoy_mobile//library/common/extensions/filters/http/socket_tag:config",
+        "@envoy_mobile//library/common/extensions/listener_managers/api_listener_manager:api_listener_manager_lib",
         "@envoy_mobile//library/common/extensions/retry/options/network_configuration:config",
     ],
 )

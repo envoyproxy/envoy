@@ -1,0 +1,59 @@
+#pragma once
+
+#include <memory>
+
+#include "envoy/server/instance.h"
+#include "envoy/server/listener_manager.h"
+
+#include "source/server/listener_manager_factory.h"
+
+namespace Envoy {
+namespace Server {
+
+/**
+ * Implementation of ListenerManager.
+ */
+class ApiListenerManagerImpl : public ListenerManager, Logger::Loggable<Logger::Id::config> {
+public:
+  ApiListenerManagerImpl(Instance& server);
+
+  // Server::ListenerManager
+  bool addOrUpdateListener(const envoy::config::listener::v3::Listener& config,
+                           const std::string& version_info, bool added_via_api) override;
+  void createLdsApi(const envoy::config::core::v3::ConfigSource&,
+                    const xds::core::v3::ResourceLocator*) override {}
+  std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners(ListenerState) override {
+    return {};
+  }
+  uint64_t numConnections() const override { return 0; }
+  bool removeListener(const std::string&) override { return true; }
+  void startWorkers(GuardDog&, std::function<void()> callback) override { callback(); }
+  void stopListeners(StopListenersType) override {}
+  void stopWorkers() override {}
+  void beginListenerUpdate() override {}
+  void endListenerUpdate(FailureStates&&) override {}
+  bool isWorkerStarted() override { return true; }
+  Http::Context& httpContext() { return server_.httpContext(); }
+  ApiListenerOptRef apiListener() override {
+    return api_listener_ ? ApiListenerOptRef(std::ref(*api_listener_)) : absl::nullopt;
+  }
+
+private:
+  Instance& server_;
+  ApiListenerPtr api_listener_;
+};
+
+class ApiListenerManagerFactoryImpl : public ListenerManagerFactory {
+public:
+  std::unique_ptr<ListenerManager>
+  createListenerManager(Instance& server, std::unique_ptr<ListenerComponentFactory>&&,
+                        WorkerFactory&, bool, Quic::QuicStatNames&) override {
+    return std::make_unique<ApiListenerManagerImpl>(server);
+  }
+  std::string name() const override { return "envoy.listener_manager_impl.api"; }
+};
+
+DECLARE_FACTORY(ApiListenerManagerFactoryImpl);
+
+} // namespace Server
+} // namespace Envoy

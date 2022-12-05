@@ -6,7 +6,8 @@
 namespace Envoy {
 
 EngineCommon::EngineCommon(int argc, const char* const* argv)
-    : options_(argc, argv, &MainCommon::hotRestartVersion, spdlog::level::info),
+    : options_(argc, argv, &MainCommon::hotRestartVersion, spdlog::level::info,
+               "envoy.listener_manager_impl.api"),
       base_(options_, real_time_system_, default_listener_hooks_, prod_component_factory_,
             std::make_unique<PlatformImpl>(), std::make_unique<Random::RandomGeneratorImpl>(),
             nullptr) {

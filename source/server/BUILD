@@ -437,22 +437,57 @@ envoy_cc_library(
     ],
 )
 
+envoy_cc_library(
+    name = "api_listener_lib",
+    srcs = [
+        "api_listener_impl.cc",
+    ],
+    hdrs = [
+        "api_listener_impl.h",
+    ],
+    deps = [
+        ":configuration_lib",
+        ":filter_chain_manager_lib",
+        ":lds_api_lib",
+        ":transport_socket_config_lib",
+        "//envoy/network:connection_interface",
+        "//envoy/network:listener_interface",
+        "//envoy/server:filter_config_interface",
+        "//envoy/server:instance_interface",
+        "//envoy/server:listener_manager_interface",
+        "//envoy/server:transport_socket_config_interface",
+        "//source/common/common:basic_resource_lib",
+        "//source/common/common:empty_string",
+        "//source/common/config:metadata_lib",
+        "//source/common/config:utility_lib",
+        "//source/common/init:manager_lib",
+        "//source/common/init:target_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/stream_info:stream_info_lib",
+        "//source/extensions/filters/network/http_connection_manager:config",
+        "//source/extensions/udp_packet_writer/default:config",
+        "//source/extensions/upstreams/http/generic:config",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+    ],
+    alwayslink = True,
+)
+
 # TODO(junr03): actually separate this lib from the listener and api listener lib.
 # this can be done if the parent_ in the listener and the api listener becomes the ListenerManager interface.
 # the issue right now is that the listener's reach into the listener manager's server_ instance variable.
 envoy_cc_library(
     name = "listener_manager_lib",
     srcs = [
-        "api_listener_impl.cc",
         "listener_impl.cc",
         "listener_manager_impl.cc",
     ],
     hdrs = [
-        "api_listener_impl.h",
         "listener_impl.h",
         "listener_manager_impl.h",
     ],
     deps = [
+        ":api_listener_lib",
         ":listener_manager_factory_lib",
         "active_raw_udp_listener_config",
         ":configuration_lib",
@@ -572,6 +607,7 @@ envoy_cc_library(
     deps = [
         "//envoy/server:factory_context_interface",
         "//envoy/server:listener_manager_interface",
+        "//envoy/server:worker_interface",
         "//source/common/quic:quic_stat_names_lib",
     ],
 )
