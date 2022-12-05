@@ -948,9 +948,6 @@ void DownstreamFilterManager::prepareLocalReplyViaFilterChain(
             encodeData(nullptr, data, end_stream,
                        FilterManager::FilterIterationStartState::CanStartFromCurrent);
           }},
-      /* This can be captured via copy though watch out for strings! */
-      /* Might be able to have this copy body by value as string, then move it
-       * out of this when processing */
       Utility::LocalReplyData{is_grpc_request, code, body, grpc_status, is_head_request});
 }
 

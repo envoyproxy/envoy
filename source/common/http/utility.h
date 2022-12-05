@@ -406,9 +406,6 @@ using PreparedLocalReplyPtr = std::unique_ptr<PreparedLocalReply>;
 void sendLocalReply(const bool& is_reset, const EncodeFunctions& encode_functions,
                     const LocalReplyData& local_reply_data);
 
-void sendLocalReplyOld(const bool& is_reset, const EncodeFunctions& encode_functions,
-                       const LocalReplyData& local_reply_data);
-
 /**
  * Prepares a locally generate response modifying headers and rewriting the
  * response.
