@@ -1,4 +1,4 @@
-#include "source/extensions/http/header_validators/envoy_default/header_validator.h"
+#include "source/extensions/http/header_validators/envoy_default/error_codes.h"
 #include "source/extensions/http/header_validators/envoy_default/path_normalizer.h"
 
 #include "test/test_common/utility.h"
