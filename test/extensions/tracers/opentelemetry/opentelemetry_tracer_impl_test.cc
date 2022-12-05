@@ -70,6 +70,9 @@ public:
       - key: host_name
         value:
           string_value: fake_host_name
+      - key: service.name
+        value:
+          string_value: fake_service_name
     )EOF";
     envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
     TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
