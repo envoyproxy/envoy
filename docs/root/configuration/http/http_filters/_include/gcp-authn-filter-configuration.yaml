@@ -63,7 +63,7 @@ static_resources:
     connect_timeout
       seconds: 5
     dns_lookup_family: V4_ONLY
-    load_assignment {
+    load_assignment:
       cluster_name: "gcp_authn"
       endpoints:
       - lb_endpoints:
