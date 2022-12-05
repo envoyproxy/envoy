@@ -203,7 +203,8 @@ INSTANTIATE_TEST_SUITE_P(CompresorFilterEnablementTest, CompresorFilterEnablemen
                               // empty CompressorPerRoute.overrides, so runtime flag controls
                               {true, PerRouteConfig::Empty, true},
                               {false, PerRouteConfig::Empty, false},
-                              // enabled by CompressorPerRoute.overrides
+                              // enabled by empty CompressorPerRoute.overrides.
+                              // This must remain true no matter what fields ever get added.
                               {true, PerRouteConfig::Enabled, true},
                               {false, PerRouteConfig::Enabled, true},
                               // disabled by CompressorPerRoute.disabled

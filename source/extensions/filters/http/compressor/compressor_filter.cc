@@ -174,6 +174,10 @@ CompressorPerRouteFilterConfig::CompressorPerRouteFilterConfig(
     break;
   case CompressorPerRoute::kOverrides:
     if (config.overrides().has_response_direction_config()) {
+      // The presence of an empty `response_direction_config` must enable response compression, just
+      // as its presence in `Compressor` would. As fields are added, this must remain true.
+      // Consequently, if `response_direction_config.common_direction_config.enabled` ever gets
+      // added, its absence must enable compression.
       response_compression_enabled_ = true;
     }
     break;

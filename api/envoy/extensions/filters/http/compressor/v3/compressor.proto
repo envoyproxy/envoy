@@ -131,6 +131,8 @@ message Compressor {
   bool choose_first = 9;
 }
 
+// Per-route overrides of `ResponseDirectionConfig`. Anything added here should be optional,
+// to allow overriding arbitrary subsets of configuration. Omitted fields must have no affect.
 message ResponseDirectionOverrides {
 }
 
