@@ -522,7 +522,9 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
     state_.filter_call_state_ |= FilterCallState::DecodeHeaders;
     (*entry)->end_stream_ = (end_stream && continue_data_entry == decoder_filters_.end());
     FilterHeadersStatus status = (*entry)->decodeHeaders(headers, (*entry)->end_stream_);
+    state_.filter_call_state_ &= ~FilterCallState::DecodeHeaders;
     if (state_.decoder_filter_chain_aborted_) {
+      executeLocalReplyIfPrepared();
       ENVOY_STREAM_LOG(trace,
                        "decodeHeaders filter iteration aborted due to local reply: filter={}",
                        *this, (*entry)->filter_context_.config_name);
@@ -533,7 +535,6 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
            "Filters should not return FilterHeadersStatus::ContinueAndDontEndStream from "
            "decodeHeaders when end_stream is already false");
 
-    state_.filter_call_state_ &= ~FilterCallState::DecodeHeaders;
     ENVOY_STREAM_LOG(trace, "decode headers called: filter={} status={}", *this,
                      (*entry)->filter_context_.config_name, static_cast<uint64_t>(status));
 
@@ -669,6 +670,7 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
     ENVOY_STREAM_LOG(trace, "decode data called: filter={} status={}", *this,
                      (*entry)->filter_context_.config_name, static_cast<uint64_t>(status));
     if (state_.decoder_filter_chain_aborted_) {
+      executeLocalReplyIfPrepared();
       ENVOY_STREAM_LOG(trace, "decodeData filter iteration aborted due to local reply: filter={}",
                        *this, (*entry)->filter_context_.config_name);
       return;
@@ -758,6 +760,7 @@ void FilterManager::decodeTrailers(ActiveStreamDecoderFilter* filter, RequestTra
     ENVOY_STREAM_LOG(trace, "decode trailers called: filter={} status={}", *this,
                      (*entry)->filter_context_.config_name, static_cast<uint64_t>(status));
     if (state_.decoder_filter_chain_aborted_) {
+      executeLocalReplyIfPrepared();
       ENVOY_STREAM_LOG(trace,
                        "decodeTrailers filter iteration aborted due to local reply: filter={}",
                        *this, (*entry)->filter_context_.config_name);
@@ -790,6 +793,7 @@ void FilterManager::decodeMetadata(ActiveStreamDecoderFilter* filter, MetadataMa
     }
 
     FilterMetadataStatus status = (*entry)->handle_->decodeMetadata(metadata_map);
+    ASSERT(!hasPreparedLocalReply(), "Sending Local Reply from Metadata is not yet supported.");
     ENVOY_STREAM_LOG(trace, "decode metadata called: filter={} status={}, metadata: {}", *this,
                      (*entry)->filter_context_.config_name, static_cast<uint64_t>(status),
                      metadata_map);
@@ -874,8 +878,17 @@ void DownstreamFilterManager::sendLocalReply(
   if (!filter_manager_callbacks_.responseHeaders().has_value() &&
       !filter_manager_callbacks_.informationalHeaders().has_value()) {
     // If the response has not started at all, send the response through the filter chain.
-    sendLocalReplyViaFilterChain(is_grpc_request, code, body, modify_headers, is_head_request,
-                                 grpc_status, details);
+
+    // We only prepare a local reply to execute later if we're actively
+    // invoking filters to avoid re-entrant in filters.
+    if (avoid_reentrant_filter_invocation_during_local_reply_ &&
+        state_.decoder_filter_chain_aborted_) {
+      prepareLocalReplyViaFilterChain(is_grpc_request, code, body, modify_headers, is_head_request,
+                                      grpc_status, details);
+    } else {
+      sendLocalReplyViaFilterChain(is_grpc_request, code, body, modify_headers, is_head_request,
+                                   grpc_status, details);
+    }
   } else if (!state_.non_100_response_headers_encoded_) {
     ENVOY_STREAM_LOG(debug, "Sending local reply with details {} directly to the encoder", *this,
                      details);
@@ -895,6 +908,59 @@ void DownstreamFilterManager::sendLocalReply(
     // Intended?
     filter_manager_callbacks_.resetStream();
   }
+}
+
+void DownstreamFilterManager::prepareLocalReplyViaFilterChain(
+    bool is_grpc_request, Code code, absl::string_view body,
+    const std::function<void(ResponseHeaderMap& headers)>& modify_headers, bool is_head_request,
+    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
+  ENVOY_STREAM_LOG(debug, "Preparing sending local reply with details {}", *this, details);
+  ASSERT(!filter_manager_callbacks_.responseHeaders().has_value());
+  // For early error handling, do a best-effort attempt to create a filter chain
+  // to ensure access logging. If the filter chain already exists this will be
+  // a no-op.
+  createFilterChain();
+
+  if (prepared_local_reply_) {
+    return;
+  }
+
+  prepared_local_reply_ = Utility::prepareLocalReply(
+      Utility::EncodeFunctions{
+          [this, modify_headers](ResponseHeaderMap& headers) -> void {
+            if (streamInfo().route() && streamInfo().route()->routeEntry()) {
+              streamInfo().route()->routeEntry()->finalizeResponseHeaders(headers, streamInfo());
+            }
+            if (modify_headers) {
+              modify_headers(headers);
+            }
+          },
+          [this](ResponseHeaderMap& response_headers, Code& code, std::string& body,
+                 absl::string_view& content_type) -> void {
+            local_reply_.rewrite(filter_manager_callbacks_.requestHeaders().ptr(), response_headers,
+                                 streamInfo(), code, body, content_type);
+          },
+          [this](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
+            filter_manager_callbacks_.setResponseHeaders(std::move(headers));
+            encodeHeaders(nullptr, filter_manager_callbacks_.responseHeaders().ref(), end_stream);
+          },
+          [this](Buffer::Instance& data, bool end_stream) -> void {
+            encodeData(nullptr, data, end_stream,
+                       FilterManager::FilterIterationStartState::CanStartFromCurrent);
+          }},
+      /* This can be captured via copy though watch out for strings! */
+      /* Might be able to have this copy body by value as string, then move it
+       * out of this when processing */
+      Utility::LocalReplyData{is_grpc_request, code, body, grpc_status, is_head_request});
+}
+
+void DownstreamFilterManager::executeLocalReplyIfPrepared() {
+  if (!prepared_local_reply_) {
+    return;
+  }
+
+  ENVOY_STREAM_LOG(debug, "Executing sending local reply.", *this);
+  Utility::encodeLocalReply(state_.destroyed_, std::move(prepared_local_reply_));
 }
 
 void DownstreamFilterManager::sendLocalReplyViaFilterChain(
@@ -924,7 +990,7 @@ void DownstreamFilterManager::sendLocalReplyViaFilterChain(
             local_reply_.rewrite(filter_manager_callbacks_.requestHeaders().ptr(), response_headers,
                                  streamInfo(), code, body, content_type);
           },
-          [this, modify_headers](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
+          [this](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
             filter_manager_callbacks_.setResponseHeaders(std::move(headers));
             encodeHeaders(nullptr, filter_manager_callbacks_.responseHeaders().ref(), end_stream);
           },

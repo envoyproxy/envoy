@@ -32,7 +32,6 @@
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 #include "nghttp2/nghttp2.h"
-#include "utility.h"
 
 namespace Envoy {
 namespace Http2 {

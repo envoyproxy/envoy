@@ -88,6 +88,9 @@ bug_fixes:
 - area: upstream
   change: |
     fixed a bug that only coarse health status is used for override host selection.
+- area: http filter
+  change: |
+    Avoid re-entrant filter invocations if we do a local reply via the filter chain when executing decoder filters.
 - area: validation
   change: |
     fixed a crash which could happen when optional ``engine_type`` is not provided in regex.
