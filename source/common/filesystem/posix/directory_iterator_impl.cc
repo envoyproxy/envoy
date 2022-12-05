@@ -42,7 +42,7 @@ void DirectoryIteratorImpl::nextEntry() {
   }
 
   if (entry == nullptr) {
-    entry_ = {"", FileType::Other, 0};
+    entry_ = {"", FileType::Other, absl::nullopt};
   } else {
     entry_ = makeEntry(entry->d_name);
   }
@@ -57,9 +57,9 @@ DirectoryEntry DirectoryIteratorImpl::makeEntry(absl::string_view filename) cons
       // Special case. This directory entity is likely to be a symlink,
       // but the reference is broken as the target could not be stat()'ed.
       // If we confirm this with an lstat, treat this file entity as
-      // a regular file, which may be unlink()'ed, with size 0.
+      // a regular file, which may be unlink()'ed.
       if (::lstat(full_path.c_str(), &stat_buf) == 0 && S_ISLNK(stat_buf.st_mode)) {
-        return DirectoryEntry{std::string{filename}, FileType::Regular, 0};
+        return DirectoryEntry{std::string{filename}, FileType::Regular, absl::nullopt};
       }
     }
     // TODO: throwing an exception here makes this dangerous to use in worker threads,
@@ -67,12 +67,12 @@ DirectoryEntry DirectoryIteratorImpl::makeEntry(absl::string_view filename) cons
     // may be thrown. Perhaps make this return StatusOr and handle failures gracefully.
     throw EnvoyException(fmt::format("unable to stat file: '{}' ({})", full_path, errno));
   } else if (S_ISDIR(stat_buf.st_mode)) {
-    return DirectoryEntry{std::string{filename}, FileType::Directory, 0};
+    return DirectoryEntry{std::string{filename}, FileType::Directory, absl::nullopt};
   } else if (S_ISREG(stat_buf.st_mode)) {
     return DirectoryEntry{std::string{filename}, FileType::Regular,
                           static_cast<uint64_t>(stat_buf.st_size)};
   } else {
-    return DirectoryEntry{std::string{filename}, FileType::Other, 0};
+    return DirectoryEntry{std::string{filename}, FileType::Other, absl::nullopt};
   }
 }
 

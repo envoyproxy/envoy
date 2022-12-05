@@ -17,8 +17,13 @@ namespace Filesystem {
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 void PrintTo(const DirectoryEntry& entry, std::ostream* os) {
-  *os << "{name=" << entry.name_ << ", type=" << static_cast<int>(entry.type_)
-      << ", size=" << entry.size_bytes_ << "}";
+  *os << "{name=" << entry.name_ << ", type=" << static_cast<int>(entry.type_) << ", size=";
+  if (entry.size_bytes_ == absl::nullopt) {
+    *os << "nullopt";
+  } else {
+    *os << entry.size_bytes_.value();
+  }
+  *os << "}";
 }
 
 class DirectoryTest : public testing::Test {
@@ -110,10 +115,9 @@ EntrySet getDirectoryContents(const std::string& dir_path, bool recursive) {
 // Test that we can list a file in a directory
 TEST_F(DirectoryTest, DirectoryWithOneFile) {
   addFiles({"file"});
-
   const EntrySet expected = {
-      {".", FileType::Directory, 0},
-      {"..", FileType::Directory, 0},
+      {".", FileType::Directory, absl::nullopt},
+      {"..", FileType::Directory, absl::nullopt},
       {"file", FileType::Regular, 0},
   };
   EXPECT_EQ(expected, getDirectoryContents(dir_path_, false));
@@ -124,8 +128,8 @@ TEST_F(DirectoryTest, DirectoryWithOneFileIncludesCorrectFileSize) {
   addFileWithContents("file", contents);
 
   const EntrySet expected = {
-      {".", FileType::Directory, 0},
-      {"..", FileType::Directory, 0},
+      {".", FileType::Directory, absl::nullopt},
+      {"..", FileType::Directory, absl::nullopt},
       {"file", FileType::Regular, contents.size()},
   };
   EXPECT_EQ(expected, getDirectoryContents(dir_path_, false));
@@ -136,9 +140,9 @@ TEST_F(DirectoryTest, DirectoryWithOneDirectory) {
   addSubDirs({"sub_dir"});
 
   const EntrySet expected = {
-      {".", FileType::Directory, 0},
-      {"..", FileType::Directory, 0},
-      {"sub_dir", FileType::Directory, 0},
+      {".", FileType::Directory, absl::nullopt},
+      {"..", FileType::Directory, absl::nullopt},
+      {"sub_dir", FileType::Directory, absl::nullopt},
   };
   EXPECT_EQ(expected, getDirectoryContents(dir_path_, false));
 }
@@ -149,9 +153,9 @@ TEST_F(DirectoryTest, DirectoryWithFileInSubDirectory) {
   addFiles({"sub_dir/sub_file"});
 
   const EntrySet expected = {
-      {".", FileType::Directory, 0},
-      {"..", FileType::Directory, 0},
-      {"sub_dir", FileType::Directory, 0},
+      {".", FileType::Directory, absl::nullopt},
+      {"..", FileType::Directory, absl::nullopt},
+      {"sub_dir", FileType::Directory, absl::nullopt},
   };
   EXPECT_EQ(expected, getDirectoryContents(dir_path_, false));
 }
@@ -162,13 +166,13 @@ TEST_F(DirectoryTest, RecursionIntoSubDirectory) {
   addFiles({"file", "sub_dir/sub_file"});
 
   const EntrySet expected = {
-      {".", FileType::Directory, 0},
-      {"..", FileType::Directory, 0},
+      {".", FileType::Directory, absl::nullopt},
+      {"..", FileType::Directory, absl::nullopt},
       {"file", FileType::Regular, 0},
-      {"sub_dir", FileType::Directory, 0},
+      {"sub_dir", FileType::Directory, absl::nullopt},
       {"sub_dir/sub_file", FileType::Regular, 0},
-      {"sub_dir/.", FileType::Directory, 0},
-      {"sub_dir/..", FileType::Directory, 0},
+      {"sub_dir/.", FileType::Directory, absl::nullopt},
+      {"sub_dir/..", FileType::Directory, absl::nullopt},
   };
   EXPECT_EQ(expected, getDirectoryContents(dir_path_, true));
 }
@@ -179,9 +183,9 @@ TEST_F(DirectoryTest, DirectoryWithFileAndDirectory) {
   addFiles({"file"});
 
   const EntrySet expected = {
-      {".", FileType::Directory, 0},
-      {"..", FileType::Directory, 0},
-      {"sub_dir", FileType::Directory, 0},
+      {".", FileType::Directory, absl::nullopt},
+      {"..", FileType::Directory, absl::nullopt},
+      {"sub_dir", FileType::Directory, absl::nullopt},
       {"file", FileType::Regular, 0},
   };
   EXPECT_EQ(expected, getDirectoryContents(dir_path_, false));
@@ -208,10 +212,10 @@ TEST_F(DirectoryTest, DirectoryWithSymlinkToDirectory) {
   addSymlinks({{"sub_dir", "link_dir"}});
 
   const EntrySet expected = {
-      {".", FileType::Directory, 0},
-      {"..", FileType::Directory, 0},
-      {"sub_dir", FileType::Directory, 0},
-      {"link_dir", FileType::Directory, 0},
+      {".", FileType::Directory, absl::nullopt},
+      {"..", FileType::Directory, absl::nullopt},
+      {"sub_dir", FileType::Directory, absl::nullopt},
+      {"link_dir", FileType::Directory, absl::nullopt},
   };
   EXPECT_EQ(expected, getDirectoryContents(dir_path_, false));
 }
@@ -223,14 +227,14 @@ TEST_F(DirectoryTest, DirectoryWithBrokenSymlink) {
   TestEnvironment::removePath(dir_path_ + "/sub_dir");
 
   const EntrySet expected = {
-      {".", FileType::Directory, 0},
-      {"..", FileType::Directory, 0},
+      {".", FileType::Directory, absl::nullopt},
+      {"..", FileType::Directory, absl::nullopt},
 #ifndef WIN32
       // On Linux, a broken directory link is simply a symlink to be rm'ed
-      {"link_dir", FileType::Regular, 0},
+      {"link_dir", FileType::Regular, absl::nullopt},
 #else
       // On Windows, a broken directory link remains a directory link to be rmdir'ed
-      {"link_dir", FileType::Directory, 0},
+      {"link_dir", FileType::Directory, absl::nullopt},
 #endif
   };
   EXPECT_EQ(expected, getDirectoryContents(dir_path_, false));
@@ -239,8 +243,8 @@ TEST_F(DirectoryTest, DirectoryWithBrokenSymlink) {
 // Test that we can list an empty directory
 TEST_F(DirectoryTest, DirectoryWithEmptyDirectory) {
   const EntrySet expected = {
-      {".", FileType::Directory, 0},
-      {"..", FileType::Directory, 0},
+      {".", FileType::Directory, absl::nullopt},
+      {"..", FileType::Directory, absl::nullopt},
   };
   EXPECT_EQ(expected, getDirectoryContents(dir_path_, false));
 }
@@ -266,9 +270,9 @@ TEST_F(DirectoryTest, Fifo) {
   ASSERT_EQ(0, mkfifo(fifo_path.c_str(), 0644));
 
   const EntrySet expected = {
-      {".", FileType::Directory, 0},
-      {"..", FileType::Directory, 0},
-      {"fifo", FileType::Other, 0},
+      {".", FileType::Directory, absl::nullopt},
+      {"..", FileType::Directory, absl::nullopt},
+      {"fifo", FileType::Other, absl::nullopt},
   };
   EXPECT_EQ(expected, getDirectoryContents(dir_path_, false));
   remove(fifo_path.c_str());
@@ -295,8 +299,8 @@ TEST(Directory, DirectoryHasTrailingPathSeparator) {
   TestEnvironment::createPath(dir_path);
 
   const EntrySet expected = {
-      {".", FileType::Directory, 0},
-      {"..", FileType::Directory, 0},
+      {".", FileType::Directory, absl::nullopt},
+      {"..", FileType::Directory, absl::nullopt},
   };
   EXPECT_EQ(expected, getDirectoryContents(dir_path, false));
   TestEnvironment::removePath(dir_path);
