@@ -7,7 +7,6 @@ import "validate/validate.proto";
 
 import "envoy/extensions/http/header_validators/envoy_default/v3/header_validator.proto";
 
-
 message PathNormalizerFuzzTestCase {
   // the character set of the :path and :method headers is validated before normalization.
   // As such it is ok to use strings to represent these values in the fuzz test.
