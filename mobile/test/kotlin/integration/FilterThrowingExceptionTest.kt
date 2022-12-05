@@ -28,6 +28,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.Assert.assertNotNull
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -38,7 +39,7 @@ class ThrowingFilter: RequestFilter, ResponseFilter {
     endStream: Boolean,
     streamIntel: StreamIntel
   ): FilterHeadersStatus<RequestHeaders> {
-    throw Exception("Demo Filter simulated onRequestHeaders exception")
+    throw Exception("Simulated onRequestHeaders exception")
   }
 
   override fun onRequestData(body: ByteBuffer, endStream: Boolean, streamIntel: StreamIntel):
@@ -56,7 +57,7 @@ class ThrowingFilter: RequestFilter, ResponseFilter {
     endStream: Boolean,
     streamIntel: StreamIntel
   ): FilterHeadersStatus<ResponseHeaders> {
-    throw Exception("Demo Filter simulated onResponseHeaders exception")
+    throw Exception("Simulated onResponseHeaders exception")
   }
 
   override fun onResponseData(
@@ -81,9 +82,7 @@ class ThrowingFilter: RequestFilter, ResponseFilter {
 
   override fun onCancel(finalStreamIntel: FinalStreamIntel) {}
 
-  override fun onComplete(finalStreamIntel: FinalStreamIntel) {
-    throw Exception("Demo Filter simulated onComplete exception")
-  }
+  override fun onComplete(finalStreamIntel: FinalStreamIntel) {}
 }
 
 @RunWith(RobolectricTestRunner::class)
@@ -96,12 +95,25 @@ class PerformHTTPRequestUsingProxy {
   fun `registers a filter that throws an exception and performs an HTTP request`() {
     val onEngineRunningLatch = CountDownLatch(1)
     val onRespondeHeadersLatch = CountDownLatch(1)
+    val onExceptionEventLatch = CountDownLatch(2)
+
+    val expectedMessages = mutableListOf(
+        "Simulated onRequestHeaders exception",
+        "Simulated onResponseHeaders exception",
+    )
 
     val context = ApplicationProvider.getApplicationContext<Context>()
     val builder = AndroidEngineBuilder(context)
     val engine = builder
       .addLogLevel(LogLevel.DEBUG)
       .addPlatformFilter(::ThrowingFilter)
+      .setEventTracker { event ->
+        if (event["name"] == "event_log" && event["log_name"] == "jni_exception") {
+          assertThat(event["message"]).isEqualTo(expectedMessages.first())
+          expectedMessages.removeAt(0)
+          onExceptionEventLatch.countDown()
+        }
+      }
       .setOnEngineRunning { onEngineRunningLatch.countDown() }
       .build()
 
@@ -127,7 +139,9 @@ class PerformHTTPRequestUsingProxy {
       .start(Executors.newSingleThreadExecutor())
       .sendHeaders(requestHeaders, true)
 
-    onRespondeHeadersLatch.await(15, TimeUnit.SECONDS)
+    onExceptionEventLatch.await(15, TimeUnit.SECONDS)
+    assertThat(onExceptionEventLatch.count).isEqualTo(0)
+    onRespondeHeadersLatch.await(5, TimeUnit.SECONDS)
     assertThat(onRespondeHeadersLatch.count).isEqualTo(0)
 
     engine.terminate()

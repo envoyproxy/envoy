@@ -110,7 +110,7 @@ jbyteArray ToJavaByteArray(JNIEnv* env, const uint8_t* bytes, size_t len);
 
 jbyteArray ToJavaByteArray(JNIEnv* env, const std::string& str);
 
-jobjectArray ToJavaArrayOfJObjects(JNIEnv* env, const ManagedEnvoyHeaders& map);
+jobjectArray ToJavaArrayOfObjectArray(JNIEnv* env, const ManagedEnvoyHeaders& map);
 
 void JavaArrayOfByteArrayToStringVector(JNIEnv* env, jobjectArray array,
                                         std::vector<std::string>* out);

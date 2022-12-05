@@ -346,7 +346,7 @@ static void* jvm_on_headers(const char* method, const ManagedEnvoyHeaders& heade
     env->SetObjectArrayElement(result, 0, status);
 
     // Since the "on headers" call threw an exception set input headers as output headers.
-    env->SetObjectArrayElement(result, 1, ToJavaArrayOfJObjects(env, headers));
+    env->SetObjectArrayElement(result, 1, ToJavaArrayOfObjectArray(env, headers));
 
     env->DeleteLocalRef(jcls_object_array);
     env->DeleteLocalRef(jcls_int);
@@ -766,6 +766,7 @@ static void* call_jvm_on_error(envoy_error error, envoy_stream_intel stream_inte
 
   jobject result = env->CallObjectMethod(j_context, jmid_onError, error.error_code, j_error_message,
                                          error.attempt_count, j_stream_intel, j_final_stream_intel);
+
   exception_check(env);
 
   env->DeleteLocalRef(j_stream_intel);
