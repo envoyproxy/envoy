@@ -1120,7 +1120,7 @@ TEST_F(AsyncClientImplTest, ResetInOnHeaders) {
   stream->sendData(*body, false);
 
   Http::StreamDecoderFilterCallbacks* filter_callbacks =
-      static_cast<Http::AsyncStreamImpl*>(stream);
+      dynamic_cast<Http::AsyncStreamImpl*>(stream);
   filter_callbacks->encodeHeaders(
       ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "200"}}), false, "details");
   dispatcher_.clearDeferredDeleteList();
@@ -1661,7 +1661,7 @@ TEST_F(AsyncClientImplTest, WatermarkCallbacks) {
   AsyncClient::Stream* stream = client_.start(stream_callbacks_, AsyncClient::StreamOptions());
   stream->sendHeaders(headers_, false);
   Http::StreamDecoderFilterCallbacks* filter_callbacks =
-      static_cast<Http::AsyncStreamImpl*>(stream);
+      dynamic_cast<Http::AsyncStreamImpl*>(stream);
   filter_callbacks->onDecoderFilterAboveWriteBufferHighWatermark();
   EXPECT_TRUE(stream->isAboveWriteBufferHighWatermark());
   filter_callbacks->onDecoderFilterAboveWriteBufferHighWatermark();
@@ -1677,7 +1677,7 @@ TEST_F(AsyncClientImplTest, RdsGettersTest) {
   AsyncClient::Stream* stream = client_.start(stream_callbacks_, AsyncClient::StreamOptions());
   stream->sendHeaders(headers_, false);
   Http::StreamDecoderFilterCallbacks* filter_callbacks =
-      static_cast<Http::AsyncStreamImpl*>(stream);
+      dynamic_cast<Http::AsyncStreamImpl*>(stream);
   auto route = filter_callbacks->route();
   ASSERT_NE(nullptr, route);
   auto route_entry = route->routeEntry();
@@ -1698,7 +1698,7 @@ TEST_F(AsyncClientImplTest, RdsGettersTest) {
 TEST_F(AsyncClientImplTest, DumpState) {
   AsyncClient::Stream* stream = client_.start(stream_callbacks_, AsyncClient::StreamOptions());
   Http::StreamDecoderFilterCallbacks* filter_callbacks =
-      static_cast<Http::AsyncStreamImpl*>(stream);
+      dynamic_cast<Http::AsyncStreamImpl*>(stream);
 
   std::stringstream out;
   filter_callbacks->scope().dumpState(out);
