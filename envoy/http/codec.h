@@ -45,6 +45,7 @@ const char MaxResponseHeadersCountOverrideKey[] =
     "envoy.reloadable_features.max_response_headers_count";
 
 class Stream;
+class RequestDecoder;
 
 /**
  * Error codes used to convey the reason for a GOAWAY.
@@ -165,6 +166,12 @@ public:
    * error.
    */
   virtual bool streamErrorOnInvalidHttpMessage() const PURE;
+
+  /**
+   * Set a new request decoder for this ResponseEncoder.
+   * @param decoder new request decoder.
+   */
+  virtual void setRequestDecoder(RequestDecoder& decoder) PURE;
 };
 
 /**
