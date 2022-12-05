@@ -1,6 +1,7 @@
 #include "source/extensions/http/header_validators/envoy_default/http2_header_validator.h"
 
 #include "source/extensions/http/header_validators/envoy_default/character_tables.h"
+#include "source/extensions/http/header_validators/envoy_default/error_codes.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/container/node_hash_set.h"
