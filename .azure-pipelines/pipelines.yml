@@ -451,6 +451,19 @@ stages:
         GCS_ARTIFACT_BUCKET: $(GcsArtifactBucket)
       condition: always()
 
+  - job: complete
+    displayName: "linux_x64"
+    dependsOn: ["bazel", "coverage"]
+    pool:
+      vmImage: "ubuntu-20.04"
+    condition: |
+      and(
+        in(dependencies.bazel.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
+        in(dependencies.coverage.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
+    steps:
+    - bash: |
+        echo "checks complete"
+
 - stage: docker
   dependsOn: ["linux_x64", "linux_arm64"]
   jobs:
