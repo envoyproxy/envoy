@@ -45,14 +45,3 @@ listening on the port. In practice, UDP listeners are configured with the SO_REU
 which will cause the kernel to consistently hash each UDP 4-tuple to the same worker. This allows a
 UDP listener filter to be "session" oriented if it so desires. A built-in example of this
 functionality is the :ref:`UDP proxy <config_udp_listener_filters_udp_proxy>` listener filter.
-
-.. _extension_envoy.listener_manager_impl.default:
-
-Listener Management
--------------------
-
-Management of both TCP and UDP listeners is handled by the Listener Manager. For uses of the Envoy
-which do not require any downstream listener, one can build Envoy without the
-``envoy.listener_manager_impl.default`` extension, however this should be done with caution as
-there are other ares of code such as config validation and admin functionality that rely on the listener
-code being present.
