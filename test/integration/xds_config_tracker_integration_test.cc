@@ -221,32 +221,9 @@ TEST_P(XdsConfigTrackerIntegrationTest, XdsConfigTrackerFailureCount) {
               cluster_name: xds_cluster
     )EOF");
 
-  FakeStream* stream = xds_stream_.get();
-  if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw ||
-      sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedSotw) {
-    envoy::service::discovery::v3::DiscoveryResponse discovery_response;
-    discovery_response.set_version_info("1");
-    discovery_response.set_type_url(Config::TypeUrl::get().Runtime);
-    discovery_response.add_resources()->PackFrom(route_config);
-
-    static int next_nonce_counter = 0;
-    discovery_response.set_nonce(absl::StrCat("nonce", next_nonce_counter++));
-
-    // Message's TypeUrl != Resource's
-    stream->sendGrpcMessage(discovery_response);
-  } else {
-    std::vector<envoy::service::discovery::v3::Resource> resources;
-    envoy::service::discovery::v3::Resource resource;
-    resource.mutable_resource()->PackFrom(route_config);
-    resource.set_name("my_route");
-    resource.set_version("1");
-    resources.emplace_back(resource);
-    const auto delta_discovery_response = createExplicitResourcesDeltaDiscoveryResponse(
-        Config::TypeUrl::get().Runtime, resources, {});
-
-    // Message's TypeUrl != Resource's
-    stream->sendGrpcMessage(delta_discovery_response);
-  }
+  // Message's TypeUrl != Resource's
+  sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
+      Config::TypeUrl::get().Runtime, {route_config}, {route_config}, {}, "1");
 
   test_server_->waitForCounterEq("test_xds_tracker.on_config_rejected", 1);
   EXPECT_EQ(1, test_server_->counter("test_xds_tracker.on_config_rejected")->value());
