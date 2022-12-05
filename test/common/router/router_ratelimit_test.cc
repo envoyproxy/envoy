@@ -893,7 +893,7 @@ filter_metadata:
 
 // Tests that no descriptor is generated when both the metadata_key and default_value are empty,
 // and skip_if_absent is set to true.
-TEST_F(RateLimitPolicyEntryTest, MetaDataAndDefaultValueEmpty2) {
+TEST_F(RateLimitPolicyEntryTest, MetaDataAndDefaultValueEmptySkipIfAbsent) {
   const std::string yaml = R"EOF(
 actions:
 - generic_key:
