@@ -117,7 +117,7 @@ SysCallIntResult OsSysCallsImpl::close(os_fd_t fd) {
   const int rc = ::closesocket(fd);
   int socket_err = ::WSAGetLastError();
   if (rc == -1) {
-    // If closesocket failed, maybe the descriptor was a file.
+    // If `closesocket` failed, maybe the descriptor was a file.
     rc = ::close(fd);
   }
   // Assume the descriptor was a socket, and return the error from that one, if both failed.
