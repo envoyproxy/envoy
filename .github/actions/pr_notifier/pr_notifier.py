@@ -42,7 +42,6 @@ MAINTAINERS = {
     'Augustyniak': 'U017R1YHXGQ',
     'jpsim': 'U02KAPRELKA',
     'abeyad': 'U03CVM7GPM1',
-
 }
 
 # First pass reviewers who are not maintainers should get
