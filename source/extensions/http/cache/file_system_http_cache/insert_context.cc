@@ -275,7 +275,6 @@ void InsertOperationQueue::commit(std::shared_ptr<InsertOperationQueue> p,
 }
 
 InsertOperationQueue::~InsertOperationQueue() {
-  std::cerr << "InsertOperationQueue destroyed" << std::endl;
   absl::MutexLock lock(&mu_);
   cancelInsert(nullptr, "destroyed before completion");
 }

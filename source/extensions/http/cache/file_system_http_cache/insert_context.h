@@ -177,7 +177,7 @@ private:
   std::function<void(bool)> callback_in_flight_ ABSL_GUARDED_BY(mu_);
   CacheFileFixedBlock header_block_ ABSL_GUARDED_BY(mu_);
   CacheFileHeader header_proto_ ABSL_GUARDED_BY(mu_);
-  bool seen_end_stream_ ABSL_GUARDED_BY(mu_);
+  bool seen_end_stream_ ABSL_GUARDED_BY(mu_) = false;
   // key_ may be updated to a varyKey during insertHeaders.
   Key key_ ABSL_GUARDED_BY(mu_);
   const std::shared_ptr<FileSystemHttpCache> cache_;
@@ -214,7 +214,6 @@ public:
   void insertTrailers(const Http::ResponseTrailerMap& trailers,
                       InsertCallback insert_complete) override;
   void onDestroy() override;
-  ~FileInsertContext() override { std::cerr << "XXXXX FileInsertContext destroyed" << std::endl; };
 
 private:
   std::unique_ptr<FileLookupContext> lookup_context_;
