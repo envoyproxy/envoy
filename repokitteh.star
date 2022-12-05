@@ -18,10 +18,10 @@ use(
       "github_status_label": "v2 freeze violations",
     },
     {
-￼      "owner": "envoyproxy/coverage-shephards",
-￼      "path": "(test/per_file_coverage.sh)",
-￼      "github_status_label": "changes to Envoy coverage scripts",
-￼      "auto_assign": True,
+       "owner": "envoyproxy/coverage-shephards",
+       "path": "(test/per_file_coverage.sh)",
+       "github_status_label": "changes to Envoy coverage scripts",
+       "auto_assign": True,
     },
     {
       "owner": "envoyproxy/api-shepherds!",
