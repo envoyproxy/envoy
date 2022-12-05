@@ -479,10 +479,14 @@ public:
                 const RequestOptions& args) override {
     return send_(request, callbacks, args);
   }
-
+  OngoingRequest* startRequest(RequestHeaderMapPtr&& headers, Callbacks& callbacks,
+                               const RequestOptions& args) override {
+    return startRequest_(headers, callbacks, args);
+  }
   MOCK_METHOD(Request*, send_,
               (RequestMessagePtr & request, Callbacks& callbacks, const RequestOptions& args));
-
+  MOCK_METHOD(OngoingRequest*, startRequest_,
+              (RequestHeaderMapPtr & request, Callbacks& callbacks, const RequestOptions& args));
   MOCK_METHOD(Stream*, start, (StreamCallbacks & callbacks, const StreamOptions& args));
 
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
@@ -525,7 +529,7 @@ public:
   MOCK_METHOD(void, onReset, ());
 };
 
-class MockAsyncClientRequest : public AsyncClient::Request {
+class MockAsyncClientRequest : public virtual AsyncClient::Request {
 public:
   MockAsyncClientRequest(MockAsyncClient* client);
   ~MockAsyncClientRequest() override;
@@ -535,7 +539,7 @@ public:
   MockAsyncClient* client_;
 };
 
-class MockAsyncClientStream : public AsyncClient::Stream {
+class MockAsyncClientStream : public virtual AsyncClient::Stream {
 public:
   MockAsyncClientStream();
   ~MockAsyncClientStream() override;
@@ -545,6 +549,31 @@ public:
   MOCK_METHOD(void, sendTrailers, (RequestTrailerMap & trailers));
   MOCK_METHOD(void, reset, ());
   MOCK_METHOD(bool, isAboveWriteBufferHighWatermark, (), (const));
+  void setDestructorCallback(AsyncClient::StreamDestructorCallbacks callback) override {
+    destructor_callback_ = callback;
+  }
+  void removeDestructorCallback() override { destructor_callback_.reset(); }
+  MOCK_METHOD(void, setWatermarkCallbacks, (DecoderFilterWatermarkCallbacks & callback),
+              (override));
+  MOCK_METHOD(void, removeWatermarkCallbacks, (), (override));
+
+private:
+  absl::optional<AsyncClient::StreamDestructorCallbacks> destructor_callback_;
+};
+
+class MockAsyncClientOngoingRequest : public virtual AsyncClient::OngoingRequest,
+                                      public MockAsyncClientStream,
+                                      public MockAsyncClientRequest {
+public:
+  MockAsyncClientOngoingRequest(MockAsyncClient* client) : MockAsyncClientRequest(client) {}
+  void captureAndSendData(Buffer::InstancePtr&& data, bool end_stream) override {
+    return captureAndSendData_(*data, end_stream);
+  }
+  void captureAndSendTrailers(RequestTrailerMapPtr&& trailers) override {
+    return captureAndSendTrailers_(*trailers);
+  }
+  MOCK_METHOD(void, captureAndSendData_, (Buffer::Instance & data, bool end_stream), ());
+  MOCK_METHOD(void, captureAndSendTrailers_, (RequestTrailerMap & trailers), ());
 };
 
 class MockDownstreamWatermarkCallbacks : public DownstreamWatermarkCallbacks {

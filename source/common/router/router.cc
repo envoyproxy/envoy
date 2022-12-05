@@ -282,6 +282,16 @@ Filter::~Filter() {
   // Upstream resources should already have been cleaned.
   ASSERT(upstream_requests_.empty());
   ASSERT(!retry_state_);
+
+  // Unregister from shadow stream notifications.
+  for (auto& [shadow_stream, ended] : shadow_streams_) {
+    if (!ended) {
+      // we have not yet sent an end stream to the shadows; cancel them.
+      shadow_stream->cancel();
+    }
+    shadow_stream->removeDestructorCallback();
+    shadow_stream->removeWatermarkCallbacks();
+  }
 }
 
 const FilterUtility::StrictHeaderChecker::HeaderCheckResult
@@ -694,6 +704,36 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       *this, std::move(generic_conn_pool), can_send_early_data, can_use_http3);
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->acceptHeadersFromRouter(end_stream);
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.streaming_shadow")) {
+    // start the shadow streams.
+    for (const auto& shadow_policy_wrapper : active_shadow_policies_) {
+      const auto& shadow_policy = shadow_policy_wrapper.get();
+      const absl::optional<absl::string_view> cluster_name =
+          getShadowCluster(shadow_policy, *downstream_headers_);
+      if (!cluster_name.has_value()) {
+        continue;
+      }
+      auto shadow_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>(*shadow_headers_);
+      auto options = Http::AsyncClient::RequestOptions()
+                         .setTimeout(timeout_.global_timeout_)
+                         .setParentSpan(callbacks_->activeSpan())
+                         .setChildSpanName("mirror")
+                         .setSampled(shadow_policy.traceSampled())
+                         .setIsShadow(true)
+                         .setEndStream(end_stream);
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.closer_shadow_behavior")) {
+        options.setFilterConfig(config_);
+      }
+      Http::AsyncClient::OngoingRequest* shadow_stream = config_.shadowWriter().streamingShadow(
+          std::string(cluster_name.value()), std::move(shadow_headers), options);
+      if (shadow_stream != nullptr) {
+        shadow_streams_[shadow_stream] = end_stream;
+        shadow_stream->setDestructorCallback(
+            [this, shadow_stream]() { shadow_streams_.erase(shadow_stream); });
+        shadow_stream->setWatermarkCallbacks(*callbacks_);
+      }
+    }
+  }
   if (end_stream) {
     onRequestComplete();
   }
@@ -738,6 +778,48 @@ void Filter::sendNoHealthyUpstreamResponse() {
                              StreamInfo::ResponseCodeDetails::get().NoHealthyUpstream);
 }
 
+/*
+ * Helper class to handle a known number of buffer copies.
+ */
+class ManyCopiedBuffer {
+public:
+  ManyCopiedBuffer(Buffer::Instance& original_buffer, int num_copies)
+      : original_buffer_(original_buffer), num_copies_(num_copies) {}
+  ~ManyCopiedBuffer() {}
+
+  // Get an unowned reference to the next copy of the buffer. The copy is owned by this class.
+  Buffer::Instance& nextBuffer() {
+    ASSERT(num_copies_ > -1);
+    if (num_copies_ == 0) {
+      --num_copies_;
+      return original_buffer_;
+    } else {
+      copy_ = Buffer::OwnedImpl(original_buffer_);
+      --num_copies_;
+      return copy_;
+    }
+  }
+
+  // Get an owned pointer to the next copy of the buffer.
+  Buffer::InstancePtr nextBufferOwned() {
+    ASSERT(num_copies_ > -1);
+    if (num_copies_ == 0) {
+      auto copy = std::make_unique<Buffer::OwnedImpl>();
+      copy->move(original_buffer_);
+      --num_copies_;
+      return std::move(copy);
+    } else {
+      --num_copies_;
+      return std::make_unique<Buffer::OwnedImpl>(original_buffer_);
+    }
+  }
+
+private:
+  Buffer::Instance& original_buffer_;
+  Buffer::OwnedImpl copy_;
+  int num_copies_;
+};
+
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
   // upstream_requests_.size() cannot be > 1 because that only happens when a per
   // try timeout occurs with hedge_on_per_try_timeout enabled but the per
@@ -746,7 +828,10 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   // a backoff timer.
   ASSERT(upstream_requests_.size() <= 1);
 
-  bool buffering = (retry_state_ && retry_state_->enabled()) || !active_shadow_policies_.empty() ||
+  bool streaming_shadow =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.streaming_shadow");
+  bool buffering = (retry_state_ && retry_state_->enabled()) ||
+                   (!active_shadow_policies_.empty() && !streaming_shadow) ||
                    (route_entry_ && route_entry_->internalRedirectPolicy().enabled());
   if (buffering &&
       getLength(callbacks_->decodingBuffer()) + data.length() > retry_shadow_buffer_limit_) {
@@ -777,22 +862,22 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   // already.
   ASSERT(buffering || !upstream_requests_.empty());
 
-  if (buffering) {
-    // If we are going to buffer for retries or shadowing, we need to make a copy before encoding
-    // since it's all moves from here on.
-    if (!upstream_requests_.empty()) {
-      Buffer::OwnedImpl copy(data);
-      upstream_requests_.front()->acceptDataFromRouter(copy, end_stream);
-    }
+  // We will need to make N copies of the data.
+  auto many_copied_buffer =
+      ManyCopiedBuffer(data, buffering + !upstream_requests_.empty() +
+                                 (streaming_shadow ? shadow_streams_.size() : 0) - 1);
 
-    // If we are potentially going to retry or shadow this request we need to buffer.
-    // This will not cause the connection manager to 413 because before we hit the
-    // buffer limit we give up on retries and buffering. We must buffer using addDecodedData()
-    // so that all buffered data is available by the time we do request complete processing and
-    // potentially shadow.
-    callbacks_->addDecodedData(data, true);
-  } else {
-    upstream_requests_.front()->acceptDataFromRouter(data, end_stream);
+  if (!upstream_requests_.empty()) {
+    upstream_requests_.front()->acceptDataFromRouter(many_copied_buffer.nextBuffer(), end_stream);
+  }
+  if (buffering) {
+    callbacks_->addDecodedData(many_copied_buffer.nextBuffer(), true);
+  }
+  if (streaming_shadow && !shadow_streams_.empty()) {
+    for (auto& [shadow_stream, ended] : shadow_streams_) {
+      shadow_stream->captureAndSendData(many_copied_buffer.nextBufferOwned(), end_stream);
+      ended = end_stream;
+    }
   }
 
   if (end_stream) {
@@ -818,6 +903,13 @@ Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap& trail
   downstream_trailers_ = &trailers;
   if (!upstream_requests_.empty()) {
     upstream_requests_.front()->acceptTrailersFromRouter(trailers);
+  }
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.streaming_shadow")) {
+    for (auto& [shadow_stream, ended] : shadow_streams_) {
+      shadow_stream->captureAndSendTrailers(
+          Http::createHeaderMap<Http::RequestTrailerMapImpl>(*shadow_trailers_));
+      ended = true;
+    }
   }
   onRequestComplete();
   return Http::FilterTrailersStatus::StopIteration;
@@ -918,7 +1010,9 @@ void Filter::onRequestComplete() {
   if (!upstream_requests_.empty()) {
     // Even if we got an immediate reset, we could still shadow, but that is a riskier change and
     // seems unnecessary right now.
-    maybeDoShadowing();
+    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.streaming_shadow")) {
+      maybeDoShadowing();
+    }
 
     if (timeout_.global_timeout_.count() > 0) {
       response_timeout_ = dispatcher.createTimer([this]() -> void { onResponseTimeout(); });

@@ -3,8 +3,11 @@
 #include <chrono>
 #include <memory>
 
+#include "envoy/buffer/buffer.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/http/filter.h"
+#include "envoy/http/header_map.h"
 #include "envoy/http/message.h"
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/tracing/http_tracer.h"
@@ -129,6 +132,10 @@ public:
     virtual void onReset() PURE;
   };
 
+  class Stream;
+
+  using StreamDestructorCallbacks = std::function<void()>;
+
   /**
    * An in-flight HTTP stream.
    */
@@ -164,10 +171,50 @@ public:
     virtual void reset() PURE;
 
     /***
+     * Add destructor callback.
+     */
+    virtual void setDestructorCallback(StreamDestructorCallbacks callback) PURE;
+
+    /***
+     * Remove previously set destructor callback.
+     */
+    virtual void removeDestructorCallback() PURE;
+
+    /***
+     * Add watermark callbacks.
+     */
+    virtual void setWatermarkCallbacks(DecoderFilterWatermarkCallbacks& callbacks) PURE;
+
+    /***
+     * Remove previously set watermark callbacks.
+     */
+    virtual void removeWatermarkCallbacks() PURE;
+
+    /***
      * @returns if the stream has enough buffered outbound data to be over the configured buffer
      * limits
      */
     virtual bool isAboveWriteBufferHighWatermark() const PURE;
+  };
+
+  /***
+   * An interface for ongoing asynchronous requests.
+   */
+  class OngoingRequest : public virtual Request, public virtual Stream {
+  public:
+    virtual ~OngoingRequest() = default;
+    /***
+     * Take ownership of data, and sends it to the underlying stream.
+     * @param data owned buffer to pass to upstream.
+     * @param end_stream whether to end the stream.
+     */
+    virtual void captureAndSendData(Buffer::InstancePtr&& data, bool end_stream) PURE;
+
+    /***
+     * Take ownership of data, and sends it to the underlying stream.
+     * @param trailers owned trailers to pass to upstream.
+     */
+    virtual void captureAndSendTrailers(RequestTrailerMapPtr&& trailers) PURE;
   };
 
   virtual ~AsyncClient() = default;
@@ -318,6 +365,10 @@ public:
       sampled_ = sampled;
       return *this;
     }
+    RequestOptions& setEndStream(bool end_stream) {
+      end_stream_immediately_ = end_stream;
+      return *this;
+    }
 
     // For gmock test
     bool operator==(const RequestOptions& src) const {
@@ -334,6 +385,8 @@ public:
     std::string child_span_name_{""};
     // Sampling decision for the tracing span. The span is sampled by default.
     absl::optional<bool> sampled_{true};
+    // Whether this request should be immediately ended
+    bool end_stream_immediately_{true};
   };
 
   /**
@@ -348,6 +401,18 @@ public:
 
   virtual Request* send(RequestMessagePtr&& request, Callbacks& callbacks,
                         const RequestOptions& options) PURE;
+
+  /**
+   * Starts a new request asynchronously with the given headers.
+   *
+   * @param request_headers headers to send.
+   * @param callbacks the callbacks to be notified of request status.
+   * @param options the data struct to control the request sending.
+   * @return a request handle or nullptr if no request could be created. See note attached to
+   * `send`.
+   */
+  virtual OngoingRequest* startRequest(RequestHeaderMapPtr&& request_headers, Callbacks& callbacks,
+                                       const RequestOptions& options) PURE;
 
   /**
    * Start an HTTP stream asynchronously.

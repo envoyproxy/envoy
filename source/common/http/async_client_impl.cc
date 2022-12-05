@@ -52,11 +52,7 @@ AsyncClientImpl::~AsyncClientImpl() {
   }
 }
 
-AsyncClient::Request* AsyncClientImpl::send(RequestMessagePtr&& request,
-                                            AsyncClient::Callbacks& callbacks,
-                                            const AsyncClient::RequestOptions& options) {
-  AsyncRequestImpl* async_request =
-      new AsyncRequestImpl(std::move(request), *this, callbacks, options);
+template <typename T> T* AsyncClientImpl::internalStartRequest(T* async_request) {
   async_request->initialize();
   std::unique_ptr<AsyncStreamImpl> new_request{async_request};
 
@@ -68,6 +64,27 @@ AsyncClient::Request* AsyncClientImpl::send(RequestMessagePtr&& request,
     new_request->cleanup();
     return nullptr;
   }
+}
+
+template AsyncRequestImpl*
+AsyncClientImpl::internalStartRequest<AsyncRequestImpl>(AsyncRequestImpl*);
+template AsyncOngoingRequestImpl*
+AsyncClientImpl::internalStartRequest<AsyncOngoingRequestImpl>(AsyncOngoingRequestImpl*);
+
+AsyncClient::Request* AsyncClientImpl::send(RequestMessagePtr&& request,
+                                            AsyncClient::Callbacks& callbacks,
+                                            const AsyncClient::RequestOptions& options) {
+  AsyncRequestImpl* async_request =
+      new AsyncRequestImpl(std::move(request), *this, callbacks, options);
+  return internalStartRequest(async_request);
+}
+
+AsyncClient::OngoingRequest*
+AsyncClientImpl::startRequest(RequestHeaderMapPtr&& request_headers, Callbacks& callbacks,
+                              const AsyncClient::RequestOptions& options) {
+  AsyncOngoingRequestImpl* async_request =
+      new AsyncOngoingRequestImpl(std::move(request_headers), *this, callbacks, options);
+  return internalStartRequest(async_request);
 }
 
 AsyncClient::Stream* AsyncClientImpl::start(AsyncClient::StreamCallbacks& callbacks,
@@ -252,10 +269,10 @@ void AsyncStreamImpl::resetStream(Http::StreamResetReason, absl::string_view) {
   cleanup();
 }
 
-AsyncRequestImpl::AsyncRequestImpl(RequestMessagePtr&& request, AsyncClientImpl& parent,
-                                   AsyncClient::Callbacks& callbacks,
-                                   const AsyncClient::RequestOptions& options)
-    : AsyncStreamImpl(parent, *this, options), request_(std::move(request)), callbacks_(callbacks) {
+AsyncRequestSharedImpl::AsyncRequestSharedImpl(AsyncClientImpl& parent,
+                                               AsyncClient::Callbacks& callbacks,
+                                               const AsyncClient::RequestOptions& options)
+    : AsyncStreamImpl(parent, *this, options), callbacks_(callbacks) {
   if (nullptr != options.parent_span_) {
     const std::string child_span_name =
         options.child_span_name_.empty()
@@ -284,7 +301,12 @@ void AsyncRequestImpl::initialize() {
   // TODO(mattklein123): Support request trailers.
 }
 
-void AsyncRequestImpl::onComplete() {
+void AsyncOngoingRequestImpl::initialize() {
+  child_span_->injectContext(*request_headers_, nullptr);
+  sendHeaders(*request_headers_, end_stream_immediately_);
+}
+
+void AsyncRequestSharedImpl::onComplete() {
   callbacks_.onBeforeFinalizeUpstreamSpan(*child_span_, &response_->headers());
 
   Tracing::HttpTracerUtility::finalizeUpstreamSpan(*child_span_, streamInfo(),
@@ -293,22 +315,22 @@ void AsyncRequestImpl::onComplete() {
   callbacks_.onSuccess(*this, std::move(response_));
 }
 
-void AsyncRequestImpl::onHeaders(ResponseHeaderMapPtr&& headers, bool) {
+void AsyncRequestSharedImpl::onHeaders(ResponseHeaderMapPtr&& headers, bool) {
   const uint64_t response_code = Http::Utility::getResponseStatus(*headers);
   streamInfo().response_code_ = response_code;
   response_ = std::make_unique<ResponseMessageImpl>(std::move(headers));
 }
 
-void AsyncRequestImpl::onData(Buffer::Instance& data, bool) {
+void AsyncRequestSharedImpl::onData(Buffer::Instance& data, bool) {
   streamInfo().addBytesReceived(data.length());
   response_->body().move(data);
 }
 
-void AsyncRequestImpl::onTrailers(ResponseTrailerMapPtr&& trailers) {
+void AsyncRequestSharedImpl::onTrailers(ResponseTrailerMapPtr&& trailers) {
   response_->trailers(std::move(trailers));
 }
 
-void AsyncRequestImpl::onReset() {
+void AsyncRequestSharedImpl::onReset() {
   if (!cancelled_) {
     // Set "error reason" tag related to reset. The tagging for "error true" is done inside the
     // Tracing::HttpTracerUtility::finalizeUpstreamSpan.
@@ -328,7 +350,7 @@ void AsyncRequestImpl::onReset() {
   }
 }
 
-void AsyncRequestImpl::cancel() {
+void AsyncRequestSharedImpl::cancel() {
   cancelled_ = true;
 
   // Add tags about the cancellation.

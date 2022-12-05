@@ -267,6 +267,15 @@ public:
   MOCK_METHOD(void, shadow_,
               (const std::string& cluster, Http::RequestMessagePtr& request,
                const Http::AsyncClient::RequestOptions& options));
+
+  Http::AsyncClient::OngoingRequest*
+  streamingShadow(const std::string& cluster, Http::RequestHeaderMapPtr&& request,
+                  const Http::AsyncClient::RequestOptions& options) override {
+    return streamingShadow_(cluster, request, options);
+  }
+  MOCK_METHOD(Http::AsyncClient::OngoingRequest*, streamingShadow_,
+              (const std::string& cluster, Http::RequestHeaderMapPtr& request,
+               const Http::AsyncClient::RequestOptions& options));
 };
 
 class TestVirtualCluster : public VirtualCluster {

@@ -11,6 +11,18 @@
 namespace Envoy {
 namespace Router {
 
+namespace {
+std::string NewHost(absl::string_view host) {
+  ASSERT(!host.empty());
+  // Switch authority to add a shadow postfix. This allows upstream logging to
+  // make more sense.
+  auto parts = StringUtil::splitToken(host, ":");
+  ASSERT(!parts.empty() && parts.size() <= 2);
+  return parts.size() == 2 ? absl::StrJoin(parts, "-shadow:") : absl::StrCat(host, "-shadow");
+}
+
+} // namespace
+
 void ShadowWriterImpl::shadow(const std::string& cluster, Http::RequestMessagePtr&& request,
                               const Http::AsyncClient::RequestOptions& options) {
   // It's possible that the cluster specified in the route configuration no longer exists due
@@ -22,13 +34,8 @@ void ShadowWriterImpl::shadow(const std::string& cluster, Http::RequestMessagePt
     return;
   }
 
-  ASSERT(!request->headers().getHostValue().empty());
-  // Switch authority to add a shadow postfix. This allows upstream logging to make more sense.
-  auto parts = StringUtil::splitToken(request->headers().getHostValue(), ":");
-  ASSERT(!parts.empty() && parts.size() <= 2);
-  request->headers().setHost(parts.size() == 2
-                                 ? absl::StrJoin(parts, "-shadow:")
-                                 : absl::StrCat(request->headers().getHostValue(), "-shadow"));
+  request->headers().setHost(NewHost(request->headers().getHostValue()));
+
   const auto& shadow_options = options.is_shadow ? options : [options] {
     Http::AsyncClient::RequestOptions actual_options(options);
     actual_options.setIsShadow(true);
@@ -36,6 +43,25 @@ void ShadowWriterImpl::shadow(const std::string& cluster, Http::RequestMessagePt
   }();
   // This is basically fire and forget. We don't handle cancelling.
   thread_local_cluster->httpAsyncClient().send(std::move(request), *this, shadow_options);
+}
+
+Http::AsyncClient::OngoingRequest*
+ShadowWriterImpl::streamingShadow(const std::string& cluster, Http::RequestHeaderMapPtr&& headers,
+                                  const Http::AsyncClient::RequestOptions& options) {
+  const auto thread_local_cluster = cm_.getThreadLocalCluster(cluster);
+  if (thread_local_cluster == nullptr) {
+    ENVOY_LOG(debug, "shadow cluster '{}' does not exist", cluster);
+    return nullptr;
+  }
+  headers->setHost(NewHost(headers->getHostValue()));
+
+  const auto& shadow_options = options.is_shadow ? options : [options] {
+    Http::AsyncClient::RequestOptions actual_options(options);
+    actual_options.setIsShadow(true);
+    return actual_options;
+  }();
+  return thread_local_cluster->httpAsyncClient().startRequest(std::move(headers), *this,
+                                                              shadow_options);
 }
 
 } // namespace Router

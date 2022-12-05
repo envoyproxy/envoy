@@ -22,6 +22,9 @@ public:
   // Router::ShadowWriter
   void shadow(const std::string& cluster, Http::RequestMessagePtr&& request,
               const Http::AsyncClient::RequestOptions& options) override;
+  Http::AsyncClient::OngoingRequest*
+  streamingShadow(const std::string& cluster, Http::RequestHeaderMapPtr&& headers,
+                  const Http::AsyncClient::RequestOptions& options) override;
 
   // Http::AsyncClient::Callbacks
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&&) override {}
