@@ -271,7 +271,7 @@ std::string EngineBuilder::generateConfigStr() const {
 
   const std::string& cert_validation_template =
       (platform_certificates_validation_on_ ? platform_cert_validation_context_template
-                                                  : default_cert_validation_context_template);
+                                            : default_cert_validation_context_template);
   config_builder << cert_validation_template << std::endl;
 
   std::string config_template = config_template_;
