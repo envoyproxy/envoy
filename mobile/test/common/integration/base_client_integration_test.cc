@@ -162,11 +162,18 @@ std::shared_ptr<Platform::RequestHeaders> BaseClientIntegrationTest::envoyToMobi
 }
 
 void BaseClientIntegrationTest::threadRoutine(absl::Notification& engine_running,
-                                              Platform::EngineSharedPtr& engine_obj) {
-  builder_.setOnEngineRunning([&]() { engine_running.Notify(); });
+                                              absl::Notification& engine_running_2) {
+  builder_.setOnEngineRunning([&]() {
+    if (!engine_running.HasBeenNotified()) {
+      engine_running.Notify();
+    } else {
+      engine_running_2.Notify();
+    }
+  });
   // need to fix this callback. alyssa suggests ending the inheritance of test->builder
   // otherwise, we could consider passing by move??
-  engine_obj = builder_.build();
+  engine_ = build();
+  engine_2_ = builder_.build();
   full_dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
@@ -177,7 +184,7 @@ void BaseClientIntegrationTest::TearDown() {
   engine_.reset();
   full_dispatcher_->exit();
   envoy_thread_->join();
-  envoy_thread_2_->join();
+  // envoy_thread_2_->join();
 }
 
 void BaseClientIntegrationTest::createEnvoy() {
@@ -200,10 +207,7 @@ void BaseClientIntegrationTest::createEnvoy() {
   absl::Notification engine_running;
   absl::Notification engine_running_2;
   envoy_thread_ = api_->threadFactory().createThread(
-      [this, &engine_running]() -> void { threadRoutine(engine_running, engine_); });
-  engine_running.WaitForNotification();
-  envoy_thread_2_ = api_->threadFactory().createThread(
-      [this, &engine_running_2]() -> void { threadRoutine(engine_running_2, engine_2_); });
+      [this, &engine_running, &engine_running_2]() -> void { threadRoutine(engine_running, engine_running_2); });
   engine_running_2.WaitForNotification();
 }
 
