@@ -36,7 +36,7 @@ public:
   ~TmpFileImplPosix() override;
 
 private:
-  // This is unset except for the case where the filesystem does not support files without inodes.
+  // This is only set in the case where the file system does not support nameless tmp files.
   std::string tmp_file_path_;
 };
 

@@ -57,7 +57,7 @@ Api::IoCallBoolResult TmpFileImplPosix::open(FlagSet in) {
   }
 
   const auto flags_and_mode = translateFlag(in);
-  // Try to open a temp file with no name. Only some filesystems support this.
+  // Try to open a temp file with no name. Only some file systems support this.
   fd_ = ::open(path().c_str(), flags_and_mode.flags_ | O_TMPFILE, flags_and_mode.mode_);
   if (fd_ != -1) {
     return resultSuccess(true);
@@ -68,7 +68,7 @@ Api::IoCallBoolResult TmpFileImplPosix::open(FlagSet in) {
     fd_ = ::open(try_path.c_str(), flags_and_mode.flags_, flags_and_mode.mode_);
     if (fd_ != -1) {
       // Try to unlink the temp file while it's still open. Again this only works on
-      // a (different) subset of filesystems.
+      // a (different) subset of file systems.
       if (::unlink(try_path.c_str()) != 0) {
         // If we couldn't unlink it, set tmp_file_path_, to unlink after close.
         tmp_file_path_ = try_path;
