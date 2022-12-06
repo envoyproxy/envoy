@@ -168,7 +168,9 @@ public:
   virtual bool streamErrorOnInvalidHttpMessage() const PURE;
 
   /**
-   * Set a new request decoder for this ResponseEncoder.
+   * Set a new request decoder for this ResponseEncoder. This is helpful in the case of an internal
+   * redirect, in which a new request decoder is created in the context of the same downstream
+   * request.
    * @param decoder new request decoder.
    */
   virtual void setRequestDecoder(RequestDecoder& decoder) PURE;

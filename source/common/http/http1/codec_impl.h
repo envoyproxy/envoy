@@ -156,6 +156,7 @@ public:
     return stream_error_on_invalid_http_message_;
   }
 
+  // For H/1, ResponseEncoder doesn't hold a pointer to RequestDecoder.
   void setRequestDecoder(Http::RequestDecoder& /*decoder*/) override {}
 
   // Http1::StreamEncoderImpl
