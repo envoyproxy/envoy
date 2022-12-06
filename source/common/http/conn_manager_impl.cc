@@ -1747,9 +1747,6 @@ void ConnectionManagerImpl::ActiveStream::onRequestDataTooLarge() {
 
 void ConnectionManagerImpl::ActiveStream::recreateStream(
     StreamInfo::FilterStateSharedPtr filter_state) {
-  // n.b. we do not currently change the codecs to point at the new stream
-  // decoder because the decoder callbacks are complete. It would be good to
-  // null out that pointer but should not be necessary.
   ResponseEncoder* response_encoder = response_encoder_;
   response_encoder_ = nullptr;
 
