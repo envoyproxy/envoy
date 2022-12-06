@@ -67,7 +67,7 @@ func (h *httpHeaderMap) Set(key, value string) {
 }
 
 func (h *httpHeaderMap) Add(key, value string) {
-    // TODO: add
+    panic("unsupported yet")
 }
 
 func (h *httpHeaderMap) Del(key string) {

@@ -34,6 +34,7 @@ import "C"
 
 import (
     "errors"
+    "fmt"
     "runtime"
     "sync"
 
@@ -84,8 +85,10 @@ func createRequest(r *C.httpRequest) *httpRequest {
     // NP: make sure filter will be deleted.
     runtime.SetFinalizer(req, requestFinalize)
 
-    // TODO: error
-    _ = Requests.StoreReq(r, req)
+    err := Requests.StoreReq(r, req)
+    if err != nil {
+        panic(fmt.Sprintf("createRequest failed, err: %s", err.Error()))
+    }
 
     configId := uint64(r.configId)
     filterFactory := getOrCreateHttpFilterFactory(C.GoStringN(r.plugin_name.data, C.int(r.plugin_name.len)), configId)
