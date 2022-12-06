@@ -83,6 +83,7 @@ bool clear_pending_exceptions(JNIEnv* env) {
   const auto message = std::string(exception_message);
 
   ENVOY_LOG_EVENT_TO_LOGGER(GET_MISC_LOGGER(), info, "jni_exception", message);
+
   env->ReleaseStringUTFChars(jobj_exception_message, exception_message);
   env->DeleteLocalRef(jcls_throwable);
   return true;
