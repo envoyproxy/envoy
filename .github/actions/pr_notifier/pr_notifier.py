@@ -39,7 +39,7 @@ MAINTAINERS = {
     'KBaichoo': 'U016ZPU8KBK',
     'wbpcode': 'U017KF5C0Q6',
     'kyessenov': 'U7KTRAA8M',
-    'keith', 'UGS5P90CF',
+    'keith': 'UGS5P90CF',
     'Augustyniak': 'U017R1YHXGQ',
     'jpsim': 'U02KAPRELKA',
     'abeyad': 'U03CVM7GPM1',
