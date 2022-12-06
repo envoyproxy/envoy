@@ -19,6 +19,7 @@ public:
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override {
     if (!headers.get(Envoy::Http::LowerCaseString("invalid-encode")).empty()) {
+      added_invalid_encode_ = true;
       Buffer::OwnedImpl body("body");
       encoder_callbacks_->addEncodedData(body, false);
     }
@@ -26,10 +27,18 @@ public:
   }
 
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool) override {
-    Buffer::OwnedImpl body("body");
-    decoder_callbacks_->addDecodedData(body, false);
+    if (!added_invalid_encode_) {
+      Buffer::OwnedImpl body("body");
+      decoder_callbacks_->addDecodedData(body, false);
+    }
     return Http::FilterHeadersStatus::Continue;
   }
+
+private:
+  // Track whether the user requested us to invoke make an invalid call to addEncodedData
+  // when decoding headers. If requested, we should not clobber the local reply
+  // generated during encodeHeaders.
+  bool added_invalid_encode_{false};
 };
 
 constexpr char AddInvalidDataFilter::name[];
