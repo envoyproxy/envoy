@@ -114,8 +114,8 @@ SysCallIntResult OsSysCallsImpl::ioctl(os_fd_t sockfd, unsigned long control_cod
 }
 
 SysCallIntResult OsSysCallsImpl::close(os_fd_t fd) {
-  const int rc = ::closesocket(fd);
-  int socket_err = ::WSAGetLastError();
+  int rc = ::closesocket(fd);
+  const int socket_err = ::WSAGetLastError();
   if (rc == -1) {
     // If `closesocket` failed, maybe the descriptor was a file.
     rc = ::close(fd);
