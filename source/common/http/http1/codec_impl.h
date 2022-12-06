@@ -157,6 +157,8 @@ public:
   }
 
   // For H/1, ResponseEncoder doesn't hold a pointer to RequestDecoder.
+  // TODO(paulsohn): Enable H/1 codec to get a pointer to the new
+  // request decoder on recreateStream, here or elsewhere.
   void setRequestDecoder(Http::RequestDecoder& /*decoder*/) override {}
 
   // Http1::StreamEncoderImpl
