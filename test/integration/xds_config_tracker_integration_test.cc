@@ -216,7 +216,7 @@ TEST_P(XdsConfigTrackerIntegrationTest, XdsConfigTrackerPartialUpdate) {
 
   initialize();
   // The first of duplicates has already been successfully applied, and a duplicate exception should
-  // threw. Only the first cluster is added.
+  // be threw. Only the first cluster is added.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       Config::TypeUrl::get().Cluster, {cluster1_, cluster1_, cluster2_},
