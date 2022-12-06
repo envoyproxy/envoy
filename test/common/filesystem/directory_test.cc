@@ -306,5 +306,30 @@ TEST(Directory, DirectoryHasTrailingPathSeparator) {
   TestEnvironment::removePath(dir_path);
 }
 
+TEST(DirectoryEntry, EqualityOperator) {
+  std::vector<DirectoryEntry> values{
+      DirectoryEntry{"bob", FileType::Directory, absl::nullopt},
+      DirectoryEntry{"bob", FileType::Regular, absl::nullopt},
+      DirectoryEntry{"bob", FileType::Other, absl::nullopt},
+      DirectoryEntry{"bob", FileType::Regular, 0},
+      DirectoryEntry{"bob", FileType::Regular, 5},
+      DirectoryEntry{"bob", FileType::Regular, 6},
+      DirectoryEntry{"alice", FileType::Regular, 6},
+      DirectoryEntry{"jim", FileType::Regular, absl::nullopt},
+  };
+  for (size_t i = 0; i < values.size(); i++) {
+    DirectoryEntry a = values[i];
+    // Two copies of the same value should be ==, in either order.
+    EXPECT_THAT(a, testing::Eq(values[i]));
+    EXPECT_THAT(values[i], testing::Eq(a));
+    for (size_t j = i + 1; j < values.size(); j++) {
+      DirectoryEntry b = values[j];
+      // No two pairs of the above DirectoryEntries should be ==, in either order.
+      EXPECT_THAT(a, testing::Not(testing::Eq(b)));
+      EXPECT_THAT(b, testing::Not(testing::Eq(a)));
+    }
+  }
+}
+
 } // namespace Filesystem
 } // namespace Envoy
