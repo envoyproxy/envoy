@@ -329,7 +329,7 @@ static void* jvm_on_headers(const char* method, const Envoy::Types::ManagedEnvoy
   // Note: be careful of JVM types. Before we casted to jlong we were getting integer problems.
   // TODO: make this cast safer.
   jobject result = env->CallObjectMethod(j_context, jmid_onHeaders, (jlong)headers.get().length,
-                                              end_stream ? JNI_TRUE : JNI_FALSE, j_stream_intel);
+                                         end_stream ? JNI_TRUE : JNI_FALSE, j_stream_intel);
   // TODO(Augustyniak): Pass the name of the filter in here so that we can instrument the origin of
   // the JNI exception better.
   bool exception_cleared = clear_pending_exceptions(env);
