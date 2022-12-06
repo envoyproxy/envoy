@@ -42,7 +42,6 @@ envoy_rust_library(
     srcs = ["matcher.rs"],
     deps = [
         "bridge",
-        "@crate_index//:regex",
         "@cxx.rs//:cxx",
     ],
 )

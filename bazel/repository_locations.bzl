@@ -966,6 +966,20 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "Apache-2.0",
         license_url = "https://github.com/bytecodealliance/wasm-micro-runtime/blob/{version}/LICENSE",
     ),
+    cxx_rs = dict(
+        project_name = "cxx.rs",
+        name_override = "cxx.rs",
+        project_desc = "Rust/C++ bridging library",
+        project_url = "https://cxx.rs",
+        version = "1.0.83",
+        sha256 = "e30cbd34fc8ec2ae78f4f9e546d29c6c92e6d714f30c3c150f7b8c6ea08ea971",
+        strip_prefix = "cxx-{version}",
+        urls = [
+            "https://github.com/dtolnay/cxx/archive/refs/tags/{version}.tar.gz",
+        ],
+        release_date = "2022-12-03",
+        use_category = ["build"],
+    ),
     com_github_wavm_wavm = dict(
         project_name = "WAVM",
         project_desc = "WebAssembly Virtual Machine",

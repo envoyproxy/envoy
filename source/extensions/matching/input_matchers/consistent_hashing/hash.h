@@ -1,6 +1,7 @@
 #pragma once
 
 #include "source/common/common/hash.h"
+
 #include "rust/cxx.h"
 
 namespace Envoy {

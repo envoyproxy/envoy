@@ -14,7 +14,7 @@ def envoy_http_archive(name, locations, **kwargs):
 
     # HTTP tarball at a given URL. Add a BUILD file if requested.
     http_archive(
-        name = name,
+        name = location.get("name_override", name),
         urls = location["urls"],
         sha256 = location["sha256"],
         strip_prefix = location.get("strip_prefix", ""),
