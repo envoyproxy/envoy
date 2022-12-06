@@ -12,7 +12,6 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/crypto:0.0"
 "source/common/event:94.1" # Emulated edge events guards don't report LCOV
 "source/common/filesystem/posix:95.5"
-"source/common/filter:95.6" # Upstream HTTP filter tests are needed
 "source/common/http:96.1"
 "source/common/http/http2:94.8"
 "source/common/io:98.0"
