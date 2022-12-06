@@ -30,6 +30,9 @@ public:
                                    Server::Configuration::Initial& config) override;
 };
 
+// This is the common main between Envoy and Envoy mobile.
+// It should only incude functionality required by Envoy Mobile: anything
+// server-specific should live in MainCommon.
 class MainCommonBase {
 public:
   static std::string hotRestartVersion(bool hot_restart_enabled);
