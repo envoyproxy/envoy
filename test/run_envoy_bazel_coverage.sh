@@ -7,6 +7,9 @@ CLANG_VERSION=$(clang --version | grep version | sed -e 's/\ *clang version \(.*
 LLVM_COV_VERSION=$(llvm-cov --version | grep version | sed -e 's/\ *LLVM version \(.*\)/\1/')
 LLVM_PROFDATA_VERSION=$(llvm-profdata show --version | grep version | sed -e 's/\ *LLVM version \(.*\)/\1/')
 
+echo "TESTING FAILURE"
+exit 1
+
 if [ "${CLANG_VERSION}" != "${LLVM_VERSION}" ]
 then
   echo "clang version ${CLANG_VERSION} does not match expected ${LLVM_VERSION}"
