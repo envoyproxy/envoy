@@ -797,13 +797,6 @@ envoy.matching.matchers.consistent_hashing:
   status: stable
   type_urls:
   - envoy.extensions.matching.input_matchers.consistent_hashing.v3.ConsistentHashing
-envoy.matching.matchers.rust_re:
-  categories:
-  - envoy.matching.input_matchers
-  security_posture: robust_to_untrusted_downstream
-  status: stable
-  type_urls:
-  - envoy.extensions.matching.input_matchers.rust_re.v3.RustRe
 envoy.matching.matchers.ip:
   categories:
   - envoy.matching.input_matchers
