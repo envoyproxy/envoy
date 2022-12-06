@@ -46,7 +46,6 @@ TEST(OsSyscallsTest, OpenPwritePreadFstatCloseStatUnlink) {
   EXPECT_EQ(fstat_result.return_value_, 0);
   EXPECT_EQ(fstat_result.errno_, 0);
   EXPECT_EQ(fstat_value.st_size, file_contents.size());
-#ifndef WIN32
   // Test `close`
   Api::SysCallIntResult close_result = os_syscalls.close(fd);
   EXPECT_EQ(close_result.return_value_, 0);
