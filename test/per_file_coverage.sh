@@ -12,7 +12,6 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/crypto:0.0"
 "source/common/event:94.1" # Emulated edge events guards don't report LCOV
 "source/common/filesystem/posix:95.5"
-"source/common/filter:95.6" # Upstream HTTP filter tests are needed
 "source/common/http:96.1"
 "source/common/http/http2:94.8"
 "source/common/io:98.0"
@@ -35,7 +34,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/watchdog:58.6" # Death tests don't report LCOV
 "source/exe:92.6"
 "source/extensions/access_loggers/wasm:93.5"
-"source/extensions/clusters/common:68.2"
+"source/extensions/clusters/common:91.5"
 "source/extensions/common:92.9"
 "source/extensions/common/tap:92.9"
 "source/extensions/common/wasm:87.5" # flaky: be careful adjusting
