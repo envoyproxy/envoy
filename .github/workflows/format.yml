@@ -1,4 +1,4 @@
-name: format
+name: mobile_format
 
 on:
   push:
@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-20.04
     timeout-minutes: 45
     container:
-      image: envoyproxy/envoy-build-ubuntu:0a02a76af5951bf7f4c7029c0ea6d29d96c0f682
+      image: envoyproxy/envoy-build-ubuntu:b0ff77ae3f25b0bf595f9b8bba46b489723ab446
       env:
         CLANG_FORMAT: /opt/llvm/bin/clang-format
         BUILDIFIER_BIN: /usr/local/bin/buildifier
@@ -65,11 +65,12 @@ jobs:
     timeout-minutes: 45
     steps:
     - uses: actions/checkout@v1
-    - uses: actions/setup-java@v1
+    - uses: actions/setup-java@c3ac5dd0ed8db40fedb61c32fbe677e6b355e94c
       with:
         java-version: '8'
         java-package: jdk
         architecture: x64
+        distribution: zulu
     - run: cd mobile && ./ci/mac_ci_setup.sh
       name: 'Install dependencies'
     - name: 'Run Kotlin Lint (Detekt)'
