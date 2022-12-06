@@ -215,10 +215,6 @@ modify different aspects of the server:
   - :ref:`envoy.extensions.transport_sockets.tls.v3.Secret <envoy_v3_api_field_extensions.transport_sockets.tls.v3.Secret.name>`
   - :ref:`envoy.config.endpoint.v3.ClusterLoadAssignment <envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.cluster_name>`
 
-  For ECDS config dump, the matched name field is the corresponding filter name, which is stored in:
-
-  - :ref:`envoy.config.core.v3.TypedExtensionConfig.name <envoy_v3_api_field_config.core.v3.TypedExtensionConfig.name>`
-
 .. _operations_admin_interface_config_dump_by_resource_and_mask:
 
 .. http:get:: /config_dump?resource={}&mask={}

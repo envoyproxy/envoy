@@ -1,4 +1,3 @@
-#include "test/integration/filters/test_listener_filter.pb.h"
 #include "test/server/admin/admin_instance.h"
 
 using testing::HasSubstr;
@@ -789,73 +788,6 @@ TEST_P(AdminInstanceTest, FieldMasksWorkWhenFetchingAllResources) {
 }
 )EOF",
             response.toString());
-}
-
-ProtobufTypes::MessagePtr testDumpEcdsConfig(const Matchers::StringMatcher&) {
-  auto msg = std::make_unique<envoy::admin::v3::EcdsConfigDump>();
-  auto* ecds = msg->mutable_ecds_filters()->Add();
-  ecds->set_version_info("1");
-  ecds->mutable_last_updated()->set_seconds(5);
-
-  envoy::config::core::v3::TypedExtensionConfig filter_config;
-  filter_config.set_name("foo");
-  auto listener_config = test::integration::filters::TestTcpListenerFilterConfig();
-  listener_config.set_drain_bytes(5);
-  filter_config.mutable_typed_config()->PackFrom(listener_config);
-  ecds->mutable_ecds_filter()->PackFrom(filter_config);
-  return msg;
-}
-
-TEST_P(AdminInstanceTest, ConfigDumpEcds) {
-  Buffer::OwnedImpl response;
-  Http::TestResponseHeaderMapImpl header_map;
-  auto ecds_config = admin_.getConfigTracker().add("ecds", testDumpEcdsConfig);
-  const std::string expected_json = R"EOF({
- "configs": [
-  {
-   "@type": "type.googleapis.com/envoy.admin.v3.EcdsConfigDump.EcdsFilterConfig",
-   "version_info": "1",
-   "ecds_filter": {
-    "@type": "type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig",
-    "name": "foo",
-    "typed_config": {
-     "@type": "type.googleapis.com/test.integration.filters.TestTcpListenerFilterConfig",
-     "drain_bytes": 5
-    }
-   },
-   "last_updated": "1970-01-01T00:00:05Z"
-  }
- ]
-}
-)EOF";
-  EXPECT_EQ(Http::Code::OK,
-            getCallback("/config_dump?resource=ecds_filters", header_map, response));
-  std::string output = response.toString();
-  EXPECT_EQ(expected_json, output);
-}
-
-TEST_P(AdminInstanceTest, ConfigDumpEcdsByResourceAndMask) {
-  Buffer::OwnedImpl response;
-  Http::TestResponseHeaderMapImpl header_map;
-  auto ecds_config = admin_.getConfigTracker().add("ecds", testDumpEcdsConfig);
-  const std::string expected_json = R"EOF({
- "configs": [
-  {
-   "@type": "type.googleapis.com/envoy.admin.v3.EcdsConfigDump.EcdsFilterConfig",
-   "version_info": "1",
-   "ecds_filter": {
-    "@type": "type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig",
-    "name": "foo"
-   }
-  }
- ]
-}
-)EOF";
-  EXPECT_EQ(Http::Code::OK, getCallback("/config_dump?resource=ecds_filters&mask="
-                                        "ecds_filter.name,version_info",
-                                        header_map, response));
-  std::string output = response.toString();
-  EXPECT_EQ(expected_json, output);
 }
 
 } // namespace Server

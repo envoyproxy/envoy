@@ -35,7 +35,9 @@ public:
   // Rebuilds the registry's factory-by-type mapping from scratch. In most cases, this is handled
   // by the replaceFactoryForTest calls in the constructor and destructor. This method is only
   // necessary if the disabled state of the factory is modified.
-  void resetTypeMappings() { Registry::FactoryRegistry<Base>::rebuildFactoriesByTypeForTest(); }
+  static void resetTypeMappings() {
+    Registry::FactoryRegistry<Base>::rebuildFactoriesByTypeForTest();
+  }
 
 private:
   Base& instance_;

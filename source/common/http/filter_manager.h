@@ -53,7 +53,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   // Functions in the following block are called after the filter finishes processing
   // corresponding data. Those functions handle state updates and data storage (if needed)
   // according to the status returned by filter's callback functions.
-  bool commonHandleAfter1xxHeadersCallback(FilterHeadersStatus status);
+  bool commonHandleAfter1xxHeadersCallback(Filter1xxHeadersStatus status);
   bool commonHandleAfterHeadersCallback(FilterHeadersStatus status, bool& end_stream);
   bool commonHandleAfterDataCallback(FilterDataStatus status, Buffer::Instance& provided_data,
                                      bool& buffer_was_streaming);
@@ -1006,6 +1006,10 @@ private:
       // Used to indicate that we're processing the final [En|De]codeData frame,
       // i.e. end_stream = true
       static constexpr uint32_t LastDataFrame = 0x80;
+
+      // Masks for filter call state.
+      static constexpr uint32_t IsDecodingMask = DecodeHeaders | DecodeData | DecodeTrailers;
+      static constexpr uint32_t IsEncodingMask = EncodeHeaders | Encode1xxHeaders | EncodeData | EncodeTrailers;
     };
   // clang-format on
 

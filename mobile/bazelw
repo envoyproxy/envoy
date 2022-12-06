@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-readonly bazelisk_version="1.10.1"
+readonly bazelisk_version="1.15.0"
 
 if [[ $OSTYPE == darwin* ]]; then
   readonly bazel_os="darwin"
@@ -21,16 +21,16 @@ fi
 bazel_platform="$bazel_os-$bazel_arch"
 case "$bazel_platform" in
   darwin-arm64)
-    readonly bazel_version_sha="c22d48601466d9d3b043ccd74051f2f4230f9b9f4509f097017c97303aa88d13"
+    readonly bazel_version_sha="dfc36f30c1d5f86d72c9870cdeb995ac894787887089fd9b61e64f27c8bc184c"
     ;;
   darwin-amd64)
-    readonly bazel_version_sha="e485bbf84532d02a60b0eb23c702610b5408df3a199087a4f2b5e0995bbf2d5a"
+    readonly bazel_version_sha="cf876f4303223e6b1867db6c30c55b5bc0208d7c8003042a9872b8ec112fd3c0"
     ;;
   linux-arm64)
-    readonly bazel_version_sha="c1de6860dd4f8d5e2ec270097bd46d6a211b971a0b8b38559784bd051ea950a1"
+    readonly bazel_version_sha="3862ab0857b776411906d0a65215509ca72f6d4923f01807e11299a8d419db80"
     ;;
   linux-amd64)
-    readonly bazel_version_sha="4cb534c52cdd47a6223d4596d530e7c9c785438ab3b0a49ff347e991c210b2cd"
+    readonly bazel_version_sha="19fd84262d5ef0cb958bcf01ad79b528566d8fef07ca56906c5c516630a0220b"
     ;;
 
   *)

@@ -910,6 +910,7 @@ TEST_F(HttpHealthCheckerImplTest, Degraded) {
   respond(0, "200", false, false, true, false, {}, false);
   EXPECT_EQ(Host::Health::Healthy,
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
+  EXPECT_FALSE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->lastHcPassTime());
 }
 
 TEST_F(HttpHealthCheckerImplTest, SuccessIntervalJitter) {
@@ -1494,23 +1495,24 @@ TEST_F(HttpHealthCheckerImplTest, TlsOptions) {
   health_checker_->start();
 }
 
-TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheck) {
+TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckSetsCorrectLastHcPassTime) {
   const std::string host = "fake_cluster";
   const std::string path = "/healthcheck";
   setupServiceValidationHC();
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
-      .WillOnce(Return(true));
+      .WillRepeatedly(Return(true));
 
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
-
+  simTime().advanceTimeWait(std::chrono::seconds(1));
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
   cluster_->info_->trafficStats().upstream_cx_total_.inc();
   expectSessionCreate();
   expectStreamCreate(0);
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  simTime().advanceTimeWait(std::chrono::seconds(4));
   EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, true))
-      .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) -> Http::Status {
+      .WillRepeatedly(Invoke([&](const Http::RequestHeaderMap& headers, bool) -> Http::Status {
         EXPECT_EQ(headers.getHostValue(), host);
         EXPECT_EQ(headers.getPathValue(), path);
         EXPECT_EQ(headers.getSchemeValue(), Http::Headers::get().SchemeValues.Http);
@@ -1520,7 +1522,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheck) {
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
   EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
-      .WillOnce(Return(45000));
+      .WillRepeatedly(Return(45000));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_,
               enableTimer(std::chrono::milliseconds(45000), _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
@@ -1528,6 +1530,52 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheck) {
   respond(0, "200", false, false, true, false, health_checked_cluster);
   EXPECT_EQ(Host::Health::Healthy,
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
+  // Last HC pass time is only updated when host transitions from unhealthy to healthy state.
+  EXPECT_FALSE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->lastHcPassTime());
+
+  simTime().advanceTimeWait(std::chrono::seconds(4));
+
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed)).Times(2);
+  expectStreamCreate(0);
+  EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  test_sessions_[0]->interval_timer_->invokeCallback();
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  respond(0, "503", false, false, true, false, health_checked_cluster, false);
+  // Last HC pass time is only updated when host transitions from unhealthy to healthy state.
+  EXPECT_FALSE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->lastHcPassTime());
+  simTime().advanceTimeWait(std::chrono::seconds(4));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::ChangePending));
+  expectStreamCreate(0);
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  test_sessions_[0]->interval_timer_->invokeCallback();
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  respond(0, "200", false, false, true, false, health_checked_cluster, false);
+  auto last_hc_pass_time_ms =
+      std::chrono::time_point_cast<std::chrono::milliseconds>(
+          cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->lastHcPassTime().value())
+          .time_since_epoch();
+  // Last HC pass time is only updated when host transitions from unhealthy to healthy state.
+  EXPECT_EQ(std::chrono::milliseconds(13000), last_hc_pass_time_ms);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  expectStreamCreate(0);
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  test_sessions_[0]->interval_timer_->invokeCallback();
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+  EXPECT_CALL(event_logger_, logAddHealthy(_, _, false));
+  respond(0, "200", false, false, true, false, health_checked_cluster, false);
+  simTime().advanceTimeWait(std::chrono::seconds(4));
+  last_hc_pass_time_ms =
+      std::chrono::time_point_cast<std::chrono::milliseconds>(
+          cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->lastHcPassTime().value())
+          .time_since_epoch();
+  // Last HC pass time is only updated when host transitions from unhealthy to healthy state.
+  EXPECT_EQ(std::chrono::milliseconds(13000), last_hc_pass_time_ms);
 }
 
 TEST_F(HttpHealthCheckerImplTest, SuccessServicePrefixPatternCheck) {
@@ -1679,6 +1727,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithCustomHostValueOnTheHos
   respond(0, "200", false, false, true, false, health_checked_cluster);
   EXPECT_EQ(Host::Health::Healthy,
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
+  EXPECT_FALSE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->lastHcPassTime());
 }
 
 // This test verifies that when a hostname is set in the endpoint's HealthCheckConfig and in the
@@ -1925,6 +1974,7 @@ TEST_F(HttpHealthCheckerImplTest, ServiceDoesNotMatchFail) {
       Host::HealthFlag::FAILED_ACTIVE_HC));
   EXPECT_EQ(Host::Health::Unhealthy,
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
+  EXPECT_FALSE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->lastHcPassTime());
 }
 
 TEST_F(HttpHealthCheckerImplTest, ServicePatternDoesNotMatchFail) {

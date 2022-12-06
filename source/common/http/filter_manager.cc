@@ -112,19 +112,21 @@ void ActiveStreamFilterBase::commonContinue() {
   iterate_from_current_filter_ = false;
 }
 
-bool ActiveStreamFilterBase::commonHandleAfter1xxHeadersCallback(FilterHeadersStatus status) {
+bool ActiveStreamFilterBase::commonHandleAfter1xxHeadersCallback(Filter1xxHeadersStatus status) {
   ASSERT(parent_.state_.has_1xx_headers_);
   ASSERT(!continued_1xx_headers_);
   ASSERT(canIterate());
 
-  if (status == FilterHeadersStatus::StopIteration) {
-    iteration_state_ = IterationState::StopSingleIteration;
-    return false;
-  } else {
-    ASSERT(status == FilterHeadersStatus::Continue);
+  switch (status) {
+  case Filter1xxHeadersStatus::Continue:
     continued_1xx_headers_ = true;
     return true;
+  case Filter1xxHeadersStatus::StopIteration:
+    iteration_state_ = IterationState::StopSingleIteration;
+    return false;
   }
+
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 bool ActiveStreamFilterBase::commonHandleAfterHeadersCallback(FilterHeadersStatus status,
@@ -853,12 +855,9 @@ void DownstreamFilterManager::sendLocalReply(
 
   // Stop filter chain iteration if local reply was sent while filter decoding or encoding callbacks
   // are running.
-  if (state_.filter_call_state_ & (FilterCallState::DecodeHeaders | FilterCallState::DecodeData |
-                                   FilterCallState::DecodeTrailers)) {
+  if (state_.filter_call_state_ & FilterCallState::IsDecodingMask) {
     state_.decoder_filter_chain_aborted_ = true;
-  } else if (state_.filter_call_state_ &
-             (FilterCallState::EncodeHeaders | FilterCallState::EncodeData |
-              FilterCallState::EncodeTrailers)) {
+  } else if (state_.filter_call_state_ & FilterCallState::IsEncodingMask) {
     state_.encoder_filter_chain_aborted_ = true;
   }
 
@@ -872,7 +871,8 @@ void DownstreamFilterManager::sendLocalReply(
     return;
   }
 
-  if (!filter_manager_callbacks_.responseHeaders().has_value()) {
+  if (!filter_manager_callbacks_.responseHeaders().has_value() &&
+      !filter_manager_callbacks_.informationalHeaders().has_value()) {
     // If the response has not started at all, send the response through the filter chain.
     sendLocalReplyViaFilterChain(is_grpc_request, code, body, modify_headers, is_head_request,
                                  grpc_status, details);
@@ -999,10 +999,18 @@ void FilterManager::encode1xxHeaders(ActiveStreamEncoderFilter* filter,
   for (; entry != encoder_filters_.end(); entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::Encode1xxHeaders));
     state_.filter_call_state_ |= FilterCallState::Encode1xxHeaders;
-    FilterHeadersStatus status = (*entry)->handle_->encode1xxHeaders(headers);
+    const Filter1xxHeadersStatus status = (*entry)->handle_->encode1xxHeaders(headers);
     state_.filter_call_state_ &= ~FilterCallState::Encode1xxHeaders;
+
     ENVOY_STREAM_LOG(trace, "encode 1xx continue headers called: filter={} status={}", *this,
                      (*entry)->filter_context_.config_name, static_cast<uint64_t>(status));
+    if (state_.encoder_filter_chain_aborted_) {
+      ENVOY_STREAM_LOG(trace,
+                       "encode1xxHeaders filter iteration aborted due to local reply: filter={}",
+                       *this, (*entry)->filter_context_.config_name);
+      return;
+    }
+
     if (!(*entry)->commonHandleAfter1xxHeadersCallback(status)) {
       return;
     }
