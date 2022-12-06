@@ -18,18 +18,18 @@ Http::FilterFactoryCb GolangFilterConfig::createFilterFactoryFromProtoTyped(
 
   FilterConfigSharedPtr config = std::make_shared<FilterConfig>(proto_config);
 
-  ENVOY_LOG_MISC(info, "open golang library at parse config: {} {}", config->soId(),
+  ENVOY_LOG_MISC(info, "load golang library at parse config: {} {}", config->soId(),
                  config->soPath());
 
-  auto res = Envoy::Dso::DsoInstanceManager::pub(config->soId(), config->soPath());
+  auto res = Envoy::Dso::DsoInstanceManager::load(config->soId(), config->soPath());
   if (!res) {
     throw EnvoyException(
-        fmt::format("golang_filter: open library failed: {} {}", config->soId(), config->soPath()));
+        fmt::format("golang_filter: load library failed: {} {}", config->soId(), config->soPath()));
   }
 
   return [&context, config](Http::FilterChainFactoryCallbacks& callbacks) {
     auto filter =
-        std::make_shared<Filter>(context.grpcContext(), config, Filter::global_stream_id_++,
+        std::make_shared<Filter>(context.grpcContext(), config, (Filter::getGlobalStreamId())++,
                                  Dso::DsoInstanceManager::getDsoInstanceByID(config->soId()));
     callbacks.addStreamFilter(filter);
     callbacks.addAccessLogHandler(filter);

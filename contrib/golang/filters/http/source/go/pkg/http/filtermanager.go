@@ -18,6 +18,7 @@
 package http
 
 import (
+    "fmt"
     "sync"
 
     "github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
@@ -40,7 +41,7 @@ func RegisterHttpFilterConfigParser(parser api.StreamFilterConfigParser) {
 func getOrCreateHttpFilterFactory(name string, configId uint64) api.StreamFilterFactory {
     config, ok := configCache.Load(configId)
     if !ok {
-        // TODO: panic
+        panic(fmt.Sprintf("get config failed, plugin: %s, configId: %d", name, configId))
     }
 
     if v, ok := httpFilterConfigFactory.Load(name); ok {

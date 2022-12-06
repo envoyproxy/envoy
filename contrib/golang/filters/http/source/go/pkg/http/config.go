@@ -32,6 +32,7 @@ package http
 import "C"
 
 import (
+    "fmt"
     "sync"
     "sync/atomic"
 
@@ -69,11 +70,11 @@ func envoyGoFilterMergeHttpPluginConfig(parentId uint64, childId uint64) uint64 
     if httpFilterConfigParser != nil {
         parent, ok := configCache.Load(parentId)
         if !ok {
-            // TODO: throw error
+            panic(fmt.Sprintf("merge config: get parentId: %d config failed", parentId))
         }
         child, ok := configCache.Load(childId)
         if !ok {
-            // TODO: throw error
+            panic(fmt.Sprintf("merge config: get childId: %d config failed", childId))
         }
 
         new := httpFilterConfigParser.Merge(parent, child)

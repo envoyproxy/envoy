@@ -5,35 +5,32 @@
 namespace Envoy {
 namespace Dso {
 
-std::map<std::string, DsoInstancePtr> DsoInstanceManager::dso_map_ = {};
-absl::Mutex DsoInstanceManager::mutex_ = {};
-
-bool DsoInstanceManager::pub(std::string dso_id, std::string dso_name) {
-  ENVOY_LOG_MISC(debug, "pub {} {} dso instance.", dso_id, dso_name);
+bool DsoInstanceManager::load(std::string dso_id, std::string dso_name) {
+  ENVOY_LOG_MISC(debug, "load {} {} dso instance.", dso_id, dso_name);
   if (getDsoInstanceByID(dso_id) != nullptr) {
     return true;
   }
 
-  absl::WriterMutexLock lock(&DsoInstanceManager::mutex_);
+  absl::WriterMutexLock lock(&DsoInstanceManager::getMutex());
 
   DsoInstancePtr dso(new DsoInstance(dso_name));
   if (!dso->loaded()) {
     return false;
   }
-  dso_map_[dso_id] = std::move(dso);
+  DsoInstanceManager::getDsoMap()[dso_id] = std::move(dso);
   return true;
 }
 
-bool DsoInstanceManager::unpub(std::string dso_id) {
-  absl::WriterMutexLock lock(&DsoInstanceManager::mutex_);
-  ENVOY_LOG_MISC(debug, "unpub {} dso instance.", dso_id);
-  return dso_map_.erase(dso_id) == 1;
+bool DsoInstanceManager::unload(std::string dso_id) {
+  absl::WriterMutexLock lock(&DsoInstanceManager::getMutex());
+  ENVOY_LOG_MISC(debug, "unload {} dso instance.", dso_id);
+  return DsoInstanceManager::getDsoMap().erase(dso_id) == 1;
 }
 
 DsoInstancePtr DsoInstanceManager::getDsoInstanceByID(std::string dso_id) {
-  absl::ReaderMutexLock lock(&DsoInstanceManager::mutex_);
-  auto it = dso_map_.find(dso_id);
-  if (it != dso_map_.end()) {
+  absl::ReaderMutexLock lock(&DsoInstanceManager::getMutex());
+  auto it = DsoInstanceManager::getDsoMap().find(dso_id);
+  if (it != DsoInstanceManager::getDsoMap().end()) {
     return it->second;
   }
 
@@ -41,9 +38,9 @@ DsoInstancePtr DsoInstanceManager::getDsoInstanceByID(std::string dso_id) {
 }
 
 std::string DsoInstanceManager::show() {
-  absl::ReaderMutexLock lock(&DsoInstanceManager::mutex_);
+  absl::ReaderMutexLock lock(&DsoInstanceManager::getMutex());
   std::string ids = "";
-  for (auto& it : dso_map_) {
+  for (auto& it : DsoInstanceManager::getDsoMap()) {
     ids += it.first;
     ids += ",";
   }

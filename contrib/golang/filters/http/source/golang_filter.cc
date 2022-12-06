@@ -22,8 +22,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Golang {
 
-std::atomic<uint64_t> Filter::global_stream_id_;
-
 void Filter::onHeadersModified() {
   // Any changes to request headers can affect how the request is going to be
   // routed. If we are changing the headers we also need to clear the route

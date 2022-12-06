@@ -110,7 +110,7 @@ public:
   }
 
   // Http::StreamFilterBase
-  void onDestroy() override;
+  void onDestroy() ABSL_LOCKS_EXCLUDED(mutex_) override;
   Http::LocalErrorStatus onLocalReply(const LocalReplyData&) override;
 
   // Http::StreamDecoderFilter
@@ -149,7 +149,9 @@ public:
   // create metadata for golang.extension namespace
   void addGolangMetadata(const std::string& k, const uint64_t v);
 
-  static std::atomic<uint64_t> global_stream_id_;
+  static std::atomic<uint64_t>& getGlobalStreamId() {
+    MUTABLE_CONSTRUCT_ON_FIRST_USE(std::atomic<uint64_t>, 0);
+  }
 
   void continueStatus(GolangStatus status);
 
@@ -158,14 +160,15 @@ public:
                       Grpc::Status::GrpcStatus grpc_status, absl::string_view details);
 
   absl::optional<absl::string_view> getHeader(absl::string_view key);
-  void copyHeaders(GoString* go_strs, char* go_buf);
-  void setHeader(absl::string_view key, absl::string_view value);
-  void removeHeader(absl::string_view key);
-  void copyBuffer(Buffer::Instance* buffer, char* data);
-  void setBufferHelper(Buffer::Instance* buffer, absl::string_view& value, bufferAction action);
-  void copyTrailers(GoString* go_strs, char* go_buf);
-  void setTrailer(absl::string_view key, absl::string_view value);
-  void getStringValue(int id, GoString* value_str);
+  void copyHeaders(GoString* go_strs, char* go_buf) ABSL_LOCKS_EXCLUDED(mutex_);
+  void setHeader(absl::string_view key, absl::string_view value) ABSL_LOCKS_EXCLUDED(mutex_);
+  void removeHeader(absl::string_view key) ABSL_LOCKS_EXCLUDED(mutex_);
+  void copyBuffer(Buffer::Instance* buffer, char* data) ABSL_LOCKS_EXCLUDED(mutex_);
+  void setBufferHelper(Buffer::Instance* buffer, absl::string_view& value, bufferAction action)
+      ABSL_LOCKS_EXCLUDED(mutex_);
+  void copyTrailers(GoString* go_strs, char* go_buf) ABSL_LOCKS_EXCLUDED(mutex_);
+  void setTrailer(absl::string_view key, absl::string_view value) ABSL_LOCKS_EXCLUDED(mutex_);
+  void getStringValue(int id, GoString* value_str) ABSL_LOCKS_EXCLUDED(mutex_);
 
 private:
   ProcessorState& getProcessorState();
@@ -193,8 +196,8 @@ private:
   const FilterConfigSharedPtr config_;
   Dso::DsoInstancePtr dynamic_lib_;
 
-  Http::RequestOrResponseHeaderMap* headers_{nullptr};
-  Http::HeaderMap* trailers_{nullptr};
+  Http::RequestOrResponseHeaderMap* headers_ ABSL_GUARDED_BY(mutex_){nullptr};
+  Http::HeaderMap* trailers_ ABSL_GUARDED_BY(mutex_){nullptr};
 
   // save temp values from local reply
   Http::RequestOrResponseHeaderMap* local_headers_{nullptr};
@@ -217,7 +220,7 @@ private:
   // to avoid race between envoy c thread and go thread (when calling back from go).
   // it should also be okay without this lock in most cases, just for extreme case.
   Thread::MutexBasicLockable mutex_{};
-  bool has_destroyed_{false};
+  bool has_destroyed_ ABSL_GUARDED_BY(mutex_){false};
 
   // other filter trigger sendLocalReply during go processing in async.
   // will wait go return before continue.

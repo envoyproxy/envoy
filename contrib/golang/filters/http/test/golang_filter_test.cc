@@ -108,7 +108,7 @@ public:
         "{{ test_rundir }}/contrib/golang/filters/http/test/test_data/" + name + "/filter.so");
   }
 
-  void setupDso() { Dso::DsoInstanceManager::pub(PASSTHROUGH, genSoPath(PASSTHROUGH)); }
+  void setupDso() { Dso::DsoInstanceManager::load(PASSTHROUGH, genSoPath(PASSTHROUGH)); }
 
   void setupConfig(
       envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,

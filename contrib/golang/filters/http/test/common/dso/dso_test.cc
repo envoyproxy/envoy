@@ -28,20 +28,20 @@ TEST(DsoInstanceManagerTest, Pub) {
   auto id = "simple.so";
   auto path = genSoPath(id);
 
-  // get before pub
+  // get before load
   auto dso = DsoInstanceManager::getDsoInstanceByID(id);
   EXPECT_EQ(dso, nullptr);
 
-  // first time pub
-  auto res = DsoInstanceManager::pub(id, path);
+  // first time load
+  auto res = DsoInstanceManager::load(id, path);
   EXPECT_EQ(res, true);
 
-  // get after pub
+  // get after load
   dso = DsoInstanceManager::getDsoInstanceByID(id);
   EXPECT_NE(dso, nullptr);
 
-  // second time pub
-  res = DsoInstanceManager::pub(id, path);
+  // second time load
+  res = DsoInstanceManager::load(id, path);
   EXPECT_EQ(res, true);
 }
 

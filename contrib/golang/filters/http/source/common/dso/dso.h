@@ -52,14 +52,14 @@ public:
    * Load the go plugin dynamic library.
    * @param dso_id is unique ID for dynamic library.
    * @param dso_name used to specify the absolute path of the dynamic library.
-   * @return false if pub are invalid. Otherwise, return true.
+   * @return false if load are invalid. Otherwise, return true.
    */
   static bool load(std::string dso_id, std::string dso_name);
 
   /**
    * Unload the go plugin dynamic library.
    * @param dso_id is unique ID for dynamic library.
-   * @return false if unpub are invalid. Otherwise, return true.
+   * @return false if unload are invalid. Otherwise, return true.
    */
   static bool unload(std::string dso_id);
 
@@ -77,8 +77,14 @@ public:
   static std::string show();
 
 private:
-  static absl::Mutex mutex_;
-  static std::map<std::string, DsoInstancePtr> dso_map_;
+  static absl::Mutex& getMutex() { MUTABLE_CONSTRUCT_ON_FIRST_USE(absl::Mutex); }
+
+  using DsoTypeMap = std::map<std::string, DsoInstancePtr>;
+  static DsoTypeMap& getDsoMap() {
+    MUTABLE_CONSTRUCT_ON_FIRST_USE(DsoTypeMap, {
+                                                   {"", nullptr},
+                                               });
+  }
 };
 
 } // namespace Dso
