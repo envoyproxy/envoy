@@ -949,7 +949,7 @@ void ConnectionImpl::onKeepaliveResponseTimeout() {
   ENVOY_CONN_LOG_EVENT(debug, "h2_ping_timeout", "Closing connection due to keepalive timeout",
                        connection_);
   stats_.keepalive_timeout_.inc();
-  connection_.close(Network::ConnectionCloseType::NoFlush);
+  connection_.close(Network::ConnectionCloseType::NoFlush, "http2_ping_timedout");
 }
 
 bool ConnectionImpl::slowContainsStreamId(int32_t stream_id) const {
@@ -1620,7 +1620,8 @@ void ConnectionImpl::scheduleProtocolConstraintViolationCallback() {
 void ConnectionImpl::onProtocolConstraintViolation() {
   // Flooded outbound queue implies that peer is not reading and it does not
   // make sense to try to flush pending bytes.
-  connection_.close(Envoy::Network::ConnectionCloseType::NoFlush);
+  connection_.close(Envoy::Network::ConnectionCloseType::NoFlush,
+                    "http2 protocol violation on connection");
 }
 
 void ConnectionImpl::onUnderlyingConnectionBelowWriteBufferLowWatermark() {

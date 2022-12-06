@@ -25,6 +25,7 @@
 #include "source/common/config/metadata.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
+#include "source/common/common/enum_to_int.h"
 #include "source/common/network/application_protocol.h"
 #include "source/common/network/proxy_protocol_filter_state.h"
 #include "source/common/network/socket_option_factory.h"
@@ -233,6 +234,12 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
          config_->stats().downstream_cx_tx_bytes_total_,
          config_->stats().downstream_cx_tx_bytes_buffered_, nullptr, nullptr});
   }
+}
+
+void Filter::onInitFailure(UpstreamFailureReason reason) {
+  read_callbacks_->connection().close(
+      Network::ConnectionCloseType::NoFlush,
+      absl::StrCat("TCP initializion failure: ", enumToInt(reason)));
 }
 
 void Filter::readDisableUpstream(bool disable) {
@@ -772,14 +779,16 @@ void Filter::onIdleTimeout() {
   config_->stats().idle_timeout_.inc();
 
   // This results in also closing the upstream connection.
-  read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+  read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush,
+                                      "Session idle timeout.");
 }
 
 void Filter::onMaxDownstreamConnectionDuration() {
   ENVOY_CONN_LOG(debug, "max connection duration reached", read_callbacks_->connection());
   getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::DurationTimeout);
   config_->stats().max_downstream_connection_duration_.inc();
-  read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+  read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush,
+                                      "Max connection duration reached.");
 }
 
 void Filter::onAccessLogFlushInterval() {

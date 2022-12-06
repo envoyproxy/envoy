@@ -66,6 +66,7 @@ void ConnectionImplBase::raiseConnectionEvent(ConnectionEvent event) {
 
 void ConnectionImplBase::onDelayedCloseTimeout() {
   delayed_close_timer_.reset();
+  setLocalCloseReason("Triggered Delayed Close Timeout");
   ENVOY_CONN_LOG(debug, "triggered delayed close", *this);
   if (connection_stats_ != nullptr && connection_stats_->delayed_close_timeouts_ != nullptr) {
     connection_stats_->delayed_close_timeouts_->inc();

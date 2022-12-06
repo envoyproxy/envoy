@@ -261,6 +261,11 @@ absl::string_view MultiConnectionBaseImpl::transportFailureReason() const {
   return connections_[0]->transportFailureReason();
 }
 
+absl::string_view MultiConnectionBaseImpl::localCloseReason() const {
+  // Note, this might change before connect finishes.
+  return connections_[0]->localCloseReason();
+}
+
 bool MultiConnectionBaseImpl::startSecureTransport() {
   if (!connect_finished_) {
     per_connection_state_.start_secure_transport_ = true;

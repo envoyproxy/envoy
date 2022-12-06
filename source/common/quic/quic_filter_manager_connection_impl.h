@@ -53,6 +53,14 @@ public:
   void enableHalfClose(bool enabled) override;
   bool isHalfCloseEnabled() override;
   void close(Network::ConnectionCloseType type) override;
+  void close(Network::ConnectionCloseType type, absl::string_view) override {
+    // TODO(kbaichoo): do pimpl where both methods impl or the other close w/o
+    // details calls this close but with empty details?
+    // if (!details.empty()) {
+    // local_close_reason_ = details;
+    //}
+    close(type);
+  }
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
   std::string nextProtocol() const override { return EMPTY_STRING; }
   // No-op. TCP_NODELAY doesn't apply to UDP.

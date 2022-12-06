@@ -215,6 +215,7 @@ Connection::State ConnectionImpl::state() const {
   }
 }
 
+// TODO(kbaichoo): Create a overloaded method of this that takes in details...
 void ConnectionImpl::closeConnectionImmediately() { closeSocket(ConnectionEvent::LocalClose); }
 
 void ConnectionImpl::setTransportSocketIsReadable() {
@@ -861,6 +862,8 @@ bool ServerConnectionImpl::initializeReadFilters() {
 
 void ServerConnectionImpl::onTransportSocketConnectTimeout() {
   stream_info_.setConnectionTerminationDetails(kTransportSocketConnectTimeoutTerminationDetails);
+  // TODO(kbaichoo): change to underscore instead.
+  setLocalCloseReason("TransportSocketTimeout");
   closeConnectionImmediately();
   transport_socket_timeout_stat_->inc();
   setFailureReason("connect timeout");

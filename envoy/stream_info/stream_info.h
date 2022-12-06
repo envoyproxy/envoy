@@ -176,8 +176,6 @@ struct ResponseCodeDetailValues {
   const std::string FilterChainNotFound = "filter_chain_not_found";
   // The client disconnected unexpectedly.
   const std::string DownstreamRemoteDisconnect = "downstream_remote_disconnect";
-  // The client connection was locally closed for an unspecified reason.
-  const std::string DownstreamLocalDisconnect = "downstream_local_disconnect";
   // The max connection duration was exceeded.
   const std::string DurationTimeout = "duration_timeout";
   // The max request downstream header duration was exceeded.
@@ -199,6 +197,10 @@ struct ResponseCodeDetailValues {
   const std::string FilterAddedInvalidRequestData = "filter_added_invalid_request_data";
   // A filter called addDecodedData at the wrong point in the filter chain.
   const std::string FilterAddedInvalidResponseData = "filter_added_invalid_response_data";
+  // We defer closed a drained connection without streams. This should *NOT*
+  // appear as a stream reset reason.
+  const std::string DeferredCloseOnDrainedStream = "deferred_close_on_drained_stream";
+  // TODO(kbaichoo): Add the other reasons close occured here.
   // Changes or additions to details should be reflected in
   // docs/root/configuration/http/http_conn_man/response_code_details.rst
 };

@@ -63,7 +63,8 @@ void TsiSocket::doHandshakeNext() {
                             callbacks_->connection().connectionInfoProvider().remoteAddress());
     if (!handshaker_) {
       ENVOY_CONN_LOG(warn, "TSI: failed to create handshaker", callbacks_->connection());
-      callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+      callbacks_->connection().close(Network::ConnectionCloseType::NoFlush,
+                                     "Failed to create handshaker");
       return;
     }
 
@@ -373,7 +374,7 @@ void TsiSocket::onNextDone(NextResultPtr&& result) {
 
   Network::PostIoAction action = doHandshakeNextDone(std::move(result));
   if (action == Network::PostIoAction::Close) {
-    callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+    callbacks_->connection().close(Network::ConnectionCloseType::NoFlush, "TSI handshake failed.");
   }
 }
 

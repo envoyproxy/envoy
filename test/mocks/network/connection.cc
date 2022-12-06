@@ -82,6 +82,10 @@ template <class T> static void initializeMockConnection(T& connection) {
   ON_CALL(connection, close(_)).WillByDefault(Invoke([&connection](ConnectionCloseType) -> void {
     connection.raiseEvent(Network::ConnectionEvent::LocalClose);
   }));
+  ON_CALL(connection, close(_, _))
+      .WillByDefault(Invoke([&connection](ConnectionCloseType, absl::string_view) -> void {
+        connection.raiseEvent(Network::ConnectionEvent::LocalClose);
+      }));
   ON_CALL(connection, id()).WillByDefault(Return(connection.next_id_));
   connection.stream_info_.downstream_connection_info_provider_->setConnectionID(connection.id_);
   ON_CALL(connection, state()).WillByDefault(ReturnPointee(&connection.state_));

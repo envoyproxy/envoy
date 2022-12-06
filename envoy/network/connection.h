@@ -139,6 +139,11 @@ public:
   virtual void close(ConnectionCloseType type) PURE;
 
   /**
+   * Close the connection.
+   */
+  virtual void close(ConnectionCloseType type, absl::string_view details) PURE;
+
+  /**
    * @return Event::Dispatcher& the dispatcher backing this connection.
    */
   virtual Event::Dispatcher& dispatcher() PURE;
@@ -311,10 +316,16 @@ public:
   virtual void setDelayedCloseTimeout(std::chrono::milliseconds timeout) PURE;
 
   /**
-   * @return std::string the failure reason of the underlying transport socket, if no failure
-   *         occurred an empty string is returned.
+   * @return absl::string_view the failure reason of the underlying transport socket, if no failure
+   *         occurred an empty string view is returned.
    */
   virtual absl::string_view transportFailureReason() const PURE;
+
+  /**
+   * @return absl::string_view the local close reason of the underlying socket, if local close
+   *         did not occur an empty string view is returned.
+   */
+  virtual absl::string_view localCloseReason() const PURE;
 
   /**
    * Instructs the connection to start using secure transport.

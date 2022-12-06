@@ -56,6 +56,7 @@ public:
   MOCK_METHOD(void, enableHalfClose, (bool enabled));                                              \
   MOCK_METHOD(bool, isHalfCloseEnabled, ());                                                       \
   MOCK_METHOD(void, close, (ConnectionCloseType type));                                            \
+  MOCK_METHOD(void, close, (ConnectionCloseType type, absl::string_view details));                 \
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());                                                 \
   MOCK_METHOD(uint64_t, id, (), (const));                                                          \
   MOCK_METHOD(void, hashKey, (std::vector<uint8_t>&), (const));                                    \
@@ -85,6 +86,7 @@ public:
   MOCK_METHOD(const StreamInfo::StreamInfo&, streamInfo, (), (const));                             \
   MOCK_METHOD(void, setDelayedCloseTimeout, (std::chrono::milliseconds));                          \
   MOCK_METHOD(absl::string_view, transportFailureReason, (), (const));                             \
+  MOCK_METHOD(absl::string_view, localCloseReason, (), (const));                                   \
   MOCK_METHOD(bool, startSecureTransport, ());                                                     \
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, lastRoundTripTime, (), (const));          \
   MOCK_METHOD(void, configureInitialCongestionWindow,                                              \
