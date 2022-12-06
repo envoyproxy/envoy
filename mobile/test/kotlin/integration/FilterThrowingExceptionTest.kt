@@ -108,11 +108,11 @@ class FilterThrowingExceptionTest {
       .addLogLevel(LogLevel.DEBUG)
       .addPlatformFilter(::ThrowingFilter)
       .setEventTracker { event ->
-        if (event["name"] == "event_log" && event["log_name"] == "jni_exception") {
-          // assertThat(event["message"]).isEqualTo(expectedMessages.first())
-          // expectedMessages.removeAt(0)
-          onExceptionEventLatch.countDown()
-        }
+        // if (event["name"] == "event_log" && event["log_name"] == "jni_exception") {
+        //   // assertThat(event["message"]).isEqualTo(expectedMessages.first())
+        //   // expectedMessages.removeAt(0)
+        //   // onExceptionEventLatch.countDown()
+        // }
       }
       .setOnEngineRunning { onEngineRunningLatch.countDown() }
       .build()
