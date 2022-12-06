@@ -366,6 +366,8 @@ ProxyStatusUtils::fromStreamInfo(const StreamInfo& stream_info) {
     return ProxyStatusError::HttpProtocolError;
   } else if (stream_info.hasResponseFlag(ResponseFlag::NoClusterFound)) {
     return ProxyStatusError::DestinationUnavailable;
+  } else if (stream_info.hasResponseFlag(ResponseFlag::DnsResolutionFailed)) {
+    return ProxyStatusError::DnsError;
   } else {
     return absl::nullopt;
   }
