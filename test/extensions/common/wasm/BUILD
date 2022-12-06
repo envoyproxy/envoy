@@ -102,3 +102,46 @@ envoy_cc_test_library(
         "//source/extensions/wasm_runtime/wavm:config",
     ],
 )
+
+envoy_cc_test(
+    name = "wasm_runtime_factory_test",
+    srcs = ["wasm_runtime_factory_test.cc"],
+    deps = [
+        "//envoy/registry",
+        "//source/extensions/common/wasm:wasm_runtime_factory_interface",
+        "//test/test_common:environment_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "context_test",
+    srcs = ["context_test.cc"],
+    deps = [
+        "//envoy/common:base_includes",
+        "//source/extensions/common/wasm:wasm_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
+    ],
+)
+
+envoy_cc_test(
+    name = "foreign_test",
+    srcs = ["foreign_test.cc"],
+    copts = select({
+        "//bazel:windows_x86_64": [],  # TODO: fix the windows ANTLR build
+        "//conditions:default": [
+            "-DWASM_USE_CEL_PARSER",
+        ],
+    }),
+    deps = [
+        "//source/extensions/common/wasm:wasm_hdr",
+        "//source/extensions/common/wasm:wasm_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:environment_lib",
+        "@proxy_wasm_cpp_host//:base_lib",
+    ],
+)

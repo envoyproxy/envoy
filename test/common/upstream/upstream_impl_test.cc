@@ -2608,7 +2608,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
 
   {
     // If the cluster manager gets a source address from the bootstrap proto, use it.
-    server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
+    server_context_.cluster_manager_.mutableBindConfig().mutable_source_address()->set_address(
+        "1.2.3.5");
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
         "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
@@ -2626,8 +2627,10 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
 
   {
     // Test extra_source_addresses from bootstrap.
-    server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
-    server_context_.cluster_manager_.bind_config_.add_extra_source_addresses()
+    server_context_.cluster_manager_.mutableBindConfig().mutable_source_address()->set_address(
+        "1.2.3.5");
+    server_context_.cluster_manager_.mutableBindConfig()
+        .add_extra_source_addresses()
         ->mutable_address()
         ->set_address("2001::1");
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
@@ -2653,8 +2656,9 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
 
   {
     // Test no same IP version in multiple source addresses.
-    server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
-    server_context_.cluster_manager_.bind_config_.clear_extra_source_addresses();
+    server_context_.cluster_manager_.mutableBindConfig().mutable_source_address()->set_address(
+        "1.2.3.5");
+    server_context_.cluster_manager_.mutableBindConfig().clear_extra_source_addresses();
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
         "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
@@ -2672,9 +2676,11 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
 
   {
     // Test two same IP version addresses.
-    server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
-    server_context_.cluster_manager_.bind_config_.clear_extra_source_addresses();
-    server_context_.cluster_manager_.bind_config_.add_extra_source_addresses()
+    server_context_.cluster_manager_.mutableBindConfig().mutable_source_address()->set_address(
+        "1.2.3.5");
+    server_context_.cluster_manager_.mutableBindConfig().clear_extra_source_addresses();
+    server_context_.cluster_manager_.mutableBindConfig()
+        .add_extra_source_addresses()
         ->mutable_address()
         ->set_address("1.2.3.6");
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
@@ -2693,12 +2699,15 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
 
   {
     // Test more than two multiple source addresses
-    server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
-    server_context_.cluster_manager_.bind_config_.clear_extra_source_addresses();
-    server_context_.cluster_manager_.bind_config_.add_extra_source_addresses()
+    server_context_.cluster_manager_.mutableBindConfig().mutable_source_address()->set_address(
+        "1.2.3.5");
+    server_context_.cluster_manager_.mutableBindConfig().clear_extra_source_addresses();
+    server_context_.cluster_manager_.mutableBindConfig()
+        .add_extra_source_addresses()
         ->mutable_address()
         ->set_address("2001::1");
-    server_context_.cluster_manager_.bind_config_.add_extra_source_addresses()
+    server_context_.cluster_manager_.mutableBindConfig()
+        .add_extra_source_addresses()
         ->mutable_address()
         ->set_address("2001::2");
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
@@ -2715,10 +2724,33 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
   }
 
   {
+    // Test missing bootstrap source_address with extra source address.
+    server_context_.cluster_manager_.mutableBindConfig().clear_source_address();
+    server_context_.cluster_manager_.mutableBindConfig().clear_extra_source_addresses();
+    server_context_.cluster_manager_.mutableBindConfig()
+        .add_extra_source_addresses()
+        ->mutable_address()
+        ->set_address("1.2.3.6");
+    Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
+        "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
+    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+        server_context_, ssl_context_manager_, *scope, server_context_.cluster_manager_, stats_,
+        validation_visitor_);
+    EXPECT_THROW_WITH_MESSAGE(StaticClusterImpl cluster(server_context_, config, runtime_,
+                                                        factory_context, std::move(scope), false),
+                              EnvoyException,
+                              "Bootstrap's upstream binding config has extra/additional source "
+                              "addresses but no source_address. Extra/additional addresses cannot "
+                              "be specified if source_address is not set.");
+  }
+
+  {
     // Test non IP address case.
-    server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
-    server_context_.cluster_manager_.bind_config_.clear_extra_source_addresses();
-    server_context_.cluster_manager_.bind_config_.add_extra_source_addresses()
+    server_context_.cluster_manager_.mutableBindConfig().mutable_source_address()->set_address(
+        "1.2.3.5");
+    server_context_.cluster_manager_.mutableBindConfig().clear_extra_source_addresses();
+    server_context_.cluster_manager_.mutableBindConfig()
+        .add_extra_source_addresses()
         ->mutable_address()
         ->set_address("2001::1");
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
@@ -2781,8 +2813,32 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
   }
 
   {
+    // Test missing cluster config source_address with extra source address.
+    config.mutable_upstream_bind_config()->clear_source_address();
+    config.mutable_upstream_bind_config()->clear_extra_source_addresses();
+    config.mutable_upstream_bind_config()
+        ->add_extra_source_addresses()
+        ->mutable_address()
+        ->set_address("2001::1");
+    Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
+        "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
+    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+        server_context_, ssl_context_manager_, *scope, server_context_.cluster_manager_, stats_,
+        validation_visitor_);
+    EXPECT_THROW_WITH_MESSAGE(
+        StaticClusterImpl cluster(server_context_, config, runtime_, factory_context,
+                                  std::move(scope), false),
+        EnvoyException,
+        "Cluster staticcluster's upstream binding config has extra/additional source "
+        "addresses but no source_address. Extra/additional addresses cannot "
+        "be specified if source_address is not set.");
+  }
+
+  {
     // The source address from cluster config takes precedence over one from the bootstrap proto.
-    server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
+    config.mutable_upstream_bind_config()->mutable_source_address()->set_address(cluster_address);
+    server_context_.cluster_manager_.mutableBindConfig().mutable_source_address()->set_address(
+        "1.2.3.5");
     config.mutable_upstream_bind_config()->clear_extra_source_addresses();
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
         "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
@@ -2803,7 +2859,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
   {
     // The bootstrap config using IPv6 address and the cluster config using IPv4 address, ensure
     // the bootstrap config will be ignored.
-    server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("2001::1");
+    server_context_.cluster_manager_.mutableBindConfig().mutable_source_address()->set_address(
+        "2001::1");
     config.mutable_upstream_bind_config()->clear_extra_source_addresses();
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
         "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
@@ -2829,10 +2886,13 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
 
   {
     // Test more than two multiple source addresses
-    server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
-    server_context_.cluster_manager_.bind_config_.add_additional_source_addresses()->set_address(
-        "2001::1");
-    server_context_.cluster_manager_.bind_config_.add_extra_source_addresses()
+    server_context_.cluster_manager_.mutableBindConfig().mutable_source_address()->set_address(
+        "1.2.3.5");
+    server_context_.cluster_manager_.mutableBindConfig()
+        .add_additional_source_addresses()
+        ->set_address("2001::1");
+    server_context_.cluster_manager_.mutableBindConfig()
+        .add_extra_source_addresses()
         ->mutable_address()
         ->set_address("2001::1");
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
@@ -2846,15 +2906,17 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
         EnvoyException,
         "Can't specify both `extra_source_addresses` and `additional_source_addresses` in the "
         "Bootstrap's upstream binding config");
-    server_context_.cluster_manager_.bind_config_.clear_extra_source_addresses();
-    server_context_.cluster_manager_.bind_config_.clear_additional_source_addresses();
+    server_context_.cluster_manager_.mutableBindConfig().clear_extra_source_addresses();
+    server_context_.cluster_manager_.mutableBindConfig().clear_additional_source_addresses();
   }
 
   {
     // Test additional_source_addresses from bootstrap.
-    server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
-    server_context_.cluster_manager_.bind_config_.add_additional_source_addresses()->set_address(
-        "2001::1");
+    server_context_.cluster_manager_.mutableBindConfig().mutable_source_address()->set_address(
+        "1.2.3.5");
+    server_context_.cluster_manager_.mutableBindConfig()
+        .add_additional_source_addresses()
+        ->set_address("2001::1");
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
         "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
@@ -2878,8 +2940,9 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
 
   {
     // Test no same IP version in multiple source addresses.
-    server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
-    server_context_.cluster_manager_.bind_config_.clear_additional_source_addresses();
+    server_context_.cluster_manager_.mutableBindConfig().mutable_source_address()->set_address(
+        "1.2.3.5");
+    server_context_.cluster_manager_.mutableBindConfig().clear_additional_source_addresses();
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
         "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
@@ -2897,10 +2960,12 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
 
   {
     // Test two same IP version addresses.
-    server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
-    server_context_.cluster_manager_.bind_config_.clear_additional_source_addresses();
-    server_context_.cluster_manager_.bind_config_.add_additional_source_addresses()->set_address(
-        "1.2.3.6");
+    server_context_.cluster_manager_.mutableBindConfig().mutable_source_address()->set_address(
+        "1.2.3.5");
+    server_context_.cluster_manager_.mutableBindConfig().clear_additional_source_addresses();
+    server_context_.cluster_manager_.mutableBindConfig()
+        .add_additional_source_addresses()
+        ->set_address("1.2.3.6");
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
         "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
@@ -2917,12 +2982,15 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
 
   {
     // Test more than two multiple source addresses
-    server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
-    server_context_.cluster_manager_.bind_config_.clear_additional_source_addresses();
-    server_context_.cluster_manager_.bind_config_.add_additional_source_addresses()->set_address(
-        "2001::1");
-    server_context_.cluster_manager_.bind_config_.add_additional_source_addresses()->set_address(
-        "2001::2");
+    server_context_.cluster_manager_.mutableBindConfig().mutable_source_address()->set_address(
+        "1.2.3.5");
+    server_context_.cluster_manager_.mutableBindConfig().clear_additional_source_addresses();
+    server_context_.cluster_manager_.mutableBindConfig()
+        .add_additional_source_addresses()
+        ->set_address("2001::1");
+    server_context_.cluster_manager_.mutableBindConfig()
+        .add_additional_source_addresses()
+        ->set_address("2001::2");
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
         "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
@@ -2938,10 +3006,12 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
 
   {
     // Test non IP address case.
-    server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
-    server_context_.cluster_manager_.bind_config_.clear_additional_source_addresses();
-    server_context_.cluster_manager_.bind_config_.add_additional_source_addresses()->set_address(
-        "2001::1");
+    server_context_.cluster_manager_.mutableBindConfig().mutable_source_address()->set_address(
+        "1.2.3.5");
+    server_context_.cluster_manager_.mutableBindConfig().clear_additional_source_addresses();
+    server_context_.cluster_manager_.mutableBindConfig()
+        .add_additional_source_addresses()
+        ->set_address("2001::1");
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
         "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
@@ -2981,7 +3051,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
 
   {
     // The source address from cluster config takes precedence over one from the bootstrap proto.
-    server_context_.cluster_manager_.bind_config_.mutable_source_address()->set_address("1.2.3.5");
+    server_context_.cluster_manager_.mutableBindConfig().mutable_source_address()->set_address(
+        "1.2.3.5");
     config.mutable_upstream_bind_config()->clear_additional_source_addresses();
     Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
         "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));

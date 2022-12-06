@@ -421,7 +421,7 @@ public:
   MOCK_METHOD(LocalErrorStatus, onLocalReply, (const LocalReplyData&));
 
   // Http::MockStreamEncoderFilter
-  MOCK_METHOD(FilterHeadersStatus, encode1xxHeaders, (ResponseHeaderMap & headers));
+  MOCK_METHOD(Filter1xxHeadersStatus, encode1xxHeaders, (ResponseHeaderMap & headers));
   MOCK_METHOD(FilterHeadersStatus, encodeHeaders, (ResponseHeaderMap & headers, bool end_stream));
   MOCK_METHOD(FilterDataStatus, encodeData, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(FilterTrailersStatus, encodeTrailers, (ResponseTrailerMap & trailers));
@@ -452,7 +452,7 @@ public:
   MOCK_METHOD(void, decodeComplete, ());
 
   // Http::MockStreamEncoderFilter
-  MOCK_METHOD(FilterHeadersStatus, encode1xxHeaders, (ResponseHeaderMap & headers));
+  MOCK_METHOD(Filter1xxHeadersStatus, encode1xxHeaders, (ResponseHeaderMap & headers));
   MOCK_METHOD(ResponseHeaderMapOptRef, informationalHeaders, (), (const));
   MOCK_METHOD(FilterHeadersStatus, encodeHeaders, (ResponseHeaderMap & headers, bool end_stream));
   MOCK_METHOD(ResponseHeaderMapOptRef, responseHeaders, (), (const));
