@@ -6,6 +6,7 @@
 
 #include "source/common/common/utility.h"
 #include "source/common/config/utility.h"
+#include "source/common/config/well_known_names.h"
 #include "source/common/event/real_time_system.h"
 #include "source/common/local_info/local_info_impl.h"
 #include "source/common/protobuf/utility.h"
@@ -104,7 +105,7 @@ void ValidationInstance::initialize(const Options& options,
   admin_ = std::make_unique<Server::ValidationAdmin>(initial_config.admin().address());
   listener_manager_ =
       Config::Utility::getAndCheckFactoryByName<ListenerManagerFactory>(
-          "envoy.listener_manager_impl.default")
+          Config::ServerExtensionValues::get().DEFAULT_LISTENER)
           .createListenerManager(*this, std::make_unique<ValidationListenerComponentFactory>(*this),
                                  *this, false, quic_stat_names_);
   thread_local_.registerThread(*dispatcher_, true);
