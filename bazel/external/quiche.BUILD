@@ -3242,6 +3242,7 @@ envoy_cc_library(
         ":quic_core_web_transport_interface_lib",
         ":quic_platform_base",
         ":quiche_common_mem_slice_storage",
+        ":quiche_common_structured_headers_lib",
         ":spdy_core_framer_lib",
         ":spdy_core_http2_deframer_lib",
         ":spdy_core_protocol_lib",
@@ -5265,6 +5266,25 @@ envoy_cc_library(
     deps = [
         ":quiche_common_endian_lib",
         ":quiche_common_platform",
+    ],
+)
+
+envoy_cc_library(
+    name = "quiche_common_structured_headers_lib",
+    srcs = ["quiche/common/structured_headers.cc"],
+    hdrs = ["quiche/common/structured_headers.h"],
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [
+        ":quiche_common_platform_export",
+        ":quiche_common_platform_logging",
+        "@com_google_absl//absl/algorithm:container",
+        "@com_google_absl//absl/container:flat_hash_set",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/strings:str_format",
+        "@com_google_absl//absl/types:optional",
+        "@com_google_absl//absl/types:span",
+        "@com_google_absl//absl/types:variant",
     ],
 )
 

@@ -48,7 +48,7 @@ public:
   MOCK_METHOD(ThreadLocalCluster*, getThreadLocalCluster, (absl::string_view cluster));
   MOCK_METHOD(bool, removeCluster, (const std::string& cluster));
   MOCK_METHOD(void, shutdown, ());
-  MOCK_METHOD(const envoy::config::core::v3::BindConfig&, bindConfig, (), (const));
+  MOCK_METHOD(const absl::optional<envoy::config::core::v3::BindConfig>&, bindConfig, (), (const));
   MOCK_METHOD(Config::GrpcMuxSharedPtr, adsMux, ());
   MOCK_METHOD(Grpc::AsyncClientManager&, grpcAsyncClientManager, ());
   MOCK_METHOD(const std::string, versionInfo, (), (const));
@@ -85,8 +85,10 @@ public:
                OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
                ProtobufMessage::ValidationVisitor& validation_visitor));
 
+  envoy::config::core::v3::BindConfig& mutableBindConfig();
+
   NiceMock<MockThreadLocalCluster> thread_local_cluster_;
-  envoy::config::core::v3::BindConfig bind_config_;
+  absl::optional<envoy::config::core::v3::BindConfig> bind_config_;
   std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux_;
   NiceMock<Grpc::MockAsyncClientManager> async_client_manager_;
   absl::optional<std::string> local_cluster_name_;

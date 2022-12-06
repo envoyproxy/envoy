@@ -304,7 +304,9 @@ public:
     updateClusterCounts();
   }
 
-  const envoy::config::core::v3::BindConfig& bindConfig() const override { return bind_config_; }
+  const absl::optional<envoy::config::core::v3::BindConfig>& bindConfig() const override {
+    return bind_config_;
+  }
 
   Config::GrpcMuxSharedPtr adsMux() override { return ads_mux_; }
   Grpc::AsyncClientManager& grpcAsyncClientManager() override { return *async_client_manager_; }
@@ -780,7 +782,7 @@ protected:
 
 private:
   ClusterMap warming_clusters_;
-  envoy::config::core::v3::BindConfig bind_config_;
+  absl::optional<envoy::config::core::v3::BindConfig> bind_config_;
   Outlier::EventLoggerSharedPtr outlier_event_logger_;
   const LocalInfo::LocalInfo& local_info_;
   CdsApiPtr cds_api_;
