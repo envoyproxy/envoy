@@ -9,6 +9,7 @@
 #include "source/common/stats/symbol_table.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 
 namespace Envoy {
@@ -25,7 +26,8 @@ public:
     // find only on the root scope will not find the gauge which is defined on a
     // lower-level scope.
     const Stats::Store& store = root_scope_.constStore();
-    Stats::GaugeOptConstRef gauge = store.findGauge(stat_name_.statName());
+    Stats::StatName stat_name = stat_name_.statName();
+    Stats::GaugeOptConstRef gauge = Stats::TestUtil::findGaugeInStore(store, stat_name);
 
     if (!gauge.has_value()) {
       decoder_callbacks_->sendLocalReply(Envoy::Http::Code::InternalServerError,

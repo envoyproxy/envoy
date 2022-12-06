@@ -241,11 +241,6 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
   auto found_counter = scope_.findCounter(c1_name.statName());
   ASSERT_TRUE(found_counter.has_value());
   EXPECT_EQ(&c1, &found_counter->get());
-
-  auto found_counter_in_store = store_->findCounter(c1_name.statName());
-  ASSERT_TRUE(found_counter_in_store.has_value());
-  EXPECT_EQ(&c1, &found_counter_in_store->get());
-
   EXPECT_EQ(100, found_counter->get().value());
   c1.add(100);
   EXPECT_EQ(200, found_counter->get().value());
@@ -258,11 +253,6 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
   auto found_gauge = scope_.findGauge(g1_name.statName());
   ASSERT_TRUE(found_gauge.has_value());
   EXPECT_EQ(&g1, &found_gauge->get());
-
-  auto found_gauge_in_store = store_->findGauge(g1_name.statName());
-  ASSERT_TRUE(found_gauge_in_store.has_value());
-  EXPECT_EQ(&g1, &found_gauge_in_store->get());
-
   EXPECT_EQ(100, found_gauge->get().value());
   g1.set(0);
   EXPECT_EQ(0, found_gauge->get().value());
@@ -274,22 +264,12 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
   auto found_histogram = scope_.findHistogram(h1_name.statName());
   ASSERT_TRUE(found_histogram.has_value());
   EXPECT_EQ(&h1, &found_histogram->get());
-
-  auto found_histogram_in_store = store_->findHistogram(h1_name.statName());
-  ASSERT_TRUE(found_histogram_in_store.has_value());
-  EXPECT_EQ(&h1, &found_histogram_in_store->get());
-
   TextReadout& t1 = scope_.textReadoutFromString("t1");
   EXPECT_EQ(&t1, &scope_.textReadoutFromString("t1"));
 
   auto found_text_readout = scope_.findTextReadout(t1.statName());
   ASSERT_TRUE(found_text_readout.has_value());
   EXPECT_EQ(&t1, &found_text_readout->get());
-
-  auto found_text_readout_in_store = store_->findTextReadout(t1.statName());
-  ASSERT_TRUE(found_text_readout_in_store.has_value());
-  EXPECT_EQ(&t1, &found_text_readout_in_store->get());
-
   EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 200));
   h1.recordValue(200);
   EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 100));
@@ -859,10 +839,6 @@ TEST_F(LookupWithStatNameTest, NotFound) {
   EXPECT_FALSE(scope_.findGauge(not_found));
   EXPECT_FALSE(scope_.findHistogram(not_found));
   EXPECT_FALSE(scope_.findTextReadout(not_found));
-  EXPECT_FALSE(store_->findCounter(not_found));
-  EXPECT_FALSE(store_->findGauge(not_found));
-  EXPECT_FALSE(store_->findHistogram(not_found));
-  EXPECT_FALSE(store_->findTextReadout(not_found));
 }
 
 class StatsMatcherTLSTest : public StatsThreadLocalStoreTest {

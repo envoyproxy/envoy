@@ -174,11 +174,6 @@ public:
   void forEachHistogram(SizeFn f_size, StatFn<ParentHistogram> f_stat) const override;
   void forEachScope(SizeFn f_size, StatFn<const Scope> f_stat) const override;
 
-  CounterOptConstRef findCounter(StatName name) const override;
-  GaugeOptConstRef findGauge(StatName name) const override;
-  HistogramOptConstRef findHistogram(StatName name) const override;
-  TextReadoutOptConstRef findTextReadout(StatName name) const override;
-
   // Stats::StoreRoot
   void addSink(Sink& sink) override { timer_sinks_.push_back(sink); }
   void setTagProducer(TagProducerPtr&& tag_producer) override {

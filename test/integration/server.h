@@ -326,22 +326,6 @@ public:
   ConstScopeSharedPtr constRootScope() const override {
     return const_cast<TestIsolatedStoreImpl*>(this)->rootScope();
   }
-  CounterOptConstRef findCounter(StatName name) const override {
-    Thread::LockGuard lock(lock_);
-    return store_.findCounter(name);
-  }
-  GaugeOptConstRef findGauge(StatName name) const override {
-    Thread::LockGuard lock(lock_);
-    return store_.findGauge(name);
-  }
-  HistogramOptConstRef findHistogram(StatName name) const override {
-    Thread::LockGuard lock(lock_);
-    return store_.findHistogram(name);
-  }
-  TextReadoutOptConstRef findTextReadout(StatName name) const override {
-    Thread::LockGuard lock(lock_);
-    return store_.findTextReadout(name);
-  }
   const SymbolTable& constSymbolTable() const override { return store_.constSymbolTable(); }
   SymbolTable& symbolTable() override { return store_.symbolTable(); }
 

@@ -476,44 +476,6 @@ bool ThreadLocalStoreImpl::checkAndRememberRejection(StatName name,
   return false;
 }
 
-CounterOptConstRef ThreadLocalStoreImpl::findCounter(StatName name) const {
-  CounterOptConstRef found_counter;
-  iterateScopes([&found_counter, name](const ScopeImplSharedPtr& scope) -> bool {
-    found_counter =
-        scope->findStatLockHeld<Counter>(name, scope->centralCacheLockHeld()->counters_);
-    return !found_counter.has_value();
-  });
-  return found_counter;
-}
-
-GaugeOptConstRef ThreadLocalStoreImpl::findGauge(StatName name) const {
-  GaugeOptConstRef found_gauge;
-  iterateScopes([&found_gauge, name](const ScopeImplSharedPtr& scope) -> bool {
-    found_gauge = scope->findStatLockHeld<Gauge>(name, scope->centralCacheLockHeld()->gauges_);
-    return !found_gauge.has_value();
-  });
-  return found_gauge;
-}
-
-HistogramOptConstRef ThreadLocalStoreImpl::findHistogram(StatName name) const {
-  HistogramOptConstRef found_histogram;
-  iterateScopes([&found_histogram, name](const ScopeImplSharedPtr& scope) -> bool {
-    found_histogram = scope->findHistogramLockHeld(name);
-    return !found_histogram.has_value();
-  });
-  return found_histogram;
-}
-
-TextReadoutOptConstRef ThreadLocalStoreImpl::findTextReadout(StatName name) const {
-  TextReadoutOptConstRef found_text_readout;
-  iterateScopes([&found_text_readout, name](const ScopeImplSharedPtr& scope) -> bool {
-    found_text_readout =
-        scope->findStatLockHeld<TextReadout>(name, scope->centralCacheLockHeld()->text_readouts_);
-    return !found_text_readout.has_value();
-  });
-  return found_text_readout;
-}
-
 template <class StatType>
 StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
     StatName full_stat_name, StatName name_no_tags,

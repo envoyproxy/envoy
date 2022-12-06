@@ -196,15 +196,6 @@ public:
     forEachTextReadout(f_size, f_stat);
   }
 
-  CounterOptConstRef findCounter(StatName name) const override { return counters_.find(name); }
-  GaugeOptConstRef findGauge(StatName name) const override { return gauges_.find(name); }
-  HistogramOptConstRef findHistogram(StatName name) const override {
-    return histograms_.find(name);
-  }
-  TextReadoutOptConstRef findTextReadout(StatName name) const override {
-    return text_readouts_.find(name);
-  }
-
   NullCounterImpl& nullCounter() override { return *null_counter_; }
   NullGaugeImpl& nullGauge() override { return *null_gauge_; }
 
