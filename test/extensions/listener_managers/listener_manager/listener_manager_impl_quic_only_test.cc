@@ -5,7 +5,7 @@
 #include "source/common/quic/quic_transport_socket_factory.h"
 #endif
 
-#include "test/server/listener_manager_impl_test.h"
+#include "test/extensions/listener_managers/listener_manager/listener_manager_impl_test.h"
 #include "test/server/utility.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
