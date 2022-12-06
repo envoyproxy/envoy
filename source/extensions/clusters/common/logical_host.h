@@ -42,13 +42,12 @@ public:
                        const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint) {
     const auto& health_check_config = lb_endpoint.endpoint().health_check_config();
     auto health_check_address = resolveHealthCheckAddress(health_check_config, address);
-
     absl::WriterMutexLock lock(&address_lock_);
     setAddress(address);
     setAddressList(address_list);
-    // TODO: the health checker only gets the first address in the list and
-    // will not walk the full happy eyeballs list. We should eventually fix
-    // this.
+    /* TODO: the health checker only gets the first address in the list and
+     * will not walk the full happy eyeballs list. We should eventually fix
+     * this. */
     setHealthCheckAddress(health_check_address);
   }
 
