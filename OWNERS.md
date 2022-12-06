@@ -79,7 +79,7 @@ without further review.
 * Yan Avlasov ([yanavlasov](https://github.com/yanavlasov)) (yavlasov@google.com)
 * William A Rowe Jr ([wrowe](https://github.com/wrowe)) (wrowe@vmware.com)
 * Otto van der Schaaf ([oschaaf](https://github.com/oschaaf)) (oschaaf@redhat.com)
-* Tim Walsh ([twghu](https://github.com/twghu)) (walsh@redhat.com)
+* Tim Walsh ([twghu](https://github.com/twghu)) (twalsh@redhat.com)
 * Ryan Northey ([phlax](https://github.com/phlax)) (ryan@synca.io)
 * Pradeep Rao ([pradeepcrao](https://github.com/pradeepcrao)) (pcrao@google.com)
 * Ryan Hamilton ([RyanTheOptimist](https://github.com/ryantheoptimist)) (rch@google.com)
