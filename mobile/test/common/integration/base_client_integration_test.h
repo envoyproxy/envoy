@@ -46,7 +46,7 @@ protected:
   virtual void initialize() override;
   virtual void cleanup();
   void createEnvoy() override;
-  void threadRoutine(absl::Notification& engine_running);
+  void threadRoutine(absl::Notification& engine_running, Platform::EngineSharedPtr& engine_obj);
   // Must be called manually by subclasses in their TearDown();
   void TearDown();
   // helpers to access protected functions in the friend class
@@ -68,7 +68,9 @@ protected:
   Platform::StreamPrototypeSharedPtr stream_prototype_;
   Platform::StreamSharedPtr stream_;
   Platform::EngineSharedPtr engine_;
+  Platform::EngineSharedPtr engine_2_;
   Thread::ThreadPtr envoy_thread_;
+  Thread::ThreadPtr envoy_thread_2_;
   bool explicit_flow_control_ = false;
   bool expect_dns_ = true;
   bool override_builder_config_ = false;
