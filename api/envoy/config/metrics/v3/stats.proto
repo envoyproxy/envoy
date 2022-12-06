@@ -109,6 +109,8 @@ message StatsConfig {
   //       3600000
   //     ]
   repeated HistogramBucketSettings histogram_bucket_settings = 4;
+  // When true, enable lazy init feature for stats that's of Stats::LazyInit<T> type.
+  bool enable_lazy_init = 5;
 }
 
 // Configuration for disabling stat instantiation.

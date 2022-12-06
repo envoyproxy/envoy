@@ -147,6 +147,12 @@ public:
    * during hot restart.
    */
   virtual void setSinkPredicates(std::unique_ptr<SinkPredicates>&& sink_predicates) PURE;
+
+  /**
+   * @brief If true, defer stats instantiation of Stats::LazyInit<T> type.
+   */
+  virtual bool enableLazyInit() const PURE;
+  bool setEnableLazyInit(const bool lazy) PURE;
 };
 
 using StoreRootPtr = std::unique_ptr<StoreRoot>;
