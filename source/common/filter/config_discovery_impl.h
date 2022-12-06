@@ -186,7 +186,7 @@ public:
       const std::string& filter_chain_type, absl::string_view stat_prefix,
       const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher)
       : DynamicFilterConfigProviderImpl(subscription, require_type_urls,
-                                        factory_context.threadLocal(), std::move(default_config),
+                                        server_context.threadLocal(), std::move(default_config),
                                         last_filter_in_filter_chain, filter_chain_type, stat_prefix,
                                         listener_filter_matcher),
         server_context_(server_context), factory_context_(factory_context) {}
@@ -405,20 +405,13 @@ public:
       const envoy::config::core::v3::ExtensionConfigSource& config_source,
       const std::string& filter_config_name,
       Server::Configuration::ServerFactoryContext& server_context, FactoryCtx& factory_context,
-      const std::string& stat_prefix, bool last_filter_in_filter_chain,
-      const std::string& filter_chain_type,
+      bool last_filter_in_filter_chain, const std::string& filter_chain_type,
       const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher) override {
     std::string subscription_stat_prefix;
     absl::string_view provider_stat_prefix;
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.top_level_ecds_stats")) {
-      subscription_stat_prefix =
-          absl::StrCat("extension_config_discovery.", statPrefix(), filter_config_name, ".");
-      provider_stat_prefix = subscription_stat_prefix;
-    } else {
-      subscription_stat_prefix =
-          absl::StrCat(stat_prefix, "extension_config_discovery.", filter_config_name, ".");
-      provider_stat_prefix = stat_prefix;
-    }
+    subscription_stat_prefix =
+        absl::StrCat("extension_config_discovery.", statPrefix(), filter_config_name, ".");
+    provider_stat_prefix = subscription_stat_prefix;
 
     auto subscription = getSubscription(config_source.config_source(), filter_config_name,
                                         server_context, subscription_stat_prefix);
@@ -436,9 +429,9 @@ public:
 
     ProtobufTypes::MessagePtr default_config;
     if (config_source.has_default_config()) {
-      default_config = getDefaultConfig(
-          config_source.default_config(), filter_config_name, server_context, factory_context,
-          last_filter_in_filter_chain, filter_chain_type, require_type_urls);
+      default_config =
+          getDefaultConfig(config_source.default_config(), filter_config_name, server_context,
+                           last_filter_in_filter_chain, filter_chain_type, require_type_urls);
     }
 
     auto provider = createFilterConfigProviderImpl(subscription, require_type_urls, server_context,
@@ -483,15 +476,14 @@ protected:
   ProtobufTypes::MessagePtr
   getDefaultConfig(const ProtobufWkt::Any& proto_config, const std::string& filter_config_name,
                    Server::Configuration::ServerFactoryContext& server_context,
-                   FactoryCtx& factory_context, bool last_filter_in_filter_chain,
-                   const std::string& filter_chain_type,
+                   bool last_filter_in_filter_chain, const std::string& filter_chain_type,
                    const absl::flat_hash_set<std::string>& require_type_urls) const {
     auto* default_factory = Config::Utility::getFactoryByType<Factory>(proto_config);
     validateProtoConfigDefaultFactory(default_factory == nullptr, filter_config_name,
                                       proto_config.type_url());
     validateProtoConfigTypeUrl(Config::Utility::getFactoryType(proto_config), require_type_urls);
     ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
-        proto_config, factory_context.messageValidationVisitor(), *default_factory);
+        proto_config, server_context.messageValidationVisitor(), *default_factory);
     validateFilters(filter_config_name, default_factory->name(), filter_chain_type,
                     isTerminalFilter(default_factory, *message, server_context),
                     last_filter_in_filter_chain);
@@ -542,9 +534,9 @@ protected:
 class UpstreamHttpFilterConfigProviderManagerImpl
     : public FilterConfigProviderManagerImpl<
           Server::Configuration::UpstreamHttpFilterConfigFactory, NamedHttpFilterFactoryCb,
-          Server::Configuration::ServerFactoryContext,
+          Server::Configuration::UpstreamHttpFactoryContext,
           HttpDynamicFilterConfigProviderImpl<
-              Server::Configuration::ServerFactoryContext,
+              Server::Configuration::UpstreamHttpFactoryContext,
               Server::Configuration::UpstreamHttpFilterConfigFactory>> {
 public:
   absl::string_view statPrefix() const override { return "http_filter."; }

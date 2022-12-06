@@ -142,8 +142,16 @@ message VirtualHost {
     items {string {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}}
   }];
 
-  // Indicates that the virtual host has a CORS policy.
-  CorsPolicy cors = 8;
+  // Indicates that the virtual host has a CORS policy. This field is ignored if related cors policy is
+  // found in the
+  // :ref:`VirtualHost.typed_per_filter_config<envoy_v3_api_field_config.route.v3.VirtualHost.typed_per_filter_config>`.
+  //
+  // .. attention::
+  //
+  //   This option has been deprecated. Please use
+  //   :ref:`VirtualHost.typed_per_filter_config<envoy_v3_api_field_config.route.v3.VirtualHost.typed_per_filter_config>`
+  //   to configure the CORS HTTP filter.
+  CorsPolicy cors = 8 [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // The per_filter_config field can be used to provide virtual host-specific configurations for filters.
   // The key should match the :ref:`filter config name
@@ -214,6 +222,13 @@ message FilterAction {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.FilterAction";
 
   google.protobuf.Any action = 1;
+}
+
+// This can be used in route matcher :ref:`VirtualHost.matcher <envoy_v3_api_field_config.route.v3.VirtualHost.matcher>`.
+// When the matcher matches, routes will be matched and run.
+message RouteList {
+  // The list of routes that will be matched and run, in order. The first route that matches will be used.
+  repeated Route routes = 1;
 }
 
 // A route is both a specification of how to match a request as well as an indication of what to do
@@ -386,10 +401,10 @@ message WeightedCluster {
       (udpa.annotations.field_migrate).oneof_promotion = "cluster_specifier"
     ];
 
-    // An integer between 0 and :ref:`total_weight
-    // <envoy_v3_api_field_config.route.v3.WeightedCluster.total_weight>`. When a request matches the route,
-    // the choice of an upstream cluster is determined by its weight. The sum of weights across all
-    // entries in the clusters array must add up to the total_weight, if total_weight is greater than 0.
+    // The weight of the cluster. This value is relative to the other clusters'
+    // weights. When a request matches the route, the choice of an upstream cluster
+    // is determined by its weight. The sum of weights across all
+    // entries in the clusters array must be greater than 0.
     google.protobuf.UInt32Value weight = 2;
 
     // Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints in
@@ -459,7 +474,10 @@ message WeightedCluster {
 
   // Specifies the total weight across all clusters. The sum of all cluster weights must equal this
   // value, if this is greater than 0.
-  google.protobuf.UInt32Value total_weight = 3;
+  // This field is now deprecated, and the client will use the sum of all
+  // cluster weights. It is up to the management server to supply the correct weights.
+  google.protobuf.UInt32Value total_weight = 3
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Specifies the runtime key prefix that should be used to construct the
   // runtime keys associated with each cluster. When the ``runtime_key_prefix`` is
@@ -572,8 +590,7 @@ message RouteMatch {
     // Expect the value to not contain ``?`` or ``#`` and not to end in ``/``
     string path_separated_prefix = 14 [(validate.rules).string = {pattern: "^[^?#]+[^?#/]$"}];
 
-    // [#not-implemented-hide:]
-    // [#comment: TODO(silverstar195): Hook into extension once added]
+    // [#extension-category: envoy.path.match]
     core.v3.TypedExtensionConfig path_match_policy = 15;
   }
 
@@ -639,7 +656,15 @@ message RouteMatch {
   repeated type.matcher.v3.MetadataMatcher dynamic_metadata = 13;
 }
 
-// [#next-free-field: 12]
+// Cors policy configuration.
+//
+// .. attention::
+//
+//   This message has been deprecated. Please use
+//   :ref:`CorsPolicy in filter extension <envoy_v3_api_msg_extensions.filters.http.cors.v3.CorsPolicy>`
+//   as as alternative.
+//
+// [#next-free-field: 13]
 message CorsPolicy {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.CorsPolicy";
 
@@ -687,6 +712,12 @@ message CorsPolicy {
   // Envoy will lookup the runtime key to get the percentage of requests for which it will evaluate
   // and track the request's ``Origin`` to determine if it's valid but will not enforce any policies.
   core.v3.RuntimeFractionalPercent shadow_enabled = 10;
+
+  // Specify whether allow requests whose target server's IP address is more private than that from
+  // which the request initiator was fetched.
+  //
+  // More details refer to https://developer.chrome.com/blog/private-network-access-preflight.
+  google.protobuf.BoolValue allow_private_network_access = 12;
 }
 
 // [#next-free-field: 42]
@@ -724,6 +755,10 @@ message RouteAction {
   // .. note::
   //
   //   Shadowing will not be triggered if the primary cluster does not exist.
+  //
+  // .. note::
+  //
+  //   Shadowing doesn't support Http CONNECT and upgrades.
   // [#next-free-field: 6]
   message RequestMirrorPolicy {
     option (udpa.annotations.versioning).previous_message_type =
@@ -1020,9 +1055,9 @@ message RouteAction {
   // place the original path before rewrite into the :ref:`x-envoy-original-path
   // <config_http_filters_router_x-envoy-original-path>` header.
   //
-  // Only one of :ref:`regex_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.regex_rewrite>` or
-  // [#comment:TODO(silverstar194) add the following once implemented: :ref:`path_rewrite_policy <envoy_v3_api_field_config.route.v3.RouteAction.path_rewrite_policy>`]
-  // :ref:`prefix_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.prefix_rewrite>` may be specified.
+  // Only one of :ref:`regex_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.regex_rewrite>`
+  // :ref:`path_rewrite_policy <envoy_v3_api_field_config.route.v3.RouteAction.path_rewrite_policy>`,
+  // or :ref:`prefix_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.prefix_rewrite>` may be specified.
   //
   // .. attention::
   //
@@ -1057,9 +1092,9 @@ message RouteAction {
   // before the rewrite into the :ref:`x-envoy-original-path
   // <config_http_filters_router_x-envoy-original-path>` header.
   //
-  // Only one of :ref:`regex_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.regex_rewrite>`
-  // or :ref:`prefix_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.prefix_rewrite>`
-  // [#comment:TODO(silverstar194) add the following once implemented: :ref:`path_rewrite_policy <envoy_v3_api_field_config.route.v3.RouteAction.path_rewrite_policy>`]
+  // Only one of :ref:`regex_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.regex_rewrite>`,
+  // :ref:`prefix_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.prefix_rewrite>`, or
+  // :ref:`path_rewrite_policy <envoy_v3_api_field_config.route.v3.RouteAction.path_rewrite_policy>`]
   // may be specified.
   //
   // Examples using Google's `RE2 <https://github.com/google/re2>`_ engine:
@@ -1080,8 +1115,7 @@ message RouteAction {
   //   ``/aaa/yyy/bbb``.
   type.matcher.v3.RegexMatchAndSubstitute regex_rewrite = 32;
 
-  // [#not-implemented-hide:]
-  // [#comment: TODO(silverstar195): Hook into extension once added]
+  // [#extension-category: envoy.path.rewrite]
   core.v3.TypedExtensionConfig path_rewrite_policy = 41;
 
   oneof host_rewrite_specifier {
@@ -1241,8 +1275,17 @@ message RouteAction {
   // ignoring the rest of the hash policy list.
   repeated HashPolicy hash_policy = 15;
 
-  // Indicates that the route has a CORS policy.
-  CorsPolicy cors = 17;
+  // Indicates that the route has a CORS policy. This field is ignored if related cors policy is
+  // found in the :ref:`Route.typed_per_filter_config<envoy_v3_api_field_config.route.v3.Route.typed_per_filter_config>` or
+  // :ref:`WeightedCluster.ClusterWeight.typed_per_filter_config<envoy_v3_api_field_config.route.v3.WeightedCluster.ClusterWeight.typed_per_filter_config>`.
+  //
+  // .. attention::
+  //
+  //   This option has been deprecated. Please use
+  //   :ref:`Route.typed_per_filter_config<envoy_v3_api_field_config.route.v3.Route.typed_per_filter_config>` or
+  //   :ref:`WeightedCluster.ClusterWeight.typed_per_filter_config<envoy_v3_api_field_config.route.v3.WeightedCluster.ClusterWeight.typed_per_filter_config>`
+  //   to configure the CORS HTTP filter.
+  CorsPolicy cors = 17 [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Deprecated by :ref:`grpc_timeout_header_max <envoy_v3_api_field_config.route.v3.RouteAction.MaxStreamDuration.grpc_timeout_header_max>`
   // If present, and the request is a gRPC request, use the
@@ -2096,7 +2139,9 @@ message RateLimit {
 //
 //     {
 //       "name": ":method",
-//       "exact_match": "POST"
+//       "string_match": {
+//         "exact": "POST"
+//       }
 //     }
 //
 // .. attention::

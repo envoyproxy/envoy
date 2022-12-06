@@ -1,61 +1,11 @@
 #include <memory>
 
-#include "source/common/buffer/buffer_impl.h"
-#include "source/common/stats/thread_local_store.h"
-#include "source/server/admin/stats_render.h"
-
-#include "test/mocks/event/mocks.h"
-#include "test/mocks/stats/mocks.h"
-#include "test/mocks/thread_local/mocks.h"
-#include "test/test_common/utility.h"
-
-#include "gtest/gtest.h"
-
-using testing::NiceMock;
+#include "test/server/admin/stats_render_test_base.h"
 
 namespace Envoy {
 namespace Server {
 
-class StatsRenderTest : public testing::Test {
-protected:
-  StatsRenderTest() : alloc_(symbol_table_), store_(alloc_) {
-    store_.addSink(sink_);
-    store_.initializeThreading(main_thread_dispatcher_, tls_);
-  }
-
-  ~StatsRenderTest() override {
-    tls_.shutdownGlobalThreading();
-    store_.shutdownThreading();
-    tls_.shutdownThread();
-  }
-
-  template <class T>
-  std::string render(StatsRender& render, absl::string_view name, const T& value) {
-    render.generate(response_, std::string(name), value);
-    render.finalize(response_);
-    return response_.toString();
-  }
-
-  Stats::ParentHistogram& populateHistogram(const std::string& name,
-                                            const std::vector<uint64_t>& vals) {
-    Stats::Histogram& h = store_.histogramFromString(name, Stats::Histogram::Unit::Unspecified);
-    for (uint64_t val : vals) {
-      h.recordValue(val);
-    }
-    store_.mergeHistograms([]() -> void {});
-    return dynamic_cast<Stats::ParentHistogram&>(h);
-  }
-
-  Stats::SymbolTableImpl symbol_table_;
-  Stats::AllocatorImpl alloc_;
-  NiceMock<Stats::MockSink> sink_;
-  NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
-  NiceMock<ThreadLocal::MockInstance> tls_;
-  Stats::ThreadLocalStoreImpl store_;
-  Http::TestResponseHeaderMapImpl response_headers_;
-  Buffer::OwnedImpl response_;
-  StatsParams params_;
-};
+using StatsRenderTest = StatsRenderTestBase;
 
 TEST_F(StatsRenderTest, TextInt) {
   StatsTextRender renderer(params_);
@@ -64,7 +14,7 @@ TEST_F(StatsRenderTest, TextInt) {
 
 TEST_F(StatsRenderTest, TextString) {
   StatsTextRender renderer(params_);
-  EXPECT_EQ("name: \"abc 123 ~!@#$%^&amp;*()-_=+;:&#39;&quot;,&lt;.&gt;/?\"\n",
+  EXPECT_EQ("name: \"abc 123 ~!@#$%^&*()-_=+;:'\",<.>/?\"\n",
             render<std::string>(renderer, "name", "abc 123 ~!@#$%^&*()-_=+;:'\",<.>/?"));
 }
 

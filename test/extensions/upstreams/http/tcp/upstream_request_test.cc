@@ -2,6 +2,7 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/router/router.h"
+#include "source/common/router/upstream_codec_filter.h"
 #include "source/common/router/upstream_request.h"
 #include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 #include "source/extensions/upstreams/http/tcp/upstream_request.h"
@@ -93,6 +94,19 @@ TEST_F(TcpConnPoolTest, Cancel) {
 class TcpUpstreamTest : public ::testing::Test {
 public:
   TcpUpstreamTest() {
+    ON_CALL(*mock_router_filter_.cluster_info_, createFilterChain(_, _))
+        .WillByDefault(Invoke(
+            [&](Envoy::Http::FilterChainManager& manager, bool only_create_if_configured) -> bool {
+              if (only_create_if_configured) {
+                return false;
+              }
+              Envoy ::Http::FilterFactoryCb factory_cb =
+                  [](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
+                callbacks.addStreamDecoderFilter(std::make_shared<Router::UpstreamCodecFilter>());
+              };
+              manager.applyFilterFactoryCb({}, factory_cb);
+              return true;
+            }));
     EXPECT_CALL(mock_router_filter_, downstreamHeaders())
         .Times(AnyNumber())
         .WillRepeatedly(Return(&request_));

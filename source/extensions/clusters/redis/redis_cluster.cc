@@ -142,7 +142,7 @@ void RedisCluster::onClusterSlotUpdate(ClusterSlotsSharedPtr&& slots) {
     }));
     updateAllHosts(hosts_added, hosts_removed, localityLbEndpoint().priority());
   } else {
-    info_->stats().update_no_rebuild_.inc();
+    info_->configUpdateStats().update_no_rebuild_.inc();
   }
 
   // TODO(hyang): If there is an initialize callback, fire it now. Note that if the
@@ -156,8 +156,8 @@ void RedisCluster::reloadHealthyHostsHelper(const Upstream::HostSharedPtr& host)
   if (lb_factory_) {
     lb_factory_->onHostHealthUpdate();
   }
-  if (host && (host->health() == Upstream::Host::Health::Degraded ||
-               host->health() == Upstream::Host::Health::Unhealthy)) {
+  if (host && (host->coarseHealth() == Upstream::Host::Health::Degraded ||
+               host->coarseHealth() == Upstream::Host::Health::Unhealthy)) {
     refresh_manager_->onHostDegraded(cluster_name_);
   }
   ClusterImplBase::reloadHealthyHostsHelper(host);
@@ -190,9 +190,9 @@ void RedisCluster::DnsDiscoveryResolveTarget::startResolveDns() {
         ENVOY_LOG(trace, "async DNS resolution complete for {}", dns_address_);
         if (status == Network::DnsResolver::ResolutionStatus::Failure || response.empty()) {
           if (status == Network::DnsResolver::ResolutionStatus::Failure) {
-            parent_.info_->stats().update_failure_.inc();
+            parent_.info_->configUpdateStats().update_failure_.inc();
           } else {
-            parent_.info_->stats().update_empty_.inc();
+            parent_.info_->configUpdateStats().update_empty_.inc();
           }
 
           if (!resolve_timer_) {
@@ -273,9 +273,11 @@ void RedisCluster::RedisDiscoverySession::registerDiscoveryAddress(
 }
 
 void RedisCluster::RedisDiscoverySession::startResolveRedis() {
-  parent_.info_->stats().update_attempt_.inc();
+  parent_.info_->configUpdateStats().update_attempt_.inc();
   // If a resolution is currently in progress, skip it.
   if (current_request_) {
+    ENVOY_LOG(debug, "redis cluster slot request is already in progress for '{}'",
+              parent_.info_->name());
     return;
   }
 
@@ -299,19 +301,19 @@ void RedisCluster::RedisDiscoverySession::startResolveRedis() {
     client->host_ = current_host_address_;
     client->client_ = client_factory_.create(host, dispatcher_, *this, redis_command_stats_,
                                              parent_.info()->statsScope(), parent_.auth_username_,
-                                             parent_.auth_password_);
+                                             parent_.auth_password_, false);
     client->client_->addConnectionCallbacks(*client);
   }
-
+  ENVOY_LOG(debug, "executing redis cluster slot request for '{}'", parent_.info_->name());
   current_request_ = client->client_->makeRequest(ClusterSlotsRequest::instance_, *this);
 }
 
 void RedisCluster::RedisDiscoverySession::updateDnsStats(
     Network::DnsResolver::ResolutionStatus status, bool empty_response) {
   if (status == Network::DnsResolver::ResolutionStatus::Failure) {
-    parent_.info_->stats().update_failure_.inc();
+    parent_.info_->configUpdateStats().update_failure_.inc();
   } else if (empty_response) {
-    parent_.info_->stats().update_empty_.inc();
+    parent_.info_->configUpdateStats().update_empty_.inc();
   }
 }
 
@@ -344,7 +346,10 @@ void RedisCluster::RedisDiscoverySession::resolveClusterHostnames(
            hostname_resolution_required_cnt](Network::DnsResolver::ResolutionStatus status,
                                              std::list<Network::DnsResponse>&& response) -> void {
             auto& slot = (*slots)[slot_idx];
-            ENVOY_LOG(debug, "async DNS resolution complete for {}", slot.primary_hostname_);
+            ENVOY_LOG(
+                debug,
+                "async DNS resolution complete for primary slot address {} at index location {}",
+                slot.primary_hostname_, slot_idx);
             updateDnsStats(status, response.empty());
             // If DNS resolution for a primary fails, we stop resolution for remaining, and reset
             // the timer.
@@ -398,7 +403,7 @@ void RedisCluster::RedisDiscoverySession::resolveReplicas(
                                            std::list<Network::DnsResponse>&& response) -> void {
           auto& slot = (*slots)[index];
           auto& replica = slot.replicas_to_resolve_[replica_idx];
-          ENVOY_LOG(debug, "async DNS resolution complete for {}", replica.first);
+          ENVOY_LOG(debug, "async DNS resolution complete for replica address {}", replica.first);
           updateDnsStats(status, response.empty());
           // If DNS resolution fails here, we move on to resolve other replicas in the list.
           // We log a warn message.
@@ -426,6 +431,7 @@ void RedisCluster::RedisDiscoverySession::finishClusterHostnameResolution(
 
 void RedisCluster::RedisDiscoverySession::onResponse(
     NetworkFilters::Common::Redis::RespValuePtr&& value) {
+  ENVOY_LOG(debug, "redis cluster slot request for '{}' succeeded", parent_.info_->name());
   current_request_ = nullptr;
 
   const uint32_t SlotRangeStart = 0;
@@ -552,17 +558,18 @@ bool RedisCluster::RedisDiscoverySession::validateCluster(
 void RedisCluster::RedisDiscoverySession::onUnexpectedResponse(
     const NetworkFilters::Common::Redis::RespValuePtr& value) {
   ENVOY_LOG(warn, "Unexpected response to cluster slot command: {}", value->toString());
-  this->parent_.info_->stats().update_failure_.inc();
+  this->parent_.info_->configUpdateStats().update_failure_.inc();
   resolve_timer_->enableTimer(parent_.cluster_refresh_rate_);
 }
 
 void RedisCluster::RedisDiscoverySession::onFailure() {
+  ENVOY_LOG(debug, "redis cluster slot request for '{}' failed", parent_.info_->name());
   current_request_ = nullptr;
   if (!current_host_address_.empty()) {
     auto client_to_delete = client_map_.find(current_host_address_);
     client_to_delete->second->client_->close();
   }
-  parent_.info()->stats().update_failure_.inc();
+  parent_.info()->configUpdateStats().update_failure_.inc();
   resolve_timer_->enableTimer(parent_.cluster_refresh_rate_);
 }
 

@@ -113,19 +113,19 @@ IntegrationCodecClient::makeHeaderOnlyRequest(const Http::RequestHeaderMap& head
 
 IntegrationStreamDecoderPtr
 IntegrationCodecClient::makeRequestWithBody(const Http::RequestHeaderMap& headers,
-                                            uint64_t body_size) {
-  return makeRequestWithBody(headers, std::string(body_size, 'a'));
+                                            uint64_t body_size, bool end_stream) {
+  return makeRequestWithBody(headers, std::string(body_size, 'a'), end_stream);
 }
 
 IntegrationStreamDecoderPtr
 IntegrationCodecClient::makeRequestWithBody(const Http::RequestHeaderMap& headers,
-                                            const std::string& body) {
+                                            const std::string& body, bool end_stream) {
   auto response = std::make_unique<IntegrationStreamDecoder>(dispatcher_);
   Http::RequestEncoder& encoder = newStream(*response);
   encoder.getStream().addCallbacks(*response);
   encoder.encodeHeaders(headers, false).IgnoreError();
   Buffer::OwnedImpl data(body);
-  encoder.encodeData(data, true);
+  encoder.encodeData(data, end_stream);
   flushWrite();
   return response;
 }
@@ -250,9 +250,10 @@ Network::ClientConnectionPtr HttpIntegrationTest::makeClientConnectionWithOption
   return Quic::createQuicNetworkConnection(
       *quic_connection_persistent_info_, quic_transport_socket_factory_ref.getCryptoConfig(),
       quic::QuicServerId(
-          quic_transport_socket_factory_ref.clientContextConfig().serverNameIndication(),
+          quic_transport_socket_factory_ref.clientContextConfig()->serverNameIndication(),
           static_cast<uint16_t>(port)),
-      *dispatcher_, server_addr, local_addr, quic_stat_names_, {}, stats_store_, options, nullptr);
+      *dispatcher_, server_addr, local_addr, quic_stat_names_, {}, stats_store_, options, nullptr,
+      connection_id_generator_);
 #else
   ASSERT(false, "running a QUIC integration test without compiling QUIC");
   return nullptr;
@@ -314,7 +315,7 @@ HttpIntegrationTest::HttpIntegrationTest(Http::CodecType downstream_protocol,
           downstream_protocol,
           [version](int) {
             return Network::Utility::parseInternetAddress(
-                Network::Test::getAnyAddressString(version), 0);
+                Network::Test::getLoopbackAddressString(version), 0);
           },
           version, config) {}
 
@@ -374,18 +375,23 @@ void HttpIntegrationTest::initialize() {
 #endif
 }
 
-void HttpIntegrationTest::setupHttp2Overrides(Http2Impl implementation) {
-  switch (implementation) {
-  case Http2Impl::Nghttp2:
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper", "false");
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_use_oghttp2", "false");
+void HttpIntegrationTest::setupHttp1ImplOverrides(Http1ParserImpl http1_implementation) {
+  switch (http1_implementation) {
+  case Http1ParserImpl::HttpParser:
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.http1_use_balsa_parser", "false");
     break;
-  case Http2Impl::WrappedNghttp2:
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper", "true");
+  case Http1ParserImpl::BalsaParser:
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.http1_use_balsa_parser", "true");
+    break;
+  }
+}
+
+void HttpIntegrationTest::setupHttp2ImplOverrides(Http2Impl http2_implementation) {
+  switch (http2_implementation) {
+  case Http2Impl::Nghttp2:
     config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_use_oghttp2", "false");
     break;
   case Http2Impl::Oghttp2:
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper", "true");
     config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_use_oghttp2", "true");
     break;
   }
@@ -1617,6 +1623,119 @@ std::string HttpIntegrationTest::listenerStatPrefix(const std::string& stat_name
     return "listener.127.0.0.1_0." + stat_name;
   }
   return "listener.[__1]_0." + stat_name;
+}
+
+void HttpIntegrationTest::expectUpstreamBytesSentAndReceived(BytesCountExpectation h1_expectation,
+                                                             BytesCountExpectation h2_expectation,
+                                                             BytesCountExpectation h3_expectation,
+                                                             const int id) {
+  auto integer_near = [](int x, int y) -> bool { return std::abs(x - y) <= (x / 20); };
+  std::string access_log = waitForAccessLog(access_log_name_, id, true);
+  std::vector<std::string> log_entries = absl::StrSplit(access_log, ' ');
+  int wire_bytes_sent = std::stoi(log_entries[0]), wire_bytes_received = std::stoi(log_entries[1]),
+      header_bytes_sent = std::stoi(log_entries[2]),
+      header_bytes_received = std::stoi(log_entries[3]);
+  switch (upstreamProtocol()) {
+  case Http::CodecType::HTTP1: {
+    EXPECT_EQ(h1_expectation.wire_bytes_sent_, wire_bytes_sent)
+        << "expect: " << h1_expectation.wire_bytes_sent_ << ", actual: " << wire_bytes_sent;
+    EXPECT_EQ(h1_expectation.wire_bytes_received_, wire_bytes_received)
+        << "expect: " << h1_expectation.wire_bytes_received_ << ", actual: " << wire_bytes_received;
+    EXPECT_EQ(h1_expectation.header_bytes_sent_, header_bytes_sent)
+        << "expect: " << h1_expectation.header_bytes_sent_ << ", actual: " << header_bytes_sent;
+    EXPECT_EQ(h1_expectation.header_bytes_received_, header_bytes_received)
+        << "expect: " << h1_expectation.header_bytes_received_
+        << ", actual: " << header_bytes_received;
+    return;
+  }
+  case Http::CodecType::HTTP2: {
+    // Because of non-deterministic h2 compression, the same plain text length don't map to the
+    // same number of wire bytes.
+    EXPECT_TRUE(integer_near(h2_expectation.wire_bytes_sent_, wire_bytes_sent))
+        << "expect: " << h2_expectation.wire_bytes_sent_ << ", actual: " << wire_bytes_sent;
+    EXPECT_TRUE(integer_near(h2_expectation.wire_bytes_received_, wire_bytes_received))
+        << "expect: " << h2_expectation.wire_bytes_received_ << ", actual: " << wire_bytes_received;
+    EXPECT_TRUE(integer_near(h2_expectation.header_bytes_sent_, header_bytes_sent))
+        << "expect: " << h2_expectation.header_bytes_sent_ << ", actual: " << header_bytes_sent;
+    EXPECT_TRUE(integer_near(h2_expectation.header_bytes_received_, header_bytes_received))
+        << "expect: " << h2_expectation.header_bytes_received_
+        << ", actual: " << header_bytes_received;
+    return;
+  }
+  case Http::CodecType::HTTP3: {
+    // Because of non-deterministic h2 compression, the same plain text length don't map to the
+    // Same number of wire bytes.
+    EXPECT_TRUE(integer_near(h3_expectation.wire_bytes_sent_, wire_bytes_sent))
+        << "expect: " << h3_expectation.wire_bytes_sent_ << ", actual: " << wire_bytes_sent;
+    EXPECT_TRUE(integer_near(h3_expectation.wire_bytes_received_, wire_bytes_received))
+        << "expect: " << h3_expectation.wire_bytes_received_ << ", actual: " << wire_bytes_received;
+    EXPECT_TRUE(integer_near(h3_expectation.header_bytes_sent_, header_bytes_sent))
+        << "expect: " << h3_expectation.header_bytes_sent_ << ", actual: " << header_bytes_sent;
+    EXPECT_TRUE(integer_near(h3_expectation.header_bytes_received_, header_bytes_received))
+        << "expect: " << h3_expectation.header_bytes_received_
+        << ", actual: " << header_bytes_received;
+    return;
+  }
+
+  default:
+    EXPECT_TRUE(false) << "Unexpected codec type: " << static_cast<int>(upstreamProtocol());
+  }
+}
+
+void HttpIntegrationTest::expectDownstreamBytesSentAndReceived(BytesCountExpectation h1_expectation,
+                                                               BytesCountExpectation h2_expectation,
+                                                               BytesCountExpectation h3_expectation,
+                                                               const int id) {
+  auto integer_near = [](int x, int y) -> bool { return std::abs(x - y) <= (x / 5); };
+  std::string access_log = waitForAccessLog(access_log_name_, id);
+  std::vector<std::string> log_entries = absl::StrSplit(access_log, ' ');
+  int wire_bytes_sent = std::stoi(log_entries[0]), wire_bytes_received = std::stoi(log_entries[1]),
+      header_bytes_sent = std::stoi(log_entries[2]),
+      header_bytes_received = std::stoi(log_entries[3]);
+  switch (downstreamProtocol()) {
+  case Http::CodecType::HTTP1: {
+    EXPECT_TRUE(integer_near(h1_expectation.wire_bytes_sent_, wire_bytes_sent))
+        << "expect: " << h1_expectation.wire_bytes_sent_ << ", actual: " << wire_bytes_sent;
+    EXPECT_EQ(h1_expectation.wire_bytes_received_, wire_bytes_received)
+        << "expect: " << h1_expectation.wire_bytes_received_ << ", actual: " << wire_bytes_received;
+    EXPECT_TRUE(integer_near(h1_expectation.header_bytes_sent_, header_bytes_sent))
+        << "expect: " << h1_expectation.header_bytes_sent_ << ", actual: " << header_bytes_sent;
+    EXPECT_EQ(h1_expectation.header_bytes_received_, header_bytes_received)
+        << "expect: " << h1_expectation.header_bytes_received_
+        << ", actual: " << header_bytes_received;
+    return;
+  }
+  case Http::CodecType::HTTP2: {
+    // Because of non-deterministic h2 compression, the same plain text length don't map to the
+    // same number of wire bytes.
+    EXPECT_TRUE(integer_near(h2_expectation.wire_bytes_sent_, wire_bytes_sent))
+        << "expect: " << h2_expectation.wire_bytes_sent_ << ", actual: " << wire_bytes_sent;
+    EXPECT_TRUE(integer_near(h2_expectation.wire_bytes_received_, wire_bytes_received))
+        << "expect: " << h2_expectation.wire_bytes_received_ << ", actual: " << wire_bytes_received;
+    EXPECT_TRUE(integer_near(h2_expectation.header_bytes_sent_, header_bytes_sent))
+        << "expect: " << h2_expectation.header_bytes_sent_ << ", actual: " << header_bytes_sent;
+    EXPECT_TRUE(integer_near(h2_expectation.header_bytes_received_, header_bytes_received))
+        << "expect: " << h2_expectation.header_bytes_received_
+        << ", actual: " << header_bytes_received;
+    return;
+  }
+  case Http::CodecType::HTTP3: {
+    // Because of non-deterministic h3 compression, the same plain text length don't map to the
+    // same number of wire bytes.
+    EXPECT_TRUE(integer_near(h3_expectation.wire_bytes_sent_, wire_bytes_sent))
+        << "expect: " << h3_expectation.wire_bytes_sent_ << ", actual: " << wire_bytes_sent;
+    EXPECT_TRUE(integer_near(h3_expectation.wire_bytes_received_, wire_bytes_received))
+        << "expect: " << h3_expectation.wire_bytes_received_ << ", actual: " << wire_bytes_received;
+    EXPECT_TRUE(integer_near(h3_expectation.header_bytes_sent_, header_bytes_sent))
+        << "expect: " << h3_expectation.header_bytes_sent_ << ", actual: " << header_bytes_sent;
+    EXPECT_TRUE(integer_near(h3_expectation.header_bytes_received_, header_bytes_received))
+        << "expect: " << h3_expectation.header_bytes_received_
+        << ", actual: " << header_bytes_received;
+    return;
+  }
+  default:
+    EXPECT_TRUE(false) << "Unexpected codec type: " << static_cast<int>(downstreamProtocol());
+  }
 }
 
 void Http2RawFrameIntegrationTest::startHttp2Session() {

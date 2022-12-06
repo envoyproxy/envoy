@@ -25,7 +25,7 @@ HttpSubscriptionImpl::HttpSubscriptionImpl(
     Random::RandomGenerator& random, std::chrono::milliseconds refresh_interval,
     std::chrono::milliseconds request_timeout, const Protobuf::MethodDescriptor& service_method,
     absl::string_view type_url, SubscriptionCallbacks& callbacks,
-    OpaqueResourceDecoder& resource_decoder, SubscriptionStats stats,
+    OpaqueResourceDecoderSharedPtr resource_decoder, SubscriptionStats stats,
     std::chrono::milliseconds init_fetch_timeout,
     ProtobufMessage::ValidationVisitor& validation_visitor)
     : Http::RestApiFetcher(cm, remote_cluster_name, dispatcher, random, refresh_interval,
@@ -91,7 +91,7 @@ void HttpSubscriptionImpl::parseResponse(const Http::ResponseMessage& response) 
   }
   TRY_ASSERT_MAIN_THREAD {
     const auto decoded_resources =
-        DecodedResourcesWrapper(resource_decoder_, message.resources(), message.version_info());
+        DecodedResourcesWrapper(*resource_decoder_, message.resources(), message.version_info());
     callbacks_.onConfigUpdate(decoded_resources.refvec_, message.version_info());
     request_.set_version_info(message.version_info());
     stats_.update_time_.set(DateUtil::nowToMilliseconds(dispatcher_.timeSource()));

@@ -8,19 +8,19 @@ deps:
   - remote: buf.build
     owner: cncf
     repository: xds
-    commit: 0492166643854ea08814f4349286f9cb
+    commit: f6f9b109ae2f445e9c1c00bb765b5373
   - remote: buf.build
     owner: envoyproxy
     repository: protoc-gen-validate
-    commit: dc09a417d27241f7b069feae2cd74a0e
+    commit: 45685e052c7e406b9fbd441fc7a568a5
   - remote: buf.build
     owner: gogo
     repository: protobuf
-    commit: 4df00b267f944190a229ce3695781e99
+    commit: 5461a3dfa9d941da82028ab185dc2a0e
   - remote: buf.build
     owner: googleapis
     repository: googleapis
-    commit: d1a849b8f8304950832335723096e954
+    commit: 62f35d8aed1149c291d606d958a7ce32
   - remote: buf.build
     owner: opencensus
     repository: opencensus
@@ -28,4 +28,4 @@ deps:
   - remote: buf.build
     owner: opentelemetry
     repository: opentelemetry
-    commit: 187ea5573ff044faa892a5d244cb2b48
+    commit: 038316eb65414db8bb0cd88c47a4ee0f

@@ -70,7 +70,7 @@ class BaseAdminHandlerTest : public testing::Test {
 public:
   void setup(Network::Address::Type socket_type = Network::Address::Type::Ip) {
     ON_CALL(admin_.socket_, addressType()).WillByDefault(Return(socket_type));
-    EXPECT_CALL(admin_, addHandler("/tap", "tap filter control", _, true, true))
+    EXPECT_CALL(admin_, addHandler("/tap", "tap filter control", _, true, true, _))
         .WillOnce(DoAll(SaveArg<2>(&cb_), Return(true)));
     EXPECT_CALL(admin_, socket());
     handler_ = std::make_unique<AdminHandler>(admin_, main_thread_dispatcher_);
@@ -86,19 +86,25 @@ public:
     return handler_->attached_request_;
   }
 
+  Http::Code makeRequest(absl::string_view path) {
+    Http::TestResponseHeaderMapImpl response_headers;
+    request_headers_.setPath(path);
+    EXPECT_CALL(admin_stream_, getRequestHeaders()).WillRepeatedly(ReturnRef(request_headers_));
+    return cb_(response_headers, response_, admin_stream_);
+  }
+
 protected:
   Server::MockAdmin admin_;
+  Http::TestRequestHeaderMapImpl request_headers_;
+  Server::StrictMockAdminStream admin_stream_;
   std::unique_ptr<AdminHandler> handler_;
   Server::Admin::HandlerCb cb_;
   MockDispatcherQueued main_thread_dispatcher_{"test_main_thread"};
+  Buffer::OwnedImpl response_;
 };
 
 class AdminHandlerTest : public BaseAdminHandlerTest {
 public:
-  Http::TestResponseHeaderMapImpl response_headers_;
-  Buffer::OwnedImpl response_;
-  Server::MockAdminStream admin_stream_;
-
   const std::string streaming_admin_request_yaml_ =
       R"EOF(
 config_id: test_config_id
@@ -135,9 +141,6 @@ tap_config:
     return fmt::format(buffered_admin_request_yaml_, max_traces, timeout_s);
   }
 
-  Http::TestResponseHeaderMapImpl response_headers_;
-  Buffer::OwnedImpl response_;
-  Server::StrictMockAdminStream admin_stream_;
   // Cannot be moved into individual test cases as expected calls are validated on object
   // destruction, and the code that satisfies the expected calls on sink_ is in the TearDown method.
   StrictMock<Http::MockStreamDecoderFilterCallbacks> sink_;
@@ -156,7 +159,7 @@ TEST_F(AdminHandlerTest, AdminWithPipeSocket) {
 TEST_F(AdminHandlerTest, NoBody) {
   setup();
   EXPECT_CALL(admin_stream_, getRequestBody());
-  EXPECT_EQ(Http::Code::BadRequest, cb_("/tap", response_headers_, response_, admin_stream_));
+  EXPECT_EQ(Http::Code::BadRequest, makeRequest("/tap"));
   EXPECT_EQ("/tap requires a JSON/YAML body", response_.toString());
 }
 
@@ -165,7 +168,7 @@ TEST_F(AdminHandlerTest, BadBody) {
   setup();
   Buffer::OwnedImpl bad_body("hello");
   EXPECT_CALL(admin_stream_, getRequestBody()).WillRepeatedly(Return(&bad_body));
-  EXPECT_EQ(Http::Code::BadRequest, cb_("/tap", response_headers_, response_, admin_stream_));
+  EXPECT_EQ(Http::Code::BadRequest, makeRequest("/tap"));
   EXPECT_EQ("Unable to convert YAML as JSON: hello", response_.toString());
 }
 
@@ -174,7 +177,7 @@ TEST_F(AdminHandlerTest, UnknownConfigId) {
   setup();
   Buffer::OwnedImpl body(streaming_admin_request_yaml_);
   EXPECT_CALL(admin_stream_, getRequestBody()).WillRepeatedly(Return(&body));
-  EXPECT_EQ(Http::Code::BadRequest, cb_("/tap", response_headers_, response_, admin_stream_));
+  EXPECT_EQ(Http::Code::BadRequest, makeRequest("/tap"));
   EXPECT_EQ("Unknown config id 'test_config_id'. No extension has registered with this id.",
             response_.toString());
 }
@@ -190,9 +193,9 @@ TEST_F(AdminHandlerTest, RequestTapWhileAttached) {
   EXPECT_CALL(extension_config, newTapConfig(_, handler_.get()));
   EXPECT_CALL(admin_stream_, setEndStreamOnComplete(false));
   EXPECT_CALL(admin_stream_, addOnDestroyCallback(_));
-  EXPECT_EQ(Http::Code::OK, cb_("/tap", response_headers_, response_, admin_stream_));
+  EXPECT_EQ(Http::Code::OK, makeRequest("/tap"));
 
-  EXPECT_EQ(Http::Code::BadRequest, cb_("/tap", response_headers_, response_, admin_stream_));
+  EXPECT_EQ(Http::Code::BadRequest, makeRequest("/tap"));
   EXPECT_EQ("An attached /tap admin stream already exists. Detach it.", response_.toString());
 }
 
@@ -209,7 +212,7 @@ TEST_F(AdminHandlerTest, CloseMidStream) {
   EXPECT_CALL(extension_config, newTapConfig(_, handler_.get()));
   EXPECT_CALL(admin_stream_, setEndStreamOnComplete(false));
   EXPECT_CALL(admin_stream_, addOnDestroyCallback(_));
-  EXPECT_EQ(Http::Code::OK, cb_("/tap", response_headers_, response_, admin_stream_));
+  EXPECT_EQ(Http::Code::OK, makeRequest("/tap"));
 
   // Direct access to the handle is required so we can submit traces directly
   PerTapSinkHandlePtr sinkHandle =
@@ -239,7 +242,7 @@ TEST_F(BufferedAdminHandlerTest, BufferedTapWrites) {
   EXPECT_CALL(admin_stream_, addOnDestroyCallback(_));
   EXPECT_CALL(admin_stream_, getDecoderFilterCallbacks()).Times(AtLeast(traces));
   EXPECT_CALL(sink_, encodeData(_, _)).Times(Between(traces, traces + 1));
-  EXPECT_EQ(Http::Code::OK, cb_("/tap", response_headers_, response_, admin_stream_));
+  EXPECT_EQ(Http::Code::OK, makeRequest("/tap"));
 
   // Direct access to the handle is required so we can submit traces directly
   PerTapSinkHandlePtr sinkHandle =
@@ -278,8 +281,7 @@ TEST_F(BufferedAdminHandlerTest, BufferedTapRace) {
   EXPECT_CALL(admin_stream_, setEndStreamOnComplete(false));
   EXPECT_CALL(admin_stream_, addOnDestroyCallback(_));
   EXPECT_CALL(main_thread_dispatcher_, post(_)).Times(2);
-  EXPECT_EQ(Http::Code::OK,
-            cb_("/tap", response_headers_, response_, admin_stream_)); // AdminHandler::handler
+  EXPECT_EQ(Http::Code::OK, makeRequest("/tap"));
 
   // Direct access to the handle is required so we can submit traces directly
   PerTapSinkHandlePtr sink_handle =
@@ -323,8 +325,7 @@ TEST_F(BufferedAdminHandlerTest, BufferedTapTimeoutRace) {
   EXPECT_CALL(main_thread_dispatcher_, post(_)).Times(3);
   EXPECT_CALL(admin_stream_, getDecoderFilterCallbacks()).Times(AtLeast(1));
   EXPECT_CALL(sink_, encodeData(_, _)).Times(Between(1, 2));
-  EXPECT_EQ(Http::Code::OK,
-            cb_("/tap", response_headers_, response_, admin_stream_)); // AdminHandler::handler
+  EXPECT_EQ(Http::Code::OK, makeRequest("/tap"));
 
   // Direct access to the handle is required so we can submit traces directly
   PerTapSinkHandlePtr sink_handle =
@@ -366,8 +367,7 @@ TEST_F(BufferedAdminHandlerTest, BufferedTapDoubleFlush) {
   EXPECT_CALL(admin_stream_, getDecoderFilterCallbacks()).Times(AtLeast(1));
   EXPECT_CALL(main_thread_dispatcher_, post(_)).Times(2);
   EXPECT_CALL(sink_, encodeData(_, _)).Times(Between(1, 2));
-  EXPECT_EQ(Http::Code::OK,
-            cb_("/tap", response_headers_, response_, admin_stream_)); // AdminHandler::handler
+  EXPECT_EQ(Http::Code::OK, makeRequest("/tap"));
 
   // Direct access to the handle is required so we can submit traces directly
   PerTapSinkHandlePtr sink_handle =

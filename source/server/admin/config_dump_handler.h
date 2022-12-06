@@ -22,8 +22,7 @@ class ConfigDumpHandler : public HandlerContextBase {
 public:
   ConfigDumpHandler(ConfigTracker& config_tracker, Server::Instance& server);
 
-  Http::Code handlerConfigDump(absl::string_view path_and_query,
-                               Http::ResponseHeaderMap& response_headers,
+  Http::Code handlerConfigDump(Http::ResponseHeaderMap& response_headers,
                                Buffer::Instance& response, AdminStream&) const;
 
 private:

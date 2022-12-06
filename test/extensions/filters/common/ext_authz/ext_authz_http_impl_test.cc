@@ -54,15 +54,6 @@ public:
             timeout: 0.25s
 
           authorization_request:
-            allowed_headers:
-              patterns:
-              - exact: Baz
-                ignore_case: true
-              - prefix: "X-"
-                ignore_case: true
-              - safe_regex:
-                  google_re2: {}
-                  regex: regex-foo.?
             headers_to_add:
             - key: "x-authz-header1"
               value: "value"
@@ -191,17 +182,8 @@ public:
 // Test HTTP client config default values.
 TEST_F(ExtAuthzHttpClientTest, ClientConfig) {
   const Http::LowerCaseString foo{"foo"};
-  const Http::LowerCaseString baz{"baz"};
   const Http::LowerCaseString bar{"bar"};
   const Http::LowerCaseString alice{"alice"};
-
-  // Check allowed request headers.
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Method.get()));
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Host.get()));
-  EXPECT_TRUE(
-      config_->requestHeaderMatchers()->matches(Http::CustomHeaders::get().Authorization.get()));
-  EXPECT_FALSE(config_->requestHeaderMatchers()->matches(Http::Headers::get().ContentLength.get()));
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(baz.get()));
 
   // Check allowed client headers.
   EXPECT_TRUE(config_->clientHeaderMatchers()->matches(Http::Headers::get().Status.get()));
@@ -225,8 +207,8 @@ TEST_F(ExtAuthzHttpClientTest, ClientConfig) {
   EXPECT_EQ(config_->timeout(), std::chrono::milliseconds{250});
 }
 
-// Test default allowed headers in the HTTP client.
-TEST_F(ExtAuthzHttpClientTest, TestDefaultAllowedHeaders) {
+// Test default allowed client and upstream headers in the HTTP client.
+TEST_F(ExtAuthzHttpClientTest, TestDefaultAllowedClientAndUpstreamHeaders) {
   const std::string yaml = R"EOF(
   http_service:
     server_uri:
@@ -237,13 +219,6 @@ TEST_F(ExtAuthzHttpClientTest, TestDefaultAllowedHeaders) {
   )EOF";
 
   initialize(yaml);
-
-  // Check allowed request headers.
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Method.get()));
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Host.get()));
-  EXPECT_TRUE(
-      config_->requestHeaderMatchers()->matches(Http::CustomHeaders::get().Authorization.get()));
-  EXPECT_FALSE(config_->requestHeaderMatchers()->matches(Http::Headers::get().ContentLength.get()));
 
   // Check allowed client headers.
   EXPECT_TRUE(config_->clientHeaderMatchers()->matches(Http::Headers::get().ContentLength.get()));
@@ -288,8 +263,6 @@ TEST_F(ExtAuthzHttpClientTest, ContentLengthEqualZeroWithAllowedHeaders) {
   )EOF";
 
   initialize(yaml);
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Method.get()));
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().ContentLength.get()));
 
   Http::RequestMessagePtr message_ptr =
       sendRequest({{Http::Headers::get().ContentLength.get(), std::string{"47"}},
@@ -297,35 +270,6 @@ TEST_F(ExtAuthzHttpClientTest, ContentLengthEqualZeroWithAllowedHeaders) {
 
   EXPECT_EQ(message_ptr->headers().getContentLengthValue(), "0");
   EXPECT_EQ(message_ptr->headers().getMethodValue(), "POST");
-}
-
-// Test the client when a request contains headers in the prefix matchers.
-TEST_F(ExtAuthzHttpClientTest, AllowedRequestHeadersPrefix) {
-  const Http::LowerCaseString regexFood{"regex-food"};
-  const Http::LowerCaseString regexFool{"regex-fool"};
-  Http::RequestMessagePtr message_ptr =
-      sendRequest({{Http::Headers::get().XContentTypeOptions.get(), "foobar"},
-                   {Http::Headers::get().XSquashDebug.get(), "foo"},
-                   {Http::Headers::get().ContentType.get(), "bar"},
-                   {regexFood.get(), "food"},
-                   {regexFool.get(), "fool"}});
-
-  EXPECT_TRUE(message_ptr->headers().get(Http::Headers::get().ContentType).empty());
-  const auto x_squash = message_ptr->headers().get(Http::Headers::get().XSquashDebug);
-  ASSERT_FALSE(x_squash.empty());
-  EXPECT_EQ(x_squash[0]->value().getStringView(), "foo");
-
-  const auto x_content_type = message_ptr->headers().get(Http::Headers::get().XContentTypeOptions);
-  ASSERT_FALSE(x_content_type.empty());
-  EXPECT_EQ(x_content_type[0]->value().getStringView(), "foobar");
-
-  const auto food = message_ptr->headers().get(regexFood);
-  ASSERT_FALSE(food.empty());
-  EXPECT_EQ(food[0]->value().getStringView(), "food");
-
-  const auto fool = message_ptr->headers().get(regexFool);
-  ASSERT_FALSE(fool.empty());
-  EXPECT_EQ(fool[0]->value().getStringView(), "fool");
 }
 
 // Verify client response when authorization server returns a 200 OK.
@@ -404,7 +348,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAddedAuthzHeadersFromStreamInf
                           expected_header.second);
 
   StreamInfo::MockStreamInfo stream_info;
-  EXPECT_CALL(stream_info, getRequestHeaders()).WillOnce(Return(&request_headers));
+  EXPECT_CALL(stream_info, getRequestHeaders()).Times(2).WillRepeatedly(Return(&request_headers));
 
   envoy::service::auth::v3::CheckRequest request;
   client_->check(request_callbacks_, request, parent_span_, stream_info);

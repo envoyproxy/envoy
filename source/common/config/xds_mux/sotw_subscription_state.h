@@ -21,7 +21,10 @@ class SotwSubscriptionState
 public:
   // Note that, outside of tests, we expect callbacks to always be a WatchMap.
   SotwSubscriptionState(std::string type_url, UntypedConfigUpdateCallbacks& callbacks,
-                        Event::Dispatcher& dispatcher, OpaqueResourceDecoder& resource_decoder);
+                        Event::Dispatcher& dispatcher,
+                        OpaqueResourceDecoderSharedPtr resource_decoder,
+                        XdsResourcesDelegateOptRef xds_resources_delegate,
+                        const std::string& target_xds_authority);
   ~SotwSubscriptionState() override;
 
   // Update which resources we're interested in subscribing to.
@@ -35,6 +38,8 @@ public:
 
   void ttlExpiryCallback(const std::vector<std::string>& expired) override;
 
+  void handleEstablishmentFailure() override;
+
   SotwSubscriptionState(const SotwSubscriptionState&) = delete;
   SotwSubscriptionState& operator=(const SotwSubscriptionState&) = delete;
 
@@ -46,7 +51,7 @@ private:
   void setResourceTtl(const DecodedResourceImpl& decoded_resource);
   bool isHeartbeatResource(const DecodedResource& resource, const std::string& version);
 
-  OpaqueResourceDecoder& resource_decoder_;
+  OpaqueResourceDecoderSharedPtr resource_decoder_;
 
   // The version_info carried by the last accepted DiscoveryResponse.
   // Remains empty until one is accepted.
@@ -68,9 +73,12 @@ public:
   ~SotwSubscriptionStateFactory() override = default;
   std::unique_ptr<SotwSubscriptionState>
   makeSubscriptionState(const std::string& type_url, UntypedConfigUpdateCallbacks& callbacks,
-                        OpaqueResourceDecoder& resource_decoder) override {
+                        OpaqueResourceDecoderSharedPtr resource_decoder,
+                        XdsResourcesDelegateOptRef xds_resources_delegate,
+                        const std::string& target_xds_authority) override {
     return std::make_unique<SotwSubscriptionState>(type_url, callbacks, dispatcher_,
-                                                   resource_decoder);
+                                                   resource_decoder, xds_resources_delegate,
+                                                   target_xds_authority);
   }
 
 private:

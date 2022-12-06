@@ -34,6 +34,17 @@ enum XRateLimitHeadersRFCVersion {
   DRAFT_VERSION_03 = 1;
 }
 
+enum VhRateLimitsOptions {
+  // Use the virtual host rate limits unless the route has a rate limit policy.
+  OVERRIDE = 0;
+
+  // Use the virtual host rate limits even if the route has a rate limit policy.
+  INCLUDE = 1;
+
+  // Ignore the virtual host rate limits even if the route does not have a rate limit policy.
+  IGNORE = 2;
+}
+
 // A RateLimitDescriptor is a list of hierarchical entries that are used by the service to
 // determine the final rate limit key and overall allowed limit. Here are some examples of how
 // they might be used for the domain "envoy".

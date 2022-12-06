@@ -102,6 +102,18 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
     return Http::FilterHeadersStatus::Continue;
   }
 
+  if (lookup_result_ == nullptr) {
+    // Filter chain iteration is paused while a lookup is outstanding, but the filter chain manager
+    // can still generate a local reply. One case where this can happen is when a downstream idle
+    // timeout fires, which may mean that the HttpCache isn't correctly setting deadlines on its
+    // asynchronous operations or is otherwise getting stuck.
+    ENVOY_BUG(Http::Utility::getResponseStatus(headers) !=
+                  Envoy::enumToInt(Http::Code::RequestTimeout),
+              "Request timed out while cache lookup was outstanding.");
+    filter_state_ = FilterState::NotServingFromCache;
+    return Http::FilterHeadersStatus::Continue;
+  }
+
   if (filter_state_ == FilterState::ValidatingCachedResponse && isResponseNotModified(headers)) {
     processSuccessfulValidation(headers);
     // Stop the encoding stream until the cached response is fetched & added to the encoding stream.
@@ -125,7 +137,8 @@ Http::FilterHeadersStatus CacheFilter::encodeHeaders(Http::ResponseHeaderMap& he
     // that an insert has failed. If an insert fails partway, it's better not to send additional
     // chunks to the cache if we're already in a failure state and should abort, but we can only do
     // that if we can communicate failures back to the filter, so we should fix this.
-    insert_->insertHeaders(headers, metadata, end_stream);
+    insert_->insertHeaders(
+        headers, metadata, [](bool) {}, end_stream);
     if (end_stream) {
       insert_status_ = InsertStatus::InsertSucceeded;
     }
@@ -175,7 +188,7 @@ Http::FilterTrailersStatus CacheFilter::encodeTrailers(Http::ResponseTrailerMap&
   response_has_trailers_ = !trailers.empty();
   if (insert_) {
     ENVOY_STREAM_LOG(debug, "CacheFilter::encodeTrailers inserting trailers", *encoder_callbacks_);
-    insert_->insertTrailers(trailers);
+    insert_->insertTrailers(trailers, [](bool) {});
   }
   insert_status_ = InsertStatus::InsertSucceeded;
 
@@ -212,11 +225,9 @@ CacheFilter::resolveLookupStatus(absl::optional<CacheEntryStatus> cache_entry_st
       case FilterState::DecodeServingFromCache:
         ABSL_FALLTHROUGH_INTENDED;
       case FilterState::Destroyed:
-        // TODO (capoferro): ENVOY_BUG prevents code coverage from working. When we fix that, we
-        // should convert this to an ENVOY_BUG.
-        ENVOY_LOG(error, absl::StrCat("Unexpected filter state in requestCacheStatus: cache lookup "
-                                      "response required validation, but filter state is ",
-                                      filter_state));
+        IS_ENVOY_BUG(absl::StrCat("Unexpected filter state in requestCacheStatus: cache lookup "
+                                  "response required validation, but filter state is ",
+                                  filter_state));
       }
       return LookupStatus::Unknown;
     }
@@ -227,12 +238,9 @@ CacheFilter::resolveLookupStatus(absl::optional<CacheEntryStatus> cache_entry_st
     case CacheEntryStatus::LookupError:
       return LookupStatus::LookupError;
     }
-    // TODO (capoferro): ENVOY_BUG prevents code coverage from working. When we fix that, we should
-    // convert this to an ENVOY_BUG.
-    ENVOY_LOG(error,
-              absl::StrCat(
-                  "Unhandled CacheEntryStatus encountered when retrieving request cache status: " +
-                  std::to_string(static_cast<int>(filter_state))));
+    IS_ENVOY_BUG(absl::StrCat(
+        "Unhandled CacheEntryStatus encountered when retrieving request cache status: " +
+        std::to_string(static_cast<int>(filter_state))));
     return LookupStatus::Unknown;
   }
   // Either decodeHeaders decided not to do a cache lookup (because the
@@ -361,6 +369,11 @@ void CacheFilter::getTrailers() {
 void CacheFilter::onHeaders(LookupResult&& result, Http::RequestHeaderMap& request_headers) {
   if (filter_state_ == FilterState::Destroyed) {
     // The filter is being destroyed, any callbacks should be ignored.
+    return;
+  }
+  if (filter_state_ == FilterState::NotServingFromCache) {
+    // A response was injected into the filter chain before the cache lookup finished, e.g. because
+    // the request stream timed out.
     return;
   }
 
@@ -554,7 +567,8 @@ void CacheFilter::processSuccessfulValidation(Http::ResponseHeaderMap& response_
     // TODO(yosrym93): else the cached entry should be deleted.
     // Update metadata associated with the cached response. Right now this is only response_time;
     const ResponseMetadata metadata = {time_source_.systemTime()};
-    cache_.updateHeaders(*lookup_, response_headers, metadata);
+    cache_.updateHeaders(*lookup_, response_headers, metadata,
+                         [](bool updated ABSL_ATTRIBUTE_UNUSED) {});
     insert_status_ = InsertStatus::HeaderUpdate;
   }
 

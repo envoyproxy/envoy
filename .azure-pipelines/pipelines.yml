@@ -10,13 +10,107 @@ trigger:
 # PR build config is manually overridden in Azure pipelines UI with different secrets
 pr: none
 
+variables:
+- name: isDev
+  # This must be checked/set in a `step` from the VERSION.txt file, in order to be useful
+  value: true
+- name: isMain
+  value: $[eq(variables['Build.SourceBranch'], 'refs/heads/main')]
+- name: isReleaseBranch
+  value: $[startsWith(variables['Build.SourceBranch'], 'refs/heads/release/v')]
+- name: isTaggedRelease
+  value: $[startsWith(variables['Build.SourceBranch'], 'refs/tags/v')]
+- name: isStableBranch
+  # A release branch can be either `main` or a `release/v1.x` stable branch
+  value: $[or(eq(variables['isMain'], 'true'), eq(variables['isReleaseBranch'], 'true'))]
+
 stages:
+- stage: env
+  #
+  # Note to use the outputs created here - this `stage` must be set as a dependency in the relevant stage
+  # eg:
+  #
+  # stage: mystage
+  # dependsOn: ["env"]
+  #
+  # To use a variable as a condition for a `stage` you can specify it as follows:
+  #
+  # condition: and(not(canceled()), succeeded(), ne(dependencies.env.outputs['repo.changed.mobileOnly'], 'true'))
+  #
+  # To use a variable as a condition for a `job` you can specify it as follows:
+  #
+  # job:
+  #   condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'))
+  #
+  # Note the difference in name resolution when used in stages and jobs.
+  #
+  # Note also, other conditions such as `not(canceled())` are not assumed and so need to be added to
+  # any conditions explicitly.
+  #
+  # NB: Avoid using _inclusive_ lists to trigger CI - eg _dont_ only trigger mobile CI if `mobile/` changed.
+  #  Instead use _exclusive_ bools - eg _do_ suppress other CI if only `mobile/` changed
+  #
+  # To use a variable in a `step` you can specify it as follows:
+  #
+  # stage: my_next_stage
+  #   jobs:
+  #     job: another_job
+  #     variables:
+  #       mobileOnly: $[stageDependencies.env.repo.outputs['changed.mobileOnly']]
+  #     steps:
+  #     - bash: echo $(mobileOnly)
+  #
+
+  jobs:
+  - job: repo
+    pool:
+      vmImage: "ubuntu-20.04"
+    steps:
+    - bash: |
+        set -e
+
+        # Only exclude checks in pull requests.
+        if [[ $(Build.Reason) != "PullRequest" ]]; then
+            echo "##vso[task.setvariable variable=mobileOnly;isoutput=true]false"
+            echo "##vso[task.setvariable variable=docsOnly;isoutput=true]false"
+            exit 0
+        fi
+
+        CHANGE_TARGET="origin/$(System.PullRequest.TargetBranch)"
+
+        echo "Comparing changes ${CHANGE_TARGET}...HEAD"
+        CHANGED_PATHS="$(git diff --name-only ${CHANGE_TARGET}...HEAD | cut -d/ -f1 | sort -u | jq -sR 'rtrimstr("\n") | split("\n")')"
+        echo "$CHANGED_PATHS" | jq '.'
+        CHANGED_PATH_COUNT=$(echo $CHANGED_PATHS | jq '. | length')
+        CHANGED_MOBILE_ONLY=false
+        CHANGED_DOCS_ONLY=false
+
+        CHANGED_MOBILE=$(echo $CHANGED_PATHS | jq '. as $A | "mobile" | IN($A[])')
+        if [[ $CHANGED_MOBILE == true && $CHANGED_PATH_COUNT -eq 1 ]]; then
+            CHANGED_MOBILE_ONLY=true
+        fi
+        CHANGED_DOCS=$(echo $CHANGED_PATHS | jq '. as $A | "docs" | IN($A[])')
+        if [[ $CHANGED_DOCS == true && $CHANGED_PATH_COUNT -eq 1 ]]; then
+            CHANGED_DOCS_ONLY=true
+        fi
+
+        echo "##vso[task.setvariable variable=mobileOnly;isoutput=true]${CHANGED_MOBILE_ONLY}"
+        echo "##vso[task.setvariable variable=docsOnly;isoutput=true]${CHANGED_DOCS_ONLY}"
+      displayName: "Detect repo changes"
+      workingDirectory: $(Build.SourcesDirectory)
+      name: changed
+    - bash: |
+        echo "env.outputs['changed.mobileOnly']: $(changed.mobileOnly)"
+        echo "env.outputs['changed.docsOnly']: $(changed.docsOnly)"
+      displayName: "Print build environment"
+
 - stage: precheck
+  dependsOn: ["env"]
   jobs:
   - job: format
     dependsOn: []
     pool:
-      vmImage: "ubuntu-18.04"
+      vmImage: "ubuntu-20.04"
     steps:
     - task: Cache@2
       inputs:
@@ -39,13 +133,14 @@ stages:
       inputs:
         pathtoPublish: "$(Build.StagingDirectory)/fix_format.diff"
         artifactName: format
+      timeoutInMinutes: 10
       # not all have fixes so improve condition/handling
       condition: failed()
 
   - job: proto_format
     dependsOn: []
     pool:
-      vmImage: "ubuntu-18.04"
+      vmImage: "ubuntu-20.04"
     steps:
     - task: Cache@2
       inputs:
@@ -68,13 +163,14 @@ stages:
       inputs:
         pathtoPublish: "$(Build.StagingDirectory)/fix_proto_format.diff"
         artifactName: format
+      timeoutInMinutes: 10
       condition: failed()
 
   - job: docs
     dependsOn: []  # this removes the implicit dependency on previous stage and causes this to run in parallel.
     condition: ne(variables['PostSubmit'], true)
     pool:
-      vmImage: "ubuntu-18.04"
+      vmImage: "ubuntu-20.04"
     steps:
     - task: Cache@2
       inputs:
@@ -105,7 +201,7 @@ stages:
   - job: dependencies
     dependsOn: []  # this removes the implicit dependency on previous stage and causes this to run in parallel.
     pool:
-      vmImage: "ubuntu-18.04"
+      vmImage: "ubuntu-20.04"
     steps:
     - task: Cache@2
       inputs:
@@ -132,7 +228,7 @@ stages:
   - job: filter_example
     dependsOn: []
     pool:
-      vmImage: "ubuntu-18.04"
+      vmImage: "ubuntu-20.04"
     steps:
     - task: InstallSSHKey@0
       inputs:
@@ -150,7 +246,7 @@ stages:
   - job: data_plane_api
     dependsOn: []
     pool:
-      vmImage: "ubuntu-18.04"
+      vmImage: "ubuntu-20.04"
     steps:
     - task: InstallSSHKey@0
       inputs:
@@ -168,7 +264,7 @@ stages:
   - job: go_control_plane
     dependsOn: []
     pool:
-      vmImage: "ubuntu-18.04"
+      vmImage: "ubuntu-20.04"
     steps:
     - task: InstallSSHKey@0
       inputs:
@@ -197,7 +293,7 @@ stages:
   - job: release
     timeoutInMinutes: 120
     pool:
-      vmImage: "ubuntu-18.04"
+      vmImage: "ubuntu-20.04"
     steps:
     - template: bazel.yml
       parameters:
@@ -227,7 +323,7 @@ stages:
     dependsOn: []
     timeoutInMinutes: 120
     pool:
-      vmImage: "ubuntu-18.04"
+      vmImage: "ubuntu-20.04"
     steps:
     - template: bazel.yml
       parameters:
@@ -248,7 +344,7 @@ stages:
     dependsOn: ["package_x64"]
     timeoutInMinutes: 120
     pool:
-      vmImage: "ubuntu-18.04"
+      vmImage: "ubuntu-20.04"
     steps:
     - task: DownloadBuildArtifacts@0
       inputs:
@@ -289,11 +385,13 @@ stages:
       displayName: "Verify packages"
 
 - stage: check
-  dependsOn: ["linux_x64"]
+  dependsOn: ["env", "linux_x64"]
   jobs:
   - job: bazel
     displayName: "linux_x64"
     dependsOn: []
+    # Skip checks if only mobile/ or docs/ have changed.
+    condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'))
     strategy:
       maxParallel: 3
       matrix:
@@ -316,7 +414,7 @@ stages:
           CI_TARGET: "bazel.compile_time_options"
     timeoutInMinutes: 120
     pool:
-      vmImage: "ubuntu-18.04"
+      vmImage: "ubuntu-20.04"
     steps:
     - template: bazel.yml
       parameters:
@@ -325,7 +423,9 @@ stages:
   - job: coverage
     displayName: "linux_x64"
     dependsOn: []
-    timeoutInMinutes: 120
+    # Skip checks if only mobile/ or docs/ have changed.
+    condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'))
+    timeoutInMinutes: 180
     pool: "x64-large"
     strategy:
       maxParallel: 2
@@ -358,7 +458,7 @@ stages:
     displayName: "linux multiarch"
     timeoutInMinutes: 120
     pool:
-      vmImage: "ubuntu-18.04"
+      vmImage: "ubuntu-20.04"
     steps:
     - bash: |
         echo "disk space at beginning of build:"
@@ -420,15 +520,16 @@ stages:
       inputs:
         pathtoPublish: "$(Build.StagingDirectory)/build_images"
         artifactName: docker
+      timeoutInMinutes: 10
       condition: always()
 
-- stage: docs
+- stage: publish
   dependsOn: ["docker"]
   condition: and(succeeded(), eq(variables['PostSubmit'], true), ne(variables['NoSync'], true))
   jobs:
-  - job: publish
+  - job: docs
     pool:
-      vmImage: "ubuntu-18.04"
+      vmImage: "ubuntu-20.04"
     steps:
     - task: Cache@2
       inputs:
@@ -455,7 +556,7 @@ stages:
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
         GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
         GCS_ARTIFACT_BUCKET: $(GcsArtifactBucket)
-      condition: eq(variables['Build.SourceBranch'], 'refs/heads/main')
+      condition: eq(variables['isMain'], 'true')
 
     - task: InstallSSHKey@0
       inputs:
@@ -471,12 +572,100 @@ stages:
         AZP_BRANCH: $(Build.SourceBranch)
         NETLIFY_TRIGGER_URL: $(NetlifyTriggerURL)
 
+  - job: github
+    dependsOn: ["docs"]
+    condition: eq(variables['isStableBranch'], 'true')
+    pool:
+      vmImage: "ubuntu-20.04"
+    steps:
+    - bash: |
+        VERSION_DEV="$(cat VERSION.txt | cut -d- -f2)"
+        if [[ $VERSION_DEV != "dev" ]]; then
+            echo "##vso[task.setvariable variable=isDev]false"
+        fi
+      displayName: Set development/release env
+
+    - script: ./ci/run_envoy_docker.sh './ci/do_ci.sh publish'
+      displayName: "Publish release to Github"
+      workingDirectory: $(Build.SourcesDirectory)
+      condition: eq(variables['isDev'], 'false')
+      env:
+        GITHUB_TOKEN: $(GitHubPublicRepoOnlyAccessToken)
+
+  - job: assets
+    dependsOn: []
+    condition: eq(variables['isTaggedRelease'], 'true')
+    pool:
+      vmImage: "ubuntu-20.04"
+    steps:
+    - task: DownloadBuildArtifacts@0
+      inputs:
+        buildType: current
+        artifactName: "bazel.release"
+        itemPattern: "bazel.release/envoy_binary.tar.gz"
+        downloadType: single
+        targetPath: $(Build.StagingDirectory)
+    - task: DownloadBuildArtifacts@0
+      inputs:
+        buildType: current
+        artifactName: "bazel.release"
+        itemPattern: "bazel.release/envoy-contrib_binary.tar.gz"
+        downloadType: single
+        targetPath: $(Build.StagingDirectory)
+    - task: DownloadBuildArtifacts@0
+      inputs:
+        buildType: current
+        artifactName: "bazel.release.arm64"
+        itemPattern: "bazel.release.arm64/envoy_binary.tar.gz"
+        downloadType: single
+        targetPath: $(Build.StagingDirectory)
+    - task: DownloadBuildArtifacts@0
+      inputs:
+        buildType: current
+        artifactName: "bazel.release.arm64"
+        itemPattern: "bazel.release.arm64/envoy-contrib_binary.tar.gz"
+        downloadType: single
+        targetPath: $(Build.StagingDirectory)
+
+    - task: DownloadSecureFile@1
+      name: MaintainerGPGKey
+      displayName: 'Download maintainer GPG key'
+      inputs:
+        secureFile: 'maintainer.gpg.key'
+
+    - bash: |
+        set -e
+
+        VERSION="$(cat VERSION.txt)"
+
+        mkdir -p linux/amd64 linux/arm64 publish
+
+        # linux/amd64
+        tar zxf $(Build.StagingDirectory)/bazel.release/envoy_binary.tar.gz -C ./linux/amd64
+        tar zxf $(Build.StagingDirectory)/bazel.release/envoy-contrib_binary.tar.gz -C ./linux/amd64
+        cp -a linux/amd64/build_envoy_release_stripped/envoy "publish/envoy-${VERSION}-linux-x86_64"
+        cp -a linux/amd64/build_envoy-contrib_release_stripped/envoy "publish/envoy-contrib-${VERSION}-linux-x86_64"
+
+        # linux/arm64
+        tar zxf $(Build.StagingDirectory)/bazel.release.arm64/envoy_binary.tar.gz -C ./linux/arm64
+        tar zxf $(Build.StagingDirectory)/bazel.release.arm64/envoy-contrib_binary.tar.gz -C ./linux/arm64
+        cp -a linux/arm64/build_envoy_release_stripped/envoy "publish/envoy-${VERSION}-linux-aarch_64"
+        cp -a linux/arm64/build_envoy-contrib_release_stripped/envoy "publish/envoy-contrib-${VERSION}-linux-aarch_64"
+
+        echo "$MAINTAINER_GPG_KEY_PASSPHRASE" | gpg --batch --yes --passphrase-fd 0 --import "$(MaintainerGPGKey.secureFilePath)"
+
+        ci/publish_github_assets.sh "v${VERSION}" "${PWD}/publish"
+      workingDirectory: $(Build.SourcesDirectory)
+      env:
+        GITHUB_TOKEN: $(GitHubPublicRepoOnlyAccessToken)
+        MAINTAINER_GPG_KEY_PASSPHRASE: $(MaintainerGPGKeyPassphrase)
+
 - stage: verify
   dependsOn: ["docker"]
   jobs:
   - job: examples
     pool:
-      vmImage: "ubuntu-18.04"
+      vmImage: "ubuntu-20.04"
     steps:
     - task: DownloadBuildArtifacts@0
       inputs:
@@ -512,6 +701,7 @@ stages:
       inputs:
         testResultsFiles: "**/bazel-testlogs/**/test.xml"
         testRunTitle: "macOS"
+      timeoutInMinutes: 10
       condition: always()
 
     - script: bazel run //ci/flaky_test:process_xml
@@ -549,16 +739,19 @@ stages:
         BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
         BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
         GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
+
     - task: PublishTestResults@2
       inputs:
         testResultsFiles: "**/bazel-out/**/testlogs/**/test.xml"
         testRunTitle: "windows"
         searchFolder: $(Build.StagingDirectory)/tmp
+      timeoutInMinutes: 10
       condition: always()
     - task: PublishBuildArtifacts@1
       inputs:
         pathtoPublish: "$(Build.StagingDirectory)/envoy"
         artifactName: windows.release
+      timeoutInMinutes: 10
       condition: always()
 
   - job: docker
@@ -605,4 +798,5 @@ stages:
       inputs:
         pathtoPublish: "$(Build.StagingDirectory)/build_images"
         artifactName: docker_windows
+      timeoutInMinutes: 10
       condition: always()

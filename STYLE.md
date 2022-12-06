@@ -36,9 +36,9 @@
   * `using BarSharedPtr = std::shared_ptr<Bar>;`
   * `using BlahConstSharedPtr = std::shared_ptr<const Blah>;`
   * Regular pointers (e.g. `int* foo`) should not be type aliased.
-* `absl::optional<std::reference_wrapper<T>> is type aliased:
-  * `using FooOptRef = absl::optional<std::reference_wrapper<T>>;`
-  * `using FooOptConstRef = absl::optional<std::reference_wrapper<const T>>;`
+* `absl::optional<std::reference_wrapper<T>>` has a helper class in `envoy/common/optref.h`, and is type aliased:
+  * `using FooOptRef = OptRef<T>;`
+  * `using FooOptConstRef = OptRef<const T>;`
 * If move semantics are intended, prefer specifying function arguments with `&&`.
   E.g., `void onHeaders(Http::HeaderMapPtr&& headers, ...)`. The rationale for this is that it
   forces the caller to specify `std::move(...)` or pass a temporary and makes the intention at
@@ -51,6 +51,8 @@
   raw memory in a test and return it to the production code with the expectation that the
   production code will hold it in a `unique_ptr` and free it. Envoy uses the factory pattern
   quite a bit for these cases. (Search the code for "factory").
+* Prefer explicitly sized integer types, such as uint64_t rather than size_t. In particular, use
+  explicitly sized integers for data that is written to disk or involved in math that might overflow.
 * The Google C++ style guide points out that [non-PoD static and global variables are forbidden](https://google.github.io/styleguide/cppguide.html#Static_and_Global_Variables).
   This _includes_ types such as `std::string`. We encourage the use of the
   advice in the [C++ FAQ on the static initialization
@@ -155,7 +157,8 @@ A few general notes on our error handling philosophy:
     debug-only builds) program invariants.
   - `ENVOY_BUG`: logs and increments a stat in release mode, fatal check in debug builds. These
     should be used where it may be useful to detect if an efficient condition is violated in
-    production (and fatal check in debug-only builds).
+    production (and fatal check in debug-only builds). This will also log a stack trace
+    of the previous calls leading up to `ENVOY_BUG`.
 
 * Sub-macros alias the macros above and can be used to annotate specific situations:
   - `ENVOY_BUG_ALPHA` (alias `ENVOY_BUG`): Used for alpha or rapidly changing protocols that need

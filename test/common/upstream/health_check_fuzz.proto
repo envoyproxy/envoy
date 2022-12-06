@@ -10,6 +10,7 @@ import "google/protobuf/empty.proto";
 message HttpRespond {
   test.fuzz.Headers headers = 1;
   uint64 status = 2 [(validate.rules).uint64.lt = 1000];
+  bytes body = 3;
 }
 
 message TcpRespond {

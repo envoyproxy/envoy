@@ -81,8 +81,8 @@ public:
   ~MockInstance() override;
 
   Common::Redis::Client::PoolRequest* makeRequest(const std::string& hash_key,
-                                                  RespVariant&& request,
-                                                  PoolCallbacks& callbacks) override {
+                                                  RespVariant&& request, PoolCallbacks& callbacks,
+                                                  Common::Redis::Client::Transaction&) override {
     return makeRequest_(hash_key, request, callbacks);
   }
 
@@ -108,11 +108,16 @@ public:
   ~MockSplitCallbacks() override;
 
   void onResponse(Common::Redis::RespValuePtr&& value) override { onResponse_(value); }
+  Common::Redis::Client::Transaction& transaction() override { return transaction_; }
 
   MOCK_METHOD(bool, connectionAllowed, ());
+  MOCK_METHOD(void, onQuit, ());
   MOCK_METHOD(void, onAuth, (const std::string& password));
   MOCK_METHOD(void, onAuth, (const std::string& username, const std::string& password));
   MOCK_METHOD(void, onResponse_, (Common::Redis::RespValuePtr & value));
+
+private:
+  Common::Redis::Client::NoOpTransaction transaction_;
 };
 
 class MockInstance : public Instance {

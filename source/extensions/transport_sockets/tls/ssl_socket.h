@@ -71,6 +71,7 @@ public:
   void onSuccess(SSL* ssl) override;
   void onFailure() override;
   Network::TransportSocketCallbacks* transportSocketCallbacks() override { return callbacks_; }
+  void onAsynchronousCertValidationComplete() override;
 
   SSL* rawSslForTest() const { return rawSsl(); }
 
@@ -88,6 +89,7 @@ private:
   void drainErrorQueue();
   void shutdownSsl();
   void shutdownBasic();
+  void resumeHandshake();
 
   const Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   Network::TransportSocketCallbacks* callbacks_{};
@@ -112,16 +114,16 @@ public:
                         Upstream::HostDescriptionConstSharedPtr) const override;
   bool implementsSecureTransport() const override;
   absl::string_view defaultServerNameIndication() const override {
-    return config().serverNameIndication();
+    return clientContextConfig()->serverNameIndication();
   }
   bool supportsAlpn() const override { return true; }
 
   // Secret::SecretCallbacks
   void onAddOrUpdateSecret() override;
 
-  const Ssl::ClientContextConfig& config() const { return *config_; }
+  OptRef<const Ssl::ClientContextConfig> clientContextConfig() const override { return {*config_}; }
 
-  Envoy::Ssl::ClientContextSharedPtr sslCtx();
+  Envoy::Ssl::ClientContextSharedPtr sslCtx() override;
 
 private:
   Envoy::Ssl::ContextManager& manager_;

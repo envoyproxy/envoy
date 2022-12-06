@@ -13,9 +13,9 @@ If you have a reproducible failure case, you can run it against a debug Envoy wi
 detailed nghttp2 error logs, which often indicate which header failed compliance checks. Alternately,
 if you can afford to run with "-l trace" on a machine encountering the errors, you can look for logs
 from the file "source/common/http/http2/codec_impl.cc" of the form
-`invalid http2: [nghttp2 error detail]`
+``invalid http2: [nghttp2 error detail]``
 for example:
-`invalid http2: Invalid HTTP header field was received: frame type: 1, stream: 1, name: [content-length], value: [3]`
+``invalid http2: Invalid HTTP header field was received: frame type: 1, stream: 1, name: [content-length], value: [3]``
 
 You can also check :ref:`HTTP/2 stats <config_http_conn_man_stats_per_codec>`: in many cases where
 Envoy resets streams, for example if there are more headers than allowed by configuration or flood

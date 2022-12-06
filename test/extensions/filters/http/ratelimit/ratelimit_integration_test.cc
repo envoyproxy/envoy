@@ -204,9 +204,13 @@ public:
       enable_x_ratelimit_headers_ = envoy::extensions::filters::http::ratelimit::v3::RateLimit::OFF;
   bool disable_x_envoy_ratelimited_header_ = false;
   envoy::extensions::filters::http::ratelimit::v3::RateLimit proto_config_{};
-  const std::string base_filter_config_ = R"EOF(
+  std::string base_filter_config_ = R"EOF(
     domain: some_domain
     timeout: 0.5s
+    response_headers_to_add:
+    - header:
+        key: x-global-ratelimit-service
+        value: rate_limit_service
   )EOF";
 };
 
@@ -511,6 +515,25 @@ TEST_P(RatelimitIntegrationTest, OverLimitAndOK) {
 
   EXPECT_EQ(2, test_server_->counter("cluster.cluster_0.ratelimit.ok")->value());
   EXPECT_EQ(2, test_server_->counter("cluster.cluster_0.ratelimit.over_limit")->value());
+  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.error"));
+}
+
+TEST_P(RatelimitIntegrationTest, OverLimitResponseHeadersToAdd) {
+  initiateClientConnection();
+  waitForRatelimitRequest();
+  sendRateLimitResponse(envoy::service::ratelimit::v3::RateLimitResponse::OVER_LIMIT, {},
+                        Http::TestResponseHeaderMapImpl{}, Http::TestRequestHeaderMapImpl{}, 0);
+  waitForFailedUpstreamResponse(429, 0);
+
+  EXPECT_THAT(responses_[0].get()->headers(),
+              Http::HeaderValueOf(Http::Headers::get().EnvoyRateLimited,
+                                  Http::Headers::get().EnvoyRateLimitedValues.True));
+  EXPECT_THAT(responses_[0].get()->headers(),
+              Http::HeaderValueOf("x-global-ratelimit-service", "rate_limit_service"));
+  cleanup();
+
+  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.ok"));
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ratelimit.over_limit")->value());
   EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.error"));
 }
 

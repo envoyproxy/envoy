@@ -10,7 +10,6 @@
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -206,17 +205,8 @@ decompressor_library:
     expectDecompression(decompressor_ptr, end_with_data);
   }
 
-  void testAcceptEncodingFilter(bool legacy, const std::string& original_accept_encoding,
+  void testAcceptEncodingFilter(const std::string& original_accept_encoding,
                                 const std::string& final_accept_encoding) {
-    TestScopedRuntime scoped_runtime;
-    if (legacy) {
-      scoped_runtime.mergeValues(
-          {{"envoy.reloadable_features.append_to_accept_content_encoding_only_once", "false"}});
-
-    } else {
-      scoped_runtime.mergeValues(
-          {{"envoy.reloadable_features.append_to_accept_content_encoding_only_once", "true"}});
-    }
     setUpFilter(R"EOF(
 decompressor_library:
   typed_config:
@@ -331,22 +321,12 @@ TEST_P(DecompressorFilterTest, ExplicitlyEnableAdvertiseAcceptEncodingOnlyOnce) 
   // Do not duplicate accept-encoding values. Remove extra accept-encoding values for the
   // content-type we specify. Also remove q-values from our content-type (if not set, it defaults
   // to 1.0). Test also whitespace in accept-encoding value string.
-  testAcceptEncodingFilter(false, "br,mock, mock\t,mock ;q=0.3", "br,mock");
-}
-
-TEST_P(DecompressorFilterTest, ExplicitlyEnableAdvertiseAcceptEncodingOnlyOnceLegacy) {
-  // legacy test to avoid a breaking change
-  testAcceptEncodingFilter(true, "br,mock, mock\t,mock ;q=0.3", "br,mock, mock\t,mock ;q=0.3,mock");
+  testAcceptEncodingFilter("br,mock, mock\t,mock ;q=0.3", "br,mock");
 }
 
 TEST_P(DecompressorFilterTest, ExplicitlyEnableAdvertiseAcceptEncodingRemoveQValue) {
   // If the accept-encoding header had a q-value, it needs to be removed.
-  testAcceptEncodingFilter(false, "mock;q=0.6", "mock");
-}
-
-TEST_P(DecompressorFilterTest, ExplicitlyEnableAdvertiseAcceptEncodingRemoveQValueLegacy) {
-  // legacy test to avoid a breaking change
-  testAcceptEncodingFilter(true, "mock;q=0.6", "mock;q=0.6,mock");
+  testAcceptEncodingFilter("mock;q=0.6", "mock");
 }
 
 TEST_P(DecompressorFilterTest, DecompressionDisabled) {
@@ -614,18 +594,12 @@ TEST_P(DecompressorFilterTest, NoResponseDecompressionNoTransformPresentInList) 
 }
 
 TEST_P(DecompressorFilterTest, DecompressionLibraryNotRegistered) {
-  EXPECT_THROW_WITH_MESSAGE(
-      setUpFilter(R"EOF(
+  EXPECT_THROW(setUpFilter(R"EOF(
 decompressor_library:
   typed_config:
     "@type": "type.googleapis.com/envoy.extensions.compression.does_not_exist"
 )EOF"),
-      EnvoyException,
-      "Unable to parse JSON as proto (INVALID_ARGUMENT:(decompressor_library.typed_config): "
-      "invalid value Invalid type URL, unknown type: envoy.extensions.compression.does_not_exist "
-      "for type Any): "
-      "{\"decompressor_library\":{\"typed_config\":{\"@type\":\"type.googleapis.com/"
-      "envoy.extensions.compression.does_not_exist\"}}}");
+               EnvoyException);
 }
 
 } // namespace

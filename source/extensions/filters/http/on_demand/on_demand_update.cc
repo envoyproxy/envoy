@@ -115,7 +115,7 @@ OptRef<const Router::Route> OnDemandRouteUpdate::handleMissingRoute() {
       std::make_shared<Http::RouteConfigUpdatedCallback>(Http::RouteConfigUpdatedCallback(
           [this](bool route_exists) -> void { onRouteConfigUpdateCompletion(route_exists); }));
   filter_iteration_state_ = Http::FilterHeadersStatus::StopIteration;
-  callbacks_->requestRouteConfigUpdate(route_config_updated_callback_);
+  callbacks_->downstreamCallbacks()->requestRouteConfigUpdate(route_config_updated_callback_);
   // decodeHeaders() is completed.
   decode_headers_active_ = false;
   return makeOptRefFromPtr(callbacks_->route().get());
@@ -221,7 +221,7 @@ void OnDemandRouteUpdate::onClusterDiscoveryCompletion(
       !callbacks_->decodingBuffer()) { // Redirects with body not yet supported.
     const Http::ResponseHeaderMap* headers = nullptr;
     if (callbacks_->recreateStream(headers)) {
-      callbacks_->clearRouteCache();
+      callbacks_->downstreamCallbacks()->clearRouteCache();
       return;
     }
   }

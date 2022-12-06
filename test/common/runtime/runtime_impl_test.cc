@@ -549,9 +549,9 @@ TEST_F(StaticLoaderImplTest, All) {
 TEST_F(StaticLoaderImplTest, QuicheReloadableFlags) {
   // Test that Quiche flags can be overwritten via Envoy runtime config.
   base_ = TestUtility::parseYaml<ProtobufWkt::Struct>(R"EOF(
-    envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_testonly_default_false: true
-    envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_testonly_default_true: false
-    envoy.reloadable_features.FLAGS_quic_reloadable_flag_spdy_testonly_default_false: false
+    envoy.reloadable_features.FLAGS_envoy_quic_reloadable_flag_quic_testonly_default_false: true
+    envoy.reloadable_features.FLAGS_envoy_quic_reloadable_flag_quic_testonly_default_true: false
+    envoy.reloadable_features.FLAGS_envoy_quic_reloadable_flag_spdy_testonly_default_false: false
   )EOF");
   SetQuicReloadableFlag(spdy_testonly_default_false, true);
   EXPECT_TRUE(GetQuicReloadableFlag(spdy_testonly_default_false));
@@ -562,7 +562,7 @@ TEST_F(StaticLoaderImplTest, QuicheReloadableFlags) {
 
   // Test that Quiche flags can be overwritten again.
   base_ = TestUtility::parseYaml<ProtobufWkt::Struct>(R"EOF(
-    envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_testonly_default_true: true
+    envoy.reloadable_features.FLAGS_envoy_quic_reloadable_flag_quic_testonly_default_true: true
   )EOF");
   setup();
   EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_false));
@@ -875,7 +875,7 @@ public:
     ON_CALL(cm_.subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _, _))
         .WillByDefault(testing::Invoke(
             [this](const envoy::config::core::v3::ConfigSource&, absl::string_view, Stats::Scope&,
-                   Config::SubscriptionCallbacks& callbacks, Config::OpaqueResourceDecoder&,
+                   Config::SubscriptionCallbacks& callbacks, Config::OpaqueResourceDecoderSharedPtr,
                    const Config::SubscriptionOptions&) -> Config::SubscriptionPtr {
               auto ret = std::make_unique<testing::NiceMock<Config::MockSubscription>>();
               rtds_subscriptions_.push_back(ret.get());

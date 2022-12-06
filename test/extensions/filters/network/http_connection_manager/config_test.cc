@@ -4,6 +4,8 @@
 #include "envoy/config/trace/v3/zipkin.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
+#include "envoy/extensions/http/header_validators/envoy_default/v3/header_validator.pb.h"
+#include "envoy/extensions/http/header_validators/envoy_default/v3/header_validator.pb.validate.h"
 #include "envoy/server/request_id_extension_config.h"
 #include "envoy/type/v3/percent.pb.h"
 
@@ -1590,8 +1592,7 @@ access_log:
   filter: []
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(parseHttpConnectionManagerFromYaml(yaml_string), EnvoyException,
-                          "filter: Proto field is not repeating, cannot start list.");
+  EXPECT_THROW(parseHttpConnectionManagerFromYaml(yaml_string), EnvoyException);
 }
 
 TEST_F(HttpConnectionManagerConfigTest, BadAccessLogType) {
@@ -1619,8 +1620,7 @@ access_log:
     bad_type: {}
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(parseHttpConnectionManagerFromYaml(yaml_string), EnvoyException,
-                          "bad_type: Cannot find field");
+  EXPECT_THROW(parseHttpConnectionManagerFromYaml(yaml_string), EnvoyException);
 }
 
 TEST_F(HttpConnectionManagerConfigTest, BadAccessLogNestedTypes) {
@@ -1656,8 +1656,7 @@ access_log:
       - not_health_check_filter: {}
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(parseHttpConnectionManagerFromYaml(yaml_string), EnvoyException,
-                          "bad_type: Cannot find field");
+  EXPECT_THROW(parseHttpConnectionManagerFromYaml(yaml_string), EnvoyException);
 }
 
 // Validates that HttpConnectionManagerConfig construction succeeds when there are no collisions
@@ -1908,7 +1907,10 @@ public:
 
   void set(Http::RequestHeaderMap&, bool) override {}
   void setInResponse(Http::ResponseHeaderMap&, const Http::RequestHeaderMap&) override {}
-  absl::optional<uint64_t> toInteger(const Http::RequestHeaderMap&) const override {
+  absl::optional<absl::string_view> get(const Http::RequestHeaderMap&) const override {
+    return absl::nullopt;
+  }
+  absl::optional<uint64_t> getInteger(const Http::RequestHeaderMap&) const override {
     return absl::nullopt;
   }
   Tracing::Reason getTraceReason(const Http::RequestHeaderMap&) override {
@@ -2599,6 +2601,43 @@ public:
   }
 };
 
+// Override the default config factory such that the test can validate the UHV config proto that
+// HCM factory synthesized.
+class DefaultHeaderValidatorFactoryConfigOverride : public Http::HeaderValidatorFactoryConfig {
+public:
+  DefaultHeaderValidatorFactoryConfigOverride(
+      ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&
+          config)
+      : config_(config) {}
+  std::string name() const override { return "envoy.http.header_validators.envoy_default"; }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<
+        ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig>();
+  }
+
+  Http::HeaderValidatorFactoryPtr
+  createFromProto(const Protobuf::Message& message,
+                  Server::Configuration::FactoryContext& context) override {
+    auto mptr = ::Envoy::Config::Utility::translateAnyToFactoryConfig(
+        dynamic_cast<const ProtobufWkt::Any&>(message), context.messageValidationVisitor(), *this);
+    const auto& proto_config =
+        MessageUtil::downcastAndValidate<const ::envoy::extensions::http::header_validators::
+                                             envoy_default::v3::HeaderValidatorConfig&>(
+            *mptr, context.messageValidationVisitor());
+
+    config_ = proto_config;
+    auto header_validator = std::make_unique<StrictMock<Http::MockHeaderValidatorFactory>>();
+    EXPECT_CALL(*header_validator, create(Http::Protocol::Http2, _))
+        .WillOnce(InvokeWithoutArgs(
+            []() { return std::make_unique<StrictMock<Http::MockHeaderValidator>>(); }));
+    return header_validator;
+  }
+
+private:
+  ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig& config_;
+};
+
 } // namespace
 
 // Verify plumbing of the header validator factory.
@@ -2640,6 +2679,89 @@ TEST_F(HttpConnectionManagerConfigTest, HeaderValidatorConfig) {
                                            http_tracer_manager_, filter_config_provider_manager_);
       },
       EnvoyException);
+#endif
+}
+
+TEST_F(HttpConnectionManagerConfigTest, DefaultHeaderValidatorConfig) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
+      proto_config;
+  DefaultHeaderValidatorFactoryConfigOverride factory(proto_config);
+  Registry::InjectFactory<Http::HeaderValidatorFactoryConfig> registration(factory);
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
+      .WillRepeatedly(Invoke(&context_.runtime_loader_.snapshot_,
+                             &Runtime::MockSnapshot::featureEnabledDefault));
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, getInteger(_, _)).Times(AnyNumber());
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+  StrictMock<StreamInfo::MockStreamInfo> stream_info;
+#ifdef ENVOY_ENABLE_UHV
+  EXPECT_NE(nullptr, config.makeHeaderValidator(Http::Protocol::Http2, stream_info));
+  EXPECT_FALSE(proto_config.restrict_http_methods());
+  EXPECT_TRUE(proto_config.uri_path_normalization_options().skip_path_normalization());
+  EXPECT_TRUE(proto_config.uri_path_normalization_options().skip_merging_slashes());
+  EXPECT_EQ(proto_config.uri_path_normalization_options().path_with_escaped_slashes_action(),
+            ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig::
+                UriPathNormalizationOptions::IMPLEMENTATION_SPECIFIC_DEFAULT);
+  EXPECT_FALSE(proto_config.http1_protocol_options().allow_chunked_length());
+#else
+  // If UHV is disabled, config should be accepted and factory should be nullptr
+  EXPECT_EQ(nullptr, config.makeHeaderValidator(Http::Protocol::Http2, stream_info));
+#endif
+}
+
+TEST_F(HttpConnectionManagerConfigTest, TranslateLegacyConfigToDefaultHeaderValidatorConfig) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  normalize_path: true
+  merge_slashes: true
+  path_with_escaped_slashes_action: UNESCAPE_AND_FORWARD
+  http_protocol_options:
+    allow_chunked_length: true
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
+      proto_config;
+  DefaultHeaderValidatorFactoryConfigOverride factory(proto_config);
+  Registry::InjectFactory<Http::HeaderValidatorFactoryConfig> registration(factory);
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
+      .WillRepeatedly(Invoke(&context_.runtime_loader_.snapshot_,
+                             &Runtime::MockSnapshot::featureEnabledDefault));
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, getInteger(_, _)).Times(AnyNumber());
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+  StrictMock<StreamInfo::MockStreamInfo> stream_info;
+#ifdef ENVOY_ENABLE_UHV
+  EXPECT_NE(nullptr, config.makeHeaderValidator(Http::Protocol::Http2, stream_info));
+  EXPECT_FALSE(proto_config.restrict_http_methods());
+  EXPECT_FALSE(proto_config.uri_path_normalization_options().skip_path_normalization());
+  EXPECT_FALSE(proto_config.uri_path_normalization_options().skip_merging_slashes());
+  EXPECT_EQ(proto_config.uri_path_normalization_options().path_with_escaped_slashes_action(),
+            ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig::
+                UriPathNormalizationOptions::UNESCAPE_AND_FORWARD);
+  EXPECT_TRUE(proto_config.http1_protocol_options().allow_chunked_length());
+#else
+  // If UHV is disabled, config should be accepted and factory should be nullptr
+  EXPECT_EQ(nullptr, config.makeHeaderValidator(Http::Protocol::Http2, stream_info));
 #endif
 }
 

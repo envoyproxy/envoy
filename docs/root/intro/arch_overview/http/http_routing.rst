@@ -193,6 +193,8 @@ upon configuration load and cache the contents.
 If **response_headers_to_add** has been set for the Route or the enclosing Virtual Host,
 Envoy will include the specified headers in the direct HTTP response.
 
+.. _arch_overview_http_routing_matcher:
+
 Routing Via Generic Matching
 ----------------------------
 
@@ -201,7 +203,8 @@ specify the route table. This is a more expressive matching engine than the orig
 for sublinear matching on arbitrary headers (unlike the original matching engine which could only
 do this for :authority in some cases).
 
-To use the generic matching tree, specify a matcher on a virtual host with a RouteAction action:
+To use the generic matching tree, specify a matcher on a virtual host with a Route or RouteList
+as the action:
 
 .. code-block:: yaml
 
@@ -241,8 +244,29 @@ To use the generic matching tree, specify a matcher on a virtual host with a Rou
                 - header:
                     key: x-route-header
                     value: new-value
+          "/new_endpoint/baz":
+            action:
+              name: route_list
+              typed_config:
+                "@type": type.googleapis.com/envoy.config.route.v3.RouteList
+                - match:
+                    prefix: /
+                    headers:
+                    - name: x-match-header
+                      string_match:
+                        exact: foo
+                  route:
+                    cluster: cluster_baz_1
+                - match:
+                    prefix: /
+                    headers:
+                    - name: x-match-header
+                      string_match:
+                        exact: bar
+                  route:
+                    cluster: cluster_baz_2
 
-This allows resolving the same Route proto message used for the `routes`-based routing using the additional
+This allows resolving the same Route proto message used for the ``routes``-based routing using the additional
 matching flexibility provided by the generic matching framework.
 
 Note that the resulting Route also specifies a match criteria. This must be satisfied in addition to resolving
@@ -250,5 +274,5 @@ the route in order to achieve a route match. When path rewrites are used, the ma
 the match criteria of the resolved Route. Path matching done during the match tree traversal does not contribute
 to path rewrites.
 
-The only inputs supported are request headers (via `envoy.type.matcher.v3.HttpRequestHeaderMatchInput`). See
+The only inputs supported are request headers (via ``envoy.type.matcher.v3.HttpRequestHeaderMatchInput``). See
 the docs for the :ref:`matching API <arch_overview_matching_api>` for more information about the API as a whole.

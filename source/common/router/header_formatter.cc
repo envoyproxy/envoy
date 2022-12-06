@@ -236,8 +236,7 @@ StreamInfoHeaderFormatter::FieldExtractor sslConnectionInfoStringHeaderExtractor
 
 } // namespace
 
-StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_name, bool append)
-    : append_(append) {
+StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_name) {
   if (field_name == "PROTOCOL") {
     field_extractor_ = [](const Envoy::StreamInfo::StreamInfo& stream_info) {
       return Envoy::Formatter::SubstitutionFormatUtils::protocolToStringOrDefault(
@@ -355,6 +354,13 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
     field_extractor_ = parseSubstitutionFormatField(field_name, formatter_map_);
   } else if (field_name == "UPSTREAM_LOCAL_ADDRESS") {
     field_extractor_ = [](const Envoy::StreamInfo::StreamInfo& stream_info) -> std::string {
+      if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.correct_remote_address")) {
+        if (stream_info.upstreamInfo().has_value() &&
+            stream_info.upstreamInfo()->upstreamHost()->address()) {
+          return stream_info.upstreamInfo()->upstreamHost()->address()->asString();
+        }
+        return "";
+      }
       if (stream_info.upstreamInfo().has_value() &&
           stream_info.upstreamInfo()->upstreamLocalAddress()) {
         return stream_info.upstreamInfo()->upstreamLocalAddress()->asString();
@@ -363,6 +369,14 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
     };
   } else if (field_name == "UPSTREAM_LOCAL_ADDRESS_WITHOUT_PORT") {
     field_extractor_ = [](const Envoy::StreamInfo::StreamInfo& stream_info) -> std::string {
+      if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.correct_remote_address")) {
+        if (stream_info.upstreamInfo().has_value() &&
+            stream_info.upstreamInfo()->upstreamHost()->address()) {
+          return StreamInfo::Utility::formatDownstreamAddressNoPort(
+              *stream_info.upstreamInfo()->upstreamHost()->address());
+        }
+        return "";
+      }
       if (stream_info.upstreamInfo().has_value() &&
           stream_info.upstreamInfo()->upstreamLocalAddress()) {
         return StreamInfo::Utility::formatDownstreamAddressNoPort(
@@ -372,6 +386,14 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
     };
   } else if (field_name == "UPSTREAM_LOCAL_PORT") {
     field_extractor_ = [](const Envoy::StreamInfo::StreamInfo& stream_info) -> std::string {
+      if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.correct_remote_address")) {
+        if (stream_info.upstreamInfo().has_value() &&
+            stream_info.upstreamInfo()->upstreamHost()->address()) {
+          return StreamInfo::Utility::formatDownstreamAddressJustPort(
+              *stream_info.upstreamInfo()->upstreamHost()->address());
+        }
+        return "";
+      }
       if (stream_info.upstreamInfo().has_value() &&
           stream_info.upstreamInfo()->upstreamLocalAddress()) {
         return StreamInfo::Utility::formatDownstreamAddressJustPort(
@@ -381,16 +403,16 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
     };
   } else if (field_name == "UPSTREAM_REMOTE_ADDRESS") {
     field_extractor_ = [](const Envoy::StreamInfo::StreamInfo& stream_info) -> std::string {
-      if (stream_info.upstreamInfo() && stream_info.upstreamInfo()->upstreamHost()) {
-        return stream_info.upstreamInfo()->upstreamHost()->address()->asString();
+      if (stream_info.upstreamInfo() && stream_info.upstreamInfo()->upstreamRemoteAddress()) {
+        return stream_info.upstreamInfo()->upstreamRemoteAddress()->asString();
       }
       return "";
     };
   } else if (field_name == "UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT") {
     field_extractor_ = [](const Envoy::StreamInfo::StreamInfo& stream_info) -> std::string {
-      if (stream_info.upstreamInfo() && stream_info.upstreamInfo()->upstreamHost()) {
+      if (stream_info.upstreamInfo() && stream_info.upstreamInfo()->upstreamRemoteAddress()) {
         return StreamInfo::Utility::formatDownstreamAddressNoPort(
-            *stream_info.upstreamInfo()->upstreamHost()->address());
+            *stream_info.upstreamInfo()->upstreamRemoteAddress());
       }
       return "";
     };

@@ -56,13 +56,13 @@ protected:
 
     server_.tsi_socket_ =
         std::make_unique<TsiSocket>(server_.handshaker_factory_, server_validator,
-                                    Network::TransportSocketPtr{server_.raw_socket_});
+                                    Network::TransportSocketPtr{server_.raw_socket_}, true);
 
     client_.raw_socket_ = new Network::MockTransportSocket();
 
     client_.tsi_socket_ =
         std::make_unique<TsiSocket>(client_.handshaker_factory_, client_validator,
-                                    Network::TransportSocketPtr{client_.raw_socket_});
+                                    Network::TransportSocketPtr{client_.raw_socket_}, false);
     ON_CALL(client_.callbacks_.connection_, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
     ON_CALL(server_.callbacks_.connection_, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
 
@@ -434,8 +434,8 @@ TEST_F(TsiSocketTest, HandshakeWithInternalError) {
   const tsi_handshaker_vtable* vtable = raw_handshaker->vtable;
   tsi_handshaker_vtable mock_vtable = *vtable;
   mock_vtable.next = [](tsi_handshaker*, const unsigned char*, size_t, const unsigned char**,
-                        size_t*, tsi_handshaker_result**, tsi_handshaker_on_next_done_cb,
-                        void*) { return TSI_INTERNAL_ERROR; };
+                        size_t*, tsi_handshaker_result**, tsi_handshaker_on_next_done_cb, void*,
+                        std::string*) { return TSI_INTERNAL_ERROR; };
   raw_handshaker->vtable = &mock_vtable;
 
   client_.handshaker_factory_ = [&](Event::Dispatcher& dispatcher,

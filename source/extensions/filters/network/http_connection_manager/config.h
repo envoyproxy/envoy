@@ -134,7 +134,7 @@ public:
       FilterConfigProviderManager& filter_config_provider_manager);
 
   // Http::FilterChainFactory
-  void createFilterChain(Http::FilterChainManager& manager) override;
+  bool createFilterChain(Http::FilterChainManager& manager, bool = false) const override;
   using FilterFactoriesList =
       std::list<Filter::FilterConfigProviderPtr<Filter::NamedHttpFilterFactoryCb>>;
   struct FilterConfig {
@@ -143,7 +143,7 @@ public:
   };
   bool createUpgradeFilterChain(absl::string_view upgrade_type,
                                 const Http::FilterChainFactory::UpgradeMap* per_route_upgrade_map,
-                                Http::FilterChainManager& manager) override;
+                                Http::FilterChainManager& manager) const override;
 
   // Http::ConnectionManagerConfig
   const Http::RequestIDExtensionSharedPtr& requestIDExtension() override {
@@ -239,6 +239,7 @@ public:
     return header_validator_factory_ ? header_validator_factory_->create(protocol, stream_info)
                                      : nullptr;
   }
+  bool appendXForwardedPort() const override { return append_x_forwarded_port_; }
 
 private:
   enum class CodecType { HTTP1, HTTP2, HTTP3, AUTO };
@@ -330,6 +331,7 @@ private:
   const uint64_t max_requests_per_connection_;
   const std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;
   const Http::HeaderValidatorFactoryPtr header_validator_factory_;
+  const bool append_x_forwarded_port_;
 };
 
 /**

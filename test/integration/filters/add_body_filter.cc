@@ -54,12 +54,9 @@ public:
   }
 
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override {
-    // Ensure that decodeData is only called for HTTP/3 (where protocol is set at the
-    // connection level). In HTTP/3 the FIN arrives separately so we will get
-    // decodeData() with an empty body.
+    // decodeData is called for HTTP/3 where the FIN arrives separately from headers.
     if (config_->where_to_add_body_ == test::integration::filters::AddBodyFilterConfig::DEFAULT) {
-      if (end_stream && decoder_callbacks_->connection()->streamInfo().protocol() &&
-          data.length() == 0u) {
+      if (end_stream && data.length() == 0u) {
         data.add("body");
       }
     } else if (config_->where_to_add_body_ ==
@@ -83,12 +80,9 @@ public:
   }
 
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override {
-    // Ensure that encodeData is only called for HTTP/3 (where protocol is set at the
-    // connection level). In HTTP/3 the FIN arrives separately so we will get
-    // encodeData() with an empty body.
+    // encodeData is called for HTTP/3 where the FIN arrives separately from headers.
     if (config_->where_to_add_body_ == test::integration::filters::AddBodyFilterConfig::DEFAULT) {
-      if (end_stream && decoder_callbacks_->connection()->streamInfo().protocol() &&
-          data.length() == 0) {
+      if (end_stream && data.length() == 0) {
         data.add("body");
       }
     } else if (config_->where_to_add_body_ ==
@@ -124,15 +118,15 @@ private:
   const std::shared_ptr<AddBodyFilterConfig> config_;
 };
 
-class AddBodyFilterFactory : public Extensions::HttpFilters::Common::FactoryBase<
+class AddBodyFilterFactory : public Extensions::HttpFilters::Common::DualFactoryBase<
                                  test::integration::filters::AddBodyFilterConfig> {
 public:
-  AddBodyFilterFactory() : FactoryBase("add-body-filter") {}
+  AddBodyFilterFactory() : DualFactoryBase("add-body-filter") {}
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const test::integration::filters::AddBodyFilterConfig& proto_config, const std::string&,
-      Server::Configuration::FactoryContext&) override {
+      DualInfo, Server::Configuration::ServerFactoryContext&) override {
     auto filter_config = std::make_shared<AddBodyFilterConfig>(
         proto_config.where_to_add_body(), proto_config.body_size(),
         proto_config.where_to_stop_and_buffer());
@@ -142,5 +136,9 @@ private:
   }
 };
 
+using UpstreamAddBodyFilterFactory = AddBodyFilterFactory;
+
 REGISTER_FACTORY(AddBodyFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
+REGISTER_FACTORY(UpstreamAddBodyFilterFactory,
+                 Server::Configuration::UpstreamHttpFilterConfigFactory);
 } // namespace Envoy

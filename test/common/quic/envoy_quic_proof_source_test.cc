@@ -72,6 +72,8 @@ public:
     auto context = std::make_shared<Extensions::TransportSockets::Tls::ClientContextImpl>(
         store_, client_context_config_, time_system_);
     ON_CALL(verify_context_, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
+    ON_CALL(verify_context_, transportSocketOptions())
+        .WillByDefault(ReturnRef(transport_socket_options_));
     verifier_ = std::make_unique<EnvoyQuicProofVerifier>(std::move(context));
   }
 
@@ -107,6 +109,7 @@ private:
   NiceMock<Ssl::MockContextManager> tls_context_manager_;
   Event::MockDispatcher dispatcher_;
   NiceMock<MockProofVerifyContext> verify_context_;
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
 };
 
 class TestSignatureCallback : public quic::ProofSource::SignatureCallback {
@@ -145,7 +148,7 @@ public:
         listener_stats_({ALL_LISTENER_STATS(POOL_COUNTER(listener_config_.listenerScope()),
                                             POOL_GAUGE(listener_config_.listenerScope()),
                                             POOL_HISTOGRAM(listener_config_.listenerScope()))}),
-        proof_source_(listen_socket_, filter_chain_manager_, listener_stats_) {
+        proof_source_(listen_socket_, filter_chain_manager_, listener_stats_, time_system_) {
     EXPECT_CALL(*mock_context_config_, setSecretUpdateCallback(_)).Times(testing::AtLeast(1u));
     transport_socket_factory_ = std::make_unique<QuicServerTransportSocketFactory>(
         true, listener_config_.listenerScope(),
@@ -156,16 +159,17 @@ public:
 
   void expectCertChainAndPrivateKey(const std::string& cert, bool expect_private_key) {
     EXPECT_CALL(listen_socket_, ioHandle()).Times(expect_private_key ? 2u : 1u);
-    EXPECT_CALL(filter_chain_manager_, findFilterChain(_))
-        .WillRepeatedly(Invoke([&](const Network::ConnectionSocket& connection_socket) {
-          EXPECT_EQ(*quicAddressToEnvoyAddressInstance(server_address_),
-                    *connection_socket.connectionInfoProvider().localAddress());
-          EXPECT_EQ(*quicAddressToEnvoyAddressInstance(client_address_),
-                    *connection_socket.connectionInfoProvider().remoteAddress());
-          EXPECT_EQ("quic", connection_socket.detectedTransportProtocol());
-          EXPECT_EQ("h3", connection_socket.requestedApplicationProtocols()[0]);
-          return &filter_chain_;
-        }));
+    EXPECT_CALL(filter_chain_manager_, findFilterChain(_, _))
+        .WillRepeatedly(Invoke(
+            [&](const Network::ConnectionSocket& connection_socket, const StreamInfo::StreamInfo&) {
+              EXPECT_EQ(*quicAddressToEnvoyAddressInstance(server_address_),
+                        *connection_socket.connectionInfoProvider().localAddress());
+              EXPECT_EQ(*quicAddressToEnvoyAddressInstance(client_address_),
+                        *connection_socket.connectionInfoProvider().remoteAddress());
+              EXPECT_EQ("quic", connection_socket.detectedTransportProtocol());
+              EXPECT_EQ("h3", connection_socket.requestedApplicationProtocols()[0]);
+              return &filter_chain_;
+            }));
     EXPECT_CALL(filter_chain_, transportSocketFactory())
         .WillRepeatedly(ReturnRef(*transport_socket_factory_));
 
@@ -196,6 +200,7 @@ protected:
   std::unique_ptr<QuicServerTransportSocketFactory> transport_socket_factory_;
   Ssl::MockTlsCertificateConfig tls_cert_config_;
   Server::ListenerStats listener_stats_;
+  Event::GlobalTimeSystem time_system_;
   EnvoyQuicProofSource proof_source_;
 };
 
@@ -223,15 +228,19 @@ TEST_F(EnvoyQuicProofSourceTest, TestGetCerChainAndSignatureAndVerify) {
 TEST_F(EnvoyQuicProofSourceTest, GetCertChainFailBadConfig) {
   // No filter chain.
   EXPECT_CALL(listen_socket_, ioHandle()).Times(3);
-  EXPECT_CALL(filter_chain_manager_, findFilterChain(_))
-      .WillOnce(Invoke([&](const Network::ConnectionSocket&) { return nullptr; }));
+  EXPECT_CALL(filter_chain_manager_, findFilterChain(_, _))
+      .WillOnce(Invoke([&](const Network::ConnectionSocket&, const StreamInfo::StreamInfo&) {
+        return nullptr;
+      }));
   bool cert_matched_sni;
   EXPECT_EQ(nullptr, proof_source_.GetCertChain(server_address_, client_address_, hostname_,
                                                 &cert_matched_sni));
 
   // Cert not ready.
-  EXPECT_CALL(filter_chain_manager_, findFilterChain(_))
-      .WillOnce(Invoke([&](const Network::ConnectionSocket&) { return &filter_chain_; }));
+  EXPECT_CALL(filter_chain_manager_, findFilterChain(_, _))
+      .WillOnce(Invoke([&](const Network::ConnectionSocket&, const StreamInfo::StreamInfo&) {
+        return &filter_chain_;
+      }));
   EXPECT_CALL(filter_chain_, transportSocketFactory())
       .WillOnce(ReturnRef(*transport_socket_factory_));
   EXPECT_CALL(*mock_context_config_, isReady()).WillOnce(Return(false));
@@ -239,16 +248,17 @@ TEST_F(EnvoyQuicProofSourceTest, GetCertChainFailBadConfig) {
                                                 &cert_matched_sni));
 
   // No certs in config.
-  EXPECT_CALL(filter_chain_manager_, findFilterChain(_))
-      .WillRepeatedly(Invoke([&](const Network::ConnectionSocket& connection_socket) {
-        EXPECT_EQ(*quicAddressToEnvoyAddressInstance(server_address_),
-                  *connection_socket.connectionInfoProvider().localAddress());
-        EXPECT_EQ(*quicAddressToEnvoyAddressInstance(client_address_),
-                  *connection_socket.connectionInfoProvider().remoteAddress());
-        EXPECT_EQ("quic", connection_socket.detectedTransportProtocol());
-        EXPECT_EQ("h3", connection_socket.requestedApplicationProtocols()[0]);
-        return &filter_chain_;
-      }));
+  EXPECT_CALL(filter_chain_manager_, findFilterChain(_, _))
+      .WillRepeatedly(Invoke(
+          [&](const Network::ConnectionSocket& connection_socket, const StreamInfo::StreamInfo&) {
+            EXPECT_EQ(*quicAddressToEnvoyAddressInstance(server_address_),
+                      *connection_socket.connectionInfoProvider().localAddress());
+            EXPECT_EQ(*quicAddressToEnvoyAddressInstance(client_address_),
+                      *connection_socket.connectionInfoProvider().remoteAddress());
+            EXPECT_EQ("quic", connection_socket.detectedTransportProtocol());
+            EXPECT_EQ("h3", connection_socket.requestedApplicationProtocols()[0]);
+            return &filter_chain_;
+          }));
   EXPECT_CALL(filter_chain_, transportSocketFactory())
       .WillOnce(ReturnRef(*transport_socket_factory_));
   EXPECT_CALL(*mock_context_config_, isReady()).WillOnce(Return(true));
@@ -297,8 +307,10 @@ GUy+n0vQNB0cXGzgcGI=
 
 TEST_F(EnvoyQuicProofSourceTest, ComputeSignatureFailNoFilterChain) {
   EXPECT_CALL(listen_socket_, ioHandle());
-  EXPECT_CALL(filter_chain_manager_, findFilterChain(_))
-      .WillOnce(Invoke([&](const Network::ConnectionSocket&) { return nullptr; }));
+  EXPECT_CALL(filter_chain_manager_, findFilterChain(_, _))
+      .WillOnce(Invoke([&](const Network::ConnectionSocket&, const StreamInfo::StreamInfo&) {
+        return nullptr;
+      }));
 
   std::string signature;
   proof_source_.ComputeTlsSignature(
@@ -308,8 +320,10 @@ TEST_F(EnvoyQuicProofSourceTest, ComputeSignatureFailNoFilterChain) {
 
 TEST_F(EnvoyQuicProofSourceTest, UnexpectedPrivateKey) {
   EXPECT_CALL(listen_socket_, ioHandle());
-  EXPECT_CALL(filter_chain_manager_, findFilterChain(_))
-      .WillOnce(Invoke([&](const Network::ConnectionSocket&) { return &filter_chain_; }));
+  EXPECT_CALL(filter_chain_manager_, findFilterChain(_, _))
+      .WillOnce(Invoke([&](const Network::ConnectionSocket&, const StreamInfo::StreamInfo&) {
+        return &filter_chain_;
+      }));
   EXPECT_CALL(filter_chain_, transportSocketFactory())
       .WillRepeatedly(ReturnRef(*transport_socket_factory_));
 
@@ -342,8 +356,10 @@ qGm130brdD+1U1EJnEFmleLZ/W6mEi3MxcKpWOpTqQ==
 
 TEST_F(EnvoyQuicProofSourceTest, InvalidPrivateKey) {
   EXPECT_CALL(listen_socket_, ioHandle());
-  EXPECT_CALL(filter_chain_manager_, findFilterChain(_))
-      .WillOnce(Invoke([&](const Network::ConnectionSocket&) { return &filter_chain_; }));
+  EXPECT_CALL(filter_chain_manager_, findFilterChain(_, _))
+      .WillOnce(Invoke([&](const Network::ConnectionSocket&, const StreamInfo::StreamInfo&) {
+        return &filter_chain_;
+      }));
   EXPECT_CALL(filter_chain_, transportSocketFactory())
       .WillRepeatedly(ReturnRef(*transport_socket_factory_));
 

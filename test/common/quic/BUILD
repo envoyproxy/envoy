@@ -101,6 +101,8 @@ envoy_cc_test(
         ":test_utils_lib",
         "//source/common/quic:envoy_quic_proof_verifier_lib",
         "//source/extensions/transport_sockets/tls:context_config_lib",
+        "//test/common/config:dummy_config_proto_cc_proto",
+        "//test/extensions/transport_sockets/tls/cert_validator:timed_cert_validator",
         "//test/mocks/event:event_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "@com_github_google_quiche//:quic_test_tools_test_certificates_lib",
@@ -247,6 +249,7 @@ envoy_cc_test(
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:global_lib",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 
@@ -338,9 +341,10 @@ envoy_cc_test_library(
         "//source/common/quic:envoy_quic_server_connection_lib",
         "//source/common/quic:quic_filter_manager_connection_lib",
         "//test/test_common:environment_lib",
+        "//test/test_common:utility_lib",
         "@com_github_google_quiche//:quic_core_http_spdy_session_lib",
         "@com_github_google_quiche//:quic_test_tools_first_flight_lib",
-        "@com_github_google_quiche//:quic_test_tools_qpack_qpack_encoder_test_utils_lib",
+        "@com_github_google_quiche//:quic_test_tools_qpack_qpack_test_utils_lib",
     ],
 )
 

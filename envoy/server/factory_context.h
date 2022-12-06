@@ -66,9 +66,9 @@ public:
   virtual const LocalInfo::LocalInfo& localInfo() const PURE;
 
   /**
-   * @return Server::Admin& the server's global admin HTTP endpoint.
+   * @return OptRef<Server::Admin> the global HTTP admin endpoint for the server.
    */
-  virtual Server::Admin& admin() PURE;
+  virtual OptRef<Server::Admin> admin() PURE;
 
   /**
    * @return Runtime::Loader& the singleton runtime loader for the server.
@@ -134,7 +134,7 @@ public:
   virtual ServerLifecycleNotifier& lifecycleNotifier() PURE;
 
   /**
-   * @return the init manager of the particular context. This can be used for extensions that need
+   * @return the init manager of the cluster. This can be used for extensions that need
    *         to initialize after cluster manager init but before the server starts listening.
    *         All extensions should register themselves during configuration load. initialize()
    *         will be called on  each registered target after cluster manager init but before the
@@ -180,11 +180,38 @@ public:
 };
 
 /**
+ * Factory context for access loggers that need access to listener properties.
+ * This context is supplied to the access log factory when called with the listener context
+ * available, such as from downstream HTTP filters.
+ * NOTE: this interface is used in proprietary access loggers, please do not delete
+ * without reaching to Envoy maintainers first.
+ */
+class ListenerAccessLogFactoryContext : public virtual CommonFactoryContext {
+public:
+  /**
+   * @return Stats::Scope& the listener's stats scope.
+   */
+  virtual Stats::Scope& listenerScope() PURE;
+
+  /**
+   * @return const envoy::config::core::v3::Metadata& the config metadata associated with this
+   * listener.
+   */
+  virtual const envoy::config::core::v3::Metadata& listenerMetadata() const PURE;
+
+  /**
+   * @return ProcessContextOptRef an optional reference to the
+   * process context. Will be unset when running in validation mode.
+   */
+  virtual ProcessContextOptRef processContext() PURE;
+};
+
+/**
  * Context passed to network and HTTP filters to access server resources.
  * TODO(mattklein123): When we lock down visibility of the rest of the code, filters should only
  * access the rest of the server via interfaces exposed here.
  */
-class FactoryContext : public virtual CommonFactoryContext {
+class FactoryContext : public virtual ListenerAccessLogFactoryContext {
 public:
   ~FactoryContext() override = default;
 
@@ -216,20 +243,9 @@ public:
   virtual bool healthCheckFailed() PURE;
 
   /**
-   * @return Stats::Scope& the listener's stats scope.
-   */
-  virtual Stats::Scope& listenerScope() PURE;
-
-  /**
    * @return bool if these filters are created under the scope of a Quic listener.
    */
   virtual bool isQuicListener() const PURE;
-
-  /**
-   * @return const envoy::config::core::v3::Metadata& the config metadata associated with this
-   * listener.
-   */
-  virtual const envoy::config::core::v3::Metadata& listenerMetadata() const PURE;
 
   /**
    * @return const Envoy::Config::TypedMetadata& return the typed metadata provided in the config
@@ -256,12 +272,6 @@ public:
    * @return Router::Context& a reference to the router context.
    */
   virtual Router::Context& routerContext() PURE;
-
-  /**
-   * @return ProcessContextOptRef an optional reference to the
-   * process context. Will be unset when running in validation mode.
-   */
-  virtual ProcessContextOptRef processContext() PURE;
 };
 
 /**
@@ -295,6 +305,34 @@ public:
  * FactoryContext for ProtocolOptionsFactory.
  */
 using ProtocolOptionsFactoryContext = Server::Configuration::TransportSocketFactoryContext;
+
+/**
+ * FactoryContext for upstream HTTP filters.
+ */
+class UpstreamHttpFactoryContext {
+public:
+  virtual ~UpstreamHttpFactoryContext() = default;
+
+  /**
+   * @return ServerFactoryContext which lifetime is no shorter than the server.
+   */
+  virtual ServerFactoryContext& getServerFactoryContext() const PURE;
+
+  /**
+   * @return the init manager of the particular context. This can be used for extensions that need
+   *         to initialize after cluster manager init but before the server starts listening.
+   *         All extensions should register themselves during configuration load. initialize()
+   *         will be called on  each registered target after cluster manager init but before the
+   *         server starts listening. Once all targets have initialized and invoked their callbacks,
+   *         the server will start listening.
+   */
+  virtual Init::Manager& initManager() PURE;
+
+  /*
+   * @return the stats scope of the cluster. This will last as long as the cluster is valid
+   * */
+  virtual Stats::Scope& scope() PURE;
+};
 
 } // namespace Configuration
 } // namespace Server

@@ -49,7 +49,17 @@ protected:
   Stats::ScopeSharedPtr scope_;
 };
 
-TEST_F(BaseVmTest, NoRuntime) { EXPECT_EQ(createWasmVm(""), nullptr); }
+TEST_F(BaseVmTest, UnspecifiedRuntime) {
+  auto wasm_vm = createWasmVm("");
+  absl::string_view first_wasm_engine_name = getFirstAvailableWasmEngineName();
+  // Envoy is built with "--define wasm=disabled", so no Wasm engine is available
+  if (first_wasm_engine_name.empty()) {
+    EXPECT_TRUE(wasm_vm.get() == nullptr);
+  } else {
+    ASSERT_TRUE(wasm_vm.get() != nullptr);
+    EXPECT_THAT(std::string(first_wasm_engine_name), HasSubstr(wasm_vm->getEngineName()));
+  }
+}
 
 TEST_F(BaseVmTest, BadRuntime) { EXPECT_EQ(createWasmVm("envoy.wasm.runtime.invalid"), nullptr); }
 

@@ -33,7 +33,8 @@ public:
                             const quic::ParsedQuicVersionVector& supported_versions,
                             Network::Address::InstanceConstSharedPtr local_addr,
                             Event::Dispatcher& dispatcher,
-                            const Network::ConnectionSocket::OptionsSharedPtr& options);
+                            const Network::ConnectionSocket::OptionsSharedPtr& options,
+                            quic::ConnectionIdGeneratorInterface& generator);
 
   EnvoyQuicClientConnection(const quic::QuicConnectionId& server_connection_id,
                             quic::QuicConnectionHelperInterface& helper,
@@ -41,7 +42,8 @@ public:
                             bool owns_writer,
                             const quic::ParsedQuicVersionVector& supported_versions,
                             Event::Dispatcher& dispatcher,
-                            Network::ConnectionSocketPtr&& connection_socket);
+                            Network::ConnectionSocketPtr&& connection_socket,
+                            quic::ConnectionIdGeneratorInterface& generator);
 
   // Network::UdpPacketProcessor
   void processPacket(Network::Address::InstanceConstSharedPtr local_address,
@@ -65,8 +67,10 @@ public:
   // Switch underlying socket with the given one. This is used in connection migration.
   void switchConnectionSocket(Network::ConnectionSocketPtr&& connection_socket);
 
+  // quic::QuicConnection
   // Potentially trigger migration.
   void OnPathDegradingDetected() override;
+  void OnCanWrite() override;
 
   // Called when port migration probing succeeds. Attempts to migrate this connection onto the new
   // socket extracted from context.
@@ -107,7 +111,8 @@ private:
   public:
     explicit EnvoyPathValidationResultDelegate(EnvoyQuicClientConnection& connection);
 
-    void OnPathValidationSuccess(std::unique_ptr<quic::QuicPathValidationContext> context) override;
+    void OnPathValidationSuccess(std::unique_ptr<quic::QuicPathValidationContext> context,
+                                 quic::QuicTime start_time) override;
 
     void OnPathValidationFailure(std::unique_ptr<quic::QuicPathValidationContext> context) override;
 
@@ -119,7 +124,8 @@ private:
                             quic::QuicAlarmFactory& alarm_factory,
                             const quic::ParsedQuicVersionVector& supported_versions,
                             Event::Dispatcher& dispatcher,
-                            Network::ConnectionSocketPtr&& connection_socket);
+                            Network::ConnectionSocketPtr&& connection_socket,
+                            quic::ConnectionIdGeneratorInterface& generator);
 
   void onFileEvent(uint32_t events, Network::ConnectionSocket& connection_socket);
 

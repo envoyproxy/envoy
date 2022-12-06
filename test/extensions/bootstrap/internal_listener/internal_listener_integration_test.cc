@@ -29,8 +29,8 @@ public:
     config_helper_.renameListener("tcp");
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto& listener = *bootstrap.mutable_static_resources()->mutable_listeners(0);
-      listener.mutable_address()->mutable_envoy_internal_address()->set_server_listener_name(
-          "internal_listener");
+      listener.mutable_internal_listener();
+      listener.clear_address();
     });
     config_helper_.addBootstrapExtension(R"EOF(
 name: envoy.bootstrap.internal_listener
@@ -53,6 +53,7 @@ TEST_P(InternalListenerIntegrationTest, BasicConfigUpdate) {
         (*(*listener->mutable_metadata()->mutable_filter_metadata())["random_filter_name"]
               .mutable_fields())["random_key"]
             .set_number_value(1);
+        listener->clear_address();
       });
 
   new_config_helper.setLds("1");
@@ -76,6 +77,7 @@ TEST_P(InternalListenerIntegrationTest, InplaceUpdate) {
               ->mutable_filter_chain_match()
               ->mutable_application_protocols()
               ->Add()) = "alpn";
+        listener->clear_address();
       });
 
   new_config_helper.setLds("1");

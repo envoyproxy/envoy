@@ -11,8 +11,7 @@ namespace Server {
 
 ServerInfoHandler::ServerInfoHandler(Server::Instance& server) : HandlerContextBase(server) {}
 
-Http::Code ServerInfoHandler::handlerCerts(absl::string_view,
-                                           Http::ResponseHeaderMap& response_headers,
+Http::Code ServerInfoHandler::handlerCerts(Http::ResponseHeaderMap& response_headers,
                                            Buffer::Instance& response, AdminStream&) {
   // This set is used to track distinct certificates. We may have multiple listeners, upstreams, etc
   // using the same cert.
@@ -33,15 +32,14 @@ Http::Code ServerInfoHandler::handlerCerts(absl::string_view,
   return Http::Code::OK;
 }
 
-Http::Code ServerInfoHandler::handlerHotRestartVersion(absl::string_view, Http::ResponseHeaderMap&,
+Http::Code ServerInfoHandler::handlerHotRestartVersion(Http::ResponseHeaderMap&,
                                                        Buffer::Instance& response, AdminStream&) {
   response.add(server_.hotRestart().version());
   return Http::Code::OK;
 }
 
 // TODO(ambuc): Add more tcmalloc stats, export proto details based on allocator.
-Http::Code ServerInfoHandler::handlerMemory(absl::string_view,
-                                            Http::ResponseHeaderMap& response_headers,
+Http::Code ServerInfoHandler::handlerMemory(Http::ResponseHeaderMap& response_headers,
                                             Buffer::Instance& response, AdminStream&) {
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   envoy::admin::v3::Memory memory;
@@ -55,8 +53,8 @@ Http::Code ServerInfoHandler::handlerMemory(absl::string_view,
   return Http::Code::OK;
 }
 
-Http::Code ServerInfoHandler::handlerReady(absl::string_view, Http::ResponseHeaderMap&,
-                                           Buffer::Instance& response, AdminStream&) {
+Http::Code ServerInfoHandler::handlerReady(Http::ResponseHeaderMap&, Buffer::Instance& response,
+                                           AdminStream&) {
   const envoy::admin::v3::ServerInfo::State state =
       Utility::serverState(server_.initManager().state(), server_.healthCheckFailed());
 
@@ -66,7 +64,7 @@ Http::Code ServerInfoHandler::handlerReady(absl::string_view, Http::ResponseHead
   return code;
 }
 
-Http::Code ServerInfoHandler::handlerServerInfo(absl::string_view, Http::ResponseHeaderMap& headers,
+Http::Code ServerInfoHandler::handlerServerInfo(Http::ResponseHeaderMap& headers,
                                                 Buffer::Instance& response, AdminStream&) {
   const std::time_t current_time =
       std::chrono::system_clock::to_time_t(server_.timeSource().systemTime());

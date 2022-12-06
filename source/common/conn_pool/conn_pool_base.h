@@ -11,6 +11,7 @@
 #include "source/common/common/linked_object.h"
 
 #include "absl/strings/string_view.h"
+#include "fmt/ostream.h"
 
 namespace Envoy {
 namespace ConnectionPool {
@@ -410,3 +411,8 @@ private:
 
 } // namespace ConnectionPool
 } // namespace Envoy
+
+// NOLINT(namespace-envoy)
+namespace fmt {
+template <> struct formatter<Envoy::ConnectionPool::ConnPoolImplBase> : ostream_formatter {};
+} // namespace fmt

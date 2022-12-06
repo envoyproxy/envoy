@@ -71,6 +71,7 @@ envoy_cc_test(
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -397,6 +398,15 @@ envoy_cc_test(
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "metadata_interface_test",
+    srcs = ["metadata_interface_test.cc"],
+    deps = [
+        "//envoy/http:metadata_interface",
+        "//source/common/http:utility_lib",
     ],
 )
 

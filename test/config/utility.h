@@ -110,6 +110,11 @@ public:
       return *this;
     }
 
+    ServerSslOptions& setTrustRootOnly(bool trust_root_only) {
+      trust_root_only_ = trust_root_only;
+      return *this;
+    }
+
     bool allow_expired_certificate_{};
     envoy::config::core::v3::TypedExtensionConfig* custom_validator_config_;
     bool rsa_cert_{true};
@@ -129,6 +134,7 @@ public:
     std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
         san_matchers_{};
     bool client_with_intermediate_cert_{false};
+    bool trust_root_only_{false};
     absl::optional<uint32_t> max_verify_depth_{absl::nullopt};
   };
 
@@ -279,7 +285,9 @@ public:
   void addVirtualHost(const envoy::config::route::v3::VirtualHost& vhost);
 
   // Add an HTTP filter prior to existing filters.
-  void prependFilter(const std::string& filter_yaml);
+  // By default, this prepends a downstream filter, but if downstream is set to
+  // false it will prepend an upstream filter.
+  void prependFilter(const std::string& filter_yaml, bool downstream = true);
 
   // Add an HTTP filter prior to existing filters.
   // TODO(rgs1): remove once envoy-filter-example has been updated.

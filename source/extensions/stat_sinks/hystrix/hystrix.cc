@@ -90,7 +90,7 @@ uint64_t HystrixSink::getRollingValue(RollingWindow rolling_window) {
 
 void HystrixSink::updateRollingWindowMap(const Upstream::ClusterInfo& cluster_info,
                                          ClusterStatsCache& cluster_stats_cache) {
-  Upstream::ClusterStats& cluster_stats = cluster_info.stats();
+  Upstream::ClusterTrafficStats& cluster_stats = cluster_info.trafficStats();
   Stats::Scope& cluster_stats_scope = cluster_info.statsScope();
 
   // Combining timeouts+retries - retries are counted  as separate requests
@@ -283,15 +283,16 @@ HystrixSink::HystrixSink(Server::Configuration::ServerFactoryContext& server,
       upstream_rq_2xx_(stat_name_pool_.add("upstream_rq_2xx")),
       upstream_rq_4xx_(stat_name_pool_.add("upstream_rq_4xx")),
       upstream_rq_5xx_(stat_name_pool_.add("upstream_rq_5xx")) {
-  Server::Admin& admin = server_.admin();
+  if (!server.admin().has_value()) {
+    return;
+  }
   ENVOY_LOG(debug,
             "adding hystrix_event_stream endpoint to enable connection to hystrix dashboard");
-  admin.addHandler("/hystrix_event_stream", "send hystrix event stream",
-                   MAKE_ADMIN_HANDLER(handlerHystrixEventStream), false, false);
+  server.admin()->addHandler("/hystrix_event_stream", "send hystrix event stream",
+                             MAKE_ADMIN_HANDLER(handlerHystrixEventStream), false, false);
 }
 
-Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
-                                                  Http::ResponseHeaderMap& response_headers,
+Http::Code HystrixSink::handlerHystrixEventStream(Http::ResponseHeaderMap& response_headers,
                                                   Buffer::Instance&,
                                                   Server::AdminStream& admin_stream) {
 

@@ -1,0 +1,3 @@
+HTTP/1.1 302 Found
+Location: https://127.0.0.1:8000/success.txt
+redirect-header: header-value

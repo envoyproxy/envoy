@@ -79,7 +79,8 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
   // Create a new SegmentContext.
   auto segment_context = SkyWalkingTestHelper::createSegmentContext(true, "CURR", "");
 
-  Envoy::Tracing::SpanPtr org_span = tracer_->startSpan("/downstream/path", segment_context);
+  Envoy::Tracing::SpanPtr org_span =
+      tracer_->startSpan("/downstream/path", "HTTP", segment_context);
   Span* span = dynamic_cast<Span*>(org_span.get());
 
   {
@@ -231,6 +232,26 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
   EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.segments_dropped").value());
   EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.cache_flushed").value());
   EXPECT_EQ(0U, mock_scope_.counter("tracing.skywalking.segments_flushed").value());
+
+  {
+    auto rpc_context = SkyWalkingTestHelper::createSegmentContext(true, "CURR", "");
+    Envoy::Tracing::SpanPtr org_rpc_span =
+        tracer_->startSpan("io.envoyproxy.rpc.demo.Service", "RPCFramework", rpc_context);
+    Span* rpc_span = dynamic_cast<Span*>(org_rpc_span.get());
+    EXPECT_TRUE(rpc_span->spanEntity()->spanLayer() == skywalking::v3::SpanLayer::RPCFramework);
+    EXPECT_EQ(rpc_span->spanEntity()->operationName(), "io.envoyproxy.rpc.demo.Service");
+  }
+
+  {
+    // When protocol is not known by "skywalking", the span layer will be Unknown
+    auto unknown_context = SkyWalkingTestHelper::createSegmentContext(true, "CURR", "");
+    Envoy::Tracing::SpanPtr org_unknown_span = tracer_->startSpan(
+        "com.company.department.business.Service", "InternalPrivateFramework", unknown_context);
+    Span* unknown_span = dynamic_cast<Span*>(org_unknown_span.get());
+    EXPECT_TRUE(unknown_span->spanEntity()->spanLayer() == skywalking::v3::SpanLayer::Unknown);
+    EXPECT_EQ(unknown_span->spanEntity()->operationName(),
+              "com.company.department.business.Service");
+  }
 }
 
 } // namespace

@@ -290,6 +290,33 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderUsePost) {
   this->upstream_->setRequestEncoder(this->encoder_, false);
 }
 
+TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderUsePostWithCustomPath) {
+  this->config_message_.set_use_post(true);
+  this->config_message_.set_post_path("/test");
+  this->setupUpstream();
+  std::unique_ptr<Http::RequestHeaderMapImpl> expected_headers;
+  expected_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
+      {Http::Headers::get().Method, "POST"},
+      {Http::Headers::get().Host, this->config_->host(this->downstream_stream_info_)},
+      {Http::Headers::get().Path, "/test"},
+  });
+
+  if (this->is_http2_) {
+    expected_headers->addReference(Http::Headers::get().Scheme,
+                                   Http::Headers::get().SchemeValues.Http);
+  }
+
+  EXPECT_CALL(this->encoder_, encodeHeaders(HeaderMapEqualRef(expected_headers.get()), false));
+  this->upstream_->setRequestEncoder(this->encoder_, false);
+}
+
+TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderConnectWithCustomPath) {
+  this->config_message_.set_use_post(false);
+  this->config_message_.set_post_path("/test");
+  EXPECT_THROW_WITH_MESSAGE(this->setupUpstream(), EnvoyException,
+                            "Can't set a post path when POST method isn't used");
+}
+
 TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderHeaders) {
   auto* header = this->config_message_.add_headers_to_add();
   auto* hdr = header->mutable_header();
@@ -300,13 +327,13 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderHeaders) {
   hdr = header->mutable_header();
   hdr->set_key("header1");
   hdr->set_value("value1");
-  header->mutable_append()->set_value(true);
+  header->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
 
   header = this->config_message_.add_headers_to_add();
   hdr = header->mutable_header();
   hdr->set_key("header1");
   hdr->set_value("value2");
-  header->mutable_append()->set_value(true);
+  header->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
 
   this->setupUpstream();
   std::unique_ptr<Http::RequestHeaderMapImpl> expected_headers;
@@ -328,13 +355,13 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest, ConfigReuse) {
   auto* hdr = header->mutable_header();
   hdr->set_key("key");
   hdr->set_value("value1");
-  header->mutable_append()->set_value(true);
+  header->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
 
   header = this->config_message_.add_headers_to_add();
   hdr = header->mutable_header();
   hdr->set_key("key");
   hdr->set_value("value2");
-  header->mutable_append()->set_value(true);
+  header->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
 
   this->setupUpstream();
   std::unique_ptr<Http::RequestHeaderMapImpl> expected_headers;
@@ -377,7 +404,7 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderHeadersWithDownstreamIn
   hdr = header->mutable_header();
   hdr->set_key("downstream_local_port");
   hdr->set_value("%DOWNSTREAM_LOCAL_PORT%");
-  header->mutable_append()->set_value(true);
+  header->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
 
   this->setupUpstream();
   std::unique_ptr<Http::RequestHeaderMapImpl> expected_headers;

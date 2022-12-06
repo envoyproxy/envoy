@@ -148,6 +148,8 @@ void Filter::onDestroy() {
   // per the filter contract.
   processing_complete_ = true;
   closeStream();
+  decoding_state_.stopMessageTimer();
+  encoding_state_.stopMessageTimer();
 }
 
 FilterHeadersStatus Filter::onHeaders(ProcessorState& state,

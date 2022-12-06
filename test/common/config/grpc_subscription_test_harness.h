@@ -5,6 +5,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
+#include "envoy/config/xds_resources_delegate.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/common/hash.h"
@@ -44,6 +45,8 @@ public:
       : method_descriptor_(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints")),
         async_client_(new NiceMock<Grpc::MockAsyncClient>()),
+        resource_decoder_(std::make_shared<TestUtility::TestOpaqueResourceDecoderImpl<
+                              envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name")),
         config_validators_(std::make_unique<NiceMock<MockCustomConfigValidators>>()),
         should_use_unified_(legacy_or_unified == Envoy::Config::LegacyOrUnified::Unified) {
     node_.set_id("fo0");
@@ -61,7 +64,8 @@ public:
       mux_ = std::make_shared<Config::GrpcMuxImpl>(
           local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
           *method_descriptor_, random_, stats_store_, rate_limit_settings_, true,
-          std::move(config_validators_));
+          std::move(config_validators_), /*xds_resources_delegate=*/XdsResourcesDelegateOptRef(),
+          /*target_xds_authority=*/"");
     }
     subscription_ = std::make_unique<GrpcSubscriptionImpl>(
         mux_, callbacks_, resource_decoder_, stats_, Config::TypeUrl::get().ClusterLoadAssignment,
@@ -221,8 +225,7 @@ public:
   Event::MockTimer* ttl_timer_;
   envoy::config::core::v3::Node node_;
   NiceMock<Config::MockSubscriptionCallbacks> callbacks_;
-  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
-      resource_decoder_{"cluster_name"};
+  OpaqueResourceDecoderSharedPtr resource_decoder_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   CustomConfigValidatorsPtr config_validators_;
   NiceMock<Grpc::MockAsyncStream> async_stream_;

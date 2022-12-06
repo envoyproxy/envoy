@@ -28,6 +28,9 @@
 namespace Envoy {
 namespace Server {
 
+constexpr absl::string_view ENABLE_UPDATE_LISTENER_SOCKET_OPTIONS_RUNTIME_FLAG{
+    "envoy.reloadable_features.enable_update_listener_socket_options"};
+
 /**
  * All missing listener config stats. @see stats_macros.h
  */
@@ -42,6 +45,12 @@ struct MissingListenerConfigStats {
 
 class ListenerMessageUtil {
 public:
+  /**
+   * @return true if listener message lhs and rhs have the same socket options.
+   */
+  static bool socketOptionsEqual(const envoy::config::listener::v3::Listener& lhs,
+                                 const envoy::config::listener::v3::Listener& rhs);
+
   /**
    * @return true if listener message lhs and rhs are the same if ignoring filter_chains field.
    */
@@ -138,7 +147,7 @@ public:
   Singleton::Manager& singletonManager() override;
   OverloadManager& overloadManager() override;
   ThreadLocal::Instance& threadLocal() override;
-  Admin& admin() override;
+  OptRef<Admin> admin() override;
   const envoy::config::core::v3::Metadata& listenerMetadata() const override;
   const Envoy::Config::TypedMetadata& listenerTypedMetadata() const override;
   envoy::config::core::v3::TrafficDirection direction() const override;
@@ -215,7 +224,7 @@ public:
   Singleton::Manager& singletonManager() override;
   OverloadManager& overloadManager() override;
   ThreadLocal::Instance& threadLocal() override;
-  Admin& admin() override;
+  OptRef<Admin> admin() override;
   const envoy::config::core::v3::Metadata& listenerMetadata() const override;
   const Envoy::Config::TypedMetadata& listenerTypedMetadata() const override;
   envoy::config::core::v3::TrafficDirection direction() const override;
@@ -299,7 +308,6 @@ public:
     return addresses_;
   }
   const envoy::config::listener::v3::Listener& config() const { return config_; }
-  const Network::ListenSocketFactory& getSocketFactory() const { return *socket_factories_[0]; }
   const std::vector<Network::ListenSocketFactoryPtr>& getSocketFactories() const {
     return socket_factories_;
   }
@@ -310,12 +318,18 @@ public:
   }
   void addSocketFactory(Network::ListenSocketFactoryPtr&& socket_factory);
   void setSocketAndOptions(const Network::SocketSharedPtr& socket);
-  const Network::Socket::OptionsSharedPtr& listenSocketOptions() { return listen_socket_options_; }
+  const Network::Socket::OptionsSharedPtr& listenSocketOptions(uint32_t address_index) {
+    ASSERT(listen_socket_options_list_.size() > address_index);
+    return listen_socket_options_list_[address_index];
+  }
   const std::string& versionInfo() const { return version_info_; }
   bool reusePort() const { return reuse_port_; }
   static bool getReusePortOrDefault(Server::Instance& server,
-                                    const envoy::config::listener::v3::Listener& config);
+                                    const envoy::config::listener::v3::Listener& config,
+                                    Network::Socket::Type socket_type);
 
+  // Compare whether two listeners have different socket options.
+  bool socketOptionsEqual(const ListenerImpl& other) const;
   // Check whether a new listener can share sockets with this listener.
   bool hasCompatibleAddress(const ListenerImpl& other) const;
   // Check whether a new listener has duplicated listening address this listener.
@@ -324,7 +338,6 @@ public:
   // Network::ListenerConfig
   Network::FilterChainManager& filterChainManager() override { return *filter_chain_manager_; }
   Network::FilterChainFactory& filterChainFactory() override { return *this; }
-  Network::ListenSocketFactory& listenSocketFactory() override { return *socket_factories_[0]; }
   std::vector<Network::ListenSocketFactoryPtr>& listenSocketFactories() override {
     return socket_factories_;
   }
@@ -370,10 +383,9 @@ public:
     return config().traffic_direction();
   }
 
-  void ensureSocketOptions() {
-    if (!listen_socket_options_) {
-      listen_socket_options_ =
-          std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
+  void ensureSocketOptions(Network::Socket::OptionsSharedPtr& options) {
+    if (options == nullptr) {
+      options = std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
     }
   }
 
@@ -440,7 +452,8 @@ private:
   void buildUdpListenerWorkerRouter(const Network::Address::Instance& address,
                                     uint32_t concurrency);
   void buildUdpListenerFactory(uint32_t concurrency);
-  void buildListenSocketOptions();
+  void buildListenSocketOptions(std::vector<std::reference_wrapper<const Protobuf::RepeatedPtrField<
+                                    envoy::config::core::v3::SocketOption>>>& address_opts_list);
   void createListenerFilterFactories();
   void validateFilterChains();
   void buildFilterChains();
@@ -451,9 +464,10 @@ private:
   void checkIpv4CompatAddress(const Network::Address::InstanceConstSharedPtr& address,
                               const envoy::config::core::v3::Address& proto_address);
 
-  void addListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) {
-    ensureSocketOptions();
-    Network::Socket::appendOptions(listen_socket_options_, options);
+  void addListenSocketOptions(Network::Socket::OptionsSharedPtr& options,
+                              const Network::Socket::OptionsSharedPtr& append_options) {
+    ensureSocketOptions(options);
+    Network::Socket::appendOptions(options, append_options);
   }
 
   ListenerManagerImpl& parent_;
@@ -485,7 +499,8 @@ private:
   std::vector<AccessLog::InstanceSharedPtr> access_logs_;
   const envoy::config::listener::v3::Listener config_;
   const std::string version_info_;
-  Network::Socket::OptionsSharedPtr listen_socket_options_;
+  // Using std::vector instead of hash map for supporting multiple zero port addresses.
+  std::vector<Network::Socket::OptionsSharedPtr> listen_socket_options_list_;
   const std::chrono::milliseconds listener_filters_timeout_;
   const bool continue_on_listener_filters_timeout_;
   std::shared_ptr<UdpListenerConfigImpl> udp_listener_config_;

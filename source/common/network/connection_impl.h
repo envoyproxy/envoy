@@ -82,7 +82,10 @@ public:
     return socket_->connectionInfoProviderSharedPtr();
   }
   absl::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const override;
-  Ssl::ConnectionInfoConstSharedPtr ssl() const override { return transport_socket_->ssl(); }
+  Ssl::ConnectionInfoConstSharedPtr ssl() const override {
+    // SSL info may be overwritten by a filter in the provider.
+    return socket_->connectionInfoProvider().sslConnection();
+  }
   State state() const override;
   bool connecting() const override {
     ENVOY_CONN_LOG_EVENT(debug, "connection_connecting_state", "current connecting state: {}",
@@ -161,7 +164,7 @@ protected:
 
   // This is called when the underlying socket is connected, not when the
   // connected event is raised.
-  virtual void onConnected() {}
+  virtual void onConnected();
 
   void setFailureReason(absl::string_view failure_reason);
   const std::string& failureReason() const { return failure_reason_; }
@@ -235,13 +238,13 @@ private:
 class ServerConnectionImpl : public ConnectionImpl, virtual public ServerConnection {
 public:
   ServerConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
-                       TransportSocketPtr&& transport_socket, StreamInfo::StreamInfo& stream_info,
-                       bool connected);
+                       TransportSocketPtr&& transport_socket, StreamInfo::StreamInfo& stream_info);
 
   // ServerConnection impl
   void setTransportSocketConnectTimeout(std::chrono::milliseconds timeout,
                                         Stats::Counter& timeout_stat) override;
   void raiseEvent(ConnectionEvent event) override;
+  bool initializeReadFilters() override;
 
 private:
   void onTransportSocketConnectTimeout();

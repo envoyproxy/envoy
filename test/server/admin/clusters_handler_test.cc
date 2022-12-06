@@ -13,7 +13,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AdminInstanceTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(AdminInstanceTest, ClustersJson) {
+TEST_P(AdminInstanceTest, ClustersJsonAndText) {
   Upstream::ClusterManager::ClusterInfoMaps cluster_maps;
   ON_CALL(server_.cluster_manager_, clusters()).WillByDefault(ReturnPointee(&cluster_maps));
 
@@ -32,6 +32,7 @@ TEST_P(AdminInstanceTest, ClustersJson) {
       .WillByDefault(Return(9.0));
 
   ON_CALL(*cluster.info_, addedViaApi()).WillByDefault(Return(true));
+  ON_CALL(*cluster.info_, edsServiceName()).WillByDefault(Return("potato_launcher"));
 
   Upstream::MockHostSet* host_set = cluster.priority_set_.getMockHostSet(0);
   auto host = std::make_shared<NiceMock<Upstream::MockHost>>();
@@ -107,6 +108,7 @@ TEST_P(AdminInstanceTest, ClustersJson) {
   {
    "name": "fake_cluster",
    "observability_name": "observability_name",
+   "eds_service_name": "potato_launcher",
    "success_rate_ejection_threshold": {
     "value": 6
    },
@@ -218,6 +220,7 @@ fake_cluster::high_priority::max_pending_requests::1024
 fake_cluster::high_priority::max_requests::1024
 fake_cluster::high_priority::max_retries::1
 fake_cluster::added_via_api::true
+fake_cluster::eds_service_name::potato_launcher
 fake_cluster::1.2.3.4:80::arest_counter::5
 fake_cluster::1.2.3.4:80::atest_gauge::10
 fake_cluster::1.2.3.4:80::rest_counter::10

@@ -106,8 +106,8 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
   callbacks_ = &callbacks;
 }
 
-Http::FilterHeadersStatus Filter::encode1xxHeaders(Http::ResponseHeaderMap&) {
-  return Http::FilterHeadersStatus::Continue;
+Http::Filter1xxHeadersStatus Filter::encode1xxHeaders(Http::ResponseHeaderMap&) {
+  return Http::Filter1xxHeadersStatus::Continue;
 }
 
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
@@ -204,6 +204,9 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
         config_->rateLimitedStatus(), response_body,
         [this](Http::HeaderMap& headers) {
           populateResponseHeaders(headers, /*from_local_reply=*/true);
+          config_->responseHeadersParser().evaluateHeaders(
+              headers, *request_headers_, dynamic_cast<const Http::ResponseHeaderMap&>(headers),
+              callbacks_->streamInfo());
         },
         config_->rateLimitedGrpcStatus(), RcDetails::get().RateLimited);
   } else if (status == Filters::Common::RateLimit::LimitStatus::Error) {

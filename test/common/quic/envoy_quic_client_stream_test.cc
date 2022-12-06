@@ -13,6 +13,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "quiche/quic/core/crypto/null_encrypter.h"
+#include "quiche/quic/core/deterministic_connection_id_generator.h"
 
 namespace Envoy {
 namespace Quic {
@@ -39,7 +40,7 @@ public:
         quic_connection_(new EnvoyQuicClientConnection(
             quic::test::TestConnectionId(), connection_helper_, alarm_factory_, &writer_,
             /*owns_writer=*/false, {quic_version_}, *dispatcher_,
-            createConnectionSocket(peer_addr_, self_addr_, nullptr))),
+            createConnectionSocket(peer_addr_, self_addr_, nullptr), connection_id_generator_)),
         quic_session_(quic_config_, {quic_version_},
                       std::unique_ptr<EnvoyQuicClientConnection>(quic_connection_), *dispatcher_,
                       quic_config_.GetInitialStreamFlowControlWindowToSend() * 2,
@@ -69,7 +70,7 @@ public:
 
   void SetUp() override {
     quic_session_.Initialize();
-    quic_connection_->setEnvoyConnection(quic_session_);
+    quic_connection_->setEnvoyConnection(quic_session_, quic_session_);
     quic_connection_->SetEncrypter(
         quic::ENCRYPTION_FORWARD_SECURE,
         std::make_unique<quic::NullEncrypter>(quic::Perspective::IS_CLIENT));
@@ -134,6 +135,8 @@ protected:
   Network::Address::InstanceConstSharedPtr peer_addr_;
   Network::Address::InstanceConstSharedPtr self_addr_;
   MockDelegate delegate_;
+  quic::DeterministicConnectionIdGenerator connection_id_generator_{
+      quic::kQuicDefaultConnectionIdLength};
   EnvoyQuicClientConnection* quic_connection_;
   TestQuicCryptoClientStreamFactory crypto_stream_factory_;
   MockEnvoyQuicClientSession quic_session_;
@@ -424,11 +427,20 @@ TEST_F(EnvoyQuicClientStreamTest, ResetStream) {
   EXPECT_TRUE(quic_stream_->rst_sent());
 }
 
-TEST_F(EnvoyQuicClientStreamTest, ReceiveResetStream) {
+TEST_F(EnvoyQuicClientStreamTest, ReceiveResetStreamWriteClosed) {
+  auto result = quic_stream_->encodeHeaders(request_headers_, true);
+  EXPECT_TRUE(result.ok());
   EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::RemoteReset, _));
   quic_stream_->OnStreamReset(quic::QuicRstStreamFrame(
       quic::kInvalidControlFrameId, quic_stream_->id(), quic::QUIC_STREAM_NO_ERROR, 0));
   EXPECT_TRUE(quic_stream_->rst_received());
+}
+
+TEST_F(EnvoyQuicClientStreamTest, ReceiveResetStreamWriteOpen) {
+  quic_stream_->OnStreamReset(quic::QuicRstStreamFrame(
+      quic::kInvalidControlFrameId, quic_stream_->id(), quic::QUIC_STREAM_NO_ERROR, 0));
+  EXPECT_TRUE(quic_stream_->rst_received());
+  EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }
 
 TEST_F(EnvoyQuicClientStreamTest, CloseConnectionDuringDecodingHeader) {

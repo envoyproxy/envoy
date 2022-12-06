@@ -808,7 +808,8 @@ TEST_P(ListenerManagerImplTest, RejectMutlipleInternalAddresses) {
 
   EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true),
                             EnvoyException,
-                            "listener foo: internal address doesn't support multiple addresses.");
+                            "error adding listener named 'foo': use internal_listener field "
+                            "instead of address for internal listeners");
 
   const std::string yaml2 = R"EOF(
     name: "foo"
@@ -830,7 +831,8 @@ TEST_P(ListenerManagerImplTest, RejectMutlipleInternalAddresses) {
 
   EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml2), "", true),
                             EnvoyException,
-                            "listener foo: internal address doesn't support multiple addresses.");
+                            "error adding listener named 'foo': use internal_listener field "
+                            "instead of address for internal listeners");
 
   const std::string yaml3 = R"EOF(
     name: "foo"
@@ -849,7 +851,8 @@ TEST_P(ListenerManagerImplTest, RejectMutlipleInternalAddresses) {
 
   EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml3), "", true),
                             EnvoyException,
-                            "listener foo: internal address doesn't support multiple addresses.");
+                            "error adding listener named 'foo': use internal_listener field "
+                            "instead of address for internal listeners");
 }
 
 TEST_P(ListenerManagerImplTest, RejectIpv4CompatOnIpv4Address) {
@@ -867,24 +870,6 @@ TEST_P(ListenerManagerImplTest, RejectIpv4CompatOnIpv4Address) {
   EXPECT_THROW_WITH_MESSAGE(addOrUpdateListener(parseListenerFromV3Yaml(yaml)), EnvoyException,
                             "Only IPv6 address '::' or valid IPv4-mapped IPv6 address can set "
                             "ipv4_compat: 0.0.0.0:13333");
-}
-
-TEST_P(ListenerManagerImplTest, AcceptIpv4CompatOnIpv4Address) {
-  auto scoped_runtime_guard = std::make_unique<TestScopedRuntime>();
-  scoped_runtime_guard->mergeValues(
-      {{"envoy.reloadable_features.strict_check_on_ipv4_compat", "false"}});
-  const std::string yaml = R"EOF(
-    name: "foo"
-    address:
-      socket_address:
-        address: "0.0.0.0"
-        port_value: 13333
-        ipv4_compat: true
-    filter_chains:
-    - filters: []
-  )EOF";
-
-  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(yaml)));
 }
 
 TEST_P(ListenerManagerImplTest, RejectIpv4CompatOnNonIpv4MappedIpv6address) {
@@ -934,24 +919,6 @@ TEST_P(ListenerManagerImplTest, AcceptIpv4CompatOnNonCanonicalIpv6AnyAddress) {
   EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(yaml)));
 }
 
-TEST_P(ListenerManagerImplTest, AcceptIpv4CompatOnNonIpv4MappedIpv6address) {
-  auto scoped_runtime_guard = std::make_unique<TestScopedRuntime>();
-  scoped_runtime_guard->mergeValues(
-      {{"envoy.reloadable_features.strict_check_on_ipv4_compat", "false"}});
-  const std::string yaml = R"EOF(
-    name: "foo"
-    address:
-      socket_address:
-        address: "::1"
-        port_value: 13333
-        ipv4_compat: true
-    filter_chains:
-    - filters: []
-  )EOF";
-
-  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(yaml)));
-}
-
 TEST_P(ListenerManagerImplTest, RejectListenerWithSocketAddressWithInternalListenerConfig) {
   const std::string yaml = R"EOF(
     name: "foo"
@@ -965,16 +932,55 @@ TEST_P(ListenerManagerImplTest, RejectListenerWithSocketAddressWithInternalListe
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(addOrUpdateListener(parseListenerFromV3Yaml(yaml)), EnvoyException,
-                            "error adding listener '127.0.0.1:1234': address is not an internal "
-                            "address but an internal listener config is provided");
+                            "error adding listener 'foo': address should not be used "
+                            "when an internal listener config is provided");
+}
+
+TEST_P(ListenerManagerImplTest, RejectListenerWithInternalListenerAddress) {
+  const std::string yaml = R"EOF(
+    name: "foo"
+    address:
+      envoy_internal_address:
+        server_listener_name: test
+    filter_chains:
+    - filters: []
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(addOrUpdateListener(parseListenerFromV3Yaml(yaml)), EnvoyException,
+                            "error adding listener named 'foo': use internal_listener field "
+                            "instead of address for internal listeners");
+}
+
+TEST_P(ListenerManagerImplTest, RejectListenerWithInternalAndApiListener) {
+  const std::string yaml = R"EOF(
+    name: "foo"
+    internal_listener: {}
+    api_listener:
+      api_listener:
+        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+        stat_prefix: hcm
+        route_config:
+          name: api_router
+          virtual_hosts:
+            - name: api
+              domains:
+                - "*"
+              routes:
+                - match:
+                    prefix: "/"
+                  route:
+                    cluster: dynamic_forward_proxy_cluster
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      addOrUpdateListener(parseListenerFromV3Yaml(yaml)), EnvoyException,
+      "error adding listener named 'foo': api_listener and internal_listener cannot be both set");
 }
 
 TEST_P(ListenerManagerImplTest, RejectTcpOptionsWithInternalListenerConfig) {
   const std::string yaml = R"EOF(
     name: "foo"
-    address:
-      envoy_internal_address:
-        server_listener_name: test_internal_listener_name
+    internal_listener: {}
     filter_chains:
     - filters: []
   )EOF";
@@ -997,14 +1003,14 @@ TEST_P(ListenerManagerImplTest, RejectTcpOptionsWithInternalListenerConfig) {
     EXPECT_THROW_WITH_MESSAGE(new ListenerImpl(new_listener, "version", *manager_, "foo", true,
                                                false, /*hash=*/static_cast<uint64_t>(0)),
                               EnvoyException,
-                              "error adding listener 'envoy://test_internal_listener_name': has "
+                              "error adding listener named 'foo': has "
                               "unsupported tcp listener feature");
   }
   {
     auto new_listener = listener;
     new_listener.mutable_socket_options()->Add();
     EXPECT_THROW_WITH_MESSAGE(addOrUpdateListener(new_listener), EnvoyException,
-                              "error adding listener 'envoy://test_internal_listener_name': does "
+                              "error adding listener named 'foo': does "
                               "not support socket option")
   }
   {
@@ -2029,6 +2035,412 @@ filter_chains:
 
   EXPECT_CALL(*listener_foo_update1, onDestroy());
   EXPECT_CALL(*listener_foo, onDestroy());
+}
+
+TEST_P(ListenerManagerImplTest, UpdateListenerWithDifferentSocketOptionsDeprecatedBehavior) {
+  const std::string listener_origin = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+enable_reuse_port: true
+socket_options:
+    - level: 1
+      name: 9
+      int_value: 1
+filter_chains:
+- filters: []
+  )EOF";
+
+  const std::string listener_updated = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+enable_reuse_port: true
+socket_options:
+    - level: 1
+      name: 9
+      int_value: 2
+filter_chains:
+- filters: []
+  )EOF";
+  testListenerUpdateWithSocketOptionsChangeDeprecatedBehavior(listener_origin, listener_updated);
+}
+
+TEST_P(ListenerManagerImplTest,
+       UpdateListenerWithDifferentSocketOptionsWithMultiAddressesDeprecatedBehavior) {
+  const std::string listener_origin = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 5678
+  socket_options:
+    socket_options:
+    - level: 1
+      name: 9
+      int_value: 2
+enable_reuse_port: true
+socket_options:
+    - level: 1
+      name: 9
+      int_value: 1
+filter_chains:
+- filters: []
+  )EOF";
+
+  const std::string listener_updated = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 5678
+  socket_options:
+    socket_options:
+    - level: 1
+      name: 9
+      int_value: 3
+enable_reuse_port: true
+socket_options:
+    - level: 1
+      name: 9
+      int_value: 1
+filter_chains:
+- filters: []
+  )EOF";
+  testListenerUpdateWithSocketOptionsChangeDeprecatedBehavior(listener_origin, listener_updated,
+                                                              true);
+}
+
+// The socket options update is only available when enable_reuse_port as true.
+// Linux is the only platform allowing the enable_reuse_port as true.
+#ifdef __linux__
+TEST_P(ListenerManagerImplTest, UpdateListenerWithDifferentSocketOptions) {
+  const std::string listener_origin = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+enable_reuse_port: true
+socket_options:
+    - level: 1
+      name: 9
+      int_value: 1
+filter_chains:
+- filters: []
+  )EOF";
+
+  const std::string listener_updated = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+enable_reuse_port: true
+socket_options:
+    - level: 1
+      name: 9
+      int_value: 2
+filter_chains:
+- filters: []
+  )EOF";
+  testListenerUpdateWithSocketOptionsChange(listener_origin, listener_updated);
+}
+#endif
+
+#ifdef __linux__
+TEST_P(ListenerManagerImplTest, UpdateListenerWithDifferentSocketOptionsWithMultiAddresses) {
+  const std::string listener_origin = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 5678
+  socket_options:
+    socket_options:
+    - level: 1
+      name: 9
+      int_value: 2
+enable_reuse_port: true
+socket_options:
+    - level: 1
+      name: 9
+      int_value: 1
+filter_chains:
+- filters: []
+  )EOF";
+
+  const std::string listener_updated = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 5678
+  socket_options:
+    socket_options:
+    - level: 1
+      name: 9
+      int_value: 3
+enable_reuse_port: true
+socket_options:
+    - level: 1
+      name: 9
+      int_value: 1
+filter_chains:
+- filters: []
+  )EOF";
+  testListenerUpdateWithSocketOptionsChange(listener_origin, listener_updated, true);
+}
+#endif
+
+// The socket options update is only available when enable_reuse_port as true.
+// Linux is the only platform allowing the enable_reuse_port as true.
+#ifdef __linux__
+TEST_P(ListenerManagerImplTest, UpdateListenerWithDifferentNumberOfSocketOptions) {
+  const std::string listener_origin = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+enable_reuse_port: true
+socket_options:
+    - level: 1
+      name: 9
+      int_value: 1
+filter_chains:
+- filters: []
+  )EOF";
+
+  const std::string listener_updated = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+enable_reuse_port: true
+filter_chains:
+- filters: []
+  )EOF";
+  testListenerUpdateWithSocketOptionsChange(listener_origin, listener_updated);
+}
+#endif
+
+// The socket options update is only available when enable_reuse_port as true.
+// Linux is the only platform allowing the enable_reuse_port as true.
+#ifdef __linux__
+TEST_P(ListenerManagerImplTest, UpdateListenerWithTransparentChange) {
+  const std::string listener_origin = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+enable_reuse_port: true
+filter_chains:
+- filters: []
+  )EOF";
+
+  const std::string listener_updated = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+enable_reuse_port: true
+transparent: true
+filter_chains:
+- filters: []
+  )EOF";
+  testListenerUpdateWithSocketOptionsChange(listener_origin, listener_updated);
+}
+#endif
+
+// The socket options update is only available when enable_reuse_port as true.
+// Linux is the only platform allowing the enable_reuse_port as true.
+#ifdef __linux__
+TEST_P(ListenerManagerImplTest, UpdateListenerWithFreeBindChange) {
+  const std::string listener_origin = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+enable_reuse_port: true
+filter_chains:
+- filters: []
+  )EOF";
+
+  const std::string listener_updated = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+enable_reuse_port: true
+freebind: true
+filter_chains:
+- filters: []
+  )EOF";
+  testListenerUpdateWithSocketOptionsChange(listener_origin, listener_updated);
+}
+#endif
+
+// The socket options update is only available when enable_reuse_port as true.
+// Linux is the only platform allowing the enable_reuse_port as true.
+#ifdef __linux__
+TEST_P(ListenerManagerImplTest, UpdateListenerWithTcpFastOpenQueueLengthChange) {
+  const std::string listener_origin = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+enable_reuse_port: true
+tcp_fast_open_queue_length: 10
+filter_chains:
+- filters: []
+  )EOF";
+
+  const std::string listener_updated = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+enable_reuse_port: true
+tcp_fast_open_queue_length: 20
+filter_chains:
+- filters: []
+  )EOF";
+  testListenerUpdateWithSocketOptionsChange(listener_origin, listener_updated);
+}
+#endif
+
+TEST_P(ListenerManagerImplTest, AddListenerWithSameAddressButDifferentSocketOptions) {
+  // Add and initialize foo listener.
+  const std::string listener_origin = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+socket_options:
+    - level: 1
+      name: 9
+      int_value: 1
+filter_chains:
+- filters: []
+  )EOF";
+
+  // Add new listener bar with same address as foo, but with different socket options
+  const std::string listener_updated = R"EOF(
+name: bar
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+socket_options:
+    - level: 1
+      name: 9
+      int_value: 2
+filter_chains:
+- filters: []
+  )EOF";
+
+  const std::string expected_error_message =
+      "error adding listener: 'bar' has duplicate address '127.0.0.1:1234' as existing listener";
+  testListenerUpdateWithSocketOptionsChangeRejected(listener_origin, listener_updated,
+                                                    expected_error_message);
+}
+
+// The socket options update is only available when enable_reuse_port as true.
+// Linux is the only platform allowing the enable_reuse_port as true.
+#ifdef __linux__
+TEST_P(ListenerManagerImplTest, UpdateListenerRejectReusePortUpdate) {
+  // Add and initialize foo listener and the default value of enable_reuse_port is true.
+  const std::string listener_origin = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+enable_reuse_port: true
+filter_chains:
+- filters: []
+  )EOF";
+
+  // update listener foo, with enable_reuse_port as false.
+  const std::string listener_updated = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+enable_reuse_port: false
+filter_chains:
+- filters: []
+  )EOF";
+
+  const std::string expected_error_message =
+      "Listener foo: reuse port cannot be changed during an update";
+  testListenerUpdateWithSocketOptionsChangeRejected(listener_origin, listener_updated,
+                                                    expected_error_message);
+}
+#endif
+
+// The deprecated behavior is the update of `enable_reuse_port` will be ignored and
+// listener update success.
+TEST_P(ListenerManagerImplTest, UpdateListenerReusePortUpdateDeprecatedBehavior) {
+  // Add and initialize foo listener and the default value of enable_reuse_port is true.
+  const std::string listener_origin = R"EOF(
+name: foo
+address:
+  socket_address:
+      address: 127.0.0.1
+      port_value: 1234
+enable_reuse_port: true
+filter_chains:
+- filters: []
+  )EOF";
+
+  // update listener foo, with enable_reuse_port as false.
+  const std::string listener_updated = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+enable_reuse_port: false
+filter_chains:
+- filters: []
+  )EOF";
+
+  testListenerUpdateWithSocketOptionsChangeDeprecatedBehavior(listener_origin, listener_updated);
 }
 
 TEST_P(ListenerManagerImplTest, UpdateListenerWithCompatibleZeroPortAddresses) {
@@ -5257,7 +5669,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
   Network::MockListenerFilterManager manager;
 
   // Return error when trying to retrieve the original dst on the invalid handle
-  EXPECT_CALL(os_sys_calls_, getsockopt_(_, _, _, _, _)).WillOnce(Return(-1));
+  EXPECT_CALL(os_sys_calls_, getsockopt_(_, _, _, _, _)).WillRepeatedly(Return(-1));
 
   NiceMock<Network::MockListenerFilterCallbacks> callbacks;
   Network::AcceptedSocketImpl socket(std::make_unique<Network::IoSocketHandleImpl>(),
@@ -5719,6 +6131,163 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, LiteralSockoptListenerEnabled) {
   EXPECT_EQ(1U, manager_->listeners().size());
 }
 
+TEST_P(ListenerManagerImplWithRealFiltersTest,
+       LiteralSockoptListenerEnabledWithMultiAddressesNoOverrideOpts) {
+  const envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
+    name: SockoptsListener
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1111 }
+    additional_addresses:
+    - address:
+        socket_address: { address: 127.0.0.1, port_value: 2222 }
+    enable_reuse_port: false
+    filter_chains:
+    - filters: []
+      name: foo
+    socket_options: [
+      # The socket goes through socket() and bind() but never listen(), so if we
+      # ever saw (7, 8, 9) being applied it would cause a EXPECT_CALL failure.
+      { level: 1, name: 2, int_value: 3, state: STATE_PREBIND },
+      { level: 4, name: 5, int_value: 6, state: STATE_BOUND },
+      { level: 7, name: 8, int_value: 9, state: STATE_LISTENING },
+    ]
+  )EOF");
+
+  // Second address.
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                           /* expected_num_options */ 3,
+                           ListenerComponentFactory::BindType::NoReusePort);
+  // First address.
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                           /* expected_num_options */ 3,
+                           ListenerComponentFactory::BindType::NoReusePort);
+
+  expectSetsockopt(
+      /* expected_sockopt_level */ 1,
+      /* expected_sockopt_name */ 2,
+      /* expected_value */ 3,
+      /* expected_num_calls */ 2);
+  expectSetsockopt(
+      /* expected_sockopt_level */ 4,
+      /* expected_sockopt_name */ 5,
+      /* expected_value */ 6,
+      /* expected_num_calls */ 2);
+
+  addOrUpdateListener(listener);
+  EXPECT_EQ(1U, manager_->listeners().size());
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest,
+       LiteralSockoptListenerEnabledWithMultiAddressesOverrideOpts) {
+  const envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
+    name: SockoptsListener
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1111 }
+    additional_addresses:
+    - address:
+        socket_address: { address: 127.0.0.1, port_value: 2222 }
+      socket_options:
+        socket_options: [
+          # The socket goes through socket() and bind() but never listen(), so if we
+          # ever saw (7, 8, 9) being applied it would cause a EXPECT_CALL failure.
+          { level: 11, name: 12, int_value: 13, state: STATE_PREBIND },
+          { level: 14, name: 15, int_value: 16, state: STATE_BOUND },
+          { level: 17, name: 18, int_value: 19, state: STATE_LISTENING },
+        ]
+    enable_reuse_port: false
+    filter_chains:
+    - filters: []
+      name: foo
+    socket_options: [
+      # The socket goes through socket() and bind() but never listen(), so if we
+      # ever saw (7, 8, 9) being applied it would cause a EXPECT_CALL failure.
+      { level: 1, name: 2, int_value: 3, state: STATE_PREBIND },
+      { level: 4, name: 5, int_value: 6, state: STATE_BOUND },
+      { level: 7, name: 8, int_value: 9, state: STATE_LISTENING },
+    ]
+  )EOF");
+
+  // Second address.
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                           /* expected_num_options */ 3,
+                           ListenerComponentFactory::BindType::NoReusePort);
+  // First address.
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                           /* expected_num_options */ 3,
+                           ListenerComponentFactory::BindType::NoReusePort);
+
+  // First address' prebind options.
+  expectSetsockopt(
+      /* expected_sockopt_level */ 1,
+      /* expected_sockopt_name */ 2,
+      /* expected_value */ 3);
+  // Second address' prebind options.
+  expectSetsockopt(
+      /* expected_sockopt_level */ 11,
+      /* expected_sockopt_name */ 12,
+      /* expected_value */ 13);
+  // First address' bind options.
+  expectSetsockopt(
+      /* expected_sockopt_level */ 4,
+      /* expected_sockopt_name */ 5,
+      /* expected_value */ 6);
+  // Second address' bind options.
+  expectSetsockopt(
+      /* expected_sockopt_level */ 14,
+      /* expected_sockopt_name */ 15,
+      /* expected_value */ 16);
+  addOrUpdateListener(listener);
+  EXPECT_EQ(1U, manager_->listeners().size());
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest,
+       LiteralSockoptListenerEnabledWithMultiAddressesEmptyOverrideOpts) {
+  const envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
+    name: SockoptsListener
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1111 }
+    additional_addresses:
+    - address:
+        socket_address: { address: 127.0.0.1, port_value: 2222 }
+      socket_options:
+        socket_options: [ ]
+    enable_reuse_port: false
+    filter_chains:
+    - filters: []
+      name: foo
+    socket_options: [
+      # The socket goes through socket() and bind() but never listen(), so if we
+      # ever saw (7, 8, 9) being applied it would cause a EXPECT_CALL failure.
+      { level: 1, name: 2, int_value: 3, state: STATE_PREBIND },
+      { level: 4, name: 5, int_value: 6, state: STATE_BOUND },
+      { level: 7, name: 8, int_value: 9, state: STATE_LISTENING },
+    ]
+  )EOF");
+
+  // Second address.
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                           /* expected_num_options */ 0,
+                           ListenerComponentFactory::BindType::NoReusePort);
+  // First address.
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                           /* expected_num_options */ 3,
+                           ListenerComponentFactory::BindType::NoReusePort);
+
+  // First address' prebind options.
+  expectSetsockopt(
+      /* expected_sockopt_level */ 1,
+      /* expected_sockopt_name */ 2,
+      /* expected_value */ 3);
+  // First address' bind options.
+  expectSetsockopt(
+      /* expected_sockopt_level */ 4,
+      /* expected_sockopt_name */ 5,
+      /* expected_value */ 6);
+
+  addOrUpdateListener(listener);
+  EXPECT_EQ(1U, manager_->listeners().size());
+}
+
 // This test relies on linux-only code, and a linux-only name IPPROTO_MPTCP
 #if defined(__linux__)
 TEST_P(ListenerManagerImplWithRealFiltersTest, Mptcp) {
@@ -6169,12 +6738,10 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, AddOrUpdateInternalListener) {
 static_listeners:
 )EOF");
 
-  // Add foo listener. The internal listener does not need explicit internal listener field.
+  // Add foo listener.
   const std::string listener_foo_yaml = R"EOF(
 name: test_internal_listener
-address:
-  envoy_internal_address:
-    server_listener_name: test_internal_listener_name
+internal_listener: {}
 filter_chains:
 - filters: []
   name: foo
@@ -6194,9 +6761,7 @@ dynamic_listeners:
       listener:
         "@type": type.googleapis.com/envoy.config.listener.v3.Listener
         name: test_internal_listener
-        address:
-          envoy_internal_address:
-            server_listener_name: test_internal_listener_name
+        internal_listener: {}
         filter_chains:
         - filters: []
           name: foo
@@ -6212,9 +6777,7 @@ dynamic_listeners:
   // Update foo listener. Should share socket.
   const std::string listener_foo_update1_yaml = R"EOF(
 name: test_internal_listener
-address:
-  envoy_internal_address:
-    server_listener_name: test_internal_listener_name
+internal_listener: {}
 filter_chains:
 - filters: []
   name: foo
@@ -6239,9 +6802,7 @@ per_connection_buffer_limit_bytes: 10
         listener:
           "@type": type.googleapis.com/envoy.config.listener.v3.Listener
           name: test_internal_listener
-          address:
-            envoy_internal_address:
-              server_listener_name: test_internal_listener_name
+          internal_listener: {}
           filter_chains:
           - filters: []
             name: foo
@@ -6299,9 +6860,7 @@ per_connection_buffer_limit_bytes: 10
         listener:
           "@type": type.googleapis.com/envoy.config.listener.v3.Listener
           name: test_internal_listener
-          address:
-            envoy_internal_address:
-              server_listener_name: test_internal_listener_name
+          internal_listener: {}
           filter_chains:
           - filters: []
             name: foo
@@ -6313,9 +6872,7 @@ per_connection_buffer_limit_bytes: 10
         listener:
           "@type": type.googleapis.com/envoy.config.listener.v3.Listener
           name: test_internal_listener
-          address:
-            envoy_internal_address:
-              server_listener_name: test_internal_listener_name
+          internal_listener: {}
           filter_chains:
           - filters: []
             name: foo
@@ -6337,13 +6894,10 @@ per_connection_buffer_limit_bytes: 10
   // Add bar listener.
   const std::string listener_bar_yaml = R"EOF(
   name: test_internal_listener_bar
-  address:
-    envoy_internal_address:
-      server_listener_name: test_internal_listener_bar
+  internal_listener: {}
   filter_chains:
   - filters: []
     name: foo
-  internal_listener: {}
     )EOF";
 
   ListenerHandle* listener_bar = expectListenerCreate(false, true);
@@ -6358,13 +6912,10 @@ per_connection_buffer_limit_bytes: 10
   // Add baz listener, this time requiring initializing.
   const std::string listener_baz_yaml = R"EOF(
   name: test_internal_listener_baz
-  address:
-    envoy_internal_address:
-      server_listener_name: test_internal_listener_baz
+  internal_listener: {}
   filter_chains:
   - filters: []
     name: foo
-  internal_listener: {}
     )EOF";
 
   ListenerHandle* listener_baz = expectListenerCreate(true, true);
@@ -6382,9 +6933,7 @@ per_connection_buffer_limit_bytes: 10
         listener:
           "@type": type.googleapis.com/envoy.config.listener.v3.Listener
           name: test_internal_listener
-          address:
-            envoy_internal_address:
-              server_listener_name: test_internal_listener_name
+          internal_listener: {}
           filter_chains:
           - filters: []
             name: foo
@@ -6397,13 +6946,10 @@ per_connection_buffer_limit_bytes: 10
         listener:
           "@type": type.googleapis.com/envoy.config.listener.v3.Listener
           name: test_internal_listener_bar
-          address:
-            envoy_internal_address:
-              server_listener_name: test_internal_listener_bar
+          internal_listener: {}
           filter_chains:
           - filters: []
             name: foo
-          internal_listener: {}
         last_updated:
           seconds: 4004004004
           nanos: 4000000
@@ -6413,13 +6959,10 @@ per_connection_buffer_limit_bytes: 10
         listener:
           "@type": type.googleapis.com/envoy.config.listener.v3.Listener
           name: test_internal_listener_baz
-          address:
-            envoy_internal_address:
-              server_listener_name: test_internal_listener_baz
+          internal_listener: {}
           filter_chains:
           - filters: []
             name: foo
-          internal_listener: {}
         last_updated:
           seconds: 5005005005
           nanos: 5000000
@@ -6432,9 +6975,6 @@ per_connection_buffer_limit_bytes: 10
   // Update baz while it is warming.
   const std::string listener_baz_update1_yaml = R"EOF(
   name: test_internal_listener_baz
-  address:
-    envoy_internal_address:
-      server_listener_name: test_internal_listener_baz
   internal_listener: {}
   filter_chains:
   - filters:
@@ -7223,7 +7763,7 @@ address:
   addOrUpdateListener(listener);
   EXPECT_EQ(1U, manager_->listeners().size());
   Network::SocketSharedPtr listen_socket =
-      manager_->listeners().front().get().listenSocketFactory().getListenSocket(0);
+      manager_->listeners().front().get().listenSocketFactories()[0]->getListenSocket(0);
   Network::UdpPacketWriterPtr udp_packet_writer =
       manager_->listeners()
           .front()
@@ -7270,21 +7810,24 @@ TEST(ListenerEnableReusePortTest, All) {
     config.mutable_enable_reuse_port()->set_value(false);
     config.mutable_address()->mutable_socket_address()->set_protocol(
         envoy::config::core::v3::SocketAddress::TCP);
-    EXPECT_FALSE(ListenerImpl::getReusePortOrDefault(server, config));
+    EXPECT_FALSE(
+        ListenerImpl::getReusePortOrDefault(server, config, Network::Socket::Type::Stream));
   }
   {
     envoy::config::listener::v3::Listener config;
     config.mutable_enable_reuse_port()->set_value(true);
     config.mutable_address()->mutable_socket_address()->set_protocol(
         envoy::config::core::v3::SocketAddress::TCP);
-    EXPECT_EQ(expected_reuse_port, ListenerImpl::getReusePortOrDefault(server, config));
+    EXPECT_EQ(expected_reuse_port,
+              ListenerImpl::getReusePortOrDefault(server, config, Network::Socket::Type::Stream));
   }
   {
     envoy::config::listener::v3::Listener config;
     config.set_reuse_port(true);
     config.mutable_address()->mutable_socket_address()->set_protocol(
         envoy::config::core::v3::SocketAddress::TCP);
-    EXPECT_EQ(expected_reuse_port, ListenerImpl::getReusePortOrDefault(server, config));
+    EXPECT_EQ(expected_reuse_port,
+              ListenerImpl::getReusePortOrDefault(server, config, Network::Socket::Type::Stream));
   }
   {
     envoy::config::listener::v3::Listener config;
@@ -7292,14 +7835,16 @@ TEST(ListenerEnableReusePortTest, All) {
     config.set_reuse_port(true);
     config.mutable_address()->mutable_socket_address()->set_protocol(
         envoy::config::core::v3::SocketAddress::TCP);
-    EXPECT_FALSE(ListenerImpl::getReusePortOrDefault(server, config));
+    EXPECT_FALSE(
+        ListenerImpl::getReusePortOrDefault(server, config, Network::Socket::Type::Stream));
   }
   {
     envoy::config::listener::v3::Listener config;
     config.mutable_address()->mutable_socket_address()->set_protocol(
         envoy::config::core::v3::SocketAddress::TCP);
     EXPECT_CALL(server, enableReusePortDefault());
-    EXPECT_EQ(expected_reuse_port, ListenerImpl::getReusePortOrDefault(server, config));
+    EXPECT_EQ(expected_reuse_port,
+              ListenerImpl::getReusePortOrDefault(server, config, Network::Socket::Type::Stream));
   }
 }
 

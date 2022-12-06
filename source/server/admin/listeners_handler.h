@@ -18,12 +18,10 @@ class ListenersHandler : public HandlerContextBase {
 public:
   ListenersHandler(Server::Instance& server);
 
-  Http::Code handlerDrainListeners(absl::string_view path_and_query,
-                                   Http::ResponseHeaderMap& response_headers,
+  Http::Code handlerDrainListeners(Http::ResponseHeaderMap& response_headers,
                                    Buffer::Instance& response, AdminStream&);
 
-  Http::Code handlerListenerInfo(absl::string_view path_and_query,
-                                 Http::ResponseHeaderMap& response_headers,
+  Http::Code handlerListenerInfo(Http::ResponseHeaderMap& response_headers,
                                  Buffer::Instance& response, AdminStream&);
 
 private:

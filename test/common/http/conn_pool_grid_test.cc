@@ -125,8 +125,8 @@ public:
       : transport_socket_options_(
             std::make_shared<Network::TransportSocketOptionsImpl>("hostname")),
         options_({Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}),
-        alternate_protocols_(
-            std::make_shared<HttpServerPropertiesCacheImpl>(dispatcher_, nullptr, 10)),
+        alternate_protocols_(std::make_shared<HttpServerPropertiesCacheImpl>(
+            dispatcher_, std::vector<std::string>(), nullptr, 10)),
         quic_stat_names_(store_.symbolTable()) {}
 
   void initialize() {
@@ -154,7 +154,8 @@ public:
     if (!use_alternate_protocols) {
       return nullptr;
     }
-    return std::make_shared<HttpServerPropertiesCacheImpl>(dispatcher_, nullptr, 10);
+    return std::make_shared<HttpServerPropertiesCacheImpl>(dispatcher_, std::vector<std::string>(),
+                                                           nullptr, 10);
   }
 
   void addHttp3AlternateProtocol(absl::optional<std::chrono::microseconds> rtt = {}) {

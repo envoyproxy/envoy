@@ -51,7 +51,7 @@ void initializeUpstreamTlsContextConfig(
     yaml_plain += R"EOF(
     tls_certificates:
       certificate_chain:
-        filename: "{{ test_rundir }}/test/config/integration/certs/client2cert.pem"
+        filename: "{{ test_rundir }}/test/config/integration/certs/client2_chain.pem"
       private_key:
         filename: "{{ test_rundir }}/test/config/integration/certs/client2key.pem"
 )EOF";
@@ -97,6 +97,10 @@ void initializeUpstreamTlsContextConfig(
   }
   if (!options.sni_.empty()) {
     tls_context.set_sni(options.sni_);
+  }
+  if (options.custom_validator_config_) {
+    common_context->mutable_validation_context()->set_allocated_custom_validator_config(
+        options.custom_validator_config_);
   }
 
   common_context->mutable_tls_params()->set_tls_minimum_protocol_version(options.tls_version_);

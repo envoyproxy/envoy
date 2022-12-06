@@ -20,27 +20,26 @@ public:
                             quic::QuicAlarmFactory& alarm_factory, quic::QuicPacketWriter* writer,
                             bool owns_writer,
                             const quic::ParsedQuicVersionVector& supported_versions,
-                            Network::ConnectionSocketPtr connection_socket);
-
-  // QuicNetworkConnection
-  // Overridden to set connection_socket_ with initialized self address and retrieve filter chain.
-  bool OnPacketHeader(const quic::QuicPacketHeader& header) override;
+                            Network::ConnectionSocketPtr connection_socket,
+                            quic::ConnectionIdGeneratorInterface& generator);
 
   // quic::QuicConnection
-  // Overridden to provide a CID manager which issues CIDs compatible with the existing BPF routing.
-  std::unique_ptr<quic::QuicSelfIssuedConnectionIdManager>
-  MakeSelfIssuedConnectionIdManager() override;
+  // Overridden to set connection_socket_ with initialized self address and retrieve filter chain.
+  bool OnPacketHeader(const quic::QuicPacketHeader& header) override;
+  void OnCanWrite() override;
+
+  bool deferSend() const { return defer_send_; }
+
+  bool actuallyDeferSend() const { return defer_send_in_response_to_packets(); }
+
+private:
+  const bool defer_send_;
 };
 
 // An implementation that issues connection IDs with stable first 4 types.
 class EnvoyQuicSelfIssuedConnectionIdManager : public quic::QuicSelfIssuedConnectionIdManager {
 public:
   using QuicSelfIssuedConnectionIdManager::QuicSelfIssuedConnectionIdManager;
-
-  // quic::QuicSelfIssuedConnectionIdManager
-  // Overridden to return a new CID with the same first 4 bytes.
-  quic::QuicConnectionId
-  GenerateNewConnectionId(const quic::QuicConnectionId& old_connection_id) const override;
 };
 
 } // namespace Quic

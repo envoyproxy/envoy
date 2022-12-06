@@ -55,6 +55,46 @@ TEST_P(AdsIntegrationTest, BasicClusterInitialWarming) {
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
 }
 
+// Tests that the Envoy xDS client can handle updates to a subset of the subscribed resources from
+// an xDS server without removing the resources not included in the DiscoveryResponse from the xDS
+// server.
+TEST_P(AdsIntegrationTest, UpdateToSubsetOfResources) {
+  initialize();
+  registerTestServerPorts({});
+  const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
+  const auto eds_type_url =
+      Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>();
+
+  auto cluster_0 = buildCluster("cluster_0");
+  auto cluster_1 = buildCluster("cluster_1");
+  EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "", {}, {}, {}, true));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cds_type_url, {cluster_0, cluster_1},
+                                                             {cluster_0, cluster_1}, {}, "1");
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 2);
+  EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "", {cluster_0.name(), cluster_1.name()},
+                                      {cluster_0.name(), cluster_1.name()}, {}));
+  auto cla_0 = buildClusterLoadAssignment(cluster_0.name());
+  auto cla_1 = buildClusterLoadAssignment(cluster_1.name());
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      eds_type_url, {cla_0, cla_1}, {cla_0, cla_1}, {}, "1");
+
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 4);
+
+  // Send an update for one of the ClusterLoadAssignments only.
+  cla_0.mutable_endpoints(0)->mutable_lb_endpoints(0)->mutable_load_balancing_weight()->set_value(
+      2);
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(eds_type_url, {cla_0},
+                                                                            {cla_0}, {}, "2");
+
+  // Verify that getting an update for only one of the ClusterLoadAssignment resources does not
+  // delete the other. We use cluster membership health as a proxy for this.
+  test_server_->waitForCounterEq("cluster.cluster_0.update_success", 2);
+  test_server_->waitForCounterEq("cluster.cluster_1.update_success", 1);
+  test_server_->waitForGaugeEq("cluster.cluster_0.membership_healthy", 1);
+  test_server_->waitForGaugeEq("cluster.cluster_1.membership_healthy", 1);
+}
+
 // Update the only warming cluster. Verify that the new cluster is still warming and the cluster
 // manager as a whole is not initialized.
 TEST_P(AdsIntegrationTest, ClusterInitializationUpdateTheOnlyWarmingCluster) {
@@ -1205,10 +1245,11 @@ public:
     // stat_prefix 'ads_cluster'.
     skip_tag_extraction_rule_check_ = true;
 
-    if (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw ||
-        sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta) {
-      config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux", "true");
-    }
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux",
+                                      (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw ||
+                                       sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta)
+                                          ? "true"
+                                          : "false");
     create_xds_upstream_ = true;
     use_lds_ = false;
     sotw_or_delta_ = sotwOrDelta();
@@ -1259,10 +1300,11 @@ public:
     // 'ads_cluster'.
     skip_tag_extraction_rule_check_ = true;
 
-    if (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw ||
-        sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta) {
-      config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux", "true");
-    }
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux",
+                                      (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw ||
+                                       sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta)
+                                          ? "true"
+                                          : "false");
     create_xds_upstream_ = true;
     use_lds_ = false;
     sotw_or_delta_ = sotwOrDelta();
@@ -1459,10 +1501,11 @@ public:
     // 'ads_cluster'.
     skip_tag_extraction_rule_check_ = true;
 
-    if (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw ||
-        sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta) {
-      config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux", "true");
-    }
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux",
+                                      (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw ||
+                                       sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta)
+                                          ? "true"
+                                          : "false");
     create_xds_upstream_ = true;
     use_lds_ = false;
     sotw_or_delta_ = sotwOrDelta();

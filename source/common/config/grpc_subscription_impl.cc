@@ -2,6 +2,8 @@
 
 #include <chrono>
 
+#include "envoy/config/subscription.h"
+
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
@@ -17,7 +19,7 @@ constexpr std::chrono::milliseconds UpdateDurationLogThreshold = std::chrono::mi
 
 GrpcSubscriptionImpl::GrpcSubscriptionImpl(GrpcMuxSharedPtr grpc_mux,
                                            SubscriptionCallbacks& callbacks,
-                                           OpaqueResourceDecoder& resource_decoder,
+                                           OpaqueResourceDecoderSharedPtr resource_decoder,
                                            SubscriptionStats stats, absl::string_view type_url,
                                            Event::Dispatcher& dispatcher,
                                            std::chrono::milliseconds init_fetch_timeout,
@@ -142,7 +144,7 @@ void GrpcSubscriptionImpl::disableInitFetchTimeoutTimer() {
 
 GrpcCollectionSubscriptionImpl::GrpcCollectionSubscriptionImpl(
     const xds::core::v3::ResourceLocator& collection_locator, GrpcMuxSharedPtr grpc_mux,
-    SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
+    SubscriptionCallbacks& callbacks, OpaqueResourceDecoderSharedPtr resource_decoder,
     SubscriptionStats stats, Event::Dispatcher& dispatcher,
     std::chrono::milliseconds init_fetch_timeout, bool is_aggregated,
     const SubscriptionOptions& options)

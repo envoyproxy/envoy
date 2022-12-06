@@ -6,19 +6,23 @@ on:
 
   workflow_dispatch:
 
+permissions:
+  contents: read # to fetch code (actions/checkout)
+  issues: write # required to open/close dependency issues
+
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     if: github.repository == 'envoyproxy/envoy'
     steps:
       - name: Checkout repository
-        uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b
+        uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8
         with:
           ref: ${{ github.head_ref }}
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@c4e89fac7e8767b327bbad6cb4d859eda999cf08
+      - name: Set up Python (3.10)
+        uses: actions/setup-python@13ae5bb136fac2878aff31522b9efb785519f984
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.10"
 
       - name: Run dependency checker
         run: |

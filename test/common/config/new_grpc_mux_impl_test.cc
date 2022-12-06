@@ -52,6 +52,8 @@ public:
   NewGrpcMuxImplTestBase(LegacyOrUnified legacy_or_unified)
       : async_client_(new Grpc::MockAsyncClient()),
         config_validators_(std::make_unique<NiceMock<MockCustomConfigValidators>>()),
+        resource_decoder_(std::make_shared<TestUtility::TestOpaqueResourceDecoderImpl<
+                              envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name")),
         control_plane_stats_(Utility::generateControlPlaneStats(stats_)),
         control_plane_connected_state_(
             stats_.gauge("control_plane.connected_state", Stats::Gauge::ImportMode::NeverImport)),
@@ -157,8 +159,7 @@ public:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   std::unique_ptr<GrpcMux> grpc_mux_;
   NiceMock<Config::MockSubscriptionCallbacks> callbacks_;
-  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
-      resource_decoder_{"cluster_name"};
+  OpaqueResourceDecoderSharedPtr resource_decoder_;
   Stats::TestUtil::TestStore stats_;
   Envoy::Config::RateLimitSettings rate_limit_settings_;
   ControlPlaneStats control_plane_stats_;

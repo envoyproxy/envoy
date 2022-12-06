@@ -29,7 +29,7 @@ static_resources:
                 common_config:
                   min_content_length: 100
                   content_type:
-                    - application/json
+                  - application/json
                 disable_on_etag_header: true
               compressor_library:
                 name: text_optimized
@@ -131,7 +131,7 @@ static_resources:
                 common_config:
                   min_content_length: 100
                   content_type:
-                    - text/plain
+                  - text/plain
                 disable_on_etag_header: true
               compressor_library:
                 name: text_optimized

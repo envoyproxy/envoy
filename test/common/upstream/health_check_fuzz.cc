@@ -106,7 +106,7 @@ void HttpHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", *time_source)};
   if (input.upstream_cx_success()) {
-    cluster_->info_->stats().upstream_cx_total_.inc();
+    cluster_->info_->trafficStats().upstream_cx_total_.inc();
   }
   expectSessionCreate();
   expectStreamCreate(0);
@@ -144,19 +144,18 @@ void HttpHealthCheckFuzz::respond(test::common::upstream::Respond respond, bool 
   response_headers->setStatus(status);
 
   // Responding with http can cause client to close, if so create a new one.
-  bool client_will_close = false;
-  if (response_headers->Connection()) {
-    client_will_close =
-        absl::EqualsIgnoreCase(response_headers->Connection()->value().getStringView(),
-                               Http::Headers::get().ConnectionValues.Close);
-  } else if (response_headers->ProxyConnection()) {
-    client_will_close =
-        absl::EqualsIgnoreCase(response_headers->ProxyConnection()->value().getStringView(),
-                               Http::Headers::get().ConnectionValues.Close);
-  }
+  const bool client_will_close =
+      Http::HeaderUtility::shouldCloseConnection(health_checker_->protocol(), *response_headers);
 
-  ENVOY_LOG_MISC(trace, "Responded headers {}", *response_headers.get());
-  test_sessions_[0]->stream_response_callbacks_->decodeHeaders(std::move(response_headers), true);
+  // Check if there is a response body.
+  bool has_response_body = !respond.http_respond().body().empty();
+  test_sessions_[0]->stream_response_callbacks_->decodeHeaders(std::move(response_headers),
+                                                               !has_response_body);
+  if (has_response_body) {
+    Buffer::OwnedImpl response_data(respond.http_respond().body());
+    test_sessions_[0]->stream_response_callbacks_->decodeData(response_data, true);
+    ENVOY_LOG_MISC(trace, "Responded body {}", respond.http_respond().body());
+  }
 
   // Interval timer gets turned on from decodeHeaders()
   if ((!reuse_connection_ || client_will_close) && !last_action) {
@@ -218,7 +217,7 @@ void TcpHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", *time_source)};
   if (input.upstream_cx_success()) {
-    cluster_->info_->stats().upstream_cx_total_.inc();
+    cluster_->info_->trafficStats().upstream_cx_total_.inc();
   }
   expectSessionCreate();
   expectClientCreate();
@@ -327,7 +326,7 @@ void GrpcHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", *time_source)};
   if (input.upstream_cx_success()) {
-    cluster_->info_->stats().upstream_cx_total_.inc();
+    cluster_->info_->trafficStats().upstream_cx_total_.inc();
   }
   expectSessionCreate();
   ON_CALL(dispatcher_, createClientConnection_(_, _, _, _))

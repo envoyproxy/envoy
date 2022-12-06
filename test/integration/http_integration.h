@@ -11,6 +11,11 @@
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/utility.h"
+
+#ifdef ENVOY_ENABLE_QUIC
+#include "quiche/quic/core/deterministic_connection_id_generator.h"
+#endif
 
 namespace Envoy {
 
@@ -18,7 +23,6 @@ using ::Envoy::Http::Http2::Http2Frame;
 
 enum class Http2Impl {
   Nghttp2,
-  WrappedNghttp2,
   Oghttp2,
 };
 
@@ -38,9 +42,9 @@ public:
 
   IntegrationStreamDecoderPtr makeHeaderOnlyRequest(const Http::RequestHeaderMap& headers);
   IntegrationStreamDecoderPtr makeRequestWithBody(const Http::RequestHeaderMap& headers,
-                                                  uint64_t body_size);
+                                                  uint64_t body_size, bool end_stream = true);
   IntegrationStreamDecoderPtr makeRequestWithBody(const Http::RequestHeaderMap& headers,
-                                                  const std::string& body);
+                                                  const std::string& body, bool end_stream = true);
   bool sawGoAway() const { return saw_goaway_; }
   bool connected() const { return connected_; }
   bool streamOpen() const { return !stream_gone_; }
@@ -134,7 +138,8 @@ public:
   ~HttpIntegrationTest() override;
 
   void initialize() override;
-  void setupHttp2Overrides(Http2Impl implementation);
+  void setupHttp1ImplOverrides(Http1ParserImpl http1_implementation);
+  void setupHttp2ImplOverrides(Http2Impl http2_implementation);
 
 protected:
   void useAccessLog(absl::string_view format = "",
@@ -294,6 +299,25 @@ protected:
       uint64_t request_size, uint64_t response_size, bool set_content_length_header,
       std::chrono::milliseconds timeout = 2 * TestUtility::DefaultTimeout * TSAN_TIMEOUT_FACTOR);
 
+  struct BytesCountExpectation {
+    BytesCountExpectation(int wire_bytes_sent, int wire_bytes_received, int header_bytes_sent,
+                          int header_bytes_received)
+        : wire_bytes_sent_{wire_bytes_sent}, wire_bytes_received_{wire_bytes_received},
+          header_bytes_sent_{header_bytes_sent}, header_bytes_received_{header_bytes_received} {}
+    int wire_bytes_sent_;
+    int wire_bytes_received_;
+    int header_bytes_sent_;
+    int header_bytes_received_;
+  };
+
+  void expectUpstreamBytesSentAndReceived(BytesCountExpectation h1_expectation,
+                                          BytesCountExpectation h2_expectation,
+                                          BytesCountExpectation h3_expectation, const int id = 0);
+
+  void expectDownstreamBytesSentAndReceived(BytesCountExpectation h1_expectation,
+                                            BytesCountExpectation h2_expectation,
+                                            BytesCountExpectation h3_expectation, const int id = 0);
+
   Http::CodecClient::Type downstreamProtocol() const { return downstream_protocol_; }
   std::string downstreamProtocolStatsRoot() const;
   // Return the upstream protocol part of the stats root.
@@ -326,6 +350,10 @@ protected:
   Quic::QuicStatNames quic_stat_names_;
   std::string san_to_match_{"spiffe://lyft.com/backend-team"};
   bool enable_quic_early_data_{true};
+#ifdef ENVOY_ENABLE_QUIC
+  quic::DeterministicConnectionIdGenerator connection_id_generator_{
+      quic::kQuicDefaultConnectionIdLength};
+#endif
 };
 
 // Helper class for integration tests using raw HTTP/2 frames

@@ -140,7 +140,8 @@ TEST_P(DeltaSubscriptionNoGrpcStreamTest, NoGrpcStream) {
   NiceMock<Random::MockRandomGenerator> random;
   Envoy::Config::RateLimitSettings rate_limit_settings;
   NiceMock<Config::MockSubscriptionCallbacks> callbacks;
-  NiceMock<Config::MockOpaqueResourceDecoder> resource_decoder;
+  OpaqueResourceDecoderSharedPtr resource_decoder(
+      std::make_shared<NiceMock<Config::MockOpaqueResourceDecoder>>());
   auto* async_client = new Grpc::MockAsyncClient();
 
   const Protobuf::MethodDescriptor* method_descriptor =

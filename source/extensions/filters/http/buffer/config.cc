@@ -17,7 +17,7 @@ namespace BufferFilter {
 
 Http::FilterFactoryCb BufferFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::buffer::v3::Buffer& proto_config, const std::string&,
-    Server::Configuration::ServerFactoryContext&) {
+    DualInfo, Server::Configuration::ServerFactoryContext&) {
   ASSERT(proto_config.has_max_request_bytes());
 
   BufferFilterConfigSharedPtr filter_config(new BufferFilterConfig(proto_config));

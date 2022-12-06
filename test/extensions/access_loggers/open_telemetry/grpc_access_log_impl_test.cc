@@ -21,7 +21,6 @@
 using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
-using testing::Return;
 using testing::ReturnRef;
 
 namespace Envoy {
@@ -36,43 +35,35 @@ const std::string ZONE_NAME = "zone_name";
 const std::string CLUSTER_NAME = "cluster_name";
 const std::string NODE_NAME = "node_name";
 
-// A helper test class to mock and intercept GrpcAccessLoggerImpl streams.
+// A helper test class to mock and intercept GrpcAccessLoggerImpl requests.
 class GrpcAccessLoggerImplTestHelper {
 public:
-  using MockAccessLogStream = Grpc::MockAsyncStream;
-  using AccessLogCallbacks = Grpc::AsyncStreamCallbacks<
-      opentelemetry::proto::collector::logs::v1::ExportLogsServiceResponse>;
-
   GrpcAccessLoggerImplTestHelper(LocalInfo::MockLocalInfo& local_info,
-                                 Grpc::MockAsyncClient* async_client) {
+                                 Grpc::MockAsyncClient* async_client)
+      : async_client_(async_client) {
     EXPECT_CALL(local_info, zoneName()).WillOnce(ReturnRef(ZONE_NAME));
     EXPECT_CALL(local_info, clusterName()).WillOnce(ReturnRef(CLUSTER_NAME));
     EXPECT_CALL(local_info, nodeName()).WillOnce(ReturnRef(NODE_NAME));
-    EXPECT_CALL(*async_client, startRaw(_, _, _, _))
-        .WillOnce(
-            Invoke([this](absl::string_view, absl::string_view, Grpc::RawAsyncStreamCallbacks& cbs,
-                          const Http::AsyncClient::StreamOptions&) {
-              this->callbacks_ = dynamic_cast<AccessLogCallbacks*>(&cbs);
-              return &this->stream_;
-            }));
   }
 
-  void expectStreamMessage(const std::string& expected_message_yaml) {
+  void expectSentMessage(const std::string& expected_message_yaml) {
     opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest expected_message;
     TestUtility::loadFromYaml(expected_message_yaml, expected_message);
-    EXPECT_CALL(stream_, isAboveWriteBufferHighWatermark()).WillOnce(Return(false));
-    EXPECT_CALL(stream_, sendMessageRaw_(_, false))
-        .WillOnce(Invoke([expected_message](Buffer::InstancePtr& request, bool) {
+    EXPECT_CALL(*async_client_, sendRaw(_, _, _, _, _, _))
+        .WillOnce(Invoke([expected_message](absl::string_view, absl::string_view,
+                                            Buffer::InstancePtr&& request,
+                                            Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
+                                            const Http::AsyncClient::RequestOptions&) {
           opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest message;
           Buffer::ZeroCopyInputStreamImpl request_stream(std::move(request));
           EXPECT_TRUE(message.ParseFromZeroCopyStream(&request_stream));
           EXPECT_EQ(message.DebugString(), expected_message.DebugString());
+          return nullptr; // We don't care about the returned request.
         }));
   }
 
 private:
-  MockAccessLogStream stream_;
-  AccessLogCallbacks* callbacks_;
+  Grpc::MockAsyncClient* async_client_;
 };
 
 class GrpcAccessLoggerImplTest : public testing::Test {
@@ -100,7 +91,7 @@ public:
 };
 
 TEST_F(GrpcAccessLoggerImplTest, Log) {
-  grpc_access_logger_impl_test_helper_.expectStreamMessage(R"EOF(
+  grpc_access_logger_impl_test_helper_.expectSentMessage(R"EOF(
   resource_logs:
     resource:
       attributes:
@@ -116,7 +107,7 @@ TEST_F(GrpcAccessLoggerImplTest, Log) {
         - key: "node_name"
           value:
             string_value: "node_name"
-    instrumentation_library_logs:
+    scope_logs:
       - log_records:
           - severity_text: "test-severity-text"
   )EOF");
@@ -163,7 +154,7 @@ TEST_F(GrpcAccessLoggerCacheImplTest, LoggerCreation) {
 
   GrpcAccessLoggerSharedPtr logger =
       logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP);
-  grpc_access_logger_impl_test_helper_.expectStreamMessage(R"EOF(
+  grpc_access_logger_impl_test_helper_.expectSentMessage(R"EOF(
   resource_logs:
     resource:
       attributes:
@@ -179,7 +170,7 @@ TEST_F(GrpcAccessLoggerCacheImplTest, LoggerCreation) {
         - key: "node_name"
           value:
             string_value: "node_name"
-    instrumentation_library_logs:
+    scope_logs:
       - log_records:
           - severity_text: "test-severity-text"
   )EOF");
@@ -214,7 +205,7 @@ values:
 
   GrpcAccessLoggerSharedPtr logger =
       logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP);
-  grpc_access_logger_impl_test_helper_.expectStreamMessage(R"EOF(
+  grpc_access_logger_impl_test_helper_.expectSentMessage(R"EOF(
   resource_logs:
     resource:
       attributes:
@@ -239,7 +230,7 @@ values:
         - key: k8s.pod.createtimestamp
           value:
             int_value: 1655429509
-    instrumentation_library_logs:
+    scope_logs:
       - log_records:
           - severity_text: "test-severity-text"
   )EOF");

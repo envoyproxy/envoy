@@ -22,7 +22,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Compressor :ref:`configuration overview <config_http_filters_compressor>`.
 // [#extension: envoy.filters.http.compressor]
 
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message Compressor {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.compressor.v2.Compressor";
@@ -123,4 +123,8 @@ message Compressor {
   //    instead of
   //    ``<stat_prefix>.compressor.<compressor_library.name>.<compressor_library_stat_prefix>.*``.
   ResponseDirectionConfig response_direction_config = 8;
+
+  // If true, chooses this compressor first to do compression when the q-values in `Accept-Encoding` are same.
+  // The last compressor which enables choose_first will be chosen if multiple compressor filters in the chain have choose_first as true.
+  bool choose_first = 9;
 }

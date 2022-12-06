@@ -183,7 +183,10 @@ typed_config:
     ASSERT_TRUE(codec->waitForDisconnect());
     codec->close();
   }
-  checkVerifyErrorCouter(1);
+  Stats::CounterSharedPtr counter =
+      test_server_->counter(listenerStatPrefix("ssl.fail_verify_san"));
+  EXPECT_EQ(1u, counter->value());
+  counter->reset();
 }
 
 // Client certificate has expired and the config does NOT allow expired certificates, so this case

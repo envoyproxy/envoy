@@ -208,9 +208,10 @@ matcher_list:
           typed_config:
             "@type": type.googleapis.com/google.protobuf.BoolValue
         custom_match:
-          name: never_match
+          name: custom_match
           typed_config:
             "@type": type.googleapis.com/google.protobuf.StringValue
+            value: custom_foo
   )EOF";
 
   envoy::config::common::matcher::v3::Matcher matcher;
@@ -218,8 +219,12 @@ matcher_list:
 
   TestUtility::validate(matcher);
 
-  auto inner_factory = TestDataInputBoolFactory("foo");
-  NeverMatchFactory match_factory;
+  // Build the input data that is to be matched.
+  std::string value = "custom_foo";
+  auto inner_factory = TestDataInputBoolFactory(value);
+
+  // Register the custom matcher factory to perform the matching.
+  CustomStringMatcherFactory custom_factory;
 
   EXPECT_CALL(validation_visitor_,
               performDataInputValidation(_, "type.googleapis.com/google.protobuf.BoolValue"));
@@ -227,7 +232,7 @@ matcher_list:
 
   const auto result = match_tree()->match(TestData());
   EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
-  EXPECT_FALSE(result.on_match_.has_value());
+  EXPECT_TRUE(result.on_match_.has_value());
 }
 
 TEST_F(MatcherTest, TestAndMatcher) {

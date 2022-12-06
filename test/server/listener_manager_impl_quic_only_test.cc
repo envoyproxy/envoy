@@ -142,7 +142,7 @@ filter_chain_matcher:
                    ->listenerFactory()
                    .isTransportConnectionless());
   Network::SocketSharedPtr listen_socket =
-      manager_->listeners().front().get().listenSocketFactory().getListenSocket(0);
+      manager_->listeners().front().get().listenSocketFactories()[0]->getListenSocket(0);
 
   Network::UdpPacketWriterPtr udp_packet_writer =
       manager_->listeners()
@@ -231,7 +231,7 @@ TEST_P(ListenerManagerImplQuicOnlyTest, QuicWriterFromConfig) {
                    ->listenerFactory()
                    .isTransportConnectionless());
   Network::SocketSharedPtr listen_socket =
-      manager_->listeners().front().get().listenSocketFactory().getListenSocket(0);
+      manager_->listeners().front().get().listenSocketFactories()[0]->getListenSocket(0);
 
   Network::UdpPacketWriterFactory& udp_packet_writer_factory =
       manager_->listeners().front().get().udpListenerConfig()->packetWriterFactory();
@@ -239,6 +239,105 @@ TEST_P(ListenerManagerImplQuicOnlyTest, QuicWriterFromConfig) {
       listen_socket->ioHandle(), manager_->listeners()[0].get().listenerScope());
   // Even though GSO is enabled, the default writer should be used.
   EXPECT_EQ(false, udp_packet_writer->isBatchMode());
+}
+
+TEST_P(ListenerManagerImplQuicOnlyTest, QuicListenerFactoryWithExplictConnectionIdConfig) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+address:
+  socket_address:
+    address: 127.0.0.1
+    protocol: UDP
+    port_value: 1234
+filter_chains:
+- filter_chain_match:
+    transport_protocol: "quic"
+  name: foo
+  filters:
+  - name: envoy.filters.network.http_connection_manager
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+      codec_type: HTTP3
+      stat_prefix: hcm
+      route_config:
+        name: local_route
+      http_filters:
+        - name: envoy.filters.http.router
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  transport_socket:
+    name: envoy.transport_sockets.quic
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.transport_sockets.quic.v3.QuicDownstreamTransport
+      downstream_tls_context:
+        common_tls_context:
+          tls_certificates:
+          - certificate_chain:
+              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+            private_key:
+              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+          validation_context:
+            trusted_ca:
+              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+            match_typed_subject_alt_names:
+            - matcher:
+                exact: localhost
+              san_type: URI
+            - matcher:
+                exact: 127.0.0.1
+              san_type: IP_ADDRESS
+udp_listener_config:
+  quic_options:
+    connection_id_generator_config:
+      name: envoy.quic.deterministic_connection_id_generator
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.quic.connection_id_generator.v3.DeterministicConnectionIdGeneratorConfig
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  envoy::config::listener::v3::Listener listener_proto = parseListenerFromV3Yaml(yaml);
+  // Configure GSO support but later verify that the default writer is used instead.
+  ON_CALL(udp_gso_syscall_, supportsUdpGso()).WillByDefault(Return(true));
+  EXPECT_CALL(server_.api_.random_, uuid());
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+#ifdef SO_RXQ_OVFL // SO_REUSEPORT is on as configured
+                           /* expected_num_options */
+                           Api::OsSysCallsSingleton::get().supportsUdpGro() ? 4 : 3,
+#else
+                           /* expected_num_options */
+                           Api::OsSysCallsSingleton::get().supportsUdpGro() ? 3 : 2,
+#endif
+                           ListenerComponentFactory::BindType::ReusePort);
+
+  expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
+                   /* expected_sockopt_name */ ENVOY_IP_PKTINFO,
+                   /* expected_value */ 1,
+                   /* expected_num_calls */ 1);
+#ifdef SO_RXQ_OVFL
+  expectSetsockopt(/* expected_sockopt_level */ SOL_SOCKET,
+                   /* expected_sockopt_name */ SO_RXQ_OVFL,
+                   /* expected_value */ 1,
+                   /* expected_num_calls */ 1);
+#endif
+  expectSetsockopt(/* expected_sockopt_level */ SOL_SOCKET,
+                   /* expected_sockopt_name */ SO_REUSEPORT,
+                   /* expected_value */ 1,
+                   /* expected_num_calls */ 1);
+#ifdef UDP_GRO
+  if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
+    expectSetsockopt(/* expected_sockopt_level */ SOL_UDP,
+                     /* expected_sockopt_name */ UDP_GRO,
+                     /* expected_value */ 1,
+                     /* expected_num_calls */ 1);
+  }
+#endif
+
+  addOrUpdateListener(listener_proto);
+  EXPECT_EQ(1u, manager_->listeners().size());
+  EXPECT_FALSE(manager_->listeners()[0]
+                   .get()
+                   .udpListenerConfig()
+                   ->listenerFactory()
+                   .isTransportConnectionless());
 }
 #endif
 
@@ -332,8 +431,71 @@ udp_listener_config:
 
 #if defined(ENVOY_ENABLE_QUIC)
   EXPECT_THROW_WITH_REGEX(addOrUpdateListener(listener_proto), EnvoyException,
-                          "error building network filter chain for quic listener: requires exactly "
-                          "one http_connection_manager filter.");
+                          "error building network filter chain for quic listener: requires "
+                          "http_connection_manager filter to be last in the chain.");
+#else
+  EXPECT_THROW_WITH_REGEX(addOrUpdateListener(listener_proto), EnvoyException,
+                          "QUIC is configured but not enabled in the build.");
+#endif
+}
+
+TEST_P(ListenerManagerImplQuicOnlyTest, QuicListenerFactoryWithNetworkFilterAfterHcm) {
+  std::string yaml = TestEnvironment::substitute(R"EOF(
+address:
+  socket_address:
+    address: 127.0.0.1
+    protocol: UDP
+    port_value: 1234
+filter_chains:
+- filter_chain_match:
+    transport_protocol: "quic"
+  name: foo
+  filters:
+  - name: envoy.filters.network.http_connection_manager
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+      codec_type: HTTP3
+      stat_prefix: hcm
+      route_config:
+        name: local_route
+      http_filters:
+        - name: envoy.filters.http.router
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  - name: envoy.test.test_network_filter
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.TestNetworkFilterConfig
+  transport_socket:
+    name: envoy.transport_sockets.quic
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.transport_sockets.quic.v3.QuicDownstreamTransport
+      downstream_tls_context:
+        common_tls_context:
+          tls_certificates:
+          - certificate_chain:
+              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+            private_key:
+              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+          validation_context:
+            trusted_ca:
+              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+            match_typed_subject_alt_names:
+            - matcher:
+                exact: localhost
+              san_type: URI
+            - matcher:
+                exact: 127.0.0.1
+              san_type: IP_ADDRESS
+udp_listener_config:
+  quic_options: {}
+  )EOF",
+                                                 Network::Address::IpVersion::v4);
+  envoy::config::listener::v3::Listener listener_proto = parseListenerFromV3Yaml(yaml);
+
+#if defined(ENVOY_ENABLE_QUIC)
+  EXPECT_THROW_WITH_REGEX(addOrUpdateListener(listener_proto), EnvoyException,
+                          "error building network filter chain for quic listener: requires "
+                          "http_connection_manager filter to be last in the chain.");
 #else
   EXPECT_THROW_WITH_REGEX(addOrUpdateListener(listener_proto), EnvoyException,
                           "QUIC is configured but not enabled in the build.");

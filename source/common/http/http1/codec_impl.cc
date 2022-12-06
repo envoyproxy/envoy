@@ -375,8 +375,8 @@ void StreamEncoderImpl::readDisable(bool disable) {
 
 uint32_t StreamEncoderImpl::bufferLimit() const { return connection_.bufferLimit(); }
 
-const Network::Address::InstanceConstSharedPtr& StreamEncoderImpl::connectionLocalAddress() {
-  return connection_.connection().connectionInfoProvider().localAddress();
+const Network::ConnectionInfoProvider& StreamEncoderImpl::connectionInfoProvider() {
+  return connection_.connection().connectionInfoProvider();
 }
 
 static constexpr absl::string_view RESPONSE_PREFIX = "HTTP/1.1 ";
@@ -465,6 +465,7 @@ Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool e
 
     std::string url = absl::StrCat(scheme->value().getStringView(), "://",
                                    host->value().getStringView(), path->value().getStringView());
+    ENVOY_CONN_LOG(trace, "Sending fully qualified URL: {}", connection_.connection(), url);
     connection_.buffer().addFragments(
         {method->value().getStringView(), SPACE, url, REQUEST_POSTFIX});
   } else {
@@ -510,13 +511,13 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       deferred_end_stream_headers_(false), dispatching_(false), max_headers_kb_(max_headers_kb),
       max_headers_count_(max_headers_count) {
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_use_balsa_parser")) {
-    parser_ = std::make_unique<BalsaParser>(type, this, max_headers_kb_ * 1024);
+    parser_ = std::make_unique<BalsaParser>(type, this, max_headers_kb_ * 1024, enableTrailers());
   } else {
     parser_ = std::make_unique<LegacyHttpParserImpl>(type, this);
   }
 }
 
-Status ConnectionImpl::completeLastHeader() {
+Status ConnectionImpl::completeCurrentHeader() {
   ASSERT(dispatching_);
   ENVOY_CONN_LOG(trace, "completed header: key={} value={}", connection_,
                  current_header_field_.getStringView(), current_header_value_.getStringView());
@@ -687,7 +688,16 @@ Envoy::StatusOr<size_t> ConnectionImpl::dispatchSlice(const char* slice, size_t 
 
   const ParserStatus status = parser_->getStatus();
   if (status != ParserStatus::Ok && status != ParserStatus::Paused) {
-    RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().HttpCodecError));
+    absl::string_view error = Http1ResponseCodeDetails::get().HttpCodecError;
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_use_balsa_parser")) {
+      if (parser_->errorMessage() == "headers size exceeds limit" ||
+          parser_->errorMessage() == "trailers size exceeds limit") {
+        error = Http1ResponseCodeDetails::get().HeadersTooLarge;
+      } else if (parser_->errorMessage() == "header value contains invalid chars") {
+        error = Http1ResponseCodeDetails::get().InvalidCharacters;
+      }
+    }
+    RETURN_IF_ERROR(sendProtocolError(error));
     // Avoid overwriting the codec_status_ set in the callbacks.
     ASSERT(codec_status_.ok());
     codec_status_ =
@@ -761,7 +771,7 @@ Status ConnectionImpl::onHeaderFieldImpl(const char* data, size_t length) {
     allocTrailers();
   }
   if (header_parsing_state_ == HeaderParsingState::Value) {
-    RETURN_IF_ERROR(completeLastHeader());
+    RETURN_IF_ERROR(completeCurrentHeader());
   }
 
   current_header_field_.append(data, length);
@@ -791,8 +801,8 @@ Status ConnectionImpl::onHeaderValueImpl(const char* data, size_t length) {
   if (current_header_value_.empty()) {
     // Strip leading whitespace if the current header value input contains the first bytes of the
     // encoded header value. Trailing whitespace is stripped once the full header value is known in
-    // ConnectionImpl::completeLastHeader. http_parser does not strip leading or trailing whitespace
-    // as the spec requires: https://tools.ietf.org/html/rfc7230#section-3.2.4 .
+    // ConnectionImpl::completeCurrentHeader. http_parser does not strip leading or trailing
+    // whitespace as the spec requires: https://tools.ietf.org/html/rfc7230#section-3.2.4 .
     header_value = StringUtil::ltrim(header_value);
   }
   current_header_value_.append(header_value.data(), header_value.length());
@@ -804,7 +814,7 @@ StatusOr<CallbackResult> ConnectionImpl::onHeadersCompleteImpl() {
   ASSERT(!processing_trailers_);
   ASSERT(dispatching_);
   ENVOY_CONN_LOG(trace, "onHeadersCompleteBase", connection_);
-  RETURN_IF_ERROR(completeLastHeader());
+  RETURN_IF_ERROR(completeCurrentHeader());
 
   if (!parser_->isHttp11()) {
     // This is not necessarily true, but it's good enough since higher layers only care if this is
@@ -861,6 +871,10 @@ StatusOr<CallbackResult> ConnectionImpl::onHeadersCompleteImpl() {
   // remove the received Content-Length field prior to forwarding such
   // a message.
 
+#ifndef ENVOY_ENABLE_UHV
+  // This check is moved into default header validator.
+  // TODO(yanavlasov): use runtime override here when UHV is moved into the main build
+
   // Reject message with Http::Code::BadRequest if both Transfer-Encoding and Content-Length
   // headers are present or if allowed by http1 codec settings and 'Transfer-Encoding'
   // is chunked - remove Content-Length and serve request.
@@ -874,6 +888,7 @@ StatusOr<CallbackResult> ConnectionImpl::onHeadersCompleteImpl() {
           "http/1.1 protocol error: both 'Content-Length' and 'Transfer-Encoding' are set.");
     }
   }
+#endif
 
   // Per https://tools.ietf.org/html/rfc7230#section-3.3.1 Envoy should reject
   // transfer-codings it does not understand.
@@ -917,7 +932,7 @@ StatusOr<CallbackResult> ConnectionImpl::onMessageCompleteImpl() {
   // If true, this indicates we were processing trailers and must
   // move the last header into current_header_map_
   if (header_parsing_state_ == HeaderParsingState::Value) {
-    RETURN_IF_ERROR(completeLastHeader());
+    RETURN_IF_ERROR(completeCurrentHeader());
   }
 
   return onMessageCompleteBase();
@@ -1027,9 +1042,7 @@ ServerConnectionImpl::ServerConnectionImpl(
           [&]() -> void { this->onBelowLowWatermark(); },
           [&]() -> void { this->onAboveHighWatermark(); },
           []() -> void { /* TODO(adisuissa): handle overflow watermark */ })),
-      headers_with_underscores_action_(headers_with_underscores_action),
-      runtime_lazy_read_disable_(
-          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_lazy_read_disable")) {
+      headers_with_underscores_action_(headers_with_underscores_action) {
   owned_output_buffer_->setWatermarks(connection.bufferLimit());
   // Inform parent
   output_buffer_ = owned_output_buffer_.get();
@@ -1181,9 +1194,6 @@ Status ServerConnectionImpl::onMessageBeginBase() {
   if (!resetStreamCalled()) {
     ASSERT(active_request_ == nullptr);
     active_request_ = std::make_unique<ActiveRequest>(*this, std::move(bytes_meter_before_stream_));
-    if (resetStreamCalled()) {
-      return codecClientError("cannot create new streams after calling reset");
-    }
     active_request_->request_decoder_ = &callbacks_.newStream(active_request_->response_encoder_);
 
     // Check for pipelined request flood as we prepare to accept a new request.
@@ -1213,8 +1223,7 @@ void ServerConnectionImpl::onBody(Buffer::Instance& data) {
 }
 
 Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
-  if (runtime_lazy_read_disable_ && active_request_ != nullptr &&
-      active_request_->remote_complete_) {
+  if (active_request_ != nullptr && active_request_->remote_complete_) {
     // Eagerly read disable the connection if the downstream is sending pipelined requests as we
     // serially process them. Reading from the connection will be re-enabled after the active
     // request is completed.
@@ -1224,8 +1233,7 @@ Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
 
   Http::Status status = ConnectionImpl::dispatch(data);
 
-  if (runtime_lazy_read_disable_ && active_request_ != nullptr &&
-      active_request_->remote_complete_) {
+  if (active_request_ != nullptr && active_request_->remote_complete_) {
     // Read disable the connection if the downstream is sending additional data while we are working
     // on an existing request. Reading from the connection will be re-enabled after the active
     // request is completed.
@@ -1242,9 +1250,6 @@ CallbackResult ServerConnectionImpl::onMessageCompleteBase() {
 
     // The request_decoder should be non-null after we've called the newStream on callbacks.
     ASSERT(active_request_->request_decoder_);
-    if (!runtime_lazy_read_disable_) {
-      active_request_->response_encoder_.readDisable(true);
-    }
     active_request_->remote_complete_ = true;
 
     if (deferred_end_stream_headers_) {

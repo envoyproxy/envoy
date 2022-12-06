@@ -25,8 +25,6 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 
-// TODO(mattklein123): UDP session access logging.
-
 namespace Envoy {
 namespace Extensions {
 namespace UdpFilters {
@@ -90,9 +88,15 @@ public:
           "is not running with the CAP_NET_ADMIN capability.");
     }
 
-    access_logs_.reserve(config.access_log_size());
+    session_access_logs_.reserve(config.access_log_size());
     for (const envoy::config::accesslog::v3::AccessLog& log_config : config.access_log()) {
-      access_logs_.emplace_back(AccessLog::AccessLogFactory::fromProto(log_config, context));
+      session_access_logs_.emplace_back(
+          AccessLog::AccessLogFactory::fromProto(log_config, context));
+    }
+
+    proxy_access_logs_.reserve(config.proxy_access_log_size());
+    for (const envoy::config::accesslog::v3::AccessLog& log_config : config.proxy_access_log()) {
+      proxy_access_logs_.emplace_back(AccessLog::AccessLogFactory::fromProto(log_config, context));
     }
 
     if (!config.hash_policies().empty()) {
@@ -116,7 +120,12 @@ public:
   const Network::ResolvedUdpSocketConfig& upstreamSocketConfig() const {
     return upstream_socket_config_;
   }
-  const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const { return access_logs_; }
+  const std::vector<AccessLog::InstanceSharedPtr>& sessionAccessLogs() const {
+    return session_access_logs_;
+  }
+  const std::vector<AccessLog::InstanceSharedPtr>& proxyAccessLogs() const {
+    return proxy_access_logs_;
+  }
 
 private:
   static UdpProxyDownstreamStats generateStats(const std::string& stat_prefix,
@@ -135,7 +144,8 @@ private:
   std::unique_ptr<const HashPolicyImpl> hash_policy_;
   mutable UdpProxyDownstreamStats stats_;
   const Network::ResolvedUdpSocketConfig upstream_socket_config_;
-  std::vector<AccessLog::InstanceSharedPtr> access_logs_;
+  std::vector<AccessLog::InstanceSharedPtr> session_access_logs_;
+  std::vector<AccessLog::InstanceSharedPtr> proxy_access_logs_;
   Random::RandomGenerator& random_;
 };
 
@@ -165,6 +175,7 @@ class UdpProxyFilter : public Network::UdpListenerReadFilter,
 public:
   UdpProxyFilter(Network::UdpReadFilterCallbacks& callbacks,
                  const UdpProxyFilterConfigSharedPtr& config);
+  ~UdpProxyFilter() override;
 
   // Network::UdpListenerReadFilter
   Network::FilterStatus onData(Network::UdpRecvData& data) override;
@@ -193,7 +204,7 @@ private:
   private:
     void onIdleTimer();
     void onReadReady();
-    void fillStreamInfo();
+    void fillSessionStreamInfo();
 
     // Network::UdpPacketProcessor
     void processPacket(Network::Address::InstanceConstSharedPtr local_address,
@@ -236,9 +247,13 @@ private:
     // packets from the upstream host. Note that a a local ephemeral port is bound on the first
     // write to the upstream host.
     const Network::SocketPtr socket_;
+    // The socket should be connected to avoid port exhaustion unless runtime guard
+    // envoy.reloadable_features.udp_proxy_connect is unset or use_original_src_ip_ is set. If it
+    // is true, there will be no calling `connect()` on the socket.
+    bool skip_connect_{};
 
     UdpProxySessionStats session_stats_{};
-    absl::optional<StreamInfo::StreamInfoImpl> udp_sess_stats_;
+    absl::optional<StreamInfo::StreamInfoImpl> udp_session_stats_;
   };
 
   using ActiveSessionPtr = std::unique_ptr<ActiveSession>;
@@ -376,6 +391,8 @@ private:
                                                  nullptr, Network::SocketCreationOptions{});
   }
 
+  void fillProxyStreamInfo();
+
   // Upstream::ClusterUpdateCallbacks
   void onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) final;
   void onClusterRemoval(const std::string& cluster_name) override;
@@ -384,6 +401,8 @@ private:
   const Upstream::ClusterUpdateCallbacksHandlePtr cluster_update_callbacks_;
   // Map for looking up cluster info with its name.
   absl::flat_hash_map<std::string, ClusterInfoPtr> cluster_infos_;
+
+  absl::optional<StreamInfo::StreamInfoImpl> udp_proxy_stats_;
 };
 
 } // namespace UdpProxy

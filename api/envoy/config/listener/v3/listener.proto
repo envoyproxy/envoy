@@ -36,6 +36,15 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // The additional address the listener is listening on.
 message AdditionalAddress {
   core.v3.Address address = 1;
+
+  // Additional socket options that may not be present in Envoy source code or
+  // precompiled binaries. If specified, this will override the
+  // :ref:`socket_options <envoy_v3_api_field_config.listener.v3.Listener.socket_options>`
+  // in the listener. If specified with no
+  // :ref:`socket_options <envoy_v3_api_field_config.core.v3.SocketOptionsOverride.socket_options>`
+  // or an empty list of :ref:`socket_options <envoy_v3_api_field_config.core.v3.SocketOptionsOverride.socket_options>`,
+  // it means no socket option will apply.
+  core.v3.SocketOptionsOverride socket_options = 2;
 }
 
 // Listener list collections. Entries are ``Listener`` resources or references.
@@ -103,7 +112,6 @@ message Listener {
   }
 
   // Configuration for envoy internal listener. All the future internal listener features should be added here.
-  // [#not-implemented-hide:]
   message InternalListenerConfig {
   }
 
@@ -234,7 +242,10 @@ message Listener {
   google.protobuf.BoolValue freebind = 11;
 
   // Additional socket options that may not be present in Envoy source code or
-  // precompiled binaries.
+  // precompiled binaries. The socket options can be updated for a listener when
+  // :ref:`enable_reuse_port <envoy_v3_api_field_config.listener.v3.Listener.enable_reuse_port>`
+  // is `true`. Otherwise, if socket options change during a listener update the update will be rejected
+  // to make it clear that the options were not updated.
   repeated core.v3.SocketOption socket_options = 13;
 
   // Whether the listener should accept TCP Fast Open (TFO) connections.
@@ -300,7 +311,9 @@ message Listener {
   // create one socket for each worker thread. This makes inbound connections
   // distribute among worker threads roughly evenly in cases where there are a high number
   // of connections. When this flag is set to false, all worker threads share one socket. This field
-  // defaults to true.
+  // defaults to true. The change of field will be rejected during an listener update when the
+  // runtime flag ``envoy.reloadable_features.enable_update_listener_socket_options`` is enabled.
+  // Otherwise, the update of this field will be ignored quietly.
   //
   // .. attention::
   //
@@ -333,24 +346,21 @@ message Listener {
   google.protobuf.BoolValue bind_to_port = 26;
 
   // The exclusive listener type and the corresponding config.
-  // TODO(lambdai): https://github.com/envoyproxy/envoy/issues/15372
-  // Will create and add TcpListenerConfig. Will add UdpListenerConfig and ApiListener.
-  // [#not-implemented-hide:]
   oneof listener_specifier {
     // Used to represent an internal listener which does not listen on OSI L4 address but can be used by the
     // :ref:`envoy cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>` to create a user space connection to.
-    // The internal listener acts as a tcp listener. It supports listener filters and network filter chains.
-    // The internal listener require :ref:`address <envoy_v3_api_field_config.listener.v3.Listener.address>` has
-    // field `envoy_internal_address`.
+    // The internal listener acts as a TCP listener. It supports listener filters and network filter chains.
+    // Upstream clusters refer to the internal listeners by their :ref:`name
+    // <envoy_v3_api_field_config.listener.v3.Listener.name>`. :ref:`Address
+    // <envoy_v3_api_field_config.listener.v3.Listener.address>` must not be set on the internal listeners.
     //
-    // There are some limitations are derived from the implementation. The known limitations include
+    // There are some limitations that are derived from the implementation. The known limitations include:
     //
     // * :ref:`ConnectionBalanceConfig <envoy_v3_api_msg_config.listener.v3.Listener.ConnectionBalanceConfig>` is not
-    //   allowed because both cluster connection and listener connection must be owned by the same dispatcher.
+    //   allowed because both the cluster connection and the listener connection must be owned by the same dispatcher.
     // * :ref:`tcp_backlog_size <envoy_v3_api_field_config.listener.v3.Listener.tcp_backlog_size>`
     // * :ref:`freebind <envoy_v3_api_field_config.listener.v3.Listener.freebind>`
     // * :ref:`transparent <envoy_v3_api_field_config.listener.v3.Listener.transparent>`
-    // [#not-implemented-hide:]
     InternalListenerConfig internal_listener = 27;
   }
 

@@ -54,6 +54,38 @@ bool Heap::profilerEnabled() { return false; }
 bool Heap::isProfilerStarted() { return false; }
 bool Heap::startProfiler(const std::string&) { return false; }
 bool Heap::stopProfiler() { return false; }
+
+} // namespace Profiler
+} // namespace Envoy
+
+#endif // #ifdef PROFILER_AVAILABLE
+
+#ifdef TCMALLOC
+
+#include "tcmalloc/malloc_extension.h"
+#include "tcmalloc/profile_marshaler.h"
+
+namespace Envoy {
+namespace Profiler {
+
+absl::StatusOr<std::string> TcmallocProfiler::tcmallocHeapProfile() {
+  auto profile = tcmalloc::MallocExtension::SnapshotCurrent(tcmalloc::ProfileType::kHeap);
+  return tcmalloc::Marshal(profile);
+}
+
+} // namespace Profiler
+} // namespace Envoy
+
+#else
+
+namespace Envoy {
+namespace Profiler {
+
+absl::StatusOr<std::string> TcmallocProfiler::tcmallocHeapProfile() {
+  return absl::Status(absl::StatusCode::kUnimplemented,
+                      "Heap profile is not implemented in current build");
+}
+
 } // namespace Profiler
 } // namespace Envoy
 

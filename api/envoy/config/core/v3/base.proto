@@ -334,7 +334,7 @@ message HeaderValueOption {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.HeaderValueOption";
 
-  // [#not-implemented-hide:] Describes the supported actions types for header append action.
+  // Describes the supported actions types for header append action.
   enum HeaderAppendAction {
     // This action will append the specified value to the existing values if the header
     // already exists. If the header doesn't exist then this will add the header with
@@ -356,10 +356,20 @@ message HeaderValueOption {
 
   // Should the value be appended? If true (default), the value is appended to
   // existing values. Otherwise it replaces any existing values.
-  google.protobuf.BoolValue append = 2;
+  // This field is deprecated and please use
+  // :ref:`append_action <envoy_v3_api_field_config.core.v3.HeaderValueOption.append_action>` as replacement.
+  //
+  // .. note::
+  //   The :ref:`external authorization service <envoy_v3_api_msg_service.auth.v3.CheckResponse>` and
+  //   :ref:`external processor service <envoy_v3_api_msg_service.ext_proc.v3.ProcessingResponse>` have
+  //   default value (``false``) for this field.
+  google.protobuf.BoolValue append = 2
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
-  // [#not-implemented-hide:] Describes the action taken to append/overwrite the given value for an existing header
-  // or to only add this header if it's absent. Value defaults to :ref:`APPEND_IF_EXISTS_OR_ADD<envoy_v3_api_enum_value_config.core.v3.HeaderValueOption.HeaderAppendAction.APPEND_IF_EXISTS_OR_ADD>`.
+  // Describes the action taken to append/overwrite the given value for an existing header
+  // or to only add this header if it's absent.
+  // Value defaults to :ref:`APPEND_IF_EXISTS_OR_ADD
+  // <envoy_v3_api_enum_value_config.core.v3.HeaderValueOption.HeaderAppendAction.APPEND_IF_EXISTS_OR_ADD>`.
   HeaderAppendAction append_action = 3 [(validate.rules).enum = {defined_only: true}];
 
   // Is the header value allowed to be empty? If false (default), custom headers with empty values are dropped,

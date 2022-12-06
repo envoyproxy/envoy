@@ -47,6 +47,8 @@ public:
   const std::string CANARY = "canary";
   // Key in envoy.lb filter namespace for the key to use to hash an endpoint.
   const std::string HASH_KEY = "hash_key";
+  // Key in envoy.lb filter namespace for providing fallback metadata
+  const std::string FALLBACK_LIST = "fallback_list";
 };
 
 using MetadataEnvoyLbKeys = ConstSingleton<MetadataEnvoyLbKeyValues>;
@@ -103,6 +105,10 @@ public:
   const std::string MONGO_CALLSITE = "envoy.mongo_callsite";
   // Stats prefix for the Ratelimit network filter
   const std::string RATELIMIT_PREFIX = "envoy.ratelimit_prefix";
+  // Stats prefix for the Local Ratelimit network filter
+  const std::string LOCAL_HTTP_RATELIMIT_PREFIX = "envoy.local_http_ratelimit_prefix";
+  // Stats prefix for the Local Ratelimit network filter
+  const std::string LOCAL_NETWORK_RATELIMIT_PREFIX = "envoy.local_network_ratelimit_prefix";
   // Stats prefix for the TCP Proxy network filter
   const std::string TCP_PREFIX = "envoy.tcp_prefix";
   // Stats prefix for the UDP Proxy network filter

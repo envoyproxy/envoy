@@ -266,7 +266,7 @@ public:
    */
   virtual Http::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& config, const std::string& stat_prefix,
-                               Server::Configuration::ServerFactoryContext& context) PURE;
+                               Server::Configuration::UpstreamHttpFactoryContext& context) PURE;
 };
 
 } // namespace Configuration

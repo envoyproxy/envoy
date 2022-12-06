@@ -26,5 +26,8 @@ constexpr char LocalReplyDuringEncodeData::name[];
 static Registry::RegisterFactory<SimpleFilterConfig<LocalReplyDuringEncodeData>,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
+static Registry::RegisterFactory<SimpleFilterConfig<LocalReplyDuringEncodeData>,
+                                 Server::Configuration::UpstreamHttpFilterConfigFactory>
+    register_upstream_;
 
 } // namespace Envoy

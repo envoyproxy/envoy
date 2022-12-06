@@ -53,6 +53,9 @@ public:
   bool use_http2_{};
   bool use_http3_{};
   bool use_alpn_{};
+  using FiltersList = Protobuf::RepeatedPtrField<
+      envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter>;
+  FiltersList http_filters_;
   absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
       alternate_protocol_cache_options_;
 };

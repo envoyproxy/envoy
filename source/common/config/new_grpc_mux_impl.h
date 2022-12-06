@@ -50,7 +50,7 @@ public:
   GrpcMuxWatchPtr addWatch(const std::string& type_url,
                            const absl::flat_hash_set<std::string>& resources,
                            SubscriptionCallbacks& callbacks,
-                           OpaqueResourceDecoder& resource_decoder,
+                           OpaqueResourceDecoderSharedPtr resource_decoder,
                            const SubscriptionOptions& options) override;
 
   void requestOnDemandUpdate(const std::string& type_url,

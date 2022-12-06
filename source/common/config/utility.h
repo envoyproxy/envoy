@@ -32,6 +32,7 @@
 #include "source/common/version/api_version.h"
 #include "source/common/version/api_version_struct.h"
 
+#include "absl/types/optional.h"
 #include "udpa/type/v1/typed_struct.pb.h"
 #include "xds/type/v3/typed_struct.pb.h"
 
@@ -190,6 +191,15 @@ public:
       const envoy::config::core::v3::ApiConfigSource& api_config_source);
 
   /**
+   * Gets the gRPC control plane management server from the API config source. The result is either
+   * a cluster name or a host name.
+   * @param api_config_source the config source to validate.
+   * @return the gRPC control plane server, or absl::nullopt if it couldn't be extracted.
+   */
+  static absl::optional<std::string>
+  getGrpcControlPlane(const envoy::config::core::v3::ApiConfigSource& api_config_source);
+
+  /**
    * Validate transport_api_version field in ApiConfigSource.
    * @param api_config_source the config source to extract transport API version from.
    * @throws DeprecatedMajorVersionException when the transport version is disabled.
@@ -198,13 +208,12 @@ public:
     const auto transport_api_version = api_config_source.transport_api_version();
     ASSERT_IS_MAIN_OR_TEST_THREAD();
     if (transport_api_version != envoy::config::core::v3::ApiVersion::V3) {
-      const ApiVersion version = ApiVersionInfo::apiVersion();
       const std::string& warning = fmt::format(
           "V2 (and AUTO) xDS transport protocol versions are deprecated in {}. "
           "The v2 xDS major version has been removed and is no longer supported. "
           "You may be missing explicit V3 configuration of the transport API version, "
-          "see the advice in https://www.envoyproxy.io/docs/envoy/v{}.{}.{}/faq/api/envoy_v3.",
-          api_config_source.DebugString(), version.major, version.minor, version.patch);
+          "see the advice in https://www.envoyproxy.io/docs/envoy/latest/faq/api/envoy_v3.",
+          api_config_source.DebugString());
       ENVOY_LOG_MISC(warn, warning);
       throw DeprecatedMajorVersionException(warning);
     }

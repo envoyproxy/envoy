@@ -30,8 +30,13 @@ OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::str
                                   Network::Address::IpVersion ip_version,
                                   FieldValidationConfig validation_config, uint32_t concurrency,
                                   std::chrono::seconds drain_time,
-                                  Server::DrainStrategy drain_strategy) {
-  OptionsImpl test_options("cluster_name", "node_name", "zone_name", spdlog::level::info);
+                                  Server::DrainStrategy drain_strategy,
+                                  bool use_bootstrap_node_metadata) {
+  // Empty string values mean the Bootstrap node metadata won't be overridden.
+  const std::string service_cluster = use_bootstrap_node_metadata ? "" : "cluster_name";
+  const std::string service_node = use_bootstrap_node_metadata ? "" : "node_name";
+  const std::string service_zone = use_bootstrap_node_metadata ? "" : "zone_name";
+  OptionsImpl test_options(service_cluster, service_node, service_zone, spdlog::level::info);
 
   test_options.setConfigPath(config_path);
   test_options.setConfigYaml(config_yaml);
@@ -58,7 +63,8 @@ IntegrationTestServerPtr IntegrationTestServer::create(
     Event::TestTimeSystem& time_system, Api::Api& api, bool defer_listener_finalization,
     ProcessObjectOptRef process_object, Server::FieldValidationConfig validation_config,
     uint32_t concurrency, std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
-    Buffer::WatermarkFactorySharedPtr watermark_factory, bool use_real_stats) {
+    Buffer::WatermarkFactorySharedPtr watermark_factory, bool use_real_stats,
+    bool use_bootstrap_node_metadata) {
   IntegrationTestServerPtr server{
       std::make_unique<IntegrationTestServerImpl>(time_system, api, config_path, use_real_stats)};
   if (server_ready_function != nullptr) {
@@ -66,7 +72,7 @@ IntegrationTestServerPtr IntegrationTestServer::create(
   }
   server->start(version, on_server_init_function, deterministic_value, defer_listener_finalization,
                 process_object, validation_config, concurrency, drain_time, drain_strategy,
-                watermark_factory);
+                watermark_factory, use_bootstrap_node_metadata);
   return server;
 }
 
@@ -99,15 +105,15 @@ void IntegrationTestServer::start(
     absl::optional<uint64_t> deterministic_value, bool defer_listener_finalization,
     ProcessObjectOptRef process_object, Server::FieldValidationConfig validator_config,
     uint32_t concurrency, std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
-    Buffer::WatermarkFactorySharedPtr watermark_factory) {
+    Buffer::WatermarkFactorySharedPtr watermark_factory, bool use_bootstrap_node_metadata) {
   ENVOY_LOG(info, "starting integration test server");
   ASSERT(!thread_);
-  thread_ = api_.threadFactory().createThread([version, deterministic_value, process_object,
-                                               validator_config, concurrency, drain_time,
-                                               drain_strategy, watermark_factory, this]() -> void {
-    threadRoutine(version, deterministic_value, process_object, validator_config, concurrency,
-                  drain_time, drain_strategy, watermark_factory);
-  });
+  thread_ = api_.threadFactory().createThread(
+      [version, deterministic_value, process_object, validator_config, concurrency, drain_time,
+       drain_strategy, watermark_factory, use_bootstrap_node_metadata, this]() -> void {
+        threadRoutine(version, deterministic_value, process_object, validator_config, concurrency,
+                      drain_time, drain_strategy, watermark_factory, use_bootstrap_node_metadata);
+      });
 
   // If any steps need to be done prior to workers starting, do them now. E.g., xDS pre-init.
   // Note that there is no synchronization guaranteeing this happens either
@@ -132,7 +138,7 @@ void IntegrationTestServer::start(
   if (tap_path) {
     std::vector<uint32_t> ports;
     for (auto listener : server().listenerManager().listeners()) {
-      const auto listen_addr = listener.get().listenSocketFactory().localAddress();
+      const auto listen_addr = listener.get().listenSocketFactories()[0]->localAddress();
       if (listen_addr->type() == Network::Address::Type::Ip) {
         ports.push_back(listen_addr->ip()->port());
       }
@@ -179,15 +185,14 @@ void IntegrationTestServer::serverReady() {
   server_set_.setReady();
 }
 
-void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion version,
-                                          absl::optional<uint64_t> deterministic_value,
-                                          ProcessObjectOptRef process_object,
-                                          Server::FieldValidationConfig validation_config,
-                                          uint32_t concurrency, std::chrono::seconds drain_time,
-                                          Server::DrainStrategy drain_strategy,
-                                          Buffer::WatermarkFactorySharedPtr watermark_factory) {
+void IntegrationTestServer::threadRoutine(
+    const Network::Address::IpVersion version, absl::optional<uint64_t> deterministic_value,
+    ProcessObjectOptRef process_object, Server::FieldValidationConfig validation_config,
+    uint32_t concurrency, std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
+    Buffer::WatermarkFactorySharedPtr watermark_factory, bool use_bootstrap_node_metadata) {
   OptionsImpl options(Server::createTestOptionsImpl(config_path_, "", version, validation_config,
-                                                    concurrency, drain_time, drain_strategy));
+                                                    concurrency, drain_time, drain_strategy,
+                                                    use_bootstrap_node_metadata));
   Thread::MutexBasicLockable lock;
 
   Random::RandomGeneratorPtr random_generator;
@@ -235,7 +240,9 @@ void IntegrationTestServerImpl::createAndRunEnvoyServer(
     // This is technically thread unsafe (assigning to a shared_ptr accessed
     // across threads), but because we synchronize below through serverReady(), the only
     // consumer on the main test thread in ~IntegrationTestServerImpl will not race.
-    admin_address_ = server.admin().socket().connectionInfoProvider().localAddress();
+    if (server.admin()) {
+      admin_address_ = server.admin()->socket().connectionInfoProvider().localAddress();
+    }
     server_ = &server;
     stat_store_ = &stat_store;
     serverReady();

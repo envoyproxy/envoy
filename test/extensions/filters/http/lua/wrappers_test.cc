@@ -276,6 +276,26 @@ TEST_F(LuaHeaderMapWrapperTest, IteratorAcrossYield) {
                             "[string \"...\"]:5: object used outside of proper scope");
 }
 
+// Verify setting the HTTP1 reason phrase
+TEST_F(LuaHeaderMapWrapperTest, SetHttp1ReasonPhrase) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      object:setHttp1ReasonPhrase("Slow Down")
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  auto headers = Http::ResponseHeaderMapImpl::create();
+  HeaderMapWrapper::create(coroutine_->luaState(), *headers, []() { return true; });
+  start("callMe");
+
+  Http::StatefulHeaderKeyFormatterOptRef formatter(headers->formatter());
+  EXPECT_EQ(true, formatter.has_value());
+  EXPECT_EQ("Slow Down", formatter->getReasonPhrase());
+}
+
 class LuaStreamInfoWrapperTest
     : public Filters::Common::Lua::LuaWrappersTestBase<StreamInfoWrapper> {
 public:

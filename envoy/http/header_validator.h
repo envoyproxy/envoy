@@ -35,6 +35,15 @@ public:
                 "Error details must not be empty in case of an error");
     }
 
+    template <typename OtherActionType> operator Result<OtherActionType>() const {
+      // Cast to another result, treating any non-success action as "ActionType::Reject"
+      if (std::get<0>(result_) != ActionType::Accept) {
+        return Result<OtherActionType>(OtherActionType::Reject, std::get<1>(result_));
+      }
+
+      return Result<OtherActionType>::success();
+    }
+
     bool ok() const { return std::get<0>(result_) == ActionType::Accept; }
     operator bool() const { return ok(); }
     absl::string_view details() const { return std::get<1>(result_); }
@@ -46,16 +55,18 @@ public:
 
   enum class RejectAction { Accept, Reject };
   enum class RejectOrRedirectAction { Accept, Reject, Redirect };
+  enum class RejectOrDropHeaderAction { Accept, Reject, DropHeader };
   using RejectResult = Result<RejectAction>;
   using RejectOrRedirectResult = Result<RejectOrRedirectAction>;
+  using RejectOrDropHeaderResult = Result<RejectOrDropHeaderAction>;
 
   /**
    * Method for validating a request header entry.
    * Returning the Reject value causes the request to be rejected with the 400 status.
    */
-  using ValidationResult = RejectResult;
-  virtual ValidationResult validateRequestHeaderEntry(const HeaderString& key,
-                                                      const HeaderString& value) PURE;
+  using HeaderEntryValidationResult = RejectOrDropHeaderResult;
+  virtual HeaderEntryValidationResult validateRequestHeaderEntry(const HeaderString& key,
+                                                                 const HeaderString& value) PURE;
 
   /**
    * Method for validating a response header entry.

@@ -42,7 +42,7 @@ public:
   }
 
   FakeResourceMonitor* monitor() const { return monitor_; }
-  void onMonitorDestroyed(FakeResourceMonitor* monitor);
+  void onMonitorDestroyed();
 
 private:
   FakeResourceMonitor* monitor_{nullptr};

@@ -18,24 +18,19 @@ class ServerInfoHandler : public HandlerContextBase {
 public:
   ServerInfoHandler(Server::Instance& server);
 
-  Http::Code handlerCerts(absl::string_view path_and_query,
-                          Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
+  Http::Code handlerCerts(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                           AdminStream&);
 
-  Http::Code handlerServerInfo(absl::string_view path_and_query,
-                               Http::ResponseHeaderMap& response_headers,
+  Http::Code handlerServerInfo(Http::ResponseHeaderMap& response_headers,
                                Buffer::Instance& response, AdminStream&);
 
-  Http::Code handlerReady(absl::string_view path_and_query,
-                          Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
+  Http::Code handlerReady(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                           AdminStream&);
 
-  Http::Code handlerHotRestartVersion(absl::string_view path_and_query,
-                                      Http::ResponseHeaderMap& response_headers,
+  Http::Code handlerHotRestartVersion(Http::ResponseHeaderMap& response_headers,
                                       Buffer::Instance& response, AdminStream&);
 
-  Http::Code handlerMemory(absl::string_view path_and_query,
-                           Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
+  Http::Code handlerMemory(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                            AdminStream&);
 };
 

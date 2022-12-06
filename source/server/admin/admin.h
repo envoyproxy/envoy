@@ -71,8 +71,7 @@ public:
   AdminImpl(const std::string& profile_path, Server::Instance& server,
             bool ignore_global_conn_limit);
 
-  Http::Code runCallback(absl::string_view path_and_query,
-                         Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
+  Http::Code runCallback(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                          AdminStream& admin_stream);
   const Network::Socket& socket() override { return *socket_; }
   Network::Socket& mutableSocket() { return *socket_; }
@@ -83,10 +82,11 @@ public:
   //
   // The prefix must start with "/" and contain at least one additional character.
   bool addHandler(const std::string& prefix, const std::string& help_text, HandlerCb callback,
-                  bool removable, bool mutates_server_state) override;
+                  bool removable, bool mutates_server_state,
+                  const ParamDescriptorVec& params = {}) override;
   bool addStreamingHandler(const std::string& prefix, const std::string& help_text,
-                           GenRequestFn callback, bool removable,
-                           bool mutates_server_state) override;
+                           GenRequestFn callback, bool removable, bool mutates_server_state,
+                           const ParamDescriptorVec& params = {}) override;
   bool removeHandler(const std::string& prefix) override;
   ConfigTracker& getConfigTracker() override;
 
@@ -98,7 +98,8 @@ public:
   uint32_t concurrency() const override { return server_.options().concurrency(); }
 
   // Network::FilterChainManager
-  const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
+  const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&,
+                                              const StreamInfo::StreamInfo&) const override {
     return admin_filter_chain_.get();
   }
 
@@ -111,9 +112,9 @@ public:
                                     Network::UdpReadFilterCallbacks&) override {}
 
   // Http::FilterChainFactory
-  void createFilterChain(Http::FilterChainManager& manager) override;
+  bool createFilterChain(Http::FilterChainManager& manager, bool) const override;
   bool createUpgradeFilterChain(absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
-                                Http::FilterChainManager&) override {
+                                Http::FilterChainManager&) const override {
     return false;
   }
 
@@ -199,13 +200,11 @@ public:
   }
   Http::Code request(absl::string_view path_and_query, absl::string_view method,
                      Http::ResponseHeaderMap& response_headers, std::string& body) override;
-  void closeSocket();
+  void closeSocket() override;
   void addListenerToHandler(Network::ConnectionHandler* handler) override;
 
-  GenRequestFn createRequestFunction() {
-    return [this](absl::string_view path_and_query, AdminStream& admin_stream) -> RequestPtr {
-      return makeRequest(path_and_query, admin_stream);
-    };
+  GenRequestFn createRequestFunction() const {
+    return [this](AdminStream& admin_stream) -> RequestPtr { return makeRequest(admin_stream); };
   }
   uint64_t maxRequestsPerConnection() const override { return 0; }
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
@@ -215,35 +214,26 @@ public:
     // TODO(yanavlasov): admin interface should use the default validator
     return nullptr;
   }
+  bool appendXForwardedPort() const override { return false; }
 
 private:
   friend class AdminTestingPeer;
 
   /**
-   * Individual admin handler including prefix, help text, and callback.
+   * Creates a Request from the request in the admin stream.
    */
-  struct UrlHandler {
-    const std::string prefix_;
-    const std::string help_text_;
-    const GenRequestFn handler_;
-    const bool removable_;
-    const bool mutates_server_state_;
-  };
-
-  /**
-   * Creates a Request from a url.
-   */
-  RequestPtr makeRequest(absl::string_view path_and_query, AdminStream& admin_stream);
+  RequestPtr makeRequest(AdminStream& admin_stream) const;
 
   /**
    * Creates a UrlHandler structure from a non-chunked callback.
    */
   UrlHandler makeHandler(const std::string& prefix, const std::string& help_text,
-                         HandlerCb callback, bool removable, bool mutates_state);
+                         HandlerCb callback, bool removable, bool mutates_state,
+                         const ParamDescriptorVec& params = {});
 
   /**
    * Creates a URL prefix bound to chunked handler. Handler is expected to
-   * supply a method makeRequest(absl::string_view, AdminStream&).
+   * supply a method makeRequest(AdminStream&).
    *
    * @param prefix the prefix to register
    * @param help_text a help text ot display in a table in the admin home page
@@ -257,8 +247,8 @@ private:
   UrlHandler makeStreamingHandler(const std::string& prefix, const std::string& help_text,
                                   Handler& handler, bool removable, bool mutates_state) {
     return {prefix, help_text,
-            [&handler](absl::string_view path, AdminStream& admin_stream) -> Admin::RequestPtr {
-              return handler.makeRequest(path, admin_stream);
+            [&handler](AdminStream& admin_stream) -> Admin::RequestPtr {
+              return handler.makeRequest(admin_stream);
             },
             removable, mutates_state};
   }
@@ -350,14 +340,12 @@ private:
   /**
    * URL handlers.
    */
-  Http::Code handlerAdminHome(absl::string_view path_and_query,
-                              Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
+  Http::Code handlerAdminHome(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                               AdminStream&);
 
-  Http::Code handlerHelp(absl::string_view path_and_query,
-                         Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
+  Http::Code handlerHelp(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                          AdminStream&);
-  void getHelp(Buffer::Instance& response);
+  void getHelp(Buffer::Instance& response) const;
 
   class AdminListenSocketFactory : public Network::ListenSocketFactory {
   public:
@@ -393,10 +381,6 @@ private:
     // Network::ListenerConfig
     Network::FilterChainManager& filterChainManager() override { return parent_; }
     Network::FilterChainFactory& filterChainFactory() override { return parent_; }
-    Network::ListenSocketFactory& listenSocketFactory() override {
-      ASSERT(parent_.socket_factories_.size() == 1);
-      return *parent_.socket_factories_[0];
-    }
     std::vector<Network::ListenSocketFactoryPtr>& listenSocketFactories() override {
       return parent_.socket_factories_;
     }
@@ -486,6 +470,7 @@ private:
   Server::StatsHandler stats_handler_;
   Server::LogsHandler logs_handler_;
   Server::ProfilingHandler profiling_handler_;
+  Server::TcmallocProfilingHandler tcmalloc_profiling_handler_;
   Server::RuntimeHandler runtime_handler_;
   Server::ListenersHandler listeners_handler_;
   Server::ServerCmdHandler server_cmd_handler_;

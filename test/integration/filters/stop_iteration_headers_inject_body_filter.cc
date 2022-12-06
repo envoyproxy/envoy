@@ -78,4 +78,7 @@ private:
 static Registry::RegisterFactory<SimpleFilterConfig<StopIterationHeadersInjectBodyFilter>,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
+static Registry::RegisterFactory<SimpleFilterConfig<StopIterationHeadersInjectBodyFilter>,
+                                 Server::Configuration::UpstreamHttpFilterConfigFactory>
+    register_upstream_;
 } // namespace Envoy

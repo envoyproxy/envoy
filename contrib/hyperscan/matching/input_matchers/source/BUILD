@@ -45,14 +45,14 @@ envoy_cmake(
 )
 
 envoy_cc_library(
-    name = "hyperscan_lib",
+    name = "matcher_lib",
     srcs = ["matcher.cc"],
     hdrs = ["matcher.h"],
     deps = [
         ":hyperscan",
+        "//envoy/common:regex_interface",
         "//envoy/matcher:matcher_interface",
         "//envoy/thread_local:thread_local_interface",
-        "@envoy_api//contrib/envoy/extensions/matching/input_matchers/hyperscan/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -74,7 +74,7 @@ envoy_cc_contrib_extension(
         "@envoy_api//contrib/envoy/extensions/matching/input_matchers/hyperscan/v3alpha:pkg_cc_proto",
     ] + select({
         "//bazel:linux_x86_64": [
-            ":hyperscan_lib",
+            ":matcher_lib",
         ],
         "//conditions:default": [
         ],

@@ -38,6 +38,7 @@ using envoy::service::ext_proc::v3::HttpHeaders;
 using envoy::service::ext_proc::v3::ProcessingRequest;
 using envoy::service::ext_proc::v3::ProcessingResponse;
 
+using Http::Filter1xxHeadersStatus;
 using Http::FilterDataStatus;
 using Http::FilterHeadersStatus;
 using Http::FilterTrailersStatus;
@@ -95,12 +96,19 @@ protected:
   }
 
   void TearDown() override {
+    // This will fail if, at the end of the test, we left any timers enabled.
+    // (This particular test suite does not actually let timers expire,
+    // although other test suites do.)
+    EXPECT_TRUE(allTimersDisabled());
+  }
+
+  bool allTimersDisabled() {
     for (auto* t : timers_) {
-      // This will fail if, at the end of the test, we left any timers enabled.
-      // (This particular test suite does not actually let timers expire,
-      // although other test suites do.)
-      EXPECT_FALSE(t->enabled_);
+      if (t->enabled_) {
+        return false;
+      }
     }
+    return true;
   }
 
   ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks, testing::Unused,
@@ -587,7 +595,7 @@ TEST_F(HttpFilterTest, PostAndChangeRequestBodyBuffered) {
   response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
   response_headers_.addCopy(LowerCaseString("content-length"), "3");
 
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
+  EXPECT_EQ(Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
   processResponseHeaders(false, absl::nullopt);
 
@@ -783,7 +791,7 @@ TEST_F(HttpFilterTest, PostAndChangeBothBodiesBufferedOneChunk) {
   response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
   response_headers_.addCopy(LowerCaseString("content-length"), "100");
 
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
+  EXPECT_EQ(Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
 
   Buffer::OwnedImpl resp_data;
@@ -859,7 +867,7 @@ TEST_F(HttpFilterTest, PostAndChangeBothBodiesBufferedMultiChunk) {
   response_headers_.addCopy(LowerCaseString(":status"), "200");
   response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
 
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
+  EXPECT_EQ(Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
 
   Buffer::OwnedImpl resp_data_1;
@@ -1734,6 +1742,33 @@ TEST_F(HttpFilterTest, PostAndClose) {
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
+// Mimic a downstream client reset while the filter waits for a response from
+// the processor.
+TEST_F(HttpFilterTest, PostAndDownstreamReset) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  )EOF");
+
+  EXPECT_FALSE(config_->failureModeAllow());
+
+  // Create synthetic HTTP request
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_FALSE(last_request_.async_mode());
+  ASSERT_TRUE(last_request_.has_request_headers());
+  EXPECT_FALSE(allTimersDisabled());
+
+  // Call onDestroy to mimic a downstream client reset.
+  filter_->onDestroy();
+
+  EXPECT_TRUE(allTimersDisabled());
+  EXPECT_EQ(1, config_->stats().streams_started_.value());
+  EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+}
+
 // Using a processing mode, configure the filter to only send the request_headers
 // message.
 TEST_F(HttpFilterTest, ProcessingModeRequestHeadersOnly) {
@@ -1887,7 +1922,7 @@ TEST_F(HttpFilterTest, ClearRouteCache) {
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
 
-  EXPECT_CALL(decoder_callbacks_, clearRouteCache());
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
   processRequestHeaders(false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& resp) {
     resp.mutable_response()->set_clear_route_cache(true);
   });
@@ -1901,7 +1936,7 @@ TEST_F(HttpFilterTest, ClearRouteCache) {
 
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_data, true));
 
-  EXPECT_CALL(encoder_callbacks_, clearRouteCache());
+  EXPECT_CALL(encoder_callbacks_.downstream_callbacks_, clearRouteCache());
   processResponseBody([](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
     resp.mutable_response()->set_clear_route_cache(true);
   });

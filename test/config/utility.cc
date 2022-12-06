@@ -495,6 +495,11 @@ envoy::config::cluster::v3::Cluster ConfigHelper::buildStaticCluster(const std::
                 socket_address:
                   address: {}
                   port_value: {}
+              health_check_config:
+                address:
+                  socket_address:
+                    address: {}
+                    port_value: {}
       lb_policy: {}
       typed_extension_protocol_options:
         envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
@@ -502,7 +507,7 @@ envoy::config::cluster::v3::Cluster ConfigHelper::buildStaticCluster(const std::
           explicit_http_config:
             http2_protocol_options: {{}}
     )EOF",
-                  name, name, address, port, lb_policy));
+                  name, name, address, port, address, port, lb_policy));
 }
 
 envoy::config::cluster::v3::Cluster ConfigHelper::buildH1ClusterWithHighCircuitBreakersLimits(
@@ -930,9 +935,12 @@ void ConfigHelper::setProtocolOptions(envoy::config::cluster::v3::Cluster& clust
     HttpProtocolOptions old_options = MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
         (*cluster.mutable_typed_extension_protocol_options())
             ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
-    ASSERT(!old_options.has_auto_config());
+    bool auto_config = old_options.has_auto_config();
     old_options.MergeFrom(protocol_options);
     protocol_options.CopyFrom(old_options);
+    if (auto_config) {
+      protocol_options.mutable_auto_config();
+    }
   }
   (*cluster.mutable_typed_extension_protocol_options())
       ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
@@ -1167,20 +1175,47 @@ void ConfigHelper::addVirtualHost(const envoy::config::route::v3::VirtualHost& v
 
 void ConfigHelper::addFilter(const std::string& config) { prependFilter(config); }
 
-void ConfigHelper::prependFilter(const std::string& config) {
+void ConfigHelper::prependFilter(const std::string& config, bool downstream) {
   RELEASE_ASSERT(!finalized_, "");
-  envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
-      hcm_config;
-  loadHttpConnectionManager(hcm_config);
+  if (downstream) {
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
+        hcm_config;
+    loadHttpConnectionManager(hcm_config);
 
-  auto* filter_list_back = hcm_config.add_http_filters();
-  TestUtility::loadFromYaml(config, *filter_list_back);
+    auto* filter_list_back = hcm_config.add_http_filters();
+    TestUtility::loadFromYaml(config, *filter_list_back);
 
-  // Now move it to the front.
-  for (int i = hcm_config.http_filters_size() - 1; i > 0; --i) {
-    hcm_config.mutable_http_filters()->SwapElements(i, i - 1);
+    // Now move it to the front.
+    for (int i = hcm_config.http_filters_size() - 1; i > 0; --i) {
+      hcm_config.mutable_http_filters()->SwapElements(i, i - 1);
+    }
+    storeHttpConnectionManager(hcm_config);
+    return;
   }
-  storeHttpConnectionManager(hcm_config);
+
+  auto* static_resources = bootstrap_.mutable_static_resources();
+  for (int i = 0; i < static_resources->clusters_size(); ++i) {
+    auto* cluster = static_resources->mutable_clusters(i);
+
+    HttpProtocolOptions old_protocol_options;
+    if (cluster->typed_extension_protocol_options().contains(
+            "envoy.extensions.upstreams.http.v3.HttpProtocolOptions")) {
+      old_protocol_options = MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
+          (*cluster->mutable_typed_extension_protocol_options())
+              ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
+    }
+    if (old_protocol_options.http_filters().empty()) {
+      old_protocol_options.add_http_filters()->set_name("envoy.filters.http.upstream_codec");
+    }
+    auto* filter_list_back = old_protocol_options.add_http_filters();
+    TestUtility::loadFromYaml(config, *filter_list_back);
+    for (int i = old_protocol_options.http_filters_size() - 1; i > 0; --i) {
+      old_protocol_options.mutable_http_filters()->SwapElements(i, i - 1);
+    }
+    (*cluster->mutable_typed_extension_protocol_options())
+        ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+            .PackFrom(old_protocol_options);
+  }
 }
 
 void ConfigHelper::setClientCodec(envoy::extensions::filters::network::http_connection_manager::v3::
@@ -1373,16 +1408,23 @@ void ConfigHelper::initializeTls(
   } else {
     if (options.client_with_intermediate_cert_) {
       validation_context->add_verify_certificate_hash(TEST_CLIENT2_CERT_HASH);
-      std::string cert_yaml = R"EOF(
+      std::string cert_yaml;
+      if (options.trust_root_only_) {
+        cert_yaml = R"EOF(
         trusted_ca:
-          filename: "{{ test_rundir }}/test/config/integration/certs/intermediate_ca_cert_chain.pem"
+          filename: "{{ test_rundir }}/test/config/integration/certs/cacert.pem"
       )EOF";
-      if (options.max_verify_depth_) {
-        cert_yaml += R"EOF(
-        max_verify_depth: 1
+      } else {
+        cert_yaml = R"EOF(
+        trusted_ca:
+          filename: "{{ test_rundir }}/test/config/integration/certs/intermediate_partial_ca_cert_chain.pem"
       )EOF";
       }
       TestUtility::loadFromYaml(TestEnvironment::substitute(cert_yaml), *validation_context);
+      if (options.max_verify_depth_.has_value()) {
+        validation_context->mutable_max_verify_depth()->set_value(
+            options.max_verify_depth_.value());
+      }
     } else {
       validation_context->mutable_trusted_ca()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));

@@ -149,7 +149,8 @@ TEST(DefaultCertValidatorTest, TestCertificateVerificationWithSANMatcher) {
   std::vector<SanMatcherPtr> san_matchers;
   san_matchers.push_back(SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_DNS, matcher)});
   // Verify the certificate with correct SAN regex matcher.
-  EXPECT_EQ(default_validator->verifyCertificate(cert.get(), /*verify_san_list=*/{}, san_matchers),
+  EXPECT_EQ(default_validator->verifyCertificate(cert.get(), /*verify_san_list=*/{}, san_matchers,
+                                                 nullptr, nullptr),
             Envoy::Ssl::ClientValidationStatus::Validated);
   EXPECT_EQ(stats.fail_verify_san_.value(), 0);
 
@@ -157,9 +158,10 @@ TEST(DefaultCertValidatorTest, TestCertificateVerificationWithSANMatcher) {
   std::vector<SanMatcherPtr> invalid_san_matchers;
   invalid_san_matchers.push_back(
       SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_DNS, matcher)});
+  std::string error;
   // Verify the certificate with incorrect SAN exact matcher.
   EXPECT_EQ(default_validator->verifyCertificate(cert.get(), /*verify_san_list=*/{},
-                                                 invalid_san_matchers),
+                                                 invalid_san_matchers, &error, nullptr),
             Envoy::Ssl::ClientValidationStatus::Failed);
   EXPECT_EQ(stats.fail_verify_san_.value(), 1);
 }
@@ -174,14 +176,46 @@ TEST(DefaultCertValidatorTest, TestCertificateVerificationWithNoValidationContex
           Event::GlobalTimeSystem().timeSystem());
 
   EXPECT_EQ(default_validator->verifyCertificate(/*cert=*/nullptr, /*verify_san_list=*/{},
-                                                 /*subject_alt_name_matchers=*/{}),
+                                                 /*subject_alt_name_matchers=*/{}, nullptr,
+                                                 nullptr),
             Envoy::Ssl::ClientValidationStatus::NotValidated);
   bssl::UniquePtr<X509> cert(X509_new());
-  EXPECT_EQ(default_validator->doSynchronousVerifyCertChain(/*store_ctx=*/nullptr,
+  bssl::UniquePtr<X509_STORE_CTX> store_ctx(X509_STORE_CTX_new());
+  EXPECT_EQ(default_validator->doSynchronousVerifyCertChain(/*store_ctx=*/store_ctx.get(),
                                                             /*ssl_extended_info=*/nullptr,
                                                             /*leaf_cert=*/*cert,
                                                             /*transport_socket_options=*/nullptr),
             0);
+  SSLContextPtr ssl_ctx = SSL_CTX_new(TLS_method());
+  bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
+  ASSERT_TRUE(bssl::PushToStack(cert_chain.get(), std::move(cert)));
+  EXPECT_EQ(ValidationResults::ValidationStatus::Failed,
+            default_validator
+                ->doVerifyCertChain(*cert_chain, /*callback=*/nullptr,
+                                    /*ssl_extended_info=*/nullptr,
+                                    /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false, "")
+                .status);
+}
+
+TEST(DefaultCertValidatorTest, TestCertificateVerificationWithEmptyCertChain) {
+  Stats::TestUtil::TestStore test_store;
+  SslStats stats = generateSslStats(test_store);
+  // Create the default validator object.
+  auto default_validator =
+      std::make_unique<Extensions::TransportSockets::Tls::DefaultCertValidator>(
+          /*CertificateValidationContextConfig=*/nullptr, stats,
+          Event::GlobalTimeSystem().timeSystem());
+
+  SSLContextPtr ssl_ctx = SSL_CTX_new(TLS_method());
+  bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
+  TestSslExtendedSocketInfo extended_socket_info;
+  EXPECT_EQ(ValidationResults::ValidationStatus::Failed,
+            default_validator
+                ->doVerifyCertChain(*cert_chain, /*callback=*/nullptr, &extended_socket_info,
+                                    /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false, "")
+                .status);
+  EXPECT_EQ(extended_socket_info.certificateValidationStatus(),
+            Ssl::ClientValidationStatus::NotValidated);
 }
 
 TEST(DefaultCertValidatorTest, NoSanInCert) {

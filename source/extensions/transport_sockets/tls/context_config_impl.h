@@ -169,6 +169,8 @@ public:
     return disable_stateless_session_resumption_;
   }
 
+  bool fullScanCertsOnSNIMismatch() const override { return full_scan_certs_on_sni_mismatch_; }
+
 private:
   static const unsigned DEFAULT_MIN_VERSION;
   static const unsigned DEFAULT_MAX_VERSION;
@@ -191,6 +193,7 @@ private:
 
   absl::optional<std::chrono::seconds> session_timeout_;
   const bool disable_stateless_session_resumption_;
+  bool full_scan_certs_on_sni_mismatch_;
 };
 
 } // namespace Tls

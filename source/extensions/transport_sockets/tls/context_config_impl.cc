@@ -43,7 +43,8 @@ std::vector<Secret::TlsCertificateConfigProviderSharedPtr> getTlsCertificateConf
       if (sds_secret_config.has_sds_config()) {
         // Fetch dynamic secret.
         providers.push_back(factory_context.secretManager().findOrCreateTlsCertificateProvider(
-            sds_secret_config.sds_config(), sds_secret_config.name(), factory_context));
+            sds_secret_config.sds_config(), sds_secret_config.name(), factory_context,
+            factory_context.initManager()));
       } else {
         // Load static secret.
         auto secret_provider = factory_context.secretManager().findStaticTlsCertificateProvider(
@@ -65,7 +66,8 @@ Secret::CertificateValidationContextConfigProviderSharedPtr getProviderFromSds(
   if (sds_secret_config.has_sds_config()) {
     // Fetch dynamic secret.
     return factory_context.secretManager().findOrCreateCertificateValidationContextProvider(
-        sds_secret_config.sds_config(), sds_secret_config.name(), factory_context);
+        sds_secret_config.sds_config(), sds_secret_config.name(), factory_context,
+        factory_context.initManager());
   } else {
     // Load static secret.
     auto secret_provider =
@@ -128,7 +130,8 @@ Secret::TlsSessionTicketKeysConfigProviderSharedPtr getTlsSessionTicketKeysConfi
     if (sds_secret_config.has_sds_config()) {
       // Fetch dynamic secret.
       return factory_context.secretManager().findOrCreateTlsSessionTicketKeysContextProvider(
-          sds_secret_config.sds_config(), sds_secret_config.name(), factory_context);
+          sds_secret_config.sds_config(), sds_secret_config.name(), factory_context,
+          factory_context.initManager());
     } else {
       // Load static secret.
       auto secret_provider =
@@ -389,7 +392,11 @@ ServerContextConfigImpl::ServerContextConfigImpl(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, require_client_certificate, false)),
       ocsp_staple_policy_(ocspStaplePolicyFromProto(config.ocsp_staple_policy())),
       session_ticket_keys_provider_(getTlsSessionTicketKeysConfigProvider(factory_context, config)),
-      disable_stateless_session_resumption_(getStatelessSessionResumptionDisabled(config)) {
+      disable_stateless_session_resumption_(getStatelessSessionResumptionDisabled(config)),
+      full_scan_certs_on_sni_mismatch_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          config, full_scan_certs_on_sni_mismatch,
+          !Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.no_full_scan_certs_on_sni_mismatch"))) {
 
   if (session_ticket_keys_provider_ != nullptr) {
     // Validate tls session ticket keys early to reject bad sds updates.

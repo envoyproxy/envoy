@@ -1,10 +1,10 @@
-FROM golang:alpine@sha256:d84b1ff3eeb9404e0a7dda7fdc6914cbe657102420529beec62ccb3ef3d143eb AS builder
+FROM golang:alpine@sha256:8bd8a4b55b233ea77a81250f83637553ef9e3348c5a0cc3ce440c5d45bf7d51d AS builder
 
 RUN apk --no-cache add make
 COPY . /app
 RUN make -C /app/grpc-service
 
-FROM alpine@sha256:7580ece7963bfa863801466c0a488f11c86f85d9988051a9f9c68cb27f6b7872
+FROM alpine@sha256:bc41182d7ef5ffc53a40b044e725193bc10142a1243f395ee852a8d9730fc2ad
 
 COPY --from=builder /app/grpc-service/server /app/server
 CMD ["/app/server", "-users", "/etc/users.json"]

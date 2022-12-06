@@ -1,0 +1,13 @@
+version: "3.8"
+services:
+  envoy:
+    build:
+      context: .
+      dockerfile: Dockerfile-envoy
+    ports:
+    - "${PORT_PROXY:-10000}:10000"
+    - "${PORT_ADMIN:-10001}:10001"
+
+  backend:
+    build:
+      context: ../shared/echo

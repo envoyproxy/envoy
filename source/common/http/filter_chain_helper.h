@@ -18,7 +18,7 @@ using DownstreamFilterConfigProviderManager =
                                         Server::Configuration::FactoryContext>;
 using UpstreamFilterConfigProviderManager =
     Filter::FilterConfigProviderManager<Filter::NamedHttpFilterFactoryCb,
-                                        Server::Configuration::ServerFactoryContext>;
+                                        Server::Configuration::UpstreamHttpFactoryContext>;
 
 class FilterChainUtility : Logger::Loggable<Logger::Id::config> {
 public:
@@ -46,7 +46,6 @@ public:
 
 template <class FilterCtx, class NeutralNamedHttpFilterFactory>
 class FilterChainHelper : Logger::Loggable<Logger::Id::config> {
-
 public:
   using FilterFactoriesList =
       std::list<Filter::FilterConfigProviderPtr<Filter::NamedHttpFilterFactoryCb>>;
@@ -63,6 +62,7 @@ public:
   using FiltersList = Protobuf::RepeatedPtrField<
       envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter>;
 
+  // Process the filters in this filter chain.
   void processFilters(const FiltersList& filters, const std::string& prefix,
                       const std::string& filter_chain_type, FilterFactoriesList& filter_factories) {
 
@@ -105,11 +105,11 @@ private:
       return;
     }
     ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-        proto_config, factory_context_.messageValidationVisitor(), *factory);
+        proto_config, server_context_.messageValidationVisitor(), *factory);
     Http::FilterFactoryCb callback =
         factory->createFilterFactoryFromProto(*message, stats_prefix_, factory_context_);
     dependency_manager.registerFilter(factory->name(), *factory->dependencies());
-    bool is_terminal = factory->isTerminalFilterByProto(*message, server_context_);
+    const bool is_terminal = factory->isTerminalFilterByProto(*message, server_context_);
     Config::Utility::validateTerminalFilters(proto_config.name(), factory->name(),
                                              filter_chain_type, is_terminal,
                                              last_filter_in_current_config);
@@ -145,8 +145,8 @@ private:
     }
 
     auto filter_config_provider = filter_config_provider_manager_.createDynamicFilterConfigProvider(
-        config_discovery, name, server_context_, factory_context_, stats_prefix_,
-        last_filter_in_current_config, filter_chain_type, nullptr);
+        config_discovery, name, server_context_, factory_context_, last_filter_in_current_config,
+        filter_chain_type, nullptr);
     filter_factories.push_back(std::move(filter_config_provider));
   }
 

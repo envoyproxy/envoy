@@ -3,7 +3,7 @@
 #include "source/common/http/headers.h"
 #include "source/extensions/filters/http/cache/cache_filter.h"
 #include "source/extensions/filters/http/cache/cache_filter_logging_info.h"
-#include "source/extensions/filters/http/cache/simple_http_cache/simple_http_cache.h"
+#include "source/extensions/http/cache/simple_http_cache/simple_http_cache.h"
 
 #include "test/extensions/filters/http/cache/common.h"
 #include "test/mocks/server/factory_context.h"
@@ -760,6 +760,106 @@ TEST_F(CacheFilterTest, FilterDeletedBeforePostedCallbackExecuted) {
 
     ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
   }
+}
+
+TEST_F(CacheFilterTest, LocalReplyDuringLookup) {
+  request_headers_.setHost("LocalReplyDuringLookup");
+  {
+    // Create filter for request 1.
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+
+    testDecodeRequestMiss(filter);
+
+    // Encode response headers.
+    EXPECT_EQ(filter->encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
+
+    filter->onStreamComplete();
+    EXPECT_THAT(lookupStatus(), IsOkAndHolds(LookupStatus::CacheMiss));
+
+    filter->onDestroy();
+  }
+  {
+    // Create filter for request 2.
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+
+    // Call decode headers to start the cache lookup, which should immediately post the callback to
+    // the dispatcher.
+    EXPECT_EQ(filter->decodeHeaders(request_headers_, true),
+              Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+
+    // While the lookup callback is still on the dispatcher, simulate a local reply.
+    Envoy::Http::TestResponseHeaderMapImpl local_response_headers{{":status", "503"}};
+    EXPECT_EQ(filter->encodeHeaders(local_response_headers, true),
+              Envoy::Http::FilterHeadersStatus::Continue);
+
+    // Make sure that the filter doesn't try to encode the cached response after processing the
+    // local reply.
+    EXPECT_CALL(decoder_callbacks_, continueDecoding).Times(0);
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_).Times(0);
+
+    // Run events on the dispatcher so that the lookup callback is invoked after the local reply.
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+    filter->onStreamComplete();
+    EXPECT_THAT(lookupStatus(), IsOkAndHolds(LookupStatus::RequestIncomplete));
+    filter->onDestroy();
+    filter.reset();
+  }
+}
+
+// Mark tests with EXPECT_ENVOY_BUG as death tests:
+// https://google.github.io/googletest/advanced.html#death-test-naming
+using CacheFilterDeathTest = CacheFilterTest;
+
+TEST_F(CacheFilterDeathTest, StreamTimeoutDuringLookup) {
+  request_headers_.setHost("StreamTimeoutDuringLookup");
+  {
+    // Create filter for request 1.
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+
+    testDecodeRequestMiss(filter);
+
+    // Encode response headers.
+    EXPECT_EQ(filter->encodeHeaders(response_headers_, true), Http::FilterHeadersStatus::Continue);
+
+    filter->onStreamComplete();
+    EXPECT_THAT(lookupStatus(), IsOkAndHolds(LookupStatus::CacheMiss));
+
+    filter->onDestroy();
+  }
+
+  Envoy::Http::TestResponseHeaderMapImpl local_response_headers{{":status", "408"}};
+  EXPECT_ENVOY_BUG(
+      {
+        // Create filter for request 2.
+        CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+
+        // Call decode headers to start the cache lookup, which should immediately post the
+        // callback to the dispatcher.
+        EXPECT_EQ(filter->decodeHeaders(request_headers_, true),
+                  Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+        // While the lookup callback is still on the dispatcher, simulate an idle timeout.
+        EXPECT_EQ(filter->encodeHeaders(local_response_headers, true),
+                  Envoy::Http::FilterHeadersStatus::Continue);
+
+        // Make sure that the filter doesn't try to encode the cached response after processing
+        // the local reply.
+        EXPECT_CALL(decoder_callbacks_, continueDecoding).Times(0);
+        EXPECT_CALL(decoder_callbacks_, encodeHeaders_).Times(0);
+
+        // Run events on the dispatcher so that the lookup callback is invoked after the local
+        // reply.
+        dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+        filter->onStreamComplete();
+        EXPECT_THAT(lookupStatus(), IsOkAndHolds(LookupStatus::RequestIncomplete));
+
+        dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+        filter->onDestroy();
+        filter.reset();
+      },
+      "Request timed out while cache lookup was outstanding.");
 }
 
 class LookupStatusTest

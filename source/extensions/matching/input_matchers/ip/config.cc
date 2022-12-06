@@ -36,7 +36,7 @@ Config::createInputMatcherFactoryCb(const Protobuf::Message& config,
   };
 }
 /**
- * Static registration for the consistent hashing matcher. @see RegisterFactory.
+ * Static registration for the IP matcher. @see RegisterFactory.
  */
 REGISTER_FACTORY(Config, Envoy::Matcher::InputMatcherFactory);
 

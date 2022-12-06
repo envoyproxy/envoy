@@ -57,6 +57,7 @@ class ConfigTest {
 public:
   ConfigTest(const OptionsImpl& options)
       : api_(Api::createApiForTest(time_system_)), options_(options) {
+    ON_CALL(*server_.server_factory_context_, api()).WillByDefault(ReturnRef(server_.api_));
     ON_CALL(server_, options()).WillByDefault(ReturnRef(options_));
     ON_CALL(server_, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
     ON_CALL(server_.api_, fileSystem()).WillByDefault(ReturnRef(file_system_));
@@ -90,12 +91,26 @@ public:
     Server::Configuration::InitialImpl initial_config(bootstrap);
     Server::Configuration::MainImpl main_config;
 
+    // Emulate main implementation of initializing bootstrap extensions.
+    std::vector<Server::BootstrapExtensionPtr> bootstrap_extensions;
+    for (const auto& bootstrap_extension : bootstrap.bootstrap_extensions()) {
+      auto& factory =
+          Config::Utility::getAndCheckFactory<Server::Configuration::BootstrapExtensionFactory>(
+              bootstrap_extension);
+      auto config = Config::Utility::translateAnyToFactoryConfig(
+          bootstrap_extension.typed_config(),
+          server_.messageValidationContext().staticValidationVisitor(), factory);
+      bootstrap_extensions.push_back(
+          factory.createBootstrapExtension(*config, server_factory_context_));
+    }
+
     cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
         server_.admin(), server_.runtime(), server_.stats(), server_.threadLocal(),
-        server_.dnsResolver(), ssl_context_manager_, server_.dispatcher(), server_.localInfo(),
-        server_.secretManager(), server_.messageValidationContext(), *api_, server_.httpContext(),
-        server_.grpcContext(), server_.routerContext(), server_.accessLogManager(),
-        server_.singletonManager(), server_.options(), server_.quic_stat_names_, server_);
+        [this]() -> Network::DnsResolverSharedPtr { return this->server_.dnsResolver(); },
+        ssl_context_manager_, server_.dispatcher(), server_.localInfo(), server_.secretManager(),
+        server_.messageValidationContext(), *api_, server_.httpContext(), server_.grpcContext(),
+        server_.routerContext(), server_.accessLogManager(), server_.singletonManager(),
+        server_.options(), server_.quic_stat_names_, server_);
 
     ON_CALL(server_, clusterManager()).WillByDefault(Invoke([&]() -> Upstream::ClusterManager& {
       return *main_config.clusterManager();
@@ -148,10 +163,12 @@ public:
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   OptionsImpl options_;
   std::unique_ptr<Upstream::ProdClusterManagerFactory> cluster_manager_factory_;
-  NiceMock<Server::MockListenerComponentFactory> component_factory_;
+  std::unique_ptr<NiceMock<Server::MockListenerComponentFactory>> component_factory_ptr_{
+      std::make_unique<NiceMock<Server::MockListenerComponentFactory>>()};
+  NiceMock<Server::MockListenerComponentFactory>& component_factory_{*component_factory_ptr_};
   NiceMock<Server::MockWorkerFactory> worker_factory_;
-  Server::ListenerManagerImpl listener_manager_{server_, component_factory_, worker_factory_, false,
-                                                server_.quic_stat_names_};
+  Server::ListenerManagerImpl listener_manager_{server_, std::move(component_factory_ptr_),
+                                                worker_factory_, false, server_.quic_stat_names_};
   Random::RandomGeneratorImpl random_;
   std::shared_ptr<Runtime::MockSnapshot> snapshot_{
       std::make_shared<NiceMock<Runtime::MockSnapshot>>()};

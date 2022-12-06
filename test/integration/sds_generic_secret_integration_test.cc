@@ -75,7 +75,8 @@ public:
             .clusterManagerFactory()
             .secretManager()
             .findOrCreateGenericSecretProvider(config_source_, "encryption_key",
-                                               factory_context.getTransportSocketFactoryContext());
+                                               factory_context.getTransportSocketFactoryContext(),
+                                               factory_context.initManager());
     return
         [&factory_context, secret_provider](Http::FilterChainFactoryCallbacks& callbacks) -> void {
           callbacks.addStreamDecoderFilter(std::make_shared<::Envoy::SdsGenericSecretTestFilter>(

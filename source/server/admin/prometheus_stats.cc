@@ -158,7 +158,6 @@ uint64_t outputStatType(
     for (const auto& metric : group.second) {
       response.add(generate_output(*metric, prefixed_tag_extracted_name.value()));
     }
-    response.add("\n");
   }
   return result;
 }

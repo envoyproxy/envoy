@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/api.h"
 #include "envoy/common/random_generator.h"
@@ -22,6 +24,8 @@
 
 namespace Envoy {
 namespace Upstream {
+
+constexpr uint64_t kDefaultMaxBytesInBuffer = 1024;
 
 /**
  * Factory for creating health checker implementations.
@@ -47,6 +51,61 @@ public:
 };
 
 /**
+ * Utility class for loading a binary health checking config and matching it against a buffer.
+ * Split out for ease of testing. The type of matching performed is the following (this is the
+ * MongoDB health check request and response):
+ *
+ * "send": [
+    {"text": "39000000"},
+    {"text": "EEEEEEEE"},
+    {"text": "00000000"},
+    {"text": "d4070000"},
+    {"text": "00000000"},
+    {"text": "746573742e"},
+    {"text": "24636d6400"},
+    {"text": "00000000"},
+    {"text": "FFFFFFFF"},
+
+    {"text": "13000000"},
+    {"text": "01"},
+    {"text": "70696e6700"},
+    {"text": "000000000000f03f"},
+    {"text": "00"}
+   ],
+   "receive": [
+    {"text": "EEEEEEEE"},
+    {"text": "01000000"},
+    {"text": "00000000"},
+    {"text": "0000000000000000"},
+    {"text": "00000000"},
+    {"text": "11000000"},
+    {"text": "01"},
+    {"text": "6f6b"},
+    {"text": "00000000000000f03f"},
+    {"text": "00"}
+   ]
+ * Each text or binary filed in Payload is converted to a binary block.
+ * The text is Hex string by default.
+ *
+ * During each health check cycle, all of the "send" bytes are sent to the target server. Each
+ * binary block can be of arbitrary length and is just concatenated together when sent.
+ *
+ * On the receive side, "fuzzy" matching is performed such that each binary block must be found,
+ * and in the order specified, but not necessary contiguous. Thus, in the example above,
+ * "FFFFFFFF" could be inserted in the response between "EEEEEEEE" and "01000000" and the check
+ * would still pass.
+ *
+ */
+class PayloadMatcher {
+public:
+  using MatchSegments = std::list<std::vector<uint8_t>>;
+
+  static MatchSegments loadProtoBytes(
+      const Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck::Payload>& byte_array);
+  static bool match(const MatchSegments& expected, const Buffer::Instance& buffer);
+};
+
+/**
  * HTTP health checker implementation. Connection keep alive is used where possible.
  */
 class HttpHealthCheckerImpl : public HealthCheckerImplBase {
@@ -54,6 +113,9 @@ public:
   HttpHealthCheckerImpl(const Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                         Random::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
+
+  // Returns the HTTP protocol used for the health checker.
+  Http::Protocol protocol() const;
 
   /**
    * Utility class checking if given http status matches configured expectations.
@@ -95,11 +157,7 @@ private:
     void onDeferredDelete() final;
 
     // Http::StreamDecoder
-    void decodeData(Buffer::Instance&, bool end_stream) override {
-      if (end_stream) {
-        onResponseComplete();
-      }
-    }
+    void decodeData(Buffer::Instance& data, bool end_stream) override;
     void decodeMetadata(Http::MetadataMapPtr&&) override {}
 
     // Http::ResponseDecoder
@@ -146,6 +204,7 @@ private:
     HttpHealthCheckerImpl& parent_;
     Http::CodecClientPtr client_;
     Http::ResponseHeaderMapPtr response_headers_;
+    Buffer::InstancePtr response_body_;
     const std::string& hostname_;
     const Http::Protocol protocol_;
     Network::ConnectionInfoProviderSharedPtr local_connection_info_provider_;
@@ -170,6 +229,9 @@ private:
 
   const std::string path_;
   const std::string host_value_;
+  const PayloadMatcher::MatchSegments receive_bytes_;
+  const envoy::config::core::v3::RequestMethod method_;
+  uint64_t response_buffer_size_;
   absl::optional<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>
       service_name_matcher_;
   Router::HeaderParserPtr request_headers_parser_;
@@ -189,58 +251,6 @@ public:
 
   // HttpHealthCheckerImpl
   Http::CodecClient* createCodecClient(Upstream::Host::CreateConnectionData& data) override;
-};
-
-/**
- * Utility class for loading a binary health checking config and matching it against a buffer.
- * Split out for ease of testing. The type of matching performed is the following (this is the
- * MongoDB health check request and response):
- *
- * "send": [
-    {"binary": "39000000"},
-    {"binary": "EEEEEEEE"},
-    {"binary": "00000000"},
-    {"binary": "d4070000"},
-    {"binary": "00000000"},
-    {"binary": "746573742e"},
-    {"binary": "24636d6400"},
-    {"binary": "00000000"},
-    {"binary": "FFFFFFFF"},
-
-    {"binary": "13000000"},
-    {"binary": "01"},
-    {"binary": "70696e6700"},
-    {"binary": "000000000000f03f"},
-    {"binary": "00"}
-   ],
-   "receive": [
-    {"binary": "EEEEEEEE"},
-    {"binary": "01000000"},
-    {"binary": "00000000"},
-    {"binary": "0000000000000000"},
-    {"binary": "00000000"},
-    {"binary": "11000000"},
-    {"binary": "01"},
-    {"binary": "6f6b"},
-    {"binary": "00000000000000f03f"},
-    {"binary": "00"}
-   ]
- *
- * During each health check cycle, all of the "send" bytes are sent to the target server. Each
- * binary block can be of arbitrary length and is just concatenated together when sent.
- *
- * On the receive side, "fuzzy" matching is performed such that each binary block must be found,
- * and in the order specified, but not necessary contiguous. Thus, in the example above,
- * "FFFFFFFF" could be inserted in the response between "EEEEEEEE" and "01000000" and the check
- * would still pass.
- */
-class TcpHealthCheckMatcher {
-public:
-  using MatchSegments = std::list<std::vector<uint8_t>>;
-
-  static MatchSegments loadProtoBytes(
-      const Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck::Payload>& byte_array);
-  static bool match(const MatchSegments& expected, const Buffer::Instance& buffer);
 };
 
 /**
@@ -304,8 +314,8 @@ private:
     return envoy::data::core::v3::TCP;
   }
 
-  const TcpHealthCheckMatcher::MatchSegments send_bytes_;
-  const TcpHealthCheckMatcher::MatchSegments receive_bytes_;
+  const PayloadMatcher::MatchSegments send_bytes_;
+  const PayloadMatcher::MatchSegments receive_bytes_;
 };
 
 /**

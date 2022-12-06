@@ -15,11 +15,13 @@ Supported service discovery types
 
 Static
 ^^^^^^
+.. _extension_envoy.clusters.static:
 
 Static is the simplest service discovery type. The configuration explicitly specifies the resolved
 network name (IP address/port, unix domain socket, etc.) of each upstream host.
 
 .. _arch_overview_service_discovery_types_strict_dns:
+.. _extension_envoy.clusters.strict_dns:
 
 Strict DNS
 ^^^^^^^^^^
@@ -51,6 +53,7 @@ controls the refresh frequency during failures, and, if not configured, the DNS 
 DNS resolving emits :ref:`cluster statistics <config_cluster_manager_cluster_stats>` fields *update_attempt*, *update_success* and *update_failure*.
 
 .. _arch_overview_service_discovery_types_logical_dns:
+.. _extension_envoy.clusters.logical_dns:
 
 Logical DNS
 ^^^^^^^^^^^
@@ -90,18 +93,20 @@ Original destination cluster can be used when incoming connections are redirecte
 via an iptables REDIRECT or TPROXY target or with Proxy Protocol. In these cases requests routed
 to an original destination cluster are forwarded to upstream hosts as addressed by the redirection
 metadata, without any explicit host configuration or upstream host discovery.
-Connections to upstream hosts are pooled and unused hosts are flushed out when they have been idle longer than
-:ref:`cleanup_interval <envoy_v3_api_field_config.cluster.v3.Cluster.cleanup_interval>`, which defaults to
-5000ms. If the original destination address is not available, no upstream connection is opened.
-Envoy can also pickup the original destination from a :ref:`HTTP header
-<arch_overview_load_balancing_types_original_destination_request_header>`.
-Original destination service discovery must be used with the original destination :ref:`load
-balancer <arch_overview_load_balancing_types_original_destination>`.
+Connections to upstream hosts are pooled and unused hosts are flushed out when they have been not use by any connection
+pool longer than :ref:`cleanup_interval <envoy_v3_api_field_config.cluster.v3.Cluster.cleanup_interval>`, which defaults
+to 5000ms. If the original destination address is not available, no upstream connection is opened.  Envoy can also
+pickup the original destination from a :ref:`HTTP header
+<arch_overview_load_balancing_types_original_destination_request_header>`. Original destination service discovery must
+be used with the original destination :ref:`load balancer <arch_overview_load_balancing_types_original_destination>`.
+When using the original destination cluster for HTTP upstreams, please set :ref:`idle_timeout
+<faq_configuration_connection_timeouts>` to 5min to limit the duration of the upstream HTTP connections.
 
 .. _arch_overview_service_discovery_types_eds:
 
 Endpoint discovery service (EDS)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. _extension_envoy.clusters.eds:
 
 The *endpoint discovery service* is a :ref:`xDS management server based on gRPC or REST-JSON API server
 <config_overview_management_server>` used by Envoy to fetch cluster members. The cluster members are called

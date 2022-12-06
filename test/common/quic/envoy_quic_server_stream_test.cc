@@ -19,6 +19,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "quiche/quic/core/crypto/null_encrypter.h"
+#include "quiche/quic/core/deterministic_connection_id_generator.h"
 #include "quiche/quic/test_tools/quic_connection_peer.h"
 #include "quiche/quic/test_tools/quic_session_peer.h"
 
@@ -39,10 +40,10 @@ public:
                                             POOL_GAUGE(listener_config_.listenerScope()),
                                             POOL_HISTOGRAM(listener_config_.listenerScope()))}),
         quic_connection_(connection_helper_, alarm_factory_, writer_,
-                         quic::ParsedQuicVersionVector{quic_version_}, *listener_config_.socket_),
+                         quic::ParsedQuicVersionVector{quic_version_}, *listener_config_.socket_,
+                         connection_id_generator_),
         quic_session_(quic_config_, {quic_version_}, &quic_connection_, *dispatcher_,
                       quic_config_.GetInitialStreamFlowControlWindowToSend() * 2),
-        stream_id_(4u),
         stats_(
             {ALL_HTTP3_CODEC_STATS(POOL_COUNTER_PREFIX(listener_config_.listenerScope(), "http3."),
                                    POOL_GAUGE_PREFIX(listener_config_.listenerScope(), "http3."))}),
@@ -53,6 +54,7 @@ public:
         response_trailers_{{"trailer-key", "trailer-value"}} {
     quic_stream_->setRequestDecoder(stream_decoder_);
     quic_stream_->addCallbacks(stream_callbacks_);
+    quic_stream_->getStream().setFlushTimeout(std::chrono::milliseconds(30000));
     quic::test::QuicConnectionPeer::SetAddressValidated(&quic_connection_);
     quic_session_.ActivateStream(std::unique_ptr<EnvoyQuicServerStream>(quic_stream_));
     EXPECT_CALL(quic_session_, ShouldYield(_)).WillRepeatedly(testing::Return(false));
@@ -171,9 +173,11 @@ protected:
   quic::QuicConfig quic_config_;
   testing::NiceMock<Network::MockListenerConfig> listener_config_;
   Server::ListenerStats listener_stats_;
+  quic::DeterministicConnectionIdGenerator connection_id_generator_{
+      quic::kQuicDefaultConnectionIdLength};
   testing::NiceMock<MockEnvoyQuicServerConnection> quic_connection_;
   MockEnvoyQuicSession quic_session_;
-  quic::QuicStreamId stream_id_;
+  quic::QuicStreamId stream_id_{4u};
   Http::Http3::CodecStats stats_;
   envoy::config::core::v3::Http3ProtocolOptions http3_options_;
   EnvoyQuicServerStream* quic_stream_;
@@ -690,6 +694,41 @@ TEST_F(EnvoyQuicServerStreamTest, ConnectionCloseDuringEncoding) {
   // shouldn't be called because the connection is closed.
   quic_stream_->encodeData(buffer, false);
   EXPECT_EQ(quic_session_.bytesToSend(), 0u);
+}
+
+TEST_F(EnvoyQuicServerStreamTest, ConnectionCloseDuringEncodingEndStream) {
+  receiveRequest(request_body_, true, request_body_.size() * 2);
+  quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/false);
+  EXPECT_CALL(quic_connection_,
+              SendConnectionClosePacket(_, quic::NO_IETF_QUIC_ERROR, "Closed in WriteHeaders"));
+  EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _, _))
+      .Times(testing::AtLeast(1u))
+      .WillRepeatedly(
+          Invoke([this](quic::QuicStreamId, size_t data_size, quic::QuicStreamOffset,
+                        quic::StreamSendingState, bool, absl::optional<quic::EncryptionLevel>) {
+            if (data_size < 10) {
+              // Ietf QUIC sends a small data frame header before sending the data frame payload.
+              return quic::QuicConsumedData{data_size, false};
+            }
+            // Mimic write failure while writing data frame payload.
+            quic_connection_.CloseConnection(
+                quic::QUIC_INTERNAL_ERROR, "Closed in WriteHeaders",
+                quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
+            // This will cause the payload to be buffered.
+            return quic::QuicConsumedData{0, false};
+          }));
+
+  // Send a response which causes connection to close.
+  EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
+
+  std::string response(16 * 1024 + 1, 'a');
+  Buffer::OwnedImpl buffer(response);
+  // Though the stream send buffer is above high watermark, onAboveWriteBufferHighWatermark())
+  // shouldn't be called because the connection is closed.
+  quic_stream_->encodeData(buffer, true);
+  EXPECT_EQ(quic_session_.bytesToSend(), 0u);
+  EXPECT_TRUE(quic_stream_->write_side_closed() && quic_stream_->read_side_closed());
+  quic_session_.CleanUpClosedStreams();
 }
 
 // Tests that after end_stream is encoded, closing connection shouldn't call

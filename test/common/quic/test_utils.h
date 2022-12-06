@@ -11,12 +11,13 @@
 #include "source/common/stats/isolated_store_impl.h"
 
 #include "test/test_common/environment.h"
+#include "test/test_common/utility.h"
 
 #include "quiche/quic/core/http/quic_spdy_session.h"
+#include "quiche/quic/core/qpack/qpack_encoder.h"
 #include "quiche/quic/core/quic_utils.h"
 #include "quiche/quic/test_tools/crypto_test_utils.h"
 #include "quiche/quic/test_tools/first_flight.h"
-#include "quiche/quic/test_tools/qpack/qpack_encoder_test_utils.h"
 #include "quiche/quic/test_tools/qpack/qpack_test_utils.h"
 #include "quiche/quic/test_tools/quic_config_peer.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
@@ -30,25 +31,25 @@ public:
                                 quic::QuicAlarmFactory& alarm_factory,
                                 quic::QuicPacketWriter& writer,
                                 const quic::ParsedQuicVersionVector& supported_versions,
-                                Network::Socket& listen_socket)
+                                Network::Socket& listen_socket,
+                                quic::ConnectionIdGeneratorInterface& generator)
       : MockEnvoyQuicServerConnection(
             helper, alarm_factory, writer,
             quic::QuicSocketAddress(quic::QuicIpAddress::Any4(), 12345),
             quic::QuicSocketAddress(quic::QuicIpAddress::Loopback4(), 12345), supported_versions,
-            listen_socket) {}
+            listen_socket, generator) {}
 
-  MockEnvoyQuicServerConnection(quic::QuicConnectionHelperInterface& helper,
-                                quic::QuicAlarmFactory& alarm_factory,
-                                quic::QuicPacketWriter& writer,
-                                quic::QuicSocketAddress self_address,
-                                quic::QuicSocketAddress peer_address,
-                                const quic::ParsedQuicVersionVector& supported_versions,
-                                Network::Socket& listen_socket)
+  MockEnvoyQuicServerConnection(
+      quic::QuicConnectionHelperInterface& helper, quic::QuicAlarmFactory& alarm_factory,
+      quic::QuicPacketWriter& writer, quic::QuicSocketAddress self_address,
+      quic::QuicSocketAddress peer_address, const quic::ParsedQuicVersionVector& supported_versions,
+      Network::Socket& listen_socket, quic::ConnectionIdGeneratorInterface& generator)
       : EnvoyQuicServerConnection(
             quic::test::TestConnectionId(), self_address, peer_address, helper, alarm_factory,
             &writer, /*owns_writer=*/false, supported_versions,
             createServerConnectionSocket(listen_socket.ioHandle(), self_address, peer_address,
-                                         "example.com", "h3-29")) {}
+                                         "example.com", "h3-29"),
+            generator) {}
 
   Network::Connection::ConnectionStats& connectionStats() const {
     return QuicNetworkConnection::connectionStats();
@@ -75,8 +76,11 @@ public:
                        EnvoyQuicServerConnection* connection, Event::Dispatcher& dispatcher,
                        uint32_t send_buffer_limit)
       : quic::QuicSpdySession(connection, /*visitor=*/nullptr, config, supported_versions),
-        QuicFilterManagerConnectionImpl(*connection, connection->connection_id(), dispatcher,
-                                        send_buffer_limit, {nullptr}),
+        QuicFilterManagerConnectionImpl(
+            *connection, connection->connection_id(), dispatcher, send_buffer_limit, {nullptr},
+            std::make_unique<StreamInfo::StreamInfoImpl>(
+                dispatcher.timeSource(),
+                connection->connectionSocket()->connectionInfoProviderSharedPtr())),
         crypto_stream_(std::make_unique<TestQuicCryptoStream>(this)) {}
 
   void Initialize() override {
@@ -234,7 +238,7 @@ void setQuicConfigWithDefaultValues(quic::QuicConfig* config) {
 
 std::string spdyHeaderToHttp3StreamPayload(const spdy::Http2HeaderBlock& header) {
   quic::test::NoopQpackStreamSenderDelegate encoder_stream_sender_delegate;
-  quic::test::NoopDecoderStreamErrorDelegate decoder_stream_error_delegate;
+  quic::NoopDecoderStreamErrorDelegate decoder_stream_error_delegate;
   auto qpack_encoder = std::make_unique<quic::QpackEncoder>(&decoder_stream_error_delegate);
   qpack_encoder->set_qpack_stream_sender_delegate(&encoder_stream_sender_delegate);
   // QpackEncoder does not use the dynamic table by default,
@@ -270,8 +274,8 @@ std::vector<std::pair<Network::Address::IpVersion, quic::ParsedQuicVersion>> gen
 std::string testParamsToString(
     const ::testing::TestParamInfo<std::pair<Network::Address::IpVersion, quic::ParsedQuicVersion>>&
         params) {
-  std::string ip_version = params.param.first == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6";
-  return absl::StrCat(ip_version, quic::QuicVersionToString(params.param.second.transport_version));
+  return absl::StrCat(TestUtility::ipVersionToString(params.param.first),
+                      quic::QuicVersionToString(params.param.second.transport_version));
 }
 
 class MockProofVerifyContext : public EnvoyQuicProofVerifyContext {
@@ -280,6 +284,8 @@ public:
   MOCK_METHOD(bool, isServer, (), (const));
   MOCK_METHOD(const Network::TransportSocketOptionsConstSharedPtr&, transportSocketOptions, (),
               (const));
+  MOCK_METHOD(Extensions::TransportSockets::Tls::CertValidator::ExtraValidationContext,
+              extraValidationContext, (), (const));
 };
 
 } // namespace Quic

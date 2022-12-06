@@ -21,13 +21,13 @@ const std::vector<std::string>& clusterInputs() {
       });
 }
 
-constexpr absl::string_view cluster_re_pattern = "^cluster\\.((.*?)\\.)";
+constexpr absl::string_view ClusterRePattern = "^cluster\\.((.*?)\\.)";
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_CompiledGoogleReMatcher(benchmark::State& state) {
   envoy::type::matcher::v3::RegexMatcher config;
   config.mutable_google_re2();
-  config.set_regex(std::string(cluster_re_pattern));
+  config.set_regex(std::string(ClusterRePattern));
   const auto matcher = Regex::CompiledGoogleReMatcher(config);
   uint32_t passes = 0;
   for (auto _ : state) { // NOLINT
@@ -43,11 +43,9 @@ BENCHMARK(BM_CompiledGoogleReMatcher);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_HyperscanMatcher(benchmark::State& state) {
-  envoy::extensions::matching::input_matchers::hyperscan::v3alpha::Hyperscan config;
-  auto regex = config.add_regexes();
-  regex->set_regex(std::string(cluster_re_pattern));
   auto instance = ThreadLocal::InstanceImpl();
-  auto matcher = Extensions::Matching::InputMatchers::Hyperscan::Matcher(config, instance);
+  auto matcher = Extensions::Matching::InputMatchers::Hyperscan::Matcher(
+      {std::string(ClusterRePattern).c_str()}, {0}, {0}, instance, false);
   uint32_t passes = 0;
   for (auto _ : state) { // NOLINT
     for (const std::string& cluster_input : clusterInputs()) {

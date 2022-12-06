@@ -28,12 +28,14 @@ class QuicNetworkConnectionTest;
 
 // Act as a Network::Connection to HCM and a FilterManager to FilterFactoryCb.
 class QuicFilterManagerConnectionImpl : public Network::ConnectionImplBase,
-                                        public SendBufferMonitor {
+                                        public SendBufferMonitor,
+                                        public QuicWriteEventCallback {
 public:
   QuicFilterManagerConnectionImpl(QuicNetworkConnection& connection,
                                   const quic::QuicConnectionId& connection_id,
                                   Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
-                                  std::shared_ptr<QuicSslConnectionInfo>&& info);
+                                  std::shared_ptr<QuicSslConnectionInfo>&& info,
+                                  std::unique_ptr<StreamInfo::StreamInfo>&& stream_info);
   // Network::FilterManager
   // Overridden to delegate calls to filter_manager_.
   void addWriteFilter(Network::WriteFilterSharedPtr filter) override;
@@ -53,13 +55,14 @@ public:
   void close(Network::ConnectionCloseType type) override;
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
   std::string nextProtocol() const override { return EMPTY_STRING; }
-  void noDelay(bool /*enable*/) override {
-    // No-op. TCP_NODELAY doesn't apply to UDP.
-  }
+  // No-op. TCP_NODELAY doesn't apply to UDP.
+  void noDelay(bool /*enable*/) override {}
   // Neither readDisable nor detectEarlyCloseWhenReadDisabled are supported for QUIC.
   // Crash in debug mode if they are called.
-  void readDisable(bool /*disable*/) override { ASSERT(false); }
-  void detectEarlyCloseWhenReadDisabled(bool /*value*/) override { ASSERT(false); }
+  void readDisable(bool /*disable*/) override { IS_ENVOY_BUG("Unexpected call to readDisable"); }
+  void detectEarlyCloseWhenReadDisabled(bool /*value*/) override {
+    IS_ENVOY_BUG("Unexpected call to detectEarlyCloseWhenReadDisabled");
+  }
   bool readEnabled() const override { return true; }
   Network::ConnectionInfoSetter& connectionInfoSetter() override {
     ENVOY_BUG(network_connection_ && network_connection_->connectionSocket(),
@@ -77,9 +80,9 @@ public:
     }
     return network_connection_->connectionSocket()->connectionInfoProviderSharedPtr();
   }
+  // Unix domain socket is not supported.
   absl::optional<Network::Connection::UnixDomainSocketPeerCredentials>
   unixSocketPeerCredentials() const override {
-    // Unix domain socket is not supported.
     return absl::nullopt;
   }
   void setConnectionStats(const Network::Connection::ConnectionStats& stats) override {
@@ -116,8 +119,8 @@ public:
   bool aboveHighWatermark() const override;
 
   const Network::ConnectionSocket::OptionsSharedPtr& socketOptions() const override;
-  StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
-  const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
+  StreamInfo::StreamInfo& streamInfo() override { return *stream_info_; }
+  const StreamInfo::StreamInfo& streamInfo() const override { return *stream_info_; }
   absl::string_view transportFailureReason() const override { return transport_failure_reason_; }
   bool startSecureTransport() override { return false; }
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override;
@@ -136,12 +139,12 @@ public:
   // SendBufferMonitor
   // Update the book keeping of the aggregated buffered bytes cross all the
   // streams, and run watermark check.
-  void updateBytesBuffered(size_t old_buffered_bytes, size_t new_buffered_bytes) override;
+  void updateBytesBuffered(uint64_t old_buffered_bytes, uint64_t new_buffered_bytes) override;
 
-  // Called after each write when a previous connection close call is postponed.
-  void maybeApplyDelayClosePolicy();
+  // QuicWriteEventCallback
+  void onWriteEventDone() override;
 
-  uint32_t bytesToSend() { return bytes_to_send_; }
+  uint64_t bytesToSend() { return bytes_to_send_; }
 
   virtual void setHttp3Options(const envoy::config::core::v3::Http3ProtocolOptions& http3_options) {
     http3_options_ = http3_options;
@@ -169,6 +172,10 @@ protected:
   virtual const quic::QuicConnection* quicConnection() const PURE;
   virtual quic::QuicConnection* quicConnection() PURE;
 
+  void maybeUpdateDelayCloseTimer(bool has_sent_any_data);
+
+  void maybeHandleCloseDuringInitialize();
+
   QuicNetworkConnection* network_connection_{nullptr};
 
   OptRef<Http::Http3::CodecStats> codec_stats_;
@@ -191,9 +198,9 @@ private:
   // and the rest incoming data bypasses these filters.
   std::unique_ptr<Network::FilterManagerImpl> filter_manager_;
 
-  StreamInfo::StreamInfoImpl stream_info_;
+  std::unique_ptr<StreamInfo::StreamInfo> stream_info_;
   std::string transport_failure_reason_;
-  uint32_t bytes_to_send_{0};
+  uint64_t bytes_to_send_{0};
   uint32_t max_headers_count_{std::numeric_limits<uint32_t>::max()};
   // Keeps the buffer state of the connection, and react upon the changes of how many bytes are
   // buffered cross all streams' send buffer. The state is evaluated and may be changed upon each

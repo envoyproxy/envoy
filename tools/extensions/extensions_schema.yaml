@@ -1,4 +1,3 @@
-
 builtin:
 - envoy.request_id.uuid
 - envoy.upstreams.tcp.generic
@@ -23,6 +22,7 @@ builtin:
 - envoy.matching.inputs.dns_san
 - envoy.matching.inputs.subject
 - envoy.regex_engines.google_re2
+- envoy.filters.http.upstream_codec
 
 # All Envoy extensions must be tagged with their security hardening stance with
 # respect to downstream and upstream data plane threats. These are verbose
@@ -79,6 +79,7 @@ categories:
 - envoy.matching.common_inputs
 - envoy.matching.input_matchers
 - envoy.tls.key_providers
+- envoy.quic.connection_id_generator
 - envoy.quic.proof_source
 - envoy.quic.server.crypto_stream
 - envoy.rate_limit_descriptors
@@ -98,15 +99,24 @@ categories:
 - envoy.upstreams
 - envoy.udp_packet_writer
 - envoy.wasm.runtime
+- envoy.xds_delegates
 - envoy.common.key_value
 - envoy.network.dns_resolver
 - envoy.network.connection_balance
 - envoy.rbac.matchers
 - envoy.access_loggers.extension_filters
 - envoy.http.stateful_session
+- envoy.matching.action
 - envoy.matching.http.input
+- envoy.matching.http.custom_matchers
 - envoy.matching.network.input
 - envoy.matching.network.custom_matchers
+- envoy.filters.http.upstream
+- envoy.path.match
+- envoy.path.rewrite
+- envoy.tls_handshakers
+- envoy.generic_proxy.filters
+- envoy.generic_proxy.codecs
 
 status_values:
 - name: stable

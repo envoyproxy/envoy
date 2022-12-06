@@ -37,6 +37,22 @@ static_resources:
                   "@type": type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip
                   memory_level: 3
                   window_bits: 10
+          - name: envoy.filters.http.decompressor
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.decompressor.v3.Decompressor
+              decompressor_library:
+                name: upload
+                typed_config:
+                  "@type": "type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip"
+                  window_bits: 9
+                  chunk_size: 8192
+                  # If this ratio is set too low, then body data will not be decompressed completely.
+                  max_inflate_ratio: 1000
+              response_direction_config:
+                common_config:
+                  enabled:
+                    default_value: false
+                    runtime_key: response_decompressor_enabled
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router

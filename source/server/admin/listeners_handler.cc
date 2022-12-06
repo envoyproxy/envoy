@@ -12,9 +12,10 @@ namespace Server {
 
 ListenersHandler::ListenersHandler(Server::Instance& server) : HandlerContextBase(server) {}
 
-Http::Code ListenersHandler::handlerDrainListeners(absl::string_view url, Http::ResponseHeaderMap&,
-                                                   Buffer::Instance& response, AdminStream&) {
-  const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
+Http::Code ListenersHandler::handlerDrainListeners(Http::ResponseHeaderMap&,
+                                                   Buffer::Instance& response,
+                                                   AdminStream& admin_query) {
+  const Http::Utility::QueryParams params = admin_query.queryParams();
 
   ListenerManager::StopListenersType stop_listeners_type =
       params.find("inboundonly") != params.end() ? ListenerManager::StopListenersType::InboundOnly
@@ -37,10 +38,10 @@ Http::Code ListenersHandler::handlerDrainListeners(absl::string_view url, Http::
   return Http::Code::OK;
 }
 
-Http::Code ListenersHandler::handlerListenerInfo(absl::string_view url,
-                                                 Http::ResponseHeaderMap& response_headers,
-                                                 Buffer::Instance& response, AdminStream&) {
-  const Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
+Http::Code ListenersHandler::handlerListenerInfo(Http::ResponseHeaderMap& response_headers,
+                                                 Buffer::Instance& response,
+                                                 AdminStream& admin_query) {
+  const Http::Utility::QueryParams query_params = admin_query.queryParams();
   const auto format_value = Utility::formatParam(query_params);
 
   if (format_value.has_value() && format_value.value() == "json") {

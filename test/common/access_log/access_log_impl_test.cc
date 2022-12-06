@@ -57,6 +57,8 @@ public:
     stream_info_.addBytesReceived(1);
     stream_info_.addBytesSent(2);
     stream_info_.protocol(Http::Protocol::Http11);
+    // Clear default stream id provider.
+    stream_info_.stream_id_provider_ = nullptr;
   }
 
   NiceMock<MockTimeSystem> time_source_;
@@ -70,7 +72,7 @@ public:
 
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Envoy::AccessLog::MockAccessLogManager> log_manager_;
-  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  NiceMock<Server::Configuration::MockFactoryContext> context_;
 };
 
 TEST_F(AccessLogImplTest, LogMoreData) {
@@ -341,8 +343,8 @@ typed_config:
   EXPECT_CALL(*file_, write(_)).Times(0);
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 
-  // Value is taken from x-request-id.
-  request_headers_.addCopy("x-request-id", "000000ff-0000-0000-0000-000000000000");
+  stream_info_.stream_id_provider_ =
+      std::make_shared<StreamInfo::StreamIdProviderImpl>("000000ff-0000-0000-0000-000000000000");
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 0, 55, 100))
       .WillOnce(Return(true));
   EXPECT_CALL(*file_, write(_));
@@ -384,8 +386,8 @@ typed_config:
   EXPECT_CALL(*file_, write(_)).Times(0);
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 
-  // Value is taken from x-request-id.
-  request_headers_.addCopy("x-request-id", "000000ff-0000-0000-0000-000000000000");
+  stream_info_.stream_id_provider_ =
+      std::make_shared<StreamInfo::StreamIdProviderImpl>("000000ff-0000-0000-0000-000000000000");
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 5, 255, 10000))
       .WillOnce(Return(true));
   EXPECT_CALL(*file_, write(_));
@@ -414,8 +416,8 @@ typed_config:
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
-  // Value should not be taken from x-request-id.
-  request_headers_.addCopy("x-request-id", "000000ff-0000-0000-0000-000000000000");
+  stream_info_.stream_id_provider_ =
+      std::make_shared<StreamInfo::StreamIdProviderImpl>("000000ff-0000-0000-0000-000000000000");
   EXPECT_CALL(context_.api_.random_, random()).WillOnce(Return(42));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 5, 42, 1000000))
       .WillOnce(Return(true));
@@ -519,7 +521,7 @@ typed_config:
 }
 
 TEST(AccessLogImplTestCtor, FiltersMissingInOrAndFilter) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
 
   {
     const std::string yaml = R"EOF(
@@ -1088,6 +1090,20 @@ typed_config:
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 }
 
+TEST_F(AccessLogImplTest, GrpcStatusFormatterUnsupportedFormat) {
+  const std::string yaml = R"EOF(
+name: accesslog
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  path: /dev/null
+  log_format:
+    text_format_source:
+      inline_string: "%GRPC_STATUS(NOT_SUPPORTED)%\n"
+  )EOF";
+  EXPECT_THROW(AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_),
+               EnvoyException);
+}
+
 TEST_F(AccessLogImplTest, ValidGrpcStatusMessage) {
   const std::string yaml = R"EOF(
 name: accesslog
@@ -1096,7 +1112,7 @@ typed_config:
   path: /dev/null
   log_format:
     text_format_source:
-      inline_string: "%GRPC_STATUS% %GRPC_STATUS_NUMBER%\n"
+      inline_string: "%GRPC_STATUS% %GRPC_STATUS_NUMBER% %GRPC_STATUS()% %GRPC_STATUS(CAMEL_STRING)% %GRPC_STATUS(SNAKE_STRING)% %GRPC_STATUS(NUMBER)%\n"
   )EOF";
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
@@ -1104,7 +1120,7 @@ typed_config:
     EXPECT_CALL(*file_, write(_));
     response_trailers_.addCopy(Http::Headers::get().GrpcStatus, "0");
     log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
-    EXPECT_EQ("OK 0\n", output_);
+    EXPECT_EQ("OK 0 OK OK OK 0\n", output_);
     response_trailers_.remove(Http::Headers::get().GrpcStatus);
   }
   {
@@ -1112,7 +1128,7 @@ typed_config:
     EXPECT_CALL(*file_, write(_));
     response_headers_.addCopy(Http::Headers::get().GrpcStatus, "1");
     log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
-    EXPECT_EQ("Canceled 1\n", output_);
+    EXPECT_EQ("Canceled 1 Canceled Canceled CANCELLED 1\n", output_);
     response_headers_.remove(Http::Headers::get().GrpcStatus);
   }
   {
@@ -1120,7 +1136,7 @@ typed_config:
     EXPECT_CALL(*file_, write(_));
     response_headers_.addCopy(Http::Headers::get().GrpcStatus, "-1");
     log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
-    EXPECT_EQ("-1 -1\n", output_);
+    EXPECT_EQ("-1 -1 -1 -1 -1 -1\n", output_);
     response_headers_.remove(Http::Headers::get().GrpcStatus);
   }
 }

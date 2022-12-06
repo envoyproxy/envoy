@@ -1,0 +1,43 @@
+#include "test/mocks/server/factory_context.h"
+
+#include "contrib/generic_proxy/filters/network/source/router/config.h"
+#include "contrib/generic_proxy/filters/network/test/mocks/filter.h"
+#include "gtest/gtest.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace NetworkFilters {
+namespace GenericProxy {
+namespace Router {
+namespace {
+
+TEST(RouterFactoryTest, RouterFactoryTest) {
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  RouterFactory factory;
+
+  ProtobufWkt::Struct proto_config;
+
+  EXPECT_NO_THROW(factory.createFilterFactoryFromProto(proto_config, "test", factory_context));
+
+  EXPECT_NE(nullptr, factory.createEmptyConfigProto());
+  EXPECT_EQ(nullptr, factory.createEmptyRouteConfigProto());
+  EXPECT_EQ(nullptr, factory.createRouteSpecificFilterConfig(
+                         proto_config, factory_context.getServerFactoryContext(),
+                         factory_context.messageValidationVisitor()));
+  EXPECT_EQ("envoy.filters.generic.router", factory.name());
+  EXPECT_EQ(true, factory.isTerminalFilter());
+
+  auto fn = factory.createFilterFactoryFromProto(proto_config, "test", factory_context);
+
+  NiceMock<MockFilterChainFactoryCallbacks> mock_cb;
+
+  EXPECT_CALL(mock_cb, addDecoderFilter(_));
+  fn(mock_cb);
+}
+
+} // namespace
+} // namespace Router
+} // namespace GenericProxy
+} // namespace NetworkFilters
+} // namespace Extensions
+} // namespace Envoy
