@@ -1264,6 +1264,77 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithQuicReset) {
   EXPECT_EQ(/* BYTES_RECEIVED */ metrics.at(5), "0");
 }
 
+TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithInternalRedirect) {
+  useAccessLog("%PROTOCOL%,%ROUNDTRIP_DURATION%,%REQUEST_DURATION%,%RESPONSE_DURATION%,%RESPONSE_"
+               "CODE%,%BYTES_RECEIVED%,%RESPONSE_CODE_DETAILS%,%RESP(test-header)%");
+  auto handle = config_helper_.createVirtualHost("handle.internal.redirect");
+  handle.mutable_routes(0)->set_name("redirect");
+  handle.mutable_routes(0)->mutable_route()->mutable_internal_redirect_policy();
+  config_helper_.addVirtualHost(handle);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  default_request_headers_.setHost("handle.internal.redirect");
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  waitForNextUpstreamRequest();
+
+  Http::TestResponseHeaderMapImpl redirect_response{{":status", "302"},
+                                                    {"content-length", "0"},
+                                                    {"location", "http://authority2/new/url"},
+                                                    // Test header added to confirm that response
+                                                    // headers are populated for internal redirects
+                                                    {"test-header", "test-header-value"}};
+
+  upstream_request_->encodeHeaders(redirect_response, true);
+  std::string log = waitForAccessLog(access_log_name_, 0);
+  std::vector<std::string> metrics = absl::StrSplit(log, ",");
+  ASSERT_EQ(metrics.size(), 8);
+  EXPECT_EQ(/* PROTOCOL */ metrics.at(0), "HTTP/3");
+  // no roundtrip duration for internal redirect.
+  EXPECT_EQ(/* ROUNDTRIP_DURATION */ metrics.at(1), "-");
+  EXPECT_GT(/* REQUEST_DURATION */ std::stoi(metrics.at(2)), 0);
+  EXPECT_GT(/* RESPONSE_DURATION */ std::stoi(metrics.at(3)), 0);
+  EXPECT_EQ(/* RESPONSE_CODE */ metrics.at(4), "302");
+  EXPECT_EQ(/* BYTES_RECEIVED */ metrics.at(5), "0");
+  EXPECT_EQ(/* RESPONSE_CODE_DETAILS */ metrics.at(6), "internal_redirect");
+  EXPECT_EQ(/* RESP(test-header) */ metrics.at(7), "test-header-value");
+
+  waitForNextUpstreamRequest();
+  ASSERT(upstream_request_->headers().EnvoyOriginalUrl() != nullptr);
+  EXPECT_EQ("http://handle.internal.redirect/test/long/url",
+            upstream_request_->headers().getEnvoyOriginalUrlValue());
+  EXPECT_EQ("/new/url", upstream_request_->headers().getPathValue());
+  EXPECT_EQ("authority2", upstream_request_->headers().getHostValue());
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_internal_redirect_succeeded_total")
+                   ->value());
+  // 302 was never returned downstream
+  EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_rq_3xx")->value());
+  EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_2xx")->value());
+
+  log = waitForAccessLog(access_log_name_, 1);
+  metrics = absl::StrSplit(log, ",");
+  ASSERT_EQ(metrics.size(), 8);
+  EXPECT_EQ(/* PROTOCOL */ metrics.at(0), "HTTP/3");
+  // roundtrip duration populated on final log.
+  EXPECT_GT(/* ROUNDTRIP_DURATION */ std::stoi(metrics.at(1)), 0);
+  EXPECT_GT(/* REQUEST_DURATION */ std::stoi(metrics.at(2)), 0);
+  EXPECT_GT(/* RESPONSE_DURATION */ std::stoi(metrics.at(3)), 0);
+  EXPECT_EQ(/* RESPONSE_CODE */ metrics.at(4), "200");
+  EXPECT_EQ(/* BYTES_RECEIVED */ metrics.at(5), "0");
+  EXPECT_EQ(/* RESPONSE_CODE_DETAILS */ metrics.at(6), "via_upstream");
+  // no test header
+  EXPECT_EQ(/* RESP(test-header) */ metrics.at(7), "-");
+}
+
 class QuicInplaceLdsIntegrationTest : public QuicHttpIntegrationTest {
 public:
   void inplaceInitialize(bool add_default_filter_chain = false) {
