@@ -279,8 +279,8 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_recordHistogramValue(JNIEnv* en
 
 // JvmCallbackContext
 
-static void pass_headers(const char* method, const Envoy::Types::ManagedEnvoyHeaders& headers,
-                         jobject j_context) {
+static void passHeaders(const char* method, const Envoy::Types::ManagedEnvoyHeaders& headers,
+                        jobject j_context) {
   JNIEnv* env = get_env();
   jclass jcls_JvmCallbackContext = env->GetObjectClass(j_context);
   jmethodID jmid_passHeader = env->GetMethodID(jcls_JvmCallbackContext, method, "([B[BZ)V");
@@ -319,7 +319,7 @@ static void* jvm_on_headers(const char* method, const Envoy::Types::ManagedEnvoy
   jni_log("[Envoy]", "jvm_on_headers");
   JNIEnv* env = get_env();
   jobject j_context = static_cast<jobject>(context);
-  pass_headers("passHeader", headers, j_context);
+  passHeaders("passHeader", headers, j_context);
 
   jclass jcls_JvmCallbackContext = env->GetObjectClass(j_context);
   jmethodID jmid_onHeaders =
@@ -514,7 +514,7 @@ static void* jvm_on_trailers(const char* method, envoy_headers trailers,
 
   JNIEnv* env = get_env();
   jobject j_context = static_cast<jobject>(context);
-  pass_headers("passHeader", trailers, j_context);
+  passHeaders("passHeader", trailers, j_context);
 
   jclass jcls_JvmCallbackContext = env->GetObjectClass(j_context);
   jmethodID jmid_onTrailers =
@@ -663,7 +663,7 @@ jvm_http_filter_on_resume(const char* method, envoy_headers* headers, envoy_data
   jlong headers_length = -1;
   if (headers) {
     headers_length = (jlong)headers->length;
-    pass_headers("passHeader", *headers, j_context);
+    passHeaders("passHeader", *headers, j_context);
   }
   jbyteArray j_in_data = nullptr;
   if (data) {
@@ -672,7 +672,7 @@ jvm_http_filter_on_resume(const char* method, envoy_headers* headers, envoy_data
   jlong trailers_length = -1;
   if (trailers) {
     trailers_length = (jlong)trailers->length;
-    pass_headers("passTrailer", *trailers, j_context);
+    passHeaders("passTrailer", *trailers, j_context);
   }
   jlongArray j_stream_intel = native_stream_intel_to_array(env, stream_intel);
 
