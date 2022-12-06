@@ -1,4 +1,4 @@
-name: core
+name: mobile_core
 
 on:
   push:
