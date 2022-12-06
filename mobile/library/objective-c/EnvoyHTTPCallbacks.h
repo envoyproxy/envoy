@@ -20,8 +20,8 @@ NS_ASSUME_NONNULL_BEGIN
  * @param endStream whether the response is headers-only.
  * @param streamIntel internal HTTP stream metrics, context, and other details.
  */
-@property (nonatomic, copy) void (^onHeaders)(
-    EnvoyHeaders *headers, BOOL endStream, EnvoyStreamIntel streamIntel);
+@property (nonatomic, copy) void (^onHeaders)
+    (EnvoyHeaders *headers, BOOL endStream, EnvoyStreamIntel streamIntel);
 
 /**
  * Called when a data frame gets received on the async HTTP stream.
@@ -30,8 +30,8 @@ NS_ASSUME_NONNULL_BEGIN
  * @param endStream whether the data is the last data frame.
  * @param streamIntel internal HTTP stream metrics, context, and other details.
  */
-@property (nonatomic, copy) void (^onData)(
-    NSData *data, BOOL endStream, EnvoyStreamIntel streamIntel);
+@property (nonatomic, copy) void (^onData)
+    (NSData *data, BOOL endStream, EnvoyStreamIntel streamIntel);
 
 /**
  * Called when all trailers get received on the async HTTP stream.
@@ -39,8 +39,8 @@ NS_ASSUME_NONNULL_BEGIN
  * @param trailers the trailers received.
  * @param streamIntel internal HTTP stream metrics, context, and other details.
  */
-@property (nonatomic, copy) void (^onTrailers)(
-    EnvoyHeaders *trailers, EnvoyStreamIntel streamIntel);
+@property (nonatomic, copy) void (^onTrailers)(EnvoyHeaders *trailers, EnvoyStreamIntel streamIntel)
+    ;
 
 /**
  * Called to signal there is buffer space available for continued request body upload.
@@ -57,9 +57,9 @@ NS_ASSUME_NONNULL_BEGIN
  * @param streamIntel internal HTTP stream metrics, context, and other details.
  * @param finalStreamIntel one time HTTP stream metrics, context, and other details.
  */
-@property (nonatomic, copy) void (^onError)(
-    uint64_t errorCode, NSString *message, int32_t attemptCount, EnvoyStreamIntel streamIntel,
-    EnvoyFinalStreamIntel finalStreamIntel);
+@property (nonatomic, copy) void (^onError)
+    (uint64_t errorCode, NSString *message, int32_t attemptCount, EnvoyStreamIntel streamIntel,
+     EnvoyFinalStreamIntel finalStreamIntel);
 
 /**
  * Called when the async HTTP stream is canceled.
@@ -69,8 +69,8 @@ NS_ASSUME_NONNULL_BEGIN
  * @param streamIntel internal HTTP stream metrics, context, and other details.
  * @param finalStreamIntel one time HTTP stream metrics, context, and other details.
  */
-@property (nonatomic, copy) void (^onCancel)(
-    EnvoyStreamIntel streamIntel, EnvoyFinalStreamIntel finalStreamIntel);
+@property (nonatomic, copy) void (^onCancel)
+    (EnvoyStreamIntel streamIntel, EnvoyFinalStreamIntel finalStreamIntel);
 
 /**
  * Final call made when an HTTP stream is closed gracefully.
@@ -79,8 +79,8 @@ NS_ASSUME_NONNULL_BEGIN
  * @param streamIntel internal HTTP stream metrics, context, and other details.
  * @param finalStreamIntel one time HTTP stream metrics, context, and other details.
  */
-@property (nonatomic, copy) void (^onComplete)(
-    EnvoyStreamIntel streamIntel, EnvoyFinalStreamIntel finalStreamIntel);
+@property (nonatomic, copy) void (^onComplete)
+    (EnvoyStreamIntel streamIntel, EnvoyFinalStreamIntel finalStreamIntel);
 
 @end
 
