@@ -231,16 +231,6 @@ struct StreamInfoImpl : public StreamInfo {
     return virtual_cluster_name_;
   }
 
-  void setDeferredLoggingHeadersAndTrailers(
-      DeferredLoggingHeadersAndTrailers deferred_logging_headers_and_trailers) override {
-    deferred_logging_headers_and_trailers_ = absl::make_optional<DeferredLoggingHeadersAndTrailers>(
-        std::move(deferred_logging_headers_and_trailers));
-  }
-  const absl::optional<DeferredLoggingHeadersAndTrailers>&
-  deferredLoggingHeadersAndTrailers() const override {
-    return deferred_logging_headers_and_trailers_;
-  }
-
   bool healthCheck() const override { return health_check_request_; }
 
   void healthCheck(bool is_health_check) override { health_check_request_ = is_health_check; }
@@ -366,9 +356,6 @@ struct StreamInfoImpl : public StreamInfo {
   // TODO(agrawroh): Check if the owner of this storage outlives the StreamInfo. We should only copy
   // the string if it could outlive the StreamInfo.
   absl::optional<std::string> virtual_cluster_name_;
-  // Headers and trailers required for access logs, stored in StreamInfo for deferred logging (i.e.
-  // after typical cleanup of a stream). nullopt indicates that deferred logging should be skipped.
-  absl::optional<DeferredLoggingHeadersAndTrailers> deferred_logging_headers_and_trailers_;
 
 private:
   static Network::ConnectionInfoProviderSharedPtr emptyDownstreamAddressProvider() {

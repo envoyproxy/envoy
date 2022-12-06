@@ -18,18 +18,17 @@ void QuicStatsGatherer::maybeDoDeferredLog() {
   if (stream_info_ == nullptr) {
     return;
   }
-  if (!stream_info_->deferredLoggingHeadersAndTrailers().has_value()) {
+  if (!deferred_logging_headers_and_trailers_.has_value()) {
     return;
   }
   if (time_source_ != nullptr) {
     stream_info_->downstreamTiming().onLastDownstreamAckReceived(*time_source_);
   }
-  auto request_headers =
-      stream_info_->deferredLoggingHeadersAndTrailers()->request_header_map.get();
-  auto response_headers =
-      stream_info_->deferredLoggingHeadersAndTrailers()->response_header_map.get();
-  auto response_trailers =
-      stream_info_->deferredLoggingHeadersAndTrailers()->response_trailer_map.get();
+  Http::DeferredLoggingHeadersAndTrailers headers_and_trailers =
+      deferred_logging_headers_and_trailers_.value();
+  auto request_headers = headers_and_trailers.request_header_map.get();
+  auto response_headers = headers_and_trailers.response_header_map.get();
+  auto response_trailers = headers_and_trailers.response_trailer_map.get();
   for (const auto& log_handler : access_log_handlers_) {
     log_handler->log(request_headers, response_headers, response_trailers, *stream_info_);
   }

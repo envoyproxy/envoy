@@ -156,6 +156,8 @@ public:
     return stream_error_on_invalid_http_message_;
   }
   void setRequestDecoder(Http::RequestDecoder& /*decoder*/) override {}
+  void setDeferredLoggingHeadersAndTrailers(
+      Http::DeferredLoggingHeadersAndTrailers /*headers_and_trailers*/) override {}
 
   // Http1::StreamEncoderImpl
   void resetStream(StreamResetReason reason) override;

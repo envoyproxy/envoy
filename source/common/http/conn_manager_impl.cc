@@ -288,8 +288,7 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
       stream.response_encoder_ != nullptr &&
       Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.quic_defer_logging_to_ack_listener")) {
-    stream.filter_manager_.streamInfo().setDeferredLoggingHeadersAndTrailers(
-        stream.DeferredLoggingHeadersAndTrailers());
+    stream.deferHeadersAndTrailers();
   } else {
     // For HTTP/1 and HTTP/2, log here as usual.
     stream.filter_manager_.log();

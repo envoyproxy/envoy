@@ -207,18 +207,18 @@ private:
     std::list<AccessLog::InstanceSharedPtr> accessLogHandlers() override {
       return filter_manager_.accessLogHandlers();
     }
-    StreamInfo::DeferredLoggingHeadersAndTrailers DeferredLoggingHeadersAndTrailers() {
-      StreamInfo::DeferredLoggingHeadersAndTrailers info;
+    void deferHeadersAndTrailers() {
+      Http::DeferredLoggingHeadersAndTrailers headers_and_trailers;
       if (requestHeaders()) {
-        info.request_header_map = request_headers_;
+        headers_and_trailers.request_header_map = request_headers_;
       }
       if (responseHeaders()) {
-        info.response_header_map = response_headers_;
+        headers_and_trailers.response_header_map = response_headers_;
       }
       if (responseTrailers()) {
-        info.response_trailer_map = response_trailers_;
+        headers_and_trailers.response_trailer_map = response_trailers_;
       }
-      return info;
+      response_encoder_->setDeferredLoggingHeadersAndTrailers(std::move(headers_and_trailers));
     }
 
     // Tracing::TracingConfig

@@ -38,12 +38,22 @@ public:
   void setAccessLogHandlers(std::list<AccessLog::InstanceSharedPtr> handlers) {
     access_log_handlers_ = handlers;
   }
+  // Set headers and trailers used for deferred logging.
+  void setDeferredLoggingHeadersAndTrailers(
+      Http::DeferredLoggingHeadersAndTrailers headers_and_trailers) {
+    deferred_logging_headers_and_trailers_ =
+        absl::make_optional<Http::DeferredLoggingHeadersAndTrailers>(
+            std::move(headers_and_trailers));
+  }
 
 private:
   uint64_t bytes_outstanding_ = 0;
   bool fin_sent_ = false;
   std::shared_ptr<StreamInfo::StreamInfo> stream_info_ = nullptr;
   std::list<AccessLog::InstanceSharedPtr> access_log_handlers_{};
+  // Headers and trailers required for deferred logging. nullopt indicates that deferred logging
+  // should be skipped.
+  absl::optional<Http::DeferredLoggingHeadersAndTrailers> deferred_logging_headers_and_trailers_;
   Envoy::TimeSource* time_source_ = nullptr;
   bool logging_done_ = false;
 };

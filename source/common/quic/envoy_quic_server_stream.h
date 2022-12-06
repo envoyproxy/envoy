@@ -38,6 +38,10 @@ public:
   bool streamErrorOnInvalidHttpMessage() const override {
     return http3_options_.override_stream_error_on_invalid_http_message().value();
   }
+  void setDeferredLoggingHeadersAndTrailers(
+      Http::DeferredLoggingHeadersAndTrailers headers_and_trailers) override {
+    stats_gatherer_->setDeferredLoggingHeadersAndTrailers(std::move(headers_and_trailers));
+  };
 
   // Http::Stream
   void resetStream(Http::StreamResetReason reason) override;
