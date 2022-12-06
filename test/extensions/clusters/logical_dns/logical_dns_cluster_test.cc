@@ -139,6 +139,9 @@ protected:
     EXPECT_EQ("", data.host_description_->locality().zone());
     EXPECT_EQ("", data.host_description_->locality().sub_zone());
     EXPECT_EQ("foo.bar.com", data.host_description_->hostname());
+    EXPECT_FALSE(data.host_description_->lastHcPassTime());
+    EXPECT_EQ("", data.host_description_->hostnameForHealthChecks());
+    EXPECT_EQ(0, data.host_description_->priority());
     EXPECT_TRUE(TestUtility::protoEqual(envoy::config::core::v3::Metadata::default_instance(),
                                         *data.host_description_->metadata()));
     data.host_description_->outlierDetector().putHttpResponseCode(200);
