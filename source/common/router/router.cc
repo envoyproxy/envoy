@@ -807,7 +807,7 @@ public:
       auto copy = std::make_unique<Buffer::OwnedImpl>();
       copy->move(original_buffer_);
       --num_copies_;
-      return std::move(copy);
+      return copy;
     } else {
       --num_copies_;
       return std::make_unique<Buffer::OwnedImpl>(original_buffer_);
