@@ -1107,9 +1107,9 @@ ClusterInfoImpl::ClusterInfoImpl(
   }
 
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tcp_pool_idle_timeout")) {
-    if (config.has_tcp_pool_idle_timeout()) {
+    if (config.has_tcp_protocol_options() && config.tcp_protocol_options().has_idle_timeout()) {
       tcp_pool_idle_timeout_ = std::chrono::milliseconds(
-          DurationUtil::durationToMilliseconds(config.tcp_pool_idle_timeout()));
+          DurationUtil::durationToMilliseconds(config.tcp_protocol_options().idle_timeout()));
       if (tcp_pool_idle_timeout_.value().count() == 0) {
         tcp_pool_idle_timeout_ = absl::nullopt;
       }

@@ -1185,19 +1185,8 @@ message Cluster {
   // connection pool for every downstream connection
   bool connection_pool_per_downstream_connection = 51;
 
-  // The idle timeout for connections. The idle timeout is defined as the period in which
-  // there are no active stream. When the idle timeout is reached, the connection will be closed.
-  //
-  // The timeout is guarded by
-  // ``envoy.reloadable_features.envoy_reloadable_features_tcp_pool_idle_timeout``.
-  //
-  // If the above runtime flag is enabled and idle timeout is not specified,
-  // this defaults to 1 hour. To disable idle timeouts, explicitly set this to 0.
-  //
-  // .. warning::
-  //   Disabling this timeout has a highly likelihood of yielding connection leaks due to lost TCP
-  //   FIN packets, etc.
-  google.protobuf.Duration tcp_pool_idle_timeout = 57;
+  // TCP protocol options that are applied to TCP connections from pool.
+  core.v3.TcpProtocolOptions tcp_protocol_options = 57;
 }
 
 // Extensible load balancing policy configuration.
