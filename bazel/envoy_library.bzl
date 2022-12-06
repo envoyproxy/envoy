@@ -13,6 +13,10 @@ load(
     "CONTRIB_EXTENSION_PACKAGE_VISIBILITY",
     "EXTENSION_CONFIG_VISIBILITY",
 )
+load(
+    "@rules_rust//rust:defs.bzl",
+    "rust_library",
+)
 
 # As above, but wrapped in list form for adding to dep lists. This smell seems needed as
 # SelectorValue values have to match the attribute type. See
@@ -224,5 +228,13 @@ def envoy_proto_library(name, **kwargs):
         # such as OSS-Fuzz.
         linkstatic = 1,
         visibility = ["//visibility:public"],
+        **kwargs
+    )
+
+def envoy_rust_library(name, deps = [], **kwargs):
+    rust_library(
+        name = name,
+        deps = ["@envoy//source/rust_common:rust_alloc_lib"] + deps,
+        edition = "2021",
         **kwargs
     )

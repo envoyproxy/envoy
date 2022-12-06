@@ -1,8 +1,8 @@
 #pragma once
 
 #include "envoy/matcher/matcher.h"
-
-#include "source/common/common/hash.h"
+#include "rust/cxx.h"
+#include "source/extensions/matching/input_matchers/consistent_hashing/matcher.rs.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -13,21 +13,20 @@ namespace ConsistentHashing {
 class Matcher : public Envoy::Matcher::InputMatcher {
 public:
   Matcher(uint32_t threshold, uint32_t modulo, uint64_t seed)
-      : threshold_(threshold), modulo_(modulo), seed_(seed) {}
+      : matcher_(newMatcher(threshold, modulo, seed)) {}
   bool match(absl::optional<absl::string_view> input) override {
     // Only match if the value is present.
+    // TODO(snowp): Figure out how to model optional values via Rust.
     if (!input) {
       return false;
     }
 
     // Otherwise, match if (hash(input) % modulo) >= threshold.
-    return HashUtil::xxHash64(*input, seed_) % modulo_ >= threshold_;
+    return doMatch(*matcher_, {input->data(), input->length()});
   }
 
 private:
-  const uint32_t threshold_;
-  const uint32_t modulo_;
-  const uint64_t seed_;
+  rust::Box<RustMatcher> matcher_;
 };
 } // namespace ConsistentHashing
 } // namespace InputMatchers
