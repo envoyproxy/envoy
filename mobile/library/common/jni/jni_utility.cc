@@ -66,7 +66,7 @@ void jni_delete_const_global_ref(const void* context) {
   jni_delete_global_ref(const_cast<void*>(context));
 }
 
-bool exception_check(JNIEnv* env) {
+bool clear_pending_exceptions(JNIEnv* env) {
   if (env->ExceptionCheck() == JNI_TRUE) {
     env->ExceptionClear();
     // TODO(Augustyniak): Log exception details.
