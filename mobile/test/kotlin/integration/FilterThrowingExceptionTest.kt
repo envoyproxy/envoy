@@ -95,7 +95,7 @@ class FilterThrowingExceptionTest {
   fun `registers a filter that throws an exception and performs an HTTP request`() {
     val onEngineRunningLatch = CountDownLatch(1)
     val onRespondeHeadersLatch = CountDownLatch(1)
-    val onExceptionEventLatch = CountDownLatch(2)
+    // val onExceptionEventLatch = CountDownLatch(2)
 
     val expectedMessages = mutableListOf(
         "Simulated onRequestHeaders exception",
@@ -110,8 +110,8 @@ class FilterThrowingExceptionTest {
       .setEventTracker { event ->
         if (event["name"] == "event_log" && event["log_name"] == "jni_exception") {
           // assertThat(event["message"]).isEqualTo(expectedMessages.first())
-          // expectedMessages.removeAt(0)
-          onExceptionEventLatch.countDown()
+          expectedMessages.removeAt(0)
+          // onExceptionEventLatch.countDown()
         }
       }
       .setOnEngineRunning { onEngineRunningLatch.countDown() }
@@ -139,10 +139,9 @@ class FilterThrowingExceptionTest {
       .start(Executors.newSingleThreadExecutor())
       .sendHeaders(requestHeaders, true)
 
-    onExceptionEventLatch.await(15, TimeUnit.SECONDS)
-    assertThat(onExceptionEventLatch.count).isEqualTo(0)
-    onRespondeHeadersLatch.await(5, TimeUnit.SECONDS)
+    onRespondeHeadersLatch.await(15, TimeUnit.SECONDS)
     assertThat(onRespondeHeadersLatch.count).isEqualTo(0)
+    assertThat(expectedMessages.size).isEqualTo(0)
 
     engine.terminate()
   }
