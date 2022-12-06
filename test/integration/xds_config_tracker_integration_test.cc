@@ -20,7 +20,10 @@
 namespace Envoy {
 namespace {
 
-constexpr char XDS_CLUSTER_NAME[] = "xds_cluster";
+const char ClusterName1[] = "cluster_1";
+const char ClusterName2[] = "cluster_2";
+const int UpstreamIndex1 = 1;
+const int UpstreamIndex2 = 2;
 
 /**
  * All stats for this xds tracker. @see stats_macros.h
@@ -93,10 +96,13 @@ class XdsConfigTrackerIntegrationTest : public Grpc::DeltaSotwIntegrationParamTe
 public:
   XdsConfigTrackerIntegrationTest()
       : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion(),
-                            ConfigHelper::baseConfigNoListeners()) {
+                            ConfigHelper::clustersNoListenerBootstrap(
+                                sotwOrDelta() == Grpc::SotwOrDelta::Sotw ||
+                                        sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw
+                                    ? "GRPC"
+                                    : "DELTA_GRPC")) {
 
     use_lds_ = false;
-    create_xds_upstream_ = true;
     sotw_or_delta_ = sotwOrDelta();
 
     config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux",
@@ -104,42 +110,6 @@ public:
                                        this->sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw)
                                           ? "true"
                                           : "false");
-
-    // Make the default cluster HTTP2.
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      ConfigHelper::setHttp2(*bootstrap.mutable_static_resources()->mutable_clusters(0));
-    });
-
-    // Build and add the xDS cluster config.
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      auto* xds_cluster = bootstrap.mutable_static_resources()->add_clusters();
-      xds_cluster->MergeFrom(ConfigHelper::buildStaticCluster(
-          std::string(XDS_CLUSTER_NAME),
-          /*port=*/0, ipVersion() == Network::Address::IpVersion::v4 ? "127.0.0.1" : "::1"));
-      ConfigHelper::setHttp2(*xds_cluster);
-    });
-
-    // Add static runtime values.
-    config_helper_.addRuntimeOverride("whatevs", "yar");
-
-    // Set up the RTDS runtime layer.
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      auto* layer = bootstrap.mutable_layered_runtime()->add_layers();
-      layer->set_name("some_rtds_layer");
-      auto* rtds_layer = layer->mutable_rtds_layer();
-      rtds_layer->set_name("some_rtds_layer");
-      auto* rtds_config = rtds_layer->mutable_rtds_config();
-      rtds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
-      auto* api_config_source = rtds_config->mutable_api_config_source();
-      api_config_source->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
-      api_config_source->set_api_type((this->sotwOrDelta() == Grpc::SotwOrDelta::Sotw ||
-                                       this->sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw)
-                                          ? envoy::config::core::v3::ApiConfigSource::GRPC
-                                          : envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
-      api_config_source->set_set_node_on_first_message_only(true);
-      api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name(
-          XDS_CLUSTER_NAME);
-    });
 
     // Add test xDS config tracer.
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -162,15 +132,32 @@ public:
     setUpstreamCount(1);
     setUpstreamProtocol(Http::CodecType::HTTP2);
     HttpIntegrationTest::initialize();
+
+    // Create the regular (i.e. not an xDS server) upstreams.
+    addFakeUpstream(Http::CodecType::HTTP2);
+    addFakeUpstream(Http::CodecType::HTTP2);
+    cluster1_ = ConfigHelper::buildStaticCluster(
+        ClusterName1, fake_upstreams_[UpstreamIndex1]->localAddress()->ip()->port(),
+        Network::Test::getLoopbackAddressString(ipVersion()), "ROUND_ROBIN");
+    cluster2_ = ConfigHelper::buildStaticCluster(
+        ClusterName2, fake_upstreams_[UpstreamIndex2]->localAddress()->ip()->port(),
+        Network::Test::getLoopbackAddressString(ipVersion()), "ROUND_ROBIN");
+
+    acceptXdsConnection();
     registerTestServerPorts({});
   }
 
   void acceptXdsConnection() {
-    createXdsConnection();
-    AssertionResult result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
+    AssertionResult result = // xds_connection_ is filled with the new FakeHttpConnection.
+        fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, xds_connection_);
+    RELEASE_ASSERT(result, result.message());
+    result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
     RELEASE_ASSERT(result, result.message());
     xds_stream_->startGrpcStream();
   }
+
+  envoy::config::cluster::v3::Cluster cluster1_;
+  envoy::config::cluster::v3::Cluster cluster2_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, XdsConfigTrackerIntegrationTest,
@@ -181,18 +168,15 @@ TEST_P(XdsConfigTrackerIntegrationTest, XdsConfigTrackerSuccessCount) {
   Registry::InjectFactory<Config::XdsConfigTrackerFactory> registered(factory);
 
   initialize();
-  acceptXdsConnection();
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
 
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "", {"some_rtds_layer"},
-                                      {"some_rtds_layer"}, {}, true));
-  const auto some_rtds_layer = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
-    name: some_rtds_layer
-    layer:
-      foo: bar
-      baz: meh
-  )EOF");
-  sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
-      Config::TypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1");
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      Config::TypeUrl::get().Cluster, {cluster1_, cluster2_}, {cluster1_, cluster2_}, {}, "1");
+
+  // 3 because the statically specified CDS server itself counts as a cluster.
+  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 3);
+
+  // onConfigAccepted is called when all the resources are accepted.
   test_server_->waitForCounterEq("test_xds_tracker.on_config_accepted", 1);
   EXPECT_EQ(1, test_server_->counter("test_xds_tracker.on_config_accepted")->value());
 }
@@ -202,10 +186,7 @@ TEST_P(XdsConfigTrackerIntegrationTest, XdsConfigTrackerFailureCount) {
   Registry::InjectFactory<Config::XdsConfigTrackerFactory> registered(factory);
 
   initialize();
-  acceptXdsConnection();
-
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "", {"some_rtds_layer"},
-                                      {"some_rtds_layer"}, {}, true));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
 
   const auto route_config =
       TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
@@ -221,12 +202,34 @@ TEST_P(XdsConfigTrackerIntegrationTest, XdsConfigTrackerFailureCount) {
               cluster_name: xds_cluster
     )EOF");
 
-  // Message's TypeUrl != Resource's
   sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
-      Config::TypeUrl::get().Runtime, {route_config}, {route_config}, {}, "1");
+      Config::TypeUrl::get().Cluster, {route_config}, {route_config}, {}, "3");
 
+  // Resources are rejected because Message's TypeUrl != Resource's
   test_server_->waitForCounterEq("test_xds_tracker.on_config_rejected", 1);
   EXPECT_EQ(1, test_server_->counter("test_xds_tracker.on_config_rejected")->value());
+}
+
+TEST_P(XdsConfigTrackerIntegrationTest, XdsConfigTrackerPartialUpdate) {
+  TestXdsConfigTrackerFactory factory;
+  Registry::InjectFactory<Config::XdsConfigTrackerFactory> registered(factory);
+
+  initialize();
+  // The first of duplicates has already been successfully applied, and a duplicate exception should
+  // threw. Only the first cluster is added.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      Config::TypeUrl::get().Cluster, {cluster1_, cluster1_, cluster2_},
+      {cluster1_, cluster1_, cluster2_}, {}, "4");
+
+  test_server_->waitForCounterGe("cluster_manager.cluster_added", 1);
+  test_server_->waitForCounterEq("test_xds_tracker.on_config_rejected", 1);
+
+  // onConfigRejected is called even if a subset of the resources are added.
+  EXPECT_EQ(1, test_server_->counter("test_xds_tracker.on_config_rejected")->value());
+
+  // onConfigAccepted is called only when all the resources in a response are successfully ingested.
+  EXPECT_EQ(0, test_server_->counter("test_xds_tracker.on_config_accepted")->value());
 }
 
 } // namespace
