@@ -52,8 +52,8 @@ class MainActivity : Activity() {
       .addLogLevel(LogLevel.DEBUG)
       .enableProxying(true)
       .addPlatformFilter(::DemoFilter)
-//      .addPlatformFilter(::BufferDemoFilter)
-//      .addPlatformFilter(::AsyncDemoFilter)
+      .addPlatformFilter(::BufferDemoFilter)
+      .addPlatformFilter(::AsyncDemoFilter)
       .addNativeFilter("envoy.filters.http.buffer", "{\"@type\":\"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer\",\"max_request_bytes\":5242880}")
       .addStringAccessor("demo-accessor", { "PlatformString" })
       .setOnEngineRunning { Log.d("MainActivity", "Envoy async internal setup completed") }
@@ -79,25 +79,23 @@ class MainActivity : Activity() {
     thread.start()
     val handler = Handler(thread.looper)
 
-    makeRequest()
-
     // Run a request loop and record stats until the application exits.
-//    handler.postDelayed(
-//      object : Runnable {
-//        override fun run() {
-//          try {
-//            makeRequest()
-//            recordStats()
-//          } catch (e: IOException) {
-//            Log.d("MainActivity", "exception making request or recording stats", e)
-//          }
-//
-//          // Make a call and report stats again
-//          handler.postDelayed(this, TimeUnit.SECONDS.toMillis(1))
-//        }
-//      },
-//      TimeUnit.SECONDS.toMillis(1)
-//    )
+    handler.postDelayed(
+      object : Runnable {
+        override fun run() {
+          try {
+            makeRequest()
+            recordStats()
+          } catch (e: IOException) {
+            Log.d("MainActivity", "exception making request or recording stats", e)
+          }
+
+          // Make a call and report stats again
+          handler.postDelayed(this, TimeUnit.SECONDS.toMillis(1))
+        }
+      },
+      TimeUnit.SECONDS.toMillis(1)
+    )
   }
 
   override fun onDestroy() {
