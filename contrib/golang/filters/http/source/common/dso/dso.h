@@ -54,7 +54,7 @@ public:
    * @param dso_name used to specify the absolute path of the dynamic library.
    * @return false if pub are invalid. Otherwise, return true.
    */
-  static bool pub(std::string dso_id, std::string dso_name);
+  static bool load(std::string dso_id, std::string dso_name);
 
   /**
    * Unload the go plugin dynamic library.
