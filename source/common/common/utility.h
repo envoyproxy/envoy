@@ -495,7 +495,9 @@ public:
               const uint64_t total_cluster_weight, const uint64_t random_value,
               const bool ignore_overflow) {
     //avoid dividing by zero    
-    ASSERT(total_cluster_weight != 0);
+    if(total_cluster_weight == 0)
+      throw EnvoyException("total_cluster_weight must be greater than 0.");
+
     uint64_t selected_value = random_value % total_cluster_weight;
     uint64_t begin = 0;
     uint64_t end = 0;
