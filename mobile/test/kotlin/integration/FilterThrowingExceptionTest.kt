@@ -107,13 +107,13 @@ class FilterThrowingExceptionTest {
     val engine = builder
       .addLogLevel(LogLevel.ERROR)
       .addPlatformFilter(::ThrowingFilter)
-      // .setEventTracker { event ->
+      .setEventTracker { event ->
         // if (event["name"] == "event_log" && event["log_name"] == "jni_exception") {
         //   // assertThat(event["message"]).isEqualTo(expectedMessages.first())
         //   // expectedMessages.removeAt(0)
         //   // onExceptionEventLatch.countDown()
         // }
-      // }
+      }
       .setOnEngineRunning { onEngineRunningLatch.countDown() }
       .build()
 
