@@ -4,6 +4,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/utility.h"
+#include "source/common/filesystem/directory.h"
 #include "source/common/filesystem/filesystem_impl.h"
 
 #include "test/test_common/environment.h"
@@ -280,6 +281,25 @@ TEST_F(FileSystemImplTest, OpenReadOnly) {
   const Api::IoCallBoolResult result = file->open(ReadOnlyFlags);
   EXPECT_TRUE(result.return_value_);
   EXPECT_TRUE(file->isOpen());
+}
+
+TEST_F(FileSystemImplTest, TemporaryFileIsDeletedOnClose) {
+  const std::string new_file_path = TestEnvironment::temporaryPath("");
+  FilePathAndType new_file_info{Filesystem::DestinationType::TmpFile, new_file_path};
+  FilePtr file = file_system_.createFile(new_file_info);
+  const Api::IoCallBoolResult result = file->open(DefaultFlags);
+  EXPECT_TRUE(result.return_value_) << result.err_->getErrorDetails();
+  EXPECT_TRUE(file->isOpen());
+  file.reset();
+  std::vector<std::string> found_files;
+  for (const DirectoryEntry& entry : Directory(new_file_path)) {
+    found_files.push_back(entry.name_);
+  }
+  // After the tmp file is closed, there should be no file persisting in the directory.
+  // (We don't necessarily expect that a named file was created - that depends on the
+  // platform and filesystem - but after the file is closed any named file that may
+  // have been created should have been destroyed.)
+  EXPECT_THAT(found_files, testing::Not(testing::Contains(testing::EndsWith(".tmp"))));
 }
 
 TEST_F(FileSystemImplTest, OpenTwice) {

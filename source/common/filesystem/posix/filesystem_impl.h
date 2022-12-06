@@ -24,10 +24,20 @@ protected:
   Api::IoCallBoolResult open(FlagSet flag) override;
   Api::IoCallSizeResult write(absl::string_view buffer) override;
   Api::IoCallBoolResult close() override;
-
-private:
   FlagsAndMode translateFlag(FlagSet in);
   friend class FileSystemImplTest;
+};
+
+class TmpFileImplPosix : public FileImplPosix {
+public:
+  TmpFileImplPosix(const FilePathAndType& file_info) : FileImplPosix(file_info) {}
+  Api::IoCallBoolResult open(FlagSet flag) override;
+  Api::IoCallBoolResult close() override;
+  ~TmpFileImplPosix() override;
+
+private:
+  // This is unset except for the case where the filesystem does not support files without inodes.
+  std::string tmp_file_path_;
 };
 
 class InstanceImplPosix : public Instance {

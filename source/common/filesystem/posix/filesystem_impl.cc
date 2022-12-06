@@ -26,8 +26,17 @@ namespace Filesystem {
 
 FileImplPosix::~FileImplPosix() {
   if (isOpen()) {
-    // NOLINTNEXTLINE(clang-analyzer-optin.cplusplus.VirtualCall)
-    const Api::IoCallBoolResult result = close();
+    // Explicit version of close because virtual calls in destructors are ambiguous.
+    const Api::IoCallBoolResult result = FileImplPosix::close();
+    ASSERT(result.return_value_);
+  }
+}
+
+TmpFileImplPosix::~TmpFileImplPosix() {
+  if (isOpen()) {
+    // Explicit version of close because virtual calls in destructors are ambiguous.
+    // (We have to duplicate the destructor to ensure the overridden close is called.)
+    const Api::IoCallBoolResult result = TmpFileImplPosix::close();
     ASSERT(result.return_value_);
   }
 }
@@ -42,6 +51,34 @@ Api::IoCallBoolResult FileImplPosix::open(FlagSet in) {
   return fd_ != -1 ? resultSuccess(true) : resultFailure(false, errno);
 }
 
+Api::IoCallBoolResult TmpFileImplPosix::open(FlagSet in) {
+  if (isOpen()) {
+    return resultSuccess(true);
+  }
+
+  const auto flags_and_mode = translateFlag(in);
+  // Try to open a temp file with no name. Only some filesystems support this.
+  fd_ = ::open(path().c_str(), flags_and_mode.flags_ | O_TMPFILE, flags_and_mode.mode_);
+  if (fd_ != -1) {
+    return resultSuccess(true);
+  }
+  // If we couldn't do a nameless temp file, open a named temp file.
+  for (int tries = 5; tries > 0; tries--) {
+    std::string try_path = generateTmpFilePath(path());
+    fd_ = ::open(try_path.c_str(), flags_and_mode.flags_, flags_and_mode.mode_);
+    if (fd_ != -1) {
+      // Try to unlink the temp file while it's still open. Again this only works on
+      // a (different) subset of filesystems.
+      if (::unlink(try_path.c_str()) != 0) {
+        // If we couldn't unlink it, set tmp_file_path_, to unlink after close.
+        tmp_file_path_ = try_path;
+      }
+      return resultSuccess(true);
+    }
+  }
+  return resultFailure(false, errno);
+}
+
 Api::IoCallSizeResult FileImplPosix::write(absl::string_view buffer) {
   const ssize_t rc = ::write(fd_, buffer.data(), buffer.size());
   return rc != -1 ? resultSuccess(rc) : resultFailure(rc, errno);
@@ -52,6 +89,16 @@ Api::IoCallBoolResult FileImplPosix::close() {
   int rc = ::close(fd_);
   fd_ = -1;
   return (rc != -1) ? resultSuccess(true) : resultFailure(false, errno);
+}
+
+Api::IoCallBoolResult TmpFileImplPosix::close() {
+  auto result = FileImplPosix::close();
+  if (!tmp_file_path_.empty()) {
+    int unlink_result = ::unlink(tmp_file_path_.c_str());
+    ASSERT(unlink_result == 0, resultFailure(0, errno).err_->getErrorDetails());
+    tmp_file_path_.clear();
+  }
+  return result;
 }
 
 FileImplPosix::FlagsAndMode FileImplPosix::translateFlag(FlagSet in) {
@@ -83,6 +130,12 @@ FilePtr InstanceImplPosix::createFile(const FilePathAndType& file_info) {
   switch (file_info.file_type_) {
   case DestinationType::File:
     return std::make_unique<FileImplPosix>(file_info);
+  case DestinationType::TmpFile:
+    if (!file_info.path_.empty() && file_info.path_.back() == '/') {
+      return std::make_unique<TmpFileImplPosix>(FilePathAndType{
+          DestinationType::TmpFile, file_info.path_.substr(0, file_info.path_.size() - 1)});
+    }
+    return std::make_unique<TmpFileImplPosix>(file_info);
   case DestinationType::Stderr:
     return std::make_unique<FileImplPosix>(FilePathAndType{DestinationType::Stderr, "/dev/stderr"});
   case DestinationType::Stdout:

@@ -23,11 +23,20 @@ protected:
     DWORD creation_ = 0;
   };
 
-  FlagsAndMode translateFlag(FlagSet in);
+  virtual FlagsAndMode translateFlag(FlagSet in);
 
 private:
   friend class FileSystemImplTest;
   bool truncate_{};
+};
+
+class TmpFileImplWin32 : public FileImplWin32 {
+public:
+  TmpFileImplWin32(const FilePathAndType& file_info) : FileImplWin32(file_info) {}
+  Api::IoCallBoolResult open(FlagSet flag) override;
+
+private:
+  std::string tmp_file_path_;
 };
 
 template <DWORD std_handle_> struct StdStreamFileImplWin32 : public FileImplWin32 {

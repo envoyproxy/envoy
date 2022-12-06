@@ -50,6 +50,7 @@ public:
 protected:
   filesystem_os_id_t fd_;
   const FilePathAndType filepath_and_type_;
+  static std::string generateTmpFilePath(absl::string_view path);
 };
 
 } // namespace Filesystem
