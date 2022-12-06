@@ -9,6 +9,9 @@ namespace Matching {
 namespace InputMatchers {
 namespace ConsistentHashing {
 
+/**
+ * Simplified API allowing Rust to call into xxHash64.
+ */
 uint64_t hash(rust::Str value, uint64_t seed);
 
 } // namespace ConsistentHashing

@@ -5,10 +5,6 @@ load(
     "envoy_extension_package",
     "envoy_rust_library",
 )
-load(
-    "@rules_rust//rust:defs.bzl",
-    "rust_library",
-)
 load("@cxx.rs//tools/bazel:rust_cxx_bridge.bzl", "rust_cxx_bridge")
 
 licenses(["notice"])  # Apache 2
