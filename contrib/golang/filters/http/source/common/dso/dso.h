@@ -61,7 +61,7 @@ public:
    * @param dso_id is unique ID for dynamic library.
    * @return false if unpub are invalid. Otherwise, return true.
    */
-  static bool unpub(std::string dso_id);
+  static bool unload(std::string dso_id);
 
   /**
    * Get the go plugin dynamic library.
