@@ -10,6 +10,8 @@
 
 using testing::ReturnRef;
 
+// AN EXACT COPY OF client_integration_test.cc with all tests removed except the first
+
 namespace Envoy {
 namespace {
 
