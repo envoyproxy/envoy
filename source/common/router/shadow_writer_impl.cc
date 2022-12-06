@@ -12,7 +12,7 @@ namespace Envoy {
 namespace Router {
 
 namespace {
-std::string NewHost(absl::string_view host) {
+std::string newHost(absl::string_view host) {
   ASSERT(!host.empty());
   // Switch authority to add a shadow postfix. This allows upstream logging to
   // make more sense.

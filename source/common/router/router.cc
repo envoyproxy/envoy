@@ -785,7 +785,6 @@ class ManyCopiedBuffer {
 public:
   ManyCopiedBuffer(Buffer::Instance& original_buffer, int num_copies)
       : original_buffer_(original_buffer), num_copies_(num_copies) {}
-  ~ManyCopiedBuffer() {}
 
   // Get an unowned reference to the next copy of the buffer. The copy is owned by this class.
   Buffer::Instance& nextBuffer() {

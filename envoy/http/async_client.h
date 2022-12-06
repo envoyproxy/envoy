@@ -202,7 +202,6 @@ public:
    */
   class OngoingRequest : public virtual Request, public virtual Stream {
   public:
-    virtual ~OngoingRequest() = default;
     /***
      * Take ownership of data, and sends it to the underlying stream.
      * @param data owned buffer to pass to upstream.

@@ -203,6 +203,57 @@ TEST_F(AsyncClientImplTest, Basic) {
                      .value());
 }
 
+TEST_F(AsyncClientImplTest, BasicOngoingRequest) {
+  auto headers = std::make_unique<TestRequestHeaderMapImpl>();
+  HttpTestUtility::addDefaultHeaders(*headers);
+  TestRequestHeaderMapImpl headers_copy = *headers;
+
+  std::unique_ptr<Buffer::OwnedImpl> data = std::make_unique<Buffer::OwnedImpl>("test data");
+  Buffer::OwnedImpl data_copy("test data");
+
+  auto trailers = std::make_unique<TestRequestTrailerMapImpl>();
+  trailers->addCopy("some", "trailer");
+  TestRequestTrailerMapImpl trailers_copy = *trailers;
+
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke(
+          [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  stream_info_, {});
+            response_decoder_ = &decoder;
+            return nullptr;
+          }));
+
+  headers_copy.addCopy("x-envoy-internal", "true");
+  headers_copy.addCopy("x-forwarded-for", "127.0.0.1");
+
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers_copy), false));
+  EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data_copy), false));
+  EXPECT_CALL(stream_encoder_, encodeTrailers(HeaderMapEqualRef(&trailers_copy)));
+
+  AsyncClient::OngoingRequest* request = client_.startRequest(
+      std::move(headers), callbacks_, AsyncClient::RequestOptions().setEndStream(false));
+  EXPECT_NE(request, nullptr);
+
+  request->captureAndSendData(std::move(data), false);
+  request->captureAndSendTrailers(std::move(trailers));
+
+  expectSuccess(request, 200);
+
+  ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
+  response_decoder_->decodeHeaders(std::move(response_headers), false);
+  Buffer::OwnedImpl response_data("test data");
+  response_decoder_->decodeData(response_data, true);
+
+  EXPECT_EQ(
+      1UL,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_200").value());
+  EXPECT_EQ(1UL, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                     .counter("internal.upstream_rq_200")
+                     .value());
+}
+
 TEST_F(AsyncClientImplTracingTest, Basic) {
   Tracing::MockSpan* child_span{new Tracing::MockSpan()};
   message_->body().add("test body");
