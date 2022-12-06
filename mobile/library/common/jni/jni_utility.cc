@@ -72,7 +72,7 @@ bool clear_pending_exceptions(JNIEnv* env) {
   }
 
   env->ExceptionClear();
-  ENVOY_LOG_EVENT_TO_LOGGER(GET_MISC_LOGGER(), info, "jni_exception", "test");
+  ENVOY_LOG_EVENT_TO_LOGGER(GET_MISC_LOGGER(), error, "jni_exception", "test");
   return true;
 }
 

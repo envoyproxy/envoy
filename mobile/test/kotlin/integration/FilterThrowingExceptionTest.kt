@@ -105,7 +105,7 @@ class FilterThrowingExceptionTest {
     val context = ApplicationProvider.getApplicationContext<Context>()
     val builder = AndroidEngineBuilder(context)
     val engine = builder
-      .addLogLevel(LogLevel.DEBUG)
+      .addLogLevel(LogLevel.ERROR)
       .addPlatformFilter(::ThrowingFilter)
       // .setEventTracker { event ->
         // if (event["name"] == "event_log" && event["log_name"] == "jni_exception") {
