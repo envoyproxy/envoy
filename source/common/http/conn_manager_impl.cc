@@ -1764,6 +1764,9 @@ void ConnectionManagerImpl::ActiveStream::recreateStream(
   connection_manager_.doEndStream(*this, /*check_for_deferred_close*/ false);
 
   RequestDecoder& new_stream = connection_manager_.newStream(*response_encoder, true);
+  // Set the new RequestDecoder on the ResponseEncoder. Even though all of the decoder callbacks
+  // have already been called at this point, the encoder still needs the new decoder for deferred
+  // logging in some cases.
   // This doesn't currently work for HTTP/1 as the H/1 ResponseEncoder doesn't hold the active
   // stream's pointer to the RequestDecoder.
   response_encoder->setRequestDecoder(new_stream);
