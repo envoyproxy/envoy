@@ -34,7 +34,7 @@ void ShadowWriterImpl::shadow(const std::string& cluster, Http::RequestMessagePt
     return;
   }
 
-  request->headers().setHost(NewHost(request->headers().getHostValue()));
+  request->headers().setHost(newHost(request->headers().getHostValue()));
 
   const auto& shadow_options = options.is_shadow ? options : [options] {
     Http::AsyncClient::RequestOptions actual_options(options);
@@ -53,7 +53,7 @@ ShadowWriterImpl::streamingShadow(const std::string& cluster, Http::RequestHeade
     ENVOY_LOG(debug, "shadow cluster '{}' does not exist", cluster);
     return nullptr;
   }
-  headers->setHost(NewHost(headers->getHostValue()));
+  headers->setHost(newHost(headers->getHostValue()));
 
   const auto& shadow_options = options.is_shadow ? options : [options] {
     Http::AsyncClient::RequestOptions actual_options(options);
