@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+// NOLINT(namespace-envoy)
+
 extern "C" {
 
 void* __rdl_alloc(size_t, size_t);
