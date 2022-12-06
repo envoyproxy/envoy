@@ -71,21 +71,8 @@ bool clear_pending_exceptions(JNIEnv* env) {
     return false;
   }
 
-  jthrowable exception = env->ExceptionOccurred();
   env->ExceptionClear();
-
-  jclass jcls_throwable = env->FindClass("java/lang/Throwable");
-  jmethodID jmid_getMessage =
-      env->GetMethodID(jcls_throwable, "getMessage", "()Ljava/lang/String;");
-  jstring jobj_exception_message = (jstring)env->CallObjectMethod(exception, jmid_getMessage);
-
-  const char* exception_message = env->GetStringUTFChars(jobj_exception_message, nullptr);
-  const auto message = std::string(exception_message);
-
-  ENVOY_LOG_EVENT_TO_LOGGER(GET_MISC_LOGGER(), info, "jni_exception", message);
-
-  env->ReleaseStringUTFChars(jobj_exception_message, exception_message);
-  env->DeleteLocalRef(jcls_throwable);
+  ENVOY_LOG_EVENT_TO_LOGGER(GET_MISC_LOGGER(), info, "jni_exception", "test");
   return true;
 }
 
