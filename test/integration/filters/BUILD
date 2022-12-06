@@ -572,6 +572,20 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "encode1xx_local_reply_config_lib",
+    srcs = [
+        "encode1xx_local_reply_filter.cc",
+    ],
+    deps = [
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+    ],
+)
+
+envoy_cc_test_library(
     name = "decode_headers_return_stop_all_filter_config_lib",
     srcs = [
         "decode_headers_return_stop_all_filter.cc",

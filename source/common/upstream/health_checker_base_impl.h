@@ -108,6 +108,7 @@ protected:
     uint32_t num_unhealthy_{};
     uint32_t num_healthy_{};
     bool first_check_{true};
+    TimeSource& time_source_;
   };
 
   using ActiveHealthCheckSessionPtr = std::unique_ptr<ActiveHealthCheckSession>;

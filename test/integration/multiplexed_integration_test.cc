@@ -1463,6 +1463,35 @@ TEST_P(MultiplexedIntegrationTest, EmptyTrailers) {
   ASSERT_TRUE(response->complete());
 }
 
+TEST_P(MultiplexedIntegrationTest, TestEncode1xxHeaders) {
+  static std::string encode1xx_local_reply_config = R"EOF(
+  name: encode1xx-local-reply-filter
+  )EOF";
+  config_helper_.prependFilter(encode1xx_local_reply_config);
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void { hcm.set_proxy_100_continue(true); });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Upstream responds with 100-continue, which the filter turns into a local
+  // reply.
+  auto response =
+      codec_client_->makeRequestWithBody(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                                        {":path", "/"},
+                                                                        {":scheme", "http"},
+                                                                        {":authority", "host"},
+                                                                        {"expect", "100-continue"}},
+                                         10);
+
+  waitForNextUpstreamRequest();
+  // This will trigger local reply response.
+  upstream_request_->encode1xxHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+}
+
 class MultiplexedRingHashIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   MultiplexedRingHashIntegrationTest();
