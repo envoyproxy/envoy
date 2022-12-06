@@ -25,16 +25,11 @@ Http::FilterFactoryCb RateLimitQuotaFilterFactory::createFilterFactoryFromProtoT
   //   std::shared_ptr<BucketCache> bucket_cache = std::make_shared<BucketCache>(context,
   //   shared_client);
   std::shared_ptr<BucketCache> bucket_cache = std::make_shared<BucketCache>(context);
-//   return
-//       [config = std::move(config), &context](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-//         callbacks.addStreamFilter(std::make_shared<RateLimitQuotaFilter>(
-//             config, context, createRateLimitClient(context, config->rlqs_server())));
-//       };
 
   return [config = std::move(config), &context, bucket_cache = std::move(bucket_cache)](
              Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<RateLimitQuotaFilter>(
-        config, context, createRateLimitClient(context, config->rlqs_server()),
+        config, context,
         &(bucket_cache->tls.get()->buckets())));
   };
 }

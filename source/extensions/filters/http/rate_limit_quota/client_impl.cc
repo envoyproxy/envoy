@@ -23,7 +23,8 @@ namespace RateLimitQuota {
 // 可能是: 1) filter 有一个member 是 RateLimitQuotaUsageReports
 // 2) every time if the request matched and not first request, fill in the reports
 // 3) periodically sent all at once
-RateLimitQuotaUsageReports RateLimitClientImpl::buildUsageReport(absl::optional<BucketId> bucket_id) {
+RateLimitQuotaUsageReports
+RateLimitClientImpl::buildUsageReport(absl::optional<BucketId> bucket_id) {
   RateLimitQuotaUsageReports reports;
   if (bucket_id.has_value() && bucket_usage_.find(bucket_id.value()) == bucket_usage_.end()) {
     auto bucket_id_val = bucket_id.value();
@@ -109,7 +110,8 @@ RateLimitQuotaUsageReports RateLimitClientImpl::buildUsageReport2(const BucketId
   //         bucket_usage_[id].usage.num_requests_allowed() + 1);
   //     bucket_usage_[id].usage.mutable_time_elapsed()->set_seconds(1000);
   //     // 2. Update `usage_reports_`
-  //     auto* usage = usage_reports_[domain_name].mutable_bucket_quota_usages(bucket_usage_[id].idx);
+  //     auto* usage =
+  //     usage_reports_[domain_name].mutable_bucket_quota_usages(bucket_usage_[id].idx);
   //     // CopyFrom will not overrride the existing entry but mergeFrom will do.
   //     usage->CopyFrom(bucket_usage_[bucket_id].usage);
 
@@ -159,22 +161,6 @@ RateLimitQuotaUsageReports buildReports(const std::vector<BucketId>& bucket_ids)
   return reports;
 }
 
-void RateLimitClientImpl::sendUsageReport(absl::optional<BucketId> bucket_id) {
-  ASSERT(stream_ != nullptr);
-  // TODO(tyxia) Build the report and handle end_stream later.
-  // RateLimitQuotaUsageReports reports = buildReport(bucket_id);
-  send(buildUsageReport(bucket_id), /*end_stream=*/true);
-}
-
-// void RateLimitClientImpl::sendUsageReport(const BucketId* bucket_id) {
-//   ASSERT(stream_ != nullptr);
-//   // TODO(tyxia) Build the report and handle end_stream later.
-//   // RateLimitQuotaUsageReports reports = buildReport(bucket_id);
-//   if (bucket_id != nullptr) {
-//     send(buildUsageReport(*bucket_id), /*end_stream=*/true);
-//   } else {
-//   }
-// }
 // TODO(tyxia) Send the report periodically!!!
 // 1) go/c++-concurrency#periodic_tasks OR envoy style
 // 2) dispatcher and Timer
@@ -184,7 +170,21 @@ void RateLimitClientImpl::sendUsageReport(absl::optional<BucketId> bucket_id) {
 //    https://source.corp.google.com/piper///depot/google3/third_party/envoy/src/source/extensions/filters/http/jwt_authn/jwks_async_fetcher.cc;rcl=476782648;l=31
 // Optional funciton arg?? only first time need the bucket_id ???
 // Later, peridiocally send should be retrieved from the map
+void RateLimitClientImpl::sendUsageReport(absl::optional<BucketId> bucket_id) {
+  ASSERT(stream_ != nullptr);
+  // TODO(tyxia) Build the report and handle end_stream later.
+  // RateLimitQuotaUsageReports reports = buildReport(bucket_id);
+  // send(buildUsageReport(bucket_id), /*end_stream=*/true);
 
+  // TODO(tyxia) local variable stores the return doesn't make any difference as it is
+  // still local scope variable.
+  stream_->sendMessage(buildUsageReport(bucket_id), /*end_stream=*/true);
+}
+
+void RateLimitClientImpl::send(
+    envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports&& reports, bool end_stream) {
+  stream_->sendMessage(std::move(reports), end_stream);
+}
 
 void RateLimitClientImpl::onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) {
   // TODO(tyxia) Add implementation later.
@@ -198,11 +198,6 @@ void RateLimitClientImpl::rateLimit(RateLimitQuotaCallbacks& callbacks) {
   // TODO(tyxia) Build the report and handle end_stream later.
   envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports reports;
   send(std::move(reports), /*end_stream=*/true);
-}
-
-void RateLimitClientImpl::send(
-    envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports&& reports, bool end_stream) {
-  stream_->sendMessage(std::move(reports), end_stream);
 }
 
 absl::Status RateLimitClientImpl::startStream(const StreamInfo::StreamInfo& stream_info) {

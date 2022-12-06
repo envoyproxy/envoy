@@ -14,6 +14,7 @@ envoy_cc_library(
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
     deps = [
+        ":matcher_lib",
         ":client_lib",
         ":quota_bucket",
         "//envoy/registry",
@@ -30,6 +31,7 @@ envoy_cc_library(
     ],
 )
 
+# TODO(tyxia) Why it is extension
 envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
@@ -80,6 +82,24 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "@envoy_api//envoy/extensions/filters/http/rate_limit_quota/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/rate_limit_quota/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "matcher_lib",
+    srcs = ["matcher.cc"],
+    hdrs = ["matcher.h"],
+    deps = [
+        "//envoy/registry",
+        "//source/common/http:headers_lib",
+        "//source/common/http:message_lib",
+        "//source/common/http:utility_lib",
+        "//source/common/http/matching:data_impl_lib",
+        "//source/common/matcher:matcher_lib",
+        "//source/common/protobuf:utility_lib",
+        "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/http/rate_limit_quota/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/rate_limit_quota/v3:pkg_cc_proto",
     ],

@@ -261,8 +261,7 @@ public:
 
 TEST_F(FilterTest, InvalidBucketMatcherConfig) {
   addMatcherConfigAndCreateFilter(MatcherConfigType::Invalid);
-  // auto match = filter_->requestMatching(default_headers_);
-  auto match_result = filter_->requestMatching2(default_headers_);
+  auto match_result = filter_->requestMatching(default_headers_);
   EXPECT_FALSE(match_result.ok());
   EXPECT_THAT(match_result, StatusIs(absl::StatusCode::kInternal));
   EXPECT_EQ(match_result.status().message(), "Matcher tree has not been initialized yet");
@@ -283,7 +282,7 @@ TEST_F(FilterTest, RequestMatchingSucceeded) {
   expected_bucket_ids.insert({"name", "prod"});
 
   // Perform request matching.
-  auto match_result = filter_->requestMatching2(default_headers_);
+  auto match_result = filter_->requestMatching(default_headers_);
   // Asserts that the request matching succeeded and then retrieve the matched action.
   ASSERT_TRUE(match_result.ok());
   const RateLimitOnMactchAction* match_action =
@@ -310,7 +309,7 @@ TEST_F(FilterTest, RequestMatchingFailed) {
   constructMismatchedRequestHeader();
 
   // Perform request matching.
-  auto match = filter_->requestMatching2(default_headers_);
+  auto match = filter_->requestMatching(default_headers_);
   // Not_OK status is expected to be returned because the matching failed due to mismatched inputs.
   EXPECT_FALSE(match.ok());
   EXPECT_THAT(match, StatusIs(absl::StatusCode::kNotFound));
@@ -323,7 +322,7 @@ TEST_F(FilterTest, RequestMatchingFailedWithOnNoMatchConfigured) {
       {"on_no_match_name", "on_no_match_value"}, {"on_no_match_name_2", "on_no_match_value_2"}};
   // Perform request matching.
   // TODO(tyxia) Rmove deprecated requestmatching
-  auto match_result = filter_->requestMatching2(default_headers_);
+  auto match_result = filter_->requestMatching(default_headers_);
   // Asserts that the request matching succeeded.
   // OK status is expected to be returned even if the exact request matching failed. It is because
   // `on_no_match` field is configured.

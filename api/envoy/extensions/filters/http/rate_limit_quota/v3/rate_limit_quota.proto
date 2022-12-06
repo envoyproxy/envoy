@@ -33,7 +33,6 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //
 // Can be overridden in the per-route and per-host configurations.
 // The more specific definition completely overrides the less specific definition.
-// TODO(tyxia) Add back the refer link of the fields for doc generation once the feature development is done.
 // [#next-free-field: 7]
 message RateLimitQuotaFilterConfig {
   // Configures the gRPC Rate Limit Quota Service (RLQS) RateLimitQuotaService.
