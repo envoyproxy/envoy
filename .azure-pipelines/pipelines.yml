@@ -456,6 +456,10 @@ stages:
     dependsOn: ["bazel", "coverage"]
     pool:
       vmImage: "ubuntu-20.04"
+    # This condition ensures that this (required) check passes if all of
+    # the preceeding checks either pass or are skipped
+    # adapted from:
+    #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
     condition: |
       and(
         in(dependencies.bazel.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
