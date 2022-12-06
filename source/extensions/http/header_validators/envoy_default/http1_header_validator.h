@@ -29,6 +29,12 @@ public:
   ResponseHeaderMapValidationResult
   validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap& header_map) override;
 
+  TrailerValidationResult
+  validateRequestTrailerMap(::Envoy::Http::RequestTrailerMap& trailer_map) override;
+
+  TrailerValidationResult
+  validateResponseTrailerMap(::Envoy::Http::ResponseTrailerMap& trailer_map) override;
+
   /*
    * Validate the Transfer-Encoding header.
    */

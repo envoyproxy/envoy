@@ -435,6 +435,19 @@ TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapRedirectPath) {
   EXPECT_EQ(headers.path(), "/dir1/dir2");
 }
 
+TEST_F(Http2HeaderValidatorTest, ValidateRequestTrailerMap) {
+  auto uhv = createH2(empty_config);
+  ::Envoy::Http::TestRequestTrailerMapImpl request_trailer_map{{"trailer1", "value1"},
+                                                               {"trailer2", "values"}};
+  EXPECT_TRUE(uhv->validateRequestTrailerMap(request_trailer_map));
+}
+
+TEST_F(Http2HeaderValidatorTest, ValidateResponseTrailerMap) {
+  auto uhv = createH2(empty_config);
+  ::Envoy::Http::TestResponseTrailerMapImpl response_trailer_map{{"trailer1", "value1"}};
+  EXPECT_TRUE(uhv->validateResponseTrailerMap(response_trailer_map).ok());
+}
+
 } // namespace
 } // namespace EnvoyDefault
 } // namespace HeaderValidators

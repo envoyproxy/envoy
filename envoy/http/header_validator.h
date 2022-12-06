@@ -72,8 +72,8 @@ public:
    * Method for validating a response header entry.
    * Returning the Reject value causes the downstream request to be rejected with the 502 status.
    */
-  virtual ValidationResult validateResponseHeaderEntry(const HeaderString& key,
-                                                       const HeaderString& value) PURE;
+  virtual HeaderEntryValidationResult validateResponseHeaderEntry(const HeaderString& key,
+                                                                  const HeaderString& value) PURE;
 
   /**
    * Validate the entire request header map.
@@ -92,7 +92,9 @@ public:
    * Returning the Reject value causes HTTP requests to be rejected with the 502 status,
    * and gRPC requests with the the UNAVAILABLE (14) error code.
    */
-  virtual ValidationResult validateResponseHeaderMap(ResponseHeaderMap& header_map) PURE;
+  using ResponseHeaderMapValidationResult = RejectResult;
+  virtual ResponseHeaderMapValidationResult
+  validateResponseHeaderMap(ResponseHeaderMap& header_map) PURE;
 
   /**
    * Validate the entire request trailer map.
@@ -100,13 +102,14 @@ public:
    * and gRPC requests with the the UNAVAILABLE (14) error code.
    * If response headers have already been sent the request is reset.
    */
-  virtual ValidationResult validateRequestTrailerMap(RequestTrailerMap& trailer_map) PURE;
+  using TrailerValidationResult = RejectResult;
+  virtual TrailerValidationResult validateRequestTrailerMap(RequestTrailerMap& trailer_map) PURE;
 
   /**
    * Validate the entire response trailer map.
    * Returning the Reject value causes HTTP requests to be reset.
    */
-  virtual ValidationResult validateResponseTrailerMap(ResponseTrailerMap& trailer_map) PURE;
+  virtual TrailerValidationResult validateResponseTrailerMap(ResponseTrailerMap& trailer_map) PURE;
 };
 
 using HeaderValidatorPtr = std::unique_ptr<HeaderValidator>;

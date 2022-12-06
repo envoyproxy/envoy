@@ -40,6 +40,14 @@ public:
   ResponseHeaderMapValidationResult validateResponseHeaderMap(ResponseHeaderMap&) override {
     return ResponseHeaderMapValidationResult::success();
   }
+
+  TrailerValidationResult validateRequestTrailerMap(::Envoy::Http::RequestTrailerMap&) override {
+    return TrailerValidationResult::success();
+  }
+
+  TrailerValidationResult validateResponseTrailerMap(::Envoy::Http::ResponseTrailerMap&) override {
+    return TrailerValidationResult::success();
+  }
 };
 
 using BaseHttpHeaderValidatorPtr = std::unique_ptr<BaseHttpHeaderValidator>;
@@ -331,19 +339,6 @@ TEST_F(BaseHeaderValidatorTest, ValidatePathHeaderCharactersFragment) {
   EXPECT_ACCEPT(uhv->validatePathHeaderCharacters(valid));
   EXPECT_REJECT_WITH_DETAILS(uhv->validatePathHeaderCharacters(invalid),
                              UhvResponseCodeDetail::get().InvalidUrl);
-}
-
-TEST_F(HeaderValidatorTest, Http2RequestTrailerMapValidation) {
-  auto uhv = create(empty_config, ::Envoy::Http::Protocol::Http2);
-  ::Envoy::Http::TestRequestTrailerMapImpl request_trailer_map{{"trailer1", "value1"},
-                                                               {"trailer2", "values"}};
-  EXPECT_TRUE(uhv->validateRequestTrailerMap(request_trailer_map));
-}
-
-TEST_F(HeaderValidatorTest, Http2ResponseTrailerMapValidation) {
-  auto uhv = create(empty_config, ::Envoy::Http::Protocol::Http2);
-  ::Envoy::Http::TestResponseTrailerMapImpl response_trailer_map{{"trailer1", "value1"}};
-  EXPECT_TRUE(uhv->validateResponseTrailerMap(response_trailer_map).ok());
 }
 
 } // namespace EnvoyDefault

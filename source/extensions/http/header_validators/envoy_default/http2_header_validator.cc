@@ -417,6 +417,16 @@ Http2HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
   return HeaderEntryValidationResult::success();
 }
 
+HeaderValidator::TrailerValidationResult
+Http2HeaderValidator::validateRequestTrailerMap(::Envoy::Http::RequestTrailerMap&) {
+  return TrailerValidationResult::success();
+}
+
+HeaderValidator::TrailerValidationResult
+Http2HeaderValidator::validateResponseTrailerMap(::Envoy::Http::ResponseTrailerMap&) {
+  return TrailerValidationResult::success();
+}
+
 } // namespace EnvoyDefault
 } // namespace HeaderValidators
 } // namespace Http

@@ -3369,8 +3369,8 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectTrailersBeforeRespons
 
         EXPECT_CALL(*header_validator, validateRequestTrailerMap(_))
             .WillOnce(InvokeWithoutArgs([]() {
-              return HeaderValidator::ValidationResult(
-                  HeaderValidator::ValidationResult::Action::Reject, "bad_trailer_map");
+              return HeaderValidator::TrailerValidationResult(
+                  HeaderValidator::TrailerValidationResult::Action::Reject, "bad_trailer_map");
             }));
         return header_validator;
       }));
@@ -3412,8 +3412,8 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectTrailersAfterResponse
 
         EXPECT_CALL(*header_validator, validateRequestTrailerMap(_))
             .WillOnce(InvokeWithoutArgs([]() {
-              return HeaderValidator::ValidationResult(
-                  HeaderValidator::ValidationResult::Action::Reject, "bad_trailer_map");
+              return HeaderValidator::TrailerValidationResult(
+                  HeaderValidator::TrailerValidationResult::Action::Reject, "bad_trailer_map");
             }));
         return header_validator;
       }));
