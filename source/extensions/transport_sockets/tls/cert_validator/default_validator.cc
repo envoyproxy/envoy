@@ -322,6 +322,8 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
     return {ValidationResults::ValidationStatus::Failed,
             Envoy::Ssl::ClientValidationStatus::NotValidated, absl::nullopt, error};
   }
+  Envoy::Ssl::ClientValidationStatus detailed_status =
+      Envoy::Ssl::ClientValidationStatus::NotValidated;
   X509* leaf_cert = sk_X509_value(&cert_chain, 0);
   ASSERT(leaf_cert);
   if (verify_trusted_ca_) {
@@ -359,11 +361,10 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
               Envoy::Ssl::ClientValidationStatus::Failed,
               SSL_alert_from_verify_result(X509_STORE_CTX_get_error(ctx.get())), error};
     }
+    detailed_status = Envoy::Ssl::ClientValidationStatus::Validated;
   }
   std::string error_details;
   uint8_t tls_alert = SSL_AD_CERTIFICATE_UNKNOWN;
-  Envoy::Ssl::ClientValidationStatus detailed_status =
-      Envoy::Ssl::ClientValidationStatus::NotValidated;
   const bool succeeded = verifyCertAndUpdateStatus(leaf_cert, transport_socket_options.get(),
                                                    detailed_status, &error_details, &tls_alert);
   return succeeded ? ValidationResults{ValidationResults::ValidationStatus::Successful,
