@@ -10,8 +10,6 @@
 
 #include "source/extensions/filters/http/common/factory_base.h"
 
-// #include "source/extensions/filters/http/rate_limit_quota/client_impl.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
