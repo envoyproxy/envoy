@@ -163,7 +163,7 @@ private:
       PANIC("not implemented");
     }
     bool streamErrorOnInvalidHttpMessage() const override { return false; }
-    void setRequestDecoder(RequestDecoder& /*decoder*/) override {};
+    void setRequestDecoder(RequestDecoder& /*decoder*/) override{};
 
     void encodeMetadata(const MetadataMapVector&) override { PANIC("not implemented"); }
 
