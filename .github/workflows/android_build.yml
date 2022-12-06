@@ -24,6 +24,7 @@ jobs:
         java-version: '8'
         java-package: jdk
         architecture: x64
+        distribution: zulu
     - name: 'Install dependencies'
       run: cd mobile && ./ci/mac_ci_setup.sh --android
     - name: 'Build envoy.aar distributable'
@@ -47,6 +48,7 @@ jobs:
         java-version: '8'
         java-package: jdk
         architecture: x64
+        distribution: zulu
     - run: cd mobile && ./ci/mac_ci_setup.sh --android
       name: 'Install dependencies'
     - name: 'Start simulator'
@@ -79,6 +81,7 @@ jobs:
         java-version: '8'
         java-package: jdk
         architecture: x64
+        distribution: zulu
     - name: 'Install dependencies'
       run: cd mobile && ./ci/mac_ci_setup.sh --android
     - name: 'Start simulator'
@@ -111,6 +114,7 @@ jobs:
         java-version: '8'
         java-package: jdk
         architecture: x64
+        distribution: zulu
     - name: 'Install dependencies'
       run: cd mobile && ./ci/mac_ci_setup.sh --android
     - name: 'Start simulator'
@@ -143,6 +147,7 @@ jobs:
         java-version: '8'
         java-package: jdk
         architecture: x64
+        distribution: zulu
     - name: 'Install dependencies'
       run: cd mobile && ./ci/mac_ci_setup.sh --android
     - name: 'Start simulator'

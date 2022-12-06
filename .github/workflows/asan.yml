@@ -42,6 +42,7 @@ jobs:
         java-version: '8'
         java-package: jdk
         architecture: x64
+        distribution: zulu
     - name: 'Run tests'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

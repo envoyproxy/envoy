@@ -70,6 +70,7 @@ jobs:
         java-version: '8'
         java-package: jdk
         architecture: x64
+        distribution: zulu
     - run: cd mobile && ./ci/mac_ci_setup.sh
       name: 'Install dependencies'
     - name: 'Run Kotlin Lint (Detekt)'

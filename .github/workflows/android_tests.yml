@@ -38,6 +38,7 @@ jobs:
         java-version: '8'
         java-package: jdk
         architecture: x64
+        distribution: zulu
     - name: 'Install dependencies'
       if: steps.check_context.outputs.run_tests == 'true'
       run: cd mobile && ./ci/mac_ci_setup.sh
@@ -75,6 +76,7 @@ jobs:
         java-version: '8'
         java-package: jdk
         architecture: x64
+        distribution: zulu
     - name: 'Install dependencies'
       if: steps.check_context.outputs.run_tests == 'true'
       run: cd mobile && ./ci/mac_ci_setup.sh
@@ -122,6 +124,7 @@ jobs:
         java-version: '8'
         java-package: jdk
         architecture: x64
+        distribution: zulu
     - name: 'Install dependencies'
       if: steps.check_context.outputs.run_tests == 'true'
       run: cd mobile && ./ci/linux_ci_setup.sh
