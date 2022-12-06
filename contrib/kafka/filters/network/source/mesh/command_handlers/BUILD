@@ -46,6 +46,23 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "list_offsets_lib",
+    srcs = [
+        "list_offsets.cc",
+    ],
+    hdrs = [
+        "list_offsets.h",
+    ],
+    tags = ["skip_on_windows"],
+    deps = [
+        "//contrib/kafka/filters/network/source:kafka_request_parser_lib",
+        "//contrib/kafka/filters/network/source:kafka_response_parser_lib",
+        "//contrib/kafka/filters/network/source/mesh:abstract_command_lib",
+        "//source/common/common:minimal_logger_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "metadata_lib",
     srcs = [
         "metadata.cc",

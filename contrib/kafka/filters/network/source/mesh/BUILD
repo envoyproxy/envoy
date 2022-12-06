@@ -69,6 +69,7 @@ envoy_cc_library(
         "//contrib/kafka/filters/network/source:kafka_request_codec_lib",
         "//contrib/kafka/filters/network/source:kafka_request_parser_lib",
         "//contrib/kafka/filters/network/source/mesh/command_handlers:api_versions_lib",
+        "//contrib/kafka/filters/network/source/mesh/command_handlers:list_offsets_lib",
         "//contrib/kafka/filters/network/source/mesh/command_handlers:metadata_lib",
         "//contrib/kafka/filters/network/source/mesh/command_handlers:produce_lib",
         "//source/common/common:minimal_logger_lib",
