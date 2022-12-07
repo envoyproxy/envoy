@@ -594,6 +594,10 @@ Utility::PreparedLocalReplyPtr Utility::prepareLocalReply(const EncodeFunctions&
     }
     // The `modify_headers` function may have added content-length, remove it.
     response_headers->removeContentLength();
+
+    // TODO(kbaichoo): In C++20 we will be able to use make_unique with
+    // aggregate initialization.
+    // NOLINTNEXTLINE(modernize-make-unique)
     return PreparedLocalReplyPtr(new PreparedLocalReply{
         local_reply_data.is_grpc_, local_reply_data.is_head_request_, std::move(response_headers),
         std::move(body_text), encode_functions.encode_headers_, encode_functions.encode_data_});
@@ -613,6 +617,9 @@ Utility::PreparedLocalReplyPtr Utility::prepareLocalReply(const EncodeFunctions&
     response_headers->removeContentType();
   }
 
+  // TODO(kbaichoo): In C++20 we will be able to use make_unique with
+  // aggregate initialization.
+  // NOLINTNEXTLINE(modernize-make-unique)
   return PreparedLocalReplyPtr(new PreparedLocalReply{
       local_reply_data.is_grpc_, local_reply_data.is_head_request_, std::move(response_headers),
       std::move(body_text), encode_functions.encode_headers_, encode_functions.encode_data_});
