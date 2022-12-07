@@ -182,7 +182,7 @@ protected:
   bool seen_trailers_{false};
 };
 
-class DecodingProcessorState : public ProcessorState, NonCopyable {
+class DecodingProcessorState : public ProcessorState {
 public:
   explicit DecodingProcessorState(Filter& filter) : ProcessorState(filter) {}
 
@@ -218,7 +218,7 @@ private:
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{nullptr};
 };
 
-class EncodingProcessorState : public ProcessorState, NonCopyable {
+class EncodingProcessorState : public ProcessorState {
 public:
   explicit EncodingProcessorState(Filter& filter) : ProcessorState(filter) {}
 
