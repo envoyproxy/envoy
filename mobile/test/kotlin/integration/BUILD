@@ -202,7 +202,7 @@ envoy_mobile_jni_kt_test(
     ],
 )
 
-envoy_mobile_android_test(
+envoy_mobile_jni_kt_test(
     name = "filter_throwing_exception_test",
     srcs = [
         "FilterThrowingExceptionTest.kt",
@@ -213,11 +213,10 @@ envoy_mobile_android_test(
         "dockerNetwork": "standard",
     },
     native_deps = [
-        "//library/common/jni:libndk_envoy_jni.so",
-        "//library/common/jni:libndk_envoy_jni.jnilib",
+        "//library/common/jni:libjava_jni_lib.so",
+        "//library/common/jni:java_jni_lib.jnilib",
     ],
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
-        "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
     ],
 )

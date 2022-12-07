@@ -1,10 +1,7 @@
 package test.kotlin.integration
 
-import android.content.Context
-import androidx.test.core.app.ApplicationProvider
 
 import io.envoyproxy.envoymobile.EngineBuilder
-import io.envoyproxy.envoymobile.AndroidEngineBuilder
 import io.envoyproxy.envoymobile.EnvoyError
 import io.envoyproxy.envoymobile.Engine
 import io.envoyproxy.envoymobile.engine.JniLibrary
@@ -31,8 +28,6 @@ import java.util.concurrent.TimeUnit
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Assert.assertNotNull
 import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 
 class ThrowingFilter: RequestFilter, ResponseFilter {
   override fun onRequestHeaders(
@@ -143,5 +138,7 @@ class FilterThrowingExceptionTest {
     onRespondeHeadersLatch.await(15, TimeUnit.SECONDS)
     assertThat(onRespondeHeadersLatch.count).isEqualTo(0)
     assertThat(expectedMessages.size).isEqualTo(0)
+
+    engine.terminate()
   }
 }
