@@ -1007,7 +1007,6 @@ Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
 }
 
 const ConnectionImpl::StreamImpl* ConnectionImpl::getStream(int32_t stream_id) const {
-
   // Delegate to the non-const version.
   return const_cast<ConnectionImpl*>(this)->getStream(stream_id);
 }
@@ -1436,7 +1435,7 @@ int ConnectionImpl::onMetadataReceived(int32_t stream_id, const uint8_t* data, s
   StreamImpl* stream = getStreamUnchecked(stream_id);
   if (!stream || stream->remote_end_stream_) {
     if (!stream) {
-      ENVOY_CONN_LOG(trace, "no stream for stream_id {} while receiving METADATA", connection_,
+      ENVOY_CONN_LOG(debug, "no stream for stream_id {} while receiving METADATA", connection_,
                      stream_id);
     }
     return 0;
@@ -1453,7 +1452,7 @@ int ConnectionImpl::onMetadataFrameComplete(int32_t stream_id, bool end_metadata
   StreamImpl* stream = getStreamUnchecked(stream_id);
   if (!stream || stream->remote_end_stream_) {
     if (!stream) {
-      ENVOY_CONN_LOG(trace, "no stream for stream_id {} while completing METADATA", connection_,
+      ENVOY_CONN_LOG(debug, "no stream for stream_id {} while completing METADATA", connection_,
                      stream_id);
     }
     return 0;
