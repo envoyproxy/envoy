@@ -3,6 +3,7 @@
 #include <charconv>
 
 #include "source/extensions/http/header_validators/envoy_default/character_tables.h"
+#include "source/extensions/http/header_validators/envoy_default/error_codes.h"
 
 #include "absl/container/node_hash_set.h"
 
@@ -19,7 +20,7 @@ using ::Envoy::Http::Protocol;
 HeaderValidator::HeaderValidator(const HeaderValidatorConfig& config, Protocol protocol,
                                  StreamInfo::StreamInfo& stream_info)
     : config_(config), protocol_(protocol), stream_info_(stream_info),
-      header_values_(::Envoy::Http::Headers::get()) {}
+      header_values_(::Envoy::Http::Headers::get()), path_normalizer_(config) {}
 
 HeaderValidator::HeaderValueValidationResult
 HeaderValidator::validateMethodHeader(const HeaderString& value) {

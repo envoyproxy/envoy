@@ -14,14 +14,11 @@ envoy::config::bootstrap::v3::LayeredRuntime layeredRuntimeConfig(const std::str
     layers:
     - name: some_static_layer
       static_layer:
-        foo: whatevs
-        bar: yar
+        envoy.reloadable_features.test_feature_false: True
     - name: some_rtds_layer
       rtds_layer:
         name: some_rtds_layer
         rtds_config:
-          # TODO(abeyad): Remove the initial_fetch_timeout when
-          # https://github.com/envoyproxy/envoy-mobile/issues/2678 is fixed.
           initial_fetch_timeout:
             seconds: 1
           resource_api_version: V3
@@ -32,8 +29,6 @@ envoy::config::bootstrap::v3::LayeredRuntime layeredRuntimeConfig(const std::str
               envoy_grpc:
                 cluster_name: {}
             set_node_on_first_message_only: true
-    - name: some_admin_layer
-      admin_layer: {{}}
   )EOF",
                                        api_type, XDS_CLUSTER);
 
@@ -79,11 +74,8 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
   EXPECT_EQ(cc_.on_error_calls, 0);
   EXPECT_EQ(cc_.on_header_consumed_bytes_from_response, 13);
   EXPECT_EQ(cc_.on_complete_received_byte_count, 41);
-
   // Check that the Runtime config is from the static layer.
-  EXPECT_EQ("whatevs", getRuntimeKey("foo"));
-  EXPECT_EQ("yar", getRuntimeKey("bar"));
-  EXPECT_EQ("", getRuntimeKey("baz"));
+  EXPECT_TRUE(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
 
   // Send a RTDS request and get back the RTDS response.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "", {"some_rtds_layer"},
@@ -91,16 +83,17 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
   auto some_rtds_layer = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
     name: some_rtds_layer
     layer:
-      foo: bar
-      baz: meh
+      envoy.reloadable_features.test_feature_false: False
+      envoy.reloadable_features.test_feature_true: False
   )EOF");
   sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
       Config::TypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1");
+  // Wait until the RTDS updates from the DiscoveryResponse have been applied.
+  ASSERT_TRUE(waitForCounterGe("runtime.load_success", 1));
 
   // Verify that the Runtime config values are from the RTDS response.
-  EXPECT_EQ("bar", getRuntimeKey("foo"));
-  EXPECT_EQ("yar", getRuntimeKey("bar"));
-  EXPECT_EQ("meh", getRuntimeKey("baz"));
+  EXPECT_FALSE(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
+  EXPECT_FALSE(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_true"));
 }
 
 } // namespace

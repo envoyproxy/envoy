@@ -108,8 +108,8 @@ void ActiveStream::continueEncoding() {
 
 void ActiveStream::onEncodingSuccess(Buffer::Instance& buffer, bool close_connection) {
   ASSERT(parent_.connection().state() == Network::Connection::State::Open);
-  parent_.deferredStream(*this);
   parent_.connection().write(buffer, close_connection);
+  parent_.deferredStream(*this);
 }
 
 void ActiveStream::initializeFilterChain(FilterChainFactory& factory) {
@@ -155,12 +155,24 @@ void Filter::deferredStream(ActiveStream& stream) {
     return;
   }
   callbacks_->connection().dispatcher().deferredDelete(stream.removeFromList(active_streams_));
+  mayBeDrainClose();
 }
 
 void Filter::resetStreamsForUnexpectedError() {
   while (!active_streams_.empty()) {
     active_streams_.front()->resetStream();
   }
+}
+
+void Filter::mayBeDrainClose() {
+  if (drain_decision_.drainClose() && active_streams_.empty()) {
+    onDrainCloseAndNoActiveStreams();
+  }
+}
+
+// Default implementation for connection draining.
+void Filter::onDrainCloseAndNoActiveStreams() {
+  connection().close(Network::ConnectionCloseType::FlushWrite);
 }
 
 } // namespace GenericProxy

@@ -1,4 +1,4 @@
-name: core
+name: mobile_core
 
 on:
   push:
@@ -19,8 +19,6 @@ jobs:
     timeout-minutes: 120
     steps:
     - uses: actions/checkout@v1
-      with:
-        submodules: true
     - name: 'Install dependencies'
       run: cd mobile && ./ci/mac_ci_setup.sh
     - name: 'Run tests'

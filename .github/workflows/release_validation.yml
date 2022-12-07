@@ -1,4 +1,4 @@
-name: release_validation
+name: mobile_release_validation
 
 on:
   push:
@@ -19,8 +19,6 @@ jobs:
     timeout-minutes: 120
     steps:
     - uses: actions/checkout@v1
-      with:
-        submodules: true
     - run: cd mobile && ./ci/mac_ci_setup.sh
       name: 'Install dependencies'
     - env:

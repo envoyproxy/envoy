@@ -26,6 +26,12 @@ public:
    * @return CodecFactory codec factory.
    */
   virtual const CodecFactory& codecFactory() const PURE;
+
+  /**
+   * @return const Network::DrainDecision& a drain decision that filters can use to
+   * determine if they should be doing graceful closes on connections when possible.
+   */
+  virtual const Network::DrainDecision& drainDecision() const PURE;
 };
 
 } // namespace GenericProxy

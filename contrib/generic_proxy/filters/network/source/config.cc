@@ -95,7 +95,8 @@ Factory::createFilterFactoryFromProtoTyped(const ProxyConfig& proto_config,
   const FilterConfigSharedPtr config = std::make_shared<FilterConfigImpl>(
       proto_config.stat_prefix(), std::move(factories.first),
       routeConfigProviderFromProto(proto_config, context, *route_config_provider_manager),
-      filtersFactoryFromProto(proto_config.filters(), proto_config.stat_prefix(), context));
+      filtersFactoryFromProto(proto_config.filters(), proto_config.stat_prefix(), context),
+      context);
 
   return [route_config_provider_manager, config,
           custom_proxy_factory](Envoy::Network::FilterManager& filter_manager) -> void {

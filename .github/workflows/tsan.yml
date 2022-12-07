@@ -1,4 +1,4 @@
-name: tsan
+name: mobile_tsan
 
 on:
   push:
@@ -18,14 +18,12 @@ jobs:
     runs-on: ubuntu-20.04
     timeout-minutes: 90
     container:
-      image: envoyproxy/envoy-build-ubuntu:0a02a76af5951bf7f4c7029c0ea6d29d96c0f682
+      image: envoyproxy/envoy-build-ubuntu:b0ff77ae3f25b0bf595f9b8bba46b489723ab446
       env:
         CC: /opt/llvm/bin/clang
         CXX: /opt/llvm/bin/clang++
     steps:
     - uses: actions/checkout@v1
-      with:
-        submodules: true
     - name: Add safe directory
       run: git config --global --add safe.directory /__w/envoy/envoy
     - id: check_context
@@ -38,12 +36,13 @@ jobs:
             echo "Skipping tests."
             echo "run_tests=false" >> $GITHUB_OUTPUT
           fi
-    - uses: actions/setup-java@v1
+    - uses: actions/setup-java@c3ac5dd0ed8db40fedb61c32fbe677e6b355e94c
       if: steps.check-cache.outputs.cache-hit != 'true'
       with:
         java-version: '8'
         java-package: jdk
         architecture: x64
+        distribution: zulu
     - name: 'Run tests'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
