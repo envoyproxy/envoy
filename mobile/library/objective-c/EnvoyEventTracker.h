@@ -6,9 +6,9 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface EnvoyEventTracker : NSObject
 
-@property (nonatomic, copy, nonnull) void (^track)(EnvoyEvent *);
+@property (nonatomic, copy) void (^track)(EnvoyEvent *);
 
-- (instancetype)initWithEventTrackingClosure:(nonnull void (^)(EnvoyEvent *))track;
+- (instancetype)initWithEventTrackingClosure:(void (^)(EnvoyEvent *))track;
 
 @end
 
