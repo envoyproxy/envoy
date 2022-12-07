@@ -152,7 +152,6 @@ static inline std::string statPrefixJoin(absl::string_view prefix, absl::string_
  */
 #define MAKE_STATS_STRUCT(StatsStruct, StatNamesStruct, ALL_STATS)                                 \
   struct StatsStruct {                                                                             \
-    using StatNameType = StatNamesStruct;                                                          \
     StatsStruct(const StatNamesStruct& stat_names, Envoy::Stats::Scope& scope,                     \
                 Envoy::Stats::StatName prefix = Envoy::Stats::StatName())                          \
         : stat_names_(stat_names)                                                                  \
@@ -160,8 +159,9 @@ static inline std::string statPrefixJoin(absl::string_view prefix, absl::string_
                         MAKE_STATS_STRUCT_HISTOGRAM_HELPER_,                                       \
                         MAKE_STATS_STRUCT_TEXT_READOUT_HELPER_,                                    \
                         MAKE_STATS_STRUCT_STATNAME_HELPER_) {}                                     \
-    const StatNameType& stat_names_;                                                               \
+    const StatNamesStruct& stat_names_;                                                            \
     ALL_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT,           \
               GENERATE_TEXT_READOUT_STRUCT, GENERATE_STATNAME_STRUCT)                              \
   }
+
 } // namespace Envoy
