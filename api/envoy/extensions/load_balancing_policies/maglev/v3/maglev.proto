@@ -28,5 +28,6 @@ message Maglev {
   // The table size must be prime number limited to 5000011. If it is not specified, the default is 65537.
   google.protobuf.UInt64Value table_size = 1 [(validate.rules).uint64 = {lte: 5000011}];
 
+  // Common configuration for hashing-based load balancing policies.
   common.v3.ConsistentHashingLbConfig consistent_hashing_lb_config = 2;
 }
