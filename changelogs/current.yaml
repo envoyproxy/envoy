@@ -101,6 +101,9 @@ bug_fixes:
 - area: jwt_authn
   change: |
     fix a bug that jwt_cache breaks the :ref:`provider_and_audiences <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtRequirement.provider_and_audiences>` JWT requirement.
+- area: grpc_http_bridge
+  change: |
+    fixed a bug where response data could be lost for requests that were upgraded from Protobuf.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
