@@ -35,7 +35,7 @@ std::string FileSharedImpl::generateTmpFilePath(absl::string_view path) {
   for (int i = 0; i < 8; i++) {
     out[i] = distribution(gen);
   }
-  return absl::StrCat(path, "/envoy_", absl::string_view{out.begin(), out.size()}, ".tmp");
+  return absl::StrCat(path, "/envoy_", absl::string_view{&out[0], out.size()}, ".tmp");
 }
 
 } // namespace Filesystem
