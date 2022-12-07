@@ -30,11 +30,14 @@
 using Envoy::Http::Headers;
 using Envoy::Http::HeaderValueOf;
 using Envoy::Http::HttpStatusIs;
+using testing::Combine;
 using testing::ContainsRegex;
 using testing::EndsWith;
 using testing::HasSubstr;
 using testing::Not;
 using testing::StartsWith;
+using testing::Values;
+using testing::ValuesIn;
 
 namespace Envoy {
 namespace {
@@ -56,7 +59,7 @@ void setAllowHttp10WithDefaultHost(
 }
 
 std::string testParamToString(
-    const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, Http1ParserImpl>>&
+    const testing::TestParamInfo<std::tuple<Network::Address::IpVersion, Http1ParserImpl>>&
         params) {
   return absl::StrCat(TestUtility::ipVersionToString(std::get<0>(params.param)),
                       TestUtility::http1ParserImplToString(std::get<1>(params.param)));
@@ -64,11 +67,10 @@ std::string testParamToString(
 
 } // namespace
 
-INSTANTIATE_TEST_SUITE_P(
-    IpVersions, IntegrationTest,
-    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                     testing::Values(Http1ParserImpl::HttpParser, Http1ParserImpl::BalsaParser)),
-    testParamToString);
+INSTANTIATE_TEST_SUITE_P(IpVersionsAndHttp1Parser, IntegrationTest,
+                         Combine(ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                                 Values(Http1ParserImpl::HttpParser, Http1ParserImpl::BalsaParser)),
+                         testParamToString);
 
 // Verify that we gracefully handle an invalid pre-bind socket option when using reuse_port.
 TEST_P(IntegrationTest, BadPrebindSocketOptionWithReusePort) {
@@ -1883,11 +1885,10 @@ TEST_P(IntegrationTest, TrailersDroppedDownstream) {
   testTrailers(10, 10, false, false);
 }
 
-INSTANTIATE_TEST_SUITE_P(
-    IpVersions, UpstreamEndpointIntegrationTest,
-    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                     testing::Values(Http1ParserImpl::HttpParser, Http1ParserImpl::BalsaParser)),
-    testParamToString);
+INSTANTIATE_TEST_SUITE_P(IpVersionsAndHttp1Parser, UpstreamEndpointIntegrationTest,
+                         Combine(ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                                 Values(Http1ParserImpl::HttpParser, Http1ParserImpl::BalsaParser)),
+                         testParamToString);
 
 TEST_P(UpstreamEndpointIntegrationTest, TestUpstreamEndpointAddress) {
   initialize();
