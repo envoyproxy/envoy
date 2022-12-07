@@ -3,6 +3,7 @@ package test.kotlin.integration
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 
+import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.AndroidEngineBuilder
 import io.envoyproxy.envoymobile.EnvoyError
 import io.envoyproxy.envoymobile.Engine
@@ -85,7 +86,7 @@ class ThrowingFilter: RequestFilter, ResponseFilter {
   override fun onComplete(finalStreamIntel: FinalStreamIntel) {}
 }
 
-@RunWith(RobolectricTestRunner::class)
+// @RunWith(RobolectricTestRunner::class)
 class FilterThrowingExceptionTest {
   init {
     JniLibrary.loadTestLibrary()
@@ -102,10 +103,10 @@ class FilterThrowingExceptionTest {
         "Simulated onResponseHeaders exception",
     )
 
-    val context = ApplicationProvider.getApplicationContext<Context>()
-    val builder = AndroidEngineBuilder(context)
+    // val context = ApplicationProvider.getApplicationContext<Context>()
+    val builder = EngineBuilder()
     val engine = builder
-      .addLogLevel(LogLevel.ERROR)
+      .addLogLevel(LogLevel.DEBUG)
       .addPlatformFilter(::ThrowingFilter)
       .setEventTracker { event ->
         if (event["name"] == "event_log" && event["log_name"] == "jni_exception") {
