@@ -1,5 +1,5 @@
-method: "OPTIONS"
-path: "*"
+method: "GET"
+path: "/foo/bar"
 options {
     skip_path_normalization: false
     skip_merging_slashes: false

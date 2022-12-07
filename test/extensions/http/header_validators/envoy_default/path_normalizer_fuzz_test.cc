@@ -17,9 +17,11 @@ DEFINE_PROTO_FUZZER(
   method.setCopyUnvalidatedForTestOnly(input.method());
   path.setCopyUnvalidatedForTestOnly(input.path());
 
+  ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig config;
+  *config.mutable_uri_path_normalization_options() = input.options();
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   Extensions::Http::HeaderValidators::EnvoyDefault::Http1HeaderValidator validator(
-      input.config(), Http::Protocol::Http11, stream_info);
+      config, Http::Protocol::Http11, stream_info);
   // The character set of the :path and :method headers is validated before normalization.
   // Here we will just not run the test with invalid values
   if (!validator.validateMethodHeader(method) ||
@@ -30,7 +32,7 @@ DEFINE_PROTO_FUZZER(
   header_map->setMethod(method.getStringView());
   header_map->setPath(path.getStringView());
 
-  Extensions::Http::HeaderValidators::EnvoyDefault::PathNormalizer normalizer(input.config());
+  Extensions::Http::HeaderValidators::EnvoyDefault::PathNormalizer normalizer(config);
   auto result = normalizer.normalizePathUri(*header_map);
   if (result.ok() || result.action() ==
                          Extensions::Http::HeaderValidators::EnvoyDefault::PathNormalizer::
@@ -53,13 +55,13 @@ DEFINE_PROTO_FUZZER(
                      "Original and normalized query/path should be the same");
     }
 
-    if (!input.config().uri_path_normalization_options().skip_merging_slashes()) {
+    if (!input.options().skip_merging_slashes()) {
       RELEASE_ASSERT(header_map->path().substr(0, normalized_query_or_fragment).find("//") ==
                          absl::string_view::npos,
                      ":path must not contain adjacent slashes.");
     }
 
-    if (!input.config().uri_path_normalization_options().skip_path_normalization()) {
+    if (!input.options().skip_path_normalization()) {
       RELEASE_ASSERT(header_map->path().substr(0, normalized_query_or_fragment).find("/./") ==
                          absl::string_view::npos,
                      ":path must not contain /./");

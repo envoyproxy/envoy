@@ -1,9 +1,0 @@
-method: "POST"
-path: "/foo/bar%2F../baz/"
-config {
-    uri_path_normalization_options {
-        skip_path_normalization: false
-        skip_merging_slashes: false
-        path_with_escaped_slashes_action: UNESCAPE_AND_REDIRECT
-    }
-}

@@ -1,5 +1,5 @@
 method: "POST"
-path: "/foo/bar/../baz/"
+path: "/foo/bar%2F../baz/"
 options {
     skip_path_normalization: false
     skip_merging_slashes: false
