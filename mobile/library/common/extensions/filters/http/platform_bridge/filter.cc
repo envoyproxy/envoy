@@ -279,6 +279,8 @@ Http::FilterHeadersStatus PlatformBridgeFilter::FilterBase::onHeaders(Http::Head
   auto callback_time_ms = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       on_headers_callback_latency_, parent_.timeSource());
 
+    ENVOY_LOG_EVENT_TO_LOGGER(GET_MISC_LOGGER(), info, "test stable", "test log event");
+
   envoy_filter_headers_status result =
       on_headers_(in_headers, end_stream, streamIntel(), parent_.platform_filter_.instance_context);
 
