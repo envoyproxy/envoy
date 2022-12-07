@@ -192,26 +192,11 @@ private:
                               std::function<void(Http::ResponseHeaderMap& headers)> modify_headers,
                               Grpc::Status::GrpcStatus grpc_status, absl::string_view details);
 
-  absl::optional<absl::string_view> getHeaderInternal(absl::string_view key)
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
-  void copyHeadersInternal(GoString* go_strs, char* go_buf) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
-  void setHeaderInternal(absl::string_view key, absl::string_view value)
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
-  void removeHeaderInternal(absl::string_view key) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
-  void copyBufferInternal(Buffer::Instance* buffer, char* data)
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
-  void setBufferHelperInternal(Buffer::Instance* buffer, absl::string_view& value,
-                               bufferAction action) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
-  void copyTrailersInternal(GoString* go_strs, char* go_buf) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
-  void setTrailerInternal(absl::string_view key, absl::string_view value)
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
-  void getStringValueInternal(int id, GoString* value_str) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
-
   const FilterConfigSharedPtr config_;
   Dso::DsoInstancePtr dynamic_lib_;
 
-  Http::RequestOrResponseHeaderMap* headers_{nullptr};
-  Http::HeaderMap* trailers_{nullptr};
+  Http::RequestOrResponseHeaderMap* headers_ ABSL_GUARDED_BY(mutex_){nullptr};
+  Http::HeaderMap* trailers_ ABSL_GUARDED_BY(mutex_){nullptr};
 
   // save temp values from local reply
   Http::RequestOrResponseHeaderMap* local_headers_{nullptr};
@@ -233,7 +218,7 @@ private:
   // headers_/trailers_/etc, to avoid race between envoy c thread and go thread (when calling back
   // from go). it should also be okay without this lock in most cases, just for extreme case.
   Thread::MutexBasicLockable mutex_{};
-  bool has_destroyed_{false};
+  bool has_destroyed_ ABSL_GUARDED_BY(mutex_){false};
 
   // other filter trigger sendLocalReply during go processing in async.
   // will wait go return before continue.

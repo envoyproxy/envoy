@@ -288,7 +288,10 @@ GolangStatus Filter::doHeadersGo(ProcessorState& state, Http::RequestOrResponseH
     }
 
     req_->phase = static_cast<int>(state.phase());
-    headers_ = &headers;
+    {
+      Thread::LockGuard lock(mutex_);
+      headers_ = &headers;
+    }
     auto status = dynamic_lib_->envoyGoFilterOnHttpHeader(req_, end_stream ? 1 : 0, headers.size(),
                                                           headers.byteSize());
     return static_cast<GolangStatus>(status);
@@ -314,6 +317,7 @@ bool Filter::doHeaders(ProcessorState& state, Http::RequestOrResponseHeaderMap& 
   auto status = doHeadersGo(state, headers, end_stream);
   auto done = state.handleHeaderGolangStatus(status);
   if (done) {
+    Thread::LockGuard lock(mutex_);
     headers_ = nullptr;
   }
   return done;
@@ -415,7 +419,10 @@ bool Filter::doTrailer(ProcessorState& state, Http::HeaderMap& trailers) {
 
   ASSERT(!state.getEndStream() && !state.isProcessingEndStream());
 
-  trailers_ = &trailers;
+  {
+    Thread::LockGuard lock(mutex_);
+    trailers_ = &trailers;
+  }
 
   bool done = false;
   switch (state.state()) {
@@ -470,6 +477,7 @@ void Filter::continueEncodeLocalReply(ProcessorState& state) {
 
   auto header_end_stream = encoding_state_.getEndStream();
   if (local_trailers_ != nullptr) {
+    Thread::LockGuard lock(mutex_);
     trailers_ = local_trailers_;
     header_end_stream = false;
   }
@@ -541,8 +549,11 @@ void Filter::continueStatusInternal(GolangStatus status) {
     }
   }
 
+  Thread::ReleasableLockGuard lock(mutex_);
   if (state.state() == FilterState::WaitingTrailer && trailers_ != nullptr) {
-    auto done = doTrailerGo(state, *trailers_);
+    auto trailers = trailers_;
+    lock.release();
+    auto done = doTrailerGo(state, *trailers);
     if (done) {
       state.continueProcessing();
     }
@@ -586,8 +597,10 @@ void Filter::sendLocalReply(Http::Code response_code, absl::string_view body_tex
   state.getDispatcher().post(
       [this, &state, weak_ptr, response_code, body_text, modify_headers, grpc_status, details] {
         ASSERT(state.isThreadSafe());
-        // do not need lock here, since it's the work thread now.
+        // TODO: do not need lock here, since it's the work thread now.
+        Thread::ReleasableLockGuard lock(mutex_);
         if (!weak_ptr.expired() && !has_destroyed_) {
+          lock.release();
           sendLocalReplyInternal(response_code, body_text, modify_headers, grpc_status, details);
         } else {
           ENVOY_LOG(info, "golang filter has gone or destroyed in sendLocalReply");
@@ -605,8 +618,10 @@ void Filter::continueStatus(GolangStatus status) {
   auto weak_ptr = weak_from_this();
   state.getDispatcher().post([this, &state, weak_ptr, status] {
     ASSERT(state.isThreadSafe());
-    // do not need lock here, since it's the work thread now.
+    // TODO: do not need lock here, since it's the work thread now.
+    Thread::ReleasableLockGuard lock(mutex_);
     if (!weak_ptr.expired() && !has_destroyed_) {
+      lock.release();
       continueStatusInternal(status);
     } else {
       ENVOY_LOG(info, "golang filter has gone or destroyed in continueStatus event");
@@ -616,10 +631,6 @@ void Filter::continueStatus(GolangStatus status) {
 
 absl::optional<absl::string_view> Filter::getHeader(absl::string_view key) {
   Thread::LockGuard lock(mutex_);
-  return getHeaderInternal(key);
-}
-
-absl::optional<absl::string_view> Filter::getHeaderInternal(absl::string_view key) {
   if (has_destroyed_) {
     ENVOY_LOG(warn, "golang filter has been destroyed");
     return "";
@@ -661,10 +672,6 @@ void copyHeaderMapToGo(Http::HeaderMap& m, GoString* go_strs, char* go_buf) {
 
 void Filter::copyHeaders(GoString* go_strs, char* go_buf) {
   Thread::LockGuard lock(mutex_);
-  copyHeadersInternal(go_strs, go_buf);
-}
-
-void Filter::copyHeadersInternal(GoString* go_strs, char* go_buf) {
   if (has_destroyed_) {
     ENVOY_LOG(warn, "golang filter has been destroyed");
     return;
@@ -675,10 +682,6 @@ void Filter::copyHeadersInternal(GoString* go_strs, char* go_buf) {
 
 void Filter::setHeader(absl::string_view key, absl::string_view value) {
   Thread::LockGuard lock(mutex_);
-  setHeaderInternal(key, value);
-}
-
-void Filter::setHeaderInternal(absl::string_view key, absl::string_view value) {
   if (has_destroyed_) {
     ENVOY_LOG(warn, "golang filter has been destroyed");
     return;
@@ -690,10 +693,6 @@ void Filter::setHeaderInternal(absl::string_view key, absl::string_view value) {
 
 void Filter::removeHeader(absl::string_view key) {
   Thread::LockGuard lock(mutex_);
-  removeHeaderInternal(key);
-}
-
-void Filter::removeHeaderInternal(absl::string_view key) {
   if (has_destroyed_) {
     ENVOY_LOG(warn, "golang filter has been destroyed");
     return;
@@ -705,10 +704,6 @@ void Filter::removeHeaderInternal(absl::string_view key) {
 
 void Filter::copyBuffer(Buffer::Instance* buffer, char* data) {
   Thread::LockGuard lock(mutex_);
-  copyBufferInternal(buffer, data);
-}
-
-void Filter::copyBufferInternal(Buffer::Instance* buffer, char* data) {
   if (has_destroyed_) {
     ENVOY_LOG(warn, "golang filter has been destroyed");
     return;
@@ -722,11 +717,6 @@ void Filter::copyBufferInternal(Buffer::Instance* buffer, char* data) {
 void Filter::setBufferHelper(Buffer::Instance* buffer, absl::string_view& value,
                              bufferAction action) {
   Thread::LockGuard lock(mutex_);
-  setBufferHelperInternal(buffer, value, action);
-}
-
-void Filter::setBufferHelperInternal(Buffer::Instance* buffer, absl::string_view& value,
-                                     bufferAction action) {
   if (has_destroyed_) {
     ENVOY_LOG(warn, "golang filter has been destroyed");
     return;
@@ -742,10 +732,6 @@ void Filter::setBufferHelperInternal(Buffer::Instance* buffer, absl::string_view
 
 void Filter::copyTrailers(GoString* go_strs, char* go_buf) {
   Thread::LockGuard lock(mutex_);
-  copyTrailersInternal(go_strs, go_buf);
-}
-
-void Filter::copyTrailersInternal(GoString* go_strs, char* go_buf) {
   if (has_destroyed_) {
     ENVOY_LOG(warn, "golang filter has been destroyed");
     return;
@@ -756,10 +742,6 @@ void Filter::copyTrailersInternal(GoString* go_strs, char* go_buf) {
 
 void Filter::setTrailer(absl::string_view key, absl::string_view value) {
   Thread::LockGuard lock(mutex_);
-  setTrailerInternal(key, value);
-}
-
-void Filter::setTrailerInternal(absl::string_view key, absl::string_view value) {
   if (has_destroyed_) {
     ENVOY_LOG(warn, "golang filter has been destroyed");
     return;
@@ -770,10 +752,6 @@ void Filter::setTrailerInternal(absl::string_view key, absl::string_view value) 
 
 void Filter::getStringValue(int id, GoString* value_str) {
   Thread::LockGuard lock(mutex_);
-  getStringValueInternal(id, value_str);
-}
-
-void Filter::getStringValueInternal(int id, GoString* value_str) {
   if (has_destroyed_) {
     ENVOY_LOG(warn, "golang filter has been destroyed");
     return;
