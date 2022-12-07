@@ -46,6 +46,9 @@ build --action_env=BAZEL_VOLATILE_DIRTY --host_action_env=BAZEL_VOLATILE_DIRTY
 # Requires setting `BAZEL_FAKE_SCM_REVISION` in the env.
 build --action_env=BAZEL_FAKE_SCM_REVISION --host_action_env=BAZEL_FAKE_SCM_REVISION
 
+# build --incompatible_enable_cc_toolchain_resolution
+
+# build --enable_platform_specific_config
 build --test_summary=terse
 
 # TODO(keith): Remove once these 2 are the default

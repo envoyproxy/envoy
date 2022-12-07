@@ -3,6 +3,7 @@ load("@rules_python//python:repositories.bzl", "python_register_toolchains")
 load("@proxy_wasm_cpp_host//bazel/cargo/wasmtime:crates.bzl", "wasmtime_fetch_remote_crates")
 load("//bazel/external/cargo:crates.bzl", "raze_fetch_remote_crates")
 load("@aspect_bazel_lib//lib:repositories.bzl", "aspect_bazel_lib_dependencies")
+load("@com_grail_bazel_toolchain//toolchain:deps.bzl", "bazel_toolchain_dependencies")
 
 def _python_minor_version(python_version):
     return "_".join(python_version.split(".")[:-1])
@@ -27,3 +28,4 @@ def envoy_dependencies_extra(
     )
 
     aspect_bazel_lib_dependencies()
+    bazel_toolchain_dependencies()

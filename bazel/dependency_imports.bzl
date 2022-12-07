@@ -16,6 +16,7 @@ load("@com_github_aignas_rules_shellcheck//:deps.bzl", "shellcheck_dependencies"
 load("@aspect_bazel_lib//lib:repositories.bzl", "register_jq_toolchains", "register_yq_toolchains")
 load("@com_google_cel_cpp//bazel:deps.bzl", "parser_deps")
 load("@com_github_chrusty_protoc_gen_jsonschema//:deps.bzl", protoc_gen_jsonschema_go_dependencies = "go_dependencies")
+load("@com_grail_bazel_toolchain//toolchain:rules.bzl", "llvm_toolchain")
 
 # go version for rules_go
 GO_VERSION = "1.18"
@@ -148,6 +149,11 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
     )
 
     protoc_gen_jsonschema_go_dependencies()
+
+    llvm_toolchain(
+        name = "llvm_toolchain",
+        llvm_version = "14.0.0",
+    )
 
 def envoy_download_go_sdks(go_version):
     go_download_sdk(
