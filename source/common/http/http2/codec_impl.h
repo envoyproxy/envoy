@@ -497,16 +497,19 @@ protected:
     void encodeTrailers(const ResponseTrailerMap& trailers) override {
       encodeTrailersBase(trailers);
     }
+    void setRequestDecoder(Http::RequestDecoder& decoder) override { request_decoder_ = &decoder; }
 
     // ScopeTrackedObject
     void dumpState(std::ostream& os, int indent_level) const override;
 
-    RequestDecoder* request_decoder_{};
     absl::variant<RequestHeaderMapPtr, RequestTrailerMapPtr> headers_or_trailers_;
 
     bool streamErrorOnInvalidHttpMessage() const override {
       return parent_.stream_error_on_invalid_http_messaging_;
     }
+
+  private:
+    RequestDecoder* request_decoder_{};
   };
 
   using ServerStreamImplPtr = std::unique_ptr<ServerStreamImpl>;
