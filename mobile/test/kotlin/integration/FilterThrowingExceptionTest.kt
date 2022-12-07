@@ -142,7 +142,5 @@ class FilterThrowingExceptionTest {
     onRespondeHeadersLatch.await(15, TimeUnit.SECONDS)
     assertThat(onRespondeHeadersLatch.count).isEqualTo(0)
     assertThat(expectedMessages.size).isEqualTo(0)
-
-    engine.terminate()
   }
 }
