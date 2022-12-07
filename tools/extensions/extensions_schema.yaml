@@ -76,6 +76,7 @@ categories:
 - envoy.internal_redirect_predicates
 - envoy.io_socket
 - envoy.http.original_ip_detection
+- envoy.listener_manager_impl
 - envoy.matching.common_inputs
 - envoy.matching.input_matchers
 - envoy.tls.key_providers
