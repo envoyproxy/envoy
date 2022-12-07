@@ -49,7 +49,7 @@ RichKafkaConsumer::RichKafkaConsumer(InboundRecordProcessor& record_processor,
     const int64_t initial_offset = 0;
     const RdKafkaPartitionRawPtr topic_partition =
         RdKafka::TopicPartition::create(topic, pt, initial_offset);
-    ENVOY_LOG(info, "Assigning {}-{}", topic, pt);
+    ENVOY_LOG(debug, "Assigning {}-{}", topic, pt);
     assignment_.push_back(topic_partition);
   }
   consumer_->assign(assignment_);
@@ -64,6 +64,7 @@ RichKafkaConsumer::~RichKafkaConsumer() {
   ENVOY_LOG(debug, "Closing Kafka consumer [{}]", topic_);
 
   poller_thread_active_ = false;
+  // This should take at most INTEREST_TIMEOUT_MS + POLL_TIMEOUT_MS.
   poller_thread_->join();
 
   consumer_->unassign();
@@ -104,10 +105,11 @@ void RichKafkaConsumer::pollContinuously() {
   ENVOY_LOG(debug, "Poller thread for consumer [{}] finished", topic_);
 }
 
-static InboundRecordSharedPtr copy(const RdKafka::Message& arg) {
-  auto topic = arg.topic_name();
-  auto partition = arg.partition();
-  auto offset = arg.offset();
+// Helper method, gets rid of librdkafka.
+static InboundRecordSharedPtr transform(std::unique_ptr<RdKafka::Message> arg) {
+  auto topic = arg->topic_name();
+  auto partition = arg->partition();
+  auto offset = arg->offset();
   return std::make_shared<InboundRecord>(topic, partition, offset);
 }
 
@@ -119,10 +121,14 @@ std::vector<InboundRecordSharedPtr> RichKafkaConsumer::receiveRecordBatch() {
   auto message = std::unique_ptr<RdKafka::Message>(consumer_->consume(POLL_TIMEOUT_MS));
   switch (message->err()) {
   case RdKafka::ERR_NO_ERROR: {
-    ENVOY_LOG(info, "Received message: {}-{}, offset={}", message->topic_name(),
-              message->partition(), message->offset());
+
+    // We got a message.
     std::vector<InboundRecordSharedPtr> result;
-    result.push_back(copy(*message));
+
+    auto inbound_record = transform(std::move(message));
+    ENVOY_LOG(trace, "Received Kafka message (first one): {}", inbound_record->toString());
+
+    result.push_back(inbound_record);
 
     // We got a message, there could be something left in the buffer, so we try to drain it by
     // consuming without waiting. See: https://github.com/edenhill/librdkafka/discussions/3897
@@ -130,27 +136,28 @@ std::vector<InboundRecordSharedPtr> RichKafkaConsumer::receiveRecordBatch() {
       auto buffered_message = std::unique_ptr<RdKafka::Message>(consumer_->consume(0));
       if (RdKafka::ERR_NO_ERROR == buffered_message->err()) {
         // There was a message in the buffer.
-        ENVOY_LOG(info, "Received buffered message: {}-{}, offset={}",
-                  buffered_message->topic_name(), buffered_message->partition(),
-                  buffered_message->offset());
-        result.push_back(copy(*buffered_message));
+        auto inbound_buffered = transform(std::move(buffered_message));
+        ENVOY_LOG(trace, "Received Kafka message (buffered): {}", inbound_buffered->toString());
+        result.push_back(inbound_buffered);
       } else {
         // Buffer is empty / consumer is failing - there is nothing more to consume.
         break;
       }
-    }
+    } // while
+
     return result;
   }
   case RdKafka::ERR__TIMED_OUT: {
-    ENVOY_LOG(info, "Timed out in [{}]", topic_);
+    // Nothing extraordinary, there is nothing coming from upstream cluster.
+    ENVOY_LOG(trace, "Timed out in [{}]", topic_);
     return {};
   }
   default: {
-    ENVOY_LOG(info, "Received other error in [{}]: {} / {}", topic_, message->err(),
+    ENVOY_LOG(trace, "Received other error in [{}]: {} / {}", topic_, message->err(),
               RdKafka::err2str(message->err()));
     return {};
   }
-  }
+  } // switch
 }
 
 } // namespace Mesh

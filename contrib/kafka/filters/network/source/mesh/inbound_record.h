@@ -3,6 +3,8 @@
 #include <memory>
 #include <string>
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -14,20 +16,25 @@ namespace Mesh {
  */
 struct InboundRecord {
 
-  std::string topic_;
-  int32_t partition_;
-  int64_t offset_;
+  const std::string topic_;
+  const int32_t partition_;
+  const int64_t offset_;
 
-  // XXX (adam.kotwasinski) Get data in here.
+  // XXX (adam.kotwasinski) Get data in here in the next commits.
 
-  std::string topic_name() { return topic_; }
+  std::string topic_name() const { return topic_; }
 
-  int32_t partition() { return partition_; }
+  int32_t partition() const { return partition_; }
 
-  int64_t offset() { return offset_; }
+  int64_t offset() const { return offset_; }
 
   InboundRecord(std::string topic, int32_t partition, int64_t offset)
       : topic_{topic}, partition_{partition}, offset_{offset} {};
+
+  // Used in logging.
+  std::string toString() const {
+    return absl::StrCat("[", topic_, "-", partition_, "/", offset_, "]");
+  }
 };
 
 using InboundRecordSharedPtr = std::shared_ptr<InboundRecord>;
