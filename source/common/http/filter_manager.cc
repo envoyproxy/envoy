@@ -1411,8 +1411,10 @@ void ActiveStreamDecoderFilter::removeDownstreamWatermarkCallbacks(
   parent_.watermark_callbacks_.remove(&watermark_callbacks);
 }
 
-void ActiveStreamDecoderFilter::setDecoderBufferLimit(uint32_t limit) {
-  parent_.setBufferLimit(limit);
+void ActiveStreamDecoderFilter::setDecoderBufferLimitLowerBound(uint32_t limit) {
+  if (limit > decoderBufferLimit() || limit == 0) {
+    parent_.setBufferLimit(limit);
+  }
 }
 
 uint32_t ActiveStreamDecoderFilter::decoderBufferLimit() { return parent_.buffer_limit_; }
@@ -1539,8 +1541,10 @@ void ActiveStreamEncoderFilter::onEncoderFilterBelowWriteBufferLowWatermark() {
   parent_.callLowWatermarkCallbacks();
 }
 
-void ActiveStreamEncoderFilter::setEncoderBufferLimit(uint32_t limit) {
-  parent_.setBufferLimit(limit);
+void ActiveStreamEncoderFilter::setEncoderBufferLimitLowerBound(uint32_t limit) {
+  if (limit > encoderBufferLimit() || limit == 0) {
+    parent_.setBufferLimit(limit);
+  }
 }
 
 uint32_t ActiveStreamEncoderFilter::encoderBufferLimit() { return parent_.buffer_limit_; }

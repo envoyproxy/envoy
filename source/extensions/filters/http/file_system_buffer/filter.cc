@@ -66,7 +66,8 @@ Http::FilterHeadersStatus FileSystemBufferFilter::decodeHeaders(Http::RequestHea
   // means we still have the thread potentially using twice the memory that the user configured as
   // the memory limit, once in our own buffer and once in the outgoing buffer. (Plus overflow
   // because the limit isn't hard.)
-  request_callbacks_->setDecoderBufferLimit(request_state_.config_->memoryBufferBytesLimit());
+  request_callbacks_->setDecoderBufferLimitLowerBound(
+      request_state_.config_->memoryBufferBytesLimit());
   // If we're going to buffer everything, don't even start sending the data until we're ready.
   if (request_state_.injecting_content_length_header_ ||
       request_state_.config_->behavior().alwaysFullyBuffer()) {
@@ -99,7 +100,8 @@ Http::FilterHeadersStatus FileSystemBufferFilter::encodeHeaders(Http::ResponseHe
   // means we still have the thread potentially using twice the memory that the user configured as
   // the memory limit, once in our own buffer and once in the outgoing buffer. (Plus overflow
   // because the limit isn't hard.)
-  response_callbacks_->setEncoderBufferLimit(response_state_.config_->memoryBufferBytesLimit());
+  response_callbacks_->setEncoderBufferLimitLowerBound(
+      response_state_.config_->memoryBufferBytesLimit());
   // If we're going to buffer everything, don't even start sending the data until we're ready.
   if (response_state_.injecting_content_length_header_ ||
       response_state_.config_->behavior().alwaysFullyBuffer()) {

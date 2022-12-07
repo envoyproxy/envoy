@@ -27,6 +27,13 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: http_filters
+  change: |
+    setEncoderBufferLimit and setDecoderBufferLimit changed to setEncoderBufferLimitLowerBound and
+    setDecoderBufferLimitLowerBound. Custom extensions calling these functions will need to be updated.
+    If for some reason a filter actually needs to *lower* the buffer limit, it now must be set to zero
+    before being set to the new lower limit.
+
 - area: tls
   change: |
     added support for intermediate CA as trusted ca. The peer certificate issued by an intermediate CA will be trusted by

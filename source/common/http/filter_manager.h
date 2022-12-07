@@ -228,7 +228,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   void addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& watermark_callbacks) override;
   void
   removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& watermark_callbacks) override;
-  void setDecoderBufferLimit(uint32_t limit) override;
+  void setDecoderBufferLimitLowerBound(uint32_t limit) override;
   uint32_t decoderBufferLimit() override;
   bool recreateStream(const Http::ResponseHeaderMap* original_response_headers) override;
 
@@ -298,7 +298,7 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
   void addEncodedMetadata(MetadataMapPtr&& metadata_map) override;
   void onEncoderFilterAboveWriteBufferHighWatermark() override;
   void onEncoderFilterBelowWriteBufferLowWatermark() override;
-  void setEncoderBufferLimit(uint32_t limit) override;
+  void setEncoderBufferLimitLowerBound(uint32_t limit) override;
   uint32_t encoderBufferLimit() override;
   void continueEncoding() override;
   const Buffer::Instance* encodingBuffer() override;

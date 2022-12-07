@@ -1298,22 +1298,22 @@ TEST_F(HttpConnectionManagerImplTest, AlterFilterWatermarkLimits) {
   EXPECT_EQ(initial_buffer_limit_, decoder_filters_[0]->callbacks_->decoderBufferLimit());
   EXPECT_EQ(initial_buffer_limit_, encoder_filters_[0]->callbacks_->encoderBufferLimit());
 
-  // Check lowering the limits.
-  decoder_filters_[0]->callbacks_->setDecoderBufferLimit(initial_buffer_limit_ - 1);
-  EXPECT_EQ(initial_buffer_limit_ - 1, decoder_filters_[0]->callbacks_->decoderBufferLimit());
+  // Ensure lowering the limits doesn't work.
+  decoder_filters_[0]->callbacks_->setDecoderBufferLimitLowerBound(initial_buffer_limit_ - 1);
+  EXPECT_EQ(initial_buffer_limit_, decoder_filters_[0]->callbacks_->decoderBufferLimit());
 
   // Check raising the limits.
-  decoder_filters_[0]->callbacks_->setDecoderBufferLimit(initial_buffer_limit_ + 1);
+  decoder_filters_[0]->callbacks_->setDecoderBufferLimitLowerBound(initial_buffer_limit_ + 1);
   EXPECT_EQ(initial_buffer_limit_ + 1, decoder_filters_[0]->callbacks_->decoderBufferLimit());
   EXPECT_EQ(initial_buffer_limit_ + 1, encoder_filters_[0]->callbacks_->encoderBufferLimit());
 
   // Verify turning off buffer limits works.
-  decoder_filters_[0]->callbacks_->setDecoderBufferLimit(0);
+  decoder_filters_[0]->callbacks_->setDecoderBufferLimitLowerBound(0);
   EXPECT_EQ(0, decoder_filters_[0]->callbacks_->decoderBufferLimit());
 
-  // Once the limits are turned off can be turned on again.
-  decoder_filters_[0]->callbacks_->setDecoderBufferLimit(100);
-  EXPECT_EQ(100, decoder_filters_[0]->callbacks_->decoderBufferLimit());
+  // Once the limits are turned off can be turned on again (inc. at a lower value than before).
+  decoder_filters_[0]->callbacks_->setDecoderBufferLimitLowerBound(99);
+  EXPECT_EQ(99, decoder_filters_[0]->callbacks_->decoderBufferLimit());
 
   doRemoteClose();
 }
@@ -1335,7 +1335,7 @@ TEST_F(HttpConnectionManagerImplTest, HitFilterWatermarkLimits) {
   // stream should be read-enabled
   EXPECT_CALL(stream_, readDisable(false));
   int buffer_len = decoder_filters_[0]->callbacks_->decodingBuffer()->length();
-  decoder_filters_[0]->callbacks_->setDecoderBufferLimit((buffer_len + 1) * 2);
+  decoder_filters_[0]->callbacks_->setDecoderBufferLimitLowerBound((buffer_len + 1) * 2);
 
   // Start the response
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
@@ -1365,7 +1365,7 @@ TEST_F(HttpConnectionManagerImplTest, HitFilterWatermarkLimits) {
   buffer_len = encoder_filters_[1]->callbacks_->encodingBuffer()->length();
   EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark());
   EXPECT_CALL(callbacks2, onBelowWriteBufferLowWatermark()).Times(0);
-  encoder_filters_[1]->callbacks_->setEncoderBufferLimit((buffer_len + 1) * 2);
+  encoder_filters_[1]->callbacks_->setEncoderBufferLimitLowerBound((buffer_len + 1) * 2);
 
   EXPECT_CALL(*log_handler_, log(_, _, _, _))
       .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,

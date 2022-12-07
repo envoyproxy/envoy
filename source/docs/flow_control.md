@@ -150,9 +150,11 @@ Each HTTP and HTTP/2 filter has an opportunity to call `decoderBufferLimit()` or
 configured bytes without calling the appropriate watermark callbacks or sending
 an error response.
 
-Filters may override the default limit with calls to `setDecoderBufferLimit()`
-and `setEncoderBufferLimit()`. These limits are applied as filters are created
-so filters later in the chain can override the limits set by prior filters.
+Filters may increase the default limit with calls to `setDecoderBufferLimitLowerBound()`
+and `setEncoderBufferLimitLowerBound()`. It is also possible to set the limit to unbounded
+with 0, but this is not recommended as if another, later filter sets a small value, it
+could leave the buffer limit at a smaller value than the original minimum. Instead, if
+unlimited buffering is desired, simply set a very large value.
 
 Most filters do not buffer internally, but instead push back on data by
 returning a FilterDataStatus on `encodeData()`/`decodeData()` calls.

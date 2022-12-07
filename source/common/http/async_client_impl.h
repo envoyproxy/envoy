@@ -418,7 +418,7 @@ private:
   }
   void addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
   void removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
-  void setDecoderBufferLimit(uint32_t) override {}
+  void setDecoderBufferLimitLowerBound(uint32_t) override {}
   uint32_t decoderBufferLimit() override { return 0; }
   bool recreateStream(const ResponseHeaderMap*) override { return false; }
   const ScopeTrackedObject& scope() override { return *this; }

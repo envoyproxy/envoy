@@ -116,7 +116,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   if (buffer_data_) {
     ENVOY_STREAM_LOG(debug, "ext_authz filter is buffering the request", *decoder_callbacks_);
     if (!config_->allowPartialMessage()) {
-      decoder_callbacks_->setDecoderBufferLimit(config_->maxRequestBytes());
+      decoder_callbacks_->setDecoderBufferLimitLowerBound(config_->maxRequestBytes());
     }
     return Http::FilterHeadersStatus::StopIteration;
   }

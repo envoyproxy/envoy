@@ -660,15 +660,19 @@ public:
   virtual void removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& callbacks) PURE;
 
   /**
-   * This routine may be called to change the buffer limit for decoder filters.
+   * This routine may be called to increase the buffer limit for decoder filters.
+   * Note, it is possible to decrease the limit by setting it to 0 then the desired
+   * value. In general filters should not decrease the buffer limit, as if another
+   * filter has specified it needs a buffer of size X, another filter decreasing the
+   * limit would prevent the first filter from functioning as configured.
    *
-   * @param limit supplies the desired buffer limit.
+   * @param limit supplies the desired buffer limit. 0 for unlimited.
    */
-  virtual void setDecoderBufferLimit(uint32_t limit) PURE;
+  virtual void setDecoderBufferLimitLowerBound(uint32_t limit) PURE;
 
   /**
    * This routine returns the current buffer limit for decoder filters. Filters should abide by
-   * this limit or change it via setDecoderBufferLimit.
+   * this limit or increase it via setDecoderBufferLimitLowerBound.
    * A buffer limit of 0 bytes indicates no limits are applied.
    *
    * @return the buffer limit the filter should apply.
@@ -995,15 +999,19 @@ public:
   virtual void onEncoderFilterBelowWriteBufferLowWatermark() PURE;
 
   /**
-   * This routine may be called to change the buffer limit for encoder filters.
+   * This routine may be called to increase the buffer limit for encoder filters.
+   * Note, it is possible to decrease the limit by setting it to 0 then the desired
+   * value. In general filters should not decrease the buffer limit, as if another
+   * filter has specified it needs a buffer of size X, another filter decreasing the
+   * limit would prevent the first filter from functioning as configured.
    *
-   * @param limit supplies the desired buffer limit.
+   * @param limit supplies the desired buffer limit. 0 for unlimited.
    */
-  virtual void setEncoderBufferLimit(uint32_t limit) PURE;
+  virtual void setEncoderBufferLimitLowerBound(uint32_t limit) PURE;
 
   /**
    * This routine returns the current buffer limit for encoder filters. Filters should abide by
-   * this limit or change it via setEncoderBufferLimit.
+   * this limit or increase it via setEncoderBufferLimitLowerBound.
    * A buffer limit of 0 bytes indicates no limits are applied.
    *
    * @return the buffer limit the filter should apply.
