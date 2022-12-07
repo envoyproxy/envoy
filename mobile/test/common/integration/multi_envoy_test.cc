@@ -8,6 +8,10 @@
 #include "library/common/network/proxy_settings.h"
 #include "library/common/types/c_types.h"
 
+#include <chrono>
+#include <thread>
+
+
 using testing::ReturnRef;
 
 // AN EXACT COPY OF client_integration_test.cc with all tests removed except the first

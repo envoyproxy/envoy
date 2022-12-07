@@ -182,9 +182,11 @@ void BaseClientIntegrationTest::TearDown() {
   fake_upstreams_.clear();
   engine_->terminate();
   engine_.reset();
+  engine_2_->terminate();
+  engine_2_.reset();
+
   full_dispatcher_->exit();
   envoy_thread_->join();
-  // envoy_thread_2_->join();
 }
 
 void BaseClientIntegrationTest::createEnvoy() {
