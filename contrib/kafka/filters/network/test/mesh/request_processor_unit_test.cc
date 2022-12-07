@@ -2,6 +2,7 @@
 
 #include "contrib/kafka/filters/network/source/mesh/abstract_command.h"
 #include "contrib/kafka/filters/network/source/mesh/command_handlers/api_versions.h"
+#include "contrib/kafka/filters/network/source/mesh/command_handlers/list_offsets.h"
 #include "contrib/kafka/filters/network/source/mesh/command_handlers/metadata.h"
 #include "contrib/kafka/filters/network/source/mesh/command_handlers/produce.h"
 #include "contrib/kafka/filters/network/source/mesh/request_processor.h"
@@ -60,6 +61,22 @@ TEST_F(RequestProcessorTest, ShouldProcessProduceRequest) {
   ASSERT_NE(std::dynamic_pointer_cast<ProduceRequestHolder>(capture), nullptr);
 }
 
+TEST_F(RequestProcessorTest, ShouldProcessListOffsetsRequest) {
+  // given
+  const RequestHeader header = {LIST_OFFSETS_REQUEST_API_KEY, 0, 0, absl::nullopt};
+  const ListOffsetsRequest data = {0, {}};
+  const auto message = std::make_shared<Request<ListOffsetsRequest>>(header, data);
+
+  InFlightRequestSharedPtr capture = nullptr;
+  EXPECT_CALL(listener_, onRequest(_)).WillOnce(testing::SaveArg<0>(&capture));
+
+  // when
+  testee_.onMessage(message);
+
+  // then
+  ASSERT_NE(std::dynamic_pointer_cast<ListOffsetsRequestHolder>(capture), nullptr);
+}
+
 TEST_F(RequestProcessorTest, ShouldProcessMetadataRequest) {
   // given
   const RequestHeader header = {METADATA_REQUEST_API_KEY, 0, 0, absl::nullopt};
@@ -94,9 +111,9 @@ TEST_F(RequestProcessorTest, ShouldProcessApiVersionsRequest) {
 
 TEST_F(RequestProcessorTest, ShouldHandleUnsupportedRequest) {
   // given
-  const RequestHeader header = {LIST_OFFSETS_REQUEST_API_KEY, 0, 0, absl::nullopt};
-  const ListOffsetsRequest data = {0, {}};
-  const auto message = std::make_shared<Request<ListOffsetsRequest>>(header, data);
+  const RequestHeader header = {END_TXN_REQUEST_API_KEY, 0, 0, absl::nullopt};
+  const EndTxnRequest data = {"", 0, 0, false};
+  const auto message = std::make_shared<Request<EndTxnRequest>>(header, data);
 
   // when, then - exception gets thrown.
   EXPECT_THROW_WITH_REGEX(testee_.onMessage(message), EnvoyException, "unsupported");

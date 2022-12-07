@@ -32,7 +32,7 @@ Network::Address::InstanceConstSharedPtr fakeAddress() {
 }
 
 struct FilterChainNameAction
-    : public Matcher::ActionBase<ProtobufWkt::StringValue, FilterChainBaseAction> {
+    : public Matcher::ActionBase<ProtobufWkt::StringValue, Configuration::FilterChainBaseAction> {
   explicit FilterChainNameAction(const std::string& name) : name_(name) {}
   const Network::FilterChain* get(const FilterChainsByName& filter_chains_by_name,
                                   const StreamInfo::StreamInfo&) const override {
@@ -591,7 +591,8 @@ FilterChainManagerImpl::findFilterChainUsingMatcher(const Network::ConnectionSoc
          "Matching must complete for network streams.");
   if (match_result.result_) {
     const auto result = match_result.result_();
-    return result->getTyped<FilterChainBaseAction>().get(filter_chains_by_name_, info);
+    return result->getTyped<Configuration::FilterChainBaseAction>().get(filter_chains_by_name_,
+                                                                        info);
   }
   return default_filter_chain_.get();
 }
