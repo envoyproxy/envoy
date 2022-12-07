@@ -978,6 +978,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "https://github.com/dtolnay/cxx/archive/refs/tags/{version}.tar.gz",
         ],
         release_date = "2022-12-03",
+        extensions = ["envoy.matching.matchers.consistent_hashing"],
         use_category = ["build"],
     ),
     com_github_wavm_wavm = dict(
