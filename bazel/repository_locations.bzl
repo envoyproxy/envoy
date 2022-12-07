@@ -1376,6 +1376,19 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2022-03-30",
         cpe = "N/A",
     ),
+    rules_license = dict(
+        project_name = "rules_license",
+        project_desc = "Bazel rules for checking open source licenses",
+        project_url = "https://github.com/bazelbuild/rules_license",
+        version = "0.0.3",
+        sha256 = "00ccc0df21312c127ac4b12880ab0f9a26c1cff99442dc6c5a331750360de3c3",
+        urls = ["https://github.com/bazelbuild/rules_license/releases/download/{version}/rules_license-{version}.tar.gz"],
+        use_category = ["build", "dataplane_core", "controlplane"],
+        release_date = "2022-05-28",
+        cpe = "N/A",
+        license = "Apache-2.0",
+        license_url = "https://github.com/bazelbuild/rules_license/blob/{version}/LICENSE",
+    ),
 )
 
 def _compiled_protoc_deps(locations, versions):
