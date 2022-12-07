@@ -4,8 +4,8 @@
 #include "envoy/server/instance.h"
 
 #include "source/common/event/real_time_system.h"
-#include "source/exe/stripped_main_base.h"
 #include "source/exe/platform_impl.h"
+#include "source/exe/stripped_main_base.h"
 #include "source/server/listener_hooks.h"
 #include "source/server/options_impl.h"
 
