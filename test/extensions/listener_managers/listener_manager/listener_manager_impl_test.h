@@ -9,8 +9,9 @@
 
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/socket_option_impl.h"
+#include "source/extensions/listener_managers/listener_manager/listener_impl.h"
+#include "source/extensions/listener_managers/listener_manager/listener_manager_impl.h"
 #include "source/server/configuration_impl.h"
-#include "source/server/listener_manager_impl.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/drain_manager.h"
