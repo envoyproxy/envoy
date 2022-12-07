@@ -288,6 +288,13 @@ public:
 };
 
 using FilterChainFactoryContextPtr = std::unique_ptr<FilterChainFactoryContext>;
+using FilterChainsByName = absl::flat_hash_map<std::string, Network::DrainableFilterChainSharedPtr>;
+
+class FilterChainBaseAction : public Matcher::Action {
+public:
+  virtual const Network::FilterChain* get(const FilterChainsByName& filter_chains_by_name,
+                                          const StreamInfo::StreamInfo& info) const PURE;
+};
 
 /**
  * An implementation of FactoryContext. The life time should cover the lifetime of the filter chains

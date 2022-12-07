@@ -179,8 +179,9 @@ HTTP Routing Integration
 ########################
 
 The matching API can be used with HTTP routing, by specifying a match tree as part of the virtual host
-and specifying a Route as the resulting action. See examples in the above sections for how the match
-tree can be configured.
+and specifying a :ref:`Route <envoy_v3_api_msg_config.route.v3.Route>` or :ref:`RouteList
+<envoy_v3_api_msg_config.route.v3.RouteList>` as the resulting action. See :ref:`the examples
+<arch_overview_http_routing_matcher>` for how the match tree can be configured.
 
 Match Tree Validation
 #####################

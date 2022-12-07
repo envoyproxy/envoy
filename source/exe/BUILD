@@ -89,6 +89,9 @@ envoy_cc_library(
     name = "envoy_main_common_lib",
     deps = [
         ":main_common_lib",
+        # This is compiled as an extension so Envoy Mobile doesn't have to link it in.
+        # Envoy requires it.
+        "//source/extensions/listener_managers/listener_manager:listener_manager_lib",
         "//source/common/version:version_linkstamp",
     ],
 )

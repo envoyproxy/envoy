@@ -1,7 +1,5 @@
 #include "envoy/extensions/http/header_validators/envoy_default/v3/header_validator.pb.h"
 
-#include "source/extensions/http/header_validators/envoy_default/config.h"
-
 #include "test/mocks/stream_info/mocks.h"
 
 #include "gtest/gtest.h"
