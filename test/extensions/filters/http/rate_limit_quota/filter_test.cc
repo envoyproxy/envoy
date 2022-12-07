@@ -125,6 +125,10 @@ public:
     TestUtility::loadFromYaml(GoogleGrpcConfig, config_);
   }
 
+  ~FilterTest() {
+    filter_->onDestroy();
+  }
+
   void addMatcherConfigAndCreateFilter(MatcherConfigType config_type) {
     // Add the matcher configuration.
     switch (config_type) {
@@ -218,6 +222,9 @@ TEST_F(FilterTest, RequestMatchingSucceeded) {
       absl::flat_hash_map<std::string, std::string>(bucket_ids.begin(), bucket_ids.end());
   EXPECT_THAT(expected_bucket_ids,
               testing::UnorderedPointwise(testing::Eq(), serialized_bucket_ids));
+
+  envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse resp;
+  filter_->onQuotaResponse(resp);
 }
 
 TEST_F(FilterTest, RequestMatchingFailed) {
