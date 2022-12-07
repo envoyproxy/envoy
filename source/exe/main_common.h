@@ -8,7 +8,8 @@
 #include "source/common/event/real_time_system.h"
 #include "source/common/grpc/google_grpc_context.h"
 #include "source/common/stats/symbol_table.h"
-#include "source/exe/main_common_base.h"
+#include "source/common/stats/thread_local_store.h"
+#include "source/common/thread_local/thread_local_impl.h"
 #include "source/exe/process_wide.h"
 #include "source/server/listener_hooks.h"
 #include "source/server/options_impl.h"
@@ -16,11 +17,41 @@
 
 #ifdef ENVOY_HANDLE_SIGNALS
 #include "source/common/signal/signal_action.h"
+#include "source/exe/stripped_main_base.h"
 #include "source/exe/terminate_handler.h"
 #endif
 
 namespace Envoy {
 
+class MainCommonBase : public StrippedMainBase {
+public:
+  using StrippedMainBase::StrippedMainBase;
+
+  bool run();
+
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
+  using AdminRequestFn =
+      std::function<void(const Http::ResponseHeaderMap& response_headers, absl::string_view body)>;
+
+  // Makes an admin-console request by path, calling handler() when complete.
+  // The caller can initiate this from any thread, but it posts the request
+  // onto the main thread, so the handler is called asynchronously.
+  //
+  // This is designed to be called from downstream consoles, so they can access
+  // the admin console information stream without opening up a network port.
+  //
+  // This should only be called while run() is active; ensuring this is the
+  // responsibility of the caller.
+  //
+  // TODO(jmarantz): consider std::future for encapsulating this delayed request
+  // semantics, rather than a handler callback.
+  void adminRequest(absl::string_view path_and_query, absl::string_view method,
+                    const AdminRequestFn& handler);
+#endif
+};
+
+// This is separate from MainCommonBase for legacy reasons: sufficient
+// downstream tests use one or the other that resolving is deemed problematic.
 class MainCommon {
 public:
   // Hook to run after a server is created.
@@ -29,7 +60,7 @@ public:
   MainCommon(int argc, const char* const* argv);
   MainCommon(const std::vector<std::string>& args);
 
-  bool run();
+  bool run() { return base_.run(); }
   // Only tests have a legitimate need for this today.
   Event::Dispatcher& dispatcherForTest() { return base_.server()->dispatcher(); }
 
@@ -79,7 +110,6 @@ private:
   Envoy::TerminateHandler log_on_terminate_;
 #endif
 
-  std::unique_ptr<Server::Platform> platform_impl_;
   Envoy::OptionsImpl options_;
   Event::RealTimeSystem real_time_system_;
   DefaultListenerHooks default_listener_hooks_;

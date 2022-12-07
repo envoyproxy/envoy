@@ -29,14 +29,14 @@
 
 namespace Envoy {
 
-bool MainCommon::run() {
+bool MainCommonBase::run() {
   switch (options_.mode()) {
   case Server::Mode::Serve:
-    base_.runServer();
+    server_->run();
     return true;
   case Server::Mode::Validate: {
     auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
-    return Server::validateConfig(options_, local_address, prod_component_factory_,
+    return Server::validateConfig(options_, local_address, component_factory_,
                                   platform_impl_->threadFactory(), platform_impl_->fileSystem());
   }
   case Server::Mode::InitOnly:
@@ -46,17 +46,44 @@ bool MainCommon::run() {
   return false; // for gcc.
 }
 
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
+void MainCommonBase::adminRequest(absl::string_view path_and_query, absl::string_view method,
+                                  const AdminRequestFn& handler) {
+  std::string path_and_query_buf = std::string(path_and_query);
+  std::string method_buf = std::string(method);
+  server_->dispatcher().post([this, path_and_query_buf, method_buf, handler]() {
+    auto response_headers = Http::ResponseHeaderMapImpl::create();
+    std::string body;
+    if (server_->admin()) {
+      server_->admin()->request(path_and_query_buf, method_buf, *response_headers, body);
+    }
+    handler(*response_headers, body);
+  });
+}
+#endif
+
 MainCommon::MainCommon(const std::vector<std::string>& args)
-    : platform_impl_(std::make_unique<PlatformImpl>()),
-      options_(args, &MainCommonBase::hotRestartVersion, spdlog::level::info),
+    : options_(args, &MainCommon::hotRestartVersion, spdlog::level::info),
       base_(options_, real_time_system_, default_listener_hooks_, prod_component_factory_,
-            *platform_impl_, std::make_unique<Random::RandomGeneratorImpl>(), nullptr) {}
+            std::make_unique<PlatformImpl>(), std::make_unique<Random::RandomGeneratorImpl>(),
+            nullptr) {}
 
 MainCommon::MainCommon(int argc, const char* const* argv)
-    : platform_impl_(std::make_unique<PlatformImpl>()),
-      options_(argc, argv, &MainCommonBase::hotRestartVersion, spdlog::level::info),
+    : options_(argc, argv, &MainCommon::hotRestartVersion, spdlog::level::info),
       base_(options_, real_time_system_, default_listener_hooks_, prod_component_factory_,
-            *platform_impl_, std::make_unique<Random::RandomGeneratorImpl>(), nullptr) {}
+            std::make_unique<PlatformImpl>(), std::make_unique<Random::RandomGeneratorImpl>(),
+            nullptr) {}
+
+std::string MainCommon::hotRestartVersion(bool hot_restart_enabled) {
+#ifdef ENVOY_HOT_RESTART
+  if (hot_restart_enabled) {
+    return Server::HotRestartImpl::hotRestartVersion();
+  }
+#else
+  UNREFERENCED_PARAMETER(hot_restart_enabled);
+#endif
+  return "disabled";
+}
 
 int MainCommon::main(int argc, char** argv, PostServerHook hook) {
 #ifndef __APPLE__

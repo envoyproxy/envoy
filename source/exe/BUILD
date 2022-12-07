@@ -62,9 +62,9 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "main_common_base_lib",
-    srcs = ["main_common_base.cc"],
-    hdrs = ["main_common_base.h"],
+    name = "stripped_main_base_lib",
+    srcs = ["stripped_main_base.cc"],
+    hdrs = ["stripped_main_base.h"],
     deps = [
         ":envoy_common_lib",
         ":platform_impl_lib",
@@ -90,7 +90,7 @@ envoy_cc_library(
     srcs = ["main_common.cc"],
     hdrs = ["main_common.h"],
     deps = [
-        ":main_common_base_lib",
+        ":stripped_main_base_lib",
         ":envoy_common_lib",
         ":platform_impl_lib",
         ":process_wide_lib",
@@ -119,9 +119,9 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "envoy_main_common_base_lib",
+    name = "envoy_stripped_main_base_lib",
     deps = [
-        ":main_common_base_lib",
+        ":stripped_main_base_lib",
         "//source/common/version:version_linkstamp",
     ],
 )
@@ -149,15 +149,13 @@ envoy_cc_library(
     name = "envoy_main_common_with_core_extensions_lib",
     srcs = [
         "main_common.cc",
-        "main_common_base.cc",
     ],
     hdrs = [
         "main_common.h",
-        "main_common_base.h",
     ],
     deps = [
         "//source/server/config_validation:server_lib",
-        ":main_common_base_lib",
+        ":stripped_main_base_lib",
         ":envoy_common_with_core_extensions_lib",
         ":platform_impl_lib",
         ":process_wide_lib",

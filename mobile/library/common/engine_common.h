@@ -4,7 +4,7 @@
 #include "envoy/server/instance.h"
 
 #include "source/common/event/real_time_system.h"
-#include "source/exe/main_common_base.h"
+#include "source/exe/stripped_main_base.h"
 #include "source/exe/platform_impl.h"
 #include "source/server/listener_hooks.h"
 #include "source/server/options_impl.h"
@@ -18,7 +18,7 @@ namespace Envoy {
 
 /**
  * This class is used instead of Envoy::MainCommon to customize logic for the Envoy Mobile setting.
- * It largely leverages Envoy::MainCommonBase.
+ * It largely leverages Envoy::StrippedMainBase.
  */
 class EngineCommon {
 public:
@@ -41,13 +41,12 @@ private:
   Envoy::SignalAction handle_sigs_;
   Envoy::TerminateHandler log_on_terminate_;
 #endif
-  PlatformImpl platform_impl_;
   Thread::MainThread register_main_thread_;
   Envoy::OptionsImpl options_;
   Event::RealTimeSystem real_time_system_; // NO_CHECK_FORMAT(real_time)
   DefaultListenerHooks default_listener_hooks_;
   ProdComponentFactory prod_component_factory_;
-  MainCommonBase base_;
+  StrippedMainBase base_;
 };
 
 } // namespace Envoy

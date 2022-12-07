@@ -1,4 +1,4 @@
-#include "source/exe/main_common_base.h"
+#include "source/exe/stripped_main_base.h"
 
 #include <fstream>
 #include <iostream>
@@ -41,20 +41,21 @@ Runtime::LoaderPtr ProdComponentFactory::createRuntime(Server::Instance& server,
   return Server::InstanceUtil::createRuntime(server, config);
 }
 
-MainCommonBase::MainCommonBase(const Server::Options& options, Event::TimeSystem& time_system,
-                               ListenerHooks& listener_hooks,
-                               Server::ComponentFactory& component_factory,
-                               Server::Platform& platform_impl,
-                               std::unique_ptr<Random::RandomGenerator>&& random_generator,
-                               std::unique_ptr<ProcessContext> process_context)
-    : options_(options), component_factory_(component_factory), stats_allocator_(symbol_table_) {
+StrippedMainBase::StrippedMainBase(const Server::Options& options, Event::TimeSystem& time_system,
+                                   ListenerHooks& listener_hooks,
+                                   Server::ComponentFactory& component_factory,
+                                   std::unique_ptr<Server::Platform> platform_impl,
+                                   std::unique_ptr<Random::RandomGenerator>&& random_generator,
+                                   std::unique_ptr<ProcessContext> process_context)
+    : platform_impl_(std::move(platform_impl)), options_(options),
+      component_factory_(component_factory), stats_allocator_(symbol_table_) {
   // Process the option to disable extensions as early as possible,
   // before we do any configuration loading.
   OptionsImpl::disableExtensions(options.disabledExtensions());
 
   // Enable core dumps as early as possible.
   if (options_.coreDumpEnabled()) {
-    const auto ret = platform_impl.enableCoreDump();
+    const auto ret = platform_impl_->enableCoreDump();
     if (ret) {
       ENVOY_LOG_MISC(info, "core dump enabled");
     } else {
@@ -86,7 +87,7 @@ MainCommonBase::MainCommonBase(const Server::Options& options, Event::TimeSystem
     server_ = std::make_unique<Server::InstanceImpl>(
         *init_manager_, options_, time_system, local_address, listener_hooks, *restarter_,
         *stats_store_, access_log_lock, component_factory, std::move(random_generator), *tls_,
-        platform_impl.threadFactory(), platform_impl.fileSystem(), std::move(process_context));
+        platform_impl_->threadFactory(), platform_impl_->fileSystem(), std::move(process_context));
 
     break;
   }
@@ -99,7 +100,7 @@ MainCommonBase::MainCommonBase(const Server::Options& options, Event::TimeSystem
   }
 }
 
-void MainCommonBase::configureComponentLogLevels() {
+void StrippedMainBase::configureComponentLogLevels() {
   for (auto& component_log_level : options_.componentLogLevels()) {
     Logger::Logger* logger_to_change = Logger::Registry::logger(component_log_level.first);
     ASSERT(logger_to_change);
@@ -107,7 +108,7 @@ void MainCommonBase::configureComponentLogLevels() {
   }
 }
 
-void MainCommonBase::configureHotRestarter(Random::RandomGenerator& random_generator) {
+void StrippedMainBase::configureHotRestarter(Random::RandomGenerator& random_generator) {
 #ifdef ENVOY_HOT_RESTART
   if (!options_.hotRestartDisabled()) {
     uint32_t base_id = options_.baseId();
@@ -163,33 +164,6 @@ void MainCommonBase::configureHotRestarter(Random::RandomGenerator& random_gener
   if (restarter_ == nullptr) {
     restarter_ = std::make_unique<Server::HotRestartNopImpl>();
   }
-}
-
-#ifdef ENVOY_ADMIN_FUNCTIONALITY
-void MainCommonBase::adminRequest(absl::string_view path_and_query, absl::string_view method,
-                                  const AdminRequestFn& handler) {
-  std::string path_and_query_buf = std::string(path_and_query);
-  std::string method_buf = std::string(method);
-  server_->dispatcher().post([this, path_and_query_buf, method_buf, handler]() {
-    auto response_headers = Http::ResponseHeaderMapImpl::create();
-    std::string body;
-    if (server_->admin()) {
-      server_->admin()->request(path_and_query_buf, method_buf, *response_headers, body);
-    }
-    handler(*response_headers, body);
-  });
-}
-#endif
-
-std::string MainCommonBase::hotRestartVersion(bool hot_restart_enabled) {
-#ifdef ENVOY_HOT_RESTART
-  if (hot_restart_enabled) {
-    return Server::HotRestartImpl::hotRestartVersion();
-  }
-#else
-  UNREFERENCED_PARAMETER(hot_restart_enabled);
-#endif
-  return "disabled";
 }
 
 } // namespace Envoy
