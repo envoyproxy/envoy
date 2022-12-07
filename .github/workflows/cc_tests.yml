@@ -1,4 +1,4 @@
-name: cc_tests
+name: mobile_cc_tests
 
 on:
   push:
