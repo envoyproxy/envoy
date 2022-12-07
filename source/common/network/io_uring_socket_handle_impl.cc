@@ -529,7 +529,7 @@ void IoUringSocketHandleImpl::onAcceptSocket(Io::AcceptedSocketParam& param) {
   cb_(Event::FileReadyType::Read);
   ENVOY_LOG(trace, "after on accept socket");
 
-  // After accept the socet, the accepted_socket_param expected to be cleanup.
+  // After accept the socket, the accepted_socket_param expected to be cleanup.
   ASSERT(accepted_socket_param_ == absl::nullopt);
 }
 

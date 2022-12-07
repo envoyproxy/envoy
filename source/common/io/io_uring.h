@@ -49,7 +49,7 @@ public:
   virtual void forEveryCompletion(CompletionCb completion_cb) PURE;
 
   /**
-   * Inject complation entry in the completion queue.
+   * Inject completion entry in the completion queue.
    */
   virtual void injectCompletion(os_fd_t fd, void* user_data, int32_t result) PURE;
 

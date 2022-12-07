@@ -36,6 +36,7 @@ TRA
 abc
 abcd
 abd
+addrlen
 ar
 btree
 CAS
@@ -233,6 +234,7 @@ LF
 LHS
 hls
 integrations
+iouring
 jkl
 lang
 libsxg
@@ -959,6 +961,7 @@ opencensus
 openssl
 opentracing
 optimizations
+optlen
 optname
 optval
 ostream
@@ -1330,6 +1333,7 @@ upcasts
 upstreams
 uptime
 upvalue
+uring
 urls
 userdata
 userinfo
