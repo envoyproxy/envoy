@@ -5,9 +5,15 @@
 
 namespace Envoy {
 
+// Allows for legacy TCP listener support when building with --copt=-DALLOW_TCP_LISTENERS
+#ifndef ALLOW_TCP_LISTENERS
+const char* listener_type = "envoy.listener_manager_impl.api";
+#else
+const char* listener_type = "envoy.listener_manager_impl.default";
+#endif
+
 EngineCommon::EngineCommon(int argc, const char* const* argv)
-    : options_(argc, argv, &MainCommon::hotRestartVersion, spdlog::level::info,
-               "envoy.listener_manager_impl.api"),
+    : options_(argc, argv, &MainCommon::hotRestartVersion, spdlog::level::info, listener_type),
       base_(options_, real_time_system_, default_listener_hooks_, prod_component_factory_,
             std::make_unique<PlatformImpl>(), std::make_unique<Random::RandomGeneratorImpl>(),
             nullptr) {

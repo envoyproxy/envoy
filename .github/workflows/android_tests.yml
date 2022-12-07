@@ -134,5 +134,5 @@ jobs:
             --test_output=all \
             --build_tests_only \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux-clang") \
-            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
+             --copt=-DALLOW_TCP_LISTENERS --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //test/kotlin/...
