@@ -110,6 +110,7 @@ envoy_cc_library(
     }),
 )
 
+# provides a library target for Envoy server builds with the versioning information set up correctly.
 envoy_cc_library(
     name = "envoy_main_common_lib",
     deps = [
@@ -118,6 +119,7 @@ envoy_cc_library(
     ],
 )
 
+# provides a library target for Envoy Mobile builds with the versioning information set up correctly.
 envoy_cc_library(
     name = "envoy_stripped_main_base_lib",
     deps = [

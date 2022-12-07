@@ -32,7 +32,7 @@ public:
 
 // This is the common main between Envoy and Envoy mobile.
 // It is stripped down to functionality required by Envoy Mobile: anything
-// server-specific should live in MainCommonBase or MainCommon which remind
+// server-specific should live in MainCommonBase or MainCommon which remain
 // separate for legacy reasons.
 class StrippedMainBase {
 public:
