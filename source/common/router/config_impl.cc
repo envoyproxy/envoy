@@ -1889,17 +1889,29 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
     auto match = Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher_, data);
 
     if (match.result_) {
-      // The only possible action that can be used within the route matching context
-      // is the RouteMatchAction, so this must be true.
       const auto result = match.result_();
-      const RouteMatchAction& route_action = result->getTyped<RouteMatchAction>();
+      if (result->typeUrl() == RouteMatchAction::staticTypeUrl()) {
+        const RouteMatchAction& route_action = result->getTyped<RouteMatchAction>();
 
-      if (route_action.route()->matches(headers, stream_info, random_value)) {
-        return route_action.route();
+        if (route_action.route()->matches(headers, stream_info, random_value)) {
+          return route_action.route();
+        }
+
+        ENVOY_LOG(debug, "route was resolved but final route did not match incoming request");
+        return nullptr;
+      } else if (result->typeUrl() == RouteListMatchAction::staticTypeUrl()) {
+        const RouteListMatchAction& action = result->getTyped<RouteListMatchAction>();
+
+        for (const auto& route : action.routes()) {
+          if (route->matches(headers, stream_info, random_value)) {
+            return route;
+          }
+        }
+
+        ENVOY_LOG(debug, "route was resolved but final route list did not match incoming request");
+        return nullptr;
       }
-
-      ENVOY_LOG(debug, "route was resolved but final route did not match incoming request");
-      return nullptr;
+      PANIC("Action in router matcher should be Route or RouteList");
     }
 
     ENVOY_LOG(debug, "failed to match incoming request: {}", static_cast<int>(match.match_state_));
@@ -2163,6 +2175,23 @@ Matcher::ActionFactoryCb RouteMatchActionFactory::createActionFactoryCb(
   return [route]() { return std::make_unique<RouteMatchAction>(route); };
 }
 REGISTER_FACTORY(RouteMatchActionFactory, Matcher::ActionFactory<RouteActionContext>);
+
+Matcher::ActionFactoryCb RouteListMatchActionFactory::createActionFactoryCb(
+    const Protobuf::Message& config, RouteActionContext& context,
+    ProtobufMessage::ValidationVisitor& validation_visitor) {
+  const auto& route_config =
+      MessageUtil::downcastAndValidate<const envoy::config::route::v3::RouteList&>(
+          config, validation_visitor);
+
+  std::vector<RouteEntryImplBaseConstSharedPtr> routes;
+  for (const auto& route : route_config.routes()) {
+    routes.emplace_back(createAndValidateRoute(route, context.vhost, context.optional_http_filters,
+                                               context.factory_context, validation_visitor,
+                                               absl::nullopt));
+  }
+  return [routes]() { return std::make_unique<RouteListMatchAction>(routes); };
+}
+REGISTER_FACTORY(RouteListMatchActionFactory, Matcher::ActionFactory<RouteActionContext>);
 
 } // namespace Router
 } // namespace Envoy

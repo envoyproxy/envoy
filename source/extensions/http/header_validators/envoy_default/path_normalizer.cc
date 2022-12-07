@@ -1,7 +1,8 @@
 #include "source/extensions/http/header_validators/envoy_default/path_normalizer.h"
 
+#include "source/common/http/headers.h"
 #include "source/extensions/http/header_validators/envoy_default/character_tables.h"
-#include "source/extensions/http/header_validators/envoy_default/header_validator.h"
+#include "source/extensions/http/header_validators/envoy_default/error_codes.h"
 
 namespace Envoy {
 namespace Extensions {
