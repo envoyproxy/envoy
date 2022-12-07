@@ -34,7 +34,8 @@ public:
    * @param succeeded true if the validation succeeds
    * @param detailed_status detailed status of the underlying validation. Depending on the
    *        validation configuration, `succeeded` may be true but `detailed_status` might
-   *        indicate a failure.
+   *        indicate a failure. This detailed status can be used to inform routing
+   *        decisions.
    * @param error_details failure details, only used if the validation fails.
    * @param tls_alert the TLS error related to the failure, only used if the validation fails.
    */
