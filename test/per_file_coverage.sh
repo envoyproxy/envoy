@@ -40,7 +40,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/http/grpc_json_transcoder:95.2"
 "source/extensions/filters/http/ip_tagging:88.0"
 "source/extensions/filters/http/kill_request:91.7" # Death tests don't report LCOV
-"source/extensions/filters/http/oath2:96.1"
+"source/extensions/filters/http/oauth2:96.1"
 "source/extensions/filters/http/wasm:1.9"
 "source/extensions/filters/http/rate_limit_quota:70" # TODO(tyxia) WIP. Improve coverage as development continues
 "source/extensions/filters/listener/original_dst:82.9"
