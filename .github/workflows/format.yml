@@ -20,6 +20,8 @@ jobs:
         ENVOY_BAZEL_PREFIX: "@envoy"
     steps:
     - uses: actions/checkout@v1
+    - name: Add safe directory
+      run: git config --global --add safe.directory /__w/envoy/envoy
     - id: should_run
       name: 'Check whether to run'
       run: ./mobile/tools/should_run_ci.sh
