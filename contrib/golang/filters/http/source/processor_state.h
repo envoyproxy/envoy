@@ -21,11 +21,9 @@ namespace Golang {
 
 class Filter;
 
-class BufferList {
+class BufferList : public NonCopyable {
 public:
   BufferList() = default;
-  BufferList(const BufferList&) = delete;
-  BufferList& operator=(const BufferList&) = delete;
 
   bool empty() const { return bytes_ == 0; }
   // return a new buffer instance, it will existing until moveOut or drain.
@@ -90,12 +88,10 @@ enum class GolangStatus {
   StopNoBuffer,
 };
 
-class ProcessorState : public Logger::Loggable<Logger::Id::http> {
+class ProcessorState : public Logger::Loggable<Logger::Id::http>, NonCopyable {
 public:
   explicit ProcessorState(Filter& filter) : filter_(filter) {}
-  ProcessorState(const ProcessorState&) = delete;
   virtual ~ProcessorState() = default;
-  ProcessorState& operator=(const ProcessorState&) = delete;
 
   FilterState state() const { return state_; }
   std::string stateStr();
@@ -186,11 +182,9 @@ protected:
   bool seen_trailers_{false};
 };
 
-class DecodingProcessorState : public ProcessorState {
+class DecodingProcessorState : public ProcessorState, NonCopyable {
 public:
   explicit DecodingProcessorState(Filter& filter) : ProcessorState(filter) {}
-  DecodingProcessorState(const DecodingProcessorState&) = delete;
-  DecodingProcessorState& operator=(const DecodingProcessorState&) = delete;
 
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
     decoder_callbacks_ = &callbacks;
@@ -224,11 +218,9 @@ private:
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{nullptr};
 };
 
-class EncodingProcessorState : public ProcessorState {
+class EncodingProcessorState : public ProcessorState, NonCopyable {
 public:
   explicit EncodingProcessorState(Filter& filter) : ProcessorState(filter) {}
-  EncodingProcessorState(const EncodingProcessorState&) = delete;
-  EncodingProcessorState& operator=(const EncodingProcessorState&) = delete;
 
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) {
     encoder_callbacks_ = &callbacks;
