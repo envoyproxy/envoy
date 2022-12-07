@@ -66,8 +66,9 @@ private:
   quiche::BalsaHeaders headers_;
   quiche::BalsaHeaders trailers_;
 
+  const MessageType message_type_ = MessageType::Request;
   ParserCallbacks* connection_ = nullptr;
-  bool on_message_begin_called_ = false;
+  bool first_byte_processed_ = false;
   bool headers_done_ = false;
   ParserStatus status_ = ParserStatus::Ok;
   absl::string_view error_message_;

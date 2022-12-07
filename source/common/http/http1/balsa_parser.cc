@@ -19,6 +19,18 @@ using ::quiche::BalsaFrameEnums;
 using ::quiche::BalsaHeaders;
 
 constexpr absl::string_view kColonSlashSlash = "://";
+// Response must start with "HTTP".
+constexpr char kResponseFirstByte = 'H';
+
+// TODO(#18819): Add flag to support custom methods.
+bool isFirstCharacterOfValidMethod(char c) {
+  static constexpr char kValidFirstCharacters[] = {'A', 'B', 'C', 'D', 'G', 'H', 'L', 'M',
+                                                   'N', 'O', 'P', 'R', 'S', 'T', 'U'};
+
+  const auto* begin = &kValidFirstCharacters[0];
+  const auto* end = &kValidFirstCharacters[ABSL_ARRAYSIZE(kValidFirstCharacters) - 1] + 1;
+  return std::binary_search(begin, end, c);
+}
 
 bool isMethodValid(absl::string_view method) {
   static constexpr absl::string_view kValidMethods[] = {
@@ -95,7 +107,7 @@ bool isUrlValid(absl::string_view url, bool is_connect) {
 
 BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t max_header_length,
                          bool enable_trailers)
-    : connection_(connection) {
+    : message_type_(type), connection_(connection) {
   ASSERT(connection_ != nullptr);
 
   framer_.set_balsa_headers(&headers_);
@@ -106,7 +118,7 @@ BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t m
   framer_.set_max_header_length(max_header_length);
   framer_.set_invalid_chars_level(quiche::BalsaFrame::InvalidCharsLevel::kError);
 
-  switch (type) {
+  switch (message_type_) {
   case MessageType::Request:
     framer_.set_is_request(true);
     break;
@@ -119,16 +131,28 @@ BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t m
 size_t BalsaParser::execute(const char* slice, int len) {
   ASSERT(status_ != ParserStatus::Error);
 
-  if (len > 0 && !on_message_begin_called_) {
+  if (len > 0 && !first_byte_processed_) {
+    if (message_type_ == MessageType::Request && !isFirstCharacterOfValidMethod(*slice)) {
+      status_ = ParserStatus::Error;
+      error_message_ = "HPE_INVALID_METHOD";
+      return 0;
+    } else if (message_type_ == MessageType::Response && *slice != kResponseFirstByte) {
+      status_ = ParserStatus::Error;
+      error_message_ = "HPE_INVALID_CONSTANT";
+      return 0;
+    }
+
     status_ = convertResult(connection_->onMessageBegin());
-    on_message_begin_called_ = true;
     if (status_ == ParserStatus::Error) {
       return 0;
     }
+
+    first_byte_processed_ = true;
   }
 
   if (len == 0 && headers_done_ && !isChunked() &&
-      ((!framer_.is_request() && hasTransferEncoding()) || !headers_.content_length_valid())) {
+      ((message_type_ == MessageType::Response && hasTransferEncoding()) ||
+       !headers_.content_length_valid())) {
     MessageDone();
   }
 
@@ -151,7 +175,7 @@ ParserStatus BalsaParser::getStatus() const { return status_; }
 uint16_t BalsaParser::statusCode() const { return headers_.parsed_response_code(); }
 
 bool BalsaParser::isHttp11() const {
-  if (framer_.is_request()) {
+  if (message_type_ == MessageType::Request) {
     return absl::EndsWith(headers_.first_line(), Http::Headers::get().ProtocolStrings.Http11String);
   } else {
     return absl::StartsWith(headers_.first_line(),
@@ -268,7 +292,7 @@ void BalsaParser::MessageDone() {
   }
   status_ = convertResult(connection_->onMessageComplete());
   framer_.Reset();
-  on_message_begin_called_ = false;
+  first_byte_processed_ = false;
 }
 
 void BalsaParser::HandleError(BalsaFrameEnums::ErrorCode error_code) {
