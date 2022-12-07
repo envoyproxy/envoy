@@ -11,6 +11,11 @@ using ::testing::_;
 
 MockAsyncFileContext::MockAsyncFileContext(std::shared_ptr<MockAsyncFileManager> manager)
     : manager_(manager) {
+  ON_CALL(*this, stat(_))
+      .WillByDefault([this](std::function<void(absl::StatusOr<struct stat>)> on_complete) {
+        return manager_->enqueue(
+            std::shared_ptr<MockAsyncFileAction>(new TypedMockAsyncFileAction(on_complete)));
+      });
   ON_CALL(*this, createHardLink(_, _))
       .WillByDefault([this](absl::string_view, std::function<void(absl::Status)> on_complete) {
         return manager_->enqueue(

@@ -7,22 +7,19 @@
 namespace Envoy {
 namespace StatusHelpers {
 
-// Check that a StatusOr is OK and has a value equal to its argument.
+// Check that a StatusOr is OK and has a value equal to or matching its argument.
 //
 // For example:
 //
 // StatusOr<int> status(3);
 // EXPECT_THAT(status, IsOkAndHolds(3));
+// EXPECT_THAT(status, IsOkAndHolds(Gt(2)));
 MATCHER_P(IsOkAndHolds, expected, "") {
   if (!arg.ok()) {
     *result_listener << "which has unexpected status: " << arg.status();
     return false;
   }
-  if (*arg != expected) {
-    *result_listener << "which has wrong value: " << *arg;
-    return false;
-  }
-  return true;
+  return ::testing::ExplainMatchResult(expected, *arg, result_listener);
 }
 
 // Check that a StatusOr as a status code equal to its argument.
