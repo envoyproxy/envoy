@@ -19,11 +19,12 @@ jobs:
     timeout-minutes: 90
     steps:
     - uses: actions/checkout@v1
-    - uses: actions/setup-java@v1
+    - uses: actions/setup-java@c3ac5dd0ed8db40fedb61c32fbe677e6b355e94c
       with:
         java-version: '8'
         java-package: jdk
         architecture: x64
+        distribution: zulu
     - name: 'Install dependencies'
       run: cd mobile && ./ci/mac_ci_setup.sh --android
     - name: 'Build envoy.aar distributable'
@@ -42,11 +43,12 @@ jobs:
     timeout-minutes: 50
     steps:
     - uses: actions/checkout@v1
-    - uses: actions/setup-java@v1
+    - uses: actions/setup-java@c3ac5dd0ed8db40fedb61c32fbe677e6b355e94c
       with:
         java-version: '8'
         java-package: jdk
         architecture: x64
+        distribution: zulu
     - run: cd mobile && ./ci/mac_ci_setup.sh --android
       name: 'Install dependencies'
     - name: 'Start simulator'
@@ -74,11 +76,12 @@ jobs:
     timeout-minutes: 50
     steps:
     - uses: actions/checkout@v1
-    - uses: actions/setup-java@v1
+    - uses: actions/setup-java@c3ac5dd0ed8db40fedb61c32fbe677e6b355e94c
       with:
         java-version: '8'
         java-package: jdk
         architecture: x64
+        distribution: zulu
     - name: 'Install dependencies'
       run: cd mobile && ./ci/mac_ci_setup.sh --android
     - name: 'Start simulator'
@@ -106,11 +109,12 @@ jobs:
     timeout-minutes: 50
     steps:
     - uses: actions/checkout@v1
-    - uses: actions/setup-java@v1
+    - uses: actions/setup-java@c3ac5dd0ed8db40fedb61c32fbe677e6b355e94c
       with:
         java-version: '8'
         java-package: jdk
         architecture: x64
+        distribution: zulu
     - name: 'Install dependencies'
       run: cd mobile && ./ci/mac_ci_setup.sh --android
     - name: 'Start simulator'
@@ -138,11 +142,12 @@ jobs:
     timeout-minutes: 50
     steps:
     - uses: actions/checkout@v1
-    - uses: actions/setup-java@v1
+    - uses: actions/setup-java@c3ac5dd0ed8db40fedb61c32fbe677e6b355e94c
       with:
         java-version: '8'
         java-package: jdk
         architecture: x64
+        distribution: zulu
     - name: 'Install dependencies'
       run: cd mobile && ./ci/mac_ci_setup.sh --android
     - name: 'Start simulator'

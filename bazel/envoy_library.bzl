@@ -231,10 +231,9 @@ def envoy_proto_library(name, **kwargs):
         **kwargs
     )
 
-def envoy_rust_library(name, deps = [], **kwargs):
+def envoy_rust_library(name, **kwargs):
     rust_library(
         name = name,
-        deps = ["@envoy//source/rust_common:rust_alloc_lib"] + deps,
         edition = "2021",
         **kwargs
     )

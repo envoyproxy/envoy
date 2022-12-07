@@ -24,11 +24,13 @@
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/secret/secret_manager_impl.h"
 #include "source/common/thread_local/thread_local_impl.h"
+
+// TODO(alyssawilk) address
+#include "source/extensions/listener_managers/listener_manager/listener_manager_impl.h"
 #include "source/server/config_validation/admin.h"
 #include "source/server/config_validation/api.h"
 #include "source/server/config_validation/cluster_manager.h"
 #include "source/server/config_validation/dns.h"
-#include "source/server/listener_manager_impl.h"
 #include "source/server/server.h"
 
 #include "absl/types/optional.h"
@@ -235,7 +237,7 @@ private:
   LocalInfo::LocalInfoPtr local_info_;
   AccessLog::AccessLogManagerImpl access_log_manager_;
   std::unique_ptr<Upstream::ValidationClusterManagerFactory> cluster_manager_factory_;
-  std::unique_ptr<ListenerManagerImpl> listener_manager_;
+  std::unique_ptr<ListenerManager> listener_manager_;
   std::unique_ptr<OverloadManager> overload_manager_;
   MutexTracer* mutex_tracer_;
   Grpc::ContextImpl grpc_context_;

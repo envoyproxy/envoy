@@ -33,6 +33,7 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
     rules_rust_dependencies()
     rust_register_toolchains(
         include_rustc_srcs = True,
+        allocator_library = "@envoy//source/rust_common:rust_alloc_lib",
         extra_target_triples = [
             "aarch64-apple-ios",
             "aarch64-apple-ios-sim",
