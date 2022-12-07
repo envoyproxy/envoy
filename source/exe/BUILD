@@ -139,6 +139,7 @@ envoy_cc_library(
                "//source/server:options_lib",
                "//source/server:server_lib",
                "//source/server:listener_hooks_lib",
+               "//source/server/config_validation:server_lib",
            ] + envoy_all_core_extensions() +
            # TODO(rojkov): drop io_uring dependency when it's fully integrated.
            select({

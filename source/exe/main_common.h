@@ -11,13 +11,13 @@
 #include "source/common/stats/thread_local_store.h"
 #include "source/common/thread_local/thread_local_impl.h"
 #include "source/exe/process_wide.h"
+#include "source/exe/stripped_main_base.h"
 #include "source/server/listener_hooks.h"
 #include "source/server/options_impl.h"
 #include "source/server/server.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
 #include "source/common/signal/signal_action.h"
-#include "source/exe/stripped_main_base.h"
 #include "source/exe/terminate_handler.h"
 #endif
 
