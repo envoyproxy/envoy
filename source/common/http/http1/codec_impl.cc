@@ -1,5 +1,6 @@
 #include "source/common/http/http1/codec_impl.h"
 
+#include <cstdint>
 #include <memory>
 #include <string>
 
@@ -1363,8 +1364,8 @@ bool ClientConnectionImpl::cannotHaveBody() {
   if (pending_response_.has_value() && pending_response_.value().encoder_.headRequest()) {
     ASSERT(!pending_response_done_);
     return true;
-  } else if (parser_->statusCode() == 204 || parser_->statusCode() == 304 ||
-             (parser_->statusCode() >= 200 &&
+  } else if (parser_->statusCode() == Http::Code::NoContent || parser_->statusCode() == Http::Code::NotModified ||
+             (parser_->statusCode() >= Http::Code::OK &&
               (parser_->contentLength().has_value() && parser_->contentLength().value() == 0) &&
               !parser_->isChunked())) {
     return true;
@@ -1396,26 +1397,26 @@ Status ClientConnectionImpl::onStatusBase(const char* data, size_t length) {
 }
 
 Envoy::StatusOr<CallbackResult> ClientConnectionImpl::onHeadersCompleteBase() {
-  ENVOY_CONN_LOG(trace, "status_code {}", connection_, parser_->statusCode());
+  ENVOY_CONN_LOG(trace, "status_code {}", connection_, enumToInt(parser_->statusCode()));
 
   // Handle the case where the client is closing a kept alive connection (by sending a 408
   // with a 'Connection: close' header). In this case we just let response flush out followed
   // by the remote close.
   if (!pending_response_.has_value() && !resetStreamCalled()) {
-    return prematureResponseError("", static_cast<Http::Code>(parser_->statusCode()));
+    return prematureResponseError("", parser_->statusCode());
   } else if (pending_response_.has_value()) {
     ASSERT(!pending_response_done_);
     auto& headers = absl::get<ResponseHeaderMapPtr>(headers_or_trailers_);
     ENVOY_CONN_LOG(trace, "Client: onHeadersComplete size={}", connection_, headers->size());
-    headers->setStatus(parser_->statusCode());
+    headers->setStatus(enumToInt(parser_->statusCode()));
 
-    if (parser_->statusCode() >= 200 && parser_->statusCode() < 300 &&
+    if (parser_->statusCode() >= Http::Code::OK && parser_->statusCode() < Http::Code::MultipleChoices &&
         pending_response_.value().encoder_.connectRequest()) {
       ENVOY_CONN_LOG(trace, "codec entering upgrade mode for CONNECT response.", connection_);
       handling_upgrade_ = true;
     }
 
-    if (parser_->statusCode() < 200 || parser_->statusCode() == 204) {
+    if (parser_->statusCode() < Http::Code::OK || parser_->statusCode() == Http::Code::NoContent) {
       if (headers->TransferEncoding()) {
         RETURN_IF_ERROR(
             sendProtocolError(Http1ResponseCodeDetails::get().TransferEncodingNotAllowed));
@@ -1448,8 +1449,8 @@ Envoy::StatusOr<CallbackResult> ClientConnectionImpl::onHeadersCompleteBase() {
     // onMessageComplete and continue processing for purely informational headers.
     // 101-SwitchingProtocols is exempt as all data after the header is proxied through after
     // upgrading.
-    if (CodeUtility::is1xx(parser_->statusCode()) &&
-        parser_->statusCode() != enumToInt(Http::Code::SwitchingProtocols)) {
+    if (CodeUtility::is1xx(enumToInt(parser_->statusCode())) &&
+        parser_->statusCode() != Http::Code::SwitchingProtocols) {
       ignore_message_complete_for_1xx_ = true;
       // Reset to ensure no information from the 1xx headers is used for the response headers.
       headers_or_trailers_.emplace<ResponseHeaderMapPtr>(nullptr);
