@@ -160,15 +160,14 @@ public:
                       Grpc::Status::GrpcStatus grpc_status, absl::string_view details);
 
   absl::optional<absl::string_view> getHeader(absl::string_view key);
-  void copyHeaders(GoString* go_strs, char* go_buf) ABSL_LOCKS_EXCLUDED(mutex_);
-  void setHeader(absl::string_view key, absl::string_view value) ABSL_LOCKS_EXCLUDED(mutex_);
-  void removeHeader(absl::string_view key) ABSL_LOCKS_EXCLUDED(mutex_);
-  void copyBuffer(Buffer::Instance* buffer, char* data) ABSL_LOCKS_EXCLUDED(mutex_);
-  void setBufferHelper(Buffer::Instance* buffer, absl::string_view& value, bufferAction action)
-      ABSL_LOCKS_EXCLUDED(mutex_);
-  void copyTrailers(GoString* go_strs, char* go_buf) ABSL_LOCKS_EXCLUDED(mutex_);
-  void setTrailer(absl::string_view key, absl::string_view value) ABSL_LOCKS_EXCLUDED(mutex_);
-  void getStringValue(int id, GoString* value_str) ABSL_LOCKS_EXCLUDED(mutex_);
+  void copyHeaders(GoString* go_strs, char* go_buf);
+  void setHeader(absl::string_view key, absl::string_view value);
+  void removeHeader(absl::string_view key);
+  void copyBuffer(Buffer::Instance* buffer, char* data);
+  void setBufferHelper(Buffer::Instance* buffer, absl::string_view& value, bufferAction action);
+  void copyTrailers(GoString* go_strs, char* go_buf);
+  void setTrailer(absl::string_view key, absl::string_view value);
+  void getStringValue(int id, GoString* value_str);
 
 private:
   ProcessorState& getProcessorState();
@@ -192,6 +191,21 @@ private:
   void sendLocalReplyInternal(Http::Code response_code, absl::string_view body_text,
                               std::function<void(Http::ResponseHeaderMap& headers)> modify_headers,
                               Grpc::Status::GrpcStatus grpc_status, absl::string_view details);
+
+  absl::optional<absl::string_view> getHeaderInternal(absl::string_view key)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  void copyHeadersInternal(GoString* go_strs, char* go_buf) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  void setHeaderInternal(absl::string_view key, absl::string_view value)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  void removeHeaderInternal(absl::string_view key) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  void copyBufferInternal(Buffer::Instance* buffer, char* data)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  void setBufferHelperInternal(Buffer::Instance* buffer, absl::string_view& value,
+                               bufferAction action) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  void copyTrailersInternal(GoString* go_strs, char* go_buf) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  void setTrailerInternal(absl::string_view key, absl::string_view value)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  void getStringValueInternal(int id, GoString* value_str) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   const FilterConfigSharedPtr config_;
   Dso::DsoInstancePtr dynamic_lib_;

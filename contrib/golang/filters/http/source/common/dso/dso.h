@@ -77,14 +77,15 @@ public:
   static std::string show();
 
 private:
-  static absl::Mutex& getMutex() { MUTABLE_CONSTRUCT_ON_FIRST_USE(absl::Mutex); }
+  using DsoMapType = std::map<std::string, DsoInstancePtr>;
+  struct DsoStoreType {
+    DsoMapType map_ ABSL_GUARDED_BY(mutex_){{
+        {"", nullptr},
+    }};
+    absl::Mutex mutex_;
+  };
 
-  using DsoTypeMap = std::map<std::string, DsoInstancePtr>;
-  static DsoTypeMap& getDsoMap() {
-    MUTABLE_CONSTRUCT_ON_FIRST_USE(DsoTypeMap, {
-                                                   {"", nullptr},
-                                               });
-  }
+  static DsoStoreType& getDsoStore() { MUTABLE_CONSTRUCT_ON_FIRST_USE(DsoStoreType); }
 };
 
 } // namespace Dso

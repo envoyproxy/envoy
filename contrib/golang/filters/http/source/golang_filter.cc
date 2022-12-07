@@ -616,6 +616,10 @@ void Filter::continueStatus(GolangStatus status) {
 
 absl::optional<absl::string_view> Filter::getHeader(absl::string_view key) {
   Thread::LockGuard lock(mutex_);
+  return getHeaderInternal(key);
+}
+
+absl::optional<absl::string_view> Filter::getHeaderInternal(absl::string_view key) {
   if (has_destroyed_) {
     ENVOY_LOG(warn, "golang filter has been destroyed");
     return "";
@@ -657,6 +661,10 @@ void copyHeaderMapToGo(Http::HeaderMap& m, GoString* go_strs, char* go_buf) {
 
 void Filter::copyHeaders(GoString* go_strs, char* go_buf) {
   Thread::LockGuard lock(mutex_);
+  copyHeadersInternal(go_strs, go_buf);
+}
+
+void Filter::copyHeadersInternal(GoString* go_strs, char* go_buf) {
   if (has_destroyed_) {
     ENVOY_LOG(warn, "golang filter has been destroyed");
     return;
@@ -667,6 +675,10 @@ void Filter::copyHeaders(GoString* go_strs, char* go_buf) {
 
 void Filter::setHeader(absl::string_view key, absl::string_view value) {
   Thread::LockGuard lock(mutex_);
+  setHeaderInternal(key, value);
+}
+
+void Filter::setHeaderInternal(absl::string_view key, absl::string_view value) {
   if (has_destroyed_) {
     ENVOY_LOG(warn, "golang filter has been destroyed");
     return;
@@ -678,6 +690,10 @@ void Filter::setHeader(absl::string_view key, absl::string_view value) {
 
 void Filter::removeHeader(absl::string_view key) {
   Thread::LockGuard lock(mutex_);
+  removeHeaderInternal(key);
+}
+
+void Filter::removeHeaderInternal(absl::string_view key) {
   if (has_destroyed_) {
     ENVOY_LOG(warn, "golang filter has been destroyed");
     return;
@@ -689,6 +705,10 @@ void Filter::removeHeader(absl::string_view key) {
 
 void Filter::copyBuffer(Buffer::Instance* buffer, char* data) {
   Thread::LockGuard lock(mutex_);
+  copyBufferInternal(buffer, data);
+}
+
+void Filter::copyBufferInternal(Buffer::Instance* buffer, char* data) {
   if (has_destroyed_) {
     ENVOY_LOG(warn, "golang filter has been destroyed");
     return;
@@ -702,6 +722,11 @@ void Filter::copyBuffer(Buffer::Instance* buffer, char* data) {
 void Filter::setBufferHelper(Buffer::Instance* buffer, absl::string_view& value,
                              bufferAction action) {
   Thread::LockGuard lock(mutex_);
+  setBufferHelperInternal(buffer, value, action);
+}
+
+void Filter::setBufferHelperInternal(Buffer::Instance* buffer, absl::string_view& value,
+                                     bufferAction action) {
   if (has_destroyed_) {
     ENVOY_LOG(warn, "golang filter has been destroyed");
     return;
@@ -717,6 +742,10 @@ void Filter::setBufferHelper(Buffer::Instance* buffer, absl::string_view& value,
 
 void Filter::copyTrailers(GoString* go_strs, char* go_buf) {
   Thread::LockGuard lock(mutex_);
+  copyTrailersInternal(go_strs, go_buf);
+}
+
+void Filter::copyTrailersInternal(GoString* go_strs, char* go_buf) {
   if (has_destroyed_) {
     ENVOY_LOG(warn, "golang filter has been destroyed");
     return;
@@ -727,6 +756,10 @@ void Filter::copyTrailers(GoString* go_strs, char* go_buf) {
 
 void Filter::setTrailer(absl::string_view key, absl::string_view value) {
   Thread::LockGuard lock(mutex_);
+  setTrailerInternal(key, value);
+}
+
+void Filter::setTrailerInternal(absl::string_view key, absl::string_view value) {
   if (has_destroyed_) {
     ENVOY_LOG(warn, "golang filter has been destroyed");
     return;
@@ -737,6 +770,10 @@ void Filter::setTrailer(absl::string_view key, absl::string_view value) {
 
 void Filter::getStringValue(int id, GoString* value_str) {
   Thread::LockGuard lock(mutex_);
+  getStringValueInternal(id, value_str);
+}
+
+void Filter::getStringValueInternal(int id, GoString* value_str) {
   if (has_destroyed_) {
     ENVOY_LOG(warn, "golang filter has been destroyed");
     return;

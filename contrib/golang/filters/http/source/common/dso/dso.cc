@@ -11,26 +11,28 @@ bool DsoInstanceManager::load(std::string dso_id, std::string dso_name) {
     return true;
   }
 
-  absl::WriterMutexLock lock(&DsoInstanceManager::getMutex());
-
+  DsoStoreType& dsoStore = DsoInstanceManager::getDsoStore();
+  absl::WriterMutexLock lock(&dsoStore.mutex_);
   DsoInstancePtr dso(new DsoInstance(dso_name));
   if (!dso->loaded()) {
     return false;
   }
-  DsoInstanceManager::getDsoMap()[dso_id] = std::move(dso);
+  dsoStore.map_[dso_id] = std::move(dso);
   return true;
 }
 
 bool DsoInstanceManager::unload(std::string dso_id) {
-  absl::WriterMutexLock lock(&DsoInstanceManager::getMutex());
   ENVOY_LOG_MISC(debug, "unload {} dso instance.", dso_id);
-  return DsoInstanceManager::getDsoMap().erase(dso_id) == 1;
+  DsoStoreType& dsoStore = DsoInstanceManager::getDsoStore();
+  absl::WriterMutexLock lock(&dsoStore.mutex_);
+  return dsoStore.map_.erase(dso_id) == 1;
 }
 
 DsoInstancePtr DsoInstanceManager::getDsoInstanceByID(std::string dso_id) {
-  absl::ReaderMutexLock lock(&DsoInstanceManager::getMutex());
-  auto it = DsoInstanceManager::getDsoMap().find(dso_id);
-  if (it != DsoInstanceManager::getDsoMap().end()) {
+  DsoStoreType& dsoStore = DsoInstanceManager::getDsoStore();
+  absl::ReaderMutexLock lock(&dsoStore.mutex_);
+  auto it = dsoStore.map_.find(dso_id);
+  if (it != dsoStore.map_.end()) {
     return it->second;
   }
 
@@ -38,9 +40,10 @@ DsoInstancePtr DsoInstanceManager::getDsoInstanceByID(std::string dso_id) {
 }
 
 std::string DsoInstanceManager::show() {
-  absl::ReaderMutexLock lock(&DsoInstanceManager::getMutex());
+  DsoStoreType& dsoStore = DsoInstanceManager::getDsoStore();
+  absl::ReaderMutexLock lock(&dsoStore.mutex_);
   std::string ids = "";
-  for (auto& it : DsoInstanceManager::getDsoMap()) {
+  for (auto& it : dsoStore.map_) {
     ids += it.first;
     ids += ",";
   }
