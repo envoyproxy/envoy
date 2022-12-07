@@ -147,8 +147,14 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "envoy_main_common_with_core_extensions_lib",
-    srcs = ["main_common.cc"],
-    hdrs = ["main_common.h"],
+    srcs = [
+        "main_common.cc",
+        "main_common_base.cc",
+    ],
+    hdrs = [
+        "main_common.h",
+        "main_common_base.h",
+    ],
     deps = [
         "//source/server/config_validation:server_lib",
         ":main_common_base_lib",
