@@ -125,9 +125,7 @@ public:
     TestUtility::loadFromYaml(GoogleGrpcConfig, config_);
   }
 
-  ~FilterTest() {
-    filter_->onDestroy();
-  }
+  ~FilterTest() { filter_->onDestroy(); }
 
   void addMatcherConfigAndCreateFilter(MatcherConfigType config_type) {
     // Add the matcher configuration.
