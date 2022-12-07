@@ -1,3 +1,5 @@
+#pragma once
+
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/thread_local/thread_local_impl.h"
 

@@ -195,6 +195,8 @@ TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
 TEST_P(CdsIntegrationTest, CdsClusterTeardownWhileConnecting) {
   initialize();
   test_server_->waitForCounterGe("cluster_manager.cluster_added", 1);
+  ASSERT_TRUE(forceCreationOfClusterTrafficStats("cluster_1"));
+
   test_server_->waitForCounterExists("cluster.cluster_1.upstream_cx_total");
   Stats::CounterSharedPtr cx_counter = test_server_->counter("cluster.cluster_1.upstream_cx_total");
   // Confirm no upstream connection is attempted so far.

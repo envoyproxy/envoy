@@ -1060,9 +1060,9 @@ public:
   virtual ClusterEndpointStats& endpointStats() const PURE;
 
   /**
-   * @return ClusterTrafficStats& all traffic related stats for this cluster.
+   * @return std::unique_ptr<ClusterTrafficStats>&  all traffic related stats for this cluster.
    */
-  virtual ClusterTrafficStats& trafficStats() const PURE;
+  virtual std::unique_ptr<ClusterTrafficStats>& trafficStats() const PURE;
 
   /**
    * @return the stats scope that contains all cluster stats. This can be used to produce dynamic

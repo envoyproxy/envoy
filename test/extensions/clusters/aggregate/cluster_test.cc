@@ -139,7 +139,7 @@ public:
   Upstream::LoadBalancerFactorySharedPtr lb_factory_;
   Upstream::LoadBalancerPtr lb_;
   Upstream::ClusterTrafficStatNames stat_names_;
-  Upstream::ClusterTrafficStats stats_;
+  std::unique_ptr<Upstream::ClusterTrafficStats> stats_;
   std::shared_ptr<Upstream::MockClusterInfo> primary_info_{
       new NiceMock<Upstream::MockClusterInfo>()};
   std::shared_ptr<Upstream::MockClusterInfo> secondary_info_{

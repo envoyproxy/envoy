@@ -1156,7 +1156,7 @@ Host::CreateConnectionData ClusterManagerImpl::ThreadLocalClusterManagerImpl::Cl
     }
     return conn_info;
   } else {
-    cluster_info_->trafficStats().upstream_cx_none_healthy_.inc();
+    cluster_info_->trafficStats()->upstream_cx_none_healthy_.inc();
     return {nullptr, nullptr};
   }
 }
@@ -1628,7 +1628,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImp
   if (!host) {
     if (!peek) {
       ENVOY_LOG(debug, "no healthy host for HTTP connection pool");
-      cluster_info_->trafficStats().upstream_cx_none_healthy_.inc();
+      cluster_info_->trafficStats()->upstream_cx_none_healthy_.inc();
     }
     return nullptr;
   }
@@ -1758,7 +1758,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPoolImpl
   if (!host) {
     if (!peek) {
       ENVOY_LOG(debug, "no healthy host for TCP connection pool");
-      cluster_info_->trafficStats().upstream_cx_none_healthy_.inc();
+      cluster_info_->trafficStats()->upstream_cx_none_healthy_.inc();
     }
     return nullptr;
   }

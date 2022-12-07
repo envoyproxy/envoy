@@ -90,7 +90,7 @@ uint64_t HystrixSink::getRollingValue(RollingWindow rolling_window) {
 
 void HystrixSink::updateRollingWindowMap(const Upstream::ClusterInfo& cluster_info,
                                          ClusterStatsCache& cluster_stats_cache) {
-  Upstream::ClusterTrafficStats& cluster_stats = cluster_info.trafficStats();
+  Upstream::ClusterTrafficStats& cluster_stats = *cluster_info.trafficStats();
   Stats::Scope& cluster_stats_scope = cluster_info.statsScope();
 
   // Combining timeouts+retries - retries are counted  as separate requests

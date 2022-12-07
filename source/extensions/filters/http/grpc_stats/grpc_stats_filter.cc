@@ -93,7 +93,7 @@ struct Config {
   Config(const envoy::extensions::filters::http::grpc_stats::v3::FilterConfig& proto_config,
          Server::Configuration::FactoryContext& context)
       : context_(context.grpcContext()), emit_filter_state_(proto_config.emit_filter_state()),
-        enable_upstream_stats_(proto_config.enable_upstream_stats()),
+        enable_traffic_stats_(proto_config.enable_upstream_stats()),
         replace_dots_in_grpc_service_name_(proto_config.replace_dots_in_grpc_service_name()) {
 
     switch (proto_config.per_method_stat_specifier_case()) {
@@ -137,7 +137,7 @@ struct Config {
   }
   Grpc::Context& context_;
   const bool emit_filter_state_;
-  const bool enable_upstream_stats_;
+  const bool enable_traffic_stats_;
   const bool replace_dots_in_grpc_service_name_;
   bool stats_for_all_methods_{false};
   absl::optional<GrpcServiceMethodToRequestNamesMap> allowlist_;
@@ -262,11 +262,11 @@ public:
   }
 
   void maybeChargeUpstreamStat() {
-    if (!config_->enable_upstream_stats_) {
+    if (!config_->enable_traffic_stats_) {
       return;
     }
     StreamInfo::TimingUtility timing(decoder_callbacks_->streamInfo());
-    if (config_->enable_upstream_stats_ && timing.lastUpstreamTxByteSent().has_value() &&
+    if (config_->enable_traffic_stats_ && timing.lastUpstreamTxByteSent().has_value() &&
         timing.lastUpstreamRxByteReceived().has_value()) {
       std::chrono::milliseconds chrono_duration =
           std::chrono::duration_cast<std::chrono::milliseconds>(

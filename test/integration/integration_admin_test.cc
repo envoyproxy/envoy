@@ -129,6 +129,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   initialize();
 
   BufferingStreamDecoderPtr response;
+  ASSERT_TRUE(forceCreationOfClusterTrafficStats("cluster_0"));
   EXPECT_EQ("404", request("admin", "GET", "/notfound", response));
   EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
   EXPECT_THAT(response->body(), HasSubstr("invalid path. admin commands are:"));
