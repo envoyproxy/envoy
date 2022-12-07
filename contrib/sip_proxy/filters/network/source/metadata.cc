@@ -1,7 +1,5 @@
 #include "contrib/sip_proxy/filters/network/source/metadata.h"
 
-#include "re2/re2.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -17,13 +15,21 @@ void SipHeader::parseHeader() {
   }
 
   std::size_t pos = 0;
-  std::string pattern = "(.*)=(.*?)>*";
   absl::string_view& header = raw_text_;
+  bool isHost = true;
 
   // Has "SIP/2.0" in top line
   // Eg: INVITE sip:User.0000@tas01.defult.svc.cluster.local SIP/2.0
   if (std::size_t found = header.find(" SIP"); found != absl::string_view::npos) {
     header = header.substr(0, found);
+  }
+  // Has message Type in header
+  // Eg: Route: <sip:test@cncs.svc.cluster.local;role=anch;lr;transport=udp>
+  if (std::size_t found = header.find(": "); found != absl::string_view::npos) {
+    header = header.substr(found + 2);
+  }
+  if (std::size_t found = header.find("<"); found != absl::string_view::npos) {
+    header = header.substr(found + 1);
   }
 
   while (std::size_t found = header.find_first_of(";>", pos)) {
@@ -34,30 +40,55 @@ void SipHeader::parseHeader() {
       str = header.substr(pos, found - pos);
     }
 
-    std::string param = "";
-    std::string value = "";
-    re2::RE2::FullMatch(std::string(str), pattern, &param, &value);
-
-    if (!param.empty() && !value.empty()) {
-      if (value.find("sip:") != absl::string_view::npos) {
-        value = value.substr(std::strlen("sip:"));
-      }
-
-      if (!value.empty()) {
-        std::size_t comma = value.find(':');
-        if (comma != absl::string_view::npos) {
-          value = value.substr(0, comma);
+    std::size_t value_pos = str.find("=");
+    if (value_pos == absl::string_view::npos) {
+      // First as host
+      if (isHost) {
+        if (str.find("sip:") != absl::string_view::npos) {
+          str = str.substr(std::strlen("sip:"));
         }
-      }
 
-      if (!value.empty()) {
-        if (param == "opaque") {
-          auto value_view = header.substr(header.find(value), value.length());
-          params_.emplace_back(std::make_pair("ep", value_view));
-        } else {
-          auto param_view = header.substr(header.find(param), param.length());
-          auto value_view = header.substr(header.find(value), value.length());
-          params_.emplace_back(std::make_pair(param_view, value_view));
+        if (!str.empty()) {
+          std::size_t at = str.find('@');
+          if (at != absl::string_view::npos) {
+            str = str.substr(at + 1);
+          }
+        }
+
+        if (!str.empty()) {
+          std::size_t comma = str.find(':');
+          if (comma != absl::string_view::npos) {
+            str = str.substr(0, comma);
+          }
+        }
+        params_.emplace_back(std::make_pair("host", str));
+        isHost = false;
+      }
+    } else {
+      auto param = str.substr(0, value_pos);
+      value_pos += 1;
+      auto value = str.substr(value_pos);
+      if (!param.empty() && !value.empty()) {
+        if (value.find("sip:") != absl::string_view::npos) {
+          value = value.substr(std::strlen("sip:"));
+        }
+
+        if (!value.empty()) {
+          std::size_t comma = value.find(':');
+          if (comma != absl::string_view::npos) {
+            value = value.substr(0, comma);
+          }
+        }
+
+        if (!value.empty()) {
+          if (param == "opaque") {
+            auto value_view = header.substr(header.find(value), value.length());
+            params_.emplace_back(std::make_pair("ep", value_view));
+          } else {
+            auto param_view = header.substr(header.find(param), param.length());
+            auto value_view = header.substr(header.find(value), value.length());
+            params_.emplace_back(std::make_pair(param_view, value_view));
+          }
         }
       }
     }
@@ -77,7 +108,7 @@ void MessageMetadata::setTransactionId(absl::string_view data) {
   }
   start_index += strlen("branch=");
 
-  auto end_index = data.find_first_of(";>", start_index);
+  auto end_index = data.find_first_of(" ,;>", start_index);
   if (end_index == absl::string_view::npos) {
     end_index = data.size();
   }
@@ -85,7 +116,7 @@ void MessageMetadata::setTransactionId(absl::string_view data) {
 }
 
 void MessageMetadata::addEPOperation(
-    size_t raw_offset, absl::string_view& header,
+    size_t raw_offset, absl::string_view& header, HeaderType type,
     const std::vector<envoy::extensions::filters::network::sip_proxy::v3alpha::LocalService>&
         local_services) {
   if (header.find(";ep=") != absl::string_view::npos) {
@@ -100,7 +131,7 @@ void MessageMetadata::addEPOperation(
   }
 
   // is domain matched
-  if (!isDomainMatched(header, local_services)) {
+  if (!isDomainMatched(type, local_services)) {
     ENVOY_LOG(trace, "header {} domain is not equal to local_services domain, don't add EP.",
               header);
     return;
@@ -154,47 +185,16 @@ void MessageMetadata::addMsgHeader(HeaderType type, absl::string_view value) {
   }
 }
 
-std::string MessageMetadata::getDomainFromHeaderParameter(absl::string_view& header,
-                                                          const std::string& parameter) {
-  // Parameter default is host
-  if (!parameter.empty() && parameter != "host") {
-    auto start = header.find(parameter);
-    if (start != absl::string_view::npos) {
-      // service.parameter() + "="
-      start = start + parameter.length() + strlen("=");
-      if ("sip:" == header.substr(start, strlen("sip:"))) {
-        start += strlen("sip:");
-      }
-      // end
-      auto end = header.find_first_of(":;>", start);
-      if (end != absl::string_view::npos) {
-        return std::string(header.substr(start, end - start));
-      }
-    }
+absl::string_view MessageMetadata::getDomainFromHeaderParameter(HeaderType type,
+                                                                const std::string& parameter) {
+  parseHeader(type);
+  if ((parameter.empty() || !header(type).hasParam(parameter)) && header(type).hasParam("host")) {
+    return header(type).param("host");
   }
-  // Parameter is host
-  // Or no domain in configured parameter, then try host
-  auto start = header.find("sip:");
-  if (start == absl::string_view::npos) {
-    return "";
+  if (header(type).hasParam(parameter)) {
+    return header(type).param(parameter);
   }
-  start += strlen("sip:");
-  auto end = header.find_first_of(":;>", start);
-  // TopLine should be absl::string_view::npos
-  if (end == absl::string_view::npos) {
-    end = header.length();
-  }
-
-  auto addr = header.substr(start, end - start);
-
-  // Remove name in format of sip:name@addr:pos
-  auto pos = addr.find("@");
-  if (pos == absl::string_view::npos) {
-    return std::string(header.substr(start, end - start));
-  } else {
-    pos += strlen("@");
-    return std::string(addr.substr(pos, addr.length() - pos));
-  }
+  return "";
 }
 
 } // namespace SipProxy

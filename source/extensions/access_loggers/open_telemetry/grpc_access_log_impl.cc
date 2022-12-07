@@ -27,7 +27,8 @@ GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
     Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info, Stats::Scope& scope)
     : GrpcAccessLogger(client, config.common_config(), dispatcher, scope, GRPC_LOG_STATS_PREFIX,
                        *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-                           "opentelemetry.proto.collector.logs.v1.LogsService.Export")) {
+                           "opentelemetry.proto.collector.logs.v1.LogsService.Export"),
+                       false) {
   initMessageRoot(config, local_info);
 }
 

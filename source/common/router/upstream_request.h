@@ -137,7 +137,7 @@ public:
                      Upstream::HostDescriptionConstSharedPtr host) override;
   void onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
                    Upstream::HostDescriptionConstSharedPtr host,
-                   const Network::Address::InstanceConstSharedPtr& upstream_local_address,
+                   const Network::ConnectionInfoProvider& address_provider,
                    StreamInfo::StreamInfo& info, absl::optional<Http::Protocol> protocol) override;
   UpstreamToDownstream& upstreamToDownstream() override;
 
@@ -322,7 +322,7 @@ public:
   }
 
   // These functions are delegated to the downstream HCM/FM
-  const Tracing::Config& tracingConfig() override;
+  OptRef<const Tracing::Config> tracingConfig() const override;
   const ScopeTrackedObject& scope() override;
   Tracing::Span& activeSpan() override;
   void resetStream(Http::StreamResetReason reset_reason,

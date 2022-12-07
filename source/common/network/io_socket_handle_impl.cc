@@ -7,7 +7,6 @@
 #include "source/common/event/file_event_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/socket_interface_impl.h"
-#include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/fixed_array.h"
 #include "absl/types/optional.h"
@@ -63,14 +62,6 @@ constexpr int messageTruncatedOption() {
 } // namespace
 
 namespace Network {
-
-bool IoSocketHandleImpl::forceV6() {
-#if defined(__APPLE__) || defined(__ANDROID_API__)
-  return Runtime::runtimeFeatureEnabled("envoy.reloadable_features.always_use_v6");
-#else
-  return false;
-#endif
-}
 
 IoSocketHandleImpl::~IoSocketHandleImpl() {
   if (SOCKET_VALID(fd_)) {
@@ -479,7 +470,7 @@ Api::SysCallIntResult IoSocketHandleImpl::connect(Address::InstanceConstSharedPt
   auto sockaddr_len_to_use = address->sockAddrLen();
 #if defined(__APPLE__) || defined(__ANDROID_API__)
   sockaddr_in6 sin6;
-  if (sockaddr_to_use->sa_family == AF_INET && forceV6()) {
+  if (sockaddr_to_use->sa_family == AF_INET && Address::forceV6()) {
     const sockaddr_in& sin4 = reinterpret_cast<const sockaddr_in&>(*sockaddr_to_use);
 
     // Android always uses IPv6 dual stack. Convert IPv4 to the IPv6 mapped address when
@@ -574,9 +565,6 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
           fmt::format("getsockname failed for '{}': {}", fd_, errorDetails(result.errno_)));
     }
   }
-  // TODO(mattklein123): If forceV6() is true, we should probably remap back to IPv4 from
-  // the mapped IPv6 address. Currently though it doesn't look like we use this function in the
-  // client path so this probably doesn't matter. If it turns out to matter we can fix this.
   return Address::addressFromSockAddrOrThrow(ss, ss_len, socket_v6only_);
 }
 

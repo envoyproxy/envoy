@@ -43,16 +43,17 @@ struct ActiveStreamFilterBase;
  */
 struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
                                 Logger::Loggable<Logger::Id::http> {
-  ActiveStreamFilterBase(FilterManager& parent, bool dual_filter, FilterContext filter_context)
+  ActiveStreamFilterBase(FilterManager& parent, bool is_encoder_decoder_filter,
+                         FilterContext filter_context)
       : parent_(parent), iteration_state_(IterationState::Continue),
         filter_context_(std::move(filter_context)), iterate_from_current_filter_(false),
         headers_continued_(false), continued_1xx_headers_(false), end_stream_(false),
-        dual_filter_(dual_filter), decode_headers_called_(false), encode_headers_called_(false) {}
+        is_encoder_decoder_filter_(is_encoder_decoder_filter), processed_headers_(false) {}
 
   // Functions in the following block are called after the filter finishes processing
   // corresponding data. Those functions handle state updates and data storage (if needed)
   // according to the status returned by filter's callback functions.
-  bool commonHandleAfter1xxHeadersCallback(FilterHeadersStatus status);
+  bool commonHandleAfter1xxHeadersCallback(Filter1xxHeadersStatus status);
   bool commonHandleAfterHeadersCallback(FilterHeadersStatus status, bool& end_stream);
   bool commonHandleAfterDataCallback(FilterDataStatus status, Buffer::Instance& provided_data,
                                      bool& buffer_was_streaming);
@@ -92,7 +93,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   uint64_t streamId() const override;
   StreamInfo::StreamInfo& streamInfo() override;
   Tracing::Span& activeSpan() override;
-  const Tracing::Config& tracingConfig() override;
+  OptRef<const Tracing::Config> tracingConfig() const override;
   const ScopeTrackedObject& scope() override;
   void restoreContextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) override;
   void resetIdleTimer() override;
@@ -157,9 +158,9 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   bool continued_1xx_headers_ : 1;
   // If true, end_stream is called for this filter.
   bool end_stream_ : 1;
-  const bool dual_filter_ : 1;
-  bool decode_headers_called_ : 1;
-  bool encode_headers_called_ : 1;
+  const bool is_encoder_decoder_filter_ : 1;
+  // If true, the filter has processed headers.
+  bool processed_headers_ : 1;
 };
 
 /**
@@ -169,8 +170,8 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
                                    public StreamDecoderFilterCallbacks,
                                    LinkedObject<ActiveStreamDecoderFilter> {
   ActiveStreamDecoderFilter(FilterManager& parent, StreamDecoderFilterSharedPtr filter,
-                            bool dual_filter, FilterContext filter_context)
-      : ActiveStreamFilterBase(parent, dual_filter, std::move(filter_context)),
+                            bool is_encoder_decoder_filter, FilterContext filter_context)
+      : ActiveStreamFilterBase(parent, is_encoder_decoder_filter, std::move(filter_context)),
         handle_(std::move(filter)) {
     handle_->setDecoderFilterCallbacks(*this);
   }
@@ -263,8 +264,8 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
                                    public StreamEncoderFilterCallbacks,
                                    LinkedObject<ActiveStreamEncoderFilter> {
   ActiveStreamEncoderFilter(FilterManager& parent, StreamEncoderFilterSharedPtr filter,
-                            bool dual_filter, FilterContext filter_context)
-      : ActiveStreamFilterBase(parent, dual_filter, std::move(filter_context)),
+                            bool is_encoder_decoder_filter, FilterContext filter_context)
+      : ActiveStreamFilterBase(parent, is_encoder_decoder_filter, std::move(filter_context)),
         handle_(std::move(filter)) {
     handle_->setEncoderFilterCallbacks(*this);
   }
@@ -504,7 +505,7 @@ public:
   /**
    * Returns the tracing configuration to use for this stream.
    */
-  virtual const Tracing::Config& tracingConfig() PURE;
+  virtual OptRef<const Tracing::Config> tracingConfig() const PURE;
 
   /**
    * Returns the tracked scope to use for this stream.
@@ -675,7 +676,7 @@ public:
 
     for (auto& filter : encoder_filters_) {
       // Do not call onStreamComplete twice for dual registered filters.
-      if (!filter->dual_filter_) {
+      if (!filter->is_encoder_decoder_filter_) {
         filter->handle_->onStreamComplete();
       }
     }
@@ -690,7 +691,7 @@ public:
 
     for (auto& filter : encoder_filters_) {
       // Do not call on destroy twice for dual registered filters.
-      if (!filter->dual_filter_) {
+      if (!filter->is_encoder_decoder_filter_) {
         filter->handle_->onDestroy();
       }
     }
@@ -1005,6 +1006,10 @@ private:
       // Used to indicate that we're processing the final [En|De]codeData frame,
       // i.e. end_stream = true
       static constexpr uint32_t LastDataFrame = 0x80;
+
+      // Masks for filter call state.
+      static constexpr uint32_t IsDecodingMask = DecodeHeaders | DecodeData | DecodeTrailers;
+      static constexpr uint32_t IsEncodingMask = EncodeHeaders | Encode1xxHeaders | EncodeData | EncodeTrailers;
     };
   // clang-format on
 
@@ -1050,6 +1055,18 @@ public:
                       const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                       absl::string_view details) override;
+
+  /**
+   * Whether remote processing has been marked as complete.
+   * For the DownstreamFilterManager rely on external state, to handle the case
+   * of internal redirects.
+   */
+  bool remoteDecodeComplete() const override {
+    return streamInfo().downstreamTiming() &&
+           streamInfo().downstreamTiming()->lastDownstreamRxByteReceived().has_value();
+  }
+
+private:
   /**
    * Sends a local reply by constructing a response and passing it through all the encoder
    * filters. The resulting response will be passed out via the FilterManagerCallbacks.
@@ -1068,17 +1085,6 @@ public:
                             bool is_head_request,
                             const absl::optional<Grpc::Status::GrpcStatus> grpc_status);
 
-  /**
-   * Whether remote processing has been marked as complete.
-   * For the DownstreamFilterManager rely on external state, to handle the case
-   * of internal redirects.
-   */
-  bool remoteDecodeComplete() const override {
-    return streamInfo().downstreamTiming() &&
-           streamInfo().downstreamTiming()->lastDownstreamRxByteReceived().has_value();
-  }
-
-private:
   OverridableRemoteConnectionInfoSetterStreamInfo stream_info_;
   const LocalReply::LocalReply& local_reply_;
 };

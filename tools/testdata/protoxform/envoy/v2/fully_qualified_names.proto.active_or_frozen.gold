@@ -20,7 +20,7 @@ option (udpa.annotations.file_migrate).move_to_package = "envoy.external.v3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Verifies normalization of fully-qualified type names.
-// [#next-free-field: 8]
+// [#next-free-field: 10]
 message UsesFullyQualifiedTypeNames {
   api.v2.core.Locality another_envoy_type = 1;
 
@@ -35,4 +35,10 @@ message UsesFullyQualifiedTypeNames {
   external.PackageLevelType external_package_level_type_fqn = 6;
 
   .RootLevelType external_root_level_type_fqn = 7;
+
+  // [#allow-fully-qualified-name:]
+  .envoy.api.v2.core.Locality another_envoy_type_keep_fqn = 8;
+
+  // [#allow-fully-qualified-name:]
+  repeated .envoy.api.v2.core.Locality repeated_another_envoy_type_keep_fqn = 9;
 }

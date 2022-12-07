@@ -94,12 +94,15 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
           Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_upstream_filters")),
       stream_options_({can_send_early_data, can_use_http3}) {
   if (parent_.config().start_child_span_) {
-    span_ = parent_.callbacks()->activeSpan().spawnChild(
-        parent_.callbacks()->tracingConfig(), "router " + parent.cluster()->name() + " egress",
-        parent.timeSource().systemTime());
-    if (parent.attemptCount() != 1) {
-      // This is a retry request, add this metadata to span.
-      span_->setTag(Tracing::Tags::get().RetryCount, std::to_string(parent.attemptCount() - 1));
+    if (auto tracing_config = parent_.callbacks()->tracingConfig(); tracing_config.has_value()) {
+      span_ = parent_.callbacks()->activeSpan().spawnChild(
+          tracing_config.value().get(),
+          absl::StrCat("router ", parent.cluster()->observabilityName(), " egress"),
+          parent.timeSource().systemTime());
+      if (parent.attemptCount() != 1) {
+        // This is a retry request, add this metadata to span.
+        span_->setTag(Tracing::Tags::get().RetryCount, std::to_string(parent.attemptCount() - 1));
+      }
     }
   }
   stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
@@ -122,10 +125,21 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
       parent_.callbacks()->connection(), parent_.callbacks()->streamId(),
       parent_.callbacks()->account(), true, parent_.callbacks()->decoderBufferLimit(),
       *parent_.cluster(), *this);
-  parent_.cluster()->createFilterChain(*filter_manager_);
-  // The cluster will always create a codec filter, which sets the upstream
+  // Attempt to create custom cluster-specified filter chain
+  bool created = parent_.cluster()->createFilterChain(*filter_manager_,
+                                                      /*only_create_if_configured=*/true);
+  if (!created) {
+    // Attempt to create custom router-specified filter chain.
+    created = parent_.config().createFilterChain(*filter_manager_);
+  }
+  if (!created) {
+    // Neither cluster nor router have a custom filter chain; add the default
+    // cluster filter chain, which only consists of the codec filter.
+    created = parent_.cluster()->createFilterChain(*filter_manager_, false);
+  }
+  // There will always be a codec filter present, which sets the upstream
   // interface. Fast-fail any tests that don't set up mocks correctly.
-  ASSERT(upstream_interface_.has_value());
+  ASSERT(created && upstream_interface_.has_value());
 }
 
 UpstreamRequest::~UpstreamRequest() { cleanUp(); }
@@ -141,8 +155,10 @@ void UpstreamRequest::cleanUp() {
   }
 
   if (span_ != nullptr) {
+    auto tracing_config = parent_.callbacks()->tracingConfig();
+    ASSERT(tracing_config.has_value());
     Tracing::HttpTracerUtility::finalizeUpstreamSpan(*span_, stream_info_,
-                                                     Tracing::EgressConfig::get());
+                                                     tracing_config.value().get());
   }
 
   if (per_try_timeout_ != nullptr) {
@@ -192,7 +208,7 @@ void UpstreamRequest::cleanUp() {
 
   while (downstream_data_disabled_ != 0) {
     parent_.callbacks()->onDecoderFilterBelowWriteBufferLowWatermark();
-    parent_.cluster()->stats().upstream_flow_control_drained_total_.inc();
+    parent_.cluster()->trafficStats().upstream_flow_control_drained_total_.inc();
     --downstream_data_disabled_;
   }
   if (allow_upstream_filters_) {
@@ -553,10 +569,11 @@ void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
   onResetStream(reset_reason, transport_failure_reason);
 }
 
-void UpstreamRequest::onPoolReady(
-    std::unique_ptr<GenericUpstream>&& upstream, Upstream::HostDescriptionConstSharedPtr host,
-    const Network::Address::InstanceConstSharedPtr& upstream_local_address,
-    StreamInfo::StreamInfo& info, absl::optional<Http::Protocol> protocol) {
+void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
+                                  Upstream::HostDescriptionConstSharedPtr host,
+                                  const Network::ConnectionInfoProvider& address_provider,
+                                  StreamInfo::StreamInfo& info,
+                                  absl::optional<Http::Protocol> protocol) {
   // This may be called under an existing ScopeTrackerScopeState but it will unwind correctly.
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
   ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks());
@@ -606,7 +623,8 @@ void UpstreamRequest::onPoolReady(
   } else {
     upstream_info.setUpstreamFilterState(filter_state);
   }
-  upstream_info.setUpstreamLocalAddress(upstream_local_address);
+  upstream_info.setUpstreamLocalAddress(address_provider.localAddress());
+  upstream_info.setUpstreamRemoteAddress(address_provider.remoteAddress());
   upstream_info.setUpstreamSslConnection(info.downstreamAddressProvider().sslConnection());
 
   if (info.downstreamAddressProvider().connectionID().has_value()) {
@@ -663,6 +681,8 @@ void UpstreamRequest::onPoolReady(
     // The injectContext() of the parent span may be called repeatedly when the request is retried.
     parent_.callbacks()->activeSpan().injectContext(*parent_.downstreamHeaders(), host);
   }
+
+  stream_info_.setRequestHeaders(*parent_.downstreamHeaders());
 
   for (auto* callback : upstream_callbacks_) {
     callback->onUpstreamConnectionEstablished();
@@ -744,7 +764,7 @@ UpstreamToDownstream& UpstreamRequest::upstreamToDownstream() {
 }
 
 void UpstreamRequest::onStreamMaxDurationReached() {
-  upstream_host_->cluster().stats().upstream_rq_max_duration_reached_.inc();
+  upstream_host_->cluster().trafficStats().upstream_rq_max_duration_reached_.inc();
 
   // The upstream had closed then try to retry along with retry policy.
   parent_.onStreamMaxDurationReached(*this);
@@ -771,7 +791,7 @@ void UpstreamRequest::DownstreamWatermarkManager::onAboveWriteBufferHighWatermar
   // The downstream connection is overrun. Pause reads from upstream.
   // If there are multiple calls to readDisable either the codec (H2) or the underlying
   // Network::Connection (H1) will handle reference counting.
-  parent_.parent_.cluster()->stats().upstream_flow_control_paused_reading_total_.inc();
+  parent_.parent_.cluster()->trafficStats().upstream_flow_control_paused_reading_total_.inc();
   parent_.upstream_->readDisable(true);
 }
 
@@ -780,7 +800,7 @@ void UpstreamRequest::DownstreamWatermarkManager::onBelowWriteBufferLowWatermark
 
   // One source of connection blockage has buffer available. Pass this on to the stream, which
   // will resume reads if this was the last remaining high watermark.
-  parent_.parent_.cluster()->stats().upstream_flow_control_resumed_reading_total_.inc();
+  parent_.parent_.cluster()->trafficStats().upstream_flow_control_resumed_reading_total_.inc();
   parent_.upstream_->readDisable(false);
 }
 
@@ -795,7 +815,7 @@ void UpstreamRequest::disableDataFromDownstreamForFlowControl() {
   // the per try timeout timer is started only after downstream_end_stream_
   // is true.
   ASSERT(parent_.upstreamRequests().size() == 1 || parent_.downstreamEndStream());
-  parent_.cluster()->stats().upstream_flow_control_backed_up_total_.inc();
+  parent_.cluster()->trafficStats().upstream_flow_control_backed_up_total_.inc();
   parent_.callbacks()->onDecoderFilterAboveWriteBufferHighWatermark();
   ++downstream_data_disabled_;
 }
@@ -811,7 +831,7 @@ void UpstreamRequest::enableDataFromDownstreamForFlowControl() {
   // the per try timeout timer is started only after downstream_end_stream_
   // is true.
   ASSERT(parent_.upstreamRequests().size() == 1 || parent_.downstreamEndStream());
-  parent_.cluster()->stats().upstream_flow_control_drained_total_.inc();
+  parent_.cluster()->trafficStats().upstream_flow_control_drained_total_.inc();
   parent_.callbacks()->onDecoderFilterBelowWriteBufferLowWatermark();
   ASSERT(downstream_data_disabled_ != 0);
   if (downstream_data_disabled_ > 0) {
@@ -837,7 +857,7 @@ const ScopeTrackedObject& UpstreamRequestFilterManagerCallbacks::scope() {
   return upstream_request_.parent_.callbacks()->scope();
 }
 
-const Tracing::Config& UpstreamRequestFilterManagerCallbacks::tracingConfig() {
+OptRef<const Tracing::Config> UpstreamRequestFilterManagerCallbacks::tracingConfig() const {
   return upstream_request_.parent_.callbacks()->tracingConfig();
 }
 

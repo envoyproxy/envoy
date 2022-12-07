@@ -405,20 +405,13 @@ public:
       const envoy::config::core::v3::ExtensionConfigSource& config_source,
       const std::string& filter_config_name,
       Server::Configuration::ServerFactoryContext& server_context, FactoryCtx& factory_context,
-      const std::string& stat_prefix, bool last_filter_in_filter_chain,
-      const std::string& filter_chain_type,
+      bool last_filter_in_filter_chain, const std::string& filter_chain_type,
       const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher) override {
     std::string subscription_stat_prefix;
     absl::string_view provider_stat_prefix;
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.top_level_ecds_stats")) {
-      subscription_stat_prefix =
-          absl::StrCat("extension_config_discovery.", statPrefix(), filter_config_name, ".");
-      provider_stat_prefix = subscription_stat_prefix;
-    } else {
-      subscription_stat_prefix =
-          absl::StrCat(stat_prefix, "extension_config_discovery.", filter_config_name, ".");
-      provider_stat_prefix = stat_prefix;
-    }
+    subscription_stat_prefix =
+        absl::StrCat("extension_config_discovery.", statPrefix(), filter_config_name, ".");
+    provider_stat_prefix = subscription_stat_prefix;
 
     auto subscription = getSubscription(config_source.config_source(), filter_config_name,
                                         server_context, subscription_stat_prefix);

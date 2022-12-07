@@ -34,6 +34,9 @@ public:
   MOCK_METHOD(void, setUpstreamLocalAddress,
               (const Network::Address::InstanceConstSharedPtr& upstream_local_address));
   MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, upstreamLocalAddress, (), (const));
+  MOCK_METHOD(void, setUpstreamRemoteAddress,
+              (const Network::Address::InstanceConstSharedPtr& upstream_remote_address));
+  MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, upstreamRemoteAddress, (), (const));
   MOCK_METHOD(void, setUpstreamTransportFailureReason, (absl::string_view failure_reason));
   MOCK_METHOD(const std::string&, upstreamTransportFailureReason, (), (const));
   MOCK_METHOD(void, setUpstreamHost, (Upstream::HostDescriptionConstSharedPtr host));
@@ -50,6 +53,7 @@ public:
   Ssl::ConnectionInfoConstSharedPtr ssl_connection_info_;
   UpstreamTiming upstream_timing_;
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
+  Network::Address::InstanceConstSharedPtr upstream_remote_address_;
   std::string failure_reason_;
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
   FilterStateSharedPtr filter_state_;
@@ -115,9 +119,8 @@ public:
   MOCK_METHOD(void, setUpstreamClusterInfo, (const Upstream::ClusterInfoConstSharedPtr&));
   MOCK_METHOD(absl::optional<Upstream::ClusterInfoConstSharedPtr>, upstreamClusterInfo, (),
               (const));
-  MOCK_METHOD(const Http::RequestIdStreamInfoProvider*, getRequestIDProvider, (), (const));
-  MOCK_METHOD(void, setRequestIDProvider,
-              (const Http::RequestIdStreamInfoProviderSharedPtr& provider));
+  MOCK_METHOD(OptRef<const StreamIdProvider>, getStreamIdProvider, (), (const));
+  MOCK_METHOD(void, setStreamIdProvider, (StreamIdProviderSharedPtr provider));
   MOCK_METHOD(void, setTraceReason, (Tracing::Reason reason));
   MOCK_METHOD(Tracing::Reason, traceReason, (), (const));
   MOCK_METHOD(absl::optional<uint64_t>, connectionID, (), (const));
@@ -131,6 +134,7 @@ public:
   MOCK_METHOD(void, setUpstreamBytesMeter, (const BytesMeterSharedPtr&));
   MOCK_METHOD(void, setDownstreamBytesMeter, (const BytesMeterSharedPtr&));
   MOCK_METHOD(void, dumpState, (std::ostream & os, int indent_level), (const));
+  MOCK_METHOD(bool, isShadow, (), (const, override));
   Envoy::Event::SimulatedTimeSystem ts_;
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;

@@ -839,6 +839,11 @@ FilterStatus ConnectionManager::ActiveRpc::messageBegin(MessageMetadataSharedPtr
     ASSERT(upgrade_handler_ != nullptr);
   }
 
+  // Filters could change cluster_header's value, which affect the routing decision.
+  // Therefore, we need to apply filter chain before the routing decision is made and cached.
+  // TODO(kuochunghsu): implement FilterCallbacks::clearRouteCache
+  auto result = applyDecoderFilters(DecoderEvent::MessageBegin, metadata);
+
   const auto& route_ptr = route();
 
   ProtobufWkt::Struct stats_obj;
@@ -863,7 +868,7 @@ FilterStatus ConnectionManager::ActiveRpc::messageBegin(MessageMetadataSharedPtr
       metadata_->sequenceId(), metadata->hasMethodName() ? metadata->methodName() : "-",
       metadata->hasFrameSize() ? metadata->frameSize() : -1, metadata->requestHeaders());
 
-  return applyDecoderFilters(DecoderEvent::MessageBegin, metadata);
+  return result;
 }
 
 FilterStatus ConnectionManager::ActiveRpc::messageEnd() {

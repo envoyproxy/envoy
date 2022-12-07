@@ -46,8 +46,8 @@ public:
     }
   }
 
-  void initializeConfig(bool add_audience) {
-    config_helper_.addConfigModifier([this, add_audience](
+  void initializeConfig(bool add_audience, bool configure_token_header = false) {
+    config_helper_.addConfigModifier([this, add_audience, configure_token_header](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* gcp_authn_cluster = bootstrap.mutable_static_resources()->add_clusters();
       gcp_authn_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
@@ -67,10 +67,16 @@ public:
                 .PackFrom(audience);
       }
 
-      // Set URI in the config and create the filter.
       TestUtility::loadFromYaml(default_config_, proto_config_);
+      // Set token_header in the config.
+      if (configure_token_header) {
+        proto_config_.mutable_token_header()->mutable_name()->append("service-to-service-auth");
+        proto_config_.mutable_token_header()->mutable_value_prefix()->append("CustomPrefix ");
+      }
+      // Set URI in the config.
       auto& uri = *proto_config_.mutable_http_uri();
       uri.set_uri(std::string(Url));
+      // Create the filter.
       envoy::config::listener::v3::Filter gcp_authn_filter;
       gcp_authn_filter.set_name(std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName));
       gcp_authn_filter.mutable_typed_config()->PackFrom(proto_config_);
@@ -89,8 +95,14 @@ public:
               {":method", "POST"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}},
           "test");
     } else {
-      response_ = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
-          {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}});
+      response_ = codec_client_->makeHeaderOnlyRequest(
+          Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                         {":path", "/"},
+                                         {":scheme", "http"},
+                                         {":authority", "host"},
+                                         // Add a pair with `Authorization` as the key for
+                                         // verification of header map overridden behavior.
+                                         {"Authorization", "test"}});
     }
   }
 
@@ -123,7 +135,18 @@ public:
   }
 
   // Send the request to destination upstream cluster
-  void sendRequestToDestinationAndValidateResponse(bool with_audience) {
+  void sendRequestToDestinationAndValidateResponse(bool with_audience,
+                                                   bool with_configured_token_header = false) {
+    // By default, the expected ID token is added to the request in the HTTP
+    // Authorization header, in format of `Bearer ID_TOKEN`; however a different
+    // header can be configured.
+    Http::LowerCaseString header_key(with_configured_token_header
+                                         ? Http::LowerCaseString("service-to-service-auth")
+                                         : authorizationHeaderKey());
+    std::string id_token(with_configured_token_header
+                             ? absl::StrCat("CustomPrefix ", MockTokenString)
+                             : absl::StrCat("Bearer ", MockTokenString));
+
     // Send the request to cluster `cluster_0`;
     AssertionResult result =
         fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
@@ -139,17 +162,17 @@ public:
 
     // Verify the proxied request was received upstream, as expected.
     EXPECT_TRUE(upstream_request_->complete());
-    // The authorization header is only added when the configuration is valid (e.g., with audience
-    // field).
+    // The header holding the ID token is only added when the configuration is valid (e.g., with
+    // audience field).
     if (with_audience) {
-      ASSERT_FALSE(upstream_request_->headers().get(authorizationHeaderKey()).empty());
-      // The expected ID token is in format of `Bearer ID_TOKEN`
-      std::string id_token = absl::StrCat("Bearer ", MockTokenString);
-      // Verify the request header modification: the token returned from authentication server
-      // has been added to the request header that is sent to destination upstream.
-      EXPECT_EQ(
-          upstream_request_->headers().get(authorizationHeaderKey())[0]->value().getStringView(),
-          id_token);
+      ASSERT_FALSE(upstream_request_->headers().get(header_key).empty());
+      // Verify the request header modification:
+      // 1) Only one entry with the appropriate header key. i.e., Any existing values should be
+      // overridden by response from authentication server.
+      EXPECT_EQ(upstream_request_->headers().get(header_key).size(), 1);
+      // 2) the token returned from authentication server has been added to the request header that
+      // is sent to destination upstream.
+      EXPECT_EQ(upstream_request_->headers().get(header_key)[0]->value().getStringView(), id_token);
     }
 
     EXPECT_EQ(0U, upstream_request_->bodyLength());
@@ -203,6 +226,27 @@ TEST_P(GcpAuthnFilterIntegrationTest, Basicflow) {
     waitForGcpAuthnServerResponse();
     // Send the request to cluster `cluster_0` and validate the response.
     sendRequestToDestinationAndValidateResponse(/*with_audience=*/true);
+    // Clean up the codec and connections.
+    cleanup();
+  }
+
+  // Verify request has been routed to both upstream clusters.
+  EXPECT_GE(test_server_->counter("cluster.gcp_authn.upstream_cx_total")->value(), num);
+  EXPECT_GE(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), num);
+}
+
+TEST_P(GcpAuthnFilterIntegrationTest, OverrideDefaultHeader) {
+  initializeConfig(/*add_audience=*/true, /*configure_token_header=*/true);
+  HttpIntegrationTest::initialize();
+  int num = 2;
+  // Send multiple requests.
+  for (int i = 0; i < num; ++i) {
+    initiateClientConnection();
+    // Send the request to cluster `gcp_authn`.
+    waitForGcpAuthnServerResponse();
+    // Send the request to cluster `cluster_0` and validate the response.
+    sendRequestToDestinationAndValidateResponse(/*with_audience=*/true,
+                                                /*with_configured_token_header*/ true);
     // Clean up the codec and connections.
     cleanup();
   }

@@ -19,7 +19,7 @@ envoy_cc_extension(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "internal_listener_registry",
     srcs = [
         "internal_listener_registry.cc",
@@ -30,12 +30,13 @@ envoy_cc_library(
     deps = [
         ":thread_local_registry",
         "//envoy/server:bootstrap_extension_config_interface",
-        "//source/server:listener_manager_lib",
+        "//source/extensions/listener_managers/listener_manager:listener_manager_lib",
         "@envoy_api//envoy/extensions/bootstrap/internal_listener/v3:pkg_cc_proto",
     ],
+    alwayslink = 1,
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "client_connection_factory",
     srcs = [
         "client_connection_factory.cc",

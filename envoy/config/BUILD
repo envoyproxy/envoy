@@ -108,6 +108,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "xds_resources_delegate_interface",
     hdrs = ["xds_resources_delegate.h"],
+    external_deps = ["abseil_optional"],
     deps = [
         ":subscription_interface",
         ":typed_config_interface",

@@ -84,9 +84,8 @@ class SubscriptionFactoryTestUnifiedOrLegacyMux
       public testing::WithParamInterface<LegacyOrUnified> {
 public:
   SubscriptionFactoryTestUnifiedOrLegacyMux() {
-    if (GetParam() == LegacyOrUnified::Unified) {
-      scoped_runtime_.mergeValues({{"envoy.reloadable_features.unified_mux", "true"}});
-    }
+    scoped_runtime_.mergeValues({{"envoy.reloadable_features.unified_mux",
+                                  (GetParam() == LegacyOrUnified::Unified) ? "true" : "false"}});
   }
 
   TestScopedRuntime scoped_runtime_;
@@ -378,7 +377,8 @@ TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux,
           "xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/bar", config)
           ->start({}),
       EnvoyException,
-      "Missing or not supported config source specifier in envoy::config::core::v3::ConfigSource "
+      "Missing or not supported config source specifier in "
+      "envoy::config::core::v3::ConfigSource "
       "for a collection. Only ADS and gRPC in delta-xDS mode are supported.");
 }
 

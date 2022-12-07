@@ -4,6 +4,7 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/typed_metadata.h"
+#include "envoy/rds/config.h"
 
 #include "contrib/generic_proxy/filters/network/source/interface/stream.h"
 
@@ -45,10 +46,8 @@ public:
 };
 using RouteEntryConstSharedPtr = std::shared_ptr<const RouteEntry>;
 
-class RouteMatcher {
+class RouteMatcher : public Rds::Config {
 public:
-  virtual ~RouteMatcher() = default;
-
   virtual RouteEntryConstSharedPtr routeEntry(const Request& request) const PURE;
 };
 using RouteMatcherPtr = std::unique_ptr<RouteMatcher>;

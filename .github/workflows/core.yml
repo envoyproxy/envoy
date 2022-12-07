@@ -1,0 +1,32 @@
+name: mobile_core
+
+on:
+  push:
+    branches:
+    - main
+    paths:
+    - 'mobile/**'
+    - '.github/workflows/**'
+  pull_request:
+    paths:
+    - 'mobile/**'
+    - '.github/workflows/**'
+
+jobs:
+  unittests:
+    name: unit_tests
+    runs-on: macos-12
+    timeout-minutes: 120
+    steps:
+    - uses: actions/checkout@v1
+    - name: 'Install dependencies'
+      run: cd mobile && ./ci/mac_ci_setup.sh
+    - name: 'Run tests'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        cd mobile && ./bazelw test \
+            --test_output=all \
+            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
+            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
+            //test/common/...

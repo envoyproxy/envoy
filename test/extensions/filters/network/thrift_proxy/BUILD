@@ -171,6 +171,7 @@ envoy_extension_cc_test(
         ":utility_lib",
         "//source/extensions/filters/network/thrift_proxy:binary_protocol_lib",
         "//test/test_common:printers_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -184,6 +185,7 @@ envoy_extension_cc_test(
         ":utility_lib",
         "//source/extensions/filters/network/thrift_proxy:compact_protocol_lib",
         "//test/test_common:printers_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )

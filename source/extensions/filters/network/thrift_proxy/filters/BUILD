@@ -48,5 +48,6 @@ envoy_cc_library(
     hdrs = ["pass_through_filter.h"],
     deps = [
         ":filter_interface",
+        "//source/extensions/filters/network/thrift_proxy:passthrough_decoder_event_handler_lib",
     ],
 )

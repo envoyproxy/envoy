@@ -26,6 +26,28 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //    without `case normalization <https://datatracker.ietf.org/doc/html/rfc3986#section-6.2.2.1>`_
 //
 message HeaderValidatorConfig {
+  // Action to take when Envoy receives client request with header names containing underscore
+  // characters.
+  // Underscore character is allowed in header names by the RFC-7230 and this behavior is implemented
+  // as a security measure due to systems that treat '_' and '-' as interchangeable. Envoy by default allows client request headers with underscore
+  // characters.
+  enum HeadersWithUnderscoresAction {
+    // Allow headers with underscores. This is the default behavior.
+    ALLOW = 0;
+
+    // Reject client request. HTTP/1 requests are rejected with the 400 status. HTTP/2 requests
+    // end with the stream reset. The
+    // :ref:`httpN.requests_rejected_with_underscores_in_headers <config_http_conn_man_stats_per_codec>` counter
+    // is incremented for each rejected request.
+    REJECT_REQUEST = 1;
+
+    // Drop the client header with name containing underscores. The header is dropped before the filter chain is
+    // invoked and as such filters will not see dropped headers. The
+    // :ref:`httpN.dropped_headers_with_underscores <config_http_conn_man_stats_per_codec>` is incremented for
+    // each dropped header.
+    DROP_HEADER = 2;
+  }
+
   message UriPathNormalizationOptions {
     // Determines the action for requests that contain ``%2F``, ``%2f``, ``%5C`` or ``%5c`` sequences in the URI path.
     // This operation occurs before URL normalization and the merge slashes transformations if they were enabled.
@@ -115,4 +137,8 @@ message HeaderValidatorConfig {
   // Envoy will respond with 400 to requests with disallowed methods.
   // By default methods with arbitrary names are accepted.
   bool restrict_http_methods = 3;
+
+  // Action to take when a client request with a header name containing underscore characters is received.
+  // If this setting is not specified, the value defaults to ALLOW.
+  HeadersWithUnderscoresAction headers_with_underscores_action = 4;
 }

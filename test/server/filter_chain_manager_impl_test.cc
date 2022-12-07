@@ -17,14 +17,15 @@
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/extensions/listener_managers/listener_manager/listener_impl.h"
 #include "source/extensions/transport_sockets/tls/ssl_socket.h"
 #include "source/server/configuration_impl.h"
 #include "source/server/filter_chain_manager_impl.h"
-#include "source/server/listener_manager_impl.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/drain_manager.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/server/utility.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/registry.h"
@@ -98,7 +99,8 @@ public:
       remote_address_ = Network::Utility::parseInternetAddress(source_address, source_port);
     }
     mock_socket->connection_info_provider_->setRemoteAddress(remote_address_);
-    return filter_chain_manager_->findFilterChain(*mock_socket);
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    return filter_chain_manager_->findFilterChain(*mock_socket, stream_info);
   }
 
   void addSingleFilterChainHelper(

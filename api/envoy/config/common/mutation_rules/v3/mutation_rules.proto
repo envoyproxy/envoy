@@ -14,7 +14,7 @@ option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/common/mutation_rules/v3;mutation_rulesv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Header Mutation Rules]
+// [#protodoc-title: Header mutation rules]
 
 // The HeaderMutationRules structure specifies what headers may be
 // manipulated by a processing filter. This set of rules makes it

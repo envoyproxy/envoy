@@ -107,7 +107,7 @@ public:
   bool implementsSecureTransport() const override { return true; }
   bool supportsAlpn() const override { return true; }
   absl::string_view defaultServerNameIndication() const override {
-    return clientContextConfig().serverNameIndication();
+    return clientContextConfig()->serverNameIndication();
   }
 
   // As documented above for QuicTransportSocketFactoryBase, the actual HTTP/3
@@ -122,15 +122,15 @@ public:
     return fallback_factory_->createTransportSocket(options, host);
   }
 
-  virtual Envoy::Ssl::ClientContextSharedPtr sslCtx() { return fallback_factory_->sslCtx(); }
+  Envoy::Ssl::ClientContextSharedPtr sslCtx() override { return fallback_factory_->sslCtx(); }
 
-  const Ssl::ClientContextConfig& clientContextConfig() const {
-    return fallback_factory_->config();
+  OptRef<const Ssl::ClientContextConfig> clientContextConfig() const override {
+    return fallback_factory_->clientContextConfig();
   }
 
   // Returns a crypto config generated from the up-to-date client context config. Once the passed in
   // context config gets updated, a new crypto config object will be returned by this method.
-  std::shared_ptr<quic::QuicCryptoClientConfig> getCryptoConfig();
+  std::shared_ptr<quic::QuicCryptoClientConfig> getCryptoConfig() override;
 
 protected:
   // fallback_factory_ will update the context.

@@ -43,9 +43,15 @@ public:
    * @return const RouteEntry* cached route entry for current request.
    */
   virtual const RouteEntry* routeEntry() const PURE;
+
+  /**
+   * @return const RouteSpecificFilterConfig* route level per filter config. The filter config
+   * name will be used to get the config.
+   */
+  virtual const RouteSpecificFilterConfig* perFilterConfig() const PURE;
 };
 
-class DecoderFilterCallback : public StreamFilterCallbacks {
+class DecoderFilterCallback : public virtual StreamFilterCallbacks {
 public:
   virtual void sendLocalReply(Status status, ResponseUpdateFunction&& cb = nullptr) PURE;
 
@@ -56,7 +62,7 @@ public:
   virtual void completeDirectly() PURE;
 };
 
-class EncoderFilterCallback : public StreamFilterCallbacks {
+class EncoderFilterCallback : public virtual StreamFilterCallbacks {
 public:
   virtual void continueEncoding() PURE;
 };
@@ -66,8 +72,6 @@ enum class FilterStatus { Continue, StopIteration };
 class DecoderFilter {
 public:
   virtual ~DecoderFilter() = default;
-
-  virtual bool isDualFilter() const { return false; }
 
   virtual void onDestroy() PURE;
 
@@ -79,18 +83,13 @@ class EncoderFilter {
 public:
   virtual ~EncoderFilter() = default;
 
-  virtual bool isDualFilter() const { return false; }
-
   virtual void onDestroy() PURE;
 
   virtual void setEncoderFilterCallbacks(EncoderFilterCallback& callbacks) PURE;
   virtual FilterStatus onStreamEncoded(Response& response) PURE;
 };
 
-class StreamFilter : public DecoderFilter, public EncoderFilter {
-public:
-  bool isDualFilter() const final { return true; }
-};
+class StreamFilter : public DecoderFilter, public EncoderFilter {};
 
 using DecoderFilterSharedPtr = std::shared_ptr<DecoderFilter>;
 using EncoderFilterSharedPtr = std::shared_ptr<EncoderFilter>;
@@ -122,21 +121,51 @@ public:
 using FilterFactoryCb = std::function<void(FilterChainFactoryCallbacks& callbacks)>;
 
 /**
- * A FilterChainFactory is used by a connection manager to create a Kafka level filter chain when
- * a new connection is created. Typically it would be implemented by a configuration engine that
- * would install a set of filters that are able to process an application scenario on top of a
- * stream of Dubbo requests.
+ * Simple struct of additional contextual information of filter, e.g. filter config name
+ * from configuration.
+ */
+struct FilterContext {
+  // The name of the filter configuration that used to create related filter factory function.
+  // This could be any legitimate non-empty string.
+  // This config name will have longger lifetime than any related filter instance. So string
+  // view could be used here safely.
+  absl::string_view config_name;
+};
+
+/**
+ * The filter chain manager is provided by the connection manager to the filter chain factory.
+ * The filter chain factory will post the filter factory context and filter factory to the
+ * filter chain manager to create filter and construct HTTP stream filter chain.
+ */
+class FilterChainManager {
+public:
+  virtual ~FilterChainManager() = default;
+
+  /**
+   * Post filter factory context and filter factory to the filter chain manager. The filter
+   * chain manager will create filter instance based on the context and factory internally.
+   * @param context supplies additional contextual information of filter factory.
+   * @param factory factory function used to create filter instances.
+   */
+  virtual void applyFilterFactoryCb(FilterContext context, FilterFactoryCb& factory) PURE;
+};
+
+/**
+ * A FilterChainFactory is used by a connection manager to create a stream level filter chain
+ * when a new stream is created. Typically it would be implemented by a configuration engine
+ * that would install a set of filters that are able to process an application scenario on top of a
+ * stream of generic requests.
  */
 class FilterChainFactory {
 public:
   virtual ~FilterChainFactory() = default;
 
   /**
-   * Called when a new Kafka stream is created on the connection.
-   * @param callbacks supplies the "sink" that is used for actually creating the filter chain. @see
-   *                  FilterChainFactoryCallbacks.
+   * Called when a new HTTP stream is created on the connection.
+   * @param manager supplies the "sink" that is used for actually creating the filter chain. @see
+   *                FilterChainManager.
    */
-  virtual void createFilterChain(FilterChainFactoryCallbacks& callbacks) PURE;
+  virtual void createFilterChain(FilterChainManager& manager) PURE;
 };
 
 } // namespace GenericProxy

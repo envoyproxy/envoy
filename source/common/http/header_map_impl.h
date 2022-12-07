@@ -181,10 +181,9 @@ protected:
   /**
    * List of HeaderEntryImpl that keeps the pseudo headers (key starting with ':') in the front
    * of the list (as required by nghttp2) and otherwise maintains insertion order.
-   * When the list size is greater or equal to the envoy.http.headermap.lazy_map_min_size runtime
-   * feature value (defaults to 3, if not set), all headers are added to a map, to allow
-   * fast access given a header key. Once the map is initialized, it will be used even if the number
-   * of headers decreases below the threshold.
+   * When the list size is greater or equal to 3, all headers are added to a map, to allow fast
+   * access given a header key. Once the map is initialized, it will be used even
+   * if the number of headers decreases below the threshold.
    *
    * Note: the internal iterators held in fields make this unsafe to copy and move, since the
    * reference to end() is not preserved across a move (see Notes in
@@ -198,10 +197,7 @@ protected:
     using HeaderNodeVector = absl::InlinedVector<HeaderNode, 1>;
     using HeaderLazyMap = absl::flat_hash_map<absl::string_view, HeaderNodeVector>;
 
-    HeaderList()
-        : pseudo_headers_end_(headers_.end()),
-          lazy_map_min_size_(static_cast<uint32_t>(
-              Runtime::getInteger("envoy.http.headermap.lazy_map_min_size", 3))) {}
+    HeaderList() : pseudo_headers_end_(headers_.end()) {}
 
     template <class Key> bool isPseudoHeader(const Key& key) {
       return !key.getStringView().empty() && key.getStringView()[0] == ':';
@@ -278,8 +274,7 @@ protected:
     }
 
     /*
-     * Creates and populates a map if the number of headers is at least the
-     * envoy.http.headermap.lazy_map_min_size runtime feature value.
+     * Creates and populates a map if the number of headers is at least 3.
      *
      * @return if a map was created.
      */
@@ -311,8 +306,6 @@ protected:
   private:
     std::list<HeaderEntryImpl> headers_;
     HeaderNode pseudo_headers_end_;
-    // The number of headers threshold for lazy map usage.
-    const uint32_t lazy_map_min_size_;
     HeaderLazyMap lazy_map_;
   };
 

@@ -17,6 +17,7 @@
 namespace Envoy {
 namespace Server {
 namespace Configuration {
+
 class MockHealthCheckerFactoryContext : public virtual HealthCheckerFactoryContext {
 public:
   MockHealthCheckerFactoryContext();
@@ -26,21 +27,23 @@ public:
   MOCK_METHOD(Event::Dispatcher&, mainThreadDispatcher, ());
   MOCK_METHOD(Envoy::Random::RandomGenerator&, random, ());
   MOCK_METHOD(Envoy::Runtime::Loader&, runtime, ());
-  MOCK_METHOD(Upstream::HealthCheckEventLogger*, eventLogger_, ());
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
   MOCK_METHOD(Api::Api&, api, ());
   Upstream::HealthCheckEventLoggerPtr eventLogger() override {
-    return Upstream::HealthCheckEventLoggerPtr(eventLogger_());
+    if (!event_logger_) {
+      event_logger_ = std::make_unique<testing::NiceMock<Upstream::MockHealthCheckEventLogger>>();
+    }
+    return std::move(event_logger_);
   }
 
   testing::NiceMock<Upstream::MockClusterMockPrioritySet> cluster_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   testing::NiceMock<Envoy::Random::MockRandomGenerator> random_;
   testing::NiceMock<Envoy::Runtime::MockLoader> runtime_;
-  testing::NiceMock<Envoy::Upstream::MockHealthCheckEventLogger>* event_logger_{};
   testing::NiceMock<Envoy::Api::MockApi> api_{};
+  std::unique_ptr<testing::NiceMock<Envoy::Upstream::MockHealthCheckEventLogger>> event_logger_;
 };
-} // namespace Configuration
 
+} // namespace Configuration
 } // namespace Server
 } // namespace Envoy

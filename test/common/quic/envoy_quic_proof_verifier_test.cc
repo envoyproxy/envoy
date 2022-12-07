@@ -427,5 +427,17 @@ TEST_P(EnvoyQuicProofVerifierTest, VerifySubjectAltNameListOverrideFailure) {
   EXPECT_FALSE(static_cast<CertVerifyResult&>(*verify_details).isValid());
 }
 
+TEST_P(EnvoyQuicProofVerifierTest, VerifyProof) {
+  configCertVerificationDetails(true);
+  EXPECT_DEATH(verifier_->VerifyProof("", 0, "", quic::QUIC_VERSION_IETF_RFC_V1, "", {}, "", "",
+                                      nullptr, nullptr, nullptr, {}),
+               "not implemented");
+}
+
+TEST_P(EnvoyQuicProofVerifierTest, CreateDefaultContext) {
+  configCertVerificationDetails(true);
+  EXPECT_EQ(nullptr, verifier_->CreateDefaultContext());
+}
+
 } // namespace Quic
 } // namespace Envoy

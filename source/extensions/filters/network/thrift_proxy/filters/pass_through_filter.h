@@ -1,6 +1,7 @@
 #pragma once
 
 #include "source/extensions/filters/network/thrift_proxy/filters/filter.h"
+#include "source/extensions/filters/network/thrift_proxy/passthrough_decoder_event_handler.h"
 
 #include "absl/strings/string_view.h"
 
@@ -14,7 +15,7 @@ namespace ThriftFilters {
  * Pass through Thrift decoder/encoder/bidirectional filter. Continue at each state within the
  * series of transitions, and pass through the decoded/encoded data.
  */
-class PassThroughDecoderFilter : public DecoderFilter {
+class PassThroughDecoderFilter : public DecoderFilter, public PassThroughDecoderEventHandler {
 public:
   // Thrift FilterBase
   void onDestroy() override {}
@@ -24,90 +25,13 @@ public:
     decoder_callbacks_ = &callbacks;
   };
 
-  // Thrift Decoder State Machine
-  ThriftProxy::FilterStatus transportBegin(ThriftProxy::MessageMetadataSharedPtr) override {
-    return ThriftProxy::FilterStatus::Continue;
-  }
-
-  ThriftProxy::FilterStatus transportEnd() override { return ThriftProxy::FilterStatus::Continue; }
-
   bool passthroughSupported() const override { return true; }
-
-  ThriftProxy::FilterStatus passthroughData(Buffer::Instance&) override {
-    return ThriftProxy::FilterStatus::Continue;
-  }
-
-  ThriftProxy::FilterStatus messageBegin(ThriftProxy::MessageMetadataSharedPtr) override {
-    return ThriftProxy::FilterStatus::Continue;
-  }
-
-  ThriftProxy::FilterStatus messageEnd() override { return ThriftProxy::FilterStatus::Continue; }
-
-  ThriftProxy::FilterStatus structBegin(absl::string_view) override {
-    return ThriftProxy::FilterStatus::Continue;
-  }
-
-  ThriftProxy::FilterStatus structEnd() override { return ThriftProxy::FilterStatus::Continue; }
-
-  ThriftProxy::FilterStatus fieldBegin(absl::string_view, ThriftProxy::FieldType&,
-                                       int16_t&) override {
-    return ThriftProxy::FilterStatus::Continue;
-  }
-
-  ThriftProxy::FilterStatus fieldEnd() override { return ThriftProxy::FilterStatus::Continue; }
-
-  ThriftProxy::FilterStatus boolValue(bool&) override {
-    return ThriftProxy::FilterStatus::Continue;
-  }
-
-  ThriftProxy::FilterStatus byteValue(uint8_t&) override {
-    return ThriftProxy::FilterStatus::Continue;
-  }
-
-  ThriftProxy::FilterStatus int16Value(int16_t&) override {
-    return ThriftProxy::FilterStatus::Continue;
-  }
-
-  ThriftProxy::FilterStatus int32Value(int32_t&) override {
-    return ThriftProxy::FilterStatus::Continue;
-  }
-
-  ThriftProxy::FilterStatus int64Value(int64_t&) override {
-    return ThriftProxy::FilterStatus::Continue;
-  }
-
-  ThriftProxy::FilterStatus doubleValue(double&) override {
-    return ThriftProxy::FilterStatus::Continue;
-  }
-
-  ThriftProxy::FilterStatus stringValue(absl::string_view) override {
-    return ThriftProxy::FilterStatus::Continue;
-  }
-
-  ThriftProxy::FilterStatus mapBegin(ThriftProxy::FieldType&, ThriftProxy::FieldType&,
-                                     uint32_t&) override {
-    return ThriftProxy::FilterStatus::Continue;
-  }
-
-  ThriftProxy::FilterStatus mapEnd() override { return ThriftProxy::FilterStatus::Continue; }
-
-  ThriftProxy::FilterStatus listBegin(ThriftProxy::FieldType&, uint32_t&) override {
-    return ThriftProxy::FilterStatus::Continue;
-  }
-
-  ThriftProxy::FilterStatus listEnd() override { return ThriftProxy::FilterStatus::Continue; }
-
-  ThriftProxy::FilterStatus setBegin(ThriftProxy::FieldType&, uint32_t&) override {
-    return ThriftProxy::FilterStatus::Continue;
-  }
-
-  ThriftProxy::FilterStatus setEnd() override { return ThriftProxy::FilterStatus::Continue; }
 
 protected:
   DecoderFilterCallbacks* decoder_callbacks_{};
 };
 
-class PassThroughEncoderFilter : public EncoderFilter {
+class PassThroughEncoderFilter : public EncoderFilter, public PassThroughDecoderEventHandler {
 public:
   // Thrift FilterBase
   void onDestroy() override {}
@@ -117,84 +41,7 @@ public:
     encoder_callbacks_ = &callbacks;
   };
 
-  // Thrift Encoder State Machine
-  ThriftProxy::FilterStatus transportBegin(ThriftProxy::MessageMetadataSharedPtr) override {
-    return ThriftProxy::FilterStatus::Continue;
-  }
-
-  ThriftProxy::FilterStatus transportEnd() override { return ThriftProxy::FilterStatus::Continue; }
-
   bool passthroughSupported() const override { return true; }
-
-  ThriftProxy::FilterStatus passthroughData(Buffer::Instance&) override {
-    return ThriftProxy::FilterStatus::Continue;
-  }
-
-  ThriftProxy::FilterStatus messageBegin(ThriftProxy::MessageMetadataSharedPtr) override {
-    return ThriftProxy::FilterStatus::Continue;
-  }
-
-  ThriftProxy::FilterStatus messageEnd() override { return ThriftProxy::FilterStatus::Continue; }
-
-  ThriftProxy::FilterStatus structBegin(absl::string_view) override {
-    return ThriftProxy::FilterStatus::Continue;
-  }
-
-  ThriftProxy::FilterStatus structEnd() override { return ThriftProxy::FilterStatus::Continue; }
-
-  ThriftProxy::FilterStatus fieldBegin(absl::string_view, ThriftProxy::FieldType&,
-                                       int16_t&) override {
-    return ThriftProxy::FilterStatus::Continue;
-  }
-
-  ThriftProxy::FilterStatus fieldEnd() override { return ThriftProxy::FilterStatus::Continue; }
-
-  ThriftProxy::FilterStatus boolValue(bool&) override {
-    return ThriftProxy::FilterStatus::Continue;
-  }
-
-  ThriftProxy::FilterStatus byteValue(uint8_t&) override {
-    return ThriftProxy::FilterStatus::Continue;
-  }
-
-  ThriftProxy::FilterStatus int16Value(int16_t&) override {
-    return ThriftProxy::FilterStatus::Continue;
-  }
-
-  ThriftProxy::FilterStatus int32Value(int32_t&) override {
-    return ThriftProxy::FilterStatus::Continue;
-  }
-
-  ThriftProxy::FilterStatus int64Value(int64_t&) override {
-    return ThriftProxy::FilterStatus::Continue;
-  }
-
-  ThriftProxy::FilterStatus doubleValue(double&) override {
-    return ThriftProxy::FilterStatus::Continue;
-  }
-
-  ThriftProxy::FilterStatus stringValue(absl::string_view) override {
-    return ThriftProxy::FilterStatus::Continue;
-  }
-
-  ThriftProxy::FilterStatus mapBegin(ThriftProxy::FieldType&, ThriftProxy::FieldType&,
-                                     uint32_t&) override {
-    return ThriftProxy::FilterStatus::Continue;
-  }
-
-  ThriftProxy::FilterStatus mapEnd() override { return ThriftProxy::FilterStatus::Continue; }
-
-  ThriftProxy::FilterStatus listBegin(ThriftProxy::FieldType&, uint32_t&) override {
-    return ThriftProxy::FilterStatus::Continue;
-  }
-
-  ThriftProxy::FilterStatus listEnd() override { return ThriftProxy::FilterStatus::Continue; }
-
-  ThriftProxy::FilterStatus setBegin(ThriftProxy::FieldType&, uint32_t&) override {
-    return ThriftProxy::FilterStatus::Continue;
-  }
-
-  ThriftProxy::FilterStatus setEnd() override { return ThriftProxy::FilterStatus::Continue; }
 
 protected:
   EncoderFilterCallbacks* encoder_callbacks_{};

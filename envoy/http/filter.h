@@ -106,6 +106,19 @@ enum class FilterHeadersStatus {
 };
 
 /**
+ * Return codes for encode on informative headers filter invocations.
+ */
+enum class Filter1xxHeadersStatus {
+  // Continue filter chain iteration.
+  Continue,
+  // Do not iterate for informative headers on any of the remaining filters in the chain.
+  //
+  // Returning FilterDataStatus::Continue from encodeData() or calling
+  // continueEncoding() MUST be called if continued filter iteration is desired.
+  StopIteration
+};
+
+/**
  * Return codes for encode/decode data filter invocations. The connection manager bases further
  * filter invocations on the return code of the previous filter.
  */
@@ -172,7 +185,7 @@ enum class FilterMetadataStatus {
  * Return codes for onLocalReply filter invocations.
  */
 enum class LocalErrorStatus {
-  // Continue sending the local reply after onLocalError has been sent to all filters.
+  // Continue sending the local reply after onLocalReply has been sent to all filters.
   Continue,
 
   // Continue sending onLocalReply to all filters, but reset the stream once all filters have been
@@ -358,9 +371,9 @@ public:
   virtual Tracing::Span& activeSpan() PURE;
 
   /**
-   * @return tracing configuration.
+   * @return tracing configuration if present.
    */
-  virtual const Tracing::Config& tracingConfig() PURE;
+  virtual OptRef<const Tracing::Config> tracingConfig() const PURE;
 
   /**
    * @return the ScopeTrackedObject for this stream.
@@ -389,7 +402,7 @@ public:
   virtual const Router::RouteSpecificFilterConfig* mostSpecificPerFilterConfig() const PURE;
 
   /**
-   * Fold all the available per route filter configs, invoking the callback with each config (if
+   * Find all the available per route filter configs, invoking the callback with each config (if
    * it is present). Iteration of the configs is in order of specificity. That means that the
    * callback will be called first for a config on a Virtual host, then a route, and finally a route
    * entry (weighted cluster). If a config is not present, the callback will not be invoked.
@@ -519,7 +532,7 @@ public:
    * response with a 200 HTTP response code and grpc-status and grpc-message headers mapped from the
    * provided parameters.
    *
-   * If a response has already started (e.g. if the router calls sendSendLocalReply after encoding
+   * If a response has already started (e.g. if the router calls sendLocalReply after encoding
    * headers) this will either ship the reply directly to the downstream codec, or reset the stream.
    *
    * @param response_code supplies the HTTP response code.
@@ -781,7 +794,7 @@ public:
    * from onLocalReply, as that has the potential for looping.
    *
    * @param data data associated with the sendLocalReply call.
-   * @param LocalErrorStatus the action to take after onLocalError completes.
+   * @param LocalErrorStatus the action to take after onLocalReply completes.
    */
   virtual LocalErrorStatus onLocalReply(const LocalReplyData&) {
     return LocalErrorStatus::Continue;
@@ -949,7 +962,7 @@ public:
    * response with a 200 HTTP response code and grpc-status and grpc-message headers mapped from the
    * provided parameters.
    *
-   * If a response has already started (e.g. if the router calls sendSendLocalReply after encoding
+   * If a response has already started (e.g. if the router calls sendLocalReply after encoding
    * headers) this will either ship the reply directly to the downstream codec, or reset the stream.
    *
    * @param response_code supplies the HTTP response code.
@@ -1013,10 +1026,10 @@ public:
    * This will only be invoked once per request.
    *
    * @param headers supplies the 1xx response headers to be encoded.
-   * @return FilterHeadersStatus determines how filter chain iteration proceeds.
+   * @return Filter1xxHeadersStatus determines how filter chain iteration proceeds.
    *
    */
-  virtual FilterHeadersStatus encode1xxHeaders(ResponseHeaderMap& headers) PURE;
+  virtual Filter1xxHeadersStatus encode1xxHeaders(ResponseHeaderMap& headers) PURE;
 
   /**
    * Called with headers to be encoded, optionally indicating end of stream.

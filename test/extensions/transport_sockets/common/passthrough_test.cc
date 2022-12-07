@@ -106,10 +106,22 @@ TEST_F(PassthroughTest, ConfigureInitialCongestionWindowDefersToInnerSocket) {
   passthrough_socket_->configureInitialCongestionWindow(100, std::chrono::microseconds(123));
 }
 
+class UpstreamTestFactory : public PassthroughFactory {
+public:
+  UpstreamTestFactory(Network::UpstreamTransportSocketFactoryPtr&& transport_socket_factory)
+      : PassthroughFactory(std::move(transport_socket_factory)) {}
+
+  Network::TransportSocketPtr
+  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr,
+                        std::shared_ptr<const Upstream::HostDescription>) const override {
+    return nullptr;
+  }
+};
+
 TEST(PassthroughFactoryTest, TestDelegation) {
   auto inner_factory_ptr = std::make_unique<NiceMock<Network::MockTransportSocketFactory>>();
   Network::MockTransportSocketFactory* inner_factory = inner_factory_ptr.get();
-  Network::UpstreamTransportSocketFactoryPtr factory{std::move(inner_factory_ptr)};
+  auto factory = std::make_unique<UpstreamTestFactory>(std::move(inner_factory_ptr));
 
   {
     EXPECT_CALL(*inner_factory, implementsSecureTransport());
@@ -124,6 +136,18 @@ TEST(PassthroughFactoryTest, TestDelegation) {
     std::vector<uint8_t> key;
     EXPECT_CALL(*inner_factory, hashKey(_, _));
     factory->hashKey(key, nullptr);
+  }
+  {
+    EXPECT_CALL(*inner_factory, sslCtx());
+    factory->sslCtx();
+  }
+  {
+    EXPECT_CALL(*inner_factory, clientContextConfig());
+    factory->clientContextConfig();
+  }
+  {
+    EXPECT_CALL(*inner_factory, getCryptoConfig());
+    factory->getCryptoConfig();
   }
 }
 

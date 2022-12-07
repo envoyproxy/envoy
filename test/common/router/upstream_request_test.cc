@@ -28,15 +28,6 @@ public:
     HttpTestUtility::addDefaultHeaders(downstream_request_header_map_);
     ON_CALL(router_filter_interface_, downstreamHeaders())
         .WillByDefault(Return(&downstream_request_header_map_));
-
-    ON_CALL(*router_filter_interface_.cluster_info_, createFilterChain)
-        .WillByDefault(Invoke([&](Http::FilterChainManager& manager) -> void {
-          Http::FilterFactoryCb factory_cb =
-              [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-            callbacks.addStreamDecoderFilter(std::make_shared<UpstreamCodecFilter>());
-          };
-          manager.applyFilterFactoryCb({}, factory_cb);
-        }));
   }
 
   void initialize() {
@@ -123,15 +114,21 @@ TEST_F(UpstreamRequestTest, AcceptRouterHeaders) {
       new NiceMock<Http::MockStreamDecoderFilter>());
 
   EXPECT_CALL(*router_filter_interface_.cluster_info_, createFilterChain)
-      .WillOnce(Invoke([&](Http::FilterChainManager& manager) -> void {
-        auto factory = createDecoderFilterFactoryCb(filter);
-        manager.applyFilterFactoryCb({}, factory);
-        Http::FilterFactoryCb factory_cb =
-            [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-          callbacks.addStreamDecoderFilter(std::make_shared<UpstreamCodecFilter>());
-        };
-        manager.applyFilterFactoryCb({}, factory_cb);
-      }));
+      .Times(2)
+      .WillRepeatedly(
+          Invoke([&](Http::FilterChainManager& manager, bool only_create_if_configured) -> bool {
+            if (only_create_if_configured) {
+              return false;
+            }
+            auto factory = createDecoderFilterFactoryCb(filter);
+            manager.applyFilterFactoryCb({}, factory);
+            Http::FilterFactoryCb factory_cb =
+                [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+              callbacks.addStreamDecoderFilter(std::make_shared<UpstreamCodecFilter>());
+            };
+            manager.applyFilterFactoryCb({}, factory_cb);
+            return true;
+          }));
 
   initialize();
   ASSERT_TRUE(filter->callbacks_ != nullptr);
@@ -140,8 +137,8 @@ TEST_F(UpstreamRequestTest, AcceptRouterHeaders) {
   EXPECT_FALSE(filter->callbacks_->informationalHeaders().has_value());
   EXPECT_FALSE(filter->callbacks_->responseHeaders().has_value());
   EXPECT_FALSE(filter->callbacks_->http1StreamEncoderOptions().has_value());
-  EXPECT_EQ(&filter->callbacks_->tracingConfig(),
-            &router_filter_interface_.callbacks_.tracingConfig());
+  EXPECT_EQ(&filter->callbacks_->tracingConfig().value().get(),
+            &router_filter_interface_.callbacks_.tracingConfig().value().get());
   EXPECT_EQ(filter->callbacks_->clusterInfo(), router_filter_interface_.callbacks_.clusterInfo());
   EXPECT_EQ(&filter->callbacks_->activeSpan(), &router_filter_interface_.callbacks_.activeSpan());
   EXPECT_EQ(&filter->callbacks_->streamInfo(), &router_filter_interface_.callbacks_.streamInfo());

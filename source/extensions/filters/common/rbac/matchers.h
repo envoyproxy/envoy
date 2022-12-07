@@ -239,6 +239,18 @@ private:
   const Envoy::Matchers::MetadataMatcher matcher_;
 };
 
+class FilterStateMatcher : public Matcher {
+public:
+  FilterStateMatcher(const envoy::type::matcher::v3::FilterStateMatcher& matcher)
+      : matcher_(matcher) {}
+
+  bool matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
+               const StreamInfo::StreamInfo& info) const override;
+
+private:
+  const Envoy::Matchers::FilterStateMatcher matcher_;
+};
+
 /**
  * Perform a match against the request server from the client's connection
  * request. This is typically TLS SNI.

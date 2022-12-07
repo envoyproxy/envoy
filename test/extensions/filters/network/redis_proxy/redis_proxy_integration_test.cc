@@ -78,6 +78,14 @@ const std::string CONFIG_WITH_REDIRECTION = CONFIG + R"EOF(
             enable_redirection: true
 )EOF";
 
+// This is a configuration with moved/ask redirection support and DNS lookups enabled.
+const std::string CONFIG_WITH_REDIRECTION_DNS = CONFIG_WITH_REDIRECTION + R"EOF(
+            dns_cache_config:
+              name: foo
+              dns_lookup_family: {}
+              max_hosts: 100
+)EOF";
+
 // This is a configuration with batching enabled.
 const std::string CONFIG_WITH_BATCHING = CONFIG + R"EOF(
             max_buffer_size_before_flush: 1024
@@ -355,6 +363,13 @@ public:
     return result.str();
   }
 
+  std::string redisHostnameAndPort(FakeUpstreamPtr& upstream) {
+    std::stringstream result;
+    result << "localhost"
+           << ":" << upstream->localAddress()->ip()->port();
+    return result.str();
+  }
+
   void initialize() override;
 
   /**
@@ -433,6 +448,9 @@ public:
   RedisProxyWithRedirectionIntegrationTest()
       : RedisProxyIntegrationTest(CONFIG_WITH_REDIRECTION, 2) {}
 
+  RedisProxyWithRedirectionIntegrationTest(const std::string& config, int num_upstreams)
+      : RedisProxyIntegrationTest(config, num_upstreams) {}
+
   /**
    * Simple bi-directional test with a fake Redis client and 2 fake Redis servers.
    * @param target_server a handle to the second server that will respond to the request.
@@ -445,6 +463,16 @@ public:
   void simpleRedirection(FakeUpstreamPtr& target_server, const std::string& request,
                          const std::string& redirection_response, const std::string& response,
                          const std::string& asking_response = "+OK\r\n");
+};
+
+class RedisProxyWithRedirectionAndDNSIntegrationTest
+    : public RedisProxyWithRedirectionIntegrationTest {
+public:
+  RedisProxyWithRedirectionAndDNSIntegrationTest()
+      : RedisProxyWithRedirectionIntegrationTest(
+            fmt::format(CONFIG_WITH_REDIRECTION_DNS,
+                        Network::Test::ipVersionToDnsFamily(GetParam())),
+            2) {}
 };
 
 class RedisProxyWithBatchingIntegrationTest : public RedisProxyIntegrationTest {
@@ -497,6 +525,10 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyIntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithRedirectionIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithRedirectionAndDNSIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
@@ -709,7 +741,12 @@ TEST_P(RedisProxyWithCommandStatsIntegrationTest, MGETRequestAndResponse) {
 
 TEST_P(RedisProxyIntegrationTest, QUITRequestAndResponse) {
   initialize();
-  simpleProxyResponse(makeBulkStringArray({"quit"}), "+OK\r\n");
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  ASSERT_TRUE(redis_client->write(makeBulkStringArray({"quit"}), false, false));
+  redis_client->waitForData("+OK\r\n");
+  redis_client->waitForDisconnect();
+  EXPECT_EQ(redis_client->data(), "+OK\r\n");
+  redis_client->close();
 }
 
 // This test sends an invalid Redis command from a fake
@@ -765,6 +802,19 @@ TEST_P(RedisProxyWithRedirectionIntegrationTest, RedirectToKnownServer) {
 
   redirection_error.str("");
   redirection_error << "-ASK 1111 " << redisAddressAndPort(fake_upstreams_[1]) << "\r\n";
+  simpleRedirection(fake_upstreams_[1], request, redirection_error.str(), "$3\r\nbar\r\n");
+}
+
+// This test sends a simple Redis command to a sequence of fake upstream
+// Redis servers. The first server replies with a MOVED redirection
+// error that specifies the hostname as its target.
+// The target server responds to a possibly transformed request, and its response
+// is received unchanged by the fake Redis client.
+TEST_P(RedisProxyWithRedirectionAndDNSIntegrationTest, RedirectUsingHostname) {
+  std::string request = makeBulkStringArray({"get", "foo"});
+  initialize();
+  std::stringstream redirection_error;
+  redirection_error << "-MOVED 1111 " << redisHostnameAndPort(fake_upstreams_[1]) << "\r\n";
   simpleRedirection(fake_upstreams_[1], request, redirection_error.str(), "$3\r\nbar\r\n");
 }
 
@@ -1204,6 +1254,137 @@ TEST_P(RedisProxyWithFaultInjectionIntegrationTest, DelayFault) {
   EXPECT_EQ(1, test_server_->counter("redis.redis_stats.command.set.success")->value());
   EXPECT_EQ(1, test_server_->counter("redis.redis_stats.command.set.delay_fault")->value());
 }
+
+// This test sends a MULTI Redis command from a fake
+// downstream client to the envoy proxy. Envoy will respond
+// with an OK.
+
+TEST_P(RedisProxyIntegrationTest, SendMulti) {
+  initialize();
+  simpleProxyResponse(makeBulkStringArray({"multi"}), "+OK\r\n");
+}
+
+// This test sends a nested MULTI Redis command from a fake
+// downstream client to the envoy proxy. Envoy will respond with an
+// error.
+
+TEST_P(RedisProxyIntegrationTest, SendNestedMulti) {
+  initialize();
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+
+  proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
+  proxyResponseStep(makeBulkStringArray({"multi"}), "-MULTI calls can not be nested\r\n",
+                    redis_client);
+
+  redis_client->close();
+}
+
+// This test sends an EXEC command without a MULTI command
+// preceding it. The proxy responds with an error.
+
+TEST_P(RedisProxyIntegrationTest, ExecWithoutMulti) {
+  initialize();
+  simpleProxyResponse(makeBulkStringArray({"exec"}), "-EXEC without MULTI\r\n");
+}
+
+// This test sends an DISCARD command without a MULTI command
+// preceding it. The proxy responds with an error.
+
+TEST_P(RedisProxyIntegrationTest, DiscardWithoutMulti) {
+  initialize();
+  simpleProxyResponse(makeBulkStringArray({"discard"}), "-DISCARD without MULTI\r\n");
+}
+
+// This test executes an empty transaction. The proxy responds
+// with an empty array.
+
+TEST_P(RedisProxyIntegrationTest, ExecuteEmptyTransaction) {
+  initialize();
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+
+  proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
+  proxyResponseStep(makeBulkStringArray({"exec"}), "*0\r\n", redis_client);
+
+  redis_client->close();
+}
+
+// This test discards an empty transaction. The proxy responds
+// with an OK.
+
+TEST_P(RedisProxyIntegrationTest, DiscardEmptyTransaction) {
+  initialize();
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+
+  proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
+  proxyResponseStep(makeBulkStringArray({"discard"}), "+OK\r\n", redis_client);
+
+  redis_client->close();
+}
+
+// This test tries to insert a multi-key command in a transaction, which is not
+// supported. The proxy responds with an error.
+
+TEST_P(RedisProxyIntegrationTest, MultiKeyCommandInTransaction) {
+  initialize();
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+
+  proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
+  proxyResponseStep(makeBulkStringArray({"mget", "foo1", "foo2"}),
+                    "-'mget' command is not supported within transaction\r\n", redis_client);
+
+  redis_client->close();
+}
+
+// This test verifies that a multi command is sent before the first
+// simple command of the transaction.
+
+TEST_P(RedisProxyWithCommandStatsIntegrationTest, SendMultiBeforeCommandInTransaction) {
+  initialize();
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+
+  proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
+
+  std::string request = makeBulkStringArray({"set", "foo", "bar"});
+  ASSERT_TRUE(redis_client->write(request));
+
+  // The upstream will receive a MULTI command before the SET command.
+  FakeUpstreamPtr& upstream = fake_upstreams_[0];
+  FakeRawConnectionPtr fake_upstream_connection;
+  std::string auth_username = "";
+  std::string auth_password = "";
+  std::string upstream_request =
+      makeBulkStringArray({"MULTI"}) + makeBulkStringArray({"set", "foo", "bar"});
+  std::string upstream_response = "";
+  expectUpstreamRequestResponse(upstream, upstream_request, upstream_response,
+                                fake_upstream_connection, auth_username, auth_password);
+
+  EXPECT_TRUE(fake_upstream_connection->close());
+  redis_client->close();
+}
+
+// This test verifies that a transaction can be pipelined.
+TEST_P(RedisProxyWithCommandStatsIntegrationTest, PipelinedTransactionTest) {
+  initialize();
+
+  std::array<FakeRawConnectionPtr, 1> fake_upstream_connection;
+  std::string transaction_commands =
+      makeBulkStringArray({"MULTI"}) + makeBulkStringArray({"set", "foo", "bar"}) +
+      makeBulkStringArray({"get", "foo"}) + makeBulkStringArray({"exec"});
+  const std::string& response = "+OK\r\n+QUEUED\r\n+QUEUED\r\n*2\r\n+OK\r\n$3\r\nbar\r\n";
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  ASSERT_TRUE(redis_client->write(transaction_commands));
+
+  expectUpstreamRequestResponse(fake_upstreams_[0], transaction_commands, response,
+                                fake_upstream_connection[0]);
+
+  redis_client->waitForData(response);
+  EXPECT_EQ(response, redis_client->data());
+
+  EXPECT_TRUE(fake_upstream_connection[0]->close());
+  redis_client->close();
+}
+
+// TODO: Add full transaction test.
 
 } // namespace
 } // namespace Envoy
