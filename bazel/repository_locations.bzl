@@ -978,7 +978,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "https://github.com/dtolnay/cxx/archive/refs/tags/{version}.tar.gz",
         ],
         release_date = "2022-12-03",
-        extensions = ["envoy.matching.matchers.consistent_hashing"],
         use_category = ["build"],
     ),
     com_github_wavm_wavm = dict(
@@ -1362,7 +1361,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "05e15e536cc1e5fd7b395d044fc2dabf73d2b27622fbc10504b7e48219bb09bc",
         urls = ["https://github.com/bazelbuild/rules_rust/releases/download/{version}/rules_rust-v{version}.tar.gz"],
         use_category = ["dataplane_ext"],
-        extensions = ["envoy.wasm.runtime.wasmtime"],
+        extensions = ["envoy.wasm.runtime.wasmtime", "envoy.matching.matchers.consistent_hashing"],
         release_date = "2022-07-26",
         cpe = "N/A",
         license = "Apache-2.0",
