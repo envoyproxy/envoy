@@ -524,6 +524,62 @@ TEST_F(Http1HeaderValidatorTest, ValidateRequestHeaderMapRedirectPath) {
   EXPECT_EQ(headers.path(), "/dir1/dir2");
 }
 
+TEST_F(Http1HeaderValidatorTest, ValidateRequestTrailerMap) {
+  auto uhv = createH1(empty_config);
+  ::Envoy::Http::TestRequestTrailerMapImpl request_trailer_map{{"trailer1", "value1"},
+                                                               {"trailer2", "values"}};
+  EXPECT_TRUE(uhv->validateRequestTrailerMap(request_trailer_map));
+}
+
+TEST_F(Http1HeaderValidatorTest, ValidateInvalidRequestTrailerMap) {
+  auto uhv = createH1(empty_config);
+  // H/2 trailers must not contain pseudo headers
+  ::Envoy::Http::TestRequestTrailerMapImpl request_trailer_map{{":path", "value1"},
+                                                               {"trailer2", "values"}};
+  auto result = uhv->validateRequestTrailerMap(request_trailer_map);
+  EXPECT_FALSE(result);
+  EXPECT_EQ(result.details(), "uhv.invalid_name_characters");
+}
+
+TEST_F(Http1HeaderValidatorTest, ValidateInvalidValueRequestTrailerMap) {
+  auto uhv = createH1(empty_config);
+  ::Envoy::Http::TestRequestTrailerMapImpl request_trailer_map{{"trailer1", "value1"},
+                                                               {"trailer2", "values"}};
+  ::Envoy::Http::HeaderString invalid_value;
+  // \n must not be present in header values
+  invalid_value.setCopyUnvalidatedForTestOnly("invalid\nvalue");
+  request_trailer_map.addViaMove(::Envoy::Http::HeaderString("trailer3"), std::move(invalid_value));
+  auto result = uhv->validateRequestTrailerMap(request_trailer_map);
+  EXPECT_FALSE(result);
+  EXPECT_EQ(result.details(), "uhv.invalid_value_characters");
+}
+
+TEST_F(Http1HeaderValidatorTest, ValidateResponseTrailerMap) {
+  auto uhv = createH1(empty_config);
+  ::Envoy::Http::TestResponseTrailerMapImpl response_trailer_map{{"trailer1", "value1"}};
+  EXPECT_TRUE(uhv->validateResponseTrailerMap(response_trailer_map).ok());
+}
+
+TEST_F(Http1HeaderValidatorTest, ValidateInvalidResponseTrailerMap) {
+  auto uhv = createH1(empty_config);
+  // H/2 trailers must not contain pseudo headers
+  ::Envoy::Http::TestResponseTrailerMapImpl response_trailer_map{{":status", "200"},
+                                                                 {"trailer1", "value1"}};
+  auto result = uhv->validateResponseTrailerMap(response_trailer_map);
+  EXPECT_FALSE(result);
+  EXPECT_EQ(result.details(), "uhv.invalid_name_characters");
+}
+
+TEST_F(Http1HeaderValidatorTest, ValidateInvalidValueResponseTrailerMap) {
+  auto uhv = createH1(empty_config);
+  // The DEL (0x7F) character is illegal in header values
+  ::Envoy::Http::TestResponseTrailerMapImpl response_trailer_map{{"trailer0", "abcd\x7F\\ef"},
+                                                                 {"trailer1", "value1"}};
+  auto result = uhv->validateResponseTrailerMap(response_trailer_map);
+  EXPECT_FALSE(result);
+  EXPECT_EQ(result.details(), "uhv.invalid_value_characters");
+}
+
 } // namespace
 } // namespace EnvoyDefault
 } // namespace HeaderValidators

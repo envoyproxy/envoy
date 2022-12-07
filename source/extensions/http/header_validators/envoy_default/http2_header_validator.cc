@@ -418,13 +418,13 @@ Http2HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
 }
 
 HeaderValidator::TrailerValidationResult
-Http2HeaderValidator::validateRequestTrailerMap(::Envoy::Http::RequestTrailerMap&) {
-  return TrailerValidationResult::success();
+Http2HeaderValidator::validateRequestTrailerMap(::Envoy::Http::RequestTrailerMap& trailer_map) {
+  return validateTrailers(trailer_map);
 }
 
 HeaderValidator::TrailerValidationResult
-Http2HeaderValidator::validateResponseTrailerMap(::Envoy::Http::ResponseTrailerMap&) {
-  return TrailerValidationResult::success();
+Http2HeaderValidator::validateResponseTrailerMap(::Envoy::Http::ResponseTrailerMap& trailer_map) {
+  return validateTrailers(trailer_map);
 }
 
 } // namespace EnvoyDefault

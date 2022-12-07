@@ -429,6 +429,39 @@ bool HeaderValidator::hasChunkedTransferEncoding(const HeaderString& value) {
   return false;
 }
 
+// For both H/1 and H/2 trailers should only contain generic headers. As such a common validation
+// method can be used. For H/2, per https://www.rfc-editor.org/rfc/rfc9113#section-8.1 trailers MUST
+// NOT contain H/2 pseudo header fields. For H/1 per
+// https://www.rfc-editor.org/rfc/rfc9110#section-6.5 there are no specific prohibitions.
+HeaderValidator::TrailerValidationResult
+HeaderValidator::validateTrailers(::Envoy::Http::HeaderMap& trailers) {
+  std::string reject_details;
+  trailers.iterate([this, &reject_details](const ::Envoy::Http::HeaderEntry& header_entry)
+                       -> ::Envoy::Http::HeaderMap::Iterate {
+    const auto& header_name = header_entry.key();
+    const auto& header_value = header_entry.value();
+
+    auto entry_name_result = validateGenericHeaderName(header_name);
+    if (!entry_name_result) {
+      reject_details = static_cast<std::string>(entry_name_result.details());
+    } else {
+      auto entry_value_result = validateGenericHeaderValue(header_value);
+      if (!entry_value_result) {
+        reject_details = static_cast<std::string>(entry_value_result.details());
+      }
+    }
+
+    return reject_details.empty() ? ::Envoy::Http::HeaderMap::Iterate::Continue
+                                  : ::Envoy::Http::HeaderMap::Iterate::Break;
+  });
+
+  if (!reject_details.empty()) {
+    return {TrailerValidationResult::Action::Reject, reject_details};
+  }
+
+  return TrailerValidationResult::success();
+}
+
 } // namespace EnvoyDefault
 } // namespace HeaderValidators
 } // namespace Http
