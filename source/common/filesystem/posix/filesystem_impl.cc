@@ -57,11 +57,13 @@ Api::IoCallBoolResult TmpFileImplPosix::open(FlagSet in) {
   }
 
   const auto flags_and_mode = translateFlag(in);
+#ifdef O_TMPFILE
   // Try to open a temp file with no name. Only some file systems support this.
   fd_ = ::open(path().c_str(), flags_and_mode.flags_ | O_TMPFILE, flags_and_mode.mode_);
   if (fd_ != -1) {
     return resultSuccess(true);
   }
+#endif
   // If we couldn't do a nameless temp file, open a named temp file.
   for (int tries = 5; tries > 0; tries--) {
     std::string try_path = generateTmpFilePath(path());
