@@ -1364,7 +1364,8 @@ bool ClientConnectionImpl::cannotHaveBody() {
   if (pending_response_.has_value() && pending_response_.value().encoder_.headRequest()) {
     ASSERT(!pending_response_done_);
     return true;
-  } else if (parser_->statusCode() == Http::Code::NoContent || parser_->statusCode() == Http::Code::NotModified ||
+  } else if (parser_->statusCode() == Http::Code::NoContent ||
+             parser_->statusCode() == Http::Code::NotModified ||
              (parser_->statusCode() >= Http::Code::OK &&
               (parser_->contentLength().has_value() && parser_->contentLength().value() == 0) &&
               !parser_->isChunked())) {
@@ -1410,7 +1411,8 @@ Envoy::StatusOr<CallbackResult> ClientConnectionImpl::onHeadersCompleteBase() {
     ENVOY_CONN_LOG(trace, "Client: onHeadersComplete size={}", connection_, headers->size());
     headers->setStatus(enumToInt(parser_->statusCode()));
 
-    if (parser_->statusCode() >= Http::Code::OK && parser_->statusCode() < Http::Code::MultipleChoices &&
+    if (parser_->statusCode() >= Http::Code::OK &&
+        parser_->statusCode() < Http::Code::MultipleChoices &&
         pending_response_.value().encoder_.connectRequest()) {
       ENVOY_CONN_LOG(trace, "codec entering upgrade mode for CONNECT response.", connection_);
       handling_upgrade_ = true;

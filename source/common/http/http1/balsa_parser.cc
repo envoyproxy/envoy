@@ -140,7 +140,9 @@ CallbackResult BalsaParser::pause() {
 
 ParserStatus BalsaParser::getStatus() const { return status_; }
 
-Http::Code BalsaParser::statusCode() const { return static_cast<Http::Code>(headers_.parsed_response_code()); }
+Http::Code BalsaParser::statusCode() const {
+  return static_cast<Http::Code>(headers_.parsed_response_code());
+}
 
 bool BalsaParser::isHttp11() const {
   if (framer_.is_request()) {
