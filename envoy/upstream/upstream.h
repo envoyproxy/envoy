@@ -765,6 +765,7 @@ MAKE_STATS_STRUCT(ClusterLbStats, ClusterLbStatNames, ALL_CLUSTER_LB_STATS);
  */
 MAKE_STAT_NAMES_STRUCT(ClusterTrafficStatNames, ALL_CLUSTER_TRAFFIC_STATS);
 MAKE_STATS_STRUCT(ClusterTrafficStats, ClusterTrafficStatNames, ALL_CLUSTER_TRAFFIC_STATS);
+using ClusterTrafficStatsPtr = std::unique_ptr<ClusterTrafficStats>;
 
 MAKE_STAT_NAMES_STRUCT(ClusterLoadReportStatNames, ALL_CLUSTER_LOAD_REPORT_STATS);
 MAKE_STATS_STRUCT(ClusterLoadReportStats, ClusterLoadReportStatNames,

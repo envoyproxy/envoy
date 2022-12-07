@@ -167,15 +167,16 @@ void ConnPoolImplBase::attachStreamToClient(Envoy::ConnectionPool::ActiveClient&
                                             AttachContext& context) {
   ASSERT(client.readyForStream());
 
+  Upstream::ClusterTrafficStats& traffic_stats = *host_->cluster().trafficStats();
   if (client.state() == Envoy::ConnectionPool::ActiveClient::State::ReadyForEarlyData) {
-    host_->cluster().trafficStats()->upstream_rq_0rtt_.inc();
+    traffic_stats.upstream_rq_0rtt_.inc();
   }
 
   if (enforceMaxRequests() && !host_->cluster().resourceManager(priority_).requests().canCreate()) {
     ENVOY_LOG(debug, "max streams overflow");
     onPoolFailure(client.real_host_description_, absl::string_view(),
                   ConnectionPool::PoolFailureReason::Overflow, context);
-    host_->cluster().trafficStats()->upstream_rq_pending_overflow_.inc();
+    traffic_stats.upstream_rq_pending_overflow_.inc();
     return;
   }
   ENVOY_CONN_LOG(debug, "creating stream", client);
@@ -185,7 +186,7 @@ void ConnPoolImplBase::attachStreamToClient(Envoy::ConnectionPool::ActiveClient&
   client.remaining_streams_--;
   if (client.remaining_streams_ == 0) {
     ENVOY_CONN_LOG(debug, "maximum streams per connection, start draining", client);
-    host_->cluster().trafficStats()->upstream_cx_max_requests_.inc();
+    traffic_stats.upstream_cx_max_requests_.inc();
     transitionActiveClientState(client, Envoy::ConnectionPool::ActiveClient::State::Draining);
   } else if (capacity == 1) {
     // As soon as the new stream is created, the client will be maxed out.
@@ -202,8 +203,8 @@ void ConnPoolImplBase::attachStreamToClient(Envoy::ConnectionPool::ActiveClient&
   num_active_streams_++;
   host_->stats().rq_total_.inc();
   host_->stats().rq_active_.inc();
-  host_->cluster().trafficStats()->upstream_rq_total_.inc();
-  host_->cluster().trafficStats()->upstream_rq_active_.inc();
+  traffic_stats.upstream_rq_total_.inc();
+  traffic_stats.upstream_rq_active_.inc();
   host_->cluster().resourceManager(priority_).requests().inc();
 
   onPoolReady(client, context);
@@ -606,8 +607,9 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
 
 PendingStream::PendingStream(ConnPoolImplBase& parent, bool can_send_early_data)
     : parent_(parent), can_send_early_data_(can_send_early_data) {
-  parent_.host()->cluster().trafficStats()->upstream_rq_pending_total_.inc();
-  parent_.host()->cluster().trafficStats()->upstream_rq_pending_active_.inc();
+  Upstream::ClusterTrafficStats& traffic_stats = *parent_.host()->cluster().trafficStats();
+  traffic_stats.upstream_rq_pending_total_.inc();
+  traffic_stats.upstream_rq_pending_active_.inc();
   parent_.host()->cluster().resourceManager(parent_.priority()).pendingRequests().inc();
 }
 

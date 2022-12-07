@@ -77,9 +77,10 @@ ClientImpl::ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dis
       flush_timer_(dispatcher.createTimer([this]() { flushBufferAndResetTimer(); })),
       time_source_(dispatcher.timeSource()), redis_command_stats_(redis_command_stats),
       scope_(scope), is_transaction_client_(is_transaction_client) {
-  host->cluster().trafficStats()->upstream_cx_total_.inc();
+  Upstream::ClusterTrafficStats& traffic_stats = *host->cluster().trafficStats();
+  traffic_stats.upstream_cx_total_.inc();
   host->stats().cx_total_.inc();
-  host->cluster().trafficStats()->upstream_cx_active_.inc();
+  traffic_stats.upstream_cx_active_.inc();
   host->stats().cx_active_.inc();
   connect_or_op_timer_->enableTimer(host->cluster().connectTimeout());
 }

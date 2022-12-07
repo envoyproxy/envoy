@@ -151,7 +151,7 @@ public:
   MOCK_METHOD(const std::string&, observabilityName, (), (const));
   MOCK_METHOD(ResourceManager&, resourceManager, (ResourcePriority priority), (const));
   MOCK_METHOD(TransportSocketMatcher&, transportSocketMatcher, (), (const));
-  MOCK_METHOD(std::unique_ptr<ClusterTrafficStats>&, trafficStats, (), (const));
+  MOCK_METHOD(ClusterTrafficStatsPtr&, trafficStats, (), (const));
   MOCK_METHOD(ClusterLbStats&, lbStats, (), (const));
   MOCK_METHOD(ClusterEndpointStats&, endpointStats, (), (const));
   MOCK_METHOD(ClusterConfigUpdateStats&, configUpdateStats, (), (const));
@@ -209,7 +209,7 @@ public:
   ClusterCircuitBreakersStatNames cluster_circuit_breakers_stat_names_;
   ClusterRequestResponseSizeStatNames cluster_request_response_size_stat_names_;
   ClusterTimeoutBudgetStatNames cluster_timeout_budget_stat_names_;
-  std::unique_ptr<ClusterTrafficStats> traffic_stats_;
+  ClusterTrafficStatsPtr traffic_stats_;
   ClusterConfigUpdateStats config_update_stats_;
   ClusterLbStats lb_stats_;
   ClusterEndpointStats endpoint_stats_;

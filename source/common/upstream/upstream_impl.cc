@@ -846,7 +846,7 @@ void MainPrioritySetImpl::updateCrossPriorityHostMap(const HostVector& hosts_add
   }
 }
 
-std::unique_ptr<ClusterTrafficStats>
+ClusterTrafficStatsPtr
 ClusterInfoImpl::generateStats(Stats::Scope& scope, const ClusterTrafficStatNames& stat_names) {
   return std::make_unique<ClusterTrafficStats>(stat_names, scope);
 }
