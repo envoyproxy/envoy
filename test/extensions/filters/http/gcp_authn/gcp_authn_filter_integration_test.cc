@@ -270,9 +270,7 @@ TEST_P(GcpAuthnFilterIntegrationTest, BasicflowWithoutAudience) {
   sendRequestToDestinationAndValidateResponse(/*with_audience=*/false);
 
   // Verify request has been routed to `cluster_0` but not `gcp_authn` cluster.
-  // Note that upstream_cx_total is from the lazy init ClusterInfo::trafficStats(), so there is
-  // no such stat yet.
-  EXPECT_EQ(test_server_->counter("cluster.gcp_authn.upstream_cx_total"), nullptr);
+  EXPECT_EQ(test_server_->counter("cluster.gcp_authn.upstream_cx_total")->value(), 0);
   EXPECT_GE(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 1);
 
   // Clean up the codec and connections.
