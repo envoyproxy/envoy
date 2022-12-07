@@ -1408,6 +1408,19 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "Apache-2.0",
         license_url = "https://github.com/bazelbuild/rules_license/blob/{version}/LICENSE",
     ),
+    com_grail_bazel_toolchain = dict(
+        project_name = "com_grail_bazel_toolchain",
+        project_desc = "A LLVM toolchain for bazel",
+        project_url = "https://github.com/grailbio/bazel-toolchain",
+        strip_prefix = "bazel-toolchain-{version}",
+        version = "0.7.2",
+        sha256 = "f7aa8e59c9d3cafde6edb372d9bd25fb4ee7293ab20b916d867cd0baaa642529",
+        urls = ["https://github.com/grailbio/bazel-toolchain/archive/{version}.tar.gz"],
+        use_category = [],
+        extensions = [],
+        release_date = "2022-05-23",
+        cpe = "N/A",
+    ),
 )
 
 def _compiled_protoc_deps(locations, versions):

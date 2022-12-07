@@ -223,6 +223,7 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
     external_http_archive("envoy_build_tools")
+    external_http_archive("com_grail_bazel_toolchain")
 
     # TODO(keith): Remove patch when we update rules_pkg
     external_http_archive(

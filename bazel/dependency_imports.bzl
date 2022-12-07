@@ -15,6 +15,7 @@ load("@emsdk//:emscripten_deps.bzl", "emscripten_deps")
 load("@com_github_aignas_rules_shellcheck//:deps.bzl", "shellcheck_dependencies")
 load("@aspect_bazel_lib//lib:repositories.bzl", "register_jq_toolchains", "register_yq_toolchains")
 load("@com_google_cel_cpp//bazel:deps.bzl", "parser_deps")
+load("@llvm_toolchain//:toolchains.bzl", "llvm_register_toolchains")
 
 # go version for rules_go
 GO_VERSION = "1.18"
@@ -60,6 +61,7 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
     emscripten_deps()
     register_jq_toolchains(version = jq_version)
     register_yq_toolchains(version = yq_version)
+    llvm_register_toolchains()
     parser_deps()
 
     # These dependencies, like most of the Go in this repository, exist only for the API.
