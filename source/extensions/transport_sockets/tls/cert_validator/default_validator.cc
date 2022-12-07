@@ -368,11 +368,9 @@ ValidationResults DefaultCertValidator::doVerifyCertChain(
   const bool succeeded = verifyCertAndUpdateStatus(leaf_cert, transport_socket_options.get(),
                                                    detailed_status, &error_details, &tls_alert);
   return succeeded ? ValidationResults{ValidationResults::ValidationStatus::Successful,
-                                       Envoy::Ssl::ClientValidationStatus::Validated, absl::nullopt,
-                                       absl::nullopt}
-                   : ValidationResults{ValidationResults::ValidationStatus::Failed,
-                                       Envoy::Ssl::ClientValidationStatus::Validated, tls_alert,
-                                       error_details};
+                                       detailed_status, absl::nullopt, absl::nullopt}
+                   : ValidationResults{ValidationResults::ValidationStatus::Failed, detailed_status,
+                                       tls_alert, error_details};
 }
 
 bool DefaultCertValidator::verifySubjectAltName(X509* cert,
