@@ -194,6 +194,9 @@ new_features:
 - area: matching
   change: |
     support filter chain selection based on the dynamic metadata and the filter state using :ref:`formatter actions <extension_envoy.matching.actions.format_string>`.
+- area: postgres
+  change: |
+    added support for upstream SSL.
 - area: redis
   change: |
     extended :ref:`cluster support <arch_overview_redis_cluster_support>` by adding a :ref:`dns_cache_config <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.dns_cache_config>` option that can be used to resolve hostnames returned by MOVED/ASK responses.
