@@ -49,11 +49,7 @@ jobs:
       image: ghcr.io/realm/swiftlint:0.50.1
     steps:
     - uses: actions/checkout@v1
-    - id: should_run
-      name: 'Check whether to run'
-      run: ./mobile/tools/should_run_ci.sh
     - name: 'Run Swift Lint (SwiftLint)'
-      if: steps.should_run.outputs.run_ci_job == 'true'
       run: swiftlint lint --strict
       working-directory: mobile
   drstring:
