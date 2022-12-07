@@ -26,7 +26,9 @@ enum class IoUringSocketType {
 /**
  * IoHandle derivative for sockets.
  */
-class IoUringSocketHandleImpl final : public IoHandle, public Io::IoUringHandler, protected Logger::Loggable<Logger::Id::io> {
+class IoUringSocketHandleImpl final : public IoHandle,
+                                      public Io::IoUringHandler,
+                                      protected Logger::Loggable<Logger::Id::io> {
 public:
   IoUringSocketHandleImpl(const uint32_t read_buffer_size, Io::IoUringFactory&,
                           os_fd_t fd = INVALID_SOCKET, bool socket_v6only = false,
@@ -85,17 +87,16 @@ public:
   void onWrite(Io::WriteParam& param) override;
 
 private:
-
   std::string ioUringSocketTypeStr() {
     switch (io_uring_socket_type_) {
-      case IoUringSocketType::Unknown:
-        return "Unknown";
-      case IoUringSocketType::Client:
-        return "Client";
-      case IoUringSocketType::Server:
-        return "Server";
-      case IoUringSocketType::Listen:
-        return "Listen";
+    case IoUringSocketType::Unknown:
+      return "Unknown";
+    case IoUringSocketType::Client:
+      return "Client";
+    case IoUringSocketType::Server:
+      return "Server";
+    case IoUringSocketType::Listen:
+      return "Listen";
     }
   }
 

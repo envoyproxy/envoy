@@ -90,19 +90,21 @@ void IoUringImpl::forEveryCompletion(CompletionCb completion_cb) {
 
 void IoUringImpl::injectCompletion(os_fd_t fd, void* user_data, int32_t result) {
   injected_completions_.emplace_back(fd, user_data, result);
-  ENVOY_LOG(trace, "inject completion, fd = {}, req = {}, num injects = {}", fd, fmt::ptr(user_data), injected_completions_.size());
+  ENVOY_LOG(trace, "inject completion, fd = {}, req = {}, num injects = {}", fd,
+            fmt::ptr(user_data), injected_completions_.size());
 }
 
 void IoUringImpl::removeInjectedCompletion(os_fd_t fd) {
   ENVOY_LOG(debug, "remove injected completion, fd = {}", fd);
-  for(auto iter = injected_completions_.begin(); iter != injected_completions_.end(); ) {
+  for (auto iter = injected_completions_.begin(); iter != injected_completions_.end();) {
     if (iter->fd_ == fd) {
       iter = injected_completions_.erase(iter);
     } else {
       iter++;
     }
   }
-  for(auto iter = current_injected_completions_.begin(); iter != current_injected_completions_.end(); ) {
+  for (auto iter = current_injected_completions_.begin();
+       iter != current_injected_completions_.end();) {
     if (iter->fd_ == fd) {
       iter = current_injected_completions_.erase(iter);
     } else {
@@ -110,7 +112,8 @@ void IoUringImpl::removeInjectedCompletion(os_fd_t fd) {
     }
   }
 
-  ENVOY_LOG(debug, "remove injected completion done, fd = {}, num injected = {}", fd, injected_completions_.size());
+  ENVOY_LOG(debug, "remove injected completion done, fd = {}, num injected = {}", fd,
+            injected_completions_.size());
 }
 
 IoUringResult IoUringImpl::prepareAccept(os_fd_t fd, struct sockaddr* remote_addr,

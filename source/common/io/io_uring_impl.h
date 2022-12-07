@@ -10,7 +10,8 @@ namespace Io {
 bool isIoUringSupported();
 
 struct InjectedCompletion {
-  InjectedCompletion(os_fd_t fd, void* user_data, int32_t result) : fd_(fd), user_data_(user_data), result_(result) {}
+  InjectedCompletion(os_fd_t fd, void* user_data, int32_t result)
+      : fd_(fd), user_data_(user_data), result_(result) {}
 
   os_fd_t fd_;
   void* user_data_;

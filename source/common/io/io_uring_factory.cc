@@ -28,8 +28,10 @@ OptRef<IoUring> IoUringFactoryImpl::get() const {
 
 void IoUringFactoryImpl::onServerInitialized() {
   tls_.set([io_uring_size = io_uring_size_,
-            use_submission_queue_polling = use_submission_queue_polling_](Event::Dispatcher& dispatcher) {
-    auto io_uring_worker = std::make_shared<IoUringWorkerImpl>(io_uring_size, use_submission_queue_polling, dispatcher);
+            use_submission_queue_polling =
+                use_submission_queue_polling_](Event::Dispatcher& dispatcher) {
+    auto io_uring_worker = std::make_shared<IoUringWorkerImpl>(
+        io_uring_size, use_submission_queue_polling, dispatcher);
     io_uring_worker->start();
     return io_uring_worker;
   });

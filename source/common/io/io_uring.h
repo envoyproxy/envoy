@@ -178,7 +178,9 @@ public:
   virtual uint64_t write(Buffer::Instance&) { PANIC("not implemented"); }
   virtual uint64_t writev(const Buffer::RawSlice*, uint64_t) { PANIC("not implemented"); }
 
-  virtual void connect(const Network::Address::InstanceConstSharedPtr&) { PANIC("not implemented"); }
+  virtual void connect(const Network::Address::InstanceConstSharedPtr&) {
+    PANIC("not implemented");
+  }
 
   virtual void onAccept(int32_t) { PANIC("not implemented"); };
   virtual void onClose(int32_t) { PANIC("not implemented"); };
@@ -197,20 +199,25 @@ public:
   virtual void enableSocket(os_fd_t fd) PURE;
   virtual void disableSocket(os_fd_t fd) PURE;
   virtual IoUringSocket& addAcceptSocket(os_fd_t fd, IoUringHandler& handler) PURE;
-  virtual IoUringSocket& addServerSocket(os_fd_t fd, IoUringHandler& handler, uint32_t read_buffer_size) PURE;
-  virtual IoUringSocket& addClientSocket(os_fd_t fd, IoUringHandler& handler, uint32_t read_buffer_size) PURE;
+  virtual IoUringSocket& addServerSocket(os_fd_t fd, IoUringHandler& handler,
+                                         uint32_t read_buffer_size) PURE;
+  virtual IoUringSocket& addClientSocket(os_fd_t fd, IoUringHandler& handler,
+                                         uint32_t read_buffer_size) PURE;
   virtual void closeSocket(os_fd_t fd) PURE;
   virtual std::unique_ptr<IoUringSocket> removeSocket(os_fd_t) PURE;
   virtual Event::Dispatcher& dispatcher() PURE;
   virtual IoUringSocket& getIoUringSocket(os_fd_t fd) PURE;
 
   virtual Request* submitAcceptRequest(IoUringSocket& socket, sockaddr_storage* remote_addr,
-                                         socklen_t* remote_addr_len) PURE;
+                                       socklen_t* remote_addr_len) PURE;
   virtual Request* submitCancelRequest(IoUringSocket& socket, Request* request_to_cancel) PURE;
   virtual Request* submitCloseRequest(IoUringSocket& socket) PURE;
   virtual Request* submitReadRequest(IoUringSocket& socket, struct iovec* iov) PURE;
-  virtual Request* submitWritevRequest(IoUringSocket& socket, struct iovec* iovecs, uint64_t num_vecs) PURE;
-  virtual Request* submitConnectRequest(IoUringSocket& socket, const Network::Address::InstanceConstSharedPtr& address) PURE;
+  virtual Request* submitWritevRequest(IoUringSocket& socket, struct iovec* iovecs,
+                                       uint64_t num_vecs) PURE;
+  virtual Request*
+  submitConnectRequest(IoUringSocket& socket,
+                       const Network::Address::InstanceConstSharedPtr& address) PURE;
 
   virtual void injectCompletion(os_fd_t, RequestType type, int32_t result) PURE;
   virtual void injectCompletion(IoUringSocket& socket, RequestType type, int32_t result) PURE;

@@ -282,7 +282,7 @@ TEST_P(ListenerIntegrationTest, RemoveListener) {
   sendLdsResponse(std::vector<std::string>{}, "2");
   test_server_->waitForGaugeEq("listener_manager.total_listeners_active", 0);
   test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 0);
-    // All the listen socket are closed. include the sockets in the active listener and
+  // All the listen socket are closed. include the sockets in the active listener and
   // the sockets in the filter chain draining listener. The new connection should be reset.
   auto codec1 =
       makeRawHttpConnection(makeClientConnection(lookupPort(listener_name_)), absl::nullopt);

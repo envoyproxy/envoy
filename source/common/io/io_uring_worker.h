@@ -1,19 +1,19 @@
 #pragma once
 
-#include "io_uring.h"
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
-
 #include "source/common/io/io_uring.h"
 #include "source/common/io/io_uring_impl.h"
+
+#include "io_uring.h"
 
 namespace Envoy {
 namespace Io {
 
 class IoUringAcceptSocket : public IoUringSocket, protected Logger::Loggable<Logger::Id::io> {
 public:
-  IoUringAcceptSocket(os_fd_t fd, IoUringHandler& io_uring_handler, IoUringWorker& parent) :
-    fd_(fd), io_uring_handler_(io_uring_handler), parent_(parent) {}
+  IoUringAcceptSocket(os_fd_t fd, IoUringHandler& io_uring_handler, IoUringWorker& parent)
+      : fd_(fd), io_uring_handler_(io_uring_handler), parent_(parent) {}
 
   // IoUringSocket
   os_fd_t fd() const override { return fd_; }
@@ -25,6 +25,7 @@ public:
   void onAccept(int32_t result) override;
   void onClose(int32_t result) override;
   void onCancel(int32_t result) override;
+
 private:
   os_fd_t fd_;
 
@@ -46,10 +47,10 @@ private:
 
 class IoUringBaseSocket : public IoUringSocket, protected Logger::Loggable<Logger::Id::io> {
 public:
-  IoUringBaseSocket(os_fd_t fd, IoUringHandler& io_uring_handler,
-                      IoUringWorker& parent, uint32_t read_buffer_size) :
-    fd_(fd), io_uring_handler_(io_uring_handler), parent_(parent),
-    read_buffer_size_(read_buffer_size), iov_(new struct iovec[1]) {}
+  IoUringBaseSocket(os_fd_t fd, IoUringHandler& io_uring_handler, IoUringWorker& parent,
+                    uint32_t read_buffer_size)
+      : fd_(fd), io_uring_handler_(io_uring_handler), parent_(parent),
+        read_buffer_size_(read_buffer_size), iov_(new struct iovec[1]) {}
 
   virtual ~IoUringBaseSocket() {
     if (SOCKET_VALID(fd_)) {
@@ -96,7 +97,7 @@ public:
       cancel_req_ = parent_.submitCancelRequest(*this, read_req_);
       return;
     }
-  
+
     if (write_req_ != nullptr) {
       return;
     }
@@ -108,11 +109,15 @@ public:
     ENVOY_LOG(debug, "enable the socket, fd = {}", fd_);
     is_disabled_ = false;
     if (pending_result_ != absl::nullopt) {
-      ENVOY_LOG(trace, "inject the pending read result, fd = {}, pending_result_ = {}, pending_buf_size = {}", fd_, pending_result_.value(), pending_read_buf_.length());
+      ENVOY_LOG(
+          trace,
+          "inject the pending read result, fd = {}, pending_result_ = {}, pending_buf_size = {}",
+          fd_, pending_result_.value(), pending_read_buf_.length());
       parent_.injectCompletion(*this, RequestType::Read, pending_result_.value());
       pending_result_ = absl::nullopt;
     } else {
-      // This could be the case of disable first, but already submit a read request, then enable again, then needn't new request again.
+      // This could be the case of disable first, but already submit a read request, then enable
+      // again, then needn't new request again.
       if (read_req_ == nullptr) {
         ENVOY_LOG(debug, "enable the socket, and submit new read reqest fd = {}", fd_);
         submitReadRequest();
@@ -126,14 +131,17 @@ public:
   };
 
   void onRead(int32_t result) override {
-    ENVOY_LOG(trace, "onRead with result {}, fd = {}, read req = {}", result, fd_, fmt::ptr(read_req_));
+    ENVOY_LOG(trace, "onRead with result {}, fd = {}, read req = {}", result, fd_,
+              fmt::ptr(read_req_));
 
     // This is injected event and we have another regular read request, so push this event directly.
     // Or ignored if disabled.
     if (read_req_ != nullptr && result == -EAGAIN) {
       if (!is_disabled_) {
         // TODO: using ptr in read param;
-        ENVOY_LOG(trace, "there is a inject event, and same time we have regular read request, fd = {}", fd_);
+        ENVOY_LOG(trace,
+                  "there is a inject event, and same time we have regular read request, fd = {}",
+                  fd_);
         Buffer::OwnedImpl temp_buf;
         ReadParam param{temp_buf, result};
         io_uring_handler_.onRead(param);
@@ -155,7 +163,8 @@ public:
       }
 
       if (is_disabled_) {
-        ENVOY_LOG(trace, "socket is disabled, pending the nagetive result, fd = {}, result = {}", fd_, result);
+        ENVOY_LOG(trace, "socket is disabled, pending the nagetive result, fd = {}, result = {}",
+                  fd_, result);
         // ignore injected event when disabled.
         if (result != -EAGAIN) {
           pending_result_ = result;
@@ -182,7 +191,7 @@ public:
       ENVOY_LOG(trace, "the connection is closing, drop the read data, fd = {}", fd_);
       return;
     }
-  
+
     // If iouring_read_buf_ is nullptr, it means there is pending data.
     if (iouring_read_buf_ != nullptr) {
       Buffer::BufferFragment* fragment = new Buffer::BufferFragmentImpl(
@@ -197,20 +206,22 @@ public:
     }
 
     if (is_disabled_) {
-      ENVOY_LOG(trace, "socket is disabled, pending the result, fd = {}, pending_buffer size = {}", fd_, pending_read_buf_.length());
+      ENVOY_LOG(trace, "socket is disabled, pending the result, fd = {}, pending_buffer size = {}",
+                fd_, pending_read_buf_.length());
       pending_result_ = result;
       return;
     }
 
     ReadParam param{pending_read_buf_, result};
-    ENVOY_LOG(trace, "calling onRead callback, fd = {}, pending read buf size = {}, result = {}", fd_, pending_read_buf_.length(), result);
+    ENVOY_LOG(trace, "calling onRead callback, fd = {}, pending read buf size = {}, result = {}",
+              fd_, pending_read_buf_.length(), result);
     io_uring_handler_.onRead(param);
     if (pending_read_buf_.length() != 0 && is_disabled_) {
       ENVOY_LOG(trace, "the pending result doesn't consume due to disable, fd = {}", fd_);
       pending_result_ = pending_read_buf_.length();
     }
 
-    //ASSERT(pending_read_buf_.length() == 0);
+    // ASSERT(pending_read_buf_.length() == 0);
     if (read_req_ == nullptr && !is_closing_ && !is_disabled_) {
       ENVOY_LOG(trace, "submit read request after previous read complete, fd = {}", fd_);
       submitReadRequest();
@@ -225,8 +236,10 @@ public:
         ENVOY_LOG(trace, "there is a inject event, but is closing, ignore it, fd = {}", fd_);
         return;
       }
-       // TODO: using ptr in read param;
-      ENVOY_LOG(trace, "there is a inject event, and same time we have regular write request, fd = {}", fd_);
+      // TODO: using ptr in read param;
+      ENVOY_LOG(trace,
+                "there is a inject event, and same time we have regular write request, fd = {}",
+                fd_);
       WriteParam param{result};
       io_uring_handler_.onWrite(param);
       return;
@@ -239,7 +252,8 @@ public:
     }
 
     if (result <= 0) {
-      if (is_closing_ && read_req_ == nullptr && cancel_req_ == nullptr && write_req_ == nullptr && close_req_ == nullptr) {
+      if (is_closing_ && read_req_ == nullptr && cancel_req_ == nullptr && write_req_ == nullptr &&
+          close_req_ == nullptr) {
         ASSERT(close_req_ == nullptr);
         close_req_ = parent_.submitCloseRequest(*this);
         return;
@@ -252,7 +266,8 @@ public:
         }
         if (!injected_event) {
           if (write_buf_.length() > 0) {
-            ENVOY_LOG(trace, "continue write buf since get eagain, size = {}, fd = {}", write_buf_.length(), fd_);
+            ENVOY_LOG(trace, "continue write buf since get eagain, size = {}, fd = {}",
+                      write_buf_.length(), fd_);
             submitWriteRequest();
           }
           return;
@@ -267,7 +282,8 @@ public:
     write_buf_.drain(result);
     ENVOY_LOG(trace, "drain write buf, drain size = {}, fd = {}", result, fd_);
     if (write_buf_.length() > 0) {
-      ENVOY_LOG(trace, "continue write buf since still have data, size = {}, fd = {}", write_buf_.length(), fd_);
+      ENVOY_LOG(trace, "continue write buf since still have data, size = {}, fd = {}",
+                write_buf_.length(), fd_);
       submitWriteRequest();
       return;
     }
@@ -278,7 +294,7 @@ public:
       close_req_ = parent_.submitCloseRequest(*this);
       return;
     }
-  
+
     if (is_full_ && write_buf_.length() == 0) {
       is_full_ = false;
       WriteParam param{result};
@@ -287,7 +303,8 @@ public:
   }
 
   uint64_t write(Buffer::Instance& buffer) override {
-    ENVOY_LOG(trace, "write, size = {}, fd = {}, slices = {}", buffer.length(), fd_, buffer.getRawSlices().size());
+    ENVOY_LOG(trace, "write, size = {}, fd = {}, slices = {}", buffer.length(), fd_,
+              buffer.getRawSlices().size());
     uint64_t buffer_limit = 1024 * 1024;
     uint64_t writable_size = buffer_limit - write_buf_.length();
     if (writable_size <= 0) {
@@ -302,7 +319,8 @@ public:
       return length_to_write;
     }
 
-    ENVOY_LOG(trace, "write buf, size = {}, slices = {}", write_buf_.length(), write_buf_.getRawSlices().size());
+    ENVOY_LOG(trace, "write buf, size = {}, slices = {}", write_buf_.length(),
+              write_buf_.getRawSlices().size());
     submitWriteRequest();
     return length_to_write;
   }
@@ -347,7 +365,8 @@ protected:
       iovecs_[i].iov_len = slices[i].len_;
     }
 
-    ENVOY_LOG(trace, "submit write request, write_buf size = {}, num_iovecs = {}, fd = {}", write_buf_.length(), slices.size(), fd_);
+    ENVOY_LOG(trace, "submit write request, write_buf size = {}, num_iovecs = {}, fd = {}",
+              write_buf_.length(), slices.size(), fd_);
 
     write_req_ = parent_.submitWritevRequest(*this, iovecs_, slices.size());
   }
@@ -376,22 +395,22 @@ protected:
   Request* close_req_{nullptr};
   Request* write_req_{nullptr};
 
-  //TODO Using water maker
+  // TODO Using water maker
   bool is_full_{false};
 };
 
 class IoUringServerSocket : public IoUringBaseSocket {
 public:
-  IoUringServerSocket(os_fd_t fd, IoUringHandler& io_uring_handler,
-                      IoUringWorker& parent, uint32_t read_buffer_size):
-    IoUringBaseSocket(fd, io_uring_handler, parent, read_buffer_size) {}
+  IoUringServerSocket(os_fd_t fd, IoUringHandler& io_uring_handler, IoUringWorker& parent,
+                      uint32_t read_buffer_size)
+      : IoUringBaseSocket(fd, io_uring_handler, parent, read_buffer_size) {}
 };
 
 class IoUringClientSocket : public IoUringBaseSocket {
 public:
-  IoUringClientSocket(os_fd_t fd, IoUringHandler& io_uring_handler,
-                      IoUringWorker& parent, uint32_t read_buffer_size):
-    IoUringBaseSocket(fd, io_uring_handler, parent, read_buffer_size) {}
+  IoUringClientSocket(os_fd_t fd, IoUringHandler& io_uring_handler, IoUringWorker& parent,
+                      uint32_t read_buffer_size)
+      : IoUringBaseSocket(fd, io_uring_handler, parent, read_buffer_size) {}
 
   void start() override {
     ENVOY_LOG(debug, "start client socket, fd = {}", fd_);
@@ -423,10 +442,10 @@ private:
   bool connecting_{true};
 };
 
-
 class IoUringWorkerImpl : public IoUringWorker, protected Logger::Loggable<Logger::Id::io> {
 public:
-  IoUringWorkerImpl(uint32_t io_uring_size, bool use_submission_queue_polling, Event::Dispatcher& dispatcher);
+  IoUringWorkerImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
+                    Event::Dispatcher& dispatcher);
   ~IoUringWorkerImpl() {
     ENVOY_LOG(trace, "destruct io uring worker");
     dispatcher_.clearDeferredDeleteList();
@@ -445,8 +464,10 @@ public:
     socket_iter->second->disable();
   }
   IoUringSocket& addAcceptSocket(os_fd_t fd, IoUringHandler& handler) override;
-  IoUringSocket& addServerSocket(os_fd_t fd, IoUringHandler& handler, uint32_t read_buffer_size) override;
-  IoUringSocket& addClientSocket(os_fd_t fd, IoUringHandler& handler, uint32_t read_buffer_size) override;
+  IoUringSocket& addServerSocket(os_fd_t fd, IoUringHandler& handler,
+                                 uint32_t read_buffer_size) override;
+  IoUringSocket& addClientSocket(os_fd_t fd, IoUringHandler& handler,
+                                 uint32_t read_buffer_size) override;
   void closeSocket(os_fd_t fd) override;
   Event::Dispatcher& dispatcher() override;
 
@@ -460,8 +481,10 @@ public:
   Request* submitCancelRequest(IoUringSocket& socket, Request* request_to_cancel) override;
   Request* submitCloseRequest(IoUringSocket& socket) override;
   Request* submitReadRequest(IoUringSocket& socket, struct iovec* iov) override;
-  Request* submitWritevRequest(IoUringSocket& socket, struct iovec* iovecs, uint64_t num_vecs) override;
-  Request* submitConnectRequest(IoUringSocket& socket, const Network::Address::InstanceConstSharedPtr& address) override;
+  Request* submitWritevRequest(IoUringSocket& socket, struct iovec* iovecs,
+                               uint64_t num_vecs) override;
+  Request* submitConnectRequest(IoUringSocket& socket,
+                                const Network::Address::InstanceConstSharedPtr& address) override;
 
   void injectCompletion(os_fd_t, RequestType type, int32_t result) override;
   void injectCompletion(IoUringSocket& socket, RequestType type, int32_t result) override;
