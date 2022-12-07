@@ -453,6 +453,9 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
   using google::api::expr::runtime::CelValue;
 
   const StreamInfo::StreamInfo* info = getConstRequestStreamInfo();
+  // In order to delegate to the StreamActivation method, we have to set the
+  // context properties to match the Wasm context properties in all callbacks
+  // (e.g. onLog or onEncodeHeaders) for the duration of the call.
   activation_info_ = info;
   activation_request_headers_ = request_headers_ ? request_headers_ : access_log_request_headers_;
   activation_response_headers_ =
