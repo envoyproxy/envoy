@@ -119,7 +119,8 @@ public:
     uint64_t size_copied = 0;
     uint64_t num_slices_copied = 0;
     while (size_copied < length && num_slices_copied < num_slices) {
-      auto copy_length = std::min((length - size_copied), slices[num_slices_copied].len_);
+      auto copy_length =
+          std::min((length - size_copied), static_cast<uint64_t>(slices[num_slices_copied].len_));
       ::memcpy(slices[num_slices_copied].mem_, this->start(), copy_length);
       size_copied += copy_length;
       if (copy_length == slices[num_slices_copied].len_) {
