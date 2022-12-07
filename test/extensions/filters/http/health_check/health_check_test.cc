@@ -274,7 +274,7 @@ TEST_F(HealthCheckFilterPassThroughTest, OkWithContinue) {
   // Goodness only knows why there would be a 100-Continue response in health
   // checks but we can still verify Envoy handles it.
   Http::TestResponseHeaderMapImpl continue_response{{":status", "100"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(continue_response));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(continue_response));
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata_map));
   Http::TestResponseHeaderMapImpl service_hc_response{{":status", "200"}};
