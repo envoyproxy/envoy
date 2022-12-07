@@ -18,12 +18,13 @@
 #include "envoy/server/worker.h"
 #include "envoy/stats/scope.h"
 
+#include "source/common/config/well_known_names.h"
 #include "source/common/filter/config_discovery_impl.h"
 #include "source/common/quic/quic_stat_names.h"
+#include "source/extensions/listener_managers/listener_manager/listener_impl.h"
 #include "source/server/filter_chain_factory_context_callback.h"
 #include "source/server/filter_chain_manager_impl.h"
 #include "source/server/lds_api.h"
-#include "source/server/listener_impl.h"
 #include "source/server/listener_manager_factory.h"
 
 namespace Envoy {
@@ -363,7 +364,9 @@ public:
     return std::make_unique<ListenerManagerImpl>(server, std::move(factory), worker_factory,
                                                  enable_dispatcher_stats, quic_stat_names);
   }
-  std::string name() const override { return "envoy.listener_manager_impl.default"; }
+  std::string name() const override {
+    return Config::ServerExtensionValues::get().DEFAULT_LISTENER;
+  }
 };
 
 } // namespace Server
