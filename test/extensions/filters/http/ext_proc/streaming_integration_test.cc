@@ -671,11 +671,22 @@ TEST_P(StreamingIntegrationTest, PostAndProcessBufferedRequestBodyTooBig) {
         stream->Write(response);
 
         ProcessingRequest header_resp;
-        if (stream->Read(&header_resp)) {
-          ASSERT_TRUE(header_resp.has_response_headers());
+        bool seen_response_headers = false;
+
+        // Reading from the stream, we might receive the response headers
+        // later on depending on when the local reply is executed.
+        for (int i = 0; i < 2; ++i) {
+          if (stream->Read(&header_resp) && header_resp.has_response_headers()) {
+            seen_response_headers = true;
+          }
         }
+
+        ASSERT_TRUE(seen_response_headers);
       });
 
+  // Increase beyond the default 200ms to avoid timing out before getting the
+  // sidecar response.
+  proto_config_.mutable_message_timeout()->set_nanos(500000000);
   initializeConfig();
   HttpIntegrationTest::initialize();
   sendPostRequest(num_chunks, chunk_size, [total_size](Http::HeaderMap& headers) {
