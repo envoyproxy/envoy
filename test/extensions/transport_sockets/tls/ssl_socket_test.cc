@@ -31,6 +31,10 @@
 #include "test/extensions/transport_sockets/tls/test_data/san_dns3_cert_info.h"
 #include "test/extensions/transport_sockets/tls/test_data/san_dns4_cert_info.h"
 #include "test/extensions/transport_sockets/tls/test_data/san_dns_cert_info.h"
+#include "test/extensions/transport_sockets/tls/test_data/san_dns_ecdsa_1_cert_info.h"
+#include "test/extensions/transport_sockets/tls/test_data/san_dns_rsa_1_cert_info.h"
+#include "test/extensions/transport_sockets/tls/test_data/san_dns_rsa_2_cert_info.h"
+#include "test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert_info.h"
 #include "test/extensions/transport_sockets/tls/test_data/san_uri_cert_info.h"
 #include "test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_cert_info.h"
 #include "test/extensions/transport_sockets/tls/test_private_key_method_provider.h"
@@ -1267,7 +1271,7 @@ TEST_P(SslSocketTest, NoCert) {
 // Prefer ECDSA certificate when multiple RSA certificates are present and the
 // client is RSA/ECDSA capable. We validate TLSv1.2 only here, since we validate
 // the e2e behavior on TLSv1.2/1.3 in ssl_integration_test.
-TEST_P(SslSocketTest, MultiCertPreferEcdsa) {
+TEST_P(SslSocketTest, MultiCertPreferEcdsaWithoutSni) {
   const std::string client_ctx_yaml = absl::StrCat(R"EOF(
     common_tls_context:
       tls_params:
@@ -1284,6 +1288,10 @@ TEST_P(SslSocketTest, MultiCertPreferEcdsa) {
   common_tls_context:
     tls_certificates:
     - certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_key.pem"
+    - certificate_chain:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
       private_key:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem"
@@ -1295,6 +1303,297 @@ TEST_P(SslSocketTest, MultiCertPreferEcdsa) {
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
   testUtil(test_options);
+}
+
+// When client supports SNI, exact match is preferred over wildcard match.
+TEST_P(SslSocketTest, MultiCertPreferExactSniMatch) {
+  const std::string client_ctx_yaml = absl::StrCat(R"EOF(
+    sni: "server1.example.com"
+    common_tls_context:
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+        cipher_suites:
+        - ECDHE-ECDSA-AES128-GCM-SHA256
+        - ECDHE-RSA-AES128-GCM-SHA256
+      validation_context:
+        verify_certificate_hash: )EOF",
+                                                   TEST_SAN_DNS_RSA_1_CERT_256_HASH);
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_key.pem"
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_rsa_1_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_rsa_1_key.pem"
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_key.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+  testUtil(test_options.setExpectedSni("server1.example.com"));
+}
+
+// When client supports SNI and there is no exact match, validate that wildcard "*.example.com"
+// matches to "wildcardonlymatch.example.com".
+TEST_P(SslSocketTest, MultiCertWildcardSniMatch) {
+  const std::string client_ctx_yaml = absl::StrCat(R"EOF(
+    sni: "wildcardonlymatch.example.com"
+    common_tls_context:
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+        cipher_suites:
+        - ECDHE-ECDSA-AES128-GCM-SHA256
+        - ECDHE-RSA-AES128-GCM-SHA256
+      validation_context:
+        verify_certificate_hash: )EOF",
+                                                   TEST_SAN_MULTIPLE_DNS_CERT_256_HASH);
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_key.pem"
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_key.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+  testUtil(test_options.setExpectedSni("wildcardonlymatch.example.com"));
+}
+
+// When client supports SNI and there is no exact match, validate that wildcard SAN *.example.com
+// does not matches to a.wildcardonlymatch.example.com, so that the default/first cert is used.
+TEST_P(SslSocketTest, MultiCertWildcardSniMismatch) {
+  const std::string client_ctx_yaml = absl::StrCat(R"EOF(
+    sni: "a.wildcardonlymatch.example.com"
+    common_tls_context:
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+        cipher_suites:
+        - ECDHE-ECDSA-AES128-GCM-SHA256
+        - ECDHE-RSA-AES128-GCM-SHA256
+      validation_context:
+        verify_certificate_hash: )EOF",
+                                                   TEST_NO_SAN_CERT_256_HASH);
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_key.pem"
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_key.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+  // The validation succeeds with default cert that does not match to SNI since Envoy does not
+  // define the criteria that how to validate cert SAN based on SNI .
+  testUtil(test_options.setExpectedSni("a.wildcardonlymatch.example.com"));
+}
+
+// On SNI match, the ECDSA certificate is preferred over RSA.
+TEST_P(SslSocketTest, MultiCertPreferEcdsaOnSniMatch) {
+  const std::string client_ctx_yaml = absl::StrCat(R"EOF(
+    sni: "server1.example.com"
+    common_tls_context:
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+        cipher_suites:
+        - ECDHE-ECDSA-AES128-GCM-SHA256
+        - ECDHE-RSA-AES128-GCM-SHA256
+      validation_context:
+        verify_certificate_hash: )EOF",
+                                                   TEST_SAN_DNS_ECDSA_1_CERT_256_HASH);
+
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_key.pem"
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_rsa_1_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_rsa_1_key.pem"
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_rsa_2_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_rsa_2_key.pem"
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_ecdsa_1_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_ecdsa_1_key.pem"
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_ecdsa_2_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_ecdsa_2_key.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+  testUtil(test_options.setExpectedSni("server1.example.com"));
+}
+
+// On SNI match, the RSA certificate will be selected if ECDSA cert is not present.
+TEST_P(SslSocketTest, MultiCertPickRSAOnSniMatch) {
+  const std::string client_ctx_yaml = absl::StrCat(R"EOF(
+    sni: "server1.example.com"
+    common_tls_context:
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+        cipher_suites:
+        - ECDHE-ECDSA-AES128-GCM-SHA256
+        - ECDHE-RSA-AES128-GCM-SHA256
+      validation_context:
+        verify_certificate_hash: )EOF",
+                                                   TEST_SAN_DNS_RSA_1_CERT_256_HASH);
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_key.pem"
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_rsa_1_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_rsa_1_key.pem"
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_rsa_2_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_rsa_2_key.pem"
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_ecdsa_2_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_ecdsa_2_key.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+  testUtil(test_options.setExpectedSni("server1.example.com"));
+}
+
+// On SNI mismatch, if full scan is disabled, validate that the first cert is used.
+TEST_P(SslSocketTest, MultiCertWithFullScanDisabledOnSniMismatch) {
+  const std::string client_ctx_yaml = absl::StrCat(R"EOF(
+    sni: "nomatch.example.com"
+    common_tls_context:
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+        cipher_suites:
+        - ECDHE-ECDSA-AES128-GCM-SHA256
+        - ECDHE-RSA-AES128-GCM-SHA256
+      validation_context:
+        verify_certificate_hash: )EOF",
+                                                   TEST_NO_SAN_CERT_256_HASH);
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_key.pem"
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_rsa_1_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_rsa_1_key.pem"
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_ecdsa_1_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_ecdsa_1_key.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+  // The validation succeeds with the default cert that does not match to SNI, because Envoy does
+  // not define the criteria that how to validate cert SAN based on SNI .
+  testUtil(test_options.setExpectedSni("nomatch.example.com"));
+}
+
+// On SNI mismatch, full scan will be executed if it is enabled, validate that ECDSA cert is
+// preferred over RSA cert.
+TEST_P(SslSocketTest, MultiCertPreferEcdsaWithFullScanEnabledOnSniMismatch) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.no_full_scan_certs_on_sni_mismatch", "false"}});
+  const std::string client_ctx_yaml = absl::StrCat(R"EOF(
+    sni: "nomatch.example.com"
+    common_tls_context:
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+        cipher_suites:
+        - ECDHE-ECDSA-AES128-GCM-SHA256
+        - ECDHE-RSA-AES128-GCM-SHA256
+      validation_context:
+        verify_certificate_hash: )EOF",
+                                                   TEST_SAN_DNS_ECDSA_1_CERT_256_HASH);
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_key.pem"
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_rsa_1_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_rsa_1_key.pem"
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_ecdsa_1_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_ecdsa_1_key.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+  // The validation succeeds with the certificate that does not match to SNI, because Envoy does not
+  // define the criteria that how to validate cert SAN based on SNI .
+  testUtil(test_options.setExpectedSni("nomatch.example.com"));
+}
+
+// EC cert is selected for a no-EC-capable client.
+TEST_P(SslSocketTest, CertWithNotECCapable) {
+  const std::string client_ctx_yaml = absl::StrCat(R"EOF(
+    sni: "server1.example.com"
+    common_tls_context:
+      tls_params:
+        tls_minimum_protocol_version: TLSv1_2
+        tls_maximum_protocol_version: TLSv1_2
+        cipher_suites:
+        - ECDHE-RSA-AES128-GCM-SHA256
+      validation_context:
+        verify_certificate_hash: )EOF",
+                                                   TEST_SAN_DNS_ECDSA_1_CERT_256_HASH);
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_ecdsa_1_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_ecdsa_1_key.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, version_);
+  // TODO(luyao): We might need to modify ssl socket to set proper stats for failed handshake
+  testUtil(test_options.setExpectedServerStats("")
+               .setExpectedSni("server1.example.com")
+               .setExpectedTransportFailureReasonContains("HANDSHAKE_FAILURE_ON_CLIENT_HELLO"));
 }
 
 TEST_P(SslSocketTest, GetUriWithLocalUriSan) {

@@ -5010,6 +5010,78 @@ TEST_F(SockoptsTest, SockoptsClusterManagerOnly) {
   expectSetsockopts(names_vals);
 }
 
+// The cluster options should override/replace the cluster manager options when both are specified.
+TEST_F(SockoptsTest, SockoptsClusterAndClusterManagerNoAddress) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: SockoptsCluster
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      load_assignment:
+        cluster_name: SockoptsCluster
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
+      upstream_bind_config:
+        socket_options: [
+          { level: 1, name: 2, int_value: 3, state: STATE_PREBIND }]
+  cluster_manager:
+    upstream_bind_config:
+      socket_options: [
+        { level: 4, name: 5, int_value: 6, state: STATE_PREBIND }]
+  )EOF";
+  initialize(yaml);
+  NameVals names_vals{{ENVOY_MAKE_SOCKET_OPTION_NAME(1, 2), 3}};
+  if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
+    names_vals.emplace_back(std::make_pair(ENVOY_SOCKET_SO_NOSIGPIPE, 1));
+  }
+  expectSetsockopts(names_vals);
+}
+
+// The cluster options should override/replace the cluster manager options when both are specified
+// when a source_address is only specified on the cluster manager bind config.
+TEST_F(SockoptsTest, SockoptsClusterAndClusterManagerAddress) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: SockoptsCluster
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      load_assignment:
+        cluster_name: SockoptsCluster
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
+      upstream_bind_config:
+        socket_options: [
+          { level: 1, name: 2, int_value: 3, state: STATE_PREBIND }]
+  cluster_manager:
+    upstream_bind_config:
+      source_address:
+        address: 1.2.3.4
+        port_value: 80
+      socket_options: [
+        { level: 4, name: 5, int_value: 6, state: STATE_PREBIND }]
+  )EOF";
+  initialize(yaml);
+  NameVals names_vals{{ENVOY_MAKE_SOCKET_OPTION_NAME(1, 2), 3}};
+  if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
+    names_vals.emplace_back(std::make_pair(ENVOY_SOCKET_SO_NOSIGPIPE, 1));
+  }
+  expectSetsockopts(names_vals);
+}
+
 TEST_F(SockoptsTest, SockoptsWithExtraSourceAddressAndOpts) {
   const std::string yaml = R"EOF(
   static_resources:
