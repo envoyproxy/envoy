@@ -890,6 +890,10 @@ void ServerContextImpl::populateServerNamesMap(TlsContext& ctx, int pkey_id) {
     auto pt_match = sn_match->second.find(pkey_id);
     if (pt_match != sn_match->second.end()) {
       // When there are duplicate names, prefer the earlier one.
+      //
+      // If all of the SANs in a certificate are unused due to duplicates, it could be useful
+      // to issue a warning, but that would require additional tracking that hasn't been
+      // implemented.
       return;
     }
     sn_match->second.emplace(std::pair<int, std::reference_wrapper<TlsContext>>(pkey_id, ctx));
