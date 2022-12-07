@@ -95,8 +95,15 @@ BaseClientIntegrationTest::BaseClientIntegrationTest(Network::Address::IpVersion
 
 void BaseClientIntegrationTest::initialize() {
   BaseIntegrationTest::initialize();
-  stream_prototype_ = engine_->streamClient()->newStreamPrototype();
-
+  if (num_engines_for_test_ == 1) {
+    stream_prototype_ = engine_->streamClient()->newStreamPrototype();
+  } else {
+    multi_stream_prototypes_.clear();
+    for (const auto& engine : multi_engines_) {
+      multi_stream_prototypes_.push_back(engine->streamClient()->newStreamPrototype());
+    }
+    stream_prototype_ = multi_stream_prototypes_[0];
+  }
   stream_prototype_->setOnHeaders(
       [this](Platform::ResponseHeadersSharedPtr headers, bool, envoy_stream_intel intel) {
         cc_.on_headers_calls++;
@@ -161,29 +168,34 @@ std::shared_ptr<Platform::RequestHeaders> BaseClientIntegrationTest::envoyToMobi
   return std::make_shared<Platform::RequestHeaders>(builder.build());
 }
 
-void BaseClientIntegrationTest::threadRoutine(absl::Notification& engine_running,
-                                              absl::Notification& engine_running_2) {
-  builder_.setOnEngineRunning([&]() {
-    if (!engine_running.HasBeenNotified()) {
-      engine_running.Notify();
-    } else {
-      engine_running_2.Notify();
-    }
-  });
-  // need to fix this callback. alyssa suggests ending the inheritance of test->builder
-  // otherwise, we could consider passing by move??
-  engine_ = build();
-  engine_2_ = builder_.build();
+void BaseClientIntegrationTest::threadRoutine(absl::BlockingCounter& engine_running) {
+  setOnEngineRunning([&]() { engine_running.DecrementCount(); });
+  if (num_engines_for_test_ == 1) {
+    engine_ = build();
+  } else {
+    for (auto i = num_engines_for_test_; i--;) {
+      multi_engines_.push_back(build());
+    };
+    engine_ = multi_engines_[0];
+  }
   full_dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
 void BaseClientIntegrationTest::TearDown() {
   test_server_.reset();
   fake_upstreams_.clear();
-  engine_->terminate();
-  engine_.reset();
-  engine_2_->terminate();
-  engine_2_.reset();
+  if (num_engines_for_test_ == 1) {
+    engine_->terminate();
+    engine_.reset();
+  } else {
+    for (auto engine : multi_engines_){
+      std::cout << "a";
+      engine->terminate();
+      engine.reset();
+    };
+    engine_.reset(); // clear this pointer too, for now
+    multi_engines_.clear();
+  }
 
   full_dispatcher_->exit();
   envoy_thread_->join();
@@ -206,11 +218,10 @@ void BaseClientIntegrationTest::createEnvoy() {
     ENVOY_LOG_MISC(warn, "Using builder config and ignoring config modifiers");
   }
 
-  absl::Notification engine_running;
-  absl::Notification engine_running_2;
+  absl::BlockingCounter engine_running(num_engines_for_test_);
   envoy_thread_ = api_->threadFactory().createThread(
-      [this, &engine_running, &engine_running_2]() -> void { threadRoutine(engine_running, engine_running_2); });
-  engine_running_2.WaitForNotification();
+      [this, &engine_running]() -> void { threadRoutine(engine_running); });
+  engine_running.Wait();
 }
 
 void BaseClientIntegrationTest::cleanup() {
