@@ -5,7 +5,7 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/protobuf/utility.h"
-#include "source/server/lds_api.h"
+#include "source/extensions/listener_managers/listener_manager/lds_api.h"
 
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/init/mocks.h"

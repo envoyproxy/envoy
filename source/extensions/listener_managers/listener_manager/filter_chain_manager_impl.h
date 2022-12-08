@@ -19,7 +19,8 @@
 #include "source/common/init/manager_impl.h"
 #include "source/common/network/cidr_range.h"
 #include "source/common/network/lc_trie.h"
-#include "source/server/filter_chain_factory_context_callback.h"
+#include "source/extensions/listener_managers/listener_manager/filter_chain_factory_context_callback.h"
+#include "source/server/factory_context_impl.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -139,57 +140,6 @@ private:
   const std::vector<Network::FilterFactoryCb> filters_factory_;
   const std::chrono::milliseconds transport_socket_connect_timeout_;
   const std::string name_;
-};
-
-/**
- * Implementation of FactoryContext wrapping a Server::Instance and some listener components.
- */
-class FactoryContextImpl : public Configuration::FactoryContext {
-public:
-  FactoryContextImpl(Server::Instance& server, const envoy::config::listener::v3::Listener& config,
-                     Network::DrainDecision& drain_decision, Stats::Scope& global_scope,
-                     Stats::Scope& listener_scope, bool is_quic);
-
-  // Configuration::FactoryContext
-  AccessLog::AccessLogManager& accessLogManager() override;
-  Upstream::ClusterManager& clusterManager() override;
-  Event::Dispatcher& mainThreadDispatcher() override;
-  const Server::Options& options() override;
-  Grpc::Context& grpcContext() override;
-  Router::Context& routerContext() override;
-  bool healthCheckFailed() override;
-  Http::Context& httpContext() override;
-  Init::Manager& initManager() override;
-  const LocalInfo::LocalInfo& localInfo() const override;
-  Envoy::Runtime::Loader& runtime() override;
-  Stats::Scope& scope() override;
-  Stats::Scope& serverScope() override { return server_.stats(); }
-  Singleton::Manager& singletonManager() override;
-  OverloadManager& overloadManager() override;
-  ThreadLocal::SlotAllocator& threadLocal() override;
-  OptRef<Admin> admin() override;
-  TimeSource& timeSource() override;
-  ProtobufMessage::ValidationContext& messageValidationContext() override;
-  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
-  Api::Api& api() override;
-  ServerLifecycleNotifier& lifecycleNotifier() override;
-  ProcessContextOptRef processContext() override;
-  Configuration::ServerFactoryContext& getServerFactoryContext() const override;
-  Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
-  const envoy::config::core::v3::Metadata& listenerMetadata() const override;
-  const Envoy::Config::TypedMetadata& listenerTypedMetadata() const override;
-  envoy::config::core::v3::TrafficDirection direction() const override;
-  Network::DrainDecision& drainDecision() override;
-  Stats::Scope& listenerScope() override;
-  bool isQuicListener() const override;
-
-private:
-  Server::Instance& server_;
-  const envoy::config::listener::v3::Listener& config_;
-  Network::DrainDecision& drain_decision_;
-  Stats::Scope& global_scope_;
-  Stats::Scope& listener_scope_;
-  bool is_quic_;
 };
 
 /**

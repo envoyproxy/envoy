@@ -54,7 +54,6 @@ RUNTIME_GUARD(envoy_reloadable_features_http_skip_adding_content_length_to_upgra
 RUNTIME_GUARD(envoy_reloadable_features_http_strip_fragment_from_path_unsafe_if_disabled);
 RUNTIME_GUARD(envoy_reloadable_features_local_ratelimit_match_all_descriptors);
 RUNTIME_GUARD(envoy_reloadable_features_lua_respond_with_send_local_reply);
-RUNTIME_GUARD(envoy_reloadable_features_no_delay_close_for_upgrades);
 RUNTIME_GUARD(envoy_reloadable_features_no_extension_lookup_by_name);
 RUNTIME_GUARD(envoy_reloadable_features_no_full_scan_certs_on_sni_mismatch);
 RUNTIME_GUARD(envoy_reloadable_features_oauth_header_passthrough_fix);
@@ -97,6 +96,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_runtime_initialized);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_always_use_v6);
 // TODO(kuochunghsu): Make this enabled after Pinterest tests
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_tcp_pool_idle_timeout)
+// TODO(alyssawilk) remove in Q2.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_no_delay_close_for_upgrades);
 
 // Block of non-boolean flags. These are deprecated. Do not add more.
 ABSL_FLAG(uint64_t, envoy_headermap_lazy_map_min_size, 3, "");  // NOLINT

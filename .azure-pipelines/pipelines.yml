@@ -317,10 +317,11 @@ stages:
         bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
 
 - stage: distribution
-  dependsOn: ["linux_arm64", "linux_x64"]
+  dependsOn: ["env", "linux_arm64", "linux_x64"]
   jobs:
   - job: package_x64
     dependsOn: []
+    condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'))
     timeoutInMinutes: 120
     pool:
       vmImage: "ubuntu-20.04"
@@ -330,6 +331,7 @@ stages:
         ciTarget: bazel.distribution
   - job: package_arm64
     dependsOn: []
+    condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'))
     timeoutInMinutes: 120
     pool: "arm-large"
     steps:
@@ -342,6 +344,7 @@ stages:
         bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
   - job: verify_x64
     dependsOn: ["package_x64"]
+    condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'))
     timeoutInMinutes: 120
     pool:
       vmImage: "ubuntu-20.04"
@@ -364,6 +367,7 @@ stages:
       displayName: "Verify packages"
   - job: verify_arm64
     dependsOn: ["package_arm64"]
+    condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'))
     timeoutInMinutes: 120
     pool: "arm-large"
     steps:
@@ -383,6 +387,22 @@ stages:
         BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
         GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
       displayName: "Verify packages"
+
+  - job: verified
+    dependsOn: ["verify_x64", "verify_arm64"]
+    pool:
+      vmImage: "ubuntu-20.04"
+    # This condition ensures that this (required) check passes if all of
+    # the preceeding checks either pass or are skipped
+    # adapted from:
+    #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
+    condition: |
+      and(
+        in(dependencies.verify_x64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
+        in(dependencies.verify_arm64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
+    steps:
+    - bash: |
+        echo "checks complete"
 
 - stage: check
   dependsOn: ["env", "linux_x64"]

@@ -315,5 +315,30 @@ TEST_P(ClientIntegrationTest, DISABLED_Proxying) {
   ASSERT_EQ(cc_.on_complete_calls, 2);
 }
 
+TEST_P(ClientIntegrationTest, DirectResponse) {
+  initialize();
+  if (version_ == Network::Address::IpVersion::v6) {
+    // Localhost only resolves to an ipv4 address - alas no kernel happy eyeballs.
+    return;
+  }
+
+  // Override to not validate stream intel.
+  stream_prototype_->setOnComplete(
+      [this](envoy_stream_intel, envoy_final_stream_intel final_intel) {
+        cc_.on_complete_received_byte_count = final_intel.received_byte_count;
+        cc_.on_complete_calls++;
+        cc_.terminal_callback->setReady();
+      });
+
+  default_request_headers_.setHost("127.0.0.1");
+  default_request_headers_.setPath("/");
+
+  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
+  terminal_callback_.waitReady();
+  ASSERT_EQ(cc_.status, "404");
+  ASSERT_EQ(cc_.on_headers_calls, 1);
+  stream_.reset();
+}
+
 } // namespace
 } // namespace Envoy
