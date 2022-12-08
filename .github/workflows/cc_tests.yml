@@ -14,7 +14,7 @@ jobs:
     container:
       image: envoyproxy/envoy-build-ubuntu:b0ff77ae3f25b0bf595f9b8bba46b489723ab446
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v3
     - name: Add safe directory
       run: git config --global --add safe.directory /__w/envoy/envoy
     - env:

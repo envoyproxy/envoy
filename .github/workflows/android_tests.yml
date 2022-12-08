@@ -14,7 +14,7 @@ jobs:
     runs-on: macos-12
     timeout-minutes: 90
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v3
     - id: should_run
       name: 'Check whether to run'
       run: ./mobile/tools/should_run_ci.sh
@@ -45,7 +45,7 @@ jobs:
     runs-on: macos-12
     timeout-minutes: 120
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v3
     - id: should_run
       name: 'Check whether to run'
       run: ./mobile/tools/should_run_ci.sh
@@ -84,7 +84,7 @@ jobs:
         CC: /opt/llvm/bin/clang
         CXX: /opt/llvm/bin/clang++
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v3
     - name: Add safe directory
       run: git config --global --add safe.directory /__w/envoy/envoy
     - id: should_run
