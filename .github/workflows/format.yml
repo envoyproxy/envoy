@@ -4,13 +4,7 @@ on:
   push:
     branches:
     - main
-    paths:
-    - 'mobile/**'
-    - '.github/workflows/**'
   pull_request:
-    paths:
-    - 'mobile/**'
-    - '.github/workflows/**'
 
 jobs:
   formatall:
@@ -26,7 +20,13 @@ jobs:
         ENVOY_BAZEL_PREFIX: "@envoy"
     steps:
     - uses: actions/checkout@v1
+    - name: Add safe directory
+      run: git config --global --add safe.directory /__w/envoy/envoy
+    - id: should_run
+      name: 'Check whether to run'
+      run: ./mobile/tools/should_run_ci.sh
     - name: 'Run formatters'
+      if: steps.should_run.outputs.run_ci_job == 'true'
       run: cd mobile && ./tools/check_format.sh
   precommit:
     name: precommit
@@ -34,9 +34,14 @@ jobs:
     timeout-minutes: 45
     steps:
     - uses: actions/checkout@v1
+    - id: should_run
+      name: 'Check whether to run'
+      run: ./mobile/tools/should_run_ci.sh
     - name: 'Install precommit'
+      if: steps.should_run.outputs.run_ci_job == 'true'
       run: brew install pre-commit
     - name: 'Run precommit'
+      if: steps.should_run.outputs.run_ci_job == 'true'
       run: cd mobile && find mobile/* | pre-commit run --files
   swiftlint:
     name: swift_lint
@@ -55,7 +60,11 @@ jobs:
     timeout-minutes: 10
     steps:
     - uses: actions/checkout@v1
+    - id: should_run
+      name: 'Check whether to run'
+      run: ./mobile/tools/should_run_ci.sh
     - name: 'Run DrString'
+      if: steps.should_run.outputs.run_ci_job == 'true'
       env:
         DEVELOPER_DIR: /Applications/Xcode_14.1.app
       run: cd mobile && ./bazelw run @DrString//:drstring check
@@ -65,14 +74,21 @@ jobs:
     timeout-minutes: 45
     steps:
     - uses: actions/checkout@v1
-    - uses: actions/setup-java@v1
+    - id: should_run
+      name: 'Check whether to run'
+      run: ./mobile/tools/should_run_ci.sh
+    - uses: actions/setup-java@c3ac5dd0ed8db40fedb61c32fbe677e6b355e94c
+      if: steps.should_run.outputs.run_ci_job == 'true'
       with:
         java-version: '8'
         java-package: jdk
         architecture: x64
+        distribution: zulu
     - run: cd mobile && ./ci/mac_ci_setup.sh
+      if: steps.should_run.outputs.run_ci_job == 'true'
       name: 'Install dependencies'
     - name: 'Run Kotlin Lint (Detekt)'
+      if: steps.should_run.outputs.run_ci_job == 'true'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
@@ -82,5 +98,5 @@ jobs:
             //library/kotlin/io/envoyproxy/envoymobile:envoy_lib_lint \
             //examples/kotlin/hello_world:hello_envoy_kt_lint
     - name: 'Run Kotlin Formatter (ktlint)'
-      run: |
-        cd mobile && ./bazelw build kotlin_format
+      if: steps.should_run.outputs.run_ci_job == 'true'
+      run: cd mobile && ./bazelw build kotlin_format
