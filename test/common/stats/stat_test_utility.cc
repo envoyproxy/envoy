@@ -276,16 +276,6 @@ std::vector<uint64_t> TestStore::histogramValues(const std::string& name, bool c
   return copy;
 }
 
-GaugeOptConstRef findGaugeInStore(const Store& store, StatName name) {
-  Stats::GaugeOptConstRef gauge;
-  store.forEachScope(nullptr, [&gauge, name](const Stats::Scope& scope) {
-    if (!gauge.has_value()) {
-      gauge = scope.findGauge(name);
-    }
-  });
-  return gauge;
-}
-
 // TODO(jmarantz): this utility is intended to be used both for unit tests
 // and fuzz tests. But those have different checking macros, e.g. EXPECT_EQ vs
 // FUZZ_ASSERT.

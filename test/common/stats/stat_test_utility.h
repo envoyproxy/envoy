@@ -15,15 +15,6 @@ namespace Envoy {
 namespace Stats {
 namespace TestUtil {
 
-/**
- * Searches all scopes in the store for a gauge with the specified name.
- *
- * @param store the store in which to search
- * @param name the stat-name of the gauge we are looking for
- * @return optional gauge, if found
- */
-GaugeOptConstRef findGaugeInStore(const Store& stoe, StatName name);
-
 class TestSymbolTableHelper {
 public:
   SymbolTable& symbolTable() { return symbol_table_; }

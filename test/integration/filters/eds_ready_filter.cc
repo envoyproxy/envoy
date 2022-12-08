@@ -25,9 +25,13 @@ public:
     // We must do the 'find' on the Store, which searches all scopes. Doing the
     // find only on the root scope will not find the gauge which is defined on a
     // lower-level scope.
-    const Stats::Store& store = root_scope_.constStore();
     Stats::StatName stat_name = stat_name_.statName();
-    Stats::GaugeOptConstRef gauge = Stats::TestUtil::findGaugeInStore(store, stat_name);
+    Stats::GaugeOptConstRef gauge;
+    root_scope_.constStore().forEachScope(nullptr, [&gauge, stat_name](const Stats::Scope& scope) {
+      if (!gauge.has_value()) {
+        gauge = scope.findGauge(stat_name);
+      }
+    });
 
     if (!gauge.has_value()) {
       decoder_callbacks_->sendLocalReply(Envoy::Http::Code::InternalServerError,
