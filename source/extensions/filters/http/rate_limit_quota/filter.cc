@@ -134,11 +134,7 @@ RateLimitOnMactchAction::generateBucketId(const Http::Matching::HttpMatchingData
         if (!result.data_.value().empty()) {
           // Build the bucket id from the matched result.
           bucket_id.mutable_bucket()->insert({bucket_id_key, result.data_.value()});
-        } else {
-          return absl::InternalError("Empty matched result.");
         }
-      } else {
-        return absl::InternalError("Failed to retrieve the result from custom value config.");
       }
       break;
     }

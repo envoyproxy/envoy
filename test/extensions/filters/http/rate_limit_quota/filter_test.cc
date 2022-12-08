@@ -125,7 +125,7 @@ public:
     TestUtility::loadFromYaml(GoogleGrpcConfig, config_);
   }
 
-  ~FilterTest() { filter_->onDestroy(); }
+  ~FilterTest() override { filter_->onDestroy(); }
 
   void addMatcherConfigAndCreateFilter(MatcherConfigType config_type) {
     // Add the matcher configuration.
@@ -153,9 +153,17 @@ public:
       break;
     }
 
+    // filter_config_ = std::make_shared<FilterConfig>(config_);
+    // filter_ = std::make_unique<RateLimitQuotaFilter>(filter_config_, context_);
+    // filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  }
+
+  void createFilter(bool set_callback = true) {
     filter_config_ = std::make_shared<FilterConfig>(config_);
     filter_ = std::make_unique<RateLimitQuotaFilter>(filter_config_, context_);
-    filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+    if (set_callback) {
+      filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+    }
   }
 
   void constructMismatchedRequestHeader() {
@@ -189,6 +197,7 @@ public:
 
 TEST_F(FilterTest, InvalidBucketMatcherConfig) {
   addMatcherConfigAndCreateFilter(MatcherConfigType::Invalid);
+  createFilter();
   auto match = filter_->requestMatching(default_headers_);
   EXPECT_FALSE(match.ok());
   EXPECT_THAT(match, StatusIs(absl::StatusCode::kInternal));
@@ -197,6 +206,7 @@ TEST_F(FilterTest, InvalidBucketMatcherConfig) {
 
 TEST_F(FilterTest, RequestMatchingSucceeded) {
   addMatcherConfigAndCreateFilter(MatcherConfigType::Valid);
+  createFilter();
   // Define the key value pairs that is used to build the bucket_id dynamically via `custom_value`
   // in the config.
   absl::flat_hash_map<std::string, std::string> custom_value_pairs = {{"environment", "staging"},
@@ -227,6 +237,7 @@ TEST_F(FilterTest, RequestMatchingSucceeded) {
 
 TEST_F(FilterTest, RequestMatchingFailed) {
   addMatcherConfigAndCreateFilter(MatcherConfigType::Valid);
+  createFilter();
   constructMismatchedRequestHeader();
 
   // Perform request matching.
@@ -237,8 +248,19 @@ TEST_F(FilterTest, RequestMatchingFailed) {
   EXPECT_EQ(match.status().message(), "The match was completed, no match found");
 }
 
+TEST_F(FilterTest, RequestMatchingFailedWithNoCallback) {
+  addMatcherConfigAndCreateFilter(MatcherConfigType::Valid);
+  createFilter(false);
+
+  auto match = filter_->requestMatching(default_headers_);
+  EXPECT_FALSE(match.ok());
+  EXPECT_THAT(match, StatusIs(absl::StatusCode::kInternal));
+  EXPECT_EQ(match.status().message(), "Filter callback has not been initialized successfully yet.");
+}
+
 TEST_F(FilterTest, RequestMatchingFailedWithOnNoMatchConfigured) {
   addMatcherConfigAndCreateFilter(MatcherConfigType::IncludeOnNoMatchConfig);
+  createFilter();
   constructMismatchedRequestHeader();
 
   // Perform request matching.
@@ -252,6 +274,7 @@ TEST_F(FilterTest, RequestMatchingFailedWithOnNoMatchConfigured) {
 
 TEST_F(FilterTest, DecodeHeaderSucceeded) {
   addMatcherConfigAndCreateFilter(MatcherConfigType::Valid);
+  createFilter();
   // Define the key value pairs that is used to build the bucket_id dynamically via `custom_value`
   // in the config.
   absl::flat_hash_map<std::string, std::string> custom_value_pairs = {{"environment", "staging"},
