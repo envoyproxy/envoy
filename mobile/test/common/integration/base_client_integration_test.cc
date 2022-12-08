@@ -95,15 +95,12 @@ BaseClientIntegrationTest::BaseClientIntegrationTest(Network::Address::IpVersion
 
 void BaseClientIntegrationTest::initialize() {
   BaseIntegrationTest::initialize();
-  if (num_engines_for_test_ == 1) {
-    stream_prototype_ = engine_->streamClient()->newStreamPrototype();
-  } else {
-    multi_stream_prototypes_.clear();
-    for (const auto& engine : multi_engines_) {
-      multi_stream_prototypes_.push_back(engine->streamClient()->newStreamPrototype());
-    }
-    stream_prototype_ = multi_stream_prototypes_[0];
+
+  multi_stream_prototypes_.clear();
+  for (const auto& engine : multi_engines_) {
+    multi_stream_prototypes_.push_back(engine->streamClient()->newStreamPrototype());
   }
+  stream_prototype_ = multi_stream_prototypes_[0];
   stream_prototype_->setOnHeaders(
       [this](Platform::ResponseHeadersSharedPtr headers, bool, envoy_stream_intel intel) {
         cc_.on_headers_calls++;
@@ -170,32 +167,24 @@ std::shared_ptr<Platform::RequestHeaders> BaseClientIntegrationTest::envoyToMobi
 
 void BaseClientIntegrationTest::threadRoutine(absl::BlockingCounter& engine_running) {
   setOnEngineRunning([&]() { engine_running.DecrementCount(); });
-  if (num_engines_for_test_ == 1) {
-    engine_ = build();
-  } else {
-    for (auto i = num_engines_for_test_; i--;) {
-      multi_engines_.push_back(build());
-    };
-    engine_ = multi_engines_[0];
-  }
+  for (auto i = num_engines_for_test_; i--;) {
+    multi_engines_.push_back(build());
+  };
+  engine_ = multi_engines_[0];
   full_dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
 void BaseClientIntegrationTest::TearDown() {
   test_server_.reset();
   fake_upstreams_.clear();
-  if (num_engines_for_test_ == 1) {
-    engine_->terminate();
-    engine_.reset();
-  } else {
-    for (auto engine : multi_engines_){
-      std::cout << "a";
-      engine->terminate();
-      engine.reset();
-    };
-    engine_.reset(); // clear this pointer too, for now
-    multi_engines_.clear();
-  }
+
+  for (auto engine : multi_engines_) {
+    std::cout << "a";
+    engine->terminate();
+    engine.reset();
+  };
+  engine_.reset(); // clear this pointer too, for now
+  multi_engines_.clear();
 
   full_dispatcher_->exit();
   envoy_thread_->join();
