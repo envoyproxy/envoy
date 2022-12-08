@@ -46,14 +46,6 @@ void validateStreamIntel(const envoy_final_stream_intel& final_intel, bool expec
   ASSERT_LE(final_intel.response_start_ms, final_intel.stream_end_ms);
 }
 
-// Use the Envoy mobile default config as much as possible in this test.
-// There are some config modifiers below which do result in deltas.
-std::string defaultConfig() {
-  Platform::EngineBuilder builder;
-  std::string config_str = absl::StrCat(config_header, builder.generateConfigStr());
-  return config_str;
-}
-
 // Gets the spdlog level from the test options and converts it to the Platform::LogLevel used by
 // the Envoy Mobile engine.
 Platform::LogLevel getPlatformLogLevelFromOptions() {
@@ -81,8 +73,17 @@ Platform::LogLevel getPlatformLogLevelFromOptions() {
 
 } // namespace
 
-BaseClientIntegrationTest::BaseClientIntegrationTest(Network::Address::IpVersion ip_version)
-    : BaseIntegrationTest(ip_version, defaultConfig()) {
+// Use the Envoy mobile default config as much as possible in this test.
+// There are some config modifiers below which do result in deltas.
+std::string defaultConfig() {
+  Platform::EngineBuilder builder;
+  std::string config_str = absl::StrCat(config_header, builder.generateConfigStr());
+  return config_str;
+}
+
+BaseClientIntegrationTest::BaseClientIntegrationTest(Network::Address::IpVersion ip_version,
+                                                     const std::string& bootstrap_config)
+    : BaseIntegrationTest(ip_version, bootstrap_config) {
   skip_tag_extraction_rule_check_ = true;
   full_dispatcher_ = api_->allocateDispatcher("fake_envoy_mobile");
   use_lds_ = false;
