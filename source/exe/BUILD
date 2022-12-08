@@ -139,7 +139,6 @@ envoy_cc_library(
                "//source/server:options_lib",
                "//source/server:server_lib",
                "//source/server:listener_hooks_lib",
-               "//source/server/config_validation:server_lib",
            ] + envoy_all_core_extensions() +
            # TODO(rojkov): drop io_uring dependency when it's fully integrated.
            select({
@@ -150,18 +149,13 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "envoy_main_common_with_core_extensions_lib",
-    srcs = [
-        "main_common.cc",
-    ],
-    hdrs = [
-        "main_common.h",
-    ],
+    srcs = ["main_common.cc"],
+    hdrs = ["main_common.h"],
     deps = [
-        "//source/server/config_validation:server_lib",
-        ":stripped_main_base_lib",
         ":envoy_common_with_core_extensions_lib",
         ":platform_impl_lib",
         ":process_wide_lib",
+        ":stripped_main_base_lib",
         "//envoy/server:platform_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:compiler_requirements_lib",
@@ -169,6 +163,7 @@ envoy_cc_library(
         "//source/common/grpc:google_grpc_context_lib",
         "//source/server:hot_restart_lib",
         "//source/server:hot_restart_nop_lib",
+        "//source/server/config_validation:server_lib",
     ] + select({
         "//bazel:disable_signal_trace": [],
         "//conditions:default": [
