@@ -976,6 +976,8 @@ ClusterInfoImpl::ClusterInfoImpl(
                         extensionProtocolOptionsTyped<HttpProtocolOptionsConfigImpl>(
                             "envoy.extensions.upstreams.http.v3.HttpProtocolOptions"),
                         factory_context.messageValidationVisitor())),
+      tcp_protocol_options_(extensionProtocolOptionsTyped<TcpProtocolOptionsConfigImpl>(
+          "envoy.extensions.upstreams.tcp.v3.TcpProtocolOptions")),
       max_requests_per_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           http_protocol_options_->common_http_protocol_options_, max_requests_per_connection,
           config.max_requests_per_connection().value())),
@@ -1107,9 +1109,8 @@ ClusterInfoImpl::ClusterInfoImpl(
   }
 
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tcp_pool_idle_timeout")) {
-    if (config.has_tcp_protocol_options() && config.tcp_protocol_options().has_idle_timeout()) {
-      tcp_pool_idle_timeout_ = std::chrono::milliseconds(
-          DurationUtil::durationToMilliseconds(config.tcp_protocol_options().idle_timeout()));
+    if (tcp_protocol_options_ && tcp_protocol_options_->idleTimeout().has_value()) {
+      tcp_pool_idle_timeout_ = tcp_protocol_options_->idleTimeout();
       if (tcp_pool_idle_timeout_.value().count() == 0) {
         tcp_pool_idle_timeout_ = absl::nullopt;
       }

@@ -3869,6 +3869,43 @@ TEST_F(ClusterInfoImplTest, Timeouts) {
   }
 }
 
+TEST_F(ClusterInfoImplTest, TcpPoolIdleTimeout) {
+  const std::string yaml_base = R"EOF(
+  name: {}
+  type: STRICT_DNS
+  lb_policy: ROUND_ROBIN
+  )EOF";
+
+  const std::string yaml_set_tcp_pool_idle_timeout = yaml_base + R"EOF(
+  typed_extension_protocol_options:
+    envoy.extensions.upstreams.tcp.v3.TcpProtocolOptions:
+      "@type": type.googleapis.com/envoy.extensions.upstreams.tcp.v3.TcpProtocolOptions
+      idle_timeout: {}
+  )EOF";
+
+  // Disable by reloadable_features
+  auto cluster1 = makeCluster(fmt::format(yaml_base, "cluster1"));
+  EXPECT_EQ(absl::nullopt, cluster1->info()->tcpPoolIdleTimeout());
+
+  auto cluster2 = makeCluster(fmt::format(yaml_set_tcp_pool_idle_timeout, "cluster2", "9s"));
+  EXPECT_EQ(absl::nullopt, cluster2->info()->tcpPoolIdleTimeout());
+
+  auto cluster3 = makeCluster(fmt::format(yaml_set_tcp_pool_idle_timeout, "cluster3", "0s"));
+  EXPECT_EQ(absl::nullopt, cluster3->info()->tcpPoolIdleTimeout());
+
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.tcp_pool_idle_timeout", "true"}});
+
+  auto cluster4 = makeCluster(fmt::format(yaml_base, "cluster4"));
+  EXPECT_EQ(std::chrono::hours(1), cluster4->info()->tcpPoolIdleTimeout());
+
+  auto cluster5 = makeCluster(fmt::format(yaml_set_tcp_pool_idle_timeout, "cluster5", "9s"));
+  EXPECT_EQ(std::chrono::seconds(9), cluster5->info()->tcpPoolIdleTimeout());
+
+  auto cluster6 = makeCluster(fmt::format(yaml_set_tcp_pool_idle_timeout, "cluster6", "0s"));
+  EXPECT_EQ(absl::nullopt, cluster6->info()->tcpPoolIdleTimeout());
+}
+
 TEST_F(ClusterInfoImplTest, TestTrackTimeoutBudgetsNotSetInConfig) {
   // Check that without the flag specified, the histogram is null.
   const std::string yaml_disabled = R"EOF(

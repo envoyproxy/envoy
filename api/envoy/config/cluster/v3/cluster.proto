@@ -44,7 +44,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 58]
+// [#next-free-field: 57]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster";
 
@@ -1184,9 +1184,6 @@ message Cluster {
   // If ``connection_pool_per_downstream_connection`` is true, the cluster will use a separate
   // connection pool for every downstream connection
   bool connection_pool_per_downstream_connection = 51;
-
-  // TCP protocol options that are applied to TCP connections from pool.
-  core.v3.TcpProtocolOptions tcp_protocol_options = 57;
 }
 
 // Extensible load balancing policy configuration.

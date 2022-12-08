@@ -23,23 +23,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Protocol options]
 
+// [#not-implemented-hide:]
 message TcpProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.TcpProtocolOptions";
-
-  // The idle timeout for connections. The idle timeout is defined as the period in which
-  // there are no active stream. When the idle timeout is reached, the connection will be closed.
-  //
-  // The timeout is guarded by
-  // ``envoy.reloadable_features.envoy_reloadable_features_tcp_pool_idle_timeout``.
-  //
-  // If the above runtime flag is enabled and idle timeout is not specified,
-  // this defaults to 1 hour. To disable idle timeouts, explicitly set this to 0.
-  //
-  // .. warning::
-  //   Disabling this timeout has a highly likelihood of yielding connection leaks due to lost TCP
-  //   FIN packets, etc.
-  google.protobuf.Duration idle_timeout = 1;
 }
 
 // Config for keepalive probes in a QUIC connection.

@@ -1124,6 +1124,11 @@ envoy.upstreams.tcp.generic:
   - envoy.upstreams
   security_posture: robust_to_untrusted_downstream
   status: stable
+envoy.upstreams.tcp.tcp_protocol_options:
+  categories:
+  - envoy.upstreams
+  security_posture: unknown
+  status: alpha
 envoy.wasm.runtime.null:
   categories:
   - envoy.wasm.runtime
