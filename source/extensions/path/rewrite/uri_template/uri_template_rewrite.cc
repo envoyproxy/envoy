@@ -27,7 +27,7 @@ namespace Rewrite {
 absl::Status
 UriTemplateRewriter::isCompatiblePathMatcher(Router::PathMatcherSharedPtr path_matcher) const {
 
-  if(path_matcher == nullptr) {
+  if (path_matcher == nullptr) {
     return absl::InvalidArgumentError("path_matcher not initialized");
   }
 
