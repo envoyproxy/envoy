@@ -232,8 +232,18 @@ public:
                                           uint64_t random_value) const;
   const VirtualCluster* virtualClusterFromEntries(const Http::HeaderMap& headers) const;
   const ConfigImpl& globalRouteConfig() const { return global_route_config_; }
-  const HeaderParser& requestHeaderParser() const { return *request_headers_parser_; }
-  const HeaderParser& responseHeaderParser() const { return *response_headers_parser_; }
+  const HeaderParser& requestHeaderParser() const {
+    if (request_headers_parser_ != nullptr) {
+      return *request_headers_parser_;
+    }
+    return HeaderParser::defaultParser();
+  }
+  const HeaderParser& responseHeaderParser() const {
+    if (response_headers_parser_ != nullptr) {
+      return *response_headers_parser_;
+    }
+    return HeaderParser::defaultParser();
+  }
 
   // Router::VirtualHost
   const CorsPolicy* corsPolicy() const override { return cors_policy_.get(); }
@@ -581,6 +591,18 @@ public:
   }
   const std::string& routeName() const override { return route_name_; }
   const CorsPolicy* corsPolicy() const override { return cors_policy_.get(); }
+  const HeaderParser& requestHeaderParser() const {
+    if (request_headers_parser_ != nullptr) {
+      return *request_headers_parser_;
+    }
+    return HeaderParser::defaultParser();
+  }
+  const HeaderParser& responseHeaderParser() const {
+    if (response_headers_parser_ != nullptr) {
+      return *response_headers_parser_;
+    }
+    return HeaderParser::defaultParser();
+  }
   void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
                               const StreamInfo::StreamInfo& stream_info,
                               bool insert_envoy_original_path) const override;
@@ -858,10 +880,23 @@ public:
       return DynamicRouteEntry::metadataMatchCriteria();
     }
 
+    const HeaderParser& requestHeaderParser() const {
+      if (request_headers_parser_ != nullptr) {
+        return *request_headers_parser_;
+      }
+      return HeaderParser::defaultParser();
+    }
+    const HeaderParser& responseHeaderParser() const {
+      if (response_headers_parser_ != nullptr) {
+        return *response_headers_parser_;
+      }
+      return HeaderParser::defaultParser();
+    }
+
     void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
                                 const StreamInfo::StreamInfo& stream_info,
                                 bool insert_envoy_original_path) const override {
-      request_headers_parser_->evaluateHeaders(headers, stream_info);
+      requestHeaderParser().evaluateHeaders(headers, stream_info);
       if (!host_rewrite_.empty()) {
         headers.setHost(host_rewrite_);
       }
@@ -875,7 +910,7 @@ public:
           stream_info.getRequestHeaders() == nullptr
               ? *Http::StaticEmptyHeaders::get().request_headers
               : *stream_info.getRequestHeaders();
-      response_headers_parser_->evaluateHeaders(headers, request_headers, headers, stream_info);
+      responseHeaderParser().evaluateHeaders(headers, request_headers, headers, stream_info);
       DynamicRouteEntry::finalizeResponseHeaders(headers, stream_info);
     }
     Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
@@ -967,7 +1002,8 @@ private:
   absl::InlinedVector<const HeaderParser*, 3>
   getResponseHeaderParsers(bool specificity_ascend) const;
 
-  absl::optional<RuntimeData> loadRuntimeData(const envoy::config::route::v3::RouteMatch& route);
+  std::unique_ptr<const RuntimeData>
+  loadRuntimeData(const envoy::config::route::v3::RouteMatch& route);
 
   static std::multimap<std::string, std::string>
   parseOpaqueConfig(const envoy::config::route::v3::Route& route);
@@ -1033,7 +1069,7 @@ private:
   const absl::optional<std::chrono::milliseconds> max_grpc_timeout_;
   const absl::optional<std::chrono::milliseconds> grpc_timeout_offset_;
   Runtime::Loader& loader_;
-  const absl::optional<RuntimeData> runtime_;
+  std::unique_ptr<const RuntimeData> runtime_;
   const std::string scheme_redirect_;
   const std::string host_redirect_;
   const std::string port_redirect_;
@@ -1378,8 +1414,18 @@ public:
              Server::Configuration::ServerFactoryContext& factory_context,
              ProtobufMessage::ValidationVisitor& validator, bool validate_clusters_default);
 
-  const HeaderParser& requestHeaderParser() const { return *request_headers_parser_; };
-  const HeaderParser& responseHeaderParser() const { return *response_headers_parser_; };
+  const HeaderParser& requestHeaderParser() const {
+    if (request_headers_parser_ != nullptr) {
+      return *request_headers_parser_;
+    }
+    return HeaderParser::defaultParser();
+  }
+  const HeaderParser& responseHeaderParser() const {
+    if (response_headers_parser_ != nullptr) {
+      return *response_headers_parser_;
+    }
+    return HeaderParser::defaultParser();
+  }
 
   bool virtualHostExists(const Http::RequestHeaderMap& headers) const {
     return route_matcher_->findVirtualHost(headers) != nullptr;
