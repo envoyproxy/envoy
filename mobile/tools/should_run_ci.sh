@@ -30,6 +30,11 @@ function failure() {
 #   exit 0
 # fi
 
+echo "CHECKING CHANGE ..."
+git remote -v
+git branch
+
+
 base_commit="$(git merge-base origin/main HEAD)"
 changed_files="$(git diff "$base_commit" --name-only)"
 
