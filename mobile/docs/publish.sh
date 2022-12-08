@@ -20,10 +20,8 @@ elif [ "$GITHUB_REF_NAME" == "main" ]
 then
   PUBLISH_DIR="$CHECKOUT_DIR"/docs/envoy-mobile/latest
 else
-  # TODO(jpsim): Revert this after testing
-  PUBLISH_DIR="$CHECKOUT_DIR"/docs/envoy-mobile/latest
-  # echo "Ignoring docs push"
-  # exit 0
+  echo "Ignoring docs push"
+  exit 0
 fi
 
 echo 'cloning'
