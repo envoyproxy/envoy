@@ -1,0 +1,12 @@
+--- pkg/private/BUILD
++++ pkg/private/BUILD
+@@ -55,6 +55,9 @@ exports_files(
+ config_setting(
+     name = "private_stamp_detect",
+     values = {"stamp": "1"},
++    # When --incompatible_config_setting_private_default_visibility is set, this fails unless this is public.
++    # TODO: refactor to clear up confusion that this is a "private" target with public access.
++    visibility = ["//visibility:public"],
+ )
+
+ py_library(
