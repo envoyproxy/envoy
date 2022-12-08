@@ -280,7 +280,7 @@ TEST_F(FilterTest, DecodeHeaderSucceeded) {
   EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::Continue);
 }
 
-TEST_F(FilterTest, DecodeHeaderFailed) {
+TEST_F(FilterTest, DecodeHeaderWithMismatchHeader) {
   addMatcherConfigAndCreateFilter(MatcherConfigType::Valid);
   createFilter();
   constructMismatchedRequestHeader();
