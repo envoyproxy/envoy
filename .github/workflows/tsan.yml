@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-20.04
     timeout-minutes: 90
     container:
-      image: envoyproxy/envoy-build-ubuntu:b0ff77ae3f25b0bf595f9b8bba46b489723ab446
+      image: envoyproxy/envoy-build-ubuntu:dce0a8c5ae9bed54dbcd1349d4333c325a7501cd
       env:
         CC: /opt/llvm/bin/clang
         CXX: /opt/llvm/bin/clang++
@@ -23,13 +23,6 @@ jobs:
     - id: should_run
       name: 'Check whether to run'
       run: ./mobile/tools/should_run_ci.sh
-    - uses: actions/setup-java@c3ac5dd0ed8db40fedb61c32fbe677e6b355e94c
-      if: steps.should_run.outputs.run_ci_job == 'true'
-      with:
-        java-version: '8'
-        java-package: jdk
-        architecture: x64
-        distribution: zulu
     - name: 'Run tests'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
