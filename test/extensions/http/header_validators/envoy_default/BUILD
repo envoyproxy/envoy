@@ -1,6 +1,8 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_fuzz_test",
     "envoy_package",
+    "envoy_proto_library",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
@@ -105,5 +107,25 @@ envoy_extension_cc_test(
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_proto_library(
+    name = "path_normalizer_fuzz_proto",
+    srcs = ["path_normalizer_fuzz.proto"],
+    deps = [
+        "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "path_normalizer_fuzz_test",
+    srcs = ["path_normalizer_fuzz_test.cc"],
+    corpus = "path_normalizer_corpus",
+    deps = [
+        ":path_normalizer_fuzz_proto_cc_proto",
+        "//source/extensions/http/header_validators/envoy_default:http1_header_validator",
+        "//source/extensions/http/header_validators/envoy_default:path_normalizer",
+        "//test/mocks/stream_info:stream_info_mocks",
     ],
 )
