@@ -38,7 +38,8 @@ git fetch origin main
 
 echo "COMPARING TO origin/main ..."
 
-base_commit="$(git merge-base origin/main HEAD)"
+merge_commit="$(git log -1 --format='%H')"
+base_commit="$(git merge-base origin/main ${merge_commit})"
 echo "COMMIT: ${base_commit} "
 changed_files="$(git diff "$base_commit" --name-only)"
 
