@@ -26,10 +26,17 @@ namespace Rewrite {
 
 absl::Status
 UriTemplateRewriter::isCompatiblePathMatcher(Router::PathMatcherSharedPtr path_matcher) const {
-  if (path_matcher == nullptr || path_matcher->name() != Extensions::UriTemplate::Match::NAME) {
-    return absl::InvalidArgumentError(fmt::format("unable to use {} extension without {} extension",
+
+  if(path_matcher == nullptr) {
+    return absl::InvalidArgumentError("path_matcher not initialized");
+  }
+
+  if (path_matcher->name() != Extensions::UriTemplate::Match::NAME) {
+    return absl::InvalidArgumentError(fmt::format("Unable to use {} extension without {} extension."
+                                                  "Extension {} provided for path_matcher.",
                                                   Extensions::UriTemplate::Rewrite::NAME,
-                                                  Extensions::UriTemplate::Match::NAME));
+                                                  Extensions::UriTemplate::Match::NAME,
+                                                  path_matcher->name()));
   }
 
   // This is needed to match up variable values.
