@@ -34,6 +34,7 @@ echo "CHECKING CHANGE ..."
 git remote -v
 git branch
 
+git fetch origin main
 
 base_commit="$(git merge-base origin/main HEAD)"
 changed_files="$(git diff "$base_commit" --name-only)"
