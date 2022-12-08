@@ -18,6 +18,7 @@ HTTP filters
   composite_filter
   cors_filter
   csrf_filter
+  custom_response_filter
   decompressor_filter
   dynamic_forward_proxy_filter
   dynamodb_filter

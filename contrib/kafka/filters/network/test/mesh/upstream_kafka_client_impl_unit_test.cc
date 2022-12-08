@@ -2,6 +2,7 @@
 #include "test/test_common/thread_factory_for_test.h"
 
 #include "absl/synchronization/blocking_counter.h"
+#include "contrib/kafka/filters/network/source/mesh/librdkafka_utils.h"
 #include "contrib/kafka/filters/network/source/mesh/upstream_kafka_client_impl.h"
 #include "contrib/kafka/filters/network/test/mesh/kafka_mocks.h"
 #include "gmock/gmock.h"
@@ -20,26 +21,6 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
 
-class MockLibRdKafkaUtils : public LibRdKafkaUtils {
-public:
-  MOCK_METHOD(RdKafka::Conf::ConfResult, setConfProperty,
-              (RdKafka::Conf&, const std::string&, const std::string&, std::string&), (const));
-  MOCK_METHOD(RdKafka::Conf::ConfResult, setConfDeliveryCallback,
-              (RdKafka::Conf&, RdKafka::DeliveryReportCb*, std::string&), (const));
-  MOCK_METHOD((std::unique_ptr<RdKafka::Producer>), createProducer,
-              (RdKafka::Conf*, std::string& errstr), (const));
-  MOCK_METHOD(RdKafka::Headers*, convertHeaders,
-              ((const std::vector<std::pair<absl::string_view, absl::string_view>>&)), (const));
-  MOCK_METHOD(void, deleteHeaders, (RdKafka::Headers * librdkafka_headers), (const));
-
-  MockLibRdKafkaUtils() {
-    ON_CALL(*this, convertHeaders(_)).WillByDefault(Return(headers_holder_.get()));
-  }
-
-private:
-  std::unique_ptr<RdKafka::Headers> headers_holder_{RdKafka::Headers::create()};
-};
-
 class MockProduceFinishCb : public ProduceFinishCb {
 public:
   MOCK_METHOD(bool, accept, (const DeliveryMemento&));
@@ -50,7 +31,7 @@ protected:
   Event::MockDispatcher dispatcher_;
   Thread::ThreadFactory& thread_factory_ = Thread::threadFactoryForTest();
   NiceMock<MockLibRdKafkaUtils> kafka_utils_{};
-  RawKafkaProducerConfig config_ = {{"key1", "value1"}, {"key2", "value2"}};
+  RawKafkaConfig config_ = {{"key1", "value1"}, {"key2", "value2"}};
 
   std::unique_ptr<MockKafkaProducer> producer_ptr = std::make_unique<MockKafkaProducer>();
   MockKafkaProducer& producer = *producer_ptr;

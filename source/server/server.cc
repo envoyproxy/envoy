@@ -32,6 +32,7 @@
 #include "source/common/config/grpc_mux_impl.h"
 #include "source/common/config/new_grpc_mux_impl.h"
 #include "source/common/config/utility.h"
+#include "source/common/config/well_known_names.h"
 #include "source/common/config/xds_mux/grpc_mux_impl.h"
 #include "source/common/config/xds_resource.h"
 #include "source/common/http/codes.h"
@@ -625,7 +626,7 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   // Workers get created first so they register for thread local updates.
   listener_manager_ =
       Config::Utility::getAndCheckFactoryByName<ListenerManagerFactory>(
-          "envoy.listener_manager_impl.default")
+          Config::ServerExtensionValues::get().DEFAULT_LISTENER)
           .createListenerManager(*this, nullptr, worker_factory_,
                                  bootstrap_.enable_dispatcher_stats(), quic_stat_names_);
 
