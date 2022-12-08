@@ -144,6 +144,6 @@ static envoy_cert_validation_result verify_x509_cert_chain(const envoy_data* cer
 envoy_cert_validator* get_android_cert_validator_api() {
   envoy_cert_validator* api = (envoy_cert_validator*)safe_malloc(sizeof(envoy_cert_validator));
   api->validate_cert = verify_x509_cert_chain;
-  api->release_validator = jvm_detach_thread;
+  api->validation_cleanup = jvm_detach_thread;
   return api;
 }

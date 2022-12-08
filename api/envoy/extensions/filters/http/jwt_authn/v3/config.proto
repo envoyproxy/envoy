@@ -314,7 +314,7 @@ message RemoteJwks {
   config.core.v3.HttpUri http_uri = 1;
 
   // Duration after which the cached JWKS should be expired. If not specified, default cache
-  // duration is 5 minutes.
+  // duration is 10 minutes.
   google.protobuf.Duration cache_duration = 2;
 
   // Fetch Jwks asynchronously in the main thread before the listener is activated.
@@ -376,6 +376,9 @@ message JwksAsyncFetch {
   // If true, it is activated without waiting for the initial fetch to complete.
   // Default is false.
   bool fast_listener = 1;
+
+  // The duration to refetch after a failed fetch. If not specified, default is 1 second.
+  google.protobuf.Duration failed_refetch_duration = 2;
 }
 
 // This message specifies a header location to extract JWT token.

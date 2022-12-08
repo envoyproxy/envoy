@@ -1,14 +1,10 @@
-name: core
+name: mobile_core
 
 on:
   push:
     branches:
-      - main
-    paths:
-    - 'mobile/**'
+    - main
   pull_request:
-    paths:
-    - 'mobile/**'
 
 jobs:
   unittests:
@@ -16,16 +12,19 @@ jobs:
     runs-on: macos-12
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v1
-        with:
-          submodules: true
-      - name: 'Install dependencies'
-        run: cd mobile && ./ci/mac_ci_setup.sh
-      - name: 'Run tests'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          cd mobile && ./bazelw test \
+    - uses: actions/checkout@v1
+    - id: should_run
+      name: 'Check whether to run'
+      run: ./mobile/tools/should_run_ci.sh
+    - name: 'Install dependencies'
+      if: steps.should_run.outputs.run_ci_job == 'true'
+      run: cd mobile && ./ci/mac_ci_setup.sh
+    - name: 'Run tests'
+      if: steps.should_run.outputs.run_ci_job == 'true'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        cd mobile && ./bazelw test \
             --test_output=all \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \

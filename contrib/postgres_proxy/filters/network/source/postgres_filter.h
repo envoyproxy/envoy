@@ -8,6 +8,7 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 
+#include "contrib/envoy/extensions/filters/network/postgres_proxy/v3alpha/postgres_proxy.pb.h"
 #include "contrib/postgres_proxy/filters/network/source/postgres_decoder.h"
 
 namespace Envoy {
@@ -32,6 +33,8 @@ namespace PostgresProxy {
   COUNTER(sessions_encrypted)                                                                      \
   COUNTER(sessions_terminated_ssl)                                                                 \
   COUNTER(sessions_unencrypted)                                                                    \
+  COUNTER(sessions_upstream_ssl_success)                                                           \
+  COUNTER(sessions_upstream_ssl_failed)                                                            \
   COUNTER(statements)                                                                              \
   COUNTER(statements_insert)                                                                       \
   COUNTER(statements_delete)                                                                       \
@@ -67,11 +70,16 @@ public:
     std::string stats_prefix_;
     bool enable_sql_parsing_;
     bool terminate_ssl_;
+    envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::SSLMode
+        upstream_ssl_;
   };
   PostgresFilterConfig(const PostgresFilterConfigOptions& config_options, Stats::Scope& scope);
 
   bool enable_sql_parsing_{true};
   bool terminate_ssl_{false};
+  envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::SSLMode
+      upstream_ssl_{
+          envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::DISABLE};
   Stats::Scope& scope_;
   PostgresProxyStats stats_;
 
@@ -112,6 +120,9 @@ public:
   void incTransactionsRollback() override;
   void processQuery(const std::string&) override;
   bool onSSLRequest() override;
+  bool shouldEncryptUpstream() const override;
+  void sendUpstream(Buffer::Instance&) override;
+  void encryptUpstream(bool, Buffer::Instance&) override;
 
   Network::FilterStatus doDecode(Buffer::Instance& data, bool);
   DecoderPtr createDecoder(DecoderCallbacks* callbacks);
