@@ -514,10 +514,6 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
           buildInternalRedirectPolicy(route.route(), validator, route.name())),
       priority_(ConfigUtility::parsePriority(route.route().priority())),
       config_headers_(Http::HeaderUtility::buildHeaderDataVector(route.match().headers())),
-      request_headers_parser_(HeaderParser::configure(route.request_headers_to_add(),
-                                                      route.request_headers_to_remove())),
-      response_headers_parser_(HeaderParser::configure(route.response_headers_to_add(),
-                                                       route.response_headers_to_remove())),
       retry_shadow_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           route, per_request_buffer_limit_bytes, vhost.retryShadowBufferLimit())),
       match_grpc_(route.match().has_grpc()),
@@ -533,6 +529,14 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                           validator),
       route_name_(route.name()), time_source_(factory_context.mainThreadDispatcher().timeSource()),
       random_value_header_name_(route.route().weighted_clusters().header_name()) {
+  if (!route.request_headers_to_add().empty() || !route.request_headers_to_remove().empty()) {
+    request_headers_parser_ =
+        HeaderParser::configure(route.request_headers_to_add(), route.request_headers_to_remove());
+  }
+  if (!route.response_headers_to_add().empty() || !route.response_headers_to_remove().empty()) {
+    response_headers_parser_ = HeaderParser::configure(route.response_headers_to_add(),
+                                                       route.response_headers_to_remove());
+  }
   if (route.has_metadata()) {
     metadata_ = std::make_unique<envoy::config::core::v3::Metadata>(route.metadata());
     typed_metadata_ = std::make_unique<RouteTypedMetadata>(route.metadata());
@@ -883,14 +887,14 @@ RouteEntryImplBase::requestHeaderTransforms(const StreamInfo::StreamInfo& stream
 absl::InlinedVector<const HeaderParser*, 3>
 RouteEntryImplBase::getRequestHeaderParsers(bool specificity_ascend) const {
   return getHeaderParsers(&vhost_.globalRouteConfig().requestHeaderParser(),
-                          &vhost_.requestHeaderParser(), request_headers_parser_.get(),
+                          &vhost_.requestHeaderParser(), &requestHeaderParser(),
                           specificity_ascend);
 }
 
 absl::InlinedVector<const HeaderParser*, 3>
 RouteEntryImplBase::getResponseHeaderParsers(bool specificity_ascend) const {
   return getHeaderParsers(&vhost_.globalRouteConfig().responseHeaderParser(),
-                          &vhost_.responseHeaderParser(), response_headers_parser_.get(),
+                          &vhost_.responseHeaderParser(), &responseHeaderParser(),
                           specificity_ascend);
 }
 
@@ -1421,14 +1425,19 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
     : DynamicRouteEntry(parent, validateWeightedClusterSpecifier(cluster).name()),
       runtime_key_(runtime_key), loader_(factory_context.runtime()),
       cluster_weight_(PROTOBUF_GET_WRAPPED_REQUIRED(cluster, weight)),
-      request_headers_parser_(HeaderParser::configure(cluster.request_headers_to_add(),
-                                                      cluster.request_headers_to_remove())),
-      response_headers_parser_(HeaderParser::configure(cluster.response_headers_to_add(),
-                                                       cluster.response_headers_to_remove())),
       per_filter_configs_(cluster.typed_per_filter_config(), optional_http_filters, factory_context,
                           validator),
       host_rewrite_(cluster.host_rewrite_literal()),
       cluster_header_name_(cluster.cluster_header()) {
+  if (!cluster.request_headers_to_add().empty() || !cluster.request_headers_to_remove().empty()) {
+    request_headers_parser_ = HeaderParser::configure(cluster.request_headers_to_add(),
+                                                      cluster.request_headers_to_remove());
+  }
+  if (!cluster.response_headers_to_add().empty() || !cluster.response_headers_to_remove().empty()) {
+    response_headers_parser_ = HeaderParser::configure(cluster.response_headers_to_add(),
+                                                       cluster.response_headers_to_remove());
+  }
+
   if (cluster.has_metadata_match()) {
     const auto filter_it = cluster.metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
@@ -1446,7 +1455,7 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
 
 Http::HeaderTransforms RouteEntryImplBase::WeightedClusterEntry::requestHeaderTransforms(
     const StreamInfo::StreamInfo& stream_info, bool do_formatting) const {
-  auto transforms = request_headers_parser_->getHeaderTransforms(stream_info, do_formatting);
+  auto transforms = requestHeaderParser().getHeaderTransforms(stream_info, do_formatting);
   mergeTransforms(transforms,
                   DynamicRouteEntry::requestHeaderTransforms(stream_info, do_formatting));
   return transforms;
@@ -1454,7 +1463,7 @@ Http::HeaderTransforms RouteEntryImplBase::WeightedClusterEntry::requestHeaderTr
 
 Http::HeaderTransforms RouteEntryImplBase::WeightedClusterEntry::responseHeaderTransforms(
     const StreamInfo::StreamInfo& stream_info, bool do_formatting) const {
-  auto transforms = response_headers_parser_->getHeaderTransforms(stream_info, do_formatting);
+  auto transforms = responseHeaderParser().getHeaderTransforms(stream_info, do_formatting);
   mergeTransforms(transforms,
                   DynamicRouteEntry::responseHeaderTransforms(stream_info, do_formatting));
   return transforms;
@@ -1672,16 +1681,22 @@ VirtualHostImpl::VirtualHostImpl(
           scope, {stat_name_storage_.statName(),
                   factory_context.routerContext().virtualClusterStatNames().vcluster_})),
       global_route_config_(global_route_config),
-      request_headers_parser_(HeaderParser::configure(virtual_host.request_headers_to_add(),
-                                                      virtual_host.request_headers_to_remove())),
-      response_headers_parser_(HeaderParser::configure(virtual_host.response_headers_to_add(),
-                                                       virtual_host.response_headers_to_remove())),
       per_filter_configs_(virtual_host.typed_per_filter_config(), optional_http_filters,
                           factory_context, validator),
       retry_shadow_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           virtual_host, per_request_buffer_limit_bytes, std::numeric_limits<uint32_t>::max())),
       include_attempt_count_in_request_(virtual_host.include_request_attempt_count()),
       include_attempt_count_in_response_(virtual_host.include_attempt_count_in_response()) {
+  if (!virtual_host.request_headers_to_add().empty() ||
+      !virtual_host.request_headers_to_remove().empty()) {
+    request_headers_parser_ = HeaderParser::configure(virtual_host.request_headers_to_add(),
+                                                      virtual_host.request_headers_to_remove());
+  }
+  if (!virtual_host.response_headers_to_add().empty() ||
+      !virtual_host.response_headers_to_remove().empty()) {
+    response_headers_parser_ = HeaderParser::configure(virtual_host.response_headers_to_add(),
+                                                       virtual_host.response_headers_to_remove());
+  }
   switch (virtual_host.require_tls()) {
     PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::config::route::v3::VirtualHost::NONE:
@@ -2073,10 +2088,14 @@ ConfigImpl::ConfigImpl(const envoy::config::route::v3::RouteConfiguration& confi
     internal_only_headers_.push_back(Http::LowerCaseString(header));
   }
 
-  request_headers_parser_ =
-      HeaderParser::configure(config.request_headers_to_add(), config.request_headers_to_remove());
-  response_headers_parser_ = HeaderParser::configure(config.response_headers_to_add(),
-                                                     config.response_headers_to_remove());
+  if (!config.request_headers_to_add().empty() || !config.request_headers_to_remove().empty()) {
+    request_headers_parser_ = HeaderParser::configure(config.request_headers_to_add(),
+                                                      config.request_headers_to_remove());
+  }
+  if (!config.response_headers_to_add().empty() || !config.response_headers_to_remove().empty()) {
+    response_headers_parser_ = HeaderParser::configure(config.response_headers_to_add(),
+                                                       config.response_headers_to_remove());
+  }
 }
 
 ClusterSpecifierPluginSharedPtr
