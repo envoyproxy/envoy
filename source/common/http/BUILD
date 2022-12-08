@@ -566,5 +566,6 @@ envoy_cc_library(
     deps = [
         "//envoy/http:codes_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:safe_memcpy_lib",
     ],
 )
