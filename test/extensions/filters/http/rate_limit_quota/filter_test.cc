@@ -246,7 +246,7 @@ TEST_F(FilterTest, RequestMatchingFailed) {
 
 TEST_F(FilterTest, RequestMatchingFailedWithNoCallback) {
   addMatcherConfigAndCreateFilter(MatcherConfigType::Valid);
-  createFilter(false);
+  createFilter(/*set_callback*/false);
 
   auto match = filter_->requestMatching(default_headers_);
   EXPECT_FALSE(match.ok());
