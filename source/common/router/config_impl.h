@@ -981,7 +981,8 @@ private:
   absl::InlinedVector<const HeaderParser*, 3>
   getResponseHeaderParsers(bool specificity_ascend) const;
 
-  absl::optional<RuntimeData> loadRuntimeData(const envoy::config::route::v3::RouteMatch& route);
+  std::unique_ptr<const RuntimeData>
+  loadRuntimeData(const envoy::config::route::v3::RouteMatch& route);
 
   static std::multimap<std::string, std::string>
   parseOpaqueConfig(const envoy::config::route::v3::Route& route);
@@ -1047,7 +1048,7 @@ private:
   const absl::optional<std::chrono::milliseconds> max_grpc_timeout_;
   const absl::optional<std::chrono::milliseconds> grpc_timeout_offset_;
   Runtime::Loader& loader_;
-  const absl::optional<RuntimeData> runtime_;
+  std::unique_ptr<const RuntimeData> runtime_;
   const std::string scheme_redirect_;
   const std::string host_redirect_;
   const std::string port_redirect_;
