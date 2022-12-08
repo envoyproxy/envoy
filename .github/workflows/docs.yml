@@ -1,0 +1,28 @@
+name: mobile_docs
+
+on:
+  push:
+    branches:
+    - main
+    tags:
+    - v*
+  pull_request:
+
+jobs:
+  docs:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 10
+    container:
+      image: envoyproxy/envoy-build-ubuntu:b0ff77ae3f25b0bf595f9b8bba46b489723ab446
+    steps:
+    - uses: actions/checkout@v1
+    - name: Add safe directory
+      run: git config --global --add safe.directory /__w/envoy/envoy
+    - name: Generate docs
+      run: mobile/docs/build.sh
+    - name: Publish docs
+      run: mobile/docs/publish.sh
+    - uses: actions/upload-artifact@v3
+      with:
+        name: docs
+        path: generated/docs
