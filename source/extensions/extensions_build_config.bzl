@@ -390,12 +390,6 @@ EXTENSIONS = {
     #
 
     "envoy.route.early_data_policy.default":           "//source/extensions/early_data:default_early_data_policy_lib",
-
-    #
-    # Listener managers
-    #
-
-    "envoy.listener_manager_impl.api":           "//source/extensions/listener_managers/api_listener_manager:api_listener_manager_lib",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which

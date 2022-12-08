@@ -11,7 +11,8 @@ namespace Envoy {
 namespace Server {
 
 /**
- * Implementation of ListenerManager.
+ * Implementation of a lightweight ListenerManager for Envoy Mobile.
+ * This does not handle downstream TCP / UDP connections but only the API listener.
  */
 class ApiListenerManagerImpl : public ListenerManager, Logger::Loggable<Logger::Id::config> {
 public:
