@@ -75,6 +75,8 @@ Every configured Postgres proxy filter has statistics rooted at postgres.<stat_p
   sessions_encrypted, Counter, Number of times the filter detected and passed upstream encrypted sessions
   sessions_terminated_ssl, Counter, Number of times the filter terminated SSL sessions
   sessions_unencrypted, Counter, Number of messages indicating unencrypted successful login
+  sessions_upstream_ssl_success, Counter, Number of times the filter established upstream SSL connection
+  sessions_upstream_ssl_failed, Counter, Number of times the filter failed to establish upstream SSL connection
   statements, Counter, Total number of SQL statements
   statements_delete, Counter, Number of DELETE statements
   statements_insert, Counter, Number of INSERT statements

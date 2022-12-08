@@ -28,9 +28,9 @@ TEST(ConfigTest, TestConfig) {
   ASSERT_NE(nullptr, action_cb);
   auto action = action_cb();
   ASSERT_NE(nullptr, action);
-  const auto& typed_action = action->getTyped<Server::FilterChainBaseAction>();
+  const auto& typed_action = action->getTyped<Server::Configuration::FilterChainBaseAction>();
 
-  Server::FilterChainsByName chains;
+  Server::Configuration::FilterChainsByName chains;
   auto chain = std::make_shared<testing::NiceMock<Network::MockFilterChain>>();
   chains.emplace("foo", chain);
 
