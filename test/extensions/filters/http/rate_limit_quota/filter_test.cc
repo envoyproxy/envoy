@@ -152,10 +152,6 @@ public:
     default:
       break;
     }
-
-    // filter_config_ = std::make_shared<FilterConfig>(config_);
-    // filter_ = std::make_unique<RateLimitQuotaFilter>(filter_config_, context_);
-    // filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
 
   void createFilter(bool set_callback = true) {
@@ -280,6 +276,15 @@ TEST_F(FilterTest, DecodeHeaderSucceeded) {
   absl::flat_hash_map<std::string, std::string> custom_value_pairs = {{"environment", "staging"},
                                                                       {"group", "envoy"}};
   buildCustomHeader(custom_value_pairs);
+  Http::FilterHeadersStatus status = filter_->decodeHeaders(default_headers_, false);
+  EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::Continue);
+}
+
+TEST_F(FilterTest, DecodeHeaderFailed) {
+  addMatcherConfigAndCreateFilter(MatcherConfigType::Valid);
+  createFilter();
+  constructMismatchedRequestHeader();
+
   Http::FilterHeadersStatus status = filter_->decodeHeaders(default_headers_, false);
   EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::Continue);
 }

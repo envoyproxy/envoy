@@ -24,20 +24,6 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
     return Envoy::Http::FilterHeadersStatus::Continue;
   }
 
-  // Request is not matched by any matcher but the `on_no_match` field is configured. In this
-  // case, the request is matched to catch-all bucket and is DENIED by default.
-  // TODO(tyxia) Think about the way of representing DENIED and ALLOWED here.
-  if (match_result.value().bucket().empty()) {
-    return Envoy::Http::FilterHeadersStatus::Continue;
-  }
-
-  // Request has been matched and the corresponding bucket id has been generated successfully.
-  // Retrieve the quota assignment, if the entry with specific `bucket_id` is found.
-  if (quota_assignment_map_.find(match_result.value()) != quota_assignment_map_.end()) {
-  }
-  // Otherwise, send the request to RLQS server for the quota assignment and insert the bucket_id to
-  // the map.
-
   return Envoy::Http::FilterHeadersStatus::Continue;
 }
 
