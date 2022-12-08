@@ -48,6 +48,7 @@ template <typename T> void storePayload(absl::Status& status, const T& payload) 
   absl::Cord cord(absl::string_view(buffer, payload_size));
   cord.Flatten(); // Flatten ahead of time for easier access later.
   status.SetPayload(EnvoyPayloadUrl, std::move(cord));
+  free(buffer);
 }
 
 template <typename T = EnvoyStatusPayload> const T& getPayload(const absl::Status& status) {
