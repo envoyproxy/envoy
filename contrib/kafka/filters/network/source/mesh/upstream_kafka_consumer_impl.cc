@@ -113,39 +113,19 @@ static InboundRecordSharedPtr transform(std::unique_ptr<RdKafka::Message> arg) {
   return std::make_shared<InboundRecord>(topic, partition, offset);
 }
 
-// How many records should be drained out of consumer in one go.
-constexpr int32_t BUFFER_DRAIN_VOLUME = 4;
-
 std::vector<InboundRecordSharedPtr> RichKafkaConsumer::receiveRecordBatch() {
   // This message kicks off librdkafka consumer's Fetch requests and delivers a message.
   auto message = std::unique_ptr<RdKafka::Message>(consumer_->consume(POLL_TIMEOUT_MS));
   switch (message->err()) {
   case RdKafka::ERR_NO_ERROR: {
-
     // We got a message.
-    std::vector<InboundRecordSharedPtr> result;
-
     auto inbound_record = transform(std::move(message));
     ENVOY_LOG(trace, "Received Kafka message (first one): {}", inbound_record->toString());
 
-    result.push_back(inbound_record);
-
-    // We got a message, there could be something left in the buffer, so we try to drain it by
-    // consuming without waiting. See: https://github.com/edenhill/librdkafka/discussions/3897
-    while (result.size() < BUFFER_DRAIN_VOLUME) {
-      auto buffered_message = std::unique_ptr<RdKafka::Message>(consumer_->consume(0));
-      if (RdKafka::ERR_NO_ERROR == buffered_message->err()) {
-        // There was a message in the buffer.
-        auto inbound_buffered = transform(std::move(buffered_message));
-        ENVOY_LOG(trace, "Received Kafka message (buffered): {}", inbound_buffered->toString());
-        result.push_back(inbound_buffered);
-      } else {
-        // Buffer is empty / consumer is failing - there is nothing more to consume.
-        break;
-      }
-    } // while
-
-    return result;
+    // XXX (adam.kotwasinski) There could be something more present in the consumer,
+    // and we could drain it (at least a little) in the next commits.
+    // See: https://github.com/edenhill/librdkafka/discussions/3897
+    return {inbound_record};
   }
   case RdKafka::ERR__TIMED_OUT: {
     // Nothing extraordinary, there is nothing coming from upstream cluster.
