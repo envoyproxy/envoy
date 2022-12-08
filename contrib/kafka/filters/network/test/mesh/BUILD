@@ -81,6 +81,7 @@ envoy_cc_test_library(
     tags = ["skip_on_windows"],
     deps = [
         envoy_external_dep_path("librdkafka"),
+        "//contrib/kafka/filters/network/source/mesh:librdkafka_utils_lib",
     ],
 )
 
