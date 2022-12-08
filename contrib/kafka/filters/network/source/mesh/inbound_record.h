@@ -20,13 +20,7 @@ struct InboundRecord {
   const int32_t partition_;
   const int64_t offset_;
 
-  // XXX (adam.kotwasinski) Get data in here in the next commits.
-
-  std::string topic_name() const { return topic_; }
-
-  int32_t partition() const { return partition_; }
-
-  int64_t offset() const { return offset_; }
+  // TODO (adam.kotwasinski) Get data in here in the next commits.
 
   InboundRecord(std::string topic, int32_t partition, int64_t offset)
       : topic_{topic}, partition_{partition}, offset_{offset} {};

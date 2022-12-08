@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 #include "contrib/kafka/filters/network/source/mesh/librdkafka_utils.h"
 
 namespace Envoy {
@@ -7,6 +9,9 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
+
+using RdKafkaPartitionRawPtr = RdKafka::TopicPartition*;
+using RdKafkaPartitionVector = std::vector<RdKafkaPartitionRawPtr>;
 
 /**
  * Real implementation that just performs librdkafka operations.
@@ -38,11 +43,14 @@ public:
   // LibRdKafkaUtils
   void deleteHeaders(RdKafka::Headers* librdkafka_headers) const override;
 
+  // LibRdKafkaUtils
+  ConsumerAssignmentPtr assignConsumerPartitions(RdKafka::KafkaConsumer& consumer,
+                                                 const std::string& topic,
+                                                 int32_t partitions) const override;
+
   // Default singleton accessor.
   static const LibRdKafkaUtils& getDefaultInstance();
 };
-
-using RawKafkaConfig = std::map<std::string, std::string>;
 
 } // namespace Mesh
 } // namespace Kafka

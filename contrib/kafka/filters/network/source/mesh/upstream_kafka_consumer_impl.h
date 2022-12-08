@@ -16,12 +16,10 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
 
-using RdKafkaPartitionRawPtr = RdKafka::TopicPartition*;
-using RdKafkaPartitionVector = std::vector<RdKafkaPartitionRawPtr>;
-
 /**
- * Combines the librdkafka consumer and its dedicated thread.
+ * Combines the librdkafka consumer and its dedicated worker thread.
  * The thread receives the records, and pushes them to the processor.
+ * The consumer is going to receive the records from all the partitions for the given topic.
  */
 class RichKafkaConsumer : public KafkaConsumer, private Logger::Loggable<Logger::Id::kafka> {
 public:
@@ -41,8 +39,8 @@ public:
 private:
   // This method continuously fetches new records and passes them to processor.
   // Does not finish until this object gets destroyed.
-  // Executed in the dedicated thread.
-  void pollContinuously();
+  // Executed in the dedicated worker thread.
+  void runWorkerLoop();
 
   // Uses internal consumer to receive records from upstream.
   std::vector<InboundRecordSharedPtr> receiveRecordBatch();
@@ -54,20 +52,19 @@ private:
   std::string topic_;
 
   // Real Kafka consumer (NOT thread-safe).
-  // All access to this thing happens in the poller thread.
+  // All access to this thing happens in the worker thread.
   std::unique_ptr<RdKafka::KafkaConsumer> consumer_;
 
-  // Consumer's assignment.
-  // These are raw librdkafka pointers that need to be freed manually in the destructor.
-  RdKafkaPartitionVector assignment_;
+  // Consumer's partition assignment.
+  ConsumerAssignmentPtr assignment_;
 
-  // Flag controlling poller threads's execution.
-  std::atomic<bool> poller_thread_active_;
+  // Flag controlling worker threads's execution.
+  std::atomic<bool> worker_thread_active_;
 
   // Real worker thread.
-  // Responsible for polling for records with consumer,
-  // and passing these records to awaiting requests.
-  Thread::ThreadPtr poller_thread_;
+  // Responsible for getting records from upstream Kafka with a consumer and passing these records
+  // to the processor.
+  Thread::ThreadPtr worker_thread_;
 };
 
 } // namespace Mesh

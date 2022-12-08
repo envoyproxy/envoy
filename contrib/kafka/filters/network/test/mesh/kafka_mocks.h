@@ -12,6 +12,8 @@ namespace Mesh {
 
 // This file defines all librdkafka-related mocks.
 
+class MockConsumerAssignment : public ConsumerAssignment {};
+
 class MockLibRdKafkaUtils : public LibRdKafkaUtils {
 public:
   MOCK_METHOD(RdKafka::Conf::ConfResult, setConfProperty,
@@ -25,6 +27,10 @@ public:
   MOCK_METHOD(RdKafka::Headers*, convertHeaders,
               ((const std::vector<std::pair<absl::string_view, absl::string_view>>&)), (const));
   MOCK_METHOD(void, deleteHeaders, (RdKafka::Headers * librdkafka_headers), (const));
+  MOCK_METHOD(ConsumerAssignmentPtr, createAssignment, (const std::string&, int32_t), (const));
+
+  MOCK_METHOD(ConsumerAssignmentPtr, assignConsumerPartitions,
+              (RdKafka::KafkaConsumer&, const std::string&, int32_t), (const));
 
   MockLibRdKafkaUtils() {
     ON_CALL(*this, convertHeaders(testing::_))
@@ -35,7 +41,7 @@ private:
   std::unique_ptr<RdKafka::Headers> headers_holder_{RdKafka::Headers::create()};
 };
 
-// Base class for librdkafka objects (we do not use this API, but still need to mock it).
+// Base class for librdkafka objects.
 class MockKafkaHandle : public virtual RdKafka::Handle {
 public:
   MOCK_METHOD(const std::string, name, (), (const));

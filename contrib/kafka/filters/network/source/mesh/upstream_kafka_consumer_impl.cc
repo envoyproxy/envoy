@@ -22,6 +22,8 @@ RichKafkaConsumer::RichKafkaConsumer(InboundRecordProcessor& record_processor,
                                      const LibRdKafkaUtils& utils)
     : record_processor_{record_processor}, topic_{topic} {
 
+  ENVOY_LOG(debug, "Creating consumer for topic [{}] with {} partitions", topic, partition_count);
+
   // Create consumer configuration object.
   std::unique_ptr<RdKafka::Conf> conf =
       std::unique_ptr<RdKafka::Conf>(RdKafka::Conf::create(RdKafka::Conf::CONF_GLOBAL));
@@ -30,7 +32,7 @@ RichKafkaConsumer::RichKafkaConsumer(InboundRecordProcessor& record_processor,
 
   // Setup consumer custom properties.
   for (const auto& e : configuration) {
-    ENVOY_LOG(info, "Setting consumer property {}={}", e.first, e.second);
+    ENVOY_LOG(debug, "Setting consumer property {}={}", e.first, e.second);
     if (utils.setConfProperty(*conf, e.first, e.second, errstr) != RdKafka::Conf::CONF_OK) {
       throw EnvoyException(absl::StrCat("Could not set consumer property [", e.first, "] to [",
                                         e.second, "]:", errstr));
@@ -43,33 +45,24 @@ RichKafkaConsumer::RichKafkaConsumer(InboundRecordProcessor& record_processor,
     throw EnvoyException(absl::StrCat("Could not create consumer:", errstr));
   }
 
-  // We assign all topic partitions to the consumer.
-  for (auto pt = 0; pt < partition_count; ++pt) {
-    // We consume records from the beginning of each partition.
-    const int64_t initial_offset = 0;
-    const RdKafkaPartitionRawPtr topic_partition =
-        RdKafka::TopicPartition::create(topic, pt, initial_offset);
-    ENVOY_LOG(debug, "Assigning {}-{}", topic, pt);
-    assignment_.push_back(topic_partition);
-  }
-  consumer_->assign(assignment_);
+  // Consumer is going to read from all the topic partitions.
+  assignment_ = utils.assignConsumerPartitions(*consumer_, topic, partition_count);
 
-  // Start the poller thread.
-  poller_thread_active_ = true;
-  std::function<void()> thread_routine = [this]() -> void { pollContinuously(); };
-  poller_thread_ = thread_factory.createThread(thread_routine);
+  // Start the worker thread.
+  worker_thread_active_ = true;
+  std::function<void()> thread_routine = [this]() -> void { runWorkerLoop(); };
+  worker_thread_ = thread_factory.createThread(thread_routine);
 }
 
 RichKafkaConsumer::~RichKafkaConsumer() {
   ENVOY_LOG(debug, "Closing Kafka consumer [{}]", topic_);
 
-  poller_thread_active_ = false;
+  worker_thread_active_ = false;
   // This should take at most INTEREST_TIMEOUT_MS + POLL_TIMEOUT_MS.
-  poller_thread_->join();
+  worker_thread_->join();
 
   consumer_->unassign();
   consumer_->close();
-  RdKafka::TopicPartition::destroy(assignment_); // XXX
 
   ENVOY_LOG(debug, "Kafka consumer [{}] closed succesfully", topic_);
 }
@@ -82,10 +75,10 @@ constexpr int32_t POLL_TIMEOUT_MS = 1000;
 
 // Large values are okay, but make the Envoy shutdown take longer
 // (as there is no good way to interrupt a 'consume' call).
-// XXX (adam.kotwasinski) This should be made configurable.
+// XXX (adam.kotwasinski) This could be made configurable.
 
-void RichKafkaConsumer::pollContinuously() {
-  while (poller_thread_active_) {
+void RichKafkaConsumer::runWorkerLoop() {
+  while (worker_thread_active_) {
 
     // It makes no sense to poll and receive records if there is no interest right now,
     // so we can just block instead.
@@ -102,11 +95,11 @@ void RichKafkaConsumer::pollContinuously() {
       record_processor_.receive(record);
     }
   }
-  ENVOY_LOG(debug, "Poller thread for consumer [{}] finished", topic_);
+  ENVOY_LOG(debug, "Worker thread for consumer [{}] finished", topic_);
 }
 
 // Helper method, gets rid of librdkafka.
-static InboundRecordSharedPtr transform(std::unique_ptr<RdKafka::Message> arg) {
+static InboundRecordSharedPtr transform(RdKafkaMessagePtr arg) {
   auto topic = arg->topic_name();
   auto partition = arg->partition();
   auto offset = arg->offset();

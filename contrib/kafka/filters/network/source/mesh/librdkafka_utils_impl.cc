@@ -8,6 +8,40 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
 
+// ConsumerAssignmentImpl
+
+class ConsumerAssignmentImpl : public ConsumerAssignment {
+public:
+  ~ConsumerAssignmentImpl() override;
+
+  void add(const std::string& topic, int32_t partition);
+
+  // The assignment in a form that librdkafka likes.
+  const RdKafkaPartitionVector& raw() const;
+
+private:
+  RdKafkaPartitionVector assignment_;
+};
+
+ConsumerAssignmentImpl::~ConsumerAssignmentImpl() { RdKafka::TopicPartition::destroy(assignment_); }
+
+void ConsumerAssignmentImpl::add(const std::string& topic, int32_t partition) {
+  // We consume records from the beginning of each partition.
+  const int64_t initial_offset = 0;
+  const RdKafkaPartitionRawPtr topic_partition =
+      RdKafka::TopicPartition::create(topic, partition, initial_offset);
+  try {
+    assignment_.push_back(topic_partition);
+  } catch (...) {
+    delete (topic_partition);
+    throw;
+  }
+}
+
+const RdKafkaPartitionVector& ConsumerAssignmentImpl::raw() const { return assignment_; }
+
+// LibRdKafkaUtils
+
 RdKafka::Conf::ConfResult LibRdKafkaUtilsImpl::setConfProperty(RdKafka::Conf& conf,
                                                                const std::string& name,
                                                                const std::string& value,
@@ -49,6 +83,17 @@ RdKafka::Headers* LibRdKafkaUtilsImpl::convertHeaders(
 
 void LibRdKafkaUtilsImpl::deleteHeaders(RdKafka::Headers* librdkafka_headers) const {
   delete librdkafka_headers;
+}
+
+ConsumerAssignmentPtr
+LibRdKafkaUtilsImpl::assignConsumerPartitions(RdKafka::KafkaConsumer& consumer,
+                                              const std::string& topic, int32_t partitions) const {
+  std::unique_ptr<ConsumerAssignmentImpl> result = std::make_unique<ConsumerAssignmentImpl>();
+  for (auto pt = 0; pt < partitions; ++pt) {
+    result->add(topic, pt);
+  }
+  consumer.assign(result->raw());
+  return result;
 }
 
 const LibRdKafkaUtils& LibRdKafkaUtilsImpl::getDefaultInstance() {
