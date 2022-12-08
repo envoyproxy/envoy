@@ -105,8 +105,14 @@ public:
 
   bool disabled() const { return disabled_; }
 
+  bool maxMessageSizeAllows(uint32_t size) const {
+    return max_message_size_ == 0 || size <= max_message_size_;
+  }
+
   envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
       RequestValidationOptions request_validation_options_{};
+
+  uint32_t max_message_size_{};
 
   void addBuiltinSymbolDescriptor(const std::string& symbol_name);
 
@@ -197,6 +203,11 @@ private:
   // Helpers for flow control.
   bool decoderBufferLimitReached(uint64_t buffer_length);
   bool encoderBufferLimitReached(uint64_t buffer_length);
+
+  /**
+   * If max_message_size is configured and larger than the buffer size, increase buffer size.
+   */
+  void maybeExpandBufferSize();
 
   const JsonTranscoderConfig& config_;
   const JsonTranscoderConfig* per_route_config_{};

@@ -1211,7 +1211,9 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamPostWithHttpBody) {
 // Streaming requests with HTTP bodies do not internally buffer any data.
 // The configured buffer limits will not apply.
 TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamPostWithHttpBodyNoBuffer) {
-  EXPECT_CALL(decoder_callbacks_, decoderBufferLimit()).Times(3).WillRepeatedly(Return(8));
+  EXPECT_CALL(decoder_callbacks_, decoderBufferLimit())
+      .Times(testing::AtLeast(3))
+      .WillRepeatedly(Return(8));
 
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"}, {":path", "/streamBody?arg=hi"}, {"content-type", "text/plain"}};
