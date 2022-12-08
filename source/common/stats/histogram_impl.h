@@ -68,8 +68,8 @@ private:
   ConstSupportedBuckets& supported_buckets_;
   std::vector<double> computed_quantiles_;
   std::vector<uint64_t> computed_buckets_;
-  uint64_t sample_count_;
-  double sample_sum_;
+  uint64_t sample_count_{0};
+  double sample_sum_{0};
   const Histogram::Unit unit_;
 };
 
