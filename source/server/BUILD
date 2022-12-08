@@ -645,3 +645,15 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "utils_lib",
+    srcs = ["utils.cc"],
+    hdrs = ["utils.h"],
+    deps = [
+        "//envoy/init:manager_interface",
+        "//source/common/common:assert_lib",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+    ],
+)
+
