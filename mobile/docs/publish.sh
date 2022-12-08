@@ -20,8 +20,10 @@ elif [ "$GITHUB_REF_NAME" == "main" ]
 then
   PUBLISH_DIR="$CHECKOUT_DIR"/docs/envoy-mobile/latest
 else
-  echo "Ignoring docs push"
-  exit 0
+  # TODO(jpsim): Revert this after testing
+  PUBLISH_DIR="$CHECKOUT_DIR"/docs/envoy-mobile/latest
+  # echo "Ignoring docs push"
+  # exit 0
 fi
 
 echo 'cloning'
@@ -33,8 +35,6 @@ rm -fr "$PUBLISH_DIR"
 mkdir -p "$PUBLISH_DIR"
 cp -r "$DOCS_DIR"/* "$PUBLISH_DIR"
 cd "$CHECKOUT_DIR"
-
-# TODO(jpsim): Set up website deploy key
 
 git config user.name "envoy-mobile-docs(ci)"
 git config user.email envoy-mobile-docs@users.noreply.github.com
