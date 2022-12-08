@@ -6,7 +6,7 @@
 
 namespace Envoy {
 namespace Server {
-namespace Utilities {
+namespace Utility {
 
 // Most utils paths are covered through other tests, these tests take of
 // of special cases to get remaining coverage.
@@ -15,6 +15,6 @@ TEST(UtilsTest, BadServerState) {
   EXPECT_ENVOY_BUG(Utility::serverState(static_cast<Init::Manager::State>(123), true),
                    "unexpected server state");
 }
-} // namespace Utilities
+} // namespace Utility
 } // namespace Server
 } // namespace Envoy
