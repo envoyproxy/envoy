@@ -33,7 +33,7 @@
 #include "source/server/api_listener_impl.h"
 #include "source/server/configuration_impl.h"
 #include "source/server/drain_manager_impl.h"
-#include "source/server/filter_chain_manager_impl.h"
+#include "source/extensions/listener_managers/listener_manager/filter_chain_manager_impl.h"
 #include "source/server/transport_socket_config_impl.h"
 
 namespace Envoy {
