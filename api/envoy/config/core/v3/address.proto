@@ -45,7 +45,8 @@ message EnvoyInternalAddress {
 
   // Specifies an endpoint identifier to distinguish between multiple endpoints for the same internal listener in a
   // single upstream pool. Only used in the upstream addresses for tracking changes to individual endpoints. This, for
-  // example, may be set to the final destination IP for the target internal listener.
+  // example, may be set to the final destination IP for the target internal listener. This endpoint identifier is only
+  // used for upstream endpoint, if specifying it in the listener, it will be rejected.
   string endpoint_id = 2;
 }
 
