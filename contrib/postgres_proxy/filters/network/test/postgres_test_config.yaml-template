@@ -21,6 +21,8 @@ static_resources:
               socket_address:
                 address: "{}"
                 port_value: 0
+    #downstream startTLS transport socket:
+    {}
   listeners:
     name: listener_0
     address:
@@ -33,9 +35,16 @@ static_resources:
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.postgres_proxy.v3alpha.PostgresProxy
           stat_prefix: postgres_stats
-          terminate_ssl: {}
+          # downstream SSL option:
+          {}
+          # upstream SSL option:
+          {}
+      # additional filters
+      {}
       - name: tcp
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
           stat_prefix: tcp_stats
           cluster: cluster_0
+      # upstream startTLS transport socket
+      {}
