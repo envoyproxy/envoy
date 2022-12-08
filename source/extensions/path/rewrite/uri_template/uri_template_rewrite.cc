@@ -28,7 +28,7 @@ absl::Status
 UriTemplateRewriter::isCompatiblePathMatcher(Router::PathMatcherSharedPtr path_matcher) const {
 
   if (path_matcher == nullptr) {
-    return absl::InvalidArgumentError("path_matcher not initialized");
+    return absl::InvalidArgumentError(fmt::format("path_matcher {} not initialized", Extensions::UriTemplate::Match::NAME));
   }
 
   if (path_matcher->name() != Extensions::UriTemplate::Match::NAME) {

@@ -134,7 +134,7 @@ TEST(RewriteTest, MatchPatternInactive) {
 
   absl::Status error = rewriter->isCompatiblePathMatcher(nullptr);
   EXPECT_FALSE(error.ok());
-  EXPECT_EQ(error.message(), "path_matcher not initialized");
+  EXPECT_EQ(error.message(), "path_matcher envoy.path.match.uri_template.uri_template_matcher not initialized");
 }
 
 TEST(RewriteTest, MatchPatternMismatchedVars) {
