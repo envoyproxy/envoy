@@ -36,8 +36,14 @@ public:
   ~TmpFileImplPosix() override;
 
 private:
+  // Ideally opening a tmp file opens it with no name; this is a fallback option for
+  // when the OS or filesystem doesn't support that. with_unlink is a test-only
+  // parameter to allow us to also test-cover the path where unlinking an open file
+  // doesn't work.
+  Api::IoCallBoolResult openNamedTmpFile(FlagsAndMode flags_and_mode, bool with_unlink = true);
   // This is only set in the case where the file system does not support nameless tmp files.
   std::string tmp_file_path_;
+  friend class FileSystemImplTest;
 };
 
 class InstanceImplPosix : public Instance {

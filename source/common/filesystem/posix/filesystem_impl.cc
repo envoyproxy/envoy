@@ -58,21 +58,29 @@ Api::IoCallBoolResult TmpFileImplPosix::open(FlagSet in) {
 
   const auto flags_and_mode = translateFlag(in);
 #ifdef O_TMPFILE
-  // Try to open a temp file with no name. Only some file systems support this.
-  fd_ = ::open(path().c_str(), flags_and_mode.flags_ | O_TMPFILE, flags_and_mode.mode_);
+  // Try to create a temp file with no name. Only some file systems support this.
+  fd_ =
+      ::open(path().c_str(), (flags_and_mode.flags_ & ~O_CREAT) | O_TMPFILE, flags_and_mode.mode_);
   if (fd_ != -1) {
     return resultSuccess(true);
   }
 #endif
   // If we couldn't do a nameless temp file, open a named temp file.
+  return openNamedTmpFile(flags_and_mode);
+}
+
+Api::IoCallBoolResult TmpFileImplPosix::openNamedTmpFile(FlagsAndMode flags_and_mode,
+                                                         bool with_unlink) {
   for (int tries = 5; tries > 0; tries--) {
     std::string try_path = generateTmpFilePath(path());
     fd_ = ::open(try_path.c_str(), flags_and_mode.flags_, flags_and_mode.mode_);
+    std::cerr << "with_unlink = " << with_unlink << std::endl;
     if (fd_ != -1) {
       // Try to unlink the temp file while it's still open. Again this only works on
       // a (different) subset of file systems.
-      if (::unlink(try_path.c_str()) != 0) {
+      if (!with_unlink || ::unlink(try_path.c_str()) != 0) {
         // If we couldn't unlink it, set tmp_file_path_, to unlink after close.
+        std::cerr << "XXXXX tmp_file_path_ set to " << try_path << std::endl;
         tmp_file_path_ = try_path;
       }
       return resultSuccess(true);
@@ -95,12 +103,13 @@ Api::IoCallBoolResult FileImplPosix::close() {
 
 Api::IoCallBoolResult TmpFileImplPosix::close() {
   auto result = FileImplPosix::close();
-  if (!tmp_file_path_.empty()) {
-    int unlink_result = ::unlink(tmp_file_path_.c_str());
-    ASSERT(unlink_result == 0, resultFailure(0, errno).err_->getErrorDetails());
-    tmp_file_path_.clear();
+  if (!result.return_value_ || tmp_file_path_.empty()) {
+    std::cerr << "not trying unlink" << std::endl;
+    return result;
   }
-  return result;
+  std::cerr << "trying unlink " << tmp_file_path_ << std::endl;
+  return (::unlink(tmp_file_path_.c_str()) != -1) ? resultSuccess(true)
+                                                  : resultFailure(false, errno);
 }
 
 FileImplPosix::FlagsAndMode FileImplPosix::translateFlag(FlagSet in) {
