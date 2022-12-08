@@ -32,13 +32,12 @@ namespace Envoy {
 bool MainCommonBase::run() {
   switch (options_.mode()) {
   case Server::Mode::Serve:
-    server_->run();
+    runServer();
     return true;
-  case Server::Mode::Validate: {
-    auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
-    return Server::validateConfig(options_, local_address, component_factory_,
-                                  platform_impl_->threadFactory(), platform_impl_->fileSystem());
-  }
+  case Server::Mode::Validate:
+    return Server::validateConfig(
+        options_, Network::Utility::getLocalAddress(options_.localAddressIpVersion()),
+        component_factory_, platform_impl_->threadFactory(), platform_impl_->fileSystem());
   case Server::Mode::InitOnly:
     PERF_DUMP();
     return true;
