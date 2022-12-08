@@ -680,8 +680,22 @@ public:
     return opaque_config_;
   }
   bool includeVirtualHostRateLimits() const override { return include_vh_rate_limits_; }
-  const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
-  const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
+  using DefaultMetadata = ConstSingleton<envoy::config::core::v3::Metadata>;
+  const envoy::config::core::v3::Metadata& metadata() const override {
+    if (metadata_ != nullptr) {
+      return *metadata_;
+    }
+    return DefaultMetadata::get();
+  }
+  using RouteTypedMetadata = Envoy::Config::TypedMetadataImpl<HttpRouteTypedMetadataFactory>;
+  const Envoy::Config::TypedMetadata& typedMetadata() const override {
+    if (typed_metadata_ != nullptr) {
+      return *typed_metadata_;
+    }
+    static const RouteTypedMetadata* defaultTypedMetadata =
+        new RouteTypedMetadata(DefaultMetadata::get());
+    return *defaultTypedMetadata;
+  }
   const PathMatchCriterion& pathMatchCriterion() const override { return *this; }
   bool includeAttemptCountInRequest() const override {
     return vhost_.includeAttemptCountInRequest();
@@ -1097,8 +1111,8 @@ private:
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
   uint32_t retry_shadow_buffer_limit_{std::numeric_limits<uint32_t>::max()};
-  envoy::config::core::v3::Metadata metadata_;
-  Envoy::Config::TypedMetadataImpl<HttpRouteTypedMetadataFactory> typed_metadata_;
+  std::unique_ptr<const envoy::config::core::v3::Metadata> metadata_;
+  std::unique_ptr<const RouteTypedMetadata> typed_metadata_;
   const bool match_grpc_;
   const std::vector<Envoy::Matchers::MetadataMatcher> dynamic_metadata_;
 
