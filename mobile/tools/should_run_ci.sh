@@ -39,8 +39,11 @@ git fetch origin main
 echo "COMPARING TO origin/main ..."
 
 merge_commit="$(git log -1 --format='%H')"
+
+echo "CURRENT COMMIT: ${merge_commit}"
+
 base_commit="$(git merge-base origin/main ${merge_commit})"
-echo "COMMIT: ${base_commit} "
+echo "BASE COMMIT: ${base_commit} "
 changed_files="$(git diff "$base_commit" --name-only)"
 
 if grep -q "^mobile/" <<< "$changed_files"; then
