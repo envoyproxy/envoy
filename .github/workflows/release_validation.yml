@@ -1,16 +1,10 @@
-name: release_validation
+name: mobile_release_validation
 
 on:
   push:
     branches:
     - main
-    paths:
-    - 'mobile/**'
-    - '.github/workflows/**'
   pull_request:
-    paths:
-    - 'mobile/**'
-    - '.github/workflows/**'
 
 jobs:
   validate_swiftpm_example:
@@ -19,9 +13,15 @@ jobs:
     timeout-minutes: 120
     steps:
     - uses: actions/checkout@v1
+    - id: should_run
+      name: 'Check whether to run'
+      run: ./mobile/tools/should_run_ci.sh
     - run: cd mobile && ./ci/mac_ci_setup.sh
+      if: steps.should_run.outputs.run_ci_job == 'true'
       name: 'Install dependencies'
-    - env:
+    - name: 'Build xcframework'
+      if: steps.should_run.outputs.run_ci_job == 'true'
+      env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         cd mobile && ./bazelw build \
@@ -29,10 +29,11 @@ jobs:
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //:ios_xcframework
-      name: 'Build xcframework'
     # Ignore errors: Bad CRC when unzipping large files: https://bbs.archlinux.org/viewtopic.php?id=153011
     - run: unzip mobile/bazel-bin/library/swift/Envoy.xcframework.zip -d mobile/examples/swift/swiftpm/Packages || true
+      if: steps.should_run.outputs.run_ci_job == 'true'
       name: 'Unzip xcframework'
     - run: xcodebuild -project mobile/examples/swift/swiftpm/EnvoySwiftPMExample.xcodeproj -scheme EnvoySwiftPMExample -destination platform="iOS Simulator,name=iPhone 13 Pro Max,OS=16.1"
+      if: steps.should_run.outputs.run_ci_job == 'true'
       name: 'Build app'
     # TODO(jpsim): Run app and inspect logs to validate
