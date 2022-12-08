@@ -74,13 +74,11 @@ Api::IoCallBoolResult TmpFileImplPosix::openNamedTmpFile(FlagsAndMode flags_and_
   for (int tries = 5; tries > 0; tries--) {
     std::string try_path = generateTmpFilePath(path());
     fd_ = ::open(try_path.c_str(), flags_and_mode.flags_, flags_and_mode.mode_);
-    std::cerr << "with_unlink = " << with_unlink << std::endl;
     if (fd_ != -1) {
       // Try to unlink the temp file while it's still open. Again this only works on
       // a (different) subset of file systems.
       if (!with_unlink || ::unlink(try_path.c_str()) != 0) {
         // If we couldn't unlink it, set tmp_file_path_, to unlink after close.
-        std::cerr << "XXXXX tmp_file_path_ set to " << try_path << std::endl;
         tmp_file_path_ = try_path;
       }
       return resultSuccess(true);
@@ -102,12 +100,10 @@ Api::IoCallBoolResult FileImplPosix::close() {
 }
 
 Api::IoCallBoolResult TmpFileImplPosix::close() {
-  auto result = FileImplPosix::close();
+  Api::IoCallBoolResult result = FileImplPosix::close();
   if (!result.return_value_ || tmp_file_path_.empty()) {
-    std::cerr << "not trying unlink" << std::endl;
     return result;
   }
-  std::cerr << "trying unlink " << tmp_file_path_ << std::endl;
   return (::unlink(tmp_file_path_.c_str()) != -1) ? resultSuccess(true)
                                                   : resultFailure(false, errno);
 }
