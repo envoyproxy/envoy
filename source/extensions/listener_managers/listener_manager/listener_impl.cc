@@ -366,6 +366,10 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
     addresses_.emplace_back(
         std::make_shared<Network::Address::EnvoyInternalInstance>(config.name()));
     address_opts_list.emplace_back(std::ref(config_.socket_options()));
+
+    if (!addresses_.back()->envoyInternalAddress()->endpointId().empty()) {
+      throw EnvoyException(fmt::format("listener {}: doesn't support specifying an endpoint ID for Envoy internal address for a listener", name_));
+    }
   } else {
     // All the addresses should be same socket type, so get the first address's socket type is
     // enough.

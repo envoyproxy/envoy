@@ -789,6 +789,23 @@ TEST_P(ListenerManagerImplTest, MultipleSocketTypeSpecifiedInAddresses) {
                             "support same socket type for all the addresses.");
 }
 
+TEST_P(ListenerManagerImplTest, RejectInternalAddressesWithEndpointID) {
+  const std::string yaml = R"EOF(
+    name: "foo"
+    address:
+      envoy_internal_address:
+        server_listener_name: a_listener_name_1
+        endpoint_id: foo
+    filter_chains:
+    - filters: []
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true),
+                            EnvoyException,
+                            "error adding listener named 'foo': use internal_listener field "
+                            "instead of address for internal listeners");
+}
+
 TEST_P(ListenerManagerImplTest, RejectMutlipleInternalAddresses) {
   const std::string yaml = R"EOF(
     name: "foo"
