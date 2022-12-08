@@ -36,6 +36,8 @@ git branch
 
 git fetch origin main
 
+echo "COMPARING TO main ..."
+
 base_commit="$(git merge-base origin/main HEAD)"
 changed_files="$(git diff "$base_commit" --name-only)"
 
