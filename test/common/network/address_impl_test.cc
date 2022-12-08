@@ -360,6 +360,15 @@ TEST(PipeInstanceTest, Basic) {
   EXPECT_EQ(nullptr, address.envoyInternalAddress());
 }
 
+TEST(AddressInstanceHashTest, Hashable) {
+  EXPECT_TRUE(absl::VerifyTypeImplementsAbslHashCorrectly({
+      AddressKey(std::make_shared<EnvoyInternalInstance>("listener_foo")),
+      AddressKey(std::make_shared<Ipv4Instance>("255.255.255.255", 80)),
+      AddressKey(std::make_shared<Ipv6Instance>("::1", 80)),
+      AddressKey(std::make_shared<PipeInstance>("/foo/bar")),
+  }));
+}
+
 TEST(InternalInstanceTest, Hashable) {
   EXPECT_TRUE(absl::VerifyTypeImplementsAbslHashCorrectly({
       AddressKey(std::make_shared<EnvoyInternalInstance>("listener_foo")),
@@ -371,13 +380,10 @@ TEST(InternalInstanceTest, Hashable) {
       AddressKey(std::make_shared<EnvoyInternalInstance>("listener_foo")),
   }));
 
-  EXPECT_FALSE(absl::VerifyTypeImplementsAbslHashCorrectly({
+  EXPECT_TRUE(absl::VerifyTypeImplementsAbslHashCorrectly({
       AddressKey(std::make_shared<EnvoyInternalInstance>("listener_foo")),
       AddressKey(std::make_shared<EnvoyInternalInstance>("listener_foo", "1")),
   }));
-
-  EXPECT_TRUE(AddressKey(std::make_shared<EnvoyInternalInstance>("listener_foo")) ==
-              AddressKey(std::make_shared<EnvoyInternalInstance>("listener_foo", "1")));
 }
 
 TEST(InternalInstanceTest, Basic) {

@@ -384,8 +384,7 @@ public:
   absl::string_view addressType() const override { return "envoy_internal"; }
 
   void abslHashValue(absl::HashState state) const override {
-    // Envoy internal address only hash by address id, ignore the endpoint id.
-    absl::HashState::combine(std::move(state), internal_address_.address_id_);
+    absl::HashState::combine(std::move(state), internal_address_.address_id_, internal_address_.endpoint_id_);
   }
 
 private:
