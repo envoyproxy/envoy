@@ -27,6 +27,9 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: listener
+  change: |
+    Previously the endpoint ID can be specified when using Envoy internal address in the listener. A rejection is added for this case since it is meanless.
 - area: tls
   change: |
     added support for intermediate CA as trusted ca. The peer certificate issued by an intermediate CA will be trusted by
