@@ -82,7 +82,6 @@ func (c *httpCApiImpl) HttpCopyHeaders(r unsafe.Pointer, num uint64, bytes uint6
         key := strs[i]
         value := strs[i+1]
         m[key] = value
-        // fmt.Printf("value of %s: %s\n", key, value)
     }
     runtime.KeepAlive(buf)
     return m

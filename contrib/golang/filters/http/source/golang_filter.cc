@@ -35,7 +35,6 @@ Http::LocalErrorStatus Filter::onLocalReply(const LocalReplyData& data) {
   ENVOY_LOG(debug, "golang filter onLocalReply, state: {}, phase: {}, code: {}", state.stateStr(),
             state.phaseStr(), int(data.code_));
 
-  // TODO: let the running go filter return a bit earilier, by setting a flag?
   return Http::LocalErrorStatus::Continue;
 }
 
@@ -44,12 +43,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   ENVOY_LOG(debug, "golang filter decodeHeaders, state: {}, phase: {}, end_stream: {}",
             state.stateStr(), state.phaseStr(), end_stream);
-
-  if (dynamic_lib_ == nullptr) {
-    ENVOY_LOG(error, "dynamic_lib_ is nullPtr, maybe the instance already unpub.");
-    // TODO return Network::FilterStatus::StopIteration and close connection immediately?
-    return Http::FilterHeadersStatus::Continue;
-  }
 
   state.setEndStream(end_stream);
 
@@ -63,12 +56,6 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   ENVOY_LOG(debug,
             "golang filter decodeData, state: {}, phase: {}, data length: {}, end_stream: {}",
             state.stateStr(), state.phaseStr(), data.length(), end_stream);
-
-  if (dynamic_lib_ == nullptr) {
-    ENVOY_LOG(error, "dynamic_lib_ is nullPtr, maybe the instance already unpub.");
-    // TODO return Network::FilterStatus::StopIteration and close connection immediately?
-    return Http::FilterDataStatus::Continue;
-  }
 
   state.setEndStream(end_stream);
 
@@ -89,12 +76,6 @@ Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap& trail
 
   state.setSeenTrailers();
 
-  if (dynamic_lib_ == nullptr) {
-    ENVOY_LOG(error, "dynamic_lib_ is nullPtr, maybe the instance already unpub.");
-    // TODO return Network::FilterStatus::StopIteration and close connection immediately?
-    return Http::FilterTrailersStatus::Continue;
-  }
-
   bool done = doTrailer(state, trailers);
 
   return done ? Http::FilterTrailersStatus::Continue : Http::FilterTrailersStatus::StopIteration;
@@ -104,12 +85,6 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   ProcessorState& state = getProcessorState();
   ENVOY_LOG(debug, "golang filter encodeHeaders, state: {}, phase: {}, end_stream: {}",
             state.stateStr(), state.phaseStr(), end_stream);
-
-  if (dynamic_lib_ == nullptr) {
-    ENVOY_LOG(error, "dynamic_lib_ is nullPtr, maybe the instance already unpub.");
-    // TODO return Network::FilterStatus::StopIteration and close connection immediately?
-    return Http::FilterHeadersStatus::Continue;
-  }
 
   encoding_state_.setEndStream(end_stream);
 
@@ -130,14 +105,6 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
 
     // get the state before changing it.
     bool inGo = state.isProcessingInGo();
-
-    /*
-    // it's safe to reset phase_ and state_, since they are read/write in safe thread.
-    ENVOY_LOG(debug, "golang filter phase grow to EncodeHeader and state grow to WaitHeader since "
-                     "enter encodeHeaders early");
-    phase_ = Phase::EncodeHeader;
-    state_ = FilterState::WaitHeader;
-    */
 
     if (inGo) {
       // NP: wait go returns to avoid concurrency conflict in go side.
@@ -172,12 +139,6 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_strea
             "golang filter encodeData, state: {}, phase: {}, data length: {}, end_stream: {}",
             state.stateStr(), state.phaseStr(), data.length(), end_stream);
 
-  if (dynamic_lib_ == nullptr) {
-    ENVOY_LOG(error, "dynamic_lib_ is nullPtr, maybe the instance already unpub.");
-    // TODO return Network::FilterStatus::StopIteration and close connection immediately?
-    return Http::FilterDataStatus::Continue;
-  }
-
   encoding_state_.setEndStream(end_stream);
 
   if (local_reply_waiting_go_) {
@@ -203,12 +164,6 @@ Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap& trai
 
   encoding_state_.setSeenTrailers();
 
-  if (dynamic_lib_ == nullptr) {
-    ENVOY_LOG(error, "dynamic_lib_ is nullPtr, maybe the instance already unpub.");
-    // TODO return Network::FilterStatus::StopIteration and close connection immediately?
-    return Http::FilterTrailersStatus::Continue;
-  }
-
   if (local_reply_waiting_go_) {
     // NP: save to another local_trailers_ variable to avoid conflict,
     // since the trailers_ may be used in Go side.
@@ -233,21 +188,11 @@ void Filter::onDestroy() {
     has_destroyed_ = true;
   }
 
-  if (dynamic_lib_ == nullptr) {
-    ENVOY_LOG(error, "golang filter dynamicLib is nullPtr.");
-    return;
-  }
+  ASSERT(req_ != nullptr);
+  auto& state = getProcessorState();
+  auto reason = state.isProcessingInGo() ? DestroyReason::Terminate : DestroyReason::Normal;
 
-  try {
-    ASSERT(req_ != nullptr);
-    auto& state = getProcessorState();
-    auto reason = state.isProcessingInGo() ? DestroyReason::Terminate : DestroyReason::Normal;
-
-    dynamic_lib_->envoyGoFilterOnHttpDestroy(req_, int(reason));
-  } catch (...) {
-    ENVOY_LOG(error, "golang filter onDestroy do destoryStream catch "
-                     "unknown exception.");
-  }
+  dynamic_lib_->envoyGoFilterOnHttpDestroy(req_, int(reason));
 }
 
 void Filter::onStreamComplete() {
@@ -277,33 +222,23 @@ GolangStatus Filter::doHeadersGo(ProcessorState& state, Http::RequestOrResponseH
   ENVOY_LOG(debug, "golang filter passing data to golang, state: {}, phase: {}, end_stream: {}",
             state.stateStr(), state.phaseStr(), end_stream);
 
-  try {
-    if (req_ == nullptr) {
-      // req is used by go, so need to use raw memory and then it is safe to release at the gc
-      // finalize phase of the go object.
-      req_ = new httpRequestInternal(weak_from_this());
-      req_->configId = getMergedConfigId(state);
-      req_->plugin_name.data = config_->pluginName().data();
-      req_->plugin_name.len = config_->pluginName().length();
-    }
-
-    req_->phase = static_cast<int>(state.phase());
-    {
-      Thread::LockGuard lock(mutex_);
-      headers_ = &headers;
-    }
-    auto status = dynamic_lib_->envoyGoFilterOnHttpHeader(req_, end_stream ? 1 : 0, headers.size(),
-                                                          headers.byteSize());
-    return static_cast<GolangStatus>(status);
-
-  } catch (const EnvoyException& e) {
-    ENVOY_LOG(error, "golang filter doHeadersGo catch: {}.", e.what());
-
-  } catch (...) {
-    ENVOY_LOG(error, "golang filter doHeadersGo catch unknown exception.");
+  if (req_ == nullptr) {
+    // req is used by go, so need to use raw memory and then it is safe to release at the gc
+    // finalize phase of the go object.
+    req_ = new httpRequestInternal(weak_from_this());
+    req_->configId = getMergedConfigId(state);
+    req_->plugin_name.data = config_->pluginName().data();
+    req_->plugin_name.len = config_->pluginName().length();
   }
 
-  return GolangStatus::Continue;
+  req_->phase = static_cast<int>(state.phase());
+  {
+    Thread::LockGuard lock(mutex_);
+    headers_ = &headers;
+  }
+  auto status = dynamic_lib_->envoyGoFilterOnHttpHeader(req_, end_stream ? 1 : 0, headers.size(),
+                                                        headers.byteSize());
+  return static_cast<GolangStatus>(status);
 }
 
 bool Filter::doHeaders(ProcessorState& state, Http::RequestOrResponseHeaderMap& headers,
@@ -331,22 +266,12 @@ bool Filter::doDataGo(ProcessorState& state, Buffer::Instance& data, bool end_st
 
   Buffer::Instance& buffer = state.doDataList.push(data);
 
-  try {
-    ASSERT(req_ != nullptr);
-    req_->phase = static_cast<int>(state.phase());
-    auto status = dynamic_lib_->envoyGoFilterOnHttpData(
-        req_, end_stream ? 1 : 0, reinterpret_cast<uint64_t>(&buffer), buffer.length());
+  ASSERT(req_ != nullptr);
+  req_->phase = static_cast<int>(state.phase());
+  auto status = dynamic_lib_->envoyGoFilterOnHttpData(
+      req_, end_stream ? 1 : 0, reinterpret_cast<uint64_t>(&buffer), buffer.length());
 
-    return state.handleDataGolangStatus(static_cast<GolangStatus>(status));
-
-  } catch (const EnvoyException& e) {
-    ENVOY_LOG(error, "golang filter decodeData catch: {}.", e.what());
-
-  } catch (...) {
-    ENVOY_LOG(error, "golang filter decodeData catch unknown exception.");
-  }
-
-  return false;
+  return state.handleDataGolangStatus(static_cast<GolangStatus>(status));
 }
 
 bool Filter::doData(ProcessorState& state, Buffer::Instance& data, bool end_stream) {
@@ -396,21 +321,12 @@ bool Filter::doTrailerGo(ProcessorState& state, Http::HeaderMap& trailers) {
 
   state.processTrailer();
 
-  bool done = true;
-  try {
-    ASSERT(req_ != nullptr);
-    req_->phase = static_cast<int>(state.phase());
-    auto status =
-        dynamic_lib_->envoyGoFilterOnHttpHeader(req_, 1, trailers.size(), trailers.byteSize());
-    done = state.handleTrailerGolangStatus(static_cast<GolangStatus>(status));
+  ASSERT(req_ != nullptr);
+  req_->phase = static_cast<int>(state.phase());
+  auto status =
+      dynamic_lib_->envoyGoFilterOnHttpHeader(req_, 1, trailers.size(), trailers.byteSize());
 
-  } catch (const EnvoyException& e) {
-    ENVOY_LOG(error, "golang filter doTrailer catch: {}.", e.what());
-
-  } catch (...) {
-    ENVOY_LOG(error, "golang filter doTrailer catch unknown exception.");
-  }
-  return done;
+  return state.handleTrailerGolangStatus(static_cast<GolangStatus>(status));
 }
 
 bool Filter::doTrailer(ProcessorState& state, Http::HeaderMap& trailers) {
@@ -651,11 +567,13 @@ void copyHeaderMapToGo(Http::HeaderMap& m, GoString* go_strs, char* go_buf) {
     auto key = std::string(header.key().getStringView());
     auto value = std::string(header.value().getStringView());
 
-    // std::cout << "idx: " << i << ", key: " << key << ", value: " << value << std::endl;
-
     auto len = key.length();
+    // go_strs is the heap memory of go, and the length is twice the number of headers. So range it
+    // is safe.
     go_strs[i].n = len;
     go_strs[i].p = go_buf;
+    // go_buf is the heap memory of go, and the length is the total length of all keys and values in
+    // the header. So use memcpy is safe.
     memcpy(go_buf, key.data(), len); // NOLINT(safe-memcpy)
     go_buf += len;
     i++;
@@ -709,6 +627,8 @@ void Filter::copyBuffer(Buffer::Instance* buffer, char* data) {
     return;
   }
   for (const Buffer::RawSlice& slice : buffer->getRawSlices()) {
+    // data is the heap memory of go, and the length is the total length of buffer. So use memcpy is
+    // safe.
     memcpy(data, static_cast<const char*>(slice.mem_), slice.len_); // NOLINT(safe-memcpy)
     data += slice.len_;
   }
@@ -874,7 +794,6 @@ uint64_t RoutePluginConfig::getMergedConfigId(uint64_t parent_id, std::string so
     auto len = str.length();
     config_id_ = dlib->envoyGoFilterNewHttpPluginConfig(ptr, len);
     if (config_id_ == 0) {
-      // TODO: throw error
       ENVOY_LOG(error, "invalid golang plugin config");
       return parent_id;
     }
@@ -883,7 +802,6 @@ uint64_t RoutePluginConfig::getMergedConfigId(uint64_t parent_id, std::string so
 
   merged_config_id_ = dlib->envoyGoFilterMergeHttpPluginConfig(parent_id, config_id_);
   if (merged_config_id_ == 0) {
-    // TODO: throw error
     ENVOY_LOG(error, "invalid golang plugin config");
   }
   ENVOY_LOG(debug, "golang filter merge plugin config, from {} + {} to {}", parent_id, config_id_,

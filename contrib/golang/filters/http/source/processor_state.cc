@@ -29,10 +29,6 @@ void BufferList::moveOut(Buffer::Instance& data) {
 void BufferList::clearLatest() {
   auto buffer = std::move(queue_.back());
   bytes_ -= buffer->length();
-
-  // buffer data will be clear automatically?
-  // buffer->drain(buffer->length());
-
   queue_.pop_back();
 };
 
@@ -47,7 +43,6 @@ bool ProcessorState::handleHeaderGolangStatus(const GolangStatus status) {
             stateStr(), phaseStr(), int(status));
 
   ASSERT(state_ == FilterState::ProcessingHeader);
-  // TODO: worth a better name?
   bool done = false;
 
   switch (status) {
@@ -77,7 +72,6 @@ bool ProcessorState::handleHeaderGolangStatus(const GolangStatus status) {
     break;
 
   default:
-    // TODO: terminate the stream?
     ENVOY_LOG(error, "unexpected status: {}", int(status));
     break;
   }
