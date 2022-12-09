@@ -46,7 +46,7 @@ public:
   // LibRdKafkaUtils
   ConsumerAssignmentPtr assignConsumerPartitions(RdKafka::KafkaConsumer& consumer,
                                                  const std::string& topic,
-                                                 int32_t partitions) const override;
+                                                 const int32_t partitions) const override;
 
   // Default singleton accessor.
   static const LibRdKafkaUtils& getDefaultInstance();

@@ -25,12 +25,12 @@ class RichKafkaConsumer : public KafkaConsumer, private Logger::Loggable<Logger:
 public:
   // Main constructor.
   RichKafkaConsumer(InboundRecordProcessor& record_processor, Thread::ThreadFactory& thread_factory,
-                    const std::string& topic, int32_t partition_count,
+                    const std::string& topic, const int32_t partition_count,
                     const RawKafkaConfig& configuration);
 
   // Visible for testing (allows injection of LibRdKafkaUtils).
   RichKafkaConsumer(InboundRecordProcessor& record_processor, Thread::ThreadFactory& thread_factory,
-                    const std::string& topic, int32_t partition_count,
+                    const std::string& topic, const int32_t partition_count,
                     const RawKafkaConfig& configuration, const LibRdKafkaUtils& utils);
 
   // More complex than usual - closes the real Kafka consumer and disposes of the assignment object.

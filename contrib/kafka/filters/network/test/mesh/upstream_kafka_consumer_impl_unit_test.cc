@@ -1,3 +1,5 @@
+#include <functional>
+
 #include "test/test_common/thread_factory_for_test.h"
 
 #include "absl/synchronization/mutex.h"
@@ -11,7 +13,6 @@ using testing::_;
 using testing::AnyNumber;
 using testing::AtLeast;
 using testing::ByMove;
-using testing::Exactly;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
@@ -83,32 +84,49 @@ TEST_F(UpstreamKafkaConsumerTest, ShouldThrowIfRawConsumerConstructionFails) {
   EXPECT_THROW(makeTestee(), EnvoyException);
 }
 
-// Utility class: thread safe "store" for values with blocking access.
-template <typename T> class Holder {
+// Utility class for counting invocations / capturing invocation data.
+template <typename T> class Tracker {
 private:
   mutable absl::Mutex mutex_;
-  bool data_set_ ABSL_GUARDED_BY(mutex_) = false;
+  int invocation_count_ ABSL_GUARDED_BY(mutex_) = 0;
   T data_ ABSL_GUARDED_BY(mutex_);
 
 public:
   // Stores the first value put inside.
-  void put(T arg) {
+  void registerInvocation(const T& arg) {
     absl::MutexLock lock{&mutex_};
-    if (!data_set_) {
-      data_set_ = true;
+    if (0 == invocation_count_) {
       data_ = arg;
     }
+    invocation_count_++;
   }
 
   // Blocks until some value appears, and returns it.
-  T await() const {
-    absl::MutexLock lock{&mutex_, absl::Condition(this, &Holder::hasDataSet)};
+  T awaitFirstInvocation() const {
+    const auto cond = std::bind(&Tracker::hasInvocations, this, 1);
+    absl::MutexLock lock{&mutex_, absl::Condition(&cond)};
     return data_;
   }
 
+  // Blocks until N invocations have happened.
+  void awaitInvocations(const int n) const {
+    const auto cond = std::bind(&Tracker::hasInvocations, this, n);
+    absl::MutexLock lock{&mutex_, absl::Condition(&cond)};
+  }
+
 private:
-  bool hasDataSet() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) { return data_set_; }
+  bool hasInvocations(const int n) const ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
+    return invocation_count_ >= n;
+  }
 };
+
+// Utility method: creates a Kafka message with given error code.
+// Results will be freed by the worker thread.
+static RdKafkaMessageRawPtr makeMessage(const RdKafka::ErrorCode error_code) {
+  const auto result = new NiceMock<MockKafkaMessage>();
+  ON_CALL(*result, err()).WillByDefault(Return(error_code));
+  return result;
+}
 
 // Expected behaviour: if there is interest, then poll for records, and pass them to processor.
 TEST_F(UpstreamKafkaConsumerTest, ShouldReceiveRecordsFromKafkaConsumer) {
@@ -119,88 +137,48 @@ TEST_F(UpstreamKafkaConsumerTest, ShouldReceiveRecordsFromKafkaConsumer) {
       .Times(AnyNumber())
       .WillRepeatedly(Return(true));
 
-  EXPECT_CALL(consumer_, consume(_))
-      .Times(AnyNumber())
-      .WillRepeatedly([]() -> RdKafkaMessageRawPtr {
-        return new NiceMock<MockKafkaMessage>(); // Will be freed by the worker thread.
-      });
+  EXPECT_CALL(consumer_, consume(_)).Times(AnyNumber()).WillRepeatedly([]() {
+    return makeMessage(RdKafka::ERR_NO_ERROR);
+  });
 
-  Holder<InboundRecordSharedPtr> holder;
+  Tracker<InboundRecordSharedPtr> tracker;
   EXPECT_CALL(record_processor_, receive(_))
       .Times(AtLeast(1))
-      .WillRepeatedly(Invoke(&holder, &Holder<InboundRecordSharedPtr>::put));
+      .WillRepeatedly(Invoke(&tracker, &Tracker<InboundRecordSharedPtr>::registerInvocation));
 
   // when
   const auto testee = makeTestee();
 
   // then - record processor got notified with a message.
-  InboundRecordSharedPtr record = holder.await();
-  ASSERT_TRUE(nullptr != record);
+  const InboundRecordSharedPtr record = tracker.awaitFirstInvocation();
+  ASSERT_NE(record, nullptr);
 }
 
-// Rich consumer's constructor starts a worker thread.
-// We are going to wait for at least one request for interest, and then destroy the consumer.
-TEST_F(UpstreamKafkaConsumerTest, ShouldCheckInterestUntilShutdown) {
+// Expected behaviour: if there is no data, we send nothing to processor.
+TEST_F(UpstreamKafkaConsumerTest, ShouldHandleNoDataGracefully) {
   // given
   setupConstructorExpectations();
 
-  // Because there will be no interest, there won't be any reading from upstream.
-  EXPECT_CALL(consumer_, consume(_)).Times(Exactly(0));
-
-  // Mutex for conditional critical section - at least one processor call has been invoked.
-  absl::Mutex mt;
-  int interest_calls = 0;
-
-  EXPECT_CALL(record_processor_, waitUntilInterest(_, _))
-      .Times(AtLeast(1))
-      .WillRepeatedly([&mt, &interest_calls]() {
-        absl::MutexLock lock(&mt);
-        interest_calls++;
-        return false; // There is no interest, but keep churning until shutdown.
-      });
-
-  // when
-  const auto testee = makeTestee();
-
-  // then - the below conditional lock is acquired,
-  // what means that the worker thread interacted with the request processor.
-  const auto at_least_one_interest_call_has_occurred = [&interest_calls]() -> bool {
-    return interest_calls > 0;
-  };
-  absl::MutexLock lock(&mt, absl::Condition(&at_least_one_interest_call_has_occurred));
-}
-
-// Rich consumer's constructor starts a worker thread.
-// We are going to wait for at least one invocation of consumer 'consume', so we are confident that
-// it does polling. Then we are going to destroy the testee, and expect the thread to finish.
-TEST_F(UpstreamKafkaConsumerTest, ShouldConsumeUntilShutdown) {
-  // given
-  setupConstructorExpectations();
-
-  // In this scenario there are requests waiting for data, so we want to consume from upstream.
+  Tracker<void*> tracker;
   EXPECT_CALL(record_processor_, waitUntilInterest(_, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Return(true));
-  EXPECT_CALL(record_processor_, receive(_)).Times(AtLeast(1));
+      .WillRepeatedly([&tracker]() {
+        tracker.registerInvocation(nullptr);
+        return true;
+      });
 
-  // Mutex for conditional critical section - at least one consumer 'consume' call has been invoked.
-  absl::Mutex mt;
-  int consume_calls = 0;
-  EXPECT_CALL(consumer_, consume(_)).Times(AtLeast(1)).WillRepeatedly([&mt, &consume_calls]() {
-    absl::MutexLock lock(&mt);
-    consume_calls++;
-    return new NiceMock<MockKafkaMessage>(); // Will be freed by the testee in its destructor.
+  EXPECT_CALL(consumer_, consume(_)).Times(AnyNumber()).WillRepeatedly([]() {
+    return makeMessage(RdKafka::ERR__TIMED_OUT);
   });
+
+  // We do not expect to receive any meaningful records.
+  EXPECT_CALL(record_processor_, receive(_)).Times(0);
 
   // when
   const auto testee = makeTestee();
 
-  // then - the below conditional lock is acquired,
-  // what means that the worker thread interacted with underlying Kafka consumer.
-  const auto at_least_one_consume_call_has_occurred = [&consume_calls]() -> bool {
-    return consume_calls > 0;
-  };
-  absl::MutexLock lock(&mt, absl::Condition(&at_least_one_consume_call_has_occurred));
+  // then - we have run a few loops, but the processor was never interacted with.
+  tracker.awaitInvocations(13);
 }
 
 } // namespace Mesh

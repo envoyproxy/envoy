@@ -62,7 +62,7 @@ public:
   // Impl: this method was extracted so that raw-pointer vector does not appear in real code.
   virtual ConsumerAssignmentPtr assignConsumerPartitions(RdKafka::KafkaConsumer& consumer,
                                                          const std::string& topic,
-                                                         int32_t partitions) const PURE;
+                                                         const int32_t partitions) const PURE;
 };
 
 using RawKafkaConfig = std::map<std::string, std::string>;

@@ -10,14 +10,14 @@ namespace Mesh {
 
 RichKafkaConsumer::RichKafkaConsumer(InboundRecordProcessor& record_processor,
                                      Thread::ThreadFactory& thread_factory,
-                                     const std::string& topic, int32_t partition_count,
+                                     const std::string& topic, const int32_t partition_count,
                                      const RawKafkaConfig& configuration)
     : RichKafkaConsumer(record_processor, thread_factory, topic, partition_count, configuration,
                         LibRdKafkaUtilsImpl::getDefaultInstance()){};
 
 RichKafkaConsumer::RichKafkaConsumer(InboundRecordProcessor& record_processor,
                                      Thread::ThreadFactory& thread_factory,
-                                     const std::string& topic, int32_t partition_count,
+                                     const std::string& topic, const int32_t partition_count,
                                      const RawKafkaConfig& configuration,
                                      const LibRdKafkaUtils& utils)
     : record_processor_{record_processor}, topic_{topic} {
@@ -50,7 +50,7 @@ RichKafkaConsumer::RichKafkaConsumer(InboundRecordProcessor& record_processor,
 
   // Start the worker thread.
   worker_thread_active_ = true;
-  std::function<void()> thread_routine = [this]() -> void { runWorkerLoop(); };
+  const std::function<void()> thread_routine = [this]() -> void { runWorkerLoop(); };
   worker_thread_ = thread_factory.createThread(thread_routine);
 }
 
@@ -67,15 +67,16 @@ RichKafkaConsumer::~RichKafkaConsumer() {
   ENVOY_LOG(debug, "Kafka consumer [{}] closed succesfully", topic_);
 }
 
+// Read timeout constants.
+// Large values are okay, but make the Envoy shutdown take longer
+// (as there is no good way to interrupt a Kafka 'consume' call).
+// XXX (adam.kotwasinski) This could be made configurable.
+
 // How long a thread should wait for interest before checking if it's cancelled.
 constexpr int32_t INTEREST_TIMEOUT_MS = 1000;
 
 // How long a consumer should poll Kafka for messages.
 constexpr int32_t POLL_TIMEOUT_MS = 1000;
-
-// Large values are okay, but make the Envoy shutdown take longer
-// (as there is no good way to interrupt a 'consume' call).
-// XXX (adam.kotwasinski) This could be made configurable.
 
 void RichKafkaConsumer::runWorkerLoop() {
   while (worker_thread_active_) {
@@ -100,17 +101,16 @@ void RichKafkaConsumer::runWorkerLoop() {
 
 // Helper method, gets rid of librdkafka.
 static InboundRecordSharedPtr transform(RdKafkaMessagePtr arg) {
-  auto topic = arg->topic_name();
-  auto partition = arg->partition();
-  auto offset = arg->offset();
+  const auto topic = arg->topic_name();
+  const auto partition = arg->partition();
+  const auto offset = arg->offset();
   return std::make_shared<InboundRecord>(topic, partition, offset);
 }
 
 std::vector<InboundRecordSharedPtr> RichKafkaConsumer::receiveRecordBatch() {
   // This message kicks off librdkafka consumer's Fetch requests and delivers a message.
   auto message = std::unique_ptr<RdKafka::Message>(consumer_->consume(POLL_TIMEOUT_MS));
-  switch (message->err()) {
-  case RdKafka::ERR_NO_ERROR: {
+  if (RdKafka::ERR_NO_ERROR == message->err()) {
     // We got a message.
     auto inbound_record = transform(std::move(message));
     ENVOY_LOG(trace, "Received Kafka message (first one): {}", inbound_record->toString());
@@ -119,18 +119,13 @@ std::vector<InboundRecordSharedPtr> RichKafkaConsumer::receiveRecordBatch() {
     // and we could drain it (at least a little) in the next commits.
     // See: https://github.com/edenhill/librdkafka/discussions/3897
     return {inbound_record};
-  }
-  case RdKafka::ERR__TIMED_OUT: {
-    // Nothing extraordinary, there is nothing coming from upstream cluster.
-    ENVOY_LOG(trace, "Timed out in [{}]", topic_);
-    return {};
-  }
-  default: {
-    ENVOY_LOG(trace, "Received other error in [{}]: {} / {}", topic_, message->err(),
+  } else {
+    // Nothing extraordinary (timeout because there is nothing upstream),
+    // or upstream connectivity failure.
+    ENVOY_LOG(trace, "No message received in consumer [{}]: {}/{}", topic_, message->err(),
               RdKafka::err2str(message->err()));
     return {};
   }
-  } // switch
 }
 
 } // namespace Mesh

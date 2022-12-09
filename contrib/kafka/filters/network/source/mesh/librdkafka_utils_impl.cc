@@ -25,7 +25,7 @@ private:
 
 ConsumerAssignmentImpl::~ConsumerAssignmentImpl() { RdKafka::TopicPartition::destroy(assignment_); }
 
-void ConsumerAssignmentImpl::add(const std::string& topic, int32_t partition) {
+void ConsumerAssignmentImpl::add(const std::string& topic, const int32_t partition) {
   // We consume records from the beginning of each partition.
   const int64_t initial_offset = 0;
   const RdKafkaPartitionRawPtr topic_partition =
@@ -85,9 +85,8 @@ void LibRdKafkaUtilsImpl::deleteHeaders(RdKafka::Headers* librdkafka_headers) co
   delete librdkafka_headers;
 }
 
-ConsumerAssignmentPtr
-LibRdKafkaUtilsImpl::assignConsumerPartitions(RdKafka::KafkaConsumer& consumer,
-                                              const std::string& topic, int32_t partitions) const {
+ConsumerAssignmentPtr LibRdKafkaUtilsImpl::assignConsumerPartitions(
+    RdKafka::KafkaConsumer& consumer, const std::string& topic, const int32_t partitions) const {
   std::unique_ptr<ConsumerAssignmentImpl> result = std::make_unique<ConsumerAssignmentImpl>();
   for (auto pt = 0; pt < partitions; ++pt) {
     result->add(topic, pt);
