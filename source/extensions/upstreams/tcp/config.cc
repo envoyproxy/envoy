@@ -16,8 +16,8 @@ namespace Tcp {
 ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
     const envoy::extensions::upstreams::tcp::v3::TcpProtocolOptions& options) {
   if (options.has_idle_timeout()) {
-    idle_timeout_ = std::chrono::milliseconds(
-          DurationUtil::durationToMilliseconds(options.idle_timeout()));
+    idle_timeout_ =
+        std::chrono::milliseconds(DurationUtil::durationToMilliseconds(options.idle_timeout()));
   }
 }
 
