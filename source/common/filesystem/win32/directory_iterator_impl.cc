@@ -43,6 +43,9 @@ DirectoryIteratorImpl& DirectoryIteratorImpl::operator++() {
 }
 
 DirectoryEntry DirectoryIteratorImpl::makeEntry(const WIN32_FIND_DATA& find_data) {
+  // `IO_REPARSE_FLAG_SYMLINK` must only be used in conjunction with
+  // `FILE_ATTRIBUTE_REPARSE_POINT`, per documentation for `dwReserved0` at
+  // https://learn.microsoft.com/en-us/windows/win32/api/minwinbase/ns-minwinbase-win32_find_dataa
   if ((find_data.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) &&
       !(find_data.dwReserved0 & IO_REPARSE_TAG_SYMLINK)) {
     // The file is reparse point and not a symlink, so it can't be
