@@ -277,5 +277,5 @@ message GrpcJsonTranscoder {
   // body was oversized.
   //
   // If unset or zero, the current stream buffer size is used.
-  uint32 max_message_size = 15;
+  uint32 max_body_size = 15;
 }

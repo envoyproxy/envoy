@@ -230,7 +230,7 @@ JsonTranscoderConfig::JsonTranscoderConfig(
   ignore_unknown_query_parameters_ = proto_config.ignore_unknown_query_parameters();
   request_validation_options_ = proto_config.request_validation_options();
   case_insensitive_enum_parsing_ = proto_config.case_insensitive_enum_parsing();
-  max_message_size_ = proto_config.max_message_size();
+  max_body_size_ = proto_config.max_body_size();
 }
 
 void JsonTranscoderConfig::addFileDescriptor(const Protobuf::FileDescriptorProto& file) {
@@ -432,7 +432,7 @@ void JsonTranscoderFilter::initPerRouteConfig() {
 }
 
 void JsonTranscoderFilter::maybeExpandBufferSize() {
-  uint32_t max_size = per_route_config_->max_message_size_;
+  uint32_t max_size = per_route_config_->max_body_size_;
   if (max_size > decoder_callbacks_->decoderBufferLimit()) {
     decoder_callbacks_->setDecoderBufferLimit(max_size);
   }
@@ -985,12 +985,12 @@ bool JsonTranscoderFilter::maybeConvertGrpcStatus(Grpc::Status::GrpcStatus grpc_
 }
 
 bool JsonTranscoderFilter::decoderBufferLimitReached(uint64_t buffer_length) {
-  if (buffer_length > decoder_callbacks_->decoderBufferLimit() ||
-      !per_route_config_->maxMessageSizeAllows(buffer_length)) {
+  uint32_t max_size = per_route_config_->maxBodySize(decoder_callbacks_->decoderBufferLimit());
+  if (buffer_length > max_size) {
     ENVOY_STREAM_LOG(debug,
                      "Request rejected because the transcoder's internal buffer size exceeds the "
                      "configured limit: {} > {}",
-                     *decoder_callbacks_, buffer_length, decoder_callbacks_->decoderBufferLimit());
+                     *decoder_callbacks_, buffer_length, max_size);
     error_ = true;
     decoder_callbacks_->sendLocalReply(
         Http::Code::PayloadTooLarge,
@@ -1004,13 +1004,13 @@ bool JsonTranscoderFilter::decoderBufferLimitReached(uint64_t buffer_length) {
 }
 
 bool JsonTranscoderFilter::encoderBufferLimitReached(uint64_t buffer_length) {
-  if (buffer_length > encoder_callbacks_->encoderBufferLimit() ||
-      !per_route_config_->maxMessageSizeAllows(buffer_length)) {
+  uint32_t max_size = per_route_config_->maxBodySize(encoder_callbacks_->encoderBufferLimit());
+  if (buffer_length > max_size) {
     ENVOY_STREAM_LOG(
         debug,
         "Response not transcoded because the transcoder's internal buffer size exceeds the "
         "configured limit: {} > {}",
-        *encoder_callbacks_, buffer_length, encoder_callbacks_->encoderBufferLimit());
+        *encoder_callbacks_, buffer_length, max_size);
     error_ = true;
     encoder_callbacks_->sendLocalReply(
         Http::Code::InternalServerError,

@@ -103,16 +103,20 @@ public:
    */
   bool convertGrpcStatus() const;
 
-  bool disabled() const { return disabled_; }
-
-  bool maxMessageSizeAllows(uint32_t size) const {
-    return max_message_size_ == 0 || size <= max_message_size_;
+  /**
+   * @param buffer_size the size of the buffer, returned if config did not specify a size.
+   * @return the maximum size of the message body.
+   */
+  uint32_t maxBodySize(uint32_t buffer_size) const {
+    return max_body_size_ == 0 ? buffer_size : max_body_size_;
   }
+
+  bool disabled() const { return disabled_; }
 
   envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
       RequestValidationOptions request_validation_options_{};
 
-  uint32_t max_message_size_{};
+  uint32_t max_body_size_{};
 
   void addBuiltinSymbolDescriptor(const std::string& symbol_name);
 
@@ -205,7 +209,7 @@ private:
   bool encoderBufferLimitReached(uint64_t buffer_length);
 
   /**
-   * If max_message_size is configured and larger than the buffer size, increase buffer size.
+   * If max_body_size is configured and larger than the buffer size, increase buffer size.
    */
   void maybeExpandBufferSize();
 

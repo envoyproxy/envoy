@@ -54,15 +54,14 @@ public:
               "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
               proto_descriptor : "{}"
               services : "bookstore.Bookstore"
-              max_message_size: {}
+              max_body_size: {}
             )EOF";
-    config_helper_.prependFilter(
-        fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"),
-                    maxMessageSize()));
+    config_helper_.prependFilter(fmt::format(
+        filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"), maxBodySize()));
   }
 
 protected:
-  virtual uint32_t maxMessageSize() const { return 0; }
+  virtual uint32_t maxBodySize() const { return 0; }
   template <class RequestType, class ResponseType>
   void testTranscoding(Http::RequestHeaderMap&& request_headers, const std::string& request_body,
                        const std::vector<std::string>& expected_grpc_request_messages,
@@ -241,17 +240,17 @@ protected:
 class GrpcJsonTranscoderIntegrationTestWithSizeLimit1024
     : public GrpcJsonTranscoderIntegrationTest {
 protected:
-  uint32_t maxMessageSize() const override { return 1024; }
+  uint32_t maxBodySize() const override { return 1024; }
 };
 
 class GrpcJsonTranscoderIntegrationTestWithSizeLimit1 : public GrpcJsonTranscoderIntegrationTest {
 protected:
-  uint32_t maxMessageSize() const override { return 1; }
+  uint32_t maxBodySize() const override { return 1; }
 };
 
 class GrpcJsonTranscoderIntegrationTestWithSizeLimit35 : public GrpcJsonTranscoderIntegrationTest {
 protected:
-  uint32_t maxMessageSize() const override { return 35; }
+  uint32_t maxBodySize() const override { return 35; }
 };
 
 INSTANTIATE_TEST_SUITE_P(
@@ -1416,7 +1415,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryPostRequestExceedsBufferLimit) {
 TEST_P(GrpcJsonTranscoderIntegrationTestWithSizeLimit1024,
        UnaryPostRequestExceedsBufferLimitButNotSizeLimitShouldWork) {
   // Request body is more than 8 bytes, but size limit from config allows 1024 bytes.
-  config_helper_.setBufferLimits(2 << 20, 8);
+  config_helper_.setBufferLimits(8, 8);
   HttpIntegrationTest::initialize();
 
   testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(

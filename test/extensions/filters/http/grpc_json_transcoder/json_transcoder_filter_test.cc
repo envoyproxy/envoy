@@ -1319,6 +1319,52 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamWithFragmentedHttpBody) {
   EXPECT_EQ(http_body.data(), fragment2->toString());
 }
 
+class GrpcJsonTranscoderFilterMaxMessageSizeTest : public GrpcJsonTranscoderFilterTest {
+public:
+  GrpcJsonTranscoderFilterMaxMessageSizeTest() : GrpcJsonTranscoderFilterTest(makeProtoConfig()) {}
+
+protected:
+  static const uint32_t max_body_size_ = 1024;
+
+private:
+  static const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder
+  makeProtoConfig() {
+    auto proto_config = bookstoreProtoConfig();
+    proto_config.set_max_body_size(max_body_size_);
+    return proto_config;
+  }
+};
+
+TEST_F(GrpcJsonTranscoderFilterMaxMessageSizeTest, IncreasesBufferSize) {
+  EXPECT_CALL(encoder_callbacks_, encoderBufferLimit())
+      .Times(testing::AtLeast(1))
+      .WillRepeatedly(Return(8));
+  EXPECT_CALL(decoder_callbacks_, decoderBufferLimit())
+      .Times(testing::AtLeast(1))
+      .WillRepeatedly(Return(8));
+  EXPECT_CALL(encoder_callbacks_, setEncoderBufferLimit(max_body_size_));
+  EXPECT_CALL(decoder_callbacks_, setDecoderBufferLimit(max_body_size_));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", "application/json"}, {":method", "POST"}, {":path", "/shelf/123"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+};
+
+TEST_F(GrpcJsonTranscoderFilterMaxMessageSizeTest, DoesNotDecreaseBufferSize) {
+  EXPECT_CALL(encoder_callbacks_, encoderBufferLimit())
+      .Times(testing::AtLeast(1))
+      .WillRepeatedly(Return(2048));
+  EXPECT_CALL(decoder_callbacks_, decoderBufferLimit())
+      .Times(testing::AtLeast(1))
+      .WillRepeatedly(Return(2048));
+  EXPECT_CALL(encoder_callbacks_, setEncoderBufferLimit(_)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, setDecoderBufferLimit(_)).Times(0);
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", "application/json"}, {":method", "POST"}, {":path", "/shelf/123"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+};
+
 class GrpcJsonTranscoderFilterReportCollisionTest : public GrpcJsonTranscoderFilterTest {
 public:
   GrpcJsonTranscoderFilterReportCollisionTest() : GrpcJsonTranscoderFilterTest(makeProtoConfig()) {}
