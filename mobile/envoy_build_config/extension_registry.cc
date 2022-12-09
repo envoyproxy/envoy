@@ -3,6 +3,7 @@
 #include "source/common/network/default_client_connection_factory.h"
 #include "source/common/network/socket_interface_impl.h"
 #include "source/common/router/upstream_codec_filter.h"
+#include "source/common/quic/quic_transport_socket_factory.h"
 #include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
 #include "source/extensions/clusters/logical_dns/logical_dns_cluster.h"
 #include "source/extensions/clusters/static/static_cluster.h"
@@ -75,6 +76,7 @@ void ExtensionRegistry::registerFactories() {
   Router::forceRegisterUpstreamCodecFilterFactory();
   Envoy::Network::forceRegisterGetAddrInfoDnsResolverFactory();
   Envoy::Extensions::RequestId::forceRegisterUUIDRequestIDExtensionFactory();
+  Envoy::Quic::forceRegisterQuicServerTransportSocketConfigFactory();
 
   // TODO: add a "force initialize" function to the upstream code, or clean up the upstream code
   // in such a way that does not depend on the statically initialized variable.
