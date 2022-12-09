@@ -1,9 +1,8 @@
 #include "extension_registry.h"
 
-#include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
-
 #include "source/common/network/default_client_connection_factory.h"
 #include "source/common/network/socket_interface_impl.h"
+#include "source/common/quic/quic_transport_socket_factory.h"
 #include "source/common/router/upstream_codec_filter.h"
 #include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
 #include "source/extensions/clusters/logical_dns/logical_dns_cluster.h"
@@ -77,6 +76,8 @@ void ExtensionRegistry::registerFactories() {
   Router::forceRegisterUpstreamCodecFilterFactory();
   Envoy::Network::forceRegisterGetAddrInfoDnsResolverFactory();
   Envoy::Extensions::RequestId::forceRegisterUUIDRequestIDExtensionFactory();
+  Envoy::Quic::forceRegisterQuicServerTransportSocketConfigFactory();
+  Envoy::Quic::forceRegisterQuicClientTransportSocketConfigFactory();
 
   // TODO: add a "force initialize" function to the upstream code, or clean up the upstream code
   // in such a way that does not depend on the statically initialized variable.
@@ -88,11 +89,6 @@ void ExtensionRegistry::registerFactories() {
   { auto ptr = std::make_unique<Network::SocketInterfaceImpl>(); }
 
   { auto ptr = std::make_unique<Network::DefaultClientConnectionFactory>(); }
-
-  {
-    auto ptr =
-        std::make_unique<envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport>();
-  }
 }
 
 } // namespace Envoy
