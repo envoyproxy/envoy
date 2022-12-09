@@ -911,7 +911,7 @@ ConnectionImpl::~ConnectionImpl() {
 void ConnectionImpl::sendKeepalive() {
   ASSERT(keepalive_timeout_timer_);
   if (keepalive_timeout_timer_->enabled()) {
-    ENVOY_CONN_LOG(trace, "Skipping PING: already awaiting PING ACK {}", connection_);
+    ENVOY_CONN_LOG(trace, "Skipping PING: already awaiting PING ACK", connection_);
     return;
   }
 
