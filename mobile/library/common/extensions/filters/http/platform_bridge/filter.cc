@@ -214,7 +214,7 @@ Http::LocalErrorStatus PlatformBridgeFilter::onLocalReply(const LocalReplyData& 
                               finalStreamIntel(), platform_filter_.instance_context);
   }
 
-  return Http::LocalErrorStatus::ContinueAndResetStream;
+  return Http::Utility::statusForOnLocalReply(reply, decoder_callbacks_->streamInfo());
 }
 
 envoy_final_stream_intel PlatformBridgeFilter::finalStreamIntel() {
