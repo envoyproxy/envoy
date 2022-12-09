@@ -145,11 +145,11 @@ envoy_cc_library(
     ],
     tags = ["skip_on_windows"],
     deps = [
+        ":librdkafka_utils_impl_lib",
         ":outbound_record_lib",
         ":upstream_kafka_client_lib",
         "//envoy/event:dispatcher_interface",
         "//source/common/common:minimal_logger_lib",
-        envoy_external_dep_path("librdkafka"),
     ],
 )
 
@@ -166,5 +166,34 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "@envoy_api//contrib/envoy/extensions/filters/network/kafka_mesh/v3alpha:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "librdkafka_utils_lib",
+    srcs = [
+    ],
+    hdrs = [
+        "librdkafka_utils.h",
+    ],
+    tags = ["skip_on_windows"],
+    deps = [
+        envoy_external_dep_path("librdkafka"),
+    ],
+)
+
+envoy_cc_library(
+    name = "librdkafka_utils_impl_lib",
+    srcs = [
+        "librdkafka_utils_impl.cc",
+    ],
+    hdrs = [
+        "librdkafka_utils_impl.h",
+    ],
+    tags = ["skip_on_windows"],
+    deps = [
+        ":librdkafka_utils_lib",
+        envoy_external_dep_path("librdkafka"),
+        "//source/common/common:macros",
     ],
 )
