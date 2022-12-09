@@ -242,6 +242,7 @@ envoy_cc_test(
         "//source/common/quic:envoy_quic_server_session_lib",
         "//source/extensions/quic/crypto_stream:envoy_quic_crypto_server_stream_lib",
         "//source/server:configuration_lib",
+        "//source/server:connection_handler_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
