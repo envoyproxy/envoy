@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.load_balancing_policies.maglev.v3;
 
+import "envoy/extensions/load_balancing_policies/common/v3/common.proto";
+
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
@@ -19,11 +21,13 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // This configuration allows the built-in Maglev LB policy to be configured via the LB policy
 // extension point. See the :ref:`load balancing architecture overview
 // <arch_overview_load_balancing_types>` and :ref:`Maglev<arch_overview_load_balancing_types_maglev>` for more information.
-// [#extension: envoy.load_balancing_policies]
 message Maglev {
   // The table size for Maglev hashing. Maglev aims for "minimal disruption" rather than an absolute guarantee.
   // Minimal disruption means that when the set of upstream hosts change, a connection will likely be sent to the same
   // upstream as it was before. Increasing the table size reduces the amount of disruption.
   // The table size must be prime number limited to 5000011. If it is not specified, the default is 65537.
   google.protobuf.UInt64Value table_size = 1 [(validate.rules).uint64 = {lte: 5000011}];
+
+  // Common configuration for hashing-based load balancing policies.
+  common.v3.ConsistentHashingLbConfig consistent_hashing_lb_config = 2;
 }

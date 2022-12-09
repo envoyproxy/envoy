@@ -18,3 +18,15 @@ envoy_cc_library(
         "@envoy//source/common/common:assert_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "managed_types_lib",
+    srcs = [
+        "managed_envoy_headers.h",
+    ],
+    repository = "@envoy",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//library/common/types:c_types_lib",
+    ],
+)
