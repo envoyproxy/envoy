@@ -50,7 +50,8 @@ DirectoryEntry DirectoryIteratorImpl::makeEntry(const WIN32_FIND_DATA& find_data
     return {std::string(find_data.cFileName), FileType::Other, absl::nullopt};
   } else if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
     return {std::string(find_data.cFileName), FileType::Directory, absl::nullopt};
-  } else if (find_data.dwReserved0 & IO_REPARSE_TAG_SYMLINK) {
+  } else if ((find_data.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) &&
+             (find_data.dwReserved0 & IO_REPARSE_TAG_SYMLINK)) {
     return {std::string(find_data.cFileName), FileType::Regular, absl::nullopt};
   } else {
     ULARGE_INTEGER file_size;
