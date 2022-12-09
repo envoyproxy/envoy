@@ -60,7 +60,7 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
     // Build the quota bucket element.
     BucketElement element;
     //  Create the gRPC client and start the stream on the first request.
-    element.rate_limit_client_ = createRateLimitClient(factory_context_, config_->rlqs_server());
+    element.rate_limit_client_ = createRateLimitClient(factory_context_, config_->rlqs_server(), quota_usage_reports_);
     auto status = element.rate_limit_client_->startStream(callbacks_->streamInfo());
     if (!status.ok()) {
       ENVOY_LOG(error, "Failed to start the gRPC stream: ", status.message());
@@ -69,11 +69,11 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
     // Send the usage report to RLQS immediately on the first time when the request is matched.
     // TODO(tyxia) Due to the lifetime concern of the bucket_id, I switch from pointer to
     // absl::optional
-    element.rate_limit_client_->sendUsageReport(bucket_id);
+    element.rate_limit_client_->sendUsageReport(config_->domain(), bucket_id);
 
     // Set up the quota usage report method that sends the reports the RLS server periodically.
     // TODO(tyxia) If each bucket has its own timer callback, do we still need to build a list of
-    // reports?????!!!
+    // reports?
     // Create and enable the report timer callback on the first request.
     // TODO(tyxia) what is the behavior on the first request while waiting for the response
     /////// Moved from RateLimitQuotaFilter constructor.
@@ -82,11 +82,18 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
     // i.e., request ends, we still have it to send the reports periodically???
     // Maybe assoiciated with the thread local storage????
     element.send_reports_timer =
-        factory_context_.mainThreadDispatcher().createTimer([&element]() -> void {
+    // TODO(tyxia) Timer should be on localThread dispatcher !!!
+    // decodecallback's dispatcher ----- worker thread dispatcher!!!!
+        callbacks_->dispatcher().createTimer([&element, this]() -> void {
           ASSERT(element.rate_limit_client_ != nullptr);
-          // TODO(tyxia) For periodical send behavior, we just pass in nullopt.
-          element.rate_limit_client_->sendUsageReport(absl::nullopt);
+          // TODO(tyxia) For periodical send behavior, we just pass in nullopt argument.
+          element.rate_limit_client_->sendUsageReport(config_->domain(), absl::nullopt);
         });
+        // factory_context_.mainThreadDispatcher().createTimer([&element, this]() -> void {
+        //   ASSERT(element.rate_limit_client_ != nullptr);
+        //   // TODO(tyxia) For periodical send behavior, we just pass in nullopt.
+        //   element.rate_limit_client_->sendUsageReport(config_->domain(), absl::nullopt);
+        // });
     // Set the reporting interval.
     const int64_t reporting_interval =
         PROTOBUF_GET_MS_REQUIRED(bucket_settings, reporting_interval);
@@ -123,72 +130,6 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
   return Envoy::Http::FilterHeadersStatus::Continue;
 }
 
-// TODO(tyxia) Mostly are example/boilerplate code, polish implementation here.
-// Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeaderMap& headers,
-//                                                               bool) {
-//   // Start the stream on the first request.
-//   auto start_stream = rate_limit_client_->startStream(callbacks_->streamInfo());
-//   if (!start_stream.ok()) {
-//     // TODO(tyxia) Consider adding the log.
-//     return Envoy::Http::FilterHeadersStatus::Continue;
-//   }
-//   absl::StatusOr<BucketId> match_result = requestMatching(headers);
-
-//   // Request is not matched by any matchers. In this case, requests are ALLOWED by default (i.e.,
-//   // fail-open) and will not be reported to RLQS server.
-//   if (!match_result.ok()) {
-//     return Envoy::Http::FilterHeadersStatus::Continue;
-//   }
-
-//   BucketId bucket_id = match_result.value();
-//   // Request is not matched by any matcher but the `on_no_match` field is configured. In this
-//   // case, the request is matched to catch-all bucket and is DENIED by default.
-//   // TODO(tyxia) Think about the way of representing DENIED and ALLOWED here.
-//   if (bucket_id.bucket().empty()) {
-//     return Envoy::Http::FilterHeadersStatus::Continue;
-//   }
-
-//   // Request has been matched and the corresponding bucket id has been generated successfully.
-//   // Retrieve the quota assignment, if the entry with specific `bucket_id` is found.
-//   if (quota_assignment_.find(bucket_id) != quota_assignment_.end()) {
-//     // Don't need to send reports.
-//   } else {
-//     if (quota_bucket_ != nullptr) {
-//       BucketElement element;
-//       element.rate_limit_client_ = createRateLimitClient(factory_context_,
-//       config_->rlqs_server()); element.send_reports_timer =
-//           factory_context_.mainThreadDispatcher().createTimer([&element]() -> void {
-//             ASSERT(element.rate_limit_client_ != nullptr);
-//             element.rate_limit_client_->sendUsageReport(absl::nullopt);
-//           });
-//       (*quota_bucket_)[bucket_id] = std::move(element);
-//     }
-//     // Otherwise, send the request to RLQS server to get the quota assignment from RLQS when the
-//     // request matches a bucket for the first time.
-//     // TODO(tyxia) Here triggers the send function for the first time, later the send function
-//     // will be triggered periodically.
-//     // The interface of asking the quota assignment and the interface of reports the
-//     // quota usage.
-//     // TODO(tyxia) If the request is mapped to one bucket, i.e., one bucket_id is generated.
-//     // Then we only have one usage report to sent, which also means we only have one usage report
-//     to
-//     // build Then why
-//     //
-//     https://source.corp.google.com/piper///depot/google3/third_party/envoy/src/api/envoy/service/rate_limit_quota/v3/rlqs.proto;rcl=464148816;l=95
-//     // here has a list of reports to build and to report. We batch the reports and send them all
-//     // together???
-//     rate_limit_client_->sendUsageReport(bucket_id);
-//     // While the filter is waiting for the response from the RLQS server,
-//     // Wait for the quota assignment from the RLQS server.
-//     return Envoy::Http::FilterHeadersStatus::StopAllIterationAndWatermark;
-//     // Then insert the bucket_id to the map once
-//   }
-
-//   rate_limit_client_->rateLimit(*this);
-
-//   return Envoy::Http::FilterHeadersStatus::Continue;
-// }
-
 void RateLimitQuotaFilter::createMatcher() {
   RateLimitOnMactchActionContext context;
   Matcher::MatchTreeFactory<Http::HttpMatchingData, RateLimitOnMactchActionContext> factory(
@@ -198,8 +139,6 @@ void RateLimitQuotaFilter::createMatcher() {
   }
 }
 
-// TODO(tyxia) Return the std::unique_ptr<Action>; so that the caller can interpret the result
-// and
 absl::StatusOr<Matcher::ActionPtr>
 RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& headers) {
   // Initialize the data pointer on first use and reuse it for subsequent requests.

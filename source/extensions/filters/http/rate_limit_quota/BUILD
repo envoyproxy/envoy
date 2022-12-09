@@ -31,7 +31,6 @@ envoy_cc_library(
     ],
 )
 
-# TODO(tyxia) Why it is extension
 envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],

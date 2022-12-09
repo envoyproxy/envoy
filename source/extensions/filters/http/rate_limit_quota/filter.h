@@ -27,6 +27,7 @@ namespace RateLimitQuota {
 
 using ::envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaBucketSettings;
 using ::envoy::service::rate_limit_quota::v3::BucketId;
+using ::envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports;
 using FilterConfig =
     envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaFilterConfig;
 using FilterConfigConstSharedPtr = std::shared_ptr<const FilterConfig>;
@@ -51,50 +52,60 @@ class RateLimitQuotaFilter : public Http::PassThroughFilter,
 public:
   RateLimitQuotaFilter(FilterConfigConstSharedPtr config,
                        Server::Configuration::FactoryContext& factory_context,
-                       // TODO(tyxia) Removed the default argument
-                       BucketContainer* quota_bucket = nullptr)
-      : config_(std::move(config)), factory_context_(factory_context), quota_bucket_(quota_bucket) {
+                       // TODO(tyxia) Removed the default argument and add const???!!
+                       BucketContainer* quota_bucket = nullptr,
+                       RateLimitQuotaUsageReports* quota_usage_reports = nullptr)
+      : config_(std::move(config)), factory_context_(factory_context), quota_bucket_(quota_bucket),
+        quota_usage_reports_(quota_usage_reports) {
     createMatcher();
   }
 
   // Http::PassThroughDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override;
   void onDestroy() override {}
-    // TODO(tyxia) How to close the stream for each quota bucket separately.
-    // rate_limit_client_->closeStream(); };
-    void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks & callbacks) override {
-      callbacks_ = &callbacks;
-    }
+  // TODO(tyxia) How to close the stream for each quota bucket separately.
+  // rate_limit_client_->closeStream(); };
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
+    callbacks_ = &callbacks;
+  }
 
-    // RateLimitQuota::RateLimitQuotaCallbacks
-    void onQuotaResponse(envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse&) override {}
+  // RateLimitQuota::RateLimitQuotaCallbacks
+  void onQuotaResponse(envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse&) override {}
 
-    // Perform request matching. It returns the generated bucket ids if the matching succeeded,
-    // error status otherwise.
-    absl::StatusOr<Matcher::ActionPtr> requestMatching(const Http::RequestHeaderMap& headers);
+  // Perform request matching. It returns the generated bucket ids if the matching succeeded,
+  // error status otherwise.
+  absl::StatusOr<Matcher::ActionPtr> requestMatching(const Http::RequestHeaderMap& headers);
 
-    Http::Matching::HttpMatchingDataImpl matchingData() {
-      ASSERT(data_ptr_ != nullptr);
-      return *data_ptr_;
-    }
+  Http::Matching::HttpMatchingDataImpl matchingData() {
+    ASSERT(data_ptr_ != nullptr);
+    return *data_ptr_;
+  }
 
-    void onComplete(const RateLimitQuotaBucketSettings& bucket_settings, RateLimitStatus status);
-    ~RateLimitQuotaFilter() override = default;
+  void onComplete(const RateLimitQuotaBucketSettings& bucket_settings, RateLimitStatus status);
+  ~RateLimitQuotaFilter() override = default;
 
-  private:
-    // Create the matcher factory and matcher.
-    void createMatcher();
+private:
+  // Create the matcher factory and matcher.
+  void createMatcher();
 
-    FilterConfigConstSharedPtr config_;
-    Server::Configuration::FactoryContext& factory_context_;
-    Http::StreamDecoderFilterCallbacks* callbacks_ = nullptr;
-    RateLimitQuotaValidationVisitor visitor_ = {};
-    Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher_ = nullptr;
-    std::unique_ptr<Http::Matching::HttpMatchingDataImpl> data_ptr_ = nullptr;
-    // TODO(tyxia) We can put this timer in client class and pass the dispatcher to its constructor.
-    // Event::TimerPtr send_reports_timer_;
-    BucketContainer* quota_bucket_;
-  };
+  FilterConfigConstSharedPtr config_;
+  Server::Configuration::FactoryContext& factory_context_;
+  Http::StreamDecoderFilterCallbacks* callbacks_ = nullptr;
+  RateLimitQuotaValidationVisitor visitor_ = {};
+  Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher_ = nullptr;
+  std::unique_ptr<Http::Matching::HttpMatchingDataImpl> data_ptr_ = nullptr;
+  // TODO(tyxia) This is the threadlocal cache that is created in the main thread.
+  BucketContainer* quota_bucket_ = nullptr;
+  // TODO(tyxia) Pass in another thread local storage object as well
+  // or we wrapp those two objects in a single object
+  // This also  needs to be avaible in client_impl.h
+  // pass by reference to indicate no ownership transfer
+  // TODO(tyxia) const!!!!
+  // UsageReportsContainer* const usage_reports_;
+  // go/totw/177#reference-members
+  // UsageReportsContainer& usage_report_ = nullptr;
+  RateLimitQuotaUsageReports* quota_usage_reports_ = nullptr;
+};
 
 } // namespace RateLimitQuota
 } // namespace HttpFilters

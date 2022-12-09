@@ -209,10 +209,6 @@ public:
       break;
     }
     case MatcherConfigType::IncludeOnNoMatchConfig: {
-      // TODO(tyxia) Remove
-      // xds::type::matcher::v3::Matcher::OnMatch on_no_matcher;
-      // TestUtility::loadFromYaml(OnNoMatchConfig, on_no_matcher);
-      // matcher.mutable_on_no_match()->MergeFrom(on_no_matcher);
       xds::type::matcher::v3::Matcher matcher;
       TestUtility::loadFromYaml(OnNoMatchConfig, matcher);
 

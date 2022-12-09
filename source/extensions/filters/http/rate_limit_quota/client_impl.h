@@ -34,11 +34,10 @@ class RateLimitClientImpl : public RateLimitClient,
                             public Logger::Loggable<Logger::Id::rate_limit_quota> {
 public:
   RateLimitClientImpl(const envoy::config::core::v3::GrpcService& grpc_service,
-                      Server::Configuration::FactoryContext& context)
+                      Server::Configuration::FactoryContext& context,
+                      RateLimitQuotaUsageReports* quota_usage_reports = nullptr)
       : aync_client_(context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
-            grpc_service, context.scope(), true)) {
-    // TODO(tyxia) startStream function is opened on the first request not at time when client is
-    // created here.
+            grpc_service, context.scope(), true)), reports_(quota_usage_reports) {
   }
 
   void onReceiveMessage(RateLimitQuotaResponsePtr&& response) override;
@@ -51,12 +50,14 @@ public:
 
   // RateLimitClient
   void rateLimit(RateLimitQuotaCallbacks& callbacks) override;
-  RateLimitQuotaUsageReports buildUsageReport(absl::optional<BucketId> bucket_id);
-
-  // This function get rid of `bucket_usage_`
-  RateLimitQuotaUsageReports buildUsageReport2(const BucketId& bucket_id);
+  RateLimitQuotaUsageReports buildUsageReport(absl::string_view domain,
+                                               absl::optional<BucketId> bucket_id);
+  RateLimitQuotaUsageReports buildUsageReportBucketUsage(absl::optional<BucketId> bucket_id);
+  // TODO(tyxia) This function get rid of `bucket_usage_`
+  // RateLimitQuotaUsageReports buildUsageReport2(absl::string_view domain,
+  //                                              absl::optional<BucketId> bucket_id);
   // void sendUsageReport(const BucketId* bucket_id);
-  void sendUsageReport(absl::optional<BucketId> bucket_id);
+  void sendUsageReport(absl::string_view domain, absl::optional<BucketId> bucket_id);
 
   absl::Status startStream(const StreamInfo::StreamInfo& stream_info);
   void closeStream();
@@ -72,16 +73,34 @@ private:
   bool stream_closed_ = false;
 
   // TODO(tyxia) Store it outside of filter, as thread local storage!!!!
+  // All the struct below should be removed!!!!!
   struct BucketQuotaUsageInfo {
     BucketQuotaUsage usage;
     std::string domain;
     // The index
     int idx;
   };
+  // 1. store <BucketId, BucketQuotaUsage>
+  struct BucketIdHash {
+    size_t operator()(const BucketId& bucket_id) const { return MessageUtil::hash(bucket_id); }
+  };
+
+  struct BucketIdEqual {
+    bool operator()(const BucketId& id1, const BucketId& id2) const {
+      return Protobuf::util::MessageDifferencer::Equals(id1, id2);
+    }
+  };
   absl::node_hash_map<BucketId, BucketQuotaUsageInfo, BucketIdHash, BucketIdEqual> bucket_usage_;
-  // TODO(tyxia) We don't really need to cache the `RateLimitQuotaUsageReports` because we build the
-  // report from scrach every time based on `bucket_usage_` above ??
-  absl::node_hash_map<std::string, RateLimitQuotaUsageReports> usage_reports_;
+  // 2. store <domain, RateLimitQuotaUsageReports> No need for domain key
+  // I am now thing useage_reports is better as long as the domain can be used to represent
+  //   1. don't need to build the report from scratch everytime
+  //   2. key is smaller
+  // TODO(tyxia) const!!!!
+
+  // Domain is provided by filter config that is tied with HCM lifetime which has same life time as
+  // tls (because tls is created by factory context). So the domain will stay same throughout the life
+  // time of the tls. (i.e., one domain per tls). So we don't need to have map/container here.
+  RateLimitQuotaUsageReports* reports_ = nullptr;
 };
 
 using RateLimitClientPtr = std::unique_ptr<RateLimitClientImpl>;
@@ -91,8 +110,9 @@ using RateLimitClientSharedPtr = std::shared_ptr<RateLimitClientImpl>;
  */
 inline RateLimitClientPtr
 createRateLimitClient(Server::Configuration::FactoryContext& context,
-                      const envoy::config::core::v3::GrpcService& grpc_service) {
-  return std::make_unique<RateLimitClientImpl>(grpc_service, context);
+                      const envoy::config::core::v3::GrpcService& grpc_service,
+                      RateLimitQuotaUsageReports* quota_usage_reports = nullptr) {
+  return std::make_unique<RateLimitClientImpl>(grpc_service, context, quota_usage_reports);
 }
 
 inline RateLimitClientSharedPtr

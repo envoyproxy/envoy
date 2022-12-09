@@ -26,7 +26,6 @@ public:
   }
 };
 
-// TODO(tyxia) Move matching related stuff to a separate file matcher.cc matcher.h
 // Contextual information used to construct the onMatch actions for a match tree.
 // Currently it is empty struct.
 struct RateLimitOnMactchActionContext {};

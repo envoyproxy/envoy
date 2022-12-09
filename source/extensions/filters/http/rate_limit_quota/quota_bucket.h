@@ -10,14 +10,13 @@
 
 #include "source/extensions/filters/http/common/factory_base.h"
 
-// #include "source/extensions/filters/http/rate_limit_quota/client_impl.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitQuota {
 
 using ::envoy::service::rate_limit_quota::v3::BucketId;
+using ::envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports;
 // using ::envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports;
 using BucketAction = ::envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse::BucketAction;
 using QuotaAssignmentAction = ::envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse::
@@ -25,6 +24,7 @@ using QuotaAssignmentAction = ::envoy::service::rate_limit_quota::v3::RateLimitQ
 using BucketQuotaUsage =
     ::envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports::BucketQuotaUsage;
 
+// Forward declaration.
 class RateLimitClientImpl;
 
 // Customized hash and equal struct for `BucketId` hash key.
@@ -48,7 +48,7 @@ struct BucketElement {
   // Default constructor
   BucketElement() = default;
 
-  // TODO(tyxia) This copy constructor is very tricky
+  // TODO(tyxia) This copy constructor is tricky
   // the unique ptr inside of this class and can only be moveable.
   // BucketElement (const BucketElement& elem) = default;
 
@@ -58,7 +58,6 @@ struct BucketElement {
 
   // TODO(tyxia) Each bucket owns the unique grpc client for sending the quota usage report
   // periodically.
-  // TODO(tyxia) Use forward declaration for now.
   std::unique_ptr<RateLimitClientImpl> rate_limit_client_;
   BucketAction bucket_action;
   // TODO(tyxia) Should store bucket action intstead of assignment action
@@ -78,7 +77,6 @@ struct Bucket {
   Event::TimerPtr send_reports_timer;
 };
 
-
 struct BucketQuotaUsageInfo {
   // The index of `bucket_quota_usage` in the `RateLimitQuotaUsageReports`.
   int idx;
@@ -89,7 +87,8 @@ using BucketContainer = absl::node_hash_map<BucketId, BucketElement, BucketIdHas
 using QuotaUsageContainer =
     absl::node_hash_map<BucketId, BucketQuotaUsageInfo, BucketIdHash, BucketIdEqual>;
 using UsageReportsContainer =
-    absl::node_hash_map<BucketId, BucketQuotaUsageInfo, BucketIdHash, BucketIdEqual>;
+    absl::node_hash_map<std::string,
+                        envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports>;
 
 // TODO (tyxia) Maybe i can test this thread local cache along with token cache.
 // TODO(tyxia) Thread local storage for all the necessary elements for the bucket.
@@ -104,9 +103,14 @@ public:
   // Return the bucket by reference so that it can be modifed on the caller site.
   BucketContainer& buckets() { return buckets_; }
 
+  UsageReportsContainer& usageReports() { return usage_reports_; }
+
+  RateLimitQuotaUsageReports& quotaUsageReports() { return quota_usage_reports_; }
+
 private:
   BucketContainer buckets_;
-  QuotaUsageContainer quota_usage_;
+  // Thread local storage for this proto.
+  RateLimitQuotaUsageReports quota_usage_reports_;
   UsageReportsContainer usage_reports_;
 };
 
