@@ -622,7 +622,6 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
       Network::SocketInterfaceSingleton::initialize(sock);
     }
   }
-
   // Workers get created first so they register for thread local updates.
   listener_manager_ =
       Config::Utility::getAndCheckFactoryByName<ListenerManagerFactory>(options_.listenerManager())

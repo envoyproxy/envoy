@@ -10,6 +10,7 @@
 #include "envoy/server/options.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/config/well_known_names.h"
 
 #include "spdlog/spdlog.h"
 
@@ -31,9 +32,10 @@ public:
    * @throw MalformedArgvException if something is wrong with the arguments (invalid flag or flag
    *        value). The caller should call exit(1) after any necessary cleanup.
    */
-  OptionsImpl(int argc, const char* const* argv, const HotRestartVersionCb& hot_restart_version_cb,
-              spdlog::level::level_enum default_log_level,
-              absl::string_view listener_manager = "envoy.listener_manager_impl.default");
+  OptionsImpl(
+      int argc, const char* const* argv, const HotRestartVersionCb& hot_restart_version_cb,
+      spdlog::level::level_enum default_log_level,
+      absl::string_view listener_manager = Config::ServerExtensionValues::get().DEFAULT_LISTENER);
 
   /**
    * @throw NoServingException if Envoy has already done everything specified by the args (e.g.
@@ -42,9 +44,10 @@ public:
    * @throw MalformedArgvException if something is wrong with the arguments (invalid flag or flag
    *        value). The caller should call exit(1) after any necessary cleanup.
    */
-  OptionsImpl(std::vector<std::string> args, const HotRestartVersionCb& hot_restart_version_cb,
-              spdlog::level::level_enum default_log_level,
-              absl::string_view listener_manager = "envoy.listener_manager_impl.default");
+  OptionsImpl(
+      std::vector<std::string> args, const HotRestartVersionCb& hot_restart_version_cb,
+      spdlog::level::level_enum default_log_level,
+      absl::string_view listener_manager = Config::ServerExtensionValues::get().DEFAULT_LISTENER);
 
   // Default constructor; creates "reasonable" defaults, but desired values should be set
   // explicitly.

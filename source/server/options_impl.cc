@@ -446,7 +446,8 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
 OptionsImpl::OptionsImpl(const std::string& service_cluster, const std::string& service_node,
                          const std::string& service_zone, spdlog::level::level_enum log_level)
     : log_level_(log_level), service_cluster_(service_cluster), service_node_(service_node),
-      service_zone_(service_zone) {}
+      service_zone_(service_zone),
+      listener_manager_(Config::ServerExtensionValues::get().DEFAULT_LISTENER) {}
 
 void OptionsImpl::disableExtensions(const std::vector<std::string>& names) {
   for (const auto& name : names) {
