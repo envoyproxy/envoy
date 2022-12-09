@@ -72,7 +72,7 @@ protected:
   void setOverrideConfigForTests(Platform::EngineBuilder builder, std::string config) {
     builder.setOverrideConfigForTests(config);
   }
-  void setAdminAddressPathForTests(Platform::EngineBuilder builder, std::string admin) {
+  void setAdminAddressPathForTests(Platform::EngineBuilder& builder, std::string admin) {
     builder.setAdminAddressPathForTests(admin);
   }
 };
