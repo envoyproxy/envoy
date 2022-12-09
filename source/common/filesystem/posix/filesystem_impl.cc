@@ -103,14 +103,8 @@ Api::IoCallBoolResult TmpFileImplPosix::close() {
   ASSERT(isOpen());
   int rc = ::close(fd_);
   fd_ = -1;
-  if (rc == -1) {
-    return resultFailure(false, errno);
-  }
-  if (tmp_file_path_.empty()) {
-    return resultSuccess(true);
-  }
-  return (::unlink(tmp_file_path_.c_str()) != -1) ? resultSuccess(true)
-                                                  : resultFailure(false, errno);
+  int rc2 = tmp_file_path_.empty() ? 0 : ::unlink(tmp_file_path_.c_str());
+  return (rc != -1 && rc2 != -1) ? resultSuccess(true) : resultFailure(false, errno);
 }
 
 FileImplPosix::FlagsAndMode FileImplPosix::translateFlag(FlagSet in) {

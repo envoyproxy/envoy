@@ -28,6 +28,11 @@ protected:
     return file_impl->fd_;
   }
 #ifndef WIN32
+  std::string getTmpFileName(File* file) {
+    auto impl = dynamic_cast<TmpFileImplPosix*>(file);
+    RELEASE_ASSERT(impl != nullptr, "failed to cast File* to TmpFileImplPosix*");
+    return impl->tmp_file_path_;
+  }
   Api::SysCallStringResult canonicalPath(const std::string& path) {
     return file_system_.canonicalPath(path);
   }
@@ -348,6 +353,30 @@ TEST_F(FileSystemImplTest, NamedTemporaryFileDeletedOnClose) {
   // platform and filesystem - but after the file is closed any named file that may
   // have been created should have been destroyed.)
   EXPECT_THAT(found_files, testing::Not(testing::Contains(testing::EndsWith(".tmp"))));
+}
+
+TEST_F(FileSystemImplTest, NamedTemporaryFileCloseUnlinkFailureReturnsError) {
+  const std::string new_file_path = TestEnvironment::temporaryPath("");
+  FilePathAndType new_file_info{Filesystem::DestinationType::TmpFile, new_file_path};
+  FilePtr file = file_system_.createFile(new_file_info);
+  const Api::IoCallBoolResult result = openNamedTmpFile(file, false);
+  EXPECT_TRUE(result.return_value_) << result.err_->getErrorDetails();
+  EXPECT_EQ(0, ::unlink(getTmpFileName(file.get()).c_str()));
+  const Api::IoCallBoolResult close_result = file->close();
+  EXPECT_FALSE(close_result.return_value_)
+      << "file close unexpectedly returned success on already unlinked file";
+}
+
+TEST_F(FileSystemImplTest, NamedTemporaryFileCloseFailureReturnsError) {
+  const std::string new_file_path = TestEnvironment::temporaryPath("");
+  FilePathAndType new_file_info{Filesystem::DestinationType::TmpFile, new_file_path};
+  FilePtr file = file_system_.createFile(new_file_info);
+  const Api::IoCallBoolResult result = openNamedTmpFile(file, false);
+  EXPECT_TRUE(result.return_value_) << result.err_->getErrorDetails();
+  EXPECT_EQ(0, ::close(getFd(file.get())));
+  const Api::IoCallBoolResult close_result = file->close();
+  EXPECT_FALSE(close_result.return_value_)
+      << "file close unexpectedly returned success on already closed file";
 }
 
 TEST_F(FileSystemImplTest, NamedTemporaryFileThatCouldntUnlinkOnOpenDeletedOnClose) {
