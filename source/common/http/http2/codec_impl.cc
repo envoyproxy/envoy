@@ -2118,8 +2118,10 @@ Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
   return ConnectionImpl::dispatch(data);
 }
 
-absl::optional<int>
-ServerConnectionImpl::checkHeaderNameForUnderscores(absl::string_view header_name) {
+absl::optional<int> ServerConnectionImpl::checkHeaderNameForUnderscores(
+    [[maybe_unused]] absl::string_view header_name) {
+#ifndef ENVOY_ENABLE_UHV
+  // This check has been moved to UHV
   if (headers_with_underscores_action_ != envoy::config::core::v3::HttpProtocolOptions::ALLOW &&
       Http::HeaderUtility::headerNameContainsUnderscore(header_name)) {
     if (headers_with_underscores_action_ ==
@@ -2134,6 +2136,7 @@ ServerConnectionImpl::checkHeaderNameForUnderscores(absl::string_view header_nam
     stats_.requests_rejected_with_underscores_in_headers_.inc();
     return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
   }
+#endif
   return absl::nullopt;
 }
 

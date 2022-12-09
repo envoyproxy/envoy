@@ -40,8 +40,9 @@ using Http2ResponseCodeDetail = ConstSingleton<Http2ResponseCodeDetailValues>;
  *
  */
 Http2HeaderValidator::Http2HeaderValidator(const HeaderValidatorConfig& config, Protocol protocol,
-                                           StreamInfo::StreamInfo& stream_info)
-    : HeaderValidator(config, protocol, stream_info) {}
+                                           StreamInfo::StreamInfo& stream_info,
+                                           ::Envoy::Http::HeaderValidatorStats& stats)
+    : HeaderValidator(config, protocol, stream_info, stats) {}
 
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
 Http2HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
@@ -408,9 +409,11 @@ Http2HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
 
   if (has_underscore) {
     if (underscore_action == HeaderValidatorConfig::REJECT_REQUEST) {
+      stats_.incRequestsRejectedWithUnderscoresInHeaders();
       return {HeaderEntryValidationResult::Action::Reject,
               UhvResponseCodeDetail::get().InvalidUnderscore};
     } else if (underscore_action == HeaderValidatorConfig::DROP_HEADER) {
+      stats_.incDroppedHeadersWithUnderscores();
       return {HeaderEntryValidationResult::Action::DropHeader,
               UhvResponseCodeDetail::get().InvalidUnderscore};
     }

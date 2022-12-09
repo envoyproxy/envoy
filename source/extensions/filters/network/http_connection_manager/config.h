@@ -236,7 +236,8 @@ public:
   }
   Http::HeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol,
                                                StreamInfo::StreamInfo& stream_info) override {
-    return header_validator_factory_ ? header_validator_factory_->create(protocol, stream_info)
+    return header_validator_factory_ ? header_validator_factory_->create(
+                                           protocol, stream_info, getHeaderValidatorStats(protocol))
                                      : nullptr;
   }
   bool appendXForwardedPort() const override { return append_x_forwarded_port_; }
@@ -251,6 +252,8 @@ private:
                              bool last_filter_in_current_config);
   void createFilterChainForFactories(Http::FilterChainManager& manager,
                                      const FilterFactoriesList& filter_factories);
+
+  ::Envoy::Http::HeaderValidatorStats& getHeaderValidatorStats(Http::Protocol protocol);
 
   /**
    * Determines what tracing provider to use for a given

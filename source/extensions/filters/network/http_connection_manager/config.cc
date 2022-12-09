@@ -153,6 +153,10 @@ createHeaderValidatorFactory([[maybe_unused]] const envoy::extensions::filters::
             config.path_with_escaped_slashes_action()));
     uhv_config.mutable_http1_protocol_options()->set_allow_chunked_length(
         config.http_protocol_options().allow_chunked_length());
+    uhv_config.set_headers_with_underscores_action(
+        static_cast<::envoy::extensions::http::header_validators::envoy_default::v3::
+                        HeaderValidatorConfig::HeadersWithUnderscoresAction>(
+            config.common_http_protocol_options().headers_with_underscores_action()));
     legacy_header_validator_config.set_name("default_envoy_uhv_from_legacy_settings");
     legacy_header_validator_config.mutable_typed_config()->PackFrom(uhv_config);
   }
@@ -747,6 +751,20 @@ const envoy::config::trace::v3::Tracing_Http* HttpConnectionManagerConfig::getPe
     return &context_.httpContext().defaultTracingConfig().http();
   }
   return nullptr;
+}
+
+::Envoy::Http::HeaderValidatorStats&
+HttpConnectionManagerConfig::getHeaderValidatorStats(Http::Protocol protocol) {
+  switch (protocol) {
+  case Http::Protocol::Http10:
+  case Http::Protocol::Http11:
+    return Http::Http1::CodecStats::atomicGet(http1_codec_stats_, context_.scope());
+  case Http::Protocol::Http2:
+    return Http::Http2::CodecStats::atomicGet(http2_codec_stats_, context_.scope());
+  case Http::Protocol::Http3:
+    return Http::Http3::CodecStats::atomicGet(http3_codec_stats_, context_.scope());
+  }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 std::function<Http::ApiListenerPtr()>

@@ -1315,6 +1315,8 @@ void ServerConnectionImpl::releaseOutboundResponse(
 }
 
 Status ServerConnectionImpl::checkHeaderNameForUnderscores() {
+#ifndef ENVOY_ENABLE_UHV
+  // This check has been moved to UHV
   if (headers_with_underscores_action_ != envoy::config::core::v3::HttpProtocolOptions::ALLOW &&
       Http::HeaderUtility::headerNameContainsUnderscore(current_header_field_.getStringView())) {
     if (headers_with_underscores_action_ ==
@@ -1333,6 +1335,7 @@ Status ServerConnectionImpl::checkHeaderNameForUnderscores() {
       return codecProtocolError("http/1.1 protocol error: header name contains underscores");
     }
   }
+#endif
   return okStatus();
 }
 

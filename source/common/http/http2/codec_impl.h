@@ -753,7 +753,7 @@ private:
   ServerConnectionCallbacks& callbacks_;
 
   // The action to take when a request header name contains underscore characters.
-  envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+  [[maybe_unused]] envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
 };
 
