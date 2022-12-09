@@ -2076,7 +2076,7 @@ Status ServerConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
   if (connection_.aboveHighWatermark()) {
     stream->runHighWatermarkCallbacks();
   }
-  stream->request_decoder_ = &callbacks_.newStream(*stream);
+  stream->setRequestDecoder(callbacks_.newStream(*stream));
   stream->stream_id_ = frame->hd.stream_id;
   LinkedList::moveIntoList(std::move(stream), active_streams_);
   adapter_->SetStreamUserData(frame->hd.stream_id, active_streams_.front().get());

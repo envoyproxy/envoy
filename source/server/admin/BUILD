@@ -76,8 +76,8 @@ envoy_cc_library(
         "//source/common/router:scoped_config_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/access_loggers/common:file_access_log_lib",
+        "//source/extensions/listener_managers/listener_manager:listener_manager_lib",
         "//source/extensions/request_id/uuid:config",
-        "//source/server:listener_manager_lib",
     ],
 )
 
