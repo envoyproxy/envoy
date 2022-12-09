@@ -17,10 +17,10 @@
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/extensions/listener_managers/listener_manager/filter_chain_manager_impl.h"
 #include "source/extensions/listener_managers/listener_manager/listener_impl.h"
 #include "source/extensions/transport_sockets/tls/ssl_socket.h"
 #include "source/server/configuration_impl.h"
-#include "source/server/filter_chain_manager_impl.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/drain_manager.h"
