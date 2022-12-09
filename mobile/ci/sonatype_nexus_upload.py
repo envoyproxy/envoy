@@ -24,7 +24,7 @@ _GROUP_ID = "io.envoyproxy.envoymobile"
 _ARTIFACT_ID = "envoy"
 _LOCAL_INSTALL_PATH = os.path.expanduser(
     "~/.m2/repository/{directory}/envoy".format(
-        directory=_GROUP_ID.replace(".", "/"), artifact_id=_ARTIFACT_ID))
+        directory=_GROUP_ID.replace(".", "/")))
 
 
 def _resolve_name(file):
