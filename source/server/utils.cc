@@ -1,4 +1,3 @@
-
 #include "source/server/utils.h"
 
 #include "source/common/common/assert.h"
