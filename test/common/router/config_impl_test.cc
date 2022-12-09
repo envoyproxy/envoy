@@ -1392,6 +1392,123 @@ virtual_hosts:
       "cannot set both matcher and routes on virtual host");
 }
 
+// Validates using RouteList as the mapper action.
+TEST_F(RouteMatcherTest, TestRouteList) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains:
+  - lyft.com
+  matcher:
+    matcher_tree:
+      input:
+        name: request-headers
+        typed_config:
+          "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+          header_name: :path
+      prefix_match_map:
+        map:
+          "/new_endpoint/foo":
+            action:
+              name: route
+              typed_config:
+                "@type": type.googleapis.com/envoy.config.route.v3.RouteList
+                routes:
+                - match:
+                    prefix: /new_endpoint/foo/1
+                  route:
+                    cluster: root_ww2
+                  request_headers_to_add:
+                  - header:
+                      key: x-route-header
+                      value: match_tree_1_1
+                - match:
+                    prefix: /new_endpoint/foo/2
+                  route:
+                    cluster: root_ww2
+                  request_headers_to_add:
+                  - header:
+                      key: x-route-header
+                      value: match_tree_1_2
+                - match:
+                    prefix: /
+                    headers:
+                    - name: x-match-header
+                      string_match:
+                        exact: matched
+                  route:
+                    cluster: root_ww2
+                  request_headers_to_add:
+                  - header:
+                      key: x-route-header
+                      value: match_tree_1_3
+                - match:
+                    prefix: /something/else
+                  route:
+                    cluster: root_ww2
+                  request_headers_to_add:
+                  - header:
+                      key: x-route-header
+                      value: match_tree_1_4
+          "/new_endpoint/bar":
+            action:
+              name: route
+              typed_config:
+                "@type": type.googleapis.com/envoy.config.route.v3.Route
+                match:
+                  prefix: /
+                route:
+                  cluster: root_ww2
+                request_headers_to_add:
+                - header:
+                    key: x-route-header
+                    value: match_tree_2
+  )EOF";
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  factory_context_.cluster_manager_.initializeClusters(
+      {"www2", "root_www2", "www2_staging", "instant-server"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("lyft.com", "/new_endpoint/foo/1", "GET");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    route->finalizeRequestHeaders(headers, stream_info, true);
+    EXPECT_EQ("match_tree_1_1", headers.get_("x-route-header"));
+  }
+
+  {
+    Http::TestRequestHeaderMapImpl headers =
+        genHeaders("lyft.com", "/new_endpoint/foo/2/bar", "GET");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    route->finalizeRequestHeaders(headers, stream_info, true);
+    EXPECT_EQ("match_tree_1_2", headers.get_("x-route-header"));
+  }
+
+  {
+    Http::TestRequestHeaderMapImpl headers =
+        genHeaders("lyft.com", "/new_endpoint/foo/match_header", "GET");
+    headers.setByKey("x-match-header", "matched");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    route->finalizeRequestHeaders(headers, stream_info, true);
+    EXPECT_EQ("match_tree_1_3", headers.get_("x-route-header"));
+  }
+
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("lyft.com", "/new_endpoint/foo/", "GET");
+    EXPECT_EQ(nullptr, config.route(headers, 0));
+  }
+
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("lyft.com", "/new_endpoint/bar", "GET");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    route->finalizeRequestHeaders(headers, stream_info, true);
+    EXPECT_EQ("match_tree_2", headers.get_("x-route-header"));
+  }
+  Http::TestRequestHeaderMapImpl headers = genHeaders("lyft.com", "/new_endpoint/baz", "GET");
+  EXPECT_EQ(nullptr, config.route(headers, 0));
+}
+
 // Validates behavior of request_headers_to_add at router, vhost, and route levels.
 TEST_F(RouteMatcherTest, TestAddRemoveRequestHeaders) {
   const std::string yaml = R"EOF(
@@ -7698,6 +7815,22 @@ virtual_hosts:
             pattern:
               regex: /strip-query/([0-9]{4})/(.*)
             substitution: /\2/\1/baz
+      - match:
+          prefix: /prefix/
+        redirect:
+          regex_rewrite:
+            pattern:
+              regex: /foo/([0-9]{4})/(.*)
+            substitution: /\2/\1/baz
+      - match:
+          prefix: /prefix-strip-query/
+        redirect:
+          strip_query: true
+          regex_rewrite:
+            pattern:
+              regex: /strip-query/([0-9]{4})/(.*)
+            substitution: /\2/\1/baz
+
   )EOF";
 
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
@@ -7736,6 +7869,33 @@ virtual_hosts:
     const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
     redirect->rewritePathHeader(headers, true);
     EXPECT_EQ("http://redirect.lyft.com/bar/anything/1984/baz", redirect->newPath(headers));
+  }
+  // Regex rewrite using prefix, without query, no strip query
+  {
+    Http::TestRequestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/prefix/foo/1984/bar/anything", false, false);
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    redirect->rewritePathHeader(headers, true);
+    EXPECT_EQ("http://redirect.lyft.com/prefix/bar/anything/1984/baz", redirect->newPath(headers));
+  }
+  // Regex rewrite using prefix, with query, no strip query
+  {
+    Http::TestRequestHeaderMapImpl headers = genRedirectHeaders(
+        "redirect.lyft.com", "/prefix/foo/9000/endpoint?lang=eng&con=US", false, false);
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    redirect->rewritePathHeader(headers, true);
+    EXPECT_EQ("http://redirect.lyft.com/prefix/endpoint/9000/baz?lang=eng&con=US",
+              redirect->newPath(headers));
+  }
+  // Regex rewrite using prefix, with query, with strip query
+  {
+    Http::TestRequestHeaderMapImpl headers = genRedirectHeaders(
+        "redirect.lyft.com", "/prefix-strip-query/strip-query/9000/endpoint?lang=eng&con=US", false,
+        false);
+    const DirectResponseEntry* redirect = config.route(headers, 0)->directResponseEntry();
+    redirect->rewritePathHeader(headers, true);
+    EXPECT_EQ("http://redirect.lyft.com/prefix-strip-query/endpoint/9000/baz",
+              redirect->newPath(headers));
   }
 }
 
@@ -9269,6 +9429,35 @@ virtual_hosts:
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
       EnvoyException, "path_match_policy.path_template /rest/{on==e}/{two} is invalid");
+}
+
+TEST_F(RouteMatcherTest, PatternMatchInvalidPlacedWildcard) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: path_pattern
+    domains: ["*"]
+    routes:
+      - match:
+          path_match_policy:
+            name: envoy.path.match.uri_template.pattern_template_match_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+              path_template: "/rest/{middlewildcard=**}/{two}"
+          case_sensitive: false
+        route:
+          cluster: "path-pattern-cluster-one"
+          path_rewrite_policy:
+            name: envoy.path.rewrite.uri_template.pattern_template_rewrite_predicate
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
+              path_template_rewrite: "/rest/{middlewildcard=**}/{two}"
+  )EOF";
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
+      EnvoyException, "path_match_policy.path_template /rest/{middlewildcard=**}/{two} is invalid");
 }
 
 TEST_F(RouteMatcherTest, PatternMatchWildcardUnnamedVariable) {

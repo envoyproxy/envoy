@@ -235,6 +235,7 @@ private:
  */
 class RateLimitPolicyImpl : public RateLimitPolicy {
 public:
+  RateLimitPolicyImpl();
   RateLimitPolicyImpl(
       const Protobuf::RepeatedPtrField<envoy::config::route::v3::RateLimit>& rate_limits,
       ProtobufMessage::ValidationVisitor& validator);
@@ -253,6 +254,7 @@ private:
   // Json::Schema::RATE_LIMIT_HTTP_FILTER_SCHEMA from common/json/config_schemas.cc.
   static const uint64_t MAX_STAGE_NUMBER;
 };
+using DefaultRateLimitPolicy = ConstSingleton<RateLimitPolicyImpl>;
 
 } // namespace Router
 } // namespace Envoy

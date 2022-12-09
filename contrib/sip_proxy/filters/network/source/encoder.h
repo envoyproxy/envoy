@@ -1,12 +1,6 @@
 #pragma once
 
-#include <string>
-
 #include "envoy/buffer/buffer.h"
-#include "envoy/common/exception.h"
-
-#include "source/common/common/assert.h"
-#include "source/common/common/logger.h"
 
 #include "contrib/sip_proxy/filters/network/source/metadata.h"
 #include "contrib/sip_proxy/filters/network/source/sip.h"

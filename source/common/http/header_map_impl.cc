@@ -22,6 +22,7 @@ namespace {
 
 constexpr absl::string_view DelimiterForInlineHeaders{","};
 constexpr absl::string_view DelimiterForInlineCookies{"; "};
+const static int kMinHeadersForLazyMap = 3; // Optimal hard-coded value based on benchmarks.
 
 bool validatedLowerCaseString(absl::string_view str) {
   auto lower_case_str = LowerCaseString(str);
@@ -58,7 +59,7 @@ template <> bool HeaderMapImpl::HeaderList::isPseudoHeader(const LowerCaseString
 
 bool HeaderMapImpl::HeaderList::maybeMakeMap() {
   if (lazy_map_.empty()) {
-    if (headers_.size() < lazy_map_min_size_) {
+    if (headers_.size() < kMinHeadersForLazyMap) {
       return false;
     }
     // Add all entries from the list into the map.

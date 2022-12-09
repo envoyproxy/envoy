@@ -1,4 +1,8 @@
+#include <string>
+
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
+#include "envoy/extensions/filters/http/router/v3/router.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "test/integration/filters/repick_cluster_filter.h"
 #include "test/integration/http_integration.h"
@@ -15,7 +19,10 @@ public:
     setUpstreamCount(2);
   }
 
-  void intitialConfigSetup(const std::string& cluster_name, const std::string& cluster_header) {
+  // Adds a mirror policy that routes to cluster_header or cluster_name, in that order. Additionally
+  // optionally registers an upstream filter on the cluster specified by
+  // cluster_with_custom_filter_.
+  void initialConfigSetup(const std::string& cluster_name, const std::string& cluster_header) {
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
       cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
@@ -90,7 +97,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ShadowPolicyIntegrationTest,
 
 // Test request mirroring / shadowing with the cluster name in policy.
 TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithCluster) {
-  intitialConfigSetup("cluster_1", "");
+  initialConfigSetup("cluster_1", "");
   initialize();
 
   sendRequestAndValidateResponse();
@@ -99,9 +106,59 @@ TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithCluster) {
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 1);
 }
 
+// Test request mirroring / shadowing with upstream filters in the router.
+TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithRouterUpstreamFilters) {
+  initialConfigSetup("cluster_1", "");
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) -> void {
+        auto* router_filter_config = hcm.mutable_http_filters(hcm.http_filters_size() - 1);
+        envoy::extensions::filters::http::router::v3::Router router_filter;
+        router_filter_config->typed_config().UnpackTo(&router_filter);
+        router_filter.add_upstream_http_filters()->set_name("add-body-filter");
+        router_filter.add_upstream_http_filters()->set_name("envoy.filters.http.upstream_codec");
+        router_filter_config->mutable_typed_config()->PackFrom(router_filter);
+      });
+  filter_name_ = "add-body-filter";
+  initialize();
+  sendRequestAndValidateResponse();
+
+  EXPECT_EQ(upstream_headers_->getContentLengthValue(), "4");
+  EXPECT_EQ(mirror_headers_->getContentLengthValue(), "4");
+}
+
+// Test that a cluster-specified filter will override router-specified filters.
+TEST_P(ShadowPolicyIntegrationTest, ClusterFilterOverridesRouterFilter) {
+  initialConfigSetup("cluster_1", "");
+  // main cluster adds body:
+  cluster_with_custom_filter_ = 0;
+  filter_name_ = "add-body-filter";
+
+  // router filter upstream filter adds header:
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) -> void {
+        auto* router_filter_config = hcm.mutable_http_filters(hcm.http_filters_size() - 1);
+        envoy::extensions::filters::http::router::v3::Router router_filter;
+        router_filter_config->typed_config().UnpackTo(&router_filter);
+        router_filter.add_upstream_http_filters()->set_name("add-header-filter");
+        router_filter.add_upstream_http_filters()->set_name("envoy.filters.http.upstream_codec");
+        router_filter_config->mutable_typed_config()->PackFrom(router_filter);
+      });
+
+  initialize();
+  sendRequestAndValidateResponse();
+  // cluster_0 (main cluster) hits AddBodyFilter
+  EXPECT_EQ(upstream_headers_->getContentLengthValue(), "4");
+  EXPECT_TRUE(upstream_headers_->get(Http::LowerCaseString("x-header-to-add")).empty());
+  // cluster_1 (shadow_cluster) hits AddHeaderFilter.
+  EXPECT_EQ(mirror_headers_->getContentLengthValue(), "");
+  EXPECT_FALSE(mirror_headers_->get(Http::LowerCaseString("x-header-to-add")).empty());
+}
+
 // Test request mirroring / shadowing with the cluster header.
 TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithClusterHeaderWithFilter) {
-  intitialConfigSetup("", "cluster_header_1");
+  initialConfigSetup("", "cluster_header_1");
 
   // Add a filter to set cluster_header in headers.
   config_helper_.addFilter("name: repick-cluster-filter");
@@ -112,7 +169,7 @@ TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithClusterHeaderWithFilt
 
 // Test request mirroring / shadowing with the original cluster having a local reply filter.
 TEST_P(ShadowPolicyIntegrationTest, OriginalClusterWithLocalReply) {
-  intitialConfigSetup("cluster_1", "");
+  initialConfigSetup("cluster_1", "");
   cluster_with_custom_filter_ = 0;
   initialize();
 
@@ -124,7 +181,7 @@ TEST_P(ShadowPolicyIntegrationTest, OriginalClusterWithLocalReply) {
 
 // Test request mirroring / shadowing with the mirror cluster having a local reply filter.
 TEST_P(ShadowPolicyIntegrationTest, MirrorClusterWithLocalReply) {
-  intitialConfigSetup("cluster_1", "");
+  initialConfigSetup("cluster_1", "");
   cluster_with_custom_filter_ = 1;
   initialize();
 
@@ -135,7 +192,7 @@ TEST_P(ShadowPolicyIntegrationTest, MirrorClusterWithLocalReply) {
 }
 
 TEST_P(ShadowPolicyIntegrationTest, OriginalClusterWithAddBody) {
-  intitialConfigSetup("cluster_1", "");
+  initialConfigSetup("cluster_1", "");
   cluster_with_custom_filter_ = 0;
   filter_name_ = "add-body-filter";
 
@@ -164,7 +221,7 @@ TEST_P(ShadowPolicyIntegrationTest, MirrorClusterWithAddBody) {
         typed_config->PackFrom(router_config);
       });
 
-  intitialConfigSetup("cluster_1", "");
+  initialConfigSetup("cluster_1", "");
   cluster_with_custom_filter_ = 1;
   filter_name_ = "add-body-filter";
 

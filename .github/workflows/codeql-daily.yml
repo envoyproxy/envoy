@@ -10,8 +10,8 @@ jobs:
     strategy:
       fail-fast: false
 
-    # CodeQL runs on ubuntu-latest and windows-latest
-    runs-on: ubuntu-latest
+    # CodeQL runs on ubuntu-20.04
+    runs-on: ubuntu-20.04
 
     steps:
     - name: Checkout repository
@@ -28,7 +28,7 @@ jobs:
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@807578363a7869ca324a79039e6db9c843e0e100
+      uses: github/codeql-action/init@b2a92eb56d8cb930006a1c6ed86b0782dd8a4297
       # Override language selection by uncommenting this and choosing your languages
       with:
         languages: cpp
@@ -38,15 +38,19 @@ jobs:
       run: |
        sudo apt-get update --error-on=any
        sudo apt-get install --yes libtool cmake automake autoconf make ninja-build curl unzip virtualenv openjdk-11-jdk build-essential libc++1
-       mkdir -p bin/clang11
-       cd bin/clang11
-       wget https://github.com/llvm/llvm-project/releases/download/llvmorg-11.0.1/clang+llvm-11.0.1-x86_64-linux-gnu-ubuntu-16.04.tar.xz
-       tar -xf clang+llvm-11.0.1-x86_64-linux-gnu-ubuntu-16.04.tar.xz --strip-components 1
-       export PATH=bin/clang11/bin:$PATH
+       # Note: the llvm/clang version should match the version specifed in:
+       #  - bazel/repository_locations.bzl
+       #  - .github/workflows/codeql-push.yml
+       #  - https://github.com/envoyproxy/envoy-build-tools/blob/main/build_container/build_container_ubuntu.sh#L84
+       mkdir -p bin/clang14
+       cd bin/clang14
+       wget https://github.com/llvm/llvm-project/releases/download/llvmorg-14.0.0/clang+llvm-14.0.0-x86_64-linux-gnu-ubuntu-18.04.tar.xz
+       tar -xf clang+llvm-14.0.0-x86_64-linux-gnu-ubuntu-18.04.tar.xz --strip-components 1
+       export PATH=bin/clang14/bin:$PATH
 
     - name: Build
       run: |
-       bazel/setup_clang.sh bin/clang11
+       bazel/setup_clang.sh bin/clang14
        bazelisk shutdown
        bazelisk build -c fastbuild --spawn_strategy=local --discard_analysis_cache --nouse_action_cache --config clang --config libc++ //source/common/http/...
 
@@ -55,4 +59,4 @@ jobs:
         git clean -xdf
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@807578363a7869ca324a79039e6db9c843e0e100
+      uses: github/codeql-action/analyze@b2a92eb56d8cb930006a1c6ed86b0782dd8a4297

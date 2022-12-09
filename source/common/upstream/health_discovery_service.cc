@@ -114,7 +114,7 @@ envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse HdsDelega
               *host->address(), *endpoint->mutable_endpoint()->mutable_address());
           // TODO(lilika): Add support for more granular options of
           // envoy::config::core::v3::HealthStatus
-          if (host->health() == Host::Health::Healthy) {
+          if (host->coarseHealth() == Host::Health::Healthy) {
             endpoint->set_health_status(envoy::config::core::v3::HEALTHY);
           } else {
             if (host->healthFlagGet(Host::HealthFlag::ACTIVE_HC_TIMEOUT)) {
@@ -167,6 +167,12 @@ envoy::config::cluster::v3::Cluster HdsDelegate::createClusterConfig(
 
     // add all endpoints for this locality group to the config
     for (const auto& endpoint : locality_endpoints.endpoints()) {
+      if (endpoint.has_health_check_config() &&
+          endpoint.health_check_config().disable_active_health_check()) {
+        ENVOY_LOG(debug, "Skip adding the endpoint {} with optional disabled health check for HDS.",
+                  endpoint.DebugString());
+        continue;
+      }
       auto* new_endpoint = endpoints->add_lb_endpoints()->mutable_endpoint();
       new_endpoint->mutable_address()->MergeFrom(endpoint.address());
       new_endpoint->mutable_health_check_config()->MergeFrom(endpoint.health_check_config());
@@ -190,14 +196,14 @@ envoy::config::cluster::v3::Cluster HdsDelegate::createClusterConfig(
 }
 
 void HdsDelegate::updateHdsCluster(HdsClusterPtr cluster,
-                                   const envoy::config::cluster::v3::Cluster& cluster_config) {
-  cluster->update(cluster_config, info_factory_, tls_);
+                                   const envoy::config::cluster::v3::Cluster& cluster_config,
+                                   const envoy::config::core::v3::BindConfig& bind_config) {
+  cluster->update(cluster_config, bind_config, info_factory_, tls_);
 }
 
 HdsClusterPtr
-HdsDelegate::createHdsCluster(const envoy::config::cluster::v3::Cluster& cluster_config) {
-  static const envoy::config::core::v3::BindConfig bind_config;
-
+HdsDelegate::createHdsCluster(const envoy::config::cluster::v3::Cluster& cluster_config,
+                              const envoy::config::core::v3::BindConfig& bind_config) {
   // Create HdsCluster.
   auto new_cluster =
       std::make_shared<HdsCluster>(server_context_, std::move(cluster_config), bind_config,
@@ -233,11 +239,11 @@ void HdsDelegate::processMessage(
       if (cluster_map_pair != hds_clusters_name_map_.end()) {
         // We have a previous cluster with this name, update.
         cluster_ptr = cluster_map_pair->second;
-        updateHdsCluster(cluster_ptr, cluster_config);
+        updateHdsCluster(cluster_ptr, cluster_config, cluster_health_check.upstream_bind_config());
       } else {
         // There is no cluster with this name previously or its an empty string, so just create a
         // new cluster.
-        cluster_ptr = createHdsCluster(cluster_config);
+        cluster_ptr = createHdsCluster(cluster_config, cluster_health_check.upstream_bind_config());
       }
 
       // If this cluster does not have a name, do not add it to the name map since cluster_name is
@@ -327,8 +333,8 @@ HdsCluster::HdsCluster(Server::Configuration::ServerFactoryContext& server_conte
                        const envoy::config::core::v3::BindConfig& bind_config, Stats::Store& stats,
                        Ssl::ContextManager& ssl_context_manager, bool added_via_api,
                        ClusterInfoFactory& info_factory, ThreadLocal::SlotAllocator& tls)
-    : server_context_(server_context), cluster_(std::move(cluster)), bind_config_(bind_config),
-      stats_(stats), ssl_context_manager_(ssl_context_manager), added_via_api_(added_via_api),
+    : server_context_(server_context), cluster_(std::move(cluster)), stats_(stats),
+      ssl_context_manager_(ssl_context_manager), added_via_api_(added_via_api),
       hosts_(new HostVector()), time_source_(server_context_.mainThreadDispatcher().timeSource()) {
   ENVOY_LOG(debug, "Creating an HdsCluster");
   priority_set_.getOrCreateHostSet(0);
@@ -337,7 +343,7 @@ HdsCluster::HdsCluster(Server::Configuration::ServerFactoryContext& server_conte
   socket_match_hash_ = RepeatedPtrUtil::hash(cluster_.transport_socket_matches());
 
   info_ = info_factory.createClusterInfo(
-      {server_context, cluster_, bind_config_, stats_, ssl_context_manager_, added_via_api_, tls});
+      {server_context, cluster_, bind_config, stats_, ssl_context_manager_, added_via_api_, tls});
 
   // Temporary structure to hold Host pointers grouped by locality, to build
   // initial_hosts_per_locality_.
@@ -372,6 +378,7 @@ HdsCluster::HdsCluster(Server::Configuration::ServerFactoryContext& server_conte
 }
 
 void HdsCluster::update(envoy::config::cluster::v3::Cluster cluster,
+                        const envoy::config::core::v3::BindConfig& bind_config,
                         ClusterInfoFactory& info_factory, ThreadLocal::SlotAllocator& tls) {
 
   // check to see if the config changed. If it did, update.
@@ -387,7 +394,7 @@ void HdsCluster::update(envoy::config::cluster::v3::Cluster cluster,
     if (socket_match_hash_ != socket_match_hash) {
       socket_match_hash_ = socket_match_hash;
       update_cluster_info = true;
-      info_ = info_factory.createClusterInfo({server_context_, cluster_, bind_config_, stats_,
+      info_ = info_factory.createClusterInfo({server_context_, cluster_, bind_config, stats_,
                                               ssl_context_manager_, added_via_api_, tls});
     }
 

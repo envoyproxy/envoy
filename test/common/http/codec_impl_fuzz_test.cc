@@ -541,7 +541,7 @@ using HttpStreamPtr = std::unique_ptr<HttpStream>;
 
 namespace {
 
-enum class HttpVersion { Http1, Http2Nghttp2, Http2WrappedNghttp2, Http2Oghttp2 };
+enum class HttpVersion { Http1, Http2Nghttp2, Http2Oghttp2 };
 
 void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersion http_version) {
   Stats::IsolatedStoreImpl stats_store;
@@ -575,17 +575,10 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
     break;
   case HttpVersion::Http2Nghttp2:
     http2 = true;
-    scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_new_codec_wrapper", "false"}});
-    scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "false"}});
-    break;
-  case HttpVersion::Http2WrappedNghttp2:
-    http2 = true;
-    scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_new_codec_wrapper", "true"}});
     scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "false"}});
     break;
   case HttpVersion::Http2Oghttp2:
     http2 = true;
-    scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_new_codec_wrapper", "true"}});
     scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "true"}});
     break;
   }
@@ -791,10 +784,6 @@ void codecFuzzHttp2Nghttp2(const test::common::http::CodecImplFuzzTestCase& inpu
   codecFuzz(input, HttpVersion::Http2Nghttp2);
 }
 
-void codecFuzzHttp2WrappedNghttp2(const test::common::http::CodecImplFuzzTestCase& input) {
-  codecFuzz(input, HttpVersion::Http2WrappedNghttp2);
-}
-
 void codecFuzzHttp2Oghttp2(const test::common::http::CodecImplFuzzTestCase& input) {
   codecFuzz(input, HttpVersion::Http2Oghttp2);
 }
@@ -814,7 +803,6 @@ DEFINE_PROTO_FUZZER(const test::common::http::CodecImplFuzzTestCase& input) {
     // We wrap the calls to *codecFuzz* through these functions in order for
     // the codec name to explicitly be in any stacktrace.
     codecFuzzHttp2Nghttp2(input);
-    codecFuzzHttp2WrappedNghttp2(input);
     // Prevent oghttp2 from aborting the program.
     // If when disabling the FATAL log abort the fuzzer will create a test that reaches an
     // inconsistent state (and crashes/accesses inconsistent memory), then it will be a bug we'll

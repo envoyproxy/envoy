@@ -16,4 +16,3 @@ bug_fixes:
 - area: router
   change: |
     fixed CVE-2022-29227 which caused an internal redirect crash for requests with body/trailers. Envoy would previously crash in some cases when processing internal redirects for requests with bodies or trailers if the redirect prompts an Envoy-generated local reply.
-

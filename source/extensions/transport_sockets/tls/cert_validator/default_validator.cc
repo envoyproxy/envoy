@@ -83,6 +83,9 @@ int DefaultCertValidator::initializeSslContexts(std::vector<SSL_CTX*> contexts,
 
     for (auto& ctx : contexts) {
       X509_STORE* store = SSL_CTX_get_cert_store(ctx);
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_intermediate_ca")) {
+        X509_STORE_set_flags(store, X509_V_FLAG_PARTIAL_CHAIN);
+      }
       bool has_crl = false;
       for (const X509_INFO* item : list.get()) {
         if (item->x509) {
@@ -109,10 +112,6 @@ int DefaultCertValidator::initializeSslContexts(std::vector<SSL_CTX*> contexts,
       verify_mode = SSL_VERIFY_PEER;
       verify_trusted_ca_ = true;
 
-      // NOTE: We're using SSL_CTX_set_cert_verify_callback() instead of X509_verify_cert()
-      // directly. However, our new callback is still calling X509_verify_cert() under
-      // the hood. Therefore, to ignore cert expiration, we need to set the callback
-      // for X509_verify_cert to ignore that error.
       if (config_->allowExpiredCertificate()) {
         CertValidatorUtil::setIgnoreCertificateExpiration(store);
       }
@@ -135,6 +134,9 @@ int DefaultCertValidator::initializeSslContexts(std::vector<SSL_CTX*> contexts,
 
     for (auto& ctx : contexts) {
       X509_STORE* store = SSL_CTX_get_cert_store(ctx);
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_intermediate_ca")) {
+        X509_STORE_set_flags(store, X509_V_FLAG_PARTIAL_CHAIN);
+      }
       for (const X509_INFO* item : list.get()) {
         if (item->crl) {
           X509_STORE_add_crl(store, item->crl);

@@ -120,7 +120,6 @@ message ExtraSourceAddress {
   // The additional address to bind.
   SocketAddress address = 1 [(validate.rules).message = {required: true}];
 
-  // [#not-implemented-hide:]
   // Additional socket options that may not be present in Envoy source code or
   // precompiled binaries. If specified, this will override the
   // :ref:`socket_options <envoy_v3_api_field_config.core.v3.BindConfig.socket_options>`
@@ -136,7 +135,7 @@ message BindConfig {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.BindConfig";
 
   // The address to bind to when creating a socket.
-  SocketAddress source_address = 1 [(validate.rules).message = {required: true}];
+  SocketAddress source_address = 1;
 
   // Whether to set the ``IP_FREEBIND`` option when creating the socket. When this
   // flag is set to true, allows the :ref:`source_address

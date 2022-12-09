@@ -32,6 +32,29 @@ independently sourced, the following steps should be followed:
 1. Configure, build and/or install the [Envoy dependencies](https://www.envoyproxy.io/docs/envoy/latest/start/building#requirements).
 1. `bazel build -c opt envoy` from the repository root.
 
+### Building from a release tarball
+
+To build Envoy from a release tarball, you can download a release tarball from Assets section in each release in project [Releases page](https://github.com/envoyproxy/envoy/releases).
+Given all required [Envoy dependencies](https://www.envoyproxy.io/docs/envoy/latest/start/building#requirements) are installed, the following steps should be followed:
+
+1. Download and extract source code of a release tarball from the Releases page. For example: https://github.com/envoyproxy/envoy/releases/tag/v1.24.0.
+1. `python3 tools/github/write_current_source_version.py` from the repository root.
+1. `bazel build -c opt envoy` from the repository root.
+
+> **Note**: If the the `write_current_source_version.py` script is missing from the extracted source code directory, you can download it from [here](https://raw.githubusercontent.com/envoyproxy/envoy/main/tools/github/write_current_source_version.py).
+> This script is used to generate SOURCE_VERSION that is required by [`bazel/get_workspace_status`](./get_workspace_status) to "stamp" the binary in a non-git directory.
+
+> **Note**: To avoid rate-limiting by GitHub API, you can provide [a valid GitHub token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/about-authentication-to-github#githubs-token-formats) to `GITHUB_TOKEN` environment variable.
+> The environment variable name that holds the token can also be customized by setting `--github_api_token_env_name`.
+> In a GitHub Actions workflow file, you can set this token from [`secrets.GITHUB_TOKEN`](https://docs.github.com/en/actions/security-guides/automatic-token-authentication#about-the-github_token-secret).
+
+Examples:
+
+```console
+GITHUB_TOKEN=<GITHUB_TOKEN> python3 tools/github/write_current_source_version.py
+MY_TOKEN=<GITHUB_TOKEN> python3 tools/github/write_current_source_version.py --github_api_token_env_name=MY_TOKEN
+```
+
 ## Quick start Bazel build for developers
 
 This section describes how to and what dependencies to install to get started building Envoy with Bazel.
@@ -674,8 +697,11 @@ The following optional features can be disabled on the Bazel build command-line:
 * tcmalloc with `--define tcmalloc=disabled`. Also you can choose Gperftools' implementation of
   tcmalloc with `--define tcmalloc=gperftools` which is the default for builds other than x86_64 and aarch64.
 * deprecated features with `--define deprecated_features=disabled`
-* http3/quic with --//bazel:http3=False
+* http3/quic with `--//bazel:http3=False`
+* autolinking libraries with `--define=library_autolink=disabled`
 * admin HTML home page with `--define=admin_html=disabled`
+* admin functionality with `--define=admin_functionality=disabled`
+* spdlogging functionality with `--define=enable_logging=disabled`
 
 ## Enabling optional features
 

@@ -7,8 +7,7 @@
 #include "source/common/quic/envoy_quic_crypto_stream_factory.h"
 #include "source/common/quic/envoy_quic_server_session.h"
 #include "source/common/quic/quic_stat_names.h"
-#include "source/server/active_listener_base.h"
-#include "source/server/connection_handler_impl.h"
+#include "source/server/listener_stats.h"
 
 #include "quiche/quic/core/quic_dispatcher.h"
 #include "quiche/quic/core/quic_utils.h"
@@ -82,12 +81,6 @@ protected:
       quic::QuicConnectionId server_connection_id, const quic::QuicSocketAddress& self_address,
       const quic::QuicSocketAddress& peer_address, absl::string_view alpn,
       const quic::ParsedQuicVersion& version, const quic::ParsedClientHello& parsed_chlo) override;
-  // Overridden to restore the first 4 bytes of the connection ID because our BPF filter only looks
-  // at the first 4 bytes. This ensures that the replacement routes to the same quic dispatcher.
-  quic::QuicConnectionId
-  ReplaceLongServerConnectionId(const quic::ParsedQuicVersion& version,
-                                const quic::QuicConnectionId& server_connection_id,
-                                uint8_t expected_server_connection_id_length) const override;
 
 private:
   Network::ConnectionHandler& connection_handler_;

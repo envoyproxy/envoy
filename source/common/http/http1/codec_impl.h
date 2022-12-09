@@ -156,6 +156,11 @@ public:
     return stream_error_on_invalid_http_message_;
   }
 
+  // For H/1, ResponseEncoder doesn't hold a pointer to RequestDecoder.
+  // TODO(paulsohn): Enable H/1 codec to get a pointer to the new
+  // request decoder on recreateStream, here or elsewhere.
+  void setRequestDecoder(Http::RequestDecoder& /*decoder*/) override {}
+
   // Http1::StreamEncoderImpl
   void resetStream(StreamResetReason reason) override;
 
@@ -555,8 +560,6 @@ private:
   // The action to take when a request header name contains underscore characters.
   const envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
-
-  const bool runtime_lazy_read_disable_{};
 };
 
 /**

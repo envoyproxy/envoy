@@ -128,17 +128,16 @@ RuntimeFilter::RuntimeFilter(const envoy::config::accesslog::v3::RuntimeFilter& 
       use_independent_randomness_(config.use_independent_randomness()) {}
 
 bool RuntimeFilter::evaluate(const StreamInfo::StreamInfo& stream_info,
-                             const Http::RequestHeaderMap& request_headers,
-                             const Http::ResponseHeaderMap&,
+                             const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
                              const Http::ResponseTrailerMap&) const {
   // This code is verbose to avoid preallocating a random number that is not needed.
   uint64_t random_value;
   if (use_independent_randomness_) {
     random_value = random_.random();
-  } else if (stream_info.getRequestIDProvider() == nullptr) {
+  } else if (!stream_info.getStreamIdProvider().has_value()) {
     random_value = random_.random();
   } else {
-    const auto rid_to_integer = stream_info.getRequestIDProvider()->toInteger(request_headers);
+    const auto rid_to_integer = stream_info.getStreamIdProvider()->toInteger();
     if (!rid_to_integer.has_value()) {
       random_value = random_.random();
     } else {

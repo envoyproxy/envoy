@@ -5,6 +5,7 @@
 #include "source/common/json/json_loader.h"
 #include "source/common/router/header_parser.h"
 
+#include "absl/strings/str_replace.h"
 #include "re2/re2.h"
 
 namespace Envoy {
@@ -25,34 +26,34 @@ std::string HeaderParser::translateMetadataFormat(const std::string& header_valu
   const re2::RE2& re = getMetadataTranslatorPattern();
   ASSERT(re.ok());
   std::string new_header_value = header_value;
-  re2::StringPiece json_array, metadata_type;
-  while (re.PartialMatch(new_header_value, re, &metadata_type, &json_array)) {
-    std::string new_format;
+  re2::StringPiece matches[3];
+  while (re.Match(new_header_value, 0, new_header_value.size(), re2::RE2::UNANCHORED, matches, 3)) {
     TRY_ASSERT_MAIN_THREAD {
-      Json::ObjectSharedPtr parsed_params = Json::Factory::loadFromString(json_array.as_string());
+      std::string new_format;
+      Json::ObjectSharedPtr parsed_params = Json::Factory::loadFromString(std::string(matches[2]));
 
       // The given json string may be an invalid object or with an empty object array.
       if (parsed_params == nullptr || parsed_params->asObjectArray().empty()) {
         // return original value
-        return new_header_value;
+        return header_value;
       }
       new_format = parsed_params->asObjectArray()[0]->asString();
       for (size_t i = 1; i < parsed_params->asObjectArray().size(); i++) {
         new_format += ":" + parsed_params->asObjectArray()[i]->asString();
       }
 
-      new_format = "%" + metadata_type.as_string() + "_METADATA(" + new_format + ")%";
-
+      new_format = "%" + matches[1].as_string() + "_METADATA(" + new_format + ")%";
       ENVOY_LOG_MISC(
           warn,
           "Header formatter: JSON format of {} parameters has been obsoleted. Use colon format: {}",
-          metadata_type.as_string() + "_METADATA", new_format.c_str());
+          matches[1].as_string() + "_METADATA", new_format.c_str());
 
-      re2::RE2::Replace(&new_header_value, re, new_format);
+      int subs = absl::StrReplaceAll({{matches[0].as_string(), new_format}}, &new_header_value);
+      ASSERT(subs > 0);
     }
     END_TRY
     catch (Json::Exception& e) {
-      return new_header_value;
+      return header_value;
     }
   }
 
@@ -73,13 +74,14 @@ std::string HeaderParser::translatePerRequestState(const std::string& header_val
   const re2::RE2& re = getPerRequestTranslatorPattern();
   ASSERT(re.ok());
   std::string new_header_value = header_value;
-  re2::StringPiece required_state;
-  while (re.PartialMatch(new_header_value, re, &required_state)) {
-    std::string new_format = "%FILTER_STATE(" + required_state.as_string() + ":PLAIN)%";
+  re2::StringPiece matches[2];
+  while (re.Match(new_header_value, 0, new_header_value.size(), re2::RE2::UNANCHORED, matches, 2)) {
+    const std::string new_format = "%FILTER_STATE(" + matches[1].as_string() + ":PLAIN)%";
 
     ENVOY_LOG_MISC(warn, "PER_REQUEST_STATE header formatter has been obsoleted. Use {}",
                    new_format.c_str());
-    re2::RE2::Replace(&new_header_value, re, new_format);
+    int subs = absl::StrReplaceAll({{matches[0].as_string(), new_format}}, &new_header_value);
+    ASSERT(subs > 0);
   }
   return new_header_value;
 }

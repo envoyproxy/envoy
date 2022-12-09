@@ -1,11 +1,13 @@
 #pragma once
 
 #include <memory>
+#include <string>
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
+#include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/network/connection_balancer_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/server/active_tcp_listener.h"
@@ -49,6 +51,33 @@ private:
   Envoy::Event::FileEventPtr dlb_event_;
 };
 
+// The dir should always be "/dev" in production.
+// For test it is a temporary directory.
+// Return Dlb device id, absl::nullopt means error.
+static absl::optional<uint> detectDlbDevice(const uint config_id, const std::string& dir) {
+  uint device_id = config_id;
+  Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
+  struct stat buffer;
+
+  std::string device_path = fmt::format("{}/dlb{}", dir, device_id);
+  if (os_sys_calls.stat(device_path.c_str(), &buffer).return_value_ != 0) {
+    int i = 0;
+    // auto detect available dlb devices, now the max number of dlb device id is 63.
+    const int max_id = 64;
+    for (; i < max_id; i++) {
+      device_path = fmt::format("{}/dlb{}", dir, i);
+      if (os_sys_calls.stat(device_path.c_str(), &buffer).return_value_ == 0) {
+        device_id = i;
+        break;
+      }
+    }
+    if (i == 64) {
+      return absl::nullopt;
+    }
+  }
+  return absl::optional<uint>{device_id};
+}
+
 class DlbConnectionBalanceFactory : public Envoy::Network::ConnectionBalanceFactory,
                                     public Logger::Loggable<Logger::Id::config> {
 public:
@@ -72,6 +101,7 @@ public:
 
   // Share those cross worker threads.
   std::vector<dlb_port_hdl_t> tx_ports, rx_ports;
+  uint max_retries;
 #endif
   std::vector<int> efds;
   std::vector<std::shared_ptr<DlbBalancedConnectionHandlerImpl>> dlb_handlers;
@@ -127,7 +157,6 @@ public:
 #endif
 };
 
-REGISTER_FACTORY(DlbConnectionBalanceFactory, Envoy::Network::ConnectionBalanceFactory);
 using DlbConnectionBalanceFactorySingleton = InjectableSingleton<DlbConnectionBalanceFactory>;
 
 /**
