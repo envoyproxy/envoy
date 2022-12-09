@@ -61,6 +61,8 @@ protected:
   bool explicit_flow_control_ = false;
   bool expect_dns_ = true;
   bool override_builder_config_ = false;
+  // True if data plane requests are expected in the test; false otherwise.
+  bool expect_data_streams_ = true;
 };
 
 } // namespace Envoy
