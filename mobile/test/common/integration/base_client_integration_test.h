@@ -68,6 +68,13 @@ protected:
   // True if data plane requests are expected in the test; false otherwise.
   bool expect_data_streams_ = true;
   Platform::EngineBuilder builder_;
+  // helpers to access protected functions in the friend class
+  void setOverrideConfigForTests(Platform::EngineBuilder builder, std::string config) {
+    builder.setOverrideConfigForTests(config);
+  }
+  void setAdminAddressPathForTests(Platform::EngineBuilder builder, std::string admin) {
+    builder.setAdminAddressPathForTests(admin);
+  }
 };
 
 } // namespace Envoy
