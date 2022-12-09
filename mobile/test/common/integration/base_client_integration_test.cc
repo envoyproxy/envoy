@@ -166,9 +166,9 @@ std::shared_ptr<Platform::RequestHeaders> BaseClientIntegrationTest::envoyToMobi
 }
 
 void BaseClientIntegrationTest::threadRoutine(absl::BlockingCounter& engine_running) {
-  builder.setOnEngineRunning([&]() { engine_running.DecrementCount(); });
+  builder_.setOnEngineRunning([&]() { engine_running.DecrementCount(); });
   for (auto i = num_engines_for_test_; i--;) {
-    multi_engines_.push_back(builder.build());
+    multi_engines_.push_back(builder_.build());
   };
   engine_ = multi_engines_[0];
   full_dispatcher_->run(Event::Dispatcher::RunType::Block);
