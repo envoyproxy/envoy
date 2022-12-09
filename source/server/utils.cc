@@ -1,6 +1,7 @@
 
-#include "source/common/common/assert.h"
 #include "source/server/utils.h"
+
+#include "source/common/common/assert.h"
 
 namespace Envoy {
 namespace Server {
