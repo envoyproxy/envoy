@@ -245,12 +245,8 @@ QueryParameterValueMatchAction::QueryParameterValueMatchAction(
     const envoy::config::route::v3::RateLimit::Action::QueryParameterValueMatch& action)
     : descriptor_value_(action.descriptor_value()),
       descriptor_key_(!action.descriptor_key().empty() ? action.descriptor_key() : "query_match"),
-      expect_match_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(action, expect_match, true)) {
-  for (const auto& query_parameter : action.query_parameters()) {
-    action_query_parameters_.push_back(
-        std::make_unique<ConfigUtility::QueryParameterMatcher>(query_parameter));
-  }
-}
+      expect_match_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(action, expect_match, true)),
+      action_query_parameters_(buildQueryParameterMatcherVector(action)) {}
 
 bool QueryParameterValueMatchAction::populateDescriptor(
     RateLimit::DescriptorEntry& descriptor_entry, const std::string&,
@@ -264,6 +260,16 @@ bool QueryParameterValueMatchAction::populateDescriptor(
   } else {
     return false;
   }
+}
+
+std::vector<ConfigUtility::QueryParameterMatcherPtr>
+QueryParameterValueMatchAction::buildQueryParameterMatcherVector(
+    const envoy::config::route::v3::RateLimit::Action::QueryParameterValueMatch& action) {
+  std::vector<ConfigUtility::QueryParameterMatcherPtr> ret;
+  for (const auto& query_parameter : action.query_parameters()) {
+    ret.push_back(std::make_unique<ConfigUtility::QueryParameterMatcher>(query_parameter));
+  }
+  return ret;
 }
 
 RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(

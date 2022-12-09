@@ -1091,7 +1091,7 @@ actions:
   EXPECT_TRUE(local_descriptors_.empty());
 }
 
-TEST_F(RateLimitPolicyEntryTest, QueryParameterValueMatchNotPresent) {
+TEST_F(RateLimitPolicyEntryTest, QueryParameterValueMatchExpectNoMatch) {
   const std::string yaml = R"EOF(
 actions:
 - query_parameter_value_match:
@@ -1114,7 +1114,7 @@ actions:
               testing::ContainerEq(local_descriptors_));
 }
 
-TEST_F(RateLimitPolicyEntryTest, QueryParameterValueMatchPresent) {
+TEST_F(RateLimitPolicyEntryTest, QueryParameterValueMatchExpectNoMatchFailed) {
   const std::string yaml = R"EOF(
 actions:
 - query_parameter_value_match:

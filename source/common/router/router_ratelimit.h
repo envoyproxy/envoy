@@ -194,11 +194,14 @@ public:
                           const Http::RequestHeaderMap& headers,
                           const StreamInfo::StreamInfo& info) const override;
 
+  std::vector<ConfigUtility::QueryParameterMatcherPtr> buildQueryParameterMatcherVector(
+      const envoy::config::route::v3::RateLimit::Action::QueryParameterValueMatch& action);
+
 private:
   const std::string descriptor_value_;
   const std::string descriptor_key_;
   const bool expect_match_;
-  std::vector<ConfigUtility::QueryParameterMatcherPtr> action_query_parameters_;
+  const std::vector<ConfigUtility::QueryParameterMatcherPtr> action_query_parameters_;
 };
 
 /*
