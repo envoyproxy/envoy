@@ -13,7 +13,7 @@ void QuicStatsGatherer::OnPacketAcked(int acked_bytes,
   }
 }
 
-void QuicStatsGatherer::maybeDoDeferredLog() {
+void QuicStatsGatherer::maybeDoDeferredLog(bool record_ack_timing) {
   logging_done_ = true;
   if (stream_info_ == nullptr) {
     return;
@@ -21,7 +21,7 @@ void QuicStatsGatherer::maybeDoDeferredLog() {
   if (!deferred_logging_headers_and_trailers_.has_value()) {
     return;
   }
-  if (time_source_ != nullptr) {
+  if (time_source_ != nullptr && record_ack_timing) {
     stream_info_->downstreamTiming().onLastDownstreamAckReceived(*time_source_);
   }
   Http::DeferredLoggingHeadersAndTrailers headers_and_trailers =

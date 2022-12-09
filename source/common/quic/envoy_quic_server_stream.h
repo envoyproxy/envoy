@@ -87,6 +87,8 @@ protected:
                 quic::QuicRstStreamErrorCode rst = quic::QUIC_BAD_APPLICATION_PAYLOAD) override;
 
 private:
+  friend class EnvoyQuicServerStreamTest;
+
   QuicFilterManagerConnectionImpl* filterManagerConnection();
 
   // Deliver awaiting trailers if body has been delivered.

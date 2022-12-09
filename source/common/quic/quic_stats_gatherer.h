@@ -28,7 +28,7 @@ public:
     fin_sent_ = end_stream;
   }
   // Log this stream using available stream info and access loggers.
-  void maybeDoDeferredLog();
+  void maybeDoDeferredLog(bool record_ack_timing = true);
   // Add a pointer to stream info that should be logged. This can be overwritten
   // in case of an internal redirect.
   void setStreamInfo(std::shared_ptr<StreamInfo::StreamInfo> stream_info) {
@@ -45,6 +45,8 @@ public:
         absl::make_optional<Http::DeferredLoggingHeadersAndTrailers>(
             std::move(headers_and_trailers));
   }
+  bool loggingDone() { return logging_done_; }
+  uint64_t bytesOutstanding() { return bytes_outstanding_; }
 
 private:
   uint64_t bytes_outstanding_ = 0;

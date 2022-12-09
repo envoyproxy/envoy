@@ -388,6 +388,9 @@ void EnvoyQuicServerStream::OnClose() {
     return;
   }
   clearWatermarkBuffer();
+  if (!stats_gatherer_->loggingDone()) {
+    stats_gatherer_->maybeDoDeferredLog(/* record_ack_timing */ false);
+  }
   stats_gatherer_ = nullptr;
 }
 
