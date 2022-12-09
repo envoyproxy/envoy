@@ -100,9 +100,14 @@ Api::IoCallBoolResult FileImplPosix::close() {
 }
 
 Api::IoCallBoolResult TmpFileImplPosix::close() {
-  Api::IoCallBoolResult result = FileImplPosix::close();
-  if (!result.return_value_ || tmp_file_path_.empty()) {
-    return result;
+  ASSERT(isOpen());
+  int rc = ::close(fd_);
+  fd_ = -1;
+  if (rc == -1) {
+    return resultFailure(false, errno);
+  }
+  if (tmp_file_path_.empty()) {
+    return resultSuccess(true);
   }
   return (::unlink(tmp_file_path_.c_str()) != -1) ? resultSuccess(true)
                                                   : resultFailure(false, errno);
