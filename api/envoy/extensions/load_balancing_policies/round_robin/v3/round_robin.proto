@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.load_balancing_policies.round_robin.v3;
 
-import "envoy/config/cluster/v3/cluster.proto";
+import "envoy/extensions/load_balancing_policies/common/v3/common.proto";
 
 import "udpa/annotations/status.proto";
 
@@ -18,9 +18,11 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // This configuration allows the built-in ROUND_ROBIN LB policy to be configured via the LB policy
 // extension point. See the :ref:`load balancing architecture overview
 // <arch_overview_load_balancing_types>` for more information.
-// [#extension: envoy.load_balancing_policies]
 message RoundRobin {
   // Configuration for slow start mode.
   // If this configuration is not set, slow start will not be not enabled.
-  config.cluster.v3.Cluster.SlowStartConfig slow_start_config = 1;
+  common.v3.SlowStartConfig slow_start_config = 1;
+
+  // Configuration for local zone aware load balancing or locality weighted load balancing.
+  common.v3.LocalityLbConfig locality_lb_config = 2;
 }

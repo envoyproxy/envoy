@@ -267,7 +267,6 @@ const char* config_template = R"(
             - name: remote_service
               domains: ["*"]
               routes:
-#{fake_remote_responses}
               - match: { prefix: "/" }
                 direct_response: { status: 404, body: { inline_string: "not found" } }
                 request_headers_to_remove:
@@ -375,6 +374,15 @@ static_resources:
           route_config:
             name: api_router
             virtual_hosts:
+            - name: remote_service
+              domains: ["127.0.0.1"]
+              routes:
+#{fake_remote_responses}
+              - match: { prefix: "/" }
+                direct_response: { status: 404, body: { inline_string: "not found" } }
+                request_headers_to_remove:
+                - x-forwarded-proto
+                - x-envoy-mobile-cluster
 )"
 // The list of virtual hosts impacts directly the number of virtual cluster stats.
 // That's because we create a separate set of virtual clusters stats for every
