@@ -2,8 +2,8 @@
 
 #include "source/common/network/default_client_connection_factory.h"
 #include "source/common/network/socket_interface_impl.h"
-#include "source/common/router/upstream_codec_filter.h"
 #include "source/common/quic/quic_transport_socket_factory.h"
+#include "source/common/router/upstream_codec_filter.h"
 #include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
 #include "source/extensions/clusters/logical_dns/logical_dns_cluster.h"
 #include "source/extensions/clusters/static/static_cluster.h"
