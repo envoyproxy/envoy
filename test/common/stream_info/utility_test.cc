@@ -316,8 +316,7 @@ TEST(ProxyStatusFromStreamInfo, TestAll) {
            {ResponseFlag::NoFilterConfigFound, ProxyStatusError::ProxyConfigurationError},
            {ResponseFlag::UpstreamProtocolError, ProxyStatusError::HttpProtocolError},
            {ResponseFlag::NoClusterFound, ProxyStatusError::DestinationUnavailable},
-           {ResponseFlag::DnsResolutionFailed, ProxyStatusError::DnsError}
-       }) {
+           {ResponseFlag::DnsResolutionFailed, ProxyStatusError::DnsError}}) {
     NiceMock<MockStreamInfo> stream_info;
     ON_CALL(stream_info, hasResponseFlag(response_flag)).WillByDefault(Return(true));
     EXPECT_THAT(ProxyStatusUtils::fromStreamInfo(stream_info), proxy_status_error);
