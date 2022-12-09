@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 
 #include "library/common/types/c_types.h"
@@ -8,6 +9,14 @@
 namespace Envoy {
 namespace Http {
 namespace Utility {
+
+/*
+ * Returns the proper status code for onLocalReply
+ * @param reply the local reply data for the stream.
+ * @param stream_info the info for the stream.
+ */
+Http::LocalErrorStatus statusForOnLocalReply(const StreamDecoderFilter::LocalReplyData& reply,
+                                             const StreamInfo::StreamInfo& stream_info);
 
 /**
  * Transform envoy_headers to the supplied HeaderMap
