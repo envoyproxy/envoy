@@ -215,17 +215,24 @@ TEST_P(XdsConfigTrackerIntegrationTest, XdsConfigTrackerPartialUpdate) {
   Registry::InjectFactory<Config::XdsConfigTrackerFactory> registered(factory);
 
   initialize();
-  // The first of duplicates has already been successfully applied, and a duplicate exception should
-  // be threw. Only the first cluster is added.
+  // The first of duplicates has already been successfully applied,
+  // and a duplicate exception should be threw.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       Config::TypeUrl::get().Cluster, {cluster1_, cluster1_, cluster2_},
-      {cluster1_, cluster1_, cluster2_}, {}, "4");
+      {cluster1_, cluster1_, cluster2_}, {}, "5");
 
-  test_server_->waitForCounterGe("cluster_manager.cluster_added", 1);
+  // For Delta, the response will be rejected when checking the message due to the duplication.
+  // For SotW, both clusters are accepted, but the internal exception is not empty.
+  if (sotw_or_delta_ == Grpc::SotwOrDelta::Delta ||
+      sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedDelta) {
+    test_server_->waitForCounterGe("cluster_manager.cluster_added", 1);
+  } else {
+    test_server_->waitForCounterGe("cluster_manager.cluster_added", 3);
+  }
+
+  // onConfigRejected is called if there is any exception even some resources are accepted.
   test_server_->waitForCounterEq("test_xds_tracker.on_config_rejected", 1);
-
-  // onConfigRejected is called even if a subset of the resources are added.
   EXPECT_EQ(1, test_server_->counter("test_xds_tracker.on_config_rejected")->value());
 
   // onConfigAccepted is called only when all the resources in a response are successfully ingested.
