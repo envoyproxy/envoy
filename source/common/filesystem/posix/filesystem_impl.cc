@@ -107,6 +107,18 @@ Api::IoCallBoolResult TmpFileImplPosix::close() {
   return (rc != -1 && rc2 != -1) ? resultSuccess(true) : resultFailure(false, errno);
 }
 
+Api::IoCallSizeResult FileImplPosix::pread(void* buf, size_t count, off_t offset) {
+  ASSERT(isOpen());
+  ssize_t rc = ::pread(fd_, buf, count, offset);
+  return (rc == -1) ? resultFailure(rc, errno) : resultSuccess(rc);
+}
+
+Api::IoCallSizeResult FileImplPosix::pwrite(const void* buf, size_t count, off_t offset) {
+  ASSERT(isOpen());
+  ssize_t rc = ::pwrite(fd_, buf, count, offset);
+  return (rc == -1) ? resultFailure(rc, errno) : resultSuccess(rc);
+}
+
 FileImplPosix::FlagsAndMode FileImplPosix::translateFlag(FlagSet in) {
   int out = 0;
   mode_t mode = 0;
@@ -117,7 +129,7 @@ FileImplPosix::FlagsAndMode FileImplPosix::translateFlag(FlagSet in) {
 
   if (in.test(File::Operation::Append)) {
     out |= O_APPEND;
-  } else if (in.test(File::Operation::Write)) {
+  } else if (in.test(File::Operation::Write) && !in.test(File::Operation::KeepExistingData)) {
     out |= O_TRUNC;
   }
 

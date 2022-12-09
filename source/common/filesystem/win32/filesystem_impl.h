@@ -17,6 +17,8 @@ protected:
   Api::IoCallBoolResult open(FlagSet flag) override;
   Api::IoCallSizeResult write(absl::string_view buffer) override;
   Api::IoCallBoolResult close() override;
+  Api::IoCallSizeResult pread(void* buf, size_t count, off_t offset) override;
+  Api::IoCallSizeResult pwrite(const void* buf, size_t count, off_t offset) override;
 
   struct FlagsAndMode {
     DWORD access_ = 0;

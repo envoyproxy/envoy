@@ -84,6 +84,31 @@ Api::IoCallBoolResult FileImplWin32::close() {
   return resultSuccess(true);
 }
 
+static OVERLAPPED overlappedForOffset(off_t offset) {
+  OVERLAPPED overlapped{};
+  overlapped.Offset = offset & 0xffffffff;
+  overlapped.OffsetHigh = offset << 32;
+  return overlapped;
+}
+
+Api::IoCallSizeResult FileImplWin32::pread(void* buf, size_t count, off_t offset) {
+  ASSERT(isOpen());
+  DWORD read_count;
+  OVERLAPPED overlapped = overlappedForOffset(offset);
+  BOOL result = ReadFile(fd_, buf, count, &read_count, &overlapped);
+  return result ? resultSuccess(static_cast<ssize_t>(read_count))
+                : resultFailure<ssize_t>(-1, ::GetLastError());
+}
+
+Api::IoCallSizeResult FileImplWin32::pwrite(const void* buf, size_t count, off_t offset) {
+  ASSERT(isOpen());
+  DWORD write_count;
+  OVERLAPPED overlapped = overlappedForOffset(offset);
+  BOOL result = WriteFile(fd_, buf, count, &write_count, &overlapped);
+  return result ? resultSuccess(static_cast<ssize_t>(write_count))
+                : resultFailure<ssize_t>(-1, ::GetLastError());
+}
+
 FileImplWin32::FlagsAndMode FileImplWin32::translateFlag(FlagSet in) {
   DWORD access = 0;
   DWORD creation = OPEN_EXISTING;
@@ -94,7 +119,7 @@ FileImplWin32::FlagsAndMode FileImplWin32::translateFlag(FlagSet in) {
 
   if (in.test(File::Operation::Write)) {
     access = GENERIC_WRITE;
-    if (!in.test(File::Operation::Append)) {
+    if (!in.test(File::Operation::Append) && !in.test(File::Operation::KeepExistingData)) {
       truncate_ = true;
     }
   }

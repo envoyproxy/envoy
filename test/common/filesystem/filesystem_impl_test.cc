@@ -293,6 +293,75 @@ TEST_F(FileSystemImplTest, OpenReadOnly) {
   EXPECT_TRUE(file->isOpen());
 }
 
+TEST_F(FileSystemImplTest, PreadReadsTheSpecifiedRange) {
+  const std::string file_path =
+      TestEnvironment::writeStringToFileForTest("test_envoy", "0123456789");
+  char buf[5];
+  absl::string_view view{buf, sizeof(buf)};
+  FilePathAndType file_info{Filesystem::DestinationType::File, file_path};
+  FilePtr file = file_system_.createFile(file_info);
+  const Api::IoCallBoolResult open_result = file->open(DefaultFlags);
+  EXPECT_TRUE(open_result.return_value_) << open_result.err_->getErrorDetails();
+  const Api::IoCallSizeResult read_result = file->pread(buf, sizeof(buf), 2);
+  EXPECT_EQ(read_result.return_value_, sizeof(buf)) << read_result.err_->getErrorDetails();
+  EXPECT_THAT(read_result.err_, ::testing::IsNull());
+  EXPECT_EQ(view, "23456");
+}
+
+TEST_F(FileSystemImplTest, PreadFailureReturnsError) {
+  const std::string file_path =
+      TestEnvironment::writeStringToFileForTest("test_envoy", "0123456789");
+  char buf[5];
+  absl::string_view view{buf, sizeof(buf)};
+  FilePathAndType file_info{Filesystem::DestinationType::File, file_path};
+  FilePtr file = file_system_.createFile(file_info);
+  // Open with write-only permission so that pread should fail.
+  const Api::IoCallBoolResult open_result =
+      file->open(FlagSet{1 << Filesystem::File::Operation::Write});
+  EXPECT_TRUE(open_result.return_value_) << open_result.err_->getErrorDetails();
+  const Api::IoCallSizeResult read_result = file->pread(buf, sizeof(buf), 2);
+  EXPECT_EQ(read_result.return_value_, -1);
+  EXPECT_THAT(read_result.err_, ::testing::Not(::testing::IsNull()));
+}
+
+TEST_F(FileSystemImplTest, PwriteWritesTheSpecifiedRange) {
+  const std::string file_path =
+      TestEnvironment::writeStringToFileForTest("test_envoy", "0123456789");
+  {
+    const char buf[6] = "BOOPS";
+    absl::string_view view{buf};
+    FilePathAndType file_info{Filesystem::DestinationType::File, file_path};
+    FilePtr file = file_system_.createFile(file_info);
+    const Api::IoCallBoolResult open_result = file->open(FlagSet{
+        (1 << Filesystem::File::Operation::Write) | (1 << Filesystem::File::Operation::Read) |
+        (1 << Filesystem::File::Operation::KeepExistingData)});
+    EXPECT_TRUE(open_result.return_value_) << open_result.err_->getErrorDetails();
+    const Api::IoCallSizeResult write_result = file->pwrite(buf, view.size(), 2);
+    EXPECT_EQ(write_result.return_value_, view.size()) << write_result.err_->getErrorDetails();
+    EXPECT_THAT(write_result.err_, ::testing::IsNull());
+    // buf shouldn't have changed.
+    EXPECT_EQ(view, "BOOPS");
+  }
+  auto contents = TestEnvironment::readFileToStringForTest(file_path);
+  EXPECT_EQ(contents, "01BOOPS789");
+}
+
+TEST_F(FileSystemImplTest, PwriteFailureReturnsError) {
+  const std::string file_path =
+      TestEnvironment::writeStringToFileForTest("test_envoy", "0123456789");
+  const char buf[6] = "BOOPS";
+  absl::string_view view{buf};
+  FilePathAndType file_info{Filesystem::DestinationType::File, file_path};
+  FilePtr file = file_system_.createFile(file_info);
+  // Open with read-only permission so write should fail.
+  const Api::IoCallBoolResult open_result =
+      file->open(FlagSet{1 << Filesystem::File::Operation::Read});
+  EXPECT_TRUE(open_result.return_value_) << open_result.err_->getErrorDetails();
+  const Api::IoCallSizeResult write_result = file->pwrite(buf, view.size(), 2);
+  EXPECT_EQ(write_result.return_value_, -1);
+  EXPECT_THAT(write_result.err_, ::testing::Not(::testing::IsNull()));
+}
+
 TEST_F(FileSystemImplTest, TemporaryFileIsDeletedOnClose) {
   const std::string new_file_path = TestEnvironment::temporaryPath("");
   FilePathAndType new_file_info{Filesystem::DestinationType::TmpFile, new_file_path};
