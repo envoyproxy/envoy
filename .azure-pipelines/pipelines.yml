@@ -405,7 +405,7 @@ stages:
         echo "checks complete"
 
 - stage: check
-  dependsOn: ["env", "linux_x64"]
+  dependsOn: ["env"]  # , "linux_x64"]
   jobs:
   - job: bazel
     displayName: "linux_x64"
@@ -415,23 +415,23 @@ stages:
     strategy:
       maxParallel: 3
       matrix:
-        api:
-          CI_TARGET: "bazel.api"
+        # api:
+        #   CI_TARGET: "bazel.api"
         # Disabled due to https://github.com/envoyproxy/envoy/pull/18218
         # api_compat:
         #  CI_TARGET: "bazel.api_compat"
-        gcc:
-          CI_TARGET: "bazel.gcc"
+        # gcc:
+        #   CI_TARGET: "bazel.gcc"
         clang_tidy:
           CI_TARGET: "bazel.clang_tidy"
-        asan:
-          CI_TARGET: "bazel.asan"
-        msan:
-          CI_TARGET: "bazel.msan"
-        tsan:
-          CI_TARGET: "bazel.tsan"
-        compile_time_options:
-          CI_TARGET: "bazel.compile_time_options"
+        # asan:
+        #   CI_TARGET: "bazel.asan"
+        # msan:
+        #   CI_TARGET: "bazel.msan"
+        # tsan:
+        #   CI_TARGET: "bazel.tsan"
+        # compile_time_options:
+        #   CI_TARGET: "bazel.compile_time_options"
     timeoutInMinutes: 120
     pool:
       vmImage: "ubuntu-20.04"

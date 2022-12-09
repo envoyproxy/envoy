@@ -453,6 +453,7 @@ elif [[ "$CI_TARGET" == "bazel.clang_tidy" ]]; then
   # clang-tidy will warn on standard library issues with libc++
   ENVOY_STDLIB="libstdc++"
   setup_clang_toolchain
+  export RUN_FULL_CLANG_TIDY=1
   BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" NUM_CPUS=$NUM_CPUS "${ENVOY_SRCDIR}"/ci/run_clang_tidy.sh "$@"
   exit 0
 elif [[ "$CI_TARGET" == "bazel.fuzz" ]]; then
