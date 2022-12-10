@@ -53,7 +53,7 @@ public:
    * For Delta, added_resources contains all the received added resources except for the heart-beat
    * ones in the original message, and the removed resources are the same in the xDS message.
    *
-   * Note: this method is called when *all* the resouces in a response are accepted.
+   * Note: this method is called when *all* the resources in a response are accepted.
    *
    * @param type_url The type url of xDS message.
    * @param added_resources A list of decoded resources to add to the current state.
