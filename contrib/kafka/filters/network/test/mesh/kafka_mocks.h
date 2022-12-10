@@ -27,9 +27,7 @@ public:
   MOCK_METHOD(RdKafka::Headers*, convertHeaders,
               ((const std::vector<std::pair<absl::string_view, absl::string_view>>&)), (const));
   MOCK_METHOD(void, deleteHeaders, (RdKafka::Headers * librdkafka_headers), (const));
-  MOCK_METHOD(ConsumerAssignmentPtr, createAssignment, (const std::string&, int32_t), (const));
-
-  MOCK_METHOD(ConsumerAssignmentPtr, assignConsumerPartitions,
+  MOCK_METHOD(ConsumerAssignmentConstPtr, assignConsumerPartitions,
               (RdKafka::KafkaConsumer&, const std::string&, int32_t), (const));
 
   MockLibRdKafkaUtils() {
@@ -125,7 +123,7 @@ public:
   MOCK_METHOD(int32_t, broker_id, (), (const));
 };
 
-class MockKafkaConsumer : public MockKafkaHandle, public RdKafka::KafkaConsumer {
+class MockKafkaConsumer : public RdKafka::KafkaConsumer, public MockKafkaHandle {
 public:
   MOCK_METHOD(RdKafka::ErrorCode, assignment, (std::vector<RdKafka::TopicPartition*>&), ());
   MOCK_METHOD(RdKafka::ErrorCode, subscription, (std::vector<std::string>&), ());

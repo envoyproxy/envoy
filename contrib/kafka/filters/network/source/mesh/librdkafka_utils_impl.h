@@ -10,8 +10,8 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
 
-using RdKafkaPartitionRawPtr = RdKafka::TopicPartition*;
-using RdKafkaPartitionVector = std::vector<RdKafkaPartitionRawPtr>;
+using RdKafkaPartitionPtr = std::unique_ptr<RdKafka::TopicPartition>;
+using RdKafkaPartitionVector = std::vector<RdKafka::TopicPartition*>;
 
 /**
  * Real implementation that just performs librdkafka operations.
@@ -44,9 +44,9 @@ public:
   void deleteHeaders(RdKafka::Headers* librdkafka_headers) const override;
 
   // LibRdKafkaUtils
-  ConsumerAssignmentPtr assignConsumerPartitions(RdKafka::KafkaConsumer& consumer,
-                                                 const std::string& topic,
-                                                 const int32_t partitions) const override;
+  ConsumerAssignmentConstPtr assignConsumerPartitions(RdKafka::KafkaConsumer& consumer,
+                                                      const std::string& topic,
+                                                      const int32_t partitions) const override;
 
   // Default singleton accessor.
   static const LibRdKafkaUtils& getDefaultInstance();

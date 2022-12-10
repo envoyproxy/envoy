@@ -56,7 +56,7 @@ private:
   std::unique_ptr<RdKafka::KafkaConsumer> consumer_;
 
   // Consumer's partition assignment.
-  ConsumerAssignmentPtr assignment_;
+  ConsumerAssignmentConstPtr assignment_;
 
   // Flag controlling worker threads's execution.
   std::atomic<bool> worker_thread_active_;

@@ -12,33 +12,23 @@ namespace Mesh {
 
 class ConsumerAssignmentImpl : public ConsumerAssignment {
 public:
-  ~ConsumerAssignmentImpl() override;
-
-  void add(const std::string& topic, int32_t partition);
+  ConsumerAssignmentImpl(std::vector<RdKafkaPartitionPtr>&& assignment)
+      : assignment_{std::move(assignment)} {};
 
   // The assignment in a form that librdkafka likes.
-  const RdKafkaPartitionVector& raw() const;
+  RdKafkaPartitionVector raw() const;
 
 private:
-  RdKafkaPartitionVector assignment_;
+  const std::vector<RdKafkaPartitionPtr> assignment_;
 };
 
-ConsumerAssignmentImpl::~ConsumerAssignmentImpl() { RdKafka::TopicPartition::destroy(assignment_); }
-
-void ConsumerAssignmentImpl::add(const std::string& topic, const int32_t partition) {
-  // We consume records from the beginning of each partition.
-  const int64_t initial_offset = 0;
-  const RdKafkaPartitionRawPtr topic_partition =
-      RdKafka::TopicPartition::create(topic, partition, initial_offset);
-  try {
-    assignment_.push_back(topic_partition);
-  } catch (...) {
-    delete (topic_partition);
-    throw;
+RdKafkaPartitionVector ConsumerAssignmentImpl::raw() const {
+  RdKafkaPartitionVector result;
+  for (const auto& tp : assignment_) {
+    result.push_back(tp.get()); // Raw pointer.
   }
+  return result;
 }
-
-const RdKafkaPartitionVector& ConsumerAssignmentImpl::raw() const { return assignment_; }
 
 // LibRdKafkaUtils
 
@@ -85,12 +75,21 @@ void LibRdKafkaUtilsImpl::deleteHeaders(RdKafka::Headers* librdkafka_headers) co
   delete librdkafka_headers;
 }
 
-ConsumerAssignmentPtr LibRdKafkaUtilsImpl::assignConsumerPartitions(
+ConsumerAssignmentConstPtr LibRdKafkaUtilsImpl::assignConsumerPartitions(
     RdKafka::KafkaConsumer& consumer, const std::string& topic, const int32_t partitions) const {
-  std::unique_ptr<ConsumerAssignmentImpl> result = std::make_unique<ConsumerAssignmentImpl>();
-  for (auto pt = 0; pt < partitions; ++pt) {
-    result->add(topic, pt);
+
+  // Construct the topic-partition vector that we are going to store.
+  std::vector<RdKafkaPartitionPtr> assignment;
+  for (int partition = 0; partition < partitions; ++partition) {
+
+    // We consume records from the beginning of each partition.
+    const int64_t initial_offset = 0;
+    assignment.push_back(std::unique_ptr<RdKafka::TopicPartition>(
+        RdKafka::TopicPartition::create(topic, partition, initial_offset)));
   }
+  auto result = std::make_unique<ConsumerAssignmentImpl>(std::move(assignment));
+
+  // Do the assignment.
   consumer.assign(result->raw());
   return result;
 }
