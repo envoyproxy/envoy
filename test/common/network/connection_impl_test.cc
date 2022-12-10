@@ -2658,33 +2658,6 @@ TEST_F(MockTransportConnectionImplTest, WriteEndStreamStopIteration) {
   connection_->write(buffer, true);
 }
 
-// Validate that when the transport signals ConnectionEvent::Connected, that we
-// check for pending write buffer content.
-TEST_F(MockTransportConnectionImplTest, WriteReadyOnConnected) {
-  InSequence s;
-
-  // Queue up some data in write buffer, simulating what happens in SSL handshake.
-  const std::string val("some data");
-  Buffer::OwnedImpl buffer(val);
-  EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Write)).WillOnce(Invoke(file_ready_cb_));
-  EXPECT_CALL(*transport_socket_, doWrite(BufferStringEqual(val), false))
-      .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, false}));
-  connection_->write(buffer, false);
-
-  // A read event happens, resulting in handshake completion and
-  // raiseEvent(Network::ConnectionEvent::Connected). Since we have data queued
-  // in the write buffer, we should see a doWrite with this data.
-  EXPECT_CALL(*transport_socket_, doRead(_)).WillOnce(InvokeWithoutArgs([this] {
-    transport_socket_callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
-    return IoResult{PostIoAction::KeepOpen, 0, false};
-  }));
-  EXPECT_CALL(*transport_socket_, doWrite(BufferStringEqual(val), false))
-      .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, false}));
-  file_ready_cb_(Event::FileReadyType::Read);
-  EXPECT_CALL(*transport_socket_, doWrite(_, true))
-      .WillOnce(Return(IoResult{PostIoAction::KeepOpen, 0, true}));
-}
-
 // Test the interface used by external consumers.
 TEST_F(MockTransportConnectionImplTest, FlushWriteBufferAndRtt) {
   InSequence s;
@@ -2878,6 +2851,19 @@ TEST_F(PostCloseConnectionImplTest, NoReadAfterCloseFlushWriteWriteData) {
   EXPECT_CALL(*read_filter_, onData(_, _)).Times(0);
   EXPECT_CALL(*transport_socket_, doRead(_)).Times(0);
   file_ready_cb_(Event::FileReadyType::Read);
+}
+
+// Test that close(ConnectionCloseType::Abort) won't write and flush pending data.
+TEST_F(PostCloseConnectionImplTest, CloseAbort) {
+  InSequence s;
+  initialize();
+  writeSomeData();
+
+  // Connection abort. We have data written above in writeSomeData(),
+  // it won't be written and flushed due to Abort.
+  EXPECT_CALL(*transport_socket_, doWrite(_, true)).Times(0);
+  EXPECT_CALL(*transport_socket_, closeSocket(_));
+  connection_->close(ConnectionCloseType::Abort);
 }
 
 class ReadBufferLimitTest : public ConnectionImplTest {

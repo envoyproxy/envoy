@@ -59,7 +59,7 @@ void CodecClient::connect() {
   }
 }
 
-void CodecClient::close() { connection_->close(Network::ConnectionCloseType::NoFlush); }
+void CodecClient::close(Network::ConnectionCloseType type) { connection_->close(type); }
 
 void CodecClient::deleteRequest(ActiveRequest& request) {
   connection_->dispatcher().deferredDelete(request.removeFromList(active_requests_));
