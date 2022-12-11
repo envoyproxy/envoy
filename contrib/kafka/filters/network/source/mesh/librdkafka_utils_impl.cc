@@ -8,6 +8,30 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
 
+// ConsumerAssignmentImpl
+
+class ConsumerAssignmentImpl : public ConsumerAssignment {
+public:
+  ConsumerAssignmentImpl(std::vector<RdKafkaPartitionPtr>&& assignment)
+      : assignment_{std::move(assignment)} {};
+
+  // The assignment in a form that librdkafka likes.
+  RdKafkaPartitionVector raw() const;
+
+private:
+  const std::vector<RdKafkaPartitionPtr> assignment_;
+};
+
+RdKafkaPartitionVector ConsumerAssignmentImpl::raw() const {
+  RdKafkaPartitionVector result;
+  for (const auto& tp : assignment_) {
+    result.push_back(tp.get()); // Raw pointer.
+  }
+  return result;
+}
+
+// LibRdKafkaUtils
+
 RdKafka::Conf::ConfResult LibRdKafkaUtilsImpl::setConfProperty(RdKafka::Conf& conf,
                                                                const std::string& name,
                                                                const std::string& value,
@@ -49,6 +73,25 @@ RdKafka::Headers* LibRdKafkaUtilsImpl::convertHeaders(
 
 void LibRdKafkaUtilsImpl::deleteHeaders(RdKafka::Headers* librdkafka_headers) const {
   delete librdkafka_headers;
+}
+
+ConsumerAssignmentConstPtr LibRdKafkaUtilsImpl::assignConsumerPartitions(
+    RdKafka::KafkaConsumer& consumer, const std::string& topic, const int32_t partitions) const {
+
+  // Construct the topic-partition vector that we are going to store.
+  std::vector<RdKafkaPartitionPtr> assignment;
+  for (int partition = 0; partition < partitions; ++partition) {
+
+    // We consume records from the beginning of each partition.
+    const int64_t initial_offset = 0;
+    assignment.push_back(std::unique_ptr<RdKafka::TopicPartition>(
+        RdKafka::TopicPartition::create(topic, partition, initial_offset)));
+  }
+  auto result = std::make_unique<ConsumerAssignmentImpl>(std::move(assignment));
+
+  // Do the assignment.
+  consumer.assign(result->raw());
+  return result;
 }
 
 const LibRdKafkaUtils& LibRdKafkaUtilsImpl::getDefaultInstance() {
