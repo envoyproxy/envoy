@@ -191,6 +191,8 @@ Decoder::Result DecoderImpl::onData(Buffer::Instance& data, bool frontend) {
     return onDataIgnore(data, frontend);
   case State::InSyncState:
     return onDataInSync(data, frontend);
+  case State::NegotiatingUpstreamSSL:
+    return onDataInNegotiating(data, frontend);
   default:
     PANIC("not implemented");
   }
@@ -240,7 +242,6 @@ Decoder::Result DecoderImpl::onDataInit(Buffer::Instance& data, bool) {
 
   Decoder::Result result = Decoder::Result::ReadyForNext;
   uint32_t code = data.peekBEInt<uint32_t>(4);
-  data.drain(4);
   // Startup message with 1234 in the most significant 16 bits
   // indicate request to encrypt.
   if (code >= 0x04d20000) {
@@ -268,8 +269,24 @@ Decoder::Result DecoderImpl::onDataInit(Buffer::Instance& data, bool) {
     }
   } else {
     ENVOY_LOG(debug, "Detected version {}.{} of Postgres", code >> 16, code & 0x0000FFFF);
-    state_ = State::InSyncState;
+    if (callbacks_->shouldEncryptUpstream()) {
+      // Copy the received initial request.
+      temp_storage_.add(data.linearize(data.length()), data.length());
+      // Send SSL request to upstream.
+      Buffer::OwnedImpl ssl_request;
+      uint32_t len = 8;
+      ssl_request.writeBEInt<uint32_t>(len);
+      uint32_t ssl_code = 0x04d2162f;
+      ssl_request.writeBEInt<uint32_t>(ssl_code);
+
+      callbacks_->sendUpstream(ssl_request);
+      result = Decoder::Result::Stopped;
+      state_ = State::NegotiatingUpstreamSSL;
+    } else {
+      state_ = State::InSyncState;
+    }
   }
+  data.drain(4);
 
   processMessageBody(data, FRONTEND, message_len_ - 4, first_, msgParser);
   data.drain(message_len_);
@@ -410,6 +427,43 @@ void DecoderImpl::decodeBackendStatements() {
     callbacks_->incTransactions();
     callbacks_->incTransactionsCommit();
   }
+}
+
+Decoder::Result DecoderImpl::onDataInNegotiating(Buffer::Instance& data, bool frontend) {
+  if (frontend) {
+    // No data from downstream is allowed when negotiating upstream SSL
+    // with the server.
+    data.drain(data.length());
+    state_ = State::OutOfSyncState;
+    return Decoder::Result::ReadyForNext;
+  }
+
+  // This should be reply from the server indicating if it accepted
+  // request to use SSL. It is only one character long packet, where
+  // 'S' means use SSL, 'E' means do not use.
+
+  // Indicate to the filter, the response and give the initial
+  // packet temporarily buffered to be sent upstream.
+  bool upstreamSSL = false;
+  state_ = State::InitState;
+  if (data.length() == 1) {
+    const char c = data.peekInt<char, ByteOrder::Host, 1>(0);
+    if (c == 'S') {
+      upstreamSSL = true;
+    } else {
+      if (c != 'E') {
+        state_ = State::OutOfSyncState;
+      }
+    }
+  } else {
+    state_ = State::OutOfSyncState;
+  }
+
+  data.drain(data.length());
+
+  callbacks_->encryptUpstream(upstreamSSL, temp_storage_);
+
+  return Decoder::Result::Stopped;
 }
 
 // Method is called when X (Terminate) message

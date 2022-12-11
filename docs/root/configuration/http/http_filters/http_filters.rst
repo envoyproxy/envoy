@@ -18,6 +18,7 @@ HTTP filters
   composite_filter
   cors_filter
   csrf_filter
+  custom_response_filter
   decompressor_filter
   dynamic_forward_proxy_filter
   dynamodb_filter
@@ -43,6 +44,7 @@ HTTP filters
   on_demand_updates_filter
   original_src_filter
   rate_limit_filter
+  rate_limit_quota_filter
   rbac_filter
   router_filter
   set_metadata_filter

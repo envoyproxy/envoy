@@ -387,17 +387,6 @@ struct LocalReplyData {
 };
 
 /**
- * Create a locally generated response using filter callbacks.
- * @param is_reset boolean reference that indicates whether a stream has been reset. It is the
- *        responsibility of the caller to ensure that this is set to false if onDestroy()
- *        is invoked in the context of sendLocalReply().
- * @param callbacks supplies the filter callbacks to use.
- * @param local_reply_data struct which keeps data related to generate reply.
- */
-void sendLocalReply(const bool& is_reset, StreamDecoderFilterCallbacks& callbacks,
-                    const LocalReplyData& local_reply_data);
-
-/**
  * Create a locally generated response using the provided lambdas.
 
  * @param is_reset boolean reference that indicates whether a stream has been reset. It is the
@@ -594,6 +583,13 @@ struct AuthorityAttributes {
  * @return hostname parse result. that includes whether host is IP Address, hostname and port-name
  */
 AuthorityAttributes parseAuthority(absl::string_view host);
+
+/**
+ * It validates RetryPolicy defined in core api. It should be called at the main thread as
+ * it may throw exception.
+ * @param retry_policy core retry policy
+ */
+void validateCoreRetryPolicy(const envoy::config::core::v3::RetryPolicy& retry_policy);
 
 /**
  * It returns RetryPolicy defined in core api to route api.

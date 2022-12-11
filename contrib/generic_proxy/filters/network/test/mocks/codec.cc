@@ -24,6 +24,10 @@ MockCodecFactory::MockCodecFactory() {
       .WillByDefault(Return(ByMove(std::make_unique<NiceMock<MockMessageCreator>>())));
 }
 
+MockProxyFactory::MockProxyFactory() = default;
+
+MockStreamCodecFactoryConfig::MockStreamCodecFactoryConfig() = default;
+
 } // namespace GenericProxy
 } // namespace NetworkFilters
 } // namespace Extensions

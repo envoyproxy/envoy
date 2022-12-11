@@ -50,7 +50,6 @@ void recordLatestDataFilter(const typename FilterList<T>::iterator current_filte
 } // namespace
 
 void ActiveStreamFilterBase::commonContinue() {
-  // TODO(mattklein123): Raise an error if this is called during a callback.
   if (!canContinue()) {
     ENVOY_STREAM_LOG(trace, "cannot continue filter chain: filter={}", *this,
                      static_cast<const void*>(this));
@@ -113,19 +112,21 @@ void ActiveStreamFilterBase::commonContinue() {
   iterate_from_current_filter_ = false;
 }
 
-bool ActiveStreamFilterBase::commonHandleAfter1xxHeadersCallback(FilterHeadersStatus status) {
+bool ActiveStreamFilterBase::commonHandleAfter1xxHeadersCallback(Filter1xxHeadersStatus status) {
   ASSERT(parent_.state_.has_1xx_headers_);
   ASSERT(!continued_1xx_headers_);
   ASSERT(canIterate());
 
-  if (status == FilterHeadersStatus::StopIteration) {
-    iteration_state_ = IterationState::StopSingleIteration;
-    return false;
-  } else {
-    ASSERT(status == FilterHeadersStatus::Continue);
+  switch (status) {
+  case Filter1xxHeadersStatus::Continue:
     continued_1xx_headers_ = true;
     return true;
+  case Filter1xxHeadersStatus::StopIteration:
+    iteration_state_ = IterationState::StopSingleIteration;
+    return false;
   }
+
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 bool ActiveStreamFilterBase::commonHandleAfterHeadersCallback(FilterHeadersStatus status,
@@ -536,7 +537,7 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
     ENVOY_STREAM_LOG(trace, "decode headers called: filter={} status={}", *this,
                      (*entry)->filter_context_.config_name, static_cast<uint64_t>(status));
 
-    (*entry)->decode_headers_called_ = true;
+    (*entry)->processed_headers_ = true;
 
     const auto continue_iteration = (*entry)->commonHandleAfterHeadersCallback(status, end_stream);
     ENVOY_BUG(!continue_iteration || !state_.local_complete_,
@@ -782,7 +783,7 @@ void FilterManager::decodeMetadata(ActiveStreamDecoderFilter* filter, MetadataMa
     // If the filter pointed by entry hasn't returned from decodeHeaders, stores newly added
     // metadata in case decodeHeaders returns StopAllIteration. The latter can happen when headers
     // callbacks generate new metadata.
-    if (!(*entry)->decode_headers_called_ || (*entry)->stoppedAll()) {
+    if (!(*entry)->processed_headers_ || (*entry)->stoppedAll()) {
       Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
       (*entry)->getSavedRequestMetadata()->emplace_back(std::move(metadata_map_ptr));
       return;
@@ -854,12 +855,9 @@ void DownstreamFilterManager::sendLocalReply(
 
   // Stop filter chain iteration if local reply was sent while filter decoding or encoding callbacks
   // are running.
-  if (state_.filter_call_state_ & (FilterCallState::DecodeHeaders | FilterCallState::DecodeData |
-                                   FilterCallState::DecodeTrailers)) {
+  if (state_.filter_call_state_ & FilterCallState::IsDecodingMask) {
     state_.decoder_filter_chain_aborted_ = true;
-  } else if (state_.filter_call_state_ &
-             (FilterCallState::EncodeHeaders | FilterCallState::EncodeData |
-              FilterCallState::EncodeTrailers)) {
+  } else if (state_.filter_call_state_ & FilterCallState::IsEncodingMask) {
     state_.encoder_filter_chain_aborted_ = true;
   }
 
@@ -873,7 +871,8 @@ void DownstreamFilterManager::sendLocalReply(
     return;
   }
 
-  if (!filter_manager_callbacks_.responseHeaders().has_value()) {
+  if (!filter_manager_callbacks_.responseHeaders().has_value() &&
+      !filter_manager_callbacks_.informationalHeaders().has_value()) {
     // If the response has not started at all, send the response through the filter chain.
     sendLocalReplyViaFilterChain(is_grpc_request, code, body, modify_headers, is_head_request,
                                  grpc_status, details);
@@ -922,20 +921,14 @@ void DownstreamFilterManager::sendLocalReplyViaFilterChain(
           },
           [this](ResponseHeaderMap& response_headers, Code& code, std::string& body,
                  absl::string_view& content_type) -> void {
-            // TODO(snowp): This &get() business isn't nice, rework LocalReply and others to accept
-            // opt refs.
             local_reply_.rewrite(filter_manager_callbacks_.requestHeaders().ptr(), response_headers,
                                  streamInfo(), code, body, content_type);
           },
           [this, modify_headers](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
             filter_manager_callbacks_.setResponseHeaders(std::move(headers));
-            // TODO: Start encoding from the last decoder filter that saw the
-            // request instead.
             encodeHeaders(nullptr, filter_manager_callbacks_.responseHeaders().ref(), end_stream);
           },
           [this](Buffer::Instance& data, bool end_stream) -> void {
-            // TODO: Start encoding from the last decoder filter that saw the
-            // request instead.
             encodeData(nullptr, data, end_stream,
                        FilterManager::FilterIterationStartState::CanStartFromCurrent);
           }},
@@ -1006,10 +999,18 @@ void FilterManager::encode1xxHeaders(ActiveStreamEncoderFilter* filter,
   for (; entry != encoder_filters_.end(); entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::Encode1xxHeaders));
     state_.filter_call_state_ |= FilterCallState::Encode1xxHeaders;
-    FilterHeadersStatus status = (*entry)->handle_->encode1xxHeaders(headers);
+    const Filter1xxHeadersStatus status = (*entry)->handle_->encode1xxHeaders(headers);
     state_.filter_call_state_ &= ~FilterCallState::Encode1xxHeaders;
+
     ENVOY_STREAM_LOG(trace, "encode 1xx continue headers called: filter={} status={}", *this,
                      (*entry)->filter_context_.config_name, static_cast<uint64_t>(status));
+    if (state_.encoder_filter_chain_aborted_) {
+      ENVOY_STREAM_LOG(trace,
+                       "encode1xxHeaders filter iteration aborted due to local reply: filter={}",
+                       *this, (*entry)->filter_context_.config_name);
+      return;
+    }
+
     if (!(*entry)->commonHandleAfter1xxHeadersCallback(status)) {
       return;
     }
@@ -1064,7 +1065,7 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
     ENVOY_STREAM_LOG(trace, "encode headers called: filter={} status={}", *this,
                      (*entry)->filter_context_.config_name, static_cast<uint64_t>(status));
 
-    (*entry)->encode_headers_called_ = true;
+    (*entry)->processed_headers_ = true;
 
     const auto continue_iteration = (*entry)->commonHandleAfterHeadersCallback(status, end_stream);
 
@@ -1127,7 +1128,7 @@ void FilterManager::encodeMetadata(ActiveStreamEncoderFilter* filter,
     // If the filter pointed by entry hasn't returned from encodeHeaders, stores newly added
     // metadata in case encodeHeaders returns StopAllIteration. The latter can happen when headers
     // callbacks generate new metadata.
-    if (!(*entry)->encode_headers_called_ || (*entry)->stoppedAll()) {
+    if (!(*entry)->processed_headers_ || (*entry)->stoppedAll()) {
       (*entry)->getSavedResponseMetadata()->emplace_back(std::move(metadata_map_ptr));
       return;
     }

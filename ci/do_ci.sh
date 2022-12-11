@@ -210,7 +210,7 @@ else
   elif [[ "${CI_TARGET}" == "bazel.msan" ]]; then
     COVERAGE_TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "-//test/extensions/...")
   fi
-  TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "@com_github_google_quiche//:ci_tests" "//mobile/test/...")
+  TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "@com_github_google_quiche//:ci_tests")
 fi
 
 if [[ "$CI_TARGET" == "bazel.release" ]]; then
@@ -398,8 +398,8 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   echo "Building and testing with wasm=wamr: ${TEST_TARGETS[*]}"
   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wamr "${COMPILE_TIME_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
 
-  echo "Building and testing with wasm=wasmtime: ${TEST_TARGETS[*]}"
-  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wasmtime "${COMPILE_TIME_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
+  echo "Building and testing with wasm=wasmtime: and admin_functionality and admin_html disabled ${TEST_TARGETS[*]}"
+  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wasmtime --define admin_html=disabled --define admin_functionality=disabled "${COMPILE_TIME_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
 
   echo "Building and testing with wasm=wavm: ${TEST_TARGETS[*]}"
   bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm "${COMPILE_TIME_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
@@ -411,8 +411,8 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   # "--define log_fast_debug_assert_in_release=enabled" must be tested with a release build, so run only these tests under "-c opt" to save time in CI. This option will test only ASSERT()s without SLOW_ASSERT()s, so additionally disable "--define log_debug_assert_in_release" which compiles in both.
     bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm "${COMPILE_TIME_OPTIONS[@]}" -c opt @envoy//test/common/common:assert_test --define log_fast_debug_assert_in_release=enabled --define log_debug_assert_in_release=disabled
 
-  echo "Building binary with wasm=wavm..."
-  bazel build "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm "${COMPILE_TIME_OPTIONS[@]}" -c dbg @envoy//source/exe:envoy-static --build_tag_filters=-nofips
+  echo "Building binary with wasm=wavm... and logging disabled"
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm --define enable_logging=disabled "${COMPILE_TIME_OPTIONS[@]}" -c dbg @envoy//source/exe:envoy-static --build_tag_filters=-nofips
   collect_build_profile build
   exit 0
 elif [[ "$CI_TARGET" == "bazel.api" ]]; then

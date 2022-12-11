@@ -107,7 +107,7 @@ public:
 
 protected:
   ThreadAwareLoadBalancerBase(
-      const PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
+      const PrioritySet& priority_set, ClusterLbStats& stats, Runtime::Loader& runtime,
       Random::RandomGenerator& random,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
       : LoadBalancerBase(priority_set, stats, runtime, random, common_config),
@@ -121,7 +121,7 @@ private:
   using PerPriorityStatePtr = std::unique_ptr<PerPriorityState>;
 
   struct LoadBalancerImpl : public LoadBalancer {
-    LoadBalancerImpl(ClusterStats& stats, Random::RandomGenerator& random)
+    LoadBalancerImpl(ClusterLbStats& stats, Random::RandomGenerator& random)
         : stats_(stats), random_(random) {}
 
     // Upstream::LoadBalancer
@@ -138,7 +138,7 @@ private:
       return {};
     }
 
-    ClusterStats& stats_;
+    ClusterLbStats& stats_;
     Random::RandomGenerator& random_;
     std::shared_ptr<std::vector<PerPriorityStatePtr>> per_priority_state_;
     std::shared_ptr<HealthyLoad> healthy_per_priority_load_;
@@ -146,7 +146,7 @@ private:
   };
 
   struct LoadBalancerFactoryImpl : public LoadBalancerFactory {
-    LoadBalancerFactoryImpl(ClusterStats& stats, Random::RandomGenerator& random)
+    LoadBalancerFactoryImpl(ClusterLbStats& stats, Random::RandomGenerator& random)
         : stats_(stats), random_(random) {}
 
     // Upstream::LoadBalancerFactory
@@ -154,7 +154,7 @@ private:
     // Ignore the params for the thread-aware LB.
     LoadBalancerPtr create(LoadBalancerParams) override { return create(); }
 
-    ClusterStats& stats_;
+    ClusterLbStats& stats_;
     Random::RandomGenerator& random_;
     absl::Mutex mutex_;
     std::shared_ptr<std::vector<PerPriorityStatePtr>> per_priority_state_ ABSL_GUARDED_BY(mutex_);

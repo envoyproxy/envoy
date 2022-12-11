@@ -121,6 +121,7 @@ TEST_P(IntegrationTest, BadPostListenSocketOption) {
 
 // Make sure we have correctly specified per-worker performance stats.
 TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
+  DISABLE_IF_ADMIN_DISABLED; // Uses admin stats
   concurrency_ = 2;
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
@@ -177,6 +178,7 @@ public:
 
 // Test extend balance.
 TEST_P(IntegrationTest, ConnectionBalanceFactory) {
+  DISABLE_IF_ADMIN_DISABLED; // Uses admin stats
   concurrency_ = 2;
 
   TestConnectionBalanceFactory factory;
@@ -2113,6 +2115,7 @@ TEST_P(IntegrationTest, Response204WithBody) {
 }
 
 TEST_P(IntegrationTest, QuitQuitQuit) {
+  DISABLE_IF_ADMIN_DISABLED; // Uses admin interface.
   initialize();
   test_server_->useAdminInterfaceToQuit(true);
 }
@@ -2463,6 +2466,148 @@ TEST_P(IntegrationTest, SetRouteToDelegatingRouteWithClusterOverride) {
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_override.upstream_cx_total")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_override.upstream_rq_200")->value());
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("cluster_override"));
+}
+
+ConfigHelper::HttpModifierFunction setAppendXForwardedPort(bool append_x_forwarded_port,
+                                                           bool use_remote_address = false,
+                                                           uint32_t xff_num_trusted_hops = 0) {
+  return
+      [append_x_forwarded_port, use_remote_address, xff_num_trusted_hops](
+          envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) {
+        hcm.mutable_use_remote_address()->set_value(use_remote_address);
+        hcm.set_xff_num_trusted_hops(xff_num_trusted_hops);
+        hcm.set_append_x_forwarded_port(append_x_forwarded_port);
+      };
+}
+
+// Verify when append_x_forwarded_port is turned on, the x-forwarded-port header should be appended.
+TEST_P(IntegrationTest, AppendXForwardedPort) {
+  config_helper_.addConfigModifier(setAppendXForwardedPort(true));
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":authority", "host"},
+                                     {"connection", "close"}});
+  waitForNextUpstreamRequest();
+  EXPECT_THAT(upstream_request_->headers(), Not(HeaderValueOf(Headers::get().ForwardedPort, "")));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), HttpStatusIs("200"));
+}
+
+// Verify when append_x_forwarded_port is not turned on, the x-forwarded-port header should not be
+// appended.
+TEST_P(IntegrationTest, DoNotAppendXForwardedPort) {
+  config_helper_.addConfigModifier(setAppendXForwardedPort(false));
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":authority", "host"},
+                                     {"connection", "close"}});
+  waitForNextUpstreamRequest();
+  EXPECT_THAT(upstream_request_->headers().ForwardedPort(), nullptr);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), HttpStatusIs("200"));
+}
+
+// Verify when the x-forwarded-port header has been set, the x-forwarded-port header should not be
+// appended.
+TEST_P(IntegrationTest, IgnoreAppendingXForwardedPortIfHasBeenSet) {
+  config_helper_.addConfigModifier(setAppendXForwardedPort(true));
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":authority", "host"},
+                                     {"connection", "close"},
+                                     {"x-forwarded-port", "8080"}});
+  waitForNextUpstreamRequest();
+  EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Headers::get().ForwardedPort, "8080"));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), HttpStatusIs("200"));
+}
+
+// Verify when append_x_forwarded_port is turned on, the x-forwarded-port header from trusted hop
+// will be preserved.
+TEST_P(IntegrationTest, PreserveXForwardedPortFromTrustedHop) {
+  config_helper_.addConfigModifier(setAppendXForwardedPort(true, true, 1));
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":authority", "host"},
+                                     {"connection", "close"},
+                                     {"x-forwarded-port", "80"}});
+  waitForNextUpstreamRequest();
+  EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Headers::get().ForwardedPort, "80"));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), HttpStatusIs("200"));
+}
+
+// Verify when append_x_forwarded_port is turned on, the x-forwarded-port header from untrusted hop
+// will be overwritten.
+TEST_P(IntegrationTest, OverwriteXForwardedPortFromUntrustedHop) {
+  config_helper_.addConfigModifier(setAppendXForwardedPort(true, true, 0));
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":authority", "host"},
+                                     {"connection", "close"},
+                                     {"x-forwarded-port", "80"}});
+  waitForNextUpstreamRequest();
+  EXPECT_THAT(upstream_request_->headers(), Not(HeaderValueOf(Headers::get().ForwardedPort, "80")));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), HttpStatusIs("200"));
+}
+
+// Verify when append_x_forwarded_port is not turned on, the x-forwarded-port header from untrusted
+// hop will not be overwritten.
+TEST_P(IntegrationTest, DoNotOverwriteXForwardedPortFromUntrustedHop) {
+  config_helper_.addConfigModifier(setAppendXForwardedPort(false, true, 0));
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":authority", "host"},
+                                     {"connection", "close"},
+                                     {"x-forwarded-port", "80"}});
+  waitForNextUpstreamRequest();
+  EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Headers::get().ForwardedPort, "80"));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), HttpStatusIs("200"));
 }
 
 } // namespace Envoy

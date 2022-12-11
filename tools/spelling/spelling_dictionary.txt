@@ -649,6 +649,7 @@ deserialize
 deserialized
 deserializer
 deserializers
+deserializes
 deserializing
 dest
 destructor

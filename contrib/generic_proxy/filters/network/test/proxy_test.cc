@@ -36,115 +36,6 @@ public:
   std::shared_ptr<NiceMock<MockRouteMatcher>> route_config_{new NiceMock<MockRouteMatcher>()};
 };
 
-/**
- * Test creating codec factory from typed extension config.
- */
-TEST(BasicFilterConfigTest, CreatingCodecFactory) {
-
-  {
-    const std::string yaml_config = R"EOF(
-      name: envoy.generic_proxy.codecs.fake
-      typed_config:
-        "@type": type.googleapis.com/xds.type.v3.TypedStruct
-        type_url: envoy.generic_proxy.codecs.fake.type
-        value: {}
-      )EOF";
-    NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-
-    envoy::config::core::v3::TypedExtensionConfig proto_config;
-    TestUtility::loadFromYaml(yaml_config, proto_config);
-
-    EXPECT_THROW(FilterConfig::codecFactoryFromProto(proto_config, factory_context),
-                 EnvoyException);
-  }
-
-  {
-    FakeStreamCodecFactoryConfig codec_factory_config;
-    Registry::InjectFactory<CodecFactoryConfig> registration(codec_factory_config);
-
-    const std::string yaml_config = R"EOF(
-      name: envoy.generic_proxy.codecs.fake
-      typed_config:
-        "@type": type.googleapis.com/xds.type.v3.TypedStruct
-        type_url: envoy.generic_proxy.codecs.fake.type
-        value: {}
-      )EOF";
-    NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-
-    envoy::config::core::v3::TypedExtensionConfig proto_config;
-    TestUtility::loadFromYaml(yaml_config, proto_config);
-
-    EXPECT_NE(nullptr, FilterConfig::codecFactoryFromProto(proto_config, factory_context));
-  }
-}
-
-/**
- * Test creating L7 filter factories from proto config.
- */
-TEST(BasicFilterConfigTest, CreatingFilterFactories) {
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-
-  ProtobufWkt::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig> filters_proto_config;
-
-  const std::string yaml_config_0 = R"EOF(
-    name: mock_generic_proxy_filter_name_0
-    typed_config:
-      "@type": type.googleapis.com/xds.type.v3.TypedStruct
-      type_url: mock_generic_proxy_filter_name_0
-      value: {}
-  )EOF";
-
-  const std::string yaml_config_1 = R"EOF(
-    name: mock_generic_proxy_filter_name_1
-    typed_config:
-      "@type": type.googleapis.com/xds.type.v3.TypedStruct
-      type_url: mock_generic_proxy_filter_name_1
-      value: {}
-  )EOF";
-
-  TestUtility::loadFromYaml(yaml_config_0, *filters_proto_config.Add());
-  TestUtility::loadFromYaml(yaml_config_1, *filters_proto_config.Add());
-
-  NiceMock<MockStreamFilterConfig> mock_filter_config_0;
-  NiceMock<MockStreamFilterConfig> mock_filter_config_1;
-
-  ON_CALL(mock_filter_config_0, name()).WillByDefault(Return("mock_generic_proxy_filter_name_0"));
-  ON_CALL(mock_filter_config_1, name()).WillByDefault(Return("mock_generic_proxy_filter_name_1"));
-  ON_CALL(mock_filter_config_0, configTypes())
-      .WillByDefault(Return(std::set<std::string>{"mock_generic_proxy_filter_name_0"}));
-  ON_CALL(mock_filter_config_1, configTypes())
-      .WillByDefault(Return(std::set<std::string>{"mock_generic_proxy_filter_name_1"}));
-
-  Registry::InjectFactory<NamedFilterConfigFactory> registration_0(mock_filter_config_0);
-  Registry::InjectFactory<NamedFilterConfigFactory> registration_1(mock_filter_config_1);
-
-  // No terminal filter.
-  {
-    EXPECT_THROW_WITH_MESSAGE(
-        FilterConfig::filtersFactoryFromProto(filters_proto_config, "test", factory_context),
-        EnvoyException, "A terminal L7 filter is necessary for generic proxy");
-  }
-
-  // Error terminal filter position.
-  {
-    ON_CALL(mock_filter_config_0, isTerminalFilter()).WillByDefault(Return(true));
-
-    EXPECT_THROW_WITH_MESSAGE(
-        FilterConfig::filtersFactoryFromProto(filters_proto_config, "test", factory_context),
-        EnvoyException,
-        "Terminal filter: mock_generic_proxy_filter_name_0 must be the last generic L7 "
-        "filter");
-  }
-
-  {
-    ON_CALL(mock_filter_config_0, isTerminalFilter()).WillByDefault(Return(false));
-    ON_CALL(mock_filter_config_1, isTerminalFilter()).WillByDefault(Return(true));
-    auto factories =
-        FilterConfig::filtersFactoryFromProto(filters_proto_config, "test", factory_context);
-    EXPECT_EQ(2, factories.size());
-  }
-}
-
 class FilterConfigTest : public testing::Test {
 public:
   void initializeFilterConfig() {
@@ -172,8 +63,9 @@ public:
 
     mock_route_entry_ = std::make_shared<NiceMock<MockRouteEntry>>();
 
-    filter_config_ = std::make_shared<FilterConfig>("test_prefix", std::move(codec_factory),
-                                                    route_config_provider_, factories);
+    filter_config_ =
+        std::make_shared<FilterConfigImpl>("test_prefix", std::move(codec_factory),
+                                           route_config_provider_, factories, factory_context_);
   }
 
   std::shared_ptr<FilterConfig> filter_config_;
@@ -261,7 +153,7 @@ public:
         .WillOnce(
             Invoke([this](RequestDecoderCallback& callback) { decoder_callback_ = &callback; }));
 
-    filter_ = std::make_shared<Filter>(filter_config_, factory_context_);
+    filter_ = std::make_shared<Filter>(filter_config_);
 
     EXPECT_EQ(filter_.get(), decoder_callback_);
 
@@ -375,11 +267,6 @@ TEST_F(FilterTest, GetConnection) {
   initializeFilter();
 
   EXPECT_EQ(&(filter_callbacks_.connection_), &filter_->connection());
-}
-
-TEST_F(FilterTest, GetFactoryContext) {
-  initializeFilter();
-  EXPECT_EQ(&factory_context_, &filter_->factoryContext());
 }
 
 TEST_F(FilterTest, NewStreamAndResetStream) {
@@ -735,6 +622,65 @@ TEST_F(FilterTest, ActiveStreamCompleteDirectlyFromFilter) {
   active_stream->decoderFiltersForTest()[0]->completeDirectly();
 
   EXPECT_EQ(0, filter_->activeStreamsForTest().size());
+}
+
+TEST_F(FilterTest, NewStreamAndReplyNormally) {
+  auto mock_decoder_filter_0 = std::make_shared<NiceMock<MockDecoderFilter>>();
+  mock_decoder_filters_ = {{"mock_0", mock_decoder_filter_0}};
+
+  initializeFilter();
+
+  auto request = std::make_unique<FakeStreamCodecFactory::FakeRequest>();
+
+  filter_->newDownstreamRequest(std::move(request));
+  EXPECT_EQ(1, filter_->activeStreamsForTest().size());
+
+  auto active_stream = filter_->activeStreamsForTest().begin()->get();
+
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferStringEqual("test"), true));
+
+  EXPECT_CALL(*encoder_, encode(_, _))
+      .WillOnce(Invoke([&](const Response&, ResponseEncoderCallback& callback) {
+        Buffer::OwnedImpl buffer;
+        buffer.add("test");
+        callback.onEncodingSuccess(buffer, true);
+      }));
+
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose()).WillOnce(Return(false));
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
+
+  auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
+  active_stream->upstreamResponse(std::move(response));
+}
+
+TEST_F(FilterTest, NewStreamAndReplyNormallyWithDrainClose) {
+  auto mock_decoder_filter_0 = std::make_shared<NiceMock<MockDecoderFilter>>();
+  mock_decoder_filters_ = {{"mock_0", mock_decoder_filter_0}};
+
+  initializeFilter();
+
+  auto request = std::make_unique<FakeStreamCodecFactory::FakeRequest>();
+
+  filter_->newDownstreamRequest(std::move(request));
+  EXPECT_EQ(1, filter_->activeStreamsForTest().size());
+
+  auto active_stream = filter_->activeStreamsForTest().begin()->get();
+
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferStringEqual("test"), true));
+
+  EXPECT_CALL(*encoder_, encode(_, _))
+      .WillOnce(Invoke([&](const Response&, ResponseEncoderCallback& callback) {
+        Buffer::OwnedImpl buffer;
+        buffer.add("test");
+        callback.onEncodingSuccess(buffer, true);
+      }));
+
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose()).WillOnce(Return(true));
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+
+  auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
+  active_stream->upstreamResponse(std::move(response));
 }
 
 } // namespace

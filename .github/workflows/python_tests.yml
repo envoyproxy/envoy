@@ -1,0 +1,33 @@
+name: python_tests
+
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+
+jobs:
+  pythontests:
+    name: python_tests
+    runs-on: ubuntu-20.04
+    timeout-minutes: 90
+    container:
+      image: envoyproxy/envoy-build-ubuntu:b0ff77ae3f25b0bf595f9b8bba46b489723ab446
+    steps:
+    - uses: actions/checkout@v1
+    - name: Add safe directory
+      run: git config --global --add safe.directory /__w/envoy/envoy
+    - id: should_run
+      name: 'Check whether to run'
+      run: ./mobile/tools/should_run_ci.sh
+    - name: 'Run tests'
+      if: steps.should_run.outputs.run_ci_job == 'true'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        cd mobile && ./bazelw test \
+            --action_env=LD_LIBRARY_PATH \
+            --test_output=all \
+            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux") \
+            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
+            //test/python/...

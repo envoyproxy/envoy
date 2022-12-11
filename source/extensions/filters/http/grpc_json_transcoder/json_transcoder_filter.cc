@@ -455,7 +455,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
                      status.message());
 
     if (status.code() == StatusCode::kNotFound &&
-        !config_.request_validation_options_.reject_unknown_method()) {
+        !per_route_config_->request_validation_options_.reject_unknown_method()) {
       ENVOY_STREAM_LOG(debug,
                        "Request is passed through without transcoding because it cannot be mapped "
                        "to a gRPC method.",
@@ -464,7 +464,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
     }
 
     if (status.code() == StatusCode::kInvalidArgument &&
-        !config_.request_validation_options_.reject_unknown_query_parameters()) {
+        !per_route_config_->request_validation_options_.reject_unknown_query_parameters()) {
       ENVOY_STREAM_LOG(debug,
                        "Request is passed through without transcoding because it contains unknown "
                        "query parameters.",

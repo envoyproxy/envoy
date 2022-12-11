@@ -76,6 +76,7 @@ categories:
 - envoy.internal_redirect_predicates
 - envoy.io_socket
 - envoy.http.original_ip_detection
+- envoy.listener_manager_impl
 - envoy.matching.common_inputs
 - envoy.matching.input_matchers
 - envoy.tls.key_providers
@@ -106,6 +107,7 @@ categories:
 - envoy.rbac.matchers
 - envoy.access_loggers.extension_filters
 - envoy.http.stateful_session
+- envoy.matching.action
 - envoy.matching.http.input
 - envoy.matching.http.custom_matchers
 - envoy.matching.network.input
@@ -116,6 +118,7 @@ categories:
 - envoy.tls_handshakers
 - envoy.generic_proxy.filters
 - envoy.generic_proxy.codecs
+- envoy.http.custom_response
 
 status_values:
 - name: stable
