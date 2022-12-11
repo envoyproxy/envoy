@@ -114,50 +114,21 @@ Certificate selection
 ---------------------
 
 :ref:`DownstreamTlsContexts <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.DownstreamTlsContext>` support multiple TLS
-certificates. These may be a mix of RSA and P-256 ECDSA certificates for multiple server name patterns.
+certificates. These may be a mix of RSA and P-256 ECDSA certificates. The following rules apply:
 
-Certificate config/loading rules:
-
-* DNS SANs or Subject Common Name is extracted as server name pattern to match SNI during handshake. Subject Common Name is not used if DNS SANs are present in the certificate.
-* FQDN like "test.example.com" and wildcard like "\*.example.com" are valid at the same time, which will be loaded
-  as two different server name patterns.
-* Only one certificate of a particular type (RSA or ECDSA) may be specified for each server name pattern.
+* Only one certificate of a particular type (RSA or ECDSA) may be specified.
 * Non-P-256 server ECDSA certificates are rejected.
+* If the client supports P-256 ECDSA, a P-256 ECDSA certificate will be selected if one is present in the
+  :ref:`DownstreamTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.DownstreamTlsContext>`
+  and it is in compliance with the OCSP policy.
+* If the client only supports RSA certificates, a RSA certificate will be selected if present in the
+  :ref:`DownstreamTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.DownstreamTlsContext>`.
+* Otherwise, the first certificate listed is used. This will result in a failed handshake if the
+  client only supports RSA certificates and the server only has ECDSA certificates.
 * Static and SDS certificates may not be mixed in a given :ref:`DownstreamTlsContext
   <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.DownstreamTlsContext>`.
-
-Certificate selection rules:
-
-* If the client supports SNI, e.g. SNI is "test.example.com", it looks for a cert that exactly matches to the SNI.
-  If the certificate adheres to the OCSP policy and matches to key type, it is selected for handshake.
-  If the certificate adheres to the OCSP policy, but key type is RSA while client is ECDSA capable, it is marked as
-  as the candidate and continues searching until a cert is selected with perfect match or certs exhausted.
-  Candidate will be selected for handshake if there is no perfect match.
-* If the client supports SNI, but no cert is selected from certs that exactly matches to SNI, it matches on wildcard server name.
-  e.g. if SNI is "test.example.com", a certificate with "test.example.com" will be preferred over "\*.example.com". And wildcard
-  matching only works for 1 level of depth, so "\*.com" will not be a match for "test.example.com".
-  Afterwards, it execuates OCSP and key type checking on each cert which is the same as what happens after exact SNI matching.
-* If no cert is selected from certs that matches wildcard name, the candidate cert is selected for handshake if it is present.
-  If there is no candidate, check :ref:`full_scan_certs_on_sni_mismatch <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.full_scan_certs_on_sni_mismatch>`,
-  go to full scan all certificates if it is enabled, otherwise pick the first certificate for handshake.
-* If the client does not provide SNI at all, go to full scan no matter :ref:`full_scan_certs_on_sni_mismatch <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.full_scan_certs_on_sni_mismatch>`
-  is false or true.
-* Full scan execuates OCSP and key type checking on each cert which is the same as described above in exact SNI matching.
-  It falls back to the first cert in the whole list if there is no cert selected.
-* Currently only two kinds of key type are supported, RSA or ECDSA. If the client supports P-256 ECDSA, the P-256 ECDSA certificate
-  is preferred over RSA. The certificate that it falls back to might result in a failed handshake. For instance, a client only supports
-  RSA certificates and the certificate only support ECDSA.
-* The final selected certificate must adhere to the OCSP policy. If no such certificate is found, the connection is refused.
-
-.. note::
-  With the support of SNI-based certificate selection, it allows configuring large number of certificates for multiple hostnames.
-  :ref:`full_scan_certs_on_sni_mismatch <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.full_scan_certs_on_sni_mismatch>`
-  is introduced to determine if we continue full scan on SNI mismatch when the client provides SNI. SNI mismatch contains two cases in this context, one is there is no cert that matches to SNI,
-  another one is there are certs matches to SNI while OCSP policy fails on those certs. The :ref:`full_scan_certs_on_sni_mismatch <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.full_scan_certs_on_sni_mismatch>`
-  defaults to false, so full scan is disabled by default. The runtime flag ``envoy.reloadable_features.no_full_scan_certs_on_sni_mismatch``
-  can be used to override the default value of :ref:`full_scan_certs_on_sni_mismatch <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.full_scan_certs_on_sni_mismatch>`.
-  If full scan is enabled, it will look for the cert from the whole cert list on SNI mismatch, this could be a problem for a potential DoS attack because of O(n) complexity.
-
+* The selected certificate must adhere to the OCSP policy. If no
+  such certificate is found, the connection is refused.
 
 Only a single TLS certificate is supported today for :ref:`UpstreamTlsContexts
 <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.UpstreamTlsContext>`.

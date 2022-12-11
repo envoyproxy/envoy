@@ -35,14 +35,17 @@ stages:
   #
   # To use a variable as a condition for a `stage` you can specify it as follows:
   #
-  # condition: ne(dependencies.env.outputs['repo.changed.mobileOnly'], 'true')
+  # condition: and(not(canceled()), succeeded(), ne(dependencies.env.outputs['repo.changed.mobileOnly'], 'true'))
   #
   # To use a variable as a condition for a `job` you can specify it as follows:
   #
   # job:
-  #   condition: ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true')
+  #   condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'))
   #
   # Note the difference in name resolution when used in stages and jobs.
+  #
+  # Note also, other conditions such as `not(canceled())` are not assumed and so need to be added to
+  # any conditions explicitly.
   #
   # NB: Avoid using _inclusive_ lists to trigger CI - eg _dont_ only trigger mobile CI if `mobile/` changed.
   #  Instead use _exclusive_ bools - eg _do_ suppress other CI if only `mobile/` changed
@@ -64,15 +67,20 @@ stages:
       vmImage: "ubuntu-20.04"
     steps:
     - bash: |
-        if [[ $(Build.Reason) == "PullRequest" ]]; then
-            CHANGE_TARGET="origin/$(System.PullRequest.TargetBranch)"
-        else
-            # This may not work so well on release branches where multiple commits are rebased to the branch
-            CHANGE_TARGET=$(git log --format="%H" -2 | tail -n1)
+        set -e
+
+        # Only exclude checks in pull requests.
+        if [[ $(Build.Reason) != "PullRequest" ]]; then
+            echo "##vso[task.setvariable variable=mobileOnly;isoutput=true]false"
+            echo "##vso[task.setvariable variable=docsOnly;isoutput=true]false"
+            exit 0
         fi
 
+        CHANGE_TARGET="origin/$(System.PullRequest.TargetBranch)"
+
         echo "Comparing changes ${CHANGE_TARGET}...HEAD"
-        CHANGED_PATHS="$(git diff --name-only ${CHANGE_TARGET}...HEAD | cut -d/ -f1 | sort -u | jq -R 'split("\n")')"
+        CHANGED_PATHS="$(git diff --name-only ${CHANGE_TARGET}...HEAD | cut -d/ -f1 | sort -u | jq -sR 'rtrimstr("\n") | split("\n")')"
+        echo "$CHANGED_PATHS" | jq '.'
         CHANGED_PATH_COUNT=$(echo $CHANGED_PATHS | jq '. | length')
         CHANGED_MOBILE_ONLY=false
         CHANGED_DOCS_ONLY=false
@@ -91,6 +99,10 @@ stages:
       displayName: "Detect repo changes"
       workingDirectory: $(Build.SourcesDirectory)
       name: changed
+    - bash: |
+        echo "env.outputs['changed.mobileOnly']: $(changed.mobileOnly)"
+        echo "env.outputs['changed.docsOnly']: $(changed.docsOnly)"
+      displayName: "Print build environment"
 
 - stage: precheck
   dependsOn: ["env"]
@@ -305,10 +317,11 @@ stages:
         bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
 
 - stage: distribution
-  dependsOn: ["linux_arm64", "linux_x64"]
+  dependsOn: ["env", "linux_arm64", "linux_x64"]
   jobs:
   - job: package_x64
     dependsOn: []
+    condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'))
     timeoutInMinutes: 120
     pool:
       vmImage: "ubuntu-20.04"
@@ -318,6 +331,7 @@ stages:
         ciTarget: bazel.distribution
   - job: package_arm64
     dependsOn: []
+    condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'))
     timeoutInMinutes: 120
     pool: "arm-large"
     steps:
@@ -330,6 +344,7 @@ stages:
         bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
   - job: verify_x64
     dependsOn: ["package_x64"]
+    condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'))
     timeoutInMinutes: 120
     pool:
       vmImage: "ubuntu-20.04"
@@ -352,6 +367,7 @@ stages:
       displayName: "Verify packages"
   - job: verify_arm64
     dependsOn: ["package_arm64"]
+    condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'))
     timeoutInMinutes: 120
     pool: "arm-large"
     steps:
@@ -372,13 +388,30 @@ stages:
         GCP_SERVICE_ACCOUNT_KEY: $(GcpServiceAccountKey)
       displayName: "Verify packages"
 
+  - job: verified
+    dependsOn: ["verify_x64", "verify_arm64"]
+    pool:
+      vmImage: "ubuntu-20.04"
+    # This condition ensures that this (required) check passes if all of
+    # the preceding checks either pass or are skipped
+    # adapted from:
+    #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
+    condition: |
+      and(
+        in(dependencies.verify_x64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
+        in(dependencies.verify_arm64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
+    steps:
+    - bash: |
+        echo "checks complete"
+
 - stage: check
   dependsOn: ["env", "linux_x64"]
-  condition: or(eq(variables['PostSubmit'], true), and(ne(dependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(dependencies.env.repo.outputs['changed.docsOnly'], 'true')))
   jobs:
   - job: bazel
     displayName: "linux_x64"
     dependsOn: []
+    # Skip checks if only mobile/ or docs/ have changed.
+    condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'))
     strategy:
       maxParallel: 3
       matrix:
@@ -410,6 +443,8 @@ stages:
   - job: coverage
     displayName: "linux_x64"
     dependsOn: []
+    # Skip checks if only mobile/ or docs/ have changed.
+    condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'))
     timeoutInMinutes: 180
     pool: "x64-large"
     strategy:
@@ -436,11 +471,29 @@ stages:
         GCS_ARTIFACT_BUCKET: $(GcsArtifactBucket)
       condition: always()
 
+  - job: complete
+    displayName: "linux_x64"
+    dependsOn: ["bazel", "coverage"]
+    pool:
+      vmImage: "ubuntu-20.04"
+    # This condition ensures that this (required) check passes if all of
+    # the preceding checks either pass or are skipped
+    # adapted from:
+    #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
+    condition: |
+      and(
+        in(dependencies.bazel.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
+        in(dependencies.coverage.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
+    steps:
+    - bash: |
+        echo "checks complete"
+
 - stage: docker
-  dependsOn: ["linux_x64", "linux_arm64"]
+  dependsOn: ["env", "linux_x64", "linux_arm64"]
   jobs:
   - job: docker
     displayName: "linux multiarch"
+    condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'))
     timeoutInMinutes: 120
     pool:
       vmImage: "ubuntu-20.04"
@@ -507,6 +560,19 @@ stages:
         artifactName: docker
       timeoutInMinutes: 10
       condition: always()
+
+  - job: linux
+    dependsOn: ["docker"]
+    pool:
+      vmImage: "ubuntu-20.04"
+    # This condition ensures that this (required) job passes if all of
+    # the preceding jobs either pass or are skipped
+    # adapted from:
+    #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
+    condition: in(dependencies.docker.result, 'Succeeded', 'SucceededWithIssues', 'Skipped')
+    steps:
+    - bash: |
+        echo "Docker linux built"
 
 - stage: publish
   dependsOn: ["docker"]
@@ -646,9 +712,10 @@ stages:
         MAINTAINER_GPG_KEY_PASSPHRASE: $(MaintainerGPGKeyPassphrase)
 
 - stage: verify
-  dependsOn: ["docker"]
+  dependsOn: ["env", "docker"]
   jobs:
   - job: examples
+    condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'))
     pool:
       vmImage: "ubuntu-20.04"
     steps:
@@ -662,6 +729,19 @@ stages:
       env:
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
         NO_BUILD_SETUP: 1
+
+  - job: verified
+    dependsOn: ["examples"]
+    pool:
+      vmImage: "ubuntu-20.04"
+    # This condition ensures that this (required) job passes if all of
+    # the preceding jobs either pass or are skipped
+    # adapted from:
+    #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
+    condition: in(dependencies.examples.result, 'Succeeded', 'SucceededWithIssues', 'Skipped')
+    steps:
+    - bash: |
+        echo "examples verifiied"
 
 - stage: macos
   dependsOn: ["precheck"]

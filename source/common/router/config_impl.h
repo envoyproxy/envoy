@@ -232,8 +232,18 @@ public:
                                           uint64_t random_value) const;
   const VirtualCluster* virtualClusterFromEntries(const Http::HeaderMap& headers) const;
   const ConfigImpl& globalRouteConfig() const { return global_route_config_; }
-  const HeaderParser& requestHeaderParser() const { return *request_headers_parser_; }
-  const HeaderParser& responseHeaderParser() const { return *response_headers_parser_; }
+  const HeaderParser& requestHeaderParser() const {
+    if (request_headers_parser_ != nullptr) {
+      return *request_headers_parser_;
+    }
+    return HeaderParser::defaultParser();
+  }
+  const HeaderParser& responseHeaderParser() const {
+    if (response_headers_parser_ != nullptr) {
+      return *response_headers_parser_;
+    }
+    return HeaderParser::defaultParser();
+  }
 
   // Router::VirtualHost
   const CorsPolicy* corsPolicy() const override { return cors_policy_.get(); }
@@ -581,6 +591,18 @@ public:
   }
   const std::string& routeName() const override { return route_name_; }
   const CorsPolicy* corsPolicy() const override { return cors_policy_.get(); }
+  const HeaderParser& requestHeaderParser() const {
+    if (request_headers_parser_ != nullptr) {
+      return *request_headers_parser_;
+    }
+    return HeaderParser::defaultParser();
+  }
+  const HeaderParser& responseHeaderParser() const {
+    if (response_headers_parser_ != nullptr) {
+      return *response_headers_parser_;
+    }
+    return HeaderParser::defaultParser();
+  }
   void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
                               const StreamInfo::StreamInfo& stream_info,
                               bool insert_envoy_original_path) const override;
@@ -658,8 +680,22 @@ public:
     return opaque_config_;
   }
   bool includeVirtualHostRateLimits() const override { return include_vh_rate_limits_; }
-  const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
-  const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
+  using DefaultMetadata = ConstSingleton<envoy::config::core::v3::Metadata>;
+  const envoy::config::core::v3::Metadata& metadata() const override {
+    if (metadata_ != nullptr) {
+      return *metadata_;
+    }
+    return DefaultMetadata::get();
+  }
+  using RouteTypedMetadata = Envoy::Config::TypedMetadataImpl<HttpRouteTypedMetadataFactory>;
+  const Envoy::Config::TypedMetadata& typedMetadata() const override {
+    if (typed_metadata_ != nullptr) {
+      return *typed_metadata_;
+    }
+    static const RouteTypedMetadata* defaultTypedMetadata =
+        new RouteTypedMetadata(DefaultMetadata::get());
+    return *defaultTypedMetadata;
+  }
   const PathMatchCriterion& pathMatchCriterion() const override { return *this; }
   bool includeAttemptCountInRequest() const override {
     return vhost_.includeAttemptCountInRequest();
@@ -858,10 +894,23 @@ public:
       return DynamicRouteEntry::metadataMatchCriteria();
     }
 
+    const HeaderParser& requestHeaderParser() const {
+      if (request_headers_parser_ != nullptr) {
+        return *request_headers_parser_;
+      }
+      return HeaderParser::defaultParser();
+    }
+    const HeaderParser& responseHeaderParser() const {
+      if (response_headers_parser_ != nullptr) {
+        return *response_headers_parser_;
+      }
+      return HeaderParser::defaultParser();
+    }
+
     void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
                                 const StreamInfo::StreamInfo& stream_info,
                                 bool insert_envoy_original_path) const override {
-      request_headers_parser_->evaluateHeaders(headers, stream_info);
+      requestHeaderParser().evaluateHeaders(headers, stream_info);
       if (!host_rewrite_.empty()) {
         headers.setHost(host_rewrite_);
       }
@@ -875,7 +924,7 @@ public:
           stream_info.getRequestHeaders() == nullptr
               ? *Http::StaticEmptyHeaders::get().request_headers
               : *stream_info.getRequestHeaders();
-      response_headers_parser_->evaluateHeaders(headers, request_headers, headers, stream_info);
+      responseHeaderParser().evaluateHeaders(headers, request_headers, headers, stream_info);
       DynamicRouteEntry::finalizeResponseHeaders(headers, stream_info);
     }
     Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
@@ -967,7 +1016,8 @@ private:
   absl::InlinedVector<const HeaderParser*, 3>
   getResponseHeaderParsers(bool specificity_ascend) const;
 
-  absl::optional<RuntimeData> loadRuntimeData(const envoy::config::route::v3::RouteMatch& route);
+  std::unique_ptr<const RuntimeData>
+  loadRuntimeData(const envoy::config::route::v3::RouteMatch& route);
 
   static std::multimap<std::string, std::string>
   parseOpaqueConfig(const envoy::config::route::v3::Route& route);
@@ -1033,7 +1083,7 @@ private:
   const absl::optional<std::chrono::milliseconds> max_grpc_timeout_;
   const absl::optional<std::chrono::milliseconds> grpc_timeout_offset_;
   Runtime::Loader& loader_;
-  const absl::optional<RuntimeData> runtime_;
+  std::unique_ptr<const RuntimeData> runtime_;
   const std::string scheme_redirect_;
   const std::string host_redirect_;
   const std::string port_redirect_;
@@ -1061,8 +1111,8 @@ private:
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
   uint32_t retry_shadow_buffer_limit_{std::numeric_limits<uint32_t>::max()};
-  envoy::config::core::v3::Metadata metadata_;
-  Envoy::Config::TypedMetadataImpl<HttpRouteTypedMetadataFactory> typed_metadata_;
+  std::unique_ptr<const envoy::config::core::v3::Metadata> metadata_;
+  std::unique_ptr<const RouteTypedMetadata> typed_metadata_;
   const bool match_grpc_;
   const std::vector<Envoy::Matchers::MetadataMatcher> dynamic_metadata_;
 
@@ -1300,6 +1350,30 @@ public:
   }
 };
 
+// Similar to RouteMatchAction, but accepts v3::RouteList instead of v3::Route.
+class RouteListMatchAction : public Matcher::ActionBase<envoy::config::route::v3::RouteList> {
+public:
+  explicit RouteListMatchAction(std::vector<RouteEntryImplBaseConstSharedPtr> routes)
+      : routes_(std::move(routes)) {}
+
+  const std::vector<RouteEntryImplBaseConstSharedPtr>& routes() const { return routes_; }
+
+private:
+  const std::vector<RouteEntryImplBaseConstSharedPtr> routes_;
+};
+
+// Registered factory for RouteListMatchAction.
+class RouteListMatchActionFactory : public Matcher::ActionFactory<RouteActionContext> {
+public:
+  Matcher::ActionFactoryCb
+  createActionFactoryCb(const Protobuf::Message& config, RouteActionContext& context,
+                        ProtobufMessage::ValidationVisitor& validation_visitor) override;
+  std::string name() const override { return "route_match_action"; }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<envoy::config::route::v3::RouteList>();
+  }
+};
+
 /**
  * Wraps the route configuration which matches an incoming request headers to a backend cluster.
  * This is split out mainly to help with unit testing.
@@ -1354,8 +1428,18 @@ public:
              Server::Configuration::ServerFactoryContext& factory_context,
              ProtobufMessage::ValidationVisitor& validator, bool validate_clusters_default);
 
-  const HeaderParser& requestHeaderParser() const { return *request_headers_parser_; };
-  const HeaderParser& responseHeaderParser() const { return *response_headers_parser_; };
+  const HeaderParser& requestHeaderParser() const {
+    if (request_headers_parser_ != nullptr) {
+      return *request_headers_parser_;
+    }
+    return HeaderParser::defaultParser();
+  }
+  const HeaderParser& responseHeaderParser() const {
+    if (response_headers_parser_ != nullptr) {
+      return *response_headers_parser_;
+    }
+    return HeaderParser::defaultParser();
+  }
 
   bool virtualHostExists(const Http::RequestHeaderMap& headers) const {
     return route_matcher_->findVirtualHost(headers) != nullptr;
