@@ -31,13 +31,27 @@ public:
 /**
  * Proper implementation.
  */
-class FetchRecordConverterImpl : public FetchRecordConverter {
+class FetchRecordConverterImpl : public FetchRecordConverter,
+                                 private Logger::Loggable<Logger::Id::kafka> {
 public:
   // FetchRecordConverter
   std::vector<FetchableTopicResponse> convert(const InboundRecordsMap& arg) const override;
 
   // Default singleton accessor.
   static const FetchRecordConverter& getDefaultInstance();
+
+private:
+  // Helper function: transform records from a partition into a record batch.
+  // See: https://kafka.apache.org/33/documentation.html#recordbatch
+  Bytes renderRecordBatch(const std::vector<InboundRecordSharedPtr>& records) const;
+
+  // Helper function: append record to output array.
+  // See: https://kafka.apache.org/33/documentation.html#record
+  // https://github.com/apache/kafka/blob/3.3.2/clients/src/main/java/org/apache/kafka/common/record/DefaultRecord.java#L164
+  void appendRecord(const InboundRecord& record, Bytes& out) const;
+
+  // Helper function: render CRC32C bytes from given input.
+  Bytes renderCrc(const unsigned char* data, const size_t len) const;
 };
 
 } // namespace Mesh
