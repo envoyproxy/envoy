@@ -33,8 +33,8 @@ protected:
   NiceMock<MockLibRdKafkaUtils> kafka_utils_{};
   RawKafkaConfig config_ = {{"key1", "value1"}, {"key2", "value2"}};
 
-  std::unique_ptr<MockKafkaProducer> producer_ptr = std::make_unique<MockKafkaProducer>();
-  MockKafkaProducer& producer = *producer_ptr;
+  std::unique_ptr<MockKafkaProducer> producer_ptr_ = std::make_unique<MockKafkaProducer>();
+  MockKafkaProducer& producer_ = *producer_ptr_;
 
   std::shared_ptr<MockProduceFinishCb> origin_ = std::make_shared<MockProduceFinishCb>();
 
@@ -47,9 +47,9 @@ protected:
     EXPECT_CALL(kafka_utils_, setConfDeliveryCallback(_, _, _))
         .WillOnce(Return(RdKafka::Conf::CONF_OK));
 
-    EXPECT_CALL(producer, poll(_)).Times(AnyNumber());
+    EXPECT_CALL(producer_, poll(_)).Times(AnyNumber());
     EXPECT_CALL(kafka_utils_, createProducer(_, _))
-        .WillOnce(Return(testing::ByMove(std::move(producer_ptr))));
+        .WillOnce(Return(testing::ByMove(std::move(producer_ptr_))));
 
     EXPECT_CALL(kafka_utils_, deleteHeaders(_)).Times(0);
   }
@@ -71,7 +71,7 @@ TEST_F(UpstreamKafkaClientTest, ShouldSendRecordsAndReceiveConfirmations) {
   RichKafkaProducer testee = {dispatcher_, thread_factory_, config_, kafka_utils_};
 
   // when, then - should send request without problems.
-  EXPECT_CALL(producer, produce("topic", 13, _, _, _, _, _, _, _, _))
+  EXPECT_CALL(producer_, produce("topic", 13, _, _, _, _, _, _, _, _))
       .Times(3)
       .WillRepeatedly(Return(RdKafka::ERR_NO_ERROR));
   const std::vector<std::string> payloads = {"value1", "value2", "value3"};
@@ -95,7 +95,7 @@ TEST_F(UpstreamKafkaClientTest, ShouldCheckCallbacksForDeliveries) {
   RichKafkaProducer testee = {dispatcher_, thread_factory_, config_, kafka_utils_};
 
   // when, then - should send request without problems.
-  EXPECT_CALL(producer, produce("topic", 13, _, _, _, _, _, _, _, _))
+  EXPECT_CALL(producer_, produce("topic", 13, _, _, _, _, _, _, _, _))
       .Times(2)
       .WillRepeatedly(Return(RdKafka::ERR_NO_ERROR));
   const std::vector<std::string> payloads = {"value1", "value2"};
@@ -122,7 +122,7 @@ TEST_F(UpstreamKafkaClientTest, ShouldHandleProduceFailures) {
   RichKafkaProducer testee = {dispatcher_, thread_factory_, config_, kafka_utils_};
 
   // when, then - if there are problems while sending, notify the source immediately.
-  EXPECT_CALL(producer, produce("topic", 13, _, _, _, _, _, _, _, _))
+  EXPECT_CALL(producer_, produce("topic", 13, _, _, _, _, _, _, _, _))
       .WillOnce(Return(RdKafka::ERR_LEADER_NOT_AVAILABLE));
   EXPECT_CALL(kafka_utils_, deleteHeaders(_));
   EXPECT_CALL(*origin_, accept(_)).WillOnce(Return(true));
@@ -149,7 +149,7 @@ TEST_F(UpstreamKafkaClientTest, ShouldHandleHeaderConversionFailures) {
   RichKafkaProducer testee = {dispatcher_, thread_factory_, config_, kafka_utils_};
 
   // when, then - producer was not interacted with, response was sent immediately.
-  EXPECT_CALL(producer, produce(_, _, _, _, _, _, _, _, _, _)).Times(0);
+  EXPECT_CALL(producer_, produce(_, _, _, _, _, _, _, _, _, _)).Times(0);
   EXPECT_CALL(*origin_, accept(_)).WillOnce(Return(true));
   testee.send(origin_, makeRecord("value"));
   EXPECT_EQ(testee.getUnfinishedRequestsForTest().size(), 0);
@@ -199,7 +199,7 @@ TEST_F(UpstreamKafkaClientTest, ShouldPollProducerForEventsUntilShutdown) {
   setupConstructorExpectations();
 
   absl::BlockingCounter counter{1};
-  EXPECT_CALL(producer, poll(_)).Times(AtLeast(1)).WillOnce([&counter]() {
+  EXPECT_CALL(producer_, poll(_)).Times(AtLeast(1)).WillOnce([&counter]() {
     counter.DecrementCount();
     return 0;
   });
