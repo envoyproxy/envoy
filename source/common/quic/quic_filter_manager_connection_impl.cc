@@ -145,7 +145,7 @@ void QuicFilterManagerConnectionImpl::updateBytesBuffered(uint64_t old_buffered_
   write_buffer_watermark_simulation_.checkLowWatermark(bytes_to_send_);
 }
 
-void QuicFilterManagerConnectionImpl::maybeApplyDelayClosePolicy() {
+void QuicFilterManagerConnectionImpl::maybeUpdateDelayCloseTimer(bool has_sent_any_data) {
   if (!inDelayedClose()) {
     if (close_type_during_initialize_.has_value()) {
       ASSERT(!Runtime::runtimeFeatureEnabled(
@@ -155,13 +155,16 @@ void QuicFilterManagerConnectionImpl::maybeApplyDelayClosePolicy() {
     }
     return;
   }
-  if (hasDataToWrite() || delayed_close_state_ == DelayedCloseState::CloseAfterFlushAndWait) {
-    if (delayed_close_timer_ != nullptr) {
-      // Re-arm delay close timer on every write event if there are still data
-      // buffered or the connection close is supposed to be delayed.
-      delayed_close_timer_->enableTimer(delayed_close_timeout_);
-    }
-  } else {
+  if (has_sent_any_data && delayed_close_timer_ != nullptr) {
+    // Re-arm delay close timer if at least some buffered data is flushed.
+    delayed_close_timer_->enableTimer(delayed_close_timeout_);
+  }
+}
+
+void QuicFilterManagerConnectionImpl::onWriteEventDone() {
+  // Apply delay close policy if there is any.
+  if (!hasDataToWrite() && inDelayedClose() &&
+      delayed_close_state_ != DelayedCloseState::CloseAfterFlushAndWait) {
     closeConnectionImmediately();
   }
 }

@@ -240,17 +240,16 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
         const RSA* rsa_public_key = EVP_PKEY_get0_RSA(public_key.get());
         // Since we checked the key type above, this should be valid.
         ASSERT(rsa_public_key != nullptr);
-        const unsigned rsa_key_length = RSA_size(rsa_public_key);
+        const unsigned rsa_key_length = RSA_bits(rsa_public_key);
 #ifdef BORINGSSL_FIPS
-        if (rsa_key_length != 2048 / 8 && rsa_key_length != 3072 / 8 &&
-            rsa_key_length != 4096 / 8) {
+        if (rsa_key_length != 2048 && rsa_key_length != 3072 && rsa_key_length != 4096) {
           throw EnvoyException(
               fmt::format("Failed to load certificate chain from {}, only RSA certificates with "
                           "2048-bit, 3072-bit or 4096-bit keys are supported in FIPS mode",
                           ctx.cert_chain_file_path_));
         }
 #else
-        if (rsa_key_length < 2048 / 8) {
+        if (rsa_key_length < 2048) {
           throw EnvoyException(
               fmt::format("Failed to load certificate chain from {}, only RSA "
                           "certificates with 2048-bit or larger keys are supported",
@@ -510,16 +509,16 @@ ValidationResults ContextImpl::customVerifyCertChain(
     extended_socket_info->setCertificateValidationStatus(Ssl::ClientValidationStatus::NotValidated);
     stats_.fail_verify_error_.inc();
     ENVOY_LOG(debug, "verify cert failed: no cert chain");
-    return {ValidationResults::ValidationStatus::Failed, SSL_AD_INTERNAL_ERROR, absl::nullopt};
+    return {ValidationResults::ValidationStatus::Failed, Ssl::ClientValidationStatus::NotValidated,
+            SSL_AD_INTERNAL_ERROR, absl::nullopt};
   }
   ASSERT(cert_validator_);
   const char* host_name = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
-  // Do not provide async callback here, but defer its creation to extended_socket_info if the
-  // validation is async.
   ValidationResults result = cert_validator_->doVerifyCertChain(
-      *cert_chain, nullptr, extended_socket_info, transport_socket_options, *SSL_get_SSL_CTX(ssl),
-      {}, SSL_is_server(ssl), absl::NullSafeStringView(host_name));
+      *cert_chain, extended_socket_info->createValidateResultCallback(), transport_socket_options,
+      *SSL_get_SSL_CTX(ssl), {}, SSL_is_server(ssl), absl::NullSafeStringView(host_name));
   if (result.status != ValidationResults::ValidationStatus::Pending) {
+    extended_socket_info->setCertificateValidationStatus(result.detailed_status);
     extended_socket_info->onCertificateValidationCompleted(
         result.status == ValidationResults::ValidationStatus::Successful);
   }
@@ -1274,11 +1273,12 @@ ValidationResults ContextImpl::customVerifyCertChainForQuic(
   SSL_CTX* ssl_ctx = tls_contexts_[0].ssl_ctx_.get();
   if (SSL_CTX_get_verify_mode(ssl_ctx) == SSL_VERIFY_NONE) {
     // Skip validation if the TLS is configured SSL_VERIFY_NONE.
-    return {ValidationResults::ValidationStatus::Successful, absl::nullopt, absl::nullopt};
+    return {ValidationResults::ValidationStatus::Successful,
+            Envoy::Ssl::ClientValidationStatus::NotValidated, absl::nullopt, absl::nullopt};
   }
-  ValidationResults result = cert_validator_->doVerifyCertChain(
-      cert_chain, std::move(callback), /*extended_socket_info=*/nullptr, transport_socket_options,
-      *ssl_ctx, validation_context, is_server, host_name);
+  ValidationResults result =
+      cert_validator_->doVerifyCertChain(cert_chain, std::move(callback), transport_socket_options,
+                                         *ssl_ctx, validation_context, is_server, host_name);
   return result;
 }
 

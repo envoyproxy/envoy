@@ -474,6 +474,7 @@ TEST(PipeInstanceTest, UnlinksExistingFile) {
 
 TEST(AddressFromSockAddrDeathTest, IPv4) {
   sockaddr_storage ss;
+  memset(&ss, 0, sizeof(ss));
   auto& sin = reinterpret_cast<sockaddr_in&>(ss);
 
   sin.sin_family = AF_INET;
@@ -493,6 +494,7 @@ TEST(AddressFromSockAddrDeathTest, IPv4) {
 
 TEST(AddressFromSockAddrDeathTest, IPv6) {
   sockaddr_storage ss;
+  memset(&ss, 0, sizeof(ss));
   auto& sin6 = reinterpret_cast<sockaddr_in6&>(ss);
 
   sin6.sin6_family = AF_INET6;
@@ -528,6 +530,7 @@ TEST(AddressFromSockAddrDeathTest, IPv6) {
 
 TEST(AddressFromSockAddrDeathTest, Pipe) {
   sockaddr_storage ss;
+  memset(&ss, 0, sizeof(ss));
   auto& sun = reinterpret_cast<sockaddr_un&>(ss);
   sun.sun_family = AF_UNIX;
 

@@ -1,0 +1,44 @@
+name: mobile_coverage
+
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+
+jobs:
+  coverage:
+    name: coverage
+    runs-on: ubuntu-20.04
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
+    container:
+      image: envoyproxy/envoy-build-ubuntu:b0ff77ae3f25b0bf595f9b8bba46b489723ab446
+    steps:
+    - uses: actions/checkout@v1
+    - name: Add safe directory
+      run: git config --global --add safe.directory /__w/envoy/envoy
+    - id: should_run
+      name: 'Check whether to run'
+      run: ./mobile/tools/should_run_ci.sh
+    - name: 'Run coverage'
+      if: steps.should_run.outputs.run_ci_job == 'true'
+      continue-on-error: true
+      run: |
+        echo "build --remote_header=\"Authorization=Bearer ${{ secrets.GITHUB_TOKEN }}\"" > ~/.bazelrc
+          cd mobile && BAZEL_BUILD_OPTIONS="--config=remote-ci-linux-coverage" \
+            PATH=/opt/llvm/bin:${PATH} \
+            COVERAGE_THRESHOLD=95 \
+            ../test/run_envoy_bazel_coverage.sh //test/common/...
+    - name: 'Package coverage'
+      if: steps.should_run.outputs.run_ci_job == 'true'
+      run: |
+        cd mobile && tar -czvf coverage.tar.gz generated/coverage
+    - name: 'Upload report'
+      if: steps.should_run.outputs.run_ci_job == 'true'
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage.tar.gz
+        path: coverage.tar.gz

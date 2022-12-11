@@ -145,8 +145,8 @@ void HealthCheckFilter::onComplete() {
 
           break;
         }
-        const auto& stats = cluster->info()->stats();
-        const uint64_t membership_total = stats.membership_total_.value();
+        const auto& endpoint_stats = cluster->info()->endpointStats();
+        const uint64_t membership_total = endpoint_stats.membership_total_.value();
         if (membership_total == 0) {
           // If the cluster exists but is empty, consider the service unhealthy unless
           // the specified minimum percent healthy for the cluster happens to be zero.
@@ -160,7 +160,8 @@ void HealthCheckFilter::onComplete() {
         }
         // In the general case, consider the service unhealthy if fewer than the
         // specified percentage of the servers in the cluster are available (healthy + degraded).
-        if ((100UL * (stats.membership_healthy_.value() + stats.membership_degraded_.value())) <
+        if ((100UL * (endpoint_stats.membership_healthy_.value() +
+                      endpoint_stats.membership_degraded_.value())) <
             membership_total * min_healthy_percentage) {
           final_status = Http::Code::ServiceUnavailable;
           details = &RcDetails::get().HealthCheckClusterUnhealthy;

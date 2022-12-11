@@ -128,7 +128,7 @@ UdpProxyFilter::ClusterInfo::createSession(Network::UdpRecvData::LocalPeerAddres
            .connections()
            .canCreate()) {
     ENVOY_LOG(debug, "cannot create new connection.");
-    cluster_.info()->stats().upstream_cx_overflow_.inc();
+    cluster_.info()->trafficStats().upstream_cx_overflow_.inc();
     return nullptr;
   }
 
@@ -139,7 +139,7 @@ UdpProxyFilter::ClusterInfo::createSession(Network::UdpRecvData::LocalPeerAddres
   auto host = chooseHost(addresses.peer_);
   if (host == nullptr) {
     ENVOY_LOG(debug, "cannot find any valid host.");
-    cluster_.info()->stats().upstream_cx_none_healthy_.inc();
+    cluster_.info()->trafficStats().upstream_cx_none_healthy_.inc();
     return nullptr;
   }
   return createSessionWithHost(std::move(addresses), host);
@@ -212,7 +212,7 @@ UdpProxyFilter::PerPacketLoadBalancingClusterInfo::onData(Network::UdpRecvData& 
   auto host = chooseHost(data.addresses_.peer_);
   if (host == nullptr) {
     ENVOY_LOG(debug, "cannot find any valid host.");
-    cluster_.info()->stats().upstream_cx_none_healthy_.inc();
+    cluster_.info()->trafficStats().upstream_cx_none_healthy_.inc();
     return Network::FilterStatus::StopIteration;
   }
 
@@ -407,7 +407,7 @@ void UdpProxyFilter::ActiveSession::write(const Buffer::Instance& buffer) {
     cluster_.cluster_stats_.sess_tx_errors_.inc();
   } else {
     cluster_.cluster_stats_.sess_tx_datagrams_.inc();
-    cluster_.cluster_.info()->stats().upstream_cx_tx_bytes_total_.add(buffer_length);
+    cluster_.cluster_.info()->trafficStats().upstream_cx_tx_bytes_total_.add(buffer_length);
   }
 }
 
@@ -420,7 +420,7 @@ void UdpProxyFilter::ActiveSession::processPacket(Network::Address::InstanceCons
   const uint64_t buffer_length = buffer->length();
 
   cluster_.cluster_stats_.sess_rx_datagrams_.inc();
-  cluster_.cluster_.info()->stats().upstream_cx_rx_bytes_total_.add(buffer_length);
+  cluster_.cluster_.info()->trafficStats().upstream_cx_rx_bytes_total_.add(buffer_length);
 
   Network::UdpSendData data{addresses_.local_->ip(), *addresses_.peer_, *buffer};
   const Api::IoCallUint64Result rc = cluster_.filter_.read_callbacks_->udpListener().send(data);
