@@ -18,8 +18,13 @@ TEST(OsSyscallsTest, OpenPwritePreadFstatCloseStatUnlink) {
   TestEnvironment::createPath(path);
   std::string file_path = path + "/file";
   absl::string_view file_contents = "12345";
-  // Test `open`
-  Api::SysCallIntResult open_result = os_syscalls.open(file_path.c_str(), O_CREAT | O_RDWR);
+// Test `open`
+#ifdef WIN32
+  int pmode = _S_IWRITE | _S_IREAD;
+#else
+  int pmode = S_IRUSR | S_IWUSR;
+#endif
+  Api::SysCallIntResult open_result = os_syscalls.open(file_path.c_str(), O_CREAT | O_RDWR, pmode);
   EXPECT_NE(open_result.return_value_, -1);
   EXPECT_EQ(open_result.errno_, 0);
   os_fd_t fd = open_result.return_value_;

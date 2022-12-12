@@ -1,4 +1,5 @@
-#include "source/extensions/http/header_validators/envoy_default/error_codes.h"
+#include "envoy/http/header_validator_errors.h"
+
 #include "source/extensions/http/header_validators/envoy_default/http1_header_validator.h"
 
 #include "test/extensions/http/header_validators/envoy_default/header_validator_test.h"
@@ -12,6 +13,7 @@ namespace {
 
 using ::Envoy::Http::HeaderString;
 using ::Envoy::Http::Protocol;
+using ::Envoy::Http::UhvResponseCodeDetail;
 
 class Http1HeaderValidatorTest : public HeaderValidatorTest {
 protected:
