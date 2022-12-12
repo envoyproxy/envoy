@@ -27,6 +27,9 @@ typedef struct {
 // Based on Http::Utility::toRequestHeaders() but only used for these tests.
 Http::ResponseHeaderMapPtr toResponseHeaders(envoy_headers headers);
 
+// Creates a default bootstrap config from the EngineBuilder.
+std::string defaultConfig();
+
 // A base class for Envoy Mobile client integration tests which interact with Envoy through the
 // Http::Client class.
 //
@@ -34,7 +37,8 @@ Http::ResponseHeaderMapPtr toResponseHeaders(envoy_headers headers);
 // into a test lib.
 class BaseClientIntegrationTest : public BaseIntegrationTest, public Platform::EngineBuilder {
 public:
-  BaseClientIntegrationTest(Network::Address::IpVersion ip_version);
+  BaseClientIntegrationTest(Network::Address::IpVersion ip_version,
+                            const std::string& bootstrap_config = defaultConfig());
   virtual ~BaseClientIntegrationTest() = default;
 
 protected:
