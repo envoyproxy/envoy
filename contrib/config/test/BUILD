@@ -23,8 +23,10 @@ envoy_cc_test(
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:resources_lib",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/runtime/v3:pkg_cc_proto",
     ],
 )

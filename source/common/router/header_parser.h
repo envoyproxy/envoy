@@ -54,6 +54,11 @@ public:
   configure(const Protobuf::RepeatedPtrField<HeaderValueOption>& headers_to_add,
             const Protobuf::RepeatedPtrField<std::string>& headers_to_remove);
 
+  static const HeaderParser& defaultParser() {
+    static HeaderParser* instance = new HeaderParser();
+    return *instance;
+  }
+
   void evaluateHeaders(Http::HeaderMap& headers, const Http::RequestHeaderMap& request_headers,
                        const Http::ResponseHeaderMap& response_headers,
                        const StreamInfo::StreamInfo& stream_info) const override;

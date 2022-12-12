@@ -413,6 +413,17 @@ private:
 
   using ActiveStreamPtr = std::unique_ptr<ActiveStream>;
 
+  class HttpStreamIdProviderImpl : public StreamInfo::StreamIdProvider {
+  public:
+    HttpStreamIdProviderImpl(ActiveStream& parent) : parent_(parent) {}
+
+    // StreamInfo::StreamIdProvider
+    absl::optional<absl::string_view> toStringView() const override;
+    absl::optional<uint64_t> toInteger() const override;
+
+    ActiveStream& parent_;
+  };
+
   /**
    * Check to see if the connection can be closed after gracefully waiting to send pending codec
    * data.

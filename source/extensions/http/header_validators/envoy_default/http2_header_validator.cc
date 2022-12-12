@@ -1,5 +1,7 @@
 #include "source/extensions/http/header_validators/envoy_default/http2_header_validator.h"
 
+#include "envoy/http/header_validator_errors.h"
+
 #include "source/extensions/http/header_validators/envoy_default/character_tables.h"
 
 #include "absl/container/node_hash_map.h"
@@ -16,6 +18,7 @@ using ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderVal
 using ::Envoy::Http::HeaderString;
 using ::Envoy::Http::LowerCaseString;
 using ::Envoy::Http::Protocol;
+using ::Envoy::Http::UhvResponseCodeDetail;
 using HeaderValidatorFunction =
     HeaderValidator::HeaderValueValidationResult (Http2HeaderValidator::*)(const HeaderString&);
 
@@ -138,18 +141,19 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
 
   auto is_connect_method = header_map.method() == header_values_.MethodValues.Connect;
   auto is_options_method = header_map.method() == header_values_.MethodValues.Options;
+  bool path_is_empty = path.empty();
   bool path_is_asterisk = path == "*";
-  bool path_is_absolute = !path.empty() && path.at(0) == '/';
+  bool path_is_absolute = !path_is_empty && path.at(0) == '/';
 
-  if (!is_connect_method && (header_map.getSchemeValue().empty() || path.empty())) {
+  if (!is_connect_method && (header_map.getSchemeValue().empty() || path_is_empty)) {
     // If this is not a connect request, then we also need the scheme and path pseudo headers.
     // This is based on RFC 9113, https://www.rfc-editor.org/rfc/rfc9113#section-8.3.1:
     //
     // All HTTP/2 requests MUST include exactly one valid value for the ":method", ":scheme", and
     // ":path" pseudo-header fields, unless they are CONNECT requests (Section 8.5). An HTTP
     // request that omits mandatory pseudo-header fields is malformed (Section 8.1.1).
-    auto details = path.empty() ? UhvResponseCodeDetail::get().InvalidUrl
-                                : UhvResponseCodeDetail::get().InvalidScheme;
+    auto details = path_is_empty ? UhvResponseCodeDetail::get().InvalidUrl
+                                 : UhvResponseCodeDetail::get().InvalidScheme;
     return {RequestHeaderMapValidationResult::Action::Reject, details};
   } else if (is_connect_method) {
     // If this is a CONNECT request, :path and :scheme must be empty and :authority must be
@@ -162,7 +166,7 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
     //    to the authority-form of the request-target of CONNECT requests; see Section 3.2.3 of
     //    [HTTP/1.1]).
     absl::string_view details;
-    if (!path.empty()) {
+    if (!path_is_empty) {
       details = UhvResponseCodeDetail::get().InvalidUrl;
     } else if (!header_map.getSchemeValue().empty()) {
       details = UhvResponseCodeDetail::get().InvalidScheme;
@@ -192,18 +196,19 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
             UhvResponseCodeDetail::get().InvalidUrl};
   }
 
-  if (path_is_absolute && !config_.uri_path_normalization_options().skip_path_normalization()) {
-    // TODO(#6589) - Validate and normalize the path, which must be a valid URI. This will be
-    // similar to:
+  if (!config_.uri_path_normalization_options().skip_path_normalization() && !path_is_empty) {
+    // Validate and normalize the path, which must be a valid URI. This is only run if the config
+    // is active and the path is not empty.
     //
-    // auto path_result = normalizePathUri(header_map);
-    // if (!path_result) {
-    //   return path_result;
-    // }
-  }
+    // If path normalization is disabled then the path will be validated against the RFC character
+    // set in validateRequestHeaderEntry.
+    auto path_result = path_normalizer_.normalizePathUri(header_map);
+    if (!path_result) {
+      return path_result;
+    }
 
-  // If path normalization is disabled or the path isn't absolute then the path will be validated
-  // against the RFC character set in validateRequestHeaderEntry.
+    path = header_map.path();
+  }
 
   // Step 3: Verify each request header
   const auto& allowed_headers =

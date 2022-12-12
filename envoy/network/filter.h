@@ -305,6 +305,20 @@ public:
    * @return Object on which filters can share data on a per-request basis.
    */
   virtual StreamInfo::FilterState& filterState() PURE;
+
+  /**
+   * @return the Dispatcher for issuing events.
+   */
+  virtual Event::Dispatcher& dispatcher() PURE;
+
+  /**
+   * If a filter returned `FilterStatus::ContinueIteration`, `continueFilterChain(true)`
+   * should be called to continue the filter chain iteration. Or `continueFilterChain(false)`
+   * should be called if the filter returned `FilterStatus::StopIteration` and closed
+   * the socket.
+   * @param success boolean telling whether the filter execution was successful or not.
+   */
+  virtual void continueFilterChain(bool success) PURE;
 };
 
 /**

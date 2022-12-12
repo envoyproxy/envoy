@@ -30,4 +30,8 @@ message Dlb {
   // The ID of the Dlb hardware, start from 0.
   // If not specified, use the first available device as default.
   uint32 id = 1;
+
+  // Maximum number of retries when sending to DLB device fails.
+  // No retry as default.
+  uint32 max_retries = 2;
 }

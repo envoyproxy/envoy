@@ -283,27 +283,33 @@ ClusterManagerImpl::ClusterManagerImpl(
     const envoy::config::bootstrap::v3::Bootstrap& bootstrap, ClusterManagerFactory& factory,
     Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
     const LocalInfo::LocalInfo& local_info, AccessLog::AccessLogManager& log_manager,
-    Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
+    Event::Dispatcher& main_thread_dispatcher, OptRef<Server::Admin> admin,
     ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
     Http::Context& http_context, Grpc::Context& grpc_context, Router::Context& router_context,
     const Server::Instance& server)
     : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls),
       random_(api.randomGenerator()),
-      bind_config_(bootstrap.cluster_manager().upstream_bind_config()), local_info_(local_info),
-      cm_stats_(generateStats(stats)),
+      bind_config_(bootstrap.cluster_manager().has_upstream_bind_config()
+                       ? absl::make_optional(bootstrap.cluster_manager().upstream_bind_config())
+                       : absl::nullopt),
+      local_info_(local_info), cm_stats_(generateStats(stats)),
       init_helper_(*this, [this](ClusterManagerCluster& cluster) { onClusterInit(cluster); }),
-      config_tracker_entry_(
-          admin.getConfigTracker().add("clusters",
-                                       [this](const Matchers::StringMatcher& name_matcher) {
-                                         return dumpClusterConfigs(name_matcher);
-                                       })),
       time_source_(main_thread_dispatcher.timeSource()), dispatcher_(main_thread_dispatcher),
       http_context_(http_context), router_context_(router_context),
       cluster_stat_names_(stats.symbolTable()),
+      cluster_config_update_stat_names_(stats.symbolTable()),
+      cluster_lb_stat_names_(stats.symbolTable()),
+      cluster_endpoint_stat_names_(stats.symbolTable()),
       cluster_load_report_stat_names_(stats.symbolTable()),
       cluster_circuit_breakers_stat_names_(stats.symbolTable()),
       cluster_request_response_size_stat_names_(stats.symbolTable()),
       cluster_timeout_budget_stat_names_(stats.symbolTable()) {
+  if (admin.has_value()) {
+    config_tracker_entry_ = admin->getConfigTracker().add(
+        "clusters", [this](const Matchers::StringMatcher& name_matcher) {
+          return dumpClusterConfigs(name_matcher);
+        });
+  }
   async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
       *this, tls, time_source_, api, grpc_context.statNames());
   const auto& cm_config = bootstrap.cluster_manager();
@@ -884,14 +890,14 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
   if (cluster_reference.info()->lbType() == LoadBalancerType::RingHash) {
     if (!cluster_reference.info()->lbSubsetInfo().isEnabled()) {
       cluster_entry_it->second->thread_aware_lb_ = std::make_unique<RingHashLoadBalancer>(
-          cluster_reference.prioritySet(), cluster_reference.info()->stats(),
+          cluster_reference.prioritySet(), cluster_reference.info()->lbStats(),
           cluster_reference.info()->statsScope(), runtime_, random_,
           cluster_reference.info()->lbRingHashConfig(), cluster_reference.info()->lbConfig());
     }
   } else if (cluster_reference.info()->lbType() == LoadBalancerType::Maglev) {
     if (!cluster_reference.info()->lbSubsetInfo().isEnabled()) {
       cluster_entry_it->second->thread_aware_lb_ = std::make_unique<MaglevLoadBalancer>(
-          cluster_reference.prioritySet(), cluster_reference.info()->stats(),
+          cluster_reference.prioritySet(), cluster_reference.info()->lbStats(),
           cluster_reference.info()->statsScope(), runtime_, random_,
           cluster_reference.info()->lbMaglevConfig(), cluster_reference.info()->lbConfig());
     }
@@ -1128,7 +1134,7 @@ void ClusterManagerImpl::postThreadLocalHealthFailure(const HostSharedPtr& host)
 
 Host::CreateConnectionData ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConn(
     LoadBalancerContext* context) {
-  HostConstSharedPtr logical_host = lb_->chooseHost(context);
+  HostConstSharedPtr logical_host = chooseHost(context);
   if (logical_host) {
     auto conn_info = logical_host->createConnection(
         parent_.thread_local_dispatcher_, nullptr,
@@ -1150,7 +1156,7 @@ Host::CreateConnectionData ClusterManagerImpl::ThreadLocalClusterManagerImpl::Cl
     }
     return conn_info;
   } else {
-    cluster_info_->stats().upstream_cx_none_healthy_.inc();
+    cluster_info_->trafficStats().upstream_cx_none_healthy_.inc();
     return {nullptr, nullptr};
   }
 }
@@ -1507,14 +1513,15 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::addClusterUpdateCallbacks(
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster,
     const LoadBalancerFactorySharedPtr& lb_factory)
-    : parent_(parent), lb_factory_(lb_factory), cluster_info_(cluster) {
+    : parent_(parent), lb_factory_(lb_factory), cluster_info_(cluster),
+      override_host_statuses_(HostUtility::createOverrideHostStatus(cluster_info_->lbConfig())) {
   priority_set_.getOrCreateHostSet(0);
 
   // TODO(mattklein123): Consider converting other LBs over to thread local. All of them could
   // benefit given the healthy panic, locality, and priority calculations that take place.
   if (cluster->lbSubsetInfo().isEnabled()) {
     lb_ = std::make_unique<SubsetLoadBalancer>(
-        cluster->lbType(), priority_set_, parent_.local_priority_set_, cluster->stats(),
+        cluster->lbType(), priority_set_, parent_.local_priority_set_, cluster->lbStats(),
         cluster->statsScope(), parent.parent_.runtime_, parent.parent_.random_,
         cluster->lbSubsetInfo(), cluster->lbRingHashConfig(), cluster->lbMaglevConfig(),
         cluster->lbRoundRobinConfig(), cluster->lbLeastRequestConfig(), cluster->lbConfig(),
@@ -1524,7 +1531,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     case LoadBalancerType::LeastRequest: {
       ASSERT(lb_factory_ == nullptr);
       lb_ = std::make_unique<LeastRequestLoadBalancer>(
-          priority_set_, parent_.local_priority_set_, cluster->stats(), parent.parent_.runtime_,
+          priority_set_, parent_.local_priority_set_, cluster->lbStats(), parent.parent_.runtime_,
           parent.parent_.random_, cluster->lbConfig(), cluster->lbLeastRequestConfig(),
           parent.thread_local_dispatcher_.timeSource());
       break;
@@ -1532,14 +1539,14 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     case LoadBalancerType::Random: {
       ASSERT(lb_factory_ == nullptr);
       lb_ = std::make_unique<RandomLoadBalancer>(priority_set_, parent_.local_priority_set_,
-                                                 cluster->stats(), parent.parent_.runtime_,
+                                                 cluster->lbStats(), parent.parent_.runtime_,
                                                  parent.parent_.random_, cluster->lbConfig());
       break;
     }
     case LoadBalancerType::RoundRobin: {
       ASSERT(lb_factory_ == nullptr);
       lb_ = std::make_unique<RoundRobinLoadBalancer>(
-          priority_set_, parent_.local_priority_set_, cluster->stats(), parent.parent_.runtime_,
+          priority_set_, parent_.local_priority_set_, cluster->lbStats(), parent.parent_.runtime_,
           parent.parent_.random_, cluster->lbConfig(), cluster->lbRoundRobinConfig(),
           parent.thread_local_dispatcher_.timeSource());
       break;
@@ -1617,11 +1624,11 @@ Http::ConnectionPool::Instance*
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImpl(
     ResourcePriority priority, absl::optional<Http::Protocol> downstream_protocol,
     LoadBalancerContext* context, bool peek) {
-  HostConstSharedPtr host = (peek ? lb_->peekAnotherHost(context) : lb_->chooseHost(context));
+  HostConstSharedPtr host = (peek ? peekAnotherHost(context) : chooseHost(context));
   if (!host) {
     if (!peek) {
       ENVOY_LOG(debug, "no healthy host for HTTP connection pool");
-      cluster_info_->stats().upstream_cx_none_healthy_.inc();
+      cluster_info_->trafficStats().upstream_cx_none_healthy_.inc();
     }
     return nullptr;
   }
@@ -1721,14 +1728,37 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::httpConnPoolIsIdle(
   }
 }
 
+HostConstSharedPtr ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::chooseHost(
+    LoadBalancerContext* context) {
+  auto cross_priority_host_map = priority_set_.crossPriorityHostMap();
+  HostConstSharedPtr host = HostUtility::selectOverrideHost(cross_priority_host_map.get(),
+                                                            override_host_statuses_, context);
+  if (host != nullptr) {
+    return host;
+  }
+  return lb_->chooseHost(context);
+}
+
+HostConstSharedPtr ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::peekAnotherHost(
+    LoadBalancerContext* context) {
+  auto cross_priority_host_map = priority_set_.crossPriorityHostMap();
+  HostConstSharedPtr host = HostUtility::selectOverrideHost(cross_priority_host_map.get(),
+                                                            override_host_statuses_, context);
+  if (host != nullptr) {
+    return host;
+  }
+  return lb_->peekAnotherHost(context);
+}
+
 Tcp::ConnectionPool::Instance*
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPoolImpl(
     ResourcePriority priority, LoadBalancerContext* context, bool peek) {
-  HostConstSharedPtr host = (peek ? lb_->peekAnotherHost(context) : lb_->chooseHost(context));
+
+  HostConstSharedPtr host = (peek ? peekAnotherHost(context) : chooseHost(context));
   if (!host) {
     if (!peek) {
       ENVOY_LOG(debug, "no healthy host for TCP connection pool");
-      cluster_info_->stats().upstream_cx_none_healthy_.inc();
+      cluster_info_->trafficStats().upstream_cx_none_healthy_.inc();
     }
     return nullptr;
   }
@@ -1920,7 +1950,7 @@ Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
 std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ProdClusterManagerFactory::clusterFromProto(
     const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
     Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) {
-  return ClusterFactoryImplBase::create(server_context_, cluster, cm, stats_, dns_resolver_,
+  return ClusterFactoryImplBase::create(server_context_, cluster, cm, stats_, dns_resolver_fn_,
                                         ssl_context_manager_, outlier_event_logger, added_via_api,
                                         added_via_api
                                             ? validation_context_.dynamicValidationVisitor()

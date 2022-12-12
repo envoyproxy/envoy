@@ -74,7 +74,7 @@ envoy.extensions.http.cache.simple:
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: wip
   type_urls:
-  - envoy.extensions.cache.simple_http_cache.v3.SimpleHttpCacheConfig
+  - envoy.extensions.http.cache.simple_http_cache.v3.SimpleHttpCacheConfig
 envoy.clusters.aggregate:
   categories:
   - envoy.clusters
@@ -85,7 +85,22 @@ envoy.clusters.dynamic_forward_proxy:
   - envoy.clusters
   security_posture: robust_to_untrusted_downstream
   status: stable
+envoy.clusters.static:
+  categories:
+  - envoy.clusters
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+envoy.clusters.strict_dns:
+  categories:
+  - envoy.clusters
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
 envoy.clusters.original_dst:
+  categories:
+  - envoy.clusters
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+envoy.clusters.eds:
   categories:
   - envoy.clusters
   security_posture: robust_to_untrusted_downstream_and_upstream
@@ -94,6 +109,11 @@ envoy.clusters.redis:
   categories:
   - envoy.clusters
   security_posture: requires_trusted_downstream_and_upstream
+  status: stable
+envoy.clusters.logical_dns:
+  categories:
+  - envoy.clusters
+  security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
 envoy.compression.brotli.compressor:
   categories:
@@ -361,7 +381,7 @@ envoy.filters.http.jwt_authn:
   categories:
   - envoy.filters.http
   security_posture: robust_to_untrusted_downstream
-  status: alpha
+  status: stable
   type_urls:
   - envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication
   - envoy.extensions.filters.http.jwt_authn.v3.PerRouteConfig
@@ -417,6 +437,15 @@ envoy.filters.http.ratelimit:
   type_urls:
   - envoy.extensions.filters.http.ratelimit.v3.RateLimit
   - envoy.extensions.filters.http.ratelimit.v3.RateLimitPerRoute
+envoy.filters.http.rate_limit_quota:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaFilterConfig
+  - envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaOverride
+  - envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
 envoy.filters.http.rbac:
   categories:
   - envoy.filters.http
@@ -1307,3 +1336,31 @@ envoy.matching.custom_matchers.trie_matcher:
   status: alpha
   type_urls:
   - xds.type.matcher.v3.IPMatcher
+envoy.filters.http.custom_response:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.filters.http.custom_response.v3.CustomResponse
+envoy.matching.actions.format_string:
+  categories:
+  - envoy.matching.action
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.config.core.v3.SubstitutionFormatString
+envoy.http.custom_response.redirect_policy:
+  categories:
+  - envoy.http.custom_response
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.http.custom_response.redirect_policy.v3.RedirectPolicy
+envoy.http.custom_response.local_response_policy:
+  categories:
+  - envoy.http.custom_response
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy

@@ -27,7 +27,7 @@ Stats::ScopeSharedPtr generateStatsScope(const envoy::config::cluster::v3::Clust
 std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ClusterFactoryImplBase::create(
     Server::Configuration::ServerFactoryContext& server_context,
     const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cluster_manager,
-    Stats::Store& stats, Network::DnsResolverSharedPtr dns_resolver,
+    Stats::Store& stats, LazyCreateDnsResolver dns_resolver_fn,
     Ssl::ContextManager& ssl_context_manager, Outlier::EventLoggerSharedPtr outlier_event_logger,
     bool added_via_api, ProtobufMessage::ValidationVisitor& validation_visitor) {
   std::string cluster_type;
@@ -69,7 +69,7 @@ std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ClusterFactoryImplBase::
         "Didn't find a registered cluster factory implementation for name: '{}'", cluster_type));
   }
 
-  ClusterFactoryContextImpl context(server_context, cluster_manager, stats, std::move(dns_resolver),
+  ClusterFactoryContextImpl context(server_context, cluster_manager, stats, dns_resolver_fn,
                                     ssl_context_manager, std::move(outlier_event_logger),
                                     added_via_api, validation_visitor);
   return factory->create(server_context, cluster, context);

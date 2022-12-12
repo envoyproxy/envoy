@@ -69,6 +69,7 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.http.ext_authz"],
     deps = [
+        "//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
         "//source/extensions/filters/http/ext_authz:config",
         "//source/server/config_validation:server_lib",
         "//test/integration:http_integration_lib",

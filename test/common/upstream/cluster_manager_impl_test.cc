@@ -4204,6 +4204,51 @@ TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsPassedToTcpConnPool) {
   EXPECT_TRUE(opt_cp.has_value());
 }
 
+TEST_F(ClusterManagerImplTest, SelectOverrideHostTestNoOverrideHost) {
+  createWithLocalClusterUpdate();
+  NiceMock<MockLoadBalancerContext> context;
+
+  auto to_create = new Tcp::ConnectionPool::MockInstance();
+
+  EXPECT_CALL(context, overrideHostToSelect()).WillOnce(Return(absl::nullopt));
+
+  EXPECT_CALL(factory_, allocateTcpConnPool_(_)).WillOnce(Return(to_create));
+  EXPECT_CALL(*to_create, addIdleCallback(_));
+
+  auto opt_cp = cluster_manager_->getThreadLocalCluster("cluster_1")
+                    ->tcpConnPool(ResourcePriority::Default, &context);
+  EXPECT_TRUE(opt_cp.has_value());
+}
+
+TEST_F(ClusterManagerImplTest, SelectOverrideHostTestWithOverrideHost) {
+  createWithLocalClusterUpdate();
+  NiceMock<MockLoadBalancerContext> context;
+
+  auto to_create = new Tcp::ConnectionPool::MockInstance();
+
+  EXPECT_CALL(context, overrideHostToSelect())
+      .WillRepeatedly(Return(absl::make_optional<absl::string_view>("127.0.0.1:11002")));
+
+  EXPECT_CALL(factory_, allocateTcpConnPool_(_))
+      .WillOnce(testing::Invoke([&](HostConstSharedPtr host) {
+        EXPECT_EQ("127.0.0.1:11002", host->address()->asStringView());
+        return to_create;
+      }));
+  EXPECT_CALL(*to_create, addIdleCallback(_));
+
+  auto opt_cp_1 = cluster_manager_->getThreadLocalCluster("cluster_1")
+                      ->tcpConnPool(ResourcePriority::Default, &context);
+  EXPECT_TRUE(opt_cp_1.has_value());
+
+  auto opt_cp_2 = cluster_manager_->getThreadLocalCluster("cluster_1")
+                      ->tcpConnPool(ResourcePriority::Default, &context);
+  EXPECT_TRUE(opt_cp_2.has_value());
+
+  auto opt_cp_3 = cluster_manager_->getThreadLocalCluster("cluster_1")
+                      ->tcpConnPool(ResourcePriority::Default, &context);
+  EXPECT_TRUE(opt_cp_3.has_value());
+}
+
 TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsPassedToConnPool) {
   createWithLocalClusterUpdate();
   NiceMock<MockLoadBalancerContext> context;
@@ -4959,6 +5004,78 @@ TEST_F(SockoptsTest, SockoptsClusterManagerOnly) {
   initialize(yaml);
   NameVals names_vals{{ENVOY_MAKE_SOCKET_OPTION_NAME(1, 2), 3},
                       {ENVOY_MAKE_SOCKET_OPTION_NAME(4, 5), 6}};
+  if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
+    names_vals.emplace_back(std::make_pair(ENVOY_SOCKET_SO_NOSIGPIPE, 1));
+  }
+  expectSetsockopts(names_vals);
+}
+
+// The cluster options should override/replace the cluster manager options when both are specified.
+TEST_F(SockoptsTest, SockoptsClusterAndClusterManagerNoAddress) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: SockoptsCluster
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      load_assignment:
+        cluster_name: SockoptsCluster
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
+      upstream_bind_config:
+        socket_options: [
+          { level: 1, name: 2, int_value: 3, state: STATE_PREBIND }]
+  cluster_manager:
+    upstream_bind_config:
+      socket_options: [
+        { level: 4, name: 5, int_value: 6, state: STATE_PREBIND }]
+  )EOF";
+  initialize(yaml);
+  NameVals names_vals{{ENVOY_MAKE_SOCKET_OPTION_NAME(1, 2), 3}};
+  if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
+    names_vals.emplace_back(std::make_pair(ENVOY_SOCKET_SO_NOSIGPIPE, 1));
+  }
+  expectSetsockopts(names_vals);
+}
+
+// The cluster options should override/replace the cluster manager options when both are specified
+// when a source_address is only specified on the cluster manager bind config.
+TEST_F(SockoptsTest, SockoptsClusterAndClusterManagerAddress) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: SockoptsCluster
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      load_assignment:
+        cluster_name: SockoptsCluster
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 11001
+      upstream_bind_config:
+        socket_options: [
+          { level: 1, name: 2, int_value: 3, state: STATE_PREBIND }]
+  cluster_manager:
+    upstream_bind_config:
+      source_address:
+        address: 1.2.3.4
+        port_value: 80
+      socket_options: [
+        { level: 4, name: 5, int_value: 6, state: STATE_PREBIND }]
+  )EOF";
+  initialize(yaml);
+  NameVals names_vals{{ENVOY_MAKE_SOCKET_OPTION_NAME(1, 2), 3}};
   if (ENVOY_SOCKET_SO_NOSIGPIPE.hasValue()) {
     names_vals.emplace_back(std::make_pair(ENVOY_SOCKET_SO_NOSIGPIPE, 1));
   }
@@ -6009,6 +6126,25 @@ TEST_F(PreconnectTest, PreconnectOn) {
       .WillRepeatedly(ReturnNew<NiceMock<Tcp::ConnectionPool::MockInstance>>());
   auto tcp_handle = cluster_manager_->getThreadLocalCluster("cluster_1")
                         ->tcpConnPool(ResourcePriority::Default, nullptr);
+  ASSERT_TRUE(tcp_handle.has_value());
+  tcp_handle.value().newConnection(tcp_callbacks_);
+}
+
+TEST_F(PreconnectTest, PreconnectOnWithOverrideHost) {
+  // With preconnect set to 1.1, maybePreconnect will kick off
+  // preconnecting, so create the pool for both the current connection and the
+  // anticipated one.
+  initialize(1.1);
+
+  NiceMock<MockLoadBalancerContext> context;
+  EXPECT_CALL(context, overrideHostToSelect())
+      .WillRepeatedly(Return(absl::make_optional<absl::string_view>("127.0.0.1:80")));
+
+  // Only allocate connection pool once.
+  EXPECT_CALL(factory_, allocateTcpConnPool_)
+      .WillOnce(ReturnNew<NiceMock<Tcp::ConnectionPool::MockInstance>>());
+  auto tcp_handle = cluster_manager_->getThreadLocalCluster("cluster_1")
+                        ->tcpConnPool(ResourcePriority::Default, &context);
   ASSERT_TRUE(tcp_handle.has_value());
   tcp_handle.value().newConnection(tcp_callbacks_);
 }
