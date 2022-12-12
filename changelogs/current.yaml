@@ -60,7 +60,7 @@ minor_behavior_changes:
     adjust the refetch time for remote_jwks async_fetch feature. For a good fetch, refetch 5 seconds before jwks cache duration. For a failed fetch, refetch time can be specified by :ref:`failed_refetch_duration <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwksAsyncFetch.failed_refetch_duration>` with default 1 second.
 - area: healthcheck
   change: |
-    When active HC is enabled and a host is ejected by outlier detection, host is considered healthy when active health check succeeds. This behavior change can be reverted by setting ``envoy.reloadable_features_prefer_active_health_check_during_outlier_ejection_wait`` to ``false``.
+    When active HC is enabled and a host is ejected by outlier detection, host is considered healthy when active health check succeeds. This behavior change can be reverted by setting ``envoy.reloadable_features_successful_active_health_check_uneject_host`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*

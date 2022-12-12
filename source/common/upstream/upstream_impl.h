@@ -35,6 +35,7 @@
 #include "envoy/upstream/health_checker.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/locality.h"
+#include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/common/callback_impl.h"
@@ -52,7 +53,6 @@
 #include "source/common/shared_pool/shared_pool.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/common/upstream/load_balancer_impl.h"
-#include "source/common/upstream/outlier_detection_impl.h"
 #include "source/common/upstream/resource_manager_impl.h"
 #include "source/common/upstream/transport_socket_match_impl.h"
 #include "source/common/upstream/upstream_http_factory_context_impl.h"
@@ -122,6 +122,24 @@ private:
 };
 
 /**
+ * Null host monitor implementation.
+ */
+class DetectorHostMonitorNullImpl : public Outlier::DetectorHostMonitor {
+public:
+  // Upstream::Outlier::DetectorHostMonitor
+  uint32_t numEjections() override { return 0; }
+  void putHttpResponseCode(uint64_t) override {}
+  void putResult(Outlier::Result, absl::optional<uint64_t>) override {}
+  void putResponseTime(std::chrono::milliseconds) override {}
+  const absl::optional<MonotonicTime>& lastEjectionTime() override { return time_; }
+  const absl::optional<MonotonicTime>& lastUnejectionTime() override { return time_; }
+  double successRate(SuccessRateMonitorType) const override { return -1; }
+
+private:
+  const absl::optional<MonotonicTime> time_{};
+};
+
+/**
  * Implementation of Upstream::HostDescription.
  */
 class HostDescriptionImpl : virtual public HostDescription,
@@ -185,8 +203,7 @@ public:
       return *outlier_detector_;
     }
 
-    static Outlier::DetectorHostMonitorNullImpl* null_outlier_detector =
-        new Outlier::DetectorHostMonitorNullImpl();
+    static DetectorHostMonitorNullImpl* null_outlier_detector = new DetectorHostMonitorNullImpl();
     return *null_outlier_detector;
   }
   HostStats& stats() const override { return stats_; }

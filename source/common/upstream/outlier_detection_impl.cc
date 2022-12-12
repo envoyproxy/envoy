@@ -282,10 +282,11 @@ DetectorImpl::~DetectorImpl() {
   }
 }
 
-std::shared_ptr<DetectorImpl> DetectorImpl::create(
-    const Cluster& cluster, const envoy::config::cluster::v3::OutlierDetection& config,
-    Event::Dispatcher& dispatcher, Runtime::Loader& runtime, TimeSource& time_source,
-    EventLoggerSharedPtr event_logger, Random::RandomGenerator& random) {
+std::shared_ptr<DetectorImpl>
+DetectorImpl::create(Cluster& cluster, const envoy::config::cluster::v3::OutlierDetection& config,
+                     Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
+                     TimeSource& time_source, EventLoggerSharedPtr event_logger,
+                     Random::RandomGenerator& random) {
   std::shared_ptr<DetectorImpl> detector(
       new DetectorImpl(cluster, config, dispatcher, runtime, time_source, event_logger, random));
 
@@ -293,17 +294,28 @@ std::shared_ptr<DetectorImpl> DetectorImpl::create(
     throw EnvoyException(
         "outlier detector's max_ejection_time cannot be smaller than base_ejection_time");
   }
-
   detector->initialize(cluster);
 
   return detector;
 }
 
-void DetectorImpl::initialize(const Cluster& cluster) {
+void DetectorImpl::initialize(Cluster& cluster) {
   for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
     for (const HostSharedPtr& host : host_set->hosts()) {
       addHostMonitor(host);
     }
+  }
+
+  if (cluster.healthChecker() != nullptr) {
+    cluster.healthChecker()->addHostCheckCompleteCb(
+        [this](HostSharedPtr host, HealthTransition changed_state) {
+          if (Runtime::runtimeFeatureEnabled(
+                  "envoy.reloadable_features.successful_active_health_check_uneject_host") &&
+              changed_state == HealthTransition::Changed &&
+              host->coarseHealth() == Host::Health::Healthy) {
+            unejectHost(host, time_source_.monotonicTime());
+          }
+        });
   }
   member_update_cb_ = cluster.prioritySet().addMemberUpdateCb(
       [this](const HostVector& hosts_added, const HostVector& hosts_removed) -> void {
@@ -355,19 +367,23 @@ void DetectorImpl::checkHostForUneject(HostSharedPtr host, DetectorHostMonitorIm
   ASSERT(monitor->numEjections() > 0);
   if ((min(base_eject_time * monitor->ejectTimeBackoff(), max_eject_time) + jitter) <=
       (now - monitor->lastEjectionTime().value())) {
-    ejections_active_helper_.dec();
-    host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
-    // Reset the consecutive failure counters to avoid re-ejection on very few new errors due
-    // to the non-triggering counter being close to its trigger value.
-    host_monitors_[host]->resetConsecutive5xx();
-    host_monitors_[host]->resetConsecutiveGatewayFailure();
-    host_monitors_[host]->resetConsecutiveLocalOriginFailure();
-    monitor->uneject(now);
-    runCallbacks(host);
+    unejectHost(host, now);
+  }
+}
 
-    if (event_logger_) {
-      event_logger_->logUneject(host);
-    }
+void DetectorImpl::unejectHost(HostSharedPtr host, MonotonicTime now) {
+  ejections_active_helper_.dec();
+  host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
+  // Reset the consecutive failure counters to avoid re-ejection on very few new errors due
+  // to the non-triggering counter being close to its trigger value.
+  host_monitors_[host]->resetConsecutive5xx();
+  host_monitors_[host]->resetConsecutiveGatewayFailure();
+  host_monitors_[host]->resetConsecutiveLocalOriginFailure();
+  host_monitors_[host]->uneject(now);
+  runCallbacks(host);
+
+  if (event_logger_) {
+    event_logger_->logUneject(host);
   }
 }
 
@@ -505,6 +521,8 @@ void DetectorImpl::ejectHost(HostSharedPtr host,
       }
     }
   } else {
+    std::cout << "ejection overflow"
+              << "\n";
     stats_.ejections_overflow_.inc();
   }
 }
