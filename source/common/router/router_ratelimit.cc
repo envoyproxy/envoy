@@ -252,7 +252,7 @@ bool QueryParameterValueMatchAction::populateDescriptor(
     RateLimit::DescriptorEntry& descriptor_entry, const std::string&,
     const Http::RequestHeaderMap& headers, const StreamInfo::StreamInfo&) const {
   Http::Utility::QueryParams query_parameters =
-      Http::Utility::parseQueryString(headers.getPathValue());
+      Http::Utility::parseAndDecodeQueryString(headers.getPathValue());
   if (expect_match_ ==
       ConfigUtility::matchQueryParams(query_parameters, action_query_parameters_)) {
     descriptor_entry = {descriptor_key_, descriptor_value_};
