@@ -21,7 +21,6 @@ import sys
 # and line information. Output appended to end of original backtrace line. Output
 # any nonmatching lines unmodified. End when EOF received.
 def decode_stacktrace_log(object_file, input_source, address_offset=0):
-    traces = {}
     # Match something like:
     #     [backtrace] [bazel-out/local-dbg/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:84]
     backtrace_marker = "\[backtrace\] [^\s]+"

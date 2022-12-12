@@ -393,7 +393,7 @@ stages:
     pool:
       vmImage: "ubuntu-20.04"
     # This condition ensures that this (required) check passes if all of
-    # the preceeding checks either pass or are skipped
+    # the preceding checks either pass or are skipped
     # adapted from:
     #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
     condition: |
@@ -477,7 +477,7 @@ stages:
     pool:
       vmImage: "ubuntu-20.04"
     # This condition ensures that this (required) check passes if all of
-    # the preceeding checks either pass or are skipped
+    # the preceding checks either pass or are skipped
     # adapted from:
     #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
     condition: |
@@ -566,7 +566,7 @@ stages:
     pool:
       vmImage: "ubuntu-20.04"
     # This condition ensures that this (required) job passes if all of
-    # the preceeding jobs either pass or are skipped
+    # the preceding jobs either pass or are skipped
     # adapted from:
     #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
     condition: in(dependencies.docker.result, 'Succeeded', 'SucceededWithIssues', 'Skipped')
@@ -735,7 +735,7 @@ stages:
     pool:
       vmImage: "ubuntu-20.04"
     # This condition ensures that this (required) job passes if all of
-    # the preceeding jobs either pass or are skipped
+    # the preceding jobs either pass or are skipped
     # adapted from:
     #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
     condition: in(dependencies.examples.result, 'Succeeded', 'SucceededWithIssues', 'Skipped')

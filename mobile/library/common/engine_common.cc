@@ -12,8 +12,10 @@ const char* listener_type = "envoy.listener_manager_impl.api";
 const char* listener_type = "envoy.listener_manager_impl.default";
 #endif
 
+std::string hotRestartVersion(bool) { return "disabled"; }
+
 EngineCommon::EngineCommon(int argc, const char* const* argv)
-    : options_(argc, argv, &MainCommon::hotRestartVersion, spdlog::level::info, listener_type),
+    : options_(argc, argv, &hotRestartVersion, spdlog::level::info, listener_type),
       base_(options_, real_time_system_, default_listener_hooks_, prod_component_factory_,
             std::make_unique<PlatformImpl>(), std::make_unique<Random::RandomGeneratorImpl>(),
             nullptr) {
