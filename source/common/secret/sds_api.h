@@ -92,7 +92,7 @@ protected:
   Api::Api& api_;
 
 private:
-  void validateUpdateSize(int num_resources);
+  bool validateUpdateSize(int num_resources);
   void initialize();
   FileContentMap loadFiles();
   uint64_t getHashForFiles(const FileContentMap& files);

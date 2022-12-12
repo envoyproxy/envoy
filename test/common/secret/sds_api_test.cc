@@ -778,7 +778,7 @@ generic_secret:
             Config::DataSource::read(generic_secret.secret(), true, *api_));
 }
 
-// Validate that SdsApi throws exception if an empty secret is passed to onConfigUpdate().
+// Validate that SdsApi returns w/o exception if an empty secret is passed to onConfigUpdate().
 TEST_F(SdsApiTest, EmptyResource) {
   envoy::config::core::v3::ConfigSource config_source;
   setupMocks();
@@ -788,9 +788,7 @@ TEST_F(SdsApiTest, EmptyResource) {
   init_manager_.add(*sds_api.initTarget());
 
   initialize();
-  EXPECT_THROW_WITH_MESSAGE(subscription_factory_.callbacks_->onConfigUpdate({}, ""),
-                            EnvoyException,
-                            "Missing SDS resources for abc.com in onConfigUpdate()");
+  EXPECT_NO_THROW(subscription_factory_.callbacks_->onConfigUpdate({}, ""));
 }
 
 // Validate that SdsApi throws exception if multiple secrets are passed to onConfigUpdate().

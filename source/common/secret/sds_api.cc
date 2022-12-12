@@ -81,7 +81,9 @@ void SdsApi::onWatchUpdate() {
 
 void SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
                             const std::string& version_info) {
-  validateUpdateSize(resources.size());
+  if (!validateUpdateSize(resources.size())) {
+    return;
+  }
   const auto& secret = dynamic_cast<const envoy::extensions::transport_sockets::tls::v3::Secret&>(
       resources[0].get().resource());
 
@@ -133,7 +135,9 @@ void SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resou
 
 void SdsApi::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
                             const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
-  validateUpdateSize(added_resources.size());
+  if (!validateUpdateSize(added_resources.size())) {
+    return;
+  }
   onConfigUpdate(added_resources, added_resources[0].get().version());
 }
 
@@ -144,14 +148,16 @@ void SdsApi::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reaso
   init_target_.ready();
 }
 
-void SdsApi::validateUpdateSize(int num_resources) {
+bool SdsApi::validateUpdateSize(int num_resources) {
   if (num_resources == 0) {
-    throw EnvoyException(
-        fmt::format("Missing SDS resources for {} in onConfigUpdate()", sds_config_name_));
+    ENVOY_LOG_MISC(debug, "Missing SDS resource for {} in onConfigUpdate()", sds_config_name_);
+    init_target_.ready();
+    return false;
   }
   if (num_resources != 1) {
     throw EnvoyException(fmt::format("Unexpected SDS secrets length: {}", num_resources));
   }
+  return true;
 }
 
 void SdsApi::initialize() {
