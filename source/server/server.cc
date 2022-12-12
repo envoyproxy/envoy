@@ -286,7 +286,8 @@ void InstanceImpl::updateServerStats() {
     server_stats_->seconds_until_first_ocsp_response_expiring_.set(
         secs_until_ocsp_response_expires.value());
   }
-  server_stats_->state_.set(enumToInt(serverState(initManager().state(), healthCheckFailed())));
+  server_stats_->state_.set(
+      enumToInt(Utility::serverState(initManager().state(), healthCheckFailed())));
   server_stats_->stats_recent_lookups_.set(
       stats_store_.symbolTable().getRecentLookups([](absl::string_view, uint64_t) {}));
 }
