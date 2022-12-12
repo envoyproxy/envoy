@@ -315,7 +315,7 @@ TEST_F(FileSystemImplTest, PreadFailureReturnsError) {
   absl::string_view view{buf, sizeof(buf)};
   FilePathAndType file_info{Filesystem::DestinationType::File, file_path};
   FilePtr file = file_system_.createFile(file_info);
-  // Open with write-only permission so that pread should fail.
+  // Open with write-only permission so that `pread` should fail.
   const Api::IoCallBoolResult open_result =
       file->open(FlagSet{1 << Filesystem::File::Operation::Write});
   EXPECT_TRUE(open_result.return_value_) << open_result.err_->getErrorDetails();
