@@ -63,6 +63,9 @@ public:
   MOCK_METHOD(CancelFunction, openExistingFile,
               (absl::string_view filename, Mode mode,
                std::function<void(absl::StatusOr<AsyncFileHandle>)> on_complete));
+  MOCK_METHOD(CancelFunction, stat,
+              (absl::string_view filename,
+               std::function<void(absl::StatusOr<struct stat>)> on_complete));
   MOCK_METHOD(CancelFunction, unlink,
               (absl::string_view filename, std::function<void(absl::Status)> on_complete));
   MOCK_METHOD(std::string, describe, (), (const));
