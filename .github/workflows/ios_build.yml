@@ -213,21 +213,20 @@ jobs:
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //examples/objective-c/hello_world:app
-    # TODO(jpsim): Re-enable running the app
     # Run the app in the background and redirect logs.
-    # - name: 'Run app'
-    #   if: steps.should_run.outputs.run_ci_job == 'true'
-    #   env:
-    #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    #   run: |
-    #     cd mobile && ./bazelw run \
-    #         --config=ios \
-    #         $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
-    #         --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
-    #         //examples/objective-c/hello_world:app &> /tmp/envoy.log &
-    # - run: sed '/received headers with status 200/q' <(touch /tmp/envoy.log && tail -F /tmp/envoy.log)
-    #   if: steps.should_run.outputs.run_ci_job == 'true'
-    #   name: 'Check connectivity'
-    # - run: cat /tmp/envoy.log
-    #   if: ${{ failure() || cancelled() }}
-    #   name: 'Log app run'
+    - name: 'Run app'
+      if: steps.should_run.outputs.run_ci_job == 'true'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        cd mobile && ./bazelw run \
+            --config=ios \
+            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
+            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
+            //examples/objective-c/hello_world:app &> /tmp/envoy.log &
+    - run: sed '/received headers with status 200/q' <(touch /tmp/envoy.log && tail -F /tmp/envoy.log)
+      if: steps.should_run.outputs.run_ci_job == 'true'
+      name: 'Check connectivity'
+    - run: cat /tmp/envoy.log
+      if: ${{ failure() || cancelled() }}
+      name: 'Log app run'
