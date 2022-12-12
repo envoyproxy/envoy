@@ -236,7 +236,17 @@ private:
   IsolatedStatsCache<TextReadout> text_readouts_;
   RefcountPtr<NullCounterImpl> null_counter_;
   RefcountPtr<NullGaugeImpl> null_gauge_;
+
+  // We construct the default-scope lazily to allow subclasses to override
+  // makeScope(), making it easier to share infrastructure across subclasses
+  // around managing scopes. Since you can't call an overridden virtual method
+  // from a parent-class constructor, we instantiate this lazily after the
+  // object has been fully constructed.
+  //
+  // This technically does not need to be declared mutable, but is conceptualy
+  // mutable because we can update this in the const method constRootScope().
   mutable ScopeSharedPtr lazy_default_scope_;
+
   std::vector<ScopeSharedPtr> scopes_;
 };
 

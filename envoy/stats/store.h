@@ -116,7 +116,7 @@ public:
   virtual void forEachScope(SizeFn f_size, StatFn<const Scope> f_stat) const PURE;
 
   /**
-   * @return a null counter that will ignore increemts and always return 0.
+   * @return a null counter that will ignore increments and always return 0.
    */
   virtual Counter& nullCounter() PURE;
 
@@ -160,8 +160,8 @@ public:
   // accessing the rootScope() to call these methods.
   operator Scope&() { return *rootScope(); }
 
-  // Delegate somea methods to the root scope; these are exposed to make it more
-  // convenient to use stats_macros.h. We mayconsider dropping them if desired,
+  // Delegate some methods to the root scope; these are exposed to make it more
+  // convenient to use stats_macros.h. We may consider dropping them if desired,
   // when we resovle #24007 or in the next follow-up.
   Counter& counterFromString(const std::string& name) {
     return rootScope()->counterFromString(name);
