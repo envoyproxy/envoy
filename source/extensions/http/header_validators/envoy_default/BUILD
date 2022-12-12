@@ -23,8 +23,8 @@ envoy_cc_library(
     ],
     deps = [
         ":character_tables",
-        ":error_codes",
         ":path_normalizer",
+        "//envoy/http:header_validator_errors",
         "//envoy/http:header_validator_interface",
         "//external:abseil_node_hash_set",
         "//source/common/http:headers_lib",
@@ -44,20 +44,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "error_codes",
-    hdrs = [
-        "error_codes.h",
-    ],
-    visibility = [
-        "//test/common/http/http1:__subpackages__",
-        "//test/extensions/http/header_validators/envoy_default:__subpackages__",
-    ],
-    deps = [
-        "//source/common/singleton:const_singleton",
-    ],
-)
-
-envoy_cc_library(
     name = "path_normalizer",
     srcs = [
         "path_normalizer.cc",
@@ -71,7 +57,7 @@ envoy_cc_library(
     ],
     deps = [
         ":character_tables",
-        ":error_codes",
+        "//envoy/http:header_validator_errors",
         "//envoy/http:header_validator_interface",
         "//source/common/http:headers_lib",
         "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto",
@@ -91,8 +77,8 @@ envoy_cc_library(
         "//test/extensions/http/header_validators/envoy_default:__subpackages__",
     ],
     deps = [
-        ":error_codes",
         ":header_validator_common",
+        "//envoy/http:header_validator_errors",
         "//envoy/http:header_validator_interface",
         "//external:abseil_node_hash_set",
         "//source/common/http:headers_lib",
@@ -113,8 +99,8 @@ envoy_cc_library(
         "//test/extensions/http/header_validators/envoy_default:__subpackages__",
     ],
     deps = [
-        ":error_codes",
         ":header_validator_common",
+        "//envoy/http:header_validator_errors",
         "//envoy/http:header_validator_interface",
         "//external:abseil_node_hash_map",
         "//external:abseil_node_hash_set",

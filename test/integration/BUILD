@@ -846,7 +846,7 @@ envoy_cc_test_library(
     deps = [
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
-        "//source/server:listener_manager_lib",
+        "//source/extensions/listener_managers/listener_manager:listener_manager_lib",
         "//envoy/api:api_interface",
         "//envoy/grpc:status",
         "//envoy/http:codec_interface",
@@ -874,7 +874,7 @@ envoy_cc_test_library(
         "//source/common/network:udp_packet_writer_handler_lib",
         "//source/common/network:utility_lib",
         "//source/common/stats:isolated_store_lib",
-        "//source/server:active_raw_udp_listener_config",
+        "//source/extensions/listener_managers/listener_manager:active_raw_udp_listener_config",
         "//source/server:connection_handler_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:test_time_system_interface",
