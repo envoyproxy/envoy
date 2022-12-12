@@ -243,7 +243,7 @@ private:
   // from a parent-class constructor, we instantiate this lazily after the
   // object has been fully constructed.
   //
-  // This technically does not need to be declared mutable, but is conceptualy
+  // This technically does not need to be declared mutable, but is conceptually
   // mutable because we can update this in the const method constRootScope().
   mutable ScopeSharedPtr lazy_default_scope_;
 
