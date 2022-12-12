@@ -100,6 +100,10 @@ class FilterThrowingExceptionTest {
     val builder = AndroidEngineBuilder(context)
     val engine = builder
       .addLogLevel(LogLevel.DEBUG)
+      .setEventTracker { event ->
+        // NO CRASH IF THIS CLOSURE IS NOT SET
+        print(event)
+      }
       .addPlatformFilter(::ThrowingFilter)
       .setOnEngineRunning { onEngineRunningLatch.countDown() }
       .build()

@@ -69,6 +69,7 @@ void jni_delete_const_global_ref(const void* context) {
 bool clear_pending_exceptions(JNIEnv* env) {
   if (env->ExceptionCheck() == JNI_TRUE) {
     env->ExceptionClear();
+    ENVOY_LOG_EVENT_TO_LOGGER(GET_MISC_LOGGER(), info, "jni_exception", "THIS CRASHES");
     // TODO(Augustyniak): Log exception details.
     return true;
   } else {
