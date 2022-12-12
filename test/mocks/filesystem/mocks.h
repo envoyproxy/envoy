@@ -22,6 +22,8 @@ public:
   Api::IoCallBoolResult open(FlagSet flag) override;
   Api::IoCallSizeResult write(absl::string_view buffer) override;
   Api::IoCallBoolResult close() override;
+  Api::IoCallSizeResult pread(void* buf, size_t count, off_t offset) override;
+  Api::IoCallSizeResult pwrite(const void* buf, size_t count, off_t offset) override;
   bool isOpen() const override { return is_open_; };
   MOCK_METHOD(std::string, path, (), (const));
   MOCK_METHOD(DestinationType, destinationType, (), (const));
@@ -30,13 +32,21 @@ public:
   MOCK_METHOD(Api::IoCallBoolResult, open_, (const FlagSet& flag));
   MOCK_METHOD(Api::IoCallSizeResult, write_, (absl::string_view buffer));
   MOCK_METHOD(Api::IoCallBoolResult, close_, ());
+  MOCK_METHOD(Api::IoCallSizeResult, pread_, (void* buf, size_t count, off_t offset));
+  MOCK_METHOD(Api::IoCallSizeResult, pwrite_, (const void* buf, size_t count, off_t offset));
 
   size_t num_opens_;
   size_t num_writes_;
+  size_t num_preads_;
+  size_t num_pwrites_;
   Thread::MutexBasicLockable open_mutex_;
   Thread::MutexBasicLockable write_mutex_;
+  Thread::MutexBasicLockable pread_mutex_;
+  Thread::MutexBasicLockable pwrite_mutex_;
   Thread::CondVar open_event_;
   Thread::CondVar write_event_;
+  Thread::CondVar pread_event_;
+  Thread::CondVar pwrite_event_;
 
 private:
   bool is_open_;
