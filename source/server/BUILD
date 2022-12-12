@@ -528,6 +528,7 @@ envoy_cc_library(
         ":listener_manager_factory_lib",
         ":regex_engine_lib",
         ":ssl_context_manager_lib",
+        ":utils_lib",
         ":worker_lib",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:signal_interface",
