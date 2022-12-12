@@ -14,7 +14,6 @@ envoy_cc_library(
     deps = [
         "extension_registry_platform_additions",
         "@envoy//source/common/network:socket_lib",
-        "@envoy//source/common/quic:quic_transport_socket_factory_lib",
         "@envoy//source/common/router:upstream_codec_filter_lib",
         "@envoy//source/extensions/clusters/dynamic_forward_proxy:cluster",
         "@envoy//source/extensions/clusters/logical_dns:logical_dns_cluster_lib",
@@ -46,7 +45,10 @@ envoy_cc_library(
         "@envoy_mobile//library/common/extensions/filters/http/socket_tag:config",
         "@envoy_mobile//library/common/extensions/listener_managers/api_listener_manager:api_listener_manager_lib",
         "@envoy_mobile//library/common/extensions/retry/options/network_configuration:config",
-    ],
+    ] + select({
+        "@envoy//bazel:disable_http3": [],
+        "//conditions:default": ["@envoy//source/common/quic:quic_transport_socket_factory_lib"],
+    }),
 )
 
 envoy_cc_library(
