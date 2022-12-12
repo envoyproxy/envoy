@@ -1,8 +1,9 @@
 #include "source/extensions/http/header_validators/envoy_default/http1_header_validator.h"
 
+#include "envoy/http/header_validator_errors.h"
+
 #include "source/common/http/utility.h"
 #include "source/extensions/http/header_validators/envoy_default/character_tables.h"
-#include "source/extensions/http/header_validators/envoy_default/error_codes.h"
 
 #include "absl/container/node_hash_set.h"
 #include "absl/strings/string_view.h"
@@ -18,6 +19,7 @@ using ::Envoy::Http::HeaderString;
 using ::Envoy::Http::LowerCaseString;
 using ::Envoy::Http::Protocol;
 using ::Envoy::Http::RequestHeaderMap;
+using ::Envoy::Http::UhvResponseCodeDetail;
 using HeaderValidatorFunction =
     HeaderValidator::HeaderValueValidationResult (Http1HeaderValidator::*)(const HeaderString&);
 

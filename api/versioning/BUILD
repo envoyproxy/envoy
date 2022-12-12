@@ -168,6 +168,7 @@ proto_library(
         "//envoy/extensions/formatter/req_without_query/v3:pkg",
         "//envoy/extensions/health_checkers/redis/v3:pkg",
         "//envoy/extensions/health_checkers/thrift/v3:pkg",
+        "//envoy/extensions/http/cache/file_system_http_cache/v3:pkg",
         "//envoy/extensions/http/cache/simple_http_cache/v3:pkg",
         "//envoy/extensions/http/custom_response/local_response_policy/v3:pkg",
         "//envoy/extensions/http/custom_response/redirect_policy/v3:pkg",

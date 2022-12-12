@@ -16,6 +16,7 @@
 #include "source/extensions/filters/network/http_connection_manager/config.h"
 #include "source/extensions/http/header_formatters/preserve_case/config.h"
 #include "source/extensions/http/original_ip_detection/xff/config.h"
+#include "source/extensions/listener_managers/listener_manager/listener_manager_impl.h"
 #include "source/extensions/network/dns_resolver/getaddrinfo/getaddrinfo.h"
 #include "source/extensions/request_id/uuid/config.h"
 #include "source/extensions/stat_sinks/metrics_service/config.h"
@@ -75,6 +76,7 @@ void ExtensionRegistry::registerFactories() {
   Router::forceRegisterUpstreamCodecFilterFactory();
   Envoy::Network::forceRegisterGetAddrInfoDnsResolverFactory();
   Envoy::Extensions::RequestId::forceRegisterUUIDRequestIDExtensionFactory();
+  Envoy::Server::forceRegisterDefaultListenerManagerFactoryImpl();
 
   // TODO: add a "force initialize" function to the upstream code, or clean up the upstream code
   // in such a way that does not depend on the statically initialized variable.

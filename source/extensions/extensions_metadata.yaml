@@ -68,6 +68,13 @@ envoy.bootstrap.wasm:
   status: alpha
   type_urls:
   - envoy.extensions.wasm.v3.WasmService
+envoy.extensions.http.cache.file_system_http_cache:
+  categories:
+  - envoy.http.cache
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.http.cache.file_system_http_cache.v3.FileSystemHttpCacheConfig
 envoy.extensions.http.cache.simple:
   categories:
   - envoy.http.cache
@@ -252,6 +259,7 @@ envoy.filters.http.compressor:
   status: stable
   type_urls:
   - envoy.extensions.filters.http.compressor.v3.Compressor
+  - envoy.extensions.filters.http.compressor.v3.CompressorPerRoute
 envoy.filters.http.cors:
   categories:
   - envoy.filters.http
