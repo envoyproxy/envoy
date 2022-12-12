@@ -765,7 +765,7 @@ MAKE_STATS_STRUCT(ClusterLbStats, ClusterLbStatNames, ALL_CLUSTER_LB_STATS);
  */
 MAKE_STAT_NAMES_STRUCT(ClusterTrafficStatNames, ALL_CLUSTER_TRAFFIC_STATS);
 MAKE_STATS_STRUCT(ClusterTrafficStats, ClusterTrafficStatNames, ALL_CLUSTER_TRAFFIC_STATS);
-using ClusterTrafficStatsPtr = std::unique_ptr<ClusterTrafficStats>;
+using LazyClusterTrafficStats = std::unique_ptr<ClusterTrafficStats>;
 
 MAKE_STAT_NAMES_STRUCT(ClusterLoadReportStatNames, ALL_CLUSTER_LOAD_REPORT_STATS);
 MAKE_STATS_STRUCT(ClusterLoadReportStats, ClusterLoadReportStatNames,
@@ -1061,12 +1061,12 @@ public:
   virtual ClusterEndpointStats& endpointStats() const PURE;
 
   /**
-   * @return std::unique_ptr<ClusterTrafficStats>&  all traffic related stats for this cluster.
-   * NOTE: Returning "std::unique_ptr<ClusterTrafficStats>&" for now to make way for future
-   * lazy-init on trafficStats(). See
+   * @return LazyClusterTrafficStats&  all traffic related stats for this cluster.
+   * NOTE: LazyClusterTrafficStats for now is an alias of "std::unique_ptr<ClusterTrafficStats>",
+   * this is to make way for future lazy-init on trafficStats(). See
    * https://github.com/envoyproxy/envoy/pull/23921#issuecomment-1335239116 for more context.
    */
-  virtual std::unique_ptr<ClusterTrafficStats>& trafficStats() const PURE;
+  virtual LazyClusterTrafficStats& trafficStats() const PURE;
 
   /**
    * @return the stats scope that contains all cluster stats. This can be used to produce dynamic
