@@ -7,6 +7,10 @@ namespace Envoy {
 namespace Server {
 namespace Utility {
 
+/*
+    Fetches the current state of the server (e.g., initializing, live, etc.)
+    given the manager's state and the status of the health check.
+*/
 envoy::admin::v3::ServerInfo::State serverState(Init::Manager::State state,
                                                 bool health_check_failed);
 
