@@ -16,7 +16,7 @@ namespace Server {
  */
 class ApiListenerManagerImpl : public ListenerManager, Logger::Loggable<Logger::Id::config> {
 public:
-  ApiListenerManagerImpl(Instance& server);
+  explicit ApiListenerManagerImpl(Instance& server);
 
   // Server::ListenerManager
   bool addOrUpdateListener(const envoy::config::listener::v3::Listener& config,
