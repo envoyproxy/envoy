@@ -2887,7 +2887,7 @@ TEST_F(PostCloseConnectionImplTest, CloseAbort) {
   writeSomeData();
 
   // Connection abort. We have data written above in writeSomeData(),
-  // it won't be written and flushed due to Abort.
+  // it won't be written and flushed due to ``ConnectionCloseType::Abort``.
   EXPECT_CALL(*transport_socket_, doWrite(_, true)).Times(0);
   EXPECT_CALL(*transport_socket_, closeSocket(_));
   connection_->close(ConnectionCloseType::Abort);
