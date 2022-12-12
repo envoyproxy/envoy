@@ -1,5 +1,5 @@
 load("@rules_foreign_cc//foreign_cc:repositories.bzl", "rules_foreign_cc_dependencies")
-load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
+load("@io_bazel_rules_go//go:deps.bzl", "go_download_sdk", "go_register_toolchains", "go_rules_dependencies")
 load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
 load("@build_bazel_rules_apple//apple:repositories.bzl", "apple_rules_dependencies")
 load("@rules_fuzzing//fuzzing:repositories.bzl", "rules_fuzzing_dependencies")
@@ -25,6 +25,12 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
     rules_foreign_cc_dependencies(register_default_tools = False, register_built_tools = False)
     go_rules_dependencies()
     go_register_toolchains(go_version)
+    go_download_sdk(
+        name = "go_sdk",
+        goos = "darwin",
+        goarch = "amd64",
+        version = go_version,
+    )
     gazelle_dependencies()
     apple_rules_dependencies()
     pip_dependencies()
