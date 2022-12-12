@@ -1,7 +1,6 @@
 #include "source/common/http/status.h"
 
 #include "source/common/common/assert.h"
-#include "source/common/common/safe_memcpy.h"
 
 #include "absl/strings/str_cat.h"
 
@@ -42,13 +41,11 @@ struct PrematureResponsePayload : public EnvoyStatusPayload {
 };
 
 template <typename T> void storePayload(absl::Status& status, const T& payload) {
-  const size_t payload_size = sizeof(payload);
-  char* buffer = new char[payload_size];
-  safeMemcpyUnsafeDst(buffer, &payload);
-  absl::Cord cord(absl::string_view(buffer, payload_size));
+  const T* allocated = new T(payload);
+  const absl::string_view sv = absl::string_view(reinterpret_cast<const char*>(allocated), sizeof(allocated));
+  absl::Cord cord = absl::MakeCordFromExternal(sv, [allocated]() { delete allocated; });
   cord.Flatten(); // Flatten ahead of time for easier access later.
   status.SetPayload(EnvoyPayloadUrl, std::move(cord));
-  free(buffer);
 }
 
 template <typename T = EnvoyStatusPayload> const T& getPayload(const absl::Status& status) {
@@ -62,9 +59,7 @@ template <typename T = EnvoyStatusPayload> const T& getPayload(const absl::Statu
       auto data = cord.TryFlat();
       ASSERT(data.has_value()); // EnvoyPayloadUrl cords are flattened ahead of time
       ASSERT(data.value().length() >= sizeof(T), "Invalid payload length");
-      char* buffer = new char[sizeof(T)];
-      memcpy(buffer, data.value().data(), sizeof(T)); // NOLINT(safe-memcpy)
-      payload = reinterpret_cast<const T*>(buffer);
+      payload = reinterpret_cast<const T*>(data.value().data());
     }
   });
   ASSERT(payload);
