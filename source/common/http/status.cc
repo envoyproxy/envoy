@@ -42,7 +42,8 @@ struct PrematureResponsePayload : public EnvoyStatusPayload {
 
 template <typename T> void storePayload(absl::Status& status, const T& payload) {
   const T* allocated = new T(payload);
-  const absl::string_view sv = absl::string_view(reinterpret_cast<const char*>(allocated), sizeof(allocated));
+  const absl::string_view sv =
+      absl::string_view(reinterpret_cast<const char*>(allocated), sizeof(allocated));
   absl::Cord cord = absl::MakeCordFromExternal(sv, [allocated]() { delete allocated; });
   cord.Flatten(); // Flatten ahead of time for easier access later.
   status.SetPayload(EnvoyPayloadUrl, std::move(cord));
