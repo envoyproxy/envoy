@@ -47,7 +47,7 @@ envoy_cc_library(
         "@envoy_mobile//library/common/extensions/retry/options/network_configuration:config",
     ] + envoy_select_enable_http3([
         "@envoy//source/common/quic:quic_transport_socket_factory_lib",
-    ])
+    ]),
 )
 
 envoy_cc_library(
