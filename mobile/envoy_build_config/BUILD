@@ -27,6 +27,7 @@ envoy_cc_library(
         "@envoy//source/extensions/filters/http/router:config",
         "@envoy//source/extensions/filters/network/http_connection_manager:config",
         "@envoy//source/extensions/http/header_formatters/preserve_case:config",
+        "@envoy//source/extensions/listener_managers/listener_manager:listener_manager_lib",
         "@envoy//source/extensions/network/dns_resolver/getaddrinfo:config",
         "@envoy//source/extensions/request_id/uuid:config",
         "@envoy//source/extensions/stat_sinks/metrics_service:config",

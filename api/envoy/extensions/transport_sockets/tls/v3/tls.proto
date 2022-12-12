@@ -55,7 +55,7 @@ message UpstreamTlsContext {
   google.protobuf.UInt32Value max_session_keys = 4;
 }
 
-// [#next-free-field: 10]
+// [#next-free-field: 9]
 message DownstreamTlsContext {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.auth.DownstreamTlsContext";
@@ -123,11 +123,6 @@ message DownstreamTlsContext {
   // an accompanying OCSP response or if the response expires at runtime.
   // Defaults to LENIENT_STAPLING
   OcspStaplePolicy ocsp_staple_policy = 8 [(validate.rules).enum = {defined_only: true}];
-
-  // Multiple certificates are allowed in Downstream transport socket to serve different SNI.
-  // If the client provides SNI but no such cert matched, it will decide to full scan certificates or not based on this config.
-  // Defaults to false. See more details in :ref:`Multiple TLS certificates <arch_overview_ssl_cert_select>`.
-  google.protobuf.BoolValue full_scan_certs_on_sni_mismatch = 9;
 }
 
 // TLS key log configuration.
@@ -232,9 +227,12 @@ message CommonTlsContext {
   // TLS protocol versions, cipher suites etc.
   TlsParameters tls_params = 1;
 
-  // Only a single TLS certificate is supported in client contexts. In server contexts,
   // :ref:`Multiple TLS certificates <arch_overview_ssl_cert_select>` can be associated with the
-  // same context to allow both RSA and ECDSA certificates and support SNI-based selection.
+  // same context to allow both RSA and ECDSA certificates.
+  //
+  // Only a single TLS certificate is supported in client contexts. In server contexts, the first
+  // RSA certificate is used for clients that only support RSA and the first ECDSA certificate is
+  // used for clients that support ECDSA.
   //
   // Only one of ``tls_certificates``, ``tls_certificate_sds_secret_configs``,
   // and ``tls_certificate_provider_instance`` may be used.

@@ -6,6 +6,7 @@
 namespace Envoy {
 namespace Server {
 
+// This macro defines the listener stats which each Envoy listener will have.
 #define ALL_LISTENER_STATS(COUNTER, GAUGE, HISTOGRAM)                                              \
   COUNTER(downstream_cx_destroy)                                                                   \
   COUNTER(downstream_cx_overflow)                                                                  \
@@ -28,6 +29,7 @@ struct ListenerStats {
   ALL_LISTENER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
 };
 
+// This macro defines the listener stats which each Envoy worker will have.
 #define ALL_PER_HANDLER_LISTENER_STATS(COUNTER, GAUGE)                                             \
   COUNTER(downstream_cx_total)                                                                     \
   GAUGE(downstream_cx_active, Accumulate)
