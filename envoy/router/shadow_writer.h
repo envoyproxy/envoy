@@ -23,7 +23,7 @@ public:
    * Shadow a request.
    * @param cluster supplies the cluster name to shadow to.
    * @param message supplies the complete request to shadow.
-   * @param timeout supplies the shadowed request timeout.
+   * @param options supplies the request options for the underlying asynchronous request.
    */
   virtual void shadow(const std::string& cluster, Http::RequestMessagePtr&& request,
                       const Http::AsyncClient::RequestOptions& options) PURE;
@@ -33,7 +33,7 @@ public:
    * data can be passed to the returned handle after the headers have been sent.
    * @param cluster supplies the cluster name to shadow to.
    * @param headers supplies the headers for initializing the shadow.
-   * @param timeout supplies the shadowed request timeout.
+   * @param options supplies the request options for the underlying asynchronous request.
    * @return OngoingRequest* pointer which can have additional data and trailers sent to it.
    */
   virtual Http::AsyncClient::OngoingRequest*

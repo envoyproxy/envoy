@@ -232,8 +232,8 @@ TEST_F(AsyncClientImplTest, BasicOngoingRequest) {
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data_copy), false));
   EXPECT_CALL(stream_encoder_, encodeTrailers(HeaderMapEqualRef(&trailers_copy)));
 
-  AsyncClient::OngoingRequest* request = client_.startRequest(
-      std::move(headers), callbacks_, AsyncClient::RequestOptions().setEndStream(false));
+  AsyncClient::OngoingRequest* request =
+      client_.startRequest(std::move(headers), callbacks_, AsyncClient::RequestOptions());
   EXPECT_NE(request, nullptr);
 
   request->captureAndSendData(std::move(data), false);

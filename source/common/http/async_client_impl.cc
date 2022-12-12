@@ -303,7 +303,7 @@ void AsyncRequestImpl::initialize() {
 
 void AsyncOngoingRequestImpl::initialize() {
   child_span_->injectContext(*request_headers_, nullptr);
-  sendHeaders(*request_headers_, end_stream_immediately_);
+  sendHeaders(*request_headers_, false);
 }
 
 void AsyncRequestSharedImpl::onComplete() {

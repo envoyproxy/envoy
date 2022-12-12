@@ -132,8 +132,6 @@ public:
     virtual void onReset() PURE;
   };
 
-  class Stream;
-
   using StreamDestructorCallbacks = std::function<void()>;
 
   /**
@@ -171,7 +169,9 @@ public:
     virtual void reset() PURE;
 
     /***
-     * Add destructor callback.
+     * Register callback to be called on stream destruction. This callback must persist beyond the
+     * lifetime of the stream or be unregistered via removeDestructorCallback. Calling this method
+     * twice with different callbacks will overwrite.
      */
     virtual void setDestructorCallback(StreamDestructorCallbacks callback) PURE;
 
@@ -181,7 +181,9 @@ public:
     virtual void removeDestructorCallback() PURE;
 
     /***
-     * Add watermark callbacks.
+     * Register a callback to be called when high/low watermark events occur on the stream. This
+     * callback must persist beyond the lifetime of the stream or be unregistered via
+     * removeWatermarkCallbacks. Calling this method twice with different callbacks will overwrite.
      */
     virtual void setWatermarkCallbacks(DecoderFilterWatermarkCallbacks& callbacks) PURE;
 
@@ -198,7 +200,8 @@ public:
   };
 
   /***
-   * An interface for ongoing asynchronous requests.
+   * An in-flight HTTP request to which additional data and trailers can be sent. Must be terminated
+   * by sending trailers or data with end_stream.
    */
   class OngoingRequest : public virtual Request, public virtual Stream {
   public:
@@ -364,10 +367,6 @@ public:
       sampled_ = sampled;
       return *this;
     }
-    RequestOptions& setEndStream(bool end_stream) {
-      end_stream_immediately_ = end_stream;
-      return *this;
-    }
 
     // For gmock test
     bool operator==(const RequestOptions& src) const {
@@ -384,8 +383,6 @@ public:
     std::string child_span_name_{""};
     // Sampling decision for the tracing span. The span is sampled by default.
     absl::optional<bool> sampled_{true};
-    // Whether this request should be immediately ended
-    bool end_stream_immediately_{true};
   };
 
   /**
@@ -402,19 +399,20 @@ public:
                         const RequestOptions& options) PURE;
 
   /**
-   * Starts a new request asynchronously with the given headers.
+   * Starts a new OngoingRequest asynchronously with the given headers.
    *
    * @param request_headers headers to send.
    * @param callbacks the callbacks to be notified of request status.
    * @param options the data struct to control the request sending.
    * @return a request handle or nullptr if no request could be created. See note attached to
-   * `send`.
+   * `send`. Calling startRequest will not trigger end stream. For header-only requests, `send`
+   * should be called instead.
    */
   virtual OngoingRequest* startRequest(RequestHeaderMapPtr&& request_headers, Callbacks& callbacks,
                                        const RequestOptions& options) PURE;
 
   /**
-   * Start an HTTP stream asynchronously.
+   * Start an HTTP stream asynchronously, without an associated HTTP request.
    * @param callbacks the callbacks to be notified of stream status.
    * @param options the data struct to control the stream.
    * @return a stream handle or nullptr if no stream could be started. NOTE: In this case

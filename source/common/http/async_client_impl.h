@@ -526,8 +526,7 @@ public:
                           AsyncClient::Callbacks& callbacks,
                           const AsyncClient::RequestOptions& options)
       : AsyncRequestSharedImpl(parent, callbacks, options),
-        request_headers_(std::move(request_headers)),
-        end_stream_immediately_(options.end_stream_immediately_) {
+        request_headers_(std::move(request_headers)) {
     ASSERT(request_headers_);
   }
   void captureAndSendData(Buffer::InstancePtr&& data, bool end_stream) override {
@@ -545,7 +544,6 @@ private:
   RequestHeaderMapPtr request_headers_;
   Buffer::InstancePtr request_data_;
   RequestTrailerMapPtr request_trailers_;
-  bool end_stream_immediately_;
 
   friend class AsyncClientImpl;
 };
@@ -554,9 +552,7 @@ class AsyncRequestImpl final : public AsyncRequestSharedImpl {
 public:
   AsyncRequestImpl(RequestMessagePtr&& request, AsyncClientImpl& parent,
                    AsyncClient::Callbacks& callbacks, const AsyncClient::RequestOptions& options)
-      : AsyncRequestSharedImpl(parent, callbacks, options), request_(std::move(request)) {
-    ASSERT(options.end_stream_immediately_);
-  }
+      : AsyncRequestSharedImpl(parent, callbacks, options), request_(std::move(request)) {}
 
 private:
   void initialize();
