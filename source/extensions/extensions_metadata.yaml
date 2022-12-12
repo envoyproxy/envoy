@@ -252,6 +252,7 @@ envoy.filters.http.compressor:
   status: stable
   type_urls:
   - envoy.extensions.filters.http.compressor.v3.Compressor
+  - envoy.extensions.filters.http.compressor.v3.CompressorPerRoute
 envoy.filters.http.cors:
   categories:
   - envoy.filters.http

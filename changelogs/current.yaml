@@ -151,6 +151,9 @@ new_features:
 - area: build
   change: |
     added an option ``--define=library_autolink=disabled`` to disable autolinking libraries.
+- area: compression
+  change: |
+    added :ref:`CompressorPerRoute proto <envoy_v3_api_msg_extensions.filters.http.compressor.v3.CompressorPerRoute>` for per-route configuration.
 - area: generic_proxy
   change: |
     added :ref:`dubbo codec support <envoy_v3_api_msg_extensions.filters.network.generic_proxy.codecs.dubbo.v3.DubboCodecConfig>` to the
