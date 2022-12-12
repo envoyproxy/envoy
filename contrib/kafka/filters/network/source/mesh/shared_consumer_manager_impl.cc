@@ -1,7 +1,5 @@
 #include "contrib/kafka/filters/network/source/mesh/shared_consumer_manager_impl.h"
 
-#include <functional>
-
 #include "source/common/common/fmt.h"
 
 #include "contrib/kafka/filters/network/source/mesh/upstream_kafka_consumer_impl.h"
@@ -12,10 +10,45 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
 
+// KafkaConsumerFactoryImpl
+
+class KafkaConsumerFactoryImpl : public KafkaConsumerFactory {
+public:
+  // KafkaConsumerFactory
+  KafkaConsumerPtr createConsumer(InboundRecordProcessor& record_processor,
+                                  Thread::ThreadFactory& thread_factory, const std::string& topic,
+                                  const int32_t partition_count,
+                                  const RawKafkaConfig& configuration) const override;
+
+  // Default singleton accessor.
+  static const KafkaConsumerFactory& getDefaultInstance();
+};
+
+KafkaConsumerPtr
+KafkaConsumerFactoryImpl::createConsumer(InboundRecordProcessor& record_processor,
+                                         Thread::ThreadFactory& thread_factory,
+                                         const std::string& topic, const int32_t partition_count,
+                                         const RawKafkaConfig& configuration) const {
+  return std::make_unique<RichKafkaConsumer>(record_processor, thread_factory, topic,
+                                             partition_count, configuration);
+}
+
+const KafkaConsumerFactory& KafkaConsumerFactoryImpl::getDefaultInstance() {
+  CONSTRUCT_ON_FIRST_USE(KafkaConsumerFactoryImpl);
+}
+
+// SharedConsumerManagerImpl
+
 SharedConsumerManagerImpl::SharedConsumerManagerImpl(
     const UpstreamKafkaConfiguration& configuration, Thread::ThreadFactory& thread_factory)
-    : record_processor_{std::make_unique<SharedProcessor>()}, configuration_{configuration},
-      thread_factory_{thread_factory} {}
+    : SharedConsumerManagerImpl{configuration, thread_factory,
+                                KafkaConsumerFactoryImpl::getDefaultInstance()} {}
+
+SharedConsumerManagerImpl::SharedConsumerManagerImpl(
+    const UpstreamKafkaConfiguration& configuration, Thread::ThreadFactory& thread_factory,
+    const KafkaConsumerFactory& consumer_factory)
+    : distributor_{std::make_unique<RecordDistributor>()}, configuration_{configuration},
+      thread_factory_{thread_factory}, consumer_factory_{consumer_factory} {}
 
 void SharedConsumerManagerImpl::registerConsumerIfAbsent(const std::string& topic) {
   absl::MutexLock lock(&consumers_mutex_);
@@ -38,22 +71,27 @@ void SharedConsumerManagerImpl::registerNewConsumer(const std::string& topic) {
   }
 
   // Create the consumer and register it.
-  KafkaConsumerPtr new_consumer = std::make_unique<RichKafkaConsumer>(
-      *record_processor_, thread_factory_, topic, cluster_config->partition_count_,
+  KafkaConsumerPtr new_consumer = consumer_factory_.createConsumer(
+      *distributor_, thread_factory_, topic, cluster_config->partition_count_,
       cluster_config->upstream_consumer_properties_);
   ENVOY_LOG(debug, "Registering new Kafka consumer for topic [{}], consuming from cluster [{}]",
             topic, cluster_config->name_);
   topic_to_consumer_.emplace(topic, std::move(new_consumer));
 }
 
-// InboundRecordProcessor
-bool SharedProcessor::waitUntilInterest(const std::string&, const int32_t) const {
+size_t SharedConsumerManagerImpl::getConsumerCountForTest() const {
+  absl::MutexLock lock(&consumers_mutex_);
+  return topic_to_consumer_.size();
+}
+
+// RecordDistributor
+
+bool RecordDistributor::waitUntilInterest(const std::string&, const int32_t) const {
   // TODO (adam.kotwasinski) To implement in future commits.
   return false;
 }
 
-// InboundRecordProcessor
-void SharedProcessor::receive(InboundRecordSharedPtr) {
+void RecordDistributor::receive(InboundRecordSharedPtr) {
   // TODO (adam.kotwasinski) To implement in future commits.
 }
 

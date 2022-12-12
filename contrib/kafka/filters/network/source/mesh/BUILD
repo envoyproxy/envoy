@@ -134,6 +134,7 @@ envoy_cc_library(
     ],
     tags = ["skip_on_windows"],
     deps = [
+        ":librdkafka_utils_lib",
         ":shared_consumer_manager_lib",
         ":upstream_config_lib",
         ":upstream_kafka_consumer_impl_lib",

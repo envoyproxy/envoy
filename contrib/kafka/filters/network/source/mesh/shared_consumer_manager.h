@@ -1,7 +1,7 @@
 #pragma once
 
-#include <map>
-#include <vector>
+#include <memory>
+#include <string>
 
 #include "contrib/kafka/filters/network/source/mesh/upstream_kafka_consumer.h"
 
@@ -13,7 +13,7 @@ namespace Mesh {
 
 /**
  * Manages (raw) Kafka consumers pointing to upstream Kafka clusters.
- * It is expected to have only one instance of this object in the runtime.
+ * It is expected to have only one instance of this object per mesh-filter type.
  */
 class SharedConsumerManager {
 public:
@@ -23,7 +23,7 @@ public:
   virtual void registerConsumerIfAbsent(const std::string& topic) PURE;
 };
 
-using SharedConsumerManagerSharedPtr = std::shared_ptr<SharedConsumerManager>;
+using SharedConsumerManagerPtr = std::unique_ptr<SharedConsumerManager>;
 
 } // namespace Mesh
 } // namespace Kafka
