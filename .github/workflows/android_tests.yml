@@ -105,6 +105,8 @@ jobs:
       if: steps.should_run.outputs.run_ci_job == 'true'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # This is run with ALLOW_TCP_LISTENERS due to the tests in test/kotlin/integration/proxying/
+      # which use Envoy as an HTTP proxy rather than a mobile library.
       run: |
         cd mobile && ./bazelw test \
             --test_output=all \
