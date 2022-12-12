@@ -379,7 +379,7 @@ public:
   void onConsecutiveLocalOriginFailure(HostSharedPtr host);
   Runtime::Loader& runtime() { return runtime_; }
   DetectorConfig& config() { return config_; }
-  void unejectHost(HostSharedPtr host, MonotonicTime now);
+  void unejectHost(HostSharedPtr host);
 
   // Upstream::Outlier::Detector
   void addChangedStateCb(ChangeStateCb cb) override { callbacks_.push_back(cb); }

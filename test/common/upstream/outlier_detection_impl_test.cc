@@ -393,7 +393,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xxViaHttpCodesWithActiveHC) {
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
-  detector->unejectHost(hosts_[0], std::chrono::steady_clock::now());
+  detector->unejectHost(hosts_[0]);
 
   // Eject host again to cause an ejection after an unejection has taken place
   hosts_[0]->outlierDetector().putResponseTime(std::chrono::milliseconds(5));

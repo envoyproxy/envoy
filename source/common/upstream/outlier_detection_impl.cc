@@ -313,7 +313,7 @@ void DetectorImpl::initialize(Cluster& cluster) {
                   "envoy.reloadable_features.successful_active_health_check_uneject_host") &&
               changed_state == HealthTransition::Changed &&
               host->coarseHealth() == Host::Health::Healthy) {
-            unejectHost(host, time_source_.monotonicTime());
+            unejectHost(host);
           }
         });
   }
@@ -367,11 +367,11 @@ void DetectorImpl::checkHostForUneject(HostSharedPtr host, DetectorHostMonitorIm
   ASSERT(monitor->numEjections() > 0);
   if ((min(base_eject_time * monitor->ejectTimeBackoff(), max_eject_time) + jitter) <=
       (now - monitor->lastEjectionTime().value())) {
-    unejectHost(host, now);
+    unejectHost(host);
   }
 }
 
-void DetectorImpl::unejectHost(HostSharedPtr host, MonotonicTime now) {
+void DetectorImpl::unejectHost(HostSharedPtr host) {
   ejections_active_helper_.dec();
   host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
   // Reset the consecutive failure counters to avoid re-ejection on very few new errors due
@@ -379,7 +379,7 @@ void DetectorImpl::unejectHost(HostSharedPtr host, MonotonicTime now) {
   host_monitors_[host]->resetConsecutive5xx();
   host_monitors_[host]->resetConsecutiveGatewayFailure();
   host_monitors_[host]->resetConsecutiveLocalOriginFailure();
-  host_monitors_[host]->uneject(now);
+  host_monitors_[host]->uneject(time_source_.monotonicTime());
   runCallbacks(host);
 
   if (event_logger_) {
