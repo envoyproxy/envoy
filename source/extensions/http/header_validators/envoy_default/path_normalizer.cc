@@ -1,7 +1,9 @@
 #include "source/extensions/http/header_validators/envoy_default/path_normalizer.h"
 
+#include "envoy/http/header_validator_errors.h"
+
+#include "source/common/http/headers.h"
 #include "source/extensions/http/header_validators/envoy_default/character_tables.h"
-#include "source/extensions/http/header_validators/envoy_default/header_validator.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -13,6 +15,7 @@ using ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderVal
 using ::envoy::extensions::http::header_validators::envoy_default::v3::
     HeaderValidatorConfig_UriPathNormalizationOptions;
 using ::Envoy::Http::RequestHeaderMap;
+using ::Envoy::Http::UhvResponseCodeDetail;
 
 struct PathNormalizerResponseCodeDetailValues {
   const std::string RedirectNormalized = "uhv.path_noramlization_redirect";

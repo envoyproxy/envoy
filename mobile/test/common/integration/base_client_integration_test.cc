@@ -108,7 +108,9 @@ void BaseClientIntegrationTest::initialize() {
   });
   stream_prototype_->setOnComplete(
       [this](envoy_stream_intel, envoy_final_stream_intel final_intel) {
-        validateStreamIntel(final_intel, expect_dns_, upstream_tls_, cc_.on_complete_calls == 0);
+        if (expect_data_streams_) {
+          validateStreamIntel(final_intel, expect_dns_, upstream_tls_, cc_.on_complete_calls == 0);
+        }
         cc_.on_complete_received_byte_count = final_intel.received_byte_count;
         cc_.on_complete_calls++;
         cc_.terminal_callback->setReady();

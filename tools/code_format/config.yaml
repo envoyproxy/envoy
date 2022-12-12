@@ -310,3 +310,4 @@ visibility_excludes:
 - source/extensions/path/match/uri_template/BUILD
 - source/extensions/path/rewrite/uri_template/BUILD
 - source/extensions/quic/connection_id_generator/BUILD
+- source/extensions/listener_managers/listener_manager/BUILD
