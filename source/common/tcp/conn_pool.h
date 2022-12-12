@@ -126,9 +126,10 @@ public:
   }
   virtual void clearCallbacks();
 
+  // // Called if the underlying connection is idle over the cluster's tcpPoolIdleTimeout()
   void onIdleTimeout();
   void disableIdleTimer();
-  void resetIdleTimer();
+  void setIdleTimer();
 
   std::shared_ptr<ConnReadFilter> read_filter_handle_;
   Envoy::ConnectionPool::ConnPoolImplBase& parent_;

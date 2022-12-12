@@ -35,7 +35,7 @@ ActiveTcpClient::ActiveTcpClient(Envoy::ConnectionPool::ConnPoolImplBase& parent
 
   if (idle_timeout_.has_value()) {
     idle_timer_ = connection_->dispatcher().createTimer([this]() -> void { onIdleTimeout(); });
-    resetIdleTimer();
+    setIdleTimer();
   }
 }
 
@@ -62,7 +62,7 @@ void ActiveTcpClient::clearCallbacks() {
   tcp_connection_data_ = nullptr;
   parent_.onStreamClosed(*this, true);
   parent_.checkForIdleAndCloseIdleConnsIfDraining();
-  resetIdleTimer();
+  setIdleTimer();
 }
 
 void ActiveTcpClient::onEvent(Network::ConnectionEvent event) {
@@ -97,6 +97,7 @@ void ActiveTcpClient::onEvent(Network::ConnectionEvent event) {
 }
 
 void ActiveTcpClient::onIdleTimeout() {
+  ENVOY_CONN_LOG(debug, "per client idle timeout", *connection_);
   parent_.host()->cluster().trafficStats().upstream_cx_idle_timeout_.inc();
   close();
 }
@@ -107,7 +108,7 @@ void ActiveTcpClient::disableIdleTimer() {
   }
 }
 
-void ActiveTcpClient::resetIdleTimer() {
+void ActiveTcpClient::setIdleTimer() {
   if (idle_timer_ != nullptr) {
     ASSERT(idle_timeout_.has_value());
     idle_timer_->enableTimer(idle_timeout_.value());

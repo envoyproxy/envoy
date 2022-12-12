@@ -1115,7 +1115,7 @@ ClusterInfoImpl::ClusterInfoImpl(
         tcp_pool_idle_timeout_ = absl::nullopt;
       }
     } else {
-      tcp_pool_idle_timeout_ = std::chrono::hours(1);
+      tcp_pool_idle_timeout_ = std::chrono::minutes(10);
     }
   } else {
     tcp_pool_idle_timeout_ = absl::nullopt;

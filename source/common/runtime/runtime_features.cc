@@ -70,6 +70,7 @@ RUNTIME_GUARD(envoy_reloadable_features_unified_header_formatter);
 RUNTIME_GUARD(envoy_reloadable_features_use_rfc_connect);
 RUNTIME_GUARD(envoy_reloadable_features_validate_connect);
 RUNTIME_GUARD(envoy_reloadable_features_validate_detailed_override_host_statuses);
+RUNTIME_GUARD(envoy_reloadable_features_tcp_pool_idle_timeout);
 RUNTIME_GUARD(envoy_restart_features_explicit_wildcard_resource);
 RUNTIME_GUARD(envoy_restart_features_remove_runtime_singleton);
 RUNTIME_GUARD(envoy_restart_features_use_apple_api_for_dns_lookups);
@@ -94,8 +95,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_runtime_initialized);
 // TODO(mattklein123): Also unit test this if this sticks and this becomes the default for Apple &
 // Android.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_always_use_v6);
-// TODO(kuochunghsu): Make this enabled after Pinterest tests
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_tcp_pool_idle_timeout)
 // TODO(alyssawilk) remove in Q2.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_no_delay_close_for_upgrades);
 
