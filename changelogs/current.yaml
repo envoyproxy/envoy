@@ -142,12 +142,6 @@ removed_config_or_runtime:
     removed ``envoy.reloadable_features.do_not_await_headers_on_upstream_timeout_to_emit_stats`` and legacy code paths.
 
 new_features:
-- area: tls
-  change: |
-    added support for SNI-based cert selection in tls downstream transport socket. Detailed documentation is available :ref:`cert selection<arch_overview_ssl_cert_select>`.
-    New config option :ref:`full_scan_certs_on_sni_mismatch <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.full_scan_certs_on_sni_mismatch>`
-    is introduced to disable or enable full scan when no cert matches to SNI, defaults to false.
-    New runtime flag ``envoy.reloadable_features.no_full_scan_certs_on_sni_mismatch`` can be used for override the default value.
 - area: build
   change: |
     added an option ``--define=library_autolink=disabled`` to disable autolinking libraries.
@@ -222,6 +216,7 @@ new_features:
 - area: http
   change: |
     added :ref:`append_x_forwarded_port <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.append_x_forwarded_port>` to append the ``x-forwarded-port`` header to HTTP upstream requests.
+
 - area: ext_authz
   change: |
     added support to allowlist headers included in the check request to gRPC authorization server (previously only available for HTTP authorization server).
