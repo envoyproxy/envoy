@@ -1,5 +1,6 @@
-#include "test/test_common/status_utility.h"
 #include <sstream>
+
+#include "test/test_common/status_utility.h"
 
 namespace Envoy {
 namespace StatusHelpers {
