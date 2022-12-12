@@ -19,7 +19,11 @@ MATCHER_P(IsOkAndHolds, expected, "") {
     *result_listener << "which has unexpected status: " << arg.status();
     return false;
   }
-  return ::testing::ExplainMatchResult(expected, *arg, result_listener);
+  if (!::testing::Matches(expected)(*arg)) {
+    *result_listener << "which has wrong value: " << ::testing::PrintToString(*arg);
+    return false;
+  }
+  return true;
 }
 
 // Check that a StatusOr as a status code equal to its argument.
