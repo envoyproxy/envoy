@@ -78,7 +78,7 @@ protected:
   bool explicit_flow_control_ = false;
   bool expect_dns_ = true;
   bool override_builder_config_ = false;
-  // if set to a value > 1, multiple engines are created and stored in multi_engines_
+  // if set to a value > 1 in a test, multiple engines are created and stored in multi_engines_
   int num_engines_for_test_ = 1;
   // True if data plane requests are expected in the test; false otherwise.
   bool expect_data_streams_ = true;

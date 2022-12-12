@@ -103,8 +103,8 @@ void BaseIntegrationTest::initialize() {
   RELEASE_ASSERT(Event::Libevent::Global::initialized(), "");
   initialized_ = true;
 
-  // createUpstreams();
-  // createXdsUpstream();
+  createUpstreams();
+  createXdsUpstream();
   createEnvoy();
 
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
