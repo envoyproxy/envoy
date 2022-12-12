@@ -898,7 +898,6 @@ void ServerContextImpl::populateServerNamesMap(TlsContext& ctx, int pkey_id) {
       // to issue a warning, but that would require additional tracking that hasn't been
       // implemented.
       return;
->>>>>>> ee1ed2d770... tls: allow multiple certs with the same SAN
     }
     sn_match->second.emplace(std::pair<int, std::reference_wrapper<TlsContext>>(pkey_id, ctx));
   };
