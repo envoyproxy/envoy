@@ -807,7 +807,7 @@ TEST_P(ServerInstanceImplTest, FlushStatsOnAdmin) {
   // Flush via admin.
   Http::TestResponseHeaderMapImpl response_headers;
   std::string body;
-  EXPECT_EQ(Http::Code::OK, server_->admin().request("/stats", "GET", response_headers, body));
+  EXPECT_EQ(Http::Code::OK, server_->admin()->request("/stats", "GET", response_headers, body));
   EXPECT_EQ(1L, counter->value());
 
   time_system_.advanceTimeWait(std::chrono::seconds(6));
@@ -1052,11 +1052,11 @@ TEST_P(ServerInstanceImplTest, RuntimeNoAdminLayer) {
   Http::TestResponseHeaderMapImpl response_headers;
   std::string response_body;
   EXPECT_EQ(Http::Code::OK,
-            server_->admin().request("/runtime", "GET", response_headers, response_body));
+            server_->admin()->request("/runtime", "GET", response_headers, response_body));
   EXPECT_THAT(response_body, HasSubstr("fozz"));
-  EXPECT_EQ(
-      Http::Code::ServiceUnavailable,
-      server_->admin().request("/runtime_modify?foo=bar", "POST", response_headers, response_body));
+  EXPECT_EQ(Http::Code::ServiceUnavailable,
+            server_->admin()->request("/runtime_modify?foo=bar", "POST", response_headers,
+                                      response_body));
   EXPECT_EQ("No admin layer specified", response_body);
 }
 
@@ -1157,7 +1157,7 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeNoAdmin) {
   // Admin::addListenerToHandler() calls one of handler's methods after checking that the Admin
   // has a listener. So, the fact that passing a nullptr doesn't cause a segfault establishes
   // that there is no listener.
-  server_->admin().addListenerToHandler(/*handler=*/nullptr);
+  server_->admin()->addListenerToHandler(/*handler=*/nullptr);
 }
 
 namespace {
@@ -1179,7 +1179,7 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithSocketOptions) {
   // Start Envoy instance with admin port with SO_REUSEPORT option.
   ASSERT_NO_THROW(
       initialize("test/server/test_data/server/node_bootstrap_with_admin_socket_options.yaml"));
-  const auto address = server_->admin().socket().connectionInfoProvider().localAddress();
+  const auto address = server_->admin()->socket().connectionInfoProvider().localAddress();
 
   // First attempt to bind and listen socket should fail due to the lack of SO_REUSEPORT socket
   // options.

@@ -1,0 +1,42 @@
+name: mobile_asan
+
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+
+jobs:
+  asan:
+    name: asan
+    runs-on: ubuntu-20.04
+    timeout-minutes: 180
+    container:
+      image: envoyproxy/envoy-build-ubuntu:b0ff77ae3f25b0bf595f9b8bba46b489723ab446
+      env:
+        CC: /opt/llvm/bin/clang
+        CXX: /opt/llvm/bin/clang++
+    steps:
+    - uses: actions/checkout@v1
+    - name: Add safe directory
+      run: git config --global --add safe.directory /__w/envoy/envoy
+    - id: should_run
+      name: 'Check whether to run'
+      run: ./mobile/tools/should_run_ci.sh
+    - uses: actions/setup-java@c3ac5dd0ed8db40fedb61c32fbe677e6b355e94c
+      if: steps.should_run.outputs.run_ci_job == 'true'
+      with:
+        java-version: '8'
+        java-package: jdk
+        architecture: x64
+        distribution: zulu
+    - name: 'Run tests'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      if: steps.should_run.outputs.run_ci_job == 'true'
+      run: |
+        cd mobile && ./bazelw test --test_output=all \
+            --test_env=ENVOY_IP_TEST_VERSIONS=v4only \
+            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux-asan") \
+            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
+            //test/common/...

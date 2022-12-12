@@ -9,7 +9,7 @@ def envoy_python_dependencies():
         extra_pip_args = ["--require-hashes"],
     )
 
-    # These need to use `pip_install`
+    # TODO(phlax): switch to `pip_parse`
     pip_install(
         # Note: dev requirements do *not* check hashes
         python_interpreter_target = interpreter,
@@ -17,9 +17,9 @@ def envoy_python_dependencies():
         requirements = "@envoy//tools/dev:requirements.txt",
     )
 
-    pip_install(
+    pip_parse(
         name = "fuzzing_pip3",
         python_interpreter_target = interpreter,
-        requirements = "@rules_fuzzing//fuzzing:requirements.txt",
+        requirements_lock = "@rules_fuzzing//fuzzing:requirements.txt",
         extra_pip_args = ["--require-hashes"],
     )

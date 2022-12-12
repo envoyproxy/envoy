@@ -74,6 +74,7 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/router:metadatamatchcriteria_lib",
+        "//source/common/stream_info:stream_id_provider_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/upstream:load_balancer_lib",
         "//source/extensions/upstreams/tcp/generic:config",

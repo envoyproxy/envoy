@@ -45,7 +45,7 @@ ActiveClient::ActiveClient(HttpConnPoolImplBase& parent,
     : MultiplexedActiveClientBase(
           parent, calculateInitialStreamsLimit(parent.cache(), parent.origin(), parent.host()),
           parent.host()->cluster().http2Options().max_concurrent_streams().value(),
-          parent.host()->cluster().stats().upstream_cx_http2_total_, data) {}
+          parent.host()->cluster().trafficStats().upstream_cx_http2_total_, data) {}
 
 ConnectionPool::InstancePtr
 allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,

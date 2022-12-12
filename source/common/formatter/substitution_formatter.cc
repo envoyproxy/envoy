@@ -1521,6 +1521,23 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                                     }
                                     return result;
                                   });
+                            }}},
+                          {"STREAM_ID",
+                           {CommandSyntaxChecker::COMMAND_ONLY,
+                            [](const std::string&, const absl::optional<size_t>&) {
+                              return std::make_unique<StreamInfoStringFieldExtractor>(
+                                  [](const StreamInfo::StreamInfo& stream_info)
+                                      -> absl::optional<std::string> {
+                                    auto provider = stream_info.getStreamIdProvider();
+                                    if (!provider.has_value()) {
+                                      return {};
+                                    }
+                                    auto id = provider->toStringView();
+                                    if (!id.has_value()) {
+                                      return {};
+                                    }
+                                    return absl::make_optional<std::string>(id.value());
+                                  });
                             }}}});
 }
 

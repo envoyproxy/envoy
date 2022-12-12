@@ -221,12 +221,6 @@ private:
       response_encoder_->setDeferredLoggingHeadersAndTrailers(std::move(headers_and_trailers));
     }
 
-    // Tracing::TracingConfig
-    Tracing::OperationName operationName() const override;
-    const Tracing::CustomTagMap* customTags() const override;
-    bool verbose() const override;
-    uint32_t maxPathTagLength() const override;
-
     // ScopeTrackedObject
     void dumpState(std::ostream& os, int indent_level = 0) const override {
       const char* spaces = spacesForLevel(indent_level);
@@ -302,8 +296,7 @@ private:
     void onRequestDataTooLarge() override;
     Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override;
     void onLocalReply(Code code) override;
-    // TODO(alyssawilk) this should be an optional reference.
-    Tracing::Config& tracingConfig() override;
+    OptRef<const Tracing::Config> tracingConfig() const override;
     const ScopeTrackedObject& scope() override;
     OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() override { return *this; }
 
@@ -382,6 +375,7 @@ private:
     bool validateHeaders();
 
     ConnectionManagerImpl& connection_manager_;
+    OptRef<const TracingConnectionManagerConfig> connection_manager_tracing_config_;
     // TODO(snowp): It might make sense to move this to the FilterManager to avoid storing it in
     // both locations, then refer to the FM when doing stream logs.
     const uint64_t stream_id_;
@@ -425,9 +419,29 @@ private:
     Http::HeaderValidatorPtr header_validator_;
 
     friend FilterManager;
+
+  private:
+    // Keep these methods private to ensure that these methods are only called by the reference
+    // returned by the public tracingConfig() method.
+    // Tracing::TracingConfig
+    Tracing::OperationName operationName() const override;
+    const Tracing::CustomTagMap* customTags() const override;
+    bool verbose() const override;
+    uint32_t maxPathTagLength() const override;
   };
 
   using ActiveStreamPtr = std::unique_ptr<ActiveStream>;
+
+  class HttpStreamIdProviderImpl : public StreamInfo::StreamIdProvider {
+  public:
+    HttpStreamIdProviderImpl(ActiveStream& parent) : parent_(parent) {}
+
+    // StreamInfo::StreamIdProvider
+    absl::optional<absl::string_view> toStringView() const override;
+    absl::optional<uint64_t> toInteger() const override;
+
+    ActiveStream& parent_;
+  };
 
   /**
    * Check to see if the connection can be closed after gracefully waiting to send pending codec

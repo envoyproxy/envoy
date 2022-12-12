@@ -28,12 +28,14 @@ class QuicNetworkConnectionTest;
 
 // Act as a Network::Connection to HCM and a FilterManager to FilterFactoryCb.
 class QuicFilterManagerConnectionImpl : public Network::ConnectionImplBase,
-                                        public SendBufferMonitor {
+                                        public SendBufferMonitor,
+                                        public QuicWriteEventCallback {
 public:
   QuicFilterManagerConnectionImpl(QuicNetworkConnection& connection,
                                   const quic::QuicConnectionId& connection_id,
                                   Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
-                                  std::shared_ptr<QuicSslConnectionInfo>&& info);
+                                  std::shared_ptr<QuicSslConnectionInfo>&& info,
+                                  std::unique_ptr<StreamInfo::StreamInfo>&& stream_info);
   // Network::FilterManager
   // Overridden to delegate calls to filter_manager_.
   void addWriteFilter(Network::WriteFilterSharedPtr filter) override;
@@ -117,8 +119,8 @@ public:
   bool aboveHighWatermark() const override;
 
   const Network::ConnectionSocket::OptionsSharedPtr& socketOptions() const override;
-  StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
-  const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
+  StreamInfo::StreamInfo& streamInfo() override { return *stream_info_; }
+  const StreamInfo::StreamInfo& streamInfo() const override { return *stream_info_; }
   absl::string_view transportFailureReason() const override { return transport_failure_reason_; }
   bool startSecureTransport() override { return false; }
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override;
@@ -139,8 +141,8 @@ public:
   // streams, and run watermark check.
   void updateBytesBuffered(uint64_t old_buffered_bytes, uint64_t new_buffered_bytes) override;
 
-  // Called after each write when a previous connection close call is postponed.
-  void maybeApplyDelayClosePolicy();
+  // QuicWriteEventCallback
+  void onWriteEventDone() override;
 
   uint64_t bytesToSend() { return bytes_to_send_; }
 
@@ -170,6 +172,8 @@ protected:
   virtual const quic::QuicConnection* quicConnection() const PURE;
   virtual quic::QuicConnection* quicConnection() PURE;
 
+  void maybeUpdateDelayCloseTimer(bool has_sent_any_data);
+
   void maybeHandleCloseDuringInitialize();
 
   QuicNetworkConnection* network_connection_{nullptr};
@@ -194,7 +198,7 @@ private:
   // and the rest incoming data bypasses these filters.
   std::unique_ptr<Network::FilterManagerImpl> filter_manager_;
 
-  StreamInfo::StreamInfoImpl stream_info_;
+  std::unique_ptr<StreamInfo::StreamInfo> stream_info_;
   std::string transport_failure_reason_;
   uint64_t bytes_to_send_{0};
   uint32_t max_headers_count_{std::numeric_limits<uint32_t>::max()};

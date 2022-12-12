@@ -2,16 +2,25 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
+    "envoy_select_admin_functionality",
     "envoy_select_admin_html",
     "envoy_select_admin_no_html",
 )
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+# Admin libraries are private (tests exempted) by default.
+# Any admin libraries with public visibility must have envoy_select_admin_functionality rules.
+envoy_package(["//test:__subpackages__"])
 
 envoy_cc_library(
     name = "admin_lib",
+    visibility = ["//visibility:public"],
+    deps = [] + envoy_select_admin_functionality(["//source/server/admin:admin_lib_internal"]),
+)
+
+envoy_cc_library(
+    name = "admin_lib_internal",
     srcs = ["admin.cc"] + envoy_select_admin_html([
         "admin_html.cc",
     ]) + envoy_select_admin_no_html([
@@ -67,8 +76,8 @@ envoy_cc_library(
         "//source/common/router:scoped_config_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/access_loggers/common:file_access_log_lib",
+        "//source/extensions/listener_managers/listener_manager:listener_manager_lib",
         "//source/extensions/request_id/uuid:config",
-        "//source/server:listener_manager_lib",
     ],
 )
 
@@ -98,7 +107,6 @@ genrule(
     cmd = "./$(location :generate_admin_html.sh) \
         $(location admin_head_start.html) $(location admin.css) > $@",
     tools = [":generate_admin_html.sh"],
-    visibility = ["//visibility:private"],
 )
 
 envoy_cc_library(
@@ -367,6 +375,7 @@ envoy_cc_library(
     name = "config_tracker_lib",
     srcs = ["config_tracker_impl.cc"],
     hdrs = ["config_tracker_impl.h"],
+    visibility = ["//visibility:public"],
     deps = [
         "//envoy/server:config_tracker_interface",
         "//source/common/common:assert_lib",
