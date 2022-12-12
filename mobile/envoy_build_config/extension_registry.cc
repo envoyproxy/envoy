@@ -82,9 +82,9 @@ void ExtensionRegistry::registerFactories() {
   Envoy::Extensions::RequestId::forceRegisterUUIDRequestIDExtensionFactory();
   Envoy::Server::forceRegisterDefaultListenerManagerFactoryImpl();
 
-  #ifdef ENVOY_ENABLE_QUIC
+#ifdef ENVOY_ENABLE_QUIC
   Quic::forceRegisterQuicServerTransportSocketConfigFactory();
-  #endif
+#endif
 
   // TODO: add a "force initialize" function to the upstream code, or clean up the upstream code
   // in such a way that does not depend on the statically initialized variable.
