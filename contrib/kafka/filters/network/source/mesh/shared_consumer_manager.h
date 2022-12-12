@@ -19,9 +19,8 @@ class SharedConsumerManager {
 public:
   virtual ~SharedConsumerManager() = default;
 
-  virtual void getRecordsOrRegisterCallback(const RecordCbSharedPtr& callback) PURE;
-
-  virtual void removeCallback(const RecordCbSharedPtr& callback) PURE;
+  // Start the consumer (if there is none) to make sure that records can be received from the topic.
+  virtual void registerConsumerIfAbsent(const std::string& topic) PURE;
 };
 
 using SharedConsumerManagerSharedPtr = std::shared_ptr<SharedConsumerManager>;
