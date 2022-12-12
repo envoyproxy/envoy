@@ -22,6 +22,7 @@ public:
   StatNamePool pool_;
 };
 
+// Helper base class for threadlocal stats testing in multiple-workers setup.
 class ThreadLocalRealThreadsTestBase : public Thread::RealThreadsTestHelper,
                                        public ThreadLocalStoreNoMocksTestBase {
 protected:

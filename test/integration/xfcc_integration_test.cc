@@ -917,6 +917,7 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
       extracted_name_map.erase(it);
     }
   };
+
   for (const Stats::CounterSharedPtr& counter : test_server_->counters()) {
     test_name_against_mapping(tag_extracted_counter_map, *counter);
   }

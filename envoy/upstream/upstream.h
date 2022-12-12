@@ -1062,6 +1062,9 @@ public:
 
   /**
    * @return std::unique_ptr<ClusterTrafficStats>&  all traffic related stats for this cluster.
+   * NOTE: Returning "std::unique_ptr<ClusterTrafficStats>&" for now to make way for future
+   * lazy-init on trafficStats(). See
+   * https://github.com/envoyproxy/envoy/pull/23921#issuecomment-1335239116 for more context.
    */
   virtual std::unique_ptr<ClusterTrafficStats>& trafficStats() const PURE;
 
