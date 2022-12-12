@@ -14,37 +14,37 @@
 namespace Envoy {
 namespace {
 
-void validateStreamIntel(const envoy_final_stream_intel& final_intel, bool expect_dns,
-                         bool upstream_tls, bool is_first_request) {
-  if (expect_dns) {
-    EXPECT_NE(-1, final_intel.dns_start_ms);
-    EXPECT_NE(-1, final_intel.dns_end_ms);
-  }
+// void validateStreamIntel(const envoy_final_stream_intel& final_intel, bool expect_dns,
+//                          bool upstream_tls, bool is_first_request) {
+//   if (expect_dns) {
+//     EXPECT_NE(-1, final_intel.dns_start_ms);
+//     EXPECT_NE(-1, final_intel.dns_end_ms);
+//   }
 
-  if (upstream_tls) {
-    EXPECT_GT(final_intel.ssl_start_ms, 0);
-    EXPECT_GT(final_intel.ssl_end_ms, 0);
-  } else {
-    EXPECT_EQ(-1, final_intel.ssl_start_ms);
-    EXPECT_EQ(-1, final_intel.ssl_end_ms);
-  }
+//   if (upstream_tls) {
+//     EXPECT_GT(final_intel.ssl_start_ms, 0);
+//     EXPECT_GT(final_intel.ssl_end_ms, 0);
+//   } else {
+//     EXPECT_EQ(-1, final_intel.ssl_start_ms);
+//     EXPECT_EQ(-1, final_intel.ssl_end_ms);
+//   }
 
-  ASSERT_NE(-1, final_intel.stream_start_ms);
-  ASSERT_NE(-1, final_intel.connect_start_ms);
-  ASSERT_NE(-1, final_intel.connect_end_ms);
-  ASSERT_NE(-1, final_intel.sending_start_ms);
-  ASSERT_NE(-1, final_intel.sending_end_ms);
-  ASSERT_NE(-1, final_intel.response_start_ms);
-  ASSERT_NE(-1, final_intel.stream_end_ms);
+//   ASSERT_NE(-1, final_intel.stream_start_ms);
+//   ASSERT_NE(-1, final_intel.connect_start_ms);
+//   ASSERT_NE(-1, final_intel.connect_end_ms);
+//   ASSERT_NE(-1, final_intel.sending_start_ms);
+//   ASSERT_NE(-1, final_intel.sending_end_ms);
+//   ASSERT_NE(-1, final_intel.response_start_ms);
+//   ASSERT_NE(-1, final_intel.stream_end_ms);
 
-  if (is_first_request) {
-    ASSERT_LE(final_intel.stream_start_ms, final_intel.connect_start_ms);
-  }
-  ASSERT_LE(final_intel.connect_start_ms, final_intel.connect_end_ms);
-  ASSERT_LE(final_intel.connect_end_ms, final_intel.sending_start_ms);
-  ASSERT_LE(final_intel.sending_start_ms, final_intel.sending_end_ms);
-  ASSERT_LE(final_intel.response_start_ms, final_intel.stream_end_ms);
-}
+//   if (is_first_request) {
+//     ASSERT_LE(final_intel.stream_start_ms, final_intel.connect_start_ms);
+//   }
+//   ASSERT_LE(final_intel.connect_start_ms, final_intel.connect_end_ms);
+//   ASSERT_LE(final_intel.connect_end_ms, final_intel.sending_start_ms);
+//   ASSERT_LE(final_intel.sending_start_ms, final_intel.sending_end_ms);
+//   ASSERT_LE(final_intel.response_start_ms, final_intel.stream_end_ms);
+// }
 
 // Gets the spdlog level from the test options and converts it to the Platform::LogLevel used by
 // the Envoy Mobile engine.
@@ -96,44 +96,45 @@ BaseClientIntegrationTest::BaseClientIntegrationTest(Network::Address::IpVersion
 void BaseClientIntegrationTest::initialize() {
   BaseIntegrationTest::initialize();
 
-  multi_stream_prototypes_.clear();
-  for (const auto& engine : multi_engines_) {
-    multi_stream_prototypes_.push_back(engine->streamClient()->newStreamPrototype());
-  }
-  stream_prototype_ = multi_stream_prototypes_[0];
-  stream_prototype_->setOnHeaders(
-      [this](Platform::ResponseHeadersSharedPtr headers, bool, envoy_stream_intel intel) {
-        cc_.on_headers_calls++;
-        cc_.status = absl::StrCat(headers->httpStatus());
-        cc_.on_header_consumed_bytes_from_response = intel.consumed_bytes_from_response;
-      });
-  stream_prototype_->setOnData([this](envoy_data c_data, bool) {
-    cc_.on_data_calls++;
-    release_envoy_data(c_data);
-  });
-  stream_prototype_->setOnComplete(
-      [this](envoy_stream_intel, envoy_final_stream_intel final_intel) {
-        if (expect_data_streams_) {
-          validateStreamIntel(final_intel, expect_dns_, upstream_tls_, cc_.on_complete_calls == 0);
-        }
-        cc_.on_complete_received_byte_count = final_intel.received_byte_count;
-        cc_.on_complete_calls++;
-        cc_.terminal_callback->setReady();
-      });
-  stream_prototype_->setOnError(
-      [this](Platform::EnvoyErrorSharedPtr, envoy_stream_intel, envoy_final_stream_intel) {
-        cc_.on_error_calls++;
-        cc_.terminal_callback->setReady();
-      });
-  stream_prototype_->setOnCancel([this](envoy_stream_intel, envoy_final_stream_intel final_intel) {
-    EXPECT_NE(-1, final_intel.stream_start_ms);
-    cc_.on_cancel_calls++;
-    cc_.terminal_callback->setReady();
-  });
+  // multi_stream_prototypes_.clear();
+  // for (const auto& engine : multi_engines_) {
+  //   multi_stream_prototypes_.push_back(engine->streamClient()->newStreamPrototype());
+  // }
+  // stream_prototype_ = multi_stream_prototypes_[0];
+  // stream_prototype_->setOnHeaders(
+  //     [this](Platform::ResponseHeadersSharedPtr headers, bool, envoy_stream_intel intel) {
+  //       cc_.on_headers_calls++;
+  //       cc_.status = absl::StrCat(headers->httpStatus());
+  //       cc_.on_header_consumed_bytes_from_response = intel.consumed_bytes_from_response;
+  //     });
+  // stream_prototype_->setOnData([this](envoy_data c_data, bool) {
+  //   cc_.on_data_calls++;
+  //   release_envoy_data(c_data);
+  // });
+  // stream_prototype_->setOnComplete(
+  //     [this](envoy_stream_intel, envoy_final_stream_intel final_intel) {
+        // if (expect_data_streams_) {
+    //       validateStreamIntel(final_intel, expect_dns_, upstream_tls_, cc_.on_complete_calls == 0);
+        // }
+  //       cc_.on_complete_received_byte_count = final_intel.received_byte_count;
+  //       cc_.on_complete_calls++;
+  //       cc_.terminal_callback->setReady();
+  //     });
+  // stream_prototype_->setOnError(
+  //     [this](Platform::EnvoyErrorSharedPtr, envoy_stream_intel, envoy_final_stream_intel) {
+  //       cc_.on_error_calls++;
+  //       cc_.terminal_callback->setReady();
+  //     });
+  // stream_prototype_->setOnCancel([this](envoy_stream_intel, envoy_final_stream_intel final_intel)
+  // {
+  //   EXPECT_NE(-1, final_intel.stream_start_ms);
+  //   cc_.on_cancel_calls++;
+  //   cc_.terminal_callback->setReady();
+  // });
 
-  stream_ = (*stream_prototype_).start(explicit_flow_control_);
-  HttpTestUtility::addDefaultHeaders(default_request_headers_);
-  default_request_headers_.setHost(fake_upstreams_[0]->localAddress()->asStringView());
+  // stream_ = (*stream_prototype_).start(explicit_flow_control_);
+  // HttpTestUtility::addDefaultHeaders(default_request_headers_);
+  // default_request_headers_.setHost(fake_upstreams_[0]->localAddress()->asStringView());
 }
 
 std::shared_ptr<Platform::RequestHeaders> BaseClientIntegrationTest::envoyToMobileHeaders(
@@ -181,6 +182,7 @@ void BaseClientIntegrationTest::TearDown() {
   for (auto engine : multi_engines_) {
     std::cout << "a";
     engine->terminate();
+    std::cout << "b";
     engine.reset();
   };
   engine_.reset(); // clear this pointer too, for now
@@ -192,11 +194,11 @@ void BaseClientIntegrationTest::TearDown() {
 
 void BaseClientIntegrationTest::createEnvoy() {
   std::vector<uint32_t> ports;
-  for (auto& upstream : fake_upstreams_) {
-    if (upstream->localAddress()->ip()) {
-      ports.push_back(upstream->localAddress()->ip()->port());
-    }
-  }
+  // for (auto& upstream : fake_upstreams_) {
+  //   if (upstream->localAddress()->ip()) {
+  //     ports.push_back(upstream->localAddress()->ip()->port());
+  //   }
+  // }
 
   finalizeConfigWithPorts(config_helper_, ports, use_lds_);
 

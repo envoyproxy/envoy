@@ -177,6 +177,8 @@ envoy_status_t Engine::terminate() {
   } // lock(_mutex)
 
   if (std::this_thread::get_id() != main_thread_.get_id()) {
+    std::cout << main_thread_.get_id();
+    std::cout << "\n";
     main_thread_.join();
   }
 
