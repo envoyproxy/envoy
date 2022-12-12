@@ -5,10 +5,7 @@
 #include "source/common/singleton/const_singleton.h"
 
 namespace Envoy {
-namespace Extensions {
 namespace Http {
-namespace HeaderValidators {
-namespace EnvoyDefault {
 
 struct UhvResponseCodeDetailValues {
   const std::string InvalidNameCharacters = "uhv.invalid_name_characters";
@@ -27,8 +24,5 @@ struct UhvResponseCodeDetailValues {
 
 using UhvResponseCodeDetail = ConstSingleton<UhvResponseCodeDetailValues>;
 
-} // namespace EnvoyDefault
-} // namespace HeaderValidators
 } // namespace Http
-} // namespace Extensions
 } // namespace Envoy

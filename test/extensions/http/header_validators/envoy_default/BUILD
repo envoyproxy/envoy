@@ -22,9 +22,9 @@ envoy_extension_cc_test(
     extension_names = ["envoy.http.header_validators.envoy_default"],
     deps = [
         ":header_validator_test_lib",
+        "//envoy/http:header_validator_errors",
         "//source/common/network:utility_lib",
         "//source/extensions/http/header_validators/envoy_default:character_tables",
-        "//source/extensions/http/header_validators/envoy_default:error_codes",
         "//source/extensions/http/header_validators/envoy_default:header_validator_common",
     ],
 )
@@ -37,7 +37,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.http.header_validators.envoy_default"],
     deps = [
         ":header_validator_test_lib",
-        "//source/extensions/http/header_validators/envoy_default:error_codes",
+        "//envoy/http:header_validator_errors",
         "//source/extensions/http/header_validators/envoy_default:http1_header_validator",
     ],
 )
@@ -50,8 +50,8 @@ envoy_extension_cc_test(
     extension_names = ["envoy.http.header_validators.envoy_default"],
     deps = [
         ":header_validator_test_lib",
+        "//envoy/http:header_validator_errors",
         "//source/extensions/http/header_validators/envoy_default:character_tables",
-        "//source/extensions/http/header_validators/envoy_default:error_codes",
         "//source/extensions/http/header_validators/envoy_default:http2_header_validator",
     ],
 )
