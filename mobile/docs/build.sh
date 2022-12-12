@@ -11,12 +11,12 @@ set -e
 # Docs for release tags are reserved for vX.Y.Z versions.
 # vX.Y.Z.ddmmyy do not publish tagged docs.
 VERSION_NUMBER=$(cat mobile/VERSION)
-if [[ -n "$CIRCLE_TAG" ]] && [[ "${VERSION_NUMBER}" =~ ^[0-9]+\.[0-9]+\.[0-9]$ ]]
+if [[ "$GITHUB_REF_TYPE" == "tag" ]] && [[ "${VERSION_NUMBER}" =~ ^[0-9]+\.[0-9]+\.[0-9]$ ]]
 then
   # Check the git tag matches the version number in the VERSION file.
-  if [ "v${VERSION_NUMBER}" != "${CIRCLE_TAG}" ]; then
+  if [ "v${VERSION_NUMBER}" != "${GITHUB_REF_NAME}" ]; then
     echo "Given git tag does not match the VERSION file content:"
-    echo "${CIRCLE_TAG} vs $(cat mobile/VERSION)"
+    echo "${GITHUB_REF_NAME} vs $(cat mobile/VERSION)"
     exit 1
   fi
   # Check the version_history.rst contains current release version.
@@ -24,9 +24,9 @@ then
     || (echo "Git tag not found in version_history.rst" && exit 1)
 
   # Now that we now there is a match, we can use the tag.
-  export ENVOY_DOCS_VERSION_STRING="tag-$CIRCLE_TAG"
+  export ENVOY_DOCS_VERSION_STRING="tag-$GITHUB_REF_NAME"
   export ENVOY_DOCS_RELEASE_LEVEL=tagged
-  export ENVOY_BLOB_SHA="$CIRCLE_TAG"
+  export ENVOY_BLOB_SHA="$GITHUB_REF_NAME"
 else
   BUILD_SHA=$(git rev-parse HEAD)
   export ENVOY_DOCS_VERSION_STRING="${VERSION_NUMBER}"-"${BUILD_SHA:0:6}"
