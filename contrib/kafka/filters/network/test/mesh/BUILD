@@ -74,6 +74,17 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "upstream_kafka_consumer_impl_unit_test",
+    srcs = ["upstream_kafka_consumer_impl_unit_test.cc"],
+    tags = ["skip_on_windows"],
+    deps = [
+        ":kafka_mocks_lib",
+        "//contrib/kafka/filters/network/source/mesh:upstream_kafka_consumer_impl_lib",
+        "//test/test_common:thread_factory_for_test_lib",
+    ],
+)
+
 envoy_cc_test_library(
     name = "kafka_mocks_lib",
     srcs = [],
@@ -81,6 +92,7 @@ envoy_cc_test_library(
     tags = ["skip_on_windows"],
     deps = [
         envoy_external_dep_path("librdkafka"),
+        "//contrib/kafka/filters/network/source/mesh:librdkafka_utils_lib",
     ],
 )
 

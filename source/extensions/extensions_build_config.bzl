@@ -99,6 +99,7 @@ EXTENSIONS = {
     "envoy.filters.http.cors":                          "//source/extensions/filters/http/cors:config",
     "envoy.filters.http.composite":                     "//source/extensions/filters/http/composite:config",
     "envoy.filters.http.csrf":                          "//source/extensions/filters/http/csrf:config",
+    "envoy.filters.http.custom_response":               "//source/extensions/filters/http/custom_response:factory",
     "envoy.filters.http.decompressor":                  "//source/extensions/filters/http/decompressor:config",
     "envoy.filters.http.dynamic_forward_proxy":         "//source/extensions/filters/http/dynamic_forward_proxy:config",
     "envoy.filters.http.ext_authz":                     "//source/extensions/filters/http/ext_authz:config",
@@ -316,6 +317,13 @@ EXTENSIONS = {
 
     "envoy.http.stateful_session.cookie":                "//source/extensions/http/stateful_session/cookie:config",
     "envoy.http.stateful_session.header":                "//source/extensions/http/stateful_session/header:config",
+
+    #
+    # Custom response policies
+    #
+
+    "envoy.http.custom_response.redirect_policy":             "//source/extensions/http/custom_response/redirect_policy:redirect_policy_lib",
+    "envoy.http.custom_response.local_response_policy":       "//source/extensions/http/custom_response/local_response_policy:local_response_policy_lib",
 
     #
     # QUIC extensions
