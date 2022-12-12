@@ -369,5 +369,7 @@ public:
   }
 };
 
+DECLARE_FACTORY(DefaultListenerManagerFactoryImpl);
+
 } // namespace Server
 } // namespace Envoy
