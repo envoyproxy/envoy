@@ -33,7 +33,7 @@ Api::IoCallSizeResult MockFile::write(absl::string_view buffer) {
   return result;
 }
 
-Api::IoCallSizeResult MockFile::pread(void* buf, size_t count, off_t offset) {
+Api::IoCallSizeResult MockFile::pread(void* buf, uint64_t count, uint64_t offset) {
   Thread::LockGuard lock(pread_mutex_);
   if (!is_open_) {
     return {-1, Api::IoErrorPtr(nullptr, [](Api::IoError*) { PANIC("reached unexpected code"); })};
@@ -46,7 +46,7 @@ Api::IoCallSizeResult MockFile::pread(void* buf, size_t count, off_t offset) {
   return result;
 }
 
-Api::IoCallSizeResult MockFile::pwrite(const void* buf, size_t count, off_t offset) {
+Api::IoCallSizeResult MockFile::pwrite(const void* buf, uint64_t count, uint64_t offset) {
   Thread::LockGuard lock(pwrite_mutex_);
   if (!is_open_) {
     return {-1, Api::IoErrorPtr(nullptr, [](Api::IoError*) { PANIC("reached unexpected code"); })};

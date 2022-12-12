@@ -6,7 +6,7 @@ namespace Envoy {
 
 namespace Filesystem {
 
-Api::IoCallSizeResult MemfileImpl::pread(void* buf, size_t count, off_t offset) {
+Api::IoCallSizeResult MemfileImpl::pread(void* buf, uint64_t count, uint64_t offset) {
   absl::MutexLock l(&info_->lock_);
   if (!flags_.test(File::Operation::Read)) {
     return resultFailure<ssize_t>(-1, EBADF);
@@ -21,7 +21,7 @@ Api::IoCallSizeResult MemfileImpl::pread(void* buf, size_t count, off_t offset) 
   return resultSuccess<ssize_t>(count);
 }
 
-Api::IoCallSizeResult MemfileImpl::pwrite(const void* buf, size_t count, off_t offset) {
+Api::IoCallSizeResult MemfileImpl::pwrite(const void* buf, uint64_t count, uint64_t offset) {
   absl::MutexLock l(&info_->lock_);
   if (!flags_.test(File::Operation::Write)) {
     return resultFailure<ssize_t>(-1, EBADF);

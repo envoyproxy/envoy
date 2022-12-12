@@ -107,13 +107,13 @@ Api::IoCallBoolResult TmpFileImplPosix::close() {
   return (rc != -1 && rc2 != -1) ? resultSuccess(true) : resultFailure(false, errno);
 }
 
-Api::IoCallSizeResult FileImplPosix::pread(void* buf, size_t count, off_t offset) {
+Api::IoCallSizeResult FileImplPosix::pread(void* buf, uint64_t count, uint64_t offset) {
   ASSERT(isOpen());
   ssize_t rc = ::pread(fd_, buf, count, offset);
   return (rc == -1) ? resultFailure(rc, errno) : resultSuccess(rc);
 }
 
-Api::IoCallSizeResult FileImplPosix::pwrite(const void* buf, size_t count, off_t offset) {
+Api::IoCallSizeResult FileImplPosix::pwrite(const void* buf, uint64_t count, uint64_t offset) {
   ASSERT(isOpen());
   ssize_t rc = ::pwrite(fd_, buf, count, offset);
   return (rc == -1) ? resultFailure(rc, errno) : resultSuccess(rc);

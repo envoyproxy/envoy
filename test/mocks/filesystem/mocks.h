@@ -22,8 +22,8 @@ public:
   Api::IoCallBoolResult open(FlagSet flag) override;
   Api::IoCallSizeResult write(absl::string_view buffer) override;
   Api::IoCallBoolResult close() override;
-  Api::IoCallSizeResult pread(void* buf, size_t count, off_t offset) override;
-  Api::IoCallSizeResult pwrite(const void* buf, size_t count, off_t offset) override;
+  Api::IoCallSizeResult pread(void* buf, uint64_t count, uint64_t offset) override;
+  Api::IoCallSizeResult pwrite(const void* buf, uint64_t count, uint64_t offset) override;
   bool isOpen() const override { return is_open_; };
   MOCK_METHOD(std::string, path, (), (const));
   MOCK_METHOD(DestinationType, destinationType, (), (const));

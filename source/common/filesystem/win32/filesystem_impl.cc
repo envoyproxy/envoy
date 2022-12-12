@@ -84,14 +84,14 @@ Api::IoCallBoolResult FileImplWin32::close() {
   return resultSuccess(true);
 }
 
-static OVERLAPPED overlappedForOffset(off_t offset) {
+static OVERLAPPED overlappedForOffset(uint64_t offset) {
   OVERLAPPED overlapped{};
   overlapped.Offset = offset & 0xffffffff;
-  overlapped.OffsetHigh = offset << 32;
+  overlapped.OffsetHigh = offset >> 32;
   return overlapped;
 }
 
-Api::IoCallSizeResult FileImplWin32::pread(void* buf, size_t count, off_t offset) {
+Api::IoCallSizeResult FileImplWin32::pread(void* buf, uint64_t count, uint64_t offset) {
   ASSERT(isOpen());
   DWORD read_count;
   OVERLAPPED overlapped = overlappedForOffset(offset);
@@ -100,7 +100,7 @@ Api::IoCallSizeResult FileImplWin32::pread(void* buf, size_t count, off_t offset
                 : resultFailure<ssize_t>(-1, ::GetLastError());
 }
 
-Api::IoCallSizeResult FileImplWin32::pwrite(const void* buf, size_t count, off_t offset) {
+Api::IoCallSizeResult FileImplWin32::pwrite(const void* buf, uint64_t count, uint64_t offset) {
   ASSERT(isOpen());
   DWORD write_count;
   OVERLAPPED overlapped = overlappedForOffset(offset);

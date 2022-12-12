@@ -46,8 +46,8 @@ protected:
     return resultSuccess(true);
   }
 
-  Api::IoCallSizeResult pread(void* buf, size_t count, off_t offset) override;
-  Api::IoCallSizeResult pwrite(const void* buf, size_t count, off_t offset) override;
+  Api::IoCallSizeResult pread(void* buf, uint64_t count, uint64_t offset) override;
+  Api::IoCallSizeResult pwrite(const void* buf, uint64_t count, uint64_t offset) override;
 
 private:
   FlagSet flags_;

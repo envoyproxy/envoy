@@ -74,7 +74,7 @@ public:
    * @param offset The offset in the file at which to start reading.
    * @return ssize_t number of bytes read, or -1 for failure.
    */
-  virtual Api::IoCallSizeResult pread(void* buf, size_t count, off_t offset) PURE;
+  virtual Api::IoCallSizeResult pread(void* buf, uint64_t count, uint64_t offset) PURE;
 
   /**
    * Write a chunk of data from a buffer to the file. The file must be explicitly opened
@@ -84,7 +84,7 @@ public:
    * @param offset The offset in the file at which to start writing.
    * @return ssize_t number of bytes written, or -1 for failure.
    */
-  virtual Api::IoCallSizeResult pwrite(const void* buf, size_t count, off_t offset) PURE;
+  virtual Api::IoCallSizeResult pwrite(const void* buf, uint64_t count, uint64_t offset) PURE;
 
   /**
    * @return bool is the file open
