@@ -24,7 +24,7 @@
 #include "source/extensions/transport_sockets/tls/cert_validator/default_validator.h"
 #include "source/extensions/transport_sockets/tls/config.h"
 #include "source/extensions/upstreams/http/generic/config.h"
-#include "source/listener_manager/listener_manager_impl.h"
+#include "source/extensions/listener_managers/listener_manager/listener_manager_impl.h"
 
 #include "extension_registry_platform_additions.h"
 #include "library/common/extensions/cert_validator/platform_bridge/config.h"
