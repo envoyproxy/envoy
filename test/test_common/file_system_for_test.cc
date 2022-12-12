@@ -11,7 +11,7 @@ Api::IoCallSizeResult MemfileImpl::pread(void* buf, uint64_t count, uint64_t off
   if (!flags_.test(File::Operation::Read)) {
     return resultFailure<ssize_t>(-1, EBADF);
   }
-  if (static_cast<unsigned>(offset) >= info_->data_.size() || offset < 0) {
+  if (static_cast<unsigned>(offset) >= info_->data_.size()) {
     count = 0;
     offset = 0;
   } else {
