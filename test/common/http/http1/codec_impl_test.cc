@@ -3800,5 +3800,56 @@ TEST_P(Http1ClientConnectionImplTest, 304WithBody) {
   EXPECT_EQ("http/1.1 protocol error: extraneous data after response complete", status.message());
 }
 
+// Receiving the first request byte results in a callbacks_->newStream() call.
+TEST_P(Http1ServerConnectionImplTest, ValidMethodFirstCharacter) {
+  initialize();
+
+  StrictMock<MockRequestDecoder> decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  Buffer::OwnedImpl buffer1("G");
+  auto status = codec_->dispatch(buffer1);
+  EXPECT_TRUE(status.ok());
+  EXPECT_EQ(0u, buffer1.length());
+
+  testing::Mock::VerifyAndClearExpectations(&callbacks_);
+
+  EXPECT_CALL(decoder, decodeHeaders_(_, _));
+  Buffer::OwnedImpl buffer2("ET / HTTP/1.1\r\n\r\n");
+  status = codec_->dispatch(buffer2);
+  EXPECT_TRUE(status.ok());
+  EXPECT_EQ(0u, buffer2.length());
+}
+
+// Receiving a first byte that cannot start a valid method name is an error.
+TEST_P(Http1ServerConnectionImplTest, InvalidMethodFirstCharacter) {
+  initialize();
+
+  StrictMock<MockRequestDecoder> decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+  EXPECT_CALL(decoder,
+              sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
+
+  // There is no known method name starting with "E".
+  Buffer::OwnedImpl buffer("E");
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(isCodecProtocolError(status));
+  EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_METHOD");
+  EXPECT_EQ(1u, buffer.length());
+}
+
+// Receiving a first byte that cannot start a valid response is an error.
+TEST_P(Http1ClientConnectionImplTest, InvalidResponseFirstCharacter) {
+  initialize();
+
+  StrictMock<MockResponseDecoder> response_decoder;
+  // A valid response must start with "HTTP".
+  Buffer::OwnedImpl buffer("I");
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(isCodecProtocolError(status));
+  EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_CONSTANT");
+  EXPECT_EQ(1u, buffer.length());
+}
+
 } // namespace Http
 } // namespace Envoy
