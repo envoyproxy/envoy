@@ -345,9 +345,14 @@ message Bootstrap {
 
   // Optional XdsConfigTracker configuration, which allows tracking xDS responses in external components,
   // e.g., external tracer or monitor. It provides the process point when receive, ingest, or fail to
-  // process xDS resources and messages.
-  // If a value is not specified, no XdsConfigTracker will be used.
-  // [#not-implemented-hide:]
+  // process xDS resources and messages. If a value is not specified, no XdsConfigTracker will be used.
+  //
+  // .. note::
+  //
+  //    There are no in-repo extensions currently, and the :repo:`XdsConfigTracker <envoy/config/xds_config_tracker.h>`
+  //    interface should be implemented before using.
+  //    See :repo:`xds_config_tracker_integration_test <test/integration/xds_config_tracker_integration_test.cc>`
+  //    for an example usage of the interface.
   core.v3.TypedExtensionConfig xds_config_tracker_extension = 36;
 }
 
