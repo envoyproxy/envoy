@@ -32,16 +32,13 @@
 #include "source/common/http/utility.h"
 #include "source/common/local_reply/local_reply.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/quic/server_connection_factory.h"
 #include "source/common/router/rds_impl.h"
 #include "source/common/router/scoped_rds.h"
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/tracing/custom_tag_impl.h"
 #include "source/common/tracing/http_tracer_manager_impl.h"
 #include "source/common/tracing/tracer_config_impl.h"
-
-#ifdef ENVOY_ENABLE_QUIC
-#include "source/common/quic/codec_impl.h"
-#endif
 
 namespace Envoy {
 namespace Extensions {
@@ -670,15 +667,13 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
         context_.api().randomGenerator(), http2_options_, maxRequestHeadersKb(),
         maxRequestHeadersCount(), headersWithUnderscoresAction());
   case CodecType::HTTP3:
-#ifdef ENVOY_ENABLE_QUIC
-    return std::make_unique<Quic::QuicHttpServerConnectionImpl>(
-        dynamic_cast<Quic::EnvoyQuicServerSession&>(connection), callbacks,
-        Http::Http3::CodecStats::atomicGet(http3_codec_stats_, context_.scope()), http3_options_,
-        maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
-#else
-    // Should be blocked by configuration checking at an earlier point.
-    PANIC("unexpected");
-#endif
+    return Config::Utility::getAndCheckFactoryByName<QuicHttpServerConnectionFactory>(
+               "quic.http_server_connection.default")
+        .createQuicHttpServerConnectionImpl(
+            connection, callbacks,
+            Http::Http3::CodecStats::atomicGet(http3_codec_stats_, context_.scope()),
+            http3_options_, maxRequestHeadersKb(), maxRequestHeadersCount(),
+            headersWithUnderscoresAction());
   case CodecType::AUTO:
     return Http::ConnectionManagerUtility::autoCreateCodec(
         connection, data, callbacks, context_.scope(), context_.api().randomGenerator(),
