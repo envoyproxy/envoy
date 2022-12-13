@@ -274,12 +274,12 @@ message GrpcJsonTranscoder {
   // The maximum size of a request body to be transcoded, in bytes. A body exceeding this size will
   // provoke a ``HTTP 413 Request Entity Too Large`` response.
   //
-  // If unset or zero, the current stream buffer size is used.
+  // If zero, the current stream buffer size is used.
   uint32 max_request_body_size = 15;
 
   // The maximum size of a response body to be transcoded, in bytes. A body exceeding this size will
   // provoke a ``HTTP 500 Internal Server Error`` response.
   //
-  // If unset or zero, the current stream buffer size is used.
+  // If zero, the current stream buffer size is used.
   uint32 max_response_body_size = 16;
 }
