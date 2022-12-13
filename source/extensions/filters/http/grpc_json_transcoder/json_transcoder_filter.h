@@ -219,9 +219,9 @@ private:
 
   /**
    * If max_request_body_size or max_response_body_size is configured and larger than
-   * the stream buffer size, increase the stream buffer size.
+   * the corresponding stream buffer limit, increase that stream buffer limit.
    */
-  void maybeExpandBufferSize();
+  void maybeExpandBufferLimits();
 
   const JsonTranscoderConfig& config_;
   const JsonTranscoderConfig* per_route_config_{};

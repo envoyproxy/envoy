@@ -432,7 +432,7 @@ void JsonTranscoderFilter::initPerRouteConfig() {
   per_route_config_ = route_local ? route_local : &config_;
 }
 
-void JsonTranscoderFilter::maybeExpandBufferSize() {
+void JsonTranscoderFilter::maybeExpandBufferLimits() {
   uint32_t max_request_size = per_route_config_->max_request_body_size_;
   if (max_request_size > decoder_callbacks_->decoderBufferLimit()) {
     decoder_callbacks_->setDecoderBufferLimit(max_request_size);
