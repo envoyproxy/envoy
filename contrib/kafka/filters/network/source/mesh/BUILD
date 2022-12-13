@@ -111,6 +111,18 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "inbound_record_lib",
+    srcs = [
+    ],
+    hdrs = [
+        "inbound_record.h",
+    ],
+    tags = ["skip_on_windows"],
+    deps = [
+    ],
+)
+
+envoy_cc_library(
     name = "outbound_record_lib",
     srcs = [
     ],
@@ -148,6 +160,36 @@ envoy_cc_library(
         ":librdkafka_utils_impl_lib",
         ":outbound_record_lib",
         ":upstream_kafka_client_lib",
+        "//envoy/event:dispatcher_interface",
+        "//source/common/common:minimal_logger_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "upstream_kafka_consumer_lib",
+    srcs = [
+    ],
+    hdrs = [
+        "upstream_kafka_consumer.h",
+    ],
+    tags = ["skip_on_windows"],
+    deps = [
+        ":inbound_record_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "upstream_kafka_consumer_impl_lib",
+    srcs = [
+        "upstream_kafka_consumer_impl.cc",
+    ],
+    hdrs = [
+        "upstream_kafka_consumer_impl.h",
+    ],
+    tags = ["skip_on_windows"],
+    deps = [
+        ":librdkafka_utils_impl_lib",
+        ":upstream_kafka_consumer_lib",
         "//envoy/event:dispatcher_interface",
         "//source/common/common:minimal_logger_lib",
     ],
