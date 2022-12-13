@@ -14,7 +14,7 @@
 #include "source/common/http/utility.h"
 
 #ifdef ENVOY_ENABLE_QUIC
-#include "source/common/quic/codec_impl.h"
+#include "source/common/quic/client_codec_impl.h"
 #endif
 
 namespace Envoy {
