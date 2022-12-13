@@ -348,8 +348,7 @@ typed_config:
 )EOF";
 }
 
-// TODO(#6327) cleaner approach to testing with static config.
-std::string ConfigHelper::discoveredClustersBootstrap(const std::string& api_type) {
+std::string ConfigHelper::clustersNoListenerBootstrap(const std::string& api_type) {
   return fmt::format(
       R"EOF(
 admin:
@@ -389,6 +388,14 @@ static_resources:
               socket_address:
                 address: 127.0.0.1
                 port_value: 0
+)EOF",
+      Platform::null_device_path, api_type);
+}
+
+// TODO(#6327) cleaner approach to testing with static config.
+std::string ConfigHelper::discoveredClustersBootstrap(const std::string& api_type) {
+  return absl::StrCat(clustersNoListenerBootstrap(api_type),
+                      R"EOF(
   listeners:
     name: http
     address:
@@ -421,8 +428,7 @@ static_resources:
                 match:
                   prefix: "/cluster2"
               domains: "*"
-)EOF",
-      Platform::null_device_path, api_type);
+)EOF");
 }
 
 // TODO(#6327) cleaner approach to testing with static config.
