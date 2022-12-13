@@ -1,5 +1,6 @@
 #include <openssl/ssl3.h>
 
+#include "envoy/extensions/transport_sockets/tls/v3/tls.pb.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/ssl/handshaker.h"
 
@@ -202,6 +203,98 @@ TEST_F(HandshakerFactoryTest, HandshakerContextProvidesObjectsFromParentContext)
 
   std::unique_ptr<Network::TransportSocket> socket =
       socket_factory.createTransportSocket(nullptr, nullptr);
+}
+
+class HandshakerFactoryImplForDownstreamTest
+    : public Extensions::TransportSockets::Tls::HandshakerFactoryImpl {
+public:
+  using CreateHandshakerHook =
+      std::function<void(const Protobuf::Message&, Ssl::HandshakerFactoryContext&,
+                         ProtobufMessage::ValidationVisitor&)>;
+
+  static constexpr char kFactoryName[] = "envoy.testonly_downstream_handshaker";
+
+  std::string name() const override { return kFactoryName; }
+
+  Ssl::HandshakerFactoryCb
+  createHandshakerCb(const Protobuf::Message& message, Ssl::HandshakerFactoryContext& context,
+                     ProtobufMessage::ValidationVisitor& validation_visitor) override {
+    if (handshaker_cb_) {
+      handshaker_cb_(message, context, validation_visitor);
+    }
+
+    // The default HandshakerImpl doesn't take a config or use the HandshakerFactoryContext.
+    return [](bssl::UniquePtr<SSL> ssl, int ssl_extended_socket_info_index,
+              Ssl::HandshakeCallbacks* handshake_callbacks) {
+      return std::make_shared<SslHandshakerImpl>(std::move(ssl), ssl_extended_socket_info_index,
+                                                 handshake_callbacks);
+    };
+  }
+
+  Ssl::SslCtxCb sslctxCb(Ssl::HandshakerFactoryContext& handshaker_factory_context) const override {
+    // Get process object, cast to custom process object, and return custom
+    // callback.
+    return CustomProcessObjectForTest::get(handshaker_factory_context.api().processContext())
+        ->getSslCtxCb();
+  }
+
+  Ssl::HandshakerCapabilities capabilities() const override { return capabilities_; }
+
+  void setCapabilities(Ssl::HandshakerCapabilities cap) { capabilities_ = cap; }
+
+  CreateHandshakerHook handshaker_cb_;
+  Ssl::HandshakerCapabilities capabilities_;
+};
+class HandshakerFactoryDownstreamTest : public testing::Test {
+protected:
+  HandshakerFactoryDownstreamTest()
+      : context_manager_(
+            std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(time_system_)) {
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
+  }
+
+  // Helper for downcasting a socket to a test socket so we can examine its
+  // SSL_CTX.
+  SSL_CTX* extractSslCtx(Network::TransportSocket* socket) {
+    SslSocket* ssl_socket = dynamic_cast<SslSocket*>(socket);
+    SSL* ssl = ssl_socket->rawSslForTest();
+    return SSL_get_SSL_CTX(ssl);
+  }
+
+  Event::GlobalTimeSystem time_system_;
+  Stats::IsolatedStoreImpl stats_store_;
+  std::unique_ptr<Extensions::TransportSockets::Tls::ContextManagerImpl> context_manager_;
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context_;
+  TestScopedRuntime scoped_runtime_;
+  Ssl::HandshakerCapabilities capabilities_;
+};
+
+// TlsCertificate messages can be empty when handshaker provides certificates.
+TEST_F(HandshakerFactoryDownstreamTest, ServerHandshakerProvidesCertificates) {
+  HandshakerFactoryImplForDownstreamTest handshaker_factory;
+  Ssl::HandshakerCapabilities cap{cap.provides_certificates = true};
+  handshaker_factory.setCapabilities(cap);
+  Registry::InjectFactory<Ssl::HandshakerFactory> registered_factory(handshaker_factory);
+
+  // DownstreamTlsContext proto expects to use the newly-registered handshaker.
+  envoy::config::core::v3::TypedExtensionConfig* custom_handshaker =
+      tls_context_.mutable_common_tls_context()->mutable_custom_handshaker();
+  custom_handshaker->set_name(HandshakerFactoryImplForDownstreamTest::kFactoryName);
+
+  CustomProcessObjectForTest custom_process_object_for_test(
+      /*cb=*/[](SSL_CTX* ssl_ctx) { SSL_CTX_set_options(ssl_ctx, SSL_OP_NO_TLSv1); });
+  auto process_context_impl = std::make_unique<Envoy::ProcessContextImpl>(
+      static_cast<Envoy::ProcessObject&>(custom_process_object_for_test));
+
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
+  EXPECT_CALL(mock_factory_ctx.api_, processContext())
+      .WillRepeatedly(Return(std::reference_wrapper<Envoy::ProcessContext>(*process_context_impl)));
+
+  Extensions::TransportSockets::Tls::ServerContextConfigImpl server_context_config(
+      tls_context_, mock_factory_ctx);
+  EXPECT_NO_THROW(context_manager_->createSslServerContext(stats_store_, server_context_config,
+                                                           std::vector<std::string>{}));
 }
 
 } // namespace
