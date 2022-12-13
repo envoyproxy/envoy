@@ -9,10 +9,10 @@ envoy_cc_library(
     srcs = [
         "config.cc",
     ] + select({
-        "//bazel:exclude_certificates": [
+        "//bazel:exclude_certificates": [],
+        "//conditions:default": [
             "certificates.inc",
         ],
-        "//conditions:default": [],
     }),
     hdrs = [
         "internal.h",

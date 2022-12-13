@@ -156,7 +156,7 @@ R"(- &enable_drain_post_dns_refresh false
 
 !ignore tls_root_ca_defs: &tls_root_certs |
 )"
-#ifdef EXCLUDE_CERTIFICATES
+#ifndef EXCLUDE_CERTIFICATES
 #include "certificates.inc"
 #endif
 R"(
