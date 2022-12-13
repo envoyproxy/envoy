@@ -30,6 +30,11 @@ public:
     setUpstreamProtocol(Http::CodecType::HTTP1);
   }
 
+  void initialize() override {
+    config_helper_.addRuntimeOverride("envoy.disallow_global_stats", "true");
+    BaseClientIntegrationTest::initialize();
+  }
+
   void TearDown() override {
     cleanup();
     BaseClientIntegrationTest::TearDown();

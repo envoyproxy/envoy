@@ -176,7 +176,6 @@ std::string BaseIntegrationTest::finalizeConfigWithPorts(ConfigHelper& config_he
                                                          std::vector<uint32_t>& ports,
                                                          bool use_lds) {
   if (use_lds) {
-    ENVOY_LOG_MISC(debug, "Setting up file-based LDS");
     // Before finalization, set up a real lds path, replacing the default /dev/null
     std::string lds_path = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
     config_helper.addConfigModifier(
@@ -213,9 +212,6 @@ std::string BaseIntegrationTest::finalizeConfigWithPorts(ConfigHelper& config_he
     // or they will not be reloadable.
     bootstrap.mutable_static_resources()->mutable_listeners()->Clear();
   }
-  ENVOY_LOG_MISC(debug, "Running Envoy with configuration:\n{}",
-                 MessageUtil::getYamlStringFromMessage(bootstrap));
-
   const std::string bootstrap_path = TestEnvironment::writeStringToFileForTest(
       "bootstrap.pb", TestUtility::getProtobufBinaryStringFromMessage(bootstrap));
   return bootstrap_path;
@@ -393,7 +389,6 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
          ++socket_factory_it, ++port_it) {
       const auto listen_addr = (*socket_factory_it)->localAddress();
       if (listen_addr->type() == Network::Address::Type::Ip) {
-        ENVOY_LOG(debug, "registered '{}' as port {}.", *port_it, listen_addr->ip()->port());
         registerPort(*port_it, listen_addr->ip()->port());
       }
     }
@@ -783,7 +778,6 @@ void BaseIntegrationTest::checkForMissingTagExtractionRules() {
     return true;
   };
   find_stat_prefix("", *json);
-  ENVOY_LOG_MISC(debug, "discovered stat_prefixes {}", stat_prefixes);
 
   auto check_metric = [&](auto& metric) {
     // Validate that the `stat_prefix` string doesn't appear in the tag-extracted name, indicating

@@ -48,28 +48,28 @@ namespace {
 
 // Gets the spdlog level from the test options and converts it to the Platform::LogLevel used by
 // the Envoy Mobile engine.
-Platform::LogLevel getPlatformLogLevelFromOptions() {
-  switch (TestEnvironment::getOptions().logLevel()) {
-  case spdlog::level::level_enum::trace:
-    return Platform::LogLevel::trace;
-  case spdlog::level::level_enum::debug:
-    return Platform::LogLevel::debug;
-  case spdlog::level::level_enum::info:
-    return Platform::LogLevel::info;
-  case spdlog::level::level_enum::warn:
-    return Platform::LogLevel::warn;
-  case spdlog::level::level_enum::err:
-    return Platform::LogLevel::error;
-  case spdlog::level::level_enum::critical:
-    return Platform::LogLevel::critical;
-  case spdlog::level::level_enum::off:
-    return Platform::LogLevel::off;
-  default:
-    ENVOY_LOG_MISC(warn, "Couldn't map spdlog level {}. Using `info` level.",
-                   TestEnvironment::getOptions().logLevel());
-    return Platform::LogLevel::info;
-  }
-}
+// Platform::LogLevel getPlatformLogLevelFromOptions() {
+//   switch (TestEnvironment::getOptions().logLevel()) {
+//   case spdlog::level::level_enum::trace:
+//     return Platform::LogLevel::trace;
+//   case spdlog::level::level_enum::debug:
+//     return Platform::LogLevel::debug;
+//   case spdlog::level::level_enum::info:
+//     return Platform::LogLevel::info;
+//   case spdlog::level::level_enum::warn:
+//     return Platform::LogLevel::warn;
+//   case spdlog::level::level_enum::err:
+//     return Platform::LogLevel::error;
+//   case spdlog::level::level_enum::critical:
+//     return Platform::LogLevel::critical;
+//   case spdlog::level::level_enum::off:
+//     return Platform::LogLevel::off;
+//   default:
+//     ENVOY_LOG_MISC(warn, "Couldn't map spdlog level {}. Using `info` level.",
+//                    TestEnvironment::getOptions().logLevel());
+//     return Platform::LogLevel::info;
+//   }
+// }
 
 } // namespace
 
@@ -90,7 +90,7 @@ BaseClientIntegrationTest::BaseClientIntegrationTest(Network::Address::IpVersion
   autonomous_upstream_ = true;
   defer_listener_finalization_ = true;
 
-  builder_.addLogLevel(getPlatformLogLevelFromOptions());
+  // builder_.addLogLevel(getPlatformLogLevelFromOptions());
 }
 
 void BaseClientIntegrationTest::initialize() {
