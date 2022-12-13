@@ -16,7 +16,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // gRPC-JSON transcoder :ref:`configuration overview <config_http_filters_grpc_json_transcoder>`.
 // [#extension: envoy.filters.http.grpc_json_transcoder]
 
-// [#next-free-field: 16]
+// [#next-free-field: 17]
 // GrpcJsonTranscoder filter configuration.
 // The filter itself can be used per route / per virtual host or on the general level. The most
 // specific one is being used for a given route. If the list of services is empty - filter
@@ -271,11 +271,15 @@ message GrpcJsonTranscoder {
   // Set this to true if your JSON request uses non uppercase enum values.
   bool case_insensitive_enum_parsing = 14;
 
-  // The maximum size of a body to be transcoded, in bytes. A body exceeding this size will
-  // provoke a ``HTTP 413 Request Entity Too Large`` if the request body was oversized,
-  // or ``HTTP 500 Internal Server Error`` response with a descriptive message if the response
-  // body was oversized.
+  // The maximum size of a request body to be transcoded, in bytes. A body exceeding this size will
+  // provoke a ``HTTP 413 Request Entity Too Large`` response.
   //
   // If unset or zero, the current stream buffer size is used.
-  uint32 max_body_size = 15;
+  uint32 max_request_body_size = 15;
+
+  // The maximum size of a response body to be transcoded, in bytes. A body exceeding this size will
+  // provoke a ``HTTP 500 Internal Server Error`` response.
+  //
+  // If unset or zero, the current stream buffer size is used.
+  uint32 max_response_body_size = 16;
 }

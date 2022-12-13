@@ -230,7 +230,8 @@ JsonTranscoderConfig::JsonTranscoderConfig(
   ignore_unknown_query_parameters_ = proto_config.ignore_unknown_query_parameters();
   request_validation_options_ = proto_config.request_validation_options();
   case_insensitive_enum_parsing_ = proto_config.case_insensitive_enum_parsing();
-  max_body_size_ = proto_config.max_body_size();
+  max_request_body_size_ = proto_config.max_request_body_size();
+  max_response_body_size_ = proto_config.max_response_body_size();
 }
 
 void JsonTranscoderConfig::addFileDescriptor(const Protobuf::FileDescriptorProto& file) {
@@ -432,12 +433,13 @@ void JsonTranscoderFilter::initPerRouteConfig() {
 }
 
 void JsonTranscoderFilter::maybeExpandBufferSize() {
-  uint32_t max_size = per_route_config_->max_body_size_;
-  if (max_size > decoder_callbacks_->decoderBufferLimit()) {
-    decoder_callbacks_->setDecoderBufferLimit(max_size);
+  uint32_t max_request_size = per_route_config_->max_request_body_size_;
+  if (max_request_size > decoder_callbacks_->decoderBufferLimit()) {
+    decoder_callbacks_->setDecoderBufferLimit(max_request_size);
   }
-  if (max_size > encoder_callbacks_->encoderBufferLimit()) {
-    encoder_callbacks_->setEncoderBufferLimit(max_size);
+  uint32_t max_response_size = per_route_config_->max_response_body_size_;
+  if (max_response_size > encoder_callbacks_->encoderBufferLimit()) {
+    encoder_callbacks_->setEncoderBufferLimit(max_response_size);
   }
 }
 
@@ -985,7 +987,8 @@ bool JsonTranscoderFilter::maybeConvertGrpcStatus(Grpc::Status::GrpcStatus grpc_
 }
 
 bool JsonTranscoderFilter::decoderBufferLimitReached(uint64_t buffer_length) {
-  uint32_t max_size = per_route_config_->maxBodySize(decoder_callbacks_->decoderBufferLimit());
+  uint32_t max_size =
+      per_route_config_->maxRequestBodySize(decoder_callbacks_->decoderBufferLimit());
   if (buffer_length > max_size) {
     ENVOY_STREAM_LOG(debug,
                      "Request rejected because the transcoder's internal buffer size exceeds the "
@@ -1004,7 +1007,8 @@ bool JsonTranscoderFilter::decoderBufferLimitReached(uint64_t buffer_length) {
 }
 
 bool JsonTranscoderFilter::encoderBufferLimitReached(uint64_t buffer_length) {
-  uint32_t max_size = per_route_config_->maxBodySize(encoder_callbacks_->encoderBufferLimit());
+  uint32_t max_size =
+      per_route_config_->maxResponseBodySize(encoder_callbacks_->encoderBufferLimit());
   if (buffer_length > max_size) {
     ENVOY_STREAM_LOG(
         debug,

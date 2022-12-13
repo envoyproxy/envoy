@@ -1324,13 +1324,15 @@ public:
   GrpcJsonTranscoderFilterMaxMessageSizeTest() : GrpcJsonTranscoderFilterTest(makeProtoConfig()) {}
 
 protected:
-  static const uint32_t max_body_size_ = 1024;
+  static const uint32_t max_request_body_size_ = 1024;
+  static const uint32_t max_response_body_size_ = 2048;
 
 private:
   static const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder
   makeProtoConfig() {
     auto proto_config = bookstoreProtoConfig();
-    proto_config.set_max_body_size(max_body_size_);
+    proto_config.set_max_request_body_size(max_request_body_size_);
+    proto_config.set_max_response_body_size(max_response_body_size_);
     return proto_config;
   }
 };
@@ -1342,8 +1344,8 @@ TEST_F(GrpcJsonTranscoderFilterMaxMessageSizeTest, IncreasesBufferSize) {
   EXPECT_CALL(decoder_callbacks_, decoderBufferLimit())
       .Times(testing::AtLeast(1))
       .WillRepeatedly(Return(8));
-  EXPECT_CALL(encoder_callbacks_, setEncoderBufferLimit(max_body_size_));
-  EXPECT_CALL(decoder_callbacks_, setDecoderBufferLimit(max_body_size_));
+  EXPECT_CALL(decoder_callbacks_, setDecoderBufferLimit(max_request_body_size_));
+  EXPECT_CALL(encoder_callbacks_, setEncoderBufferLimit(max_response_body_size_));
   Http::TestRequestHeaderMapImpl request_headers{
       {"content-type", "application/json"}, {":method", "POST"}, {":path", "/shelf/123"}};
 
