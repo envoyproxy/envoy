@@ -1066,7 +1066,7 @@ public:
   virtual ClusterEndpointStats& endpointStats() const PURE;
 
   /**
-   * @return LazyClusterTrafficStats&  all traffic related stats for this cluster.
+   * @return  all traffic related stats for this cluster.
    */
   virtual LazyClusterTrafficStats& trafficStats() const PURE;
 
