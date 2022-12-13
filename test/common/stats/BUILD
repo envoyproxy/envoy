@@ -100,18 +100,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test_library(
-    name = "real_thread_test_base",
-    srcs = ["real_thread_test_base.cc"],
-    hdrs = ["real_thread_test_base.h"],
-    deps = [
-        "//source/common/stats:thread_local_store_lib",
-        "//source/common/thread_local:thread_local_lib",
-        "//test/mocks/thread_local:thread_local_mocks",
-        "//test/test_common:real_threads_test_helper_lib",
-    ],
-)
-
-envoy_cc_test_library(
     name = "stat_test_utility_lib",
     srcs = ["stat_test_utility.cc"],
     hdrs = ["stat_test_utility.h"],
@@ -275,15 +263,17 @@ envoy_cc_test(
     name = "thread_local_store_test",
     srcs = ["thread_local_store_test.cc"],
     deps = [
-        ":real_thread_test_base",
         ":stat_test_utility_lib",
         "//source/common/memory:stats_lib",
         "//source/common/stats:stats_matcher_lib",
-        "//source/common/stats:symbol_table_lib",
+        "//source/common/stats:thread_local_store_lib",
+        "//source/common/thread_local:thread_local_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/mocks/stats:stats_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:logging_lib",
+        "//test/test_common:real_threads_test_helper_lib",
         "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",

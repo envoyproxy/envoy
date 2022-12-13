@@ -15,14 +15,15 @@
 #include "source/common/stats/symbol_table.h"
 #include "source/common/stats/tag_producer_impl.h"
 #include "source/common/stats/thread_local_store.h"
+#include "source/common/thread_local/thread_local_impl.h"
 
-#include "test/common/stats/real_thread_test_base.h"
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/real_threads_test_helper.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_split.h"
@@ -755,7 +756,26 @@ TEST_F(StatsThreadLocalStoreTest, SharedScopes) {
   tls_.shutdownThread();
 }
 
-class LookupWithStatNameTest : public ThreadLocalStoreNoMocksTestBase, public testing::Test {};
+class ThreadLocalStoreNoMocksTestBase : public testing::Test {
+public:
+  ThreadLocalStoreNoMocksTestBase()
+      : alloc_(symbol_table_), store_(std::make_unique<ThreadLocalStoreImpl>(alloc_)),
+        pool_(symbol_table_) {}
+  ~ThreadLocalStoreNoMocksTestBase() override {
+    if (store_ != nullptr) {
+      store_->shutdownThreading();
+    }
+  }
+
+  StatName makeStatName(absl::string_view name) { return pool_.add(name); }
+
+  SymbolTableImpl symbol_table_;
+  AllocatorImpl alloc_;
+  ThreadLocalStoreImplPtr store_;
+  StatNamePool pool_;
+};
+
+class LookupWithStatNameTest : public ThreadLocalStoreNoMocksTestBase {};
 
 TEST_F(LookupWithStatNameTest, All) {
   ScopeSharedPtr scope1 = store_->scopeFromStatName(makeStatName("scope1"));
@@ -1664,7 +1684,39 @@ TEST_F(HistogramTest, ForEachHistogram) {
   EXPECT_EQ(deleted_histogram.unit(), Histogram::Unit::Unspecified);
 }
 
-class OneWorkerThread : public ThreadLocalRealThreadsTestBase, public testing::Test {
+class ThreadLocalRealThreadsTestBase : public Thread::RealThreadsTestHelper,
+                                       public ThreadLocalStoreNoMocksTestBase {
+protected:
+  static constexpr uint32_t NumScopes = 1000;
+  static constexpr uint32_t NumIters = 35;
+
+public:
+  ThreadLocalRealThreadsTestBase(uint32_t num_threads)
+      : RealThreadsTestHelper(num_threads), pool_(store_->symbolTable()) {
+    runOnMainBlocking([this]() { store_->initializeThreading(*main_dispatcher_, *tls_); });
+  }
+
+  ~ThreadLocalRealThreadsTestBase() override {
+    // TODO(chaoqin-li1123): clean this up when we figure out how to free the threading resources in
+    // RealThreadsTestHelper.
+    shutdownThreading();
+    exitThreads([this]() { store_.reset(); });
+  }
+
+  void shutdownThreading() {
+    runOnMainBlocking([this]() {
+      if (!tls_->isShutdown()) {
+        tls_->shutdownGlobalThreading();
+      }
+      store_->shutdownThreading();
+      tls_->shutdownThread();
+    });
+  }
+
+  StatNamePool pool_;
+};
+
+class OneWorkerThread : public ThreadLocalRealThreadsTestBase {
 protected:
   static constexpr uint32_t NumThreads = 1;
   OneWorkerThread() : ThreadLocalRealThreadsTestBase(NumThreads) {}
@@ -1708,8 +1760,7 @@ TEST_F(OneWorkerThread, DeleteForEachRace) {
   wait_for_main();
 }
 
-class ClusterShutdownCleanupStarvationTest : public ThreadLocalRealThreadsTestBase,
-                                             public testing::Test {
+class ClusterShutdownCleanupStarvationTest : public ThreadLocalRealThreadsTestBase {
 protected:
   static constexpr uint32_t NumThreads = 2;
 
@@ -1793,7 +1844,7 @@ TEST_F(ClusterShutdownCleanupStarvationTest, TwelveThreadsWithoutBlockade) {
   store_->sync().signal(ThreadLocalStoreImpl::MainDispatcherCleanupSync);
 }
 
-class HistogramThreadTest : public ThreadLocalRealThreadsTestBase, public testing::Test {
+class HistogramThreadTest : public ThreadLocalRealThreadsTestBase {
 protected:
   static constexpr uint32_t NumThreads = 10;
 

@@ -846,8 +846,8 @@ void MainPrioritySetImpl::updateCrossPriorityHostMap(const HostVector& hosts_add
   }
 }
 
-LazyClusterTrafficStats
-ClusterInfoImpl::generateStats(Stats::Scope& scope, const ClusterTrafficStatNames& stat_names) {
+LazyClusterTrafficStats ClusterInfoImpl::generateStats(Stats::Scope& scope,
+                                                       const ClusterTrafficStatNames& stat_names) {
   return std::make_unique<ClusterTrafficStats>(stat_names, scope);
 }
 
