@@ -11,6 +11,8 @@ namespace Compressor {
 
 namespace {
 
+using envoy::extensions::filters::http::compressor::v3::CompressorPerRoute;
+
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
     accept_encoding_handle(Http::CustomHeaders::get().AcceptEncoding);
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::ResponseHeaders>
@@ -164,6 +166,28 @@ Envoy::Compression::Compressor::CompressorPtr CompressorFilterConfig::makeCompre
 CompressorFilter::CompressorFilter(const CompressorFilterConfigSharedPtr config)
     : config_(std::move(config)) {}
 
+CompressorPerRouteFilterConfig::CompressorPerRouteFilterConfig(
+    const envoy::extensions::filters::http::compressor::v3::CompressorPerRoute& config) {
+  switch (config.override_case()) {
+  case CompressorPerRoute::kDisabled:
+    response_compression_enabled_ = false;
+    break;
+  case CompressorPerRoute::kOverrides:
+    if (config.overrides().has_response_direction_config()) {
+      // The presence of an empty `response_direction_config` must enable response compression, just
+      // as its presence in `Compressor` would. As fields are added, this must remain true.
+      // Consequently, if `response_direction_config.common_direction_config.enabled` ever gets
+      // added, its absence must enable compression.
+      response_compression_enabled_ = true;
+    }
+    break;
+  case CompressorPerRoute::OVERRIDE_NOT_SET:
+    // This can't happen, because the `override` oneof has a `validate.required` PGV constraint,
+    // which is checked in `CommonFactoryBase::createRouteSpecificFilterConfig`.
+    PANIC_DUE_TO_CORRUPT_ENUM;
+  }
+}
+
 Http::FilterHeadersStatus CompressorFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                           bool end_stream) {
   const Http::HeaderEntry* accept_encoding = headers.getInline(accept_encoding_handle.handle());
@@ -174,7 +198,7 @@ Http::FilterHeadersStatus CompressorFilter::decodeHeaders(Http::RequestHeaderMap
   }
 
   const auto& response_config = config_->responseDirectionConfig();
-  if (response_config.compressionEnabled() && response_config.removeAcceptEncodingHeader()) {
+  if (compressionEnabled(response_config) && response_config.removeAcceptEncodingHeader()) {
     headers.removeInline(accept_encoding_handle.handle());
   }
 
@@ -245,7 +269,7 @@ Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMa
 
   // This is used to decide whether stats for accept-encoding header should be touched.
   const bool isEnabledAndContentLengthBigEnough =
-      config.compressionEnabled() && config.isMinimumContentLength(headers);
+      compressionEnabled(config) && config.isMinimumContentLength(headers);
 
   const bool isCompressible =
       isEnabledAndContentLengthBigEnough && !Http::Utility::isUpgrade(headers) &&
@@ -602,6 +626,17 @@ void CompressorFilter::sanitizeEtagHeader(Http::ResponseHeaderMap& headers) {
       headers.removeInline(etag_handle.handle());
     }
   }
+}
+
+// True if response compression is enabled.
+bool CompressorFilter::compressionEnabled(
+    const CompressorFilterConfig::ResponseDirectionConfig& config) const {
+  const CompressorPerRouteFilterConfig* per_route_config =
+      Http::Utility::resolveMostSpecificPerFilterConfig<CompressorPerRouteFilterConfig>(
+          decoder_callbacks_);
+  return per_route_config && per_route_config->responseCompressionEnabled().has_value()
+             ? *per_route_config->responseCompressionEnabled()
+             : config.compressionEnabled();
 }
 
 } // namespace Compressor
