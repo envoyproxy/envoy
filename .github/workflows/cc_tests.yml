@@ -25,7 +25,7 @@ jobs:
         cd mobile && ./bazelw test \
             --action_env=LD_LIBRARY_PATH \
             --test_output=all \
-            --copt=-DUSE_API_LISTENER
+            --copt=-DUSE_API_LISTENER \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //test/cc/...
