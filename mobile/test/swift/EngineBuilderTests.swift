@@ -564,6 +564,7 @@ final class EngineBuilderTests: XCTestCase {
       enableInterfaceBinding: false,
       enableDrainPostDnsRefresh: true,
       enforceTrustChainVerification: true,
+      forceIPv6: false,
       enablePlatformCertificateValidation: true,
       h2ConnectionKeepaliveIdleIntervalMilliseconds: 1,
       h2ConnectionKeepaliveTimeoutSeconds: 333,
