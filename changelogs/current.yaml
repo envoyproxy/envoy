@@ -153,12 +153,6 @@ new_features:
     added ``max_request_body_size`` and ``max_response_body_size`` fields, which can either increase or decrease
     the size of messages that can be processed. It can increase (but does not decrease) the stream buffer size,
     and can reject messages even if they're smaller than the stream buffer size if configured smaller.
-- area: tls
-  change: |
-    added support for SNI-based cert selection in tls downstream transport socket. Detailed documentation is available :ref:`cert selection<arch_overview_ssl_cert_select>`.
-    New config option :ref:`full_scan_certs_on_sni_mismatch <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.full_scan_certs_on_sni_mismatch>`
-    is introduced to disable or enable full scan when no cert matches to SNI, defaults to false.
-    New runtime flag ``envoy.reloadable_features.no_full_scan_certs_on_sni_mismatch`` can be used for override the default value.
 - area: build
   change: |
     added an option ``--define=library_autolink=disabled`` to disable autolinking libraries.
