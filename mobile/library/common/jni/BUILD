@@ -21,6 +21,7 @@ cc_library(
     deps = [
         "//library/common/jni/import:jni_import_lib",
         "//library/common/types:c_types_lib",
+        "//library/common/types:managed_types_lib",
         "@envoy//source/common/common:assert_lib",
     ],
 )
@@ -34,10 +35,12 @@ cc_library(
     copts = ["-std=c++17"],
     linkopts = [
         "-lm",
-        "-llog",
         "-ldl",
     ] + select({
         "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
+        "//conditions:default": [],
+    }) + select({
+        "@envoy//bazel:android": ["-llog"],
         "//conditions:default": [],
     }),
     deps = [
@@ -46,6 +49,7 @@ cc_library(
         ":ndk_jni_support",
         "//library/common:envoy_main_interface_lib",
         "//library/common/api:c_types",
+        "//library/common/types:managed_types_lib",
     ],
     # We need this to ensure that we link this into the .so even though there are no code references.
     alwayslink = True,
@@ -65,9 +69,11 @@ cc_binary(
     copts = ["-std=c++17"],
     linkopts = [
         "-lm",
-        "-llog",
     ] + select({
         "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
+        "//conditions:default": [],
+    }) + select({
+        "@envoy//bazel:android": ["-llog"],
         "//conditions:default": [],
     }) + select({
         # TODO(keith): https://github.com/rust-lang/compiler-builtins/issues/353
@@ -111,6 +117,7 @@ cc_binary(
         "//library/common:envoy_main_interface_lib",
         "//library/common/api:c_types",
         "//library/common/jni/import:jni_import_lib",
+        "//library/common/types:managed_types_lib",
     ],
 )
 
@@ -165,6 +172,7 @@ cc_library(
         "//library/common/jni/import:jni_import_lib",
         "//library/common:envoy_main_interface_lib",
         "//library/common/types:c_types_lib",
+        "//library/common/types:managed_types_lib",
         "@envoy//source/common/common:assert_lib",
     ] + TEST_EXTENSIONS,
 )
@@ -189,14 +197,18 @@ cc_library(
 cc_library(
     name = "ndk_jni_support",
     srcs = [
-        "ndk_jni_support.cc",
-    ],
+    ] + select({
+        "@envoy//bazel:android": ["ndk_jni_support.cc"],
+        "//conditions:default": [],
+    }),
     hdrs = ["jni_support.h"],
     copts = ["-std=c++14"],
     linkopts = [
         "-lm",
-        "-llog",
-    ],
+    ] + select({
+        "@envoy//bazel:android": ["-llog"],
+        "//conditions:default": [],
+    }),
     deps = [
         "//library/common/jni/import:jni_import_lib",
     ],

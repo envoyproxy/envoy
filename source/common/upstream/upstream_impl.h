@@ -72,7 +72,7 @@ class UpstreamLocalAddressSelectorImpl : public UpstreamLocalAddressSelector {
 public:
   UpstreamLocalAddressSelectorImpl(
       const envoy::config::cluster::v3::Cluster& config,
-      const envoy::config::core::v3::BindConfig& bootstrap_bind_config);
+      const absl::optional<envoy::config::core::v3::BindConfig>& bootstrap_bind_config);
 
   // UpstreamLocalAddressSelector
   UpstreamLocalAddress getUpstreamLocalAddress(
@@ -209,7 +209,7 @@ public:
   Network::UpstreamTransportSocketFactory&
   resolveTransportSocketFactory(const Network::Address::InstanceConstSharedPtr& dest_address,
                                 const envoy::config::core::v3::Metadata* metadata) const;
-  MonotonicTime creationTime() const override { return creation_time_; }
+  absl::optional<MonotonicTime> lastHcPassTime() const override { return last_hc_pass_time_; }
 
   void setAddressList(const std::vector<Network::Address::InstanceConstSharedPtr>& address_list) {
     address_list_ = address_list;
@@ -228,6 +228,10 @@ protected:
 
   void setOutlierDetectorImpl(Outlier::DetectorHostMonitorPtr&& outlier_detector) {
     outlier_detector_ = std::move(outlier_detector);
+  }
+
+  void setLastHcPassTimeImpl(MonotonicTime last_hc_pass_time) {
+    last_hc_pass_time_.emplace(std::move(last_hc_pass_time));
   }
 
 private:
@@ -250,6 +254,7 @@ private:
   std::reference_wrapper<Network::UpstreamTransportSocketFactory>
       socket_factory_ ABSL_GUARDED_BY(metadata_mutex_);
   const MonotonicTime creation_time_;
+  absl::optional<MonotonicTime> last_hc_pass_time_;
 };
 
 /**
@@ -306,6 +311,10 @@ public:
   }
   void setOutlierDetector(Outlier::DetectorHostMonitorPtr&& outlier_detector) override {
     setOutlierDetectorImpl(std::move(outlier_detector));
+  }
+
+  void setLastHcPassTime(MonotonicTime last_hc_pass_time) override {
+    setLastHcPassTimeImpl(std::move(last_hc_pass_time));
   }
 
   Host::HealthStatus healthStatus() const override {
@@ -688,9 +697,10 @@ public:
       Envoy::Extensions::Upstreams::Http::ProtocolOptionsConfigImpl;
   ClusterInfoImpl(Init::Manager& info, Server::Configuration::ServerFactoryContext& server_context,
                   const envoy::config::cluster::v3::Cluster& config,
-                  const envoy::config::core::v3::BindConfig& bind_config, Runtime::Loader& runtime,
-                  TransportSocketMatcherPtr&& socket_matcher, Stats::ScopeSharedPtr&& stats_scope,
-                  bool added_via_api, Server::Configuration::TransportSocketFactoryContext&);
+                  const absl::optional<envoy::config::core::v3::BindConfig>& bind_config,
+                  Runtime::Loader& runtime, TransportSocketMatcherPtr&& socket_matcher,
+                  Stats::ScopeSharedPtr&& stats_scope, bool added_via_api,
+                  Server::Configuration::TransportSocketFactoryContext&);
 
   static ClusterTrafficStats generateStats(Stats::Scope& scope,
                                            const ClusterTrafficStatNames& cluster_stat_names);

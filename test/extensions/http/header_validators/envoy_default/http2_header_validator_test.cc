@@ -1,3 +1,5 @@
+#include "envoy/http/header_validator_errors.h"
+
 #include "source/extensions/http/header_validators/envoy_default/character_tables.h"
 #include "source/extensions/http/header_validators/envoy_default/http2_header_validator.h"
 
@@ -13,6 +15,7 @@ namespace {
 using ::Envoy::Extensions::Http::HeaderValidators::EnvoyDefault::Http2HeaderValidator;
 using ::Envoy::Http::HeaderString;
 using ::Envoy::Http::Protocol;
+using ::Envoy::Http::UhvResponseCodeDetail;
 
 class Http2HeaderValidatorTest : public HeaderValidatorTest {
 protected:

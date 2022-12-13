@@ -26,10 +26,10 @@ def envoy_select_google_grpc(xs, repository = ""):
     })
 
 # Selects the given values if logging is enabled in the current build.
-def envoy_select_enable_logging(xs, repository = ""):
+def envoy_select_disable_logging(xs, repository = ""):
     return select({
-        repository + "//bazel:disable_logging": [],
-        "//conditions:default": xs,
+        repository + "//bazel:disable_logging": xs,
+        "//conditions:default": [],
     })
 
 # Selects the given values if admin HTML is enabled in the current build.

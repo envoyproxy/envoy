@@ -62,9 +62,39 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "stripped_main_base_lib",
+    srcs = ["stripped_main_base.cc"],
+    hdrs = ["stripped_main_base.h"],
+    deps = [
+        ":envoy_common_lib",
+        ":platform_impl_lib",
+        ":process_wide_lib",
+        "//source/common/thread_local:thread_local_lib",
+        "//source/common/api:os_sys_calls_lib",
+        "//source/common/common:compiler_requirements_lib",
+        "//source/common/common:perf_annotation_lib",
+        "//source/common/grpc:google_grpc_context_lib",
+        "//source/server:hot_restart_lib",
+        "//source/server:hot_restart_nop_lib",
+    ] + select({
+        "//bazel:disable_signal_trace": [],
+        "//conditions:default": [
+            "//source/common/signal:sigaction_lib",
+            ":terminate_handler_lib",
+        ],
+    }),
+)
+
+envoy_cc_library(
     name = "main_common_lib",
-    srcs = ["main_common.cc"],
-    hdrs = ["main_common.h"],
+    srcs = [
+        "main_common.cc",
+        "stripped_main_base.cc",
+    ],
+    hdrs = [
+        "main_common.h",
+        "stripped_main_base.h",
+    ],
     deps = [
         ":envoy_common_lib",
         ":platform_impl_lib",
@@ -85,10 +115,23 @@ envoy_cc_library(
     }),
 )
 
+# provides a library target for Envoy server builds with the versioning information set up correctly.
 envoy_cc_library(
     name = "envoy_main_common_lib",
     deps = [
         ":main_common_lib",
+        # This is compiled as an extension so Envoy Mobile doesn't have to link it in.
+        # Envoy requires it.
+        "//source/extensions/listener_managers/listener_manager:listener_manager_lib",
+        "//source/common/version:version_linkstamp",
+    ],
+)
+
+# provides a library target for Envoy Mobile builds with the versioning information set up correctly.
+envoy_cc_library(
+    name = "envoy_stripped_main_base_lib",
+    deps = [
+        ":stripped_main_base_lib",
         "//source/common/version:version_linkstamp",
     ],
 )
@@ -114,8 +157,14 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "envoy_main_common_with_core_extensions_lib",
-    srcs = ["main_common.cc"],
-    hdrs = ["main_common.h"],
+    srcs = [
+        "main_common.cc",
+        "stripped_main_base.cc",
+    ],
+    hdrs = [
+        "main_common.h",
+        "stripped_main_base.h",
+    ],
     deps = [
         ":envoy_common_with_core_extensions_lib",
         ":platform_impl_lib",
