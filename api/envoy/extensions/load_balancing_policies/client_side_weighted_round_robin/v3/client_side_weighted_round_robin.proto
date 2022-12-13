@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package envoy.extensions.load_balancing_policies.client_side_weighted_round_robin.v3;
+
+import "udpa/annotations/status.proto";
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.load_balancing_policies.client_side_weighted_round_robin.v3";
+option java_outer_classname = "ClientSideWeightedRoundRobinProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/load_balancing_policies/client_side_weighted_round_robin/v3;client_side_weighted_round_robinv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Client-Side Weighted Round Robin Load Balancing Policy]
+// [#not-implemented-hide:]
+
+// Configuration for the client_side_weighted_round_robin LB policy.
+//
+// This policy differs from the built-in ROUND_ROBIN policy in terms of
+// how the endpoint weights are determined. In the ROUND_ROBIN policy,
+// the endpoint weights are sent by the control plane via EDS. However,
+// in this policy, the endpoint weights are instead determined via
+// qps and CPU utilization metrics sent by the endpoint using the ORCA
+// protocol. The weight of a given endpoint is computed as
+// qps / cpu_utilization.
+//
+// See the :ref:`load balancing architecture overview<arch_overview_load_balancing_types>` for more information.
+message RoundRobin {
+  // Whether to enable out-of-band utilization reporting collection from
+  // the endpoints. By default, per-request utilization reporting is used.
+  google.protobuf.BoolValue enable_oob_load_report = 1;
+
+  // A given endpoint must report load metrics continuously for at least
+  // this long before the endpoint weight will be used. This avoids
+  // churn when the set of endpoint addresses changes. Default is 10 seconds.
+  google.protobuf.Duration blackout_period = 2;
+
+  // How often endpoint weights are recalculated.  Default is 1 second.
+  google.protobuf.Duration weight_update_period = 3;
+}
