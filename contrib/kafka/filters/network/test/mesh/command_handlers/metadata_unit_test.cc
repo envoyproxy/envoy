@@ -33,7 +33,7 @@ TEST(MetadataTest, shouldBeAlwaysReadyForAnswer) {
   const std::pair<std::string, int32_t> advertised_address = {"host", 1234};
   EXPECT_CALL(configuration, getAdvertisedAddress()).WillOnce(Return(advertised_address));
   // First topic is going to have configuration present (42 partitions for each topic).
-  const ClusterConfig topic1config = {"", 42, {}};
+  const ClusterConfig topic1config = {"", 42, {}, {}};
   EXPECT_CALL(configuration, computeClusterConfigForTopic("topic1"))
       .WillOnce(Return(absl::make_optional(topic1config)));
   // Second topic is not going to have configuration present.

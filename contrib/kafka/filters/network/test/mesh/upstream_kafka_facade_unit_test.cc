@@ -36,7 +36,8 @@ TEST(UpstreamKafkaFacadeTest, shouldCreateProducerOnlyOnceForTheSameCluster) {
   const std::string topic2 = "topic2";
 
   MockUpstreamKafkaConfiguration configuration;
-  const ClusterConfig cluster_config = {"cluster", 1, {{"bootstrap.servers", "localhost:9092"}}};
+  const ClusterConfig cluster_config = {
+      "cluster", 1, {{"bootstrap.servers", "localhost:9092"}}, {}};
   EXPECT_CALL(configuration, computeClusterConfigForTopic(topic1)).WillOnce(Return(cluster_config));
   EXPECT_CALL(configuration, computeClusterConfigForTopic(topic2)).WillOnce(Return(cluster_config));
   ThreadLocal::MockInstance slot_allocator;
@@ -61,10 +62,12 @@ TEST(UpstreamKafkaFacadeTest, shouldCreateDifferentProducersForDifferentClusters
 
   MockUpstreamKafkaConfiguration configuration;
   // Notice it's the cluster name that matters, not the producer config.
-  const ClusterConfig cluster_config1 = {"cluster1", 1, {{"bootstrap.servers", "localhost:9092"}}};
+  const ClusterConfig cluster_config1 = {
+      "cluster1", 1, {{"bootstrap.servers", "localhost:9092"}}, {}};
   EXPECT_CALL(configuration, computeClusterConfigForTopic(topic1))
       .WillOnce(Return(cluster_config1));
-  const ClusterConfig cluster_config2 = {"cluster2", 1, {{"bootstrap.servers", "localhost:9092"}}};
+  const ClusterConfig cluster_config2 = {
+      "cluster2", 1, {{"bootstrap.servers", "localhost:9092"}}, {}};
   EXPECT_CALL(configuration, computeClusterConfigForTopic(topic2))
       .WillOnce(Return(cluster_config2));
   ThreadLocal::MockInstance slot_allocator;
@@ -87,7 +90,8 @@ TEST(UpstreamKafkaFacadeTest, shouldThrowIfThereIsNoConfigurationForGivenTopic) 
   const std::string topic = "topic1";
 
   MockUpstreamKafkaConfiguration configuration;
-  const ClusterConfig cluster_config = {"cluster", 1, {{"bootstrap.servers", "localhost:9092"}}};
+  const ClusterConfig cluster_config = {
+      "cluster", 1, {{"bootstrap.servers", "localhost:9092"}}, {}};
   EXPECT_CALL(configuration, computeClusterConfigForTopic(topic)).WillOnce(Return(absl::nullopt));
   ThreadLocal::MockInstance slot_allocator;
   EXPECT_CALL(slot_allocator, allocateSlot())
