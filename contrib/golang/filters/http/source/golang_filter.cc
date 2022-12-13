@@ -104,7 +104,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
     state.drainBufferData();
 
     // get the state before changing it.
-    bool inGo = state.isProcessingInGo();
+    bool in_go = state.isProcessingInGo();
 
     if (inGo) {
       // NP: wait go returns to avoid concurrency conflict in go side.
