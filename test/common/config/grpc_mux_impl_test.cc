@@ -2,6 +2,7 @@
 
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
+#include "envoy/config/xds_config_tracker.h"
 #include "envoy/config/xds_resources_delegate.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
@@ -64,6 +65,7 @@ public:
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
         random_, stats_, rate_limit_settings_, true, std::move(config_validators_),
+        /*xds_config_tracker=*/XdsConfigTrackerOptRef(),
         /*xds_resources_delegate=*/XdsResourcesDelegateOptRef(), /*target_xds_authority=*/"");
   }
 
@@ -73,6 +75,7 @@ public:
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
         random_, stats_, custom_rate_limit_settings, true, std::move(config_validators_),
+        /*xds_config_tracker=*/XdsConfigTrackerOptRef(),
         /*xds_resources_delegate=*/XdsResourcesDelegateOptRef(), /*target_xds_authority=*/"");
   }
 
@@ -893,6 +896,7 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyClusterName) {
               "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
           random_, stats_, rate_limit_settings_, true,
           std::make_unique<NiceMock<MockCustomConfigValidators>>(),
+          /*xds_config_tracker=*/XdsConfigTrackerOptRef(),
           /*xds_resources_delegate=*/XdsResourcesDelegateOptRef(), /*target_xds_authority=*/""),
       EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
@@ -908,6 +912,7 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyNodeName) {
               "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
           random_, stats_, rate_limit_settings_, true,
           std::make_unique<NiceMock<MockCustomConfigValidators>>(),
+          /*xds_config_tracker=*/XdsConfigTrackerOptRef(),
           /*xds_resources_delegate=*/XdsResourcesDelegateOptRef(), /*target_xds_authority=*/""),
       EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
