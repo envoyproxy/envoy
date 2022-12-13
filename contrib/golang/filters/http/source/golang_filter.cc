@@ -93,7 +93,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   // eg. filtermanager may invoke sendLocalReply, when scheme is invalid,
   // with "Sending local reply with details // http1.invalid_scheme" details.
   if (state.state() != FilterState::Done) {
-    ENVOY_LOG(info,
+    ENVOY_LOG(debug,
               "golang filter enter encodeHeaders early, maybe sendLocalReply or encodeHeaders "
               "happened, current state: {}, phase: {}",
               state.stateStr(), state.phaseStr());
@@ -120,8 +120,8 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
       return Http::FilterHeadersStatus::StopIteration;
 
     } else {
-      ENVOY_LOG(info, "golang filter clear do data buffer before continue encodeHeader, "
-                      "since no go code is running");
+      ENVOY_LOG(debug, "golang filter clear do data buffer before continue encodeHeader, "
+                       "since no go code is running");
       state.doDataList.clearAll();
     }
   }
@@ -177,12 +177,12 @@ Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap& trai
 }
 
 void Filter::onDestroy() {
-  ENVOY_LOG(info, "golang filter on destroy");
+  ENVOY_LOG(debug, "golang filter on destroy");
 
   {
     Thread::LockGuard lock(mutex_);
     if (has_destroyed_) {
-      ENVOY_LOG(warn, "golang filter has been destroyed");
+      ENVOY_LOG(debug, "golang filter has been destroyed");
       return;
     }
     has_destroyed_ = true;
@@ -384,7 +384,7 @@ void Filter::continueEncodeLocalReply(ProcessorState& state) {
             "go, current state: {}, phase: {}",
             state.stateStr(), state.phaseStr());
 
-  ENVOY_LOG(info, "golang filter drain do data buffer before continueEncodeLocalReply");
+  ENVOY_LOG(debug, "golang filter drain do data buffer before continueEncodeLocalReply");
   state.doDataList.clearAll();
 
   local_reply_waiting_go_ = false;
@@ -412,7 +412,7 @@ void Filter::continueStatusInternal(GolangStatus status) {
   auto saved_state = state.state();
 
   if (local_reply_waiting_go_) {
-    ENVOY_LOG(info,
+    ENVOY_LOG(debug,
               "other filter already trigger sendLocalReply, ignoring the continue status: {}, "
               "state: {}, phase: {}",
               int(status), state.stateStr(), state.phaseStr());
@@ -485,7 +485,7 @@ void Filter::sendLocalReplyInternal(
   ProcessorState& state = getProcessorState();
 
   if (local_reply_waiting_go_) {
-    ENVOY_LOG(info,
+    ENVOY_LOG(debug,
               "other filter already invoked sendLocalReply or encodeHeaders, ignoring the local "
               "reply from go, code: {}, body: {}, details: {}",
               int(response_code), body_text, details);
@@ -494,7 +494,7 @@ void Filter::sendLocalReplyInternal(
     return;
   }
 
-  ENVOY_LOG(info, "golang filter drain do data buffer before sendLocalReply");
+  ENVOY_LOG(debug, "golang filter drain do data buffer before sendLocalReply");
   state.doDataList.clearAll();
 
   // drain buffer data if it's not empty, before sendLocalReply
@@ -519,7 +519,7 @@ void Filter::sendLocalReply(Http::Code response_code, absl::string_view body_tex
           lock.release();
           sendLocalReplyInternal(response_code, body_text, modify_headers, grpc_status, details);
         } else {
-          ENVOY_LOG(info, "golang filter has gone or destroyed in sendLocalReply");
+          ENVOY_LOG(debug, "golang filter has gone or destroyed in sendLocalReply");
         }
       });
 };
@@ -540,7 +540,7 @@ void Filter::continueStatus(GolangStatus status) {
       lock.release();
       continueStatusInternal(status);
     } else {
-      ENVOY_LOG(info, "golang filter has gone or destroyed in continueStatus event");
+      ENVOY_LOG(debug, "golang filter has gone or destroyed in continueStatus event");
     }
   });
 }
@@ -548,7 +548,7 @@ void Filter::continueStatus(GolangStatus status) {
 absl::optional<absl::string_view> Filter::getHeader(absl::string_view key) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
-    ENVOY_LOG(warn, "golang filter has been destroyed");
+    ENVOY_LOG(debug, "golang filter has been destroyed");
     return "";
   }
   auto& state = getProcessorState();
@@ -591,7 +591,7 @@ void copyHeaderMapToGo(Http::HeaderMap& m, GoString* go_strs, char* go_buf) {
 void Filter::copyHeaders(GoString* go_strs, char* go_buf) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
-    ENVOY_LOG(warn, "golang filter has been destroyed");
+    ENVOY_LOG(debug, "golang filter has been destroyed");
     return;
   }
   ASSERT(headers_ != nullptr, "headers is empty, may already continue to next filter");
@@ -601,7 +601,7 @@ void Filter::copyHeaders(GoString* go_strs, char* go_buf) {
 void Filter::setHeader(absl::string_view key, absl::string_view value) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
-    ENVOY_LOG(warn, "golang filter has been destroyed");
+    ENVOY_LOG(debug, "golang filter has been destroyed");
     return;
   }
   ASSERT(headers_ != nullptr, "headers is empty, may already continue to next filter");
@@ -612,7 +612,7 @@ void Filter::setHeader(absl::string_view key, absl::string_view value) {
 void Filter::removeHeader(absl::string_view key) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
-    ENVOY_LOG(warn, "golang filter has been destroyed");
+    ENVOY_LOG(debug, "golang filter has been destroyed");
     return;
   }
   ASSERT(headers_ != nullptr, "headers is empty, may already continue to next filter");
@@ -623,7 +623,7 @@ void Filter::removeHeader(absl::string_view key) {
 void Filter::copyBuffer(Buffer::Instance* buffer, char* data) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
-    ENVOY_LOG(warn, "golang filter has been destroyed");
+    ENVOY_LOG(debug, "golang filter has been destroyed");
     return;
   }
   for (const Buffer::RawSlice& slice : buffer->getRawSlices()) {
@@ -638,7 +638,7 @@ void Filter::setBufferHelper(Buffer::Instance* buffer, absl::string_view& value,
                              bufferAction action) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
-    ENVOY_LOG(warn, "golang filter has been destroyed");
+    ENVOY_LOG(debug, "golang filter has been destroyed");
     return;
   }
   if (action == bufferAction::Set) {
@@ -653,7 +653,7 @@ void Filter::setBufferHelper(Buffer::Instance* buffer, absl::string_view& value,
 void Filter::copyTrailers(GoString* go_strs, char* go_buf) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
-    ENVOY_LOG(warn, "golang filter has been destroyed");
+    ENVOY_LOG(debug, "golang filter has been destroyed");
     return;
   }
   ASSERT(trailers_ != nullptr, "trailers is empty");
@@ -663,7 +663,7 @@ void Filter::copyTrailers(GoString* go_strs, char* go_buf) {
 void Filter::setTrailer(absl::string_view key, absl::string_view value) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
-    ENVOY_LOG(warn, "golang filter has been destroyed");
+    ENVOY_LOG(debug, "golang filter has been destroyed");
     return;
   }
   ASSERT(trailers_ != nullptr, "trailers is empty");
@@ -673,7 +673,7 @@ void Filter::setTrailer(absl::string_view key, absl::string_view value) {
 void Filter::getStringValue(int id, GoString* value_str) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
-    ENVOY_LOG(warn, "golang filter has been destroyed");
+    ENVOY_LOG(debug, "golang filter has been destroyed");
     return;
   }
   auto& state = getProcessorState();
@@ -702,7 +702,7 @@ uint64_t Filter::getMergedConfigId(ProcessorState& state) {
         route_config_list.push_back(dynamic_cast<const FilterConfigPerRoute*>(&cfg));
       });
 
-  ENVOY_LOG(info, "golang filter route config list length: {}.", route_config_list.size());
+  ENVOY_LOG(debug, "golang filter route config list length: {}.", route_config_list.size());
 
   auto id = config_->getConfigId();
   for (auto it : route_config_list) {
@@ -719,7 +719,7 @@ FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config)
     : plugin_name_(proto_config.plugin_name()), so_id_(proto_config.library_id()),
       so_path_(proto_config.library_path()), plugin_config_(proto_config.plugin_config()) {
-  ENVOY_LOG(info, "initilizing golang filter config");
+  ENVOY_LOG(debug, "initilizing golang filter config");
   // NP: dso may not loaded yet, can not invoke envoyGoFilterNewHttpPluginConfig yet.
 };
 
@@ -751,7 +751,7 @@ FilterConfigPerRoute::FilterConfigPerRoute(
     const envoy::extensions::filters::http::golang::v3alpha::ConfigsPerRoute& config,
     Server::Configuration::ServerFactoryContext&) {
   // NP: dso may not loaded yet, can not invoke envoyGoFilterNewHttpPluginConfig yet.
-  ENVOY_LOG(info, "initilizing per route golang filter config");
+  ENVOY_LOG(debug, "initilizing per route golang filter config");
 
   for (const auto& it : config.plugins_config()) {
     auto plugin_name = it.first;

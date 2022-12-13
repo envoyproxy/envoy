@@ -21,13 +21,6 @@ bool DsoInstanceManager::load(std::string dso_id, std::string dso_name) {
   return true;
 }
 
-bool DsoInstanceManager::unload(std::string dso_id) {
-  ENVOY_LOG_MISC(debug, "unload {} dso instance.", dso_id);
-  DsoStoreType& dsoStore = DsoInstanceManager::getDsoStore();
-  absl::WriterMutexLock lock(&dsoStore.mutex_);
-  return dsoStore.map_.erase(dso_id) == 1;
-}
-
 DsoInstancePtr DsoInstanceManager::getDsoInstanceByID(std::string dso_id) {
   DsoStoreType& dsoStore = DsoInstanceManager::getDsoStore();
   absl::ReaderMutexLock lock(&dsoStore.mutex_);
@@ -50,8 +43,23 @@ std::string DsoInstanceManager::show() {
   return ids;
 }
 
+template <typename T>
+bool dlsymInternal(T& fn, void* handler, const std::string name, const std::string symbol) {
+  if (!handler) {
+    return false;
+  }
+
+  fn = reinterpret_cast<T>(dlsym(handler, symbol.c_str()));
+  if (!fn) {
+    ENVOY_LOG_MISC(error, "lib: {}, cannot find symbol: {}, err: {}", name, symbol, dlerror());
+    return false;
+  }
+
+  return true;
+}
+
 DsoInstance::DsoInstance(const std::string dso_name) : dso_name_(dso_name) {
-  ENVOY_LOG_MISC(info, "loading symbols from so file: {}", dso_name);
+  ENVOY_LOG_MISC(debug, "loading symbols from so file: {}", dso_name);
 
   handler_ = dlopen(dso_name.c_str(), RTLD_LAZY);
   if (!handler_) {
@@ -59,24 +67,18 @@ DsoInstance::DsoInstance(const std::string dso_name) : dso_name_(dso_name) {
     return;
   }
 
-  loaded_ = true;
-
-#define _DLSYM(fn, name)                                                                           \
-  do {                                                                                             \
-    fn = reinterpret_cast<decltype(fn)>(dlsym(handler_, name));                                    \
-    if (!fn) {                                                                                     \
-      loaded_ = false;                                                                             \
-      ENVOY_LOG_MISC(error, "lib: {}, cannot find symbol: {}, err: {}", dso_name, name,            \
-                     dlerror());                                                                   \
-    }                                                                                              \
-  } while (0)
-
-  _DLSYM(envoy_go_filter_new_http_plugin_config_, "envoyGoFilterNewHttpPluginConfig");
-  _DLSYM(envoy_go_filter_merge_http_plugin_config_, "envoyGoFilterMergeHttpPluginConfig");
-  _DLSYM(envoy_go_filter_on_http_header_, "envoyGoFilterOnHttpHeader");
-  _DLSYM(envoy_go_filter_on_http_data_, "envoyGoFilterOnHttpData");
-  _DLSYM(envoy_go_filter_on_http_destroy_, "envoyGoFilterOnHttpDestroy");
-#undef _DLSYM
+  loaded_ = dlsymInternal<decltype(envoy_go_filter_new_http_plugin_config_)>(
+      envoy_go_filter_new_http_plugin_config_, handler_, dso_name,
+      "envoyGoFilterNewHttpPluginConfig");
+  loaded_ = dlsymInternal<decltype(envoy_go_filter_merge_http_plugin_config_)>(
+      envoy_go_filter_merge_http_plugin_config_, handler_, dso_name,
+      "envoyGoFilterMergeHttpPluginConfig");
+  loaded_ = dlsymInternal<decltype(envoy_go_filter_on_http_header_)>(
+      envoy_go_filter_on_http_header_, handler_, dso_name, "envoyGoFilterOnHttpHeader");
+  loaded_ = dlsymInternal<decltype(envoy_go_filter_on_http_data_)>(
+      envoy_go_filter_on_http_data_, handler_, dso_name, "envoyGoFilterOnHttpData");
+  loaded_ = dlsymInternal<decltype(envoy_go_filter_on_http_destroy_)>(
+      envoy_go_filter_on_http_destroy_, handler_, dso_name, "envoyGoFilterOnHttpDestroy");
 }
 
 DsoInstance::~DsoInstance() {

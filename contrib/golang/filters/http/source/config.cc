@@ -18,9 +18,12 @@ Http::FilterFactoryCb GolangFilterConfig::createFilterFactoryFromProtoTyped(
 
   FilterConfigSharedPtr config = std::make_shared<FilterConfig>(proto_config);
 
-  ENVOY_LOG_MISC(info, "load golang library at parse config: {} {}", config->soId(),
+  ENVOY_LOG_MISC(debug, "load golang library at parse config: {} {}", config->soId(),
                  config->soPath());
 
+  // loads DSO store a static map and a open handles leak will occur when the filter gets loaded and
+  // unloaded.
+  // TODO: unload DSO when filter updated.
   auto res = Envoy::Dso::DsoInstanceManager::load(config->soId(), config->soPath());
   if (!res) {
     throw EnvoyException(

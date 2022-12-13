@@ -57,13 +57,6 @@ public:
   static bool load(std::string dso_id, std::string dso_name);
 
   /**
-   * Unload the go plugin dynamic library.
-   * @param dso_id is unique ID for dynamic library.
-   * @return false if unload are invalid. Otherwise, return true.
-   */
-  static bool unload(std::string dso_id);
-
-  /**
    * Get the go plugin dynamic library.
    * @param dso_id is unique ID for dynamic library.
    * @return nullptr if get failed. Otherwise, return the DSO instance.
