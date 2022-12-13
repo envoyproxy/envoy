@@ -114,8 +114,14 @@ SysCallIntResult OsSysCallsImpl::ioctl(os_fd_t sockfd, unsigned long control_cod
 }
 
 SysCallIntResult OsSysCallsImpl::close(os_fd_t fd) {
-  const int rc = ::closesocket(fd);
-  return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
+  int rc = ::closesocket(fd);
+  const int socket_err = ::WSAGetLastError();
+  if (rc == -1) {
+    // If `closesocket` failed, maybe the descriptor was a file.
+    rc = ::close(fd);
+  }
+  // Assume the descriptor was a socket, and return the error from that one, if both failed.
+  return {rc, rc != -1 ? 0 : socket_err};
 }
 
 SysCallSizeResult OsSysCallsImpl::writev(os_fd_t fd, const iovec* iov, int num_iov) {
@@ -223,6 +229,11 @@ SysCallPtrResult OsSysCallsImpl::mmap(void* addr, size_t length, int prot, int f
 
 SysCallIntResult OsSysCallsImpl::stat(const char* pathname, struct stat* buf) {
   const int rc = ::stat(pathname, buf);
+  return {rc, rc != -1 ? 0 : errno};
+}
+
+SysCallIntResult OsSysCallsImpl::fstat(os_fd_t fd, struct stat* buf) {
+  const int rc = ::fstat(fd, buf);
   return {rc, rc != -1 ? 0 : errno};
 }
 
