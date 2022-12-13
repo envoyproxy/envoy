@@ -178,7 +178,8 @@ envoy_status_t Engine::terminate() {
 
   if (std::this_thread::get_id() != main_thread_.get_id()) {
     std::cout << main_thread_.get_id();
-    std::cout << "\n";
+    std::cout << main_thread_.joinable();
+    std::cout << "was id \n";
     main_thread_.join();
   }
 
