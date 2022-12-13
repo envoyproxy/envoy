@@ -47,23 +47,23 @@ public:
 
   void SetUp() override {
     setUpstreamProtocol(Http::CodecType::HTTP2);
-    const std::string filter =
-        R"EOF(
-            name: grpc_json_transcoder
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
-              proto_descriptor : "{}"
-              services : "bookstore.Bookstore"
-              max_request_body_size: {}
-              max_response_body_size: {}
-            )EOF";
-    config_helper_.prependFilter(
-        fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"),
-                    maxBodySize(), maxBodySize()));
+    config_helper_.prependFilter(filter());
   }
 
 protected:
-  virtual uint32_t maxBodySize() const { return 0; }
+  static std::string baseFilter() {
+    return R"EOF(
+name: grpc_json_transcoder
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
+  proto_descriptor : "{}"
+  services : "bookstore.Bookstore"
+)EOF";
+  }
+  virtual std::string filter() {
+    return fmt::format(baseFilter(),
+                       TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"));
+  }
   template <class RequestType, class ResponseType>
   void testTranscoding(Http::RequestHeaderMap&& request_headers, const std::string& request_body,
                        const std::vector<std::string>& expected_grpc_request_messages,
@@ -239,18 +239,33 @@ protected:
   bool deferredProcessing() const { return std::get<1>(GetParam()); }
 };
 
+class GrpcJsonTranscoderIntegrationTestWithSizeLimit : public GrpcJsonTranscoderIntegrationTest {
+protected:
+  std::string filter() override {
+    return fmt::format(baseFilter() + R"(
+  max_request_body_size: {}
+  max_response_body_size: {}
+)",
+                       TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"),
+                       maxBodySize(), maxBodySize());
+  }
+  virtual uint32_t maxBodySize() const PURE;
+};
+
 class GrpcJsonTranscoderIntegrationTestWithSizeLimit1024
-    : public GrpcJsonTranscoderIntegrationTest {
+    : public GrpcJsonTranscoderIntegrationTestWithSizeLimit {
 protected:
   uint32_t maxBodySize() const override { return 1024; }
 };
 
-class GrpcJsonTranscoderIntegrationTestWithSizeLimit1 : public GrpcJsonTranscoderIntegrationTest {
+class GrpcJsonTranscoderIntegrationTestWithSizeLimit1
+    : public GrpcJsonTranscoderIntegrationTestWithSizeLimit {
 protected:
   uint32_t maxBodySize() const override { return 1; }
 };
 
-class GrpcJsonTranscoderIntegrationTestWithSizeLimit35 : public GrpcJsonTranscoderIntegrationTest {
+class GrpcJsonTranscoderIntegrationTestWithSizeLimit35
+    : public GrpcJsonTranscoderIntegrationTestWithSizeLimit {
 protected:
   uint32_t maxBodySize() const override { return 35; }
 };

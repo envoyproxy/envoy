@@ -1331,8 +1331,8 @@ private:
   static const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder
   makeProtoConfig() {
     auto proto_config = bookstoreProtoConfig();
-    proto_config.set_max_request_body_size(max_request_body_size_);
-    proto_config.set_max_response_body_size(max_response_body_size_);
+    proto_config.mutable_max_request_body_size()->set_value(max_request_body_size_);
+    proto_config.mutable_max_response_body_size()->set_value(max_response_body_size_);
     return proto_config;
   }
 };

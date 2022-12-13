@@ -103,29 +103,13 @@ public:
    */
   bool convertGrpcStatus() const;
 
-  /**
-   * @param buffer_size the size of the buffer, returned if config did not specify a size.
-   * @return the maximum size of the request body.
-   */
-  uint32_t maxRequestBodySize(uint32_t buffer_size) const {
-    return max_request_body_size_ == 0 ? buffer_size : max_request_body_size_;
-  }
-
-  /**
-   * @param buffer_size the size of the buffer, returned if config did not specify a size.
-   * @return the maximum size of the response body.
-   */
-  uint32_t maxResponseBodySize(uint32_t buffer_size) const {
-    return max_response_body_size_ == 0 ? buffer_size : max_response_body_size_;
-  }
-
   bool disabled() const { return disabled_; }
 
   envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
       RequestValidationOptions request_validation_options_{};
 
-  uint32_t max_request_body_size_{};
-  uint32_t max_response_body_size_{};
+  absl::optional<uint32_t> max_request_body_size_;
+  absl::optional<uint32_t> max_response_body_size_;
 
   void addBuiltinSymbolDescriptor(const std::string& symbol_name);
 

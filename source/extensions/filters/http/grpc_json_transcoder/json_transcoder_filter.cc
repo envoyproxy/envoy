@@ -230,8 +230,12 @@ JsonTranscoderConfig::JsonTranscoderConfig(
   ignore_unknown_query_parameters_ = proto_config.ignore_unknown_query_parameters();
   request_validation_options_ = proto_config.request_validation_options();
   case_insensitive_enum_parsing_ = proto_config.case_insensitive_enum_parsing();
-  max_request_body_size_ = proto_config.max_request_body_size();
-  max_response_body_size_ = proto_config.max_response_body_size();
+  if (proto_config.has_max_request_body_size()) {
+    max_request_body_size_ = proto_config.max_request_body_size().value();
+  }
+  if (proto_config.has_max_response_body_size()) {
+    max_response_body_size_ = proto_config.max_response_body_size().value();
+  }
 }
 
 void JsonTranscoderConfig::addFileDescriptor(const Protobuf::FileDescriptorProto& file) {
@@ -433,11 +437,11 @@ void JsonTranscoderFilter::initPerRouteConfig() {
 }
 
 void JsonTranscoderFilter::maybeExpandBufferLimits() {
-  uint32_t max_request_size = per_route_config_->max_request_body_size_;
+  uint32_t max_request_size = per_route_config_->max_request_body_size_.value_or(0);
   if (max_request_size > decoder_callbacks_->decoderBufferLimit()) {
     decoder_callbacks_->setDecoderBufferLimit(max_request_size);
   }
-  uint32_t max_response_size = per_route_config_->max_response_body_size_;
+  uint32_t max_response_size = per_route_config_->max_response_body_size_.value_or(0);
   if (max_response_size > encoder_callbacks_->encoderBufferLimit()) {
     encoder_callbacks_->setEncoderBufferLimit(max_response_size);
   }
@@ -501,7 +505,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  maybeExpandBufferSize();
+  maybeExpandBufferLimits();
 
   if (method_->request_type_is_http_body_) {
     if (headers.ContentType() != nullptr) {
@@ -987,8 +991,10 @@ bool JsonTranscoderFilter::maybeConvertGrpcStatus(Grpc::Status::GrpcStatus grpc_
 }
 
 bool JsonTranscoderFilter::decoderBufferLimitReached(uint64_t buffer_length) {
+  // The limit is either the configured maximum request body size, or, if not configured,
+  // the default buffer limit.
   uint32_t max_size =
-      per_route_config_->maxRequestBodySize(decoder_callbacks_->decoderBufferLimit());
+      per_route_config_->max_request_body_size_.value_or(decoder_callbacks_->decoderBufferLimit());
   if (buffer_length > max_size) {
     ENVOY_STREAM_LOG(debug,
                      "Request rejected because the transcoder's internal buffer size exceeds the "
@@ -1007,8 +1013,10 @@ bool JsonTranscoderFilter::decoderBufferLimitReached(uint64_t buffer_length) {
 }
 
 bool JsonTranscoderFilter::encoderBufferLimitReached(uint64_t buffer_length) {
+  // The limit is either the configured maximum response body size, or, if not configured,
+  // the default buffer limit.
   uint32_t max_size =
-      per_route_config_->maxResponseBodySize(encoder_callbacks_->encoderBufferLimit());
+      per_route_config_->max_response_body_size_.value_or(encoder_callbacks_->encoderBufferLimit());
   if (buffer_length > max_size) {
     ENVOY_STREAM_LOG(
         debug,
