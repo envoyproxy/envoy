@@ -832,7 +832,7 @@ stages:
   dependsOn: ["env", "precheck"]
   jobs:
   - job: release
-    condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'))
+    condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
     timeoutInMinutes: 180
     pool:
       vmImage: "windows-2019"
