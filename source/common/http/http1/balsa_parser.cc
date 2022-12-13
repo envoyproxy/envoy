@@ -172,7 +172,9 @@ CallbackResult BalsaParser::pause() {
 
 ParserStatus BalsaParser::getStatus() const { return status_; }
 
-uint16_t BalsaParser::statusCode() const { return headers_.parsed_response_code(); }
+Http::Code BalsaParser::statusCode() const {
+  return static_cast<Http::Code>(headers_.parsed_response_code());
+}
 
 bool BalsaParser::isHttp11() const {
   if (message_type_ == MessageType::Request) {

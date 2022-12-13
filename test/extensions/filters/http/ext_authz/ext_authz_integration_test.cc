@@ -26,12 +26,7 @@ using Headers = std::vector<std::pair<const std::string, const std::string>>;
 class ExtAuthzGrpcIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
                                     public HttpIntegrationTest {
 public:
-  ExtAuthzGrpcIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {
-    // TODO(ggreenway): add tag extraction rules.
-    // Missing stat tag-extraction rule for stat 'http.ext_authz.failure_mode_allowed' and
-    // stat_prefix 'ext_authz'.
-    skip_tag_extraction_rule_check_ = true;
-  }
+  ExtAuthzGrpcIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {}
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
@@ -43,11 +38,11 @@ public:
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
       ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
-      ext_authz_cluster->set_name("ext_authz");
+      ext_authz_cluster->set_name("ext_authz_cluster");
       ConfigHelper::setHttp2(*ext_authz_cluster);
 
       TestUtility::loadFromYaml(base_filter_config_, proto_config_);
-      setGrpcService(*proto_config_.mutable_grpc_service(), "ext_authz",
+      setGrpcService(*proto_config_.mutable_grpc_service(), "ext_authz_cluster",
                      fake_upstreams_.back()->localAddress());
 
       proto_config_.mutable_filter_enabled()->set_runtime_key("envoy.ext_authz.enable");
@@ -1029,7 +1024,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
     // Since this is not laziness creation, it should create one client per
     // thread before the traffic comes.
     expected_grpc_client_creation_count =
-        test_server_->counter("grpc.ext_authz.google_grpc_client_creation")->value();
+        test_server_->counter("grpc.ext_authz_cluster.google_grpc_client_creation")->value();
   }
 
   waitForSuccessfulUpstreamResponse("200");
@@ -1056,7 +1051,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
   if (clientType() == Grpc::ClientType::GoogleGrpc) {
     // Make sure no more Google grpc client is created no matter how many requests coming in.
     EXPECT_EQ(expected_grpc_client_creation_count,
-              test_server_->counter("grpc.ext_authz.google_grpc_client_creation")->value());
+              test_server_->counter("grpc.ext_authz_cluster.google_grpc_client_creation")->value());
   }
   sendExtAuthzResponse(Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
                        Http::TestRequestHeaderMapImpl{}, Headers{});
@@ -1081,7 +1076,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
   if (clientType() == Grpc::ClientType::GoogleGrpc) {
     // Make sure no more Google grpc client is created no matter how many requests coming in.
     EXPECT_EQ(expected_grpc_client_creation_count,
-              test_server_->counter("grpc.ext_authz.google_grpc_client_creation")->value());
+              test_server_->counter("grpc.ext_authz_cluster.google_grpc_client_creation")->value());
   }
 
   cleanup();
