@@ -1,5 +1,6 @@
 #pragma once
 
+#include "contrib/kafka/filters/network/source/mesh/librdkafka_utils.h"
 #include "gmock/gmock.h"
 #include "librdkafka/rdkafkacpp.h"
 
@@ -8,6 +9,31 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
+
+// This file defines all librdkafka-related mocks.
+
+class MockLibRdKafkaUtils : public LibRdKafkaUtils {
+public:
+  MOCK_METHOD(RdKafka::Conf::ConfResult, setConfProperty,
+              (RdKafka::Conf&, const std::string&, const std::string&, std::string&), (const));
+  MOCK_METHOD(RdKafka::Conf::ConfResult, setConfDeliveryCallback,
+              (RdKafka::Conf&, RdKafka::DeliveryReportCb*, std::string&), (const));
+  MOCK_METHOD((std::unique_ptr<RdKafka::Producer>), createProducer,
+              (RdKafka::Conf*, std::string& errstr), (const));
+  MOCK_METHOD((std::unique_ptr<RdKafka::KafkaConsumer>), createConsumer,
+              (RdKafka::Conf*, std::string& errstr), (const));
+  MOCK_METHOD(RdKafka::Headers*, convertHeaders,
+              ((const std::vector<std::pair<absl::string_view, absl::string_view>>&)), (const));
+  MOCK_METHOD(void, deleteHeaders, (RdKafka::Headers * librdkafka_headers), (const));
+
+  MockLibRdKafkaUtils() {
+    ON_CALL(*this, convertHeaders(testing::_))
+        .WillByDefault(testing::Return(headers_holder_.get()));
+  }
+
+private:
+  std::unique_ptr<RdKafka::Headers> headers_holder_{RdKafka::Headers::create()};
+};
 
 class MockKafkaProducer : public RdKafka::Producer {
 public:
