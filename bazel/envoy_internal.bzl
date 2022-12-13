@@ -1,6 +1,6 @@
 # DO NOT LOAD THIS FILE. Targets from this file should be considered private
 # and not used outside of the @envoy//bazel package.
-load(":envoy_select.bzl", "envoy_select_admin_html", "envoy_select_enable_http3", "envoy_select_google_grpc", "envoy_select_hot_restart")
+load(":envoy_select.bzl", "envoy_select_admin_functionality", "envoy_select_admin_html", "envoy_select_disable_logging", "envoy_select_enable_http3", "envoy_select_google_grpc", "envoy_select_hot_restart")
 
 # Compute the final copts based on various options.
 def envoy_copts(repository, test = False):
@@ -123,6 +123,8 @@ def envoy_copts(repository, test = False):
                "//conditions:default": [],
            }) + envoy_select_hot_restart(["-DENVOY_HOT_RESTART"], repository) + \
            envoy_select_admin_html(["-DENVOY_ADMIN_HTML"], repository) + \
+           envoy_select_admin_functionality(["-DENVOY_ADMIN_FUNCTIONALITY"], repository) + \
+           envoy_select_disable_logging(["-DENVOY_DISABLE_LOGGING"], repository) + \
            envoy_select_enable_http3(["-DENVOY_ENABLE_QUIC"], repository) + \
            _envoy_select_perf_annotation(["-DENVOY_PERF_ANNOTATION"]) + \
            _envoy_select_perfetto(["-DENVOY_PERFETTO"]) + \
@@ -197,3 +199,23 @@ def _envoy_select_perfetto(xs):
         "@envoy//bazel:enable_perf_tracing": xs,
         "//conditions:default": [],
     })
+
+def envoy_exported_symbols_input():
+    return ["@envoy//bazel:exported_symbols.txt"]
+
+# Default symbols to be exported.
+# TODO(wbpcode): make this work correctly for apple/darwin.
+def _envoy_default_exported_symbols():
+    return select({
+        "@envoy//bazel:linux": [
+            "-Wl,--dynamic-list=$(location @envoy//bazel:exported_symbols.txt)",
+        ],
+        "//conditions:default": [],
+    })
+
+# Select the given values if exporting is enabled in the current build.
+def envoy_select_exported_symbols(xs):
+    return select({
+        "@envoy//bazel:enable_exported_symbols": xs,
+        "//conditions:default": [],
+    }) + _envoy_default_exported_symbols()

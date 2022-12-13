@@ -292,6 +292,11 @@ config_setting(
 )
 
 config_setting(
+    name = "disable_library_autolink",
+    values = {"define": "library_autolink=disabled"},
+)
+
+config_setting(
     name = "disable_object_dump_on_signal_trace",
     values = {"define": "object_dump_on_signal_trace=disabled"},
 )
@@ -299,6 +304,14 @@ config_setting(
 config_setting(
     name = "disable_deprecated_features",
     values = {"define": "deprecated_features=disabled"},
+)
+
+selects.config_setting_group(
+    name = "disable_hot_restart_or_admin",
+    match_any = [
+        "//bazel:disable_hot_restart",
+        "//bazel:disable_admin_functionality",
+    ],
 )
 
 bool_flag(
@@ -328,6 +341,16 @@ selects.config_setting_group(
 config_setting(
     name = "disable_admin_html",
     values = {"define": "admin_html=disabled"},
+)
+
+config_setting(
+    name = "disable_logging",
+    values = {"define": "enable_logging=disabled"},
+)
+
+config_setting(
+    name = "disable_admin_functionality",
+    values = {"define": "admin_functionality=disabled"},
 )
 
 config_setting(

@@ -55,6 +55,7 @@
 #include "source/common/upstream/outlier_detection_impl.h"
 #include "source/common/upstream/resource_manager_impl.h"
 #include "source/common/upstream/transport_socket_match_impl.h"
+#include "source/common/upstream/upstream_http_factory_context_impl.h"
 #include "source/extensions/upstreams/http/config.h"
 #include "source/server/transport_socket_config_impl.h"
 
@@ -71,7 +72,7 @@ class UpstreamLocalAddressSelectorImpl : public UpstreamLocalAddressSelector {
 public:
   UpstreamLocalAddressSelectorImpl(
       const envoy::config::cluster::v3::Cluster& config,
-      const envoy::config::core::v3::BindConfig& bootstrap_bind_config);
+      const absl::optional<envoy::config::core::v3::BindConfig>& bootstrap_bind_config);
 
   // UpstreamLocalAddressSelector
   UpstreamLocalAddress getUpstreamLocalAddress(
@@ -208,7 +209,7 @@ public:
   Network::UpstreamTransportSocketFactory&
   resolveTransportSocketFactory(const Network::Address::InstanceConstSharedPtr& dest_address,
                                 const envoy::config::core::v3::Metadata* metadata) const;
-  MonotonicTime creationTime() const override { return creation_time_; }
+  absl::optional<MonotonicTime> lastHcPassTime() const override { return last_hc_pass_time_; }
 
   void setAddressList(const std::vector<Network::Address::InstanceConstSharedPtr>& address_list) {
     address_list_ = address_list;
@@ -227,6 +228,10 @@ protected:
 
   void setOutlierDetectorImpl(Outlier::DetectorHostMonitorPtr&& outlier_detector) {
     outlier_detector_ = std::move(outlier_detector);
+  }
+
+  void setLastHcPassTimeImpl(MonotonicTime last_hc_pass_time) {
+    last_hc_pass_time_.emplace(std::move(last_hc_pass_time));
   }
 
 private:
@@ -249,6 +254,7 @@ private:
   std::reference_wrapper<Network::UpstreamTransportSocketFactory>
       socket_factory_ ABSL_GUARDED_BY(metadata_mutex_);
   const MonotonicTime creation_time_;
+  absl::optional<MonotonicTime> last_hc_pass_time_;
 };
 
 /**
@@ -266,11 +272,17 @@ public:
            TimeSource& time_source)
       : HostDescriptionImpl(cluster, hostname, address, metadata, locality, health_check_config,
                             priority, time_source),
+        disable_active_health_check_(health_check_config.disable_active_health_check()),
         health_status_(health_status) {
     // This EDS flags setting is still necessary for stats, configuration dump, canonical
     // coarseHealth() etc.
     setEdsHealthFlag(health_status);
     HostImpl::weight(initial_weight);
+  }
+
+  bool disableActiveHealthCheck() const override { return disable_active_health_check_; }
+  void setDisableActiveHealthCheck(bool disable_active_health_check) override {
+    disable_active_health_check_ = disable_active_health_check;
   }
 
   // Upstream::Host
@@ -299,6 +311,10 @@ public:
   }
   void setOutlierDetector(Outlier::DetectorHostMonitorPtr&& outlier_detector) override {
     setOutlierDetectorImpl(std::move(outlier_detector));
+  }
+
+  void setLastHcPassTime(MonotonicTime last_hc_pass_time) override {
+    setLastHcPassTimeImpl(std::move(last_hc_pass_time));
   }
 
   Host::HealthStatus healthStatus() const override {
@@ -359,6 +375,7 @@ private:
 
   std::atomic<uint32_t> health_flags_{};
   std::atomic<uint32_t> weight_;
+  bool disable_active_health_check_;
   // TODO(wbpcode): should we store the EDS health status to health_flags_ to get unified status or
   // flag access? May be we could refactor HealthFlag to contain all these statuses and flags in the
   // future.
@@ -669,25 +686,6 @@ protected:
   mutable HostMapSharedPtr mutable_cross_priority_host_map_;
 };
 
-class UpstreamHttpFactoryContextImpl : public Server::Configuration::UpstreamHttpFactoryContext {
-public:
-  UpstreamHttpFactoryContextImpl(Server::Configuration::ServerFactoryContext& context,
-                                 Init::Manager& init_manager, Stats::Scope& scope)
-      : server_context_(context), init_manager_(init_manager), scope_(scope) {}
-
-  Server::Configuration::ServerFactoryContext& getServerFactoryContext() const override {
-    return server_context_;
-  }
-
-  Init::Manager& initManager() override { return init_manager_; }
-  Stats::Scope& scope() override { return scope_; }
-
-private:
-  Server::Configuration::ServerFactoryContext& server_context_;
-  Init::Manager& init_manager_;
-  Stats::Scope& scope_;
-};
-
 /**
  * Implementation of ClusterInfo that reads from JSON.
  */
@@ -699,12 +697,13 @@ public:
       Envoy::Extensions::Upstreams::Http::ProtocolOptionsConfigImpl;
   ClusterInfoImpl(Init::Manager& info, Server::Configuration::ServerFactoryContext& server_context,
                   const envoy::config::cluster::v3::Cluster& config,
-                  const envoy::config::core::v3::BindConfig& bind_config, Runtime::Loader& runtime,
-                  TransportSocketMatcherPtr&& socket_matcher, Stats::ScopeSharedPtr&& stats_scope,
-                  bool added_via_api, Server::Configuration::TransportSocketFactoryContext&);
+                  const absl::optional<envoy::config::core::v3::BindConfig>& bind_config,
+                  Runtime::Loader& runtime, TransportSocketMatcherPtr&& socket_matcher,
+                  Stats::ScopeSharedPtr&& stats_scope, bool added_via_api,
+                  Server::Configuration::TransportSocketFactoryContext&);
 
-  static ClusterStats generateStats(Stats::Scope& scope,
-                                    const ClusterStatNames& cluster_stat_names);
+  static ClusterTrafficStats generateStats(Stats::Scope& scope,
+                                           const ClusterTrafficStatNames& cluster_stat_names);
   static ClusterLoadReportStats
   generateLoadReportStats(Stats::Scope& scope, const ClusterLoadReportStatNames& stat_names);
   static ClusterCircuitBreakersStats
@@ -791,7 +790,10 @@ public:
   const std::string& observabilityName() const override { return observability_name_; }
   ResourceManager& resourceManager(ResourcePriority priority) const override;
   TransportSocketMatcher& transportSocketMatcher() const override { return *socket_matcher_; }
-  ClusterStats& stats() const override { return stats_; }
+  ClusterTrafficStats& trafficStats() const override { return stats_; }
+  ClusterConfigUpdateStats& configUpdateStats() const override { return config_update_stats_; }
+  ClusterLbStats& lbStats() const override { return lb_stats_; }
+  ClusterEndpointStats& endpointStats() const override { return endpoint_stats_; }
   Stats::Scope& statsScope() const override { return *stats_scope_; }
 
   ClusterRequestResponseSizeStatsOptRef requestResponseSizeStats() const override {
@@ -846,8 +848,13 @@ public:
   upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const override;
 
   // Http::FilterChainFactory
-  void createFilterChain(Http::FilterChainManager& manager) const override {
+  bool createFilterChain(Http::FilterChainManager& manager,
+                         bool only_create_if_configured) const override {
+    if (!has_configured_http_filters_ && only_create_if_configured) {
+      return false;
+    }
     Http::FilterChainUtility::createFilterChainForFactories(manager, http_filter_factories_);
+    return true;
   }
   bool createUpgradeFilterChain(absl::string_view, const UpgradeMap*,
                                 Http::FilterChainManager&) const override {
@@ -905,7 +912,10 @@ private:
   const uint32_t per_connection_buffer_limit_bytes_;
   TransportSocketMatcherPtr socket_matcher_;
   Stats::ScopeSharedPtr stats_scope_;
-  mutable ClusterStats stats_;
+  mutable ClusterTrafficStats stats_;
+  mutable ClusterConfigUpdateStats config_update_stats_;
+  mutable ClusterLbStats lb_stats_;
+  mutable ClusterEndpointStats endpoint_stats_;
   Stats::IsolatedStoreImpl load_report_stats_store_;
   mutable ClusterLoadReportStats load_report_stats_;
   const std::unique_ptr<OptionalClusterStats> optional_cluster_stats_;
@@ -939,6 +949,8 @@ private:
   const std::unique_ptr<Server::Configuration::CommonFactoryContext> factory_context_;
   std::vector<Network::FilterFactoryCb> filter_factories_;
   Http::FilterChainUtility::FilterFactoriesList http_filter_factories_;
+  // true iff the cluster proto specified upstream http filters.
+  bool has_configured_http_filters_{false};
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   mutable Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;

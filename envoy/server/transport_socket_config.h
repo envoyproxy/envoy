@@ -30,9 +30,9 @@ public:
   virtual ~TransportSocketFactoryContext() = default;
 
   /**
-   * @return Server::Admin& the server's admin interface.
+   * @return OptRef<Server::Admin> the global HTTP admin endpoint for the server.
    */
-  virtual Server::Admin& admin() PURE;
+  virtual OptRef<Server::Admin> admin() PURE;
 
   /**
    * @return Ssl::ContextManager& the SSL context manager.

@@ -101,6 +101,7 @@ public:
 
   // Share those cross worker threads.
   std::vector<dlb_port_hdl_t> tx_ports, rx_ports;
+  uint max_retries;
 #endif
   std::vector<int> efds;
   std::vector<std::shared_ptr<DlbBalancedConnectionHandlerImpl>> dlb_handlers;

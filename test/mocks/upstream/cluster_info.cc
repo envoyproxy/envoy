@@ -9,6 +9,7 @@
 #include "source/common/config/metadata.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/raw_buffer_socket.h"
+#include "source/common/router/upstream_codec_filter.h"
 #include "source/common/upstream/upstream_impl.h"
 
 using testing::_;
@@ -54,11 +55,15 @@ MockClusterInfo::MockClusterInfo()
     : http2_options_(::Envoy::Http2::Utility::initializeAndValidateOptions(
           envoy::config::core::v3::Http2ProtocolOptions())),
       stat_names_(stats_store_.symbolTable()),
+      config_update_stats_names_(stats_store_.symbolTable()),
+      lb_stat_names_(stats_store_.symbolTable()), endpoint_stat_names_(stats_store_.symbolTable()),
       cluster_load_report_stat_names_(stats_store_.symbolTable()),
       cluster_circuit_breakers_stat_names_(stats_store_.symbolTable()),
       cluster_request_response_size_stat_names_(stats_store_.symbolTable()),
       cluster_timeout_budget_stat_names_(stats_store_.symbolTable()),
       stats_(ClusterInfoImpl::generateStats(stats_store_, stat_names_)),
+      config_update_stats_(config_update_stats_names_, stats_store_),
+      lb_stats_(lb_stat_names_, stats_store_), endpoint_stats_(endpoint_stat_names_, stats_store_),
       transport_socket_matcher_(new NiceMock<Upstream::MockTransportSocketMatcher>()),
       load_report_stats_(ClusterInfoImpl::generateLoadReportStats(load_report_stats_store_,
                                                                   cluster_load_report_stat_names_)),
@@ -94,7 +99,10 @@ MockClusterInfo::MockClusterInfo()
       .WillByDefault(ReturnPointee(&max_response_headers_count_));
   ON_CALL(*this, maxRequestsPerConnection())
       .WillByDefault(ReturnPointee(&max_requests_per_connection_));
-  ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_));
+  ON_CALL(*this, trafficStats()).WillByDefault(ReturnRef(stats_));
+  ON_CALL(*this, lbStats()).WillByDefault(ReturnRef(lb_stats_));
+  ON_CALL(*this, configUpdateStats()).WillByDefault(ReturnRef(config_update_stats_));
+  ON_CALL(*this, endpointStats()).WillByDefault(ReturnRef(endpoint_stats_));
   ON_CALL(*this, statsScope()).WillByDefault(ReturnRef(stats_store_));
   // TODO(incfly): The following is a hack because it's not possible to directly embed
   // a mock transport socket factory matcher due to circular dependencies. Fix this up in a follow
@@ -139,6 +147,19 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, clusterType()).WillByDefault(ReturnRef(cluster_type_));
   ON_CALL(*this, upstreamHttpProtocol(_))
       .WillByDefault(Return(std::vector<Http::Protocol>{Http::Protocol::Http11}));
+  ON_CALL(*this, createFilterChain(_, _))
+      .WillByDefault(
+          Invoke([&](Http::FilterChainManager& manager, bool only_create_if_configured) -> bool {
+            if (only_create_if_configured) {
+              return false;
+            }
+            Http::FilterFactoryCb factory_cb =
+                [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+              callbacks.addStreamDecoderFilter(std::make_shared<Router::UpstreamCodecFilter>());
+            };
+            manager.applyFilterFactoryCb({}, factory_cb);
+            return true;
+          }));
 }
 
 MockClusterInfo::~MockClusterInfo() = default;

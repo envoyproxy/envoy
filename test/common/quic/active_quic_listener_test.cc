@@ -150,7 +150,7 @@ protected:
   }
 
   void maybeConfigureMocks(int connection_count) {
-    EXPECT_CALL(filter_chain_manager_, findFilterChain(_))
+    EXPECT_CALL(filter_chain_manager_, findFilterChain(_, _))
         .Times(connection_count)
         .WillRepeatedly(Return(filter_chain_));
     EXPECT_CALL(listener_config_, filterChainFactory()).Times(connection_count);

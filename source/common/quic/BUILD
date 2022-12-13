@@ -3,6 +3,10 @@ load(
     "envoy_cc_library",
     "envoy_package",
 )
+load(
+    "@envoy_build_config//:extensions_build_config.bzl",
+    "LEGACY_ALWAYSLINK",
+)
 
 licenses(["notice"])  # Apache 2
 
@@ -103,7 +107,8 @@ envoy_cc_library(
         ":quic_io_handle_wrapper_lib",
         ":quic_transport_socket_factory_lib",
         "//envoy/ssl:tls_certificate_config_interface",
-        "//source/server:connection_handler_lib",
+        "//source/common/stream_info:stream_info_lib",
+        "//source/server:listener_stats",
         "@com_github_google_quiche//:quic_core_crypto_certificate_view_lib",
     ],
 )
@@ -319,7 +324,6 @@ envoy_cc_library(
         ":quic_io_handle_wrapper_lib",
         ":quic_network_connection_lib",
         "//source/common/quic:envoy_quic_utils_lib",
-        "//source/server:connection_handler_lib",
         "@com_github_google_quiche//:quic_core_connection_lib",
     ],
 )
@@ -352,7 +356,6 @@ envoy_cc_library(
         ":envoy_quic_server_session_lib",
         ":quic_stat_names_lib",
         "//envoy/network:listener_interface",
-        "//source/server:connection_handler_lib",
         "@com_github_google_quiche//:quic_core_server_lib",
         "@com_github_google_quiche//:quic_core_utils_lib",
     ],
@@ -382,7 +385,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_lib",
         "//source/extensions/quic/connection_id_generator:envoy_deterministic_connection_id_generator_config",
-        "//source/server:connection_handler_lib",
+        "//source/server:active_udp_listener",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/quic/connection_id_generator/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/quic/crypto_stream/v3:pkg_cc_proto",
@@ -431,6 +434,7 @@ envoy_cc_library(
         "@com_github_google_quiche//:quic_core_crypto_crypto_handshake_lib",
         "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
     ],
+    alwayslink = LEGACY_ALWAYSLINK,
 )
 
 # Create a single target that contains all the libraries that register factories.
@@ -510,7 +514,6 @@ envoy_cc_library(
     tags = ["nofips"],
     deps = [
         "//envoy/config:typed_config_interface",
-        "//source/server:connection_handler_lib",
         "@com_github_google_quiche//:quic_core_crypto_proof_source_lib",
     ],
 )

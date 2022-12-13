@@ -1058,7 +1058,6 @@ TEST_F(TcpConnPoolImplTest, TestIdleTimeout) {
   c1.releaseConn();
   conn_pool_->test_conns_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
 
-  testing::MockFunction<void()> drained_callback;
   EXPECT_CALL(idle_callback, Call());
   conn_pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
   EXPECT_CALL(*conn_pool_, onConnDestroyedForTest());

@@ -37,6 +37,11 @@ independently.
 
 .. note::
 
+ Currently, updating a listener's :ref:`socket_options <envoy_v3_api_field_config.listener.v3.Listener.socket_options>` during a hot restart isn't supported.
+ The old process socket options will be used. If it is required to update socket options either do a full restart or perform an LDS based listener updated.
+
+.. note::
+
  This feature is not supported on Windows.
 
 Socket handling

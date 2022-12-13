@@ -382,7 +382,7 @@ void ProtoLayer::walkProtoValue(const ProtobufWkt::Value& v, const std::string& 
     if (hasRuntimePrefix(prefix) && !isRuntimeFeature(prefix)) {
       IS_ENVOY_BUG(absl::StrCat(
           "Using a removed guard ", prefix,
-          ". In future version of Enovy this will be treated as invalid configuration"));
+          ". In future version of Envoy this will be treated as invalid configuration"));
     }
     values_.emplace(prefix, SnapshotImpl::createEntry(v));
     break;

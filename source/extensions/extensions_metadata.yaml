@@ -68,13 +68,20 @@ envoy.bootstrap.wasm:
   status: alpha
   type_urls:
   - envoy.extensions.wasm.v3.WasmService
+envoy.extensions.http.cache.file_system_http_cache:
+  categories:
+  - envoy.http.cache
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.http.cache.file_system_http_cache.v3.FileSystemHttpCacheConfig
 envoy.extensions.http.cache.simple:
   categories:
   - envoy.http.cache
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: wip
   type_urls:
-  - envoy.extensions.cache.simple_http_cache.v3.SimpleHttpCacheConfig
+  - envoy.extensions.http.cache.simple_http_cache.v3.SimpleHttpCacheConfig
 envoy.clusters.aggregate:
   categories:
   - envoy.clusters
@@ -85,10 +92,35 @@ envoy.clusters.dynamic_forward_proxy:
   - envoy.clusters
   security_posture: robust_to_untrusted_downstream
   status: stable
+envoy.clusters.static:
+  categories:
+  - envoy.clusters
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+envoy.clusters.strict_dns:
+  categories:
+  - envoy.clusters
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+envoy.clusters.original_dst:
+  categories:
+  - envoy.clusters
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+envoy.clusters.eds:
+  categories:
+  - envoy.clusters
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
 envoy.clusters.redis:
   categories:
   - envoy.clusters
   security_posture: requires_trusted_downstream_and_upstream
+  status: stable
+envoy.clusters.logical_dns:
+  categories:
+  - envoy.clusters
+  security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
 envoy.compression.brotli.compressor:
   categories:
@@ -227,6 +259,7 @@ envoy.filters.http.compressor:
   status: stable
   type_urls:
   - envoy.extensions.filters.http.compressor.v3.Compressor
+  - envoy.extensions.filters.http.compressor.v3.CompressorPerRoute
 envoy.filters.http.cors:
   categories:
   - envoy.filters.http
@@ -355,7 +388,7 @@ envoy.filters.http.jwt_authn:
   categories:
   - envoy.filters.http
   security_posture: robust_to_untrusted_downstream
-  status: alpha
+  status: stable
   type_urls:
   - envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication
   - envoy.extensions.filters.http.jwt_authn.v3.PerRouteConfig
@@ -411,6 +444,15 @@ envoy.filters.http.ratelimit:
   type_urls:
   - envoy.extensions.filters.http.ratelimit.v3.RateLimit
   - envoy.extensions.filters.http.ratelimit.v3.RateLimitPerRoute
+envoy.filters.http.rate_limit_quota:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaFilterConfig
+  - envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaOverride
+  - envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
 envoy.filters.http.rbac:
   categories:
   - envoy.filters.http
@@ -771,21 +813,21 @@ envoy.matching.matchers.ip:
   type_urls:
   - envoy.extensions.matching.input_matchers.ip.v3.Ip
 envoy.path.match.uri_template.uri_template_matcher:
-    categories:
-    - envoy.path.match
-    security_posture: robust_to_untrusted_downstream_and_upstream
-    status: stable
-    undocumented: true
-    type_urls:
-    - envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
+  categories:
+  - envoy.path.match
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+  undocumented: true
+  type_urls:
+  - envoy.extensions.path.match.uri_template.v3.UriTemplateMatchConfig
 envoy.path.rewrite.uri_template.uri_template_rewriter:
-      categories:
-      - envoy.path.rewrite
-      security_posture: robust_to_untrusted_downstream_and_upstream
-      status: stable
-      undocumented: true
-      type_urls:
-      - envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
+  categories:
+  - envoy.path.rewrite
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+  undocumented: true
+  type_urls:
+  - envoy.extensions.path.rewrite.uri_template.v3.UriTemplateRewriteConfig
 envoy.quic.proof_source.filter_chain:
   categories:
   - envoy.quic.proof_source
@@ -842,6 +884,13 @@ envoy.request_id.uuid:
   status: stable
   type_urls:
   - envoy.extensions.request_id.uuid.v3.UuidRequestIdConfig
+envoy.resource_monitors.downstream_connections:
+  categories:
+  - envoy.resource_monitors
+  security_posture: data_plane_agnostic
+  status: wip
+  type_urls:
+  - envoy.extensions.resource_monitors.downstream_connections.v3.DownstreamConnectionsConfig
 envoy.resource_monitors.fixed_heap:
   categories:
   - envoy.resource_monitors
@@ -1096,17 +1145,17 @@ envoy.wasm.runtime.v8:
 envoy.wasm.runtime.wamr:
   categories:
   - envoy.wasm.runtime
-  security_posture: unknown # "This may never change from unknown until the threat model at https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions is updated to capture additional Wasm runtimes".
+  security_posture: unknown  # "This may never change from unknown until the threat model at https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions is updated to capture additional Wasm runtimes".
   status: alpha
 envoy.wasm.runtime.wasmtime:
   categories:
   - envoy.wasm.runtime
-  security_posture: unknown # "This may never change from unknown until the threat model at https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions is updated to capture additional Wasm runtimes".
+  security_posture: unknown  # "This may never change from unknown until the threat model at https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions is updated to capture additional Wasm runtimes".
   status: alpha
 envoy.wasm.runtime.wavm:
   categories:
   - envoy.wasm.runtime
-  security_posture: unknown # "This may never change from unknown until the threat model at https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions is updated to capture additional Wasm runtimes".
+  security_posture: unknown  # "This may never change from unknown until the threat model at https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/threat_model#core-and-extensions is updated to capture additional Wasm runtimes".
   status: alpha
 envoy.watchdog.profile_action:
   categories:
@@ -1294,3 +1343,31 @@ envoy.matching.custom_matchers.trie_matcher:
   status: alpha
   type_urls:
   - xds.type.matcher.v3.IPMatcher
+envoy.filters.http.custom_response:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.filters.http.custom_response.v3.CustomResponse
+envoy.matching.actions.format_string:
+  categories:
+  - envoy.matching.action
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.config.core.v3.SubstitutionFormatString
+envoy.http.custom_response.redirect_policy:
+  categories:
+  - envoy.http.custom_response
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.http.custom_response.redirect_policy.v3.RedirectPolicy
+envoy.http.custom_response.local_response_policy:
+  categories:
+  - envoy.http.custom_response
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy

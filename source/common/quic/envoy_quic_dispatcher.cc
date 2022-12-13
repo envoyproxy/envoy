@@ -88,8 +88,10 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
   // ALPN.
   Network::ConnectionSocketPtr connection_socket = createServerConnectionSocket(
       listen_socket_.ioHandle(), self_address, peer_address, std::string(parsed_chlo.sni), "h3");
+  auto stream_info = std::make_unique<StreamInfo::StreamInfoImpl>(
+      dispatcher_.timeSource(), connection_socket->connectionInfoProviderSharedPtr());
   const Network::FilterChain* filter_chain =
-      listener_config_->filterChainManager().findFilterChain(*connection_socket);
+      listener_config_->filterChainManager().findFilterChain(*connection_socket, *stream_info);
 
   auto quic_connection = std::make_unique<EnvoyQuicServerConnection>(
       server_connection_id, self_address, peer_address, *helper(), *alarm_factory(), writer(),
@@ -99,7 +101,7 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
       quic_config, quic::ParsedQuicVersionVector{version}, std::move(quic_connection), this,
       session_helper(), crypto_config(), compressed_certs_cache(), dispatcher_,
       listener_config_->perConnectionBufferLimitBytes(), quic_stat_names_,
-      listener_config_->listenerScope(), crypto_server_stream_factory_);
+      listener_config_->listenerScope(), crypto_server_stream_factory_, std::move(stream_info));
   if (filter_chain != nullptr) {
     // Setup filter chain before Initialize().
     const bool has_filter_initialized =

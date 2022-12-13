@@ -6,6 +6,7 @@
 #include "envoy/config/core/v3/config_source.pb.validate.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
+#include "envoy/config/xds_config_tracker.h"
 #include "envoy/config/xds_resources_delegate.h"
 #include "envoy/stats/scope.h"
 
@@ -47,7 +48,8 @@ public:
         http_request_(&cm_.thread_local_cluster_.async_client_),
         api_(Api::createApiForTest(stats_store_, random_)),
         subscription_factory_(local_info_, dispatcher_, cm_, validation_visitor_, *api_, server_,
-                              /*xds_resources_delegate=*/XdsResourcesDelegateOptRef()) {}
+                              /*xds_resources_delegate=*/XdsResourcesDelegateOptRef(),
+                              /*xds_config_tracker=*/XdsConfigTrackerOptRef()) {}
 
   SubscriptionPtr
   subscriptionFromConfigSource(const envoy::config::core::v3::ConfigSource& config) {
@@ -84,9 +86,8 @@ class SubscriptionFactoryTestUnifiedOrLegacyMux
       public testing::WithParamInterface<LegacyOrUnified> {
 public:
   SubscriptionFactoryTestUnifiedOrLegacyMux() {
-    if (GetParam() == LegacyOrUnified::Unified) {
-      scoped_runtime_.mergeValues({{"envoy.reloadable_features.unified_mux", "true"}});
-    }
+    scoped_runtime_.mergeValues({{"envoy.reloadable_features.unified_mux",
+                                  (GetParam() == LegacyOrUnified::Unified) ? "true" : "false"}});
   }
 
   TestScopedRuntime scoped_runtime_;
@@ -378,7 +379,8 @@ TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux,
           "xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/bar", config)
           ->start({}),
       EnvoyException,
-      "Missing or not supported config source specifier in envoy::config::core::v3::ConfigSource "
+      "Missing or not supported config source specifier in "
+      "envoy::config::core::v3::ConfigSource "
       "for a collection. Only ADS and gRPC in delta-xDS mode are supported.");
 }
 

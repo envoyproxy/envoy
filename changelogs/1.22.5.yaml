@@ -10,4 +10,3 @@ bug_fixes:
 - area: transport_socket
   change: |
     fixed a bug that prevented the tcp stats to be retrieved when running on kernels different than the kernel where Envoy was built.
-

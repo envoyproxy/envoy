@@ -1,22 +1,22 @@
 version: v1
 deps:
-    - buf.build/googleapis/googleapis:62f35d8aed1149c291d606d958a7ce32
-    - buf.build/opencensus/opencensus
-    - buf.build/beta/prometheus
-    - buf.build/opentelemetry/opentelemetry
-    - buf.build/gogo/protobuf
-    - buf.build/cncf/xds
+- buf.build/googleapis/googleapis:62f35d8aed1149c291d606d958a7ce32
+- buf.build/opencensus/opencensus
+- buf.build/beta/prometheus
+- buf.build/opentelemetry/opentelemetry
+- buf.build/gogo/protobuf
+- buf.build/cncf/xds
 breaking:
   ignore_unstable_packages: true
   use:
-    - FIELD_SAME_ONEOF
-    - FIELD_SAME_JSON_NAME
-    - FIELD_SAME_NAME
-    - FIELD_SAME_TYPE
-    - FIELD_SAME_LABEL
-    - FILE_SAME_PACKAGE
-    - FIELD_NO_DELETE_UNLESS_NUMBER_RESERVED
-    - FIELD_NO_DELETE_UNLESS_NAME_RESERVED
+  - FIELD_SAME_ONEOF
+  - FIELD_SAME_JSON_NAME
+  - FIELD_SAME_NAME
+  - FIELD_SAME_TYPE
+  - FIELD_SAME_LABEL
+  - FILE_SAME_PACKAGE
+  - FIELD_NO_DELETE_UNLESS_NUMBER_RESERVED
+  - FIELD_NO_DELETE_UNLESS_NAME_RESERVED
 lint:
   use:
   - IMPORT_USED

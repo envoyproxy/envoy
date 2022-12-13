@@ -110,6 +110,11 @@ public:
       return *this;
     }
 
+    ServerSslOptions& setTrustRootOnly(bool trust_root_only) {
+      trust_root_only_ = trust_root_only;
+      return *this;
+    }
+
     bool allow_expired_certificate_{};
     envoy::config::core::v3::TypedExtensionConfig* custom_validator_config_;
     bool rsa_cert_{true};
@@ -129,6 +134,7 @@ public:
     std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
         san_matchers_{};
     bool client_with_intermediate_cert_{false};
+    bool trust_root_only_{false};
     absl::optional<uint32_t> max_verify_depth_{absl::nullopt};
   };
 
@@ -190,6 +196,9 @@ public:
   // Configuration for L7 proxying, with clusters cluster_1 and cluster_2 meant to be added via CDS.
   // api_type should be REST, GRPC, or DELTA_GRPC.
   static std::string discoveredClustersBootstrap(const std::string& api_type);
+  // Configuration for L7 proxying, with clusters cluster_1 and cluster_2 meant to be added via CDS.
+  // but there are no listeners.
+  static std::string clustersNoListenerBootstrap(const std::string& api_type);
   static std::string adsBootstrap(const std::string& api_type);
   // Builds a standard Cluster config fragment, with a single endpoint (at address:port).
   static envoy::config::cluster::v3::Cluster
