@@ -227,7 +227,7 @@ new_features:
     added :ref:`append_x_forwarded_port <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.append_x_forwarded_port>` to append the ``x-forwarded-port`` header to HTTP upstream requests.
 - area: tcp
   change: |
-    added :ref:`idle_timeout <envoy_v3_api_field_extensions.upstreams.tcp.v3.TcpProtocolOptions.idle_timeout>` to support per client idle timeout for tcp connection pool. The timeout is guarded by ``envoy.reloadable_features.envoy_reloadable_features_tcp_pool_idle_timeout`` and timeout defaults to 10 minutes if runtime flag is enabled.
+    added :ref:`idle_timeout <envoy_v3_api_field_extensions.upstreams.tcp.v3.TcpProtocolOptions.idle_timeout>` to support per client idle timeout for tcp connection pool. The timeout is guarded by ``envoy.reloadable_features.tcp_pool_idle_timeout`` and timeout defaults to 10 minutes if runtime flag is enabled.
 
 - area: ext_authz
   change: |
