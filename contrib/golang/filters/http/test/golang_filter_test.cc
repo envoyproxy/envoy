@@ -39,9 +39,6 @@ namespace {
 class TestFilter : public Filter {
 public:
   using Filter::Filter;
-
-  // TODO: for mock methods
-  // MOCK_METHOD;
 };
 
 class GolangHttpFilterTest : public testing::Test {

@@ -229,7 +229,7 @@ void ProcessorState::drainBufferData() {
   if (data_buffer_ != nullptr) {
     auto len = data_buffer_->length();
     if (len > 0) {
-      ENVOY_LOG(warn, "golang filter drain buffer data");
+      ENVOY_LOG(info, "golang filter drain buffer data");
       data_buffer_->drain(len);
     }
   }

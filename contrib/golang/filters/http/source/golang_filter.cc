@@ -93,7 +93,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   // eg. filtermanager may invoke sendLocalReply, when scheme is invalid,
   // with "Sending local reply with details // http1.invalid_scheme" details.
   if (state.state() != FilterState::Done) {
-    ENVOY_LOG(warn,
+    ENVOY_LOG(info,
               "golang filter enter encodeHeaders early, maybe sendLocalReply or encodeHeaders "
               "happened, current state: {}, phase: {}",
               state.stateStr(), state.phaseStr());
@@ -106,7 +106,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
     // get the state before changing it.
     bool in_go = state.isProcessingInGo();
 
-    if (inGo) {
+    if (in_go) {
       // NP: wait go returns to avoid concurrency conflict in go side.
       local_reply_waiting_go_ = true;
       ENVOY_LOG(debug, "waiting go returns before handle the local reply from other filter");
@@ -120,7 +120,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
       return Http::FilterHeadersStatus::StopIteration;
 
     } else {
-      ENVOY_LOG(warn, "golang filter clear do data buffer before continue encodeHeader, "
+      ENVOY_LOG(info, "golang filter clear do data buffer before continue encodeHeader, "
                       "since no go code is running");
       state.doDataList.clearAll();
     }
@@ -384,7 +384,7 @@ void Filter::continueEncodeLocalReply(ProcessorState& state) {
             "go, current state: {}, phase: {}",
             state.stateStr(), state.phaseStr());
 
-  ENVOY_LOG(warn, "golang filter drain do data buffer before continueEncodeLocalReply");
+  ENVOY_LOG(info, "golang filter drain do data buffer before continueEncodeLocalReply");
   state.doDataList.clearAll();
 
   local_reply_waiting_go_ = false;
@@ -412,7 +412,7 @@ void Filter::continueStatusInternal(GolangStatus status) {
   auto saved_state = state.state();
 
   if (local_reply_waiting_go_) {
-    ENVOY_LOG(warn,
+    ENVOY_LOG(info,
               "other filter already trigger sendLocalReply, ignoring the continue status: {}, "
               "state: {}, phase: {}",
               int(status), state.stateStr(), state.phaseStr());
@@ -485,7 +485,7 @@ void Filter::sendLocalReplyInternal(
   ProcessorState& state = getProcessorState();
 
   if (local_reply_waiting_go_) {
-    ENVOY_LOG(warn,
+    ENVOY_LOG(info,
               "other filter already invoked sendLocalReply or encodeHeaders, ignoring the local "
               "reply from go, code: {}, body: {}, details: {}",
               int(response_code), body_text, details);
@@ -494,7 +494,7 @@ void Filter::sendLocalReplyInternal(
     return;
   }
 
-  ENVOY_LOG(warn, "golang filter drain do data buffer before sendLocalReply");
+  ENVOY_LOG(info, "golang filter drain do data buffer before sendLocalReply");
   state.doDataList.clearAll();
 
   // drain buffer data if it's not empty, before sendLocalReply

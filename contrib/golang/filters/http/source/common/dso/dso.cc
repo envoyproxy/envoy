@@ -61,70 +61,27 @@ DsoInstance::DsoInstance(const std::string dso_name) : dso_name_(dso_name) {
 
   loaded_ = true;
 
-  auto func = dlsym(handler_, "envoyGoFilterNewHttpPluginConfig");
-  if (func) {
-    envoy_go_filter_new_http_plugin_config_ =
-        reinterpret_cast<GoUint64 (*)(GoUint64 p0, GoUint64 p1)>(func);
-  } else {
-    loaded_ = false;
-    ENVOY_LOG_MISC(error, "lib: {}, cannot find symbol: envoyGoFilterNewHttpPluginConfig, err: {}",
-                   dso_name, dlerror());
-  }
+#define _DLSYM(fn, name)                                                                           \
+  do {                                                                                             \
+    fn = reinterpret_cast<decltype(fn)>(dlsym(handler_, name));                                    \
+    if (!fn) {                                                                                     \
+      loaded_ = false;                                                                             \
+      ENVOY_LOG_MISC(error, "lib: {}, cannot find symbol: {}, err: {}", dso_name, name,            \
+                     dlerror());                                                                   \
+    }                                                                                              \
+  } while (0)
 
-  func = dlsym(handler_, "envoyGoFilterMergeHttpPluginConfig");
-  if (func) {
-    envoy_go_filter_merge_http_plugin_config_ =
-        reinterpret_cast<GoUint64 (*)(GoUint64 p0, GoUint64 p1)>(func);
-  } else {
-    loaded_ = false;
-    ENVOY_LOG_MISC(error,
-                   "lib: {}, cannot find symbol: envoyGoFilterMergeHttpPluginConfig, err: {}",
-                   dso_name, dlerror());
-  }
-
-  func = dlsym(handler_, "envoyGoFilterOnHttpHeader");
-  if (func) {
-    envoy_go_filter_on_http_header_ =
-        reinterpret_cast<GoUint64 (*)(httpRequest * p0, GoUint64 p1, GoUint64 p2, GoUint64 p3)>(
-            func);
-  } else {
-    loaded_ = false;
-    ENVOY_LOG_MISC(error, "lib: {}, cannot find symbol: envoyGoFilterOnHttpHeader, err: {}",
-                   dso_name, dlerror());
-  }
-
-  func = dlsym(handler_, "envoyGoFilterOnHttpData");
-  if (func) {
-    envoy_go_filter_on_http_data_ =
-        reinterpret_cast<GoUint64 (*)(httpRequest * p0, GoUint64 p1, GoUint64 p2, GoUint64 p3)>(
-            func);
-  } else {
-    loaded_ = false;
-    ENVOY_LOG_MISC(error, "lib: {}, cannot find symbol: envoyGoFilterOnHttpDecodeData, err: {}",
-                   dso_name, dlerror());
-  }
-
-  func = dlsym(handler_, "envoyGoFilterOnHttpDestroy");
-  if (func) {
-    envoy_go_filter_on_http_destroy_ =
-        reinterpret_cast<void (*)(httpRequest * p0, GoUint64 p1)>(func);
-  } else {
-    loaded_ = false;
-    ENVOY_LOG_MISC(error, "lib: {}, cannot find symbol: envoyGoFilterOnHttpDecodeDestroy, err: {}",
-                   dso_name, dlerror());
-  }
+  _DLSYM(envoy_go_filter_new_http_plugin_config_, "envoyGoFilterNewHttpPluginConfig");
+  _DLSYM(envoy_go_filter_merge_http_plugin_config_, "envoyGoFilterMergeHttpPluginConfig");
+  _DLSYM(envoy_go_filter_on_http_header_, "envoyGoFilterOnHttpHeader");
+  _DLSYM(envoy_go_filter_on_http_data_, "envoyGoFilterOnHttpData");
+  _DLSYM(envoy_go_filter_on_http_destroy_, "envoyGoFilterOnHttpDestroy");
+#undef _DLSYM
 }
 
 DsoInstance::~DsoInstance() {
-  envoy_go_filter_new_http_plugin_config_ = nullptr;
-  envoy_go_filter_merge_http_plugin_config_ = nullptr;
-  envoy_go_filter_on_http_header_ = nullptr;
-  envoy_go_filter_on_http_data_ = nullptr;
-  envoy_go_filter_on_http_destroy_ = nullptr;
-
   if (handler_ != nullptr) {
     dlclose(handler_);
-    handler_ = nullptr;
   }
 }
 
