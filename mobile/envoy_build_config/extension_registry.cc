@@ -86,10 +86,6 @@ void ExtensionRegistry::registerFactories() {
   Quic::forceRegisterQuicServerTransportSocketConfigFactory();
 #endif
 
-#ifdef ENVOY_ENABLE_QUIC
-  Quic::forceRegisterQuicServerTransportSocketConfigFactory();
-#endif
-
   // TODO: add a "force initialize" function to the upstream code, or clean up the upstream code
   // in such a way that does not depend on the statically initialized variable.
   // The current setup exposes in iOS the same problem as the one described in:
