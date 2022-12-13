@@ -12,6 +12,7 @@ envoy_cc_library(
     hdrs = ["extension_registry.h"],
     repository = "@envoy",
     deps = [
+        "@envoy//source/extensions/listener_managers/listener_manager:listener_manager_lib",  #TODO(2711) remove
         "extension_registry_platform_additions",
         "@envoy//source/common/network:socket_lib",
         "@envoy//source/common/router:upstream_codec_filter_lib",

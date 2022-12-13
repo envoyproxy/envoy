@@ -5,8 +5,8 @@
 
 namespace Envoy {
 
-// Allows for legacy TCP listener support when building with --copt=-DALLOW_TCP_LISTENERS
-#ifndef ALLOW_TCP_LISTENERS
+// Allows for using the new API listener when building with --copt=-DUSE_API_LISTENER
+#ifndef USE_API_LISTENER
 const char* listener_type = "envoy.listener_manager_impl.api";
 #else
 const char* listener_type = "envoy.listener_manager_impl.default";

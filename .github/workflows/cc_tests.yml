@@ -20,10 +20,12 @@ jobs:
     - env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       name: 'Run tests'
+        # Regression test using the new API listener. TODO(#2711) clean up.
       run: |
         cd mobile && ./bazelw test \
             --action_env=LD_LIBRARY_PATH \
             --test_output=all \
+            --copt=-DUSE_API_LISTENER
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //test/cc/...
