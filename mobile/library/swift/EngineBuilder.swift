@@ -535,6 +535,7 @@ open class EngineBuilder: NSObject {
       enableInterfaceBinding: self.enableInterfaceBinding,
       enableDrainPostDnsRefresh: self.enableDrainPostDnsRefresh,
       enforceTrustChainVerification: self.enforceTrustChainVerification,
+      forceIPv6: self.forceIPv6,
       enablePlatformCertificateValidation: self.enablePlatformCertificateValidation,
       h2ConnectionKeepaliveIdleIntervalMilliseconds:
         self.h2ConnectionKeepaliveIdleIntervalMilliseconds,
