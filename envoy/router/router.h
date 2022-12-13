@@ -649,6 +649,12 @@ public:
   virtual bool includeAttemptCountInResponse() const PURE;
 
   /**
+  * @return bool whether to include the header in the upstream request to indicate it is a retry
+  * initiated by a timeout.
+  */
+  virtual bool includeIsTimeoutRetryHeader() const PURE;
+
+  /**
    * @return uint32_t any route cap on bytes which should be buffered for shadowing or retries.
    *         This is an upper bound so does not necessarily reflect the bytes which will be buffered
    *         as other limits may apply.

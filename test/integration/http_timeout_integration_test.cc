@@ -323,6 +323,85 @@ TEST_P(HttpTimeoutIntegrationTest, PerTryTimeoutWithoutGlobalTimeout) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
+void HttpTimeoutIntegrationTest::testIsTimeoutRetryHeader(bool use_hedged_retry) {
+  auto host = config_helper_.createVirtualHost("squareup.com", "/test_retry");
+  host.set_include_is_timeout_retry_header(true);
+  config_helper_.addVirtualHost(host);
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto encoder_decoder = codec_client_->startRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/test_retry"},
+                                     {":scheme", "http"},
+                                     {":authority", "squareup.com"},
+                                     {"x-forwarded-for", "10.0.0.1"},
+                                     {"x-envoy-retry-on", "5xx"},
+                                     {"x-envoy-hedge-on-per-try-timeout", use_hedged_retry ? "true" : "fase"},
+                                     {"x-envoy-upstream-rq-timeout-ms", "500"},
+                                     {"x-envoy-upstream-rq-per-try-timeout-ms", "400"}});
+  auto response = std::move(encoder_decoder.second);
+  request_encoder_ = &encoder_decoder.first;
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  codec_client_->sendData(*request_encoder_, 0, true);
+
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  // Trigger per try timeout (but not global timeout).
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(400));
+
+  // Trigger retry (there's a 25ms backoff before it's issued).
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(26));
+
+  // Wait for a second request to be sent upstream
+  FakeStreamPtr upstream_request2;
+
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request2));
+
+  ASSERT_TRUE(upstream_request2->waitForHeadersComplete());
+
+  // Expect the x-envoy-is-timeout-header to set to indicate to the upstream this is a retry 
+  // initiated by a previous per try timeout
+  EXPECT_EQ(upstream_request2->headers().getEnvoyIsTimeoutRetryValue(), "true");
+  
+  ASSERT_TRUE(upstream_request2->waitForEndStream(*dispatcher_));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+
+  if (use_hedged_retry) {
+    upstream_request_->encodeHeaders(response_headers, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    // The second request should be reset since we used the response from the first request.
+    ASSERT_TRUE(upstream_request2->waitForReset(std::chrono::seconds(15)));
+  } else {
+    upstream_request2->encodeHeaders(response_headers, true);
+    ASSERT_TRUE(response->waitForEndStream());
+  }
+
+  codec_client_->close();
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// With hedge_on_per_try_timeout enabled via config, sends a request with a
+// global timeout and per try timeout specified, sleeps for longer than the per
+// try but slightly less than the global timeout. We expect a retry to be sent
+// upstream and the x-envoy-is-timeout-retry request header to be set to true.
+TEST_P(HttpTimeoutIntegrationTest, IsTimeoutRetryHeaderHedgedRetry) {
+  testIsTimeoutRetryHeader(true);
+}
+
+// Sends a request with a per try timeout specified, sleeps for longer than the per
+// try but slightly less than the global timeout. We expect a retry to be sent
+// upstream and the x-envoy-is-timeout-retry request header to be set to true.
+TEST_P(HttpTimeoutIntegrationTest, IsTimeoutRetryHeaderPerTryTimeout) {
+  testIsTimeoutRetryHeader(false);
+}
+
 // With hedge_on_per_try_timeout enabled via config, sends a request with a
 // global timeout and per try timeout specified, sleeps for longer than the per
 // try but slightly less than the global timeout. We then have the first

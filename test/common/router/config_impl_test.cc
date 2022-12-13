@@ -3974,6 +3974,47 @@ virtual_hosts:
                   ->includeAttemptCountInResponse());
 }
 
+TEST_F(RouteMatcherTest, EnableIsTimeoutRetryHeader) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: "www2"
+    domains: ["www.squareup.com"]
+    include_is_timeout_retry_header: true
+    routes:
+      - match: { prefix: "/"}
+        route:
+          cluster: "whatever"
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"whatever"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  EXPECT_TRUE(config.route(genHeaders("www.squareup.com", "/foo", "GET"), 0)
+                  ->routeEntry()
+                  ->virtualHost()
+                  .includeIsTimeoutRetryHeader());
+}
+
+TEST_F(RouteMatcherTest, NoIsTimeoutRetryHeader) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: "www2"
+    domains: ["www.squareup.com"]
+    routes:
+      - match: { prefix: "/"}
+        route:
+          cluster: "whatever"
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"whatever"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  EXPECT_FALSE(config.route(genHeaders("www.squareup.com", "/foo", "GET"), 0)
+                  ->routeEntry()
+                  ->virtualHost()
+                  .includeIsTimeoutRetryHeader());
+}
+
 TEST_F(RouteMatcherTest, ClusterNotFoundResponseCode) {
   const std::string yaml = R"EOF(
 virtual_hosts:

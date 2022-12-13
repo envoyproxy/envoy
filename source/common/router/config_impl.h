@@ -258,6 +258,7 @@ public:
   const RouteSpecificFilterConfig* mostSpecificPerFilterConfig(const std::string&) const override;
   bool includeAttemptCountInRequest() const override { return include_attempt_count_in_request_; }
   bool includeAttemptCountInResponse() const override { return include_attempt_count_in_response_; }
+  bool includeIsTimeoutRetryHeader() const override { return include_is_timeout_retry_header_; }
   const std::vector<ShadowPolicyPtr>& shadowPolicies() const { return shadow_policies_; }
   RetryPolicyConstOptRef retryPolicy() const {
     if (retry_policy_ != nullptr) {
@@ -337,6 +338,7 @@ private:
   uint32_t retry_shadow_buffer_limit_{std::numeric_limits<uint32_t>::max()};
   const bool include_attempt_count_in_request_;
   const bool include_attempt_count_in_response_;
+  const bool include_is_timeout_retry_header_;
   std::unique_ptr<envoy::config::route::v3::RetryPolicy> retry_policy_;
   std::unique_ptr<envoy::config::route::v3::HedgePolicy> hedge_policy_;
   std::unique_ptr<const CatchAllVirtualCluster> virtual_cluster_catch_all_;

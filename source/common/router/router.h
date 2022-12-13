@@ -573,7 +573,7 @@ private:
                                                      const Http::HeaderMap& headers) const;
 
   void maybeDoShadowing();
-  bool maybeRetryReset(Http::StreamResetReason reset_reason, UpstreamRequest& upstream_request);
+  bool maybeRetryReset(Http::StreamResetReason reset_reason, UpstreamRequest& upstream_request, bool is_timeout_retry);
   uint32_t numRequestsAwaitingHeaders();
   void onGlobalTimeout();
   void onRequestComplete();
@@ -601,7 +601,7 @@ private:
                                                 uint64_t status_code);
   void updateOutlierDetection(Upstream::Outlier::Result result, UpstreamRequest& upstream_request,
                               absl::optional<uint64_t> code);
-  void doRetry(bool can_send_early_data, bool can_use_http3);
+  void doRetry(bool can_send_early_data, bool can_use_http3, bool is_timeout_retry);
   void runRetryOptionsPredicates(UpstreamRequest& retriable_request);
   // Called immediately after a non-5xx header is received from upstream, performs stats accounting
   // and handle difference between gRPC and non-gRPC requests.
@@ -649,6 +649,7 @@ private:
   bool downstream_end_stream_ : 1;
   bool is_retry_ : 1;
   bool include_attempt_count_in_request_ : 1;
+  bool include_timeout_retry_header_in_request_: 1;
   bool request_buffer_overflowed_ : 1;
   bool conn_pool_new_stream_with_early_data_and_http3_ : 1;
   uint32_t attempt_count_{1};

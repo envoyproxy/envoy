@@ -41,7 +41,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // host header. This allows a single listener to service multiple top level domain path trees. Once
 // a virtual host is selected based on the domain, the routes are processed in order to see which
 // upstream cluster to route to or whether to perform a redirect.
-// [#next-free-field: 23]
+// [#next-free-field: 24]
 message VirtualHost {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.VirtualHost";
 
@@ -205,6 +205,10 @@ message VirtualHost {
   // route level entry will take precedence over this config and it'll be treated
   // independently (e.g.: values are not inherited).
   HedgePolicy hedge_policy = 17;
+
+  // Decides whether to include the :ref:`x-envoy-is-timeout-retry <config_http_filters_router_x-envoy-is-timeout-retry>`
+  // request header in retries initiated by per try timeouts.
+  bool include_is_timeout_retry_header = 23;
 
   // The maximum bytes which will be buffered for retries and shadowing.
   // If set and a route-specific limit is not set, the bytes actually buffered will be the minimum
