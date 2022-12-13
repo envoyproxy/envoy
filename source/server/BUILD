@@ -390,6 +390,7 @@ envoy_cc_library(
         ":listener_manager_factory_lib",
         ":regex_engine_lib",
         ":ssl_context_manager_lib",
+        ":utils_lib",
         ":worker_lib",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:signal_interface",
@@ -506,5 +507,16 @@ envoy_cc_library(
     deps = [
         "//source/common/common:regex_lib",
         "//source/common/config:utility_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "utils_lib",
+    srcs = ["utils.cc"],
+    hdrs = ["utils.h"],
+    deps = [
+        "//envoy/init:manager_interface",
+        "//source/common/common:assert_lib",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
     ],
 )

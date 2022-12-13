@@ -25,7 +25,7 @@ public:
   void resume() override;
   CallbackResult pause() override;
   ParserStatus getStatus() const override;
-  uint16_t statusCode() const override;
+  Http::Code statusCode() const override;
   bool isHttp11() const override;
   absl::optional<uint64_t> contentLength() const override;
   bool isChunked() const override;

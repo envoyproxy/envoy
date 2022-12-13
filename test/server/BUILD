@@ -378,3 +378,11 @@ envoy_benchmark_test(
     name = "server_stats_flush_benchmark_test",
     benchmark_binary = "server_stats_flush_benchmark",
 )
+
+envoy_cc_test(
+    name = "utils_test",
+    srcs = envoy_select_admin_functionality(["utils_test.cc"]),
+    deps = [
+        "//source/server:utils_lib",
+    ],
+)
