@@ -57,8 +57,9 @@ public:
               max_request_body_size: {}
               max_response_body_size: {}
             )EOF";
-    config_helper_.prependFilter(fmt::format(
-        filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"), maxBodySize(), maxBodySize()));
+    config_helper_.prependFilter(
+        fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"),
+                    maxBodySize(), maxBodySize()));
   }
 
 protected:
