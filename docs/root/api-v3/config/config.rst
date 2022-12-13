@@ -21,6 +21,7 @@ Extensions
   grpc_credential/grpc_credential
   health_checker/health_checker
   http/early_header_mutation
+  http/custom_response
   http/header_formatters
   http/header_validators
   http/original_ip_detection

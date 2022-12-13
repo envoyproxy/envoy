@@ -223,6 +223,7 @@ public:
     // be changed too
     return nullptr;
   }
+  bool appendXForwardedPort() const override { return false; }
 
   const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
       config_;

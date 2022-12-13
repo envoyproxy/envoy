@@ -99,7 +99,7 @@ This would then allow requests of method name ``foo`` with the ``version`` paylo
 under ``info`` field set to be matched against endpoints with the corresponding version. Whereas
 requests with that payload missing would be matched with the default endpoints.
 
-The regex matching and substitution is similiar with :ref:`header to metadata filter <config_thrift_filters_header_to_metadata>`.
+The regex matching and substitution is similar with :ref:`header to metadata filter <config_thrift_filters_header_to_metadata>`.
 
 
 Statistics

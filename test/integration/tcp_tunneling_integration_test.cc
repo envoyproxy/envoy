@@ -22,7 +22,7 @@ public:
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) {
-          hcm.mutable_delayed_close_timeout()->set_seconds(delay_close_seconds_);
+          hcm.mutable_delayed_close_timeout()->set_seconds(1);
           ConfigHelper::setConnectConfig(hcm, !terminate_via_cluster_config_, allow_post_,
                                          downstream_protocol_ == Http::CodecType::HTTP3);
 
@@ -95,7 +95,6 @@ public:
 
   FakeRawConnectionPtr fake_raw_upstream_connection_;
   IntegrationStreamDecoderPtr response_;
-  uint32_t delay_close_seconds_ = 200;
   bool terminate_via_cluster_config_{};
   bool enable_timeout_{};
   bool exact_match_{};
@@ -135,7 +134,6 @@ TEST_P(ConnectTerminationIntegrationTest, BasicWithClusterconfig) {
 
 TEST_P(ConnectTerminationIntegrationTest, BasicAllowPost) {
   // This case does not handle delay close well.
-  delay_close_seconds_ = 1;
   allow_post_ = true;
   initialize();
 

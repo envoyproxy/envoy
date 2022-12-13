@@ -16,12 +16,24 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AdaptiveConcurrency {
 
+namespace {
+Http::Code toErrorCode(uint64_t status) {
+  const auto code = static_cast<Http::Code>(status);
+  if (code >= Http::Code::BadRequest) {
+    return code;
+  }
+  return Http::Code::ServiceUnavailable;
+}
+} // namespace
+
 AdaptiveConcurrencyFilterConfig::AdaptiveConcurrencyFilterConfig(
     const envoy::extensions::filters::http::adaptive_concurrency::v3::AdaptiveConcurrency&
         proto_config,
     Runtime::Loader& runtime, std::string stats_prefix, Stats::Scope&, TimeSource& time_source)
     : stats_prefix_(std::move(stats_prefix)), time_source_(time_source),
-      adaptive_concurrency_feature_(proto_config.enabled(), runtime) {}
+      adaptive_concurrency_feature_(proto_config.enabled(), runtime),
+      concurrency_limit_exceeded_status_(
+          toErrorCode(proto_config.concurrency_limit_exceeded_status().code())) {}
 
 AdaptiveConcurrencyFilter::AdaptiveConcurrencyFilter(
     AdaptiveConcurrencyFilterConfigSharedPtr config, ConcurrencyControllerSharedPtr controller)
@@ -36,8 +48,9 @@ Http::FilterHeadersStatus AdaptiveConcurrencyFilter::decodeHeaders(Http::Request
   }
 
   if (controller_->forwardingDecision() == Controller::RequestForwardingAction::Block) {
-    decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "reached concurrency limit",
-                                       nullptr, absl::nullopt, "reached_concurrency_limit");
+    decoder_callbacks_->sendLocalReply(config_->concurrencyLimitExceededStatus(),
+                                       "reached concurrency limit", nullptr, absl::nullopt,
+                                       "reached_concurrency_limit");
     return Http::FilterHeadersStatus::StopIteration;
   }
 

@@ -244,3 +244,13 @@ envoy_cc_library(
         "//envoy/stream_info:stream_info_interface",
     ],
 )
+
+envoy_cc_library(
+    name = "header_validator_errors",
+    hdrs = [
+        "header_validator_errors.h",
+    ],
+    deps = [
+        "//source/common/singleton:const_singleton",
+    ],
+)

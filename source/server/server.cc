@@ -32,6 +32,7 @@
 #include "source/common/config/grpc_mux_impl.h"
 #include "source/common/config/new_grpc_mux_impl.h"
 #include "source/common/config/utility.h"
+#include "source/common/config/well_known_names.h"
 #include "source/common/config/xds_mux/grpc_mux_impl.h"
 #include "source/common/config/xds_resource.h"
 #include "source/common/http/codes.h"
@@ -56,28 +57,13 @@
 #include "source/server/connection_handler_impl.h"
 #include "source/server/guarddog_impl.h"
 #include "source/server/listener_hooks.h"
+#include "source/server/listener_manager_factory.h"
 #include "source/server/regex_engine.h"
 #include "source/server/ssl_context_manager.h"
+#include "source/server/utils.h"
 
 namespace Envoy {
 namespace Server {
-namespace {
-// TODO(alyssawilk) resolve the copy/paste code here.
-envoy::admin::v3::ServerInfo::State serverState(Init::Manager::State state,
-                                                bool health_check_failed) {
-  switch (state) {
-  case Init::Manager::State::Uninitialized:
-    return envoy::admin::v3::ServerInfo::PRE_INITIALIZING;
-  case Init::Manager::State::Initializing:
-    return envoy::admin::v3::ServerInfo::INITIALIZING;
-  case Init::Manager::State::Initialized:
-    return health_check_failed ? envoy::admin::v3::ServerInfo::DRAINING
-                               : envoy::admin::v3::ServerInfo::LIVE;
-  }
-  IS_ENVOY_BUG("unexpected server state enum");
-  return envoy::admin::v3::ServerInfo::PRE_INITIALIZING;
-}
-} // namespace
 
 InstanceImpl::InstanceImpl(
     Init::Manager& init_manager, const Options& options, Event::TimeSystem& time_system,
@@ -103,8 +89,7 @@ InstanceImpl::InstanceImpl(
                           store),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
       handler_(new ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
-      listener_component_factory_(*this), worker_factory_(thread_local_, *api_, hooks),
-      terminated_(false),
+      worker_factory_(thread_local_, *api_, hooks), terminated_(false),
       mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
                                                   : nullptr),
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
@@ -301,7 +286,8 @@ void InstanceImpl::updateServerStats() {
     server_stats_->seconds_until_first_ocsp_response_expiring_.set(
         secs_until_ocsp_response_expires.value());
   }
-  server_stats_->state_.set(enumToInt(serverState(initManager().state(), healthCheckFailed())));
+  server_stats_->state_.set(
+      enumToInt(Utility::serverState(initManager().state(), healthCheckFailed())));
   server_stats_->stats_recent_lookups_.set(
       stats_store_.symbolTable().getRecentLookups([](absl::string_view, uint64_t) {}));
 }
@@ -624,8 +610,10 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
 
   // Workers get created first so they register for thread local updates.
   listener_manager_ =
-      std::make_unique<ListenerManagerImpl>(*this, listener_component_factory_, worker_factory_,
-                                            bootstrap_.enable_dispatcher_stats(), quic_stat_names_);
+      Config::Utility::getAndCheckFactoryByName<ListenerManagerFactory>(
+          Config::ServerExtensionValues::get().DEFAULT_LISTENER)
+          .createListenerManager(*this, nullptr, worker_factory_,
+                                 bootstrap_.enable_dispatcher_stats(), quic_stat_names_);
 
   // The main thread is also registered for thread local updates so that code that does not care
   // whether it runs on the main thread or on workers can still use TLS.

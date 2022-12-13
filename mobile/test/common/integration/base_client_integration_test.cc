@@ -6,8 +6,10 @@
 
 #include "gtest/gtest.h"
 #include "library/cc/bridge_utility.h"
+#include "library/cc/log_level.h"
 #include "library/common/config/internal.h"
 #include "library/common/http/header_utility.h"
+#include "spdlog/spdlog.h"
 
 namespace Envoy {
 namespace {
@@ -44,6 +46,33 @@ void validateStreamIntel(const envoy_final_stream_intel& final_intel, bool expec
   ASSERT_LE(final_intel.response_start_ms, final_intel.stream_end_ms);
 }
 
+// Gets the spdlog level from the test options and converts it to the Platform::LogLevel used by
+// the Envoy Mobile engine.
+Platform::LogLevel getPlatformLogLevelFromOptions() {
+  switch (TestEnvironment::getOptions().logLevel()) {
+  case spdlog::level::level_enum::trace:
+    return Platform::LogLevel::trace;
+  case spdlog::level::level_enum::debug:
+    return Platform::LogLevel::debug;
+  case spdlog::level::level_enum::info:
+    return Platform::LogLevel::info;
+  case spdlog::level::level_enum::warn:
+    return Platform::LogLevel::warn;
+  case spdlog::level::level_enum::err:
+    return Platform::LogLevel::error;
+  case spdlog::level::level_enum::critical:
+    return Platform::LogLevel::critical;
+  case spdlog::level::level_enum::off:
+    return Platform::LogLevel::off;
+  default:
+    ENVOY_LOG_MISC(warn, "Couldn't map spdlog level {}. Using `info` level.",
+                   TestEnvironment::getOptions().logLevel());
+    return Platform::LogLevel::info;
+  }
+}
+
+} // namespace
+
 // Use the Envoy mobile default config as much as possible in this test.
 // There are some config modifiers below which do result in deltas.
 std::string defaultConfig() {
@@ -52,15 +81,16 @@ std::string defaultConfig() {
   return config_str;
 }
 
-} // namespace
-
-BaseClientIntegrationTest::BaseClientIntegrationTest(Network::Address::IpVersion ip_version)
-    : BaseIntegrationTest(ip_version, defaultConfig()) {
+BaseClientIntegrationTest::BaseClientIntegrationTest(Network::Address::IpVersion ip_version,
+                                                     const std::string& bootstrap_config)
+    : BaseIntegrationTest(ip_version, bootstrap_config) {
   skip_tag_extraction_rule_check_ = true;
   full_dispatcher_ = api_->allocateDispatcher("fake_envoy_mobile");
   use_lds_ = false;
   autonomous_upstream_ = true;
   defer_listener_finalization_ = true;
+
+  addLogLevel(getPlatformLogLevelFromOptions());
 }
 
 void BaseClientIntegrationTest::initialize() {
@@ -79,7 +109,9 @@ void BaseClientIntegrationTest::initialize() {
   });
   stream_prototype_->setOnComplete(
       [this](envoy_stream_intel, envoy_final_stream_intel final_intel) {
-        validateStreamIntel(final_intel, expect_dns_, upstream_tls_, cc_.on_complete_calls == 0);
+        if (expect_data_streams_) {
+          validateStreamIntel(final_intel, expect_dns_, upstream_tls_, cc_.on_complete_calls == 0);
+        }
         cc_.on_complete_received_byte_count = final_intel.received_byte_count;
         cc_.on_complete_calls++;
         cc_.terminal_callback->setReady();
