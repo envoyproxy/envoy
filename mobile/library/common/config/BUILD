@@ -7,13 +7,21 @@ envoy_package()
 envoy_cc_library(
     name = "config_lib",
     srcs = [
-        "certificates.inc",
         "config.cc",
-    ],
+    ] + select({
+        "//bazel:exclude_certificates": [
+            "certificates.inc",
+        ],
+        "//conditions:default": [],
+    }),
     hdrs = [
         "internal.h",
         "templates.h",
     ],
+    copts = select({
+        "//bazel:exclude_certificates": ["-DEXCLUDE_CERTIFICATES"],
+        "//conditions:default": [],
+    }),
     repository = "@envoy",
     deps = [
         "@envoy//source/extensions/http/header_formatters/preserve_case:config",
