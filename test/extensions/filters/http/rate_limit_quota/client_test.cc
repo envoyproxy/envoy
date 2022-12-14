@@ -91,7 +91,7 @@ constexpr char MultipleBukcetId[] = R"EOF(
       "test"
 )EOF";
 
-TEST_F(RateLimitStreamTest, buildUsageReport) {
+TEST_F(RateLimitStreamTest, BuildUsageReport) {
   ::envoy::service::rate_limit_quota::v3::BucketId bucket_id;
   TestUtility::loadFromYaml(SingleBukcetId, bucket_id);
   std::string domain = "cloud_12345_67890_td_rlqs";
@@ -104,7 +104,7 @@ TEST_F(RateLimitStreamTest, buildUsageReport) {
   EXPECT_EQ(report.bucket_quota_usages(0).num_requests_denied(), 0);
 }
 
-TEST_F(RateLimitStreamTest, buildMultipleReports) {
+TEST_F(RateLimitStreamTest, BuildMultipleReports) {
   ::envoy::service::rate_limit_quota::v3::BucketId bucket_id;
   TestUtility::loadFromYaml(SingleBukcetId, bucket_id);
   std::string domain = "cloud_12345_67890_td_rlqs";
