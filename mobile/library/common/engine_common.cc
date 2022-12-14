@@ -6,7 +6,7 @@
 namespace Envoy {
 
 // Allows for using the new API listener when building with --copt=-DUSE_API_LISTENER
-#ifndef USE_API_LISTENER
+#ifdef USE_API_LISTENER
 const char* listener_type = "envoy.listener_manager_impl.api";
 #else
 const char* listener_type = "envoy.listener_manager_impl.default";
