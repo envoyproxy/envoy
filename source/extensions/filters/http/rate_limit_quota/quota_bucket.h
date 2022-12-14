@@ -17,7 +17,6 @@ namespace RateLimitQuota {
 
 using ::envoy::service::rate_limit_quota::v3::BucketId;
 using ::envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports;
-// using ::envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports;
 using BucketAction = ::envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse::BucketAction;
 using QuotaAssignmentAction = ::envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse::
     BucketAction::QuotaAssignmentAction;

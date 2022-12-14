@@ -37,8 +37,8 @@ public:
                       Server::Configuration::FactoryContext& context,
                       RateLimitQuotaUsageReports* quota_usage_reports = nullptr)
       : aync_client_(context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
-            grpc_service, context.scope(), true)), reports_(quota_usage_reports) {
-  }
+            grpc_service, context.scope(), true)),
+        reports_(quota_usage_reports) {}
 
   void onReceiveMessage(RateLimitQuotaResponsePtr&& response) override;
 
@@ -50,9 +50,7 @@ public:
 
   // RateLimitClient
   void rateLimit(RateLimitQuotaCallbacks& callbacks) override;
-  RateLimitQuotaUsageReports buildUsageReport(absl::string_view domain,
-                                               absl::optional<BucketId> bucket_id);
-  RateLimitQuotaUsageReports buildUsageReportBucketUsage(absl::optional<BucketId> bucket_id);
+
   // TODO(tyxia) This function get rid of `bucket_usage_`
   // RateLimitQuotaUsageReports buildUsageReport2(absl::string_view domain,
   //                                              absl::optional<BucketId> bucket_id);
@@ -63,8 +61,11 @@ public:
   void closeStream();
   void send(envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports&& reports,
             bool end_stream);
-
+  RateLimitQuotaUsageReports buildUsageReport(absl::string_view domain,
+                                              absl::optional<BucketId> bucket_id);
 private:
+  //RateLimitQuotaUsageReports buildUsageReportBucketUsage(absl::optional<BucketId> bucket_id);
+
   // Store the client as the bare object since there is no ownership transfer involved.
   GrpcAsyncClient aync_client_;
   Grpc::AsyncStream<envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports> stream_{};
@@ -98,8 +99,8 @@ private:
   // TODO(tyxia) const!!!!
 
   // Domain is provided by filter config that is tied with HCM lifetime which has same life time as
-  // tls (because tls is created by factory context). So the domain will stay same throughout the life
-  // time of the tls. (i.e., one domain per tls). So we don't need to have map/container here.
+  // tls (because tls is created by factory context). So the domain will stay same throughout the
+  // life time of the tls. (i.e., one domain per tls). So we don't need to have map/container here.
   RateLimitQuotaUsageReports* reports_ = nullptr;
 };
 
@@ -111,7 +112,7 @@ using RateLimitClientSharedPtr = std::shared_ptr<RateLimitClientImpl>;
 inline RateLimitClientPtr
 createRateLimitClient(Server::Configuration::FactoryContext& context,
                       const envoy::config::core::v3::GrpcService& grpc_service,
-                      RateLimitQuotaUsageReports* quota_usage_reports = nullptr) {
+                      RateLimitQuotaUsageReports* quota_usage_reports) {
   return std::make_unique<RateLimitClientImpl>(grpc_service, context, quota_usage_reports);
 }
 

@@ -7,55 +7,54 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitQuota {
 
-// Helper function to build the usage report.
-
+// TODO(tyxia) Remove
 // RateLimitQuotaUsageReports contains reports for multiple buckets!!!!!!!
 // so RateLimitQuotaUsageReports is not mapped to each bucket.
-RateLimitQuotaUsageReports
-RateLimitClientImpl::buildUsageReportBucketUsage(absl::optional<BucketId> bucket_id) {
-  RateLimitQuotaUsageReports reports;
-  if (bucket_id.has_value() && bucket_usage_.find(bucket_id.value()) == bucket_usage_.end()) {
-    auto bucket_id_val = bucket_id.value();
-    // First request.
-    // The domain should only be provided in the first report.
-    std::string domain = "cloud_12345_67890_td_rlqs";
-    reports.set_domain(domain);
-    auto* usage = reports.add_bucket_quota_usages();
-    *usage->mutable_bucket_id() = bucket_id_val;
-    usage->mutable_time_elapsed()->set_seconds(0);
-    bucket_usage_[bucket_id_val].domain = domain;
-    bucket_usage_[bucket_id_val].idx = reports.bucket_quota_usages_size() - 1;
-    bucket_usage_[bucket_id_val].usage = *usage;
-  } else {
-    // This case for both
-    // 1) no bucket id ---- perodical send behavior.
-    // 2) has bucket id and it is found in the cache, i.e., NOT the first request.
-    for (auto it : bucket_usage_) {
-      BucketId id = it.first;
+// RateLimitQuotaUsageReports
+// RateLimitClientImpl::buildUsageReportBucketUsage(absl::optional<BucketId> bucket_id) {
+//   RateLimitQuotaUsageReports reports;
+//   if (bucket_id.has_value() && bucket_usage_.find(bucket_id.value()) == bucket_usage_.end()) {
+//     auto bucket_id_val = bucket_id.value();
+//     // First request.
+//     // The domain should only be provided in the first report.
+//     std::string domain = "cloud_12345_67890_td_rlqs";
+//     reports.set_domain(domain);
+//     auto* usage = reports.add_bucket_quota_usages();
+//     *usage->mutable_bucket_id() = bucket_id_val;
+//     usage->mutable_time_elapsed()->set_seconds(0);
+//     bucket_usage_[bucket_id_val].domain = domain;
+//     bucket_usage_[bucket_id_val].idx = reports.bucket_quota_usages_size() - 1;
+//     bucket_usage_[bucket_id_val].usage = *usage;
+//   } else {
+//     // This case for both
+//     // 1) no bucket id ---- perodical send behavior.
+//     // 2) has bucket id and it is found in the cache, i.e., NOT the first request.
+//     for (auto it : bucket_usage_) {
+//       BucketId id = it.first;
 
-      // case 2), has the bucket id and the corresponding entry is found in the cache
-      // Update the `bucket_usage_`
-      // TODO(tyxia) How to update the current usage!!!!
-      // if (bucket_id.has_value() && id == bucket_id.value()) {
-      if (bucket_id.has_value() &&
-          Protobuf::util::MessageDifferencer::Equals(id, bucket_id.value())) {
-        bucket_usage_[id].usage.set_num_requests_allowed(
-            bucket_usage_[id].usage.num_requests_allowed() + 1);
-        bucket_usage_[id].usage.mutable_time_elapsed()->set_seconds(1000);
-      }
+//       // case 2), has the bucket id and the corresponding entry is found in the cache
+//       // Update the `bucket_usage_`
+//       // TODO(tyxia) How to update the current usage!!!!
+//       // if (bucket_id.has_value() && id == bucket_id.value()) {
+//       if (bucket_id.has_value() &&
+//           Protobuf::util::MessageDifferencer::Equals(id, bucket_id.value())) {
+//         bucket_usage_[id].usage.set_num_requests_allowed(
+//             bucket_usage_[id].usage.num_requests_allowed() + 1);
+//         bucket_usage_[id].usage.mutable_time_elapsed()->set_seconds(1000);
+//       }
 
-      // 2. Always update the usage in the reports that will be sent to server.
-      // no matter if it is perodical send behavior or decodeheader place where the incoming
-      // request has arrived
-      // Even though we have `bucket_usage_` stored, we still need to build the reports here from
-      // scratch.
-      auto* added_usage = reports.add_bucket_quota_usages();
-      // CopyFrom will not overrride the existing entry but mergeFrom will do.
-      added_usage->CopyFrom(bucket_usage_[bucket_id.value()].usage);
-    }
-  }
-  return reports;
-}
+//       // 2. Always update the usage in the reports that will be sent to server.
+//       // no matter if it is perodical send behavior or decodeheader place where the incoming
+//       // request has arrived
+//       // Even though we have `bucket_usage_` stored, we still need to build the reports here from
+//       // scratch.
+//       auto* added_usage = reports.add_bucket_quota_usages();
+//       // CopyFrom will not overrride the existing entry but mergeFrom will do.
+//       added_usage->CopyFrom(bucket_usage_[bucket_id.value()].usage);
+//     }
+//   }
+//   return reports;
+// }
 
 // Helper function to build the usage report.
 RateLimitQuotaUsageReports
@@ -89,8 +88,8 @@ RateLimitClientImpl::buildUsageReport(absl::string_view domain,
         // Only upate the bucket with that specific id.
         if (bucket_id.has_value() &&
             Protobuf::util::MessageDifferencer::Equals(usage->bucket_id(), bucket_id.value())) {
-          // if (usage->bucket_id() == bucket_id.value()) {
           usage->set_num_requests_allowed(usage->num_requests_allowed() + 1);
+          // TODO(tyxia) How set the time elapsed.
           usage->mutable_time_elapsed()->set_seconds(1000);
           updated = true;
           // TODO(tyxia) Break the loop here since it should only one unique usage report for
