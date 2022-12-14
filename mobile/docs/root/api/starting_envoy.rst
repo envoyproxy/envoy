@@ -478,8 +478,7 @@ to use IPv6. Note this is an experimental option and should be enabled with caut
 **Example**::
 
   // Kotlin
-  builder.forceIPv6(true)
-
+  // No API: always enabled
   // Swift
   builder.forceIPv6(true)
 
