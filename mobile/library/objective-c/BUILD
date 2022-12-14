@@ -48,6 +48,7 @@ objc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":envoy_aliases_lib",
+        ":envoy_key_value_store_bridge_impl_lib",
         ":envoy_key_value_store_lib",
         ":envoy_objc_bridge_lib",
         "//library/common:envoy_main_interface_lib",
