@@ -19,6 +19,8 @@ public:
   ConnectTerminationIntegrationTest() { enableHalfClose(true); }
 
   void initialize() override {
+    useAccessLog("%UPSTREAM_WIRE_BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED% "
+                 "%UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_HEADER_BYTES_RECEIVED%");
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) {
@@ -91,6 +93,27 @@ public:
       ASSERT_TRUE(response_->waitForEndStream());
       ASSERT_FALSE(response_->reset());
     }
+
+    const int expected_wire_bytes_sent = 9;
+    const int expected_wire_bytes_received = 9;
+    const int expected_header_bytes_sent = 0;
+    const int expected_header_bytes_received = 0;
+    checkAccessLogOutput(expected_wire_bytes_sent, expected_wire_bytes_received,
+                         expected_header_bytes_sent, expected_header_bytes_received);
+  }
+
+  void checkAccessLogOutput(int expected_wire_bytes_sent, int expected_wire_bytes_received,
+                            int expected_header_bytes_sent, int expected_header_bytes_received) {
+    std::string log = waitForAccessLog(access_log_name_);
+    std::vector<std::string> log_entries = absl::StrSplit(log, ' ');
+    const int wire_bytes_sent = std::stoi(log_entries[0]),
+              wire_bytes_received = std::stoi(log_entries[1]),
+              header_bytes_sent = std::stoi(log_entries[2]),
+              header_bytes_received = std::stoi(log_entries[3]);
+    EXPECT_EQ(wire_bytes_sent, expected_wire_bytes_sent);
+    EXPECT_EQ(wire_bytes_received, expected_wire_bytes_received);
+    EXPECT_EQ(header_bytes_sent, expected_header_bytes_sent);
+    EXPECT_EQ(header_bytes_received, expected_header_bytes_received);
   }
 
   FakeRawConnectionPtr fake_raw_upstream_connection_;
@@ -165,6 +188,12 @@ TEST_P(ConnectTerminationIntegrationTest, DownstreamClose) {
   // Tear down by closing the client connection.
   codec_client_->close();
   ASSERT_TRUE(fake_raw_upstream_connection_->waitForHalfClose());
+  const int expected_wire_bytes_sent = 5;
+  const int expected_wire_bytes_received = 6;
+  const int expected_header_bytes_sent = 0;
+  const int expected_header_bytes_received = 0;
+  checkAccessLogOutput(expected_wire_bytes_sent, expected_wire_bytes_received,
+                       expected_header_bytes_sent, expected_header_bytes_received);
 }
 
 TEST_P(ConnectTerminationIntegrationTest, DownstreamReset) {
@@ -180,6 +209,13 @@ TEST_P(ConnectTerminationIntegrationTest, DownstreamReset) {
   // Tear down by resetting the client stream.
   codec_client_->sendReset(*request_encoder_);
   ASSERT_TRUE(fake_raw_upstream_connection_->waitForHalfClose());
+
+  const int expected_wire_bytes_sent = 5;
+  const int expected_wire_bytes_received = 6;
+  const int expected_header_bytes_sent = 0;
+  const int expected_header_bytes_received = 0;
+  checkAccessLogOutput(expected_wire_bytes_sent, expected_wire_bytes_received,
+                       expected_header_bytes_sent, expected_header_bytes_received);
 }
 
 TEST_P(ConnectTerminationIntegrationTest, UpstreamClose) {
@@ -200,6 +236,12 @@ TEST_P(ConnectTerminationIntegrationTest, UpstreamClose) {
   } else {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   }
+  const int expected_wire_bytes_sent = 5;
+  const int expected_wire_bytes_received = 6;
+  const int expected_header_bytes_sent = 0;
+  const int expected_header_bytes_received = 0;
+  checkAccessLogOutput(expected_wire_bytes_sent, expected_wire_bytes_received,
+                       expected_header_bytes_sent, expected_header_bytes_received);
 }
 
 TEST_P(ConnectTerminationIntegrationTest, TestTimeout) {
