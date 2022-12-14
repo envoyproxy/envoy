@@ -152,7 +152,59 @@ ScopeSharedPtr ThreadLocalStoreImpl::createScope(const std::string& name) {
   return scopeFromStatName(stat_name_storage.statName());
 }
 
+class NullScope : public Scope {
+ public:
+  explicit NullScope(ThreadLocalStoreImpl& parent) : parent_(parent) {}
+  ScopeSharedPtr createScope(const std::string&) override { return getShared(); }
+  ScopeSharedPtr scopeFromStatName(StatName) override { return getShared(); }
+  void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
+  Counter& counterFromStatNameWithTags(const StatName&, StatNameTagVectorOptConstRef) override {
+    return parent_.null_counter_;
+  }
+  Counter& counterFromString(const std::string&) override { return parent_.null_counter_; }
+  Gauge& gaugeFromStatNameWithTags(const StatName&, StatNameTagVectorOptConstRef,
+                                   Gauge::ImportMode) override {
+    return parent_.null_gauge_;
+  }
+  Gauge& gaugeFromString(const std::string&, Gauge::ImportMode) override {
+    return parent_.null_gauge_;
+  }
+  NullGaugeImpl& nullGauge(const std::string&) override { return parent_.null_gauge_; }
+  Histogram& histogramFromStatNameWithTags(const StatName&, StatNameTagVectorOptConstRef,
+                                           Histogram::Unit) override {
+    return parent_.null_histogram_;
+  }
+  Histogram& histogramFromString(const std::string&, Histogram::Unit) override {
+    return parent_.null_histogram_;
+  }
+  TextReadout& textReadoutFromStatNameWithTags(const StatName&,
+                                               StatNameTagVectorOptConstRef) override {
+    return parent_.null_text_readout_;
+  }
+  TextReadout& textReadoutFromString(const std::string&) override {
+    return parent_.null_text_readout_;
+  }
+  CounterOptConstRef findCounter(StatName) const override { return absl::nullopt; }
+  GaugeOptConstRef findGauge(StatName) const override { return absl::nullopt; }
+  HistogramOptConstRef findHistogram(StatName) const override { return absl::nullopt; }
+  TextReadoutOptConstRef findTextReadout(StatName) const override { return absl::nullopt; }
+  const SymbolTable& constSymbolTable() const override { return parent_.constSymbolTable(); }
+  SymbolTable& symbolTable() override { return parent_.symbolTable(); }
+  bool iterate(const IterateFn<Counter>&) const override { return false; }
+  bool iterate(const IterateFn<Gauge>&) const override { return false; }
+  bool iterate(const IterateFn<Histogram>&) const override { return false; };
+  bool iterate(const IterateFn<TextReadout>&) const override { return false; }
+  StatName prefix() const override { return StatName(); }
+
+ private:
+  ThreadLocalStoreImpl& parent_;
+};
+
 ScopeSharedPtr ThreadLocalStoreImpl::scopeFromStatName(StatName name) {
+  if (stats_matcher_->rejects(name)) {
+    return std::make_shared<NullScope>(*this);
+  }
+
   auto new_scope = std::make_shared<ScopeImpl>(*this, name);
   Thread::LockGuard lock(lock_);
   scopes_[new_scope.get()] = std::weak_ptr<ScopeImpl>(new_scope);

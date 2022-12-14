@@ -245,6 +245,7 @@ public:
 
 private:
   friend class ThreadLocalStoreTestingPeer;
+  friend class NullScope;
 
   template <class Stat> using StatRefMap = StatNameHashMap<std::reference_wrapper<Stat>>;
 
