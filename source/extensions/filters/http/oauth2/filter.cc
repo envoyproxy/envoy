@@ -257,6 +257,11 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     if (config_->redirectPathMatcher().match(path_str)) {
       Http::Utility::QueryParams query_parameters = Http::Utility::parseQueryString(path_str);
 
+      if (query_parameters.find(queryParamsState()) == query_parameters.end()) {
+        sendUnauthorizedResponse();
+        return Http::FilterHeadersStatus::StopIteration;
+      }
+
       const auto state =
           Http::Utility::PercentEncoding::decode(query_parameters.at(queryParamsState()));
       Http::Utility::Url state_url;
