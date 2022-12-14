@@ -24,7 +24,7 @@ bool UpstreamHttp11ConnectSocket::isValidConnectResponse(absl::string_view respo
   headers_complete = parser.headersComplete();
 
   return parser.parser().getStatus() != Http::Http1::ParserStatus::Error &&
-         parser.headersComplete() && parser.parser().statusCode() == 200;
+         parser.headersComplete() && parser.parser().statusCode() == Http::Code::OK;
 }
 
 UpstreamHttp11ConnectSocket::UpstreamHttp11ConnectSocket(

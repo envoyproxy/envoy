@@ -20,7 +20,7 @@ class DeltaSubscriptionState
                                    envoy::service::discovery::v3::DeltaDiscoveryRequest> {
 public:
   DeltaSubscriptionState(std::string type_url, UntypedConfigUpdateCallbacks& watch_map,
-                         Event::Dispatcher& dispatcher);
+                         Event::Dispatcher& dispatcher, XdsConfigTrackerOptRef xds_config_tracker);
 
   ~DeltaSubscriptionState() override;
 
@@ -114,10 +114,11 @@ public:
   ~DeltaSubscriptionStateFactory() override = default;
   std::unique_ptr<DeltaSubscriptionState>
   makeSubscriptionState(const std::string& type_url, UntypedConfigUpdateCallbacks& callbacks,
-                        OpaqueResourceDecoderSharedPtr,
+                        OpaqueResourceDecoderSharedPtr, XdsConfigTrackerOptRef xds_config_tracker,
                         XdsResourcesDelegateOptRef /*xds_resources_delegate*/,
                         const std::string& /*target_xds_authority*/) override {
-    return std::make_unique<DeltaSubscriptionState>(type_url, callbacks, dispatcher_);
+    return std::make_unique<DeltaSubscriptionState>(type_url, callbacks, dispatcher_,
+                                                    xds_config_tracker);
   }
 
 private:

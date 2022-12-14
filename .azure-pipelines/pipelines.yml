@@ -286,11 +286,12 @@ stages:
         AZP_BRANCH: $(Build.SourceBranch)
 
 - stage: linux_x64
-  dependsOn: ["precheck"]
+  dependsOn: ["env", "precheck"]
   # For post-submit builds, continue even if precheck fails
   condition: and(not(canceled()), or(succeeded(), eq(variables['PostSubmit'], true)))
   jobs:
   - job: release
+    condition: and(not(canceled()), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'))
     timeoutInMinutes: 120
     pool:
       vmImage: "ubuntu-20.04"
@@ -299,12 +300,26 @@ stages:
       parameters:
         ciTarget: bazel.release
 
+  - job: released
+    dependsOn: ["release"]
+    pool:
+      vmImage: "ubuntu-20.04"
+    # This condition ensures that this (required) job passes if all of
+    # the preceeding jobs either pass or are skipped
+    # adapted from:
+    #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
+    condition: in(dependencies.release.result, 'Succeeded', 'SucceededWithIssues', 'Skipped')
+    steps:
+    - bash: |
+        echo "linux_x64 released"
+
 - stage: linux_arm64
-  dependsOn: ["precheck"]
+  dependsOn: ["env", "precheck"]
   # For post-submit builds, continue even if precheck fails
   condition: and(not(canceled()), or(succeeded(), eq(variables['PostSubmit'], true)))
   jobs:
   - job: release
+    condition: and(not(canceled()), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'))
     timeoutInMinutes: 120
     pool: "arm-large"
     steps:
@@ -315,6 +330,19 @@ stages:
         rbe: false
         artifactSuffix: ".arm64"
         bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
+
+  - job: released
+    dependsOn: ["release"]
+    pool:
+      vmImage: "ubuntu-20.04"
+    # This condition ensures that this (required) job passes if all of
+    # the preceeding jobs either pass or are skipped
+    # adapted from:
+    #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
+    condition: in(dependencies.release.result, 'Succeeded', 'SucceededWithIssues', 'Skipped')
+    steps:
+    - bash: |
+        echo "linux_arm64 released"
 
 - stage: distribution
   dependsOn: ["env", "linux_arm64", "linux_x64"]
@@ -393,7 +421,7 @@ stages:
     pool:
       vmImage: "ubuntu-20.04"
     # This condition ensures that this (required) check passes if all of
-    # the preceeding checks either pass or are skipped
+    # the preceding checks either pass or are skipped
     # adapted from:
     #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
     condition: |
@@ -477,7 +505,7 @@ stages:
     pool:
       vmImage: "ubuntu-20.04"
     # This condition ensures that this (required) check passes if all of
-    # the preceeding checks either pass or are skipped
+    # the preceding checks either pass or are skipped
     # adapted from:
     #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
     condition: |
@@ -566,7 +594,7 @@ stages:
     pool:
       vmImage: "ubuntu-20.04"
     # This condition ensures that this (required) job passes if all of
-    # the preceeding jobs either pass or are skipped
+    # the preceding jobs either pass or are skipped
     # adapted from:
     #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
     condition: in(dependencies.docker.result, 'Succeeded', 'SucceededWithIssues', 'Skipped')
@@ -735,7 +763,7 @@ stages:
     pool:
       vmImage: "ubuntu-20.04"
     # This condition ensures that this (required) job passes if all of
-    # the preceeding jobs either pass or are skipped
+    # the preceding jobs either pass or are skipped
     # adapted from:
     #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
     condition: in(dependencies.examples.result, 'Succeeded', 'SucceededWithIssues', 'Skipped')
@@ -744,9 +772,10 @@ stages:
         echo "examples verifiied"
 
 - stage: macos
-  dependsOn: ["precheck"]
+  dependsOn: ["env", "precheck"]
   jobs:
   - job: test
+    condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'))
     timeoutInMinutes: 180
     pool:
       vmImage: "macos-11"
@@ -778,10 +807,24 @@ stages:
         REPO_URI: $(Build.Repository.Uri)
         BUILD_URI: $(Build.BuildUri)
 
+  - job: tested
+    dependsOn: ["test"]
+    pool:
+      vmImage: "ubuntu-20.04"
+    # This condition ensures that this (required) job passes if all of
+    # the preceeding jobs either pass or are skipped
+    # adapted from:
+    #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
+    condition: in(dependencies.test.result, 'Succeeded', 'SucceededWithIssues', 'Skipped')
+    steps:
+    - bash: |
+        echo "macos tested"
+
 - stage: windows
-  dependsOn: ["precheck"]
+  dependsOn: ["env", "precheck"]
   jobs:
   - job: release
+    condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'))
     timeoutInMinutes: 180
     pool:
       vmImage: "windows-2019"
@@ -820,6 +863,7 @@ stages:
       condition: always()
 
   - job: docker
+    condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'))
     strategy:
       matrix:
         windows2019:
@@ -865,3 +909,19 @@ stages:
         artifactName: docker_windows
       timeoutInMinutes: 10
       condition: always()
+
+  - job: released
+    dependsOn: ["release", "docker"]
+    pool:
+      vmImage: "ubuntu-20.04"
+    # This condition ensures that this (required) job passes if all of
+    # the preceeding jobs either pass or are skipped
+    # adapted from:
+    #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
+    condition: |
+      and(
+        in(dependencies.release.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
+        in(dependencies.docker.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
+    steps:
+    - bash: |
+        echo "windows released"

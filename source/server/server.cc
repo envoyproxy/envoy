@@ -60,26 +60,10 @@
 #include "source/server/listener_manager_factory.h"
 #include "source/server/regex_engine.h"
 #include "source/server/ssl_context_manager.h"
+#include "source/server/utils.h"
 
 namespace Envoy {
 namespace Server {
-namespace {
-// TODO(alyssawilk) resolve the copy/paste code here.
-envoy::admin::v3::ServerInfo::State serverState(Init::Manager::State state,
-                                                bool health_check_failed) {
-  switch (state) {
-  case Init::Manager::State::Uninitialized:
-    return envoy::admin::v3::ServerInfo::PRE_INITIALIZING;
-  case Init::Manager::State::Initializing:
-    return envoy::admin::v3::ServerInfo::INITIALIZING;
-  case Init::Manager::State::Initialized:
-    return health_check_failed ? envoy::admin::v3::ServerInfo::DRAINING
-                               : envoy::admin::v3::ServerInfo::LIVE;
-  }
-  IS_ENVOY_BUG("unexpected server state enum");
-  return envoy::admin::v3::ServerInfo::PRE_INITIALIZING;
-}
-} // namespace
 
 InstanceImpl::InstanceImpl(
     Init::Manager& init_manager, const Options& options, Event::TimeSystem& time_system,
@@ -302,7 +286,8 @@ void InstanceImpl::updateServerStats() {
     server_stats_->seconds_until_first_ocsp_response_expiring_.set(
         secs_until_ocsp_response_expires.value());
   }
-  server_stats_->state_.set(enumToInt(serverState(initManager().state(), healthCheckFailed())));
+  server_stats_->state_.set(
+      enumToInt(Utility::serverState(initManager().state(), healthCheckFailed())));
   server_stats_->stats_recent_lookups_.set(
       stats_store_.symbolTable().getRecentLookups([](absl::string_view, uint64_t) {}));
 }

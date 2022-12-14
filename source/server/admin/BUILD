@@ -298,6 +298,7 @@ envoy_cc_library(
         "//source/common/http:header_map_lib",
         "//source/common/memory:stats_lib",
         "//source/common/version:version_includes",
+        "//source/server:utils_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
     ],
 )

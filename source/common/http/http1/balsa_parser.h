@@ -25,7 +25,7 @@ public:
   void resume() override;
   CallbackResult pause() override;
   ParserStatus getStatus() const override;
-  uint16_t statusCode() const override;
+  Http::Code statusCode() const override;
   bool isHttp11() const override;
   absl::optional<uint64_t> contentLength() const override;
   bool isChunked() const override;
@@ -66,7 +66,9 @@ private:
   quiche::BalsaHeaders headers_;
   quiche::BalsaHeaders trailers_;
 
+  const MessageType message_type_ = MessageType::Request;
   ParserCallbacks* connection_ = nullptr;
+  bool first_byte_processed_ = false;
   bool headers_done_ = false;
   ParserStatus status_ = ParserStatus::Ok;
   absl::string_view error_message_;

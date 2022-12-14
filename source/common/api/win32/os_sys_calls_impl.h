@@ -36,6 +36,7 @@ public:
   SysCallPtrResult mmap(void* addr, size_t length, int prot, int flags, int fd,
                         off_t offset) override;
   SysCallIntResult stat(const char* pathname, struct stat* buf) override;
+  SysCallIntResult fstat(os_fd_t fd, struct stat* buf) override;
   SysCallIntResult setsockopt(os_fd_t sockfd, int level, int optname, const void* optval,
                               socklen_t optlen) override;
   SysCallIntResult getsockopt(os_fd_t sockfd, int level, int optname, void* optval,
