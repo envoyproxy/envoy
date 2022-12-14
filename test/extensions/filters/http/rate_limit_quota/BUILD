@@ -72,3 +72,21 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
+
+
+envoy_extension_cc_test(
+    name = "integration_test",
+    srcs = ["rate_limit_quota_integration_test.cc"],
+    extension_names = ["envoy.filters.http.rate_limit_quota"],
+    deps = [
+        "//source/extensions/filters/http/rate_limit_quota",
+        "//source/extensions/filters/http/rate_limit_quota:config",
+        "//source/server/config_validation:server_lib",
+        "//test/integration:http_integration_lib",
+        "//test/mocks/server:options_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/rate_limit_quota/v3:pkg_cc_proto",
+    ],
+)
