@@ -100,41 +100,27 @@ StatusOr<sockaddr_in> parseV4Address(const std::string& ip_address, uint16_t por
 }
 
 StatusOr<sockaddr_in6> parseV6Address(const std::string& ip_address, uint16_t port) {
-  sockaddr_in6 sa6;
-  memset(&sa6, 0, sizeof(sa6));
-  const auto scope_pos = ip_address.rfind('%');
-  // TODO(#23952): Even though it would be nice to do any IPv6 parsing only with the getaddrinfo at
-  // the moment Windows parsing is slightly different in behavior than other platforms. For this
-  // reason we use the inet_pton for any parsing that does not contain the zone id.
-  if (scope_pos == std::string::npos) {
-    // Parse IPv6 with no scope.
-    if (inet_pton(AF_INET6, ip_address.c_str(), &sa6.sin6_addr) != 1) {
-      return absl::FailedPreconditionError("failed parsing ipv6");
-    }
-    sa6.sin6_family = AF_INET6;
-  } else {
-    // Parse IPv6 with optional scope using getaddrinfo().
-    struct addrinfo hints;
-    memset(&hints, 0, sizeof(hints));
-    struct addrinfo* res = nullptr;
-    // Suppresses any potentially lengthy network host address lookups and inhibit the invocation of
-    // a name resolution service.
-    hints.ai_flags = AI_NUMERICHOST | AI_NUMERICSERV;
-    hints.ai_family = AF_INET6;
-    // Given that we don't specify a service but we use getaddrinfo() to only parse the node
-    // address, specifying the socket type allows to hint the getaddrinfo() to return only an
-    // element with the below socket type. The behavior though remains platform dependent and anyway
-    // we consume only the first element (if the call succeeds).
-    hints.ai_socktype = SOCK_DGRAM;
-    hints.ai_protocol = IPPROTO_UDP;
-    const Api::SysCallIntResult rc = Api::OsSysCallsSingleton::get().getaddrinfo(
-        ip_address.c_str(), /*service=*/nullptr, &hints, &res);
-    if (rc.return_value_ != 0) {
-      return absl::FailedPreconditionError(fmt::format("getaddrinfo error: {}", rc.return_value_));
-    }
-    sa6 = *reinterpret_cast<sockaddr_in6*>(res->ai_addr);
-    freeaddrinfo(res);
+  // Parse IPv6 with optional scope using getaddrinfo().
+  struct addrinfo hints;
+  memset(&hints, 0, sizeof(hints));
+  struct addrinfo* res = nullptr;
+  // Suppresses any potentially lengthy network host address lookups and inhibit the invocation of
+  // a name resolution service.
+  hints.ai_flags = AI_NUMERICHOST | AI_NUMERICSERV;
+  hints.ai_family = AF_INET6;
+  // Given that we don't specify a service but we use getaddrinfo() to only parse the node
+  // address, specifying the socket type allows to hint the getaddrinfo() to return only an
+  // element with the below socket type. The behavior though remains platform dependent and anyway
+  // we consume only the first element (if the call succeeds).
+  hints.ai_socktype = SOCK_DGRAM;
+  hints.ai_protocol = IPPROTO_UDP;
+  const Api::SysCallIntResult rc = Api::OsSysCallsSingleton::get().getaddrinfo(
+      ip_address.c_str(), /*service=*/nullptr, &hints, &res);
+  if (rc.return_value_ != 0) {
+    return absl::FailedPreconditionError(fmt::format("getaddrinfo error: {}", rc.return_value_));
   }
+  sockaddr_in6 sa6 = *reinterpret_cast<sockaddr_in6*>(res->ai_addr);
+  freeaddrinfo(res);
   sa6.sin6_port = htons(port);
   return sa6;
 }

@@ -137,6 +137,8 @@ public:
   const std::string RDS_ROUTE_CONFIG = "envoy.rds_route_config";
   // Request route given by the Router http filter
   const std::string ROUTE = "envoy.route";
+  // Stats prefix for the ext_authz HTTP filter
+  const std::string EXT_AUTHZ_PREFIX = "envoy.ext_authz_prefix";
   // Listener manager worker id
   const std::string WORKER_ID = "envoy.worker_id";
   // Stats prefix for the Thrift Proxy network filter
@@ -172,6 +174,16 @@ private:
 };
 
 using TagNames = ConstSingleton<TagNameValues>;
+
+// This class holds extension points which will always be built into Envoy in
+// server mode, but may be excluded from Envoy Mobile.
+class ServerBuiltInExtensionValues {
+public:
+  // Extension point for the default listener.
+  const std::string DEFAULT_LISTENER = "envoy.listener_manager_impl.default";
+};
+
+using ServerExtensionValues = ConstSingleton<ServerBuiltInExtensionValues>;
 
 } // namespace Config
 } // namespace Envoy

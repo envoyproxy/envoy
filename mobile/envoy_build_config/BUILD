@@ -1,4 +1,4 @@
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_package")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_package", "envoy_select_enable_http3")
 
 licenses(["notice"])  # Apache 2
 
@@ -27,7 +27,9 @@ envoy_cc_library(
         "@envoy//source/extensions/filters/http/router:config",
         "@envoy//source/extensions/filters/network/http_connection_manager:config",
         "@envoy//source/extensions/http/header_formatters/preserve_case:config",
+        "@envoy//source/extensions/listener_managers/listener_manager:listener_manager_lib",
         "@envoy//source/extensions/network/dns_resolver/getaddrinfo:config",
+        "@envoy//source/extensions/request_id/uuid:config",
         "@envoy//source/extensions/stat_sinks/metrics_service:config",
         "@envoy//source/extensions/stat_sinks/statsd:config",
         "@envoy//source/extensions/transport_sockets/http_11_proxy:upstream_config",
@@ -43,7 +45,12 @@ envoy_cc_library(
         "@envoy_mobile//library/common/extensions/filters/http/route_cache_reset:config",
         "@envoy_mobile//library/common/extensions/filters/http/socket_tag:config",
         "@envoy_mobile//library/common/extensions/retry/options/network_configuration:config",
-    ],
+    ] + envoy_select_enable_http3(
+        [
+            "@envoy//source/common/quic:quic_transport_socket_factory_lib",
+        ],
+        "@envoy",
+    ),
 )
 
 envoy_cc_library(

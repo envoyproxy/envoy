@@ -3,6 +3,7 @@
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.validate.h"
 
+#include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/hash.h"
 #include "source/common/network/socket_impl.h"
 #include "source/common/network/socket_option_impl.h"
@@ -55,7 +56,22 @@ Api::IoCallUint64Result makeError(int sys_errno) {
                                                     Network::IoSocketError::deleteIoError));
 }
 
-class UdpProxyFilterTest : public testing::Test {
+class UdpProxyFilterBase : public testing::Test {
+public:
+  UdpProxyFilterBase() {
+    EXPECT_CALL(os_sys_calls_, getaddrinfo(_, _, _, _))
+        .WillRepeatedly(Invoke([&](const char* node, const char* service,
+                                   const struct addrinfo* hints, struct addrinfo** res) {
+          Api::OsSysCallsImpl real;
+          return real.getaddrinfo(node, service, hints, res);
+        }));
+  }
+
+protected:
+  Api::MockOsSysCalls os_sys_calls_;
+};
+
+class UdpProxyFilterTest : public UdpProxyFilterBase {
 public:
   struct TestSession {
     TestSession(UdpProxyFilterTest& parent,
@@ -336,7 +352,6 @@ use_original_src_ip: true
     return true;
   }
 
-  Api::MockOsSysCalls os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_;
   NiceMock<Server::Configuration::MockListenerFactoryContext> factory_context_;
   UdpProxyFilterConfigSharedPtr config_;

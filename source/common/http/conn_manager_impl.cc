@@ -1747,9 +1747,6 @@ void ConnectionManagerImpl::ActiveStream::onRequestDataTooLarge() {
 
 void ConnectionManagerImpl::ActiveStream::recreateStream(
     StreamInfo::FilterStateSharedPtr filter_state) {
-  // n.b. we do not currently change the codecs to point at the new stream
-  // decoder because the decoder callbacks are complete. It would be good to
-  // null out that pointer but should not be necessary.
   ResponseEncoder* response_encoder = response_encoder_;
   response_encoder_ = nullptr;
 
@@ -1767,6 +1764,12 @@ void ConnectionManagerImpl::ActiveStream::recreateStream(
   connection_manager_.doEndStream(*this, /*check_for_deferred_close*/ false);
 
   RequestDecoder& new_stream = connection_manager_.newStream(*response_encoder, true);
+  // Set the new RequestDecoder on the ResponseEncoder. Even though all of the decoder callbacks
+  // have already been called at this point, the encoder still needs the new decoder for deferred
+  // logging in some cases.
+  // This doesn't currently work for HTTP/1 as the H/1 ResponseEncoder doesn't hold the active
+  // stream's pointer to the RequestDecoder.
+  response_encoder->setRequestDecoder(new_stream);
   // We don't need to copy over the old parent FilterState from the old StreamInfo if it did not
   // store any objects with a LifeSpan at or above DownstreamRequest. This is to avoid unnecessary
   // heap allocation.

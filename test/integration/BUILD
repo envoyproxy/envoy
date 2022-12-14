@@ -417,6 +417,7 @@ envoy_cc_test(
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/buffer:config",
+        "//test/integration/filters:encode1xx_local_reply_config_lib",
         "//test/integration/filters:metadata_stop_all_filter_config_lib",
         "//test/integration/filters:on_local_reply_filter_config_lib",
         "//test/integration/filters:request_metadata_filter_config_lib",
@@ -844,7 +845,7 @@ envoy_cc_test_library(
     deps = [
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
-        "//source/server:listener_manager_lib",
+        "//source/extensions/listener_managers/listener_manager:listener_manager_lib",
         "//envoy/api:api_interface",
         "//envoy/grpc:status",
         "//envoy/http:codec_interface",
@@ -872,7 +873,7 @@ envoy_cc_test_library(
         "//source/common/network:udp_packet_writer_handler_lib",
         "//source/common/network:utility_lib",
         "//source/common/stats:isolated_store_lib",
-        "//source/server:active_raw_udp_listener_config",
+        "//source/extensions/listener_managers/listener_manager:active_raw_udp_listener_config",
         "//source/server:connection_handler_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:test_time_system_interface",
@@ -2072,4 +2073,28 @@ envoy_cc_test(
 envoy_proto_library(
     name = "xds_delegate_test_config_proto",
     srcs = ["xds_delegate_test_config.proto"],
+)
+
+envoy_cc_test(
+    name = "xds_config_tracker_integration_test",
+    srcs = ["xds_config_tracker_integration_test.cc"],
+    external_deps = ["abseil_strings"],
+    deps = [
+        ":http_integration_lib",
+        ":xds_config_tracker_test_proto_cc_proto",
+        "//envoy/config:subscription_interface",
+        "//envoy/config:xds_config_tracker_interface",
+        "//envoy/protobuf:message_validator_interface",
+        "//test/common/grpc:grpc_client_integration_lib",
+        "//test/config:v2_link_hacks",
+        "//test/test_common:registry_lib",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/runtime/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_proto_library(
+    name = "xds_config_tracker_test_proto",
+    srcs = ["xds_config_tracker_test.proto"],
 )
