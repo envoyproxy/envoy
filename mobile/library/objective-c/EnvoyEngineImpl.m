@@ -403,8 +403,8 @@ static void ios_kv_store_save(envoy_data native_key, envoy_data native_value, co
     NSString *key = [[NSString alloc] initWithBytes:native_key.bytes
                                              length:native_key.length
                                            encoding:NSUTF8StringEncoding];
-    NSString *value = [[NSString alloc] initWithBytes:native_key.bytes
-                                               length:native_key.length
+    NSString *value = [[NSString alloc] initWithBytes:native_value.bytes
+                                               length:native_value.length
                                              encoding:NSUTF8StringEncoding];
     [keyValueStore saveValue:value toKey:key];
   }
