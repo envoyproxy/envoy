@@ -24,30 +24,36 @@ namespace Mesh {
  * waiting for records (that had no matching records delivered yet).
  * Basically core of Fetch-handling business logic.
  */
-class RecordDistributor : public InboundRecordProcessor,
-                          private Logger::Loggable<Logger::Id::kafka> {
+class InboundRecordDistributor : public RecordCallbackProcessor,
+                                 public InboundRecordProcessor,
+                                 private Logger::Loggable<Logger::Id::kafka> {
 public:
+  InboundRecordDistributor(SharedConsumerManagerPtr&& consumer_manager);
+
+  // RecordCallbackProcessor
+  void processCallback(const RecordCbSharedPtr& callback) override;
+
+  // RecordCallbackProcessor
+  void removeCallback(const RecordCbSharedPtr& callback) override;
+
   // InboundRecordProcessor
   bool waitUntilInterest(const std::string& topic, const int32_t timeout_ms) const override;
 
   // InboundRecordProcessor
   void receive(InboundRecordSharedPtr message) override;
 
-  // Process an inbound record callback by passing cached records to it
-  // and (if needed) registering the callback.
-  void processCallback(const RecordCbSharedPtr& callback);
-
-  // Remove the callback (usually invoked by the callback timing out downstream).
-  void removeCallback(const RecordCbSharedPtr& callback);
-
 private:
+  // Helper function (real processing: finding matching records, registering callback).
+  void doProcessCallback(const RecordCbSharedPtr& callback);
+
+  // Helper function (real lock removal).
+  void doRemoveCallback(const RecordCbSharedPtr& callback)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(callbacks_mutex_);
+
   // Checks whether any of the callbacks stored right now are interested in the topic.
   bool hasInterest(const std::string& topic) const ABSL_EXCLUSIVE_LOCKS_REQUIRED(callbacks_mutex_);
 
-  // HAX!
-  void removeCallbackWithoutLocking(
-      const RecordCbSharedPtr& callback,
-      std::map<KafkaPartition, std::vector<RecordCbSharedPtr>>& partition_to_callbacks);
+  SharedConsumerManagerPtr consumer_manager_;
 
   /**
    * Invariant: for every i: KafkaPartition, the following holds:
@@ -58,12 +64,10 @@ private:
   std::map<KafkaPartition, std::vector<RecordCbSharedPtr>>
       partition_to_callbacks_ ABSL_GUARDED_BY(callbacks_mutex_);
 
-  mutable absl::Mutex messages_mutex_;
+  mutable absl::Mutex records_mutex_;
   std::map<KafkaPartition, std::vector<InboundRecordSharedPtr>>
-      messages_waiting_for_interest_ ABSL_GUARDED_BY(messages_mutex_);
+      records_waiting_for_interest_ ABSL_GUARDED_BY(records_mutex_);
 };
-
-using RecordDistributorPtr = std::unique_ptr<RecordDistributor>;
 
 /**
  * Injectable for tests.
@@ -81,7 +85,6 @@ public:
 
 /**
  * Maintains a collection of Kafka consumers (one per topic).
- * Maintains a message cache for messages that had no interest but might be requested later.
  */
 class SharedConsumerManagerImpl : public SharedConsumerManager,
                                   private Logger::Loggable<Logger::Id::kafka> {
@@ -96,22 +99,15 @@ public:
                             const KafkaConsumerFactory& consumer_factory);
 
   // SharedConsumerManager
-  void processCallback(const RecordCbSharedPtr& callback) override;
-
-  // SharedConsumerManager
-  void removeCallback(const RecordCbSharedPtr& callback) override;
-
-  // SharedConsumerManager
-  void registerConsumerIfAbsent(const std::string& topic) override;
+  void registerConsumerIfAbsent(const std::string& topic,
+                                InboundRecordProcessor& processor) override;
 
   size_t getConsumerCountForTest() const;
 
 private:
   // Mutates 'topic_to_consumer_'.
-  void registerNewConsumer(const std::string& topic)
+  void registerNewConsumer(const std::string& topic, InboundRecordProcessor& processor)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(consumers_mutex_);
-
-  RecordDistributorPtr distributor_;
 
   const UpstreamKafkaConfiguration& configuration_;
   Thread::ThreadFactory& thread_factory_;
