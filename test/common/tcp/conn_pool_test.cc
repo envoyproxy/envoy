@@ -17,6 +17,7 @@
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -138,7 +139,8 @@ public:
 
     Event::MockDispatcher* dispatcher =
         static_cast<Event::MockDispatcher*>(&(test_conn.connection_->dispatcher()));
-    if (has_idle_timers_) {
+    if (has_idle_timers_ &&
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tcp_pool_idle_timeout")) {
       test_conn.idle_timer_ = new NiceMock<Event::MockTimer>(dispatcher);
     } else {
       // No idle timeout when idle timeout is not configured.
@@ -457,6 +459,28 @@ TEST_F(TcpConnPoolImplTest, IdleTimerCloseConnections) {
   EXPECT_TRUE(conn_pool_->isIdle());
 
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_idle_timeout_.value());
+}
+
+/**
+ * Verify that no idle timer is created if we flip the runtime guard.
+ */
+TEST_F(TcpConnPoolImplTest, NoIdleTimerWithoutRuntimeGuard) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.tcp_pool_idle_timeout", "false"}});
+
+  initialize();
+  cluster_->resetResourceManager(1, 1024, 1024, 1, 1);
+  conn_pool_->setupIdleTimers();
+
+  // No timer creation assert is in expectConnCreate.
+  ActiveTestConn c1(*this, 0, ActiveTestConn::Type::CreateConnection);
+  EXPECT_CALL(*conn_pool_, onConnReleasedForTest());
+  c1.releaseConn();
+
+  // Cause the connection to go away.
+  EXPECT_CALL(*conn_pool_, onConnDestroyedForTest());
+  conn_pool_->test_conns_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  dispatcher_.clearDeferredDeleteList();
 }
 
 /**

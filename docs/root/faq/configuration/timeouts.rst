@@ -158,7 +158,7 @@ TCP
 * The TCP protocol :ref:`idle_timeout <envoy_v3_api_field_extensions.upstreams.tcp.v3.TcpProtocolOptions.idle_timeout>`
   is defined in a :ref:`TcpProtocolOptions <envoy_v3_api_msg_extensions.upstreams.tcp.v3.TcpProtocolOptions>`
   used by all TCP connections from pool. The idle timeout is the time at which
-  a upstream connection will be terminated if there are no active stream. The timeout is guarded by
+  a upstream connection will be terminated if the connection is not in use. The timeout is guarded by
   ``envoy.reloadable_features.tcp_pool_idle_timeout``. If the above runtime flag is enabled
   and :ref:`idle_timeout <envoy_v3_api_field_extensions.upstreams.tcp.v3.TcpProtocolOptions.idle_timeout>`
   is not specified, this defaults to *10 minutes*. To disable idle timeouts, explicitly set

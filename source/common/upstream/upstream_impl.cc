@@ -1108,17 +1108,13 @@ ClusterInfoImpl::ClusterInfoImpl(
     idle_timeout_ = std::chrono::hours(1);
   }
 
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tcp_pool_idle_timeout")) {
-    if (tcp_protocol_options_ && tcp_protocol_options_->idleTimeout().has_value()) {
-      tcp_pool_idle_timeout_ = tcp_protocol_options_->idleTimeout();
-      if (tcp_pool_idle_timeout_.value().count() == 0) {
-        tcp_pool_idle_timeout_ = absl::nullopt;
-      }
-    } else {
-      tcp_pool_idle_timeout_ = std::chrono::minutes(10);
+  if (tcp_protocol_options_ && tcp_protocol_options_->idleTimeout().has_value()) {
+    tcp_pool_idle_timeout_ = tcp_protocol_options_->idleTimeout();
+    if (tcp_pool_idle_timeout_.value().count() == 0) {
+      tcp_pool_idle_timeout_ = absl::nullopt;
     }
   } else {
-    tcp_pool_idle_timeout_ = absl::nullopt;
+    tcp_pool_idle_timeout_ = std::chrono::minutes(10);
   }
 
   if (http_protocol_options_->common_http_protocol_options_.has_max_connection_duration()) {

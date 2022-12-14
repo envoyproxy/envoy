@@ -32,14 +32,11 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //        .... [further cluster config]
 
 message TcpProtocolOptions {
-  // The idle timeout for connections. The idle timeout is defined as the period in which
-  // there are no active stream. When the idle timeout is reached, the connection will be closed.
+  // The idle timeout for the connection. The idle timeout is defined as the period in which
+  // there connection is not associated with a downstream connection. When the idle timeout is
+  // reached, the connection will be closed.
   //
-  // The timeout is guarded by
-  // ``envoy.reloadable_features.tcp_pool_idle_timeout``.
-  //
-  // If the above runtime flag is enabled and idle timeout is not specified,
-  // this defaults to 10 minutes. To disable idle timeouts, explicitly set this to 0.
+  // If not set, the default idle timeout is 10 minutes. To disable idle timeouts, explicitly set this to 0.
   //
   // .. warning::
   //   Disabling this timeout has a highly likelihood of yielding connection leaks due to lost TCP
