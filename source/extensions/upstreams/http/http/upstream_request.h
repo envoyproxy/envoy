@@ -30,7 +30,7 @@ public:
         thread_local_cluster.httpConnPool(route_entry.priority(), downstream_protocol, ctx);
   }
   ~HttpConnPool() override {
-    ASSERT(conn_pool_stream_handle_ == nullptr, "conn_pool_stream_handle not null");
+    ENVOY_BUG(conn_pool_stream_handle_ == nullptr, "conn_pool_stream_handle not null");
   }
   void newStream(Router::GenericConnectionPoolCallbacks* callbacks) override;
   bool cancelAnyPendingStream() override;
