@@ -521,8 +521,6 @@ void DetectorImpl::ejectHost(HostSharedPtr host,
       }
     }
   } else {
-    std::cout << "ejection overflow"
-              << "\n";
     stats_.ejections_overflow_.inc();
   }
 }

@@ -386,7 +386,6 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xxViaHttpCodesWithActiveHC) {
   time_system_.setMonotonicTime(std::chrono::milliseconds(9999));
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
   interval_timer_->invokeCallback();
-  EXPECT_FALSE(hosts_[0]->outlierDetector().lastUnejectionTime());
 
   hosts_[0]->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
 
