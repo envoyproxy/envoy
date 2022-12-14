@@ -1737,7 +1737,6 @@ TEST_F(ThriftRouterTest, RequestResponseSize) {
 
 TEST_F(ThriftRouterTest, UpstreamDraining) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.thrift_connection_draining", "true"}});
 
   initializeRouter();
 
