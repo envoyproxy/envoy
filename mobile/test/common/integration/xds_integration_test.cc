@@ -51,7 +51,7 @@ XdsIntegrationTest::XdsIntegrationTest() : BaseClientIntegrationTest(ipVersion()
     bootstrap.mutable_admin()->MergeFrom(adminConfig());
   });
   admin_filename_ = TestEnvironment::temporaryPath("admin_address.txt");
-  setAdminAddressPathForTests(admin_filename_);
+  builder_.setAdminAddressPathForTests(admin_filename_);
 }
 
 void XdsIntegrationTest::initialize() {

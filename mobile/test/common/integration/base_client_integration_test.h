@@ -35,7 +35,7 @@ std::string defaultConfig();
 //
 // TODO(junr03): move this to derive from the ApiListenerIntegrationTest after moving that class
 // into a test lib.
-class BaseClientIntegrationTest : public BaseIntegrationTest, public Platform::EngineBuilder {
+class BaseClientIntegrationTest : public BaseIntegrationTest {
 public:
   BaseClientIntegrationTest(Network::Address::IpVersion ip_version,
                             const std::string& bootstrap_config = defaultConfig());
@@ -67,6 +67,7 @@ protected:
   bool override_builder_config_ = false;
   // True if data plane requests are expected in the test; false otherwise.
   bool expect_data_streams_ = true;
+  Platform::EngineBuilder builder_;
 };
 
 } // namespace Envoy
