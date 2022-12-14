@@ -4,13 +4,13 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/event/libevent_scheduler.h"
-#include "source/common/quic/codec_impl.h"
 #include "source/common/quic/envoy_quic_alarm_factory.h"
 #include "source/common/quic/envoy_quic_connection_helper.h"
 #include "source/common/quic/envoy_quic_server_connection.h"
 #include "source/common/quic/envoy_quic_server_session.h"
 #include "source/common/quic/envoy_quic_server_stream.h"
 #include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/server_codec_impl.h"
 #include "source/server/configuration_impl.h"
 
 #include "test/common/quic/test_proof_source.h"
