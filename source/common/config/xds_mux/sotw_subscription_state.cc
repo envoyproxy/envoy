@@ -7,14 +7,12 @@ namespace Envoy {
 namespace Config {
 namespace XdsMux {
 
-SotwSubscriptionState::SotwSubscriptionState(std::string type_url,
-                                             UntypedConfigUpdateCallbacks& callbacks,
-                                             Event::Dispatcher& dispatcher,
-                                             OpaqueResourceDecoderSharedPtr resource_decoder,
-                                             XdsResourcesDelegateOptRef xds_resources_delegate,
-                                             const std::string& target_xds_authority)
-    : BaseSubscriptionState(std::move(type_url), callbacks, dispatcher, xds_resources_delegate,
-                            target_xds_authority),
+SotwSubscriptionState::SotwSubscriptionState(
+    std::string type_url, UntypedConfigUpdateCallbacks& callbacks, Event::Dispatcher& dispatcher,
+    OpaqueResourceDecoderSharedPtr resource_decoder, XdsConfigTrackerOptRef xds_config_tracker,
+    XdsResourcesDelegateOptRef xds_resources_delegate, const std::string& target_xds_authority)
+    : BaseSubscriptionState(std::move(type_url), callbacks, dispatcher, xds_config_tracker,
+                            xds_resources_delegate, target_xds_authority),
       resource_decoder_(resource_decoder) {}
 
 SotwSubscriptionState::~SotwSubscriptionState() = default;
@@ -76,6 +74,11 @@ void SotwSubscriptionState::handleGoodResponse(
   // Now that we're passed onConfigUpdate() without an exception thrown, we know we're good.
   last_good_version_info_ = message.version_info();
   last_good_nonce_ = message.nonce();
+
+  // Processing point when resources are successfully ingested.
+  if (xds_config_tracker_.has_value()) {
+    xds_config_tracker_->onConfigAccepted(message.type_url(), non_heartbeat_resources);
+  }
 
   // Send the resources to the xDS delegate, if configured.
   if (xds_resources_delegate_.has_value()) {

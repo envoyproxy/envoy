@@ -241,5 +241,9 @@ new_features:
     :ref:`source_address <envoy_v3_api_field_config.core.v3.BindConfig.source_address>`. This allows setting
     :ref:`socket options <envoy_v3_api_field_config.core.v3.BindConfig.socket_options>` when using the default unspecified bind address
     is desired.
+- area: xds
+  change: |
+    added an api configuration :ref:`xds_config_tracker_extension <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.xds_config_tracker_extension>` in the bootstrap
+    to allow tracking xDS responses in external components, and provided the extension interface.
 
 deprecated:
