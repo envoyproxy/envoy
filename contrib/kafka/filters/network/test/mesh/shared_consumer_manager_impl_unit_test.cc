@@ -28,12 +28,6 @@ public:
   MOCK_METHOD((std::pair<std::string, int32_t>), getAdvertisedAddress, (), (const));
 };
 
-class MockInboundRecordProcessor : public InboundRecordProcessor {
-public:
-  MOCK_METHOD(void, receive, (InboundRecordSharedPtr), ());
-  MOCK_METHOD(bool, waitUntilInterest, (const std::string&, const int32_t), (const));
-};
-
 class MockKafkaConsumerFactory : public KafkaConsumerFactory {
 public:
   MOCK_METHOD(KafkaConsumerPtr, createConsumer,
@@ -47,7 +41,6 @@ protected:
   MockThreadFactory thread_factory_;
   MockUpstreamKafkaConfiguration configuration_;
   MockKafkaConsumerFactory consumer_factory_;
-  MockInboundRecordProcessor processor_;
 
   std::unique_ptr<SharedConsumerManagerImpl> makeTestee() {
     return std::make_unique<SharedConsumerManagerImpl>(configuration_, thread_factory_,
@@ -74,10 +67,10 @@ TEST_F(SharedConsumerManagerTest, ShouldRegisterTopicOnlyOnce) {
 
   // when
   for (int i = 0; i < 3; ++i) {
-    testee->registerConsumerIfAbsent(topic1, processor_);
+    testee->registerConsumerIfAbsent(topic1);
   }
   for (int i = 0; i < 3; ++i) {
-    testee->registerConsumerIfAbsent(topic2, processor_);
+    testee->registerConsumerIfAbsent(topic2);
   }
 
   // then
@@ -95,7 +88,7 @@ TEST_F(SharedConsumerManagerTest, ShouldHandleMissingConfig) {
   auto testee = makeTestee();
 
   // when, then - construction throws and nothing gets registered.
-  EXPECT_THROW(testee->registerConsumerIfAbsent(topic, processor_), EnvoyException);
+  EXPECT_THROW(testee->registerConsumerIfAbsent(topic), EnvoyException);
   ASSERT_EQ(testee->getConsumerCountForTest(), 0);
 }
 
