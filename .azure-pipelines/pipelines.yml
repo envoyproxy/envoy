@@ -871,7 +871,7 @@ stages:
       condition: always()
 
   - job: docker
-    condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'))
+    condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
     strategy:
       matrix:
         windows2019:
