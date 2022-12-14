@@ -18,6 +18,13 @@ public:
     static T* instance = new T();
     return *instance;
   }
+
+  using Factory = T*(void);
+
+  static const T& get(Factory f) {
+    static T* instance = f();
+    return *instance;
+  }
 };
 
 } // namespace Envoy

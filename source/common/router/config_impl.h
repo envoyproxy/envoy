@@ -688,13 +688,13 @@ public:
     return DefaultMetadata::get();
   }
   using RouteTypedMetadata = Envoy::Config::TypedMetadataImpl<HttpRouteTypedMetadataFactory>;
+  using DefaultRouteTypedMetadata = ConstSingleton<RouteTypedMetadata>;
   const Envoy::Config::TypedMetadata& typedMetadata() const override {
     if (typed_metadata_ != nullptr) {
       return *typed_metadata_;
     }
-    static const RouteTypedMetadata* defaultTypedMetadata =
-        new RouteTypedMetadata(DefaultMetadata::get());
-    return *defaultTypedMetadata;
+    return DefaultRouteTypedMetadata::get(
+        []() { return new RouteTypedMetadata(DefaultMetadata::get()); });
   }
   const PathMatchCriterion& pathMatchCriterion() const override { return *this; }
   bool includeAttemptCountInRequest() const override {
