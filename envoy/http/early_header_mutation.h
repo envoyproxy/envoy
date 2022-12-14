@@ -20,7 +20,7 @@ public:
   virtual ~EarlyHeaderMutation() = default;
 
   /**
-   * Mutate the request headers at very early.
+   * Mutate the request headers before routing, tracing or any filter processing.
    *
    * @param headers request headers to be mutated.
    * @param stream_info stream info.

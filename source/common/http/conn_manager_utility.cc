@@ -80,11 +80,9 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
     ConnectionManagerConfig& config, const Router::Config& route_config,
     const LocalInfo::LocalInfo& local_info, const StreamInfo::StreamInfo& stream_info) {
 
-  if (!config.earlyHeaderMutationExtensions().empty()) {
-    for (const auto& extension : config.earlyHeaderMutationExtensions()) {
-      if (!extension->mutate(request_headers, stream_info)) {
-        break;
-      }
+  for (const auto& extension : config.earlyHeaderMutationExtensions()) {
+    if (!extension->mutate(request_headers, stream_info)) {
+      break;
     }
   }
 

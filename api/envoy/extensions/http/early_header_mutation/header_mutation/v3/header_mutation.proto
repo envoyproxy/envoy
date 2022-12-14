@@ -5,6 +5,7 @@ package envoy.extensions.http.early_header_mutation.header_mutation.v3;
 import "envoy/config/common/mutation_rules/v3/mutation_rules.proto";
 
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.http.early_header_mutation.header_mutation.v3";
 option java_outer_classname = "HeaderMutationProto";
@@ -17,5 +18,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // This extension allows for early header mutation by the substitution formatter.
 message HeaderMutation {
-  repeated config.common.mutation_rules.v3.HeaderMutation mutations = 1;
+  repeated config.common.mutation_rules.v3.HeaderMutation mutations = 1
+      [(validate.rules).repeated = {min_items: 1}];
 }
