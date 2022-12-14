@@ -24,7 +24,8 @@ namespace Mesh {
  * waiting for records (that had no matching records delivered yet).
  * Basically core of Fetch-handling business logic.
  */
-class RecordDistributor : public InboundRecordProcessor,
+class RecordDistributor : public RecordCallbackProcessor,
+                          public InboundRecordProcessor,
                           private Logger::Loggable<Logger::Id::kafka> {
 public:
   // InboundRecordProcessor
@@ -33,21 +34,19 @@ public:
   // InboundRecordProcessor
   void receive(InboundRecordSharedPtr message) override;
 
-  // Process an inbound record callback by passing cached records to it
-  // and (if needed) registering the callback.
-  void processCallback(const RecordCbSharedPtr& callback);
+  // RecordCallbackProcessor
+  void processCallback(const RecordCbSharedPtr& callback) override;
 
-  // Remove the callback (usually invoked by the callback timing out downstream).
-  void removeCallback(const RecordCbSharedPtr& callback);
+  // RecordCallbackProcessor
+  void removeCallback(const RecordCbSharedPtr& callback) override;
 
 private:
   // Checks whether any of the callbacks stored right now are interested in the topic.
   bool hasInterest(const std::string& topic) const ABSL_EXCLUSIVE_LOCKS_REQUIRED(callbacks_mutex_);
 
-  // HAX!
-  void removeCallbackWithoutLocking(
-      const RecordCbSharedPtr& callback,
-      std::map<KafkaPartition, std::vector<RecordCbSharedPtr>>& partition_to_callbacks);
+  // Helper function (real callback removal).
+  void doRemoveCallback(const RecordCbSharedPtr& callback)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(callbacks_mutex_);
 
   /**
    * Invariant: for every i: KafkaPartition, the following holds:
@@ -80,10 +79,10 @@ public:
 };
 
 /**
- * Maintains a collection of Kafka consumers (one per topic).
- * Maintains a message cache for messages that had no interest but might be requested later.
+ * Maintains a collection of Kafka consumers (one per topic) and the real distributor instance.
  */
-class SharedConsumerManagerImpl : public SharedConsumerManager,
+class SharedConsumerManagerImpl : public RecordCallbackProcessor,
+                                  public SharedConsumerManager,
                                   private Logger::Loggable<Logger::Id::kafka> {
 public:
   // Main constructor.
@@ -95,10 +94,10 @@ public:
                             Thread::ThreadFactory& thread_factory,
                             const KafkaConsumerFactory& consumer_factory);
 
-  // SharedConsumerManager
+  // RecordCallbackProcessor
   void processCallback(const RecordCbSharedPtr& callback) override;
 
-  // SharedConsumerManager
+  // RecordCallbackProcessor
   void removeCallback(const RecordCbSharedPtr& callback) override;
 
   // SharedConsumerManager
