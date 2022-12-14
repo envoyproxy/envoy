@@ -36,12 +36,16 @@ std::vector<std::string> toArgsVector(int argc, const char* const* argv) {
 
 OptionsImpl::OptionsImpl(int argc, const char* const* argv,
                          const HotRestartVersionCb& hot_restart_version_cb,
-                         spdlog::level::level_enum default_log_level)
-    : OptionsImpl(toArgsVector(argc, argv), hot_restart_version_cb, default_log_level) {}
+                         spdlog::level::level_enum default_log_level,
+                         absl::string_view listener_manager)
+    : OptionsImpl(toArgsVector(argc, argv), hot_restart_version_cb, default_log_level,
+                  listener_manager) {}
 
 OptionsImpl::OptionsImpl(std::vector<std::string> args,
                          const HotRestartVersionCb& hot_restart_version_cb,
-                         spdlog::level::level_enum default_log_level) {
+                         spdlog::level::level_enum default_log_level,
+                         absl::string_view listener_manager)
+    : listener_manager_(listener_manager) {
   std::string log_levels_string = fmt::format("Log levels: {}", allowedLogLevels());
   log_levels_string +=
       fmt::format("\nDefault is [{}]", spdlog::level::level_string_views[default_log_level]);
@@ -442,7 +446,8 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
 OptionsImpl::OptionsImpl(const std::string& service_cluster, const std::string& service_node,
                          const std::string& service_zone, spdlog::level::level_enum log_level)
     : log_level_(log_level), service_cluster_(service_cluster), service_node_(service_node),
-      service_zone_(service_zone) {}
+      service_zone_(service_zone),
+      listener_manager_(Config::ServerExtensionValues::get().DEFAULT_LISTENER) {}
 
 void OptionsImpl::disableExtensions(const std::vector<std::string>& names) {
   for (const auto& name : names) {
