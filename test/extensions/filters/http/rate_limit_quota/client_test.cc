@@ -88,13 +88,13 @@ constexpr char MultipleBukcetId[] = R"EOF(
     "fairshare_project_id":
       "mock_project"
     "fairshare_user_id":
-      "test"
+      "test_user"
 )EOF";
 
 TEST_F(RateLimitStreamTest, BuildUsageReport) {
   ::envoy::service::rate_limit_quota::v3::BucketId bucket_id;
   TestUtility::loadFromYaml(SingleBukcetId, bucket_id);
-  std::string domain = "cloud_12345_67890_td_rlqs";
+  std::string domain = "cloud_12345";
 
   EXPECT_OK(client_->startStream(stream_info_));
   RateLimitQuotaUsageReports report = client_->buildUsageReport(domain, bucket_id);
