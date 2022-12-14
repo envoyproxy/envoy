@@ -118,7 +118,7 @@ fi
 set +e
 if [[ "$VALIDATE_COVERAGE" == "true" ]] && [[ "${FUZZ_COVERAGE}" == "false" ]]; then
   echo "Checking per-extension coverage"
-  output=$(./test/per_file_coverage.sh)
+  output=$(sh ./test/per_file_coverage.sh)
 
   if [ $? -eq 1 ]; then
     echo Per-extension coverage failed:
