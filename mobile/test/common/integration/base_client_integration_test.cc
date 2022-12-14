@@ -113,9 +113,9 @@ void BaseClientIntegrationTest::initialize() {
   // });
   // stream_prototype_->setOnComplete(
   //     [this](envoy_stream_intel, envoy_final_stream_intel final_intel) {
-        // if (expect_data_streams_) {
-    //       validateStreamIntel(final_intel, expect_dns_, upstream_tls_, cc_.on_complete_calls == 0);
-        // }
+  // if (expect_data_streams_) {
+  //       validateStreamIntel(final_intel, expect_dns_, upstream_tls_, cc_.on_complete_calls == 0);
+  // }
   //       cc_.on_complete_received_byte_count = final_intel.received_byte_count;
   //       cc_.on_complete_calls++;
   //       cc_.terminal_callback->setReady();
@@ -178,14 +178,13 @@ void BaseClientIntegrationTest::threadRoutine(absl::BlockingCounter& engine_runn
 void BaseClientIntegrationTest::TearDown() {
   test_server_.reset();
   fake_upstreams_.clear();
-
-  for (auto engine : multi_engines_) {
+  // Note that engines must be terminated in reverse order of creation to avoid a segfault ;___;
+  for (auto i = multi_engines_.size() - 1; i >= 0; i--) {
     std::cout << "a";
-    engine->terminate();
+    multi_engines_[i]->terminate();
     std::cout << "b";
-    engine.reset();
   };
-  engine_.reset(); // clear this pointer too, for now
+  engine_.reset();
   multi_engines_.clear();
 
   full_dispatcher_->exit();
