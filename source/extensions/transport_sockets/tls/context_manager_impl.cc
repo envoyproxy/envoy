@@ -17,11 +17,6 @@ namespace Tls {
 
 ContextManagerImpl::ContextManagerImpl(TimeSource& time_source) : time_source_(time_source) {}
 
-ContextManagerImpl::~ContextManagerImpl() {
-  // KNOWN_ISSUE_ASSERT(contexts_.empty(), "https://github.com/envoyproxy/envoy/issues/10030");
-  // contexts_ is allowed to be empty when handshaker provides certificates.
-}
-
 Envoy::Ssl::ClientContextSharedPtr
 ContextManagerImpl::createSslClientContext(Stats::Scope& scope,
                                            const Envoy::Ssl::ClientContextConfig& config) {

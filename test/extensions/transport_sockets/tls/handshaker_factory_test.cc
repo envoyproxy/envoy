@@ -273,7 +273,8 @@ protected:
 // TlsCertificate messages can be empty when handshaker provides certificates.
 TEST_F(HandshakerFactoryDownstreamTest, ServerHandshakerProvidesCertificates) {
   HandshakerFactoryImplForDownstreamTest handshaker_factory;
-  Ssl::HandshakerCapabilities cap{cap.provides_certificates = true};
+  Ssl::HandshakerCapabilities cap;
+  cap.provides_certificates = true;
   handshaker_factory.setCapabilities(cap);
   Registry::InjectFactory<Ssl::HandshakerFactory> registered_factory(handshaker_factory);
 
@@ -293,6 +294,7 @@ TEST_F(HandshakerFactoryDownstreamTest, ServerHandshakerProvidesCertificates) {
 
   Extensions::TransportSockets::Tls::ServerContextConfigImpl server_context_config(
       tls_context_, mock_factory_ctx);
+  EXPECT_TRUE(server_context_config.isReady());
   EXPECT_NO_THROW(context_manager_->createSslServerContext(stats_store_, server_context_config,
                                                            std::vector<std::string>{}));
 }
