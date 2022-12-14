@@ -158,11 +158,11 @@ public:
   // A follow-up PR is required to remove the functions below, which will
   // require a large number of files to be trivially changed, by explicitly
   // accessing the rootScope() to call these methods.
-  operator Scope&() { return *rootScope(); }
+  // operator Scope&() { return *rootScope(); }
 
   // Delegate some methods to the root scope; these are exposed to make it more
   // convenient to use stats_macros.h. We may consider dropping them if desired,
-  // when we resovle #24007 or in the next follow-up.
+  // when we resolve #24007 or in the next follow-up.
   Counter& counterFromString(const std::string& name) {
     return rootScope()->counterFromString(name);
   }
