@@ -649,9 +649,9 @@ public:
   virtual bool includeAttemptCountInResponse() const PURE;
 
   /**
-  * @return bool whether to include the header in the upstream request to indicate it is a retry
-  * initiated by a timeout.
-  */
+   * @return bool whether to include the header in the upstream request to indicate it is a retry
+   * initiated by a timeout.
+   */
   virtual bool includeIsTimeoutRetryHeader() const PURE;
 
   /**

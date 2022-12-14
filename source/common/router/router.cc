@@ -686,7 +686,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       conn_pool_new_stream_with_early_data_and_http3_ &&
       route_entry_->earlyDataPolicy().allowsEarlyDataForRequest(*downstream_headers_);
 
-  include_timeout_retry_header_in_request_ = route_entry_->virtualHost().includeIsTimeoutRetryHeader();
+  include_timeout_retry_header_in_request_ =
+      route_entry_->virtualHost().includeIsTimeoutRetryHeader();
 
   // Set initial HTTP/3 use based on the presence of HTTP/1.1 proxy config.
   // For retries etc, HTTP/3 usability may transition from true to false, but
@@ -1053,7 +1054,8 @@ void Filter::onPerTryTimeoutCommon(UpstreamRequest& upstream_request, Stats::Cou
   updateOutlierDetection(Upstream::Outlier::Result::LocalOriginTimeout, upstream_request,
                          absl::optional<uint64_t>(enumToInt(timeout_response_code_)));
 
-  if (maybeRetryReset(Http::StreamResetReason::LocalReset, upstream_request, /*is_timeout_retry*/ true)) {
+  if (maybeRetryReset(Http::StreamResetReason::LocalReset, upstream_request,
+                      /*is_timeout_retry*/ true)) {
     return;
   }
 
@@ -1067,7 +1069,8 @@ void Filter::onPerTryTimeoutCommon(UpstreamRequest& upstream_request, Stats::Cou
 void Filter::onStreamMaxDurationReached(UpstreamRequest& upstream_request) {
   upstream_request.resetStream();
 
-  if (maybeRetryReset(Http::StreamResetReason::LocalReset, upstream_request, /*is_timeout_retry*/ false)) {
+  if (maybeRetryReset(Http::StreamResetReason::LocalReset, upstream_request,
+                      /*is_timeout_retry*/ false)) {
     return;
   }
 
@@ -1172,8 +1175,8 @@ bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
   const RetryStatus retry_status = retry_state_->shouldRetryReset(
       reset_reason, was_using_http3,
       [this, can_send_early_data = upstream_request.upstreamStreamOptions().can_send_early_data_,
-       can_use_http3 =
-           upstream_request.upstreamStreamOptions().can_use_http3_, is_timeout_retry](bool disable_http3) -> void {
+       can_use_http3 = upstream_request.upstreamStreamOptions().can_use_http3_,
+       is_timeout_retry](bool disable_http3) -> void {
         // This retry might be because of ConnectionFailure of 0-RTT handshake. In this case, though
         // the original request is retried with the same can_send_early_data setting, it will not be
         // sent as early data by the underlying connection pool grid.
@@ -1404,7 +1407,8 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
           [this, can_use_http3 = upstream_request.upstreamStreamOptions().can_use_http3_,
            had_early_data = upstream_request.upstreamStreamOptions().can_send_early_data_](
               bool disable_early_data) -> void {
-            doRetry((disable_early_data ? false : had_early_data), can_use_http3, /*is_timeout_retry*/ false);
+            doRetry((disable_early_data ? false : had_early_data), can_use_http3,
+                    /*is_timeout_retry*/ false);
           });
       if (retry_status == RetryStatus::Yes) {
         runRetryOptionsPredicates(upstream_request);

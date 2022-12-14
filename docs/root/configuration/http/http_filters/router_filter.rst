@@ -345,7 +345,7 @@ flag is set to true.
 .. _config_http_filters_router_x-envoy-is-timeout-retry:
 
 x-envoy-is-timeout-retry
-^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^
 
 Sent to the upstream to indicate that the request is a retry initiated due to timeouts. Only set if the
 :ref:`include_is_timeout_retry_header <envoy_v3_api_field_config.route.v3.VirtualHost.include_is_timeout_retry_header>`

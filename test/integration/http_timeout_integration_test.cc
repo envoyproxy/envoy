@@ -324,23 +324,23 @@ TEST_P(HttpTimeoutIntegrationTest, PerTryTimeoutWithoutGlobalTimeout) {
 }
 
 void HttpTimeoutIntegrationTest::testIsTimeoutRetryHeader(bool use_hedged_retry) {
-  auto host = config_helper_.createVirtualHost("squareup.com", "/test_retry");
+  auto host = config_helper_.createVirtualHost("example.com", "/test_retry");
   host.set_include_is_timeout_retry_header(true);
   config_helper_.addVirtualHost(host);
 
   initialize();
 
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  auto encoder_decoder = codec_client_->startRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "POST"},
-                                     {":path", "/test_retry"},
-                                     {":scheme", "http"},
-                                     {":authority", "squareup.com"},
-                                     {"x-forwarded-for", "10.0.0.1"},
-                                     {"x-envoy-retry-on", "5xx"},
-                                     {"x-envoy-hedge-on-per-try-timeout", use_hedged_retry ? "true" : "fase"},
-                                     {"x-envoy-upstream-rq-timeout-ms", "500"},
-                                     {"x-envoy-upstream-rq-per-try-timeout-ms", "400"}});
+  auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "POST"},
+      {":path", "/test_retry"},
+      {":scheme", "http"},
+      {":authority", "example.com"},
+      {"x-forwarded-for", "10.0.0.1"},
+      {"x-envoy-retry-on", "5xx"},
+      {"x-envoy-hedge-on-per-try-timeout", use_hedged_retry ? "true" : "fase"},
+      {"x-envoy-upstream-rq-timeout-ms", "500"},
+      {"x-envoy-upstream-rq-per-try-timeout-ms", "400"}});
   auto response = std::move(encoder_decoder.second);
   request_encoder_ = &encoder_decoder.first;
 
@@ -364,10 +364,10 @@ void HttpTimeoutIntegrationTest::testIsTimeoutRetryHeader(bool use_hedged_retry)
 
   ASSERT_TRUE(upstream_request2->waitForHeadersComplete());
 
-  // Expect the x-envoy-is-timeout-header to set to indicate to the upstream this is a retry 
-  // initiated by a previous per try timeout
+  // Expect the x-envoy-is-timeout-header to set to indicate to the upstream this is a retry
+  // initiated by a previous per try timeout.
   EXPECT_EQ(upstream_request2->headers().getEnvoyIsTimeoutRetryValue(), "true");
-  
+
   ASSERT_TRUE(upstream_request2->waitForEndStream(*dispatcher_));
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
