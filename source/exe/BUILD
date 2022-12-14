@@ -125,7 +125,7 @@ envoy_cc_library(
         # Envoy requires them.
         "//source/extensions/listener_managers/listener_manager:listener_manager_lib",
         "//source/common/version:version_linkstamp",
-    ] + envoy_select_enable_http3(["//source/common/quic:server_codec_impl"]),
+    ] + envoy_select_enable_http3(["//source/common/quic:server_codec_lib"]),
 )
 
 # provides a library target for Envoy Mobile builds with the versioning information set up correctly.
