@@ -4,6 +4,7 @@ import Foundation
 /// Builder used for creating and running a new Engine instance.
 @objcMembers
 open class EngineBuilder: NSObject {
+  // swiftlint:disable:previous type_body_length
   private let base: BaseConfiguration
   private var engineType: EnvoyEngine.Type = EnvoyEngineImpl.self
   private var logLevel: LogLevel = .info
