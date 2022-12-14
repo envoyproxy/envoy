@@ -22,12 +22,13 @@ using TopicToPartitionsMap = std::map<std::string, std::vector<int32_t>>;
  * Callback's response when it is provided with a record.
  */
 enum class CallbackReply {
-  // Callback is not interested in this record.
-  REJECTED,
+  // Callback is not interested in any record anymore.
+  // Impl note: this can be caused by callback timing out in between.
+  Rejected,
   // Callback consumed the record and is capable of accepting more.
-  ACCEPTED_AND_WANT_MORE,
+  AcceptedAndWantMore,
   // Callback consumed the record and will not receive more (allows us to optimize a little).
-  ACCEPTED_AND_FINISHED,
+  AcceptedAndFinished,
 };
 
 /**

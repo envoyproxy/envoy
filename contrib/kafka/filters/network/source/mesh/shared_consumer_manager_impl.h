@@ -19,15 +19,24 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
 
+template <typename T> using PartitionMap = std::map<KafkaPartition, std::vector<T>>;
+
 /**
- * Processor implementation that stores received records (that had no interest), and callbacks
- * waiting for records (that had no matching records delivered yet).
+ * Processor implementation that stores received records (that had no interest),
+ * and callbacks waiting for records (that had no matching records delivered yet).
  * Basically core of Fetch-handling business logic.
  */
 class RecordDistributor : public RecordCallbackProcessor,
                           public InboundRecordProcessor,
                           private Logger::Loggable<Logger::Id::kafka> {
 public:
+  // Main constructor.
+  RecordDistributor();
+
+  // Visible for testing.
+  RecordDistributor(const PartitionMap<RecordCbSharedPtr>& callbacks,
+                    const PartitionMap<InboundRecordSharedPtr>& records);
+
   // InboundRecordProcessor
   bool waitUntilInterest(const std::string& topic, const int32_t timeout_ms) const override;
 
@@ -40,26 +49,31 @@ public:
   // RecordCallbackProcessor
   void removeCallback(const RecordCbSharedPtr& callback) override;
 
+  size_t getCallbackCountForTest(const std::string& topic, const int32_t partition) const;
+
+  size_t getRecordCountForTest(const std::string& topic, const int32_t partition) const;
+
 private:
   // Checks whether any of the callbacks stored right now are interested in the topic.
   bool hasInterest(const std::string& topic) const ABSL_EXCLUSIVE_LOCKS_REQUIRED(callbacks_mutex_);
+
+  // Helper function (passes records to callback).
+  bool passRecordsToCallback(const RecordCbSharedPtr& callback);
 
   // Helper function (real callback removal).
   void doRemoveCallback(const RecordCbSharedPtr& callback)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(callbacks_mutex_);
 
   /**
-   * Invariant: for every i: KafkaPartition, the following holds:
-   * !(partition_to_callbacks_[i].size() >= 0 && messages_waiting_for_interest_[i].size() >= 0)
+   * Invariant - for every KafkaPartition, there may be callbacks for this partition,
+   * or there may be records for this partition, but never both at the same time.
    */
 
   mutable absl::Mutex callbacks_mutex_;
-  std::map<KafkaPartition, std::vector<RecordCbSharedPtr>>
-      partition_to_callbacks_ ABSL_GUARDED_BY(callbacks_mutex_);
+  PartitionMap<RecordCbSharedPtr> partition_to_callbacks_ ABSL_GUARDED_BY(callbacks_mutex_);
 
-  mutable absl::Mutex messages_mutex_;
-  std::map<KafkaPartition, std::vector<InboundRecordSharedPtr>>
-      messages_waiting_for_interest_ ABSL_GUARDED_BY(messages_mutex_);
+  mutable absl::Mutex stored_records_mutex_;
+  PartitionMap<InboundRecordSharedPtr> stored_records_ ABSL_GUARDED_BY(stored_records_mutex_);
 };
 
 using RecordDistributorPtr = std::unique_ptr<RecordDistributor>;
