@@ -1,11 +1,12 @@
 #include "source/extensions/filters/http/rate_limit_quota/config.h"
-#include "source/extensions/filters/http/rate_limit_quota/quota_bucket.h"
+
+#include <memory>
 
 #include "envoy/registry/registry.h"
 
 #include "source/extensions/filters/http/rate_limit_quota/client_impl.h"
 #include "source/extensions/filters/http/rate_limit_quota/filter.h"
-#include <memory>
+#include "source/extensions/filters/http/rate_limit_quota/quota_bucket.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -29,18 +30,9 @@ Http::FilterFactoryCb RateLimitQuotaFilterFactory::createFilterFactoryFromProtoT
   return [config = std::move(config), &context, bucket_cache = std::move(bucket_cache)](
              Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<RateLimitQuotaFilter>(
-        config, context,
-        &(bucket_cache->tls.get()->buckets()),
+        config, context, &(bucket_cache->tls.get()->buckets()),
         &(bucket_cache->tls.get()->quotaUsageReports())));
   };
-}
-
-Router::RouteSpecificFilterConfigConstSharedPtr
-RateLimitQuotaFilterFactory::createRouteSpecificFilterConfigTyped(
-    const envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaOverride&,
-    Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
-  // TODO(tyxia) Added per route config for override later.
-  return nullptr;
 }
 
 /**

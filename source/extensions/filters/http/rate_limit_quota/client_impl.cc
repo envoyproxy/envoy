@@ -17,7 +17,7 @@ namespace RateLimitQuota {
 //     auto bucket_id_val = bucket_id.value();
 //     // First request.
 //     // The domain should only be provided in the first report.
-//     std::string domain = "cloud_12345_67890_td_rlqs";
+//     std::string domain = "cloud_12345_67890_TD_rlqs";
 //     reports.set_domain(domain);
 //     auto* usage = reports.add_bucket_quota_usages();
 //     *usage->mutable_bucket_id() = bucket_id_val;
@@ -27,7 +27,7 @@ namespace RateLimitQuota {
 //     bucket_usage_[bucket_id_val].usage = *usage;
 //   } else {
 //     // This case for both
-//     // 1) no bucket id ---- perodical send behavior.
+//     // 1) no bucket id ---- periodical send behavior.
 //     // 2) has bucket id and it is found in the cache, i.e., NOT the first request.
 //     for (auto it : bucket_usage_) {
 //       BucketId id = it.first;
@@ -37,19 +37,19 @@ namespace RateLimitQuota {
 //       // TODO(tyxia) How to update the current usage!!!!
 //       // if (bucket_id.has_value() && id == bucket_id.value()) {
 //       if (bucket_id.has_value() &&
-//           Protobuf::util::MessageDifferencer::Equals(id, bucket_id.value())) {
+//           Protobuf::util::MessageDifference::Equals(id, bucket_id.value())) {
 //         bucket_usage_[id].usage.set_num_requests_allowed(
 //             bucket_usage_[id].usage.num_requests_allowed() + 1);
 //         bucket_usage_[id].usage.mutable_time_elapsed()->set_seconds(1000);
 //       }
 
 //       // 2. Always update the usage in the reports that will be sent to server.
-//       // no matter if it is perodical send behavior or decodeheader place where the incoming
+//       // no matter if it is periodical send behavior or decode header place where the incoming
 //       // request has arrived
 //       // Even though we have `bucket_usage_` stored, we still need to build the reports here from
 //       // scratch.
 //       auto* added_usage = reports.add_bucket_quota_usages();
-//       // CopyFrom will not overrride the existing entry but mergeFrom will do.
+//       // CopyFrom will not override the existing entry but mergeFrom will do.
 //       added_usage->CopyFrom(bucket_usage_[bucket_id.value()].usage);
 //     }
 //   }
@@ -72,20 +72,20 @@ RateLimitClientImpl::buildUsageReport(absl::string_view domain,
     usage->mutable_time_elapsed()->set_seconds(0);
     // TODO(tyxia) How to set the value of requests allowed and denied.
     // This is requests allowed and denied for this bucket which contains many requests.
-    // It seems that the lock is needed for this?? Becasue here is read from the map
+    // It seems that the lock is needed for this?? Because here is read from the map
     // update is write to map.
     usage->set_num_requests_allowed(1);
     usage->set_num_requests_denied(0);
   } else {
-    // TODO(tyxia) use const ponter const to address
-    // Use reference variable to udate the reports_.
+    // TODO(tyxia) use const pointer const to address
+    // Use reference variable to update the reports_.
     RateLimitQuotaUsageReports& cached_report = *reports_;
     if (bucket_id.has_value()) {
       bool updated = false;
       // TODO(tyxia) That will be better if it can be a map
       for (int idx = 0; idx < cached_report.bucket_quota_usages_size(); ++idx) {
         auto* usage = cached_report.mutable_bucket_quota_usages(idx);
-        // Only upate the bucket with that specific id.
+        // Only update the bucket with that specific id.
         if (bucket_id.has_value() &&
             Protobuf::util::MessageDifferencer::Equals(usage->bucket_id(), bucket_id.value())) {
           usage->set_num_requests_allowed(usage->num_requests_allowed() + 1);
@@ -144,10 +144,6 @@ absl::Status RateLimitClientImpl::startStream(const StreamInfo::StreamInfo& stre
         *this,
         Http::AsyncClient::RequestOptions().setParentContext(
             Http::AsyncClient::ParentContext{&stream_info}));
-
-    if (stream_ == nullptr) {
-      return absl::InternalError("Unable to establish the new stream");
-    }
   }
   return absl::OkStatus();
 }

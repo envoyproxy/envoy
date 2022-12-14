@@ -140,7 +140,8 @@ constexpr char OnNoMatchConfig[] = R"EOF(
 // constexpr char OnNoMatchConfig_deprecated[] = R"EOF(
 //   action:
 //     typed_config:
-//       '@type': type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
+//       '@type':
+//       type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
 //       no_assignment_behavior:
 //         fallback_rate_limit:
 //           blanket_rule: DENY_ALL
@@ -199,7 +200,9 @@ public:
     TestUtility::loadFromYaml(GoogleGrpcConfig, config_);
   }
 
-  void addMatcherConfigAndCreateFilter(MatcherConfigType config_type) {
+  ~FilterTest() override { filter_->onDestroy(); }
+
+  void addMatcherConfig(MatcherConfigType config_type) {
     // Add the matcher configuration.
     switch (config_type) {
     case MatcherConfigType::Valid: {
@@ -220,10 +223,14 @@ public:
     default:
       break;
     }
+  }
 
+  void createFilter(bool set_callback = true) {
     filter_config_ = std::make_shared<FilterConfig>(config_);
     filter_ = std::make_unique<RateLimitQuotaFilter>(filter_config_, context_, nullptr);
-    filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+    if (set_callback) {
+      filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+    }
   }
 
   void constructMismatchedRequestHeader() {
@@ -256,7 +263,8 @@ public:
 };
 
 TEST_F(FilterTest, InvalidBucketMatcherConfig) {
-  addMatcherConfigAndCreateFilter(MatcherConfigType::Invalid);
+  addMatcherConfig(MatcherConfigType::Invalid);
+  createFilter();
   auto match_result = filter_->requestMatching(default_headers_);
   EXPECT_FALSE(match_result.ok());
   EXPECT_THAT(match_result, StatusIs(absl::StatusCode::kInternal));
@@ -264,7 +272,8 @@ TEST_F(FilterTest, InvalidBucketMatcherConfig) {
 }
 
 TEST_F(FilterTest, RequestMatchingSucceeded) {
-  addMatcherConfigAndCreateFilter(MatcherConfigType::Valid);
+  addMatcherConfig(MatcherConfigType::Valid);
+  createFilter();
   // Define the key value pairs that is used to build the bucket_id dynamically via `custom_value`
   // in the config.
   absl::flat_hash_map<std::string, std::string> custom_value_pairs = {{"environment", "staging"},
@@ -298,10 +307,14 @@ TEST_F(FilterTest, RequestMatchingSucceeded) {
 
   EXPECT_THAT(expected_bucket_ids,
               testing::UnorderedPointwise(testing::Eq(), serialized_bucket_ids));
+
+  envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse resp;
+  filter_->onQuotaResponse(resp);
 }
 
 TEST_F(FilterTest, RequestMatchingFailed) {
-  addMatcherConfigAndCreateFilter(MatcherConfigType::Valid);
+  addMatcherConfig(MatcherConfigType::Valid);
+  createFilter();
   constructMismatchedRequestHeader();
 
   // Perform request matching.
@@ -312,12 +325,23 @@ TEST_F(FilterTest, RequestMatchingFailed) {
   EXPECT_EQ(match.status().message(), "The match was completed, no match found");
 }
 
+TEST_F(FilterTest, RequestMatchingFailedWithNoCallback) {
+  addMatcherConfig(MatcherConfigType::Valid);
+  createFilter(/*set_callback*/ false);
+
+  auto match = filter_->requestMatching(default_headers_);
+  EXPECT_FALSE(match.ok());
+  EXPECT_THAT(match, StatusIs(absl::StatusCode::kInternal));
+  EXPECT_EQ(match.status().message(), "Filter callback has not been initialized successfully yet.");
+}
+
 TEST_F(FilterTest, RequestMatchingFailedWithOnNoMatchConfigured) {
-  addMatcherConfigAndCreateFilter(MatcherConfigType::IncludeOnNoMatchConfig);
+  addMatcherConfig(MatcherConfigType::IncludeOnNoMatchConfig);
+  createFilter();
   absl::flat_hash_map<std::string, std::string> expected_bucket_ids = {
       {"on_no_match_name", "on_no_match_value"}, {"on_no_match_name_2", "on_no_match_value_2"}};
   // Perform request matching.
-  // TODO(tyxia) Rmove deprecated requestmatching
+  // TODO(tyxia) Remove deprecated request matching
   auto match_result = filter_->requestMatching(default_headers_);
   // Asserts that the request matching succeeded.
   // OK status is expected to be returned even if the exact request matching failed. It is because
@@ -335,9 +359,18 @@ TEST_F(FilterTest, RequestMatchingFailedWithOnNoMatchConfigured) {
   auto bucket_ids = ret.value().bucket();
   auto serialized_bucket_ids =
       absl::flat_hash_map<std::string, std::string>(bucket_ids.begin(), bucket_ids.end());
-  // Verfies that the expected bucket ids are generated for `on_no_match` case.
+  // Verifies that the expected bucket ids are generated for `on_no_match` case.
   EXPECT_THAT(expected_bucket_ids,
               testing::UnorderedPointwise(testing::Eq(), serialized_bucket_ids));
+}
+
+TEST_F(FilterTest, DecodeHeaderWithMismatchHeader) {
+  addMatcherConfig(MatcherConfigType::Valid);
+  createFilter();
+  constructMismatchedRequestHeader();
+
+  Http::FilterHeadersStatus status = filter_->decodeHeaders(default_headers_, false);
+  EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::Continue);
 }
 
 } // namespace

@@ -1,4 +1,5 @@
 #include "source/extensions/filters/http/rate_limit_quota/matcher.h"
+
 #include "envoy/registry/registry.h"
 
 namespace Envoy {
@@ -49,7 +50,7 @@ RateLimitOnMactchAction::generateBucketId(const Http::Matching::HttpMatchingData
           return absl::InternalError("Empty matched result from custom value config.");
         }
       } else {
-        // Currently, this line will be hitted if we configure the `custom_value` in
+        // Currently, this line will be hotted if we configure the `custom_value` in
         // `on_no_match` action.
         return absl::InternalError("No matched result from custom value config.");
       }
@@ -70,7 +71,7 @@ RateLimitOnMactchAction::generateBucketId(const Http::Matching::HttpMatchingData
   // TODO(tyxia) Include the additional info and refactor the return object along the callstack,
   // to indicate the it is on_no_match and handle this blanket rule in the caller site.
   if (setting_.has_no_assignment_behavior()) {
-    // Retrive the value from the `blanket_rule` in the config to decide if we want to fail-open or
+    // Retrieve the value from the `blanket_rule` in the config to decide if we want to fail-open or
     // fail-close.
     auto strategy = setting_.no_assignment_behavior().fallback_rate_limit();
     if (strategy.blanket_rule() == RateLimitStrategy::ALLOW_ALL) {
@@ -79,7 +80,7 @@ RateLimitOnMactchAction::generateBucketId(const Http::Matching::HttpMatchingData
 
   // Add the expired assignment behavior if the corresponding config is present.
   if (setting_.has_expired_assignment_behavior()) {
-    // Retrive the value from the `blanket_rule` in the config to decide if we want to fail-open or
+    // Retrieve the value from the `blanket_rule` in the config to decide if we want to fail-open or
     // fail-close.
     auto strategy = setting_.expired_assignment_behavior().fallback_rate_limit();
     switch (strategy.blanket_rule()) {

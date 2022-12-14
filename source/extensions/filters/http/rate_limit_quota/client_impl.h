@@ -63,8 +63,9 @@ public:
             bool end_stream);
   RateLimitQuotaUsageReports buildUsageReport(absl::string_view domain,
                                               absl::optional<BucketId> bucket_id);
+
 private:
-  //RateLimitQuotaUsageReports buildUsageReportBucketUsage(absl::optional<BucketId> bucket_id);
+  // RateLimitQuotaUsageReports buildUsageReportBucketUsage(absl::optional<BucketId> bucket_id);
 
   // Store the client as the bare object since there is no ownership transfer involved.
   GrpcAsyncClient aync_client_;
@@ -93,8 +94,8 @@ private:
   };
   absl::node_hash_map<BucketId, BucketQuotaUsageInfo, BucketIdHash, BucketIdEqual> bucket_usage_;
   // 2. store <domain, RateLimitQuotaUsageReports> No need for domain key
-  // I am now thing useage_reports is better as long as the domain can be used to represent
-  //   1. don't need to build the report from scratch everytime
+  // I am now thing usage_reports is better as long as the domain can be used to represent
+  //   1. don't need to build the report from scratch every time
   //   2. key is smaller
   // TODO(tyxia) const!!!!
 

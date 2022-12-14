@@ -57,7 +57,8 @@ TEST(RateLimitQuotaFilterConfigTest, RateLimitQuotaFilterWithCorrectProto) {
 
   // envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaOverride override_config;
   // ProtobufMessage::ValidationVisitor visitor = {};
-  // EXPECT_EQ(factory.createRouteSpecificFilterConfigTyped(override_config, context, visitor), nullptr);
+  // EXPECT_EQ(factory.createRouteSpecificFilterConfigTyped(override_config, context, visitor),
+  // nullptr);
 }
 
 } // namespace

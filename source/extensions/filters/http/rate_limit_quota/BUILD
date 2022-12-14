@@ -14,8 +14,8 @@ envoy_cc_library(
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
     deps = [
-        ":matcher_lib",
         ":client_lib",
+        ":matcher_lib",
         ":quota_bucket",
         "//envoy/registry",
         "//source/common/http:headers_lib",

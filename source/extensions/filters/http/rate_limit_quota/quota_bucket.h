@@ -6,8 +6,8 @@
 #include "envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.pb.validate.h"
 #include "envoy/service/rate_limit_quota/v3/rlqs.pb.h"
 #include "envoy/service/rate_limit_quota/v3/rlqs.pb.validate.h"
-#include "source/common/protobuf/utility.h"
 
+#include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/common/factory_base.h"
 
 namespace Envoy {
@@ -59,12 +59,12 @@ struct BucketElement {
   // periodically.
   std::unique_ptr<RateLimitClientImpl> rate_limit_client_;
   BucketAction bucket_action;
-  // TODO(tyxia) Should store bucket action intstead of assignment action
-  // because abondon
+  // TODO(tyxia) Should store bucket action instead of assignment action
+  // because abandon
   // QuotaAssignmentAction assignment;
   Event::TimerPtr send_reports_timer;
   UsageReport usage;
-  // TODO(tyxia) Also stroes bucketId in its element.
+  // TODO(tyxia) Also stores bucketId in its element.
   BucketId id;
   BucketQuotaUsage quota_usage;
 };
@@ -99,7 +99,7 @@ public:
   // in the `rate_limit_quota_filter` when the request comes.
   ThreadLocalBucket() = default;
 
-  // Return the bucket by reference so that it can be modifed on the caller site.
+  // Return the bucket by reference so that it can be modified on the caller site.
   BucketContainer& buckets() { return buckets_; }
 
   UsageReportsContainer& usageReports() { return usage_reports_; }

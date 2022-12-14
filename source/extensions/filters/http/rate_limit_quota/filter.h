@@ -94,15 +94,15 @@ private:
   RateLimitQuotaValidationVisitor visitor_ = {};
   Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher_ = nullptr;
   std::unique_ptr<Http::Matching::HttpMatchingDataImpl> data_ptr_ = nullptr;
-  // TODO(tyxia) This is the threadlocal cache that is created in the main thread.
+  // TODO(tyxia) This is the thread local cache that is created in the main thread.
   BucketContainer* quota_bucket_ = nullptr;
   // TODO(tyxia) Pass in another thread local storage object as well
-  // or we wrapp those two objects in a single object
-  // This also  needs to be avaible in client_impl.h
+  // or we wrap those two objects in a single object
+  // This also  needs to be available in client_impl.h
   // pass by reference to indicate no ownership transfer
   // TODO(tyxia) const!!!!
   // UsageReportsContainer* const usage_reports_;
-  // go/totw/177#reference-members
+  // go//177#reference-members
   // UsageReportsContainer& usage_report_ = nullptr;
   RateLimitQuotaUsageReports* quota_usage_reports_ = nullptr;
 };

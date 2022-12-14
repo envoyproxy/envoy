@@ -1,7 +1,8 @@
 #include "source/extensions/filters/http/rate_limit_quota/filter.h"
-#include "source/extensions/filters/http/rate_limit_quota/matcher.h"
 
 #include <memory>
+
+#include "source/extensions/filters/http/rate_limit_quota/matcher.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -12,11 +13,11 @@ using ::envoy::type::v3::RateLimitStrategy;
 
 Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                               bool) {
-  // First, perform requset matching.
+  // First, perform request matching.
   absl::StatusOr<Matcher::ActionPtr> match_result = requestMatching(headers);
 
   if (!match_result.ok()) {
-    // When the reequest is not matched by any matchers, request is ALLOWED by
+    // When the request is not matched by any matchers, request is ALLOWED by
     // default (i.e., fail-open) and will not be reported to RLQS server.
     ENVOY_LOG(debug,
               "The request is not matched by any matchers: ", match_result.status().message());
@@ -60,7 +61,8 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
     // Build the quota bucket element.
     BucketElement element;
     //  Create the gRPC client and start the stream on the first request.
-    element.rate_limit_client_ = createRateLimitClient(factory_context_, config_->rlqs_server(), quota_usage_reports_);
+    element.rate_limit_client_ =
+        createRateLimitClient(factory_context_, config_->rlqs_server(), quota_usage_reports_);
     auto status = element.rate_limit_client_->startStream(callbacks_->streamInfo());
     if (!status.ok()) {
       ENVOY_LOG(error, "Failed to start the gRPC stream: ", status.message());
@@ -78,22 +80,22 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
     // TODO(tyxia) what is the behavior on the first request while waiting for the response
     /////// Moved from RateLimitQuotaFilter constructor.
     // Create the timer object to periodically sent the usage report to the RLS server.
-    // TODO(tyxia) Timer callback will need to be outside of filter so that when filter is destoryed
+    // TODO(tyxia) Timer callback will need to be outside of filter so that when filter is destroyed
     // i.e., request ends, we still have it to send the reports periodically???
-    // Maybe assoiciated with the thread local storage????
+    // Maybe associated with the thread local storage????
     element.send_reports_timer =
-    // TODO(tyxia) Timer should be on localThread dispatcher !!!
-    // decodecallback's dispatcher ----- worker thread dispatcher!!!!
+        // TODO(tyxia) Timer should be on localThread dispatcher !!!
+        // decode callback's dispatcher ----- worker thread dispatcher!!!!
         callbacks_->dispatcher().createTimer([&element, this]() -> void {
           ASSERT(element.rate_limit_client_ != nullptr);
           // TODO(tyxia) For periodical send behavior, we just pass in nullopt argument.
           element.rate_limit_client_->sendUsageReport(config_->domain(), absl::nullopt);
         });
-        // factory_context_.mainThreadDispatcher().createTimer([&element, this]() -> void {
-        //   ASSERT(element.rate_limit_client_ != nullptr);
-        //   // TODO(tyxia) For periodical send behavior, we just pass in nullopt.
-        //   element.rate_limit_client_->sendUsageReport(config_->domain(), absl::nullopt);
-        // });
+    // factory_context_.mainThreadDispatcher().createTimer([&element, this]() -> void {
+    //   ASSERT(element.rate_limit_client_ != nullptr);
+    //   // TODO(tyxia) For periodical send behavior, we just pass in nullopt.
+    //   element.rate_limit_client_->sendUsageReport(config_->domain(), absl::nullopt);
+    // });
     // Set the reporting interval.
     const int64_t reporting_interval =
         PROTOBUF_GET_MS_REQUIRED(bucket_settings, reporting_interval);
@@ -113,10 +115,10 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
     if (bucket_action.has_quota_assignment_action()) {
       auto quota_action = bucket_action.quota_assignment_action();
       if (!quota_action.has_rate_limit_strategy()) {
-        // Nothing to do probabaly.
+        // Nothing to do probably.
       }
 
-      // Retrieve the rate limiting stragtegy.
+      // Retrieve the rate limiting strategy.
       RateLimitStrategy strategy = quota_action.rate_limit_strategy();
       if (strategy.has_blanket_rule() && strategy.blanket_rule() == RateLimitStrategy::ALLOW_ALL) {
         // TODO(tyxia) Keep track of #num of requests allowed, #num of requests denied.
@@ -125,7 +127,7 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
     }
   }
 
-  //rate_limit_client_->rateLimit(*this);
+  // rate_limit_client_->rateLimit(*this);
 
   return Envoy::Http::FilterHeadersStatus::Continue;
 }
