@@ -432,6 +432,30 @@ TEST(PathMatcher, MatchPrefixPathIgnoreCase) {
   EXPECT_FALSE(matcher->match("/prefiz#/prefix"));
 }
 
+TEST(PathMatcher, SlashPrefixMatcherShared) {
+  const auto matcher1 = Envoy::Matchers::PathMatcher::createPrefix("/", false);
+  EXPECT_TRUE(matcher1->match("/bla"));
+  const auto matcher2 = Envoy::Matchers::PathMatcher::createPrefix("/", false);
+  EXPECT_TRUE(matcher2->match("/bla"));
+  const auto matcher3 = Envoy::Matchers::PathMatcher::createPrefix("/", true);
+  EXPECT_TRUE(matcher3->match("/bla"));
+
+  EXPECT_EQ(matcher1, matcher2);
+  EXPECT_EQ(matcher1, matcher3);
+}
+
+TEST(PathMatcher, EmptyPrefixMatcherShared) {
+  const auto matcher1 = Envoy::Matchers::PathMatcher::createPrefix("", false);
+  EXPECT_TRUE(matcher1->match("/bla"));
+  const auto matcher2 = Envoy::Matchers::PathMatcher::createPrefix("", false);
+  EXPECT_TRUE(matcher2->match("/bla"));
+  const auto matcher3 = Envoy::Matchers::PathMatcher::createPrefix("", true);
+  EXPECT_TRUE(matcher3->match("/bla"));
+
+  EXPECT_EQ(matcher1, matcher2);
+  EXPECT_EQ(matcher1, matcher3);
+}
+
 TEST(PathMatcher, MatchSuffixPath) {
   envoy::type::matcher::v3::PathMatcher matcher;
   matcher.mutable_path()->set_suffix("suffix");

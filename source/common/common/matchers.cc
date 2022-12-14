@@ -130,11 +130,25 @@ PathMatcherConstSharedPtr PathMatcher::createExact(const std::string& exact, boo
   return std::make_shared<const PathMatcher>(matcher);
 }
 
-PathMatcherConstSharedPtr PathMatcher::createPrefix(const std::string& prefix, bool ignore_case) {
+namespace {
+PathMatcherConstSharedPtr createPrefixPathMatcher(const std::string& prefix, bool ignore_case) {
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.set_prefix(prefix);
   matcher.set_ignore_case(ignore_case);
   return std::make_shared<const PathMatcher>(matcher);
+}
+static const PathMatcherConstSharedPtr emptyPrefixPathMatcher = createPrefixPathMatcher("", false);
+static const PathMatcherConstSharedPtr slashPrefixPathMatcher = createPrefixPathMatcher("/", false);
+} // namespace
+
+PathMatcherConstSharedPtr PathMatcher::createPrefix(const std::string& prefix, bool ignore_case) {
+  if (prefix.empty()) {
+    return emptyPrefixPathMatcher;
+  }
+  if (prefix == "/") {
+    return slashPrefixPathMatcher;
+  }
+  return createPrefixPathMatcher(prefix, ignore_case);
 }
 
 PathMatcherConstSharedPtr PathMatcher::createPattern(const std::string& pattern, bool ignore_case) {
