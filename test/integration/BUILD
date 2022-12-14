@@ -873,7 +873,7 @@ envoy_cc_test_library(
         "//source/common/network:udp_packet_writer_handler_lib",
         "//source/common/network:utility_lib",
         "//source/common/stats:isolated_store_lib",
-        "//source/server:active_raw_udp_listener_config",
+        "//source/extensions/listener_managers/listener_manager:active_raw_udp_listener_config",
         "//source/server:connection_handler_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:test_time_system_interface",
@@ -882,7 +882,8 @@ envoy_cc_test_library(
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ] + envoy_select_enable_http3([
         "//source/common/quic:active_quic_listener_lib",
-        "//source/common/quic:quic_factory_lib",
+        "//source/common/quic:quic_client_factory_lib",
+        "//source/common/quic:quic_server_factory_lib",
         "@com_github_google_quiche//:quic_test_tools_session_peer_lib",
     ]),
 )
@@ -1931,7 +1932,8 @@ envoy_cc_test(
             ":protocol_integration_test_lib",
             "//source/common/quic:active_quic_listener_lib",
             "//source/common/quic:client_connection_factory_lib",
-            "//source/common/quic:quic_factory_lib",
+            "//source/common/quic:quic_client_factory_lib",
+            "//source/common/quic:quic_server_factory_lib",
             "//source/common/quic:quic_transport_socket_factory_lib",
             "//test/integration/filters:pause_filter_for_quic_lib",
         ],
@@ -1971,7 +1973,8 @@ envoy_cc_test(
         "//source/common/quic:envoy_quic_client_session_lib",
         "//source/common/quic:envoy_quic_connection_helper_lib",
         "//source/common/quic:envoy_quic_proof_verifier_lib",
-        "//source/common/quic:quic_factory_lib",
+        "//source/common/quic:quic_client_factory_lib",
+        "//source/common/quic:quic_server_factory_lib",
         "//test/common/quic:test_utils_lib",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
         "//test/integration/filters:stream_info_to_headers_filter_lib",
@@ -2073,4 +2076,28 @@ envoy_cc_test(
 envoy_proto_library(
     name = "xds_delegate_test_config_proto",
     srcs = ["xds_delegate_test_config.proto"],
+)
+
+envoy_cc_test(
+    name = "xds_config_tracker_integration_test",
+    srcs = ["xds_config_tracker_integration_test.cc"],
+    external_deps = ["abseil_strings"],
+    deps = [
+        ":http_integration_lib",
+        ":xds_config_tracker_test_proto_cc_proto",
+        "//envoy/config:subscription_interface",
+        "//envoy/config:xds_config_tracker_interface",
+        "//envoy/protobuf:message_validator_interface",
+        "//test/common/grpc:grpc_client_integration_lib",
+        "//test/config:v2_link_hacks",
+        "//test/test_common:registry_lib",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/runtime/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_proto_library(
+    name = "xds_config_tracker_test_proto",
+    srcs = ["xds_config_tracker_test.proto"],
 )

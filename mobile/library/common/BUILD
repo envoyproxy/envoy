@@ -53,7 +53,7 @@ envoy_cc_library(
         "@envoy//source/common/common:minimal_logger_lib",
         "@envoy//source/common/common:random_generator_lib",
         "@envoy//source/common/runtime:runtime_lib",
-        "@envoy//source/exe:main_common_lib",
+        "@envoy//source/exe:stripped_main_base_lib",
     ] + select({
         "@envoy//bazel:disable_signal_trace": [],
         "//conditions:default": [
@@ -67,6 +67,6 @@ envoy_cc_library(
     repository = "@envoy",
     deps = [
         ":engine_common_lib",
-        "@envoy//source/exe:envoy_main_common_lib",
+        "@envoy//source/exe:envoy_stripped_main_base_lib",
     ],
 )

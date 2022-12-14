@@ -1,6 +1,8 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_fuzz_test",
     "envoy_package",
+    "envoy_proto_library",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
@@ -20,9 +22,9 @@ envoy_extension_cc_test(
     extension_names = ["envoy.http.header_validators.envoy_default"],
     deps = [
         ":header_validator_test_lib",
+        "//envoy/http:header_validator_errors",
         "//source/common/network:utility_lib",
         "//source/extensions/http/header_validators/envoy_default:character_tables",
-        "//source/extensions/http/header_validators/envoy_default:error_codes",
         "//source/extensions/http/header_validators/envoy_default:header_validator_common",
     ],
 )
@@ -35,7 +37,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.http.header_validators.envoy_default"],
     deps = [
         ":header_validator_test_lib",
-        "//source/extensions/http/header_validators/envoy_default:error_codes",
+        "//envoy/http:header_validator_errors",
         "//source/extensions/http/header_validators/envoy_default:http1_header_validator",
     ],
 )
@@ -48,8 +50,8 @@ envoy_extension_cc_test(
     extension_names = ["envoy.http.header_validators.envoy_default"],
     deps = [
         ":header_validator_test_lib",
+        "//envoy/http:header_validator_errors",
         "//source/extensions/http/header_validators/envoy_default:character_tables",
-        "//source/extensions/http/header_validators/envoy_default:error_codes",
         "//source/extensions/http/header_validators/envoy_default:http2_header_validator",
     ],
 )
@@ -105,5 +107,25 @@ envoy_extension_cc_test(
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_proto_library(
+    name = "path_normalizer_fuzz_proto",
+    srcs = ["path_normalizer_fuzz.proto"],
+    deps = [
+        "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "path_normalizer_fuzz_test",
+    srcs = ["path_normalizer_fuzz_test.cc"],
+    corpus = "path_normalizer_corpus",
+    deps = [
+        ":path_normalizer_fuzz_proto_cc_proto",
+        "//source/extensions/http/header_validators/envoy_default:http1_header_validator",
+        "//source/extensions/http/header_validators/envoy_default:path_normalizer",
+        "//test/mocks/stream_info:stream_info_mocks",
     ],
 )

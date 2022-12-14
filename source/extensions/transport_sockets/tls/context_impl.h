@@ -5,7 +5,6 @@
 #include <array>
 #include <deque>
 #include <functional>
-#include <memory>
 #include <string>
 #include <vector>
 
@@ -132,8 +131,6 @@ protected:
       Envoy::Ssl::SslExtendedSocketInfo* extended_socket_info,
       const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options, SSL* ssl);
 
-  void populateServerNamesMap(TlsContext& ctx, const int pkey_id);
-
   // This is always non-empty, with the first context used for all new SSL
   // objects. For server contexts, once we have ClientHello, we
   // potentially switch to a different CertificateContext based on certificate
@@ -197,16 +194,6 @@ public:
   enum ssl_select_cert_result_t selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello);
 
 private:
-  // Currently, at most one certificate of a given key type may be specified for each exact
-  // server name or wildcard domain name.
-  using PkeyTypesMap = absl::flat_hash_map<int, std::reference_wrapper<TlsContext>>;
-  // Both exact server names and wildcard domains are part of the same map, in which wildcard
-  // domains are prefixed with "." (i.e. ".example.com" for "*.example.com") to differentiate
-  // between exact and wildcard entries.
-  using ServerNamesMap = absl::flat_hash_map<std::string, PkeyTypesMap>;
-
-  void populateServerNamesMap(TlsContext& ctx, const int pkey_id);
-
   using SessionContextID = std::array<uint8_t, SSL_MAX_SSL_SESSION_ID_LENGTH>;
 
   int alpnSelectCallback(const unsigned char** out, unsigned char* outlen, const unsigned char* in,
@@ -221,9 +208,6 @@ private:
 
   const std::vector<Envoy::Ssl::ServerContextConfig::SessionTicketKey> session_ticket_keys_;
   const Ssl::ServerContextConfig::OcspStaplePolicy ocsp_staple_policy_;
-  ServerNamesMap server_names_map_;
-  bool has_rsa_;
-  bool full_scan_certs_on_sni_mismatch_;
 };
 
 } // namespace Tls
