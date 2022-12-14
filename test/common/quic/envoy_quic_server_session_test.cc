@@ -365,7 +365,7 @@ TEST_F(EnvoyQuicServerSessionTest, OnResetFrameIetfQuic) {
   stream1->encodeHeaders(response_headers, true);
 
   EXPECT_EQ(1U, TestUtility::findCounter(
-                    static_cast<Stats::IsolatedStoreImpl&>(listener_config_.listenerScope()),
+                    listener_config_.listenerScope().store(),
                     "http3.downstream.rx.quic_reset_stream_error_code_QUIC_ERROR_PROCESSING_STREAM")
                     ->value());
 
@@ -392,7 +392,7 @@ TEST_F(EnvoyQuicServerSessionTest, OnResetFrameIetfQuic) {
   envoy_quic_session_.OnStopSendingFrame(stop_sending2);
   envoy_quic_session_.OnRstStream(rst2);
   EXPECT_EQ(1U, TestUtility::findCounter(
-                    static_cast<Stats::IsolatedStoreImpl&>(listener_config_.listenerScope()),
+                    listener_config_.listenerScope().store(),
                     "http3.downstream.rx.quic_reset_stream_error_code_QUIC_REFUSED_STREAM")
                     ->value());
 
@@ -413,7 +413,7 @@ TEST_F(EnvoyQuicServerSessionTest, OnResetFrameIetfQuic) {
   envoy_quic_session_.OnRstStream(rst3);
   envoy_quic_session_.OnStopSendingFrame(stop_sending3);
   EXPECT_EQ(2U, TestUtility::findCounter(
-                    static_cast<Stats::IsolatedStoreImpl&>(listener_config_.listenerScope()),
+                    listener_config_.listenerScope().store(),
                     "http3.downstream.rx.quic_reset_stream_error_code_QUIC_REFUSED_STREAM")
                     ->value());
 }
