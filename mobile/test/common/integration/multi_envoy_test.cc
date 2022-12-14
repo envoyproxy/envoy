@@ -46,7 +46,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, MultiEnvoyTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(MultiEnvoyTest, Basic) {
-  num_engines_for_test_ = 5; // change this
+  num_engines_for_test_ = 10; // change this
   initialize();
 
   // Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");

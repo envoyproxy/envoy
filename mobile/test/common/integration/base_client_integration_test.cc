@@ -168,10 +168,10 @@ std::shared_ptr<Platform::RequestHeaders> BaseClientIntegrationTest::envoyToMobi
 
 void BaseClientIntegrationTest::threadRoutine(absl::BlockingCounter& engine_running) {
   builder_.setOnEngineRunning([&]() { engine_running.DecrementCount(); });
-  for (auto i = num_engines_for_test_; i--;) {
+  for (auto i = 0; i<num_engines_for_test_; i++) {
     multi_engines_.push_back(builder_.build());
   };
-  engine_ = multi_engines_[0];
+  engine_ = multi_engines_[num_engines_for_test_-1];
   full_dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
@@ -179,10 +179,10 @@ void BaseClientIntegrationTest::TearDown() {
   test_server_.reset();
   fake_upstreams_.clear();
   // Note that engines must be terminated in reverse order of creation to avoid a segfault ;___;
-  for (auto i = multi_engines_.size() - 1; i >= 0; i--) {
-    std::cout << "a";
+  for (int i = multi_engines_.size() - 1; i >= 0; i--) {
+    std::cout << "a\n";
     multi_engines_[i]->terminate();
-    std::cout << "b";
+    std::cout << "b\n";
   };
   engine_.reset();
   multi_engines_.clear();

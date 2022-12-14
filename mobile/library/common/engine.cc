@@ -183,6 +183,7 @@ envoy_status_t Engine::terminate() {
     std::cout << main_thread_.joinable();
 
     main_thread_.join();
+    std::cout << "join finished\n";
   }
 
   return ENVOY_SUCCESS;
