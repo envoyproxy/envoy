@@ -54,7 +54,6 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/network/thrift_proxy/filters/payload_to_metadata:96.2"
 "source/extensions/filters/network/wasm:76.9"
 "source/extensions/http/cache/simple_http_cache:95.9"
-"source/extensions/network/dns_resolver/getaddrinfo:96.5"
 "source/extensions/rate_limit_descriptors:95.5"
 "source/extensions/rate_limit_descriptors/expr:95.5"
 "source/extensions/stat_sinks/graphite_statsd:82.1"
