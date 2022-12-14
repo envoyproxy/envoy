@@ -1,7 +1,7 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/network/transport_socket_options_impl.h"
-#include "source/common/quic/codec_impl.h"
+#include "source/common/quic/client_codec_impl.h"
 #include "source/common/quic/envoy_quic_alarm_factory.h"
 #include "source/common/quic/envoy_quic_client_connection.h"
 #include "source/common/quic/envoy_quic_client_session.h"

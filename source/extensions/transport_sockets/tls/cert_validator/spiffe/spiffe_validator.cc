@@ -148,19 +148,21 @@ int SPIFFEValidator::doSynchronousVerifyCertChain(X509_STORE_CTX* store_ctx,
   STACK_OF(X509)* cert_chain = X509_STORE_CTX_get0_untrusted(store_ctx);
   X509_VERIFY_PARAM* verify_param = X509_STORE_CTX_get0_param(store_ctx);
   std::string error_details;
-  return verifyCertChainUsingTrustBundleStore(ssl_extended_info, leaf_cert, cert_chain,
-                                              verify_param, error_details)
-             ? 1
-             : 0;
+  bool verified =
+      verifyCertChainUsingTrustBundleStore(leaf_cert, cert_chain, verify_param, error_details);
+  if (ssl_extended_info) {
+    ssl_extended_info->setCertificateValidationStatus(
+        verified ? Envoy::Ssl::ClientValidationStatus::Validated
+                 : Envoy::Ssl::ClientValidationStatus::Failed);
+  }
+  return verified ? 1 : 0;
 }
 
-bool SPIFFEValidator::verifyCertChainUsingTrustBundleStore(
-    Ssl::SslExtendedSocketInfo* ssl_extended_info, X509& leaf_cert, STACK_OF(X509)* cert_chain,
-    X509_VERIFY_PARAM* verify_param, std::string& error_details) {
+bool SPIFFEValidator::verifyCertChainUsingTrustBundleStore(X509& leaf_cert,
+                                                           STACK_OF(X509)* cert_chain,
+                                                           X509_VERIFY_PARAM* verify_param,
+                                                           std::string& error_details) {
   if (!SPIFFEValidator::certificatePrecheck(&leaf_cert)) {
-    if (ssl_extended_info) {
-      ssl_extended_info->setCertificateValidationStatus(Envoy::Ssl::ClientValidationStatus::Failed);
-    }
     error_details = "verify cert failed: cert precheck";
     stats_.fail_verify_error_.inc();
     return false;
@@ -168,9 +170,6 @@ bool SPIFFEValidator::verifyCertChainUsingTrustBundleStore(
 
   auto trust_bundle = getTrustBundleStore(&leaf_cert);
   if (!trust_bundle) {
-    if (ssl_extended_info) {
-      ssl_extended_info->setCertificateValidationStatus(Envoy::Ssl::ClientValidationStatus::Failed);
-    }
     error_details = "verify cert failed: no trust bundle store";
     stats_.fail_verify_error_.inc();
     return false;
@@ -189,9 +188,6 @@ bool SPIFFEValidator::verifyCertChainUsingTrustBundleStore(
   }
   auto ret = X509_verify_cert(new_store_ctx.get());
   if (!ret) {
-    if (ssl_extended_info) {
-      ssl_extended_info->setCertificateValidationStatus(Envoy::Ssl::ClientValidationStatus::Failed);
-    }
     error_details = absl::StrCat("verify cert failed: ",
                                  Utility::getX509VerificationErrorInfo(new_store_ctx.get()));
     stats_.fail_verify_error_.inc();
@@ -204,37 +200,30 @@ bool SPIFFEValidator::verifyCertChainUsingTrustBundleStore(
     error_details = "verify cert failed: SAN match";
     stats_.fail_verify_san_.inc();
   }
-  if (ssl_extended_info) {
-    ssl_extended_info->setCertificateValidationStatus(
-        san_match ? Envoy::Ssl::ClientValidationStatus::Validated
-                  : Envoy::Ssl::ClientValidationStatus::Failed);
-  }
   return san_match;
 }
 
 ValidationResults SPIFFEValidator::doVerifyCertChain(
     STACK_OF(X509)& cert_chain, Ssl::ValidateResultCallbackPtr /*callback*/,
-    Ssl::SslExtendedSocketInfo* ssl_extended_info,
     const Network::TransportSocketOptionsConstSharedPtr& /*transport_socket_options*/,
     SSL_CTX& ssl_ctx, const CertValidator::ExtraValidationContext& /*validation_context*/,
     bool /*is_server*/, absl::string_view /*host_name*/) {
   if (sk_X509_num(&cert_chain) == 0) {
-    if (ssl_extended_info) {
-      ssl_extended_info->setCertificateValidationStatus(
-          Envoy::Ssl::ClientValidationStatus::NotValidated);
-    }
     stats_.fail_verify_error_.inc();
-    return {ValidationResults::ValidationStatus::Failed, absl::nullopt,
+    return {ValidationResults::ValidationStatus::Failed,
+            Envoy::Ssl::ClientValidationStatus::NotValidated, absl::nullopt,
             "verify cert failed: empty cert chain"};
   }
   X509* leaf_cert = sk_X509_value(&cert_chain, 0);
   std::string error_details;
-  return verifyCertChainUsingTrustBundleStore(ssl_extended_info, *leaf_cert, &cert_chain,
-                                              SSL_CTX_get0_param(&ssl_ctx), error_details)
-             ? ValidationResults{ValidationResults::ValidationStatus::Successful, absl::nullopt,
-                                 absl::nullopt}
-             : ValidationResults{ValidationResults::ValidationStatus::Failed, absl::nullopt,
-                                 error_details};
+  bool verified = verifyCertChainUsingTrustBundleStore(*leaf_cert, &cert_chain,
+                                                       SSL_CTX_get0_param(&ssl_ctx), error_details);
+  return verified ? ValidationResults{ValidationResults::ValidationStatus::Successful,
+                                      Envoy::Ssl::ClientValidationStatus::Validated, absl::nullopt,
+                                      absl::nullopt}
+                  : ValidationResults{ValidationResults::ValidationStatus::Failed,
+                                      Envoy::Ssl::ClientValidationStatus::Failed, absl::nullopt,
+                                      error_details};
 }
 
 X509_STORE* SPIFFEValidator::getTrustBundleStore(X509* leaf_cert) {
