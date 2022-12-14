@@ -7,7 +7,6 @@ exports_files([
 objc_library(
     name = "envoy_engine_objc_lib",
     srcs = [
-        "EnvoyAliases.h",
         "EnvoyConfiguration.h",
         "EnvoyConfiguration.m",
         "EnvoyEngineImpl.m",
@@ -23,7 +22,6 @@ objc_library(
         "EnvoyHTTPFilterFactory.m",
         "EnvoyHTTPStream.h",
         "EnvoyHTTPStreamImpl.m",
-        "EnvoyKeyValueStore.h",
         "EnvoyLogger.h",
         "EnvoyLogger.m",
         "EnvoyNativeFilterConfig.h",
@@ -49,6 +47,8 @@ objc_library(
     }),
     visibility = ["//visibility:public"],
     deps = [
+        ":envoy_aliases_lib",
+        ":envoy_key_value_store_lib",
         ":envoy_objc_bridge_lib",
         "//library/common:envoy_main_interface_lib",
         "//library/common/api:c_types",
@@ -61,6 +61,30 @@ objc_library(
     hdrs = ["EnvoyBridgeUtility.h"],
     visibility = ["//visibility:public"],
     deps = [
+        ":envoy_aliases_lib",
         "//library/common/types:c_types_lib",
     ],
+)
+
+objc_library(
+    name = "envoy_aliases_lib",
+    hdrs = ["EnvoyAliases.h"],
+    visibility = ["//visibility:public"],
+)
+
+objc_library(
+    name = "envoy_key_value_store_bridge_impl_lib",
+    srcs = ["EnvoyKeyValueStoreBridgeImpl.m"],
+    hdrs = ["EnvoyKeyValueStoreBridgeImpl.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":envoy_key_value_store_lib",
+        ":envoy_objc_bridge_lib",
+    ],
+)
+
+objc_library(
+    name = "envoy_key_value_store_lib",
+    hdrs = ["EnvoyKeyValueStore.h"],
+    visibility = ["//visibility:public"],
 )
