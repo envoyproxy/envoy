@@ -85,7 +85,7 @@ public:
       std::reference_wrapper<const envoy::extensions::transport_sockets::tls::v3::TlsCertificate>>
   tlsCertificates(const std::string& cert_name) const override;
   Envoy::CertificateProvider::OnDemandUpdateHandlePtr addOnDemandUpdateCallback(
-      const std::string cert_name, Envoy::CertificateProvider::OnDemandUpdateMetadataPtr metadata,
+      const std::string cert_name, absl::optional<Envoy::CertificateProvider::OnDemandUpdateMetadataPtr> metadata,
       Event::Dispatcher& thread_local_dispatcher,
       ::Envoy::CertificateProvider::OnDemandUpdateCallbacks& callback) override;
   Common::CallbackHandlePtr addUpdateCallback(const std::string& cert_name,
@@ -107,6 +107,7 @@ private:
 
   void runAddUpdateCallback();
   void runOnDemandUpdateCallback(const std::string& host,
+                                 absl::optional<Envoy::CertificateProvider::OnDemandUpdateMetadataPtr> metadata,
                                  Event::Dispatcher& thread_local_dispatcher, bool in_cache = true);
   // void signCertificate(std::string sni, absl::Span<const std::string> dns_sans, const std::string
   // subject,

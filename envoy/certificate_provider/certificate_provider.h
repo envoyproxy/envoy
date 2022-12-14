@@ -32,12 +32,12 @@ public:
    * Called when cert is already in cache.
    * @param host supplies host of cert.
    */
-  virtual void onCacheHit(const std::string host) const PURE;
+  virtual void onCacheHit(const std::string host, bool check_only) PURE;
   /**
    * Called when cert cache is missed.
    * @param host supplies host of cert.
    */
-  virtual void onCacheMiss(const std::string host) const PURE;
+  virtual void onCacheMiss(const std::string host, bool check_only) PURE;
 };
 
 class OnDemandUpdateHandle {
@@ -86,7 +86,7 @@ public:
    * @return OnDemandUpdateHandle the handle which can remove that update callback.
    */
   virtual OnDemandUpdateHandlePtr addOnDemandUpdateCallback(
-      const std::string cert_name, Envoy::CertificateProvider::OnDemandUpdateMetadataPtr metadata,
+      const std::string cert_name, absl::optional<Envoy::CertificateProvider::OnDemandUpdateMetadataPtr> metadata,
       Event::Dispatcher& thread_local_dispatcher, OnDemandUpdateCallbacks& callback) PURE;
 
   /**

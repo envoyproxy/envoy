@@ -1,5 +1,6 @@
 #include "source/extensions/certificate_providers/local_certificate/local_certificate.h"
 
+#include <cstddef>
 #include <openssl/x509.h>
 
 #include "source/common/common/logger.h"
@@ -54,7 +55,7 @@ Provider::tlsCertificates(const std::string&) const {
 }
 
 Envoy::CertificateProvider::OnDemandUpdateHandlePtr Provider::addOnDemandUpdateCallback(
-    const std::string sni, ::Envoy::CertificateProvider::OnDemandUpdateMetadataPtr metadata,
+    const std::string sni, absl::optional<::Envoy::CertificateProvider::OnDemandUpdateMetadataPtr> metadata,
     Event::Dispatcher& thread_local_dispatcher,
     Envoy::CertificateProvider::OnDemandUpdateCallbacks& callback) {
   ASSERT(main_thread_dispatcher_.isThreadSafe());
@@ -68,15 +69,21 @@ Envoy::CertificateProvider::OnDemandUpdateHandlePtr Provider::addOnDemandUpdateC
   // We need to align this cache_hit with current transport socket behavior
   bool cache_hit = [&]() { return certificates_.is_in_cache(sni); }();
 
-  if (cache_hit) {
-    ENVOY_LOG(debug, "Cache hit for {}", sni);
-    // Cache hit, run on-demand update callback directly
-    runOnDemandUpdateCallback(sni, thread_local_dispatcher, true);
-  } else {
-    // Cache miss, generate self-signed cert
-    main_thread_dispatcher_.post([sni, metadata, &thread_local_dispatcher, this] {
-      signCertificate(sni, metadata, thread_local_dispatcher);
-    });
+
+  if (metadata.has_value()) {
+    if (cache_hit) {
+      ENVOY_LOG(debug, "Cache hit for {}", sni);
+      // Cache hit, run on-demand update callback directly
+      runOnDemandUpdateCallback(sni, metadata, thread_local_dispatcher, true);
+    } else {
+      // Cache miss, generate self-signed cert
+      main_thread_dispatcher_.post([sni, metadata, &thread_local_dispatcher, this] {
+        signCertificate(sni, metadata.value(), thread_local_dispatcher);
+      });
+    }
+  }
+  else {
+    runOnDemandUpdateCallback(sni, absl::nullopt, thread_local_dispatcher, cache_hit);
   }
   return handle;
 }
@@ -93,6 +100,7 @@ void Provider::runAddUpdateCallback() {
 }
 
 void Provider::runOnDemandUpdateCallback(const std::string& host,
+                                         absl::optional<Envoy::CertificateProvider::OnDemandUpdateMetadataPtr> metadata,
                                          Event::Dispatcher& thread_local_dispatcher,
                                          bool in_cache) {
   ASSERT(main_thread_dispatcher_.isThreadSafe());
@@ -102,9 +110,9 @@ void Provider::runOnDemandUpdateCallback(const std::string& host,
       auto& callbacks = pending_callbacks->callbacks_;
       pending_callbacks->cancel();
       if (in_cache) {
-        thread_local_dispatcher.post([&callbacks, host] { callbacks.onCacheHit(host); });
+        thread_local_dispatcher.post([&callbacks, host, metadata] { callbacks.onCacheHit(host, !metadata.has_value()); });
       } else {
-        thread_local_dispatcher.post([&callbacks, host] { callbacks.onCacheMiss(host); });
+        thread_local_dispatcher.post([&callbacks, host, metadata] { callbacks.onCacheMiss(host, !metadata.has_value()); });
       }
     }
     on_demand_update_callbacks_.erase(host_it);
@@ -162,7 +170,7 @@ void Provider::signCertificate(const std::string sni,
   certificates_.insert(sni, tls_certificate);
 
   runAddUpdateCallback();
-  runOnDemandUpdateCallback(sni, thread_local_dispatcher, false);
+  runOnDemandUpdateCallback(sni, metadata, thread_local_dispatcher, false);
 }
 
 void Provider::setSubjectToCSR(absl::string_view subject, X509_REQ* req) {

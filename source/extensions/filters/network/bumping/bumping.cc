@@ -231,6 +231,18 @@ void Filter::onGenericPoolReady(StreamInfo::StreamInfo*,
 }
 
 void Filter::requestCertificate(Ssl::ConnectionInfoConstSharedPtr info) {
+  if (info == nullptr) {
+    // if no info provided, only check if cert is present and determime whether or not
+    // to establish connection with upstream
+    config_->main_dispatcher_.post([this]() {
+      this->on_demand_handle_ = config_->tls_certificate_provider_->addOnDemandUpdateCallback(
+          std::string(read_callbacks_->connection().requestedServerName()),
+          absl::nullopt, read_callbacks_->connection().dispatcher(), *this);
+    });
+    return;
+  }
+  // if info is provided, it represents upstream connection is established, interact with
+  // certificate provide to mimic certificate
   ENVOY_CONN_LOG(info, "sni: {}", read_callbacks_->connection(),
                  read_callbacks_->connection().requestedServerName());
   config_->main_dispatcher_.post([this, info]() {
@@ -254,8 +266,11 @@ Network::FilterStatus Filter::onData(Buffer::Instance&, bool) {
 
 Network::FilterStatus Filter::onNewConnection() {
   // ASSERT(upstream_ == nullptr);
+  ENVOY_CONN_LOG(info, "Bumping onNewConnection()", read_callbacks_->connection());
   route_ = pickRoute();
-  return establishUpstreamConnection();
+  // check if the corresponding mimic cert is present
+  requestCertificate(nullptr);
+  return Network::FilterStatus::StopIteration;
 }
 
 void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
@@ -288,7 +303,16 @@ void Filter::onUpstreamConnection() {
                  getStreamInfo().downstreamAddressProvider().requestedServerName());
 }
 
-void Filter::onCacheHit(const std::string) const {
+void Filter::onCacheHit(const std::string, bool) {
+  // cert is present in cert provider cache, continue filter chain no matter
+  // upstream connection is established or not
+  // Recreate transport socket to ensure up-to-date certificate is used
+  try {
+    dynamic_cast<Envoy::Network::ServerConnectionImpl&>(read_callbacks_->connection())
+        .refreshTransportSocket();
+  } catch (std::bad_cast exp) {
+    ENVOY_CONN_LOG(warn, "connection cast failed in bumping filter", read_callbacks_->connection());
+  }
   // Re-enable downstream reads and writes
   read_callbacks_->connection().readDisable(false);
   read_callbacks_->connection().write_disable = false;
@@ -296,7 +320,15 @@ void Filter::onCacheHit(const std::string) const {
   read_callbacks_->continueReading();
 }
 
-void Filter::onCacheMiss(const std::string) const {
+void Filter::onCacheMiss(const std::string, bool check_only) {
+  if (check_only) {
+    // cert is not present in cert provider cache, and mimic cert is not generated
+    // establish connection with upstream and trigger cert mimicking based on original certification.
+    establishUpstreamConnection();
+    //read_callbacks_->continueReading();
+    return;
+  }
+  // cert is not present in cert provider cache, and mimic cert is generated
   // Recreate transport socket to use newly generate certificate
   try {
     dynamic_cast<Envoy::Network::ServerConnectionImpl&>(read_callbacks_->connection())
