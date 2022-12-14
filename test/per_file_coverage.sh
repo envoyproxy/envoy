@@ -6,6 +6,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common:96.0"
 "source/common/api:82.5"
 "source/common/api/posix:81.3"
+"source/common/common/posix:92.7"
 "source/common/config:96.4"
 "source/common/crypto:88.1"
 "source/common/event:95.1" # Emulated edge events guards don't report LCOV
@@ -42,7 +43,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/http/kill_request:91.7" # Death tests don't report LCOV
 "source/extensions/filters/http/oauth2:96.1"
 "source/extensions/filters/http/wasm:1.9"
-"source/extensions/filters/http/rate_limit_quota:70" # TODO(tyxia) WIP. Improve coverage as development continues
+"source/extensions/filters/http/rate_limit_quota:94" # TODO(tyxia) WIP. Improve coverage as development continues
 "source/extensions/filters/listener/original_dst:82.9"
 "source/extensions/filters/listener/original_src:92.1"
 "source/extensions/filters/network/common:96.1"

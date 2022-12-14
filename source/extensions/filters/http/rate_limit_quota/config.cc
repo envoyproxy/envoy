@@ -24,14 +24,6 @@ Http::FilterFactoryCb RateLimitQuotaFilterFactory::createFilterFactoryFromProtoT
       };
 }
 
-Router::RouteSpecificFilterConfigConstSharedPtr
-RateLimitQuotaFilterFactory::createRouteSpecificFilterConfigTyped(
-    const envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaOverride&,
-    Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
-  // TODO(tyxia) Added per route config for override later.
-  return nullptr;
-}
-
 /**
  * Static registration for the filter. @see RegisterFactory.
  */

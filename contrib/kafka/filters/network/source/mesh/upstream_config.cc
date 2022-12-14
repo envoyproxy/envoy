@@ -16,6 +16,8 @@ using KafkaClusterDefinition =
     envoy::extensions::filters::network::kafka_mesh::v3alpha::KafkaClusterDefinition;
 using ForwardingRule = envoy::extensions::filters::network::kafka_mesh::v3alpha::ForwardingRule;
 
+const std::string DEFAULT_CONSUMER_GROUP_ID = "envoy";
+
 UpstreamKafkaConfigurationImpl::UpstreamKafkaConfigurationImpl(const KafkaMeshProtoConfig& config)
     : advertised_address_{config.advertised_host(), config.advertised_port()} {
 
@@ -43,8 +45,15 @@ UpstreamKafkaConfigurationImpl::UpstreamKafkaConfigurationImpl(const KafkaMeshPr
         upstream_cluster_definition.producer_config().begin(),
         upstream_cluster_definition.producer_config().end()};
     producer_configs["bootstrap.servers"] = upstream_cluster_definition.bootstrap_servers();
+
+    // TODO (adam.kotwasinski) This needs to read configs just like producer does.
+    std::map<std::string, std::string> consumer_configs = {};
+    consumer_configs["bootstrap.servers"] = upstream_cluster_definition.bootstrap_servers();
+    // TODO (adam.kotwasinski) When configs are read, use this only if absent.
+    consumer_configs["group.id"] = DEFAULT_CONSUMER_GROUP_ID;
+
     ClusterConfig cluster_config = {cluster_name, upstream_cluster_definition.partition_count(),
-                                    producer_configs};
+                                    producer_configs, consumer_configs};
     cluster_name_to_cluster_config[cluster_name] = cluster_config;
   }
 

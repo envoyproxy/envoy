@@ -111,6 +111,7 @@ TEST_F(RateLimitStreamTest, SendRequestAndReceiveResponse) {
   EXPECT_CALL(stream_, closeStream());
   EXPECT_CALL(stream_, resetStream());
   client_->closeStream();
+  client_->onRemoteClose(0, "");
 }
 
 } // namespace
