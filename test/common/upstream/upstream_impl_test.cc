@@ -3891,19 +3891,6 @@ TEST_F(ClusterInfoImplTest, TcpPoolIdleTimeout) {
 
   auto cluster3 = makeCluster(fmt::format(yaml_set_tcp_pool_idle_timeout, "cluster3", "0s"));
   EXPECT_EQ(absl::nullopt, cluster3->info()->tcpPoolIdleTimeout());
-
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.tcp_pool_idle_timeout", "false"}});
-
-  // Disable by reloadable_features
-  auto cluster4 = makeCluster(fmt::format(yaml_base, "cluster4"));
-  EXPECT_EQ(absl::nullopt, cluster4->info()->tcpPoolIdleTimeout());
-
-  auto cluster5 = makeCluster(fmt::format(yaml_set_tcp_pool_idle_timeout, "cluster5", "9s"));
-  EXPECT_EQ(absl::nullopt, cluster5->info()->tcpPoolIdleTimeout());
-
-  auto cluster6 = makeCluster(fmt::format(yaml_set_tcp_pool_idle_timeout, "cluster6", "0s"));
-  EXPECT_EQ(absl::nullopt, cluster6->info()->tcpPoolIdleTimeout());
 }
 
 TEST_F(ClusterInfoImplTest, TestTrackTimeoutBudgetsNotSetInConfig) {
