@@ -364,6 +364,37 @@ TEST_F(FilterTest, RequestMatchingFailedWithOnNoMatchConfigured) {
               testing::UnorderedPointwise(testing::Eq(), serialized_bucket_ids));
 }
 
+TEST_F(FilterTest, DecodeHeaderWithValidConfig) {
+  addMatcherConfig(MatcherConfigType::Valid);
+  createFilter();
+
+  // Define the key value pairs that is used to build the bucket_id dynamically via `custom_value`
+  // in the config.
+  absl::flat_hash_map<std::string, std::string> custom_value_pairs = {{"environment", "staging"},
+                                                                      {"group", "envoy"}};
+
+  buildCustomHeader(custom_value_pairs);
+
+  Http::FilterHeadersStatus status = filter_->decodeHeaders(default_headers_, false);
+  EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::Continue);
+}
+
+TEST_F(FilterTest, DecodeHeaderWithOnNoMatchConfigured) {
+  addMatcherConfig(MatcherConfigType::IncludeOnNoMatchConfig);
+  createFilter();
+
+  Http::FilterHeadersStatus status = filter_->decodeHeaders(default_headers_, false);
+  EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::Continue);
+}
+
+TEST_F(FilterTest, DecodeHeaderWithInvalidConfig) {
+  addMatcherConfig(MatcherConfigType::Invalid);
+  createFilter();
+
+  Http::FilterHeadersStatus status = filter_->decodeHeaders(default_headers_, false);
+  EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::Continue);
+}
+
 TEST_F(FilterTest, DecodeHeaderWithMismatchHeader) {
   addMatcherConfig(MatcherConfigType::Valid);
   createFilter();
