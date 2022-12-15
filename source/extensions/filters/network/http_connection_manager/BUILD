@@ -22,6 +22,7 @@ envoy_cc_extension(
         "//envoy/config:config_provider_manager_interface",
         "//envoy/filesystem:filesystem_interface",
         "//envoy/http:codec_interface",
+        "//envoy/http:early_header_mutation_interface",
         "//envoy/http:filter_interface",
         "//envoy/http:header_validator_interface",
         "//envoy/http:original_ip_detection_interface",
