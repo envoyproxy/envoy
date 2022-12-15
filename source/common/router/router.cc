@@ -786,47 +786,6 @@ void Filter::sendNoHealthyUpstreamResponse() {
                              StreamInfo::ResponseCodeDetails::get().NoHealthyUpstream);
 }
 
-/*
- * Helper class to handle a known number of buffer copies.
- */
-class ManyCopiedBuffer {
-public:
-  ManyCopiedBuffer(Buffer::Instance& original_buffer, int num_copies)
-      : original_buffer_(original_buffer), num_copies_(num_copies) {}
-
-  // Get an unowned reference to the next copy of the buffer. The copy is owned by this class.
-  Buffer::Instance& nextBuffer() {
-    ASSERT(num_copies_ > -1);
-    if (num_copies_ == 0) {
-      --num_copies_;
-      return original_buffer_;
-    } else {
-      copy_ = Buffer::OwnedImpl(original_buffer_);
-      --num_copies_;
-      return copy_;
-    }
-  }
-
-  // Get an owned pointer to the next copy of the buffer.
-  Buffer::InstancePtr nextBufferOwned() {
-    ASSERT(num_copies_ > -1);
-    if (num_copies_ == 0) {
-      auto copy = std::make_unique<Buffer::OwnedImpl>();
-      copy->move(original_buffer_);
-      --num_copies_;
-      return copy;
-    } else {
-      --num_copies_;
-      return std::make_unique<Buffer::OwnedImpl>(original_buffer_);
-    }
-  }
-
-private:
-  Buffer::Instance& original_buffer_;
-  Buffer::OwnedImpl copy_;
-  int num_copies_;
-};
-
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
   // upstream_requests_.size() cannot be > 1 because that only happens when a per
   // try timeout occurs with hedge_on_per_try_timeout enabled but the per
@@ -869,8 +828,8 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
 
   // We will need to make N copies of the data.
   auto many_copied_buffer =
-      ManyCopiedBuffer(data, buffering + !upstream_requests_.empty() +
-                                 (streaming_shadows_ ? shadow_streams_.size() : 0) - 1);
+      Buffer::ManyCopiedBuffer(data, buffering + !upstream_requests_.empty() +
+                                         (streaming_shadows_ ? shadow_streams_.size() : 0));
 
   if (!upstream_requests_.empty()) {
     upstream_requests_.front()->acceptDataFromRouter(many_copied_buffer.nextBuffer(), end_stream);

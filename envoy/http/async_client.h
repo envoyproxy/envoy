@@ -213,7 +213,7 @@ public:
     virtual void captureAndSendData(Buffer::InstancePtr&& data, bool end_stream) PURE;
 
     /***
-     * Take ownership of data, and sends it to the underlying stream.
+     * Take ownership of trailers, and sends it to the underlying stream.
      * @param trailers owned trailers to pass to upstream.
      */
     virtual void captureAndSendTrailers(RequestTrailerMapPtr&& trailers) PURE;
