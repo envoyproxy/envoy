@@ -109,9 +109,13 @@ public:
   }
 
   void setDestructorCallback(AsyncClient::StreamDestructorCallbacks callback) override {
+    ASSERT(!destructor_callback_);
     destructor_callback_.emplace(callback);
   }
-  void removeDestructorCallback() override { destructor_callback_.reset(); }
+  void removeDestructorCallback() override {
+    ASSERT(destructor_callback_);
+    destructor_callback_.reset();
+  }
 
   void setWatermarkCallbacks(DecoderFilterWatermarkCallbacks& callbacks) override {
     ASSERT(!watermark_callbacks_);

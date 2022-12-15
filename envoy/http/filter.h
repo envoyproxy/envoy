@@ -442,6 +442,7 @@ public:
    * the low watermark callbacks an equal number of times as the respective buffers are drained.
    */
   virtual void onDecoderFilterAboveWriteBufferHighWatermark() PURE;
+
   /**
    * Called when a decoder filter or any buffers the filter sends data to go from over its high
    * watermark to under its low watermark.

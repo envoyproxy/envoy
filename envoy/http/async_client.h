@@ -170,20 +170,22 @@ public:
 
     /***
      * Register callback to be called on stream destruction. This callback must persist beyond the
-     * lifetime of the stream or be unregistered via removeDestructorCallback. Calling this method
-     * twice with different callbacks will overwrite.
+     * lifetime of the stream or be unregistered via removeDestructorCallback. If there's already a
+     * destructor callback registered, this method will ASSERT-fail.
      */
     virtual void setDestructorCallback(StreamDestructorCallbacks callback) PURE;
 
     /***
-     * Remove previously set destructor callback.
+     * Remove previously set destructor callback. Calling this without having previously set a
+     * Destructor callback will ASSERT-fail.
      */
     virtual void removeDestructorCallback() PURE;
 
     /***
-     * Register a callback to be called when high/low watermark events occur on the stream. This
-     * callback must persist beyond the lifetime of the stream or be unregistered via
-     * removeWatermarkCallbacks. Calling this method twice with different callbacks will overwrite.
+     * Register a callback to be called when high/low write buffer watermark events occur on the
+     * stream. This callback must persist beyond the lifetime of the stream or be unregistered via
+     * removeWatermarkCallbacks. If there's already a watermark callback registered, this method
+     * will ASSERT-fail.
      */
     virtual void setWatermarkCallbacks(DecoderFilterWatermarkCallbacks& callbacks) PURE;
 
