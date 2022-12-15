@@ -21,7 +21,7 @@
 #include "source/common/network/udp_packet_writer_handler_impl.h"
 #include "source/common/network/utility.h"
 #include "source/extensions/listener_managers/listener_manager/active_raw_udp_listener_config.h"
-#include "source/extensions/listener_managers/listener_manager/connection_handler_impl.h"
+#include "source/server/connection_handler_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/api/mocks.h"

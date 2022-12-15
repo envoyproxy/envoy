@@ -10,9 +10,9 @@
 #include "source/common/quic/envoy_quic_server_session.h"
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/quic_transport_socket_factory.h"
-#include "source/extensions/listener_managers/listener_manager/connection_handler_impl.h"
 #include "source/extensions/quic/crypto_stream/envoy_quic_crypto_server_stream.h"
 #include "source/server/configuration_impl.h"
+#include "source/server/connection_handler_impl.h"
 
 #include "test/common/quic/test_proof_source.h"
 #include "test/common/quic/test_utils.h"

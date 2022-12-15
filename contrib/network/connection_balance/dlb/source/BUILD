@@ -44,7 +44,7 @@ envoy_cc_contrib_extension(
         "//source/common/common:logger_lib",
         "//source/common/network:connection_balancer_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/extensions/listener_managers/listener_manager:active_tcp_listener",
+        "//source/server:active_tcp_listener",
         "@envoy_api//contrib/envoy/extensions/network/connection_balance/dlb/v3alpha:pkg_cc_proto",
     ] + select({
         "//bazel:linux_x86_64": [
