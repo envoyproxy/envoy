@@ -90,10 +90,6 @@ cc_binary(
     }) + select({
         "@envoy//bazel:android": ["-llog"],
         "//conditions:default": [],
-    }) + select({
-        # TODO(keith): https://github.com/rust-lang/compiler-builtins/issues/353
-        ":android_armeabi": ["-Wl,--allow-multiple-definition"],
-        "//conditions:default": [],
     }),
     linkshared = True,
     deps = [
