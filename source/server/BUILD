@@ -367,7 +367,6 @@ envoy_cc_library(
     name = "listener_manager_factory_lib",
     hdrs = ["listener_manager_factory.h"],
     deps = [
-        ":worker_lib",
         "//envoy/server:factory_context_interface",
         "//envoy/server:listener_manager_interface",
         "//envoy/server:worker_interface",
