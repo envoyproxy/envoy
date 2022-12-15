@@ -141,6 +141,9 @@ PathMatcherConstSharedPtr createPrefixPathMatcher(const std::string& prefix, boo
 } // namespace
 
 PathMatcherConstSharedPtr PathMatcher::createPrefix(const std::string& prefix, bool ignore_case) {
+  // "" and "/" prefixes are the most common among prefix path matchers (as they effectively
+  // represent "match any path" cases). They are optimized by using the same shared instances of the
+  // matchers, to avoid creating a lot of identical instances of those trivial matchers.
   if (prefix.empty()) {
     static const PathMatcherConstSharedPtr emptyPrefixPathMatcher =
         createPrefixPathMatcher("", false);
