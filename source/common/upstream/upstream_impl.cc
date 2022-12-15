@@ -1593,7 +1593,8 @@ ClusterInfoImpl::generateCircuitBreakersStats(Stats::Scope& scope, Stats::StatNa
                                              Stats::Gauge::ImportMode::Accumulate);
   };
 
-#define REMAINING_GAUGE(stat_name) track_remaining ? make_gauge(stat_name) : scope.nullGauge("")
+#define REMAINING_GAUGE(stat_name)                                                                 \
+  track_remaining ? make_gauge(stat_name) : scope.store().nullGauge()
 
   return {
       make_gauge(stat_names.cx_open_),

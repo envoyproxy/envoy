@@ -7,6 +7,7 @@ load(
     "envoy_cc_posix_without_linux_library",
     "envoy_cc_win32_library",
     "envoy_package",
+    "envoy_select_enable_http3",
 )
 load("//source/extensions:all_extensions.bzl", "envoy_all_core_extensions", "envoy_all_extensions")
 load("//bazel:repositories.bzl", "PPC_SKIP_TARGETS", "WINDOWS_SKIP_TARGETS")
@@ -120,11 +121,11 @@ envoy_cc_library(
     name = "envoy_main_common_lib",
     deps = [
         ":main_common_lib",
-        # This is compiled as an extension so Envoy Mobile doesn't have to link it in.
-        # Envoy requires it.
+        # These are compiled as extensions so Envoy Mobile doesn't have to link them in.
+        # Envoy requires them.
         "//source/extensions/listener_managers/listener_manager:listener_manager_lib",
         "//source/common/version:version_linkstamp",
-    ],
+    ] + envoy_select_enable_http3(["//source/common/quic:server_codec_lib"]),
 )
 
 # provides a library target for Envoy Mobile builds with the versioning information set up correctly.

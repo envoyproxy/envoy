@@ -221,6 +221,7 @@ envoy_cc_library(
         "//envoy/registry",
         "@com_github_google_quiche//:quic_core_http_spdy_session_lib",
     ],
+    alwayslink = LEGACY_ALWAYSLINK,
 )
 
 envoy_cc_library(
