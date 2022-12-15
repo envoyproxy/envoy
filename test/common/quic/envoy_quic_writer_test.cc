@@ -135,6 +135,7 @@ TEST_F(EnvoyQuicWriterTest, SendFailureMessageTooBig) {
   EXPECT_EQ(quic::WRITE_STATUS_ERROR, result.status);
   EXPECT_EQ(SOCKET_ERROR_MSG_SIZE, result.error_code);
   EXPECT_FALSE(envoy_quic_writer_.IsWriteBlocked());
+  // Just testing whether this is failing Windows testing already.
 }
 
 } // namespace Quic
