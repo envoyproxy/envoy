@@ -66,6 +66,10 @@ stages:
     pool:
       vmImage: "ubuntu-20.04"
     steps:
+    - script: |
+        git config --global init.defaultBranch main
+        git config --global advice.detachedHead false
+    - checkout: self
     - bash: |
         set -e
 
@@ -120,6 +124,10 @@ stages:
     pool:
       vmImage: "ubuntu-20.04"
     steps:
+    - script: |
+        git config --global init.defaultBranch main
+        git config --global advice.detachedHead false
+    - checkout: self
     - task: Cache@2
       inputs:
         key: "format | ./WORKSPACE | **/*.bzl"
@@ -150,6 +158,10 @@ stages:
     pool:
       vmImage: "ubuntu-20.04"
     steps:
+    - script: |
+        git config --global init.defaultBranch main
+        git config --global advice.detachedHead false
+    - checkout: self
     - task: Cache@2
       inputs:
         key: "proto_format | ./WORKSPACE | **/*.bzl"
@@ -180,6 +192,10 @@ stages:
     pool:
       vmImage: "ubuntu-20.04"
     steps:
+    - script: |
+        git config --global init.defaultBranch main
+        git config --global advice.detachedHead false
+    - checkout: self
     - task: Cache@2
       inputs:
         key: "docs | ./WORKSPACE | **/*.bzl"
@@ -211,6 +227,10 @@ stages:
     pool:
       vmImage: "ubuntu-20.04"
     steps:
+    - script: |
+        git config --global init.defaultBranch main
+        git config --global advice.detachedHead false
+    - checkout: self
     - task: Cache@2
       inputs:
         key: "dependencies | ./WORKSPACE | **/*.bzl"
@@ -387,6 +407,10 @@ stages:
     pool:
       vmImage: "ubuntu-20.04"
     steps:
+    - script: |
+        git config --global init.defaultBranch main
+        git config --global advice.detachedHead false
+    - checkout: self
     - task: DownloadBuildArtifacts@0
       inputs:
         buildType: current
@@ -409,6 +433,10 @@ stages:
     timeoutInMinutes: 120
     pool: "arm-large"
     steps:
+    - script: |
+        git config --global init.defaultBranch main
+        git config --global advice.detachedHead false
+    - checkout: self
     - task: DownloadBuildArtifacts@0
       inputs:
         buildType: current
@@ -538,6 +566,10 @@ stages:
     pool:
       vmImage: "ubuntu-20.04"
     steps:
+    - script: |
+        git config --global init.defaultBranch main
+        git config --global advice.detachedHead false
+    - checkout: self
     - bash: |
         echo "disk space at beginning of build:"
         df -h
@@ -623,6 +655,10 @@ stages:
     pool:
       vmImage: "ubuntu-20.04"
     steps:
+    - script: |
+        git config --global init.defaultBranch main
+        git config --global advice.detachedHead false
+    - checkout: self
     - task: Cache@2
       inputs:
         key: "docs | ./WORKSPACE | **/*.bzl"
@@ -760,6 +796,10 @@ stages:
     pool:
       vmImage: "ubuntu-20.04"
     steps:
+    - script: |
+        git config --global init.defaultBranch main
+        git config --global advice.detachedHead false
+    - checkout: self
     - task: DownloadBuildArtifacts@0
       inputs:
         buildType: current
@@ -794,6 +834,10 @@ stages:
     pool:
       vmImage: "macos-11"
     steps:
+    - script: |
+        git config --global init.defaultBranch main
+        git config --global advice.detachedHead false
+    - checkout: self
     - script: ./ci/mac_ci_setup.sh
       displayName: "Install dependencies"
 
@@ -844,6 +888,10 @@ stages:
     pool:
       vmImage: "windows-2019"
     steps:
+    - script: |
+        git config --global init.defaultBranch main
+        git config --global advice.detachedHead false
+    - checkout: self
     - task: Cache@2
       inputs:
         key: '"windows.release" | ./WORKSPACE | **/*.bzl'
@@ -896,6 +944,10 @@ stages:
     pool:
       vmImage: $(imageName)
     steps:
+    - script: |
+        git config --global init.defaultBranch main
+        git config --global advice.detachedHead false
+    - checkout: self
     - task: DownloadBuildArtifacts@0
       inputs:
         buildType: current

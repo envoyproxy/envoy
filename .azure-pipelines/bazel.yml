@@ -19,6 +19,10 @@ parameters:
   default: "--flaky_test_attempts=2"
 
 steps:
+- script: |
+    git config --global init.defaultBranch main
+    git config --global advice.detachedHead false
+- checkout: self
 - task: Cache@2
   inputs:
     key: '"${{ parameters.ciTarget }}" | ./WORKSPACE | **/*.bzl'
