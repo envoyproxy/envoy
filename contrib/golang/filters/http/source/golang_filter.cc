@@ -728,22 +728,15 @@ uint64_t FilterConfig::getConfigId() {
     return config_id_;
   }
   auto dlib = Dso::DsoInstanceManager::getDsoInstanceByID(so_id_);
-  if (dlib == nullptr) {
-    ENVOY_LOG(error, "golang extension filter dynamicLib is nullPtr.");
-    return 0;
-  }
+  ASSERT(dlib != nullptr, "load at the config parse phase, so it should not be null");
 
   std::string str;
-  if (!plugin_config_.SerializeToString(&str)) {
-    ENVOY_LOG(error, "failed to serialize any pb to string");
-    return 0;
-  }
+  ASSERT(plugin_config_.SerializeToString(&str));
   auto ptr = reinterpret_cast<unsigned long long>(str.data());
   auto len = str.length();
   config_id_ = dlib->envoyGoFilterNewHttpPluginConfig(ptr, len);
-  if (config_id_ == 0) {
-    ENVOY_LOG(error, "invalid golang plugin config");
-  }
+  ASSERT(config_id_, "config id is always grows");
+
   return config_id_;
 }
 
@@ -778,32 +771,22 @@ uint64_t RoutePluginConfig::getMergedConfigId(uint64_t parent_id, std::string so
   if (merged_config_id_ > 0) {
     return merged_config_id_;
   }
+
   auto dlib = Dso::DsoInstanceManager::getDsoInstanceByID(so_id);
-  if (dlib == nullptr) {
-    ENVOY_LOG(error, "golang extension filter dynamicLib is nullPtr.");
-    return 0;
-  }
+  ASSERT(dlib != nullptr, "load at the config parse phase, so it should not be null");
 
   if (config_id_ == 0) {
     std::string str;
-    if (!plugin_config_.SerializeToString(&str)) {
-      ENVOY_LOG(error, "failed to serialize any pb to string");
-      return 0;
-    }
+    ASSERT(plugin_config_.SerializeToString(&str));
     auto ptr = reinterpret_cast<unsigned long long>(str.data());
     auto len = str.length();
     config_id_ = dlib->envoyGoFilterNewHttpPluginConfig(ptr, len);
-    if (config_id_ == 0) {
-      ENVOY_LOG(error, "invalid golang plugin config");
-      return parent_id;
-    }
+    ASSERT(config_id_, "config id is always grows");
     ENVOY_LOG(debug, "golang filter new plugin config, id: {}", config_id_);
   }
 
   merged_config_id_ = dlib->envoyGoFilterMergeHttpPluginConfig(parent_id, config_id_);
-  if (merged_config_id_ == 0) {
-    ENVOY_LOG(error, "invalid golang plugin config");
-  }
+  ASSERT(merged_config_id_, "config id is always grows");
   ENVOY_LOG(debug, "golang filter merge plugin config, from {} + {} to {}", parent_id, config_id_,
             merged_config_id_);
   return merged_config_id_;

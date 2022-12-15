@@ -58,6 +58,32 @@ TEST(GolangFilterConfigTest, GolangFilterWithValidConfig) {
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   EXPECT_CALL(filter_callback, addAccessLogHandler(_));
+  auto plugin_config = proto_config.plugin_config();
+  std::string str;
+  EXPECT_TRUE(plugin_config.SerializeToString(&str));
+  cb(filter_callback);
+}
+
+TEST(GolangFilterConfigTest, GolangFilterWithNilPluginConfig) {
+  const auto yaml_fmt = R"EOF(
+  library_id: %s
+  library_path: %s
+  plugin_name: xxx
+  )EOF";
+
+  const std::string PASSTHROUGH{"passthrough"};
+  auto yaml_string = absl::StrFormat(yaml_fmt, PASSTHROUGH, genSoPath(PASSTHROUGH));
+  envoy::extensions::filters::http::golang::v3alpha::Config proto_config;
+  TestUtility::loadFromYaml(yaml_string, proto_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  GolangFilterConfig factory;
+  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  EXPECT_CALL(filter_callback, addAccessLogHandler(_));
+  auto plugin_config = proto_config.plugin_config();
+  std::string str;
+  EXPECT_TRUE(plugin_config.SerializeToString(&str));
   cb(filter_callback);
 }
 
