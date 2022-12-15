@@ -2,6 +2,7 @@
 
 #include "envoy/config/config_provider.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/http/early_header_mutation.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_validator.h"
 #include "envoy/http/original_ip_detection.h"
@@ -491,6 +492,8 @@ public:
    */
   virtual const std::vector<OriginalIPDetectionSharedPtr>&
   originalIpDetectionExtensions() const PURE;
+
+  virtual const std::vector<EarlyHeaderMutationPtr>& earlyHeaderMutationExtensions() const PURE;
 
   /**
    * @return if the HttpConnectionManager should remove trailing host dot from host/authority
