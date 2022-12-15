@@ -194,7 +194,7 @@ TEST_F(RecordDistributorTest, ShouldPassRecordToCallbacksAndRemoveIfFinished) {
   // Record was not stored.
   ASSERT_EQ(testee->getRecordCountForTest("topic", 2), -1);
   // Our callback got removed, others stay.
-  ASSERT_EQ(testee->getCallbackCountForTest("topic", 0), 0);
+  ASSERT_EQ(testee->getCallbackCountForTest("topic", 0), -1);
   ASSERT_EQ(testee->getCallbackCountForTest("topic", 1), 1);
   ASSERT_EQ(testee->getCallbackCountForTest("topic", 2), 1);
   ASSERT_EQ(testee->getCallbackCountForTest("topic", 3), 2);
@@ -374,7 +374,25 @@ TEST_F(RecordDistributorTest, ShouldNotRegisterCallbackIfItRejectsRecords) {
   ASSERT_EQ(testee->getCallbackCountForTest("topic", 2), -1);
 }
 
-// FIXME (adam.kotwasinski) removeCallback tests
+TEST_F(RecordDistributorTest, ShouldRemoveCallbackProperly) {
+  // given
+  const auto callback = makeCb();
+  PartitionMap<RecordCbSharedPtr> callbacks;
+  callbacks[{"topic", 0}] = {callback};
+  callbacks[{"topic", 1}] = {callback, makeCb()};
+  callbacks[{"topic", 2}] = {makeCb(), callback};
+  callbacks[{"topic", 3}] = {makeCb(), callback, makeCb()};
+  const auto testee = makeTestee(callbacks);
+
+  // when
+  testee->removeCallback(callback);
+
+  // then
+  ASSERT_EQ(testee->getCallbackCountForTest("topic", 0), -1);
+  ASSERT_EQ(testee->getCallbackCountForTest("topic", 1), 1);
+  ASSERT_EQ(testee->getCallbackCountForTest("topic", 2), 1);
+  ASSERT_EQ(testee->getCallbackCountForTest("topic", 3), 2);
+}
 
 } // namespace
 } // namespace Mesh

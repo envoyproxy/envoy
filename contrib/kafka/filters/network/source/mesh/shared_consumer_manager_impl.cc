@@ -227,12 +227,15 @@ bool RecordDistributor::passRecordsToCallback(const RecordCbSharedPtr& callback)
     for (const int32_t partition : topic_and_partitions.second) {
       const KafkaPartition kp = {topic_and_partitions.first, partition};
       // Processing of given partition's records was enough for given callback.
-      const bool early_exit = passPartitionRecordsToCallback(callback, kp);
-      if (early_exit) {
+      const bool processing_finished = passPartitionRecordsToCallback(callback, kp);
+      if (processing_finished) {
         return true;
       }
     }
   }
+
+  // All the eligible records have been passed to callback, but it still wants more.
+  // So we are going to need to register it.
   return false;
 }
 
@@ -248,30 +251,30 @@ bool RecordDistributor::passPartitionRecordsToCallback(const RecordCbSharedPtr& 
   ENVOY_LOG(trace, "Early notification for callback {}, as there are {} messages available",
             callback->toString(), partition_records.size());
 
-  bool early_exit = false;
-  for (auto rit = partition_records.begin(); rit != partition_records.end();) {
-    const CallbackReply callback_status = callback->receive(*rit);
+  bool processing_finished = false;
+  for (auto record_it = partition_records.begin(); record_it != partition_records.end();) {
+    const CallbackReply callback_status = callback->receive(*record_it);
     switch (callback_status) {
     case CallbackReply::AcceptedAndWantMore: {
       // Callback consumed the record, and wants more. We keep iterating.
-      rit = partition_records.erase(rit);
+      record_it = partition_records.erase(record_it);
       break;
     }
     case CallbackReply::AcceptedAndFinished: {
       // We had a callback that wanted records, and got all it wanted in the initial
       // processing (== everything it needed was buffered), so we won't need to register it.
-      rit = partition_records.erase(rit);
-      early_exit = true;
+      record_it = partition_records.erase(record_it);
+      processing_finished = true;
       break;
     }
     case CallbackReply::Rejected: {
       // Our callback entered a terminal state in the meantime. We won't work with it anymore.
-      early_exit = true;
+      processing_finished = true;
       break;
     }
     } /* switch */
 
-    if (early_exit) {
+    if (processing_finished) {
       // No more processing needed.
       break;
     }
@@ -282,7 +285,7 @@ bool RecordDistributor::passPartitionRecordsToCallback(const RecordCbSharedPtr& 
     stored_records_.erase(it);
   }
 
-  return early_exit;
+  return processing_finished;
 }
 
 void RecordDistributor::removeCallback(const RecordCbSharedPtr& callback) {
@@ -292,14 +295,17 @@ void RecordDistributor::removeCallback(const RecordCbSharedPtr& callback) {
 
 void RecordDistributor::doRemoveCallback(const RecordCbSharedPtr& callback) {
   ENVOY_LOG(trace, "Removing callback {}", callback->toString());
-  for (auto& e : partition_to_callbacks_) {
-    auto& partition_callbacks = e.second;
+  for (auto it = partition_to_callbacks_.begin(); it != partition_to_callbacks_.end();) {
+    auto& partition_callbacks = it->second;
     partition_callbacks.erase(
         std::remove(partition_callbacks.begin(), partition_callbacks.end(), callback),
         partition_callbacks.end());
+    if (partition_callbacks.empty()) {
+      it = partition_to_callbacks_.erase(it);
+    } else {
+      ++it;
+    }
   }
-  // TODO (adam.kotwasinski) Resource leak: map can have keys pointing to empty vectors.
-  // Not terrible with limited number of topics, but stil ugly. Same with records.
 }
 
 // Just a helper function for tests.
@@ -309,7 +315,7 @@ int32_t countForTest(const std::string& topic, const int32_t partition, Partitio
   if (map.end() != it) {
     return it->second.size();
   } else {
-    return -1;
+    return -1; // Tests are simpler to type if we do this instead of absl::optional.
   }
 }
 
