@@ -54,7 +54,7 @@ public:
   SubscriptionPtr
   subscriptionFromConfigSource(const envoy::config::core::v3::ConfigSource& config) {
     return subscription_factory_.subscriptionFromConfigSource(
-        config, Config::TypeUrl::get().ClusterLoadAssignment, stats_store_, callbacks_,
+        config, Config::TypeUrl::get().ClusterLoadAssignment, *stats_store_.rootScope(), callbacks_,
         resource_decoder_, {});
   }
 
@@ -63,8 +63,8 @@ public:
                                 const envoy::config::core::v3::ConfigSource& config) {
     const auto resource_locator = XdsResourceIdentifier::decodeUrl(xds_url);
     return subscription_factory_.collectionSubscriptionFromUrl(
-        resource_locator, config, "envoy.config.endpoint.v3.ClusterLoadAssignment", stats_store_,
-        callbacks_, resource_decoder_);
+        resource_locator, config, "envoy.config.endpoint.v3.ClusterLoadAssignment",
+        *stats_store_.rootScope(), callbacks_, resource_decoder_);
   }
 
   Upstream::MockClusterManager cm_;
@@ -437,8 +437,8 @@ TEST_F(SubscriptionFactoryTest, LogWarningOnDeprecatedV2Transport) {
   EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
 
   EXPECT_THROW_WITH_REGEX(subscription_factory_.subscriptionFromConfigSource(
-                              config, Config::TypeUrl::get().ClusterLoadAssignment, stats_store_,
-                              callbacks_, resource_decoder_, {}),
+                              config, Config::TypeUrl::get().ClusterLoadAssignment,
+                              *stats_store_.rootScope(), callbacks_, resource_decoder_, {}),
                           EnvoyException,
                           "V2 .and AUTO. xDS transport protocol versions are deprecated in");
 }
@@ -459,8 +459,8 @@ TEST_F(SubscriptionFactoryTest, LogWarningOnDeprecatedAutoTransport) {
   EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
 
   EXPECT_THROW_WITH_REGEX(subscription_factory_.subscriptionFromConfigSource(
-                              config, Config::TypeUrl::get().ClusterLoadAssignment, stats_store_,
-                              callbacks_, resource_decoder_, {}),
+                              config, Config::TypeUrl::get().ClusterLoadAssignment,
+                              *stats_store_.rootScope(), callbacks_, resource_decoder_, {}),
                           EnvoyException,
                           "V2 .and AUTO. xDS transport protocol versions are deprecated in");
 }

@@ -45,11 +45,11 @@ public:
 class MaglevLoadBalancerTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
   MaglevLoadBalancerTest()
-      : stat_names_(stats_store_.symbolTable()), stats_(stat_names_, stats_store_) {}
+      : stat_names_(stats_store_.symbolTable()), stats_(stat_names_, *stats_store_.rootScope()) {}
 
   void createLb() {
-    lb_ = std::make_unique<MaglevLoadBalancer>(priority_set_, stats_, stats_store_, runtime_,
-                                               random_, config_, common_config_);
+    lb_ = std::make_unique<MaglevLoadBalancer>(priority_set_, stats_, *stats_store_.rootScope(),
+                                               runtime_, random_, config_, common_config_);
   }
 
   void init(uint64_t table_size) {
