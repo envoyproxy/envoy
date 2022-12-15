@@ -245,6 +245,9 @@ new_features:
     added support to allowlist headers included in the check request to gRPC authorization server (previously only available for HTTP authorization server).
     Pre-existing field :ref:`allowed_headers <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.AuthorizationRequest.allowed_headers>` is deprecated in favour
     of the new field :ref:`allowed_headers <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.allowed_headers>`.
+- area: attributes
+  change: |
+    added :ref:`attributes <arch_overview_attributes>` for looking up xDS configuration information.
 - area: router
   change: |
     added :ref:`RouteList <envoy_v3_api_msg_config.route.v3.RouteList>` to support route list in :ref:`VirtualHost.matcher <envoy_v3_api_field_config.route.v3.VirtualHost.matcher>`.
