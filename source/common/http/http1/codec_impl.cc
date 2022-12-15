@@ -1336,6 +1336,9 @@ Status ServerConnectionImpl::checkHeaderNameForUnderscores() {
       return codecProtocolError("http/1.1 protocol error: header name contains underscores");
     }
   }
+#else
+  // Workaround for gcc not understanding [[maybe_unused]] for class members.
+  (void)headers_with_underscores_action_;
 #endif
   return okStatus();
 }
