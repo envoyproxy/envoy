@@ -154,6 +154,13 @@ size_t BalsaParser::execute(const char* slice, int len) {
       ((message_type_ == MessageType::Response && hasTransferEncoding()) ||
        !headers_.content_length_valid())) {
     MessageDone();
+    return 0;
+  }
+
+  if (len == 0) {
+    status_ = ParserStatus::Error;
+    error_message_ = "HPE_INVALID_EOF_STATE";
+    return 0;
   }
 
   return framer_.ProcessInput(slice, len);
@@ -295,6 +302,7 @@ void BalsaParser::MessageDone() {
   status_ = convertResult(connection_->onMessageComplete());
   framer_.Reset();
   first_byte_processed_ = false;
+  headers_done_ = false;
 }
 
 void BalsaParser::HandleError(BalsaFrameEnums::ErrorCode error_code) {
