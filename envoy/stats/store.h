@@ -157,7 +157,9 @@ public:
   //
   // A series of follow-up PRs is required to remove the functions below, which
   // will require a large number of files to be trivially changed, by explicitly
-  // accessing the rootScope() to call these methods.
+  // accessing the rootScope() to call these methods. The first in the series is
+  // https://github.com/envoyproxy/envoy/pull/24567 which just takes care of
+  // test/common/...
   operator Scope&() { return *rootScope(); }
 
   // Delegate some methods to the root scope; these are exposed to make it more
