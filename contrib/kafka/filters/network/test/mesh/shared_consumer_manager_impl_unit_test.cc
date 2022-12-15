@@ -192,7 +192,7 @@ TEST_F(RecordDistributorTest, ShouldPassRecordToCallbacksAndRemoveIfFinished) {
 
   // then
   // Record was not stored.
-  ASSERT_EQ(testee->getRecordCountForTest("topic", 2), 0);
+  ASSERT_EQ(testee->getRecordCountForTest("topic", 2), -1);
   // Our callback got removed, others stay.
   ASSERT_EQ(testee->getCallbackCountForTest("topic", 0), 0);
   ASSERT_EQ(testee->getCallbackCountForTest("topic", 1), 1);
@@ -218,7 +218,7 @@ TEST_F(RecordDistributorTest, ShouldPassRecordToCallbacksAndKeepThem) {
 
   // then
   // Record was not stored.
-  ASSERT_EQ(testee->getRecordCountForTest("topic", 2), 0);
+  ASSERT_EQ(testee->getRecordCountForTest("topic", 2), -1);
   // All records stay.
   ASSERT_EQ(testee->getCallbackCountForTest("topic", 0), 1);
   ASSERT_EQ(testee->getCallbackCountForTest("topic", 1), 2);
@@ -279,8 +279,8 @@ TEST_F(RecordDistributorTest, ShouldRegisterCallbackAndPassItMatchingMessages) {
 
   // then
   // Messages got consumed.
-  ASSERT_EQ(testee->getRecordCountForTest("topic", 0), 0);
-  ASSERT_EQ(testee->getRecordCountForTest("topic", 1), 0);
+  ASSERT_EQ(testee->getRecordCountForTest("topic", 0), -1);
+  ASSERT_EQ(testee->getRecordCountForTest("topic", 1), -1);
   // Callback got registered.
   ASSERT_EQ(testee->getCallbackCountForTest("topic", 0), 1);
   ASSERT_EQ(testee->getCallbackCountForTest("topic", 1), 1);
@@ -289,43 +289,75 @@ TEST_F(RecordDistributorTest, ShouldRegisterCallbackAndPassItMatchingMessages) {
 TEST_F(RecordDistributorTest, ShouldNotRegisterCallbackIfItGotSatisfied) {
   // given
   const auto cb = makeCb();
-  const TopicToPartitionsMap tp = {{"topic", {0, 1}}};
+  const TopicToPartitionsMap tp = {{"topic", {0, 1, 2}}};
   EXPECT_CALL(*cb, interest).WillRepeatedly(Return(tp));
   EXPECT_CALL(*cb, receive(_))
-      .Times(2)
+      .Times(3)
+      .WillOnce(Return(CallbackReply::AcceptedAndWantMore))
+      .WillOnce(Return(CallbackReply::AcceptedAndWantMore))
+      .WillOnce(Return(CallbackReply::AcceptedAndFinished));
+
+  PartitionMap<InboundRecordSharedPtr> records;
+  records[{"topic", 0}] = {makeRecord("topic", 0)};
+  records[{"topic", 1}] = {makeRecord("topic", 1), makeRecord("topic", 1), makeRecord("topic", 1)};
+  records[{"topic", 2}] = {makeRecord("topic", 2), makeRecord("topic", 2)};
+  const auto testee = makeTestee(records);
+
+  // when
+  testee->processCallback(cb);
+
+  // then
+  // Some messages got consumed.
+  ASSERT_EQ(testee->getRecordCountForTest("topic", 0), -1);
+  ASSERT_EQ(testee->getRecordCountForTest("topic", 1), 1);
+  ASSERT_EQ(testee->getRecordCountForTest("topic", 2), 2);
+  // Callback was not registered.
+  ASSERT_EQ(testee->getCallbackCountForTest("topic", 0), -1);
+  ASSERT_EQ(testee->getCallbackCountForTest("topic", 1), -1);
+  ASSERT_EQ(testee->getCallbackCountForTest("topic", 2), -1);
+}
+
+// Very similar to previous one, but makes sure we clean up vectors in record map.
+TEST_F(RecordDistributorTest, ShouldNotRegisterCallbackIfItGotSatisfiedWithLastRecordInPartition) {
+  // given
+  const auto cb = makeCb();
+  const TopicToPartitionsMap tp = {{"topic", {0}}};
+  EXPECT_CALL(*cb, interest).WillRepeatedly(Return(tp));
+  EXPECT_CALL(*cb, receive(_))
+      .Times(3)
+      .WillOnce(Return(CallbackReply::AcceptedAndWantMore))
       .WillOnce(Return(CallbackReply::AcceptedAndWantMore))
       .WillOnce(Return(CallbackReply::AcceptedAndFinished));
 
   PartitionMap<InboundRecordSharedPtr> records;
   records[{"topic", 0}] = {makeRecord("topic", 0), makeRecord("topic", 0), makeRecord("topic", 0)};
-  records[{"topic", 1}] = {makeRecord("topic", 1), makeRecord("topic", 1)};
   const auto testee = makeTestee(records);
 
   // when
   testee->processCallback(cb);
 
   // then
-  // Some messages got consumed.
-  ASSERT_EQ(testee->getRecordCountForTest("topic", 0), 1);
-  ASSERT_EQ(testee->getRecordCountForTest("topic", 1), 2);
-  // Callback got registered.
-  ASSERT_EQ(testee->getCallbackCountForTest("topic", 0), 0);
-  ASSERT_EQ(testee->getCallbackCountForTest("topic", 1), 0);
+  // All messages got consumed.
+  ASSERT_EQ(testee->getRecordCountForTest("topic", 0), -1);
+  // Callback was not registered.
+  ASSERT_EQ(testee->getCallbackCountForTest("topic", 0), -1);
 }
 
 TEST_F(RecordDistributorTest, ShouldNotRegisterCallbackIfItRejectsRecords) {
   // given
   const auto cb = makeCb();
-  const TopicToPartitionsMap tp = {{"topic", {0, 1}}};
+  const TopicToPartitionsMap tp = {{"topic", {0, 1, 2}}};
   EXPECT_CALL(*cb, interest).WillRepeatedly(Return(tp));
   EXPECT_CALL(*cb, receive(_))
-      .Times(2)
+      .Times(3)
+      .WillOnce(Return(CallbackReply::AcceptedAndWantMore))
       .WillOnce(Return(CallbackReply::AcceptedAndWantMore))
       .WillOnce(Return(CallbackReply::Rejected)); // Callback cancelled / abandoned / timed out.
 
   PartitionMap<InboundRecordSharedPtr> records;
-  records[{"topic", 0}] = {makeRecord("topic", 0), makeRecord("topic", 0), makeRecord("topic", 0)};
-  records[{"topic", 1}] = {makeRecord("topic", 1), makeRecord("topic", 1)};
+  records[{"topic", 0}] = {makeRecord("topic", 0)};
+  records[{"topic", 1}] = {makeRecord("topic", 1), makeRecord("topic", 1), makeRecord("topic", 1)};
+  records[{"topic", 2}] = {makeRecord("topic", 2), makeRecord("topic", 2)};
   const auto testee = makeTestee(records);
 
   // when
@@ -333,12 +365,16 @@ TEST_F(RecordDistributorTest, ShouldNotRegisterCallbackIfItRejectsRecords) {
 
   // then
   // Some messages got consumed.
-  ASSERT_EQ(testee->getRecordCountForTest("topic", 0), 2);
+  ASSERT_EQ(testee->getRecordCountForTest("topic", 0), -1);
   ASSERT_EQ(testee->getRecordCountForTest("topic", 1), 2);
-  // Callback got registered.
-  ASSERT_EQ(testee->getCallbackCountForTest("topic", 0), 0);
-  ASSERT_EQ(testee->getCallbackCountForTest("topic", 1), 0);
+  ASSERT_EQ(testee->getRecordCountForTest("topic", 2), 2);
+  // Callback was not registered.
+  ASSERT_EQ(testee->getCallbackCountForTest("topic", 0), -1);
+  ASSERT_EQ(testee->getCallbackCountForTest("topic", 1), -1);
+  ASSERT_EQ(testee->getCallbackCountForTest("topic", 2), -1);
 }
+
+// FIXME (adam.kotwasinski) removeCallback tests
 
 } // namespace
 } // namespace Mesh

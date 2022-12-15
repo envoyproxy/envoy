@@ -49,16 +49,21 @@ public:
   // RecordCallbackProcessor
   void removeCallback(const RecordCbSharedPtr& callback) override;
 
-  size_t getCallbackCountForTest(const std::string& topic, const int32_t partition) const;
+  int32_t getCallbackCountForTest(const std::string& topic, const int32_t partition) const;
 
-  size_t getRecordCountForTest(const std::string& topic, const int32_t partition) const;
+  int32_t getRecordCountForTest(const std::string& topic, const int32_t partition) const;
 
 private:
   // Checks whether any of the callbacks stored right now are interested in the topic.
   bool hasInterest(const std::string& topic) const ABSL_EXCLUSIVE_LOCKS_REQUIRED(callbacks_mutex_);
 
-  // Helper function (passes records to callback).
+  // Helper function (passes all stored records to callback).
   bool passRecordsToCallback(const RecordCbSharedPtr& callback);
+
+  // Helper function (passes partition records to callback).
+  bool passPartitionRecordsToCallback(const RecordCbSharedPtr& callback,
+                                      const KafkaPartition& kafka_partition)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(stored_records_mutex_);
 
   // Helper function (real callback removal).
   void doRemoveCallback(const RecordCbSharedPtr& callback)

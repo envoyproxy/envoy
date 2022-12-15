@@ -222,43 +222,67 @@ void RecordDistributor::processCallback(const RecordCbSharedPtr& callback) {
 bool RecordDistributor::passRecordsToCallback(const RecordCbSharedPtr& callback) {
   TopicToPartitionsMap requested = callback->interest();
   absl::MutexLock lock(&stored_records_mutex_);
+
   for (const auto& topic_and_partitions : requested) {
-    const std::string topic = topic_and_partitions.first;
     for (const int32_t partition : topic_and_partitions.second) {
-      const KafkaPartition kp = {topic, partition};
-
-      auto& stored_records = stored_records_[kp];
-      if (!stored_records.empty()) {
-        ENVOY_LOG(trace, "Early notification for callback {}, as there are {} messages available",
-                  callback->toString(), stored_records.size());
+      const KafkaPartition kp = {topic_and_partitions.first, partition};
+      // Processing of given partition's records was enough for given callback.
+      const bool early_exit = passPartitionRecordsToCallback(callback, kp);
+      if (early_exit) {
+        return true;
       }
-
-      for (auto it = stored_records.begin(); it != stored_records.end();) {
-        const CallbackReply callback_status = callback->receive(*it);
-        switch (callback_status) {
-        case CallbackReply::AcceptedAndWantMore: {
-          // Callback consumed the record, and wants more. We keep iterating.
-          it = stored_records.erase(it);
-          break;
-        }
-        case CallbackReply::AcceptedAndFinished: {
-          // We had a callback that wanted records, and got all it wanted in the initial
-          // processing (== everything it needed was buffered), so we won't need to register it.
-          it = stored_records.erase(it);
-          return true;
-        }
-        case CallbackReply::Rejected: {
-          // Our callback entered a terminal state in the meantime. We won't work with it anymore.
-          return true;
-        }
-        } /* switch */
-      }   /* for-stored-records */
-    }     /* for-partitions */
-  }       /* for-topic_and_partitions */
-
-  // We ran through all matching records, and the callback still wants records.
-  // So it needs to be registered.
+    }
+  }
   return false;
+}
+
+bool RecordDistributor::passPartitionRecordsToCallback(const RecordCbSharedPtr& callback,
+                                                       const KafkaPartition& kafka_partition) {
+  const auto it = stored_records_.find(kafka_partition);
+  if (stored_records_.end() == it) {
+    // This partition does not have any records buffered.
+    return false;
+  }
+
+  auto& partition_records = it->second;
+  ENVOY_LOG(trace, "Early notification for callback {}, as there are {} messages available",
+            callback->toString(), partition_records.size());
+
+  bool early_exit = false;
+  for (auto rit = partition_records.begin(); rit != partition_records.end();) {
+    const CallbackReply callback_status = callback->receive(*rit);
+    switch (callback_status) {
+    case CallbackReply::AcceptedAndWantMore: {
+      // Callback consumed the record, and wants more. We keep iterating.
+      rit = partition_records.erase(rit);
+      break;
+    }
+    case CallbackReply::AcceptedAndFinished: {
+      // We had a callback that wanted records, and got all it wanted in the initial
+      // processing (== everything it needed was buffered), so we won't need to register it.
+      rit = partition_records.erase(rit);
+      early_exit = true;
+      break;
+    }
+    case CallbackReply::Rejected: {
+      // Our callback entered a terminal state in the meantime. We won't work with it anymore.
+      early_exit = true;
+      break;
+    }
+    } /* switch */
+
+    if (early_exit) {
+      // No more processing needed.
+      break;
+    }
+  } /* for-stored-records */
+
+  if (partition_records.empty()) {
+    // The partition's buffer got drained - there is no reason to keep empty vectors.
+    stored_records_.erase(it);
+  }
+
+  return early_exit;
 }
 
 void RecordDistributor::removeCallback(const RecordCbSharedPtr& callback) {
@@ -280,23 +304,23 @@ void RecordDistributor::doRemoveCallback(const RecordCbSharedPtr& callback) {
 
 // Just a helper function for tests.
 template <typename T>
-size_t countForTest(const std::string& topic, const int32_t partition, PartitionMap<T> map) {
+int32_t countForTest(const std::string& topic, const int32_t partition, PartitionMap<T> map) {
   const auto it = map.find({topic, partition});
   if (map.end() != it) {
     return it->second.size();
   } else {
-    return 0;
+    return -1;
   }
 }
 
-size_t RecordDistributor::getCallbackCountForTest(const std::string& topic,
-                                                  const int32_t partition) const {
+int32_t RecordDistributor::getCallbackCountForTest(const std::string& topic,
+                                                   const int32_t partition) const {
   absl::MutexLock lock(&callbacks_mutex_);
   return countForTest(topic, partition, partition_to_callbacks_);
 }
 
-size_t RecordDistributor::getRecordCountForTest(const std::string& topic,
-                                                const int32_t partition) const {
+int32_t RecordDistributor::getRecordCountForTest(const std::string& topic,
+                                                 const int32_t partition) const {
   absl::MutexLock lock(&stored_records_mutex_);
   return countForTest(topic, partition, stored_records_);
 }
