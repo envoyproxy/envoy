@@ -32,8 +32,8 @@ public:
   MOCK_METHOD(Api::IoCallBoolResult, open_, (const FlagSet& flag));
   MOCK_METHOD(Api::IoCallSizeResult, write_, (absl::string_view buffer));
   MOCK_METHOD(Api::IoCallBoolResult, close_, ());
-  MOCK_METHOD(Api::IoCallSizeResult, pread_, (void* buf, size_t count, off_t offset));
-  MOCK_METHOD(Api::IoCallSizeResult, pwrite_, (const void* buf, size_t count, off_t offset));
+  MOCK_METHOD(Api::IoCallSizeResult, pread_, (void* buf, uint64_t count, uint64_t offset));
+  MOCK_METHOD(Api::IoCallSizeResult, pwrite_, (const void* buf, uint64_t count, uint64_t offset));
 
   size_t num_opens_;
   size_t num_writes_;
