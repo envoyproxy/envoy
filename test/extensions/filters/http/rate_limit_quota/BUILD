@@ -44,6 +44,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/http:message_lib",
         "//source/extensions/filters/http/rate_limit_quota",
+        "//source/extensions/filters/http/rate_limit_quota:quota_bucket",
         "//test/common/http:common_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/server:factory_context_mocks",
@@ -72,7 +73,6 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
-
 
 envoy_extension_cc_test(
     name = "integration_test",

@@ -54,8 +54,10 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
         // TODO(tyxia) Implement the allow/deny interface
       }
     } else {
-      ENVOY_LOG(error, "no assignment behavior for is not configured.");
+      // TODO(tyxia) Change it to error, debug for testing
+      ENVOY_LOG(debug, "no assignment behavior for is not configured.");
       // We just use fail-open (i.e. ALLOW_ALL) here.
+      return Envoy::Http::FilterHeadersStatus::Continue;
     }
 
     // Build the quota bucket element.

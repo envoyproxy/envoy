@@ -5,6 +5,7 @@
 
 #include "source/common/http/header_map_impl.h"
 #include "source/extensions/filters/http/rate_limit_quota/filter.h"
+#include "source/extensions/filters/http/rate_limit_quota/quota_bucket.h"
 
 #include "test/common/http/common.h"
 #include "test/mocks/event/mocks.h"
@@ -227,7 +228,7 @@ public:
 
   void createFilter(bool set_callback = true) {
     filter_config_ = std::make_shared<FilterConfig>(config_);
-    filter_ = std::make_unique<RateLimitQuotaFilter>(filter_config_, context_, nullptr);
+    filter_ = std::make_unique<RateLimitQuotaFilter>(filter_config_, context_, &bucket_cache_);
     if (set_callback) {
       filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     }
@@ -260,6 +261,7 @@ public:
   FilterConfig config_;
   Http::TestRequestHeaderMapImpl default_headers_{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
+  BucketContainer bucket_cache_;
 };
 
 TEST_F(FilterTest, InvalidBucketMatcherConfig) {
@@ -341,7 +343,6 @@ TEST_F(FilterTest, RequestMatchingFailedWithOnNoMatchConfigured) {
   absl::flat_hash_map<std::string, std::string> expected_bucket_ids = {
       {"on_no_match_name", "on_no_match_value"}, {"on_no_match_name_2", "on_no_match_value_2"}};
   // Perform request matching.
-  // TODO(tyxia) Remove deprecated request matching
   auto match_result = filter_->requestMatching(default_headers_);
   // Asserts that the request matching succeeded.
   // OK status is expected to be returned even if the exact request matching failed. It is because
@@ -362,6 +363,31 @@ TEST_F(FilterTest, RequestMatchingFailedWithOnNoMatchConfigured) {
   // Verifies that the expected bucket ids are generated for `on_no_match` case.
   EXPECT_THAT(expected_bucket_ids,
               testing::UnorderedPointwise(testing::Eq(), serialized_bucket_ids));
+}
+
+TEST_F(FilterTest, DecodeHeader) {
+  addMatcherConfig(MatcherConfigType::Valid);
+  createFilter();
+
+  Http::FilterHeadersStatus status = filter_->decodeHeaders(default_headers_, false);
+  EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::Continue);
+}
+
+// TODO(tyxia)This may need the integration test to start the fake grpc client
+TEST_F(FilterTest, DecodeHeaderWithOnNoMatchConfigured) {
+  addMatcherConfig(MatcherConfigType::IncludeOnNoMatchConfig);
+  createFilter();
+
+  Http::FilterHeadersStatus status = filter_->decodeHeaders(default_headers_, false);
+  EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::Continue);
+}
+
+TEST_F(FilterTest, DecodeHeaderWithInvalidConfig) {
+  addMatcherConfig(MatcherConfigType::Invalid);
+  createFilter();
+
+  Http::FilterHeadersStatus status = filter_->decodeHeaders(default_headers_, false);
+  EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::Continue);
 }
 
 TEST_F(FilterTest, DecodeHeaderWithMismatchHeader) {
