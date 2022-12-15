@@ -1590,7 +1590,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckSetsHealhtyDuringOutlierEje
   simTime().advanceTimeWait(std::chrono::seconds(1));
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
-  cluster_->info_->trafficStats().upstream_cx_total_.inc();
+  cluster_->info_->trafficStats()->upstream_cx_total_.inc();
   expectSessionCreate();
   expectStreamCreate(0);
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
