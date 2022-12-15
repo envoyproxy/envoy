@@ -27,10 +27,26 @@ cc_library(
 )
 
 cc_library(
+    name = "jni_interface_lib",
+    srcs = [
+        "jni_interface.cc",
+    ],
+    deps = [
+        ":android_network_utility_lib",
+        ":jni_utility_lib",
+        ":ndk_jni_support",
+        "//library/common:envoy_main_interface_lib",
+        "//library/common/api:c_types",
+        "//library/common/types:managed_types_lib",
+    ],
+    # We need this to ensure that we link this into the .so even though there are no code references.
+    alwayslink = True,
+)
+
+cc_library(
     name = "envoy_jni_lib",
     srcs = [
         "android_jni_interface.cc",
-        "jni_interface.cc",
     ],
     linkopts = [
         "-lm",
@@ -44,6 +60,7 @@ cc_library(
     }),
     deps = [
         ":android_network_utility_lib",
+        ":jni_interface_lib",
         ":jni_utility_lib",
         ":ndk_jni_support",
         "//library/common:envoy_main_interface_lib",
@@ -102,7 +119,6 @@ cc_binary(
     name = "libndk_envoy_jni.so",
     srcs = [
         "android_test_jni_interface.cc",
-        "jni_interface.cc",
     ],
     linkopts = [
     ],
@@ -111,6 +127,7 @@ cc_binary(
         ":android_network_utility_lib",
         ":base_java_jni_lib",
         ":java_jni_support",
+        ":jni_interface_lib",
         "//library/common:envoy_main_interface_lib",
         "//library/common/api:c_types",
         "//library/common/jni/import:jni_import_lib",
@@ -126,12 +143,10 @@ envoy_mobile_so_to_jni_lib(
 
 cc_library(
     name = "java_jni_base_lib",
-    srcs = [
-        "jni_interface.cc",
-    ],
     deps = [
         ":android_network_utility_lib",
         ":base_java_jni_lib",
+        ":jni_interface_lib",
     ],
     alwayslink = True,
 )
