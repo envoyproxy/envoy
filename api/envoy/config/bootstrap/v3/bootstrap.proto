@@ -41,7 +41,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <config_overview_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
-// [#next-free-field: 36]
+// [#next-free-field: 37]
 message Bootstrap {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v2.Bootstrap";
@@ -342,6 +342,18 @@ message Bootstrap {
   // TODO(abeyad): Add public-facing documentation.
   // [#not-implemented-hide:]
   core.v3.TypedExtensionConfig xds_delegate_extension = 35;
+
+  // Optional XdsConfigTracker configuration, which allows tracking xDS responses in external components,
+  // e.g., external tracer or monitor. It provides the process point when receive, ingest, or fail to
+  // process xDS resources and messages. If a value is not specified, no XdsConfigTracker will be used.
+  //
+  // .. note::
+  //
+  //    There are no in-repo extensions currently, and the :repo:`XdsConfigTracker <envoy/config/xds_config_tracker.h>`
+  //    interface should be implemented before using.
+  //    See :repo:`xds_config_tracker_integration_test <test/integration/xds_config_tracker_integration_test.cc>`
+  //    for an example usage of the interface.
+  core.v3.TypedExtensionConfig xds_config_tracker_extension = 36;
 }
 
 // Administration interface :ref:`operations documentation

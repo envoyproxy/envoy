@@ -26,6 +26,10 @@
 #include "source/extensions/transport_sockets/tls/config.h"
 #include "source/extensions/upstreams/http/generic/config.h"
 
+#ifdef ENVOY_ENABLE_QUIC
+#include "source/common/quic/quic_transport_socket_factory.h"
+#endif
+
 #include "extension_registry_platform_additions.h"
 #include "library/common/extensions/cert_validator/platform_bridge/config.h"
 #include "library/common/extensions/filters/http/assertion/config.h"
@@ -33,6 +37,7 @@
 #include "library/common/extensions/filters/http/network_configuration/config.h"
 #include "library/common/extensions/filters/http/platform_bridge/config.h"
 #include "library/common/extensions/filters/http/route_cache_reset/config.h"
+#include "library/common/extensions/listener_managers/api_listener_manager/api_listener_manager.h"
 #include "library/common/extensions/retry/options/network_configuration/config.h"
 
 namespace Envoy {
@@ -77,6 +82,11 @@ void ExtensionRegistry::registerFactories() {
   Envoy::Network::forceRegisterGetAddrInfoDnsResolverFactory();
   Envoy::Extensions::RequestId::forceRegisterUUIDRequestIDExtensionFactory();
   Envoy::Server::forceRegisterDefaultListenerManagerFactoryImpl();
+  Envoy::Server::forceRegisterApiListenerManagerFactoryImpl();
+
+#ifdef ENVOY_ENABLE_QUIC
+  Quic::forceRegisterQuicServerTransportSocketConfigFactory();
+#endif
 
   // TODO: add a "force initialize" function to the upstream code, or clean up the upstream code
   // in such a way that does not depend on the statically initialized variable.

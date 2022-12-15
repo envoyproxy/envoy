@@ -38,19 +38,6 @@ def upstream_envoy_overrides():
         build_file_content = """filegroup(name = "all", srcs = glob(["**"]), visibility = ["//visibility:public"])""",
     )
 
-    # Patch upstream Abseil to prevent Foundation dependency from leaking into Android builds.
-    # Workaround for https://github.com/abseil/abseil-cpp/issues/326.
-    # TODO: Should be removed in https://github.com/envoyproxy/envoy-mobile/issues/136 once rules_android
-    # supports platform toolchains.
-    http_archive(
-        name = "com_google_absl",
-        patches = ["@envoy_mobile//bazel:abseil.patch"],
-        sha256 = "3a0bb3d2e6f53352526a8d1a7e7b5749c68cd07f2401766a404fb00d2853fa49",
-        strip_prefix = "abseil-cpp-4bbdb026899fea9f882a95cbd7d6a4adaf49b2dd",
-        # 2022-07-05
-        urls = ["https://github.com/abseil/abseil-cpp/archive/4bbdb026899fea9f882a95cbd7d6a4adaf49b2dd.tar.gz"],
-    )
-
     # This should be kept in sync with Envoy itself, we just need to apply this patch
     # Remove this once https://boringssl-review.googlesource.com/c/boringssl/+/37804 is in master-with-bazel
     http_archive(
@@ -86,8 +73,8 @@ def swift_repos():
     http_archive(
         name = "SwiftLint",
         build_file_content = """exports_files(["swiftlint"])""",
-        sha256 = "61d335766a39ba8fa499017a560950bd9fa0b0e5bc318559a9c1c7f4da679256",
-        url = "https://github.com/realm/SwiftLint/releases/download/0.47.1/portable_swiftlint.zip",
+        sha256 = "47078845857fa7cf8497f5861967c7ce67f91915e073fb3d3114b8b2486a9270",
+        url = "https://github.com/realm/SwiftLint/releases/download/0.50.3/portable_swiftlint.zip",
     )
 
     http_archive(
