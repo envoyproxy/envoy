@@ -24,12 +24,6 @@ public:
       const envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaFilterConfig&
           filter_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
-
-  Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
-      const envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaOverride&
-          proto_config,
-      Server::Configuration::ServerFactoryContext& context,
-      ProtobufMessage::ValidationVisitor& validator) override;
 };
 
 } // namespace RateLimitQuota
