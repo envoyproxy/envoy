@@ -816,7 +816,8 @@ void ConfigHelper::addClusterFilterMetadata(absl::string_view metadata_yaml,
 
 void ConfigHelper::setConnectConfig(
     envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager& hcm,
-    bool terminate_connect, bool allow_post, bool http3) {
+    bool terminate_connect, bool allow_post, bool http3,
+    absl::optional<envoy::config::core::v3::ProxyProtocolConfig::Version> proxy_protocol_version) {
   auto* route_config = hcm.mutable_route_config();
   ASSERT_EQ(1, route_config->virtual_hosts_size());
   auto* route = route_config->mutable_virtual_hosts(0)->mutable_routes(0);
@@ -839,6 +840,10 @@ void ConfigHelper::setConnectConfig(
     auto* config = upgrade->mutable_connect_config();
     if (allow_post) {
       config->set_allow_post(true);
+    }
+
+    if (proxy_protocol_version.has_value()) {
+      config->mutable_proxy_protocol_config()->set_version(proxy_protocol_version.value());
     }
   }
 
