@@ -39,7 +39,7 @@ envoy_mobile_android_test(
     ],
     native_deps = [
         "//library/common/jni:libndk_envoy_jni.so",
-        "//library/common/jni:libndk_envoy_jni.jnilib",
+        "//library/common/jni:libndk_envoy_jni_jnilib",
     ],
     deps = [
         "//library/java/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib",
