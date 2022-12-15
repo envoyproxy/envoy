@@ -28,3 +28,12 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "const_singleton_test",
+    srcs = ["const_singleton_test.cc"],
+    deps = [
+        "//source/common/singleton:const_singleton",
+        "//test/test_common:utility_lib",
+    ],
+)

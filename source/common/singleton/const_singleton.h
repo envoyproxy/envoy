@@ -10,16 +10,15 @@ namespace Envoy {
  */
 template <class T> class ConstSingleton {
 public:
+  using Factory = T*(void);
+
   /**
    * Obtain an instance of the singleton for class T.
    * @return const T& a reference to the singleton for class T.
    */
   static const T& get() {
-    static T* instance = new T();
-    return *instance;
+    return get([]() { return new T(); });
   }
-
-  using Factory = T*(void);
 
   static const T& get(Factory f) {
     static T* instance = f();
