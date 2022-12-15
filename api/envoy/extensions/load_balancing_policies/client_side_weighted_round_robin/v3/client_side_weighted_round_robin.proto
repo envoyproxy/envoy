@@ -32,11 +32,16 @@ message ClientSideWeightedRoundRobin {
   // the endpoints. By default, per-request utilization reporting is used.
   google.protobuf.BoolValue enable_oob_load_report = 1;
 
+  // Load reporting interval to request from the server. Note that the
+  // server may not provide reports as frequently as the client requests.
+  // Used only when enable_oob_load_report is true. Default is 10 seconds.
+  google.protobuf.Duration oob_reporting_period = 2;
+
   // A given endpoint must report load metrics continuously for at least
   // this long before the endpoint weight will be used. This avoids
   // churn when the set of endpoint addresses changes. Default is 10 seconds.
-  google.protobuf.Duration blackout_period = 2;
+  google.protobuf.Duration blackout_period = 3;
 
   // How often endpoint weights are recalculated.  Default is 1 second.
-  google.protobuf.Duration weight_update_period = 3;
+  google.protobuf.Duration weight_update_period = 4;
 }
