@@ -41,10 +41,12 @@ struct CodecStats : public ::Envoy::Http::HeaderValidatorStats {
     });
   }
 
+#ifdef ENVOY_ENABLE_UHV
   void incDroppedHeadersWithUnderscores() override { dropped_headers_with_underscores_.inc(); }
   void incRequestsRejectedWithUnderscoresInHeaders() override {
     requests_rejected_with_underscores_in_headers_.inc();
   }
+#endif
 
   ALL_HTTP3_CODEC_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };

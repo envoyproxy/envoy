@@ -2136,6 +2136,9 @@ absl::optional<int> ServerConnectionImpl::checkHeaderNameForUnderscores(
     stats_.requests_rejected_with_underscores_in_headers_.inc();
     return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
   }
+#else
+  // Workaround for gcc not understanding [[maybe_unused]] for class members.
+  (void)headers_with_underscores_action_;
 #endif
   return absl::nullopt;
 }
