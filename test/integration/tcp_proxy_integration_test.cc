@@ -682,12 +682,10 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithNoData) {
   tcp_client->waitForDisconnect();
 }
 
-// TODO(kuochunghsu) Debug apple CI failure.
-#if !defined(__APPLE__)
 TEST_P(TcpProxyIntegrationTest, TestPerClientIdletimeout) {
   autonomous_upstream_ = true;
-  enableHalfClose(false);
 
+  enableHalfClose(false);
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* static_resources = bootstrap.mutable_static_resources();
     for (int i = 0; i < static_resources->clusters_size(); ++i) {
@@ -716,12 +714,14 @@ TEST_P(TcpProxyIntegrationTest, TestPerClientIdletimeout) {
 
   initialize();
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  // Platforms could prevent ActiveTcpClient construction unless we explicitly wait for it.
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 1);
+
   tcp_client->close();
 
   // Two pre-connections are closed by idle timers.
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_destroy", 2);
 }
-#endif
 
 TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
   config_helper_.setBufferLimits(1024, 1024);
