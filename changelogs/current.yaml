@@ -40,7 +40,6 @@ minor_behavior_changes:
     a full chain.
     :ref:`trust_ca<envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.trusted_ca>`.
     This change can be reverted via the ``envoy.reloadable_features.enable_intermediate_ca``.
-
 - area: cache_filter
   change: |
     add a completion callback to updateHeaders interface. Any external cache implementations will need to update to match this new interface. See changes to simple_http_cache in PR#23666 for example.
@@ -65,10 +64,14 @@ minor_behavior_changes:
 - area: jwt_authn
   change: |
     adjust the refetch time for remote_jwks async_fetch feature. For a good fetch, refetch 5 seconds before jwks cache duration. For a failed fetch, refetch time can be specified by :ref:`failed_refetch_duration <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwksAsyncFetch.failed_refetch_duration>` with default 1 second.
+- area: config
+  change: |
+    add support for thrift connection draining. This can be disabled by setting the runtime guard ``envoy.reloadable_features.thrift_connection_draining`` to false.
 - area: http
   change: |
     reverting the behavioral change to have ``CONNECT`` and upgrade requests over HTTP/1.1 not delay close.  One can reinstate
     delay close for upgrades by setting ``envoy.reloadable_features.no_delay_close_for_upgrades`` to ``true``.
+
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -148,6 +151,12 @@ removed_config_or_runtime:
     removed ``envoy.reloadable_features.do_not_await_headers_on_upstream_timeout_to_emit_stats`` and legacy code paths.
 
 new_features:
+- area: tls
+  change: |
+    added support for SNI-based cert selection in tls downstream transport socket. Detailed documentation is available :ref:`cert selection<arch_overview_ssl_cert_select>`.
+    New config option :ref:`full_scan_certs_on_sni_mismatch <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.full_scan_certs_on_sni_mismatch>`
+    is introduced to disable or enable full scan when no cert matches to SNI, defaults to false.
+    New runtime flag ``envoy.reloadable_features.no_full_scan_certs_on_sni_mismatch`` can be used for override the default value.
 - area: build
   change: |
     added an option ``--define=library_autolink=disabled`` to disable autolinking libraries.
@@ -228,7 +237,6 @@ new_features:
 - area: http
   change: |
     added :ref:`append_x_forwarded_port <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.append_x_forwarded_port>` to append the ``x-forwarded-port`` header to HTTP upstream requests.
-
 - area: ext_authz
   change: |
     added support to allowlist headers included in the check request to gRPC authorization server (previously only available for HTTP authorization server).

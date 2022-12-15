@@ -124,7 +124,7 @@ OriginalDstCluster::LoadBalancer::requestOverrideHost(LoadBalancerContext* conte
   if (request_host == nullptr) {
     ENVOY_LOG(debug, "original_dst_load_balancer: invalid override header value. {}",
               request_override_host);
-    parent_->info()->trafficStats().original_dst_host_invalid_.inc();
+    parent_->info()->trafficStats()->original_dst_host_invalid_.inc();
     return nullptr;
   }
   ENVOY_LOG(debug, "Using request override host {}.", request_override_host);
