@@ -12,6 +12,7 @@ envoy_cc_library(
     hdrs = ["extension_registry.h"],
     repository = "@envoy",
     deps = [
+        "@envoy//source/extensions/listener_managers/listener_manager:listener_manager_lib",  #TODO(2711) remove
         "extension_registry_platform_additions",
         "@envoy//source/common/network:socket_lib",
         "@envoy//source/common/router:upstream_codec_filter_lib",
@@ -27,7 +28,6 @@ envoy_cc_library(
         "@envoy//source/extensions/filters/http/router:config",
         "@envoy//source/extensions/filters/network/http_connection_manager:config",
         "@envoy//source/extensions/http/header_formatters/preserve_case:config",
-        "@envoy//source/extensions/listener_managers/listener_manager:listener_manager_lib",
         "@envoy//source/extensions/network/dns_resolver/getaddrinfo:config",
         "@envoy//source/extensions/request_id/uuid:config",
         "@envoy//source/extensions/stat_sinks/metrics_service:config",
@@ -44,6 +44,7 @@ envoy_cc_library(
         "@envoy_mobile//library/common/extensions/filters/http/platform_bridge:config",
         "@envoy_mobile//library/common/extensions/filters/http/route_cache_reset:config",
         "@envoy_mobile//library/common/extensions/filters/http/socket_tag:config",
+        "@envoy_mobile//library/common/extensions/listener_managers/api_listener_manager:api_listener_manager_lib",
         "@envoy_mobile//library/common/extensions/retry/options/network_configuration:config",
     ] + envoy_select_enable_http3(
         [
