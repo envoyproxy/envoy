@@ -100,6 +100,9 @@ public:
                   const AsyncClient::StreamOptions& options);
   ~AsyncStreamImpl() override {
     router_.onDestroy();
+    for (uint32_t i = 0; i < high_watermark_calls_; ++i) {
+      watermark_callbacks_->get().onDecoderFilterBelowWriteBufferLowWatermark();
+    }
     if (destructor_callback_.has_value()) {
       (*destructor_callback_)();
     }
@@ -111,9 +114,19 @@ public:
   void removeDestructorCallback() override { destructor_callback_.reset(); }
 
   void setWatermarkCallbacks(DecoderFilterWatermarkCallbacks& callbacks) override {
+    ASSERT(!watermark_callbacks_);
     watermark_callbacks_.emplace(callbacks);
+    for (uint32_t i = 0; i < high_watermark_calls_; ++i) {
+      watermark_callbacks_->get().onDecoderFilterAboveWriteBufferHighWatermark();
+    }
   }
-  void removeWatermarkCallbacks() override { watermark_callbacks_.reset(); }
+  void removeWatermarkCallbacks() override {
+    ASSERT(watermark_callbacks_);
+    for (uint32_t i = 0; i < high_watermark_calls_; ++i) {
+      watermark_callbacks_->get().onDecoderFilterBelowWriteBufferLowWatermark();
+    }
+    watermark_callbacks_.reset();
+  }
 
   // Http::AsyncClient::Stream
   void sendHeaders(RequestHeaderMap& headers, bool end_stream) override;

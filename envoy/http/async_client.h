@@ -200,8 +200,9 @@ public:
   };
 
   /***
-   * An in-flight HTTP request to which additional data and trailers can be sent. Must be terminated
-   * by sending trailers or data with end_stream.
+   * An in-flight HTTP request to which additional data and trailers can be sent, as well as resets
+   * and other stream-cancelling events. Must be terminated by sending trailers or data with
+   * end_stream.
    */
   class OngoingRequest : public virtual Request, public virtual Stream {
   public:

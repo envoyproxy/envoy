@@ -36,6 +36,7 @@ using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
+using testing::StrictMock;
 
 namespace Envoy {
 namespace Http {
@@ -81,8 +82,8 @@ public:
   TestRequestHeaderMapImpl headers_{};
   RequestMessagePtr message_{new RequestMessageImpl()};
   Stats::MockIsolatedStatsStore stats_store_;
-  MockAsyncClientCallbacks callbacks_;
-  MockAsyncClientStreamCallbacks stream_callbacks_;
+  NiceMock<MockAsyncClientCallbacks> callbacks_;
+  NiceMock<MockAsyncClientStreamCallbacks> stream_callbacks_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<MockRequestEncoder> stream_encoder_;
   ResponseDecoder* response_decoder_{};
@@ -209,11 +210,11 @@ TEST_F(AsyncClientImplTest, BasicOngoingRequest) {
   TestRequestHeaderMapImpl headers_copy = *headers;
 
   std::unique_ptr<Buffer::OwnedImpl> data = std::make_unique<Buffer::OwnedImpl>("test data");
-  Buffer::OwnedImpl data_copy("test data");
+  const Buffer::OwnedImpl data_copy("test data");
 
   auto trailers = std::make_unique<TestRequestTrailerMapImpl>();
   trailers->addCopy("some", "trailer");
-  TestRequestTrailerMapImpl trailers_copy = *trailers;
+  const TestRequestTrailerMapImpl trailers_copy = *trailers;
 
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(Invoke(
@@ -252,6 +253,64 @@ TEST_F(AsyncClientImplTest, BasicOngoingRequest) {
   EXPECT_EQ(1UL, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                      .counter("internal.upstream_rq_200")
                      .value());
+}
+
+TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarking) {
+  auto headers = std::make_unique<TestRequestHeaderMapImpl>();
+  HttpTestUtility::addDefaultHeaders(*headers);
+  TestRequestHeaderMapImpl headers_copy = *headers;
+  headers_copy.addCopy("x-envoy-internal", "true");
+  headers_copy.addCopy("x-forwarded-for", "127.0.0.1");
+
+  std::unique_ptr<Buffer::OwnedImpl> data = std::make_unique<Buffer::OwnedImpl>("test data");
+  const Buffer::OwnedImpl data_copy("test data");
+
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke(
+          [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  stream_info_, {});
+            // Pretend like the connection is already backed up.
+            dynamic_cast<MockStream&>(stream_encoder_.getStream()).runHighWatermarkCallbacks();
+            response_decoder_ = &decoder;
+            return nullptr;
+          }));
+
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers_copy), false));
+
+  auto* request =
+      client_.startRequest(std::move(headers), callbacks_, AsyncClient::RequestOptions());
+  EXPECT_NE(request, nullptr);
+  StrictMock<MockStreamDecoderFilterCallbacks> watermark_callbacks;
+  // Registering a new watermark callback should note that the high watermark has already been hit.
+  EXPECT_CALL(watermark_callbacks, onDecoderFilterAboveWriteBufferHighWatermark());
+  request->setWatermarkCallbacks(watermark_callbacks);
+
+  // Upstream gets unblocked.
+  EXPECT_CALL(watermark_callbacks, onDecoderFilterBelowWriteBufferLowWatermark());
+  dynamic_cast<MockStream&>(stream_encoder_.getStream()).runLowWatermarkCallbacks();
+
+  EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data_copy), false));
+  request->captureAndSendData(std::move(data), false);
+  // Blocked again.
+  EXPECT_CALL(watermark_callbacks, onDecoderFilterAboveWriteBufferHighWatermark());
+  dynamic_cast<MockStream&>(stream_encoder_.getStream()).runHighWatermarkCallbacks();
+
+  // Clear the callback, which calls the low watermark function.
+  EXPECT_CALL(watermark_callbacks, onDecoderFilterBelowWriteBufferLowWatermark());
+  request->removeWatermarkCallbacks();
+  // Add the callback back.
+  EXPECT_CALL(watermark_callbacks, onDecoderFilterAboveWriteBufferHighWatermark());
+  request->setWatermarkCallbacks(watermark_callbacks);
+
+  EXPECT_CALL(stream_encoder_, encodeData(BufferStringEqual(""), true));
+  request->captureAndSendData(std::make_unique<Buffer::OwnedImpl>(), true);
+
+  ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
+  // On request end, we expect to run the low watermark callbacks.
+  EXPECT_CALL(watermark_callbacks, onDecoderFilterBelowWriteBufferLowWatermark());
+  response_decoder_->decodeHeaders(std::move(response_headers), true);
 }
 
 TEST_F(AsyncClientImplTracingTest, Basic) {
