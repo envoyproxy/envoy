@@ -8,6 +8,8 @@
 namespace Envoy {
 namespace Thread {
 
+// Base class for both performance and unit tests, no mocks or other "slow" test structures should
+// be added to it.
 class RealThreadsTestHelper {
 public:
   // Helper class to block on a number of multi-threaded operations occurring.

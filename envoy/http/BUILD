@@ -198,6 +198,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "early_header_mutation_interface",
+    hdrs = ["early_header_mutation.h"],
+    deps = [
+        ":header_map_interface",
+        "//envoy/config:typed_config_interface",
+        "//envoy/server:factory_context_interface",
+        "//envoy/stream_info:stream_info_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "header_evaluator",
     hdrs = ["header_evaluator.h"],
     deps = [
@@ -231,5 +242,15 @@ envoy_cc_library(
         "//envoy/http:protocol_interface",
         "//envoy/server:factory_context_interface",
         "//envoy/stream_info:stream_info_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "header_validator_errors",
+    hdrs = [
+        "header_validator_errors.h",
+    ],
+    deps = [
+        "//source/common/singleton:const_singleton",
     ],
 )

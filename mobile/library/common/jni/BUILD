@@ -21,31 +21,51 @@ cc_library(
     deps = [
         "//library/common/jni/import:jni_import_lib",
         "//library/common/types:c_types_lib",
+        "//library/common/types:managed_types_lib",
         "@envoy//source/common/common:assert_lib",
     ],
 )
 
 cc_library(
-    name = "envoy_jni_lib",
+    name = "jni_interface_lib",
     srcs = [
-        "android_jni_interface.cc",
         "jni_interface.cc",
     ],
-    copts = ["-std=c++17"],
-    linkopts = [
-        "-lm",
-        "-llog",
-        "-ldl",
-    ] + select({
-        "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
-        "//conditions:default": [],
-    }),
     deps = [
         ":android_network_utility_lib",
         ":jni_utility_lib",
         ":ndk_jni_support",
         "//library/common:envoy_main_interface_lib",
         "//library/common/api:c_types",
+        "//library/common/types:managed_types_lib",
+    ],
+    # We need this to ensure that we link this into the .so even though there are no code references.
+    alwayslink = True,
+)
+
+cc_library(
+    name = "envoy_jni_lib",
+    srcs = [
+        "android_jni_interface.cc",
+    ],
+    linkopts = [
+        "-lm",
+        "-ldl",
+    ] + select({
+        "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
+        "//conditions:default": [],
+    }) + select({
+        "@envoy//bazel:android": ["-llog"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        ":android_network_utility_lib",
+        ":jni_interface_lib",
+        ":jni_utility_lib",
+        ":ndk_jni_support",
+        "//library/common:envoy_main_interface_lib",
+        "//library/common/api:c_types",
+        "//library/common/types:managed_types_lib",
     ],
     # We need this to ensure that we link this into the .so even though there are no code references.
     alwayslink = True,
@@ -62,16 +82,13 @@ config_setting(
 # Main dynamic library for the Envoy Mobile aar
 cc_binary(
     name = "libenvoy_jni.so",
-    copts = ["-std=c++17"],
     linkopts = [
         "-lm",
-        "-llog",
     ] + select({
         "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
         "//conditions:default": [],
     }) + select({
-        # TODO(keith): https://github.com/rust-lang/compiler-builtins/issues/353
-        ":android_armeabi": ["-Wl,--allow-multiple-definition"],
+        "@envoy//bazel:android": ["-llog"],
         "//conditions:default": [],
     }),
     linkshared = True,
@@ -89,7 +106,7 @@ android_debug_info(
 ## Targets for local execution
 # OS X binary (.jnilib) for NDK testing
 envoy_mobile_so_to_jni_lib(
-    name = "libndk_envoy_jni.jnilib",
+    name = "libndk_envoy_jni_jnilib",
     native_dep = "libndk_envoy_jni.so",
 )
 
@@ -98,19 +115,19 @@ cc_binary(
     name = "libndk_envoy_jni.so",
     srcs = [
         "android_test_jni_interface.cc",
-        "jni_interface.cc",
     ],
-    copts = ["-std=c++17"],
     linkopts = [
     ],
     linkshared = True,
     deps = [
-        "base_java_jni_lib",
         ":android_network_utility_lib",
+        ":base_java_jni_lib",
         ":java_jni_support",
+        ":jni_interface_lib",
         "//library/common:envoy_main_interface_lib",
         "//library/common/api:c_types",
         "//library/common/jni/import:jni_import_lib",
+        "//library/common/types:managed_types_lib",
     ],
 )
 
@@ -122,12 +139,10 @@ envoy_mobile_so_to_jni_lib(
 
 cc_library(
     name = "java_jni_base_lib",
-    srcs = [
-        "jni_interface.cc",
-    ],
     deps = [
-        "base_java_jni_lib",
         ":android_network_utility_lib",
+        ":base_java_jni_lib",
+        ":jni_interface_lib",
     ],
     alwayslink = True,
 )
@@ -135,7 +150,6 @@ cc_library(
 # Base binary (.so) for JVM testing
 cc_binary(
     name = "libjava_jni_lib.so",
-    copts = ["-std=c++17"],
     linkopts = [
         "-lm",
     ],
@@ -148,23 +162,16 @@ cc_binary(
 
 cc_library(
     name = "base_java_jni_lib",
-    srcs = [
-        "jni_utility.cc",
-        "jni_version.cc",
-    ],
-    hdrs = [
-        "jni_utility.h",
-        "jni_version.h",
-    ],
-    copts = ["-std=c++14"],
     linkopts = [
         "-lm",
     ],
     deps = [
         ":java_jni_support",
+        ":jni_utility_lib",
         "//library/common/jni/import:jni_import_lib",
         "//library/common:envoy_main_interface_lib",
         "//library/common/types:c_types_lib",
+        "//library/common/types:managed_types_lib",
         "@envoy//source/common/common:assert_lib",
     ] + TEST_EXTENSIONS,
 )
@@ -176,7 +183,6 @@ cc_library(
         "java_jni_support.cc",
     ],
     hdrs = ["jni_support.h"],
-    copts = ["-std=c++14"],
     linkopts = [
         "-lm",
     ],
@@ -189,14 +195,17 @@ cc_library(
 cc_library(
     name = "ndk_jni_support",
     srcs = [
-        "ndk_jni_support.cc",
-    ],
+    ] + select({
+        "@envoy//bazel:android": ["ndk_jni_support.cc"],
+        "//conditions:default": [],
+    }),
     hdrs = ["jni_support.h"],
-    copts = ["-std=c++14"],
     linkopts = [
         "-lm",
-        "-llog",
-    ],
+    ] + select({
+        "@envoy//bazel:android": ["-llog"],
+        "//conditions:default": [],
+    }),
     deps = [
         "//library/common/jni/import:jni_import_lib",
     ],

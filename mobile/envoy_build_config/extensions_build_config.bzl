@@ -29,6 +29,8 @@ EXTENSIONS = {
     "envoy.transport_sockets.tls":                         "//source/extensions/transport_sockets/tls:config",
     "envoy.http.stateful_header_formatters.preserve_case": "//source/extensions/http/header_formatters/preserve_case:config",
     "envoy_mobile.cert_validator.platform_bridge_cert_validator": "@envoy_mobile//library/common/extensions/cert_validator/platform_bridge:config",
+    "envoy.listener_manager_impl.api":                     "@envoy_mobile//library/common/extensions/listener_managers/api_listener_manager:api_listener_manager_lib",
+
 }
 WINDOWS_EXTENSIONS = {}
 LEGACY_ALWAYSLINK = 1

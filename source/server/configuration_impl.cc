@@ -60,7 +60,8 @@ void FilterChainUtility::buildUdpFilterChain(
   }
 }
 
-StatsConfigImpl::StatsConfigImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+StatsConfigImpl::StatsConfigImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap)
+    : enable_lazyinit_stats_(bootstrap.enable_lazyinit_stats()) {
   if (bootstrap.has_stats_flush_interval() &&
       bootstrap.stats_flush_case() !=
           envoy::config::bootstrap::v3::Bootstrap::STATS_FLUSH_NOT_SET) {

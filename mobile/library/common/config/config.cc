@@ -156,7 +156,9 @@ R"(- &enable_drain_post_dns_refresh false
 
 !ignore tls_root_ca_defs: &tls_root_certs |
 )"
+#ifndef EXCLUDE_CERTIFICATES
 #include "certificates.inc"
+#endif
 R"(
 
 !ignore validation_context_defs:
@@ -267,7 +269,6 @@ const char* config_template = R"(
             - name: remote_service
               domains: ["*"]
               routes:
-#{fake_remote_responses}
               - match: { prefix: "/" }
                 direct_response: { status: 404, body: { inline_string: "not found" } }
                 request_headers_to_remove:
@@ -375,6 +376,15 @@ static_resources:
           route_config:
             name: api_router
             virtual_hosts:
+            - name: remote_service
+              domains: ["127.0.0.1"]
+              routes:
+#{fake_remote_responses}
+              - match: { prefix: "/" }
+                direct_response: { status: 404, body: { inline_string: "not found" } }
+                request_headers_to_remove:
+                - x-forwarded-proto
+                - x-envoy-mobile-cluster
 )"
 // The list of virtual hosts impacts directly the number of virtual cluster stats.
 // That's because we create a separate set of virtual clusters stats for every
@@ -495,7 +505,7 @@ stats_config:
         - safe_regex:
             regex: '^pulse.*'
         - safe_regex:
-            regex: '^vhost\.[\w]+\.vcluster\.[\w]+?\.upstream_rq_(?:[12345]xx|[3-5][0-9][0-9]|retry.*|time|timeout|total)'
+            regex: '^vhost\.[\w]+\.vcluster\.[\w]+?\.upstream_rq_(?:[12345]xx|[3-5][0-9][0-9]|retry|total)'
   use_all_default_tags:
     false
 watchdogs:

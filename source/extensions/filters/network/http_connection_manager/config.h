@@ -12,6 +12,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
 #include "envoy/filter/config_provider_manager.h"
+#include "envoy/http/early_header_mutation.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_validator.h"
 #include "envoy/http/original_ip_detection.h"
@@ -230,6 +231,10 @@ public:
   originalIpDetectionExtensions() const override {
     return original_ip_detection_extensions_;
   }
+  const std::vector<Http::EarlyHeaderMutationPtr>& earlyHeaderMutationExtensions() const override {
+    return early_header_mutation_extensions_;
+  }
+
   uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return proxy_status_config_.get();
@@ -239,6 +244,7 @@ public:
     return header_validator_factory_ ? header_validator_factory_->create(protocol, stream_info)
                                      : nullptr;
   }
+  bool appendXForwardedPort() const override { return append_x_forwarded_port_; }
 
 private:
   enum class CodecType { HTTP1, HTTP2, HTTP3, AUTO };
@@ -317,6 +323,7 @@ private:
       headers_with_underscores_action_;
   const LocalReply::LocalReplyPtr local_reply_;
   std::vector<Http::OriginalIPDetectionSharedPtr> original_ip_detection_extensions_{};
+  std::vector<Http::EarlyHeaderMutationPtr> early_header_mutation_extensions_{};
 
   // Default idle timeout is 5 minutes if nothing is specified in the HCM config.
   static const uint64_t StreamIdleTimeoutMs = 5 * 60 * 1000;
@@ -330,6 +337,7 @@ private:
   const uint64_t max_requests_per_connection_;
   const std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;
   const Http::HeaderValidatorFactoryPtr header_validator_factory_;
+  const bool append_x_forwarded_port_;
 };
 
 /**

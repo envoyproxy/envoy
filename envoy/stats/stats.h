@@ -211,6 +211,7 @@ template <typename Stat> using StatFn = std::function<void(Stat&)>;
 
 // Template that lazy-init a StatsStruct.
 template <typename StatsStructType> class LazyInit;
+template <typename StatsStructType> class DirectStats;
 
 } // namespace Stats
 } // namespace Envoy

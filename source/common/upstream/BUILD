@@ -247,6 +247,7 @@ envoy_cc_library(
     deps = [
         "//envoy/upstream:load_balancer_interface",
         "//envoy/upstream:upstream_interface",
+        "//source/common/runtime:runtime_lib",
     ],
 )
 

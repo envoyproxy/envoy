@@ -10,6 +10,7 @@ Breaking changes:
 - build: building on macOS now requires Xcode 14.1. (:issue:`#2664 <2664>`)
 - iOS: remove experimental option to force all connections to use IPv6.
 - kotlin: always use ``getaddrinfo`` DNS resolver. Remove ``addDNSFallbackNameservers``, ``enableDNSFilterUnroutableFamilies``, and ``enableDNSUseSystemResolver`` methods from the Kotlin engine builder. (:issue:`#2618 <2618>`)
+- Envoy Mobile's release builds compile without admin support by default. (``--define=admin_functionality=disabled``) (:issue`#2693 <2693>`)
 
 Bugfixes:
 
@@ -26,6 +27,7 @@ Features:
 - api: Add support for String Accessors to the C++ EngineBuilder. (:issue:`#2498 <2498>`)
 - api: Add support for Native Filters and Platform Filters to the C++ EngineBuilder. (:issue:`#2498 <2498>`)
 - api: added upstream protocol to final stream intel. (:issue:`#2613 <2613>`)
+- build: Add a build feature ``exclude_certificates`` to disable inclusion of the Envoy Mobile certificate list, for use when using platform certificate validation.
 
 0.5.0 (September 2, 2022)
 ===========================

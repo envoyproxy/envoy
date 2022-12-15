@@ -235,7 +235,7 @@ TEST_F(ConnPoolMapImplTest, GetPoolHittingLimitIncrementsFailureCounter) {
   ON_CALL(*mock_pools_[0], hasActiveConnections()).WillByDefault(Return(true));
   test_map->getPool(2, getNeverCalledFactory());
 
-  EXPECT_EQ(host_->cluster_.traffic_stats_->upstream_cx_pool_overflow_.value(), 1);
+  EXPECT_EQ(host_->cluster_.trafficStats()->upstream_cx_pool_overflow_.value(), 1);
 }
 
 TEST_F(ConnPoolMapImplTest, GetPoolHittingLimitIncrementsFailureMultiple) {
@@ -247,7 +247,7 @@ TEST_F(ConnPoolMapImplTest, GetPoolHittingLimitIncrementsFailureMultiple) {
   test_map->getPool(2, getNeverCalledFactory());
   test_map->getPool(2, getNeverCalledFactory());
 
-  EXPECT_EQ(host_->cluster_.traffic_stats_->upstream_cx_pool_overflow_.value(), 3);
+  EXPECT_EQ(host_->cluster_.trafficStats()->upstream_cx_pool_overflow_.value(), 3);
 }
 
 TEST_F(ConnPoolMapImplTest, GetPoolHittingLimitGreaterThan1Fails) {
@@ -284,7 +284,7 @@ TEST_F(ConnPoolMapImplTest, GetPoolLimitHitFollowedBySuccessDoesNotClearFailure)
   ON_CALL(*mock_pools_[0], hasActiveConnections()).WillByDefault(Return(false));
 
   test_map->getPool(2, getBasicFactory());
-  EXPECT_EQ(host_->cluster_.traffic_stats_->upstream_cx_pool_overflow_.value(), 1);
+  EXPECT_EQ(host_->cluster_.trafficStats()->upstream_cx_pool_overflow_.value(), 1);
 }
 
 // Test that only the pool which are idle are actually cleared

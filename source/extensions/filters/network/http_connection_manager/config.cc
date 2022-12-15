@@ -32,16 +32,13 @@
 #include "source/common/http/utility.h"
 #include "source/common/local_reply/local_reply.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/quic/server_connection_factory.h"
 #include "source/common/router/rds_impl.h"
 #include "source/common/router/scoped_rds.h"
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/tracing/custom_tag_impl.h"
 #include "source/common/tracing/http_tracer_manager_impl.h"
 #include "source/common/tracing/tracer_config_impl.h"
-
-#ifdef ENVOY_ENABLE_QUIC
-#include "source/common/quic/codec_impl.h"
-#endif
 
 namespace Envoy {
 namespace Extensions {
@@ -381,7 +378,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
                                ? std::make_unique<HttpConnectionManagerProto::ProxyStatusConfig>(
                                      config.proxy_status_config())
                                : nullptr),
-      header_validator_factory_(createHeaderValidatorFactory(config, context)) {
+      header_validator_factory_(createHeaderValidatorFactory(config, context)),
+      append_x_forwarded_port_(config.append_x_forwarded_port()) {
   if (!idle_timeout_) {
     idle_timeout_ = std::chrono::hours(1);
   } else if (idle_timeout_.value().count() == 0) {
@@ -451,8 +449,26 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     original_ip_detection_extensions_.push_back(extension);
   }
 
-  // If scoped RDS is enabled, avoid creating a route config provider. Route config providers will
-  // be managed by the scoped routing logic instead.
+  const auto& header_mutation_extensions = config.early_header_mutation_extensions();
+  early_header_mutation_extensions_.reserve(header_mutation_extensions.size());
+  for (const auto& extension_config : header_mutation_extensions) {
+    auto* factory =
+        Envoy::Config::Utility::getFactory<Http::EarlyHeaderMutationFactory>(extension_config);
+    if (!factory) {
+      throw EnvoyException(
+          fmt::format("Early header mutation extension not found: '{}'", extension_config.name()));
+    }
+
+    auto extension = factory->createExtension(extension_config.typed_config(), context_);
+    if (!extension) {
+      throw EnvoyException(fmt::format("Early header mutation extension could not be created: '{}'",
+                                       extension_config.name()));
+    }
+    early_header_mutation_extensions_.push_back(std::move(extension));
+  }
+
+  // If scoped RDS is enabled, avoid creating a route config provider. Route config providers
+  // will be managed by the scoped routing logic instead.
   switch (config.route_specifier_case()) {
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       RouteSpecifierCase::kRds:
@@ -669,15 +685,13 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
         context_.api().randomGenerator(), http2_options_, maxRequestHeadersKb(),
         maxRequestHeadersCount(), headersWithUnderscoresAction());
   case CodecType::HTTP3:
-#ifdef ENVOY_ENABLE_QUIC
-    return std::make_unique<Quic::QuicHttpServerConnectionImpl>(
-        dynamic_cast<Quic::EnvoyQuicServerSession&>(connection), callbacks,
-        Http::Http3::CodecStats::atomicGet(http3_codec_stats_, context_.scope()), http3_options_,
-        maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
-#else
-    // Should be blocked by configuration checking at an earlier point.
-    PANIC("unexpected");
-#endif
+    return Config::Utility::getAndCheckFactoryByName<QuicHttpServerConnectionFactory>(
+               "quic.http_server_connection.default")
+        .createQuicHttpServerConnectionImpl(
+            connection, callbacks,
+            Http::Http3::CodecStats::atomicGet(http3_codec_stats_, context_.scope()),
+            http3_options_, maxRequestHeadersKb(), maxRequestHeadersCount(),
+            headersWithUnderscoresAction());
   case CodecType::AUTO:
     return Http::ConnectionManagerUtility::autoCreateCodec(
         connection, data, callbacks, context_.scope(), context_.api().randomGenerator(),

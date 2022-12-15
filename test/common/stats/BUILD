@@ -304,6 +304,8 @@ envoy_cc_test(
         "//source/common/memory:stats_lib",
         "//source/common/stats:stats_matcher_lib",
         "//source/common/stats:symbol_table_lib",
+        "//source/common/stats:thread_local_store_lib",
+        "//source/common/thread_local:thread_local_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/mocks/stats:stats_mocks",

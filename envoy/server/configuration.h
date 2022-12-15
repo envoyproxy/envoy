@@ -84,6 +84,11 @@ public:
    * @return bool indicator to flush stats on-demand via the admin interface instead of on a timer.
    */
   virtual bool flushOnAdmin() const PURE;
+
+  /**
+   * When true, enable lazy-init of stats.
+   */
+  virtual bool enableLazyInitStats() const PURE;
 };
 
 /**

@@ -71,9 +71,7 @@ envoy_cc_library(
         ":null_counter_lib",
         ":null_gauge_lib",
         ":null_text_readout_lib",
-        ":scope_prefixer_lib",
         ":stats_lib",
-        ":store_impl_lib",
         ":tag_utility_lib",
         "//envoy/stats:stats_macros",
         "//source/common/stats:allocator_lib",
@@ -138,26 +136,6 @@ envoy_cc_library(
     hdrs = ["recent_lookups.h"],
     deps = [
         "//source/common/common:assert_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "store_impl_lib",
-    hdrs = ["store_impl.h"],
-    deps = [
-        ":symbol_table_lib",
-        "//envoy/stats:stats_interface",
-    ],
-)
-
-envoy_cc_library(
-    name = "scope_prefixer_lib",
-    srcs = ["scope_prefixer.cc"],
-    hdrs = ["scope_prefixer.h"],
-    deps = [
-        ":symbol_table_lib",
-        ":utility_lib",
-        "//envoy/stats:stats_interface",
     ],
 )
 
@@ -264,7 +242,6 @@ envoy_cc_library(
         ":null_counter_lib",
         ":null_gauge_lib",
         ":null_text_readout_lib",
-        ":scope_prefixer_lib",
         ":stats_lib",
         ":stats_matcher_lib",
         ":tag_producer_lib",

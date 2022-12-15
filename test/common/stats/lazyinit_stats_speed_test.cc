@@ -33,7 +33,7 @@ public:
       scopes_.push_back(scope);
       if (lazy_init_) {
         auto lazy_stat =
-            std::make_shared<Stats::LazyInit<ClusterTrafficStats>>(*scope, stat_names_);
+            std::make_shared<Stats::LazyInit<ClusterTrafficStats>>(stat_names_, *scope);
         lazy_stats_.push_back(lazy_stat);
         if (!defer_init) {
           *(*lazy_stat);

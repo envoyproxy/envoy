@@ -81,7 +81,7 @@ public:
 
     client_ = ClientImpl::create(host_, dispatcher_, Common::Redis::EncoderPtr{encoder_}, *this,
                                  *config_, redis_command_stats_, stats_, false);
-    EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_cx_total_.value());
+    EXPECT_EQ(1UL, host_->cluster_.trafficStats()->upstream_cx_total_.value());
     EXPECT_EQ(1UL, host_->stats_.cx_total_.value());
     EXPECT_EQ(false, client_->active());
 
@@ -117,8 +117,8 @@ public:
     EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
     client_->initialize(auth_username_, auth_password_);
 
-    EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_rq_total_.value());
-    EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_rq_active_.value());
+    EXPECT_EQ(1UL, host_->cluster_.trafficStats()->upstream_rq_total_.value());
+    EXPECT_EQ(1UL, host_->cluster_.trafficStats()->upstream_rq_active_.value());
     EXPECT_EQ(1UL, host_->stats_.rq_total_.value());
     EXPECT_EQ(1UL, host_->stats_.rq_active_.value());
 
@@ -308,8 +308,8 @@ TEST_F(RedisClientImplTest, Basic) {
   PoolRequest* handle2 = client_->makeRequest(request2, callbacks2);
   EXPECT_NE(nullptr, handle2);
 
-  EXPECT_EQ(2UL, host_->cluster_.traffic_stats_->upstream_rq_total_.value());
-  EXPECT_EQ(2UL, host_->cluster_.traffic_stats_->upstream_rq_active_.value());
+  EXPECT_EQ(2UL, host_->cluster_.trafficStats()->upstream_rq_total_.value());
+  EXPECT_EQ(2UL, host_->cluster_.trafficStats()->upstream_rq_active_.value());
   EXPECT_EQ(2UL, host_->stats_.rq_total_.value());
   EXPECT_EQ(2UL, host_->stats_.rq_active_.value());
 
@@ -385,8 +385,8 @@ TEST_F(RedisClientImplTest, CommandStatsDisabledSingleRequest) {
   onConnected();
 
   // Regular Envoy stats function as normal
-  EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_rq_total_.value());
-  EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_rq_active_.value());
+  EXPECT_EQ(1UL, host_->cluster_.trafficStats()->upstream_rq_total_.value());
+  EXPECT_EQ(1UL, host_->cluster_.trafficStats()->upstream_rq_active_.value());
   EXPECT_EQ(1UL, host_->stats_.rq_total_.value());
   EXPECT_EQ(1UL, host_->stats_.rq_active_.value());
 
@@ -449,8 +449,8 @@ TEST_F(RedisClientImplTest, CommandStatsEnabledTwoRequests) {
   EXPECT_NE(nullptr, handle2);
 
   // Regular Envoy stats function as normal
-  EXPECT_EQ(2UL, host_->cluster_.traffic_stats_->upstream_rq_total_.value());
-  EXPECT_EQ(2UL, host_->cluster_.traffic_stats_->upstream_rq_active_.value());
+  EXPECT_EQ(2UL, host_->cluster_.trafficStats()->upstream_rq_total_.value());
+  EXPECT_EQ(2UL, host_->cluster_.trafficStats()->upstream_rq_active_.value());
   EXPECT_EQ(2UL, host_->stats_.rq_total_.value());
   EXPECT_EQ(2UL, host_->stats_.rq_active_.value());
 
@@ -513,8 +513,8 @@ TEST_F(RedisClientImplTest, InitializedWithAuthPassword) {
   EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
   client_->initialize(auth_username_, auth_password_);
 
-  EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_rq_total_.value());
-  EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_rq_active_.value());
+  EXPECT_EQ(1UL, host_->cluster_.trafficStats()->upstream_rq_total_.value());
+  EXPECT_EQ(1UL, host_->cluster_.trafficStats()->upstream_rq_active_.value());
   EXPECT_EQ(1UL, host_->stats_.rq_total_.value());
   EXPECT_EQ(1UL, host_->stats_.rq_active_.value());
 
@@ -535,8 +535,8 @@ TEST_F(RedisClientImplTest, InitializedWithAuthAcl) {
   EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
   client_->initialize(auth_username_, auth_password_);
 
-  EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_rq_total_.value());
-  EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_rq_active_.value());
+  EXPECT_EQ(1UL, host_->cluster_.trafficStats()->upstream_rq_total_.value());
+  EXPECT_EQ(1UL, host_->cluster_.trafficStats()->upstream_rq_active_.value());
   EXPECT_EQ(1UL, host_->stats_.rq_total_.value());
   EXPECT_EQ(1UL, host_->stats_.rq_active_.value());
 
@@ -612,7 +612,7 @@ TEST_F(RedisClientImplTest, Cancel) {
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
   client_->close();
 
-  EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_rq_cancelled_.value());
+  EXPECT_EQ(1UL, host_->cluster_.trafficStats()->upstream_rq_cancelled_.value());
 }
 
 TEST_F(RedisClientImplTest, FailAll) {
@@ -639,9 +639,9 @@ TEST_F(RedisClientImplTest, FailAll) {
   EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose));
   upstream_connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
 
-  EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_cx_destroy_with_active_rq_.value());
+  EXPECT_EQ(1UL, host_->cluster_.trafficStats()->upstream_cx_destroy_with_active_rq_.value());
   EXPECT_EQ(1UL,
-            host_->cluster_.traffic_stats_->upstream_cx_destroy_remote_with_active_rq_.value());
+            host_->cluster_.trafficStats()->upstream_cx_destroy_remote_with_active_rq_.value());
 }
 
 TEST_F(RedisClientImplTest, FailAllWithCancel) {
@@ -667,9 +667,9 @@ TEST_F(RedisClientImplTest, FailAllWithCancel) {
   EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
   upstream_connection_->raiseEvent(Network::ConnectionEvent::LocalClose);
 
-  EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_cx_destroy_with_active_rq_.value());
-  EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_cx_destroy_local_with_active_rq_.value());
-  EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_rq_cancelled_.value());
+  EXPECT_EQ(1UL, host_->cluster_.trafficStats()->upstream_cx_destroy_with_active_rq_.value());
+  EXPECT_EQ(1UL, host_->cluster_.trafficStats()->upstream_cx_destroy_local_with_active_rq_.value());
+  EXPECT_EQ(1UL, host_->cluster_.trafficStats()->upstream_rq_cancelled_.value());
 }
 
 TEST_F(RedisClientImplTest, ProtocolError) {
@@ -697,7 +697,7 @@ TEST_F(RedisClientImplTest, ProtocolError) {
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
   upstream_read_filter_->onData(fake_data, false);
 
-  EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_cx_protocol_error_.value());
+  EXPECT_EQ(1UL, host_->cluster_.trafficStats()->upstream_cx_protocol_error_.value());
   EXPECT_EQ(1UL, host_->stats_.rq_error_.value());
 }
 
@@ -719,7 +719,7 @@ TEST_F(RedisClientImplTest, ConnectFail) {
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
   upstream_connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
 
-  EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_cx_connect_fail_.value());
+  EXPECT_EQ(1UL, host_->cluster_.trafficStats()->upstream_cx_connect_fail_.value());
   EXPECT_EQ(1UL, host_->stats_.cx_connect_fail_.value());
 }
 
@@ -754,7 +754,7 @@ TEST_F(RedisClientImplTest, OutlierDisabled) {
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
   upstream_connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
 
-  EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_cx_connect_fail_.value());
+  EXPECT_EQ(1UL, host_->cluster_.trafficStats()->upstream_cx_connect_fail_.value());
   EXPECT_EQ(1UL, host_->stats_.cx_connect_fail_.value());
 }
 
@@ -777,7 +777,7 @@ TEST_F(RedisClientImplTest, ConnectTimeout) {
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
   connect_or_op_timer_->invokeCallback();
 
-  EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_cx_connect_timeout_.value());
+  EXPECT_EQ(1UL, host_->cluster_.trafficStats()->upstream_cx_connect_timeout_.value());
   EXPECT_EQ(1UL, host_->stats_.cx_connect_fail_.value());
 }
 
@@ -795,8 +795,8 @@ TEST_F(RedisClientImplTest, OpTimeout) {
 
   onConnected();
 
-  EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_rq_total_.value());
-  EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_rq_active_.value());
+  EXPECT_EQ(1UL, host_->cluster_.trafficStats()->upstream_rq_total_.value());
+  EXPECT_EQ(1UL, host_->cluster_.trafficStats()->upstream_rq_active_.value());
 
   EXPECT_CALL(callbacks1, onResponse_(_));
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
@@ -804,8 +804,8 @@ TEST_F(RedisClientImplTest, OpTimeout) {
               putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
   respond();
 
-  EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_rq_total_.value());
-  EXPECT_EQ(0UL, host_->cluster_.traffic_stats_->upstream_rq_active_.value());
+  EXPECT_EQ(1UL, host_->cluster_.trafficStats()->upstream_rq_total_.value());
+  EXPECT_EQ(0UL, host_->cluster_.trafficStats()->upstream_rq_active_.value());
 
   EXPECT_CALL(*encoder_, encode(Ref(request1), _));
   EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
@@ -820,10 +820,10 @@ TEST_F(RedisClientImplTest, OpTimeout) {
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
   connect_or_op_timer_->invokeCallback();
 
-  EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_rq_timeout_.value());
+  EXPECT_EQ(1UL, host_->cluster_.trafficStats()->upstream_rq_timeout_.value());
   EXPECT_EQ(1UL, host_->stats_.rq_timeout_.value());
-  EXPECT_EQ(2UL, host_->cluster_.traffic_stats_->upstream_rq_total_.value());
-  EXPECT_EQ(0UL, host_->cluster_.traffic_stats_->upstream_rq_active_.value());
+  EXPECT_EQ(2UL, host_->cluster_.trafficStats()->upstream_rq_total_.value());
+  EXPECT_EQ(0UL, host_->cluster_.trafficStats()->upstream_rq_active_.value());
 }
 
 TEST_F(RedisClientImplTest, AskRedirection) {
@@ -847,8 +847,8 @@ TEST_F(RedisClientImplTest, AskRedirection) {
   PoolRequest* handle2 = client_->makeRequest(request2, callbacks2);
   EXPECT_NE(nullptr, handle2);
 
-  EXPECT_EQ(2UL, host_->cluster_.traffic_stats_->upstream_rq_total_.value());
-  EXPECT_EQ(2UL, host_->cluster_.traffic_stats_->upstream_rq_active_.value());
+  EXPECT_EQ(2UL, host_->cluster_.trafficStats()->upstream_rq_total_.value());
+  EXPECT_EQ(2UL, host_->cluster_.trafficStats()->upstream_rq_active_.value());
   EXPECT_EQ(2UL, host_->stats_.rq_total_.value());
   EXPECT_EQ(2UL, host_->stats_.rq_active_.value());
 
@@ -904,8 +904,8 @@ TEST_F(RedisClientImplTest, MovedRedirection) {
   PoolRequest* handle2 = client_->makeRequest(request2, callbacks2);
   EXPECT_NE(nullptr, handle2);
 
-  EXPECT_EQ(2UL, host_->cluster_.traffic_stats_->upstream_rq_total_.value());
-  EXPECT_EQ(2UL, host_->cluster_.traffic_stats_->upstream_rq_active_.value());
+  EXPECT_EQ(2UL, host_->cluster_.trafficStats()->upstream_rq_total_.value());
+  EXPECT_EQ(2UL, host_->cluster_.trafficStats()->upstream_rq_active_.value());
   EXPECT_EQ(2UL, host_->stats_.rq_total_.value());
   EXPECT_EQ(2UL, host_->stats_.rq_active_.value());
 
@@ -961,8 +961,8 @@ TEST_F(RedisClientImplTest, RedirectionFailure) {
   PoolRequest* handle2 = client_->makeRequest(request2, callbacks2);
   EXPECT_NE(nullptr, handle2);
 
-  EXPECT_EQ(2UL, host_->cluster_.traffic_stats_->upstream_rq_total_.value());
-  EXPECT_EQ(2UL, host_->cluster_.traffic_stats_->upstream_rq_active_.value());
+  EXPECT_EQ(2UL, host_->cluster_.trafficStats()->upstream_rq_total_.value());
+  EXPECT_EQ(2UL, host_->cluster_.trafficStats()->upstream_rq_active_.value());
   EXPECT_EQ(2UL, host_->stats_.rq_total_.value());
   EXPECT_EQ(2UL, host_->stats_.rq_active_.value());
 
@@ -983,9 +983,9 @@ TEST_F(RedisClientImplTest, RedirectionFailure) {
     callbacks_->onRespValue(std::move(response1));
 
     EXPECT_EQ(0UL,
-              host_->cluster_.traffic_stats_->upstream_internal_redirect_succeeded_total_.value());
+              host_->cluster_.trafficStats()->upstream_internal_redirect_succeeded_total_.value());
     EXPECT_EQ(0UL,
-              host_->cluster_.traffic_stats_->upstream_internal_redirect_failed_total_.value());
+              host_->cluster_.trafficStats()->upstream_internal_redirect_failed_total_.value());
 
     // Test a truncated MOVED error response that cannot be parsed properly.
     Common::Redis::RespValuePtr response2(new Common::Redis::RespValue());
@@ -998,9 +998,9 @@ TEST_F(RedisClientImplTest, RedirectionFailure) {
     callbacks_->onRespValue(std::move(response2));
 
     EXPECT_EQ(0UL,
-              host_->cluster_.traffic_stats_->upstream_internal_redirect_succeeded_total_.value());
+              host_->cluster_.trafficStats()->upstream_internal_redirect_succeeded_total_.value());
     EXPECT_EQ(0UL,
-              host_->cluster_.traffic_stats_->upstream_internal_redirect_failed_total_.value());
+              host_->cluster_.trafficStats()->upstream_internal_redirect_failed_total_.value());
   }));
   upstream_read_filter_->onData(fake_data, false);
 
@@ -1030,8 +1030,8 @@ TEST_F(RedisClientImplTest, AskRedirectionNotEnabled) {
   PoolRequest* handle2 = client_->makeRequest(request2, callbacks2);
   EXPECT_NE(nullptr, handle2);
 
-  EXPECT_EQ(2UL, host_->cluster_.traffic_stats_->upstream_rq_total_.value());
-  EXPECT_EQ(2UL, host_->cluster_.traffic_stats_->upstream_rq_active_.value());
+  EXPECT_EQ(2UL, host_->cluster_.trafficStats()->upstream_rq_total_.value());
+  EXPECT_EQ(2UL, host_->cluster_.trafficStats()->upstream_rq_active_.value());
   EXPECT_EQ(2UL, host_->stats_.rq_total_.value());
   EXPECT_EQ(2UL, host_->stats_.rq_active_.value());
 
@@ -1050,9 +1050,9 @@ TEST_F(RedisClientImplTest, AskRedirectionNotEnabled) {
     callbacks_->onRespValue(std::move(response1));
 
     EXPECT_EQ(0UL,
-              host_->cluster_.traffic_stats_->upstream_internal_redirect_failed_total_.value());
+              host_->cluster_.trafficStats()->upstream_internal_redirect_failed_total_.value());
     EXPECT_EQ(0UL,
-              host_->cluster_.traffic_stats_->upstream_internal_redirect_succeeded_total_.value());
+              host_->cluster_.trafficStats()->upstream_internal_redirect_succeeded_total_.value());
 
     Common::Redis::RespValuePtr response2(new Common::Redis::RespValue());
     response2->type(Common::Redis::RespType::Error);
@@ -1065,9 +1065,9 @@ TEST_F(RedisClientImplTest, AskRedirectionNotEnabled) {
     callbacks_->onRespValue(std::move(response2));
 
     EXPECT_EQ(0UL,
-              host_->cluster_.traffic_stats_->upstream_internal_redirect_failed_total_.value());
+              host_->cluster_.trafficStats()->upstream_internal_redirect_failed_total_.value());
     EXPECT_EQ(0UL,
-              host_->cluster_.traffic_stats_->upstream_internal_redirect_succeeded_total_.value());
+              host_->cluster_.trafficStats()->upstream_internal_redirect_succeeded_total_.value());
   }));
   upstream_read_filter_->onData(fake_data, false);
 
@@ -1097,8 +1097,8 @@ TEST_F(RedisClientImplTest, MovedRedirectionNotEnabled) {
   PoolRequest* handle2 = client_->makeRequest(request2, callbacks2);
   EXPECT_NE(nullptr, handle2);
 
-  EXPECT_EQ(2UL, host_->cluster_.traffic_stats_->upstream_rq_total_.value());
-  EXPECT_EQ(2UL, host_->cluster_.traffic_stats_->upstream_rq_active_.value());
+  EXPECT_EQ(2UL, host_->cluster_.trafficStats()->upstream_rq_total_.value());
+  EXPECT_EQ(2UL, host_->cluster_.trafficStats()->upstream_rq_active_.value());
   EXPECT_EQ(2UL, host_->stats_.rq_total_.value());
   EXPECT_EQ(2UL, host_->stats_.rq_active_.value());
 
@@ -1116,9 +1116,9 @@ TEST_F(RedisClientImplTest, MovedRedirectionNotEnabled) {
     callbacks_->onRespValue(std::move(response1));
 
     EXPECT_EQ(0UL,
-              host_->cluster_.traffic_stats_->upstream_internal_redirect_succeeded_total_.value());
+              host_->cluster_.trafficStats()->upstream_internal_redirect_succeeded_total_.value());
     EXPECT_EQ(0UL,
-              host_->cluster_.traffic_stats_->upstream_internal_redirect_failed_total_.value());
+              host_->cluster_.trafficStats()->upstream_internal_redirect_failed_total_.value());
 
     Common::Redis::RespValuePtr response2(new Common::Redis::RespValue());
     response2->type(Common::Redis::RespType::Error);
@@ -1131,9 +1131,9 @@ TEST_F(RedisClientImplTest, MovedRedirectionNotEnabled) {
     callbacks_->onRespValue(std::move(response2));
 
     EXPECT_EQ(0UL,
-              host_->cluster_.traffic_stats_->upstream_internal_redirect_succeeded_total_.value());
+              host_->cluster_.trafficStats()->upstream_internal_redirect_succeeded_total_.value());
     EXPECT_EQ(0UL,
-              host_->cluster_.traffic_stats_->upstream_internal_redirect_failed_total_.value());
+              host_->cluster_.trafficStats()->upstream_internal_redirect_failed_total_.value());
   }));
   upstream_read_filter_->onData(fake_data, false);
 

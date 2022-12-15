@@ -1,16 +1,10 @@
-name: core
+name: mobile_core
 
 on:
   push:
     branches:
     - main
-    paths:
-    - 'mobile/**'
-    - '.github/workflows/**'
   pull_request:
-    paths:
-    - 'mobile/**'
-    - '.github/workflows/**'
 
 jobs:
   unittests:
@@ -19,11 +13,14 @@ jobs:
     timeout-minutes: 120
     steps:
     - uses: actions/checkout@v1
-      with:
-        submodules: true
+    - id: should_run
+      name: 'Check whether to run'
+      run: ./mobile/tools/should_run_ci.sh
     - name: 'Install dependencies'
+      if: steps.should_run.outputs.run_ci_job == 'true'
       run: cd mobile && ./ci/mac_ci_setup.sh
     - name: 'Run tests'
+      if: steps.should_run.outputs.run_ci_job == 'true'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |

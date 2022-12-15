@@ -32,6 +32,11 @@
 #include "fmt/format.h"
 
 namespace Envoy {
+
+namespace Stats {
+template <typename StatsStructType> class LazyableInterface;
+}
+
 namespace Http {
 class FilterChainManager;
 }
@@ -219,6 +224,12 @@ public:
    * across threads.
    */
   virtual void setOutlierDetector(Outlier::DetectorHostMonitorPtr&& outlier_detector) PURE;
+
+  /**
+   * Set the timestamp of when the host has transitioned from unhealthy to healthy state via an
+   * active healchecking.
+   */
+  virtual void setLastHcPassTime(MonotonicTime last_hc_pass_time) PURE;
 
   /**
    * @return the current load balancing weight of the host, in the range 1-128 (see
@@ -759,6 +770,9 @@ MAKE_STATS_STRUCT(ClusterLbStats, ClusterLbStatNames, ALL_CLUSTER_LB_STATS);
  */
 MAKE_STAT_NAMES_STRUCT(ClusterTrafficStatNames, ALL_CLUSTER_TRAFFIC_STATS);
 MAKE_STATS_STRUCT(ClusterTrafficStats, ClusterTrafficStatNames, ALL_CLUSTER_TRAFFIC_STATS);
+using LazyInitClusterTrafficStats = Stats::LazyInit<ClusterTrafficStats>;
+using DirectInitClusterTrafficStats = Stats::DirectStats<ClusterTrafficStats>;
+using LazyableClusterTrafficStats = Stats::LazyableInterface<ClusterTrafficStats>;
 
 MAKE_STAT_NAMES_STRUCT(ClusterLoadReportStatNames, ALL_CLUSTER_LOAD_REPORT_STATS);
 MAKE_STATS_STRUCT(ClusterLoadReportStats, ClusterLoadReportStatNames,
@@ -1054,10 +1068,9 @@ public:
   virtual ClusterEndpointStats& endpointStats() const PURE;
 
   /**
-   * @return ClusterTrafficStats& all traffic related stats for this cluster.
+   * @return  all traffic related stats for this cluster.
    */
-  virtual Stats::LazyInit<ClusterTrafficStats>& trafficStats() const PURE;
-
+  virtual LazyableClusterTrafficStats& trafficStats() const PURE;
   /**
    * @return the stats scope that contains all cluster stats. This can be used to produce dynamic
    *         stats that will be freed when the cluster is removed.
