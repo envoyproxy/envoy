@@ -105,7 +105,7 @@ std::chrono::milliseconds HealthCheckerImplBase::interval(HealthState state,
   // If a connection has been established, we choose an interval based on the host's health. Please
   // refer to the HealthCheck API documentation for more details.
   uint64_t base_time_ms;
-  if (cluster_.info()->trafficStats().upstream_cx_total_.used()) {
+  if (cluster_.info()->trafficStats()->upstream_cx_total_.used()) {
     // When healthy/unhealthy threshold is configured the health transition of a host will be
     // delayed. In this situation Envoy should use the edge interval settings between health checks.
     //

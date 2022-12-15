@@ -37,6 +37,7 @@
 #include "library/common/extensions/filters/http/network_configuration/config.h"
 #include "library/common/extensions/filters/http/platform_bridge/config.h"
 #include "library/common/extensions/filters/http/route_cache_reset/config.h"
+#include "library/common/extensions/listener_managers/api_listener_manager/api_listener_manager.h"
 #include "library/common/extensions/retry/options/network_configuration/config.h"
 
 namespace Envoy {
@@ -81,6 +82,7 @@ void ExtensionRegistry::registerFactories() {
   Envoy::Network::forceRegisterGetAddrInfoDnsResolverFactory();
   Envoy::Extensions::RequestId::forceRegisterUUIDRequestIDExtensionFactory();
   Envoy::Server::forceRegisterDefaultListenerManagerFactoryImpl();
+  Envoy::Server::forceRegisterApiListenerManagerFactoryImpl();
 
 #ifdef ENVOY_ENABLE_QUIC
   Quic::forceRegisterQuicServerTransportSocketConfigFactory();
