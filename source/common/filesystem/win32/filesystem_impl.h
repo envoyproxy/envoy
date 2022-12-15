@@ -23,7 +23,7 @@ protected:
     DWORD creation_ = 0;
   };
 
-  virtual FlagsAndMode translateFlag(FlagSet in);
+  FlagsAndMode translateFlag(FlagSet in);
 
 private:
   friend class FileSystemImplTest;
