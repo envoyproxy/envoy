@@ -126,7 +126,7 @@ public:
   }
   virtual void clearCallbacks();
 
-  // // Called if the underlying connection is idle over the cluster's tcpPoolIdleTimeout()
+  // Called if the underlying connection is idle over the cluster's tcpPoolIdleTimeout()
   void onIdleTimeout();
   void disableIdleTimer();
   void setIdleTimer();

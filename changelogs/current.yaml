@@ -69,6 +69,9 @@ minor_behavior_changes:
   change: |
     reverting the behavioral change to have ``CONNECT`` and upgrade requests over HTTP/1.1 not delay close.  One can reinstate
     delay close for upgrades by setting ``envoy.reloadable_features.no_delay_close_for_upgrades`` to ``true``.
+- area: tcp
+  change: |
+    added :ref:`idle_timeout <envoy_v3_api_field_extensions.upstreams.tcp.v3.TcpProtocolOptions.idle_timeout>` to support per client idle timeout for tcp connection pool. The timeout is guarded by ``envoy.reloadable_features.tcp_pool_idle_timeout`` and timeout defaults to 10 minutes if runtime flag is enabled.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -227,8 +230,7 @@ new_features:
     added :ref:`append_x_forwarded_port <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.append_x_forwarded_port>` to append the ``x-forwarded-port`` header to HTTP upstream requests.
 - area: tcp
   change: |
-    added :ref:`idle_timeout <envoy_v3_api_field_extensions.upstreams.tcp.v3.TcpProtocolOptions.idle_timeout>` to support per client idle timeout for tcp connection pool. The timeout is guarded by ``envoy.reloadable_features.tcp_pool_idle_timeout`` and timeout defaults to 10 minutes if runtime flag is enabled.
-
+    added :ref:`idle_timeout <envoy_v3_api_field_extensions.upstreams.tcp.v3.TcpProtocolOptions.idle_timeout>` to support per client idle timeout for tcp connection pool. See also minor_behavior_changes.
 - area: ext_authz
   change: |
     added support to allowlist headers included in the check request to gRPC authorization server (previously only available for HTTP authorization server).

@@ -62,8 +62,8 @@ void ActiveTcpClient::clearCallbacks() {
   callbacks_ = nullptr;
   tcp_connection_data_ = nullptr;
   parent_.onStreamClosed(*this, true);
-  parent_.checkForIdleAndCloseIdleConnsIfDraining();
   setIdleTimer();
+  parent_.checkForIdleAndCloseIdleConnsIfDraining();
 }
 
 void ActiveTcpClient::onEvent(Network::ConnectionEvent event) {
@@ -112,6 +112,7 @@ void ActiveTcpClient::disableIdleTimer() {
 void ActiveTcpClient::setIdleTimer() {
   if (idle_timer_ != nullptr) {
     ASSERT(idle_timeout_.has_value());
+
     idle_timer_->enableTimer(idle_timeout_.value());
   }
 }
