@@ -144,72 +144,101 @@ MemoryTest::Mode MemoryTest::mode() {
 #endif
 }
 
-Counter& TestStore::counterFromString(const std::string& name) {
-  Counter*& counter_ref = counter_map_[name];
+TestScope::TestScope(const std::string& prefix, TestStore& store)
+    : IsolatedScopeImpl(prefix, store), store_(store), prefix_str_(addDot(prefix)) {}
+TestScope::TestScope(StatName prefix, TestStore& store)
+    : IsolatedScopeImpl(prefix, store), store_(store),
+      prefix_str_(addDot(store.symbolTable().toString(prefix))) {}
+
+// Override the Stats::Store methods for name-based lookup of stats, to use
+// and update the string-maps in this class. Note that IsolatedStoreImpl
+// does not support deletion of stats, so we only have to track additions
+// to keep the maps up-to-date.
+//
+// Stats::Scope
+Counter& TestScope::counterFromString(const std::string& leaf_name) {
+  std::string name = prefix_str_ + leaf_name;
+  Counter*& counter_ref = store_.counter_map_[name];
   if (counter_ref == nullptr) {
-    counter_ref = &IsolatedStoreImpl::counterFromString(name);
+    counter_ref = &IsolatedScopeImpl::counterFromString(leaf_name);
   }
   return *counter_ref;
 }
 
-Counter& TestStore::counterFromStatNameWithTags(const StatName& stat_name,
-                                                StatNameTagVectorOptConstRef tags) {
-  std::string name = symbolTable().toString(stat_name);
-  Counter*& counter_ref = counter_map_[name];
-  if (counter_ref == nullptr) {
-    counter_ref = &IsolatedStoreImpl::counterFromStatNameWithTags(stat_name, tags);
-  } else {
-    // Ensures StatNames with the same string representation are specified
-    // consistently using symbolic/dynamic components on every access.
-    ASSERT(counter_ref->statName() == stat_name, "Inconsistent dynamic vs symbolic "
-                                                 "stat name specification");
-  }
-  return *counter_ref;
-}
-
-Gauge& TestStore::gaugeFromString(const std::string& name, Gauge::ImportMode mode) {
-  Gauge*& gauge_ref = gauge_map_[name];
+Gauge& TestScope::gaugeFromString(const std::string& leaf_name, Gauge::ImportMode import_mode) {
+  std::string name = prefix_str_ + leaf_name;
+  Gauge*& gauge_ref = store_.gauge_map_[name];
   if (gauge_ref == nullptr) {
-    gauge_ref = &IsolatedStoreImpl::gaugeFromString(name, mode);
+    gauge_ref = &IsolatedScopeImpl::gaugeFromString(leaf_name, import_mode);
   }
   return *gauge_ref;
 }
 
-Gauge& TestStore::gaugeFromStatNameWithTags(const StatName& stat_name,
-                                            StatNameTagVectorOptConstRef tags,
-                                            Gauge::ImportMode mode) {
-  std::string name = symbolTable().toString(stat_name);
-  Gauge*& gauge_ref = gauge_map_[name];
-  if (gauge_ref == nullptr) {
-    gauge_ref = &IsolatedStoreImpl::gaugeFromStatNameWithTags(stat_name, tags, mode);
-  } else {
-    ASSERT(gauge_ref->statName() == stat_name, "Inconsistent dynamic vs symbolic "
-                                               "stat name specification");
-  }
-  return *gauge_ref;
-}
-
-Histogram& TestStore::histogramFromString(const std::string& name, Histogram::Unit unit) {
-  Histogram*& histogram_ref = histogram_map_[name];
+Histogram& TestScope::histogramFromString(const std::string& leaf_name, Histogram::Unit unit) {
+  std::string name = prefix_str_ + leaf_name;
+  Histogram*& histogram_ref = store_.histogram_map_[name];
   if (histogram_ref == nullptr) {
-    histogram_ref = &IsolatedStoreImpl::histogramFromString(name, unit);
+    histogram_ref = &IsolatedScopeImpl::histogramFromString(leaf_name, unit);
   }
   return *histogram_ref;
 }
 
-Histogram& TestStore::histogramFromStatNameWithTags(const StatName& stat_name,
+void TestScope::verifyConsistency(StatName ref_stat_name, StatName stat_name) {
+  // Ensures StatNames with the same string representation are specified
+  // consistently using symbolic/dynamic components on every access.
+  SymbolTable::StoragePtr joined = symbolTable().join({prefix(), stat_name});
+  StatName joined_stat_name(joined.get());
+  ASSERT(ref_stat_name == joined_stat_name,
+         absl::StrCat("Inconsistent dynamic vs symbolic stat name specification: ref_stat_name=",
+                      symbolTable().toString(ref_stat_name),
+                      " stat_name=", symbolTable().toString(joined_stat_name)));
+}
+
+Counter& TestScope::counterFromStatNameWithTags(const StatName& stat_name,
+                                                StatNameTagVectorOptConstRef tags) {
+  std::string name = prefix_str_ + symbolTable().toString(stat_name);
+  Counter*& counter_ref = store_.counter_map_[name];
+  if (counter_ref == nullptr) {
+    counter_ref = &IsolatedScopeImpl::counterFromStatNameWithTags(stat_name, tags);
+  } else {
+    verifyConsistency(counter_ref->statName(), stat_name);
+  }
+  return *counter_ref;
+}
+
+Gauge& TestScope::gaugeFromStatNameWithTags(const StatName& stat_name,
+                                            StatNameTagVectorOptConstRef tags,
+                                            Gauge::ImportMode import_mode) {
+  std::string name = prefix_str_ + symbolTable().toString(stat_name);
+  Gauge*& gauge_ref = store_.gauge_map_[name];
+  if (gauge_ref == nullptr) {
+    gauge_ref = &IsolatedScopeImpl::gaugeFromStatNameWithTags(stat_name, tags, import_mode);
+  } else {
+    verifyConsistency(gauge_ref->statName(), stat_name);
+  }
+  return *gauge_ref;
+}
+
+Histogram& TestScope::histogramFromStatNameWithTags(const StatName& stat_name,
                                                     StatNameTagVectorOptConstRef tags,
                                                     Histogram::Unit unit) {
-  std::string name = symbolTable().toString(stat_name);
-  Histogram*& histogram_ref = histogram_map_[name];
+  std::string name = prefix_str_ + symbolTable().toString(stat_name);
+  Histogram*& histogram_ref = store_.histogram_map_[name];
   if (histogram_ref == nullptr) {
-    histogram_ref = &IsolatedStoreImpl::histogramFromStatNameWithTags(stat_name, tags, unit);
+    histogram_ref = &IsolatedScopeImpl::histogramFromStatNameWithTags(stat_name, tags, unit);
   } else {
-    ASSERT(histogram_ref->statName() == stat_name, "Inconsistent dynamic vs symbolic "
-                                                   "stat name specification");
+    verifyConsistency(histogram_ref->statName(), stat_name);
   }
   return *histogram_ref;
 }
+
+ScopeSharedPtr TestStore::makeScope(StatName name) {
+  return std::make_shared<TestScope>(name, *this);
+}
+
+TestStore::TestStore() : IsolatedStoreImpl(*global_symbol_table_) {}
+
+TestStore::TestStore(SymbolTable& symbol_table) : IsolatedStoreImpl(symbol_table) {}
 
 template <class StatType>
 using StatTypeOptConstRef = absl::optional<std::reference_wrapper<const StatType>>;
@@ -235,6 +264,16 @@ GaugeOptConstRef TestStore::findGaugeByString(const std::string& name) const {
 
 HistogramOptConstRef TestStore::findHistogramByString(const std::string& name) const {
   return findByString<Histogram>(name, histogram_map_);
+}
+
+std::vector<uint64_t> TestStore::histogramValues(const std::string& name, bool clear) {
+  auto it = histogram_values_map_.find(name);
+  ASSERT(it != histogram_values_map_.end(), absl::StrCat("Couldn't find histogram ", name));
+  std::vector<uint64_t> copy = it->second;
+  if (clear) {
+    it->second.clear();
+  }
+  return copy;
 }
 
 // TODO(jmarantz): this utility is intended to be used both for unit tests

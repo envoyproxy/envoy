@@ -158,7 +158,7 @@ TEST_F(AwsLambdaFilterTest, DecodeDataRecordsPayloadSize) {
   FilterSettings settings{arn_, InvocationMode::Synchronous, true /*passthrough*/};
   NiceMock<Stats::MockStore> store;
   NiceMock<Stats::MockHistogram> histogram;
-  EXPECT_CALL(store, histogramFromString(_, _)).WillOnce(ReturnRef(histogram));
+  EXPECT_CALL(store, histogram(_, _)).WillOnce(ReturnRef(histogram));
 
   setupClusterMetadata();
 

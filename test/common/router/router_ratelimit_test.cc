@@ -1026,6 +1026,115 @@ actions:
   EXPECT_TRUE(local_descriptors_.empty());
 }
 
+TEST_F(RateLimitPolicyEntryTest, QueryParameterValueMatch) {
+  const std::string yaml = R"EOF(
+actions:
+- query_parameter_value_match:
+    descriptor_value: fake_value
+    query_parameters:
+    - name: x-parameter-name
+      string_match:
+        exact: test_value
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{":path", "/?x-parameter-name=test_value"}};
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header, stream_info_);
+  rate_limit_entry_->populateLocalDescriptors(local_descriptors_, "", header, stream_info_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"query_match", "fake_value"}}}}),
+              testing::ContainerEq(descriptors_));
+  EXPECT_THAT(std::vector<Envoy::RateLimit::LocalDescriptor>({{{{"query_match", "fake_value"}}}}),
+              testing::ContainerEq(local_descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, QueryParameterValueMatchDescriptorKey) {
+  const std::string yaml = R"EOF(
+actions:
+- query_parameter_value_match:
+    descriptor_key: fake_key
+    descriptor_value: fake_value
+    query_parameters:
+    - name: x-parameter-name
+      string_match:
+        exact: test_value
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{":path", "/?x-parameter-name=test_value"}};
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header, stream_info_);
+  rate_limit_entry_->populateLocalDescriptors(local_descriptors_, "", header, stream_info_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"fake_key", "fake_value"}}}}),
+              testing::ContainerEq(descriptors_));
+  EXPECT_THAT(std::vector<Envoy::RateLimit::LocalDescriptor>({{{{"fake_key", "fake_value"}}}}),
+              testing::ContainerEq(local_descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, QueryParameterValueMatchNoMatch) {
+  const std::string yaml = R"EOF(
+actions:
+- query_parameter_value_match:
+    descriptor_value: fake_value
+    query_parameters:
+    - name: x-parameter-name
+      string_match:
+        exact: test_value
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{":path", "/?x-parameter-name=not_same_value"}};
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header, stream_info_);
+  rate_limit_entry_->populateLocalDescriptors(local_descriptors_, "", header, stream_info_);
+  EXPECT_TRUE(descriptors_.empty());
+  EXPECT_TRUE(local_descriptors_.empty());
+}
+
+TEST_F(RateLimitPolicyEntryTest, QueryParameterValueMatchExpectNoMatch) {
+  const std::string yaml = R"EOF(
+actions:
+- query_parameter_value_match:
+    descriptor_value: fake_value
+    expect_match: false
+    query_parameters:
+    - name: x-parameter-name
+      string_match:
+        exact: test_value
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{":path", "/?x-parameter-name=not_same_value"}};
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header, stream_info_);
+  rate_limit_entry_->populateLocalDescriptors(local_descriptors_, "", header, stream_info_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"query_match", "fake_value"}}}}),
+              testing::ContainerEq(descriptors_));
+  EXPECT_THAT(std::vector<Envoy::RateLimit::LocalDescriptor>({{{{"query_match", "fake_value"}}}}),
+              testing::ContainerEq(local_descriptors_));
+}
+
+TEST_F(RateLimitPolicyEntryTest, QueryParameterValueMatchExpectNoMatchFailed) {
+  const std::string yaml = R"EOF(
+actions:
+- query_parameter_value_match:
+    descriptor_value: fake_value
+    expect_match: false
+    query_parameters:
+    - name: x-parameter-name
+      string_match:
+        exact: test_value
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{":path", "/?x-parameter-name=test_value"}};
+
+  rate_limit_entry_->populateDescriptors(descriptors_, "", header, stream_info_);
+  rate_limit_entry_->populateLocalDescriptors(local_descriptors_, "", header, stream_info_);
+  EXPECT_TRUE(descriptors_.empty());
+  EXPECT_TRUE(local_descriptors_.empty());
+}
+
 TEST_F(RateLimitPolicyEntryTest, CompoundActions) {
   const std::string yaml = R"EOF(
 actions:
