@@ -185,9 +185,9 @@ sphinxcontrib-devhelp==1.0.2 \
 sphinxcontrib-htmlhelp==2.0.0 \
     --hash=sha256:d412243dfb797ae3ec2b59eca0e52dac12e75a241bf0e4eb861e450d06c6ed07 \
     --hash=sha256:f5f8bb2d0d629f398bf47d0d69c07bc13b65f75a81ad9e2f71a63d4b7a2f6db2
-sphinxcontrib-httpdomain==1.8.0 \
-    --hash=sha256:a3396d6350728d574f52458b400f0ac848f8b6913bd41fed95d391d3ffbbade3 \
-    --hash=sha256:2059cfabd0cca8fcc3455cc8ffad92f0915a7d3bb03bfddba078a6a0f35beec5
+sphinxcontrib-httpdomain==1.8.1 \
+    --hash=sha256:21eefe1270e4d9de8d717cc89ee92cc4871b8736774393bafc5e38a6bb77b1d5 \
+    --hash=sha256:6c2dfe6ca282d75f66df333869bb0ce7331c01b475db6809ff9d107b7cdfe04b
 sphinxcontrib-googleanalytics==0.3 \
     --hash=sha256:5a2dc8d81f5e2f3375754eba491ea9f09a19d7e2f7737ecddcd0c6c47ffe3e6e
 sphinxcontrib-jsmath==1.0.1 \

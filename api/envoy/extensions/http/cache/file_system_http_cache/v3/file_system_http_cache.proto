@@ -1,0 +1,80 @@
+syntax = "proto3";
+
+package envoy.extensions.http.cache.file_system_http_cache.v3;
+
+import "envoy/extensions/common/async_files/v3/async_file_manager.proto";
+
+import "google/protobuf/wrappers.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.http.cache.file_system_http_cache.v3";
+option java_outer_classname = "FileSystemHttpCacheProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/http/cache/file_system_http_cache/v3;file_system_http_cachev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: FileSystemHttpCacheConfig]
+// [#extension: envoy.extensions.http.cache.file_system_http_cache]
+
+// Configuration for a cache implementation that caches in the local file system.
+//
+// By default this cache uses a least-recently-used eviction strategy.
+// [#next-free-field: 7]
+message FileSystemHttpCacheConfig {
+  // Configuration of a manager for how the file system is used asynchronously.
+  common.async_files.v3.AsyncFileManagerConfig manager_config = 1
+      [(validate.rules).message = {required: true}];
+
+  // Path at which the cache files will be stored.
+  //
+  // This also doubles as the unique identifier for a cache, so a cache can be shared
+  // between different routes, or separate paths can be used to specify separate caches.
+  //
+  // If the same ``cache_path`` is used in more than one ``CacheConfig``, the rest of the
+  // ``FileSystemHttpCacheConfig`` must also match, and will refer to the same cache
+  // instance.
+  string cache_path = 2 [(validate.rules).string = {min_len: 1}];
+
+  // The maximum size of the cache in bytes - when reached, another entry is removed.
+  //
+  // This is measured as the sum of file sizes, such that it includes headers, trailers,
+  // and metadata, but does not include e.g. file system overhead and block size padding.
+  //
+  // If unset there is no limit except file system failure.
+  //
+  // [#not-implemented-hide:]
+  google.protobuf.UInt64Value max_cache_size_bytes = 3;
+
+  // The maximum size of a cache entry in bytes - larger responses will not be cached.
+  //
+  // This is measured as the file size for the cache entry, such that it includes
+  // headers, trailers, and metadata.
+  //
+  // If unset there is no limit.
+  //
+  // [#not-implemented-hide:]
+  google.protobuf.UInt64Value max_cache_entry_size_bytes = 4;
+
+  // The maximum number of cache entries - when reached, another entry is removed.
+  //
+  // If unset there is no limit.
+  //
+  // [#not-implemented-hide:]
+  google.protobuf.UInt64Value max_cache_entry_count = 5;
+
+  // A number of folders into which to subdivide the cache.
+  //
+  // Setting this can help with performance in file systems where a large number of inodes
+  // in a single branch degrades performance. The optimal value in that case would be
+  // ``sqrt(expected_cache_entry_count)``.
+  //
+  // On file systems that perform well with many inodes, the default value of 1 should be used.
+  //
+  // [#not-implemented-hide:]
+  uint32 cache_subdivisions = 6;
+}

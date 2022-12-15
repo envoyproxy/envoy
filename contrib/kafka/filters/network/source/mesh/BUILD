@@ -111,6 +111,39 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "shared_consumer_manager_lib",
+    srcs = [
+    ],
+    hdrs = [
+        "shared_consumer_manager.h",
+    ],
+    tags = ["skip_on_windows"],
+    deps = [
+        ":upstream_kafka_consumer_lib",
+        "//source/common/common:minimal_logger_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "shared_consumer_manager_impl_lib",
+    srcs = [
+        "shared_consumer_manager_impl.cc",
+    ],
+    hdrs = [
+        "shared_consumer_manager_impl.h",
+    ],
+    tags = ["skip_on_windows"],
+    deps = [
+        ":librdkafka_utils_lib",
+        ":shared_consumer_manager_lib",
+        ":upstream_config_lib",
+        ":upstream_kafka_consumer_impl_lib",
+        "//contrib/kafka/filters/network/source:kafka_types_lib",
+        "//source/common/common:minimal_logger_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "inbound_record_lib",
     srcs = [
     ],
