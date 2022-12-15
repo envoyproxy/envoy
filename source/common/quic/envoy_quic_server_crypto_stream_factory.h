@@ -5,7 +5,6 @@
 #include "envoy/network/transport_socket.h"
 
 #include "quiche/quic/core/crypto/quic_crypto_server_config.h"
-#include "quiche/quic/core/quic_crypto_client_stream.h"
 #include "quiche/quic/core/quic_crypto_server_stream_base.h"
 #include "quiche/quic/core/quic_session.h"
 #include "quiche/quic/core/tls_server_handshaker.h"
@@ -24,19 +23,6 @@ public:
       quic::QuicCryptoServerStreamBase::Helper* helper,
       OptRef<const Network::DownstreamTransportSocketFactory> transport_socket_factory,
       Event::Dispatcher& dispatcher) PURE;
-};
-
-class EnvoyQuicCryptoClientStreamFactoryInterface {
-public:
-  virtual ~EnvoyQuicCryptoClientStreamFactoryInterface() = default;
-
-  // Return an Envoy specific quic crypto client stream object.
-  virtual std::unique_ptr<quic::QuicCryptoClientStreamBase>
-  createEnvoyQuicCryptoClientStream(const quic::QuicServerId& server_id, quic::QuicSession* session,
-                                    std::unique_ptr<quic::ProofVerifyContext> verify_context,
-                                    quic::QuicCryptoClientConfig* crypto_config,
-                                    quic::QuicCryptoClientStream::ProofHandler* proof_handler,
-                                    bool has_application_state) PURE;
 };
 
 } // namespace Quic
