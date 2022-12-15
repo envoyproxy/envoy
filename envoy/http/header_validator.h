@@ -106,9 +106,8 @@ class HeaderValidatorStats {
 public:
   virtual ~HeaderValidatorStats() = default;
 
-  // These can't be PURE for now, otherwise coverage in non UHV builds is unhappy.
-  virtual void incDroppedHeadersWithUnderscores() {}
-  virtual void incRequestsRejectedWithUnderscoresInHeaders() {}
+  virtual void incDroppedHeadersWithUnderscores() PURE;
+  virtual void incRequestsRejectedWithUnderscoresInHeaders() PURE;
 };
 
 /**

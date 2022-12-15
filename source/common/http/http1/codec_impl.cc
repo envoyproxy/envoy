@@ -1324,7 +1324,7 @@ Status ServerConnectionImpl::checkHeaderNameForUnderscores() {
         envoy::config::core::v3::HttpProtocolOptions::DROP_HEADER) {
       ENVOY_CONN_LOG(debug, "Dropping header with invalid characters in its name: {}", connection_,
                      current_header_field_.getStringView());
-      stats_.dropped_headers_with_underscores_.inc();
+      stats_.incDroppedHeadersWithUnderscores();
       current_header_field_.clear();
       current_header_value_.clear();
     } else {
@@ -1332,7 +1332,7 @@ Status ServerConnectionImpl::checkHeaderNameForUnderscores() {
                      connection_, current_header_field_.getStringView());
       error_code_ = Http::Code::BadRequest;
       RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().InvalidUnderscore));
-      stats_.requests_rejected_with_underscores_in_headers_.inc();
+      stats_.incRequestsRejectedWithUnderscoresInHeaders();
       return codecProtocolError("http/1.1 protocol error: header name contains underscores");
     }
   }
