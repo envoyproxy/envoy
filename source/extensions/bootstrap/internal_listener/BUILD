@@ -98,7 +98,7 @@ envoy_cc_library(
         "//source/common/stats:timespan_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/io_socket/user_space:config",
-        "//source/extensions/listener_managers/listener_manager:active_stream_listener_base",
-        "//source/extensions/listener_managers/listener_manager:active_tcp_listener",
+        "//source/server:active_stream_listener_base",
+        "//source/server:active_tcp_listener",
     ],
 )

@@ -13,7 +13,6 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/non_copyable.h"
-#include "source/server/listener_manager_factory.h"
 
 #include "spdlog/spdlog.h"
 
@@ -28,7 +27,9 @@ class ActiveInternalListener;
  * Server side connection handler. This is used both by workers as well as the
  * main thread for non-threaded listeners.
  */
-class ConnectionHandlerImpl : public ConnectionHandler,
+class ConnectionHandlerImpl : public Network::TcpConnectionHandler,
+                              public Network::UdpConnectionHandler,
+                              public Network::InternalListenerManager,
                               NonCopyable,
                               Logger::Loggable<Logger::Id::conn_handler> {
 public:
@@ -152,19 +153,6 @@ private:
   bool disable_listeners_;
   UnitFloat listener_reject_fraction_{UnitFloat::min()};
 };
-
-class ConnectionHandlerFactoryImpl : public ConnectionHandlerFactory {
-public:
-  std::unique_ptr<ConnectionHandler>
-  createConnectionHandler(Event::Dispatcher& dispatcher,
-                          absl::optional<uint32_t> worker_index) override {
-    return std::make_unique<ConnectionHandlerImpl>(dispatcher, worker_index);
-  }
-
-  std::string name() const override { return "envoy.connection_handler.default"; }
-};
-
-DECLARE_FACTORY(ConnectionHandlerFactoryImpl);
 
 } // namespace Server
 } // namespace Envoy

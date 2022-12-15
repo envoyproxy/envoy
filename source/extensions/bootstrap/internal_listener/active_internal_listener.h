@@ -18,7 +18,7 @@
 #include "source/common/common/linked_object.h"
 #include "source/common/common/non_copyable.h"
 #include "source/common/stream_info/stream_info_impl.h"
-#include "source/extensions/listener_managers/listener_manager/active_stream_listener_base.h"
+#include "source/server/active_stream_listener_base.h"
 
 #include "spdlog/spdlog.h"
 
