@@ -16,7 +16,6 @@
 #include "source/extensions/filters/http/rate_limit_quota/client.h"
 #include "source/extensions/filters/http/rate_limit_quota/client_impl.h"
 #include "source/extensions/filters/http/rate_limit_quota/matcher.h"
-#include "source/extensions/filters/http/rate_limit_quota/quota_bucket.h"
 
 #include "absl/status/statusor.h"
 
@@ -51,12 +50,8 @@ class RateLimitQuotaFilter : public Http::PassThroughFilter,
                              public Logger::Loggable<Logger::Id::filter> {
 public:
   RateLimitQuotaFilter(FilterConfigConstSharedPtr config,
-                       Server::Configuration::FactoryContext& factory_context,
-                       // TODO(tyxia) Removed the default argument and add const???!!
-                       BucketContainer* quota_bucket = nullptr,
-                       RateLimitQuotaUsageReports* quota_usage_reports = nullptr)
-      : config_(std::move(config)), factory_context_(factory_context), quota_bucket_(quota_bucket),
-        quota_usage_reports_(quota_usage_reports) {
+                       Server::Configuration::FactoryContext& factory_context)
+      : config_(std::move(config)), factory_context_(factory_context) {
     createMatcher();
   }
 
@@ -94,17 +89,6 @@ private:
   RateLimitQuotaValidationVisitor visitor_ = {};
   Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher_ = nullptr;
   std::unique_ptr<Http::Matching::HttpMatchingDataImpl> data_ptr_ = nullptr;
-  // TODO(tyxia) This is the thread local cache that is created in the main thread.
-  BucketContainer* quota_bucket_ = nullptr;
-  // TODO(tyxia) Pass in another thread local storage object as well
-  // or we wrap those two objects in a single object
-  // This also  needs to be available in client_impl.h
-  // pass by reference to indicate no ownership transfer
-  // TODO(tyxia) const!!!!
-  // UsageReportsContainer* const usage_reports_;
-  // go//177#reference-members
-  // UsageReportsContainer& usage_report_ = nullptr;
-  RateLimitQuotaUsageReports* quota_usage_reports_ = nullptr;
 };
 
 } // namespace RateLimitQuota

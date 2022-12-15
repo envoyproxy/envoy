@@ -58,7 +58,6 @@ envoy_cc_library(
     hdrs = ["client_impl.h"],
     deps = [
         ":client_interface",
-        ":quota_bucket",
         "//envoy/grpc:async_client_interface",
         "//envoy/grpc:status",
         "//source/common/common:statusor_lib",

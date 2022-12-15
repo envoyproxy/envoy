@@ -9,7 +9,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitQuota {
 
-using ::envoy::type::v3::RateLimitStrategy;
+using envoy::type::v3::RateLimitStrategy;
 
 Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                               bool) {
@@ -38,97 +38,6 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
   }
 
   BucketId bucket_id = ret.value();
-  ASSERT(quota_bucket_ != nullptr);
-  // Third, look up the quota bucket cache.
-  if (quota_bucket_->find(bucket_id) == quota_bucket_->end()) {
-    // The request has been matched to the bucket successfully for the first time.
-    auto bucket_settings = match_action->bucketSettings();
-    // TODO(tyxia) For the first matched request that doesn't have quota assignment from the RLQS
-    // server, we get the pre-configured rate limiting strategy from no assignment behavior in
-    // the configuration.
-    if (bucket_settings.has_no_assignment_behavior()) {
-      // Retrieve the `blanket_rule` value from the config to decide if we want to fail-open or
-      // fail-close.
-      auto strategy = bucket_settings.no_assignment_behavior().fallback_rate_limit();
-      if (strategy.blanket_rule() == RateLimitStrategy::ALLOW_ALL) {
-        // TODO(tyxia) Implement the allow/deny interface
-      }
-    } else {
-      ENVOY_LOG(error, "no assignment behavior for is not configured.");
-      // We just use fail-open (i.e. ALLOW_ALL) here.
-    }
-
-    // Build the quota bucket element.
-    BucketElement element;
-    //  Create the gRPC client and start the stream on the first request.
-    element.rate_limit_client_ =
-        createRateLimitClient(factory_context_, config_->rlqs_server(), quota_usage_reports_);
-    auto status = element.rate_limit_client_->startStream(callbacks_->streamInfo());
-    if (!status.ok()) {
-      ENVOY_LOG(error, "Failed to start the gRPC stream: ", status.message());
-      return Envoy::Http::FilterHeadersStatus::Continue;
-    }
-    // Send the usage report to RLQS immediately on the first time when the request is matched.
-    // TODO(tyxia) Due to the lifetime concern of the bucket_id, I switch from pointer to
-    // absl::optional
-    element.rate_limit_client_->sendUsageReport(config_->domain(), bucket_id);
-
-    // Set up the quota usage report method that sends the reports the RLS server periodically.
-    // TODO(tyxia) If each bucket has its own timer callback, do we still need to build a list of
-    // reports?
-    // Create and enable the report timer callback on the first request.
-    // TODO(tyxia) what is the behavior on the first request while waiting for the response
-    /////// Moved from RateLimitQuotaFilter constructor.
-    // Create the timer object to periodically sent the usage report to the RLS server.
-    // TODO(tyxia) Timer callback will need to be outside of filter so that when filter is destroyed
-    // i.e., request ends, we still have it to send the reports periodically???
-    // Maybe associated with the thread local storage????
-    element.send_reports_timer =
-        // TODO(tyxia) Timer should be on localThread dispatcher !!!
-        // decode callback's dispatcher ----- worker thread dispatcher!!!!
-        callbacks_->dispatcher().createTimer([&element, this]() -> void {
-          ASSERT(element.rate_limit_client_ != nullptr);
-          // TODO(tyxia) For periodical send behavior, we just pass in nullopt argument.
-          element.rate_limit_client_->sendUsageReport(config_->domain(), absl::nullopt);
-        });
-    // factory_context_.mainThreadDispatcher().createTimer([&element, this]() -> void {
-    //   ASSERT(element.rate_limit_client_ != nullptr);
-    //   // TODO(tyxia) For periodical send behavior, we just pass in nullopt.
-    //   element.rate_limit_client_->sendUsageReport(config_->domain(), absl::nullopt);
-    // });
-    // Set the reporting interval.
-    const int64_t reporting_interval =
-        PROTOBUF_GET_MS_REQUIRED(bucket_settings, reporting_interval);
-    element.send_reports_timer->enableTimer(std::chrono::milliseconds(reporting_interval));
-
-    // Store it into the buckets
-    (*quota_bucket_)[bucket_id] = std::move(element);
-
-    // TODO(tyxia) For the first request, we don't need to wait for the quota assignment from the
-    // RLQS server because we already have the no_assignment behavior. Continue the filter chain
-    // iteration.
-    return Envoy::Http::FilterHeadersStatus::Continue;
-  } else {
-    // The existing entry for this request has been found in the quota cache.
-    // BucketElement elem = (*quota_bucket_)[bucket_id];
-    auto bucket_action = (*quota_bucket_)[bucket_id].bucket_action;
-    if (bucket_action.has_quota_assignment_action()) {
-      auto quota_action = bucket_action.quota_assignment_action();
-      if (!quota_action.has_rate_limit_strategy()) {
-        // Nothing to do probably.
-      }
-
-      // Retrieve the rate limiting strategy.
-      RateLimitStrategy strategy = quota_action.rate_limit_strategy();
-      if (strategy.has_blanket_rule() && strategy.blanket_rule() == RateLimitStrategy::ALLOW_ALL) {
-        // TODO(tyxia) Keep track of #num of requests allowed, #num of requests denied.
-        return Envoy::Http::FilterHeadersStatus::Continue;
-      }
-    }
-  }
-
-  // rate_limit_client_->rateLimit(*this);
-
   return Envoy::Http::FilterHeadersStatus::Continue;
 }
 

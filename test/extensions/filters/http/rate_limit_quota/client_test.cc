@@ -34,7 +34,7 @@ public:
     EXPECT_CALL(context_.cluster_manager_.async_client_manager_, getOrCreateRawAsyncClient(_, _, _))
         .WillOnce(Invoke(this, &RateLimitStreamTest::mockCreateAsyncClient));
 
-    client_ = createRateLimitClient(context_, grpc_service_, &reports_);
+    client_ = createRateLimitClient(context_, grpc_service_);
   }
 
   Grpc::RawAsyncClientSharedPtr mockCreateAsyncClient(Unused, Unused, Unused) {
@@ -63,7 +63,7 @@ public:
   Grpc::Status::GrpcStatus grpc_status_ = Grpc::Status::WellKnownGrpcStatus::Ok;
   RateLimitClientPtr client_;
   MockRateLimitQuotaCallbacks callbacks_;
-  RateLimitQuotaUsageReports reports_;
+  //RateLimitQuotaUsageReports reports_;
 
   bool grpc_closed_ = false;
 };
@@ -75,75 +75,87 @@ TEST_F(RateLimitStreamTest, OpenAndCloseStream) {
   client_->closeStream();
 }
 
-constexpr char SingleBukcetId[] = R"EOF(
-  bucket:
-    "fairshare_group_id":
-      "mock_group"
-)EOF";
+// constexpr char SingleBukcetId[] = R"EOF(
+//   bucket:
+//     "fairshare_group_id":
+//       "mock_group"
+// )EOF";
 
-constexpr char MultipleBukcetId[] = R"EOF(
-  bucket:
-    "fairshare_group_id":
-      "mock_group"
-    "fairshare_project_id":
-      "mock_project"
-    "fairshare_user_id":
-      "test_user"
-)EOF";
+// constexpr char MultipleBukcetId[] = R"EOF(
+//   bucket:
+//     "fairshare_group_id":
+//       "mock_group"
+//     "fairshare_project_id":
+//       "mock_project"
+//     "fairshare_user_id":
+//       "test_user"
+// )EOF";
 
-TEST_F(RateLimitStreamTest, BuildUsageReport) {
-  ::envoy::service::rate_limit_quota::v3::BucketId bucket_id;
-  TestUtility::loadFromYaml(SingleBukcetId, bucket_id);
-  std::string domain = "cloud_12345";
+// TEST_F(RateLimitStreamTest, BuildUsageReport) {
+//   ::envoy::service::rate_limit_quota::v3::BucketId bucket_id;
+//   TestUtility::loadFromYaml(SingleBukcetId, bucket_id);
+//   std::string domain = "cloud_12345";
 
-  EXPECT_OK(client_->startStream(stream_info_));
-  RateLimitQuotaUsageReports report = client_->buildUsageReport(domain, bucket_id);
-  EXPECT_EQ(report.domain(), domain);
-  EXPECT_EQ(report.bucket_quota_usages().size(), 1);
-  EXPECT_EQ(report.bucket_quota_usages(0).num_requests_allowed(), 1);
-  EXPECT_EQ(report.bucket_quota_usages(0).num_requests_denied(), 0);
-}
+//   EXPECT_OK(client_->startStream(stream_info_));
+//   RateLimitQuotaUsageReports report = client_->buildUsageReport(domain, bucket_id);
+//   EXPECT_EQ(report.domain(), domain);
+//   EXPECT_EQ(report.bucket_quota_usages().size(), 1);
+//   EXPECT_EQ(report.bucket_quota_usages(0).num_requests_allowed(), 1);
+//   EXPECT_EQ(report.bucket_quota_usages(0).num_requests_denied(), 0);
+// }
 
-TEST_F(RateLimitStreamTest, BuildMultipleReports) {
-  ::envoy::service::rate_limit_quota::v3::BucketId bucket_id;
-  TestUtility::loadFromYaml(SingleBukcetId, bucket_id);
-  std::string domain = "cloud_12345_67890_td_rlqs";
+// TEST_F(RateLimitStreamTest, BuildMultipleReports) {
+//   ::envoy::service::rate_limit_quota::v3::BucketId bucket_id;
+//   TestUtility::loadFromYaml(SingleBukcetId, bucket_id);
+//   std::string domain = "cloud_12345_67890_td_rlqs";
 
-  EXPECT_OK(client_->startStream(stream_info_));
-  // Build the usage report with 2 entries with same domain and bucket id.
-  RateLimitQuotaUsageReports report = client_->buildUsageReport(domain, bucket_id);
-  report = client_->buildUsageReport(domain, bucket_id);
-  EXPECT_EQ(report.domain(), domain);
-  EXPECT_EQ(report.bucket_quota_usages().size(), 1);
-  EXPECT_EQ(report.bucket_quota_usages(0).num_requests_allowed(), 2);
-  EXPECT_EQ(report.bucket_quota_usages(0).num_requests_denied(), 0);
+//   EXPECT_OK(client_->startStream(stream_info_));
+//   // Build the usage report with 2 entries with same domain and bucket id.
+//   RateLimitQuotaUsageReports report = client_->buildUsageReport(domain, bucket_id);
+//   report = client_->buildUsageReport(domain, bucket_id);
+//   EXPECT_EQ(report.domain(), domain);
+//   EXPECT_EQ(report.bucket_quota_usages().size(), 1);
+//   EXPECT_EQ(report.bucket_quota_usages(0).num_requests_allowed(), 2);
+//   EXPECT_EQ(report.bucket_quota_usages(0).num_requests_denied(), 0);
 
-  ::envoy::service::rate_limit_quota::v3::BucketId bucket_id2;
-  TestUtility::loadFromYaml(MultipleBukcetId, bucket_id2);
-  // Build the usage report with the entry with different bucket id which will create a new entry in
-  // report.
-  report = client_->buildUsageReport(domain, bucket_id2);
-  EXPECT_EQ(report.bucket_quota_usages().size(), 2);
-  EXPECT_EQ(report.bucket_quota_usages(0).num_requests_allowed(), 2);
-  EXPECT_EQ(report.bucket_quota_usages(1).num_requests_allowed(), 1);
-  EXPECT_EQ(report.bucket_quota_usages(0).num_requests_denied(), 0);
+//   ::envoy::service::rate_limit_quota::v3::BucketId bucket_id2;
+//   TestUtility::loadFromYaml(MultipleBukcetId, bucket_id2);
+//   // Build the usage report with the entry with different bucket id which will create a new entry in
+//   // report.
+//   report = client_->buildUsageReport(domain, bucket_id2);
+//   EXPECT_EQ(report.bucket_quota_usages().size(), 2);
+//   EXPECT_EQ(report.bucket_quota_usages(0).num_requests_allowed(), 2);
+//   EXPECT_EQ(report.bucket_quota_usages(1).num_requests_allowed(), 1);
+//   EXPECT_EQ(report.bucket_quota_usages(0).num_requests_denied(), 0);
 
-  // Update the usage report with old bucket id.
-  report = client_->buildUsageReport(domain, bucket_id);
-  EXPECT_EQ(report.bucket_quota_usages().size(), 2);
-  EXPECT_EQ(report.bucket_quota_usages(0).num_requests_allowed(), 3);
-  EXPECT_EQ(report.bucket_quota_usages(0).num_requests_denied(), 0);
-}
+//   // Update the usage report with old bucket id.
+//   report = client_->buildUsageReport(domain, bucket_id);
+//   EXPECT_EQ(report.bucket_quota_usages().size(), 2);
+//   EXPECT_EQ(report.bucket_quota_usages(0).num_requests_allowed(), 3);
+//   EXPECT_EQ(report.bucket_quota_usages(0).num_requests_denied(), 0);
+// }
 
-TEST_F(RateLimitStreamTest, SendUsageReport) {
-  ::envoy::service::rate_limit_quota::v3::BucketId bucket_id;
-  TestUtility::loadFromYaml(SingleBukcetId, bucket_id);
-  std::string domain = "cloud_12345_67890_td_rlqs";
+// TEST_F(RateLimitStreamTest, SendUsageReport) {
+//   ::envoy::service::rate_limit_quota::v3::BucketId bucket_id;
+//   TestUtility::loadFromYaml(SingleBukcetId, bucket_id);
+//   std::string domain = "cloud_12345_67890_td_rlqs";
+//   EXPECT_OK(client_->startStream(stream_info_));
+//   bool end_stream = true;
+//   // Send quota usage report and ensure that we get it.
+//   EXPECT_CALL(stream_, sendMessageRaw_(_, end_stream));
+//   client_->sendUsageReport(domain, bucket_id);
+//   EXPECT_CALL(stream_, closeStream());
+//   EXPECT_CALL(stream_, resetStream());
+//   client_->closeStream();
+// }
+
+TEST_F(RateLimitStreamTest, SendRequest) {
   EXPECT_OK(client_->startStream(stream_info_));
   bool end_stream = true;
-  // Send quota usage report and ensure that we get it.
+  // Send empty report and ensure that we get it.
   EXPECT_CALL(stream_, sendMessageRaw_(_, end_stream));
-  client_->sendUsageReport(domain, bucket_id);
+  envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports report;
+  client_->send(std::move(report), end_stream);
   EXPECT_CALL(stream_, closeStream());
   EXPECT_CALL(stream_, resetStream());
   client_->closeStream();

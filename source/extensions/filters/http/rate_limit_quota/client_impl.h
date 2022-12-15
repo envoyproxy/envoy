@@ -33,8 +33,7 @@ class RateLimitClientImpl : public RateLimitClient,
                             public Logger::Loggable<Logger::Id::rate_limit_quota> {
 public:
   RateLimitClientImpl(const envoy::config::core::v3::GrpcService& grpc_service,
-                      Server::Configuration::FactoryContext& context,
-                      RateLimitQuotaUsageReports* quota_usage_reports = nullptr)
+                      Server::Configuration::FactoryContext& context)
       : aync_client_(context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
             grpc_service, context.scope(), true)) {}
 
@@ -61,15 +60,6 @@ private:
   RateLimitQuotaCallbacks* callbacks_{};
   // TODO(tyxia) Further look at the use of this flag later.
   bool stream_closed_ = false;
-
-  // TODO(tyxia) Store it outside of filter, as thread local storage!!!!
-  // All the struct below should be removed!!!!!
-  struct BucketQuotaUsageInfo {
-    BucketQuotaUsage usage;
-    std::string domain;
-    // The index
-    int idx;
-  };
 };
 
 using RateLimitClientPtr = std::unique_ptr<RateLimitClientImpl>;
@@ -80,6 +70,7 @@ inline RateLimitClientPtr
 createRateLimitClient(Server::Configuration::FactoryContext& context,
                       const envoy::config::core::v3::GrpcService& grpc_service) {
   return std::make_unique<RateLimitClientImpl>(grpc_service, context);
+}
 
 } // namespace RateLimitQuota
 } // namespace HttpFilters
