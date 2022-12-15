@@ -39,7 +39,8 @@ Api::IoCallBoolResult FileImplWin32::open(FlagSet in) {
   if (fd_ == INVALID_HANDLE) {
     return resultFailure(false, ::GetLastError());
   }
-  if (in.test(File::Operation::Write) && !in.test(File::Operation::Append)) {
+  if (in.test(File::Operation::Write) && !in.test(File::Operation::Append) &&
+      !in.test(File::Operation::KeepExistingData)) {
     SetEndOfFile(fd_);
   }
   return resultSuccess(true);
