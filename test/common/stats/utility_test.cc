@@ -135,8 +135,8 @@ protected:
   }
 
   template <class StatType> void scopeOnce(const MakeStatFn make_stat) {
-    CachedReference<StatType> symbolic2_ref(*store_, "scope.symbolic2");
-    CachedReference<StatType> dynamic2_ref(*store_, "scope.dynamic2");
+    CachedReference<StatType> symbolic2_ref(*scope_, "scope.symbolic2");
+    CachedReference<StatType> dynamic2_ref(*scope_, "scope.dynamic2");
     EXPECT_FALSE(symbolic2_ref.get());
     EXPECT_FALSE(dynamic2_ref.get());
 
