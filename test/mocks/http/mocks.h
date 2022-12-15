@@ -658,6 +658,9 @@ public:
               pathWithEscapedSlashesAction, (), (const));
   MOCK_METHOD(const std::vector<Http::OriginalIPDetectionSharedPtr>&, originalIpDetectionExtensions,
               (), (const));
+  const std::vector<Http::EarlyHeaderMutationPtr>& earlyHeaderMutationExtensions() const override {
+    return early_header_mutation_extensions_;
+  }
   MOCK_METHOD(uint64_t, maxRequestsPerConnection, (), (const));
   MOCK_METHOD(const HttpConnectionManagerProto::ProxyStatusConfig*, proxyStatusConfig, (), (const));
   MOCK_METHOD(HeaderValidatorPtr, makeHeaderValidator,
@@ -666,6 +669,7 @@ public:
 
   std::unique_ptr<Http::InternalAddressConfig> internal_address_config_ =
       std::make_unique<DefaultInternalAddressConfig>();
+  std::vector<Http::EarlyHeaderMutationPtr> early_header_mutation_extensions_;
   absl::optional<std::string> scheme_;
 };
 
