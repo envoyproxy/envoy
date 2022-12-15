@@ -20,6 +20,12 @@ behavior_changes:
 - area: build
   change: |
     moved the strict_dns, original_dst, logical_dns, static, and eds clusters to extensions. If you use these clusters and override extensions_build_config.bzl you will now need to include it explicitly.
+- area: stats http ext_authz
+  change: |
+    Fixed ext_authz metric tag extraction so that :ref:`stat_prefix <envoy_v3_api_msg_extensions.filters.http.ext_authz.v3.ExtAuthz>`
+    is properly extracted. This changes the Prometheus name from
+    envoy_http_ext_authz_prefixval_denied{} to envoy_http_ext_authz_denied{envoy_ext_authz_prefix="prefixval"}.
+    envoy_cluster_X_ext_authz_Y_denied follows the same pattern.
 - area: loadbalancing
   change: |
     When active HC is enabled per cluster, slow start calculation now starts after first passing HC. Cluster membership duration condition is dropped from slow start calculation.
@@ -34,7 +40,6 @@ minor_behavior_changes:
     a full chain.
     :ref:`trust_ca<envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.trusted_ca>`.
     This change can be reverted via the ``envoy.reloadable_features.enable_intermediate_ca``.
-
 - area: cache_filter
   change: |
     add a completion callback to updateHeaders interface. Any external cache implementations will need to update to match this new interface. See changes to simple_http_cache in PR#23666 for example.
@@ -59,10 +64,14 @@ minor_behavior_changes:
 - area: jwt_authn
   change: |
     adjust the refetch time for remote_jwks async_fetch feature. For a good fetch, refetch 5 seconds before jwks cache duration. For a failed fetch, refetch time can be specified by :ref:`failed_refetch_duration <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwksAsyncFetch.failed_refetch_duration>` with default 1 second.
+- area: config
+  change: |
+    add support for thrift connection draining. This can be disabled by setting the runtime guard ``envoy.reloadable_features.thrift_connection_draining`` to false.
 - area: http
   change: |
     reverting the behavioral change to have ``CONNECT`` and upgrade requests over HTTP/1.1 not delay close.  One can reinstate
     delay close for upgrades by setting ``envoy.reloadable_features.no_delay_close_for_upgrades`` to ``true``.
+
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -151,6 +160,9 @@ new_features:
 - area: build
   change: |
     added an option ``--define=library_autolink=disabled`` to disable autolinking libraries.
+- area: compression
+  change: |
+    added :ref:`CompressorPerRoute proto <envoy_v3_api_msg_extensions.filters.http.compressor.v3.CompressorPerRoute>` for per-route configuration.
 - area: generic_proxy
   change: |
     added :ref:`dubbo codec support <envoy_v3_api_msg_extensions.filters.network.generic_proxy.codecs.dubbo.v3.DubboCodecConfig>` to the
@@ -237,5 +249,9 @@ new_features:
     :ref:`source_address <envoy_v3_api_field_config.core.v3.BindConfig.source_address>`. This allows setting
     :ref:`socket options <envoy_v3_api_field_config.core.v3.BindConfig.socket_options>` when using the default unspecified bind address
     is desired.
+- area: xds
+  change: |
+    added an api configuration :ref:`xds_config_tracker_extension <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.xds_config_tracker_extension>` in the bootstrap
+    to allow tracking xDS responses in external components, and provided the extension interface.
 
 deprecated:

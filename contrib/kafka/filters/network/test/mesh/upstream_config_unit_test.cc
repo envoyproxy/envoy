@@ -108,8 +108,14 @@ forwarding_rules:
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
   const UpstreamKafkaConfiguration& testee = UpstreamKafkaConfigurationImpl{proto_config};
 
-  const ClusterConfig cluster1 = {"cluster1", 1, {{"bootstrap.servers", "s1"}}};
-  const ClusterConfig cluster2 = {"cluster2", 2, {{"bootstrap.servers", "s2"}}};
+  const ClusterConfig cluster1 = {"cluster1",
+                                  1,
+                                  {{"bootstrap.servers", "s1"}},
+                                  {{"bootstrap.servers", "s1"}, {"group.id", "envoy"}}};
+  const ClusterConfig cluster2 = {"cluster2",
+                                  2,
+                                  {{"bootstrap.servers", "s2"}},
+                                  {{"bootstrap.servers", "s2"}, {"group.id", "envoy"}}};
 
   // when, then (advertised address is returned properly)
   const auto address = testee.getAdvertisedAddress();

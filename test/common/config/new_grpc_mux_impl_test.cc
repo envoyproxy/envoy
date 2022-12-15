@@ -2,6 +2,7 @@
 
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
+#include "envoy/config/xds_config_tracker.h"
 #include "envoy/event/timer.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
@@ -65,14 +66,16 @@ public:
           std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-          random_, stats_, rate_limit_settings_, local_info_, false, std::move(config_validators_));
+          random_, stats_, rate_limit_settings_, local_info_, false, std::move(config_validators_),
+          /*xds_config_tracker=*/XdsConfigTrackerOptRef());
       return;
     }
     grpc_mux_ = std::make_unique<NewGrpcMuxImpl>(
         std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
-        random_, stats_, rate_limit_settings_, local_info_, std::move(config_validators_));
+        random_, stats_, rate_limit_settings_, local_info_, std::move(config_validators_),
+        /*xds_config_tracker=*/XdsConfigTrackerOptRef());
   }
 
   void expectSendMessage(const std::string& type_url,
