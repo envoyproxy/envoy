@@ -95,14 +95,39 @@ TEST_F(SharedConsumerManagerTest, ShouldHandleMissingConfig) {
   ASSERT_EQ(testee->getConsumerCountForTest(), 0);
 }
 
-// RecordDistributorTest
-
 class MockRecordCb : public RecordCb {
 public:
   MOCK_METHOD(CallbackReply, receive, (InboundRecordSharedPtr), ());
   MOCK_METHOD(TopicToPartitionsMap, interest, (), (const));
   MOCK_METHOD(std::string, toString, (), (const));
 };
+
+TEST_F(SharedConsumerManagerTest, ShouldProcessCallback) {
+  // given
+  const std::string topic1 = "topic1";
+  const std::string topic2 = "topic2";
+
+  const ClusterConfig cluster_config = {"cluster", 1, {}, {}};
+  EXPECT_CALL(configuration_, computeClusterConfigForTopic(topic1))
+      .WillOnce(Return(cluster_config));
+  EXPECT_CALL(configuration_, computeClusterConfigForTopic(topic2))
+      .WillOnce(Return(cluster_config));
+  EXPECT_CALL(consumer_factory_, createConsumer(_, _, _, _, _)).Times(2);
+
+  auto testee = makeTestee();
+
+  const auto cb = std::make_shared<NiceMock<MockRecordCb>>();
+  const TopicToPartitionsMap tp = {{topic1, {0, 1}}, {topic2, {0, 1, 2, 3, 4}}};
+  EXPECT_CALL(*cb, interest).WillRepeatedly(Return(tp));
+
+  // when
+  testee->processCallback(cb);
+
+  // then
+  ASSERT_EQ(testee->getConsumerCountForTest(), 2);
+}
+
+// RecordDistributorTest
 
 class RecordDistributorTest : public testing::Test {
 protected:
