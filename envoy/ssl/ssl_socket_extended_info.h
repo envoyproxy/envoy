@@ -32,11 +32,15 @@ public:
   /**
    * Called when the asynchronous cert validation completes.
    * @param succeeded true if the validation succeeds
+   * @param detailed_status detailed status of the underlying validation. Depending on the
+   *        validation configuration, `succeeded` may be true but `detailed_status` might
+   *        indicate a failure. This detailed status can be used to inform routing
+   *        decisions.
    * @param error_details failure details, only used if the validation fails.
    * @param tls_alert the TLS error related to the failure, only used if the validation fails.
    */
-  virtual void onCertValidationResult(bool succeeded, const std::string& error_details,
-                                      uint8_t tls_alert) PURE;
+  virtual void onCertValidationResult(bool succeeded, ClientValidationStatus detailed_status,
+                                      const std::string& error_details, uint8_t tls_alert) PURE;
 };
 
 using ValidateResultCallbackPtr = std::unique_ptr<ValidateResultCallback>;

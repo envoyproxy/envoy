@@ -118,6 +118,8 @@ categories:
 - envoy.tls_handshakers
 - envoy.generic_proxy.filters
 - envoy.generic_proxy.codecs
+- envoy.http.early_header_mutation
+- envoy.http.custom_response
 
 status_values:
 - name: stable

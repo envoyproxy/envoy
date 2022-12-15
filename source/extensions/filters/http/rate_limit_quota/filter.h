@@ -120,20 +120,6 @@ private:
   RateLimitQuotaValidationVisitor visitor_ = {};
   Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher_ = nullptr;
   std::unique_ptr<Http::Matching::HttpMatchingDataImpl> data_ptr_ = nullptr;
-
-  // Customized hash and equal struct for `BucketId` hash key.
-  struct BucketIdHash {
-    size_t operator()(const BucketId& bucket_id) const { return MessageUtil::hash(bucket_id); }
-  };
-
-  struct BucketIdEqual {
-    bool operator()(const BucketId& id1, const BucketId& id2) const {
-      return Protobuf::util::MessageDifferencer::Equals(id1, id2);
-    }
-  };
-  // TODO(tyxia) Thread local storage.
-  absl::node_hash_map<BucketId, QuotaAssignmentAction, BucketIdHash, BucketIdEqual>
-      quota_assignment_map_;
 };
 
 } // namespace RateLimitQuota

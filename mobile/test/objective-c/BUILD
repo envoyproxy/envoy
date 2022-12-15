@@ -12,3 +12,15 @@ envoy_mobile_objc_test(
         "//library/objective-c:envoy_objc_bridge_lib",
     ],
 )
+
+envoy_mobile_objc_test(
+    name = "envoy_key_value_store_bridge_impl_test",
+    srcs = [
+        "EnvoyKeyValueStoreBridgeImplTest.m",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//library/objective-c:envoy_key_value_store_bridge_impl_lib",
+        "//library/objective-c:envoy_objc_bridge_lib",
+    ],
+)

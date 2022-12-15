@@ -16,7 +16,7 @@ envoy_mobile_android_test(
     },
     native_deps = [
         "//library/common/jni:libndk_envoy_jni.so",
-        "//library/common/jni:libndk_envoy_jni.jnilib",
+        "//library/common/jni:libndk_envoy_jni_jnilib",
     ],
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
@@ -34,7 +34,7 @@ envoy_mobile_android_test(
     },
     native_deps = [
         "//library/common/jni:libndk_envoy_jni.so",
-        "//library/common/jni:libndk_envoy_jni.jnilib",
+        "//library/common/jni:libndk_envoy_jni_jnilib",
     ],
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
@@ -53,7 +53,7 @@ envoy_mobile_android_test(
     },
     native_deps = [
         "//library/common/jni:libndk_envoy_jni.so",
-        "//library/common/jni:libndk_envoy_jni.jnilib",
+        "//library/common/jni:libndk_envoy_jni_jnilib",
     ],
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
@@ -72,7 +72,7 @@ envoy_mobile_android_test(
     },
     native_deps = [
         "//library/common/jni:libndk_envoy_jni.so",
-        "//library/common/jni:libndk_envoy_jni.jnilib",
+        "//library/common/jni:libndk_envoy_jni_jnilib",
     ],
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
