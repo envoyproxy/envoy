@@ -512,8 +512,8 @@ public:
   Grpc::MockAsyncClientManager async_client_manager_;
   Grpc::MockAsyncClient* async_client_ = nullptr;
   Grpc::MockAsyncClientFactory* factory_ = nullptr;
-  MockGrpcAccessLoggerCache logger_cache_;
   NiceMock<Stats::MockIsolatedStatsStore> scope_;
+  MockGrpcAccessLoggerCache logger_cache_;
 };
 
 TEST_F(GrpcAccessLoggerCacheTest, Deduplication) {

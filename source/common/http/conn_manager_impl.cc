@@ -1076,7 +1076,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
     // Modify the downstream remote address depending on configuration and headers.
     const auto mutate_result = ConnectionManagerUtility::mutateRequestHeaders(
         *request_headers_, connection_manager_.read_callbacks_->connection(),
-        connection_manager_.config_, *snapped_route_config_, connection_manager_.local_info_);
+        connection_manager_.config_, *snapped_route_config_, connection_manager_.local_info_,
+        filter_manager_.streamInfo());
 
     // IP detection failed, reject the request.
     if (mutate_result.reject_request.has_value()) {

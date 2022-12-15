@@ -332,6 +332,7 @@ envoy_cc_test_library(
         "//envoy/server:filter_config_interface",
         "//source/common/stats:symbol_table_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
     ],
 )
