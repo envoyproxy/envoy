@@ -21,7 +21,7 @@
 #include "quiche/quic/test_tools/quic_session_peer.h"
 #endif
 
-#include "source/extensions/listener_managers/listener_manager/connection_handler_impl.h"
+#include "source/server/connection_handler_impl.h"
 
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
