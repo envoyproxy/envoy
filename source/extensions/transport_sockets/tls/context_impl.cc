@@ -784,6 +784,9 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
   }
 
   for (auto& ctx : tls_contexts_) {
+    if (ctx.cert_chain_ == nullptr) {
+      continue;
+    }
     bssl::UniquePtr<EVP_PKEY> public_key(X509_get_pubkey(ctx.cert_chain_.get()));
     const int pkey_id = EVP_PKEY_id(public_key.get());
     // Load DNS SAN entries and Subject Common Name as server name patterns after certificate

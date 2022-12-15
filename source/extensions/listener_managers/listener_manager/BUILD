@@ -76,7 +76,7 @@ envoy_cc_extension(
     ] + envoy_select_enable_http3([
         "//source/common/quic:active_quic_listener_lib",
         "//source/common/quic:client_connection_factory_lib",
-        "//source/common/quic:quic_factory_lib",
+        "//source/common/quic:quic_server_factory_lib",
         "//source/common/quic:quic_transport_socket_factory_lib",
         "//source/common/quic:udp_gso_batch_writer_lib",
         "//source/extensions/udp_packet_writer/gso:config",

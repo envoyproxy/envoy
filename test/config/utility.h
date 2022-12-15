@@ -197,6 +197,9 @@ public:
   // Configuration for L7 proxying, with clusters cluster_1 and cluster_2 meant to be added via CDS.
   // api_type should be REST, GRPC, or DELTA_GRPC.
   static std::string discoveredClustersBootstrap(const std::string& api_type);
+  // Configuration for L7 proxying, with clusters cluster_1 and cluster_2 meant to be added via CDS.
+  // but there are no listeners.
+  static std::string clustersNoListenerBootstrap(const std::string& api_type);
   static std::string adsBootstrap(const std::string& api_type);
   // Builds a standard Cluster config fragment, with a single endpoint (at address:port).
   static envoy::config::cluster::v3::Cluster

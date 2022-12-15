@@ -156,7 +156,9 @@ R"(- &enable_drain_post_dns_refresh false
 
 !ignore tls_root_ca_defs: &tls_root_certs |
 )"
+#ifndef EXCLUDE_CERTIFICATES
 #include "certificates.inc"
+#endif
 R"(
 
 !ignore validation_context_defs:
@@ -503,7 +505,7 @@ stats_config:
         - safe_regex:
             regex: '^pulse.*'
         - safe_regex:
-            regex: '^vhost\.[\w]+\.vcluster\.[\w]+?\.upstream_rq_(?:[12345]xx|[3-5][0-9][0-9]|retry.*|timeout|total)'
+            regex: '^vhost\.[\w]+\.vcluster\.[\w]+?\.upstream_rq_(?:[12345]xx|[3-5][0-9][0-9]|retry|total)'
   use_all_default_tags:
     false
 watchdogs:
