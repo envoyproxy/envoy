@@ -19,6 +19,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/cluster_priority_set.h"
+#include "test/mocks/upstream/health_checker.h"
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/host_set.h"
 #include "test/test_common/simulated_time_system.h"
@@ -359,6 +360,12 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xxViaHttpCodesWithActiveHC) {
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+
+  // Add health checker to cluster and validate that host call back is called.
+  std::shared_ptr<MockHealthChecker> health_checker(new MockHealthChecker());
+  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
+  ON_CALL(cluster_, healthChecker()).WillByDefault(Return(health_checker.get()));
+
   std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(cluster_, empty_outlier_detection_,
                                                               dispatcher_, runtime_, time_system_,
                                                               event_logger_, random_));
@@ -389,10 +396,12 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xxViaHttpCodesWithActiveHC) {
 
   hosts_[0]->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
 
+  // Trigger the health checker callbacks and validate host is unejected.
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
-  detector->unejectHost(hosts_[0]);
+  health_checker->runCallbacks(hosts_[0], HealthTransition::Changed);
+  EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
 
   // Eject host again to cause an ejection after an unejection has taken place
   hosts_[0]->outlierDetector().putResponseTime(std::chrono::milliseconds(5));
