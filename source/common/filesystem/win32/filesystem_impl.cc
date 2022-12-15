@@ -39,6 +39,9 @@ Api::IoCallBoolResult FileImplWin32::open(FlagSet in) {
   if (fd_ == INVALID_HANDLE) {
     return resultFailure(false, ::GetLastError());
   }
+  if (in.test(File::Operation::Write) && !in.test(File::Operation::Append)) {
+    SetEndOfFile(fd_);
+  }
   return resultSuccess(true);
 }
 
@@ -73,9 +76,6 @@ Api::IoCallSizeResult FileImplWin32::write(absl::string_view buffer) {
 Api::IoCallBoolResult FileImplWin32::close() {
   ASSERT(isOpen());
 
-  if (truncate_) {
-    SetEndOfFile(fd_);
-  }
   BOOL result = CloseHandle(fd_);
   fd_ = INVALID_HANDLE;
   if (result == 0) {
@@ -119,9 +119,6 @@ FileImplWin32::FlagsAndMode FileImplWin32::translateFlag(FlagSet in) {
 
   if (in.test(File::Operation::Write)) {
     access = GENERIC_WRITE;
-    if (!in.test(File::Operation::Append) && !in.test(File::Operation::KeepExistingData)) {
-      truncate_ = true;
-    }
   }
 
   // Order of tests matter here. There reason for that

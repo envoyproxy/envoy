@@ -29,7 +29,6 @@ protected:
 
 private:
   friend class FileSystemImplTest;
-  bool truncate_{};
 };
 
 class TmpFileImplWin32 : public FileImplWin32 {
