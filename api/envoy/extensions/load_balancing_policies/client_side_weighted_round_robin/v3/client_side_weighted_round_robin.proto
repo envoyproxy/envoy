@@ -27,7 +27,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // qps / cpu_utilization.
 //
 // See the :ref:`load balancing architecture overview<arch_overview_load_balancing_types>` for more information.
-message RoundRobin {
+message ClientSideWeightedRoundRobin {
   // Whether to enable out-of-band utilization reporting collection from
   // the endpoints. By default, per-request utilization reporting is used.
   google.protobuf.BoolValue enable_oob_load_report = 1;
