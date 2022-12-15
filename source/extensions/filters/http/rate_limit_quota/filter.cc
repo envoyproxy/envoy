@@ -37,6 +37,8 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
     return Envoy::Http::FilterHeadersStatus::Continue;
   }
 
+  // TODO(tyxia) Log
+  // ENVOY_LOG(error, "quota bucket!");
   BucketId bucket_id = ret.value();
   ASSERT(quota_bucket_ != nullptr);
   // Third, look up the quota bucket cache.
@@ -47,6 +49,8 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
     // server, we get the pre-configured rate limiting strategy from no assignment behavior in
     // the configuration.
     if (bucket_settings.has_no_assignment_behavior()) {
+      // TODO(tyxia) Log
+      // ENVOY_LOG(error, "no assignment!");
       // Retrieve the `blanket_rule` value from the config to decide if we want to fail-open or
       // fail-close.
       auto strategy = bucket_settings.no_assignment_behavior().fallback_rate_limit();
@@ -60,6 +64,8 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
       return Envoy::Http::FilterHeadersStatus::Continue;
     }
 
+    // TODO(tyxia) Log
+    // ENVOY_LOG(error, "I am here!!!");
     // Build the quota bucket element.
     BucketElement element;
     //  Create the gRPC client and start the stream on the first request.

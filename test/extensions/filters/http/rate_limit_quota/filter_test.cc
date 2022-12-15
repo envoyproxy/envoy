@@ -1,5 +1,14 @@
 #include <initializer_list>
 
+#include "envoy/config/core/v3/grpc_service.pb.h"
+#include "test/extensions/filters/http/rate_limit_quota/mocks.h"
+#include "test/mocks/grpc/mocks.h"
+#include "test/mocks/server/mocks.h"
+#include "test/test_common/status_utility.h"
+#include "source/extensions/filters/http/rate_limit_quota/client.h"
+#include "source/extensions/filters/http/rate_limit_quota/client_impl.h"
+
+
 #include "envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.pb.h"
 #include "envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.pb.validate.h"
 
@@ -22,6 +31,55 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitQuota {
 namespace {
+
+using Server::Configuration::MockFactoryContext;
+using testing::Invoke;
+using testing::Unused;
+
+class RateLimitStreamUtility {
+public:
+  RateLimitStreamUtility() {
+    std::cout << "init grpc" << std::endl;
+    grpc_service_.mutable_envoy_grpc()->set_cluster_name("rate_limit_quota");
+    // Set the expected behavior for async_client_manager in mock context.
+    // Note, we need to set it through `MockFactoryContext` rather than `MockAsyncClientManager`
+    // directly because the rate limit client object below requires context argument as the input.
+    EXPECT_CALL(context_.cluster_manager_.async_client_manager_, getOrCreateRawAsyncClient(_, _, _))
+        .WillOnce(Invoke(this, &RateLimitStreamUtility::mockCreateAsyncClient));
+
+    client_ = createRateLimitClient(context_, grpc_service_, &reports_);
+  }
+
+  Grpc::RawAsyncClientSharedPtr mockCreateAsyncClient(Unused, Unused, Unused) {
+    auto async_client = std::make_shared<Grpc::MockAsyncClient>();
+    EXPECT_CALL(*async_client, startRaw("envoy.service.rate_limit_quota.v3.RateLimitQuotaService",
+                                        "StreamRateLimitQuotas", _, _))
+        .WillOnce(Invoke(this, &RateLimitStreamUtility::mockStartRaw));
+
+    return async_client;
+  }
+
+  Grpc::RawAsyncStream* mockStartRaw(Unused, Unused, Grpc::RawAsyncStreamCallbacks& callbacks,
+                                     const Http::AsyncClient::StreamOptions&) {
+    stream_callbacks_ = &callbacks;
+    return &stream_;
+  }
+
+  ~RateLimitStreamUtility() = default;
+
+  NiceMock<MockFactoryContext> context_;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
+
+  envoy::config::core::v3::GrpcService grpc_service_;
+  Grpc::MockAsyncStream stream_;
+  Grpc::RawAsyncStreamCallbacks* stream_callbacks_;
+  Grpc::Status::GrpcStatus grpc_status_ = Grpc::Status::WellKnownGrpcStatus::Ok;
+  RateLimitClientPtr client_;
+  MockRateLimitQuotaCallbacks callbacks_;
+  RateLimitQuotaUsageReports reports_;
+
+  bool grpc_closed_ = false;
+};
 
 using ::Envoy::Extensions::HttpFilters::RateLimitQuota::FilterConfig;
 using ::Envoy::StatusHelpers::StatusIs;
@@ -62,6 +120,9 @@ constexpr char ValidMatcherConfig[] = R"EOF(
                         "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
                         header_name: group
             reporting_interval: 60s
+            no_assignment_behavior:
+              fallback_rate_limit:
+                blanket_rule: ALLOW_ALL
   )EOF";
 
 constexpr char OnNoMatchConfig[] = R"EOF(
@@ -114,47 +175,22 @@ constexpr char OnNoMatchConfig[] = R"EOF(
         reporting_interval: 5s
 )EOF";
 
-// constexpr char OnNoMatchConfig[] = R"EOF(
-//   action:
-//     name: rate_limit_quota
-//     typed_config:
-//       "@type":
-//       type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
-//       bucket_id_builder:
-//         bucket_id_builder:
-//           "name":
-//               string_value: "prod"
-//           "environment":
-//               custom_value:
-//                 name: "test_1"
-//                 typed_config:
-//                   "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-//                   header_name: environment
-//       deny_response_settings:
-//         grpc_status:
-//           code: 8
-//       expired_assignment_behavior:
-//         fallback_rate_limit:
-//           blanket_rule: ALLOW_ALL
-//       reporting_interval: 5s
-// )EOF";
-// constexpr char OnNoMatchConfig_deprecated[] = R"EOF(
-//   action:
-//     typed_config:
-//       '@type':
-//       type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
-//       no_assignment_behavior:
-//         fallback_rate_limit:
-//           blanket_rule: DENY_ALL
-//       reporting_interval: 60s
-// )EOF";
-
-const std::string GoogleGrpcConfig = R"EOF(
+// It uses Google Grpc config.
+constexpr char FilterConfigStr[] = R"EOF(
   rlqs_server:
     google_grpc:
       target_uri: rate_limit_quota_server
       stat_prefix: google
-  )EOF";
+  domain:
+    rate_limit_quota_test
+)EOF";
+
+// const std::string GoogleGrpcConfig = R"EOF(
+//   rlqs_server:
+//     google_grpc:
+//       target_uri: rate_limit_quota_server
+//       stat_prefix: google
+//   )EOF";
 
 // const std::string GrpcConfig = R"EOF(
 //   rlqs_server:
@@ -198,7 +234,9 @@ class FilterTest : public testing::Test {
 public:
   FilterTest() {
     // Add the grpc service config.
-    TestUtility::loadFromYaml(GoogleGrpcConfig, config_);
+    TestUtility::loadFromYaml(FilterConfigStr, config_);
+    RateLimitStreamUtility utility;
+    EXPECT_OK(utility.client_->startStream(utility.stream_info_));
   }
 
   ~FilterTest() override { filter_->onDestroy(); }
@@ -365,15 +403,23 @@ TEST_F(FilterTest, RequestMatchingFailedWithOnNoMatchConfigured) {
               testing::UnorderedPointwise(testing::Eq(), serialized_bucket_ids));
 }
 
-TEST_F(FilterTest, DecodeHeader) {
+// TODO(tyxia)This may need the integration test to start the fake grpc client
+TEST_F(FilterTest, DecodeHeaderWithValidConfig) {
   addMatcherConfig(MatcherConfigType::Valid);
   createFilter();
+
+  // Define the key value pairs that is used to build the bucket_id dynamically via `custom_value`
+  // in the config.
+  absl::flat_hash_map<std::string, std::string> custom_value_pairs = {{"environment", "staging"},
+                                                                      {"group", "envoy"}};
+
+  buildCustomHeader(custom_value_pairs);
 
   Http::FilterHeadersStatus status = filter_->decodeHeaders(default_headers_, false);
   EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::Continue);
 }
 
-// TODO(tyxia)This may need the integration test to start the fake grpc client
+
 TEST_F(FilterTest, DecodeHeaderWithOnNoMatchConfigured) {
   addMatcherConfig(MatcherConfigType::IncludeOnNoMatchConfig);
   createFilter();
