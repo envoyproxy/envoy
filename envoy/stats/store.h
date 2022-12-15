@@ -155,10 +155,10 @@ public:
   // inheritance of Scope as a parent of Store. There is semantic complexity to
   // that PR, so it's going to be easier review if it's as small as possible.
   //
-  // A follow-up PR is required to remove the functions below, which will
-  // require a large number of files to be trivially changed, by explicitly
+  // A series of follow-up PRs is required to remove the functions below, which
+  // will require a large number of files to be trivially changed, by explicitly
   // accessing the rootScope() to call these methods.
-  // operator Scope&() { return *rootScope(); }
+  operator Scope&() { return *rootScope(); }
 
   // Delegate some methods to the root scope; these are exposed to make it more
   // convenient to use stats_macros.h. We may consider dropping them if desired,
@@ -177,7 +177,7 @@ public:
   }
 
   /**
-   * @returns a scape of the given name.
+   * @returns a scope of the given name.
    */
   ScopeSharedPtr createScope(const std::string& name) { return rootScope()->createScope(name); }
 };
