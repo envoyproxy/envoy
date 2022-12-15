@@ -206,6 +206,13 @@ private:
 
   std::shared_ptr<Common::AsyncFiles::AsyncFileManager> async_file_manager_;
   CacheStats stats_;
+
+  // These are part of stats, but we have to track them separately because there is
+  // potential to go "less than zero" due to not having sole control of the file cache;
+  // gauge values don't have fine enough control to prevent that, and aren't allowed to
+  // be negative.
+  std::atomic<uint64_t> size_count_;
+  std::atomic<uint64_t> size_bytes_;
 };
 
 } // namespace FileSystemHttpCache

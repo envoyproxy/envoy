@@ -334,8 +334,8 @@ InsertContextPtr FileSystemHttpCache::makeInsertContext(LookupContextPtr&& looku
 }
 
 void FileSystemHttpCache::init() {
-  uint64_t size_bytes = 0;
-  uint64_t size_count = 0;
+  size_bytes_ = 0;
+  size_count_ = 0;
   for (const Filesystem::DirectoryEntry& entry : Filesystem::Directory(std::string{cachePath()})) {
     if (entry.type_ != Filesystem::FileType::Regular) {
       continue;
@@ -343,11 +343,11 @@ void FileSystemHttpCache::init() {
     if (!absl::StartsWith(entry.name_, "cache-")) {
       continue;
     }
-    size_count++;
-    size_bytes += entry.size_bytes_.value_or(0);
+    size_count_++;
+    size_bytes_ += entry.size_bytes_.value_or(0);
   }
-  stats_.size_count_.set(size_count);
-  stats_.size_bytes_.set(size_bytes);
+  stats_.size_count_.set(size_count_);
+  stats_.size_bytes_.set(size_bytes_);
   if (config().has_max_cache_entry_size_bytes()) {
     stats_.size_limit_bytes_.set(config().max_cache_entry_size_bytes().value());
   }
@@ -357,14 +357,27 @@ void FileSystemHttpCache::init() {
 }
 
 void FileSystemHttpCache::trackFileAdded(uint64_t file_size) {
+  size_count_++;
+  size_bytes_ += file_size;
   stats_.size_count_.inc();
   stats_.size_bytes_.add(file_size);
   // TODO(ravenblack): potentially trigger cache cleanup operation.
 }
 
 void FileSystemHttpCache::trackFileRemoved(uint64_t file_size) {
-  stats_.size_count_.dec();
-  stats_.size_bytes_.sub(file_size);
+  // Atomically decrement-but-clamp-at-zero the count of files in the cache.
+  uint64_t count = size_count_;
+  while (count > 0 && !size_count_.compare_exchange_weak(count, count - 1)) {
+  }
+  stats_.size_count_.set(size_count_);
+  // Atomically decrease-but-clamp-at-zero the size of files in the cache, by file_size.
+  uint64_t size = size_bytes_;
+  while (size >= file_size && !size_bytes_.compare_exchange_weak(size, size - file_size)) {
+  }
+  if (size < file_size) {
+    size_bytes_ = 0;
+  }
+  stats_.size_bytes_.set(size_bytes_);
 }
 
 } // namespace FileSystemHttpCache

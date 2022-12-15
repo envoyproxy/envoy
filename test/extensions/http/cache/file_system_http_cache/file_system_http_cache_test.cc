@@ -431,6 +431,11 @@ TEST_F(FileSystemHttpCacheTestWithMockFiles, FailedOpenForReadReturnsMiss) {
 }
 
 TEST_F(FileSystemHttpCacheTestWithMockFiles, FailedReadOfHeaderBlockInvalidatesTheCacheEntry) {
+  // Fake-add two files of size 12345, so we can validate the stats decrease of removing a file.
+  cache_->trackFileAdded(12345);
+  cache_->trackFileAdded(12345);
+  EXPECT_EQ(cache_->stats().size_bytes_.value(), 2 * 12345);
+  EXPECT_EQ(cache_->stats().size_count_.value(), 2);
   auto lookup = testLookupContext();
   absl::Cleanup destroy_lookup([&lookup]() { lookup->onDestroy(); });
   LookupResult result;
@@ -450,12 +455,12 @@ TEST_F(FileSystemHttpCacheTestWithMockFiles, FailedReadOfHeaderBlockInvalidatesT
   // unlink
   mock_async_file_manager_->nextActionCompletes(absl::OkStatus());
   EXPECT_EQ(result.cache_entry_status_, CacheEntryStatus::Unusable);
-  // Should have deducted the size of the file that got deleted. Since we started at zero this
-  // should make the stat negative.
-  EXPECT_EQ(cache_->stats().size_bytes_.value(), -stat_result.st_size);
-  // Should have deducted one file for the file that got deleted. Since we started at zero this
-  // should make the stat negative.
-  EXPECT_EQ(cache_->stats().size_count_.value(), -1);
+  // Should have deducted the size of the file that got deleted. Since we started at 2 * 12345,
+  // this should make the value 12345.
+  EXPECT_EQ(cache_->stats().size_bytes_.value(), 12345);
+  // Should have deducted one file for the file that got deleted. Since we started at 2,
+  // this should make the value 1.
+  EXPECT_EQ(cache_->stats().size_count_.value(), 1);
 }
 
 Buffer::InstancePtr invalidHeaderBlock() {
