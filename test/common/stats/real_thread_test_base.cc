@@ -5,7 +5,7 @@ namespace Stats {
 
 ThreadLocalStoreNoMocksTestBase::ThreadLocalStoreNoMocksTestBase()
     : alloc_(symbol_table_), store_(std::make_unique<ThreadLocalStoreImpl>(alloc_)),
-      pool_(symbol_table_) {}
+      scope_(*store_->rootScope()), pool_(symbol_table_) {}
 
 ThreadLocalStoreNoMocksTestBase::~ThreadLocalStoreNoMocksTestBase() {
   if (store_ != nullptr) {
@@ -18,7 +18,7 @@ StatName ThreadLocalStoreNoMocksTestBase::makeStatName(absl::string_view name) {
 }
 
 ThreadLocalRealThreadsTestBase::ThreadLocalRealThreadsTestBase(uint32_t num_threads)
-    : RealThreadsTestHelper(num_threads) {
+    : RealThreadsTestHelper(num_threads), pool_(store_->symbolTable()) {
   runOnMainBlocking([this]() { store_->initializeThreading(*main_dispatcher_, *tls_); });
 }
 

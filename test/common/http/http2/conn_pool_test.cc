@@ -634,8 +634,8 @@ TEST_F(Http2ConnPoolImplTest, DrainConnections) {
   EXPECT_CALL(*this, onClientDestroy()).Times(2);
   dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(2U, cluster_->traffic_stats_->upstream_cx_destroy_.value());
-  EXPECT_EQ(2U, cluster_->traffic_stats_->upstream_cx_destroy_remote_.value());
+  EXPECT_EQ(2U, cluster_->trafficStats()->upstream_cx_destroy_.value());
+  EXPECT_EQ(2U, cluster_->trafficStats()->upstream_cx_destroy_remote_.value());
 }
 
 // Test that cluster.http2_protocol_options.max_concurrent_streams limits
@@ -688,7 +688,7 @@ TEST_F(Http2ConnPoolImplTest, MaxConcurrentRequestsPerStream) {
   EXPECT_CALL(*this, onClientDestroy()).Times(2);
   dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(2U, cluster_->traffic_stats_->upstream_cx_total_.value());
+  EXPECT_EQ(2U, cluster_->trafficStats()->upstream_cx_total_.value());
 }
 
 // Verifies that requests are queued up in the conn pool until the connection becomes ready.
@@ -732,8 +732,8 @@ TEST_F(Http2ConnPoolImplTest, PendingStreams) {
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_destroy_.value());
-  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_destroy_remote_.value());
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_cx_destroy_.value());
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_cx_destroy_remote_.value());
 }
 
 // Verifies that the correct number of CONNECTING connections are created for
@@ -853,8 +853,8 @@ TEST_F(Http2ConnPoolImplTest, PendingStreamsFailure) {
   EXPECT_CALL(*this, onClientDestroy()).Times(2);
   dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(2U, cluster_->traffic_stats_->upstream_cx_destroy_.value());
-  EXPECT_EQ(2U, cluster_->traffic_stats_->upstream_cx_destroy_remote_.value());
+  EXPECT_EQ(2U, cluster_->trafficStats()->upstream_cx_destroy_.value());
+  EXPECT_EQ(2U, cluster_->trafficStats()->upstream_cx_destroy_remote_.value());
 }
 
 // Verifies resets due to local connection closes are tracked correctly.
@@ -909,8 +909,8 @@ TEST_F(Http2ConnPoolImplTest, PendingStreamsRequestOverflow) {
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_destroy_.value());
-  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_destroy_remote_.value());
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_cx_destroy_.value());
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_cx_destroy_remote_.value());
 }
 
 // Verifies that we honor the max pending requests circuit breaker.
@@ -947,8 +947,8 @@ TEST_F(Http2ConnPoolImplTest, PendingStreamsMaxPendingCircuitBreaker) {
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_destroy_.value());
-  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_destroy_remote_.value());
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_cx_destroy_.value());
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_cx_destroy_remote_.value());
 }
 
 TEST_F(Http2ConnPoolImplTest, VerifyConnectionTimingStats) {
@@ -973,8 +973,8 @@ TEST_F(Http2ConnPoolImplTest, VerifyConnectionTimingStats) {
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_destroy_.value());
-  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_destroy_remote_.value());
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_cx_destroy_.value());
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_cx_destroy_remote_.value());
 }
 
 /**
@@ -1004,8 +1004,8 @@ TEST_F(Http2ConnPoolImplTest, VerifyBufferLimits) {
   dispatcher_.clearDeferredDeleteList();
   CHECK_STATE(0 /*active*/, 0 /*pending*/, 0 /*capacity*/);
 
-  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_destroy_.value());
-  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_destroy_remote_.value());
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_cx_destroy_.value());
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_cx_destroy_remote_.value());
 }
 
 TEST_F(Http2ConnPoolImplTest, RequestAndResponse) {
@@ -1019,7 +1019,7 @@ TEST_F(Http2ConnPoolImplTest, RequestAndResponse) {
       r1.callbacks_.outer_encoder_
           ->encodeHeaders(TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, true)
           .ok());
-  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_active_.value());
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_cx_active_.value());
   EXPECT_CALL(r1.decoder_, decodeHeaders_(_, true));
   r1.inner_decoder_->decodeHeaders(
       ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
@@ -1038,9 +1038,9 @@ TEST_F(Http2ConnPoolImplTest, RequestAndResponse) {
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(0U, cluster_->traffic_stats_->upstream_cx_active_.value());
-  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_destroy_.value());
-  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_destroy_remote_.value());
+  EXPECT_EQ(0U, cluster_->trafficStats()->upstream_cx_active_.value());
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_cx_destroy_.value());
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_cx_destroy_remote_.value());
 }
 
 TEST_F(Http2ConnPoolImplTest, LocalReset) {
@@ -1059,11 +1059,11 @@ TEST_F(Http2ConnPoolImplTest, LocalReset) {
   test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
-  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_destroy_.value());
-  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_destroy_remote_.value());
-  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_rq_tx_reset_.value());
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_cx_destroy_.value());
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_cx_destroy_remote_.value());
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_rq_tx_reset_.value());
   EXPECT_EQ(0U, cluster_->circuit_breakers_stats_.rq_open_.value());
-  EXPECT_EQ(0U, cluster_->traffic_stats_->upstream_cx_active_.value());
+  EXPECT_EQ(0U, cluster_->trafficStats()->upstream_cx_active_.value());
 }
 
 TEST_F(Http2ConnPoolImplTest, RemoteReset) {
@@ -1082,11 +1082,11 @@ TEST_F(Http2ConnPoolImplTest, RemoteReset) {
   test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
-  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_destroy_.value());
-  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_destroy_remote_.value());
-  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_rq_rx_reset_.value());
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_cx_destroy_.value());
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_cx_destroy_remote_.value());
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_rq_rx_reset_.value());
   EXPECT_EQ(0U, cluster_->circuit_breakers_stats_.rq_open_.value());
-  EXPECT_EQ(0U, cluster_->traffic_stats_->upstream_cx_active_.value());
+  EXPECT_EQ(0U, cluster_->trafficStats()->upstream_cx_active_.value());
 }
 
 TEST_F(Http2ConnPoolImplTest, DrainDisconnectWithActiveRequest) {
@@ -1111,8 +1111,8 @@ TEST_F(Http2ConnPoolImplTest, DrainDisconnectWithActiveRequest) {
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_destroy_.value());
-  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_destroy_remote_.value());
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_cx_destroy_.value());
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_cx_destroy_remote_.value());
 }
 
 TEST_F(Http2ConnPoolImplTest, DrainDisconnectDrainingWithActiveRequest) {
@@ -1155,8 +1155,8 @@ TEST_F(Http2ConnPoolImplTest, DrainDisconnectDrainingWithActiveRequest) {
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(2U, cluster_->traffic_stats_->upstream_cx_destroy_.value());
-  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_destroy_remote_.value());
+  EXPECT_EQ(2U, cluster_->trafficStats()->upstream_cx_destroy_.value());
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_cx_destroy_remote_.value());
 }
 
 TEST_F(Http2ConnPoolImplTest, DrainPrimary) {
@@ -1278,13 +1278,13 @@ TEST_F(Http2ConnPoolImplTest, ConnectTimeout) {
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_rq_total_.value());
-  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_connect_fail_.value());
-  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_connect_timeout_.value());
-  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_rq_pending_failure_eject_.value());
-  EXPECT_EQ(2U, cluster_->traffic_stats_->upstream_cx_destroy_.value());
-  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_destroy_local_.value());
-  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_destroy_remote_.value());
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_rq_total_.value());
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_cx_connect_fail_.value());
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_cx_connect_timeout_.value());
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_rq_pending_failure_eject_.value());
+  EXPECT_EQ(2U, cluster_->trafficStats()->upstream_cx_destroy_.value());
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_cx_destroy_local_.value());
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_cx_destroy_remote_.value());
 }
 
 TEST_F(Http2ConnPoolImplTest, MaxGlobalRequests) {
@@ -1310,8 +1310,8 @@ TEST_F(Http2ConnPoolImplTest, MaxGlobalRequests) {
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_destroy_.value());
-  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_destroy_remote_.value());
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_cx_destroy_.value());
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_cx_destroy_remote_.value());
 }
 
 TEST_F(Http2ConnPoolImplTest, GoAway) {
@@ -1348,7 +1348,7 @@ TEST_F(Http2ConnPoolImplTest, GoAway) {
   EXPECT_CALL(*this, onClientDestroy()).Times(2);
   dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_close_notify_.value());
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_cx_close_notify_.value());
 }
 
 TEST_F(Http2ConnPoolImplTest, NoActiveConnectionsByDefault) {

@@ -258,7 +258,7 @@ TEST_F(CodecClientTest, ProtocolError) {
   Buffer::OwnedImpl data;
   filter_->onData(data, false);
 
-  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_protocol_error_.value());
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_cx_protocol_error_.value());
 }
 
 TEST_F(CodecClientTest, 408Response) {
@@ -270,7 +270,7 @@ TEST_F(CodecClientTest, 408Response) {
   Buffer::OwnedImpl data;
   filter_->onData(data, false);
 
-  EXPECT_EQ(0U, cluster_->traffic_stats_->upstream_cx_protocol_error_.value());
+  EXPECT_EQ(0U, cluster_->trafficStats()->upstream_cx_protocol_error_.value());
 }
 
 TEST_F(CodecClientTest, PrematureResponse) {
@@ -281,7 +281,7 @@ TEST_F(CodecClientTest, PrematureResponse) {
   Buffer::OwnedImpl data;
   filter_->onData(data, false);
 
-  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_protocol_error_.value());
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_cx_protocol_error_.value());
 }
 
 TEST_F(CodecClientTest, WatermarkPassthrough) {

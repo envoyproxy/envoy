@@ -569,7 +569,7 @@ TEST_F(TcpConnPoolImplTest, MaxPendingRequests) {
 
   EXPECT_EQ(ConnectionPool::PoolFailureReason::Overflow, callbacks2.reason_);
 
-  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_rq_pending_overflow_.value());
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_rq_pending_overflow_.value());
 }
 
 /**
@@ -597,8 +597,8 @@ TEST_F(TcpConnPoolImplTest, RemoteConnectFailure) {
   EXPECT_EQ(ConnectionPool::PoolFailureReason::RemoteConnectionFailure, callbacks.reason_);
   EXPECT_EQ("foo", callbacks.failure_reason_string_);
 
-  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_connect_fail_.value());
-  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_rq_pending_failure_eject_.value());
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_cx_connect_fail_.value());
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_rq_pending_failure_eject_.value());
 }
 
 /**
@@ -623,8 +623,8 @@ TEST_F(TcpConnPoolImplTest, LocalConnectFailure) {
 
   EXPECT_EQ(ConnectionPool::PoolFailureReason::LocalConnectionFailure, callbacks.reason_);
 
-  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_connect_fail_.value());
-  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_rq_pending_failure_eject_.value());
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_cx_connect_fail_.value());
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_rq_pending_failure_eject_.value());
 }
 
 /**
@@ -655,8 +655,8 @@ TEST_F(TcpConnPoolImplTest, ConnectTimeout) {
   EXPECT_EQ(ConnectionPool::PoolFailureReason::Timeout, callbacks1.reason_);
   EXPECT_EQ(ConnectionPool::PoolFailureReason::Timeout, callbacks2.reason_);
 
-  EXPECT_EQ(2U, cluster_->traffic_stats_->upstream_cx_connect_fail_.value());
-  EXPECT_EQ(2U, cluster_->traffic_stats_->upstream_cx_connect_timeout_.value());
+  EXPECT_EQ(2U, cluster_->trafficStats()->upstream_cx_connect_fail_.value());
+  EXPECT_EQ(2U, cluster_->trafficStats()->upstream_cx_connect_timeout_.value());
 }
 
 /**
@@ -781,7 +781,7 @@ TEST_F(TcpConnPoolImplTest, MaxConnections) {
   // Request 2 should not kick off a new connection.
   ConnPoolCallbacks callbacks2;
   handle = conn_pool_->newConnection(callbacks2);
-  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_overflow_.value());
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_cx_overflow_.value());
 
   EXPECT_NE(nullptr, handle);
 
@@ -828,8 +828,8 @@ TEST_F(TcpConnPoolImplTest, MaxRequestsPerConnection) {
   callbacks.conn_data_.reset();
   dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(0U, cluster_->traffic_stats_->upstream_cx_destroy_with_active_rq_.value());
-  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_max_requests_.value());
+  EXPECT_EQ(0U, cluster_->trafficStats()->upstream_cx_destroy_with_active_rq_.value());
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_cx_max_requests_.value());
 }
 
 /*
