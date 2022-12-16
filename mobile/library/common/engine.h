@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/server/lifecycle_notifier.h"
+#include "envoy/stats/store.h"
 
 #include "source/common/common/logger.h"
 #include "source/extensions/clusters/logical_dns/logical_dns_cluster.h"
@@ -128,6 +129,11 @@ public:
    * Get cluster manager from the Engine.
    */
   Upstream::ClusterManager& getClusterManager();
+
+  /*
+   * Get the stats store from the Engine.
+   */
+  Stats::Store& getStatsStore();
 
 private:
   envoy_status_t main(std::string config, std::string log_level, std::string admin_address_path);

@@ -1,4 +1,3 @@
-#include "test/common/integration/xds_integration_test.h"
 #include "xds_integration_test.h"
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
@@ -93,52 +92,6 @@ void XdsIntegrationTest::initializeXdsStream() {
       xds_connection_->waitForNewStream(*BaseIntegrationTest::dispatcher_, xds_stream_);
   RELEASE_ASSERT(result, result.message());
   xds_stream_->startGrpcStream();
-}
-
-std::string XdsIntegrationTest::getRuntimeKey(const std::string& key) {
-  auto response = IntegrationUtil::makeSingleRequest(
-      lookupPort("admin"), "GET", "/runtime?format=json", "", Http::CodecType::HTTP2, version_);
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().getStatusValue());
-  Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(response->body());
-  auto entries = loader->getObject("entries");
-  if (entries->hasObject(key)) {
-    return entries->getObject(key)->getString("final_value");
-  }
-  return "";
-}
-
-// TODO(abeyad): Change this implementation to use the PulseClient once implemented. See
-// https://github.com/envoyproxy/envoy-mobile/issues/2356 for details.
-uint64_t XdsIntegrationTest::getCounterValue(const std::string& counter) {
-  auto response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?usedonly",
-                                                     "", Http::CodecType::HTTP2, version_);
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().getStatusValue());
-  std::stringstream ss(response->body());
-  std::string line;
-  while (std::getline(ss, line, '\n')) {
-    auto pos = line.find(':');
-    if (pos == std::string::npos) {
-      continue;
-    }
-    if (line.substr(0, pos) == counter) {
-      return std::stoi(line.substr(pos + 1));
-    }
-  }
-  return 0;
-}
-
-AssertionResult XdsIntegrationTest::waitForCounterGe(const std::string& name, uint64_t value) {
-  constexpr std::chrono::milliseconds timeout = TestUtility::DefaultTimeout;
-  Event::TestTimeSystem::RealTimeBound bound(timeout);
-  while (getCounterValue(name) < value) {
-    Event::GlobalTimeSystem().timeSystem().advanceTimeWait(std::chrono::milliseconds(10));
-    if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
-      return AssertionFailure() << fmt::format("timed out waiting for {} to be {}", name, value);
-    }
-  }
-  return AssertionSuccess();
 }
 
 envoy::config::cluster::v3::Cluster

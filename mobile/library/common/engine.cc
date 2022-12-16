@@ -314,6 +314,11 @@ Upstream::ClusterManager& Engine::getClusterManager() {
   return server_->clusterManager();
 }
 
+Stats::Store& Engine::getStatsStore() {
+  ASSERT(dispatcher_->isThreadSafe(), "getStatsStore must be called from the dispatcher's context");
+  return server_->stats();
+}
+
 void Engine::logInterfaces(absl::string_view event,
                            std::vector<Network::InterfacePair>& interfaces) {
   std::vector<std::string> names;

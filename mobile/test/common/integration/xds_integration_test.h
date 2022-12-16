@@ -39,22 +39,12 @@ protected:
   // Returns whether the test is using the state-of-the-world or Delta xDS protocol.
   Grpc::SotwOrDelta sotwOrDelta() const;
 
-  // Get the runtime configuration value for the given key. The runtime value is either statically
-  // provided in the bootstrap config or provided (or overridden) by the RTDS config.
-  std::string getRuntimeKey(const std::string& key);
-
   // Creates a cluster config with a single static endpoint, where the endpoint is intended to be of
   // a fake upstream on the loopback address.
   envoy::config::cluster::v3::Cluster
   createSingleEndpointClusterConfig(const std::string& cluster_name);
   // Creates an admin config for being able to query various configuration values.
   envoy::config::bootstrap::v3::Admin adminConfig();
-
-  // Get the value of a Counter in the Envoy instance.
-  uint64_t getCounterValue(const std::string& counter);
-  // Wait until the Counter specified by `name` is >= `value`.
-  ABSL_MUST_USE_RESULT testing::AssertionResult waitForCounterGe(const std::string& name,
-                                                                 uint64_t value);
 
 private:
   std::string admin_filename_;
