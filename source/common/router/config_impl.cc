@@ -634,7 +634,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       throw EnvoyException(absl::StrCat("Duplicate upgrade ", upgrade_config.upgrade_type()));
     }
     if (upgrade_config.upgrade_type() == Http::Headers::get().MethodValues.Connect) {
-      connect_config_ = upgrade_config.connect_config();
+      connect_config_ = std::make_unique<ConnectConfig>(upgrade_config.connect_config());
     } else if (upgrade_config.has_connect_config()) {
       throw EnvoyException(absl::StrCat("Non-CONNECT upgrade type ", upgrade_config.upgrade_type(),
                                         " has ConnectConfig"));
