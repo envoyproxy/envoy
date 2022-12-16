@@ -24,12 +24,12 @@ public:
 
 protected:
   Api::IoCallBoolResult open(FlagSet flag) override {
-    absl::MutexLock l(&info_->lock_);
     ASSERT(!isOpen());
     flags_ = flag;
     open_ = true;
     if (flags_.test(File::Operation::Write) && !flags_.test(File::Operation::Append) &&
         !flags_.test(File::Operation::KeepExistingData)) {
+      absl::MutexLock l(&info_->lock_);
       info_->data_.clear();
     }
     return resultSuccess(true);
