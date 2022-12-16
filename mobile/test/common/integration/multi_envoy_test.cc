@@ -11,7 +11,6 @@
 #include <chrono>
 #include <thread>
 
-
 using testing::ReturnRef;
 
 // AN EXACT COPY OF client_integration_test.cc with all tests removed except the first
@@ -20,7 +19,7 @@ namespace Envoy {
 namespace {
 
 class MultiEnvoyTest : public BaseClientIntegrationTest,
-                              public testing::TestWithParam<Network::Address::IpVersion> {
+                       public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   MultiEnvoyTest() : BaseClientIntegrationTest(/*ip_version=*/GetParam()) {}
 
@@ -46,7 +45,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, MultiEnvoyTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(MultiEnvoyTest, Basic) {
-  num_engines_for_test_ = 10; // change this
+  num_engines_for_test_ = 50; // change this
   initialize();
 
   // Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");

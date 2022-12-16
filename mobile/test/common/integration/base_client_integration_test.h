@@ -9,6 +9,7 @@
 #include "library/common/types/c_types.h"
 #include <vector>
 #include "absl/synchronization/blocking_counter.h"
+#include "absl/synchronization/mutex.h"
 
 namespace Envoy {
 
@@ -48,7 +49,7 @@ protected:
   virtual void initialize() override;
   virtual void cleanup();
   void createEnvoy() override;
-  void threadRoutine(absl::BlockingCounter& engine_running);
+  void threadRoutine(absl::Notification& engine_running);
   // Must be called manually by subclasses in their TearDown();
   void TearDown();
   // helpers to access protected functions in the friend class

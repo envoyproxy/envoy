@@ -163,20 +163,25 @@ Context::Context(spdlog::level::level_enum log_level, const std::string& log_for
                  Thread::BasicLockable& lock, bool should_escape, bool enable_fine_grain_logging)
     : log_level_(log_level), log_format_(log_format), lock_(lock), should_escape_(should_escape),
       enable_fine_grain_logging_(enable_fine_grain_logging), save_context_(current_context) {
+  std::cout << "Creating Context:" << std::this_thread::get_id() << std::endl;
   current_context = this;
   activate();
 }
 
 Context::~Context() {
+  std::cout << "Deleting Context:" << this << std::endl;
   current_context = save_context_;
+  // separate out the deletion and the global logger handoff
   if (current_context != nullptr) {
     current_context->activate();
   } else {
+    std::cout << "clearing lock" << std::endl;
     Registry::getSink()->clearLock();
   }
 }
 
 void Context::activate() {
+  std::cout << "Activating Context:" << this << std::endl;
   Registry::getSink()->setLock(lock_);
   Registry::getSink()->setShouldEscape(should_escape_);
   Registry::setLogLevel(log_level_);

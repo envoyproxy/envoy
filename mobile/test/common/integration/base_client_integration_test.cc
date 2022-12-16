@@ -10,6 +10,7 @@
 #include "library/common/config/internal.h"
 #include "library/common/http/header_utility.h"
 #include "spdlog/spdlog.h"
+#include <unistd.h>
 
 namespace Envoy {
 namespace {
@@ -166,12 +167,15 @@ std::shared_ptr<Platform::RequestHeaders> BaseClientIntegrationTest::envoyToMobi
   return std::make_shared<Platform::RequestHeaders>(builder.build());
 }
 
-void BaseClientIntegrationTest::threadRoutine(absl::BlockingCounter& engine_running) {
-  builder_.setOnEngineRunning([&]() { engine_running.DecrementCount(); });
-  for (auto i = 0; i<num_engines_for_test_; i++) {
+void BaseClientIntegrationTest::threadRoutine(absl::Notification& engine_running) {
+  for (auto i = 0; i < num_engines_for_test_; i++) {
+    absl::Notification engine_notification;
+    builder_.setOnEngineRunning([&]() { engine_notification.Notify(); });
     multi_engines_.push_back(builder_.build());
+    engine_notification.WaitForNotification();
   };
-  engine_ = multi_engines_[num_engines_for_test_-1];
+  engine_running.Notify();
+  engine_ = multi_engines_[num_engines_for_test_ - 1];
   full_dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
@@ -208,10 +212,10 @@ void BaseClientIntegrationTest::createEnvoy() {
     ENVOY_LOG_MISC(warn, "Using builder config and ignoring config modifiers");
   }
 
-  absl::BlockingCounter engine_running(num_engines_for_test_);
+  absl::Notification engine_running;
   envoy_thread_ = api_->threadFactory().createThread(
       [this, &engine_running]() -> void { threadRoutine(engine_running); });
-  engine_running.Wait();
+  engine_running.WaitForNotification();
 }
 
 void BaseClientIntegrationTest::cleanup() {
