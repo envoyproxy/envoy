@@ -766,9 +766,9 @@ const envoy::config::trace::v3::Tracing_Http* HttpConnectionManagerConfig::getPe
   return nullptr;
 }
 
+#ifdef ENVOY_ENABLE_UHV
 ::Envoy::Http::HeaderValidatorStats&
 HttpConnectionManagerConfig::getHeaderValidatorStats([[maybe_unused]] Http::Protocol protocol) {
-#ifdef ENVOY_ENABLE_UHV
   switch (protocol) {
   case Http::Protocol::Http10:
   case Http::Protocol::Http11:
@@ -778,9 +778,9 @@ HttpConnectionManagerConfig::getHeaderValidatorStats([[maybe_unused]] Http::Prot
   case Http::Protocol::Http3:
     return Http::Http3::CodecStats::atomicGet(http3_codec_stats_, context_.scope());
   }
-#endif
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
+#endif
 
 std::function<Http::ApiListenerPtr()>
 HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
