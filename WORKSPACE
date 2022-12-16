@@ -23,3 +23,11 @@ envoy_python_dependencies()
 load("//bazel:dependency_imports.bzl", "envoy_dependency_imports")
 
 envoy_dependency_imports()
+
+load("//bazel:bazel_version_check.bzl", "setup_bazel_version_check")
+
+setup_bazel_version_check(name = "bazel_version_check")
+
+load("@bazel_version_check//:version.bzl", "check_bazel_version")
+
+check_bazel_version()

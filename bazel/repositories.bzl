@@ -74,6 +74,7 @@ def _envoy_repo_impl(repository_ctx):
     api_version_path = repository_ctx.path(repository_ctx.attr.envoy_api_version)
     version = repository_ctx.read(repo_version_path).strip()
     api_version = repository_ctx.read(api_version_path).strip()
+    fail("hi")
     repository_ctx.file("version.bzl", "VERSION = '%s'\nAPI_VERSION = '%s'" % (version, api_version))
     repository_ctx.file("path.bzl", "PATH = '%s'" % repo_version_path.dirname)
     repository_ctx.file("__init__.py", "PATH = '%s'\nVERSION = '%s'\nAPI_VERSION = '%s'" % (repo_version_path.dirname, version, api_version))
