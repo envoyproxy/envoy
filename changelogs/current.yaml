@@ -107,6 +107,9 @@ bug_fixes:
 - area: upstream
   change: |
     fixed a bug when specify both a single address in bootstrap and cluster upstream binding config but with a different IP version. It should be allowed but it is rejected.
+- area: upstream
+  change: |
+    fixed a bug for tcp upstream where we did not count use the count the header and data to/from the upstream.
 - area: jwt_authn
   change: |
     fix a bug that jwt_cache breaks the :ref:`provider_and_audiences <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtRequirement.provider_and_audiences>` JWT requirement.
