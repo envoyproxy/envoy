@@ -12,6 +12,21 @@ namespace Kafka {
 namespace Mesh {
 
 /**
+ * Processes incoming record callbacks (i.e. Fetch requests).
+ */
+class RecordCallbackProcessor {
+public:
+  virtual ~RecordCallbackProcessor() = default;
+
+  // Process an inbound record callback by passing cached records to it
+  // and (if needed) registering the callback.
+  virtual void processCallback(const RecordCbSharedPtr& callback) PURE;
+
+  // Remove the callback (usually invoked by the callback timing out downstream).
+  virtual void removeCallback(const RecordCbSharedPtr& callback) PURE;
+};
+
+/**
  * Manages (raw) Kafka consumers pointing to upstream Kafka clusters.
  * It is expected to have only one instance of this object per mesh-filter type.
  */
