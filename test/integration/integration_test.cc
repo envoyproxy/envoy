@@ -30,11 +30,14 @@
 using Envoy::Http::Headers;
 using Envoy::Http::HeaderValueOf;
 using Envoy::Http::HttpStatusIs;
+using testing::Combine;
 using testing::ContainsRegex;
 using testing::EndsWith;
 using testing::HasSubstr;
 using testing::Not;
 using testing::StartsWith;
+using testing::Values;
+using testing::ValuesIn;
 
 namespace Envoy {
 namespace {
@@ -55,11 +58,19 @@ void setAllowHttp10WithDefaultHost(
   hcm.mutable_http_protocol_options()->set_default_host_for_http_10("default.com");
 }
 
+std::string testParamToString(
+    const testing::TestParamInfo<std::tuple<Network::Address::IpVersion, Http1ParserImpl>>&
+        params) {
+  return absl::StrCat(TestUtility::ipVersionToString(std::get<0>(params.param)),
+                      TestUtility::http1ParserImplToString(std::get<1>(params.param)));
+}
+
 } // namespace
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, IntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersionsAndHttp1Parser, IntegrationTest,
+                         Combine(ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                                 Values(Http1ParserImpl::HttpParser, Http1ParserImpl::BalsaParser)),
+                         testParamToString);
 
 // Verify that we gracefully handle an invalid pre-bind socket option when using reuse_port.
 TEST_P(IntegrationTest, BadPrebindSocketOptionWithReusePort) {
@@ -131,7 +142,7 @@ TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
 
   // Per-worker listener stats.
   auto check_listener_stats = [this](uint64_t cx_active, uint64_t cx_total) {
-    if (GetParam() == Network::Address::IpVersion::v4) {
+    if (ip_version_ == Network::Address::IpVersion::v4) {
       test_server_->waitForGaugeEq("listener.127.0.0.1_0.worker_0.downstream_cx_active", cx_active);
       test_server_->waitForGaugeEq("listener.127.0.0.1_0.worker_1.downstream_cx_active", cx_active);
       test_server_->waitForCounterEq("listener.127.0.0.1_0.worker_0.downstream_cx_total", cx_total);
@@ -201,7 +212,7 @@ TEST_P(IntegrationTest, ConnectionBalanceFactory) {
   initialize();
 
   auto check_listener_stats = [this](uint64_t cx_active, uint64_t cx_total) {
-    if (GetParam() == Network::Address::IpVersion::v4) {
+    if (ip_version_ == Network::Address::IpVersion::v4) {
       test_server_->waitForGaugeEq("listener.127.0.0.1_0.worker_0.downstream_cx_active", cx_active);
       test_server_->waitForGaugeEq("listener.127.0.0.1_0.worker_1.downstream_cx_active", cx_active);
       test_server_->waitForCounterEq("listener.127.0.0.1_0.worker_0.downstream_cx_total", cx_total);
@@ -240,7 +251,7 @@ TEST_P(IntegrationTest, AllWorkersAreHandlingLoad) {
   initialize();
 
   std::string worker0_stat_name, worker1_stat_name;
-  if (GetParam() == Network::Address::IpVersion::v4) {
+  if (ip_version_ == Network::Address::IpVersion::v4) {
     worker0_stat_name = "listener.127.0.0.1_0.worker_0.downstream_cx_total";
     worker1_stat_name = "listener.127.0.0.1_0.worker_1.downstream_cx_total";
   } else {
@@ -975,6 +986,11 @@ TEST_P(IntegrationTest, TestClientAllowChunkedLength) {
 }
 
 TEST_P(IntegrationTest, BadFirstline) {
+  if (http1_implementation_ == Http1ParserImpl::BalsaParser) {
+    // TODO(#21245): Re-enable this test for BalsaParser.
+    return;
+  }
+
   initialize();
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"), "hello", &response);
@@ -1003,6 +1019,11 @@ TEST_P(IntegrationTest, InvalidCharacterInFirstline) {
 }
 
 TEST_P(IntegrationTest, InvalidVersion) {
+  if (http1_implementation_ == Http1ParserImpl::BalsaParser) {
+    // TODO(#21245): Re-enable this test for BalsaParser.
+    return;
+  }
+
   initialize();
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.01\r\nHost: host\r\n\r\n",
@@ -1012,6 +1033,11 @@ TEST_P(IntegrationTest, InvalidVersion) {
 
 // Expect that malformed trailers to break the connection
 TEST_P(IntegrationTest, BadTrailer) {
+  if (http1_implementation_ == Http1ParserImpl::BalsaParser) {
+    // TODO(#21245): Re-enable this test for BalsaParser.
+    return;
+  }
+
   initialize();
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"),
@@ -1028,6 +1054,11 @@ TEST_P(IntegrationTest, BadTrailer) {
 
 // Expect malformed headers to break the connection
 TEST_P(IntegrationTest, BadHeader) {
+  if (http1_implementation_ == Http1ParserImpl::BalsaParser) {
+    // TODO(#21245): Re-enable this test for BalsaParser.
+    return;
+  }
+
   initialize();
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"),
@@ -1093,6 +1124,11 @@ TEST_P(IntegrationTest, Http09Enabled) {
 }
 
 TEST_P(IntegrationTest, Http09WithKeepalive) {
+  if (http1_implementation_ == Http1ParserImpl::BalsaParser) {
+    // TODO(#21245): Re-enable this test for BalsaParser.
+    return;
+  }
+
 #ifdef ENVOY_ENABLE_UHV
   // TODO(#23287) - Determine HTTP/0.9 and HTTP/1.0 support within UHV
   return;
@@ -1440,7 +1476,7 @@ TEST_P(IntegrationTest, AbsolutePathUsingHttpsAllowedInternally) {
 TEST_P(IntegrationTest, TestHostWithAddress) {
   useAccessLog("%REQ(Host)%");
   std::string address_string;
-  if (GetParam() == Network::Address::IpVersion::v4) {
+  if (ip_version_ == Network::Address::IpVersion::v4) {
     address_string = TestUtility::getIpv4Loopback();
   } else {
     address_string = "[::1]";
@@ -1524,7 +1560,13 @@ TEST_P(IntegrationTest, Connect) {
 }
 
 // Test that Envoy returns HTTP code 502 on upstream protocol error.
-TEST_P(IntegrationTest, UpstreamProtocolError) { testRouterUpstreamProtocolError("502", "UPE"); }
+TEST_P(IntegrationTest, UpstreamProtocolError) {
+  if (http1_implementation_ == Http1ParserImpl::BalsaParser) {
+    // TODO(#21245): Re-enable this test for BalsaParser.
+    return;
+  }
+  testRouterUpstreamProtocolError("502", "UPE");
+}
 
 TEST_P(IntegrationTest, TestHead) {
   initialize();
@@ -1588,7 +1630,7 @@ TEST_P(IntegrationTest, TestHeadWithExplicitTE) {
 
 TEST_P(IntegrationTest, TestBind) {
   std::string address_string;
-  if (GetParam() == Network::Address::IpVersion::v4) {
+  if (ip_version_ == Network::Address::IpVersion::v4) {
     address_string = TestUtility::getIpv4Loopback();
   } else {
     address_string = "::1";
@@ -1843,14 +1885,15 @@ TEST_P(IntegrationTest, TrailersDroppedDownstream) {
   testTrailers(10, 10, false, false);
 }
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, UpstreamEndpointIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersionsAndHttp1Parser, UpstreamEndpointIntegrationTest,
+                         Combine(ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                                 Values(Http1ParserImpl::HttpParser, Http1ParserImpl::BalsaParser)),
+                         testParamToString);
 
 TEST_P(UpstreamEndpointIntegrationTest, TestUpstreamEndpointAddress) {
   initialize();
   EXPECT_STREQ(fake_upstreams_[0]->localAddress()->ip()->addressAsString().c_str(),
-               Network::Test::getLoopbackAddressString(GetParam()).c_str());
+               Network::Test::getLoopbackAddressString(ip_version_).c_str());
 }
 
 // Send continuous pipelined requests while not reading responses, to check
@@ -2435,7 +2478,7 @@ TEST_P(IntegrationTest, SetRouteToDelegatingRouteWithClusterOverride) {
   initialize();
 
   const std::string ip_port_pair =
-      absl::StrCat(Network::Test::getLoopbackAddressUrlString(GetParam()), ":",
+      absl::StrCat(Network::Test::getLoopbackAddressUrlString(ip_version_), ":",
                    fake_upstreams_[1]->localAddress()->ip()->port());
 
   Http::TestRequestHeaderMapImpl request_headers{

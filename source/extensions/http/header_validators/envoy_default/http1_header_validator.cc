@@ -42,8 +42,9 @@ using Http1ResponseCodeDetail = ConstSingleton<Http1ResponseCodeDetailValues>;
  *
  */
 Http1HeaderValidator::Http1HeaderValidator(const HeaderValidatorConfig& config, Protocol protocol,
-                                           StreamInfo::StreamInfo& stream_info)
-    : HeaderValidator(config, protocol, stream_info) {}
+                                           StreamInfo::StreamInfo& stream_info,
+                                           ::Envoy::Http::HeaderValidatorStats& stats)
+    : HeaderValidator(config, protocol, stream_info, stats) {}
 
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
 Http1HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,

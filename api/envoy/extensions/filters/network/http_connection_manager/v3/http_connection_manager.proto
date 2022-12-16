@@ -793,7 +793,7 @@ message HttpConnectionManager {
   // normalization for request attributes, such as URI path.
   // If the typed_header_validation_config is present it overrides the following options:
   // ``normalize_path``, ``merge_slashes``, ``path_with_escaped_slashes_action``
-  // ``http_protocol_options.allow_chunked_length``.
+  // ``http_protocol_options.allow_chunked_length``, ``common_http_protocol_options.headers_with_underscores_action``.
   //
   // The default UHV checks the following:
   //

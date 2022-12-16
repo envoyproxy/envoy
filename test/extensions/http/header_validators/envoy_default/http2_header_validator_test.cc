@@ -24,7 +24,8 @@ protected:
         typed_config;
     TestUtility::loadFromYaml(std::string(config_yaml), typed_config);
 
-    return std::make_unique<Http2HeaderValidator>(typed_config, Protocol::Http2, stream_info_);
+    return std::make_unique<Http2HeaderValidator>(typed_config, Protocol::Http2, stream_info_,
+                                                  stats_);
   }
 };
 

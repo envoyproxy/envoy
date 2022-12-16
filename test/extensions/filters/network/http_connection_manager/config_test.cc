@@ -2594,7 +2594,7 @@ public:
   Http::HeaderValidatorFactoryPtr createFromProto(const Protobuf::Message&,
                                                   Server::Configuration::FactoryContext&) override {
     auto header_validator = std::make_unique<StrictMock<Http::MockHeaderValidatorFactory>>();
-    EXPECT_CALL(*header_validator, create(Http::Protocol::Http2, _))
+    EXPECT_CALL(*header_validator, create(Http::Protocol::Http2, _, _))
         .WillOnce(InvokeWithoutArgs(
             []() { return std::make_unique<StrictMock<Http::MockHeaderValidator>>(); }));
     return header_validator;
@@ -2628,7 +2628,7 @@ public:
 
     config_ = proto_config;
     auto header_validator = std::make_unique<StrictMock<Http::MockHeaderValidatorFactory>>();
-    EXPECT_CALL(*header_validator, create(Http::Protocol::Http2, _))
+    EXPECT_CALL(*header_validator, create(Http::Protocol::Http2, _, _))
         .WillOnce(InvokeWithoutArgs(
             []() { return std::make_unique<StrictMock<Http::MockHeaderValidator>>(); }));
     return header_validator;

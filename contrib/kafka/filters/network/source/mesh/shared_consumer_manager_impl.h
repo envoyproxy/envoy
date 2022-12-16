@@ -1,6 +1,7 @@
 #pragma once
 
 #include <map>
+#include <vector>
 
 #include "envoy/thread/thread.h"
 
@@ -18,20 +19,66 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
 
+template <typename T> using PartitionMap = std::map<KafkaPartition, std::vector<T>>;
+
 /**
- * Placeholder interface for now.
- * In future:
- * Processor implementation that stores received records (that had no interest), and callbacks
- * waiting for records (that had no matching records delivered yet).
+ * Processor implementation that stores received records (that had no interest),
+ * and callbacks waiting for records (that had no matching records delivered yet).
  * Basically core of Fetch-handling business logic.
  */
-class RecordDistributor : public InboundRecordProcessor {
+class RecordDistributor : public RecordCallbackProcessor,
+                          public InboundRecordProcessor,
+                          private Logger::Loggable<Logger::Id::kafka> {
 public:
+  // Main constructor.
+  RecordDistributor();
+
+  // Visible for testing.
+  RecordDistributor(const PartitionMap<RecordCbSharedPtr>& callbacks,
+                    const PartitionMap<InboundRecordSharedPtr>& records);
+
   // InboundRecordProcessor
   bool waitUntilInterest(const std::string& topic, const int32_t timeout_ms) const override;
 
   // InboundRecordProcessor
   void receive(InboundRecordSharedPtr message) override;
+
+  // RecordCallbackProcessor
+  void processCallback(const RecordCbSharedPtr& callback) override;
+
+  // RecordCallbackProcessor
+  void removeCallback(const RecordCbSharedPtr& callback) override;
+
+  int32_t getCallbackCountForTest(const std::string& topic, const int32_t partition) const;
+
+  int32_t getRecordCountForTest(const std::string& topic, const int32_t partition) const;
+
+private:
+  // Checks whether any of the callbacks stored right now are interested in the topic.
+  bool hasInterest(const std::string& topic) const ABSL_EXCLUSIVE_LOCKS_REQUIRED(callbacks_mutex_);
+
+  // Helper function (passes all stored records to callback).
+  bool passRecordsToCallback(const RecordCbSharedPtr& callback);
+
+  // Helper function (passes partition records to callback).
+  bool passPartitionRecordsToCallback(const RecordCbSharedPtr& callback,
+                                      const KafkaPartition& kafka_partition)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(stored_records_mutex_);
+
+  // Helper function (real callback removal).
+  void doRemoveCallback(const RecordCbSharedPtr& callback)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(callbacks_mutex_);
+
+  /**
+   * Invariant - for every KafkaPartition, there may be callbacks for this partition,
+   * or there may be records for this partition, but never both at the same time.
+   */
+
+  mutable absl::Mutex callbacks_mutex_;
+  PartitionMap<RecordCbSharedPtr> partition_to_callbacks_ ABSL_GUARDED_BY(callbacks_mutex_);
+
+  mutable absl::Mutex stored_records_mutex_;
+  PartitionMap<InboundRecordSharedPtr> stored_records_ ABSL_GUARDED_BY(stored_records_mutex_);
 };
 
 using RecordDistributorPtr = std::unique_ptr<RecordDistributor>;
@@ -51,9 +98,10 @@ public:
 };
 
 /**
- * Maintains a collection of Kafka consumers (one per topic).
+ * Maintains a collection of Kafka consumers (one per topic) and the real distributor instance.
  */
-class SharedConsumerManagerImpl : public SharedConsumerManager,
+class SharedConsumerManagerImpl : public RecordCallbackProcessor,
+                                  public SharedConsumerManager,
                                   private Logger::Loggable<Logger::Id::kafka> {
 public:
   // Main constructor.
@@ -64,6 +112,12 @@ public:
   SharedConsumerManagerImpl(const UpstreamKafkaConfiguration& configuration,
                             Thread::ThreadFactory& thread_factory,
                             const KafkaConsumerFactory& consumer_factory);
+
+  // RecordCallbackProcessor
+  void processCallback(const RecordCbSharedPtr& callback) override;
+
+  // RecordCallbackProcessor
+  void removeCallback(const RecordCbSharedPtr& callback) override;
 
   // SharedConsumerManager
   void registerConsumerIfAbsent(const std::string& topic) override;

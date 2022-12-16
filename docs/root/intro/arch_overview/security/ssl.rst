@@ -121,7 +121,7 @@ Certificate config/loading rules:
 * DNS SANs or Subject Common Name is extracted as server name pattern to match SNI during handshake. Subject Common Name is not used if DNS SANs are present in the certificate.
 * FQDN like "test.example.com" and wildcard like "\*.example.com" are valid at the same time, which will be loaded
   as two different server name patterns.
-* Only one certificate of a particular type (RSA or ECDSA) may be specified for each server name pattern.
+* If multiple certificates of a particular type (RSA or ECDSA) are specified for the same name or name pattern, the first one loaded is used for that name.
 * Non-P-256 server ECDSA certificates are rejected.
 * Static and SDS certificates may not be mixed in a given :ref:`DownstreamTlsContext
   <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.DownstreamTlsContext>`.
