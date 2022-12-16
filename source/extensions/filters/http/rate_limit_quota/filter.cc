@@ -84,16 +84,8 @@ RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& headers) {
   }
 }
 
-struct RateLimitResponseValue {
-  // This request went above the configured limits for the rate limit filter.
-  const std::string RateLimited = "request_rate_limited";
-  // The rate limiter encountered a failure, and was configured to fail-closed.
-  const std::string RateLimitError = "rate_limiter_error";
-};
-
 // TODO(tyxia) This is how we represent the RATELIMITED and ALLOWED
-void RateLimitQuotaFilter::onComplete(const RateLimitQuotaBucketSettings&,
-                                      RateLimitStatus) {}
+void RateLimitQuotaFilter::onComplete(const RateLimitQuotaBucketSettings&, RateLimitStatus) {}
 
 } // namespace RateLimitQuota
 } // namespace HttpFilters
