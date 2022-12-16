@@ -30,10 +30,7 @@ public:
   RateLimitClientImpl(const envoy::config::core::v3::GrpcService& grpc_service,
                       Server::Configuration::FactoryContext& context)
       : aync_client_(context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
-            grpc_service, context.scope(), true)) {
-    // TODO(tyxia) startStream function is opened on the first request not at time when client is
-    // created here.
-  }
+            grpc_service, context.scope(), true)) {}
 
   void onReceiveMessage(RateLimitQuotaResponsePtr&& response) override;
 

@@ -13,7 +13,8 @@ public:
   Http2HeaderValidator(
       const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&
           config,
-      ::Envoy::Http::Protocol protocol, StreamInfo::StreamInfo& stream_info);
+      ::Envoy::Http::Protocol protocol, StreamInfo::StreamInfo& stream_info,
+      ::Envoy::Http::HeaderValidatorStats& stats);
 
   HeaderEntryValidationResult
   validateRequestHeaderEntry(const ::Envoy::Http::HeaderString& key,

@@ -1,4 +1,5 @@
-#include "source/extensions/http/header_validators/envoy_default/error_codes.h"
+#include "envoy/http/header_validator_errors.h"
+
 #include "source/extensions/http/header_validators/envoy_default/path_normalizer.h"
 
 #include "test/test_common/utility.h"
@@ -10,6 +11,8 @@ namespace Extensions {
 namespace Http {
 namespace HeaderValidators {
 namespace EnvoyDefault {
+
+using ::Envoy::Http::UhvResponseCodeDetail;
 
 class PathNormalizerTest : public testing::Test {
 protected:

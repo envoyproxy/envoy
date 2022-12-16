@@ -445,8 +445,6 @@ stat_prefix: test
     TestScopedRuntime scoped_runtime;
 
     if (draining) {
-      scoped_runtime.mergeValues(
-          {{"envoy.reloadable_features.thrift_connection_draining", "true"}});
       EXPECT_CALL(drain_decision_, drainClose()).WillOnce(Return(true));
     }
 
@@ -2084,7 +2082,6 @@ TEST_F(ThriftConnectionManagerTest, EncoderFiltersModifyRequests) {
 
 TEST_F(ThriftConnectionManagerTest, TransportEndWhenRemoteClose) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.thrift_connection_draining", "true"}});
 
   // We want the Drain header to be set by RemoteClose which triggers end downstream in local reply.
   EXPECT_CALL(drain_decision_, drainClose()).WillOnce(Return(false));

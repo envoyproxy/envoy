@@ -24,9 +24,17 @@ public:
               (ResponseTrailerMap & trailer_map));
 };
 
+class MockHeaderValidatorStats : public HeaderValidatorStats {
+public:
+  MOCK_METHOD(void, incDroppedHeadersWithUnderscores, ());
+  MOCK_METHOD(void, incRequestsRejectedWithUnderscoresInHeaders, ());
+};
+
 class MockHeaderValidatorFactory : public HeaderValidatorFactory {
 public:
-  MOCK_METHOD(HeaderValidatorPtr, create, (Protocol protocol, StreamInfo::StreamInfo& stream_info));
+  MOCK_METHOD(HeaderValidatorPtr, create,
+              (Protocol protocol, StreamInfo::StreamInfo& stream_info,
+               HeaderValidatorStats& stats));
 };
 
 } // namespace Http

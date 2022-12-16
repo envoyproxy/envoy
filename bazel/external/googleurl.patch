@@ -76,6 +76,32 @@ index 4a9494e..ba44fa0 100644
      // Force a compile failure if instantiated.
      return CheckOnFailure::template HandleFailure<Dst>();
    }
+diff --git a/base/containers/span.h b/base/containers/span.h
+index 40e325f..c66c183 100644
+--- a/base/containers/span.h
++++ b/base/containers/span.h
+@@ -125,7 +125,7 @@ using EnableIfSpanCompatibleContainerAndSpanIsDynamic =
+ template <size_t Extent>
+ class ExtentStorage {
+  public:
+-  constexpr explicit ExtentStorage(size_t size) noexcept {}
++  constexpr explicit ExtentStorage(size_t /*size*/) noexcept {}
+   constexpr size_t size() const noexcept { return Extent; }
+ };
+
+diff --git a/polyfills/third_party/perfetto/include/perfetto/tracing/traced_value.h b/polyfills/third_party/perfetto/include/perfetto/tracing/traced_value.h
+index 6d059f7..6339fa5 100644
+--- a/polyfills/third_party/perfetto/include/perfetto/tracing/traced_value.h
++++ b/polyfills/third_party/perfetto/include/perfetto/tracing/traced_value.h
+@@ -13,7 +13,7 @@ class TracedValue {
+ };
+
+ template <typename T>
+-void WriteIntoTracedValue(TracedValue context, T&& value) {}
++void WriteIntoTracedValue(TracedValue /*context*/, T&& /*value*/) {}
+
+ template <typename T, typename ResultType = void, class = void>
+ struct check_traced_value_support {
 diff --git a/build_config/build_config.bzl b/build_config/build_config.bzl
 index 5960d2a..08295ff 100644
 --- a/build_config/build_config.bzl

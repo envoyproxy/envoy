@@ -55,6 +55,7 @@ envoy_cc_library(
         "//library/common/data:utility_lib",
         "//library/common/types:c_types_lib",
         "@envoy//envoy/buffer:buffer_interface",
+        "@envoy//envoy/http:filter_interface",
         "@envoy//envoy/http:header_map_interface",
         "@envoy//source/common/http:header_map_lib",
         "@envoy//source/extensions/http/header_formatters/preserve_case:preserve_case_formatter",

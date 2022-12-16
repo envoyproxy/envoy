@@ -1,5 +1,6 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
+#include "envoy/config/xds_config_tracker.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/buffer/zero_copy_input_stream_impl.h"
@@ -152,12 +153,14 @@ TEST_P(DeltaSubscriptionNoGrpcStreamTest, NoGrpcStream) {
     xds_context = std::make_shared<Config::XdsMux::GrpcMuxDelta>(
         std::unique_ptr<Grpc::MockAsyncClient>(async_client), dispatcher, *method_descriptor,
         random, stats_store, rate_limit_settings, local_info, false,
-        std::make_unique<NiceMock<MockCustomConfigValidators>>());
+        std::make_unique<NiceMock<MockCustomConfigValidators>>(),
+        /*xds_config_tracker=*/XdsConfigTrackerOptRef());
   } else {
     xds_context = std::make_shared<NewGrpcMuxImpl>(
         std::unique_ptr<Grpc::MockAsyncClient>(async_client), dispatcher, *method_descriptor,
         random, stats_store, rate_limit_settings, local_info,
-        std::make_unique<NiceMock<MockCustomConfigValidators>>());
+        std::make_unique<NiceMock<MockCustomConfigValidators>>(),
+        /*xds_config_tracker=*/XdsConfigTrackerOptRef());
   }
 
   GrpcSubscriptionImplPtr subscription = std::make_unique<GrpcSubscriptionImpl>(

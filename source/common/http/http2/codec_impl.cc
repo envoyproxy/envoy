@@ -911,7 +911,7 @@ ConnectionImpl::~ConnectionImpl() {
 void ConnectionImpl::sendKeepalive() {
   ASSERT(keepalive_timeout_timer_);
   if (keepalive_timeout_timer_->enabled()) {
-    ENVOY_CONN_LOG(trace, "Skipping PING: already awaiting PING ACK {}", connection_);
+    ENVOY_CONN_LOG(trace, "Skipping PING: already awaiting PING ACK", connection_);
     return;
   }
 
@@ -2076,7 +2076,7 @@ Status ServerConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
   if (connection_.aboveHighWatermark()) {
     stream->runHighWatermarkCallbacks();
   }
-  stream->request_decoder_ = &callbacks_.newStream(*stream);
+  stream->setRequestDecoder(callbacks_.newStream(*stream));
   stream->stream_id_ = frame->hd.stream_id;
   LinkedList::moveIntoList(std::move(stream), active_streams_);
   adapter_->SetStreamUserData(frame->hd.stream_id, active_streams_.front().get());
@@ -2118,22 +2118,28 @@ Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
   return ConnectionImpl::dispatch(data);
 }
 
-absl::optional<int>
-ServerConnectionImpl::checkHeaderNameForUnderscores(absl::string_view header_name) {
+absl::optional<int> ServerConnectionImpl::checkHeaderNameForUnderscores(
+    [[maybe_unused]] absl::string_view header_name) {
+#ifndef ENVOY_ENABLE_UHV
+  // This check has been moved to UHV
   if (headers_with_underscores_action_ != envoy::config::core::v3::HttpProtocolOptions::ALLOW &&
       Http::HeaderUtility::headerNameContainsUnderscore(header_name)) {
     if (headers_with_underscores_action_ ==
         envoy::config::core::v3::HttpProtocolOptions::DROP_HEADER) {
       ENVOY_CONN_LOG(debug, "Dropping header with invalid characters in its name: {}", connection_,
                      header_name);
-      stats_.dropped_headers_with_underscores_.inc();
+      stats_.incDroppedHeadersWithUnderscores();
       return 0;
     }
     ENVOY_CONN_LOG(debug, "Rejecting request due to header name with underscores: {}", connection_,
                    header_name);
-    stats_.requests_rejected_with_underscores_in_headers_.inc();
+    stats_.incRequestsRejectedWithUnderscoresInHeaders();
     return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
   }
+#else
+  // Workaround for gcc not understanding [[maybe_unused]] for class members.
+  (void)headers_with_underscores_action_;
+#endif
   return absl::nullopt;
 }
 
