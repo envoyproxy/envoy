@@ -121,13 +121,13 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
     // BucketElement elem = (*quota_bucket_)[bucket_id];
     auto bucket_action = (*quota_bucket_)[bucket_id].bucket_action;
     if (bucket_action.has_quota_assignment_action()) {
-      auto quota_action = bucket_action.quota_assignment_action();
+      const auto& quota_action = bucket_action.quota_assignment_action();
       if (!quota_action.has_rate_limit_strategy()) {
         // Nothing to do probably.
       }
 
       // Retrieve the rate limiting strategy.
-      RateLimitStrategy strategy = quota_action.rate_limit_strategy();
+      const RateLimitStrategy& strategy = quota_action.rate_limit_strategy();
       if (strategy.has_blanket_rule() && strategy.blanket_rule() == RateLimitStrategy::ALLOW_ALL) {
         // TODO(tyxia) Keep track of #num of requests allowed, #num of requests denied.
         return Envoy::Http::FilterHeadersStatus::Continue;
@@ -209,7 +209,7 @@ void RateLimitQuotaFilter::onComplete(const RateLimitQuotaBucketSettings& bucket
     break;
   case RateLimitStatus::OverLimit:
     // If the request has been `RateLimited`, send the local reply.
-    auto deny_response_settings = bucket_settings.deny_response_settings();
+    const auto& deny_response_settings = bucket_settings.deny_response_settings();
     callbacks_->sendLocalReply(toErrorCode(deny_response_settings.http_status().code()),
                                std::string(deny_response_settings.http_body().value()), nullptr,
                                absl::nullopt, RateLimitResponseDetails::get().RateLimited);

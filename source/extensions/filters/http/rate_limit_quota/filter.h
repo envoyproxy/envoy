@@ -26,7 +26,6 @@ namespace HttpFilters {
 namespace RateLimitQuota {
 
 using ::envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaBucketSettings;
-using ::envoy::service::rate_limit_quota::v3::BucketId;
 using ::envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports;
 using FilterConfig =
     envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaFilterConfig;

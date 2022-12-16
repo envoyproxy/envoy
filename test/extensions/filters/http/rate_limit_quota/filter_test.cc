@@ -1,23 +1,19 @@
 #include <initializer_list>
 
 #include "envoy/config/core/v3/grpc_service.pb.h"
-#include "test/extensions/filters/http/rate_limit_quota/mocks.h"
-#include "test/mocks/grpc/mocks.h"
-#include "test/mocks/server/mocks.h"
-#include "test/test_common/status_utility.h"
-#include "source/extensions/filters/http/rate_limit_quota/client.h"
-#include "source/extensions/filters/http/rate_limit_quota/client_impl.h"
-
-
 #include "envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.pb.h"
 #include "envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.pb.validate.h"
 
 #include "source/common/http/header_map_impl.h"
+#include "source/extensions/filters/http/rate_limit_quota/client.h"
+#include "source/extensions/filters/http/rate_limit_quota/client_impl.h"
 #include "source/extensions/filters/http/rate_limit_quota/filter.h"
 #include "source/extensions/filters/http/rate_limit_quota/quota_bucket.h"
 
 #include "test/common/http/common.h"
+#include "test/extensions/filters/http/rate_limit_quota/mocks.h"
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/grpc/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/server/mocks.h"
@@ -39,7 +35,6 @@ using testing::Unused;
 class RateLimitStreamUtility {
 public:
   RateLimitStreamUtility() {
-    std::cout << "init grpc" << std::endl;
     grpc_service_.mutable_envoy_grpc()->set_cluster_name("rate_limit_quota");
     // Set the expected behavior for async_client_manager in mock context.
     // Note, we need to set it through `MockFactoryContext` rather than `MockAsyncClientManager`
@@ -403,22 +398,22 @@ TEST_F(FilterTest, RequestMatchingFailedWithOnNoMatchConfigured) {
               testing::UnorderedPointwise(testing::Eq(), serialized_bucket_ids));
 }
 
-// TODO(tyxia)This may need the integration test to start the fake grpc client
-TEST_F(FilterTest, DecodeHeaderWithValidConfig) {
-  addMatcherConfig(MatcherConfigType::Valid);
-  createFilter();
+// TODO(tyxia) This may need the integration test to start the fake grpc client
+// TEST_F(FilterTest, DecodeHeaderWithValidConfig) {
+//   addMatcherConfig(MatcherConfigType::Valid);
+//   createFilter();
 
-  // Define the key value pairs that is used to build the bucket_id dynamically via `custom_value`
-  // in the config.
-  absl::flat_hash_map<std::string, std::string> custom_value_pairs = {{"environment", "staging"},
-                                                                      {"group", "envoy"}};
+//   // Define the key value pairs that is used to build the bucket_id dynamically via
+//   `custom_value`
+//   // in the config.
+//   absl::flat_hash_map<std::string, std::string> custom_value_pairs = {{"environment", "staging"},
+//                                                                       {"group", "envoy"}};
 
-  buildCustomHeader(custom_value_pairs);
+//   buildCustomHeader(custom_value_pairs);
 
-  Http::FilterHeadersStatus status = filter_->decodeHeaders(default_headers_, false);
-  EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::Continue);
-}
-
+//   Http::FilterHeadersStatus status = filter_->decodeHeaders(default_headers_, false);
+//   EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::Continue);
+// }
 
 TEST_F(FilterTest, DecodeHeaderWithOnNoMatchConfigured) {
   addMatcherConfig(MatcherConfigType::IncludeOnNoMatchConfig);
