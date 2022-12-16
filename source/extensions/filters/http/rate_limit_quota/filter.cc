@@ -92,8 +92,8 @@ struct RateLimitResponseValue {
 };
 
 // TODO(tyxia) This is how we represent the RATELIMITED and ALLOWED
-void RateLimitQuotaFilter::onComplete(const RateLimitQuotaBucketSettings& bucket_settings,
-                                      RateLimitStatus status) {}
+void RateLimitQuotaFilter::onComplete(const RateLimitQuotaBucketSettings&,
+                                      RateLimitStatus) {}
 
 } // namespace RateLimitQuota
 } // namespace HttpFilters
