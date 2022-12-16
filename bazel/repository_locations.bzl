@@ -1,6 +1,6 @@
 # This should match the schema defined in external_deps.bzl.
 
-PROTOBUF_VERSION = "21.7"
+PROTOBUF_VERSION = "21.12"
 
 # These names of these deps *must* match the names used in `/bazel/protobuf.patch`,
 # and both must match the names from the protobuf releases (see
@@ -8,11 +8,11 @@ PROTOBUF_VERSION = "21.7"
 # The names change in upcoming versions.
 # The shas are calculated from the downloads on the releases page.
 PROTOC_VERSIONS = dict(
-    linux_aarch_64 = "2696a8f9a61ce67c510d000c88e2d0a8b5adf1f90514e461e8d8943c46d04737",
-    linux_x86_64 = "0a260c6df439bcf1ecdd5e38e7a7648e4edf99c1a22a4cc66ce8e62c53bdb837",
-    osx_aarch_64 = "f79a67d708aba6ff2c6208578a6f2bf94f1528795aed646b65e99d4a678c97f8",
-    osx_x86_64 = "cd3609fa1efc73db9c58fc63e40b240558eb2a8080b4fbfbe1c4b93bbedecc20",
-    win64 = "954cc5dfdb1d95d4c448c40f274d3720c018f73187b0c19b3c4f9bacc48d1ff0",
+    linux_aarch_64 = "2dd17f75d66a682640b136e31848da9fb2eefe68d55303baf8b32617374f6711",
+    linux_x86_64 = "3a4c1e5f2516c639d3079b1586e703fc7bcfa2136d58bda24d1d54f949c315e8",
+    osx_aarch_64 = "96839af0caed64352442fc8236f4bdf7c1cd6efcfaa98fa5db37307a73fc7c70",
+    osx_x86_64 = "9448ff40278504a7ae5139bb70c962acc78c32d8fc54b4890a55c14c68b9d10a",
+    win64 = "71852a30cf62975358edfcbbff93086e8857a079c8e4d6904881aa968d65c7f9",
 )
 
 REPOSITORY_LOCATIONS_SPEC = dict(
@@ -60,10 +60,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Apple Rules for Bazel",
         project_desc = "Bazel rules for Apple platforms",
         project_url = "https://github.com/bazelbuild/rules_apple",
-        version = "1.1.2",
-        sha256 = "90e3b5e8ff942be134e64a83499974203ea64797fd620eddeb71b3a8e1bff681",
+        version = "1.1.3",
+        sha256 = "f94e6dddf74739ef5cb30f000e13a2a613f6ebfa5e63588305a71fce8a8a9911",
         urls = ["https://github.com/bazelbuild/rules_apple/releases/download/{version}/rules_apple.{version}.tar.gz"],
-        release_date = "2022-09-16",
+        release_date = "2022-11-09",
         use_category = ["build"],
         license = "Apache-2.0",
         license_url = "https://github.com/bazelbuild/rules_apple/blob/{version}/LICENSE",
@@ -455,12 +455,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Nghttp2",
         project_desc = "Implementation of HTTP/2 and its header compression algorithm HPACK in C",
         project_url = "https://nghttp2.org",
-        version = "1.50.0",
-        sha256 = "d162468980dba58e54e31aa2cbaf96fd2f0890e6dd141af100f6bd1b30aa73c6",
+        version = "1.51.0",
+        sha256 = "2a0bef286f65b35c24250432e7ec042441a8157a5b93519412d9055169d9ce54",
         strip_prefix = "nghttp2-{version}",
         urls = ["https://github.com/nghttp2/nghttp2/releases/download/v{version}/nghttp2-{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2022-09-21",
+        release_date = "2022-11-13",
         cpe = "cpe:2.3:a:nghttp2:nghttp2:*",
         license = "MIT",
         license_url = "https://github.com/nghttp2/nghttp2/blob/v{version}/LICENSE",
@@ -850,11 +850,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # test/common/json:gen_excluded_unicodes to recompute the ranges
         # excluded from differential fuzzing that are populated in
         # test/common/json/json_sanitizer_test_util.cc.
-        sha256 = "e07046fbac432b05adc1fd1318c6f19ab1b0ec0655f7f4e74627d9713959a135",
+        sha256 = "2c6a36c7b5a55accae063667ef3c55f2642e67476d96d355ff0acb13dbb47f09",
         strip_prefix = "protobuf-{version}",
         urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protobuf-all-{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        release_date = "2022-09-29",
+        release_date = "2022-12-14",
         cpe = "cpe:2.3:a:google:protobuf:*",
         license = "Protocol Buffers",
         license_url = "https://github.com/protocolbuffers/protobuf/blob/v{version}/LICENSE",
@@ -1384,11 +1384,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "rules_license",
         project_desc = "Bazel rules for checking open source licenses",
         project_url = "https://github.com/bazelbuild/rules_license",
-        version = "0.0.3",
-        sha256 = "00ccc0df21312c127ac4b12880ab0f9a26c1cff99442dc6c5a331750360de3c3",
+        version = "0.0.4",
+        sha256 = "6157e1e68378532d0241ecd15d3c45f6e5cfd98fc10846045509fb2a7cc9e381",
         urls = ["https://github.com/bazelbuild/rules_license/releases/download/{version}/rules_license-{version}.tar.gz"],
         use_category = ["build", "dataplane_core", "controlplane"],
-        release_date = "2022-05-28",
+        release_date = "2022-11-02",
         cpe = "N/A",
         license = "Apache-2.0",
         license_url = "https://github.com/bazelbuild/rules_license/blob/{version}/LICENSE",
@@ -1405,7 +1405,7 @@ def _compiled_protoc_deps(locations, versions):
             sha256 = sha,
             urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protoc-{version}-%s.zip" % platform.replace("_", "-", 1)],
             use_category = ["dataplane_core", "controlplane"],
-            release_date = "2022-09-29",
+            release_date = "2022-12-14",
             cpe = "N/A",
             license = "Protocol Buffers",
             license_url = "https://github.com/protocolbuffers/protobuf/blob/v{version}/LICENSE",
