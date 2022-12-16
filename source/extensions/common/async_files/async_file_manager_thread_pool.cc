@@ -214,6 +214,26 @@ private:
   const AsyncFileManager::Mode mode_;
 };
 
+class ActionStat : public AsyncFileActionWithResult<absl::StatusOr<struct stat>> {
+public:
+  ActionStat(Api::OsSysCalls& posix, absl::string_view filename,
+             std::function<void(absl::StatusOr<struct stat>)> on_complete)
+      : AsyncFileActionWithResult(on_complete), posix_(posix), filename_(filename) {}
+
+  absl::StatusOr<struct stat> executeImpl() override {
+    struct stat ret;
+    Api::SysCallIntResult stat_result = posix_.stat(filename_.c_str(), &ret);
+    if (stat_result.return_value_ == -1) {
+      return statusAfterFileError(stat_result);
+    }
+    return ret;
+  }
+
+private:
+  Api::OsSysCalls& posix_;
+  const std::string filename_;
+};
+
 class ActionUnlink : public AsyncFileActionWithResult<absl::Status> {
 public:
   ActionUnlink(Api::OsSysCalls& posix, absl::string_view filename,
@@ -244,6 +264,12 @@ CancelFunction AsyncFileManagerThreadPool::openExistingFile(
     absl::string_view filename, Mode mode,
     std::function<void(absl::StatusOr<AsyncFileHandle>)> on_complete) {
   return enqueue(std::make_shared<ActionOpenExistingFile>(*this, filename, mode, on_complete));
+}
+
+CancelFunction
+AsyncFileManagerThreadPool::stat(absl::string_view filename,
+                                 std::function<void(absl::StatusOr<struct stat>)> on_complete) {
+  return enqueue(std::make_shared<ActionStat>(posix(), filename, on_complete));
 }
 
 CancelFunction AsyncFileManagerThreadPool::unlink(absl::string_view filename,

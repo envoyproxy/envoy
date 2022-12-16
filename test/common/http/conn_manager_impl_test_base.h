@@ -154,7 +154,7 @@ public:
   }
   HeaderValidatorPtr makeHeaderValidator(Protocol protocol,
                                          StreamInfo::StreamInfo& stream_info) override {
-    return header_validator_factory_.create(protocol, stream_info);
+    return header_validator_factory_.create(protocol, stream_info, header_validator_stats_);
   }
   bool appendXForwardedPort() const override { return false; }
 
@@ -261,6 +261,7 @@ public:
   bool strip_trailing_host_dot_ = false;
   std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;
   NiceMock<MockHeaderValidatorFactory> header_validator_factory_;
+  NiceMock<MockHeaderValidatorStats> header_validator_stats_;
 };
 
 } // namespace Http

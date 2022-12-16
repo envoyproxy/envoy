@@ -1,6 +1,6 @@
 # This should match the schema defined in external_deps.bzl.
 
-PROTOBUF_VERSION = "21.7"
+PROTOBUF_VERSION = "21.12"
 
 # These names of these deps *must* match the names used in `/bazel/protobuf.patch`,
 # and both must match the names from the protobuf releases (see
@@ -8,11 +8,11 @@ PROTOBUF_VERSION = "21.7"
 # The names change in upcoming versions.
 # The shas are calculated from the downloads on the releases page.
 PROTOC_VERSIONS = dict(
-    linux_aarch_64 = "2696a8f9a61ce67c510d000c88e2d0a8b5adf1f90514e461e8d8943c46d04737",
-    linux_x86_64 = "0a260c6df439bcf1ecdd5e38e7a7648e4edf99c1a22a4cc66ce8e62c53bdb837",
-    osx_aarch_64 = "f79a67d708aba6ff2c6208578a6f2bf94f1528795aed646b65e99d4a678c97f8",
-    osx_x86_64 = "cd3609fa1efc73db9c58fc63e40b240558eb2a8080b4fbfbe1c4b93bbedecc20",
-    win64 = "954cc5dfdb1d95d4c448c40f274d3720c018f73187b0c19b3c4f9bacc48d1ff0",
+    linux_aarch_64 = "2dd17f75d66a682640b136e31848da9fb2eefe68d55303baf8b32617374f6711",
+    linux_x86_64 = "3a4c1e5f2516c639d3079b1586e703fc7bcfa2136d58bda24d1d54f949c315e8",
+    osx_aarch_64 = "96839af0caed64352442fc8236f4bdf7c1cd6efcfaa98fa5db37307a73fc7c70",
+    osx_x86_64 = "9448ff40278504a7ae5139bb70c962acc78c32d8fc54b4890a55c14c68b9d10a",
+    win64 = "71852a30cf62975358edfcbbff93086e8857a079c8e4d6904881aa968d65c7f9",
 )
 
 REPOSITORY_LOCATIONS_SPEC = dict(
@@ -850,11 +850,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # test/common/json:gen_excluded_unicodes to recompute the ranges
         # excluded from differential fuzzing that are populated in
         # test/common/json/json_sanitizer_test_util.cc.
-        sha256 = "e07046fbac432b05adc1fd1318c6f19ab1b0ec0655f7f4e74627d9713959a135",
+        sha256 = "2c6a36c7b5a55accae063667ef3c55f2642e67476d96d355ff0acb13dbb47f09",
         strip_prefix = "protobuf-{version}",
         urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protobuf-all-{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        release_date = "2022-09-29",
+        release_date = "2022-12-14",
         cpe = "cpe:2.3:a:google:protobuf:*",
         license = "Protocol Buffers",
         license_url = "https://github.com/protocolbuffers/protobuf/blob/v{version}/LICENSE",
@@ -1080,12 +1080,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
         project_url = "https://github.com/google/quiche",
-        version = "9b4551033df6483c4bf18c9e70ec14897070aa80",
-        sha256 = "c015d5ce1d806e5f3fd4cd8bc1b5a2ae0163c669501219d45df9c7353405d5f9",
+        version = "b788f047d3d97a9f88e3b4f27a88124f94b1cbc1",
+        sha256 = "2000c5f7d414e9c1d109fa5eecece8879b611c37c7010e34dbc21f796907b832",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
         use_category = ["dataplane_core"],
-        release_date = "2022-11-30",
+        release_date = "2022-12-16",
         cpe = "N/A",
         license = "BSD-3-Clause",
         license_url = "https://github.com/google/quiche/blob/{version}/LICENSE",
@@ -1405,7 +1405,7 @@ def _compiled_protoc_deps(locations, versions):
             sha256 = sha,
             urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protoc-{version}-%s.zip" % platform.replace("_", "-", 1)],
             use_category = ["dataplane_core", "controlplane"],
-            release_date = "2022-09-29",
+            release_date = "2022-12-14",
             cpe = "N/A",
             license = "Protocol Buffers",
             license_url = "https://github.com/protocolbuffers/protobuf/blob/v{version}/LICENSE",
