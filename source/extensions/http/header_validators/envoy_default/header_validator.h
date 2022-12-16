@@ -21,7 +21,8 @@ public:
   HeaderValidator(
       const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&
           config,
-      ::Envoy::Http::Protocol protocol, StreamInfo::StreamInfo& stream_info);
+      ::Envoy::Http::Protocol protocol, StreamInfo::StreamInfo& stream_info,
+      ::Envoy::Http::HeaderValidatorStats& stats);
 
   using HeaderValueValidationResult = RejectResult;
   /*
@@ -136,6 +137,7 @@ protected:
   ::Envoy::Http::Protocol protocol_;
   StreamInfo::StreamInfo& stream_info_;
   const ::Envoy::Http::HeaderValues& header_values_;
+  ::Envoy::Http::HeaderValidatorStats& stats_;
   const PathNormalizer path_normalizer_;
 };
 

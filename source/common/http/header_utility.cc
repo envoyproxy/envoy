@@ -383,8 +383,7 @@ HeaderUtility::HeaderValidationResult HeaderUtility::checkHeaderNameForUnderscor
     absl::string_view header_name,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
         headers_with_underscores_action,
-    Stats::Counter& dropped_headers_with_underscores,
-    Stats::Counter& requests_rejected_with_underscores_in_headers) {
+    HeaderValidatorStats& stats) {
   if (headers_with_underscores_action == envoy::config::core::v3::HttpProtocolOptions::ALLOW ||
       !HeaderUtility::headerNameContainsUnderscore(header_name)) {
     return HeaderValidationResult::ACCEPT;
@@ -392,11 +391,11 @@ HeaderUtility::HeaderValidationResult HeaderUtility::checkHeaderNameForUnderscor
   if (headers_with_underscores_action ==
       envoy::config::core::v3::HttpProtocolOptions::DROP_HEADER) {
     ENVOY_LOG_MISC(debug, "Dropping header with invalid characters in its name: {}", header_name);
-    dropped_headers_with_underscores.inc();
+    stats.incDroppedHeadersWithUnderscores();
     return HeaderValidationResult::DROP;
   }
   ENVOY_LOG_MISC(debug, "Rejecting request due to header name with underscores: {}", header_name);
-  requests_rejected_with_underscores_in_headers.inc();
+  stats.incRequestsRejectedWithUnderscoresInHeaders();
   return HeaderUtility::HeaderValidationResult::REJECT;
 }
 

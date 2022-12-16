@@ -16,7 +16,8 @@ public:
           config);
 
   ::Envoy::Http::HeaderValidatorPtr create(::Envoy::Http::Protocol protocol,
-                                           StreamInfo::StreamInfo& stream_info) override;
+                                           StreamInfo::StreamInfo& stream_info,
+                                           ::Envoy::Http::HeaderValidatorStats& stats) override;
 
 private:
   const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
