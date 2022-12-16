@@ -201,8 +201,10 @@ TEST_P(CdsIntegrationTest, CdsClusterTeardownWhileConnecting) {
   // This line ensures that the ClusterInfoImpl is created already.
   test_server_->waitForCounterGe("cluster_manager.cluster_added", 1);
   if (this->enableLazyInitStats()) {
+    EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.inited")->value(), 0);
     EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total"), nullptr);
     ASSERT_TRUE(forceCreationOfClusterTrafficStats("cluster_1"));
+    EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.inited")->value(), 1);
   } else {
     EXPECT_NE(test_server_->counter("cluster.cluster_1.upstream_cx_total"), nullptr);
   }
@@ -232,6 +234,66 @@ TEST_P(CdsIntegrationTest, CdsClusterTeardownWhileConnecting) {
   EXPECT_LE(cx_counter->value(), 1);
 }
 
+// Test that TrafficStats lazyinit when configured.
+TEST_P(CdsIntegrationTest, TrafficStatsLazyInit) {
+  initialize();
+  // This line ensures that the ClusterInfoImpl is created already.
+  test_server_->waitForCounterGe("cluster_manager.cluster_added", 1);
+  if (this->enableLazyInitStats()) {
+    EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.inited")->value(), 0);
+    EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total"), nullptr);
+  } else {
+    EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 0);
+  }
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"},
+      {":path", "/cluster1"},
+      {":scheme", "http"},
+      {":authority", "host"},
+  };
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("http"), "GET", "/cluster1", "", downstream_protocol_, version_, "foo.com");
+  ASSERT_TRUE(response->complete());
+  cleanupUpstreamAndDownstream();
+  if (this->enableLazyInitStats()) {
+    EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.inited")->value(), 1);
+  }
+  // Cluster_1 trafficStats updated.
+  EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
+
+  // Now update cluster1.
+  envoy::config::cluster::v3::Cluster cluster1_updated =
+      cluster_creator_(ClusterName1, fake_upstreams_[UpstreamIndex2]->localAddress()->ip()->port(),
+                       Network::Test::getLoopbackAddressString(ipVersion()), "ROUND_ROBIN");
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
+                                                             {cluster1_}, {cluster1_}, {}, "42");
+  test_server_->waitForCounterGe("cluster_manager.cds.update_success", 2);
+  // Now the ClusterTrafficStats.inited gauge is still 1.
+  if (this->enableLazyInitStats()) {
+    EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.inited")->value(), 1);
+  }
+  // Cluster traffic stats not lost.
+  EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
+
+  // Remove "cluster_1".
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster, {}, {},
+                                                             {ClusterName1}, "42");
+  test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
+  // Make sure the deferred deletion of "cluster_1" is done.
+  runOnWorkerThreadsAndWaitforCompletion(
+      test_server_->server(), []() { ENVOY_LOG_MISC(error, "DDD run on all threads."); });
+  absl::Notification notification;
+  test_server_->server().dispatcher().post([&notification]() { notification.Notify(); });
+  notification.WaitForNotification();
+  // Now the stats are gone.
+  if (this->enableLazyInitStats()) {
+    auto DDD = test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.inited");
+    ENVOY_LOG_MISC(error, "DDD {} ", DDD ? DDD->value() : -999);
+    EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.inited"), nullptr);
+  }
+  EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total"), nullptr);
+}
+
 // Test the fast addition and removal of clusters when they use ThreadAwareLb.
 TEST_P(CdsIntegrationTest, CdsClusterWithThreadAwareLbCycleUpDownUp) {
   // Calls our initialize(), which includes establishing a listener, route, and cluster.
@@ -242,8 +304,8 @@ TEST_P(CdsIntegrationTest, CdsClusterWithThreadAwareLbCycleUpDownUp) {
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "55", {}, {}, {}));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster, {}, {},
                                                              {ClusterName1}, "42");
-  // Make sure that Envoy's ClusterManager has made use of the DiscoveryResponse that says cluster_1
-  // is gone.
+  // Make sure that Envoy's ClusterManager has made use of the DiscoveryResponse that says
+  // cluster_1 is gone.
   test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
 
   // Update cluster1_ to use MAGLEV load balancer policy.
@@ -361,7 +423,8 @@ TEST_P(CdsIntegrationTest, TwoClustersAndRedirects) {
 }
 
 // Tests that when Envoy's delta xDS stream dis/reconnects, Envoy can inform the server of the
-// resources it already has: the reconnected stream need not start with a state-of-the-world update.
+// resources it already has: the reconnected stream need not start with a state-of-the-world
+// update.
 TEST_P(CdsIntegrationTest, VersionsRememberedAfterReconnect) {
   SKIP_IF_XDS_IS(Grpc::SotwOrDelta::Sotw);
   SKIP_IF_XDS_IS(Grpc::SotwOrDelta::UnifiedSotw);
@@ -496,7 +559,8 @@ TEST_P(CdsIntegrationTest, CdsClusterDownWithLotsOfIdleConnections) {
 
 // This test verifies that Envoy can delete a cluster with a lot of connections in the connecting
 // state and associated pending requests. The recursion guard in the
-// ConnPoolImplBase::closeIdleConnectionsForDrainingPool() would fire if it was called recursively.
+// ConnPoolImplBase::closeIdleConnectionsForDrainingPool() would fire if it was called
+// recursively.
 //
 // Test is currently disabled as there is presently no reliable way of making upstream connections
 // hang in connecting state.

@@ -74,6 +74,35 @@ typeToCodecType(Http::CodecType type) {
 
 } // namespace
 
+void runOnWorkerThreadsAndWaitforCompletion(Server::Instance& server, std::function<void()> func) {
+  absl::Notification done_notification;
+  ThreadLocal::TypedSlotPtr<> slot;
+  Envoy::Thread::ThreadId main_tid;
+  server.dispatcher().post([&] {
+    slot = ThreadLocal::TypedSlot<>::makeUnique(server.threadLocal());
+    slot->set(
+        [](Envoy::Event::Dispatcher&) -> std::shared_ptr<Envoy::ThreadLocal::ThreadLocalObject> {
+          return nullptr;
+        });
+
+    main_tid = server.api().threadFactory().currentThreadId();
+
+    slot->runOnAllThreads(
+        [main_tid, &server, &func](OptRef<ThreadLocal::ThreadLocalObject>) {
+          // Run on the worker thread.
+          if (server.api().threadFactory().currentThreadId() != main_tid) {
+            func();
+          }
+        },
+        [&slot, &done_notification] {
+          slot.reset(nullptr);
+          done_notification.Notify();
+        });
+  });
+  done_notification.WaitForNotification();
+}
+
+
 IntegrationCodecClient::IntegrationCodecClient(
     Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
     Network::ClientConnectionPtr&& conn, Upstream::HostDescriptionConstSharedPtr host_description,

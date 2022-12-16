@@ -47,34 +47,6 @@ std::string protocolTestParamsAndBoolToString(
                                                : "without_per_stream_buffer_accounting");
 }
 
-void runOnWorkerThreadsAndWaitforCompletion(Server::Instance& server, std::function<void()> func) {
-  absl::Notification done_notification;
-  ThreadLocal::TypedSlotPtr<> slot;
-  Envoy::Thread::ThreadId main_tid;
-  server.dispatcher().post([&] {
-    slot = ThreadLocal::TypedSlot<>::makeUnique(server.threadLocal());
-    slot->set(
-        [](Envoy::Event::Dispatcher&) -> std::shared_ptr<Envoy::ThreadLocal::ThreadLocalObject> {
-          return nullptr;
-        });
-
-    main_tid = server.api().threadFactory().currentThreadId();
-
-    slot->runOnAllThreads(
-        [main_tid, &server, &func](OptRef<ThreadLocal::ThreadLocalObject>) {
-          // Run on the worker thread.
-          if (server.api().threadFactory().currentThreadId() != main_tid) {
-            func();
-          }
-        },
-        [&slot, &done_notification] {
-          slot.reset(nullptr);
-          done_notification.Notify();
-        });
-  });
-  done_notification.WaitForNotification();
-}
-
 void waitForNumTurns(std::vector<uint64_t>& turns, absl::Mutex& mu, uint32_t expected_size) {
 
   absl::MutexLock l(&mu);

@@ -1046,6 +1046,7 @@ ClusterInfoImpl::ClusterInfoImpl(
       factory_context_(
           std::make_unique<FactoryContextImpl>(*stats_scope_, runtime, factory_context)),
       upstream_context_(server_context, init_manager, *stats_scope_) {
+  ENVOY_LOG_MISC(error, "DDD CCC created clusterINFO: {}", config.name());
 #ifdef WIN32
   if (set_local_interface_name_on_upstream_connections_) {
     throw EnvoyException("set_local_interface_name_on_upstream_connections_ cannot be set to true "

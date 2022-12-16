@@ -26,6 +26,8 @@ enum class Http2Impl {
   Oghttp2,
 };
 
+//  Runs 'func' on all worker threads.
+void runOnWorkerThreadsAndWaitforCompletion(Server::Instance& server, std::function<void()> func);
 /**
  * HTTP codec client used during integration testing.
  */

@@ -25,14 +25,32 @@ public:
   // StatsStructType object later.
   // Caller should make sure scope and stat_names outlive this object.
   LazyInit(const typename StatsStructType::StatNameType& stat_names, Stats::Scope& scope)
-      : ctor_([&scope, &stat_names]() -> StatsStructType* {
+      : inited_(Stats::Utility::gaugeFromElements(
+            scope, {Stats::DynamicName(StatsStructType::typeName()), Stats::DynamicName("inited")},
+            Stats::Gauge::ImportMode::NeverImport)),
+        ctor_([&scope, &stat_names, this]() -> StatsStructType* {
+          inited_.inc();
+          ENVOY_LOG_MISC(error, "DDDD III inc {} now : {}", inited_.name(), inited_.value());
           return new StatsStructType(stat_names, scope);
-        }) {}
+        }) {
+    if (inited_.value() > 0) {
+      // Create the nested StatsStructType.
+      instantiate();
+    }
+  }
   // Helper operators to get-or-create and return the StatsStructType object.
-  inline StatsStructType* operator->() override { return internal_stats_.get(ctor_); }
-  inline StatsStructType& operator*() override { return *internal_stats_.get(ctor_); }
+  inline StatsStructType* operator->() override { return instantiate(); }
+  inline StatsStructType& operator*() override { return *instantiate(); }
+  ~LazyInit() {
+    if (inited_.value() > 0) {
+      inited_.dec();
+      ENVOY_LOG_MISC(error, "DDDD DDD dec {} now : {}", inited_.name(), inited_.value());
+    }
+  }
 
 private:
+  inline StatsStructType* instantiate() { return internal_stats_.get(ctor_); }
+  Gauge& inited_;
   // TODO(stevenzzzz, jmarantz): Clean up this ctor_ by moving ownership to AtomicPtr, and drop it
   // when the nested object is created.
   std::function<StatsStructType*()> ctor_;
