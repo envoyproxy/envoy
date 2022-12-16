@@ -25,30 +25,7 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
     rules_foreign_cc_dependencies(register_default_tools = False, register_built_tools = False)
     go_rules_dependencies()
     go_register_toolchains(go_version)
-    go_download_sdk(
-        name = "go_linux_amd64",
-        goos = "linux",
-        goarch = "amd64",
-        version = go_version,
-    )
-    go_download_sdk(
-        name = "go_linux_arm64",
-        goos = "linux",
-        goarch = "arm64",
-        version = go_version,
-    )
-    go_download_sdk(
-        name = "go_darwin_amd64",
-        goos = "darwin",
-        goarch = "amd64",
-        version = go_version,
-    )
-    go_download_sdk(
-        name = "go_darwin_arm64",
-        goos = "darwin",
-        goarch = "arm64",
-        version = go_version,
-    )
+    envoy_download_go_sdks(go_version)
     gazelle_dependencies(go_sdk = "go_sdk")
     apple_rules_dependencies()
     pip_dependencies()
@@ -150,4 +127,30 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
         # last_update = "2020-11-22"
         # use_category = ["api"],
         # source = "https://github.com/bufbuild/protoc-gen-validate/blob/v0.6.1/dependencies.bzl#L23-L28"
+    )
+
+def envoy_download_go_sdks(go_version):
+    go_download_sdk(
+        name = "go_linux_amd64",
+        goos = "linux",
+        goarch = "amd64",
+        version = go_version,
+    )
+    go_download_sdk(
+        name = "go_linux_arm64",
+        goos = "linux",
+        goarch = "arm64",
+        version = go_version,
+    )
+    go_download_sdk(
+        name = "go_darwin_amd64",
+        goos = "darwin",
+        goarch = "amd64",
+        version = go_version,
+    )
+    go_download_sdk(
+        name = "go_darwin_arm64",
+        goos = "darwin",
+        goarch = "arm64",
+        version = go_version,
     )
