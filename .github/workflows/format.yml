@@ -48,7 +48,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     container:
-      image: ghcr.io/realm/swiftlint:0.50.1
+      image: ghcr.io/realm/swiftlint:0.50.3
     steps:
     - uses: actions/checkout@v1
     - name: 'Run Swift Lint (SwiftLint)'

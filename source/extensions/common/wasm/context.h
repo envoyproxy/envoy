@@ -109,7 +109,7 @@ class Context : public proxy_wasm::ContextBase,
                 public Http::StreamFilter,
                 public Network::ConnectionCallbacks,
                 public Network::Filter,
-                public google::api::expr::runtime::BaseActivation,
+                public Filters::Common::Expr::StreamActivation,
                 public std::enable_shared_from_this<Context> {
 public:
   Context();                                          // Testing.
@@ -272,16 +272,10 @@ public:
   void onStatsUpdate(Envoy::Stats::MetricSnapshot& snapshot);
 
   // CEL evaluation
-  std::vector<const google::api::expr::runtime::CelFunction*>
-  FindFunctionOverloads(absl::string_view) const override {
-    return {};
-  }
   absl::optional<google::api::expr::runtime::CelValue>
   findValue(absl::string_view name, Protobuf::Arena* arena, bool last) const;
   absl::optional<google::api::expr::runtime::CelValue>
-  FindValue(absl::string_view name, Protobuf::Arena* arena) const override {
-    return findValue(name, arena, false);
-  }
+  FindValue(absl::string_view name, Protobuf::Arena* arena) const override;
 
   // Foreign function state
   virtual void setForeignData(absl::string_view data_name, std::unique_ptr<StorageObject> data) {
