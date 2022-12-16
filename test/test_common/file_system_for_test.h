@@ -24,17 +24,19 @@ public:
 
 protected:
   Api::IoCallBoolResult open(FlagSet flag) override {
+    absl::MutexLock l(&info_->lock_);
     ASSERT(!isOpen());
     flags_ = flag;
     open_ = true;
+    if (flags_.test(File::Operation::Write) && !flags_.test(File::Operation::Append) &&
+        !flags_.test(File::Operation::KeepExistingData)) {
+      info_->data_.clear();
+    }
     return resultSuccess(true);
   }
 
   Api::IoCallSizeResult write(absl::string_view buffer) override {
     absl::MutexLock l(&info_->lock_);
-    if (!flags_.test(File::Operation::Append)) {
-      info_->data_.clear();
-    }
     info_->data_.append(std::string(buffer));
     const ssize_t size = info_->data_.size();
     return resultSuccess(size);
