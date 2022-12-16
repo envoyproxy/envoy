@@ -9,8 +9,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitQuota {
 
-using envoy::type::v3::RateLimitStrategy;
-
 Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                               bool) {
   // First, perform request matching.
@@ -92,40 +90,10 @@ struct RateLimitResponseValue {
   // The rate limiter encountered a failure, and was configured to fail-closed.
   const std::string RateLimitError = "rate_limiter_error";
 };
-using RateLimitResponseDetails = ConstSingleton<RateLimitResponseValue>;
-
-static inline Http::Code toErrorCode(uint64_t status) {
-  const auto code = static_cast<Http::Code>(status);
-  if (code >= Http::Code::BadRequest) {
-    return code;
-  }
-  return Http::Code::TooManyRequests;
-}
 
 // TODO(tyxia) This is how we represent the RATELIMITED and ALLOWED
 void RateLimitQuotaFilter::onComplete(const RateLimitQuotaBucketSettings& bucket_settings,
-                                      RateLimitStatus status) {
-  switch (status) {
-  case RateLimitStatus::OK:
-    break;
-  case RateLimitStatus::OverLimit:
-    // If the request has been `RateLimited`, send the local reply.
-    auto deny_response_settings = bucket_settings.deny_response_settings();
-    callbacks_->sendLocalReply(toErrorCode(deny_response_settings.http_status().code()),
-                               std::string(deny_response_settings.http_body().value()), nullptr,
-                               absl::nullopt, RateLimitResponseDetails::get().RateLimited);
-
-    // The callback is nullptr at this moment.
-    // Send local reply extra information want to be added in the local reply will add this
-    // callback And it will be triggered when the local reply is constructed.
-    // Response_header_to_add for ERROR Status Response for Error case
-    // -- Rate limits exceed   response from envoy to downstream client
-    // -- Like rate-limit-exceeded
-    // Request for OK case
-    // -- Request go through to be send to upstream
-    break;
-  }
-}
+                                      RateLimitStatus status) {}
 
 } // namespace RateLimitQuota
 } // namespace HttpFilters
