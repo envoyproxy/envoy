@@ -27,11 +27,29 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
     go_register_toolchains(go_version)
     go_download_sdk(
         name = "go_sdk",
+        goos = "linux",
+        goarch = "amd64",
+        version = go_version,
+    )
+    go_download_sdk(
+        name = "go_sdk",
+        goos = "linux",
+        goarch = "arm64",
+        version = go_version,
+    )
+    go_download_sdk(
+        name = "go_sdk",
         goos = "darwin",
         goarch = "amd64",
         version = go_version,
     )
-    gazelle_dependencies()
+    go_download_sdk(
+        name = "go_sdk",
+        goos = "darwin",
+        goarch = "arm64",
+        version = go_version,
+    )
+    gazelle_dependencies(go_sdk = "go_sdk")
     apple_rules_dependencies()
     pip_dependencies()
     pip_fuzzing_dependencies()
