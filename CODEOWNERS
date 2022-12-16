@@ -284,6 +284,8 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/path/rewrite/uri_template @alyssawilk @yanjunxiang-google
 # Dubbo codec
 /*/extensions/common/dubbo @wbpcode @lizan
+# Early header mutation
+/*/extensions/http/early_header_mutation/header_mutation @wbpcode @UNOWNED
 
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED

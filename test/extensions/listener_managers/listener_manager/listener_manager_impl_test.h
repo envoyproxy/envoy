@@ -125,6 +125,11 @@ protected:
         .WillRepeatedly(Invoke([this](os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) {
           return os_sys_calls_actual_.getsockname(sockfd, addr, addrlen);
         }));
+    EXPECT_CALL(os_sys_calls_, getaddrinfo(_, _, _, _))
+        .WillRepeatedly(Invoke([&](const char* node, const char* service,
+                                   const struct addrinfo* hints, struct addrinfo** res) {
+          return os_sys_calls_actual_.getaddrinfo(node, service, hints, res);
+        }));
     socket_ = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
   }
 

@@ -22,9 +22,9 @@ envoy_extension_cc_test(
     extension_names = ["envoy.http.header_validators.envoy_default"],
     deps = [
         ":header_validator_test_lib",
+        "//envoy/http:header_validator_errors",
         "//source/common/network:utility_lib",
         "//source/extensions/http/header_validators/envoy_default:character_tables",
-        "//source/extensions/http/header_validators/envoy_default:error_codes",
         "//source/extensions/http/header_validators/envoy_default:header_validator_common",
     ],
 )
@@ -37,7 +37,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.http.header_validators.envoy_default"],
     deps = [
         ":header_validator_test_lib",
-        "//source/extensions/http/header_validators/envoy_default:error_codes",
+        "//envoy/http:header_validator_errors",
         "//source/extensions/http/header_validators/envoy_default:http1_header_validator",
     ],
 )
@@ -50,8 +50,8 @@ envoy_extension_cc_test(
     extension_names = ["envoy.http.header_validators.envoy_default"],
     deps = [
         ":header_validator_test_lib",
+        "//envoy/http:header_validator_errors",
         "//source/extensions/http/header_validators/envoy_default:character_tables",
-        "//source/extensions/http/header_validators/envoy_default:error_codes",
         "//source/extensions/http/header_validators/envoy_default:http2_header_validator",
     ],
 )
@@ -64,6 +64,7 @@ envoy_extension_cc_test_library(
     extension_names = ["envoy.http.header_validators.envoy_default"],
     deps = [
         "//source/extensions/http/header_validators/envoy_default:config",
+        "//test/mocks/http:header_validator_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto",
     ],
@@ -78,6 +79,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/network:utility_lib",
         "//source/extensions/http/header_validators/envoy_default:config",
+        "//test/mocks/http:header_validator_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto",
@@ -126,6 +128,7 @@ envoy_cc_fuzz_test(
         ":path_normalizer_fuzz_proto_cc_proto",
         "//source/extensions/http/header_validators/envoy_default:http1_header_validator",
         "//source/extensions/http/header_validators/envoy_default:path_normalizer",
+        "//test/mocks/http:header_validator_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
     ],
 )

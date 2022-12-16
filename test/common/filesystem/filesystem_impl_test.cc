@@ -1,9 +1,11 @@
 #include <chrono>
 #include <filesystem>
+#include <stdexcept>
 #include <string>
 
 #include "source/common/common/assert.h"
 #include "source/common/common/utility.h"
+#include "source/common/filesystem/directory.h"
 #include "source/common/filesystem/filesystem_impl.h"
 
 #include "test/test_common/environment.h"
@@ -26,8 +28,18 @@ protected:
     return file_impl->fd_;
   }
 #ifndef WIN32
+  std::string getTmpFileName(File* file) {
+    auto impl = dynamic_cast<TmpFileImplPosix*>(file);
+    RELEASE_ASSERT(impl != nullptr, "failed to cast File* to TmpFileImplPosix*");
+    return impl->tmp_file_path_;
+  }
   Api::SysCallStringResult canonicalPath(const std::string& path) {
     return file_system_.canonicalPath(path);
+  }
+  Api::IoCallBoolResult openNamedTmpFile(FilePtr& file, bool with_unlink = true) {
+    TmpFileImplPosix* impl = dynamic_cast<TmpFileImplPosix*>(file.get());
+    RELEASE_ASSERT(impl != nullptr, "failed to cast File* to TmpFileImplPosix*");
+    return impl->openNamedTmpFile(impl->translateFlag(DefaultFlags), with_unlink);
   }
 #endif
   InstanceImpl file_system_;
@@ -95,15 +107,17 @@ TEST_F(FileSystemImplTest, FileReadToEndDoesNotExist) {
                EnvoyException);
 }
 
+#ifndef WIN32
+// In Windows this method of removing the permissions does not make read fail.
 TEST_F(FileSystemImplTest, FileReadToEndNotReadable) {
   const std::string data = "test string\ntest";
   const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", data);
 
   std::filesystem::permissions(file_path, std::filesystem::perms::owner_all,
                                std::filesystem::perm_options::remove);
-  EXPECT_THROW(file_system_.fileReadToEnd(TestEnvironment::temporaryPath("envoy_this_not_exist")),
-               EnvoyException);
+  EXPECT_THROW(file_system_.fileReadToEnd(file_path), EnvoyException);
 }
+#endif
 
 TEST_F(FileSystemImplTest, FileReadToEndDenylisted) {
   EXPECT_THROW(file_system_.fileReadToEnd("/dev/urandom"), EnvoyException);
@@ -281,6 +295,120 @@ TEST_F(FileSystemImplTest, OpenReadOnly) {
   EXPECT_TRUE(result.return_value_);
   EXPECT_TRUE(file->isOpen());
 }
+
+TEST_F(FileSystemImplTest, TemporaryFileIsDeletedOnClose) {
+  const std::string new_file_path = TestEnvironment::temporaryPath("");
+  FilePathAndType new_file_info{Filesystem::DestinationType::TmpFile, new_file_path};
+  FilePtr file = file_system_.createFile(new_file_info);
+  const Api::IoCallBoolResult result = file->open(DefaultFlags);
+  EXPECT_TRUE(result.return_value_) << result.err_->getErrorDetails();
+  EXPECT_TRUE(file->isOpen());
+  file.reset();
+  std::vector<std::string> found_files;
+  for (const DirectoryEntry& entry : Directory(new_file_path)) {
+    found_files.push_back(entry.name_);
+  }
+  // After the tmp file is closed, there should be no file persisting in the directory.
+  // (We don't necessarily expect that a named file was created - that depends on the
+  // platform and filesystem - but after the file is closed any named file that may
+  // have been created should have been destroyed.)
+  EXPECT_THAT(found_files, testing::Not(testing::Contains(testing::EndsWith(".tmp"))));
+}
+
+TEST_F(FileSystemImplTest, TemporaryFileOpenedTwiceIsDeletedOnClose) {
+  const std::string new_file_path = TestEnvironment::temporaryPath("");
+  FilePathAndType new_file_info{Filesystem::DestinationType::TmpFile, new_file_path};
+  FilePtr file = file_system_.createFile(new_file_info);
+  const Api::IoCallBoolResult result = file->open(DefaultFlags);
+  EXPECT_TRUE(result.return_value_) << result.err_->getErrorDetails();
+  EXPECT_TRUE(file->isOpen());
+  const filesystem_os_id_t initial_fd = getFd(file.get());
+  const Api::IoCallBoolResult result2 = file->open(DefaultFlags);
+  EXPECT_TRUE(result2.return_value_) << result2.err_->getErrorDetails();
+  EXPECT_TRUE(file->isOpen());
+  EXPECT_EQ(initial_fd, getFd(file.get()));
+  file.reset();
+  std::vector<std::string> found_files;
+  for (const DirectoryEntry& entry : Directory(new_file_path)) {
+    found_files.push_back(entry.name_);
+  }
+  // After the tmp file is closed, there should be no file persisting in the directory.
+  // (We don't necessarily expect that a named file was created - that depends on the
+  // platform and filesystem - but after the file is closed any named file that may
+  // have been created should have been destroyed.)
+  EXPECT_THAT(found_files, testing::Not(testing::Contains(testing::EndsWith(".tmp"))));
+}
+
+#ifndef WIN32
+TEST_F(FileSystemImplTest, NamedTemporaryFileDeletedOnClose) {
+  const std::string new_file_path = TestEnvironment::temporaryPath("");
+  FilePathAndType new_file_info{Filesystem::DestinationType::TmpFile, new_file_path};
+  FilePtr file = file_system_.createFile(new_file_info);
+  const Api::IoCallBoolResult result = openNamedTmpFile(file);
+  EXPECT_TRUE(result.return_value_) << result.err_->getErrorDetails();
+  file.reset();
+  std::vector<std::string> found_files;
+  for (const DirectoryEntry& entry : Directory(new_file_path)) {
+    found_files.push_back(entry.name_);
+  }
+  // After the tmp file is closed, there should be no file persisting in the directory.
+  // (We don't necessarily expect that a named file was created - that depends on the
+  // platform and filesystem - but after the file is closed any named file that may
+  // have been created should have been destroyed.)
+  EXPECT_THAT(found_files, testing::Not(testing::Contains(testing::EndsWith(".tmp"))));
+}
+
+TEST_F(FileSystemImplTest, NamedTemporaryFileCloseUnlinkFailureReturnsError) {
+  const std::string new_file_path = TestEnvironment::temporaryPath("");
+  FilePathAndType new_file_info{Filesystem::DestinationType::TmpFile, new_file_path};
+  FilePtr file = file_system_.createFile(new_file_info);
+  const Api::IoCallBoolResult result = openNamedTmpFile(file, false);
+  EXPECT_TRUE(result.return_value_) << result.err_->getErrorDetails();
+  EXPECT_EQ(0, ::unlink(getTmpFileName(file.get()).c_str()));
+  const Api::IoCallBoolResult close_result = file->close();
+  EXPECT_FALSE(close_result.return_value_)
+      << "file close unexpectedly returned success on already unlinked file";
+}
+
+TEST_F(FileSystemImplTest, NamedTemporaryFileCloseFailureReturnsError) {
+  const std::string new_file_path = TestEnvironment::temporaryPath("");
+  FilePathAndType new_file_info{Filesystem::DestinationType::TmpFile, new_file_path};
+  FilePtr file = file_system_.createFile(new_file_info);
+  const Api::IoCallBoolResult result = openNamedTmpFile(file, false);
+  EXPECT_TRUE(result.return_value_) << result.err_->getErrorDetails();
+  EXPECT_EQ(0, ::close(getFd(file.get())));
+  const Api::IoCallBoolResult close_result = file->close();
+  EXPECT_FALSE(close_result.return_value_)
+      << "file close unexpectedly returned success on already closed file";
+}
+
+TEST_F(FileSystemImplTest, NamedTemporaryFileThatCouldntUnlinkOnOpenDeletedOnClose) {
+  const std::string new_file_path = TestEnvironment::temporaryPath("");
+  FilePathAndType new_file_info{Filesystem::DestinationType::TmpFile, new_file_path};
+  FilePtr file = file_system_.createFile(new_file_info);
+  const Api::IoCallBoolResult result = openNamedTmpFile(file, false);
+  EXPECT_TRUE(result.return_value_) << result.err_->getErrorDetails();
+  file.reset();
+  std::vector<std::string> found_files;
+  for (const DirectoryEntry& entry : Directory(new_file_path)) {
+    found_files.push_back(entry.name_);
+  }
+  // After the tmp file is closed, there should be no file persisting in the directory.
+  // (We don't necessarily expect that a named file was created - that depends on the
+  // platform and filesystem - but after the file is closed any named file that may
+  // have been created should have been destroyed.)
+  EXPECT_THAT(found_files, testing::Not(testing::Contains(testing::EndsWith(".tmp"))));
+}
+
+TEST_F(FileSystemImplTest, NamedTemporaryFileFailureToOpenReturnsError) {
+  const std::string new_file_path = TestEnvironment::temporaryPath("nonexistent_path");
+  FilePathAndType new_file_info{Filesystem::DestinationType::TmpFile, new_file_path};
+  FilePtr file = file_system_.createFile(new_file_info);
+  const Api::IoCallBoolResult result = openNamedTmpFile(file);
+  EXPECT_FALSE(result.return_value_);
+  EXPECT_TRUE(result.err_);
+}
+#endif
 
 TEST_F(FileSystemImplTest, OpenTwice) {
   const std::string new_file_path = TestEnvironment::temporaryPath("envoy_this_not_exist");

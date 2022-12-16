@@ -39,6 +39,7 @@ TcpUpstream::TcpUpstream(Router::UpstreamToDownstream* upstream_request,
 }
 
 void TcpUpstream::encodeData(Buffer::Instance& data, bool end_stream) {
+  bytes_meter_->addWireBytesSent(data.length());
   upstream_conn_data_->connection().write(data, end_stream);
 }
 
@@ -57,6 +58,9 @@ Envoy::Http::Status TcpUpstream::encodeHeaders(const Envoy::Http::RequestHeaderM
     }
 
     if (data.length() != 0 || end_stream) {
+      // Count header bytes for proxy proto.
+      bytes_meter_->addHeaderBytesSent(data.length());
+      bytes_meter_->addWireBytesSent(data.length());
       upstream_conn_data_->connection().write(data, end_stream);
     }
   }
@@ -88,6 +92,7 @@ void TcpUpstream::resetStream() {
 }
 
 void TcpUpstream::onUpstreamData(Buffer::Instance& data, bool end_stream) {
+  bytes_meter_->addWireBytesReceived(data.length());
   upstream_request_->decodeData(data, end_stream);
 }
 

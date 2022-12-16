@@ -24,6 +24,11 @@ use(
        "auto_assign": True,
     },
     {
+       "owner": "envoyproxy/runtime-guard-changes",
+       "path": "(source/common/runtime/runtime_features.cc)",
+       "github_status_label": "changes to Envoy runtime guards",
+    },
+    {
       "owner": "envoyproxy/api-shepherds!",
       "path": "(api/envoy/|docs/root/api-docs/)",
       "label": "api",

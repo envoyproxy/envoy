@@ -245,6 +245,7 @@ EXTENSIONS = {
     #
     # CacheFilter plugins
     #
+    "envoy.extensions.http.cache.file_system_http_cache": "//source/extensions/http/cache/file_system_http_cache:config",
     "envoy.extensions.http.cache.simple":               "//source/extensions/http/cache/simple_http_cache:config",
 
     #
@@ -390,6 +391,11 @@ EXTENSIONS = {
     #
 
     "envoy.route.early_data_policy.default":           "//source/extensions/early_data:default_early_data_policy_lib",
+
+    #
+    # HTTP Early Header Mutation
+    #
+    "envoy.http.early_header_mutation.header_mutation": "//source/extensions/http/early_header_mutation/header_mutation:config",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which
