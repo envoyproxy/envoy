@@ -258,7 +258,7 @@ TEST_F(ProxyFilterTest, CircuitBreakerOverflowWithDnsCacheResourceManager) {
             filter2->decodeHeaders(request_headers_, false));
 
   // Cluster circuit breaker overflow counter won't be incremented.
-  EXPECT_EQ(0, cm_.thread_local_cluster_.cluster_.info_->traffic_stats_
+  EXPECT_EQ(0, cm_.thread_local_cluster_.cluster_.info_->trafficStats()
                    ->upstream_rq_pending_overflow_.value());
   filter2->onDestroy();
   EXPECT_CALL(*handle, onDestroy());

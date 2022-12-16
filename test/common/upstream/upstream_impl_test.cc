@@ -3366,34 +3366,34 @@ public:
   Api::ApiPtr api_;
 };
 
-  struct Foo : public Envoy::Config::TypedMetadata::Object {};
+struct Foo : public Envoy::Config::TypedMetadata::Object {};
 
-  struct Baz : public Envoy::Config::TypedMetadata::Object {
-    Baz(std::string n) : name(n) {}
-    std::string name;
-  };
+struct Baz : public Envoy::Config::TypedMetadata::Object {
+  Baz(std::string n) : name(n) {}
+  std::string name;
+};
 
-  class BazFactory : public ClusterTypedMetadataFactory {
-  public:
-    std::string name() const override { return "baz"; }
-    // Returns nullptr (conversion failure) if d is empty.
-    std::unique_ptr<const Envoy::Config::TypedMetadata::Object>
-    parse(const ProtobufWkt::Struct& d) const override {
-      if (d.fields().find("name") != d.fields().end()) {
-        return std::make_unique<Baz>(d.fields().at("name").string_value());
-      }
-      throw EnvoyException("Cannot create a Baz when metadata is empty.");
+class BazFactory : public ClusterTypedMetadataFactory {
+public:
+  std::string name() const override { return "baz"; }
+  // Returns nullptr (conversion failure) if d is empty.
+  std::unique_ptr<const Envoy::Config::TypedMetadata::Object>
+  parse(const ProtobufWkt::Struct& d) const override {
+    if (d.fields().find("name") != d.fields().end()) {
+      return std::make_unique<Baz>(d.fields().at("name").string_value());
     }
+    throw EnvoyException("Cannot create a Baz when metadata is empty.");
+  }
 
-    std::unique_ptr<const Envoy::Config::TypedMetadata::Object>
-    parse(const ProtobufWkt::Any&) const override {
-      return nullptr;
-    }
-  };
+  std::unique_ptr<const Envoy::Config::TypedMetadata::Object>
+  parse(const ProtobufWkt::Any&) const override {
+    return nullptr;
+  }
+};
 
-  // Cluster metadata and common config retrieval.
-  TEST_P(ClusterInfoImplTest, Metadata) {
-    const std::string yaml = R"EOF(
+// Cluster metadata and common config retrieval.
+TEST_P(ClusterInfoImplTest, Metadata) {
+  const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
     type: STRICT_DNS
@@ -3413,22 +3413,22 @@ public:
         value: 0.3
   )EOF";
 
-    BazFactory baz_factory;
-    Registry::InjectFactory<ClusterTypedMetadataFactory> registered_factory(baz_factory);
-    auto cluster = makeCluster(yaml);
+  BazFactory baz_factory;
+  Registry::InjectFactory<ClusterTypedMetadataFactory> registered_factory(baz_factory);
+  auto cluster = makeCluster(yaml);
 
-    EXPECT_EQ("meh", cluster->info()->typedMetadata().get<Baz>(baz_factory.name())->name);
-    EXPECT_EQ(nullptr, cluster->info()->typedMetadata().get<Foo>(baz_factory.name()));
-    EXPECT_EQ("test_value",
-              Config::Metadata::metadataValue(&cluster->info()->metadata(), "com.bar.foo", "baz")
-                  .string_value());
-    EXPECT_EQ(0.3, cluster->info()->lbConfig().healthy_panic_threshold().value());
-    EXPECT_EQ(LoadBalancerType::Maglev, cluster->info()->lbType());
-  }
+  EXPECT_EQ("meh", cluster->info()->typedMetadata().get<Baz>(baz_factory.name())->name);
+  EXPECT_EQ(nullptr, cluster->info()->typedMetadata().get<Foo>(baz_factory.name()));
+  EXPECT_EQ("test_value",
+            Config::Metadata::metadataValue(&cluster->info()->metadata(), "com.bar.foo", "baz")
+                .string_value());
+  EXPECT_EQ(0.3, cluster->info()->lbConfig().healthy_panic_threshold().value());
+  EXPECT_EQ(LoadBalancerType::Maglev, cluster->info()->lbType());
+}
 
-  // Verify retry budget default values are honored.
-  TEST_P(ClusterInfoImplTest, RetryBudgetDefaultPopulation) {
-    std::string yaml = R"EOF(
+// Verify retry budget default values are honored.
+TEST_P(ClusterInfoImplTest, RetryBudgetDefaultPopulation) {
+  std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
     type: STRICT_DNS
@@ -3459,39 +3459,39 @@ public:
           min_retry_concurrency: 123
   )EOF";
 
-    makeCluster(yaml);
-    absl::optional<double> budget_percent;
-    absl::optional<uint32_t> min_retry_concurrency;
-    auto threshold = cluster_config_.circuit_breakers().thresholds();
+  makeCluster(yaml);
+  absl::optional<double> budget_percent;
+  absl::optional<uint32_t> min_retry_concurrency;
+  auto threshold = cluster_config_.circuit_breakers().thresholds();
 
-    std::tie(budget_percent, min_retry_concurrency) =
-        RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[0]);
-    EXPECT_EQ(budget_percent, absl::nullopt);
-    EXPECT_EQ(min_retry_concurrency, absl::nullopt);
+  std::tie(budget_percent, min_retry_concurrency) =
+      RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[0]);
+  EXPECT_EQ(budget_percent, absl::nullopt);
+  EXPECT_EQ(min_retry_concurrency, absl::nullopt);
 
-    std::tie(budget_percent, min_retry_concurrency) =
-        RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[1]);
-    EXPECT_EQ(budget_percent, 20.0);
-    EXPECT_EQ(min_retry_concurrency, 3UL);
+  std::tie(budget_percent, min_retry_concurrency) =
+      RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[1]);
+  EXPECT_EQ(budget_percent, 20.0);
+  EXPECT_EQ(min_retry_concurrency, 3UL);
 
-    std::tie(budget_percent, min_retry_concurrency) =
-        RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[2]);
-    EXPECT_EQ(budget_percent, 20.0);
-    EXPECT_EQ(min_retry_concurrency, 3UL);
+  std::tie(budget_percent, min_retry_concurrency) =
+      RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[2]);
+  EXPECT_EQ(budget_percent, 20.0);
+  EXPECT_EQ(min_retry_concurrency, 3UL);
 
-    std::tie(budget_percent, min_retry_concurrency) =
-        RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[3]);
-    EXPECT_EQ(budget_percent, 42.0);
-    EXPECT_EQ(min_retry_concurrency, 3UL);
+  std::tie(budget_percent, min_retry_concurrency) =
+      RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[3]);
+  EXPECT_EQ(budget_percent, 42.0);
+  EXPECT_EQ(min_retry_concurrency, 3UL);
 
-    std::tie(budget_percent, min_retry_concurrency) =
-        RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[4]);
-    EXPECT_EQ(budget_percent, 20.0);
-    EXPECT_EQ(min_retry_concurrency, 123UL);
-  }
+  std::tie(budget_percent, min_retry_concurrency) =
+      RetryBudgetTestClusterInfo::getRetryBudgetParams(threshold[4]);
+  EXPECT_EQ(budget_percent, 20.0);
+  EXPECT_EQ(min_retry_concurrency, 123UL);
+}
 
-  TEST_P(ClusterInfoImplTest, UnsupportedPerHostFields) {
-    std::string yaml = R"EOF(
+TEST_P(ClusterInfoImplTest, UnsupportedPerHostFields) {
+  std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
     type: STRICT_DNS
@@ -3505,13 +3505,13 @@ public:
         max_retries: 123
   )EOF";
 
-    EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
-                              "Unsupported field in per_host_thresholds");
-  }
+  EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
+                            "Unsupported field in per_host_thresholds");
+}
 
-  // Eds service_name is populated.
-  TEST_P(ClusterInfoImplTest, EdsServiceNamePopulation) {
-    const std::string yaml = R"EOF(
+// Eds service_name is populated.
+TEST_P(ClusterInfoImplTest, EdsServiceNamePopulation) {
+  const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
     type: EDS
@@ -3530,10 +3530,10 @@ public:
       healthy_panic_threshold:
         value: 0.3
   )EOF";
-    auto cluster = makeCluster(yaml);
-    EXPECT_EQ(cluster->info()->edsServiceName(), "service_foo");
+  auto cluster = makeCluster(yaml);
+  EXPECT_EQ(cluster->info()->edsServiceName(), "service_foo");
 
-    const std::string unexpected_eds_config_yaml = R"EOF(
+  const std::string unexpected_eds_config_yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
     type: STRICT_DNS
@@ -3552,13 +3552,13 @@ public:
       healthy_panic_threshold:
         value: 0.3
   )EOF";
-    EXPECT_THROW_WITH_MESSAGE(makeCluster(unexpected_eds_config_yaml), EnvoyException,
-                              "eds_cluster_config set in a non-EDS cluster");
-  }
+  EXPECT_THROW_WITH_MESSAGE(makeCluster(unexpected_eds_config_yaml), EnvoyException,
+                            "eds_cluster_config set in a non-EDS cluster");
+}
 
-  // Typed metadata loading throws exception.
-  TEST_P(ClusterInfoImplTest, BrokenTypedMetadata) {
-    const std::string yaml = R"EOF(
+// Typed metadata loading throws exception.
+TEST_P(ClusterInfoImplTest, BrokenTypedMetadata) {
+  const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
     type: STRICT_DNS
@@ -3578,15 +3578,15 @@ public:
         value: 0.3
   )EOF";
 
-    BazFactory baz_factory;
-    Registry::InjectFactory<ClusterTypedMetadataFactory> registered_factory(baz_factory);
-    EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
-                              "Cannot create a Baz when metadata is empty.");
-  }
+  BazFactory baz_factory;
+  Registry::InjectFactory<ClusterTypedMetadataFactory> registered_factory(baz_factory);
+  EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
+                            "Cannot create a Baz when metadata is empty.");
+}
 
-  // Cluster extension protocol options fails validation when configured for an unregistered filter.
-  TEST_P(ClusterInfoImplTest, ExtensionProtocolOptionsForUnknownFilter) {
-    const std::string yaml = R"EOF(
+// Cluster extension protocol options fails validation when configured for an unregistered filter.
+TEST_P(ClusterInfoImplTest, ExtensionProtocolOptionsForUnknownFilter) {
+  const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
     type: STRICT_DNS
@@ -3606,13 +3606,13 @@ public:
           option: "value"
   )EOF";
 
-    EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
-                              "Didn't find a registered network or http filter or "
-                              "protocol options implementation for name: 'no_such_filter'");
-  }
+  EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
+                            "Didn't find a registered network or http filter or "
+                            "protocol options implementation for name: 'no_such_filter'");
+}
 
-  TEST_P(ClusterInfoImplTest, TypedExtensionProtocolOptionsForUnknownFilter) {
-    const std::string yaml = R"EOF(
+TEST_P(ClusterInfoImplTest, TypedExtensionProtocolOptionsForUnknownFilter) {
+  const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
     type: STRICT_DNS
@@ -3630,24 +3630,24 @@ public:
         "@type": type.googleapis.com/google.protobuf.Struct
   )EOF";
 
-    EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
-                              "Didn't find a registered network or http filter or "
-                              "protocol options implementation for name: 'no_such_filter'");
-  }
+  EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
+                            "Didn't find a registered network or http filter or "
+                            "protocol options implementation for name: 'no_such_filter'");
+}
 
-  TEST_P(ClusterInfoImplTest, TestTrackRequestResponseSizesNotSetInConfig) {
-    const std::string yaml_disabled = R"EOF(
+TEST_P(ClusterInfoImplTest, TestTrackRequestResponseSizesNotSetInConfig) {
+  const std::string yaml_disabled = R"EOF(
     name: name
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
   )EOF";
 
-    auto cluster = makeCluster(yaml_disabled);
-    // By default, histograms tracking request/response sizes are not published.
-    EXPECT_FALSE(cluster->info()->requestResponseSizeStats().has_value());
+  auto cluster = makeCluster(yaml_disabled);
+  // By default, histograms tracking request/response sizes are not published.
+  EXPECT_FALSE(cluster->info()->requestResponseSizeStats().has_value());
 
-    const std::string yaml_disabled2 = R"EOF(
+  const std::string yaml_disabled2 = R"EOF(
     name: name
     connect_timeout: 0.25s
     type: STRICT_DNS
@@ -3655,10 +3655,10 @@ public:
     track_cluster_stats: { timeout_budgets : true }
   )EOF";
 
-    cluster = makeCluster(yaml_disabled2);
-    EXPECT_FALSE(cluster->info()->requestResponseSizeStats().has_value());
+  cluster = makeCluster(yaml_disabled2);
+  EXPECT_FALSE(cluster->info()->requestResponseSizeStats().has_value());
 
-    const std::string yaml_disabled3 = R"EOF(
+  const std::string yaml_disabled3 = R"EOF(
     name: name
     connect_timeout: 0.25s
     type: STRICT_DNS
@@ -3666,12 +3666,12 @@ public:
     track_cluster_stats: { request_response_sizes : false }
   )EOF";
 
-    cluster = makeCluster(yaml_disabled3);
-    EXPECT_FALSE(cluster->info()->requestResponseSizeStats().has_value());
-  }
+  cluster = makeCluster(yaml_disabled3);
+  EXPECT_FALSE(cluster->info()->requestResponseSizeStats().has_value());
+}
 
-  TEST_P(ClusterInfoImplTest, TestTrackRequestResponseSizes) {
-    const std::string yaml = R"EOF(
+TEST_P(ClusterInfoImplTest, TestTrackRequestResponseSizes) {
+  const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
     type: STRICT_DNS
@@ -3679,20 +3679,20 @@ public:
     track_cluster_stats: { request_response_sizes : true }
   )EOF";
 
-    auto cluster = makeCluster(yaml);
-    // The stats should be created.
-    ASSERT_TRUE(cluster->info()->requestResponseSizeStats().has_value());
+  auto cluster = makeCluster(yaml);
+  // The stats should be created.
+  ASSERT_TRUE(cluster->info()->requestResponseSizeStats().has_value());
 
-    Upstream::ClusterRequestResponseSizeStats req_resp_stats =
-        cluster->info()->requestResponseSizeStats()->get();
+  Upstream::ClusterRequestResponseSizeStats req_resp_stats =
+      cluster->info()->requestResponseSizeStats()->get();
 
-    EXPECT_EQ(Stats::Histogram::Unit::Bytes, req_resp_stats.upstream_rq_headers_size_.unit());
-    EXPECT_EQ(Stats::Histogram::Unit::Bytes, req_resp_stats.upstream_rq_body_size_.unit());
-    EXPECT_EQ(Stats::Histogram::Unit::Bytes, req_resp_stats.upstream_rs_body_size_.unit());
-  }
+  EXPECT_EQ(Stats::Histogram::Unit::Bytes, req_resp_stats.upstream_rq_headers_size_.unit());
+  EXPECT_EQ(Stats::Histogram::Unit::Bytes, req_resp_stats.upstream_rq_body_size_.unit());
+  EXPECT_EQ(Stats::Histogram::Unit::Bytes, req_resp_stats.upstream_rs_body_size_.unit());
+}
 
-  TEST_P(ClusterInfoImplTest, TestTrackRemainingResourcesGauges) {
-    const std::string yaml = R"EOF(
+TEST_P(ClusterInfoImplTest, TestTrackRemainingResourcesGauges) {
+  const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
     type: STRICT_DNS
@@ -3714,53 +3714,52 @@ public:
         track_remaining: true
   )EOF";
 
-    auto cluster = makeCluster(yaml);
+  auto cluster = makeCluster(yaml);
 
-    // The value of a remaining resource gauge will always be 0 for the default
-    // priority circuit breaker since track_remaining is false
-    Stats::Gauge& default_remaining_retries =
-        stats_.gauge("cluster.name.circuit_breakers.default.remaining_retries",
-                     Stats::Gauge::ImportMode::Accumulate);
-    EXPECT_EQ(0U, default_remaining_retries.value());
-    cluster->info()->resourceManager(ResourcePriority::Default).retries().inc();
-    EXPECT_EQ(0U, default_remaining_retries.value());
-    cluster->info()->resourceManager(ResourcePriority::Default).retries().dec();
-    EXPECT_EQ(0U, default_remaining_retries.value());
+  // The value of a remaining resource gauge will always be 0 for the default
+  // priority circuit breaker since track_remaining is false
+  Stats::Gauge& default_remaining_retries =
+      stats_.gauge("cluster.name.circuit_breakers.default.remaining_retries",
+                   Stats::Gauge::ImportMode::Accumulate);
+  EXPECT_EQ(0U, default_remaining_retries.value());
+  cluster->info()->resourceManager(ResourcePriority::Default).retries().inc();
+  EXPECT_EQ(0U, default_remaining_retries.value());
+  cluster->info()->resourceManager(ResourcePriority::Default).retries().dec();
+  EXPECT_EQ(0U, default_remaining_retries.value());
 
-    // This gauge will be correctly set since we have opted in to tracking remaining
-    // resource gauges in the high priority circuit breaker.
-    Stats::Gauge& high_remaining_retries =
-        stats_.gauge("cluster.name.circuit_breakers.high.remaining_retries",
-                     Stats::Gauge::ImportMode::Accumulate);
-    EXPECT_EQ(4U, high_remaining_retries.value());
-    cluster->info()->resourceManager(ResourcePriority::High).retries().inc();
-    EXPECT_EQ(3U, high_remaining_retries.value());
-    cluster->info()->resourceManager(ResourcePriority::High).retries().dec();
-    EXPECT_EQ(4U, high_remaining_retries.value());
-  }
+  // This gauge will be correctly set since we have opted in to tracking remaining
+  // resource gauges in the high priority circuit breaker.
+  Stats::Gauge& high_remaining_retries = stats_.gauge(
+      "cluster.name.circuit_breakers.high.remaining_retries", Stats::Gauge::ImportMode::Accumulate);
+  EXPECT_EQ(4U, high_remaining_retries.value());
+  cluster->info()->resourceManager(ResourcePriority::High).retries().inc();
+  EXPECT_EQ(3U, high_remaining_retries.value());
+  cluster->info()->resourceManager(ResourcePriority::High).retries().dec();
+  EXPECT_EQ(4U, high_remaining_retries.value());
+}
 
-  TEST_P(ClusterInfoImplTest, DefaultConnectTimeout) {
-    const std::string yaml = R"EOF(
+TEST_P(ClusterInfoImplTest, DefaultConnectTimeout) {
+  const std::string yaml = R"EOF(
   name: cluster1
   type: STRICT_DNS
   lb_policy: ROUND_ROBIN
 )EOF";
 
-    auto cluster = makeCluster(yaml);
-    envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+  auto cluster = makeCluster(yaml);
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-    EXPECT_FALSE(cluster_config.has_connect_timeout());
-    EXPECT_EQ(std::chrono::seconds(5), cluster->info()->connectTimeout());
-  }
+  EXPECT_FALSE(cluster_config.has_connect_timeout());
+  EXPECT_EQ(std::chrono::seconds(5), cluster->info()->connectTimeout());
+}
 
-  TEST_P(ClusterInfoImplTest, MaxConnectionDurationTest) {
-    const std::string yaml_base = R"EOF(
+TEST_P(ClusterInfoImplTest, MaxConnectionDurationTest) {
+  const std::string yaml_base = R"EOF(
   name: {}
   type: STRICT_DNS
   lb_policy: ROUND_ROBIN
   )EOF";
 
-    const std::string yaml_set_max_connection_duration = yaml_base + R"EOF(
+  const std::string yaml_set_max_connection_duration = yaml_base + R"EOF(
   typed_extension_protocol_options:
     envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
       "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
@@ -3770,18 +3769,18 @@ public:
         max_connection_duration: {}
   )EOF";
 
-    auto cluster1 = makeCluster(fmt::format(yaml_base, "cluster1"));
-    EXPECT_EQ(absl::nullopt, cluster1->info()->maxConnectionDuration());
+  auto cluster1 = makeCluster(fmt::format(yaml_base, "cluster1"));
+  EXPECT_EQ(absl::nullopt, cluster1->info()->maxConnectionDuration());
 
-    auto cluster2 = makeCluster(fmt::format(yaml_set_max_connection_duration, "cluster2", "9s"));
-    EXPECT_EQ(std::chrono::seconds(9), cluster2->info()->maxConnectionDuration());
+  auto cluster2 = makeCluster(fmt::format(yaml_set_max_connection_duration, "cluster2", "9s"));
+  EXPECT_EQ(std::chrono::seconds(9), cluster2->info()->maxConnectionDuration());
 
-    auto cluster3 = makeCluster(fmt::format(yaml_set_max_connection_duration, "cluster3", "0s"));
-    EXPECT_EQ(absl::nullopt, cluster3->info()->maxConnectionDuration());
-  }
+  auto cluster3 = makeCluster(fmt::format(yaml_set_max_connection_duration, "cluster3", "0s"));
+  EXPECT_EQ(absl::nullopt, cluster3->info()->maxConnectionDuration());
+}
 
-  TEST_P(ClusterInfoImplTest, Timeouts) {
-    const std::string yaml = R"EOF(
+TEST_P(ClusterInfoImplTest, Timeouts) {
+  const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
     type: STRICT_DNS
@@ -3801,18 +3800,18 @@ public:
         value: 0.3
   )EOF";
 
-    BazFactory baz_factory;
-    Registry::InjectFactory<ClusterTypedMetadataFactory> registered_factory(baz_factory);
-    auto cluster1 = makeCluster(yaml);
-    ASSERT_TRUE(cluster1->info()->idleTimeout().has_value());
-    EXPECT_EQ(std::chrono::hours(1), cluster1->info()->idleTimeout().value());
+  BazFactory baz_factory;
+  Registry::InjectFactory<ClusterTypedMetadataFactory> registered_factory(baz_factory);
+  auto cluster1 = makeCluster(yaml);
+  ASSERT_TRUE(cluster1->info()->idleTimeout().has_value());
+  EXPECT_EQ(std::chrono::hours(1), cluster1->info()->idleTimeout().value());
 
-    const std::string explicit_timeout = R"EOF(
+  const std::string explicit_timeout = R"EOF(
     common_http_protocol_options:
       idle_timeout: 1s
   )EOF";
 
-    const std::string explicit_timeout_new = R"EOF(
+  const std::string explicit_timeout_new = R"EOF(
     typed_extension_protocol_options:
       envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
         "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
@@ -3822,7 +3821,7 @@ public:
           idle_timeout: 1s
   )EOF";
 
-    const std::string explicit_timeout_bad = R"EOF(
+  const std::string explicit_timeout_bad = R"EOF(
     typed_extension_protocol_options:
       envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
         "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
@@ -3830,27 +3829,27 @@ public:
           idle_timeout: 1s
   )EOF";
 
-    {
-      auto cluster2 = makeCluster(yaml + explicit_timeout);
-      ASSERT_TRUE(cluster2->info()->idleTimeout().has_value());
-      EXPECT_EQ(std::chrono::seconds(1), cluster2->info()->idleTimeout().value());
-    }
-    {
-      auto cluster2 = makeCluster(yaml + explicit_timeout_new);
-      ASSERT_TRUE(cluster2->info()->idleTimeout().has_value());
-      EXPECT_EQ(std::chrono::seconds(1), cluster2->info()->idleTimeout().value());
-    }
-    {
-      auto cluster2 = makeCluster(yaml + explicit_timeout_new);
-      EXPECT_THROW_WITH_REGEX(makeCluster(yaml + explicit_timeout_bad), EnvoyException,
-                              ".*Proto constraint validation failed.*");
-    }
-    const std::string no_timeout = R"EOF(
+  {
+    auto cluster2 = makeCluster(yaml + explicit_timeout);
+    ASSERT_TRUE(cluster2->info()->idleTimeout().has_value());
+    EXPECT_EQ(std::chrono::seconds(1), cluster2->info()->idleTimeout().value());
+  }
+  {
+    auto cluster2 = makeCluster(yaml + explicit_timeout_new);
+    ASSERT_TRUE(cluster2->info()->idleTimeout().has_value());
+    EXPECT_EQ(std::chrono::seconds(1), cluster2->info()->idleTimeout().value());
+  }
+  {
+    auto cluster2 = makeCluster(yaml + explicit_timeout_new);
+    EXPECT_THROW_WITH_REGEX(makeCluster(yaml + explicit_timeout_bad), EnvoyException,
+                            ".*Proto constraint validation failed.*");
+  }
+  const std::string no_timeout = R"EOF(
     common_http_protocol_options:
       idle_timeout: 0s
   )EOF";
 
-    const std::string no_timeout_new = R"EOF(
+  const std::string no_timeout_new = R"EOF(
     typed_extension_protocol_options:
       envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
         "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
@@ -3860,31 +3859,31 @@ public:
           idle_timeout: 0s
   )EOF";
 
-    {
-      auto cluster3 = makeCluster(yaml + no_timeout);
-      EXPECT_FALSE(cluster3->info()->idleTimeout().has_value());
-    }
-
-    {
-      auto cluster3 = makeCluster(yaml + no_timeout_new);
-      EXPECT_FALSE(cluster3->info()->idleTimeout().has_value());
-    }
+  {
+    auto cluster3 = makeCluster(yaml + no_timeout);
+    EXPECT_FALSE(cluster3->info()->idleTimeout().has_value());
   }
 
-  TEST_P(ClusterInfoImplTest, TestTrackTimeoutBudgetsNotSetInConfig) {
-    // Check that without the flag specified, the histogram is null.
-    const std::string yaml_disabled = R"EOF(
+  {
+    auto cluster3 = makeCluster(yaml + no_timeout_new);
+    EXPECT_FALSE(cluster3->info()->idleTimeout().has_value());
+  }
+}
+
+TEST_P(ClusterInfoImplTest, TestTrackTimeoutBudgetsNotSetInConfig) {
+  // Check that without the flag specified, the histogram is null.
+  const std::string yaml_disabled = R"EOF(
     name: name
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
   )EOF";
 
-    auto cluster = makeCluster(yaml_disabled);
-    // The stats will be null if they have not been explicitly turned on.
-    EXPECT_FALSE(cluster->info()->timeoutBudgetStats().has_value());
+  auto cluster = makeCluster(yaml_disabled);
+  // The stats will be null if they have not been explicitly turned on.
+  EXPECT_FALSE(cluster->info()->timeoutBudgetStats().has_value());
 
-    const std::string yaml_disabled2 = R"EOF(
+  const std::string yaml_disabled2 = R"EOF(
     name: name
     connect_timeout: 0.25s
     type: STRICT_DNS
@@ -3892,10 +3891,10 @@ public:
     track_cluster_stats: { request_response_sizes : true }
   )EOF";
 
-    cluster = makeCluster(yaml_disabled2);
-    EXPECT_FALSE(cluster->info()->timeoutBudgetStats().has_value());
+  cluster = makeCluster(yaml_disabled2);
+  EXPECT_FALSE(cluster->info()->timeoutBudgetStats().has_value());
 
-    const std::string yaml_disabled3 = R"EOF(
+  const std::string yaml_disabled3 = R"EOF(
     name: name
     connect_timeout: 0.25s
     type: STRICT_DNS
@@ -3903,13 +3902,13 @@ public:
     track_cluster_stats: { timeout_budgets : false }
   )EOF";
 
-    cluster = makeCluster(yaml_disabled3);
-    EXPECT_FALSE(cluster->info()->timeoutBudgetStats().has_value());
-  }
+  cluster = makeCluster(yaml_disabled3);
+  EXPECT_FALSE(cluster->info()->timeoutBudgetStats().has_value());
+}
 
-  TEST_P(ClusterInfoImplTest, TestTrackTimeoutBudgets) {
-    // Check that with the flag, the histogram is created.
-    const std::string yaml = R"EOF(
+TEST_P(ClusterInfoImplTest, TestTrackTimeoutBudgets) {
+  // Check that with the flag, the histogram is created.
+  const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
     type: STRICT_DNS
@@ -3917,32 +3916,32 @@ public:
     track_cluster_stats: { timeout_budgets : true }
   )EOF";
 
-    auto cluster = makeCluster(yaml);
-    // The stats should be created.
-    ASSERT_TRUE(cluster->info()->timeoutBudgetStats().has_value());
+  auto cluster = makeCluster(yaml);
+  // The stats should be created.
+  ASSERT_TRUE(cluster->info()->timeoutBudgetStats().has_value());
 
-    Upstream::ClusterTimeoutBudgetStats tb_stats = cluster->info()->timeoutBudgetStats()->get();
-    EXPECT_EQ(Stats::Histogram::Unit::Unspecified,
-              tb_stats.upstream_rq_timeout_budget_percent_used_.unit());
-    EXPECT_EQ(Stats::Histogram::Unit::Unspecified,
-              tb_stats.upstream_rq_timeout_budget_per_try_percent_used_.unit());
-  }
+  Upstream::ClusterTimeoutBudgetStats tb_stats = cluster->info()->timeoutBudgetStats()->get();
+  EXPECT_EQ(Stats::Histogram::Unit::Unspecified,
+            tb_stats.upstream_rq_timeout_budget_percent_used_.unit());
+  EXPECT_EQ(Stats::Histogram::Unit::Unspecified,
+            tb_stats.upstream_rq_timeout_budget_per_try_percent_used_.unit());
+}
 
-  TEST_P(ClusterInfoImplTest, DEPRECATED_FEATURE_TEST(TestTrackTimeoutBudgetsOld)) {
-    // Check that without the flag specified, the histogram is null.
-    const std::string yaml_disabled = R"EOF(
+TEST_P(ClusterInfoImplTest, DEPRECATED_FEATURE_TEST(TestTrackTimeoutBudgetsOld)) {
+  // Check that without the flag specified, the histogram is null.
+  const std::string yaml_disabled = R"EOF(
     name: name
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
   )EOF";
 
-    auto cluster = makeCluster(yaml_disabled);
-    // The stats will be null if they have not been explicitly turned on.
-    EXPECT_FALSE(cluster->info()->timeoutBudgetStats().has_value());
+  auto cluster = makeCluster(yaml_disabled);
+  // The stats will be null if they have not been explicitly turned on.
+  EXPECT_FALSE(cluster->info()->timeoutBudgetStats().has_value());
 
-    // Check that with the flag, the histogram is created.
-    const std::string yaml = R"EOF(
+  // Check that with the flag, the histogram is created.
+  const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
     type: STRICT_DNS
@@ -3950,20 +3949,20 @@ public:
     track_timeout_budgets: true
   )EOF";
 
-    cluster = makeCluster(yaml);
-    // The stats should be created.
-    ASSERT_TRUE(cluster->info()->timeoutBudgetStats().has_value());
+  cluster = makeCluster(yaml);
+  // The stats should be created.
+  ASSERT_TRUE(cluster->info()->timeoutBudgetStats().has_value());
 
-    Upstream::ClusterTimeoutBudgetStats tb_stats = cluster->info()->timeoutBudgetStats()->get();
-    EXPECT_EQ(Stats::Histogram::Unit::Unspecified,
-              tb_stats.upstream_rq_timeout_budget_percent_used_.unit());
-    EXPECT_EQ(Stats::Histogram::Unit::Unspecified,
-              tb_stats.upstream_rq_timeout_budget_per_try_percent_used_.unit());
-  }
+  Upstream::ClusterTimeoutBudgetStats tb_stats = cluster->info()->timeoutBudgetStats()->get();
+  EXPECT_EQ(Stats::Histogram::Unit::Unspecified,
+            tb_stats.upstream_rq_timeout_budget_percent_used_.unit());
+  EXPECT_EQ(Stats::Histogram::Unit::Unspecified,
+            tb_stats.upstream_rq_timeout_budget_per_try_percent_used_.unit());
+}
 
-  // Validates HTTP2 SETTINGS config.
-  TEST_P(ClusterInfoImplTest, Http2ProtocolOptions) {
-    const std::string yaml = R"EOF(
+// Validates HTTP2 SETTINGS config.
+TEST_P(ClusterInfoImplTest, Http2ProtocolOptions) {
+  const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
     type: STRICT_DNS
@@ -3978,104 +3977,103 @@ public:
           value: 12
   )EOF";
 
-    auto cluster = makeCluster(yaml);
-    EXPECT_EQ(cluster->info()->http2Options().hpack_table_size().value(), 2048);
-    EXPECT_EQ(cluster->info()->http2Options().initial_stream_window_size().value(), 65536);
-    EXPECT_EQ(cluster->info()->http2Options().custom_settings_parameters()[0].identifier().value(),
-              0x10);
-    EXPECT_EQ(cluster->info()->http2Options().custom_settings_parameters()[0].value().value(), 10);
-    EXPECT_EQ(cluster->info()->http2Options().custom_settings_parameters()[1].identifier().value(),
-              0x12);
-    EXPECT_EQ(cluster->info()->http2Options().custom_settings_parameters()[1].value().value(), 12);
+  auto cluster = makeCluster(yaml);
+  EXPECT_EQ(cluster->info()->http2Options().hpack_table_size().value(), 2048);
+  EXPECT_EQ(cluster->info()->http2Options().initial_stream_window_size().value(), 65536);
+  EXPECT_EQ(cluster->info()->http2Options().custom_settings_parameters()[0].identifier().value(),
+            0x10);
+  EXPECT_EQ(cluster->info()->http2Options().custom_settings_parameters()[0].value().value(), 10);
+  EXPECT_EQ(cluster->info()->http2Options().custom_settings_parameters()[1].identifier().value(),
+            0x12);
+  EXPECT_EQ(cluster->info()->http2Options().custom_settings_parameters()[1].value().value(), 12);
+}
+
+class TestFilterConfigFactoryBase {
+public:
+  TestFilterConfigFactoryBase(
+      std::function<ProtobufTypes::MessagePtr()> empty_proto,
+      std::function<Upstream::ProtocolOptionsConfigConstSharedPtr(const Protobuf::Message&)> config)
+      : empty_proto_(empty_proto), config_(config) {}
+
+  ProtobufTypes::MessagePtr createEmptyProtocolOptionsProto() { return empty_proto_(); }
+  Upstream::ProtocolOptionsConfigConstSharedPtr
+  createProtocolOptionsConfig(const Protobuf::Message& msg) {
+    return config_(msg);
   }
 
-  class TestFilterConfigFactoryBase {
-  public:
-    TestFilterConfigFactoryBase(
-        std::function<ProtobufTypes::MessagePtr()> empty_proto,
-        std::function<Upstream::ProtocolOptionsConfigConstSharedPtr(const Protobuf::Message&)>
-            config)
-        : empty_proto_(empty_proto), config_(config) {}
+  std::function<ProtobufTypes::MessagePtr()> empty_proto_;
+  std::function<Upstream::ProtocolOptionsConfigConstSharedPtr(const Protobuf::Message&)> config_;
+};
 
-    ProtobufTypes::MessagePtr createEmptyProtocolOptionsProto() { return empty_proto_(); }
-    Upstream::ProtocolOptionsConfigConstSharedPtr
-    createProtocolOptionsConfig(const Protobuf::Message& msg) {
-      return config_(msg);
-    }
+class TestNetworkFilterConfigFactory
+    : public Server::Configuration::NamedNetworkFilterConfigFactory {
+public:
+  TestNetworkFilterConfigFactory(TestFilterConfigFactoryBase& parent) : parent_(parent) {}
 
-    std::function<ProtobufTypes::MessagePtr()> empty_proto_;
-    std::function<Upstream::ProtocolOptionsConfigConstSharedPtr(const Protobuf::Message&)> config_;
-  };
+  // NamedNetworkFilterConfigFactory
+  Network::FilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message&,
+                               Server::Configuration::FactoryContext&) override {
+    PANIC("not implemented");
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override { PANIC("not implemented"); }
+  ProtobufTypes::MessagePtr createEmptyProtocolOptionsProto() override {
+    return parent_.createEmptyProtocolOptionsProto();
+  }
+  Upstream::ProtocolOptionsConfigConstSharedPtr
+  createProtocolOptionsConfig(const Protobuf::Message& msg,
+                              Server::Configuration::ProtocolOptionsFactoryContext&) override {
+    return parent_.createProtocolOptionsConfig(msg);
+  }
+  std::string name() const override { CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.filter"); }
+  std::set<std::string> configTypes() override { return {}; };
 
-  class TestNetworkFilterConfigFactory
-      : public Server::Configuration::NamedNetworkFilterConfigFactory {
-  public:
-    TestNetworkFilterConfigFactory(TestFilterConfigFactoryBase& parent) : parent_(parent) {}
+  TestFilterConfigFactoryBase& parent_;
+};
 
-    // NamedNetworkFilterConfigFactory
-    Network::FilterFactoryCb
-    createFilterFactoryFromProto(const Protobuf::Message&,
-                                 Server::Configuration::FactoryContext&) override {
-      PANIC("not implemented");
-    }
-    ProtobufTypes::MessagePtr createEmptyConfigProto() override { PANIC("not implemented"); }
-    ProtobufTypes::MessagePtr createEmptyProtocolOptionsProto() override {
-      return parent_.createEmptyProtocolOptionsProto();
-    }
-    Upstream::ProtocolOptionsConfigConstSharedPtr
-    createProtocolOptionsConfig(const Protobuf::Message& msg,
-                                Server::Configuration::ProtocolOptionsFactoryContext&) override {
-      return parent_.createProtocolOptionsConfig(msg);
-    }
-    std::string name() const override { CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.filter"); }
-    std::set<std::string> configTypes() override { return {}; };
+class TestHttpFilterConfigFactory : public Server::Configuration::NamedHttpFilterConfigFactory {
+public:
+  TestHttpFilterConfigFactory(TestFilterConfigFactoryBase& parent) : parent_(parent) {}
 
-    TestFilterConfigFactoryBase& parent_;
-  };
+  // NamedNetworkFilterConfigFactory
+  Http::FilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
+                               Server::Configuration::FactoryContext&) override {
+    PANIC("not implemented");
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override { PANIC("not implemented"); }
+  ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override { PANIC("not implemented"); }
+  Router::RouteSpecificFilterConfigConstSharedPtr
+  createRouteSpecificFilterConfig(const Protobuf::Message&,
+                                  Server::Configuration::ServerFactoryContext&,
+                                  ProtobufMessage::ValidationVisitor&) override {
+    PANIC("not implemented");
+  }
 
-  class TestHttpFilterConfigFactory : public Server::Configuration::NamedHttpFilterConfigFactory {
-  public:
-    TestHttpFilterConfigFactory(TestFilterConfigFactoryBase& parent) : parent_(parent) {}
+  ProtobufTypes::MessagePtr createEmptyProtocolOptionsProto() override {
+    return parent_.createEmptyProtocolOptionsProto();
+  }
+  Upstream::ProtocolOptionsConfigConstSharedPtr
+  createProtocolOptionsConfig(const Protobuf::Message& msg,
+                              Server::Configuration::ProtocolOptionsFactoryContext&) override {
+    return parent_.createProtocolOptionsConfig(msg);
+  }
+  std::string name() const override { CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.filter"); }
+  std::set<std::string> configTypes() override { return {}; };
 
-    // NamedNetworkFilterConfigFactory
-    Http::FilterFactoryCb
-    createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
-                                 Server::Configuration::FactoryContext&) override {
-      PANIC("not implemented");
-    }
-    ProtobufTypes::MessagePtr createEmptyConfigProto() override { PANIC("not implemented"); }
-    ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override { PANIC("not implemented"); }
-    Router::RouteSpecificFilterConfigConstSharedPtr
-    createRouteSpecificFilterConfig(const Protobuf::Message&,
-                                    Server::Configuration::ServerFactoryContext&,
-                                    ProtobufMessage::ValidationVisitor&) override {
-      PANIC("not implemented");
-    }
+  TestFilterConfigFactoryBase& parent_;
+};
+struct TestFilterProtocolOptionsConfig : public Upstream::ProtocolOptionsConfig {};
 
-    ProtobufTypes::MessagePtr createEmptyProtocolOptionsProto() override {
-      return parent_.createEmptyProtocolOptionsProto();
-    }
-    Upstream::ProtocolOptionsConfigConstSharedPtr
-    createProtocolOptionsConfig(const Protobuf::Message& msg,
-                                Server::Configuration::ProtocolOptionsFactoryContext&) override {
-      return parent_.createProtocolOptionsConfig(msg);
-    }
-    std::string name() const override { CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.filter"); }
-    std::set<std::string> configTypes() override { return {}; };
-
-    TestFilterConfigFactoryBase& parent_;
-  };
-  struct TestFilterProtocolOptionsConfig : public Upstream::ProtocolOptionsConfig {};
-
-  // Cluster extension protocol options fails validation when configured for filter that does not
-  // support options.
-  TEST_P(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithoutOptions) {
-    TestFilterConfigFactoryBase factoryBase(
-        []() -> ProtobufTypes::MessagePtr { return nullptr; },
-        [](const Protobuf::Message&) -> Upstream::ProtocolOptionsConfigConstSharedPtr {
-          return nullptr;
-        });
-    const std::string yaml = R"EOF(
+// Cluster extension protocol options fails validation when configured for filter that does not
+// support options.
+TEST_P(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithoutOptions) {
+  TestFilterConfigFactoryBase factoryBase(
+      []() -> ProtobufTypes::MessagePtr { return nullptr; },
+      [](const Protobuf::Message&) -> Upstream::ProtocolOptionsConfigConstSharedPtr {
+        return nullptr;
+      });
+  const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
     type: STRICT_DNS
@@ -4095,29 +4093,28 @@ public:
           option: "value"
   )EOF";
 
-    {
-      TestNetworkFilterConfigFactory factory(factoryBase);
-      Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory> registry(
-          factory);
-      EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
-                                "filter envoy.test.filter does not support protocol options");
-    }
-    {
-      TestHttpFilterConfigFactory factory(factoryBase);
-      Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registry(
-          factory);
-      EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
-                                "filter envoy.test.filter does not support protocol options");
-    }
+  {
+    TestNetworkFilterConfigFactory factory(factoryBase);
+    Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory> registry(
+        factory);
+    EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
+                              "filter envoy.test.filter does not support protocol options");
   }
+  {
+    TestHttpFilterConfigFactory factory(factoryBase);
+    Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registry(factory);
+    EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
+                              "filter envoy.test.filter does not support protocol options");
+  }
+}
 
-  TEST_P(ClusterInfoImplTest, TypedExtensionProtocolOptionsForFilterWithoutOptions) {
-    TestFilterConfigFactoryBase factoryBase(
-        []() -> ProtobufTypes::MessagePtr { return nullptr; },
-        [](const Protobuf::Message&) -> Upstream::ProtocolOptionsConfigConstSharedPtr {
-          return nullptr;
-        });
-    const std::string yaml = R"EOF(
+TEST_P(ClusterInfoImplTest, TypedExtensionProtocolOptionsForFilterWithoutOptions) {
+  TestFilterConfigFactoryBase factoryBase(
+      []() -> ProtobufTypes::MessagePtr { return nullptr; },
+      [](const Protobuf::Message&) -> Upstream::ProtocolOptionsConfigConstSharedPtr {
+        return nullptr;
+      });
+  const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
     type: STRICT_DNS
@@ -4134,36 +4131,35 @@ public:
       envoy.test.filter: { "@type": type.googleapis.com/google.protobuf.Struct }
   )EOF";
 
-    {
-      TestNetworkFilterConfigFactory factory(factoryBase);
-      Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory> registry(
-          factory);
-      EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
-                                "filter envoy.test.filter does not support protocol options");
-    }
-    {
-      TestHttpFilterConfigFactory factory(factoryBase);
-      Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registry(
-          factory);
-      EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
-                                "filter envoy.test.filter does not support protocol options");
-    }
+  {
+    TestNetworkFilterConfigFactory factory(factoryBase);
+    Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory> registry(
+        factory);
+    EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
+                              "filter envoy.test.filter does not support protocol options");
   }
+  {
+    TestHttpFilterConfigFactory factory(factoryBase);
+    Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registry(factory);
+    EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
+                              "filter envoy.test.filter does not support protocol options");
+  }
+}
 
-  // Cluster retrieval of typed extension protocol options.
-  TEST_P(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithOptions) {
-    auto protocol_options = std::make_shared<TestFilterProtocolOptionsConfig>();
+// Cluster retrieval of typed extension protocol options.
+TEST_P(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithOptions) {
+  auto protocol_options = std::make_shared<TestFilterProtocolOptionsConfig>();
 
-    TestFilterConfigFactoryBase factoryBase(
-        []() -> ProtobufTypes::MessagePtr { return std::make_unique<ProtobufWkt::Struct>(); },
-        [&](const Protobuf::Message& msg) -> Upstream::ProtocolOptionsConfigConstSharedPtr {
-          const auto& msg_struct = dynamic_cast<const ProtobufWkt::Struct&>(msg);
-          EXPECT_TRUE(msg_struct.fields().find("option") != msg_struct.fields().end());
+  TestFilterConfigFactoryBase factoryBase(
+      []() -> ProtobufTypes::MessagePtr { return std::make_unique<ProtobufWkt::Struct>(); },
+      [&](const Protobuf::Message& msg) -> Upstream::ProtocolOptionsConfigConstSharedPtr {
+        const auto& msg_struct = dynamic_cast<const ProtobufWkt::Struct&>(msg);
+        EXPECT_TRUE(msg_struct.fields().find("option") != msg_struct.fields().end());
 
-          return protocol_options;
-        });
+        return protocol_options;
+      });
 
-    const std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
     type: STRICT_DNS
@@ -4183,7 +4179,7 @@ public:
           option: "value"
   )EOF";
 
-    const std::string typed_yaml = R"EOF(
+  const std::string typed_yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
     type: STRICT_DNS
@@ -4203,52 +4199,50 @@ public:
           option: "value"
   )EOF";
 
-    // This vector is used to gather clusters with extension_protocol_options from the different
-    // types of extension factories (network, http).
-    std::vector<std::unique_ptr<StrictDnsClusterImpl>> clusters;
+  // This vector is used to gather clusters with extension_protocol_options from the different
+  // types of extension factories (network, http).
+  std::vector<std::unique_ptr<StrictDnsClusterImpl>> clusters;
 
-    {
-      // Get the cluster with extension_protocol_options for a network filter factory.
-      TestNetworkFilterConfigFactory factory(factoryBase);
-      Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory> registry(
-          factory);
-      clusters.push_back(makeCluster(yaml));
-    }
-    {
-      // Get the cluster with extension_protocol_options for an http filter factory.
-      TestHttpFilterConfigFactory factory(factoryBase);
-      Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registry(
-          factory);
-      clusters.push_back(makeCluster(yaml));
-    }
-    {
-      // Get the cluster with extension_protocol_options for a network filter factory.
-      TestNetworkFilterConfigFactory factory(factoryBase);
-      Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory> registry(
-          factory);
-      clusters.push_back(makeCluster(typed_yaml));
-    }
-    {
-      // Get the cluster with extension_protocol_options for an http filter factory.
-      TestHttpFilterConfigFactory factory(factoryBase);
-      Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registry(
-          factory);
-      clusters.push_back(makeCluster(typed_yaml));
-    }
-
-    // Make sure that the clusters created from both factories are as expected.
-    for (auto&& cluster : clusters) {
-      std::shared_ptr<const TestFilterProtocolOptionsConfig> stored_options =
-          cluster->info()->extensionProtocolOptionsTyped<TestFilterProtocolOptionsConfig>(
-              "envoy.test.filter");
-      EXPECT_NE(nullptr, protocol_options);
-      // Same pointer
-      EXPECT_EQ(stored_options.get(), protocol_options.get());
-    }
+  {
+    // Get the cluster with extension_protocol_options for a network filter factory.
+    TestNetworkFilterConfigFactory factory(factoryBase);
+    Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory> registry(
+        factory);
+    clusters.push_back(makeCluster(yaml));
+  }
+  {
+    // Get the cluster with extension_protocol_options for an http filter factory.
+    TestHttpFilterConfigFactory factory(factoryBase);
+    Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registry(factory);
+    clusters.push_back(makeCluster(yaml));
+  }
+  {
+    // Get the cluster with extension_protocol_options for a network filter factory.
+    TestNetworkFilterConfigFactory factory(factoryBase);
+    Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory> registry(
+        factory);
+    clusters.push_back(makeCluster(typed_yaml));
+  }
+  {
+    // Get the cluster with extension_protocol_options for an http filter factory.
+    TestHttpFilterConfigFactory factory(factoryBase);
+    Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registry(factory);
+    clusters.push_back(makeCluster(typed_yaml));
   }
 
-  TEST_P(ClusterInfoImplTest, UseDownstreamHttpProtocolWithDowngrade) {
-    const std::string yaml = R"EOF(
+  // Make sure that the clusters created from both factories are as expected.
+  for (auto&& cluster : clusters) {
+    std::shared_ptr<const TestFilterProtocolOptionsConfig> stored_options =
+        cluster->info()->extensionProtocolOptionsTyped<TestFilterProtocolOptionsConfig>(
+            "envoy.test.filter");
+    EXPECT_NE(nullptr, protocol_options);
+    // Same pointer
+    EXPECT_EQ(stored_options.get(), protocol_options.get());
+  }
+}
+
+TEST_P(ClusterInfoImplTest, UseDownstreamHttpProtocolWithDowngrade) {
+  const std::string yaml = R"EOF(
   name: name
   connect_timeout: 0.25s
   type: STRICT_DNS
@@ -4256,21 +4250,21 @@ public:
   protocol_selection: USE_DOWNSTREAM_PROTOCOL
 )EOF";
 
-    auto cluster = makeCluster(yaml);
+  auto cluster = makeCluster(yaml);
 
-    EXPECT_EQ(Http::Protocol::Http10,
-              cluster->info()->upstreamHttpProtocol({Http::Protocol::Http10})[0]);
-    EXPECT_EQ(Http::Protocol::Http11,
-              cluster->info()->upstreamHttpProtocol({Http::Protocol::Http11})[0]);
-    EXPECT_EQ(Http::Protocol::Http2,
-              cluster->info()->upstreamHttpProtocol({Http::Protocol::Http2})[0]);
-    // This will get downgraded because the cluster does not support HTTP/3
-    EXPECT_EQ(Http::Protocol::Http2,
-              cluster->info()->upstreamHttpProtocol({Http::Protocol::Http3})[0]);
-  }
+  EXPECT_EQ(Http::Protocol::Http10,
+            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http10})[0]);
+  EXPECT_EQ(Http::Protocol::Http11,
+            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http11})[0]);
+  EXPECT_EQ(Http::Protocol::Http2,
+            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http2})[0]);
+  // This will get downgraded because the cluster does not support HTTP/3
+  EXPECT_EQ(Http::Protocol::Http2,
+            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http3})[0]);
+}
 
-  TEST_P(ClusterInfoImplTest, UpstreamHttp2Protocol) {
-    const std::string yaml = R"EOF(
+TEST_P(ClusterInfoImplTest, UpstreamHttp2Protocol) {
+  const std::string yaml = R"EOF(
   name: name
   connect_timeout: 0.25s
   type: STRICT_DNS
@@ -4278,39 +4272,39 @@ public:
   http2_protocol_options: {}
 )EOF";
 
-    auto cluster = makeCluster(yaml);
+  auto cluster = makeCluster(yaml);
 
-    EXPECT_EQ(Http::Protocol::Http2, cluster->info()->upstreamHttpProtocol(absl::nullopt)[0]);
-    EXPECT_EQ(Http::Protocol::Http2,
-              cluster->info()->upstreamHttpProtocol({Http::Protocol::Http10})[0]);
-    EXPECT_EQ(Http::Protocol::Http2,
-              cluster->info()->upstreamHttpProtocol({Http::Protocol::Http11})[0]);
-    EXPECT_EQ(Http::Protocol::Http2,
-              cluster->info()->upstreamHttpProtocol({Http::Protocol::Http2})[0]);
-  }
+  EXPECT_EQ(Http::Protocol::Http2, cluster->info()->upstreamHttpProtocol(absl::nullopt)[0]);
+  EXPECT_EQ(Http::Protocol::Http2,
+            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http10})[0]);
+  EXPECT_EQ(Http::Protocol::Http2,
+            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http11})[0]);
+  EXPECT_EQ(Http::Protocol::Http2,
+            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http2})[0]);
+}
 
-  TEST_P(ClusterInfoImplTest, UpstreamHttp11Protocol) {
-    const std::string yaml = R"EOF(
+TEST_P(ClusterInfoImplTest, UpstreamHttp11Protocol) {
+  const std::string yaml = R"EOF(
   name: name
   connect_timeout: 0.25s
   type: STRICT_DNS
   lb_policy: ROUND_ROBIN
 )EOF";
 
-    auto cluster = makeCluster(yaml);
+  auto cluster = makeCluster(yaml);
 
-    EXPECT_EQ(Http::Protocol::Http11, cluster->info()->upstreamHttpProtocol(absl::nullopt)[0]);
-    EXPECT_EQ(Http::Protocol::Http11,
-              cluster->info()->upstreamHttpProtocol({Http::Protocol::Http10})[0]);
-    EXPECT_EQ(Http::Protocol::Http11,
-              cluster->info()->upstreamHttpProtocol({Http::Protocol::Http11})[0]);
-    EXPECT_EQ(Http::Protocol::Http11,
-              cluster->info()->upstreamHttpProtocol({Http::Protocol::Http2})[0]);
-  }
+  EXPECT_EQ(Http::Protocol::Http11, cluster->info()->upstreamHttpProtocol(absl::nullopt)[0]);
+  EXPECT_EQ(Http::Protocol::Http11,
+            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http10})[0]);
+  EXPECT_EQ(Http::Protocol::Http11,
+            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http11})[0]);
+  EXPECT_EQ(Http::Protocol::Http11,
+            cluster->info()->upstreamHttpProtocol({Http::Protocol::Http2})[0]);
+}
 
 #ifdef ENVOY_ENABLE_QUIC
-  TEST_P(ClusterInfoImplTest, Http3) {
-    const std::string yaml = TestEnvironment::substitute(R"EOF(
+TEST_P(ClusterInfoImplTest, Http3) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
     name: name
     connect_timeout: 0.25s
     type: STRICT_DNS
@@ -4345,12 +4339,12 @@ public:
                   exact: 127.0.0.1
                 san_type: IP_ADDRESS
   )EOF",
-                                                         Network::Address::IpVersion::v4);
-    auto cluster1 = makeCluster(yaml);
-    ASSERT_TRUE(cluster1->info()->idleTimeout().has_value());
-    EXPECT_EQ(std::chrono::hours(1), cluster1->info()->idleTimeout().value());
+                                                       Network::Address::IpVersion::v4);
+  auto cluster1 = makeCluster(yaml);
+  ASSERT_TRUE(cluster1->info()->idleTimeout().has_value());
+  EXPECT_EQ(std::chrono::hours(1), cluster1->info()->idleTimeout().value());
 
-    const std::string explicit_http3 = R"EOF(
+  const std::string explicit_http3 = R"EOF(
     typed_extension_protocol_options:
       envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
         "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
@@ -4362,7 +4356,7 @@ public:
           idle_timeout: 1s
   )EOF";
 
-    const std::string downstream_http3 = R"EOF(
+  const std::string downstream_http3 = R"EOF(
     typed_extension_protocol_options:
       envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
         "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
@@ -4372,22 +4366,19 @@ public:
           idle_timeout: 1s
   )EOF";
 
-    auto explicit_h3 = makeCluster(yaml + explicit_http3);
-    EXPECT_EQ(Http::Protocol::Http3,
-              explicit_h3->info()->upstreamHttpProtocol({Http::Protocol::Http10})[0]);
-    EXPECT_EQ(explicit_h3->info()
-                  ->http3Options()
-                  .quic_protocol_options()
-                  .max_concurrent_streams()
-                  .value(),
-              2);
+  auto explicit_h3 = makeCluster(yaml + explicit_http3);
+  EXPECT_EQ(Http::Protocol::Http3,
+            explicit_h3->info()->upstreamHttpProtocol({Http::Protocol::Http10})[0]);
+  EXPECT_EQ(
+      explicit_h3->info()->http3Options().quic_protocol_options().max_concurrent_streams().value(),
+      2);
 
-    auto downstream_h3 = makeCluster(yaml + downstream_http3);
-    EXPECT_EQ(Http::Protocol::Http3,
-              downstream_h3->info()->upstreamHttpProtocol({Http::Protocol::Http3})[0]);
-    EXPECT_FALSE(
-        downstream_h3->info()->http3Options().quic_protocol_options().has_max_concurrent_streams());
-  }
+  auto downstream_h3 = makeCluster(yaml + downstream_http3);
+  EXPECT_EQ(Http::Protocol::Http3,
+            downstream_h3->info()->upstreamHttpProtocol({Http::Protocol::Http3})[0]);
+  EXPECT_FALSE(
+      downstream_h3->info()->http3Options().quic_protocol_options().has_max_concurrent_streams());
+}
 
 TEST_P(ClusterInfoImplTest, Http3BadConfig) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
@@ -4558,8 +4549,8 @@ TEST_P(ClusterInfoImplTest, UseDownstreamHttpProtocolWithoutDowngrade) {
 }
 
 #else
-  TEST_P(ClusterInfoImplTest, Http3BadConfig) {
-    const std::string yaml = TestEnvironment::substitute(R"EOF(
+TEST_P(ClusterInfoImplTest, Http3BadConfig) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
     name: name
     connect_timeout: 0.25s
     type: STRICT_DNS
@@ -4580,11 +4571,11 @@ TEST_P(ClusterInfoImplTest, UseDownstreamHttpProtocolWithoutDowngrade) {
         common_http_protocol_options:
           idle_timeout: 1s
   )EOF",
-                                                         Network::Address::IpVersion::v4);
+                                                       Network::Address::IpVersion::v4);
 
-    EXPECT_THROW_WITH_REGEX(makeCluster(yaml), EnvoyException,
-                            "HTTP3 configured but not enabled in the build.");
-  }
+  EXPECT_THROW_WITH_REGEX(makeCluster(yaml), EnvoyException,
+                          "HTTP3 configured but not enabled in the build.");
+}
 #endif // ENVOY_ENABLE_QUIC
 
 TEST_P(ClusterInfoImplTest, Http2Auto) {

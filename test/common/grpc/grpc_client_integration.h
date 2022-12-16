@@ -120,6 +120,25 @@ public:
   ClientType clientType() const override { return std::get<1>(GetParam()); }
   SotwOrDelta sotwOrDelta() const { return std::get<2>(GetParam()); }
 };
+class DeltaSotwStatsLazyInitIntegrationParamTest
+    : public BaseGrpcClientIntegrationParamTest,
+      public testing::TestWithParam<
+          std::tuple<Network::Address::IpVersion, ClientType, SotwOrDelta, bool>> {
+public:
+  ~DeltaSotwStatsLazyInitIntegrationParamTest() override = default;
+  static std::string protocolTestParamsToString(
+      const ::testing::TestParamInfo<
+          std::tuple<Network::Address::IpVersion, ClientType, SotwOrDelta, bool>>& p) {
+    return fmt::format("{}_{}_{}_{}", TestUtility::ipVersionToString(std::get<0>(p.param)),
+                       std::get<1>(p.param) == ClientType::GoogleGrpc ? "GoogleGrpc" : "EnvoyGrpc",
+                       std::get<2>(p.param) == SotwOrDelta::Delta ? "Delta" : "StateOfTheWorld",
+                       std::get<3>(p.param) ? "_LazyInitStats" : "");
+  }
+  Network::Address::IpVersion ipVersion() const override { return std::get<0>(GetParam()); }
+  ClientType clientType() const override { return std::get<1>(GetParam()); }
+  SotwOrDelta sotwOrDelta() const { return std::get<2>(GetParam()); }
+  bool enableLazyInitStats() const { return std::get<3>(GetParam()); }
+};
 
 // Skip tests based on gRPC client type.
 #define SKIP_IF_GRPC_CLIENT(client_type)                                                           \
@@ -142,6 +161,12 @@ public:
   testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
                    testing::ValuesIn(TestEnvironment::getsGrpcVersionsForTest()),                  \
                    testing::Values(Grpc::SotwOrDelta::Sotw, Grpc::SotwOrDelta::Delta))
+#define DELTA_SOTW_GRPC_CLIENT_LAZYINITSTATS_INTEGRATION_PARAMS                                    \
+  testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
+                   testing::ValuesIn(TestEnvironment::getsGrpcVersionsForTest()),                  \
+                   testing::Values(Grpc::SotwOrDelta::Sotw, Grpc::SotwOrDelta::Delta),             \
+                   testing::Bool())
+
 #define UNIFIED_LEGACY_GRPC_CLIENT_INTEGRATION_PARAMS                                              \
   testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
                    testing::ValuesIn(TestEnvironment::getsGrpcVersionsForTest()),                  \

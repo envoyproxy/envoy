@@ -18,7 +18,7 @@ StatName ThreadLocalStoreNoMocksTestBase::makeStatName(absl::string_view name) {
 }
 
 ThreadLocalRealThreadsTestBase::ThreadLocalRealThreadsTestBase(uint32_t num_threads)
-    : RealThreadsTestHelper(num_threads), pool_(store_->symbolTable()) {
+    : RealThreadsTestHelper(num_threads) {
   runOnMainBlocking([this]() { store_->initializeThreading(*main_dispatcher_, *tls_); });
 }
 

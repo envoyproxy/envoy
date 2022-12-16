@@ -11,7 +11,6 @@
 #include "envoy/config/typed_metadata.h"
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
-
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/common/thread.h"

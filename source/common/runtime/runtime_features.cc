@@ -96,10 +96,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_always_use_v6);
 // TODO(alyssawilk) remove in Q2.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_no_delay_close_for_upgrades);
 
-// TODO(stevenzzzz): Flip this to true and/or remove completely if verified in prod LazyInit<Stats>
-// can defer Stats creation in worker threads without major performance penalty.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_stats_lazyinit);
-
 // Block of non-boolean flags. These are deprecated. Do not add more.
 ABSL_FLAG(uint64_t, envoy_headermap_lazy_map_min_size, 3, "");  // NOLINT
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT

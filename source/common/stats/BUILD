@@ -41,7 +41,6 @@ envoy_cc_library(
     hdrs = ["lazy_init.h"],
     deps = [
         "//source/common/common:thread_lib",
-        "//source/common/runtime:runtime_features_lib",
     ],
 )
 

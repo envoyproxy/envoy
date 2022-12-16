@@ -2462,8 +2462,8 @@ TEST_P(IntegrationTest, SetRouteToDelegatingRouteWithClusterOverride) {
   // Even though headers specify cluster_0, set_route_filter modifies cached route cluster of
   // current request to cluster_override.
   // cluster_0 trafficStats() not created yet.
-  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_total"), nullptr);
-  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_total"), nullptr);
+  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 0);
+  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_total")->value(), 0);
 
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_override.upstream_cx_total")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_override.upstream_rq_200")->value());

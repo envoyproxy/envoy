@@ -29,7 +29,8 @@ const char ClusterName2[] = "cluster_2";
 const int UpstreamIndex1 = 1;
 const int UpstreamIndex2 = 2;
 
-class CdsIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest, public HttpIntegrationTest {
+class CdsIntegrationTest : public Grpc::DeltaSotwStatsLazyInitIntegrationParamTest,
+                           public HttpIntegrationTest {
 public:
   CdsIntegrationTest()
       : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion(),
@@ -44,6 +45,9 @@ public:
                                        sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta)
                                           ? "true"
                                           : "false");
+    config_helper_.addConfigModifier([this](::envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      bootstrap.set_enable_lazyinit_stats(this->enableLazyInitStats());
+    });
     use_lds_ = false;
     sotw_or_delta_ = sotwOrDelta();
   }
@@ -142,7 +146,7 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, CdsIntegrationTest,
-                         DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
+                         DELTA_SOTW_GRPC_CLIENT_LAZYINITSTATS_INTEGRATION_PARAMS);
 
 // 1) Envoy starts up with no static clusters (other than the CDS-over-gRPC server).
 // 2) Envoy is told of a cluster via CDS.
@@ -194,10 +198,14 @@ TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
 // Make sure that clusters won't create new connections on teardown.
 TEST_P(CdsIntegrationTest, CdsClusterTeardownWhileConnecting) {
   initialize();
+  // This line ensures that the ClusterInfoImpl is created already.
   test_server_->waitForCounterGe("cluster_manager.cluster_added", 1);
-  ASSERT_TRUE(forceCreationOfClusterTrafficStats("cluster_1"));
-
-  test_server_->waitForCounterExists("cluster.cluster_1.upstream_cx_total");
+  if (this->enableLazyInitStats()) {
+    EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total"), nullptr);
+    ASSERT_TRUE(forceCreationOfClusterTrafficStats("cluster_1"));
+  } else {
+    EXPECT_NE(test_server_->counter("cluster.cluster_1.upstream_cx_total"), nullptr);
+  }
   Stats::CounterSharedPtr cx_counter = test_server_->counter("cluster.cluster_1.upstream_cx_total");
   // Confirm no upstream connection is attempted so far.
   EXPECT_EQ(0, cx_counter->value());

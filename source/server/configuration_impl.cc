@@ -88,6 +88,10 @@ void MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstr
   // tracing configuration is missing from the bootstrap config.
   initializeTracers(bootstrap.tracing(), server);
 
+  // stats_config_ should be set before creating the ClusterManagers so that it is available
+  // from the ServerFactoryContext when creating the static clusters and stats sinks.
+  stats_config_ = std::make_unique<StatsConfigImpl>(bootstrap);
+
   const auto& secrets = bootstrap.static_resources().secrets();
   ENVOY_LOG(info, "loading {} static secret(s)", secrets.size());
   for (ssize_t i = 0; i < secrets.size(); i++) {
@@ -104,18 +108,15 @@ void MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstr
     ENVOY_LOG(debug, "listener #{}:", i);
     server.listenerManager().addOrUpdateListener(listeners[i], "", false);
   }
-
   initializeWatchdogs(bootstrap, server);
-  initializeStatsConfig(bootstrap, server);
+  // This has to happen after ClusterManager initilization, as it depends on config from
+  // ClusterManager.
+  loadSinksIntoStatsConfig(bootstrap, server);
 }
 
-void MainImpl::initializeStatsConfig(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                                     Instance& server) {
-  ENVOY_LOG(info, "loading stats configuration");
-
-  // stats_config_ should be set before populating the sinks so that it is available
-  // from the ServerFactoryContext when creating the stats sinks.
-  stats_config_ = std::make_unique<StatsConfigImpl>(bootstrap);
+void MainImpl::loadSinksIntoStatsConfig(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                                        Instance& server) {
+  ENVOY_LOG(info, "loading stats sinks configuration");
 
   for (const envoy::config::metrics::v3::StatsSink& sink_object : bootstrap.stats_sinks()) {
     // Generate factory and translate stats sink custom config.

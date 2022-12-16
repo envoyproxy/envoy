@@ -117,7 +117,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    shard_count = 4,
+    shard_count = 8,
     deps = [
         ":http_integration_lib",
         "//source/common/config:protobuf_link_hacks",
