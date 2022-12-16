@@ -9,6 +9,7 @@
 
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/common/factory_base.h"
+#include "source/extensions/filters/http/rate_limit_quota/client_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -23,8 +24,8 @@ using QuotaAssignmentAction = ::envoy::service::rate_limit_quota::v3::RateLimitQ
 using BucketQuotaUsage =
     ::envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports::BucketQuotaUsage;
 
-// Forward declaration.
-class RateLimitClientImpl;
+// Forward declaration. TODO(tyxia)
+// class RateLimitClientImpl;
 
 // Customized hash and equal struct for `BucketId` hash key.
 struct BucketIdHash {

@@ -9,7 +9,6 @@
 #include "source/common/grpc/typed_async_client.h"
 #include "source/extensions/filters/http/common/factory_base.h"
 #include "source/extensions/filters/http/rate_limit_quota/client.h"
-#include "source/extensions/filters/http/rate_limit_quota/quota_bucket.h"
 
 #include "absl/status/status.h"
 
