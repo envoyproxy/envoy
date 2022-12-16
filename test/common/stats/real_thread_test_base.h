@@ -19,9 +19,12 @@ public:
   SymbolTableImpl symbol_table_;
   AllocatorImpl alloc_;
   ThreadLocalStoreImplPtr store_;
+  Scope& scope_;
   StatNamePool pool_;
 };
 
+// Helper base class for threadlocal stats testing in multiple-workers setup.
+// This is used in threadlocal store tests.
 class ThreadLocalRealThreadsTestBase : public Thread::RealThreadsTestHelper,
                                        public ThreadLocalStoreNoMocksTestBase {
 protected:
