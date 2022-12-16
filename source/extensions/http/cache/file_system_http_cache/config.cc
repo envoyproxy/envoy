@@ -7,6 +7,7 @@
 
 #include "source/extensions/common/async_files/async_file_manager_factory.h"
 #include "source/extensions/filters/http/cache/http_cache.h"
+#include "source/extensions/http/cache/file_system_http_cache/cache_eviction_thread.h"
 #include "source/extensions/http/cache/file_system_http_cache/file_system_http_cache.h"
 
 namespace Envoy {
@@ -57,7 +58,7 @@ public:
     }
     if (!cache) {
       cache = std::make_shared<FileSystemHttpCache>(
-          singleton, std::move(config),
+          singleton, cache_eviction_thread_, std::move(config),
           async_file_manager_factory_->getAsyncFileManager(config.manager_config()), stats_scope);
       caches_[key] = cache;
     } else if (!Protobuf::util::MessageDifferencer::Equals(cache->config(), config)) {
@@ -69,6 +70,7 @@ public:
   }
 
 private:
+  CacheEvictionThread cache_eviction_thread_;
   std::shared_ptr<Common::AsyncFiles::AsyncFileManagerFactory> async_file_manager_factory_;
   absl::Mutex mu_;
   // We keep weak_ptr here so the caches can be destroyed if the config is updated to stop using

@@ -2,17 +2,27 @@
 
 #include "source/common/filesystem/directory.h"
 #include "source/common/http/header_map_impl.h"
+#include "source/extensions/http/cache/file_system_http_cache/cache_eviction_thread.h"
 #include "source/extensions/http/cache/file_system_http_cache/cache_file_fixed_block.h"
 #include "source/extensions/http/cache/file_system_http_cache/cache_file_header_proto_util.h"
 #include "source/extensions/http/cache/file_system_http_cache/insert_context.h"
 #include "source/extensions/http/cache/file_system_http_cache/lookup_context.h"
 #include "source/extensions/http/cache/file_system_http_cache/stats.h"
 
+static bool operator<(const struct timespec& a, const struct timespec& b) {
+  return std::tie(a.tv_sec, a.tv_nsec) < std::tie(b.tv_sec, b.tv_nsec);
+}
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 namespace FileSystemHttpCache {
+namespace {
+bool isCacheFile(const Filesystem::DirectoryEntry& entry) {
+  return absl::StartsWith(entry.name_, "cache-") && entry.type_ == Filesystem::FileType::Regular;
+}
+} // namespace
 
 // Copying in 128K chunks is an arbitrary choice for a reasonable balance of performance and
 // memory usage. Since UpdateHeaders is unlikely to be a common operation it is most likely
@@ -71,11 +81,12 @@ absl::string_view FileSystemHttpCache::name() {
 }
 
 FileSystemHttpCache::FileSystemHttpCache(
-    Singleton::InstanceSharedPtr owner, ConfigProto config,
-    std::shared_ptr<Common::AsyncFiles::AsyncFileManager>&& async_file_manager,
+    Singleton::InstanceSharedPtr owner, CacheEvictionThread& cache_eviction_thread,
+    ConfigProto config, std::shared_ptr<Common::AsyncFiles::AsyncFileManager>&& async_file_manager,
     Stats::Scope& stats_scope)
     : owner_(owner), config_(config), async_file_manager_(async_file_manager),
-      stats_(generateStats(stats_scope, cachePath())) {}
+      stats_(generateStats(stats_scope, cachePath())),
+      cache_eviction_thread_(cache_eviction_thread) {}
 
 CacheInfo FileSystemHttpCache::cacheInfo() const {
   CacheInfo info;
@@ -337,10 +348,7 @@ void FileSystemHttpCache::init() {
   size_bytes_ = 0;
   size_count_ = 0;
   for (const Filesystem::DirectoryEntry& entry : Filesystem::Directory(std::string{cachePath()})) {
-    if (entry.type_ != Filesystem::FileType::Regular) {
-      continue;
-    }
-    if (!absl::StartsWith(entry.name_, "cache-")) {
+    if (!isCacheFile(entry)) {
       continue;
     }
     size_count_++;
@@ -354,6 +362,7 @@ void FileSystemHttpCache::init() {
   if (config().has_max_cache_entry_count()) {
     stats_.size_limit_count_.set(config().max_cache_entry_count().value());
   }
+  cache_eviction_thread_.addCache(shared_from_this());
 }
 
 void FileSystemHttpCache::trackFileAdded(uint64_t file_size) {
@@ -361,7 +370,7 @@ void FileSystemHttpCache::trackFileAdded(uint64_t file_size) {
   size_bytes_ += file_size;
   stats_.size_count_.inc();
   stats_.size_bytes_.add(file_size);
-  // TODO(ravenblack): potentially trigger cache cleanup operation.
+  cache_eviction_thread_.signal();
 }
 
 void FileSystemHttpCache::trackFileRemoved(uint64_t file_size) {
@@ -378,6 +387,75 @@ void FileSystemHttpCache::trackFileRemoved(uint64_t file_size) {
     size_bytes_ = 0;
   }
   stats_.size_bytes_.set(size_bytes_);
+}
+
+void FileSystemHttpCache::maybeEvict(Api::OsSysCalls& os_sys_calls) {
+  uint64_t size_to_evict = 0;
+  uint64_t count_to_evict = 0;
+  if (config().has_max_cache_entry_size_bytes()) {
+    // capture a value from the atomic because we're going to use it twice and don't want our
+    // value to change in between.
+    uint64_t seen_size = size_bytes_;
+    size_to_evict = seen_size > config().max_cache_entry_size_bytes().value()
+                        ? seen_size - config().max_cache_entry_size_bytes().value()
+                        : 0;
+  }
+  if (config().has_max_cache_entry_count()) {
+    // capture a value from the atomic because we're going to use it twice and don't want our
+    // value to change in between.
+    uint64_t seen_count = size_count_;
+    count_to_evict = seen_count > config().max_cache_entry_count().value()
+                         ? seen_count - config().max_cache_entry_count().value()
+                         : 0;
+  }
+  if (size_to_evict == 0 && count_to_evict == 0) {
+    return;
+  }
+
+  uint64_t size = 0;
+  uint64_t count = 0;
+  uint64_t proposed_size_evicted = 0;
+  struct ProposedEviction {
+    std::string name_;
+    uint64_t size_;
+    struct timespec last_touch_;
+    bool operator<(const ProposedEviction& other) const { return last_touch_ < other.last_touch_; }
+  };
+  std::multiset<ProposedEviction> proposed_evictions;
+
+  for (const Filesystem::DirectoryEntry& entry : Filesystem::Directory(std::string{cachePath()})) {
+    if (!isCacheFile(entry)) {
+      continue;
+    }
+    count++;
+    size += entry.size_bytes_.value_or(0);
+    struct stat s;
+    if (os_sys_calls.stat(absl::StrCat(cachePath(), entry.name_).c_str(), &s).return_value_ != -1) {
+      struct timespec last_touch = std::max(s.st_atim, s.st_ctim);
+      if (proposed_size_evicted < size_to_evict || proposed_evictions.size() < count_to_evict ||
+          proposed_evictions.begin()->last_touch_ < last_touch) {
+        // We either haven't evicted enough yet, or this eviction candidate is less recently
+        // used than our current least recently used. So add this one to candidates.
+        proposed_evictions.insert(
+            ProposedEviction{entry.name_, entry.size_bytes_.value_or(0), last_touch});
+        proposed_size_evicted += entry.size_bytes_.value_or(0);
+        if (proposed_size_evicted - proposed_evictions.rbegin()->size_ >= size_to_evict &&
+            proposed_evictions.size() > count_to_evict) {
+          // We'd still be evicting enough if we don't evict the 'newest' proposed eviction,
+          // so we unpropose that one.
+          proposed_evictions.erase(std::prev(proposed_evictions.end()));
+        }
+      }
+    }
+  }
+  size_bytes_ = size;
+  size_count_ = count;
+  for (const ProposedEviction& eviction : proposed_evictions) {
+    if (os_sys_calls.unlink(absl::StrCat(cachePath(), eviction.name_).c_str()).return_value_ !=
+        -1) {
+      trackFileRemoved(eviction.size_);
+    }
+  }
 }
 
 } // namespace FileSystemHttpCache

@@ -21,11 +21,14 @@ namespace FileSystemHttpCache {
 using ConfigProto =
     envoy::extensions::http::cache::file_system_http_cache::v3::FileSystemHttpCacheConfig;
 
+class CacheEvictionThread;
+
 class FileSystemHttpCache : public HttpCache,
                             public std::enable_shared_from_this<FileSystemHttpCache>,
                             public Logger::Loggable<Logger::Id::cache_filter> {
 public:
-  FileSystemHttpCache(Singleton::InstanceSharedPtr owner, ConfigProto config,
+  FileSystemHttpCache(Singleton::InstanceSharedPtr owner,
+                      CacheEvictionThread& cache_eviction_thread, ConfigProto config,
                       std::shared_ptr<Common::AsyncFiles::AsyncFileManager>&& async_file_manager,
                       Stats::Scope& stats_scope);
 
@@ -174,6 +177,13 @@ public:
   // is totally irrelevant to the outward-facing API.
   static const size_t max_update_headers_copy_chunk_size_;
 
+  /**
+   * Called from CacheEvictionThread, this checks if the cache is over any of its
+   * size thresholds, and if so, least recently touched files are erased to bring
+   * it back under those thresholds.
+   */
+  void maybeEvict(Api::OsSysCalls& os_sys_calls);
+
 private:
   /**
    * Writes a vary node to disk for the given key. A vary node in the cache consists of
@@ -213,6 +223,8 @@ private:
   // be negative.
   std::atomic<uint64_t> size_count_;
   std::atomic<uint64_t> size_bytes_;
+
+  CacheEvictionThread& cache_eviction_thread_;
 };
 
 } // namespace FileSystemHttpCache
