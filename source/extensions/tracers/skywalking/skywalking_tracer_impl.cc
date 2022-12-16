@@ -65,7 +65,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config&, Tracing::TraceContext
     auto header_value_string = propagation_header.value();
 
     // TODO(wbpcode): catching all exceptions is not a good practice. But the cpp2sky library may
-    // throw exception that not be wrappered by TracerException. See
+    // throw exception that not be wrapped by TracerException. See
     // https://github.com/SkyAPM/cpp2sky/issues/117. So, we need to catch all exceptions here to
     // avoid Envoy crash in the runtime.
     try {
