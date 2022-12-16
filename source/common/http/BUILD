@@ -517,6 +517,7 @@ envoy_cc_library(
         "//envoy/common:matchers_interface",
         "//envoy/common:regex_interface",
         "//envoy/http:header_map_interface",
+        "//envoy/http:header_validator_interface",
         "//source/common/common:matchers_lib",
         "//source/common/common:regex_lib",
         "//source/common/common:utility_lib",
