@@ -2,21 +2,18 @@
 
 #include <string>
 
+#include "test/common/http/common.h"
+#include "test/test_common/utility.h"
+
 #include "absl/synchronization/notification.h"
-
 #include "gtest/gtest.h"
-
 #include "library/cc/bridge_utility.h"
 #include "library/cc/log_level.h"
 #include "library/common/config/internal.h"
 #include "library/common/engine.h"
 #include "library/common/engine_handle.h"
 #include "library/common/http/header_utility.h"
-
 #include "spdlog/spdlog.h"
-
-#include "test/common/http/common.h"
-#include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace {
