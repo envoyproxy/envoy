@@ -1141,9 +1141,10 @@ public:
     StatsMatcherPtr matcher_ptr(matcher);
     store_.setStatsMatcher(std::move(matcher_ptr));
 
+    StatNamePool pool(symbol_table_);
+    EXPECT_CALL(*matcher, fastRejects(pool.add("scope")));
     ScopeSharedPtr scope = store_.createScope("scope.");
 
-    StatNamePool pool(symbol_table_);
     for (int j = 0; j < 5; ++j) {
       // Note: zero calls to fastReject() or slowReject() are made, as
       // reject-all should short-circuit.
@@ -1289,6 +1290,91 @@ TEST_F(StatsThreadLocalStoreTest, RemoveRejectedStats) {
   tls_.shutdownGlobalThreading();
   store_->shutdownThreading();
   tls_.shutdownThread();
+}
+
+namespace {
+
+template <class StatType> void testIterate(const ScopeSharedPtr& null_scope) {
+  IterateFn<StatType> iterate = [](const RefcountPtr<StatType>&) -> bool {
+    EXPECT_FALSE(true);
+    return false;
+  };
+  null_scope->iterate(iterate);
+}
+
+} // namespace
+
+TEST_F(StatsThreadLocalStoreTest, RejectScopes) {
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+  envoy::config::metrics::v3::StatsConfig stats_config;
+  auto exclusions = stats_config.mutable_stats_matcher()->mutable_exclusion_list();
+  exclusions->add_patterns()->set_prefix("scope1.");
+  exclusions->add_patterns()->set_prefix("scope2"); // Scope rejections requires trailing dot.
+  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config, symbol_table_));
+  ScopeSharedPtr null_scope = store_->createScope("scope1.");
+  EXPECT_EQ("", symbol_table_.toString(null_scope->prefix()));
+  ScopeSharedPtr scope2 = store_->createScope("scope2.");
+  EXPECT_EQ("scope2", symbol_table_.toString(scope2->prefix()));
+  ScopeSharedPtr scope3 = store_->createScope("scope3.");
+  EXPECT_EQ("scope3", symbol_table_.toString(scope3->prefix()));
+
+  // Now's the time to cover all the lines in the implementation of NullScope.
+  EXPECT_EQ(null_scope, null_scope->createScope("foo")); // Null scopes beget more null scopes
+  StatNamePool pool(symbol_table_);
+  StatName foo = pool.add("foo");
+  EXPECT_EQ(null_scope, null_scope->scopeFromStatName(foo));
+  EXPECT_EQ(&store_->nullCounter(), &null_scope->counterFromStatNameWithTags(foo, absl::nullopt));
+  EXPECT_EQ(&store_->nullCounter(), &null_scope->counterFromString("foo"));
+  EXPECT_EQ(&store_->nullGauge(), &null_scope->gaugeFromStatNameWithTags(
+                                      foo, absl::nullopt, Gauge::ImportMode::NeverImport));
+  EXPECT_EQ(&store_->nullGauge(),
+            &null_scope->gaugeFromString("foo", Gauge::ImportMode::NeverImport));
+  EXPECT_EQ(
+      Histogram::Unit::Null,
+      null_scope->histogramFromStatNameWithTags(foo, absl::nullopt, Histogram::Unit::Milliseconds)
+          .unit());
+  EXPECT_EQ(Histogram::Unit::Null,
+            null_scope->histogramFromString("foo", Histogram::Unit::Milliseconds).unit());
+  EXPECT_EQ(&store_->nullTextReadout(),
+            &null_scope->textReadoutFromStatNameWithTags(foo, absl::nullopt));
+  EXPECT_EQ(&store_->nullTextReadout(), &null_scope->textReadoutFromString("foo"));
+  EXPECT_EQ(absl::nullopt, null_scope->findCounter(foo));
+  EXPECT_EQ(absl::nullopt, null_scope->findGauge(foo));
+  EXPECT_EQ(absl::nullopt, null_scope->findHistogram(foo));
+  EXPECT_EQ(absl::nullopt, null_scope->findTextReadout(foo));
+  EXPECT_EQ(&symbol_table_, &null_scope->symbolTable());
+  EXPECT_EQ(&symbol_table_, &null_scope->constSymbolTable());
+  EXPECT_EQ(store_.get(), &null_scope->store());
+  EXPECT_EQ(store_.get(), &null_scope->constStore());
+  testIterate<Counter>(null_scope);
+  testIterate<Gauge>(null_scope);
+  testIterate<Histogram>(null_scope);
+  testIterate<TextReadout>(null_scope);
+}
+
+TEST_F(StatsThreadLocalStoreTest, RejectScopesFromSoleInclusion) {
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+  envoy::config::metrics::v3::StatsConfig stats_config;
+  auto inclusions = stats_config.mutable_stats_matcher()->mutable_inclusion_list();
+  inclusions->add_patterns()->set_prefix("scope1.");
+  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config, symbol_table_));
+  ScopeSharedPtr scope1 = store_->createScope("scope1.");
+  EXPECT_EQ("scope1", symbol_table_.toString(scope1->prefix()));
+  ScopeSharedPtr scope2 = store_->createScope("scope2.");
+  EXPECT_EQ("", symbol_table_.toString(scope2->prefix()));
+}
+
+TEST_F(StatsThreadLocalStoreTest, NoRejectScopesFromInclusions) {
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+  envoy::config::metrics::v3::StatsConfig stats_config;
+  auto inclusions = stats_config.mutable_stats_matcher()->mutable_inclusion_list();
+  inclusions->add_patterns()->set_prefix("scope1.");
+  inclusions->add_patterns()->set_prefix("ambiguity");
+  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config, symbol_table_));
+  ScopeSharedPtr scope1 = store_->createScope("scope1.");
+  EXPECT_EQ("scope1", symbol_table_.toString(scope1->prefix()));
+  ScopeSharedPtr scope2 = store_->createScope("scope2.");
+  EXPECT_EQ("scope2", symbol_table_.toString(scope2->prefix()));
 }
 
 // Verify that asking for deleted stats by name does not create new copies on

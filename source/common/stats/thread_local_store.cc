@@ -149,13 +149,8 @@ std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
   return ret;
 }
 
-ScopeSharedPtr ThreadLocalStoreImpl::ScopeImpl::createScope(const std::string& name) {
-  StatNameManagedStorage stat_name_storage(Utility::sanitizeStatsName(name), symbolTable());
-  return scopeFromStatName(stat_name_storage.statName());
-}
-
 class NullScope : public Scope {
- public:
+public:
   explicit NullScope(ThreadLocalStoreImpl& parent) : parent_(parent) {}
   ScopeSharedPtr createScope(const std::string&) override { return getShared(); }
   ScopeSharedPtr scopeFromStatName(StatName) override { return getShared(); }
@@ -195,14 +190,27 @@ class NullScope : public Scope {
   bool iterate(const IterateFn<Histogram>&) const override { return false; };
   bool iterate(const IterateFn<TextReadout>&) const override { return false; }
   StatName prefix() const override { return StatName(); }
+  Store& store() override { return parent_; }
+  const Store& constStore() const override { return parent_; }
 
- private:
+private:
   ThreadLocalStoreImpl& parent_;
 };
 
+ScopeSharedPtr ThreadLocalStoreImpl::ScopeImpl::createScope(const std::string& name) {
+  StatNameManagedStorage stat_name_storage(Utility::sanitizeStatsName(name), symbolTable());
+  return scopeFromStatName(stat_name_storage.statName());
+}
+
 ScopeSharedPtr ThreadLocalStoreImpl::ScopeImpl::scopeFromStatName(StatName name) {
   SymbolTable::StoragePtr joined = symbolTable().join({prefix_.statName(), name});
-  auto new_scope = std::make_shared<ScopeImpl>(parent_, StatName(joined.get()));
+  StatName joined_name(joined.get());
+
+  if (parent_.stats_matcher_->fastRejects(joined_name) == StatsMatcher::FastResult::Rejects) {
+    return std::make_shared<NullScope>(parent_);
+  }
+
+  auto new_scope = std::make_shared<ScopeImpl>(parent_, joined_name);
   parent_.addScope(new_scope);
   return new_scope;
 }

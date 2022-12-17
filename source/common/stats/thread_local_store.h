@@ -210,6 +210,8 @@ public:
 
   const TagProducer& tagProducer() const { return *tag_producer_; }
 
+  NullTextReadoutImpl& nullTextReadout() { return null_text_readout_; }
+
 private:
   friend class ThreadLocalStoreTestingPeer;
   friend class NullScope;
