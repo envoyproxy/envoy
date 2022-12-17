@@ -1515,17 +1515,17 @@ PrefixRouteEntryImpl::PrefixRouteEntryImpl(
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator)
     : RouteEntryImplBase(vhost, route, optional_http_filters, factory_context, validator),
-      prefix_(route.match().prefix()),
-      path_matcher_(Matchers::PathMatcher::createPrefix(prefix_, !case_sensitive_)) {}
+      path_matcher_(Matchers::PathMatcher::createPrefix(route.match().prefix(), !case_sensitive_)) {
+}
 
 void PrefixRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                              bool insert_envoy_original_path) const {
-  finalizePathHeader(headers, prefix_, insert_envoy_original_path);
+  finalizePathHeader(headers, matcher(), insert_envoy_original_path);
 }
 
 absl::optional<std::string>
 PrefixRouteEntryImpl::currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const {
-  return currentUrlPathAfterRewriteWithMatchedPath(headers, prefix_);
+  return currentUrlPathAfterRewriteWithMatchedPath(headers, matcher());
 }
 
 RouteConstSharedPtr PrefixRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
@@ -1544,17 +1544,16 @@ PathRouteEntryImpl::PathRouteEntryImpl(const VirtualHostImpl& vhost,
                                        Server::Configuration::ServerFactoryContext& factory_context,
                                        ProtobufMessage::ValidationVisitor& validator)
     : RouteEntryImplBase(vhost, route, optional_http_filters, factory_context, validator),
-      path_(route.match().path()),
-      path_matcher_(Matchers::PathMatcher::createExact(path_, !case_sensitive_)) {}
+      path_matcher_(Matchers::PathMatcher::createExact(route.match().path(), !case_sensitive_)) {}
 
 void PathRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                            bool insert_envoy_original_path) const {
-  finalizePathHeader(headers, path_, insert_envoy_original_path);
+  finalizePathHeader(headers, matcher(), insert_envoy_original_path);
 }
 
 absl::optional<std::string>
 PathRouteEntryImpl::currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const {
-  return currentUrlPathAfterRewriteWithMatchedPath(headers, path_);
+  return currentUrlPathAfterRewriteWithMatchedPath(headers, matcher());
 }
 
 RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
@@ -1574,7 +1573,6 @@ RegexRouteEntryImpl::RegexRouteEntryImpl(
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator)
     : RouteEntryImplBase(vhost, route, optional_http_filters, factory_context, validator),
-      regex_str_(route.match().safe_regex().regex()),
       path_matcher_(Matchers::PathMatcher::createSafeRegex(route.match().safe_regex())) {
   ASSERT(route.match().path_specifier_case() ==
          envoy::config::route::v3::RouteMatch::PathSpecifierCase::kSafeRegex);
@@ -1641,17 +1639,17 @@ PathSeparatedPrefixRouteEntryImpl::PathSeparatedPrefixRouteEntryImpl(
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator)
     : RouteEntryImplBase(vhost, route, optional_http_filters, factory_context, validator),
-      prefix_(route.match().path_separated_prefix()),
-      path_matcher_(Matchers::PathMatcher::createPrefix(prefix_, !case_sensitive_)) {}
+      path_matcher_(Matchers::PathMatcher::createPrefix(route.match().path_separated_prefix(),
+                                                        !case_sensitive_)) {}
 
 void PathSeparatedPrefixRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                                           bool insert_envoy_original_path) const {
-  finalizePathHeader(headers, prefix_, insert_envoy_original_path);
+  finalizePathHeader(headers, matcher(), insert_envoy_original_path);
 }
 
 absl::optional<std::string> PathSeparatedPrefixRouteEntryImpl::currentUrlPathAfterRewrite(
     const Http::RequestHeaderMap& headers) const {
-  return currentUrlPathAfterRewriteWithMatchedPath(headers, prefix_);
+  return currentUrlPathAfterRewriteWithMatchedPath(headers, matcher());
 }
 
 RouteConstSharedPtr
@@ -1663,8 +1661,10 @@ PathSeparatedPrefixRouteEntryImpl::matches(const Http::RequestHeaderMap& headers
   }
   absl::string_view sanitized_path = sanitizePathBeforePathMatching(
       Http::PathUtil::removeQueryAndFragment(headers.getPathValue()));
-  if (sanitized_path.size() >= prefix_.size() && path_matcher_->match(sanitized_path) &&
-      (sanitized_path.size() == prefix_.size() || sanitized_path[prefix_.size()] == '/')) {
+  size_t sanitized_size = sanitized_path.size();
+  size_t matcher_size = matcher().size();
+  if (sanitized_size >= matcher_size && path_matcher_->match(sanitized_path) &&
+      (sanitized_size == matcher_size || sanitized_path[matcher_size] == '/')) {
     return clusterEntry(headers, random_value);
   }
   return nullptr;

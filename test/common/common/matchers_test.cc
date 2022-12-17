@@ -379,6 +379,8 @@ TEST(StringMatcher, SafeRegexValueIgnoreCase) {
 TEST(PathMatcher, MatchExactPath) {
   const auto matcher = Envoy::Matchers::PathMatcher::createExact("/exact", false);
 
+  EXPECT_EQ(matcher->criterion(), "/exact");
+
   EXPECT_TRUE(matcher->match("/exact"));
   EXPECT_TRUE(matcher->match("/exact?param=val"));
   EXPECT_TRUE(matcher->match("/exact#fragment"));
@@ -392,6 +394,8 @@ TEST(PathMatcher, MatchExactPath) {
 
 TEST(PathMatcher, MatchExactPathIgnoreCase) {
   const auto matcher = Envoy::Matchers::PathMatcher::createExact("/exact", true);
+
+  EXPECT_EQ(matcher->criterion(), "/exact");
 
   EXPECT_TRUE(matcher->match("/exact"));
   EXPECT_TRUE(matcher->match("/EXACT"));
@@ -407,6 +411,8 @@ TEST(PathMatcher, MatchExactPathIgnoreCase) {
 TEST(PathMatcher, MatchPrefixPath) {
   const auto matcher = Envoy::Matchers::PathMatcher::createPrefix("/prefix", false);
 
+  EXPECT_EQ(matcher->criterion(), "/prefix");
+
   EXPECT_TRUE(matcher->match("/prefix"));
   EXPECT_TRUE(matcher->match("/prefix-abc"));
   EXPECT_TRUE(matcher->match("/prefix?param=val"));
@@ -420,6 +426,8 @@ TEST(PathMatcher, MatchPrefixPath) {
 
 TEST(PathMatcher, MatchPrefixPathIgnoreCase) {
   const auto matcher = Envoy::Matchers::PathMatcher::createPrefix("/prefix", true);
+
+  EXPECT_EQ(matcher->criterion(), "/prefix");
 
   EXPECT_TRUE(matcher->match("/prefix"));
   EXPECT_TRUE(matcher->match("/prefix-abc"));
@@ -436,6 +444,8 @@ TEST(PathMatcher, MatchSuffixPath) {
   envoy::type::matcher::v3::PathMatcher matcher;
   matcher.mutable_path()->set_suffix("suffix");
 
+  EXPECT_EQ(Matchers::PathMatcher(matcher).criterion(), "/prefix");
+
   EXPECT_TRUE(Matchers::PathMatcher(matcher).match("/suffix"));
   EXPECT_TRUE(Matchers::PathMatcher(matcher).match("/abc-suffix"));
   EXPECT_TRUE(Matchers::PathMatcher(matcher).match("/suffix?param=val"));
@@ -449,6 +459,8 @@ TEST(PathMatcher, MatchSuffixPath) {
 TEST(PathMatcher, MatchContainsPath) {
   envoy::type::matcher::v3::PathMatcher matcher;
   matcher.mutable_path()->set_contains("contains");
+
+  EXPECT_EQ(Matchers::PathMatcher(matcher).criterion(), "/contains");
 
   EXPECT_TRUE(Matchers::PathMatcher(matcher).match("/contains"));
   EXPECT_TRUE(Matchers::PathMatcher(matcher).match("/abc-contains"));
@@ -464,6 +476,8 @@ TEST(PathMatcher, MatchRegexPath) {
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.mutable_safe_regex()->mutable_google_re2();
   matcher.mutable_safe_regex()->set_regex(".*regex.*");
+
+  EXPECT_EQ(Matchers::PathMatcher(matcher).criterion(), ".*regex.*");
 
   EXPECT_TRUE(Matchers::PathMatcher(matcher).match("/regex"));
   EXPECT_TRUE(Matchers::PathMatcher(matcher).match("/regex/xyz"));
