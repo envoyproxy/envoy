@@ -444,7 +444,7 @@ TEST(PathMatcher, MatchSuffixPath) {
   envoy::type::matcher::v3::PathMatcher matcher;
   matcher.mutable_path()->set_suffix("suffix");
 
-  EXPECT_EQ(Matchers::PathMatcher(matcher).criterion(), "/prefix");
+  EXPECT_EQ(Matchers::PathMatcher(matcher).criterion(), "suffix");
 
   EXPECT_TRUE(Matchers::PathMatcher(matcher).match("/suffix"));
   EXPECT_TRUE(Matchers::PathMatcher(matcher).match("/abc-suffix"));
@@ -460,7 +460,7 @@ TEST(PathMatcher, MatchContainsPath) {
   envoy::type::matcher::v3::PathMatcher matcher;
   matcher.mutable_path()->set_contains("contains");
 
-  EXPECT_EQ(Matchers::PathMatcher(matcher).criterion(), "/contains");
+  EXPECT_EQ(Matchers::PathMatcher(matcher).criterion(), "contains");
 
   EXPECT_TRUE(Matchers::PathMatcher(matcher).match("/contains"));
   EXPECT_TRUE(Matchers::PathMatcher(matcher).match("/abc-contains"));
