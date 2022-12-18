@@ -161,23 +161,5 @@ bool PathMatcher::match(const absl::string_view path) const {
   return matcher_.match(Http::PathUtil::removeQueryAndFragment(path));
 }
 
-const std::string& PathMatcher::criterion() const {
-  switch (matcher_.matcher().match_pattern_case()) {
-  case envoy::type::matcher::v3::StringMatcher::kPrefix:
-    return matcher_.matcher().prefix();
-  case envoy::type::matcher::v3::StringMatcher::kExact:
-    return matcher_.matcher().exact();
-  case envoy::type::matcher::v3::StringMatcher::kSuffix:
-    return matcher_.matcher().suffix();
-  case envoy::type::matcher::v3::StringMatcher::kSafeRegex:
-    return matcher_.matcher().safe_regex().regex();
-  case envoy::type::matcher::v3::StringMatcher::kContains:
-    return matcher_.matcher().contains();
-  case envoy::type::matcher::v3::StringMatcher::MATCH_PATTERN_NOT_SET:
-    break;
-  }
-  PANIC("unexpected");
-}
-
 } // namespace Matchers
 } // namespace Envoy
