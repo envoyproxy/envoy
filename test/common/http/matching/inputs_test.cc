@@ -107,6 +107,29 @@ TEST(MatchingData, HttpResponseTrailersDataInput) {
   }
 }
 
+TEST(MatchingData, HttpRequestQueryParamsDataInput) {
+  Network::ConnectionInfoSetterImpl connection_info_provider(
+      std::make_shared<Network::Address::Ipv4Instance>(80),
+      std::make_shared<Network::Address::Ipv4Instance>(80));
+  HttpMatchingDataImpl data(connection_info_provider);
+
+  {
+    HttpRequestQueryParamsDataInput input("username", false /* url_decoded */);
+    TestRequestHeaderMapImpl request_headers({{":path", "/test?username=foo&username=bar"}});
+    data.onRequestHeaders(request_headers);
+
+    EXPECT_EQ(input.get(data).data_, "foo");
+  }
+
+  {
+    HttpRequestQueryParamsDataInput input("user name", true /* url_decoded */);
+    TestRequestHeaderMapImpl request_headers({{":path", "/test?user\%20name=foo\%20bar"}});
+    data.onRequestHeaders(request_headers);
+
+    EXPECT_EQ(input.get(data).data_, "foo bar");
+  }
+}
+
 } // namespace Matching
 } // namespace Http
 } // namespace Envoy

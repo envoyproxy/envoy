@@ -139,6 +139,42 @@ class HttpResponseTrailersDataInputFactory
 public:
   HttpResponseTrailersDataInputFactory() : HttpHeadersDataInputFactoryBase("response_trailers") {}
 };
+
+class HttpRequestQueryParamsDataInput : public Matcher::DataInput<HttpMatchingData> {
+public:
+  explicit HttpRequestQueryParamsDataInput(const std::string& query_param, bool url_decoded)
+      : query_param_(query_param), url_decoded_(url_decoded) {}
+
+  Matcher::DataInputGetResult get(const HttpMatchingData& /*data*/) const override;
+
+private:
+  const std::string query_param_;
+  bool url_decoded_;
+};
+
+class HttpRequestQueryParamsDataInputFactory : public Matcher::DataInputFactory<HttpMatchingData> {
+public:
+  std::string name() const override { return "query_params"; }
+
+  Matcher::DataInputFactoryCb<HttpMatchingData>
+  createDataInputFactoryCb(const Protobuf::Message& config,
+                           ProtobufMessage::ValidationVisitor& validation_visitor) override {
+    const auto& typed_config = MessageUtil::downcastAndValidate<
+        const envoy::type::matcher::v3::HttpRequestQueryParamMatchInput&>(config,
+                                                                          validation_visitor);
+
+    return [query_param = typed_config.query_param(), url_decoded = typed_config.url_decoded()] {
+      return std::make_unique<HttpRequestQueryParamsDataInput>(query_param, url_decoded);
+    };
+  };
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<envoy::type::matcher::v3::HttpRequestQueryParamMatchInput>();
+  }
+
+private:
+  const std::string name_;
+};
+
 } // namespace Matching
 } // namespace Http
 } // namespace Envoy
