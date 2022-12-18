@@ -547,7 +547,7 @@ private:
 using DefaultInternalRedirectPolicy = ConstSingleton<InternalRedirectPolicyImpl>;
 
 /**
- * Base implementation for all route entries.
+ * Base implementation for all route entries.q
  */
 class RouteEntryImplBase : public RouteEntryAndRoute,
                            public Matchable,
@@ -1174,7 +1174,7 @@ public:
 
   // Router::PathMatchCriterion
   const std::string& matcher() const override {
-    return path_matcher_ != nullptr ? path_matcher_->criterion() : EMPTY_STRING;
+    return path_matcher_ != nullptr ? path_matcher_->matcher().matcher().prefix() : EMPTY_STRING;
   }
   PathMatchType matchType() const override { return PathMatchType::Prefix; }
 
@@ -1207,7 +1207,7 @@ public:
 
   // Router::PathMatchCriterion
   const std::string& matcher() const override {
-    return path_matcher_ != nullptr ? path_matcher_->criterion() : EMPTY_STRING;
+    return path_matcher_ != nullptr ? path_matcher_->matcher().matcher().exact() : EMPTY_STRING;
   }
   PathMatchType matchType() const override { return PathMatchType::Exact; }
 
@@ -1240,7 +1240,8 @@ public:
 
   // Router::PathMatchCriterion
   const std::string& matcher() const override {
-    return path_matcher_ != nullptr ? path_matcher_->criterion() : EMPTY_STRING;
+    return path_matcher_ != nullptr ? path_matcher_->matcher().matcher().safe_regex().regex()
+                                    : EMPTY_STRING;
   }
   PathMatchType matchType() const override { return PathMatchType::Regex; }
 
@@ -1303,7 +1304,7 @@ public:
 
   // Router::PathMatchCriterion
   const std::string& matcher() const override {
-    return path_matcher_ != nullptr ? path_matcher_->criterion() : EMPTY_STRING;
+    return path_matcher_ != nullptr ? path_matcher_->matcher().matcher().prefix() : EMPTY_STRING;
   }
   PathMatchType matchType() const override { return PathMatchType::PathSeparatedPrefix; }
 

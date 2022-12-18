@@ -1661,8 +1661,8 @@ PathSeparatedPrefixRouteEntryImpl::matches(const Http::RequestHeaderMap& headers
   }
   absl::string_view sanitized_path = sanitizePathBeforePathMatching(
       Http::PathUtil::removeQueryAndFragment(headers.getPathValue()));
-  size_t sanitized_size = sanitized_path.size();
-  size_t matcher_size = matcher().size();
+  const size_t sanitized_size = sanitized_path.size();
+  const size_t matcher_size = matcher().size();
   if (sanitized_size >= matcher_size && path_matcher_->match(sanitized_path) &&
       (sanitized_size == matcher_size || sanitized_path[matcher_size] == '/')) {
     return clusterEntry(headers, random_value);
