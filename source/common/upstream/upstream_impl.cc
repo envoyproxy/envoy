@@ -976,6 +976,8 @@ ClusterInfoImpl::ClusterInfoImpl(
                         extensionProtocolOptionsTyped<HttpProtocolOptionsConfigImpl>(
                             "envoy.extensions.upstreams.http.v3.HttpProtocolOptions"),
                         factory_context.messageValidationVisitor())),
+      tcp_protocol_options_(extensionProtocolOptionsTyped<TcpProtocolOptionsConfigImpl>(
+          "envoy.extensions.upstreams.tcp.v3.TcpProtocolOptions")),
       max_requests_per_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           http_protocol_options_->common_http_protocol_options_, max_requests_per_connection,
           config.max_requests_per_connection().value())),
@@ -1105,6 +1107,15 @@ ClusterInfoImpl::ClusterInfoImpl(
     }
   } else {
     idle_timeout_ = std::chrono::hours(1);
+  }
+
+  if (tcp_protocol_options_ && tcp_protocol_options_->idleTimeout().has_value()) {
+    tcp_pool_idle_timeout_ = tcp_protocol_options_->idleTimeout();
+    if (tcp_pool_idle_timeout_.value().count() == 0) {
+      tcp_pool_idle_timeout_ = absl::nullopt;
+    }
+  } else {
+    tcp_pool_idle_timeout_ = std::chrono::minutes(10);
   }
 
   if (http_protocol_options_->common_http_protocol_options_.has_max_connection_duration()) {

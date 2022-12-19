@@ -96,7 +96,8 @@ public:
   allocateTcpConnPool(Event::Dispatcher&, HostConstSharedPtr host, ResourcePriority,
                       const Network::ConnectionSocket::OptionsSharedPtr&,
                       Network::TransportSocketOptionsConstSharedPtr,
-                      Upstream::ClusterConnectivityState&) override {
+                      Upstream::ClusterConnectivityState&,
+                      absl::optional<std::chrono::milliseconds>) override {
     return Tcp::ConnectionPool::InstancePtr{allocateTcpConnPool_(host)};
   }
 
