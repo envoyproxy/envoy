@@ -206,6 +206,9 @@ new_features:
 - area: thrift_proxy
   change: |
     added ``envoy.reloadable_features.thrift_allow_negative_field_ids`` to support negative field ids for legacy thrift service.
+- area: bandwidth_limit
+  change: |
+    added two new response trailers ``bandwidth-request-filter-delay-ms`` and ``bandwidth-response-filter-delay-ms`` to measure the delays added by this filter.
 - area: udp_proxy
   change: |
     added support for :ref:`proxy_access_log <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.proxy_access_log>`.
