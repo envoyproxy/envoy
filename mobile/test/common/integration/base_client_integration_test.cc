@@ -183,7 +183,7 @@ void BaseClientIntegrationTest::threadRoutine(absl::Notification& engine_running
     engine_notification.WaitForNotification();
   };
   engine_running.Notify();
-  engine_ = multi_engines_[num_engines_for_test_ - 1];
+  engine_ = multi_engines_[0];
   full_dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
@@ -197,7 +197,6 @@ void BaseClientIntegrationTest::TearDown() {
   };
   engine_.reset();
   multi_engines_.clear();
-
   multi_terminal_callbacks_.clear();
   multi_stream_prototypes_.clear();
   multi_cc_.clear();

@@ -42,19 +42,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "multi_envoy_test",
-    srcs = ["multi_envoy_test.cc"],
-    exec_properties = {
-        # TODO(willengflow): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
-        "sandboxNetwork": "standard",
-    },
-    repository = "@envoy",
-    deps = [
-        ":base_client_integration_test_lib",
-    ],
-)
-
-envoy_cc_test(
     name = "sds_integration_test",
     srcs = [
         "sds_integration_test.cc",
