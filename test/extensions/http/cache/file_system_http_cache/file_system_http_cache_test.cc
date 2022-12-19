@@ -126,6 +126,19 @@ class FileSystemHttpCacheTest : public FileSystemCacheTestContext, public ::test
   void SetUp() override { initCache(); }
 };
 
+TEST_F(FileSystemHttpCacheTest, TrackFileRemovedClampsAtZero) {
+  cache_->trackFileAdded(1);
+  EXPECT_EQ(cache_->stats().size_bytes_.value(), 1);
+  EXPECT_EQ(cache_->stats().size_count_.value(), 1);
+  cache_->trackFileRemoved(8);
+  EXPECT_EQ(cache_->stats().size_bytes_.value(), 0);
+  EXPECT_EQ(cache_->stats().size_count_.value(), 0);
+  // Remove a second time to ensure that count going below zero also clamps at zero.
+  cache_->trackFileRemoved(8);
+  EXPECT_EQ(cache_->stats().size_bytes_.value(), 0);
+  EXPECT_EQ(cache_->stats().size_count_.value(), 0);
+}
+
 TEST_F(FileSystemHttpCacheTest, ExceptionOnTryingToCreateCachesWithDistinctConfigsOnSamePath) {
   ConfigProto cfg = testConfig();
   cfg.mutable_manager_config()->mutable_thread_pool()->set_thread_count(2);
