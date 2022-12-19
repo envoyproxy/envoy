@@ -268,6 +268,16 @@ public:
       return *this;
     }
 
+    // Set buffer restriction and accounting for the stream.
+    StreamOptions& setBufferAccount(const Buffer::BufferMemoryAccountSharedPtr& account) {
+      account_ = account;
+      return *this;
+    }
+    StreamOptions& setBufferLimit(uint32_t limit) {
+      buffer_limit_ = limit;
+      return *this;
+    }
+
     // this should be done with setBufferedBodyForRetry=true ?
     StreamOptions& setRetryPolicy(const envoy::config::route::v3::RetryPolicy& p) {
       retry_policy = p;
@@ -309,6 +319,10 @@ public:
     ParentContext parent_context;
 
     envoy::config::core::v3::Metadata metadata;
+
+    Buffer::BufferMemoryAccountSharedPtr account_{nullptr};
+
+    absl::optional<uint32_t> buffer_limit_;
 
     absl::optional<envoy::config::route::v3::RetryPolicy> retry_policy;
 
@@ -368,6 +382,14 @@ public:
     }
     RequestOptions& setSampled(absl::optional<bool> sampled) {
       sampled_ = sampled;
+      return *this;
+    }
+    RequestOptions& setBufferAccount(const Buffer::BufferMemoryAccountSharedPtr& account) {
+      account_ = account;
+      return *this;
+    }
+    RequestOptions& setBufferLimit(uint32_t limit) {
+      buffer_limit_ = limit;
       return *this;
     }
 

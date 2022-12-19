@@ -719,7 +719,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
                          .setParentSpan(callbacks_->activeSpan())
                          .setChildSpanName("mirror")
                          .setSampled(shadow_policy.traceSampled())
-                         .setIsShadow(true);
+                         .setIsShadow(true)
+                         .setBufferAccount(callbacks_->account())
+                         .setBufferLimit(callbacks_->decoderBufferLimit());
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.closer_shadow_behavior")) {
         options.setFilterConfig(config_);
       }

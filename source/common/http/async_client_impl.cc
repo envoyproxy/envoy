@@ -103,13 +103,13 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
       tracing_config_(Tracing::EgressConfig::get()),
       route_(std::make_shared<RouteImpl>(parent_, options.timeout, options.hash_policy,
                                          options.retry_policy)),
+      account_(options.account_), buffer_limit_(options.buffer_limit_),
       send_xff_(options.send_xff) {
-
   stream_info_.dynamicMetadata().MergeFrom(options.metadata);
   stream_info_.setIsShadow(options.is_shadow);
 
   if (options.buffer_body_for_retry) {
-    buffered_body_ = std::make_unique<Buffer::OwnedImpl>();
+    buffered_body_ = std::make_unique<Buffer::OwnedImpl>(account_);
   }
 
   router_.setDecoderFilterCallbacks(*this);

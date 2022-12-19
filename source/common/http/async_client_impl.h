@@ -402,7 +402,7 @@ private:
   Upstream::ClusterInfoConstSharedPtr clusterInfo() override { return parent_.cluster_; }
   uint64_t streamId() const override { return stream_id_; }
   // TODO(kbaichoo): Plumb account from owning request filter.
-  Buffer::BufferMemoryAccountSharedPtr account() const override { return nullptr; }
+  Buffer::BufferMemoryAccountSharedPtr account() const override { return account_; }
   Tracing::Span& activeSpan() override { return active_span_; }
   OptRef<const Tracing::Config> tracingConfig() const override {
     return makeOptRef<const Tracing::Config>(tracing_config_);
@@ -467,8 +467,12 @@ private:
   }
   void addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
   void removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
-  void setDecoderBufferLimit(uint32_t) override {}
-  uint32_t decoderBufferLimit() override { return 0; }
+  void setDecoderBufferLimit(uint32_t limit) override {
+    if (buffer_limit_) {
+      buffer_limit_ = limit;
+    }
+  }
+  uint32_t decoderBufferLimit() override { return buffer_limit_.value_or(0); }
   bool recreateStream(const ResponseHeaderMap*) override { return false; }
   const ScopeTrackedObject& scope() override { return *this; }
   void restoreContextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) override {
@@ -506,6 +510,8 @@ private:
   bool local_closed_{};
   bool remote_closed_{};
   Buffer::InstancePtr buffered_body_;
+  Buffer::BufferMemoryAccountSharedPtr account_{nullptr};
+  absl::optional<uint32_t> buffer_limit_{absl::nullopt};
   bool encoded_response_headers_{};
   bool is_grpc_request_{};
   bool is_head_request_{false};

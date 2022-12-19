@@ -15,6 +15,7 @@
 #include "test/integration/tracked_watermark_buffer.h"
 #include "test/integration/utility.h"
 #include "test/mocks/http/mocks.h"
+#include "test/test_common/test_runtime.h"
 
 #include "fake_upstream.h"
 #include "gtest/gtest.h"
@@ -96,7 +97,8 @@ class Http2BufferWatermarksTest
       public HttpIntegrationTest {
 public:
   std::vector<IntegrationStreamDecoderPtr>
-  sendRequests(uint32_t num_responses, uint32_t request_body_size, uint32_t response_body_size) {
+  sendRequests(uint32_t num_responses, uint32_t request_body_size, uint32_t response_body_size,
+               absl::string_view cluster_to_wait_for = "") {
     std::vector<IntegrationStreamDecoderPtr> responses;
 
     Http::TestRequestHeaderMapImpl header_map{
@@ -108,6 +110,11 @@ public:
 
     for (uint32_t idx = 0; idx < num_responses; ++idx) {
       responses.emplace_back(codec_client_->makeRequestWithBody(header_map, request_body_size));
+      absl::SleepFor(absl::Milliseconds(20));
+      if (!cluster_to_wait_for.empty()) {
+        test_server_->waitForGaugeEq(
+            absl::StrCat("cluster.", cluster_to_wait_for, ".upstream_rq_active"), idx + 1);
+      }
     }
 
     return responses;
@@ -340,7 +347,8 @@ TEST_P(Http2BufferWatermarksTest, ShouldTrackAllocatedBytesToUpstream) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto responses = sendRequests(num_requests, request_body_size, response_body_size);
+  auto responses = sendRequests(num_requests, request_body_size, response_body_size,
+                                /*cluster_to_wait_for=*/"cluster_0");
 
   // Wait for all requests to have accounted for the requests we've sent.
   if (streamBufferAccounting()) {
@@ -348,6 +356,61 @@ TEST_P(Http2BufferWatermarksTest, ShouldTrackAllocatedBytesToUpstream) {
         buffer_factory_->waitForExpectedAccountBalanceWithTimeout(TestUtility::DefaultTimeout))
         << "buffer total: " << buffer_factory_->totalBufferSize()
         << " buffer max: " << buffer_factory_->maxBufferSize() << printAccounts();
+  }
+
+  write_matcher_->setResumeWrites();
+
+  for (auto& response : responses) {
+    ASSERT_TRUE(response->waitForEndStream());
+    ASSERT_TRUE(response->complete());
+  }
+}
+
+TEST_P(Http2BufferWatermarksTest, ShouldTrackAllocatedBytesToShadowUpstream) {
+  const int num_requests = 5;
+  const uint32_t request_body_size = 4096;
+  const uint32_t response_body_size = 4096;
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.streaming_shadow", "true"}});
+
+  autonomous_upstream_ = true;
+  autonomous_allow_incomplete_streams_ = true;
+  setUpstreamCount(2);
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
+    cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+    cluster->set_name("cluster_1");
+  });
+  config_helper_.addConfigModifier(
+      [=](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto* mirror_policy = hcm.mutable_route_config()
+                                  ->mutable_virtual_hosts(0)
+                                  ->mutable_routes(0)
+                                  ->mutable_route()
+                                  ->add_request_mirror_policies();
+        mirror_policy->set_cluster("cluster_1");
+      });
+  initialize();
+
+  buffer_factory_->setExpectedAccountBalance(request_body_size, num_requests);
+
+  // Makes us have Envoy's writes to shadow upstream return EAGAIN
+  write_matcher_->setDestinationPort(fake_upstreams_[1]->localAddress()->ip()->port());
+  write_matcher_->setWriteReturnsEgain();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto responses = sendRequests(num_requests, request_body_size, response_body_size,
+                                /*cluster_to_wait_for=*/"cluster_1");
+
+  // Wait for all requests to have accounted for the requests we've sent.
+  if (streamBufferAccounting()) {
+    EXPECT_TRUE(
+        buffer_factory_->waitForExpectedAccountBalanceWithTimeout(TestUtility::DefaultTimeout))
+        << "buffer total: " << buffer_factory_->totalBufferSize() << "\n"
+        << " buffer max: " << buffer_factory_->maxBufferSize() << "\n"
+        << printAccounts();
   }
 
   write_matcher_->setResumeWrites();
