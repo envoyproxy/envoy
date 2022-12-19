@@ -1,5 +1,6 @@
 #include "test/common/integration/base_client_integration_test.h"
 
+#include <memory>
 #include <string>
 
 #include "test/common/http/common.h"
@@ -15,62 +16,62 @@
 namespace Envoy {
 namespace {
 
-// void validateStreamIntel(const envoy_final_stream_intel& final_intel, bool expect_dns,
-//                          bool upstream_tls, bool is_first_request) {
-//   if (expect_dns) {
-//     EXPECT_NE(-1, final_intel.dns_start_ms);
-//     EXPECT_NE(-1, final_intel.dns_end_ms);
-//   }
+void validateStreamIntel(const envoy_final_stream_intel& final_intel, bool expect_dns,
+                         bool upstream_tls, bool is_first_request) {
+  if (expect_dns) {
+    EXPECT_NE(-1, final_intel.dns_start_ms);
+    EXPECT_NE(-1, final_intel.dns_end_ms);
+  }
 
-//   if (upstream_tls) {
-//     EXPECT_GT(final_intel.ssl_start_ms, 0);
-//     EXPECT_GT(final_intel.ssl_end_ms, 0);
-//   } else {
-//     EXPECT_EQ(-1, final_intel.ssl_start_ms);
-//     EXPECT_EQ(-1, final_intel.ssl_end_ms);
-//   }
+  if (upstream_tls) {
+    EXPECT_GT(final_intel.ssl_start_ms, 0);
+    EXPECT_GT(final_intel.ssl_end_ms, 0);
+  } else {
+    EXPECT_EQ(-1, final_intel.ssl_start_ms);
+    EXPECT_EQ(-1, final_intel.ssl_end_ms);
+  }
 
-//   ASSERT_NE(-1, final_intel.stream_start_ms);
-//   ASSERT_NE(-1, final_intel.connect_start_ms);
-//   ASSERT_NE(-1, final_intel.connect_end_ms);
-//   ASSERT_NE(-1, final_intel.sending_start_ms);
-//   ASSERT_NE(-1, final_intel.sending_end_ms);
-//   ASSERT_NE(-1, final_intel.response_start_ms);
-//   ASSERT_NE(-1, final_intel.stream_end_ms);
+  ASSERT_NE(-1, final_intel.stream_start_ms);
+  ASSERT_NE(-1, final_intel.connect_start_ms);
+  ASSERT_NE(-1, final_intel.connect_end_ms);
+  ASSERT_NE(-1, final_intel.sending_start_ms);
+  ASSERT_NE(-1, final_intel.sending_end_ms);
+  ASSERT_NE(-1, final_intel.response_start_ms);
+  ASSERT_NE(-1, final_intel.stream_end_ms);
 
-//   if (is_first_request) {
-//     ASSERT_LE(final_intel.stream_start_ms, final_intel.connect_start_ms);
-//   }
-//   ASSERT_LE(final_intel.connect_start_ms, final_intel.connect_end_ms);
-//   ASSERT_LE(final_intel.connect_end_ms, final_intel.sending_start_ms);
-//   ASSERT_LE(final_intel.sending_start_ms, final_intel.sending_end_ms);
-//   ASSERT_LE(final_intel.response_start_ms, final_intel.stream_end_ms);
-// }
+  if (is_first_request) {
+    ASSERT_LE(final_intel.stream_start_ms, final_intel.connect_start_ms);
+  }
+  ASSERT_LE(final_intel.connect_start_ms, final_intel.connect_end_ms);
+  ASSERT_LE(final_intel.connect_end_ms, final_intel.sending_start_ms);
+  ASSERT_LE(final_intel.sending_start_ms, final_intel.sending_end_ms);
+  ASSERT_LE(final_intel.response_start_ms, final_intel.stream_end_ms);
+}
 
 // Gets the spdlog level from the test options and converts it to the Platform::LogLevel used by
 // the Envoy Mobile engine.
-// Platform::LogLevel getPlatformLogLevelFromOptions() {
-//   switch (TestEnvironment::getOptions().logLevel()) {
-//   case spdlog::level::level_enum::trace:
-//     return Platform::LogLevel::trace;
-//   case spdlog::level::level_enum::debug:
-//     return Platform::LogLevel::debug;
-//   case spdlog::level::level_enum::info:
-//     return Platform::LogLevel::info;
-//   case spdlog::level::level_enum::warn:
-//     return Platform::LogLevel::warn;
-//   case spdlog::level::level_enum::err:
-//     return Platform::LogLevel::error;
-//   case spdlog::level::level_enum::critical:
-//     return Platform::LogLevel::critical;
-//   case spdlog::level::level_enum::off:
-//     return Platform::LogLevel::off;
-//   default:
-//     ENVOY_LOG_MISC(warn, "Couldn't map spdlog level {}. Using `info` level.",
-//                    TestEnvironment::getOptions().logLevel());
-//     return Platform::LogLevel::info;
-//   }
-// }
+Platform::LogLevel getPlatformLogLevelFromOptions() {
+  switch (TestEnvironment::getOptions().logLevel()) {
+  case spdlog::level::level_enum::trace:
+    return Platform::LogLevel::trace;
+  case spdlog::level::level_enum::debug:
+    return Platform::LogLevel::debug;
+  case spdlog::level::level_enum::info:
+    return Platform::LogLevel::info;
+  case spdlog::level::level_enum::warn:
+    return Platform::LogLevel::warn;
+  case spdlog::level::level_enum::err:
+    return Platform::LogLevel::error;
+  case spdlog::level::level_enum::critical:
+    return Platform::LogLevel::critical;
+  case spdlog::level::level_enum::off:
+    return Platform::LogLevel::off;
+  default:
+    ENVOY_LOG_MISC(warn, "Couldn't map spdlog level {}. Using `info` level.",
+                   TestEnvironment::getOptions().logLevel());
+    return Platform::LogLevel::info;
+  }
+}
 
 } // namespace
 
@@ -91,51 +92,58 @@ BaseClientIntegrationTest::BaseClientIntegrationTest(Network::Address::IpVersion
   autonomous_upstream_ = true;
   defer_listener_finalization_ = true;
 
-  // builder_.addLogLevel(getPlatformLogLevelFromOptions());
+  builder_.addLogLevel(getPlatformLogLevelFromOptions());
 }
 
 void BaseClientIntegrationTest::initialize() {
   BaseIntegrationTest::initialize();
+  for (int i = 0; i < num_engines_for_test_; i++) {
+    auto engine = multi_engines_[i];
+    multi_terminal_callbacks_.push_back(std::make_shared<ConditionalInitializer>());
+    multi_cc_.push_back(std::make_shared<callbacks_called>(
+        callbacks_called{0, 0, 0, 0, 0, 0, 0, "", multi_terminal_callbacks_[i].get(), {}}));
+    auto cc = multi_cc_[i];
+    multi_stream_prototypes_.push_back(engine->streamClient()->newStreamPrototype());
+    auto stream_prototype = multi_stream_prototypes_[i];
 
-  // multi_stream_prototypes_.clear();
-  // for (const auto& engine : multi_engines_) {
-  //   multi_stream_prototypes_.push_back(engine->streamClient()->newStreamPrototype());
-  // }
-  // stream_prototype_ = multi_stream_prototypes_[0];
-  // stream_prototype_->setOnHeaders(
-  //     [this](Platform::ResponseHeadersSharedPtr headers, bool, envoy_stream_intel intel) {
-  //       cc_.on_headers_calls++;
-  //       cc_.status = absl::StrCat(headers->httpStatus());
-  //       cc_.on_header_consumed_bytes_from_response = intel.consumed_bytes_from_response;
-  //     });
-  // stream_prototype_->setOnData([this](envoy_data c_data, bool) {
-  //   cc_.on_data_calls++;
-  //   release_envoy_data(c_data);
-  // });
-  // stream_prototype_->setOnComplete(
-  //     [this](envoy_stream_intel, envoy_final_stream_intel final_intel) {
-  // if (expect_data_streams_) {
-  //       validateStreamIntel(final_intel, expect_dns_, upstream_tls_, cc_.on_complete_calls == 0);
-  // }
-  //       cc_.on_complete_received_byte_count = final_intel.received_byte_count;
-  //       cc_.on_complete_calls++;
-  //       cc_.terminal_callback->setReady();
-  //     });
-  // stream_prototype_->setOnError(
-  //     [this](Platform::EnvoyErrorSharedPtr, envoy_stream_intel, envoy_final_stream_intel) {
-  //       cc_.on_error_calls++;
-  //       cc_.terminal_callback->setReady();
-  //     });
-  // stream_prototype_->setOnCancel([this](envoy_stream_intel, envoy_final_stream_intel final_intel)
-  // {
-  //   EXPECT_NE(-1, final_intel.stream_start_ms);
-  //   cc_.on_cancel_calls++;
-  //   cc_.terminal_callback->setReady();
-  // });
+    stream_prototype->setOnHeaders(
+        [cc](Platform::ResponseHeadersSharedPtr headers, bool, envoy_stream_intel intel) {
+          cc->on_headers_calls++;
+          cc->status = absl::StrCat(headers->httpStatus());
+          cc->on_header_consumed_bytes_from_response = intel.consumed_bytes_from_response;
+        });
+    stream_prototype->setOnData([cc](envoy_data c_data, bool) {
+      cc->on_data_calls++;
+      release_envoy_data(c_data);
+    });
+    stream_prototype->setOnComplete([cc, this](envoy_stream_intel, envoy_final_stream_intel final_intel) {
+      if (expect_data_streams_) {
+        validateStreamIntel(final_intel, expect_dns_, upstream_tls_, cc->on_complete_calls == 0);
+      }
+      cc->on_complete_received_byte_count = final_intel.received_byte_count;
+      cc->on_complete_calls++;
+      cc->terminal_callback->setReady();
+    });
+    stream_prototype->setOnError(
+        [cc](Platform::EnvoyErrorSharedPtr, envoy_stream_intel, envoy_final_stream_intel) {
+          cc->on_error_calls++;
+          cc->terminal_callback->setReady();
+        });
+    stream_prototype->setOnCancel([cc](envoy_stream_intel, envoy_final_stream_intel final_intel) {
+      EXPECT_NE(-1, final_intel.stream_start_ms);
+      cc->on_cancel_calls++;
+      cc->terminal_callback->setReady();
+    });
 
-  // stream_ = (*stream_prototype_).start(explicit_flow_control_);
-  // HttpTestUtility::addDefaultHeaders(default_request_headers_);
-  // default_request_headers_.setHost(fake_upstreams_[0]->localAddress()->asStringView());
+    multi_streams_.push_back((*stream_prototype).start(explicit_flow_control_));
+  }
+  cc_ = multi_cc_[0];
+  terminal_callback_ = multi_terminal_callbacks_[0];
+  stream_prototype_ = multi_stream_prototypes_[0];
+  stream_ = multi_streams_[0];
+
+  HttpTestUtility::addDefaultHeaders(default_request_headers_);
+  default_request_headers_.setHost(fake_upstreams_[0]->localAddress()->asStringView());
 }
 
 std::shared_ptr<Platform::RequestHeaders> BaseClientIntegrationTest::envoyToMobileHeaders(
@@ -182,26 +190,29 @@ void BaseClientIntegrationTest::threadRoutine(absl::Notification& engine_running
 void BaseClientIntegrationTest::TearDown() {
   test_server_.reset();
   fake_upstreams_.clear();
-  // Note that engines must be terminated in reverse order of creation to avoid a segfault ;___;
+  // Note that engines must be terminated in reverse order of creation
+  // so that logging is handed off correctly
   for (int i = multi_engines_.size() - 1; i >= 0; i--) {
-    std::cout << "a\n";
     multi_engines_[i]->terminate();
-    std::cout << "b\n";
   };
   engine_.reset();
   multi_engines_.clear();
 
+  multi_terminal_callbacks_.clear();
+  multi_stream_prototypes_.clear();
+  multi_cc_.clear();
   full_dispatcher_->exit();
   envoy_thread_->join();
+
 }
 
 void BaseClientIntegrationTest::createEnvoy() {
   std::vector<uint32_t> ports;
-  // for (auto& upstream : fake_upstreams_) {
-  //   if (upstream->localAddress()->ip()) {
-  //     ports.push_back(upstream->localAddress()->ip()->port());
-  //   }
-  // }
+  for (auto& upstream : fake_upstreams_) {
+    if (upstream->localAddress()->ip()) {
+      ports.push_back(upstream->localAddress()->ip()->port());
+    }
+  }
 
   finalizeConfigWithPorts(config_helper_, ports, use_lds_);
 

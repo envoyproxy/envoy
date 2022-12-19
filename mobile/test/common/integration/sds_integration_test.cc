@@ -97,14 +97,14 @@ TEST_P(SdsIntegrationTest, SdsForUpstreamCluster) {
       waitForCounterGe("cluster.base_h2.client_ssl_socket_factory.ssl_context_update_by_sds", 1));
 
   stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
-  terminal_callback_.waitReady();
+  terminal_callback_->waitReady();
 
-  EXPECT_EQ(cc_.on_headers_calls, 1);
-  EXPECT_EQ(cc_.status, "200");
-  EXPECT_EQ(cc_.on_complete_calls, 1);
-  EXPECT_EQ(cc_.on_cancel_calls, 0);
-  EXPECT_EQ(cc_.on_error_calls, 0);
-  EXPECT_EQ(cc_.on_header_consumed_bytes_from_response, 13);
+  EXPECT_EQ(cc_->on_headers_calls, 1);
+  EXPECT_EQ(cc_->status, "200");
+  EXPECT_EQ(cc_->on_complete_calls, 1);
+  EXPECT_EQ(cc_->on_cancel_calls, 0);
+  EXPECT_EQ(cc_->on_error_calls, 0);
+  EXPECT_EQ(cc_->on_header_consumed_bytes_from_response, 13);
 }
 
 } // namespace

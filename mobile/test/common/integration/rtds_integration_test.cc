@@ -64,16 +64,16 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
 
   // Send a request on the data plane.
   stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
-  terminal_callback_.waitReady();
+  terminal_callback_->waitReady();
 
-  EXPECT_EQ(cc_.on_headers_calls, 1);
-  EXPECT_EQ(cc_.status, "200");
-  EXPECT_EQ(cc_.on_data_calls, 2);
-  EXPECT_EQ(cc_.on_complete_calls, 1);
-  EXPECT_EQ(cc_.on_cancel_calls, 0);
-  EXPECT_EQ(cc_.on_error_calls, 0);
-  EXPECT_EQ(cc_.on_header_consumed_bytes_from_response, 13);
-  EXPECT_EQ(cc_.on_complete_received_byte_count, 41);
+  EXPECT_EQ(cc_->on_headers_calls, 1);
+  EXPECT_EQ(cc_->status, "200");
+  EXPECT_EQ(cc_->on_data_calls, 2);
+  EXPECT_EQ(cc_->on_complete_calls, 1);
+  EXPECT_EQ(cc_->on_cancel_calls, 0);
+  EXPECT_EQ(cc_->on_error_calls, 0);
+  EXPECT_EQ(cc_->on_header_consumed_bytes_from_response, 13);
+  EXPECT_EQ(cc_->on_complete_received_byte_count, 41);
   // Check that the Runtime config is from the static layer.
   EXPECT_TRUE(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
 

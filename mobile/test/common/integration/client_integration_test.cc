@@ -47,7 +47,7 @@ TEST_P(ClientIntegrationTest, Basic) {
     } else {
       EXPECT_EQ(c_data.length, 10);
     }
-    cc_.on_data_calls++;
+    cc_->on_data_calls++;
     release_envoy_data(c_data);
   });
 
@@ -61,14 +61,14 @@ TEST_P(ClientIntegrationTest, Basic) {
       std::make_shared<Platform::RequestTrailers>(builder.build());
   stream_->close(trailers);
 
-  terminal_callback_.waitReady();
+  terminal_callback_->waitReady();
 
-  ASSERT_EQ(cc_.on_headers_calls, 1);
-  ASSERT_EQ(cc_.status, "200");
-  ASSERT_EQ(cc_.on_data_calls, 2);
-  ASSERT_EQ(cc_.on_complete_calls, 1);
-  ASSERT_EQ(cc_.on_header_consumed_bytes_from_response, 27);
-  ASSERT_EQ(cc_.on_complete_received_byte_count, 67);
+  ASSERT_EQ(cc_->on_headers_calls, 1);
+  ASSERT_EQ(cc_->status, "200");
+  ASSERT_EQ(cc_->on_data_calls, 2);
+  ASSERT_EQ(cc_->on_complete_calls, 1);
+  ASSERT_EQ(cc_->on_header_consumed_bytes_from_response, 27);
+  ASSERT_EQ(cc_->on_complete_received_byte_count, 67);
 }
 
 TEST_P(ClientIntegrationTest, BasicNon2xx) {
@@ -80,12 +80,12 @@ TEST_P(ClientIntegrationTest, BasicNon2xx) {
           Http::TestResponseHeaderMapImpl({{":status", "503"}, {"content-length", "0"}})));
 
   stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
-  terminal_callback_.waitReady();
+  terminal_callback_->waitReady();
 
-  ASSERT_EQ(cc_.on_error_calls, 0);
-  ASSERT_EQ(cc_.status, "503");
-  ASSERT_EQ(cc_.on_headers_calls, 1);
-  ASSERT_EQ(cc_.on_complete_calls, 1);
+  ASSERT_EQ(cc_->on_error_calls, 0);
+  ASSERT_EQ(cc_->status, "503");
+  ASSERT_EQ(cc_->on_headers_calls, 1);
+  ASSERT_EQ(cc_->on_complete_calls, 1);
 }
 
 TEST_P(ClientIntegrationTest, BasicReset) {
@@ -94,10 +94,10 @@ TEST_P(ClientIntegrationTest, BasicReset) {
   default_request_headers_.addCopy(AutonomousStream::RESET_AFTER_REQUEST, "yes");
 
   stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
-  terminal_callback_.waitReady();
+  terminal_callback_->waitReady();
 
-  ASSERT_EQ(cc_.on_error_calls, 1);
-  ASSERT_EQ(cc_.on_headers_calls, 0);
+  ASSERT_EQ(cc_->on_error_calls, 1);
+  ASSERT_EQ(cc_->on_headers_calls, 0);
 }
 
 TEST_P(ClientIntegrationTest, BasicCancel) {
@@ -108,8 +108,8 @@ TEST_P(ClientIntegrationTest, BasicCancel) {
   stream_prototype_->setOnHeaders(
       [this, &headers_callback](Platform::ResponseHeadersSharedPtr headers, bool,
                                 envoy_stream_intel) {
-        cc_.status = absl::StrCat(headers->httpStatus());
-        cc_.on_headers_calls++;
+        cc_->status = absl::StrCat(headers->httpStatus());
+        cc_->on_headers_calls++;
         headers_callback.setReady();
         return nullptr;
       });
@@ -128,21 +128,21 @@ TEST_P(ClientIntegrationTest, BasicCancel) {
   ASSERT_TRUE(upstream_connection->write(response));
 
   headers_callback.waitReady();
-  ASSERT_EQ(cc_.on_headers_calls, 1);
-  ASSERT_EQ(cc_.status, "200");
-  ASSERT_EQ(cc_.on_data_calls, 0);
-  ASSERT_EQ(cc_.on_complete_calls, 0);
+  ASSERT_EQ(cc_->on_headers_calls, 1);
+  ASSERT_EQ(cc_->status, "200");
+  ASSERT_EQ(cc_->on_data_calls, 0);
+  ASSERT_EQ(cc_->on_complete_calls, 0);
 
   // Now cancel, and make sure the cancel is received.
   stream_->cancel();
-  memset(&cc_.final_intel, 0, sizeof(cc_.final_intel));
-  terminal_callback_.waitReady();
+  memset(&cc_->final_intel, 0, sizeof(cc_->final_intel));
+  terminal_callback_->waitReady();
 
-  ASSERT_EQ(cc_.on_headers_calls, 1);
-  ASSERT_EQ(cc_.status, "200");
-  ASSERT_EQ(cc_.on_data_calls, 0);
-  ASSERT_EQ(cc_.on_complete_calls, 0);
-  ASSERT_EQ(cc_.on_cancel_calls, 1);
+  ASSERT_EQ(cc_->on_headers_calls, 1);
+  ASSERT_EQ(cc_->status, "200");
+  ASSERT_EQ(cc_->on_data_calls, 0);
+  ASSERT_EQ(cc_->on_complete_calls, 0);
+  ASSERT_EQ(cc_->on_cancel_calls, 1);
 }
 
 TEST_P(ClientIntegrationTest, CancelWithPartialStream) {
@@ -154,8 +154,8 @@ TEST_P(ClientIntegrationTest, CancelWithPartialStream) {
   stream_prototype_->setOnHeaders(
       [this, &headers_callback](Platform::ResponseHeadersSharedPtr headers, bool,
                                 envoy_stream_intel) {
-        cc_.status = absl::StrCat(headers->httpStatus());
-        cc_.on_headers_calls++;
+        cc_->status = absl::StrCat(headers->httpStatus());
+        cc_->on_headers_calls++;
         headers_callback.setReady();
         return nullptr;
       });
@@ -174,21 +174,21 @@ TEST_P(ClientIntegrationTest, CancelWithPartialStream) {
   ASSERT_TRUE(upstream_connection->write(response));
   headers_callback.waitReady();
 
-  ASSERT_EQ(cc_.on_headers_calls, 1);
-  ASSERT_EQ(cc_.status, "200");
-  ASSERT_EQ(cc_.on_data_calls, 0);
-  ASSERT_EQ(cc_.on_complete_calls, 0);
+  ASSERT_EQ(cc_->on_headers_calls, 1);
+  ASSERT_EQ(cc_->status, "200");
+  ASSERT_EQ(cc_->on_data_calls, 0);
+  ASSERT_EQ(cc_->on_complete_calls, 0);
   // Due to explicit flow control, the upstream stream is complete, but the
   // callbacks will not be called for data and completion. Cancel the stream
   // and make sure the cancel is received.
   stream_->cancel();
-  terminal_callback_.waitReady();
+  terminal_callback_->waitReady();
 
-  ASSERT_EQ(cc_.on_headers_calls, 1);
-  ASSERT_EQ(cc_.status, "200");
-  ASSERT_EQ(cc_.on_data_calls, 0);
-  ASSERT_EQ(cc_.on_complete_calls, 0);
-  ASSERT_EQ(cc_.on_cancel_calls, 1);
+  ASSERT_EQ(cc_->on_headers_calls, 1);
+  ASSERT_EQ(cc_->status, "200");
+  ASSERT_EQ(cc_->on_data_calls, 0);
+  ASSERT_EQ(cc_->on_complete_calls, 0);
+  ASSERT_EQ(cc_->on_cancel_calls, 1);
 }
 
 // TODO(junr03): test with envoy local reply with local stream not closed, which causes a reset
@@ -211,8 +211,8 @@ TEST_P(ClientIntegrationTest, CaseSensitive) {
 
   stream_prototype_->setOnHeaders(
       [this](Platform::ResponseHeadersSharedPtr headers, bool, envoy_stream_intel) {
-        cc_.status = absl::StrCat(headers->httpStatus());
-        cc_.on_headers_calls++;
+        cc_->status = absl::StrCat(headers->httpStatus());
+        cc_->on_headers_calls++;
         EXPECT_TRUE(headers->contains("My-ResponsE-Header"));
         EXPECT_TRUE((*headers)["My-ResponsE-Header"][0] == "foo");
         return nullptr;
@@ -232,12 +232,12 @@ TEST_P(ClientIntegrationTest, CaseSensitive) {
   auto response = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nMy-ResponsE-Header: foo\r\n\r\n";
   ASSERT_TRUE(upstream_connection->write(response));
 
-  terminal_callback_.waitReady();
+  terminal_callback_->waitReady();
 
-  ASSERT_EQ(cc_.on_headers_calls, 1);
-  ASSERT_EQ(cc_.status, "200");
-  ASSERT_EQ(cc_.on_data_calls, 0);
-  ASSERT_EQ(cc_.on_complete_calls, 1);
+  ASSERT_EQ(cc_->on_headers_calls, 1);
+  ASSERT_EQ(cc_->status, "200");
+  ASSERT_EQ(cc_->on_data_calls, 0);
+  ASSERT_EQ(cc_->on_complete_calls, 1);
 }
 
 TEST_P(ClientIntegrationTest, TimeoutOnRequestPath) {
@@ -254,12 +254,12 @@ TEST_P(ClientIntegrationTest, TimeoutOnRequestPath) {
   std::string upstream_request;
   EXPECT_TRUE(upstream_connection->waitForData(FakeRawConnection::waitForInexactMatch("GET /"),
                                                &upstream_request));
-  terminal_callback_.waitReady();
+  terminal_callback_->waitReady();
 
-  ASSERT_EQ(cc_.on_headers_calls, 0);
-  ASSERT_EQ(cc_.on_data_calls, 0);
-  ASSERT_EQ(cc_.on_complete_calls, 0);
-  ASSERT_EQ(cc_.on_error_calls, 1);
+  ASSERT_EQ(cc_->on_headers_calls, 0);
+  ASSERT_EQ(cc_->on_data_calls, 0);
+  ASSERT_EQ(cc_->on_complete_calls, 0);
+  ASSERT_EQ(cc_->on_error_calls, 1);
 }
 
 TEST_P(ClientIntegrationTest, TimeoutOnResponsePath) {
@@ -280,13 +280,13 @@ TEST_P(ClientIntegrationTest, TimeoutOnResponsePath) {
   auto response = "HTTP/1.1 200 OK\r\nContent-Length: 10\r\nMy-ResponsE-Header: foo\r\n\r\n";
   ASSERT_TRUE(upstream_connection->write(response));
 
-  terminal_callback_.waitReady();
+  terminal_callback_->waitReady();
 
-  ASSERT_EQ(cc_.on_headers_calls, 1);
-  ASSERT_EQ(cc_.status, "200");
-  ASSERT_EQ(cc_.on_data_calls, 0);
-  ASSERT_EQ(cc_.on_complete_calls, 0);
-  ASSERT_EQ(cc_.on_error_calls, 1);
+  ASSERT_EQ(cc_->on_headers_calls, 1);
+  ASSERT_EQ(cc_->status, "200");
+  ASSERT_EQ(cc_->on_data_calls, 0);
+  ASSERT_EQ(cc_->on_complete_calls, 0);
+  ASSERT_EQ(cc_->on_error_calls, 1);
 }
 
 // TODO(alyssawilk) get this working in a follow-up.
@@ -302,17 +302,17 @@ TEST_P(ClientIntegrationTest, DISABLED_Proxying) {
 
   // The initial request will do the DNS lookup and resolve localhost to 127.0.0.1
   stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
-  terminal_callback_.waitReady();
-  ASSERT_EQ(cc_.status, "200");
-  ASSERT_EQ(cc_.on_complete_calls, 1);
+  terminal_callback_->waitReady();
+  ASSERT_EQ(cc_->status, "200");
+  ASSERT_EQ(cc_->on_complete_calls, 1);
   stream_.reset();
 
   // The second request will use the cached DNS entry and should succeed as well.
   stream_ = (*stream_prototype_).start(explicit_flow_control_);
   stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
-  terminal_callback_.waitReady();
-  ASSERT_EQ(cc_.status, "200");
-  ASSERT_EQ(cc_.on_complete_calls, 2);
+  terminal_callback_->waitReady();
+  ASSERT_EQ(cc_->status, "200");
+  ASSERT_EQ(cc_->on_complete_calls, 2);
 }
 
 TEST_P(ClientIntegrationTest, DirectResponse) {
@@ -325,18 +325,18 @@ TEST_P(ClientIntegrationTest, DirectResponse) {
   // Override to not validate stream intel.
   stream_prototype_->setOnComplete(
       [this](envoy_stream_intel, envoy_final_stream_intel final_intel) {
-        cc_.on_complete_received_byte_count = final_intel.received_byte_count;
-        cc_.on_complete_calls++;
-        cc_.terminal_callback->setReady();
+        cc_->on_complete_received_byte_count = final_intel.received_byte_count;
+        cc_->on_complete_calls++;
+        cc_->terminal_callback->setReady();
       });
 
   default_request_headers_.setHost("127.0.0.1");
   default_request_headers_.setPath("/");
 
   stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), true);
-  terminal_callback_.waitReady();
-  ASSERT_EQ(cc_.status, "404");
-  ASSERT_EQ(cc_.on_headers_calls, 1);
+  terminal_callback_->waitReady();
+  ASSERT_EQ(cc_->status, "404");
+  ASSERT_EQ(cc_->on_headers_calls, 1);
   stream_.reset();
 }
 

@@ -13,7 +13,6 @@
 
 using testing::ReturnRef;
 
-// AN EXACT COPY OF client_integration_test.cc with all tests removed except the first
 
 namespace Envoy {
 namespace {
@@ -44,42 +43,46 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, MultiEnvoyTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+// Sets up 20 engines, tests data plane access for the first one.
 TEST_P(MultiEnvoyTest, Basic) {
-  num_engines_for_test_ = 50; // change this
+  num_engines_for_test_ = 20;
   initialize();
 
-  // Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
-  // default_request_headers_.addCopy(AutonomousStream::EXPECT_REQUEST_SIZE_BYTES,
-  //                                  std::to_string(request_data.length()));
+  Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
+  default_request_headers_.addCopy(AutonomousStream::EXPECT_REQUEST_SIZE_BYTES,
+                                   std::to_string(request_data.length()));
+  for (int i = 0; i<num_engines_for_test_; i++){
+    multi_stream_prototypes_[i]->setOnData([=](envoy_data c_data, bool end_stream) {
+      if (end_stream) {
+        EXPECT_EQ(Data::Utility::copyToString(c_data), "");
+      } else {
+        EXPECT_EQ(c_data.length, 10);
+      }
+      multi_cc_[i]->on_data_calls++;
+      release_envoy_data(c_data);
+    });
 
-  // stream_prototype_->setOnData([this](envoy_data c_data, bool end_stream) {
-  //   if (end_stream) {
-  //     EXPECT_EQ(Data::Utility::copyToString(c_data), "");
-  //   } else {
-  //     EXPECT_EQ(c_data.length, 10);
-  //   }
-  //   cc_.on_data_calls++;
-  //   release_envoy_data(c_data);
-  // });
+    multi_streams_[i]->sendHeaders(envoyToMobileHeaders(default_request_headers_), false);
 
-  // stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), false);
+    envoy_data c_data = Data::Utility::toBridgeData(request_data);
+    multi_streams_[i]->sendData(c_data);
 
-  // envoy_data c_data = Data::Utility::toBridgeData(request_data);
-  // stream_->sendData(c_data);
+    Platform::RequestTrailersBuilder builder;
+    std::shared_ptr<Platform::RequestTrailers> trailers =
+        std::make_shared<Platform::RequestTrailers>(builder.build());
+    multi_streams_[i]->close(trailers);
 
-  // Platform::RequestTrailersBuilder builder;
-  // std::shared_ptr<Platform::RequestTrailers> trailers =
-  //     std::make_shared<Platform::RequestTrailers>(builder.build());
-  // stream_->close(trailers);
+    multi_terminal_callbacks_[i]->waitReady();
 
-  // terminal_callback_.waitReady();
-
-  // ASSERT_EQ(cc_.on_headers_calls, 1);
-  // ASSERT_EQ(cc_.status, "200");
-  // ASSERT_EQ(cc_.on_data_calls, 2);
-  // ASSERT_EQ(cc_.on_complete_calls, 1);
-  // ASSERT_EQ(cc_.on_header_consumed_bytes_from_response, 27);
-  // ASSERT_EQ(cc_.on_complete_received_byte_count, 67);
+    ASSERT_EQ(multi_cc_[i]->on_headers_calls, 1);
+    ASSERT_EQ(multi_cc_[i]->status, "200");
+    ASSERT_EQ(multi_cc_[i]->on_data_calls, 2);
+    ASSERT_EQ(multi_cc_[i]->on_complete_calls, 1);
+    ASSERT_EQ(multi_cc_[i]->on_header_consumed_bytes_from_response, 27);
+    ASSERT_EQ(multi_cc_[i]->on_complete_received_byte_count, 67);
+    // Request is freed by the engine and must be recreated
+    request_data = Buffer::OwnedImpl("request body");
+  }
 }
 
 } // namespace
