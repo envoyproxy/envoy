@@ -27,6 +27,7 @@ envoy_cc_library(
     name = "codec_stats_lib",
     hdrs = ["codec_stats.h"],
     deps = [
+        "//envoy/http:header_validator_interface",
         "//envoy/stats:stats_interface",
         "//envoy/stats:stats_macros",
         "//source/common/common:thread_lib",

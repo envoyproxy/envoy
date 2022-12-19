@@ -3,6 +3,7 @@
 
 #include "test/extensions/http/header_validators/envoy_default/path_normalizer_fuzz.pb.h"
 #include "test/fuzz/fuzz_runner.h"
+#include "test/mocks/http/header_validator.h"
 #include "test/mocks/stream_info/mocks.h"
 
 namespace Envoy {
@@ -19,9 +20,10 @@ DEFINE_PROTO_FUZZER(
 
   ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig config;
   *config.mutable_uri_path_normalization_options() = input.options();
-  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  NiceMock<Http::MockHeaderValidatorStats> stats_fake;
   Extensions::Http::HeaderValidators::EnvoyDefault::Http1HeaderValidator validator(
-      config, Http::Protocol::Http11, stream_info);
+      config, Http::Protocol::Http11, stream_info, stats_fake);
   // The character set of the :path and :method headers is validated before normalization.
   // Here we will just not run the test with invalid values
   if (!validator.validateMethodHeader(method) ||
