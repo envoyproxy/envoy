@@ -1516,18 +1516,12 @@ TEST(Url, ParsingFails) {
 }
 
 void validateUrl(absl::string_view raw_url, absl::string_view expected_scheme,
-                 absl::string_view expected_host_port, absl::string_view expected_path,
-                 bool validate_tostring = true) {
+                 absl::string_view expected_host_port, absl::string_view expected_path) {
   Utility::Url url;
   ASSERT_TRUE(url.initialize(raw_url, false)) << "Failed to initialize " << raw_url;
   EXPECT_EQ(url.scheme(), expected_scheme);
   EXPECT_EQ(url.hostAndPort(), expected_host_port);
   EXPECT_EQ(url.pathAndQueryParams(), expected_path);
-  if (validate_tostring) {
-    // Verify that url.toString() is equivalent to raw_url.
-    validateUrl(url.toString(), expected_scheme, expected_host_port, expected_path,
-                /*validate_tostring=*/false);
-  }
 }
 
 void validateConnectUrl(absl::string_view raw_url) {
