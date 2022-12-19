@@ -13,6 +13,7 @@
                            dnsQueryTimeoutSeconds:(UInt32)dnsQueryTimeoutSeconds
                              dnsMinRefreshSeconds:(UInt32)dnsMinRefreshSeconds
                            dnsPreresolveHostnames:(NSString *)dnsPreresolveHostnames
+                                   enableDNSCache:(BOOL)enableDNSCache
                               enableHappyEyeballs:(BOOL)enableHappyEyeballs
                                        enableGzip:(BOOL)enableGzip
                                      enableBrotli:(BOOL)enableBrotli
@@ -58,6 +59,7 @@
   self.dnsQueryTimeoutSeconds = dnsQueryTimeoutSeconds;
   self.dnsMinRefreshSeconds = dnsMinRefreshSeconds;
   self.dnsPreresolveHostnames = dnsPreresolveHostnames;
+  self.enableDNSCache = enableDNSCache;
   self.enableHappyEyeballs = enableHappyEyeballs;
   self.enableGzip = enableGzip;
   self.enableBrotli = enableBrotli;
@@ -191,6 +193,11 @@
                                           : @(default_cert_validation_context_template);
 
   [definitions appendFormat:@"%@\n", cert_validator_template];
+
+  if (self.enableDNSCache) {
+    NSString *dns_cache_config = [[NSString alloc] initWithUTF8String:dns_cache_key_value_config_insert];
+    [definitions appendFormat:@"- &dns_cache_key_value_config %@\n", dns_cache_config];
+  }
 
   NSMutableArray *stat_sinks_config = [self.statsSinks mutableCopy];
 

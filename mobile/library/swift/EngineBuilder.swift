@@ -22,6 +22,7 @@ open class EngineBuilder: NSObject {
   private var dnsMinRefreshSeconds: UInt32 = 60
   private var dnsPreresolveHostnames: String = "[]"
   private var dnsRefreshSeconds: UInt32 = 60
+  private var enableDNSCache: Bool = false
   private var enableHappyEyeballs: Bool = true
   private var enableGzip: Bool = true
   private var enableBrotli: Bool = false
@@ -168,6 +169,19 @@ open class EngineBuilder: NSObject {
   @discardableResult
   public func addDNSRefreshSeconds(_ dnsRefreshSeconds: UInt32) -> Self {
     self.dnsRefreshSeconds = dnsRefreshSeconds
+    return self
+  }
+
+  /// Specify whether to enable DNS cache. Noe that
+  ///
+  /// - parameter enableDNSCache: whether to enable DNS cache. Disabled by default.
+  ///
+  /// - note: Enabled DNS cache requires an addition of a key value store named 'reserved.platform_store'.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func enableDNSCache(_ enableDNSCache: Bool) -> Self {
+    self.enableDNSCache = enableDNSCache
     return self
   }
 
@@ -516,6 +530,7 @@ open class EngineBuilder: NSObject {
       dnsQueryTimeoutSeconds: self.dnsQueryTimeoutSeconds,
       dnsMinRefreshSeconds: self.dnsMinRefreshSeconds,
       dnsPreresolveHostnames: self.dnsPreresolveHostnames,
+      enableDNSCache: self.enableDNSCache,
       enableHappyEyeballs: self.enableHappyEyeballs,
       enableGzip: self.enableGzip,
       enableBrotli: self.enableBrotli,
