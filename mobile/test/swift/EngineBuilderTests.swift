@@ -578,6 +578,7 @@ final class EngineBuilderTests: XCTestCase {
     )
     let resolvedYAML = try XCTUnwrap(config.resolveTemplate(kMockTemplate))
     XCTAssertTrue(resolvedYAML.contains("&dns_lookup_family V4_PREFERRED"))
+// swiftlint:disable line_length
     XCTAssertTrue(resolvedYAML.contains(
   """
       config:
@@ -589,6 +590,7 @@ final class EngineBuilderTests: XCTestCase {
             seconds: 15
   """
     ))
+// swiftlint:enable line_length
     XCTAssertTrue(resolvedYAML.contains("&dns_multiple_addresses false"))
     XCTAssertTrue(resolvedYAML.contains("&enable_interface_binding false"))
     XCTAssertTrue(resolvedYAML.contains("&trust_chain_verification VERIFY_TRUST_CHAIN"))
