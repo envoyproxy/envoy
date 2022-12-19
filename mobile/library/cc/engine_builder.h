@@ -66,6 +66,8 @@ public:
   std::string generateConfigStr() const;
 
   EngineSharedPtr build();
+
+protected:
   void setOverrideConfigForTests(std::string config) { config_override_for_tests_ = config; }
   void setAdminAddressPathForTests(std::string admin) { admin_address_path_for_tests_ = admin; }
 

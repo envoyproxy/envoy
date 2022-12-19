@@ -10,7 +10,6 @@
 #include "library/common/network/android.h"
 #include "library/common/stats/utility.h"
 
-
 namespace Envoy {
 
 Engine::Engine(envoy_engine_callbacks callbacks, envoy_logger logger,
@@ -178,13 +177,7 @@ envoy_status_t Engine::terminate() {
   } // lock(_mutex)
 
   if (std::this_thread::get_id() != main_thread_.get_id()) {
-    std::cout << "printing thread id: \n" << std::endl;
-    std::cout << main_thread_.get_id() << std::endl;
-    std::cout << "printing is joinable: \n" << std::endl;
-    std::cout << main_thread_.joinable() << std::endl;
-
     main_thread_.join();
-    std::cout << "join finished\n";
   }
 
   return ENVOY_SUCCESS;

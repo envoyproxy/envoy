@@ -1,6 +1,5 @@
 #include "test/common/integration/base_client_integration_test.h"
 
-#include <memory>
 #include <string>
 
 #include "test/common/http/common.h"
@@ -11,7 +10,6 @@
 #include "library/common/config/internal.h"
 #include "library/common/http/header_utility.h"
 #include "spdlog/spdlog.h"
-#include <unistd.h>
 
 namespace Envoy {
 namespace {
@@ -116,7 +114,8 @@ void BaseClientIntegrationTest::initialize() {
       cc->on_data_calls++;
       release_envoy_data(c_data);
     });
-    stream_prototype->setOnComplete([cc, this](envoy_stream_intel, envoy_final_stream_intel final_intel) {
+    stream_prototype->setOnComplete([cc, this](envoy_stream_intel,
+                                               envoy_final_stream_intel final_intel) {
       if (expect_data_streams_) {
         validateStreamIntel(final_intel, expect_dns_, upstream_tls_, cc->on_complete_calls == 0);
       }
@@ -202,7 +201,6 @@ void BaseClientIntegrationTest::TearDown() {
   multi_cc_.clear();
   full_dispatcher_->exit();
   envoy_thread_->join();
-
 }
 
 void BaseClientIntegrationTest::createEnvoy() {

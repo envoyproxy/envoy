@@ -8,8 +8,6 @@
 #include "library/common/http/client.h"
 #include "library/common/types/c_types.h"
 #include <vector>
-#include "absl/synchronization/blocking_counter.h"
-#include "absl/synchronization/mutex.h"
 
 namespace Envoy {
 
