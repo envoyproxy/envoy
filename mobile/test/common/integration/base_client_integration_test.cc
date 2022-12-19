@@ -90,7 +90,7 @@ BaseClientIntegrationTest::BaseClientIntegrationTest(Network::Address::IpVersion
   autonomous_upstream_ = true;
   defer_listener_finalization_ = true;
 
-  addLogLevel(getPlatformLogLevelFromOptions());
+  builder_.addLogLevel(getPlatformLogLevelFromOptions());
 }
 
 void BaseClientIntegrationTest::initialize() {
@@ -162,8 +162,8 @@ std::shared_ptr<Platform::RequestHeaders> BaseClientIntegrationTest::envoyToMobi
 }
 
 void BaseClientIntegrationTest::threadRoutine(absl::Notification& engine_running) {
-  setOnEngineRunning([&]() { engine_running.Notify(); });
-  engine_ = build();
+  builder_.setOnEngineRunning([&]() { engine_running.Notify(); });
+  engine_ = builder_.build();
   full_dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
@@ -187,7 +187,8 @@ void BaseClientIntegrationTest::createEnvoy() {
   finalizeConfigWithPorts(config_helper_, ports, use_lds_);
 
   if (override_builder_config_) {
-    setOverrideConfigForTests(MessageUtil::getYamlStringFromMessage(config_helper_.bootstrap()));
+    builder_.setOverrideConfigForTests(
+        MessageUtil::getYamlStringFromMessage(config_helper_.bootstrap()));
   } else {
     ENVOY_LOG_MISC(warn, "Using builder config and ignoring config modifiers");
   }

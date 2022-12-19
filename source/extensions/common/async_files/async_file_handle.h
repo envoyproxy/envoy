@@ -17,6 +17,10 @@ namespace AsyncFiles {
 // Instantiated from an AsyncFileManager.
 class AsyncFileContext : public std::enable_shared_from_this<AsyncFileContext> {
 public:
+  // Gets a stat struct for the file.
+  virtual absl::StatusOr<CancelFunction>
+  stat(std::function<void(absl::StatusOr<struct stat>)> on_complete) PURE;
+
   // Action to hard link the file that is currently open. Typically for use in tandem with
   // createAnonymousFile to turn that file into a named file after finishing writing its contents.
   //
