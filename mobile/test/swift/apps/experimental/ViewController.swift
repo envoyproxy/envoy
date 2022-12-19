@@ -24,6 +24,9 @@ final class ViewController: UITableViewController {
       .addPlatformFilter(AsyncDemoFilter.init)
       .h2ExtendKeepaliveTimeout(true)
       .enableAdminInterface()
+      .enableDNSCache()
+      // needed for DNS cache to work
+      .addKeyValueStore(name: "reserved.platform_store", keyValueStore: UserDefaults.default)
       .enableInterfaceBinding(true)
       .enablePlatformCertificateValidation(true)
       .addNativeFilter(
