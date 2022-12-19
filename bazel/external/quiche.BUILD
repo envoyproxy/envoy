@@ -3682,7 +3682,7 @@ envoy_cc_library(
         ":quic_core_versions_lib",
         ":quic_platform",
         ":quic_platform_socket_address",
-	":quic_stream_priority_lib",
+        ":quic_stream_priority_lib",
     ],
 )
 
@@ -4235,7 +4235,7 @@ envoy_cc_library(
         ":quic_core_versions_lib",
         ":quic_platform",
         ":quic_server_crypto_crypto_handshake_lib",
-	":quic_stream_priority_lib",
+        ":quic_stream_priority_lib",
         ":quiche_common_structured_headers_lib",
         ":quiche_common_text_utils_lib",
         ":spdy_core_protocol_lib",
