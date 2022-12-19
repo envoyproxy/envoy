@@ -4,8 +4,6 @@
 #include <string>
 #include <utility>
 
-#include "envoy/extensions/cache/simple_http_cache/v3/config.pb.h"
-
 #include "source/common/common/assert.h"
 #include "source/extensions/filters/http/cache/cache_headers_utils.h"
 #include "source/extensions/filters/http/cache/http_cache.h"
@@ -564,7 +562,7 @@ TEST_P(HttpCacheImplementationTest, UpdateHeadersForMissingKeyFails) {
   EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 }
 
-TEST_P(HttpCacheImplementationTest, UpdateHeadersDisabledForVaryHeaders) {
+TEST_P(HttpCacheImplementationTest, UpdateHeadersForVaryHeaders) {
   if (!validationEnabled()) {
     // UpdateHeaders would not be called when validation is disabled.
     GTEST_SKIP();
@@ -590,10 +588,10 @@ TEST_P(HttpCacheImplementationTest, UpdateHeadersDisabledForVaryHeaders) {
                                                      {"cache-control", "public,max-age=3600"},
                                                      {"accept", "image/*"},
                                                      {"vary", "accept"}};
-  EXPECT_FALSE(updateHeaders(request_path_1, response_headers_2, {time_2}));
-  response_headers_1.setReferenceKey(Http::LowerCaseString("age"), "3600");
+  EXPECT_TRUE(updateHeaders(request_path_1, response_headers_2, {time_2}));
+  response_headers_2.setReferenceKey(Http::LowerCaseString("age"), "0");
   // the age is still 0 because an entry is considered fresh after validation
-  EXPECT_TRUE(expectLookupSuccessWithHeaders(lookup(request_path_1).get(), response_headers_1));
+  EXPECT_TRUE(expectLookupSuccessWithHeaders(lookup(request_path_1).get(), response_headers_2));
 }
 
 TEST_P(HttpCacheImplementationTest, UpdateHeadersSkipEtagHeader) {

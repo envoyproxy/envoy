@@ -1,5 +1,8 @@
 #include "source/extensions/http/header_validators/envoy_default/http1_header_validator.h"
 
+#include "envoy/http/header_validator_errors.h"
+
+#include "source/common/http/utility.h"
 #include "source/extensions/http/header_validators/envoy_default/character_tables.h"
 
 #include "absl/container/node_hash_set.h"
@@ -16,6 +19,7 @@ using ::Envoy::Http::HeaderString;
 using ::Envoy::Http::LowerCaseString;
 using ::Envoy::Http::Protocol;
 using ::Envoy::Http::RequestHeaderMap;
+using ::Envoy::Http::UhvResponseCodeDetail;
 using HeaderValidatorFunction =
     HeaderValidator::HeaderValueValidationResult (Http1HeaderValidator::*)(const HeaderString&);
 
@@ -38,8 +42,9 @@ using Http1ResponseCodeDetail = ConstSingleton<Http1ResponseCodeDetailValues>;
  *
  */
 Http1HeaderValidator::Http1HeaderValidator(const HeaderValidatorConfig& config, Protocol protocol,
-                                           StreamInfo::StreamInfo& stream_info)
-    : HeaderValidator(config, protocol, stream_info) {}
+                                           StreamInfo::StreamInfo& stream_info,
+                                           ::Envoy::Http::HeaderValidatorStats& stats)
+    : HeaderValidator(config, protocol, stream_info, stats) {}
 
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
 Http1HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
@@ -179,7 +184,6 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
   }
 
   auto path_is_asterisk = path == "*";
-  auto path_is_absolute = path.empty() ? false : path.at(0) == '/';
 
   // HTTP/1.1 allows for a path of "*" when for OPTIONS requests, based on RFC
   // 9112, https://www.rfc-editor.org/rfc/rfc9112.html#section-3.2.4:
@@ -287,19 +291,19 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
       return {RequestHeaderMapValidationResult::Action::Reject,
               UhvResponseCodeDetail::get().InvalidUrl};
     }
-  } else if (!config_.uri_path_normalization_options().skip_path_normalization() &&
-             path_is_absolute) {
-    // TODO(#6589) - Validate and normalize the path, which must be a valid URI. This will be
-    // similar to:
+  } else if (!config_.uri_path_normalization_options().skip_path_normalization()) {
+    // Validate and normalize the path, which must be a valid URI. This is only run if the config
+    // is active.
     //
-    // auto path_result = normalizePathUri(header_map);
-    // if (path_result != RequestHeaderMapValidationResult::Accept) {
-    //   return path_result;
-    // }
-  }
+    // If path normalization is disabled then the path will be validated against the RFC character
+    // set in validateRequestHeaderEntry.
+    auto path_result = path_normalizer_.normalizePathUri(header_map);
+    if (!path_result.ok()) {
+      return path_result;
+    }
 
-  // If path normalization is disabled or the path isn't absolute then the path will be validated
-  // against the RFC character set in validateRequestHeaderEntry.
+    path = header_map.path();
+  }
 
   // Step 4: Verify each request header
   std::string reject_details;

@@ -1907,7 +1907,10 @@ public:
 
   void set(Http::RequestHeaderMap&, bool) override {}
   void setInResponse(Http::ResponseHeaderMap&, const Http::RequestHeaderMap&) override {}
-  absl::optional<uint64_t> toInteger(const Http::RequestHeaderMap&) const override {
+  absl::optional<absl::string_view> get(const Http::RequestHeaderMap&) const override {
+    return absl::nullopt;
+  }
+  absl::optional<uint64_t> getInteger(const Http::RequestHeaderMap&) const override {
     return absl::nullopt;
   }
   Tracing::Reason getTraceReason(const Http::RequestHeaderMap&) override {
@@ -2591,7 +2594,7 @@ public:
   Http::HeaderValidatorFactoryPtr createFromProto(const Protobuf::Message&,
                                                   Server::Configuration::FactoryContext&) override {
     auto header_validator = std::make_unique<StrictMock<Http::MockHeaderValidatorFactory>>();
-    EXPECT_CALL(*header_validator, create(Http::Protocol::Http2, _))
+    EXPECT_CALL(*header_validator, create(Http::Protocol::Http2, _, _))
         .WillOnce(InvokeWithoutArgs(
             []() { return std::make_unique<StrictMock<Http::MockHeaderValidator>>(); }));
     return header_validator;
@@ -2625,7 +2628,7 @@ public:
 
     config_ = proto_config;
     auto header_validator = std::make_unique<StrictMock<Http::MockHeaderValidatorFactory>>();
-    EXPECT_CALL(*header_validator, create(Http::Protocol::Http2, _))
+    EXPECT_CALL(*header_validator, create(Http::Protocol::Http2, _, _))
         .WillOnce(InvokeWithoutArgs(
             []() { return std::make_unique<StrictMock<Http::MockHeaderValidator>>(); }));
     return header_validator;

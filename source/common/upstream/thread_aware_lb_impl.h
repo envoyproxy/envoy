@@ -107,11 +107,11 @@ public:
 
 protected:
   ThreadAwareLoadBalancerBase(
-      const PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
+      const PrioritySet& priority_set, ClusterLbStats& stats, Runtime::Loader& runtime,
       Random::RandomGenerator& random,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
       : LoadBalancerBase(priority_set, stats, runtime, random, common_config),
-        factory_(new LoadBalancerFactoryImpl(stats, random, override_host_status_)) {}
+        factory_(new LoadBalancerFactoryImpl(stats, random)) {}
 
 private:
   struct PerPriorityState {
@@ -121,7 +121,7 @@ private:
   using PerPriorityStatePtr = std::unique_ptr<PerPriorityState>;
 
   struct LoadBalancerImpl : public LoadBalancer {
-    LoadBalancerImpl(ClusterStats& stats, Random::RandomGenerator& random)
+    LoadBalancerImpl(ClusterLbStats& stats, Random::RandomGenerator& random)
         : stats_(stats), random_(random) {}
 
     // Upstream::LoadBalancer
@@ -138,45 +138,29 @@ private:
       return {};
     }
 
-    ClusterStats& stats_;
+    ClusterLbStats& stats_;
     Random::RandomGenerator& random_;
-    HostStatusSet override_host_status_{};
     std::shared_ptr<std::vector<PerPriorityStatePtr>> per_priority_state_;
     std::shared_ptr<HealthyLoad> healthy_per_priority_load_;
     std::shared_ptr<DegradedLoad> degraded_per_priority_load_;
-
-    // Cross priority host map.
-    HostMapConstSharedPtr cross_priority_host_map_;
   };
 
   struct LoadBalancerFactoryImpl : public LoadBalancerFactory {
-    LoadBalancerFactoryImpl(ClusterStats& stats, Random::RandomGenerator& random,
-                            HostStatusSet status)
-        : stats_(stats), random_(random), override_host_status_(status) {}
+    LoadBalancerFactoryImpl(ClusterLbStats& stats, Random::RandomGenerator& random)
+        : stats_(stats), random_(random) {}
 
     // Upstream::LoadBalancerFactory
     LoadBalancerPtr create() override;
     // Ignore the params for the thread-aware LB.
     LoadBalancerPtr create(LoadBalancerParams) override { return create(); }
 
-    ClusterStats& stats_;
+    ClusterLbStats& stats_;
     Random::RandomGenerator& random_;
-    HostStatusSet override_host_status_{};
     absl::Mutex mutex_;
     std::shared_ptr<std::vector<PerPriorityStatePtr>> per_priority_state_ ABSL_GUARDED_BY(mutex_);
     // This is split out of PerPriorityState so LoadBalancerBase::ChoosePriority can be reused.
     std::shared_ptr<HealthyLoad> healthy_per_priority_load_ ABSL_GUARDED_BY(mutex_);
     std::shared_ptr<DegradedLoad> degraded_per_priority_load_ ABSL_GUARDED_BY(mutex_);
-
-    // Whenever the membership changes, the cross_priority_host_map_ will be updated automatically.
-    // And all workers will create a new worker local load balancer and copy the
-    // cross_priority_host_map_.
-    // This leads to the possibility of simultaneous reading and writing of cross_priority_host_map_
-    // in different threads. For this reason, mutex is necessary to guard cross_priority_host_map_.
-    //
-    // Cross priority host map for fast cross priority host searching. When the priority update
-    // callback is executed, the host map will also be updated.
-    HostMapConstSharedPtr cross_priority_host_map_ ABSL_GUARDED_BY(mutex_);
   };
 
   virtual HashingLoadBalancerSharedPtr

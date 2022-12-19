@@ -62,7 +62,8 @@ This filter is designed to support payload passthrough. Performing payload to me
 can do deserialization once, and pass the metadata to other filters. This means that load balancing
 decisions, consumed from log and routing could all use payload information with a single parse.
 Also notably performing the parsing in payload passthrough buffer will mean deserialization once
-and not re-serializing, which is the most performant outcome.
+and not re-serializing, which is the most performant outcome. Currently there is a redundant buffer
+copy until we have `BufferView <https://github.com/envoyproxy/envoy/issues/23901>`_.
 
 If any of the filter chain doesn't support payload passthrough, a customized non-passthrough
 filter to setup metadata is encouraged from point of performance view.
@@ -98,7 +99,7 @@ This would then allow requests of method name ``foo`` with the ``version`` paylo
 under ``info`` field set to be matched against endpoints with the corresponding version. Whereas
 requests with that payload missing would be matched with the default endpoints.
 
-The regex matching and substitution is similiar with :ref:`header to metadata filter <config_thrift_filters_header_to_metadata>`.
+The regex matching and substitution is similar with :ref:`header to metadata filter <config_thrift_filters_header_to_metadata>`.
 
 
 Statistics

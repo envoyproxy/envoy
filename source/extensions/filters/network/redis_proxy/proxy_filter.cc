@@ -19,12 +19,19 @@ namespace RedisProxy {
 ProxyFilterConfig::ProxyFilterConfig(
     const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy& config,
     Stats::Scope& scope, const Network::DrainDecision& drain_decision, Runtime::Loader& runtime,
-    Api::Api& api)
+    Api::Api& api,
+    Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory)
     : drain_decision_(drain_decision), runtime_(runtime),
       stat_prefix_(fmt::format("redis.{}.", config.stat_prefix())),
       stats_(generateStats(stat_prefix_, scope)),
       downstream_auth_username_(
-          Config::DataSource::read(config.downstream_auth_username(), true, api)) {
+          Config::DataSource::read(config.downstream_auth_username(), true, api)),
+      dns_cache_manager_(cache_manager_factory.get()), dns_cache_(getCache(config)) {
+
+  if (config.settings().enable_redirection() && !config.settings().has_dns_cache_config()) {
+    ENVOY_LOG(warn, "redirections without DNS lookups enabled might cause client errors, set the "
+                    "dns_cache_config field within the connection pool settings to avoid them");
+  }
 
   auto downstream_auth_password =
       Config::DataSource::read(config.downstream_auth_password(), true, api);
@@ -42,6 +49,13 @@ ProxyFilterConfig::ProxyFilterConfig(
       }
     }
   }
+}
+
+Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr ProxyFilterConfig::getCache(
+    const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy& config) {
+  return config.settings().has_dns_cache_config()
+             ? dns_cache_manager_->getCache(config.settings().dns_cache_config())
+             : nullptr;
 }
 
 ProxyStats ProxyFilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {

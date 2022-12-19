@@ -2,6 +2,8 @@
 
 #include <charconv>
 
+#include "envoy/http/header_validator_errors.h"
+
 #include "source/extensions/http/header_validators/envoy_default/character_tables.h"
 
 #include "absl/container/node_hash_set.h"
@@ -15,11 +17,13 @@ namespace EnvoyDefault {
 using ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig;
 using ::Envoy::Http::HeaderString;
 using ::Envoy::Http::Protocol;
+using ::Envoy::Http::UhvResponseCodeDetail;
 
 HeaderValidator::HeaderValidator(const HeaderValidatorConfig& config, Protocol protocol,
-                                 StreamInfo::StreamInfo& stream_info)
+                                 StreamInfo::StreamInfo& stream_info,
+                                 ::Envoy::Http::HeaderValidatorStats& stats)
     : config_(config), protocol_(protocol), stream_info_(stream_info),
-      header_values_(::Envoy::Http::Headers::get()) {}
+      header_values_(::Envoy::Http::Headers::get()), stats_(stats), path_normalizer_(config) {}
 
 HeaderValidator::HeaderValueValidationResult
 HeaderValidator::validateMethodHeader(const HeaderString& value) {
@@ -193,9 +197,11 @@ HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
 
   if (has_underscore) {
     if (underscore_action == HeaderValidatorConfig::REJECT_REQUEST) {
+      stats_.incRequestsRejectedWithUnderscoresInHeaders();
       return {HeaderEntryValidationResult::Action::Reject,
               UhvResponseCodeDetail::get().InvalidUnderscore};
     } else if (underscore_action == HeaderValidatorConfig::DROP_HEADER) {
+      stats_.incDroppedHeadersWithUnderscores();
       return {HeaderEntryValidationResult::Action::DropHeader,
               UhvResponseCodeDetail::get().InvalidUnderscore};
     }

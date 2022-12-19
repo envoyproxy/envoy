@@ -16,6 +16,7 @@ namespace Dubbo {
 namespace {
 
 constexpr absl::string_view VERSION_KEY = "version";
+constexpr absl::string_view UNKNOWN_RESPONSE_STATUS = "UnknownResponseStatus";
 
 #define ENUM_TO_STRING_VIEW(X)                                                                     \
   case Common::Dubbo::ResponseStatus::X:                                                           \
@@ -35,6 +36,7 @@ absl::string_view responseStatusToStringView(Common::Dubbo::ResponseStatus statu
     ENUM_TO_STRING_VIEW(ClientError);
     ENUM_TO_STRING_VIEW(ServerThreadpoolExhaustedError);
   }
+  return UNKNOWN_RESPONSE_STATUS;
 }
 
 Common::Dubbo::ResponseStatus genericStatusToStatus(StatusCode code) {
@@ -68,6 +70,7 @@ StatusCode statusToGenericStatus(Common::Dubbo::ResponseStatus status) {
   case Common::Dubbo::ResponseStatus::ServerThreadpoolExhaustedError:
     return StatusCode::kResourceExhausted;
   }
+  return StatusCode::kUnavailable;
 }
 
 } // namespace
@@ -157,8 +160,8 @@ ResponsePtr DubboMessageCreator::response(Status status, const Request& origin_r
 }
 
 CodecFactoryPtr
-DubboCodecFactoryConfig::createFactory(const Protobuf::Message&,
-                                       Envoy::Server::Configuration::FactoryContext&) {
+DubboCodecFactoryConfig::createCodecFactory(const Protobuf::Message&,
+                                            Envoy::Server::Configuration::FactoryContext&) {
   return std::make_unique<DubboCodecFactory>();
 }
 

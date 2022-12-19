@@ -113,7 +113,7 @@ Network::DownstreamTransportSocketFactoryPtr XfccIntegrationTest::createUpstream
 
   auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
       tls_context, factory_context_);
-  static Stats::Scope* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
+  static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
   return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
       std::move(cfg), *context_manager_, *upstream_stats_store, std::vector<std::string>{});
 }
@@ -621,8 +621,6 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
       {"http.config_test.downstream_rq_4xx", "http.downstream_rq_xx"},
       {"http.config_test.downstream_rq_ws_on_non_ws_route",
        "http.downstream_rq_ws_on_non_ws_route"},
-      {"vhost.integration.vcluster.other.upstream_rq_timeout",
-       "vhost.vcluster.upstream_rq_timeout"},
       {"cluster.cluster_0.update_attempt", "cluster.update_attempt"},
       {"cluster.cluster_0.upstream_rq_retry_limit_exceeded",
        "cluster.upstream_rq_retry_limit_exceeded"},
@@ -681,8 +679,6 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
       {"http.config_test.downstream_rq_rx_reset", "http.downstream_rq_rx_reset"},
       {"cluster.cluster_0.upstream_cx_destroy_local_with_active_rq",
        "cluster.upstream_cx_destroy_local_with_active_rq"},
-      {"vhost.integration.vcluster.other.upstream_rq_retry_success",
-       "vhost.vcluster.upstream_rq_retry_success"},
       {"runtime.load_success", "runtime.load_success"},
       {"filesystem.write_failed", "filesystem.write_failed"},
       {"cluster_manager.cluster_modified", "cluster_manager.cluster_modified"},
@@ -710,7 +706,6 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
       {"http.admin.downstream_cx_total", "http.downstream_cx_total"},
       {"http.config_test.tracing.client_enabled", "http.tracing.client_enabled"},
       {"http.config_test.downstream_cx_drain_close", "http.downstream_cx_drain_close"},
-      {"vhost.integration.vcluster.other.upstream_rq_retry", "vhost.vcluster.upstream_rq_retry"},
       {"runtime.override_dir_exists", "runtime.override_dir_exists"},
       {"listener_manager.lds.init_fetch_timeout", "listener_manager.lds.init_fetch_timeout"},
       {"cluster.cluster_0.upstream_rq_total", "cluster.upstream_rq_total"},
@@ -733,7 +728,6 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
       {"cluster.cluster_0.lb_subsets_fallback", "cluster.lb_subsets_fallback"},
       {"listener_manager.listener_in_place_updated", "listener_manager.listener_in_place_updated"},
       {"cluster.cluster_0.upstream_cx_total", "cluster.upstream_cx_total"},
-      {"vhost.integration.vcluster.other.upstream_rq_total", "vhost.vcluster.upstream_rq_total"},
       {"http.admin.downstream_rq_2xx", "http.downstream_rq_xx"},
       {"cluster.cluster_0.lb_subsets_created", "cluster.lb_subsets_created"},
       {"cluster.cluster_0.upstream_rq_retry_backoff_exponential",
@@ -743,8 +737,6 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
       {"listener.admin.no_filter_chain_match", "listener.admin.no_filter_chain_match"},
       {"http.config_test.passthrough_internal_redirect_too_many_redirects",
        "http.passthrough_internal_redirect_too_many_redirects"},
-      {"vhost.integration.vcluster.other.upstream_rq_retry_overflow",
-       "vhost.vcluster.upstream_rq_retry_overflow"},
       {"http.config_test.downstream_rq_rejected_via_ip_detection",
        "http.downstream_rq_rejected_via_ip_detection"},
       {"cluster.cluster_0.upstream_cx_destroy", "cluster.upstream_cx_destroy"},
@@ -769,8 +761,6 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
       {"http.admin.downstream_cx_overload_disable_keepalive",
        "http.downstream_cx_overload_disable_keepalive"},
       {"cluster.cluster_0.lb_zone_routing_all_directly", "cluster.lb_zone_routing_all_directly"},
-      {"vhost.integration.vcluster.other.upstream_rq_retry_limit_exceeded",
-       "vhost.vcluster.upstream_rq_retry_limit_exceeded"},
       {"cluster.cluster_0.upstream_cx_max_duration_reached",
        "cluster.upstream_cx_max_duration_reached"},
       {"http.admin.downstream_rq_4xx", "http.downstream_rq_xx"},

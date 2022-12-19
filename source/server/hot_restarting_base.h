@@ -16,6 +16,7 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/assert.h"
+#include "source/server/hot_restart.pb.h"
 
 namespace Envoy {
 namespace Server {

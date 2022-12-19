@@ -4,7 +4,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/network/socket.h"
 
-#include "source/server/active_listener_base.h"
+#include "source/server/listener_stats.h"
 
 #include "quiche/quic/core/crypto/proof_source.h"
 
@@ -21,7 +21,7 @@ public:
   virtual std::unique_ptr<quic::ProofSource>
   createQuicProofSource(Network::Socket& listen_socket,
                         Network::FilterChainManager& filter_chain_manager,
-                        Server::ListenerStats& listener_stats) PURE;
+                        Server::ListenerStats& listener_stats, TimeSource& time_source) PURE;
 };
 
 } // namespace Quic

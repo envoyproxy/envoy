@@ -6,7 +6,23 @@ PUBLISH_DIR="$2"
 REPO_OWNER="${REPO_OWNER:-envoyproxy}"
 REPO_NAME="${REPO_NAME:-envoy}"
 RELEASE_API_URL="https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases"
+MAINTAINER_GPG_KEY_PASSPHRASE="${MAINTAINER_GPG_KEY_PASSPHRASE:-}"
+GITHUB_TOKEN="${GITHUB_TOKEN:-}"
 
+if [[ -z "$GITHUB_TOKEN" ]]; then
+    # shellcheck disable=SC2016
+    echo 'env var `GITHUB_TOKEN` must be set'
+    exit 1
+fi
+
+
+gpg_sign () {
+    if [[ -n "$MAINTAINER_GPG_KEY_PASSPHRASE" ]]; then
+        echo "$MAINTAINER_GPG_KEY_PASSPHRASE" | gpg --pinentry-mode loopback --passphrase-fd 0 --clearsign checksums.txt
+    else
+        gpg --clearsign checksums.txt
+    fi
+}
 
 sign_assets () {
     local asset
@@ -21,7 +37,7 @@ sign_assets () {
         sha256sum "$asset" >> "checksums.txt"
     done
 
-    gpg --clearsign checksums.txt
+    gpg_sign checksums.txt
     rm checksums.txt
     cat checksums.txt.asc
 }
@@ -66,11 +82,16 @@ upload_to_github () {
 
 upload_assets () {
     local release_id upload_url
+
     release_id="$(get_release_id "${1}")"
+    if [[ "$release_id" == null ]]; then
+        # shellcheck disable=SC2016
+        echo 'Failed querying github API - `GITHUB_TOKEN` may not be valid or the release ('"${release_id}"') was not found'
+        return 1
+    fi
     upload_url="$(get_upload_url "$release_id")"
 
     echo "Upload assets (${PUBLISH_DIR}) -> ${upload_url}"
-
     for asset in ./*; do
         asset="$(echo "${asset}" | cut -d/ -f2)"
         upload_to_github "${upload_url}" "$asset"

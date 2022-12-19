@@ -2,8 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.load_balancing_policies.least_request.v3;
 
-import "envoy/config/cluster/v3/cluster.proto";
 import "envoy/config/core/v3/base.proto";
+import "envoy/extensions/load_balancing_policies/common/v3/common.proto";
 
 import "google/protobuf/wrappers.proto";
 
@@ -54,5 +54,8 @@ message LeastRequest {
 
   // Configuration for slow start mode.
   // If this configuration is not set, slow start will not be not enabled.
-  config.cluster.v3.Cluster.SlowStartConfig slow_start_config = 3;
+  common.v3.SlowStartConfig slow_start_config = 3;
+
+  // Configuration for local zone aware load balancing or locality weighted load balancing.
+  common.v3.LocalityLbConfig locality_lb_config = 4;
 }

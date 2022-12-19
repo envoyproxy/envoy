@@ -2,8 +2,11 @@ syntax = "proto3";
 
 package envoy.extensions.load_balancing_policies.ring_hash.v3;
 
+import "envoy/extensions/load_balancing_policies/common/v3/common.proto";
+
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -19,8 +22,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // This configuration allows the built-in RING_HASH LB policy to be configured via the LB policy
 // extension point. See the :ref:`load balancing architecture overview
 // <arch_overview_load_balancing_types>` for more information.
-// [#extension: envoy.load_balancing_policies]
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message RingHash {
   // The hash function used to hash hosts onto the ketama ring.
   enum HashFunction {
@@ -53,7 +55,12 @@ message RingHash {
 
   // If set to `true`, the cluster will use hostname instead of the resolved
   // address as the key to consistently hash to an upstream host. Only valid for StrictDNS clusters with hostnames which resolve to a single IP address.
-  bool use_hostname_for_hashing = 4;
+  //
+  // ..note::
+  //   This is deprecated and please use :ref:`consistent_hashing_lb_config
+  //   <envoy_v3_api_field_extensions.load_balancing_policies.ring_hash.v3.RingHash.consistent_hashing_lb_config>` instead.
+  bool use_hostname_for_hashing = 4
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Configures percentage of average cluster load to bound per upstream host. For example, with a value of 150
   // no upstream host will get a load more than 1.5 times the average load of all the hosts in the cluster.
@@ -71,5 +78,16 @@ message RingHash {
   //
   // This is an O(N) algorithm, unlike other load balancers. Using a lower `hash_balance_factor` results in more hosts
   // being probed, so use a higher value if you require better performance.
-  google.protobuf.UInt32Value hash_balance_factor = 5 [(validate.rules).uint32 = {gte: 100}];
+  //
+  // ..note::
+  //   This is deprecated and please use :ref:`consistent_hashing_lb_config
+  //   <envoy_v3_api_field_extensions.load_balancing_policies.ring_hash.v3.RingHash.consistent_hashing_lb_config>` instead.
+  google.protobuf.UInt32Value hash_balance_factor = 5 [
+    deprecated = true,
+    (validate.rules).uint32 = {gte: 100},
+    (envoy.annotations.deprecated_at_minor_version) = "3.0"
+  ];
+
+  // Common configuration for hashing-based load balancing policies.
+  common.v3.ConsistentHashingLbConfig consistent_hashing_lb_config = 6;
 }

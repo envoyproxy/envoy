@@ -32,9 +32,9 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_impl.h"
+#include "source/extensions/listener_managers/listener_manager/listener_impl.h"
 #include "source/extensions/request_id/uuid/config.h"
 #include "source/server/admin/utils.h"
-#include "source/server/listener_impl.h"
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
@@ -261,11 +261,12 @@ bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
   return true;
 }
 
-void AdminImpl::createFilterChain(Http::FilterChainManager& manager) const {
+bool AdminImpl::createFilterChain(Http::FilterChainManager& manager, bool) const {
   Http::FilterFactoryCb factory = [this](Http::FilterChainFactoryCallbacks& callbacks) {
     callbacks.addStreamFilter(std::make_shared<AdminFilter>(createRequestFunction()));
   };
   manager.applyFilterFactoryCb({}, factory);
+  return true;
 }
 
 namespace {

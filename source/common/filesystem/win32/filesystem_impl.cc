@@ -33,12 +33,32 @@ Api::IoCallBoolResult FileImplWin32::open(FlagSet in) {
   }
 
   auto flags = translateFlag(in);
-  fd_ = CreateFileA(path().c_str(), flags.access_, FILE_SHARE_READ | FILE_SHARE_WRITE, 0,
-                    flags.creation_, 0, NULL);
+  fd_ = CreateFileA(path().c_str(), flags.access_,
+                    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, 0, flags.creation_, 0,
+                    NULL);
   if (fd_ == INVALID_HANDLE) {
     return resultFailure(false, ::GetLastError());
   }
   return resultSuccess(true);
+}
+
+Api::IoCallBoolResult TmpFileImplWin32::open(FlagSet in) {
+  if (isOpen()) {
+    return resultSuccess(true);
+  }
+
+  auto flags = translateFlag(in);
+  for (int tries = 5; tries > 0; tries--) {
+    std::string try_path = generateTmpFilePath(path());
+    fd_ = CreateFileA(try_path.c_str(), flags.access_,
+                      FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, 0, CREATE_NEW,
+                      FILE_FLAG_DELETE_ON_CLOSE, NULL);
+    if (fd_ != INVALID_HANDLE) {
+      tmp_file_path_ = try_path;
+      return resultSuccess(true);
+    }
+  }
+  return resultFailure(false, ::GetLastError());
 }
 
 Api::IoCallSizeResult FileImplWin32::write(absl::string_view buffer) {
@@ -98,6 +118,13 @@ FilePtr InstanceImplWin32::createFile(const FilePathAndType& file_info) {
   switch (file_info.file_type_) {
   case DestinationType::File:
     return std::make_unique<FileImplWin32>(file_info);
+  case DestinationType::TmpFile:
+    if (!file_info.path_.empty() &&
+        (file_info.path_.back() == '/' || file_info.path_.back() == '\\')) {
+      return std::make_unique<TmpFileImplWin32>(FilePathAndType{
+          DestinationType::TmpFile, file_info.path_.substr(0, file_info.path_.size() - 1)});
+    }
+    return std::make_unique<TmpFileImplWin32>(file_info);
   case DestinationType::Stderr:
     return std::make_unique<StdStreamFileImplWin32<STD_ERROR_HANDLE>>();
   case DestinationType::Stdout:

@@ -22,7 +22,7 @@ You can get a heap profile of Envoy by the following command:
 
     $ curl <Envoy IP>:<Envoy Admin Port>/dump_heap -o /heap/output/envoy.heap
 
-And then you can analyze the outputed heap profile with pprof:
+And then you can analyze the outputted heap profile with pprof:
 
 .. code-block:: bash
 

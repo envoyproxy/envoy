@@ -43,6 +43,7 @@ envoy_cc_library(
     hdrs = ["subscription_state.h"],
     deps = [
         "//envoy/config:subscription_interface",
+        "//envoy/config:xds_config_tracker_interface",
         "//envoy/config:xds_resources_delegate_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/local_info:local_info_interface",

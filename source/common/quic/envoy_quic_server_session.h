@@ -3,8 +3,8 @@
 #include <memory>
 #include <ostream>
 
-#include "source/common/quic/envoy_quic_crypto_stream_factory.h"
 #include "source/common/quic/envoy_quic_server_connection.h"
+#include "source/common/quic/envoy_quic_server_crypto_stream_factory.h"
 #include "source/common/quic/envoy_quic_server_stream.h"
 #include "source/common/quic/quic_filter_manager_connection_impl.h"
 #include "source/common/quic/quic_stat_names.h"
@@ -52,7 +52,8 @@ public:
                          quic::QuicCompressedCertsCache* compressed_certs_cache,
                          Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
                          QuicStatNames& quic_stat_names, Stats::Scope& listener_scope,
-                         EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory);
+                         EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
+                         std::unique_ptr<StreamInfo::StreamInfo>&& stream_info);
 
   ~EnvoyQuicServerSession() override;
 

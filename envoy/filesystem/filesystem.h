@@ -10,13 +10,14 @@
 #include "envoy/common/pure.h"
 
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Filesystem {
 
 using FlagSet = std::bitset<4>;
 
-enum class DestinationType { File, Stderr, Stdout };
+enum class DestinationType { File, Stderr, Stdout, TmpFile };
 
 /**
  * Abstraction for a basic file on disk.
@@ -169,15 +170,19 @@ struct DirectoryEntry {
   // target. For example, if name_ is a symlink to a directory, its file type will be Directory.
   FileType type_;
 
+  // The file size in bytes for regular files. nullopt for FileType::Directory and FileType::Other,
+  // and, on Windows, also nullopt for symlinks, and on Linux nullopt for broken symlinks.
+  absl::optional<uint64_t> size_bytes_;
+
   bool operator==(const DirectoryEntry& rhs) const {
-    return name_ == rhs.name_ && type_ == rhs.type_;
+    return name_ == rhs.name_ && type_ == rhs.type_ && size_bytes_ == rhs.size_bytes_;
   }
 };
 
 class DirectoryIteratorImpl;
 class DirectoryIterator {
 public:
-  DirectoryIterator() : entry_({"", FileType::Other}) {}
+  DirectoryIterator() : entry_({"", FileType::Other, absl::nullopt}) {}
   virtual ~DirectoryIterator() = default;
 
   const DirectoryEntry& operator*() const { return entry_; }

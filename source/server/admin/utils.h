@@ -15,9 +15,6 @@ namespace Utility {
 
 enum class HistogramBucketsMode { NoBuckets, Cumulative, Disjoint };
 
-envoy::admin::v3::ServerInfo::State serverState(Init::Manager::State state,
-                                                bool health_check_failed);
-
 void populateFallbackResponseHeaders(Http::Code code, Http::ResponseHeaderMap& header_map);
 
 bool filterParam(Http::Utility::QueryParams params, Buffer::Instance& response,

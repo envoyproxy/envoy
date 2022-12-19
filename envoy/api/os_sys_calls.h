@@ -150,6 +150,11 @@ public:
   virtual SysCallIntResult stat(const char* pathname, struct stat* buf) PURE;
 
   /**
+   * @see man 2 fstat
+   */
+  virtual SysCallIntResult fstat(os_fd_t fd, struct stat* buf) PURE;
+
+  /**
    * @see man 2 setsockopt
    */
   virtual SysCallIntResult setsockopt(os_fd_t sockfd, int level, int optname, const void* optval,
