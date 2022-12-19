@@ -120,7 +120,7 @@ const std::string config_header = R"(
 - &dns_preresolve_hostnames []
 - &dns_query_timeout 25s
 - &dns_refresh_rate 60s
-- $dns_cache_key_value_config NULL
+- &dns_cache_key_value_config NULL
 - &force_ipv6 false
 )"
 #if defined(__APPLE__)
