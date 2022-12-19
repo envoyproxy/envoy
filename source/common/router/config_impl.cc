@@ -281,20 +281,21 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& re
   if (retry_policy.has_retry_back_off()) {
     base_interval_ = std::chrono::milliseconds(
         PROTOBUF_GET_MS_REQUIRED(retry_policy.retry_back_off(), base_interval));
-    if ((*base_interval_).count() < 1) {
+    if (base_interval_.count() < 1) {
       base_interval_ = std::chrono::milliseconds(1);
     }
 
-    max_interval_ = PROTOBUF_GET_OPTIONAL_MS(retry_policy.retry_back_off(), max_interval);
-    if (max_interval_) {
+    max_interval_ = std::chrono::milliseconds(
+        PROTOBUF_GET_MS_OR_DEFAULT(retry_policy.retry_back_off(), max_interval, -1));
+    if (max_interval_.count() >= 0) {
       // Apply the same rounding to max interval in case both are set to sub-millisecond values.
-      if ((*max_interval_).count() < 1) {
+      if (max_interval_.count() < 1) {
         max_interval_ = std::chrono::milliseconds(1);
       }
 
-      if ((*max_interval_).count() < (*base_interval_).count()) {
+      if (max_interval_.count() < base_interval_.count()) {
         throw EnvoyException(
-            "retry_policy.max_interval must greater than or equal to the base_interval");
+            "retry_policy.max_interval must be greater than or equal to the base_interval");
       }
     }
   }
@@ -486,15 +487,15 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       cluster_not_found_response_code_(ConfigUtility::parseClusterNotFoundResponseCode(
           route.route().cluster_not_found_response_code())),
       timeout_(PROTOBUF_GET_MS_OR_DEFAULT(route.route(), timeout, DEFAULT_ROUTE_TIMEOUT_MS)),
-      idle_timeout_(PROTOBUF_GET_OPTIONAL_MS(route.route(), idle_timeout)),
+      idle_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(route.route(), idle_timeout, -1)),
       max_stream_duration_(
-          PROTOBUF_GET_OPTIONAL_MS(route.route().max_stream_duration(), max_stream_duration)),
-      grpc_timeout_header_max_(
-          PROTOBUF_GET_OPTIONAL_MS(route.route().max_stream_duration(), grpc_timeout_header_max)),
-      grpc_timeout_header_offset_(PROTOBUF_GET_OPTIONAL_MS(route.route().max_stream_duration(),
-                                                           grpc_timeout_header_offset)),
-      max_grpc_timeout_(PROTOBUF_GET_OPTIONAL_MS(route.route(), max_grpc_timeout)),
-      grpc_timeout_offset_(PROTOBUF_GET_OPTIONAL_MS(route.route(), grpc_timeout_offset)),
+          PROTOBUF_GET_MS_OR_DEFAULT(route.route().max_stream_duration(), max_stream_duration, -1)),
+      grpc_timeout_header_max_(PROTOBUF_GET_MS_OR_DEFAULT(route.route().max_stream_duration(),
+                                                          grpc_timeout_header_max, -1)),
+      grpc_timeout_header_offset_(PROTOBUF_GET_MS_OR_DEFAULT(route.route().max_stream_duration(),
+                                                             grpc_timeout_header_offset, -1)),
+      max_grpc_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(route.route(), max_grpc_timeout, -1)),
+      grpc_timeout_offset_(PROTOBUF_GET_MS_OR_DEFAULT(route.route(), grpc_timeout_offset, -1)),
       loader_(factory_context.runtime()), runtime_(loadRuntimeData(route.match())),
       scheme_redirect_(route.redirect().scheme_redirect()),
       host_redirect_(route.redirect().host_redirect()),
