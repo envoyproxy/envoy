@@ -378,10 +378,12 @@ public:
     return retriable_request_headers_;
   }
   absl::optional<std::chrono::milliseconds> baseInterval() const override {
-    return base_interval_.count() >= 0 ? absl::optional(base_interval_) : absl::nullopt;
+    return base_interval_.count() >= 0 ? absl::optional<std::chrono::milliseconds>(base_interval_)
+                                       : absl::nullopt;
   }
   absl::optional<std::chrono::milliseconds> maxInterval() const override {
-    return max_interval_.count() >= 0 ? absl::optional(max_interval_) : absl::nullopt;
+    return max_interval_.count() >= 0 ? absl::optional<std::chrono::milliseconds>(max_interval_)
+                                      : absl::nullopt;
   }
   const std::vector<ResetHeaderParserSharedPtr>& resetHeaders() const override {
     return reset_headers_;
@@ -663,25 +665,34 @@ public:
   }
   std::chrono::milliseconds timeout() const override { return timeout_; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override {
-    return idle_timeout_.count() >= 0 ? absl::optional(idle_timeout_) : absl::nullopt;
+    return idle_timeout_.count() >= 0 ? absl::optional<std::chrono::milliseconds>(idle_timeout_)
+                                      : absl::nullopt;
   }
   bool usingNewTimeouts() const override { return using_new_timeouts_; }
   absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
-    return max_stream_duration_.count() >= 0 ? absl::optional(max_stream_duration_) : absl::nullopt;
+    return max_stream_duration_.count() >= 0
+               ? absl::optional<std::chrono::milliseconds>(max_stream_duration_)
+               : absl::nullopt;
   }
   absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderMax() const override {
-    return grpc_timeout_header_max_.count() >= 0 ? absl::optional(grpc_timeout_header_max_)
-                                                 : absl::nullopt;
+    return grpc_timeout_header_max_.count() >= 0
+               ? absl::optional<std::chrono::milliseconds>(grpc_timeout_header_max_)
+               : absl::nullopt;
   }
   absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderOffset() const override {
-    return grpc_timeout_header_offset_.count() >= 0 ? absl::optional(grpc_timeout_header_offset_)
-                                                    : absl::nullopt;
+    return grpc_timeout_header_offset_.count() >= 0
+               ? absl::optional<std::chrono::milliseconds>(grpc_timeout_header_offset_)
+               : absl::nullopt;
   }
   absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const override {
-    return max_grpc_timeout_.count() >= 0 ? absl::optional(max_grpc_timeout_) : absl::nullopt;
+    return max_grpc_timeout_.count() >= 0
+               ? absl::optional<std::chrono::milliseconds>(max_grpc_timeout_)
+               : absl::nullopt;
   }
   absl::optional<std::chrono::milliseconds> grpcTimeoutOffset() const override {
-    return grpc_timeout_offset_.count() >= 0 ? absl::optional(grpc_timeout_offset_) : absl::nullopt;
+    return grpc_timeout_offset_.count() >= 0
+               ? absl::optional<std::chrono::milliseconds>(grpc_timeout_offset_)
+               : absl::nullopt;
   }
   const VirtualHost& virtualHost() const override { return vhost_; }
   bool autoHostRewrite() const override { return auto_host_rewrite_; }
