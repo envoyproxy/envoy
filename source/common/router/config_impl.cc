@@ -286,8 +286,8 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& re
     }
 
     max_interval_ = std::chrono::milliseconds(
-        PROTOBUF_GET_MS_OR_DEFAULT(retry_policy.retry_back_off(), max_interval, -1));
-    if (max_interval_.count() >= 0) {
+        PROTOBUF_GET_MS_OR_DEFAULT(retry_policy.retry_back_off(), max_interval, UnsetDuration));
+    if (max_interval_.count() != UnsetDuration) {
       // Apply the same rounding to max interval in case both are set to sub-millisecond values.
       if (max_interval_.count() < 1) {
         max_interval_ = std::chrono::milliseconds(1);
@@ -487,15 +487,16 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       cluster_not_found_response_code_(ConfigUtility::parseClusterNotFoundResponseCode(
           route.route().cluster_not_found_response_code())),
       timeout_(PROTOBUF_GET_MS_OR_DEFAULT(route.route(), timeout, DEFAULT_ROUTE_TIMEOUT_MS)),
-      idle_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(route.route(), idle_timeout, -1)),
-      max_stream_duration_(
-          PROTOBUF_GET_MS_OR_DEFAULT(route.route().max_stream_duration(), max_stream_duration, -1)),
+      idle_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(route.route(), idle_timeout, UnsetDuration)),
+      max_stream_duration_(PROTOBUF_GET_MS_OR_DEFAULT(route.route().max_stream_duration(),
+                                                      max_stream_duration, UnsetDuration)),
       grpc_timeout_header_max_(PROTOBUF_GET_MS_OR_DEFAULT(route.route().max_stream_duration(),
-                                                          grpc_timeout_header_max, -1)),
-      grpc_timeout_header_offset_(PROTOBUF_GET_MS_OR_DEFAULT(route.route().max_stream_duration(),
-                                                             grpc_timeout_header_offset, -1)),
-      max_grpc_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(route.route(), max_grpc_timeout, -1)),
-      grpc_timeout_offset_(PROTOBUF_GET_MS_OR_DEFAULT(route.route(), grpc_timeout_offset, -1)),
+                                                          grpc_timeout_header_max, UnsetDuration)),
+      grpc_timeout_header_offset_(PROTOBUF_GET_MS_OR_DEFAULT(
+          route.route().max_stream_duration(), grpc_timeout_header_offset, UnsetDuration)),
+      max_grpc_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(route.route(), max_grpc_timeout, UnsetDuration)),
+      grpc_timeout_offset_(
+          PROTOBUF_GET_MS_OR_DEFAULT(route.route(), grpc_timeout_offset, UnsetDuration)),
       loader_(factory_context.runtime()), runtime_(loadRuntimeData(route.match())),
       scheme_redirect_(route.redirect().scheme_redirect()),
       host_redirect_(route.redirect().host_redirect()),

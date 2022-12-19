@@ -344,6 +344,8 @@ private:
 };
 
 using VirtualHostSharedPtr = std::shared_ptr<VirtualHostImpl>;
+// Sentinel value to represent an unset std::duration.
+static constexpr long UnsetDuration = -1;
 
 /**
  * Implementation of RetryPolicy that reads from the proto route or virtual host config.
@@ -378,12 +380,14 @@ public:
     return retriable_request_headers_;
   }
   absl::optional<std::chrono::milliseconds> baseInterval() const override {
-    return base_interval_.count() >= 0 ? absl::optional<std::chrono::milliseconds>(base_interval_)
-                                       : absl::nullopt;
+    return base_interval_.count() != UnsetDuration
+               ? absl::optional<std::chrono::milliseconds>(base_interval_)
+               : absl::nullopt;
   }
   absl::optional<std::chrono::milliseconds> maxInterval() const override {
-    return max_interval_.count() >= 0 ? absl::optional<std::chrono::milliseconds>(max_interval_)
-                                      : absl::nullopt;
+    return max_interval_.count() != UnsetDuration
+               ? absl::optional<std::chrono::milliseconds>(max_interval_)
+               : absl::nullopt;
   }
   const std::vector<ResetHeaderParserSharedPtr>& resetHeaders() const override {
     return reset_headers_;
@@ -410,10 +414,10 @@ private:
   std::vector<uint32_t> retriable_status_codes_;
   std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_;
   std::vector<Http::HeaderMatcherSharedPtr> retriable_request_headers_;
-  // Durations below are optional in the config. -1 sentinel is used to represent a value that
-  // was not provided.
-  std::chrono::milliseconds base_interval_{-1};
-  std::chrono::milliseconds max_interval_{-1};
+  // Durations below are optional in the config. `UnsetDuration` sentinel is used to represent a
+  // value that was not provided.
+  std::chrono::milliseconds base_interval_{UnsetDuration};
+  std::chrono::milliseconds max_interval_{UnsetDuration};
   std::vector<ResetHeaderParserSharedPtr> reset_headers_{};
   std::chrono::milliseconds reset_max_interval_{300000};
   ProtobufMessage::ValidationVisitor* validation_visitor_{};
@@ -665,32 +669,33 @@ public:
   }
   std::chrono::milliseconds timeout() const override { return timeout_; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override {
-    return idle_timeout_.count() >= 0 ? absl::optional<std::chrono::milliseconds>(idle_timeout_)
-                                      : absl::nullopt;
+    return idle_timeout_.count() != UnsetDuration
+               ? absl::optional<std::chrono::milliseconds>(idle_timeout_)
+               : absl::nullopt;
   }
   bool usingNewTimeouts() const override { return using_new_timeouts_; }
   absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
-    return max_stream_duration_.count() >= 0
+    return max_stream_duration_.count() != UnsetDuration
                ? absl::optional<std::chrono::milliseconds>(max_stream_duration_)
                : absl::nullopt;
   }
   absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderMax() const override {
-    return grpc_timeout_header_max_.count() >= 0
+    return grpc_timeout_header_max_.count() != UnsetDuration
                ? absl::optional<std::chrono::milliseconds>(grpc_timeout_header_max_)
                : absl::nullopt;
   }
   absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderOffset() const override {
-    return grpc_timeout_header_offset_.count() >= 0
+    return grpc_timeout_header_offset_.count() != UnsetDuration
                ? absl::optional<std::chrono::milliseconds>(grpc_timeout_header_offset_)
                : absl::nullopt;
   }
   absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const override {
-    return max_grpc_timeout_.count() >= 0
+    return max_grpc_timeout_.count() != UnsetDuration
                ? absl::optional<std::chrono::milliseconds>(max_grpc_timeout_)
                : absl::nullopt;
   }
   absl::optional<std::chrono::milliseconds> grpcTimeoutOffset() const override {
-    return grpc_timeout_offset_.count() >= 0
+    return grpc_timeout_offset_.count() != UnsetDuration
                ? absl::optional<std::chrono::milliseconds>(grpc_timeout_offset_)
                : absl::nullopt;
   }
@@ -1100,14 +1105,14 @@ private:
   ClusterSpecifierPluginSharedPtr cluster_specifier_plugin_;
   const Http::Code cluster_not_found_response_code_;
   const std::chrono::milliseconds timeout_;
-  // Durations below are optional in the config. -1 sentinel is used to represent a value that
-  // was not provided.
-  const std::chrono::milliseconds idle_timeout_{-1};
-  const std::chrono::milliseconds max_stream_duration_{-1};
-  const std::chrono::milliseconds grpc_timeout_header_max_{-1};
-  const std::chrono::milliseconds grpc_timeout_header_offset_{-1};
-  const std::chrono::milliseconds max_grpc_timeout_{-1};
-  const std::chrono::milliseconds grpc_timeout_offset_{-1};
+  // Durations below are optional in the config. `UnsetDuration` sentinel is used to represent a
+  // value that was not provided.
+  const std::chrono::milliseconds idle_timeout_{UnsetDuration};
+  const std::chrono::milliseconds max_stream_duration_{UnsetDuration};
+  const std::chrono::milliseconds grpc_timeout_header_max_{UnsetDuration};
+  const std::chrono::milliseconds grpc_timeout_header_offset_{UnsetDuration};
+  const std::chrono::milliseconds max_grpc_timeout_{UnsetDuration};
+  const std::chrono::milliseconds grpc_timeout_offset_{UnsetDuration};
   Runtime::Loader& loader_;
   std::unique_ptr<const RuntimeData> runtime_;
   const std::string scheme_redirect_;
