@@ -157,7 +157,7 @@ size_t BalsaParser::execute(const char* slice, int len) {
     return 0;
   }
 
-  if (len == 0) {
+  if (first_byte_processed_ && len == 0) {
     status_ = ParserStatus::Error;
     error_message_ = "HPE_INVALID_EOF_STATE";
     return 0;

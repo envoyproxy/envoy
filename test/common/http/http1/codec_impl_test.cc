@@ -3880,6 +3880,52 @@ TEST_P(Http1ClientConnectionImplTest, InvalidResponseFirstCharacter) {
   EXPECT_EQ(1u, buffer.length());
 }
 
+// A first read of zero bytes when parsing a request is ignored.
+TEST_P(Http1ServerConnectionImplTest, FirstReadEOF) {
+  initialize();
+  InSequence s;
+
+  Buffer::OwnedImpl empty;
+  auto status = codec_->dispatch(empty);
+  ASSERT_TRUE(status.ok());
+
+  StrictMock<MockRequestDecoder> decoder;
+  Http::ResponseEncoder* response_encoder = nullptr;
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder = &encoder;
+        return decoder;
+      }));
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
+  EXPECT_CALL(decoder, decodeHeaders_(_, true));
+  status = codec_->dispatch(buffer);
+  EXPECT_EQ(0, buffer.length());
+  EXPECT_TRUE(status.ok());
+}
+
+// A first read of zero bytes when parsing a response is ignored.
+TEST_P(Http1ClientConnectionImplTest, FirstReadEOF) {
+  initialize();
+  InSequence s;
+
+  StrictMock<MockResponseDecoder> decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(decoder);
+  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
+
+  Buffer::OwnedImpl empty;
+  auto status = codec_->dispatch(empty);
+  ASSERT_TRUE(status.ok());
+
+  Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\n\r\nfoo");
+  EXPECT_CALL(decoder, decodeHeaders_(_, false));
+  EXPECT_CALL(decoder, decodeData(BufferStringEqual("foo"), false));
+  status = codec_->dispatch(buffer);
+  EXPECT_EQ(0, buffer.length());
+  EXPECT_TRUE(status.ok());
+}
+
 // A read of zero bytes during the first line of a request is an error.
 TEST_P(Http1ServerConnectionImplTest, EOFDuringHeaders) {
   initialize();
@@ -3894,7 +3940,8 @@ TEST_P(Http1ServerConnectionImplTest, EOFDuringHeaders) {
       }));
   Buffer::OwnedImpl buffer("GET");
   auto status = codec_->dispatch(buffer);
-  EXPECT_TRUE(status.ok());
+  EXPECT_EQ(0, buffer.length());
+  ASSERT_TRUE(status.ok());
 
   EXPECT_CALL(decoder,
               sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
@@ -3910,14 +3957,15 @@ TEST_P(Http1ClientConnectionImplTest, EOFDuringHeaders) {
   initialize();
   InSequence s;
 
-  StrictMock<MockResponseDecoder> response_decoder;
-  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+  StrictMock<MockResponseDecoder> decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(decoder);
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
   EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
   Buffer::OwnedImpl buffer("HTT");
   auto status = codec_->dispatch(buffer);
-  EXPECT_TRUE(status.ok());
+  EXPECT_EQ(0, buffer.length());
+  ASSERT_TRUE(status.ok());
 
   Buffer::OwnedImpl empty;
   status = codec_->dispatch(empty);
@@ -3945,7 +3993,8 @@ TEST_P(Http1ServerConnectionImplTest, EOFDuringChunkedBody) {
                            "9\r\n"
                            "foo");
   auto status = codec_->dispatch(buffer);
-  EXPECT_TRUE(status.ok());
+  EXPECT_EQ(0, buffer.length());
+  ASSERT_TRUE(status.ok());
 
   EXPECT_CALL(decoder,
               sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
@@ -3973,7 +4022,8 @@ TEST_P(Http1ClientConnectionImplTest, EOFDuringChunkedBody) {
                            "9\r\n"
                            "foo");
   auto status = codec_->dispatch(buffer);
-  EXPECT_TRUE(status.ok());
+  EXPECT_EQ(0, buffer.length());
+  ASSERT_TRUE(status.ok());
 
   Buffer::OwnedImpl empty;
   status = codec_->dispatch(empty);
@@ -4000,7 +4050,8 @@ TEST_P(Http1ServerConnectionImplTest, EOFDuringContentLengthBody) {
                            "content-length: 9\r\n\r\n"
                            "foo");
   auto status = codec_->dispatch(buffer);
-  EXPECT_TRUE(status.ok());
+  EXPECT_EQ(0, buffer.length());
+  ASSERT_TRUE(status.ok());
 
   EXPECT_CALL(decoder,
               sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
@@ -4027,7 +4078,8 @@ TEST_P(Http1ClientConnectionImplTest, EOFDuringContentLengthBody) {
                            "content-length: 9\r\n\r\n"
                            "foo");
   auto status = codec_->dispatch(buffer);
-  EXPECT_TRUE(status.ok());
+  EXPECT_EQ(0, buffer.length());
+  ASSERT_TRUE(status.ok());
 
   Buffer::OwnedImpl empty;
   status = codec_->dispatch(empty);
@@ -4094,7 +4146,7 @@ TEST_P(Http1ClientConnectionImplTest, NoContentLengthResponse) {
     EXPECT_CALL(decoder, decodeData(BufferStringEqual(""), true));
     Buffer::OwnedImpl empty;
     status = codec_->dispatch(empty);
-    EXPECT_TRUE(status.ok());
+    ASSERT_TRUE(status.ok());
   }
 
   {
@@ -4114,6 +4166,8 @@ TEST_P(Http1ClientConnectionImplTest, NoContentLengthResponse) {
     }
     Buffer::OwnedImpl buffer(kResponseWithBody);
     auto status = codec_->dispatch(buffer);
+    EXPECT_EQ(0, buffer.length());
+    ASSERT_TRUE(status.ok());
 
     EXPECT_CALL(decoder, decodeData(BufferStringEqual(""), true));
     Buffer::OwnedImpl empty;
