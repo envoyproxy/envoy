@@ -195,7 +195,8 @@
   [definitions appendFormat:@"%@\n", cert_validator_template];
 
   if (self.enableDNSCache) {
-    NSString *dns_cache_config = [[NSString alloc] initWithUTF8String:dns_cache_key_value_config_insert];
+    NSString *dns_cache_config =
+        [[NSString alloc] initWithUTF8String:dns_cache_key_value_config_insert];
     [definitions appendFormat:@"- &dns_cache_key_value_config %@\n", dns_cache_config];
   }
 

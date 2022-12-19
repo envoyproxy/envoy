@@ -172,11 +172,12 @@ open class EngineBuilder: NSObject {
     return self
   }
 
-  /// Specify whether to enable DNS cache. Noe that
+  /// Specify whether to enable DNS cache.
+  ///
+  /// Note that DNS cache requires an addition of a key value store named
+  /// 'reserved.platform_store'.
   ///
   /// - parameter enableDNSCache: whether to enable DNS cache. Disabled by default.
-  ///
-  /// - note: Enabled DNS cache requires an addition of a key value store named 'reserved.platform_store'.
   ///
   /// - returns: This builder.
   @discardableResult

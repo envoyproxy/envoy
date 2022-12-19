@@ -452,6 +452,7 @@ final class EngineBuilderTests: XCTestCase {
       dnsMinRefreshSeconds: 100,
       dnsPreresolveHostnames: "[test]",
       enableHappyEyeballs: true,
+      enableDNSCache: false,
       enableGzip: true,
       enableBrotli: false,
       enableInterfaceBinding: true,
@@ -490,6 +491,7 @@ final class EngineBuilderTests: XCTestCase {
     XCTAssertTrue(resolvedYAML.contains("&dns_preresolve_hostnames [test]"))
     XCTAssertTrue(resolvedYAML.contains("&dns_lookup_family ALL"))
     XCTAssertTrue(resolvedYAML.contains("&dns_multiple_addresses true"))
+    XCTAssertTrue(resolvedYAML.contains("&dns_cache_key_value_config null"))
     XCTAssertTrue(resolvedYAML.contains("&enable_interface_binding true"))
     XCTAssertTrue(resolvedYAML.contains("&trust_chain_verification ACCEPT_UNTRUSTED"))
     XCTAssertTrue(resolvedYAML.contains("""
@@ -544,6 +546,7 @@ final class EngineBuilderTests: XCTestCase {
       dnsQueryTimeoutSeconds: 800,
       dnsMinRefreshSeconds: 100,
       dnsPreresolveHostnames: "[test]",
+      enableDNSCache: true,
       enableHappyEyeballs: false,
       enableGzip: false,
       enableBrotli: true,
@@ -575,6 +578,17 @@ final class EngineBuilderTests: XCTestCase {
     )
     let resolvedYAML = try XCTUnwrap(config.resolveTemplate(kMockTemplate))
     XCTAssertTrue(resolvedYAML.contains("&dns_lookup_family V4_PREFERRED"))
+    XCTAssertTrue(resolvedYAML.contains(
+  """
+      config:
+        name: "envoy.key_value.platform"
+        typed_config:
+          "@type": type.googleapis.com/envoymobile.extensions.key_value.platform.PlatformKeyValueStoreConfig
+          key: dns_cache
+          save_interval:
+            seconds: 15
+  """
+    ))
     XCTAssertTrue(resolvedYAML.contains("&dns_multiple_addresses false"))
     XCTAssertTrue(resolvedYAML.contains("&enable_interface_binding false"))
     XCTAssertTrue(resolvedYAML.contains("&trust_chain_verification VERIFY_TRUST_CHAIN"))
