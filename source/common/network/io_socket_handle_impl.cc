@@ -551,7 +551,7 @@ Address::InstanceConstSharedPtr IoSocketHandleImpl::peerAddress() {
       os_sys_calls.getpeername(fd_, reinterpret_cast<sockaddr*>(&ss), &ss_len);
   if (result.return_value_ != 0) {
     throw EnvoyException(
-        fmt::format("getpeername failed for '{}': {}", errorDetails(result.errno_)));
+        fmt::format("getpeername failed for '{}': {}", fd_, errorDetails(result.errno_)));
   }
 
   if (ss_len == udsAddressLength() && ss.ss_family == AF_UNIX) {

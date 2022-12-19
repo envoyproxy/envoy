@@ -98,6 +98,21 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "local_reply_during_decoding_filter_lib",
+    srcs = [
+        "local_reply_during_decoding_filter.cc",
+    ],
+    deps = [
+        ":common_lib",
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+    ],
+)
+
+envoy_cc_test_library(
     name = "tee_filter_lib",
     srcs = [
         "tee_filter.cc",
@@ -317,6 +332,7 @@ envoy_cc_test_library(
         "//envoy/server:filter_config_interface",
         "//source/common/stats:symbol_table_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
     ],
 )

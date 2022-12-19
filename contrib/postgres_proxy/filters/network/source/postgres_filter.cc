@@ -3,6 +3,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/network/connection.h"
 
+#include "source/common/common/assert.h"
 #include "source/extensions/filters/network/well_known_names.h"
 
 #include "contrib/postgres_proxy/filters/network/source/postgres_decoder.h"
@@ -15,8 +16,8 @@ namespace PostgresProxy {
 PostgresFilterConfig::PostgresFilterConfig(const PostgresFilterConfigOptions& config_options,
                                            Stats::Scope& scope)
     : enable_sql_parsing_(config_options.enable_sql_parsing_),
-      terminate_ssl_(config_options.terminate_ssl_), scope_{scope},
-      stats_{generateStats(config_options.stats_prefix_, scope)} {}
+      terminate_ssl_(config_options.terminate_ssl_), upstream_ssl_(config_options.upstream_ssl_),
+      scope_{scope}, stats_{generateStats(config_options.stats_prefix_, scope)} {}
 
 PostgresFilter::PostgresFilter(PostgresFilterConfigSharedPtr config) : config_{config} {
   if (!decoder_) {
@@ -50,7 +51,12 @@ Network::FilterStatus PostgresFilter::onWrite(Buffer::Instance& data, bool) {
 
   // Backend Buffer
   backend_buffer_.add(data);
-  return doDecode(backend_buffer_, false);
+  Network::FilterStatus result = doDecode(backend_buffer_, false);
+  if (result == Network::FilterStatus::StopIteration) {
+    ASSERT(backend_buffer_.length() == 0);
+    data.drain(data.length());
+  }
+  return result;
 }
 
 DecoderPtr PostgresFilter::createDecoder(DecoderCallbacks* callbacks) {
@@ -205,8 +211,9 @@ bool PostgresFilter::onSSLRequest() {
     // Wait until 'S' has been transmitted.
     if (bytes >= 1) {
       if (!read_callbacks_->connection().startSecureTransport()) {
-        ENVOY_CONN_LOG(info, "postgres_proxy: cannot enable secure transport. Check configuration.",
-                       read_callbacks_->connection());
+        ENVOY_CONN_LOG(
+            info, "postgres_proxy: cannot enable downstream secure transport. Check configuration.",
+            read_callbacks_->connection());
         read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
       } else {
         // Unsubscribe the callback.
@@ -225,6 +232,45 @@ bool PostgresFilter::onSSLRequest() {
   read_callbacks_->connection().write(buf, false);
 
   return false;
+}
+
+bool PostgresFilter::shouldEncryptUpstream() const {
+  return (config_->upstream_ssl_ ==
+          envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::REQUIRE);
+}
+
+void PostgresFilter::sendUpstream(Buffer::Instance& data) {
+  read_callbacks_->injectReadDataToFilterChain(data, false);
+}
+
+void PostgresFilter::encryptUpstream(bool upstream_agreed, Buffer::Instance& data) {
+  RELEASE_ASSERT(
+      config_->upstream_ssl_ !=
+          envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::DISABLE,
+      "encryptUpstream should not be called when upstream SSL is disabled.");
+  if (!upstream_agreed) {
+    ENVOY_CONN_LOG(info,
+                   "postgres_proxy: upstream server rejected request to establish SSL connection. "
+                   "Terminating.",
+                   read_callbacks_->connection());
+    read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+
+    config_->stats_.sessions_upstream_ssl_failed_.inc();
+  } else {
+    // Try to switch upstream connection to use a secure channel.
+    if (read_callbacks_->startUpstreamSecureTransport()) {
+      config_->stats_.sessions_upstream_ssl_success_.inc();
+      read_callbacks_->injectReadDataToFilterChain(data, false);
+      ENVOY_CONN_LOG(trace, "postgres_proxy: upstream SSL enabled.", read_callbacks_->connection());
+    } else {
+      ENVOY_CONN_LOG(info,
+                     "postgres_proxy: cannot enable upstream secure transport. Check "
+                     "configuration. Terminating.",
+                     read_callbacks_->connection());
+      read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+      config_->stats_.sessions_upstream_ssl_failed_.inc();
+    }
+  }
 }
 
 Network::FilterStatus PostgresFilter::doDecode(Buffer::Instance& data, bool frontend) {

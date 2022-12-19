@@ -46,14 +46,6 @@ void validateStreamIntel(const envoy_final_stream_intel& final_intel, bool expec
   ASSERT_LE(final_intel.response_start_ms, final_intel.stream_end_ms);
 }
 
-// Use the Envoy mobile default config as much as possible in this test.
-// There are some config modifiers below which do result in deltas.
-std::string defaultConfig() {
-  Platform::EngineBuilder builder;
-  std::string config_str = absl::StrCat(config_header, builder.generateConfigStr());
-  return config_str;
-}
-
 // Gets the spdlog level from the test options and converts it to the Platform::LogLevel used by
 // the Envoy Mobile engine.
 Platform::LogLevel getPlatformLogLevelFromOptions() {
@@ -81,15 +73,24 @@ Platform::LogLevel getPlatformLogLevelFromOptions() {
 
 } // namespace
 
-BaseClientIntegrationTest::BaseClientIntegrationTest(Network::Address::IpVersion ip_version)
-    : BaseIntegrationTest(ip_version, defaultConfig()) {
+// Use the Envoy mobile default config as much as possible in this test.
+// There are some config modifiers below which do result in deltas.
+std::string defaultConfig() {
+  Platform::EngineBuilder builder;
+  std::string config_str = absl::StrCat(config_header, builder.generateConfigStr());
+  return config_str;
+}
+
+BaseClientIntegrationTest::BaseClientIntegrationTest(Network::Address::IpVersion ip_version,
+                                                     const std::string& bootstrap_config)
+    : BaseIntegrationTest(ip_version, bootstrap_config) {
   skip_tag_extraction_rule_check_ = true;
   full_dispatcher_ = api_->allocateDispatcher("fake_envoy_mobile");
   use_lds_ = false;
   autonomous_upstream_ = true;
   defer_listener_finalization_ = true;
 
-  addLogLevel(getPlatformLogLevelFromOptions());
+  builder_.addLogLevel(getPlatformLogLevelFromOptions());
 }
 
 void BaseClientIntegrationTest::initialize() {
@@ -108,7 +109,9 @@ void BaseClientIntegrationTest::initialize() {
   });
   stream_prototype_->setOnComplete(
       [this](envoy_stream_intel, envoy_final_stream_intel final_intel) {
-        validateStreamIntel(final_intel, expect_dns_, upstream_tls_, cc_.on_complete_calls == 0);
+        if (expect_data_streams_) {
+          validateStreamIntel(final_intel, expect_dns_, upstream_tls_, cc_.on_complete_calls == 0);
+        }
         cc_.on_complete_received_byte_count = final_intel.received_byte_count;
         cc_.on_complete_calls++;
         cc_.terminal_callback->setReady();
@@ -159,8 +162,8 @@ std::shared_ptr<Platform::RequestHeaders> BaseClientIntegrationTest::envoyToMobi
 }
 
 void BaseClientIntegrationTest::threadRoutine(absl::Notification& engine_running) {
-  setOnEngineRunning([&]() { engine_running.Notify(); });
-  engine_ = build();
+  builder_.setOnEngineRunning([&]() { engine_running.Notify(); });
+  engine_ = builder_.build();
   full_dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
@@ -184,7 +187,8 @@ void BaseClientIntegrationTest::createEnvoy() {
   finalizeConfigWithPorts(config_helper_, ports, use_lds_);
 
   if (override_builder_config_) {
-    setOverrideConfigForTests(MessageUtil::getYamlStringFromMessage(config_helper_.bootstrap()));
+    builder_.setOverrideConfigForTests(
+        MessageUtil::getYamlStringFromMessage(config_helper_.bootstrap()));
   } else {
     ENVOY_LOG_MISC(warn, "Using builder config and ignoring config modifiers");
   }

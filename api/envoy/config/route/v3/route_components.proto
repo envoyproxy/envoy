@@ -1838,7 +1838,7 @@ message VirtualCluster {
 message RateLimit {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RateLimit";
 
-  // [#next-free-field: 11]
+  // [#next-free-field: 12]
   message Action {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RateLimit.Action";
@@ -2031,6 +2031,33 @@ message RateLimit {
       Source source = 4 [(validate.rules).enum = {defined_only: true}];
     }
 
+    // The following descriptor entry is appended to the descriptor:
+    //
+    // .. code-block:: cpp
+    //
+    //   ("query_match", "<descriptor_value>")
+    message QueryParameterValueMatch {
+      // The key to use in the descriptor entry. Defaults to ``query_match``.
+      string descriptor_key = 4;
+
+      // The value to use in the descriptor entry.
+      string descriptor_value = 1 [(validate.rules).string = {min_len: 1}];
+
+      // If set to true, the action will append a descriptor entry when the
+      // request matches the headers. If set to false, the action will append a
+      // descriptor entry when the request does not match the headers. The
+      // default value is true.
+      google.protobuf.BoolValue expect_match = 2;
+
+      // Specifies a set of query parameters that the rate limit action should match
+      // on. The action will check the request’s query parameters against all the
+      // specified query parameters in the config. A match will happen if all the
+      // query parameters in the config are present in the request with the same values
+      // (or based on presence if the value field is not in the config).
+      repeated QueryParameterMatcher query_parameters = 3
+          [(validate.rules).repeated = {min_items: 1}];
+    }
+
     oneof action_specifier {
       option (validate.required) = true;
 
@@ -2077,6 +2104,9 @@ message RateLimit {
 
       // Rate limit on masked remote address.
       MaskedRemoteAddress masked_remote_address = 10;
+
+      // Rate limit on the existence of query parameters.
+      QueryParameterValueMatch query_parameter_value_match = 11;
     }
   }
 
