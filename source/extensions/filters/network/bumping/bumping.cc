@@ -236,8 +236,8 @@ void Filter::requestCertificate(Ssl::ConnectionInfoConstSharedPtr info) {
     // to establish connection with upstream
     config_->main_dispatcher_.post([this]() {
       this->on_demand_handle_ = config_->tls_certificate_provider_->addOnDemandUpdateCallback(
-          std::string(read_callbacks_->connection().requestedServerName()),
-          absl::nullopt, read_callbacks_->connection().dispatcher(), *this);
+          std::string(read_callbacks_->connection().requestedServerName()), absl::nullopt,
+          read_callbacks_->connection().dispatcher(), *this);
     });
     return;
   }
@@ -323,9 +323,10 @@ void Filter::onCacheHit(const std::string, bool) {
 void Filter::onCacheMiss(const std::string, bool check_only) {
   if (check_only) {
     // cert is not present in cert provider cache, and mimic cert is not generated
-    // establish connection with upstream and trigger cert mimicking based on original certification.
+    // establish connection with upstream and trigger cert mimicking based on original
+    // certification.
     establishUpstreamConnection();
-    //read_callbacks_->continueReading();
+    // read_callbacks_->continueReading();
     return;
   }
   // cert is not present in cert provider cache, and mimic cert is generated

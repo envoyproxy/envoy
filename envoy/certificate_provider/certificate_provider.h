@@ -86,7 +86,8 @@ public:
    * @return OnDemandUpdateHandle the handle which can remove that update callback.
    */
   virtual OnDemandUpdateHandlePtr addOnDemandUpdateCallback(
-      const std::string cert_name, absl::optional<Envoy::CertificateProvider::OnDemandUpdateMetadataPtr> metadata,
+      const std::string cert_name,
+      absl::optional<Envoy::CertificateProvider::OnDemandUpdateMetadataPtr> metadata,
       Event::Dispatcher& thread_local_dispatcher, OnDemandUpdateCallbacks& callback) PURE;
 
   /**

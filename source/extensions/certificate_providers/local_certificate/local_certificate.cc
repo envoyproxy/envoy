@@ -1,7 +1,8 @@
 #include "source/extensions/certificate_providers/local_certificate/local_certificate.h"
 
-#include <cstddef>
 #include <openssl/x509.h>
+
+#include <cstddef>
 
 #include "source/common/common/logger.h"
 #include "source/common/config/datasource.h"
@@ -55,7 +56,8 @@ Provider::tlsCertificates(const std::string&) const {
 }
 
 Envoy::CertificateProvider::OnDemandUpdateHandlePtr Provider::addOnDemandUpdateCallback(
-    const std::string sni, absl::optional<::Envoy::CertificateProvider::OnDemandUpdateMetadataPtr> metadata,
+    const std::string sni,
+    absl::optional<::Envoy::CertificateProvider::OnDemandUpdateMetadataPtr> metadata,
     Event::Dispatcher& thread_local_dispatcher,
     Envoy::CertificateProvider::OnDemandUpdateCallbacks& callback) {
   ASSERT(main_thread_dispatcher_.isThreadSafe());
@@ -67,8 +69,7 @@ Envoy::CertificateProvider::OnDemandUpdateHandlePtr Provider::addOnDemandUpdateC
   // if we generate two mimic certs for these SNIs, it can not pass the certs config check
   // since we do not allow duplicated SANs.
   // We need to align this cache_hit with current transport socket behavior
-  bool cache_hit = [&]() { return certificates_.is_in_cache(sni); }();
-
+  bool cache_hit = [&]() { return certificates_.isInCache(sni); }();
 
   if (metadata.has_value()) {
     if (cache_hit) {
@@ -81,8 +82,7 @@ Envoy::CertificateProvider::OnDemandUpdateHandlePtr Provider::addOnDemandUpdateC
         signCertificate(sni, metadata.value(), thread_local_dispatcher);
       });
     }
-  }
-  else {
+  } else {
     runOnDemandUpdateCallback(sni, absl::nullopt, thread_local_dispatcher, cache_hit);
   }
   return handle;
@@ -99,10 +99,10 @@ void Provider::runAddUpdateCallback() {
   update_callback_manager_.runCallbacks();
 }
 
-void Provider::runOnDemandUpdateCallback(const std::string& host,
-                                         absl::optional<Envoy::CertificateProvider::OnDemandUpdateMetadataPtr> metadata,
-                                         Event::Dispatcher& thread_local_dispatcher,
-                                         bool in_cache) {
+void Provider::runOnDemandUpdateCallback(
+    const std::string& host,
+    absl::optional<Envoy::CertificateProvider::OnDemandUpdateMetadataPtr> metadata,
+    Event::Dispatcher& thread_local_dispatcher, bool in_cache) {
   ASSERT(main_thread_dispatcher_.isThreadSafe());
   auto host_it = on_demand_update_callbacks_.find(host);
   if (host_it != on_demand_update_callbacks_.end()) {
@@ -110,9 +110,11 @@ void Provider::runOnDemandUpdateCallback(const std::string& host,
       auto& callbacks = pending_callbacks->callbacks_;
       pending_callbacks->cancel();
       if (in_cache) {
-        thread_local_dispatcher.post([&callbacks, host, metadata] { callbacks.onCacheHit(host, !metadata.has_value()); });
+        thread_local_dispatcher.post(
+            [&callbacks, host, metadata] { callbacks.onCacheHit(host, !metadata.has_value()); });
       } else {
-        thread_local_dispatcher.post([&callbacks, host, metadata] { callbacks.onCacheMiss(host, !metadata.has_value()); });
+        thread_local_dispatcher.post(
+            [&callbacks, host, metadata] { callbacks.onCacheMiss(host, !metadata.has_value()); });
       }
     }
     on_demand_update_callbacks_.erase(host_it);
@@ -185,7 +187,7 @@ void Provider::setSubjectToCSR(absl::string_view subject, X509_REQ* req) {
       absl::StrAppend(&item, v.substr(0, v.length() - 1), delim);
     } else {
       absl::StrAppend(&item, v.substr(0, v.length()));
-      std::vector<std::string> entries = absl::StrSplit(item, "=");
+      std::vector<std::string> entries = absl::StrSplit(item, '=');
       X509_NAME_add_entry_by_txt(x509_name.get(), entries[0].c_str(), MBSTRING_ASC,
                                  reinterpret_cast<const unsigned char*>(entries[1].c_str()), -1, -1,
                                  0);

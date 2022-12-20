@@ -66,7 +66,7 @@ TransportSocketOptionsUtility::fromFilterState(const StreamInfo::FilterState& fi
   bool needs_transport_socket_options = false;
 
   // sni parameter prevails over value from filterstate
-  if (sni.size()) {
+  if (!sni.empty()) {
     server_name = sni;
     needs_transport_socket_options = true;
   } else if (auto typed_data =
