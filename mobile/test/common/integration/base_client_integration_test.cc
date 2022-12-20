@@ -75,6 +75,7 @@ Platform::LogLevel getPlatformLogLevelFromOptions() {
 
 // Use the Envoy mobile default config as much as possible in this test.
 // There are some config modifiers below which do result in deltas.
+// Note: This function is only used to build the Engine if `override_builder_config_` is true.
 std::string defaultConfig() {
   Platform::EngineBuilder builder;
   std::string config_str = absl::StrCat(config_header, builder.generateConfigStr());

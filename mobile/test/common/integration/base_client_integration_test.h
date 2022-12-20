@@ -28,6 +28,7 @@ typedef struct {
 Http::ResponseHeaderMapPtr toResponseHeaders(envoy_headers headers);
 
 // Creates a default bootstrap config from the EngineBuilder.
+// Only used to build the Engine if `override_builder_config_` is set to true.
 std::string defaultConfig();
 
 // A base class for Envoy Mobile client integration tests which interact with Envoy through the
