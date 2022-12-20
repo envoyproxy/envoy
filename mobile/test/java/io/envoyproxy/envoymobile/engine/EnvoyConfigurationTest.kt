@@ -61,6 +61,7 @@ class EnvoyConfigurationTest {
     dnsFailureRefreshSecondsMax: Int = 456,
     dnsQueryTimeoutSeconds: Int = 321,
     dnsMinRefreshSeconds: Int = 12,
+    enableDNSCache: Boolean = false,
     dnsPreresolveHostnames: String = "[hostname]",
     enableDrainPostDnsRefresh: Boolean = false,
     enableHttp3: Boolean = false,
@@ -93,6 +94,7 @@ class EnvoyConfigurationTest {
       dnsQueryTimeoutSeconds,
       dnsMinRefreshSeconds,
       dnsPreresolveHostnames,
+      enableDNSCache,
       enableDrainPostDnsRefresh,
       enableHttp3,
       enableGzip,
@@ -143,6 +145,7 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("&dns_min_refresh_rate 12s")
     assertThat(resolvedTemplate).contains("&dns_preresolve_hostnames [hostname]")
     assertThat(resolvedTemplate).contains("&enable_drain_post_dns_refresh false")
+    assertThat(resolvedTemplate).contains("&persistent_dns_cache_config NULL")
 
     // Interface Binding
     assertThat(resolvedTemplate).contains("&enable_interface_binding false")
@@ -199,6 +202,7 @@ class EnvoyConfigurationTest {
   fun `configuration resolves with alternate values`() {
     val envoyConfiguration = buildTestEnvoyConfiguration(
       enableDrainPostDnsRefresh = true,
+      enableDNSCache = true,
       enableHappyEyeballs = true,
       enableHttp3 = true,
       enableGzip = false,
@@ -218,6 +222,18 @@ CERT_VALIDATION_TEMPLATE
     assertThat(resolvedTemplate).contains("&dns_lookup_family ALL")
     assertThat(resolvedTemplate).contains("&dns_multiple_addresses true")
     assertThat(resolvedTemplate).contains("&enable_drain_post_dns_refresh true")
+    assertThat(resolvedTemplate).contains(
+      """
+      config:
+        name: "envoy.key_value.platform"
+        typed_config:
+          "@type": type.googleapis.com/envoymobile.extensions.key_value.platform.PlatformKeyValueStoreConfig
+          key: dns_persistent_cache
+          save_interval:
+            seconds: 15
+          max_entries: 100
+      """.trimIndent()
+    )
 
     // H2
     assertThat(resolvedTemplate).contains("&h2_delay_keepalive_timeout true")

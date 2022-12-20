@@ -491,7 +491,7 @@ final class EngineBuilderTests: XCTestCase {
     XCTAssertTrue(resolvedYAML.contains("&dns_preresolve_hostnames [test]"))
     XCTAssertTrue(resolvedYAML.contains("&dns_lookup_family ALL"))
     XCTAssertTrue(resolvedYAML.contains("&dns_multiple_addresses true"))
-    XCTAssertTrue(resolvedYAML.contains("&dns_cache_key_value_config NULL"))
+    XCTAssertTrue(resolvedYAML.contains("&persistent_dns_cache_config NULL"))
     XCTAssertTrue(resolvedYAML.contains("&enable_interface_binding true"))
     XCTAssertTrue(resolvedYAML.contains("&trust_chain_verification ACCEPT_UNTRUSTED"))
     XCTAssertTrue(resolvedYAML.contains("""
@@ -585,9 +585,10 @@ final class EngineBuilderTests: XCTestCase {
         name: "envoy.key_value.platform"
         typed_config:
           "@type": type.googleapis.com/envoymobile.extensions.key_value.platform.PlatformKeyValueStoreConfig
-          key: dns_cache
+          key: dns_persistent_cache
           save_interval:
             seconds: 15
+          max_entries: 100
   """
     ))
 // swiftlint:enable line_length
