@@ -491,7 +491,7 @@ final class EngineBuilderTests: XCTestCase {
     XCTAssertTrue(resolvedYAML.contains("&dns_preresolve_hostnames [test]"))
     XCTAssertTrue(resolvedYAML.contains("&dns_lookup_family ALL"))
     XCTAssertTrue(resolvedYAML.contains("&dns_multiple_addresses true"))
-    XCTAssertTrue(resolvedYAML.contains("&dns_cache_key_value_config null"))
+    XCTAssertTrue(resolvedYAML.contains("&dns_cache_key_value_config NULL"))
     XCTAssertTrue(resolvedYAML.contains("&enable_interface_binding true"))
     XCTAssertTrue(resolvedYAML.contains("&trust_chain_verification ACCEPT_UNTRUSTED"))
     XCTAssertTrue(resolvedYAML.contains("""
