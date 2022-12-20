@@ -579,7 +579,8 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
   EXPECT_CALL(conn_handler_, incNumConnections());
   EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(filter_chain_.get()));
   EXPECT_CALL(*filter_chain_, transportSocketFactory)
-      .WillOnce(testing::ReturnRef(*transport_socket_factory));
+      .Times(2)
+      .WillRepeatedly(testing::ReturnRef(*transport_socket_factory));
   EXPECT_CALL(*filter_chain_, networkFilterFactories).WillOnce(ReturnRef(*filter_factory_callback));
   EXPECT_CALL(listener_config2, filterChainFactory())
       .WillRepeatedly(ReturnRef(filter_chain_factory_));
@@ -661,7 +662,8 @@ TEST_F(ActiveTcpListenerTest, Rebalance) {
   EXPECT_CALL(conn_handler_, incNumConnections());
   EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(filter_chain_.get()));
   EXPECT_CALL(*filter_chain_, transportSocketFactory)
-      .WillOnce(testing::ReturnRef(*transport_socket_factory));
+      .Times(2)
+      .WillRepeatedly(testing::ReturnRef(*transport_socket_factory));
   EXPECT_CALL(*filter_chain_, networkFilterFactories).WillOnce(ReturnRef(*filter_factory_callback));
   EXPECT_CALL(listener_config2, filterChainFactory())
       .WillRepeatedly(ReturnRef(filter_chain_factory_));
