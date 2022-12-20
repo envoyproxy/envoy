@@ -620,6 +620,7 @@ final class EngineBuilderTests: XCTestCase {
       dnsQueryTimeoutSeconds: 800,
       dnsMinRefreshSeconds: 100,
       dnsPreresolveHostnames: "[test]",
+      enableDNSCache: false,
       enableHappyEyeballs: false,
       enableGzip: false,
       enableBrotli: false,
