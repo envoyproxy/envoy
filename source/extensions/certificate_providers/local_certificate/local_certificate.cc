@@ -134,7 +134,7 @@ void Provider::signCertificate(const std::string sni,
   bssl::UniquePtr<EVP_PKEY> ca_key;
   ca_key.reset(PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));
 
-  // create a new CSR
+  // create a new Cert Signing Request
   bssl::UniquePtr<X509_REQ> req(X509_REQ_new());
   X509_REQ_set_version(req.get(), 0);
   setSubjectToCSR(metadata->connectionInfo()->subjectPeerCertificate().data(), req.get());
@@ -200,12 +200,10 @@ void Provider::setSubjectToCSR(absl::string_view subject, X509_REQ* req) {
 void Provider::setPkeyToCSR(Envoy::CertificateProvider::OnDemandUpdateMetadataPtr metadata,
                             EVP_PKEY* key, X509_REQ* req) {
   auto pkey_rsa = [&](const int size) {
-    // BN provides support for working with arbitrary sized integers
     BIGNUM* bne = BN_new();
     BN_set_word(bne, RSA_F4);
     RSA* rsa = RSA_new();
-    // generates a new RSA key where the modulus has size |bits|=2048 and the public exponent is
-    // |e|=bne
+    // generates a new RSA key where the modulus has size and the public exponent
     RSA_generate_key_ex(rsa, size, bne, nullptr);
 
     // set the underlying public key in an |EVP_PKEY| object
