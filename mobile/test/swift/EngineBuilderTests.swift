@@ -491,7 +491,7 @@ final class EngineBuilderTests: XCTestCase {
     XCTAssertTrue(resolvedYAML.contains("&dns_preresolve_hostnames [test]"))
     XCTAssertTrue(resolvedYAML.contains("&dns_lookup_family ALL"))
     XCTAssertTrue(resolvedYAML.contains("&dns_multiple_addresses true"))
-    XCTAssertTrue(resolvedYAML.contains("&persistent_dns_cache_config NULL"))
+    XCTAssertFalse(resolvedYAML.contains("&persistent_dns_cache_config"))
     XCTAssertTrue(resolvedYAML.contains("&enable_interface_binding true"))
     XCTAssertTrue(resolvedYAML.contains("&trust_chain_verification ACCEPT_UNTRUSTED"))
     XCTAssertTrue(resolvedYAML.contains("""
@@ -580,16 +580,17 @@ final class EngineBuilderTests: XCTestCase {
     XCTAssertTrue(resolvedYAML.contains("&dns_lookup_family V4_PREFERRED"))
 // swiftlint:disable line_length
     XCTAssertTrue(resolvedYAML.contains(
-  """
-      config:
-        name: "envoy.key_value.platform"
-        typed_config:
-          "@type": type.googleapis.com/envoymobile.extensions.key_value.platform.PlatformKeyValueStoreConfig
-          key: dns_persistent_cache
-          save_interval:
-            seconds: 15
-          max_entries: 100
-  """
+"""
+- &persistent_dns_cache_config
+  config:
+    name: "envoy.key_value.platform"
+    typed_config:
+      "@type": type.googleapis.com/envoymobile.extensions.key_value.platform.PlatformKeyValueStoreConfig
+      key: dns_persistent_cache
+      save_interval:
+        seconds: 15
+      max_entries: 100
+"""
     ))
 // swiftlint:enable line_length
     XCTAssertTrue(resolvedYAML.contains("&dns_multiple_addresses false"))
