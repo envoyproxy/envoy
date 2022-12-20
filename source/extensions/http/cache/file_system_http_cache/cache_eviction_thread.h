@@ -4,9 +4,10 @@
 #include <memory>
 #include <vector>
 
+#include "source/common/api/os_sys_calls_impl.h"
+
 #include "absl/base/thread_annotations.h"
 #include "absl/synchronization/mutex.h"
-#include "source/common/api/os_sys_calls_impl.h"
 
 namespace Envoy {
 namespace Extensions {

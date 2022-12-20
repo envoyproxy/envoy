@@ -41,8 +41,8 @@ void CacheEvictionThread::terminate() {
 
 bool CacheEvictionThread::waitForSignal() {
   absl::MutexLock lock(&mu_);
-  // Worth noting here that if signalled_ is already true, the lock is not released
-  // until idle_ is false again, so waitForIdle will not return until signalled_
+  // Worth noting here that if `signalled_` is already true, the lock is not released
+  // until idle_ is false again, so waitForIdle will not return until `signalled_`
   // stays false for the duration of an eviction cycle.
   idle_ = true;
   auto cond = [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_) { return signalled_; };
