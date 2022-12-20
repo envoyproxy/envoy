@@ -21,15 +21,12 @@ HttpRequestQueryParamsDataInput::get(const HttpMatchingData& data) const {
     return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt};
   }
 
-  Utility::QueryParams params;
-  if (url_decoded_) {
-    params = Http::Utility::parseAndDecodeQueryString(ret->value().getStringView());
-  } else {
-    params = Http::Utility::parseQueryString(ret->value().getStringView());
-  }
+  Utility::QueryParams params =
+      Http::Utility::parseAndDecodeQueryString(ret->value().getStringView());
+
   auto ItParam = params.find(query_param_);
   if (ItParam == params.end()) {
-    return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt};
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt};
   }
   return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
           std::move(ItParam->second)};

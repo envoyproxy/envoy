@@ -68,7 +68,4 @@ message HttpResponseTrailerMatchInput {
 message HttpRequestQueryParamMatchInput {
   // The query parameter to match on.
   string query_param = 1 [(validate.rules).string = {min_len: 1}];
-
-  // Whether the query parameters and their value should be URL-decoded.
-  bool url_decoded = 2;
 }

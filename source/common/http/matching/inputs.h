@@ -142,14 +142,13 @@ public:
 
 class HttpRequestQueryParamsDataInput : public Matcher::DataInput<HttpMatchingData> {
 public:
-  explicit HttpRequestQueryParamsDataInput(const std::string& query_param, bool url_decoded)
-      : query_param_(query_param), url_decoded_(url_decoded) {}
+  explicit HttpRequestQueryParamsDataInput(const std::string& query_param)
+      : query_param_(query_param) {}
 
   Matcher::DataInputGetResult get(const HttpMatchingData& /*data*/) const override;
 
 private:
   const std::string query_param_;
-  bool url_decoded_;
 };
 
 class HttpRequestQueryParamsDataInputFactory : public Matcher::DataInputFactory<HttpMatchingData> {
@@ -163,16 +162,13 @@ public:
         const envoy::type::matcher::v3::HttpRequestQueryParamMatchInput&>(config,
                                                                           validation_visitor);
 
-    return [query_param = typed_config.query_param(), url_decoded = typed_config.url_decoded()] {
-      return std::make_unique<HttpRequestQueryParamsDataInput>(query_param, url_decoded);
+    return [query_param = typed_config.query_param()] {
+      return std::make_unique<HttpRequestQueryParamsDataInput>(query_param);
     };
   };
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::type::matcher::v3::HttpRequestQueryParamMatchInput>();
   }
-
-private:
-  const std::string name_;
 };
 
 } // namespace Matching

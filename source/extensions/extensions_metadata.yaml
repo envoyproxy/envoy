@@ -1241,6 +1241,13 @@ envoy.matching.inputs.response_trailers:
   status: alpha
   type_urls:
   - envoy.type.matcher.v3.HttpResponseTrailerMatchInput
+envoy.matching.inputs.query_params:
+  categories:
+  - envoy.matching.http.input
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.type.matcher.v3.HttpRequestQueryParamMatchInput
 envoy.matching.inputs.destination_ip:
   categories:
   - envoy.matching.http.input

@@ -114,19 +114,43 @@ TEST(MatchingData, HttpRequestQueryParamsDataInput) {
   HttpMatchingDataImpl data(connection_info_provider);
 
   {
-    HttpRequestQueryParamsDataInput input("username", false /* url_decoded */);
-    TestRequestHeaderMapImpl request_headers({{":path", "/test?username=foo&username=bar"}});
-    data.onRequestHeaders(request_headers);
-
-    EXPECT_EQ(input.get(data).data_, "foo");
-  }
-
-  {
-    HttpRequestQueryParamsDataInput input("user name", true /* url_decoded */);
+    HttpRequestQueryParamsDataInput input("user name");
     TestRequestHeaderMapImpl request_headers({{":path", "/test?user\%20name=foo\%20bar"}});
     data.onRequestHeaders(request_headers);
 
     EXPECT_EQ(input.get(data).data_, "foo bar");
+  }
+
+  {
+    HttpRequestQueryParamsDataInput input("username");
+    TestRequestHeaderMapImpl request_headers({{":path", "/test?username=fooA&username=fooB"}});
+    data.onRequestHeaders(request_headers);
+
+    EXPECT_EQ(input.get(data).data_, "fooA");
+  }
+
+  {
+    HttpRequestQueryParamsDataInput input("username");
+    TestRequestHeaderMapImpl request_headers({{":path", "/test"}});
+    data.onRequestHeaders(request_headers);
+
+    const auto result = input.get(data);
+
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::AllDataAvailable);
+    EXPECT_EQ(result.data_, absl::nullopt);
+  }
+
+  {
+    HttpRequestQueryParamsDataInput input("username");
+    TestRequestHeaderMapImpl request_headers;
+    data.onRequestHeaders(request_headers);
+
+    const auto result = input.get(data);
+
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::NotAvailable);
+    EXPECT_EQ(result.data_, absl::nullopt);
   }
 }
 
