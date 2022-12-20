@@ -100,6 +100,17 @@ public:
 using HeaderValidatorPtr = std::unique_ptr<HeaderValidator>;
 
 /**
+ * Interface for stats.
+ */
+class HeaderValidatorStats {
+public:
+  virtual ~HeaderValidatorStats() = default;
+
+  virtual void incDroppedHeadersWithUnderscores() PURE;
+  virtual void incRequestsRejectedWithUnderscoresInHeaders() PURE;
+};
+
+/**
  * Interface for creating header validators.
  */
 class HeaderValidatorFactory {
@@ -109,7 +120,8 @@ public:
   /**
    * Create a new header validator for the specified protocol.
    */
-  virtual HeaderValidatorPtr create(Protocol protocol, StreamInfo::StreamInfo& stream_info) PURE;
+  virtual HeaderValidatorPtr create(Protocol protocol, StreamInfo::StreamInfo& stream_info,
+                                    HeaderValidatorStats& stats) PURE;
 };
 
 using HeaderValidatorFactoryPtr = std::unique_ptr<HeaderValidatorFactory>;

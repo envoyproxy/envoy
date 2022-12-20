@@ -24,6 +24,9 @@ final class ViewController: UITableViewController {
       .addPlatformFilter(AsyncDemoFilter.init)
       .h2ExtendKeepaliveTimeout(true)
       .enableAdminInterface()
+      .enableDNSCache(true)
+      // required by DNS cache
+      .addKeyValueStore(name: "reserved.platform_store", keyValueStore: UserDefaults.standard)
       .enableInterfaceBinding(true)
       .enablePlatformCertificateValidation(true)
       .addNativeFilter(
@@ -39,6 +42,7 @@ final class ViewController: UITableViewController {
       .addStringAccessor(name: "demo-accessor", accessor: { return "PlatformString" })
       .addKeyValueStore(name: "demo-kv-store", keyValueStore: UserDefaults.standard)
       .setEventTracker { NSLog("Envoy event emitted: \($0)") }
+      .forceIPv6(true)
       .build()
     self.streamClient = engine.streamClient()
     self.pulseClient = engine.pulseClient()

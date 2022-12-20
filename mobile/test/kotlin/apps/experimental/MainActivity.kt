@@ -57,13 +57,15 @@ class MainActivity : Activity() {
       .addPlatformFilter(::AsyncDemoFilter)
       .h2ExtendKeepaliveTimeout(true)
       .enableAdminInterface()
+      .enableDNSCache(true)
+      // required by DNS cache
+      .addKeyValueStore("reserved.platform_store", SharedPreferencesStore(preferences))
       .enableInterfaceBinding(true)
       .enableSocketTagging(true)
       .enableProxying(true)
       .enableSkipDNSLookupForProxiedRequests(true)
       .addNativeFilter("envoy.filters.http.buffer", "{\"@type\":\"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer\",\"max_request_bytes\":5242880}")
       .addStringAccessor("demo-accessor", { "PlatformString" })
-      .addKeyValueStore("demo-kv-store", SharedPreferencesStore(preferences))
       .setOnEngineRunning { Log.d("MainActivity", "Envoy async internal setup completed") }
       .setEventTracker({
         for (entry in it.entries) {
