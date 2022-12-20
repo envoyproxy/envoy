@@ -722,7 +722,7 @@ Filter::createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster) {
     should_tcp_proxy = (method == Http::Headers::get().MethodValues.Connect);
 
     // Allow POST for proxying raw TCP if it is configured.
-    if (!should_tcp_proxy && route_entry_->connectConfig().value().allow_post()) {
+    if (!should_tcp_proxy && route_entry_->connectConfig()->allow_post()) {
       should_tcp_proxy = (method == Http::Headers::get().MethodValues.Post);
     }
   }

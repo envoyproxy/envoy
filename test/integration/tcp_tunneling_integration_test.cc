@@ -95,6 +95,9 @@ public:
       ASSERT_FALSE(response_->reset());
     }
 
+    // expected_header_bytes_* is 0 as we do not use proxy protocol.
+    // expected_wire_bytes_sent is 9 as the Envoy sends "hello,bye".
+    // expected_wire_bytes_received is 9 as the Upstream sends "there!ack".
     const int expected_wire_bytes_sent = 9;
     const int expected_wire_bytes_received = 9;
     const int expected_header_bytes_sent = 0;
@@ -189,8 +192,9 @@ TEST_P(ConnectTerminationIntegrationTest, DownstreamClose) {
   // Tear down by closing the client connection.
   codec_client_->close();
   ASSERT_TRUE(fake_raw_upstream_connection_->waitForHalfClose());
-  const int expected_wire_bytes_sent = 5;
-  const int expected_wire_bytes_received = 6;
+  const int expected_wire_bytes_sent = 5;     // Envoy sends "hello".
+  const int expected_wire_bytes_received = 6; // Upstream sends "there!".
+  // expected_header_bytes_* is 0 as we do not use proxy protocol.
   const int expected_header_bytes_sent = 0;
   const int expected_header_bytes_received = 0;
   checkAccessLogOutput(expected_wire_bytes_sent, expected_wire_bytes_received,
@@ -211,8 +215,9 @@ TEST_P(ConnectTerminationIntegrationTest, DownstreamReset) {
   codec_client_->sendReset(*request_encoder_);
   ASSERT_TRUE(fake_raw_upstream_connection_->waitForHalfClose());
 
-  const int expected_wire_bytes_sent = 5;
-  const int expected_wire_bytes_received = 6;
+  const int expected_wire_bytes_sent = 5;     // Envoy sends "hello".
+  const int expected_wire_bytes_received = 6; // Upstream sends "there!".
+  // expected_header_bytes_* is 0 as we do not use proxy protocol.
   const int expected_header_bytes_sent = 0;
   const int expected_header_bytes_received = 0;
   checkAccessLogOutput(expected_wire_bytes_sent, expected_wire_bytes_received,
@@ -237,8 +242,9 @@ TEST_P(ConnectTerminationIntegrationTest, UpstreamClose) {
   } else {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   }
-  const int expected_wire_bytes_sent = 5;
-  const int expected_wire_bytes_received = 6;
+  const int expected_wire_bytes_sent = 5;     // Envoy sends "hello".
+  const int expected_wire_bytes_received = 6; // Upstream sends "there!".
+  // expected_header_bytes_* is 0 as we do not use proxy protocol.
   const int expected_header_bytes_sent = 0;
   const int expected_header_bytes_received = 0;
   checkAccessLogOutput(expected_wire_bytes_sent, expected_wire_bytes_received,
@@ -376,6 +382,13 @@ protected:
     }
     const bool is_ipv4 = version_ == Network::Address::IpVersion::v4;
 
+    // expected_header_bytes_sent is based on the proxy protocol header sent to
+    //  the upstream.
+    // expected_header_bytes_received is zero since Envoy initiates the proxy
+    // protocol.
+    // expected_wire_bytes_sent changes depending on the proxy protocol header
+    // size which varies based on ip version. Envoy also sends "hello,bye".
+    // expected_wire_bytes_received is 9 as the Upstream sends "there!ack".
     int expected_wire_bytes_sent;
     int expected_header_bytes_sent;
     if (proxy_protocol_version_ == envoy::config::core::v3::ProxyProtocolConfig::V1) {

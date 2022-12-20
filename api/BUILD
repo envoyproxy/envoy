@@ -296,6 +296,7 @@ proto_library(
         "//envoy/extensions/upstreams/http/tcp/v3:pkg",
         "//envoy/extensions/upstreams/http/v3:pkg",
         "//envoy/extensions/upstreams/tcp/generic/v3:pkg",
+        "//envoy/extensions/upstreams/tcp/v3:pkg",
         "//envoy/extensions/wasm/v3:pkg",
         "//envoy/extensions/watchdog/profile_action/v3:pkg",
         "//envoy/service/accesslog/v3:pkg",
