@@ -105,7 +105,7 @@ const char* persistent_dns_cache_config_insert = R"(
       "@type": type.googleapis.com/envoymobile.extensions.key_value.platform.PlatformKeyValueStoreConfig
       key: dns_persistent_cache
       save_interval:
-        seconds: 15
+        seconds: 0
       max_entries: 100
 )";
 
