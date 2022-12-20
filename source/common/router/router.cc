@@ -829,9 +829,10 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   ASSERT(buffering || !upstream_requests_.empty());
 
   // We will need to make N copies of the data.
-  auto many_copied_buffer =
-      Buffer::ManyCopiedBuffer(data, buffering + !upstream_requests_.empty() +
-                                         (streaming_shadows_ ? shadow_streams_.size() : 0));
+  int num_copies = buffering +                   // one copy for the buffer.
+                   !upstream_requests_.empty() + // one copy for the main request.
+                   shadow_streams_.size();       // one copy for each shadow.
+  auto many_copied_buffer = Buffer::ManyCopiedBuffer(data, num_copies);
 
   if (!upstream_requests_.empty()) {
     upstream_requests_.front()->acceptDataFromRouter(many_copied_buffer.nextBuffer(), end_stream);

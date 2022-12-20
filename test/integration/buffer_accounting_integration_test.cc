@@ -110,7 +110,6 @@ public:
 
     for (uint32_t idx = 0; idx < num_responses; ++idx) {
       responses.emplace_back(codec_client_->makeRequestWithBody(header_map, request_body_size));
-      absl::SleepFor(absl::Milliseconds(20));
       if (!cluster_to_wait_for.empty()) {
         test_server_->waitForGaugeEq(
             absl::StrCat("cluster.", cluster_to_wait_for, ".upstream_rq_active"), idx + 1);
