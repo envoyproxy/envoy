@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <vector>
 
@@ -20,19 +21,25 @@ class FileSystemHttpCache;
  * of FileSystemHttpCache are performed.
  *
  * The instance of CacheEvictionThread is owned by the `CacheSingleton`, which is
- * destroyed only when all cache instances have been destroyed. During destruction, the
- * thread is terminated and joined.
+ * destroyed only when all cache instances have been destroyed.
  **/
 class CacheEvictionThread {
 public:
-  CacheEvictionThread();
-  ~CacheEvictionThread();
+  CacheEvictionThread(Thread::ThreadFactory& thread_factory);
 
   /**
    * Adds the given cache to the caches that may be evicted from.
-   * @param cache a weak pointer to the cache in question.
+   * May block for up to one eviction cycle, if one is in progress.
+   * @param cache an unowned reference to the cache in question.
    */
-  void addCache(std::weak_ptr<FileSystemHttpCache> cache);
+  void addCache(FileSystemHttpCache& cache);
+
+  /**
+   * Removes the given cache from the caches that may be evicted from.
+   * May block for up to one eviction cycle, if one is in progress.
+   * @param cache an unowned reference to the cache in question.
+   */
+  void removeCache(FileSystemHttpCache& cache);
 
   /**
    * Signals the cache eviction thread that it's time to test things.
@@ -49,19 +56,22 @@ private:
   void work();
 
   /**
-   * Get the set of caches the thread should potentially evict from.
-   * This also erases from caches_ any weak_ptrs whose target has been deleted.
-   * @return a vector of shared_ptrs for each of the cache instances that still exist.
+   * @return false if terminating.
    */
-  std::vector<std::shared_ptr<FileSystemHttpCache>> cachesToCheck();
+  bool waitForSignal();
+  void terminate();
 
   absl::Mutex mu_;
   bool signalled_ ABSL_GUARDED_BY(mu_) = false;
   bool terminating_ ABSL_GUARDED_BY(mu_) = false;
+
   absl::Mutex cache_mu_;
-  std::vector<std::weak_ptr<FileSystemHttpCache>> caches_ ABSL_GUARDED_BY(cache_mu_);
+  // We must store the caches as unowned references so they can be destroyed
+  // during config changes - that destruction is the only signal that a cache
+  // instance should be removed.
+  std::set<FileSystemHttpCache*> caches_ ABSL_GUARDED_BY(cache_mu_);
   Api::OsSysCalls& os_sys_calls_;
-  std::thread thread_;
+  Thread::ThreadPtr thread_;
 };
 
 } // namespace FileSystemHttpCache

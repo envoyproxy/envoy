@@ -42,8 +42,10 @@ ConfigProto normalizeConfig(const ConfigProto& original) {
 class CacheSingleton : public Envoy::Singleton::Instance {
 public:
   CacheSingleton(
-      std::shared_ptr<Common::AsyncFiles::AsyncFileManagerFactory>&& async_file_manager_factory)
-      : async_file_manager_factory_(async_file_manager_factory) {}
+      std::shared_ptr<Common::AsyncFiles::AsyncFileManagerFactory>&& async_file_manager_factory,
+      Thread::ThreadFactory& thread_factory)
+      : async_file_manager_factory_(async_file_manager_factory),
+        cache_eviction_thread_(thread_factory) {}
 
   std::shared_ptr<FileSystemHttpCache> get(std::shared_ptr<CacheSingleton> singleton,
                                            const ConfigProto& non_normalized_config,
@@ -70,8 +72,8 @@ public:
   }
 
 private:
-  CacheEvictionThread cache_eviction_thread_;
   std::shared_ptr<Common::AsyncFiles::AsyncFileManagerFactory> async_file_manager_factory_;
+  CacheEvictionThread cache_eviction_thread_;
   absl::Mutex mu_;
   // We keep weak_ptr here so the caches can be destroyed if the config is updated to stop using
   // that config of cache. The caches each keep shared_ptrs to this singleton, which keeps the
@@ -99,7 +101,8 @@ public:
     std::shared_ptr<CacheSingleton> caches = context.singletonManager().getTyped<CacheSingleton>(
         SINGLETON_MANAGER_REGISTERED_NAME(file_system_http_cache_singleton), [&context] {
           return std::make_shared<CacheSingleton>(
-              Common::AsyncFiles::AsyncFileManagerFactory::singleton(&context.singletonManager()));
+              Common::AsyncFiles::AsyncFileManagerFactory::singleton(&context.singletonManager()),
+              context.api().threadFactory());
         });
     std::shared_ptr<FileSystemHttpCache> cache = caches->get(caches, config, context.scope());
     cache->init();

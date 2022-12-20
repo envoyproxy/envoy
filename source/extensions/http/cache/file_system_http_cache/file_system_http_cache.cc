@@ -88,6 +88,8 @@ FileSystemHttpCache::FileSystemHttpCache(
       stats_(generateStats(stats_scope, cachePath())),
       cache_eviction_thread_(cache_eviction_thread) {}
 
+FileSystemHttpCache::~FileSystemHttpCache() { cache_eviction_thread_.removeCache(*this); }
+
 CacheInfo FileSystemHttpCache::cacheInfo() const {
   CacheInfo info;
   info.name_ = name();
@@ -362,7 +364,7 @@ void FileSystemHttpCache::init() {
   if (config().has_max_cache_entry_count()) {
     stats_.size_limit_count_.set(config().max_cache_entry_count().value());
   }
-  cache_eviction_thread_.addCache(shared_from_this());
+  cache_eviction_thread_.addCache(*this);
 }
 
 void FileSystemHttpCache::trackFileAdded(uint64_t file_size) {

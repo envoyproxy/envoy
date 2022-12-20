@@ -31,6 +31,7 @@ public:
                       CacheEvictionThread& cache_eviction_thread, ConfigProto config,
                       std::shared_ptr<Common::AsyncFiles::AsyncFileManager>&& async_file_manager,
                       Stats::Scope& stats_scope);
+  ~FileSystemHttpCache() override;
 
   // Overrides for HttpCache
   LookupContextPtr makeLookupContext(LookupRequest&& lookup,

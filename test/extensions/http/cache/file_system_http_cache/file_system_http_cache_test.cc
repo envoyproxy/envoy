@@ -62,6 +62,9 @@ public:
       throw EnvoyException(
           fmt::format("Didn't find a registered implementation for type: '{}'", type));
     }
+    ON_CALL(context_.api_, threadFactory()).WillByDefault([]() -> Thread::ThreadFactory& {
+      return Thread::threadFactoryForTest();
+    });
   }
 
   void initCache() {
@@ -1198,6 +1201,9 @@ TEST(Registration, GetCacheFromFactory) {
   ASSERT_NE(factory, nullptr);
   envoy::extensions::filters::http::cache::v3::CacheConfig cache_config;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  ON_CALL(factory_context.api_, threadFactory()).WillByDefault([]() -> Thread::ThreadFactory& {
+    return Thread::threadFactoryForTest();
+  });
   TestUtility::loadFromYaml(std::string(yaml_config), cache_config);
   EXPECT_EQ(factory->getCache(cache_config, factory_context)->cacheInfo().name_,
             "envoy.extensions.http.cache.file_system_http_cache");
