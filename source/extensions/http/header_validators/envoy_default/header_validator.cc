@@ -441,27 +441,36 @@ bool HeaderValidator::hasChunkedTransferEncoding(const HeaderString& value) {
 HeaderValidator::TrailerValidationResult
 HeaderValidator::validateTrailers(::Envoy::Http::HeaderMap& trailers) {
   std::string reject_details;
-  trailers.iterate([this, &reject_details](const ::Envoy::Http::HeaderEntry& header_entry)
-                       -> ::Envoy::Http::HeaderMap::Iterate {
-    const auto& header_name = header_entry.key();
-    const auto& header_value = header_entry.value();
+  std::vector<absl::string_view> drop_headers;
+  trailers.iterate(
+      [this, &reject_details, &drop_headers](
+          const ::Envoy::Http::HeaderEntry& header_entry) -> ::Envoy::Http::HeaderMap::Iterate {
+        const auto& header_name = header_entry.key();
+        const auto& header_value = header_entry.value();
 
-    auto entry_name_result = validateGenericHeaderName(header_name);
-    if (!entry_name_result) {
-      reject_details = static_cast<std::string>(entry_name_result.details());
-    } else {
-      auto entry_value_result = validateGenericHeaderValue(header_value);
-      if (!entry_value_result) {
-        reject_details = static_cast<std::string>(entry_value_result.details());
-      }
-    }
+        auto entry_name_result = validateGenericHeaderName(header_name);
+        if (entry_name_result.action() == HeaderEntryValidationResult::Action::DropHeader) {
+          // drop the header, continue processing the request
+          drop_headers.push_back(header_name.getStringView());
+        } else if (!entry_name_result) {
+          reject_details = static_cast<std::string>(entry_name_result.details());
+        } else {
+          auto entry_value_result = validateGenericHeaderValue(header_value);
+          if (!entry_value_result) {
+            reject_details = static_cast<std::string>(entry_value_result.details());
+          }
+        }
 
-    return reject_details.empty() ? ::Envoy::Http::HeaderMap::Iterate::Continue
-                                  : ::Envoy::Http::HeaderMap::Iterate::Break;
-  });
+        return reject_details.empty() ? ::Envoy::Http::HeaderMap::Iterate::Continue
+                                      : ::Envoy::Http::HeaderMap::Iterate::Break;
+      });
 
   if (!reject_details.empty()) {
     return {TrailerValidationResult::Action::Reject, reject_details};
+  }
+
+  for (auto& name : drop_headers) {
+    trailers.remove(::Envoy::Http::LowerCaseString(name));
   }
 
   return TrailerValidationResult::success();

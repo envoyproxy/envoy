@@ -919,7 +919,24 @@ bool ConnectionManagerImpl::ActiveStream::validateTrailers() {
         grpc_status = Grpc::Status::WellKnownGrpcStatus::Internal;
       }
 
-      sendLocalReply(response_code, "", nullptr, grpc_status, validation_result.details());
+      // H/2 codec was resetting requests that were rejected due to headers with underscores,
+      // instead of sending 400. Preserving this behavior for now.
+      // TODO(#24466): Make H/2 behavior consistent with H/1 and H/3.
+      if (validation_result.details() == UhvResponseCodeDetail::get().InvalidUnderscore &&
+          connection_manager_.codec_->protocol() == Protocol::Http2) {
+        filter_manager_.streamInfo().setResponseCodeDetails(validation_result.details());
+        resetStream();
+      } else {
+        if (connection_manager_.codec_->protocol() < Protocol::Http2) {
+          sendLocalReply(response_code, "", nullptr, grpc_status, validation_result.details());
+        } else {
+          filter_manager_.streamInfo().setResponseCodeDetails(validation_result.details());
+          resetStream();
+        }
+        if (!response_encoder_->streamErrorOnInvalidHttpMessage()) {
+          connection_manager_.handleCodecError(validation_result.details());
+        }
+      }
       return false;
     }
   }
