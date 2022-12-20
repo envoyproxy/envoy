@@ -10,6 +10,7 @@
 #include "envoy/server/instance.h"
 
 #include "source/server/admin/handler_ctx.h"
+#include "source/server/admin/prometheus_stats_request.h"
 #include "source/server/admin/stats_request.h"
 #include "source/server/admin/utils.h"
 
@@ -83,8 +84,15 @@ public:
    */
   Admin::UrlHandler statsHandler();
 
+  Admin::UrlHandler prometheusStatsHandler();
+
   static Admin::RequestPtr makeRequest(Stats::Store& stats, const StatsParams& params,
                                        StatsRequest::UrlHandlerFn url_handler_fn = nullptr);
+
+  static Admin::RequestPtr
+  makePrometheusRequest(Stats::Store& stats, const StatsParams& params,
+                        Stats::CustomStatNamespaces& custom_namespaces,
+                        PrometheusStatsRequest::UrlHandlerFn url_handler_fn = nullptr);
   Admin::RequestPtr makeRequest(AdminStream&);
   // static Admin::RequestPtr makeRequest(Stats::Store& stats, const StatsParams& params,
   //                                     StatsRequest::UrlHandlerFn url_handler_fn);
