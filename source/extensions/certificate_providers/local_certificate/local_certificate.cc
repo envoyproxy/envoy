@@ -3,6 +3,7 @@
 #include <openssl/x509.h>
 
 #include <cstddef>
+#include <memory>
 
 #include "source/common/common/logger.h"
 #include "source/common/config/datasource.h"
@@ -33,11 +34,11 @@ Provider::Provider(
   certificates_.setMaxSize(cache_size_);
 
   // Set default TLS Certificate
-  envoy::extensions::transport_sockets::tls::v3::TlsCertificate* tls_certificate =
-      new envoy::extensions::transport_sockets::tls::v3::TlsCertificate();
+  TlsCertificatePtr tls_certificate =
+      std::make_unique<envoy::extensions::transport_sockets::tls::v3::TlsCertificate>();
   tls_certificate->mutable_certificate_chain()->set_inline_string(default_identity_cert_);
   tls_certificate->mutable_private_key()->set_inline_string(default_identity_key_);
-  certificates_.insert("default", tls_certificate);
+  certificates_.insert("default", std::move(tls_certificate));
 }
 
 Envoy::CertificateProvider::CertificateProvider::Capabilities Provider::capabilities() const {
@@ -48,8 +49,7 @@ Envoy::CertificateProvider::CertificateProvider::Capabilities Provider::capabili
 
 const std::string Provider::trustedCA(const std::string&) const { return ""; }
 
-std::vector<
-    std::reference_wrapper<const envoy::extensions::transport_sockets::tls::v3::TlsCertificate>>
+std::vector<std::reference_wrapper<const TlsCertificate>>
 Provider::tlsCertificates(const std::string&) const {
   ASSERT(main_thread_dispatcher_.isThreadSafe());
   return certificates_.getCertificates();
@@ -163,13 +163,13 @@ void Provider::signCertificate(const std::string sni,
   std::string key_pem(reinterpret_cast<const char*>(output), length);
 
   // Generate TLS Certificate
-  envoy::extensions::transport_sockets::tls::v3::TlsCertificate* tls_certificate =
-      new envoy::extensions::transport_sockets::tls::v3::TlsCertificate();
+  TlsCertificatePtr tls_certificate =
+      std::make_unique<envoy::extensions::transport_sockets::tls::v3::TlsCertificate>();
   tls_certificate->mutable_certificate_chain()->set_inline_string(cert_pem);
   tls_certificate->mutable_private_key()->set_inline_string(key_pem);
 
   // Update certificates_ map
-  certificates_.insert(sni, tls_certificate);
+  certificates_.insert(sni, std::move(tls_certificate));
 
   runAddUpdateCallback();
   runOnDemandUpdateCallback(sni, metadata, thread_local_dispatcher, false);
@@ -181,7 +181,7 @@ void Provider::setSubjectToCSR(absl::string_view subject, X509_REQ* req) {
   const std::string delim = ",";
   std::string item;
   for (absl::string_view v : absl::StrSplit(subject, delim)) {
-    // This happens when peer subject from connectioninfo contains escaped comma,
+    // This happens when peer subject from connection info contains escaped comma,
     // like O=Technology Co.\\, Ltd, have to remove the double backslash.
     if (v.back() == '\\') {
       absl::StrAppend(&item, v.substr(0, v.length() - 1), delim);

@@ -223,7 +223,7 @@ void Filter::onGenericPoolReady(StreamInfo::StreamInfo*,
                                 const Network::ConnectionInfoProvider&,
                                 Ssl::ConnectionInfoConstSharedPtr info) {
 
-  // Request mimick cert from local certificate provider.
+  // Request cert from local certificate provider.
   requestCertificate(info);
   // upstream_ = std::move(upstream);
   generic_conn_pool_.reset();
@@ -232,7 +232,7 @@ void Filter::onGenericPoolReady(StreamInfo::StreamInfo*,
 
 void Filter::requestCertificate(Ssl::ConnectionInfoConstSharedPtr info) {
   if (info == nullptr) {
-    // if no info provided, only check if cert is present and determime whether or not
+    // if no info provided, only check if cert is present and determine whether or not
     // to establish connection with upstream
     config_->main_dispatcher_.post([this]() {
       this->on_demand_handle_ = config_->tls_certificate_provider_->addOnDemandUpdateCallback(

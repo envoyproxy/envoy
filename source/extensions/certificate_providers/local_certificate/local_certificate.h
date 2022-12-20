@@ -18,6 +18,8 @@ namespace LocalCertificate {
 
 using ::google::simple_lru_cache::SimpleLRUCache;
 using TlsCertificate = envoy::extensions::transport_sockets::tls::v3::TlsCertificate;
+using TlsCertificatePtr =
+    std::unique_ptr<envoy::extensions::transport_sockets::tls::v3::TlsCertificate>;
 
 // Default cert cache size
 constexpr int CacheDefaultSize = 1024;
@@ -50,9 +52,9 @@ public:
     return false;
   }
 
-  void insert(const std::string& host, const TlsCertificate* cert) {
+  void insert(const std::string& host, TlsCertificatePtr&& cert) {
     if (cert_cache_) {
-      cert_cache_->insert(host, cert, 1);
+      cert_cache_->insert(host, cert.release(), 1);
     }
   }
 
