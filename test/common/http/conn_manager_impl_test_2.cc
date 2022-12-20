@@ -3155,7 +3155,6 @@ TEST_F(HttpConnectionManagerImplTest, DirectLocalReplyCausesDisconnect) {
   EXPECT_EQ(1U, stats_.named_.rs_too_large_.value());
 }
 
-#ifdef ENVOY_ENABLE_UHV
 // Header validator rejects header map for HTTP/1.x protocols
 TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectHttp1) {
   setup(false, "");
@@ -3543,8 +3542,6 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorAccept) {
   EXPECT_EQ(1U, stats_.named_.downstream_rq_completed_.value());
   EXPECT_EQ(1U, listener_stats_.downstream_rq_completed_.value());
 }
-
-#endif // ENVOY_ENABLE_UHV
 
 } // namespace Http
 } // namespace Envoy
