@@ -344,8 +344,8 @@ private:
 };
 
 using VirtualHostSharedPtr = std::shared_ptr<VirtualHostImpl>;
-// Sentinel value to represent an unset std::duration.
-static constexpr long UnsetDuration = -1;
+// Sentinel value to represent an unset std::duration, in lieu of using std::optional.
+static constexpr int64_t UnsetDuration = -1;
 
 /**
  * Implementation of RetryPolicy that reads from the proto route or virtual host config.
@@ -415,7 +415,7 @@ private:
   std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_;
   std::vector<Http::HeaderMatcherSharedPtr> retriable_request_headers_;
   // Durations below are optional in the config. `UnsetDuration` sentinel is used to represent a
-  // value that was not provided.
+  // value that was not provided. This takes less memory than using std::optional.
   std::chrono::milliseconds base_interval_{UnsetDuration};
   std::chrono::milliseconds max_interval_{UnsetDuration};
   std::vector<ResetHeaderParserSharedPtr> reset_headers_{};
@@ -1106,7 +1106,7 @@ private:
   const Http::Code cluster_not_found_response_code_;
   const std::chrono::milliseconds timeout_;
   // Durations below are optional in the config. `UnsetDuration` sentinel is used to represent a
-  // value that was not provided.
+  // value that was not provided. This takes less memory than using std::optional.
   const std::chrono::milliseconds idle_timeout_{UnsetDuration};
   const std::chrono::milliseconds max_stream_duration_{UnsetDuration};
   const std::chrono::milliseconds grpc_timeout_header_max_{UnsetDuration};
