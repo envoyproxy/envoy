@@ -309,5 +309,22 @@ void HttpConnectionManagerImplTest::testPathNormalization(
   conn_manager_->onData(fake_input, false);
 }
 
+void HttpConnectionManagerImplTest::expectUhvTrailerCheckFail() {
+  EXPECT_CALL(header_validator_factory_, create(codec_->protocol_, _, _))
+      .WillOnce(InvokeWithoutArgs([]() {
+        auto header_validator = std::make_unique<testing::StrictMock<MockHeaderValidator>>();
+        EXPECT_CALL(*header_validator, validateRequestHeaderMap(_))
+            .WillOnce(InvokeWithoutArgs(
+                []() { return HeaderValidator::RequestHeaderMapValidationResult::success(); }));
+
+        EXPECT_CALL(*header_validator, validateRequestTrailerMap(_))
+            .WillOnce(InvokeWithoutArgs([]() {
+              return HeaderValidator::TrailerValidationResult(
+                  HeaderValidator::TrailerValidationResult::Action::Reject, "bad_trailer_map");
+            }));
+        return header_validator;
+      }));
+}
+
 } // namespace Http
 } // namespace Envoy

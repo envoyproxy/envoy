@@ -177,6 +177,7 @@ public:
       callbacks.addAccessLogHandler(handler);
     };
   }
+  void expectUhvTrailerCheckFail();
 
   Envoy::Event::SimulatedTimeSystem test_time_;
   NiceMock<Router::MockRouteConfigProvider> route_config_provider_;
