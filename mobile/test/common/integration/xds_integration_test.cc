@@ -44,13 +44,6 @@ XdsIntegrationTest::XdsIntegrationTest() : BaseClientIntegrationTest(ipVersion()
 
   // xDS upstream is created separately in the test infra, and there's only one non-xDS cluster.
   setUpstreamCount(1);
-
-  // Add the Admin config.
-  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    bootstrap.mutable_admin()->MergeFrom(adminConfig());
-  });
-  admin_filename_ = TestEnvironment::temporaryPath("admin_address.txt");
-  setAdminAddressPathForTests(admin_filename_);
 }
 
 void XdsIntegrationTest::initialize() {
@@ -78,9 +71,6 @@ void XdsIntegrationTest::TearDown() {
 
 void XdsIntegrationTest::createEnvoy() {
   BaseClientIntegrationTest::createEnvoy();
-  std::string admin_str = TestEnvironment::readFileToStringForTest(admin_filename_);
-  auto addr = Network::Utility::parseInternetAddressAndPort(admin_str);
-  registerPort("admin", addr->ip()->port());
   if (on_server_init_function_) {
     on_server_init_function_();
   }
@@ -113,20 +103,6 @@ XdsIntegrationTest::createSingleEndpointClusterConfig(const std::string& cluster
   (*config.mutable_typed_extension_protocol_options())
       ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
           .PackFrom(options);
-  return config;
-}
-
-envoy::config::bootstrap::v3::Admin XdsIntegrationTest::adminConfig() {
-  const std::string yaml = fmt::format(R"EOF(
-    address:
-      socket_address:
-        address: {}
-        port_value: 0
-  )EOF",
-                                       Network::Test::getLoopbackAddressString(ipVersion()));
-
-  envoy::config::bootstrap::v3::Admin config;
-  TestUtility::loadFromYaml(yaml, config);
   return config;
 }
 
