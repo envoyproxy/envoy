@@ -66,6 +66,9 @@ stages:
     pool:
       vmImage: "ubuntu-20.04"
     steps:
+    - checkout: self
+      fetchDepth: 0
+      fetchTags: true
     - bash: |
         set -e
 
@@ -318,6 +321,7 @@ stages:
     #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
     condition: in(dependencies.release.result, 'Succeeded', 'SucceededWithIssues', 'Skipped')
     steps:
+    - checkout: none
     - bash: |
         echo "linux_x64 released"
 
@@ -349,6 +353,7 @@ stages:
     #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
     condition: in(dependencies.release.result, 'Succeeded', 'SucceededWithIssues', 'Skipped')
     steps:
+    - checkout: none
     - bash: |
         echo "linux_arm64 released"
 
@@ -437,6 +442,7 @@ stages:
         in(dependencies.verify_x64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
         in(dependencies.verify_arm64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
     steps:
+    - checkout: none
     - bash: |
         echo "checks complete"
 
@@ -521,6 +527,7 @@ stages:
         in(dependencies.bazel.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
         in(dependencies.coverage.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
     steps:
+    - checkout: none
     - bash: |
         echo "checks complete"
 
@@ -607,6 +614,7 @@ stages:
     #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
     condition: in(dependencies.docker.result, 'Succeeded', 'SucceededWithIssues', 'Skipped')
     steps:
+    - checkout: none
     - bash: |
         echo "Docker linux built"
 
@@ -776,6 +784,7 @@ stages:
     #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
     condition: in(dependencies.examples.result, 'Succeeded', 'SucceededWithIssues', 'Skipped')
     steps:
+    - checkout: none
     - bash: |
         echo "examples verifiied"
 
@@ -825,6 +834,7 @@ stages:
     #   https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
     condition: in(dependencies.test.result, 'Succeeded', 'SucceededWithIssues', 'Skipped')
     steps:
+    - checkout: none
     - bash: |
         echo "macos tested"
 
@@ -931,5 +941,6 @@ stages:
         in(dependencies.release.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
         in(dependencies.docker.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
     steps:
+    - checkout: none
     - bash: |
         echo "windows released"

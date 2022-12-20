@@ -1812,7 +1812,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPoolImpl
             parent_.thread_local_dispatcher_, host, priority,
             !upstream_options->empty() ? upstream_options : nullptr,
             have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr,
-            parent_.cluster_manager_state_));
+            parent_.cluster_manager_state_, cluster_info_->tcpPoolIdleTimeout()));
     ASSERT(inserted);
     pool_iter->second->addIdleCallback(
         [&parent = parent_, host, hash_key]() { parent.tcpConnPoolIsIdle(host, hash_key); });
@@ -1952,10 +1952,11 @@ Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
     Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority,
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
-    ClusterConnectivityState& state) {
+    ClusterConnectivityState& state,
+    absl::optional<std::chrono::milliseconds> tcp_pool_idle_timeout) {
   ENVOY_LOG_MISC(debug, "Allocating TCP conn pool");
-  return std::make_unique<Tcp::ConnPoolImpl>(dispatcher, host, priority, options,
-                                             transport_socket_options, state);
+  return std::make_unique<Tcp::ConnPoolImpl>(
+      dispatcher, host, priority, options, transport_socket_options, state, tcp_pool_idle_timeout);
 }
 
 std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ProdClusterManagerFactory::clusterFromProto(

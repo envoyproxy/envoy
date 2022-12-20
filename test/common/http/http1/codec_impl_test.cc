@@ -101,6 +101,7 @@ protected:
 class Http1ServerConnectionImplTest : public Http1CodecTestBase {
 public:
   void initialize() {
+    createHeaderValidator();
     codec_ = std::make_unique<Http1::ServerConnectionImpl>(
         connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
         max_request_headers_count_, headers_with_underscores_action_);
@@ -161,9 +162,13 @@ public:
     if (codec_settings_.allow_chunked_length_) {
       header_validator_config_.mutable_http1_protocol_options()->set_allow_chunked_length(true);
     }
+    header_validator_config_.set_headers_with_underscores_action(
+        static_cast<::envoy::extensions::http::header_validators::envoy_default::v3::
+                        HeaderValidatorConfig::HeadersWithUnderscoresAction>(
+            headers_with_underscores_action_));
     header_validator_ =
         std::make_unique<Extensions::Http::HeaderValidators::EnvoyDefault::Http1HeaderValidator>(
-            header_validator_config_, Protocol::Http11, stream_info_);
+            header_validator_config_, Protocol::Http11, stream_info_, http1CodecStats());
   }
 
 protected:
@@ -1295,7 +1300,17 @@ TEST_P(Http1ServerConnectionImplTest, HeaderNameWithUnderscoreAllowed) {
       {":method", "GET"},
       {"foo_bar", "bar"},
   };
+#ifdef ENVOY_ENABLE_UHV
+  // Header validation is done by the HCM when header map is fully parsed.
+  EXPECT_CALL(decoder, decodeHeaders_(_, _))
+      .WillOnce(Invoke([this, &expected_headers](RequestHeaderMapPtr& headers, bool) -> void {
+        auto result = header_validator_->validateRequestHeaderMap(*headers);
+        EXPECT_THAT(headers, HeaderMapEqualIgnoreOrder(&expected_headers));
+        ASSERT_TRUE(result.ok());
+      }));
+#else
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
+#endif
 
   Buffer::OwnedImpl buffer(absl::StrCat("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo_bar: bar\r\n\r\n"));
   auto status = codec_->dispatch(buffer);
@@ -1318,7 +1333,17 @@ TEST_P(Http1ServerConnectionImplTest, HeaderNameWithUnderscoreAreDropped) {
       {":path", "/"},
       {":method", "GET"},
   };
+#ifdef ENVOY_ENABLE_UHV
+  // Header validation is done by the HCM when header map is fully parsed.
+  EXPECT_CALL(decoder, decodeHeaders_(_, _))
+      .WillOnce(Invoke([this, &expected_headers](RequestHeaderMapPtr& headers, bool) -> void {
+        auto result = header_validator_->validateRequestHeaderMap(*headers);
+        EXPECT_THAT(headers, HeaderMapEqualIgnoreOrder(&expected_headers));
+        ASSERT_TRUE(result.ok());
+      }));
+#else
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
+#endif
 
   Buffer::OwnedImpl buffer(absl::StrCat("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo_bar: bar\r\n\r\n"));
   auto status = codec_->dispatch(buffer);
@@ -1335,18 +1360,46 @@ TEST_P(Http1ServerConnectionImplTest, HeaderNameWithUnderscoreCauseRequestReject
 
   MockRequestDecoder decoder;
   Http::ResponseEncoder* response_encoder = nullptr;
+  std::string response;
   EXPECT_CALL(callbacks_, newStream(_, _))
       .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder = &encoder;
         return decoder;
       }));
 
-  Buffer::OwnedImpl buffer(absl::StrCat("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo_bar: bar\r\n\r\n"));
+#ifdef ENVOY_ENABLE_UHV
+  // Header validation is done by the HCM when header map is fully parsed.
+  // This callback approximates handling of header validation error, when HCM calls
+  // sendLocalReply and closes network connection (based on the
+  // stream_error_on_invalid_http_message flag, which in this test is assumed to equal false).
+  EXPECT_CALL(decoder, decodeHeaders_(_, _))
+      .WillOnce(Invoke([this, &response_encoder](RequestHeaderMapPtr& headers, bool) -> void {
+        auto result = header_validator_->validateRequestHeaderMap(*headers);
+        ASSERT_FALSE(result.ok());
+        response_encoder->encodeHeaders(TestResponseHeaderMapImpl{{":status", "400"},
+                                                                  {"connection", "close"},
+                                                                  {"content-length", "0"}},
+                                        true);
+        response_encoder->getStream().resetStream(StreamResetReason::LocalReset);
+        connection_.state_ = Network::Connection::State::Closing;
+      }));
+  ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&response));
+#else
   EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
+#endif
+
+  Buffer::OwnedImpl buffer(absl::StrCat("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo_bar: bar\r\n\r\n"));
   auto status = codec_->dispatch(buffer);
+#ifdef ENVOY_ENABLE_UHV
+  // With header validator enabled, request and connection are rejected at the HCM level and
+  // the codec no longer reports a parsing error from the dispatch call.
+  EXPECT_EQ("HTTP/1.1 400 Bad Request\r\nconnection: close\r\ncontent-length: 0\r\n\r\n", response);
+  EXPECT_TRUE(status.ok());
+#else
   EXPECT_TRUE(isCodecProtocolError(status));
   EXPECT_EQ(status.message(), "http/1.1 protocol error: header name contains underscores");
   EXPECT_EQ("http1.unexpected_underscore", response_encoder->getStream().responseDetails());
+#endif
   EXPECT_EQ(1, store_.counter("http1.requests_rejected_with_underscores_in_headers").value());
 }
 

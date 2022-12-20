@@ -547,7 +547,7 @@ private:
 using DefaultInternalRedirectPolicy = ConstSingleton<InternalRedirectPolicyImpl>;
 
 /**
- * Base implementation for all route entries.
+ * Base implementation for all route entries.q
  */
 class RouteEntryImplBase : public RouteEntryAndRoute,
                            public Matchable,
@@ -703,7 +703,12 @@ public:
   bool includeAttemptCountInResponse() const override {
     return vhost_.includeAttemptCountInResponse();
   }
-  const absl::optional<ConnectConfig>& connectConfig() const override { return connect_config_; }
+  const ConnectConfigOptRef connectConfig() const override {
+    if (connect_config_ != nullptr) {
+      return *connect_config_;
+    }
+    return absl::nullopt;
+  }
   const UpgradeMap& upgradeMap() const override { return upgrade_map_; }
   const EarlyDataPolicy& earlyDataPolicy() const override { return *early_data_policy_; }
 
@@ -840,9 +845,7 @@ public:
     bool includeAttemptCountInResponse() const override {
       return parent_->includeAttemptCountInResponse();
     }
-    const absl::optional<ConnectConfig>& connectConfig() const override {
-      return parent_->connectConfig();
-    }
+    const ConnectConfigOptRef connectConfig() const override { return parent_->connectConfig(); }
     const RouteStatsContextOptRef routeStatsContext() const override {
       return parent_->routeStatsContext();
     }
@@ -967,7 +970,7 @@ protected:
   std::string regex_rewrite_redirect_substitution_;
   const std::string host_rewrite_;
   bool include_vh_rate_limits_;
-  absl::optional<ConnectConfig> connect_config_;
+  std::unique_ptr<ConnectConfig> connect_config_;
 
   RouteConstSharedPtr clusterEntry(const Http::RequestHeaderMap& headers,
                                    uint64_t random_value) const;
@@ -1173,7 +1176,9 @@ public:
                        ProtobufMessage::ValidationVisitor& validator);
 
   // Router::PathMatchCriterion
-  const std::string& matcher() const override { return prefix_; }
+  const std::string& matcher() const override {
+    return path_matcher_ != nullptr ? path_matcher_->matcher().matcher().prefix() : EMPTY_STRING;
+  }
   PathMatchType matchType() const override { return PathMatchType::Prefix; }
 
   // Router::Matchable
@@ -1190,7 +1195,6 @@ public:
   currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
 
 private:
-  const std::string prefix_;
   const Matchers::PathMatcherConstSharedPtr path_matcher_;
 };
 
@@ -1205,7 +1209,9 @@ public:
                      ProtobufMessage::ValidationVisitor& validator);
 
   // Router::PathMatchCriterion
-  const std::string& matcher() const override { return path_; }
+  const std::string& matcher() const override {
+    return path_matcher_ != nullptr ? path_matcher_->matcher().matcher().exact() : EMPTY_STRING;
+  }
   PathMatchType matchType() const override { return PathMatchType::Exact; }
 
   // Router::Matchable
@@ -1222,7 +1228,6 @@ public:
   currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
 
 private:
-  const std::string path_;
   const Matchers::PathMatcherConstSharedPtr path_matcher_;
 };
 
@@ -1237,7 +1242,10 @@ public:
                       ProtobufMessage::ValidationVisitor& validator);
 
   // Router::PathMatchCriterion
-  const std::string& matcher() const override { return regex_str_; }
+  const std::string& matcher() const override {
+    return path_matcher_ != nullptr ? path_matcher_->matcher().matcher().safe_regex().regex()
+                                    : EMPTY_STRING;
+  }
   PathMatchType matchType() const override { return PathMatchType::Regex; }
 
   // Router::Matchable
@@ -1254,7 +1262,6 @@ public:
   currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
 
 private:
-  const std::string regex_str_;
   const Matchers::PathMatcherConstSharedPtr path_matcher_;
 };
 
@@ -1299,7 +1306,9 @@ public:
                                     ProtobufMessage::ValidationVisitor& validator);
 
   // Router::PathMatchCriterion
-  const std::string& matcher() const override { return prefix_; }
+  const std::string& matcher() const override {
+    return path_matcher_ != nullptr ? path_matcher_->matcher().matcher().prefix() : EMPTY_STRING;
+  }
   PathMatchType matchType() const override { return PathMatchType::PathSeparatedPrefix; }
 
   // Router::Matchable
@@ -1316,7 +1325,6 @@ public:
   currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
 
 private:
-  const std::string prefix_;
   const Matchers::PathMatcherConstSharedPtr path_matcher_;
 };
 

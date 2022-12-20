@@ -74,6 +74,9 @@ minor_behavior_changes:
   change: |
     reverting the behavioral change to have ``CONNECT`` and upgrade requests over HTTP/1.1 not delay close.  One can reinstate
     delay close for upgrades by setting ``envoy.reloadable_features.no_delay_close_for_upgrades`` to ``true``.
+- area: tcp
+  change: |
+    added :ref:`idle_timeout <envoy_v3_api_field_extensions.upstreams.tcp.v3.TcpProtocolOptions.idle_timeout>` to support per client idle timeout for tcp connection pool. The timeout is guarded by ``envoy.reloadable_features.tcp_pool_idle_timeout`` and timeout defaults to 10 minutes if runtime flag is enabled.
 
 
 bug_fixes:
@@ -110,6 +113,9 @@ bug_fixes:
 - area: upstream
   change: |
     fixed a bug when specify both a single address in bootstrap and cluster upstream binding config but with a different IP version. It should be allowed but it is rejected.
+- area: upstream
+  change: |
+    fixed a bug for tcp upstream where we did not count use the count the header and data to/from the upstream.
 - area: jwt_authn
   change: |
     fix a bug that jwt_cache breaks the :ref:`provider_and_audiences <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtRequirement.provider_and_audiences>` JWT requirement.
@@ -154,6 +160,11 @@ removed_config_or_runtime:
     removed ``envoy.reloadable_features.do_not_await_headers_on_upstream_timeout_to_emit_stats`` and legacy code paths.
 
 new_features:
+- area: grpc_json_transcoder
+  change: |
+    added ``max_request_body_size`` and ``max_response_body_size`` fields, which can either increase or decrease
+    the size of messages that can be processed. It can increase (but does not decrease) the stream buffer size,
+    and can reject messages even if they're smaller than the stream buffer size if configured smaller.
 - area: tls
   change: |
     added support for SNI-based cert selection in tls downstream transport socket. Detailed documentation is available :ref:`cert selection<arch_overview_ssl_cert_select>`.
@@ -201,6 +212,9 @@ new_features:
 - area: thrift_proxy
   change: |
     added ``envoy.reloadable_features.thrift_allow_negative_field_ids`` to support negative field ids for legacy thrift service.
+- area: bandwidth_limit
+  change: |
+    added two new response trailers ``bandwidth-request-filter-delay-ms`` and ``bandwidth-response-filter-delay-ms`` to measure the delays added by this filter.
 - area: udp_proxy
   change: |
     added support for :ref:`proxy_access_log <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.proxy_access_log>`.
@@ -228,6 +242,12 @@ new_features:
 - area: tracing
   change: |
     added support for setting the hostname used when sending spans to a Datadog collector using the :ref:`collector_hostname <envoy_v3_api_field_config.trace.v3.DatadogConfig.collector_hostname>` field.
+- area: http
+  change: |
+    added support of :ref:`early header mutation <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.early_header_mutation_extensions>` to the HTTP connection manager.
+- area: http
+  change: |
+    added support of :ref:`header mutation <envoy_v3_api_msg_extensions.http.early_header_mutation.header_mutation.v3.HeaderMutation>` for HCM :ref:`early header mutation <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.early_header_mutation_extensions>`.
 - area: jwt_authn
   change: |
     added support for copying jwt claims to http headers.
@@ -237,11 +257,17 @@ new_features:
 - area: http
   change: |
     added :ref:`append_x_forwarded_port <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.append_x_forwarded_port>` to append the ``x-forwarded-port`` header to HTTP upstream requests.
+- area: tcp
+  change: |
+    added :ref:`idle_timeout <envoy_v3_api_field_extensions.upstreams.tcp.v3.TcpProtocolOptions.idle_timeout>` to support per client idle timeout for tcp connection pool. See also minor_behavior_changes.
 - area: ext_authz
   change: |
     added support to allowlist headers included in the check request to gRPC authorization server (previously only available for HTTP authorization server).
     Pre-existing field :ref:`allowed_headers <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.AuthorizationRequest.allowed_headers>` is deprecated in favour
     of the new field :ref:`allowed_headers <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.allowed_headers>`.
+- area: attributes
+  change: |
+    added :ref:`attributes <arch_overview_attributes>` for looking up xDS configuration information.
 - area: router
   change: |
     added :ref:`RouteList <envoy_v3_api_msg_config.route.v3.RouteList>` to support route list in :ref:`VirtualHost.matcher <envoy_v3_api_field_config.route.v3.VirtualHost.matcher>`.

@@ -9,6 +9,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/core/v3/proxy_protocol.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
@@ -393,7 +394,9 @@ public:
   // Given an HCM with the default config, set the matcher to be a connect matcher and enable
   // CONNECT requests.
   static void setConnectConfig(HttpConnectionManager& hcm, bool terminate_connect, bool allow_post,
-                               bool http3 = false);
+                               bool http3 = false,
+                               absl::optional<envoy::config::core::v3::ProxyProtocolConfig::Version>
+                                   proxy_protocol_version = absl::nullopt);
 
   void setLocalReply(
       const envoy::extensions::filters::network::http_connection_manager::v3::LocalReplyConfig&

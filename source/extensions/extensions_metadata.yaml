@@ -1132,6 +1132,11 @@ envoy.upstreams.tcp.generic:
   - envoy.upstreams
   security_posture: robust_to_untrusted_downstream
   status: stable
+envoy.upstreams.tcp.tcp_protocol_options:
+  categories:
+  - envoy.upstreams
+  security_posture: unknown
+  status: alpha
 envoy.wasm.runtime.null:
   categories:
   - envoy.wasm.runtime
@@ -1343,6 +1348,13 @@ envoy.matching.custom_matchers.trie_matcher:
   status: alpha
   type_urls:
   - xds.type.matcher.v3.IPMatcher
+envoy.http.early_header_mutation.header_mutation:
+  categories:
+  - envoy.http.early_header_mutation
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.http.early_header_mutation.header_mutation.v3.HeaderMutation
 envoy.filters.http.custom_response:
   categories:
   - envoy.filters.http

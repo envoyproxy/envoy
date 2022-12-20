@@ -48,6 +48,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/listener/original_src:92.1"
 "source/extensions/filters/network/common:96.1"
 "source/extensions/filters/network/common/redis:96.24"
+"source/extensions/filters/network/http_connection_manager:96.4"
 "source/extensions/filters/network/mongo_proxy:96.0"
 "source/extensions/filters/network/sni_cluster:88.9"
 "source/extensions/filters/network/thrift_proxy/router:96.5"
@@ -76,6 +77,8 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/server/admin:97.4"
 "source/server/admin:profiler-lib:83"
 "source/server/config_validation:74.8"
+"source/extensions/http/early_header_mutation:95.2" # Death tests don't report LCOV
+"source/extensions/http/early_header_mutation/header_mutation:95.2" # Death tests don't report LCOV
 )
 
 [[ -z "${SRCDIR}" ]] && SRCDIR="${PWD}"
