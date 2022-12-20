@@ -26,7 +26,7 @@ final class ViewController: UITableViewController {
       .enableAdminInterface()
       .enableDNSCache()
       // required by DNS cache
-      .addKeyValueStore(name: "reserved.platform_store", keyValueStore: UserDefaults.default)
+      .addKeyValueStore(name: "reserved.platform_store", keyValueStore: UserDefaults.standard)
       .enableInterfaceBinding(true)
       .enablePlatformCertificateValidation(true)
       .addNativeFilter(
