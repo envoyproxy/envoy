@@ -72,6 +72,7 @@ protected:
   void setAdminAddressPathForTests(std::string admin) { admin_address_path_for_tests_ = admin; }
 
 private:
+  friend BaseClientIntegrationTest;
   struct NativeFilterConfig {
     NativeFilterConfig(std::string name, std::string typed_config)
         : name_(std::move(name)), typed_config_(std::move(typed_config)) {}

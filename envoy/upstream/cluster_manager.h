@@ -497,7 +497,8 @@ public:
                       ResourcePriority priority,
                       const Network::ConnectionSocket::OptionsSharedPtr& options,
                       Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
-                      ClusterConnectivityState& state) PURE;
+                      ClusterConnectivityState& state,
+                      absl::optional<std::chrono::milliseconds> tcp_pool_idle_timeout) PURE;
 
   /**
    * Allocate a cluster from configuration proto.

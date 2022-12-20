@@ -515,6 +515,7 @@ envoy_cc_library(
         "//source/common/stats:stats_lib",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/upstreams/http:config",
+        "//source/extensions/upstreams/tcp:config",
         "//source/server:transport_socket_config_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
