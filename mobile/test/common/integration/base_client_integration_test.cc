@@ -96,13 +96,13 @@ BaseClientIntegrationTest::BaseClientIntegrationTest(Network::Address::IpVersion
 void BaseClientIntegrationTest::initialize() {
   BaseIntegrationTest::initialize();
   for (int i = 0; i < num_engines_for_test_; i++) {
-    auto engine = multi_engines_[i];
-    multi_terminal_callbacks_.push_back(std::make_shared<ConditionalInitializer>());
-    multi_cc_.push_back(std::make_shared<callbacks_called>(
+    Platform::EngineSharedPtr engine = multi_engines_[i];
+    multi_terminal_callbacks_.push_back(std::make_unique<ConditionalInitializer>());
+    multi_cc_.push_back(std::make_unique<callbacks_called>(
         callbacks_called{0, 0, 0, 0, 0, 0, 0, "", multi_terminal_callbacks_[i].get(), {}}));
-    auto cc = multi_cc_[i];
+    callbacks_called* cc = multi_cc_[i].get();
     multi_stream_prototypes_.push_back(engine->streamClient()->newStreamPrototype());
-    auto stream_prototype = multi_stream_prototypes_[i];
+    Platform::StreamPrototypeSharedPtr stream_prototype = multi_stream_prototypes_[i];
 
     stream_prototype->setOnHeaders(
         [cc](Platform::ResponseHeadersSharedPtr headers, bool, envoy_stream_intel intel) {
@@ -136,8 +136,8 @@ void BaseClientIntegrationTest::initialize() {
 
     multi_streams_.push_back((*stream_prototype).start(explicit_flow_control_));
   }
-  cc_ = multi_cc_[0];
-  terminal_callback_ = multi_terminal_callbacks_[0];
+  cc_ = multi_cc_[0].get();
+  terminal_callback_ = multi_terminal_callbacks_[0].get();
   stream_prototype_ = multi_stream_prototypes_[0];
   stream_ = multi_streams_[0];
 

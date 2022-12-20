@@ -62,10 +62,10 @@ protected:
   envoyToMobileHeaders(const Http::TestRequestHeaderMapImpl& request_headers);
   Event::ProvisionalDispatcherPtr dispatcher_ = std::make_unique<Event::ProvisionalDispatcher>();
   envoy_http_callbacks bridge_callbacks_;
-  std::shared_ptr<ConditionalInitializer> terminal_callback_;
-  std::vector<std::shared_ptr<ConditionalInitializer>> multi_terminal_callbacks_;
-  std::shared_ptr<callbacks_called> cc_;
-  std::vector<std::shared_ptr<callbacks_called>> multi_cc_;
+  ConditionalInitializer* terminal_callback_;
+  std::vector<std::unique_ptr<ConditionalInitializer>> multi_terminal_callbacks_;
+  callbacks_called* cc_;
+  std::vector<std::unique_ptr<callbacks_called>> multi_cc_;
   Http::TestRequestHeaderMapImpl default_request_headers_;
   Event::DispatcherPtr full_dispatcher_;
   Platform::StreamPrototypeSharedPtr stream_prototype_;
