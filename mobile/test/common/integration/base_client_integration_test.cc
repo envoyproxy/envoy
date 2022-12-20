@@ -195,10 +195,6 @@ void BaseClientIntegrationTest::TearDown() {
     multi_engines_[i]->terminate();
   };
   engine_.reset();
-  multi_engines_.clear();
-  multi_terminal_callbacks_.clear();
-  multi_stream_prototypes_.clear();
-  multi_cc_.clear();
   full_dispatcher_->exit();
   envoy_thread_->join();
 }
