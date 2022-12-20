@@ -38,9 +38,14 @@ void CacheEvictionThread::terminate() {
 
 bool CacheEvictionThread::waitForSignal() {
   absl::MutexLock lock(&mu_);
+  // Worth noting here that if signalled_ is already true, the lock is not released
+  // until idle_ is false again, so waitForIdle will not return until signalled_
+  // stays false for the duration of an eviction cycle.
+  idle_ = true;
   auto cond = [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_) { return signalled_; };
   mu_.Await(absl::Condition(&cond));
   signalled_ = false;
+  idle_ = false;
   return !terminating_;
 }
 
@@ -51,6 +56,12 @@ void CacheEvictionThread::work() {
       cache->maybeEvict(os_sys_calls_);
     }
   }
+}
+
+void CacheEvictionThread::waitForIdle() {
+  absl::MutexLock lock(&mu_);
+  auto cond = [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_) { return idle_; };
+  mu_.Await(absl::Condition(&cond));
 }
 
 } // namespace FileSystemHttpCache

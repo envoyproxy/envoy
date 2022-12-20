@@ -72,6 +72,11 @@ private:
   std::set<FileSystemHttpCache*> caches_ ABSL_GUARDED_BY(cache_mu_);
   Api::OsSysCalls& os_sys_calls_;
   Thread::ThreadPtr thread_;
+
+  // Allow test access to waitForIdle for synchronization.
+  friend class FileSystemCacheTestContext;
+  bool idle_ ABSL_GUARDED_BY(mu_) = false;
+  void waitForIdle();
 };
 
 } // namespace FileSystemHttpCache

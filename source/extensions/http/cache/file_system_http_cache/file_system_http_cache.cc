@@ -392,14 +392,16 @@ void FileSystemHttpCache::trackFileRemoved(uint64_t file_size) {
 }
 
 void FileSystemHttpCache::maybeEvict(Api::OsSysCalls& os_sys_calls) {
+  std::cerr << "maybeEvict" << std::endl;
   uint64_t size_to_evict = 0;
   uint64_t count_to_evict = 0;
-  if (config().has_max_cache_entry_size_bytes()) {
+  if (config().has_max_cache_size_bytes()) {
     // capture a value from the atomic because we're going to use it twice and don't want our
     // value to change in between.
     uint64_t seen_size = size_bytes_;
-    size_to_evict = seen_size > config().max_cache_entry_size_bytes().value()
-                        ? seen_size - config().max_cache_entry_size_bytes().value()
+    std::cerr << "seen_size=" << seen_size << std::endl;
+    size_to_evict = seen_size > config().max_cache_size_bytes().value()
+                        ? seen_size - config().max_cache_size_bytes().value()
                         : 0;
   }
   if (config().has_max_cache_entry_count()) {
@@ -413,6 +415,8 @@ void FileSystemHttpCache::maybeEvict(Api::OsSysCalls& os_sys_calls) {
   if (size_to_evict == 0 && count_to_evict == 0) {
     return;
   }
+  std::cerr << "size_to_evict=" << size_to_evict << ", count_to_evict=" << count_to_evict
+            << std::endl;
 
   uint64_t size = 0;
   uint64_t count = 0;
@@ -434,18 +438,24 @@ void FileSystemHttpCache::maybeEvict(Api::OsSysCalls& os_sys_calls) {
     struct stat s;
     if (os_sys_calls.stat(absl::StrCat(cachePath(), entry.name_).c_str(), &s).return_value_ != -1) {
       struct timespec last_touch = std::max(s.st_atim, s.st_ctim);
+      std::cerr << "last_touch for " << entry.name_ << " = " << last_touch.tv_sec << "."
+                << last_touch.tv_nsec << std::endl;
       if (proposed_size_evicted < size_to_evict || proposed_evictions.size() < count_to_evict ||
-          proposed_evictions.begin()->last_touch_ < last_touch) {
-        // We either haven't evicted enough yet, or this eviction candidate is less recently
-        // used than our current least recently used. So add this one to candidates.
+          last_touch < proposed_evictions.rbegin()->last_touch_) {
+        // We either haven't evicted enough yet, or this eviction candidate is 'older'
+        // than our current 'youngest' eviction candidate. So add this one to candidates.
+        std::cerr << "proposing eviction" << std::endl;
         proposed_evictions.insert(
             ProposedEviction{entry.name_, entry.size_bytes_.value_or(0), last_touch});
         proposed_size_evicted += entry.size_bytes_.value_or(0);
-        if (proposed_size_evicted - proposed_evictions.rbegin()->size_ >= size_to_evict &&
+        auto youngest = std::prev(proposed_evictions.end());
+        if (proposed_size_evicted - youngest->size_ >= size_to_evict &&
             proposed_evictions.size() > count_to_evict) {
-          // We'd still be evicting enough if we don't evict the 'newest' proposed eviction,
+          // We'd still be evicting enough if we don't evict the 'youngest' proposed eviction,
           // so we unpropose that one.
-          proposed_evictions.erase(std::prev(proposed_evictions.end()));
+          std::cerr << "unproposing eviction " << youngest->name_ << std::endl;
+          proposed_size_evicted -= youngest->size_;
+          proposed_evictions.erase(youngest);
         }
       }
     }
@@ -453,6 +463,7 @@ void FileSystemHttpCache::maybeEvict(Api::OsSysCalls& os_sys_calls) {
   size_bytes_ = size;
   size_count_ = count;
   for (const ProposedEviction& eviction : proposed_evictions) {
+    std::cerr << "evicting " << eviction.name_ << std::endl;
     if (os_sys_calls.unlink(absl::StrCat(cachePath(), eviction.name_).c_str()).return_value_ !=
         -1) {
       trackFileRemoved(eviction.size_);

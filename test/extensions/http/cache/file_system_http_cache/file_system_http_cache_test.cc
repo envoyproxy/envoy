@@ -6,6 +6,7 @@
 #include "source/common/filesystem/directory.h"
 #include "source/extensions/filters/http/cache/cache_entry_utils.h"
 #include "source/extensions/filters/http/cache/cache_headers_utils.h"
+#include "source/extensions/http/cache/file_system_http_cache/cache_eviction_thread.h"
 #include "source/extensions/http/cache/file_system_http_cache/cache_file_fixed_block.h"
 #include "source/extensions/http/cache/file_system_http_cache/cache_file_header_proto_util.h"
 #include "source/extensions/http/cache/file_system_http_cache/file_system_http_cache.h"
@@ -27,7 +28,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 namespace FileSystemHttpCache {
-namespace {
 
 using Common::AsyncFiles::AsyncFileHandle;
 using Common::AsyncFiles::MockAsyncFileContext;
@@ -71,6 +71,8 @@ public:
     cache_ = std::dynamic_pointer_cast<FileSystemHttpCache>(
         http_cache_factory_->getCache(cacheConfig(testConfig()), context_));
   }
+
+  void waitForEvictionThreadIdle() { cache_->cache_eviction_thread_.waitForIdle(); }
 
   ConfigProto testConfig() {
     envoy::extensions::filters::http::cache::v3::CacheConfig cache_config;
@@ -123,6 +125,62 @@ TEST_F(FileSystemHttpCacheTestWithNoDefaultCache, InitialStatsAreSetCorrectly) {
   EXPECT_EQ(cache_->stats().size_limit_count_.value(), max_count);
   EXPECT_EQ(cache_->stats().size_bytes_.value(), file_1_contents.size() + file_2_contents.size());
   EXPECT_EQ(cache_->stats().size_count_.value(), 2);
+}
+
+TEST_F(FileSystemHttpCacheTestWithNoDefaultCache, EvictsOldestFilesUntilUnderCountLimit) {
+  const std::string file_contents = "XXXXX";
+  const uint64_t max_count = 2;
+  ConfigProto cfg = testConfig();
+  cfg.mutable_max_cache_entry_count()->set_value(max_count);
+  env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-a"), file_contents, true);
+  env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-b"), file_contents, true);
+  {
+    // TODO(ravenblack): replace this with backdating the files when that's possible.
+    absl::Mutex mu;
+    absl::MutexLock lock(&mu);
+    auto cond = []() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu) { return false; };
+    mu.AwaitWithTimeout(absl::Condition(&cond), absl::Seconds(1));
+  }
+  cache_ = std::dynamic_pointer_cast<FileSystemHttpCache>(
+      http_cache_factory_->getCache(cacheConfig(cfg), context_));
+  env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-c"), file_contents, true);
+  env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-d"), file_contents, true);
+  cache_->trackFileAdded(file_contents.size());
+  cache_->trackFileAdded(file_contents.size());
+  waitForEvictionThreadIdle();
+  EXPECT_EQ(cache_->stats().size_bytes_.value(), file_contents.size() * 2);
+  EXPECT_EQ(cache_->stats().size_count_.value(), 2);
+  EXPECT_FALSE(Filesystem::fileSystemForTest().fileExists(absl::StrCat(cache_path_, "cache-a")));
+  EXPECT_FALSE(Filesystem::fileSystemForTest().fileExists(absl::StrCat(cache_path_, "cache-b")));
+  EXPECT_TRUE(Filesystem::fileSystemForTest().fileExists(absl::StrCat(cache_path_, "cache-c")));
+  EXPECT_TRUE(Filesystem::fileSystemForTest().fileExists(absl::StrCat(cache_path_, "cache-d")));
+}
+
+TEST_F(FileSystemHttpCacheTestWithNoDefaultCache, EvictsOldestFilesUntilUnderSizeLimit) {
+  const std::string file_contents = "XXXXX";
+  const std::string large_file_contents = "XXXXXXXXXX";
+  const uint64_t max_size = large_file_contents.size();
+  ConfigProto cfg = testConfig();
+  cfg.mutable_max_cache_size_bytes()->set_value(max_size);
+  env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-a"), file_contents, true);
+  env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-b"), file_contents, true);
+  {
+    // TODO(ravenblack): replace this with backdating the files when that's possible.
+    absl::Mutex mu;
+    absl::MutexLock lock(&mu);
+    auto cond = []() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu) { return false; };
+    mu.AwaitWithTimeout(absl::Condition(&cond), absl::Seconds(1));
+  }
+  cache_ = std::dynamic_pointer_cast<FileSystemHttpCache>(
+      http_cache_factory_->getCache(cacheConfig(cfg), context_));
+  env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-c"), large_file_contents, true);
+  cache_->trackFileAdded(large_file_contents.size());
+  waitForEvictionThreadIdle();
+  EXPECT_EQ(cache_->stats().size_bytes_.value(), large_file_contents.size());
+  EXPECT_EQ(cache_->stats().size_count_.value(), 1);
+  EXPECT_FALSE(Filesystem::fileSystemForTest().fileExists(absl::StrCat(cache_path_, "cache-a")));
+  EXPECT_FALSE(Filesystem::fileSystemForTest().fileExists(absl::StrCat(cache_path_, "cache-b")));
+  EXPECT_TRUE(Filesystem::fileSystemForTest().fileExists(absl::StrCat(cache_path_, "cache-c")));
 }
 
 class FileSystemHttpCacheTest : public FileSystemCacheTestContext, public ::testing::Test {
@@ -1215,7 +1273,6 @@ TEST(Registration, GetCacheFromFactory) {
             "/tmp/");
 }
 
-} // namespace
 } // namespace FileSystemHttpCache
 } // namespace Cache
 } // namespace HttpFilters

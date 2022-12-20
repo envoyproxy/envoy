@@ -226,6 +226,9 @@ private:
   std::atomic<uint64_t> size_bytes_;
 
   CacheEvictionThread& cache_eviction_thread_;
+
+  // Allow test access to cache_eviction_thread_ for synchronization.
+  friend class FileSystemCacheTestContext;
 };
 
 } // namespace FileSystemHttpCache
