@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 #include "test/integration/integration.h"
 
 #include "library/cc/engine_builder.h"
@@ -7,7 +9,6 @@
 #include "library/cc/stream_prototype.h"
 #include "library/common/http/client.h"
 #include "library/common/types/c_types.h"
-#include <vector>
 
 namespace Envoy {
 
