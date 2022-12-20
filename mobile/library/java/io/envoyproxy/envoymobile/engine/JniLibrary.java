@@ -316,6 +316,11 @@ public class JniLibrary {
   public static native String brotliConfigInsert();
 
   /**
+   * Provides a configuration that may be used to enable a persistent DNS cache.
+   */
+  public static native String persistentDNSCacheConfigInsert();
+
+  /**
    * Provides a template to config the certification validator to be used.
    *
    * @param usePlatform true if the usage of platform validation APIs is desired.

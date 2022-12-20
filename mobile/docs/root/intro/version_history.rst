@@ -20,6 +20,7 @@ Features:
 
 - api: add option to support platform provided certificates validation interfaces on iOS and Android. (:issue `#2144 <2144>`)
 - api: Add a ``setPerTryIdleTimeoutSeconds()`` method to C++ EngineBuilder.
+- swift/kotlin: add an option to enable DNS cache by calling ``enableDNSCache(_:)`` method.
 - kotlin: add a way to tell Envoy Mobile to respect system proxy settings by calling an ``enableProxying(true)`` method on the engine builder. (:issue:`#2416 <2416>`)
 - kotlin: add a ``enableSkipDNSLookupForProxiedRequests(true)`` knob for controlling whether Envoy waits on DNS response in the dynamic forward proxy filter for proxied requests. (:issue:`#2602 <2602>`)
 - api: Add various methods to C++ EngineBuilder to bring it to parity with the Java and Obj-C builders. (:issue:`#2498 <2498>`)
