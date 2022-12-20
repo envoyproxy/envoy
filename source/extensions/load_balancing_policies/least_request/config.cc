@@ -24,8 +24,10 @@ Upstream::LoadBalancerPtr LeastRequestCreator::operator()(Upstream::LoadBalancer
                  "Invalid load balancing policy configuration for least request load balancer");
 
   return std::make_unique<Upstream::LeastRequestLoadBalancer>(
-      params.priority_set, params.local_priority_set, cluster_info.stats(), runtime, random,
-      cluster_info.lbConfig(), *typed_config, time_source);
+      params.priority_set, params.local_priority_set, cluster_info.lbStats(), runtime, random,
+      PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(cluster_info.lbConfig(),
+                                                     healthy_panic_threshold, 100, 50),
+      *typed_config, time_source);
 }
 
 /**

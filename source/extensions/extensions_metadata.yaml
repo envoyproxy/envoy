@@ -1350,6 +1350,20 @@ envoy.load_balancing_policies.least_request:
   status: alpha
   type_urls:
   - envoy.extensions.load_balancing_policies.least_request.v3.LeastRequest
+envoy.load_balancing_policies.random:
+  categories:
+  - envoy.load_balancing_policies
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.load_balancing_policies.random.v3.Random
+envoy.load_balancing_policies.round_robin:
+  categories:
+  - envoy.load_balancing_policies
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.load_balancing_policies.round_robin.v3.RoundRobin
 envoy.http.early_header_mutation.header_mutation:
   categories:
   - envoy.http.early_header_mutation
