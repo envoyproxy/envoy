@@ -50,7 +50,7 @@ private const val CERT_VALIDATION_TEMPLATE =
     name: "dumb_validator"
 """
 
-private const val PERSISTENT_DNS_CACHE_INSERT = 
+private const val PERSISTENT_DNS_CACHE_INSERT =
 """
   config: persistent_dns_cache
 """
