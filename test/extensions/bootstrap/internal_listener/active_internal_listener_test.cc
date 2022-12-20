@@ -169,7 +169,7 @@ TEST_F(ActiveInternalListenerTest, AcceptSocketAndCreateNetworkFilter) {
 
   EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(filter_chain_.get()));
   EXPECT_CALL(*filter_chain_, transportSocketFactory)
-      .WillOnce(testing::ReturnRef(*transport_socket_factory));
+      .WillRepeatedly(testing::ReturnRef(*transport_socket_factory));
   EXPECT_CALL(*filter_chain_, networkFilterFactories).WillOnce(ReturnRef(*filter_factory_callback));
   auto* connection = new NiceMock<Network::MockServerConnection>();
   EXPECT_CALL(dispatcher_, createServerConnection_()).WillOnce(Return(connection));
@@ -217,7 +217,7 @@ TEST_F(ActiveInternalListenerTest, DestroyListenerCloseAllConnections) {
       .WillRepeatedly(Invoke([&](Network::ListenerFilterManager&) -> bool { return true; }));
   EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(filter_chain_.get()));
   EXPECT_CALL(*filter_chain_, transportSocketFactory)
-      .WillOnce(testing::ReturnRef(*transport_socket_factory));
+      .WillRepeatedly(testing::ReturnRef(*transport_socket_factory));
   EXPECT_CALL(*filter_chain_, networkFilterFactories).WillOnce(ReturnRef(*filter_factory_callback));
   auto* connection = new NiceMock<Network::MockServerConnection>();
   EXPECT_CALL(dispatcher_, createServerConnection_()).WillOnce(Return(connection));
