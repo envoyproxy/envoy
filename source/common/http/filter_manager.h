@@ -746,7 +746,7 @@ public:
                               const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                               absl::string_view details) PURE;
   /**
-   * Executes any prepared, but not yet propagated, local reply.
+   * Executes a prepared, but not yet propagated, local reply.
    * Prepared local replies can occur in the decoder filter chain iteration.
    */
   virtual void executeLocalReplyIfPrepared() PURE;

@@ -674,8 +674,13 @@ TEST_P(StreamingIntegrationTest, PostAndProcessBufferedRequestBodyTooBig) {
         bool seen_response_headers = false;
 
         // Reading from the stream, we might receive the response headers
-        // later on depending on when the local reply is executed.
-        for (int i = 0; i < 2; ++i) {
+        // later if we execute the local reply after the filter executes.
+        const int num_reads_for_response_headers =
+            Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.http_filter_avoid_reentrant_local_reply")
+                ? 2
+                : 1;
+        for (int i = 0; i < num_reads_for_response_headers; ++i) {
           if (stream->Read(&header_resp) && header_resp.has_response_headers()) {
             seen_response_headers = true;
             break;

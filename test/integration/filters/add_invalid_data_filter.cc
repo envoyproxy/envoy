@@ -27,6 +27,8 @@ public:
   }
 
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool) override {
+    // If we made an invalid call to addEncodedData during decodeHeaders, we
+    // should not clobber the generated local reply.
     if (!added_invalid_encode_) {
       Buffer::OwnedImpl body("body");
       decoder_callbacks_->addDecodedData(body, false);
@@ -35,9 +37,8 @@ public:
   }
 
 private:
-  // Track whether the user requested us to invoke make an invalid call to addEncodedData
-  // when decoding headers. If requested, we should not clobber the local reply
-  // generated during encodeHeaders.
+  // Tracks whether the downstream requested the filter to make an invalid call
+  // to addEncodedData during decoding headers.
   bool added_invalid_encode_{false};
 };
 

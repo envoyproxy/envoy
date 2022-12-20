@@ -407,13 +407,19 @@ void sendLocalReply(const bool& is_reset, const EncodeFunctions& encode_function
                     const LocalReplyData& local_reply_data);
 
 /**
- * Prepares a locally generate response modifying headers and rewriting the
- * response.
+ * Prepares a locally generated response.
+ *
+ * @param encode_functions supplies the functions to encode response body and headers.
+ * @param local_reply_data struct which keeps data related to generate reply.
  */
 PreparedLocalReplyPtr prepareLocalReply(const EncodeFunctions& encode_functions,
                                         const LocalReplyData& local_reply_data);
 /**
  * Encodes a prepared local reply.
+ * @param is_reset boolean reference that indicates whether a stream has been reset. It is the
+ *                 responsibility of the caller to ensure that this is set to false if onDestroy()
+ *                 is invoked in the context of sendLocalReply().
+ * @param prepared_local_reply supplies the local reply to encode.
  */
 void encodeLocalReply(const bool& is_reset, PreparedLocalReplyPtr prepared_local_reply);
 
