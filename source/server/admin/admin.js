@@ -32,13 +32,13 @@ class ValueRecord {
     this.label = split[split.length - 1];
     this.fetch = false;
     this.value = null;
-    this.stats = [];
+    // this.stats = [];
     this.scopes = [];
     names.set(name, this);
   }
 
   isScope() {
-    return this.fetch || this.stats.length > 0;
+    return this.fetch /* || this.stats.length > 0 */;
   }
 
   labelValue() {
@@ -54,13 +54,13 @@ class ValueRecord {
 // using the same JSON format sent by the server. When the user expands into
 // this synthetic hierarchy we can just populate the UI directly from the saved
 // values.
-function addNameToSyntheticScope(synthetic_scope, name, value, names) {
+/*function addNameToSyntheticScope(synthetic_scope, name, value, names) {
   let value_record = names.get(synthetic_scope);
   if (!value_record) {
     value_record = new ValueRecord(names, synthetic_scope);
   }
   value_record.stats.push({name: name, value: value});
-}
+}*/
 
 // Adds a scope the the UI, underneath the specified parent HTML element.
 // expand_fn is called when the user clicks the button to expand the scope.
@@ -179,8 +179,9 @@ function addStat(parent, name, value, prefix, names) {
   // If the name has hierarchy in it, then create a scope node instead.
   const split = name.split('.');
   if (split.length >= 2) {
-    const synthetic_scope = prefix ? (prefix + '.' + split[0]) : split[0];
-    addNameToSyntheticScope(synthetic_scope, full_name, value, names);
+    alert('expecting only one dot in ' + split);
+    //const synthetic_scope = prefix ? (prefix + '.' + split[0]) : split[0];
+    //addNameToSyntheticScope(synthetic_scope, full_name, value, names);
   } else {
     let value_record = names.get(full_name);
     if (value_record == null) {
