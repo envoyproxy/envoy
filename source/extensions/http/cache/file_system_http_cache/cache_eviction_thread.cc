@@ -23,6 +23,9 @@ void CacheEvictionThread::removeCache(FileSystemHttpCache& cache) {
   absl::MutexLock lock(&cache_mu_);
   bool removed = caches_.erase(&cache);
   ASSERT(removed);
+  if (caches_.empty()) {
+    terminate();
+  }
 }
 
 void CacheEvictionThread::signal() {
