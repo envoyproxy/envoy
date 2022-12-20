@@ -111,7 +111,7 @@ TEST_F(FileSystemHttpCacheTestWithNoDefaultCache, InitialStatsAreSetCorrectly) {
   const uint64_t max_size = 87654321;
   ConfigProto cfg = testConfig();
   cfg.mutable_max_cache_entry_count()->set_value(max_count);
-  cfg.mutable_max_cache_entry_size_bytes()->set_value(max_size);
+  cfg.mutable_max_cache_size_bytes()->set_value(max_size);
   env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-a"), file_1_contents, true);
   env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-b"), file_2_contents, true);
   cache_ = std::dynamic_pointer_cast<FileSystemHttpCache>(

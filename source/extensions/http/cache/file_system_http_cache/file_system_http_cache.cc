@@ -348,8 +348,8 @@ void FileSystemHttpCache::init() {
   }
   stats_.size_count_.set(size_count_);
   stats_.size_bytes_.set(size_bytes_);
-  if (config().has_max_cache_entry_size_bytes()) {
-    stats_.size_limit_bytes_.set(config().max_cache_entry_size_bytes().value());
+  if (config().has_max_cache_size_bytes()) {
+    stats_.size_limit_bytes_.set(config().max_cache_size_bytes().value());
   }
   if (config().has_max_cache_entry_count()) {
     stats_.size_limit_count_.set(config().max_cache_entry_count().value());
