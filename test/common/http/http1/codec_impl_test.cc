@@ -3885,17 +3885,17 @@ TEST_P(Http1ServerConnectionImplTest, FirstReadEOF) {
   initialize();
   InSequence s;
 
+  // A read of zero bytes does not trigger creation of a new stream.
+  EXPECT_CALL(callbacks_, newStream(_, _)).Times(0);
+
   Buffer::OwnedImpl empty;
   auto status = codec_->dispatch(empty);
   ASSERT_TRUE(status.ok());
 
   StrictMock<MockRequestDecoder> decoder;
-  Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
-        response_encoder = &encoder;
-        return decoder;
-      }));
+      .WillOnce(
+          Invoke([&](ResponseEncoder& /*encoder*/, bool) -> RequestDecoder& { return decoder; }));
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
   EXPECT_CALL(decoder, decodeHeaders_(_, true));
