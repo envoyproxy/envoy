@@ -103,7 +103,10 @@ protected:
   virtual void frameDataEnd() {}
 
   State state_{State::FhFlag};
-  uint32_t length_{0};
+  union {
+    uint32_t length_{0};
+    uint8_t length_as_bytes_[4];
+  };
   uint64_t count_{0};
 };
 
