@@ -14,6 +14,8 @@
 #include "source/server/admin/stats_request.h"
 
 #include "absl/strings/numbers.h"
+#include "prometheus_stats_request.h"
+#include "stats_params.h"
 
 namespace Envoy {
 namespace Server {
@@ -74,21 +76,9 @@ Http::Code StatsHandler::handlerStatsRecentLookupsEnable(Http::ResponseHeaderMap
 Admin::RequestPtr StatsHandler::makeRequest(AdminStream& admin_stream) {
   StatsParams params;
   Buffer::OwnedImpl response;
-  Http::Code code = params.parse(admin_stream.getRequestHeaders().getPathValue(), response);
+  absl::string_view path = admin_stream.getRequestHeaders().getPathValue();
+  Http::Code code = params.parse(path, response);
   if (code != Http::Code::OK) {
-    return Admin::makeStaticTextRequest(response, code);
-  }
-
-  if (params.format_ == StatsFormat::Prometheus) {
-    // TODO(#16139): modify streaming algorithm to cover Prometheus.
-    //
-    // This may be easiest to accomplish by populating the set
-    // with tagExtractedName(), and allowing for vectors of
-    // stats as multiples will have the same tag-extracted names.
-    // Ideally we'd find a way to do this without slowing down
-    // the non-Prometheus implementations.
-    Buffer::OwnedImpl response;
-    prometheusFlushAndRender(params, response);
     return Admin::makeStaticTextRequest(response, code);
   }
 
@@ -96,13 +86,26 @@ Admin::RequestPtr StatsHandler::makeRequest(AdminStream& admin_stream) {
     server_.flushStats();
   }
 
-  return makeRequest(server_.stats(), params,
-                     [this]() -> Admin::UrlHandler { return statsHandler(); });
+  if (params.format_ == StatsFormat::Prometheus || path == "/stats/prometheus") {
+    return makePrometheusRequest(
+        server_.stats(), params, server_.api().customStatNamespaces(),
+        [this]() -> Admin::UrlHandler { return prometheusStatsHandler(); });
+  } else {
+    return makeRequest(server_.stats(), params,
+                       [this]() -> Admin::UrlHandler { return statsHandler(); });
+  }
 }
 
 Admin::RequestPtr StatsHandler::makeRequest(Stats::Store& stats, const StatsParams& params,
                                             StatsRequest::UrlHandlerFn url_handler_fn) {
   return std::make_unique<StatsRequest>(stats, params, url_handler_fn);
+}
+
+Admin::RequestPtr
+StatsHandler::makePrometheusRequest(Stats::Store& stats, const StatsParams& params,
+                                    Stats::CustomStatNamespaces& custom_namespaces,
+                                    PrometheusStatsRequest::UrlHandlerFn url_handler_fn) {
+  return std::make_unique<PrometheusStatsRequest>(stats, params, custom_namespaces, url_handler_fn);
 }
 
 Http::Code StatsHandler::handlerPrometheusStats(Http::ResponseHeaderMap&,
@@ -184,6 +187,22 @@ Admin::UrlHandler StatsHandler::statsHandler() {
         "histogram_buckets",
         "Histogram bucket display mode",
         {"cumulative", "disjoint", "none"}}}};
+}
+
+Admin::UrlHandler StatsHandler::prometheusStatsHandler() {
+  return {
+      "/stats/prometheus",
+      "print server stats in prometheus format",
+      [this](AdminStream& admin_stream) -> Admin::RequestPtr { return makeRequest(admin_stream); },
+      false,
+      false,
+      {{Admin::ParamDescriptor::Type::Boolean, "usedonly",
+        "Only include stats that have been written by system since restart"},
+       {Admin::ParamDescriptor::Type::Boolean, "text_readouts",
+        "Render text_readouts as new gaugues with value 0 (increases Prometheus "
+        "data size)"},
+       {Admin::ParamDescriptor::Type::String, "filter",
+        "Regular expression (Google re2) for filtering stats"}}};
 }
 
 } // namespace Server

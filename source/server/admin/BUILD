@@ -132,8 +132,16 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "stats_request_lib",
-    srcs = ["stats_request.cc"],
-    hdrs = ["stats_request.h"],
+    srcs = [
+        "prometheus_stats_render.cc",
+        "prometheus_stats_request.cc",
+        "stats_request.cc",
+    ],
+    hdrs = [
+        "prometheus_stats_render.h",
+        "prometheus_stats_request.h",
+        "stats_request.h",
+    ],
     deps = [
         ":handler_ctx_lib",
         ":prometheus_stats_lib",
