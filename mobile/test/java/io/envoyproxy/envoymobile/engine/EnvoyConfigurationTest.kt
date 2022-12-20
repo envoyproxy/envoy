@@ -150,7 +150,6 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("&dns_min_refresh_rate 12s")
     assertThat(resolvedTemplate).contains("&dns_preresolve_hostnames [hostname]")
     assertThat(resolvedTemplate).contains("&enable_drain_post_dns_refresh false")
-    assertThat(resolvedTemplate).contains("&persistent_dns_cache_config NULL")
     assertThat(resolvedTemplate).doesNotContain(PERSISTENT_DNS_CACHE_INSERT);
 
     // Interface Binding
