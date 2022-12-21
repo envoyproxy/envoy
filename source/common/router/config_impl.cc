@@ -463,12 +463,10 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                                        const OptionalHttpFilters& optional_http_filters,
                                        Server::Configuration::ServerFactoryContext& factory_context,
                                        ProtobufMessage::ValidationVisitor& validator)
-    : case_sensitive_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.match(), case_sensitive, true)),
-      prefix_rewrite_(route.route().prefix_rewrite()),
+    : prefix_rewrite_(route.route().prefix_rewrite()),
       path_matcher_(buildPathMatcher(route, validator)),
       path_rewriter_(buildPathRewriter(route, validator)),
       host_rewrite_(route.route().host_rewrite_literal()), vhost_(vhost),
-      auto_host_rewrite_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), auto_host_rewrite, false)),
       auto_host_rewrite_header_(!route.route().host_rewrite_header().empty()
                                     ? absl::optional<Http::LowerCaseString>(Http::LowerCaseString(
                                           route.route().host_rewrite_header()))
@@ -481,10 +479,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
           route.route().has_host_rewrite_path_regex()
               ? route.route().host_rewrite_path_regex().substitution()
               : ""),
-      append_xfh_(route.route().append_x_forwarded_host()), cluster_name_(route.route().cluster()),
-      cluster_header_name_(route.route().cluster_header()),
-      cluster_not_found_response_code_(ConfigUtility::parseClusterNotFoundResponseCode(
-          route.route().cluster_not_found_response_code())),
+      cluster_name_(route.route().cluster()), cluster_header_name_(route.route().cluster_header()),
       timeout_(PROTOBUF_GET_MS_OR_DEFAULT(route.route(), timeout, DEFAULT_ROUTE_TIMEOUT_MS)),
       idle_timeout_(PROTOBUF_GET_OPTIONAL_MS(route.route(), idle_timeout)),
       max_stream_duration_(
@@ -502,33 +497,37 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                          ? ":" + std::to_string(route.redirect().port_redirect())
                          : ""),
       path_redirect_(route.redirect().path_redirect()),
-      path_redirect_has_query_(path_redirect_.find('?') != absl::string_view::npos),
-      https_redirect_(route.redirect().https_redirect()),
-      using_new_timeouts_(route.route().has_max_stream_duration()),
       prefix_rewrite_redirect_(route.redirect().prefix_rewrite()),
-      strip_query_(route.redirect().strip_query()),
       hedge_policy_(buildHedgePolicy(vhost.hedgePolicy(), route.route())),
       retry_policy_(
           buildRetryPolicy(vhost.retryPolicy(), route.route(), validator, factory_context)),
       internal_redirect_policy_(
           buildInternalRedirectPolicy(route.route(), validator, route.name())),
-      priority_(ConfigUtility::parsePriority(route.route().priority())),
       config_headers_(Http::HeaderUtility::buildHeaderDataVector(route.match().headers())),
       retry_shadow_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           route, per_request_buffer_limit_bytes, vhost.retryShadowBufferLimit())),
-      match_grpc_(route.match().has_grpc()),
       dynamic_metadata_(route.match().dynamic_metadata().begin(),
                         route.match().dynamic_metadata().end()),
       opaque_config_(parseOpaqueConfig(route)), decorator_(parseDecorator(route)),
       route_tracing_(parseRouteTracing(route)),
-      direct_response_code_(ConfigUtility::parseDirectResponseCode(route)),
       direct_response_body_(ConfigUtility::parseDirectResponseBody(
           route, factory_context.api(),
           vhost_.globalRouteConfig().maxDirectResponseBodySizeBytes())),
       per_filter_configs_(route.typed_per_filter_config(), optional_http_filters, factory_context,
                           validator),
       route_name_(route.name()), time_source_(factory_context.mainThreadDispatcher().timeSource()),
-      random_value_header_name_(route.route().weighted_clusters().header_name()) {
+      random_value_header_name_(route.route().weighted_clusters().header_name()),
+      direct_response_code_(ConfigUtility::parseDirectResponseCode(route)),
+      cluster_not_found_response_code_(ConfigUtility::parseClusterNotFoundResponseCode(
+          route.route().cluster_not_found_response_code())),
+      priority_(ConfigUtility::parsePriority(route.route().priority())),
+      auto_host_rewrite_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), auto_host_rewrite, false)),
+      append_xfh_(route.route().append_x_forwarded_host()),
+      path_redirect_has_query_(path_redirect_.find('?') != absl::string_view::npos),
+      https_redirect_(route.redirect().https_redirect()),
+      using_new_timeouts_(route.route().has_max_stream_duration()),
+      strip_query_(route.redirect().strip_query()), match_grpc_(route.match().has_grpc()),
+      case_sensitive_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.match(), case_sensitive, true)) {
   if (!route.request_headers_to_add().empty() || !route.request_headers_to_remove().empty()) {
     request_headers_parser_ =
         HeaderParser::configure(route.request_headers_to_add(), route.request_headers_to_remove());
@@ -976,8 +975,8 @@ absl::optional<std::string> RouteEntryImplBase::currentUrlPathAfterRewriteWithMa
       auto just_path(Http::PathUtil::removeQueryAndFragment(path));
       return path.replace(0, just_path.size(), rewrite);
     }
-    ASSERT(case_sensitive_ ? absl::StartsWith(path, matched_path)
-                           : absl::StartsWithIgnoreCase(path, matched_path));
+    ASSERT(case_sensitive() ? absl::StartsWith(path, matched_path)
+                            : absl::StartsWithIgnoreCase(path, matched_path));
     return path.replace(0, matched_path.size(), rewrite);
   }
 
@@ -1515,8 +1514,8 @@ PrefixRouteEntryImpl::PrefixRouteEntryImpl(
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator)
     : RouteEntryImplBase(vhost, route, optional_http_filters, factory_context, validator),
-      path_matcher_(Matchers::PathMatcher::createPrefix(route.match().prefix(), !case_sensitive_)) {
-}
+      path_matcher_(
+          Matchers::PathMatcher::createPrefix(route.match().prefix(), !case_sensitive())) {}
 
 void PrefixRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                              bool insert_envoy_original_path) const {
@@ -1544,7 +1543,7 @@ PathRouteEntryImpl::PathRouteEntryImpl(const VirtualHostImpl& vhost,
                                        Server::Configuration::ServerFactoryContext& factory_context,
                                        ProtobufMessage::ValidationVisitor& validator)
     : RouteEntryImplBase(vhost, route, optional_http_filters, factory_context, validator),
-      path_matcher_(Matchers::PathMatcher::createExact(route.match().path(), !case_sensitive_)) {}
+      path_matcher_(Matchers::PathMatcher::createExact(route.match().path(), !case_sensitive())) {}
 
 void PathRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                            bool insert_envoy_original_path) const {
@@ -1640,7 +1639,7 @@ PathSeparatedPrefixRouteEntryImpl::PathSeparatedPrefixRouteEntryImpl(
     ProtobufMessage::ValidationVisitor& validator)
     : RouteEntryImplBase(vhost, route, optional_http_filters, factory_context, validator),
       path_matcher_(Matchers::PathMatcher::createPrefix(route.match().path_separated_prefix(),
-                                                        !case_sensitive_)) {}
+                                                        !case_sensitive())) {}
 
 void PathSeparatedPrefixRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                                           bool insert_envoy_original_path) const {
@@ -2058,14 +2057,14 @@ ConfigImpl::ConfigImpl(const envoy::config::route::v3::RouteConfiguration& confi
                        ProtobufMessage::ValidationVisitor& validator,
                        bool validate_clusters_default)
     : name_(config.name()), symbol_table_(factory_context.scope().symbolTable()),
-      uses_vhds_(config.has_vhds()),
-      most_specific_header_mutations_wins_(config.most_specific_header_mutations_wins()),
       max_direct_response_body_size_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_direct_response_body_size_bytes,
                                           DEFAULT_MAX_DIRECT_RESPONSE_BODY_SIZE_BYTES)),
-      ignore_path_parameters_in_path_matching_(config.ignore_path_parameters_in_path_matching()),
       per_filter_configs_(config.typed_per_filter_config(), optional_http_filters, factory_context,
-                          validator) {
+                          validator),
+      uses_vhds_(config.has_vhds()),
+      most_specific_header_mutations_wins_(config.most_specific_header_mutations_wins()),
+      ignore_path_parameters_in_path_matching_(config.ignore_path_parameters_in_path_matching()) {
   if (!config.request_mirror_policies().empty()) {
     shadow_policies_.reserve(config.request_mirror_policies().size());
     for (const auto& mirror_policy_config : config.request_mirror_policies()) {
