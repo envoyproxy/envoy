@@ -101,6 +101,12 @@ void ActiveTcpListener::onReject(RejectCause cause) {
 void ActiveTcpListener::onAcceptWorker(Network::ConnectionSocketPtr&& socket,
                                        bool hand_off_restored_destination_connections,
                                        bool rebalanced) {
+  // Get Round Trip Time
+  absl::optional<std::chrono::milliseconds> t = socket->lastRoundTripTime();
+  if (t.has_value()) {
+    socket->connectionInfoProvider().setRoundTripTime(t.value());
+  }
+
   if (!rebalanced) {
     Network::BalancedConnectionHandler& target_handler =
         connection_balancer_.pickTargetHandler(*this);

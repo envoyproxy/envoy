@@ -582,6 +582,9 @@ public:
   absl::string_view ja3Hash() const override {
     return StreamInfoImpl::downstreamAddressProvider().ja3Hash();
   }
+  const absl::optional<std::chrono::milliseconds>& roundTripTime() const override {
+    return StreamInfoImpl::downstreamAddressProvider().roundTripTime();
+  }
 
 private:
   Network::Address::InstanceConstSharedPtr overridden_downstream_remote_address_;
