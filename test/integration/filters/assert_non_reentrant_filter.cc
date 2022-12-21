@@ -31,8 +31,6 @@ public:
 
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool) override {
     ASSERT(!is_active_);
-    is_active_ = true;
-    is_active_ = false;
     return Http::FilterHeadersStatus::Continue;
   }
 
