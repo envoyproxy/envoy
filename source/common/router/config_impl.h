@@ -278,7 +278,7 @@ public:
       std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override;
 
 private:
-  enum class SslRequirements : int8_t { None, ExternalOnly, All };
+  enum class SslRequirements : uint8_t { None, ExternalOnly, All };
 
   struct StatNameProvider {
     StatNameProvider(absl::string_view name, Stats::SymbolTable& symbol_table)
@@ -1133,8 +1133,8 @@ private:
   const bool using_new_timeouts_ : 1;
   const bool strip_query_ : 1;
   const bool match_grpc_ : 1;
-  bool include_vh_rate_limits_ : 1;
   const bool case_sensitive_ : 1;
+  bool include_vh_rate_limits_ : 1;
 };
 
 /**

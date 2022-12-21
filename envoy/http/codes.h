@@ -11,7 +11,7 @@ namespace Http {
  * HTTP response codes.
  * http://www.iana.org/assignments/http-status-codes/http-status-codes.xhtml
  */
-enum class Code : int16_t {
+enum class Code : uint16_t {
   // clang-format off
   Continue                      = 100,
   SwitchingProtocols            = 101,
