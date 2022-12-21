@@ -102,24 +102,6 @@ NS_ASSUME_NONNULL_BEGIN
 - (int)recordGaugeSub:(NSString *)elements tags:(EnvoyTags *)tags amount:(NSUInteger)amount;
 
 /**
- Add another recorded duration to the timer histogram with the given string of elements.
- @param elements Elements of the histogram stat.
- @param durationMs The duration in milliseconds to record in the histogram distribution
- @return A status indicating if the action was successful.
- */
-- (int)recordHistogramDuration:(NSString *)elements
-                          tags:(EnvoyTags *)tags
-                    durationMs:(NSUInteger)durationMs;
-
-/**
- Add another recorded value to the histogram with the given string of elements.
- @param elements Elements of the histogram stat.
- @param value Amount to record as a new value for the histogram distribution.
- @return A status indicating if the action was successful.
- */
-- (int)recordHistogramValue:(NSString *)elements tags:(EnvoyTags *)tags value:(NSUInteger)value;
-
-/**
  Attempt to trigger a stat flush.
  */
 - (void)flushStats;

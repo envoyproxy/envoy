@@ -1,7 +1,5 @@
 #include "library/common/engine.h"
 
-#include "envoy/stats/histogram.h"
-
 #include "source/common/common/lock_guard.h"
 
 #include "library/common/bridge/utility.h"
@@ -233,36 +231,6 @@ envoy_status_t Engine::recordGaugeSub(const std::string& elements, envoy_stats_t
   Stats::Utility::gaugeFromElements(*client_scope_, {Stats::DynamicName(name)},
                                     Stats::Gauge::ImportMode::NeverImport, tags_vctr)
       .sub(amount);
-  return ENVOY_SUCCESS;
-}
-
-envoy_status_t Engine::recordHistogramValue(const std::string& elements, envoy_stats_tags tags,
-                                            uint64_t value,
-                                            envoy_histogram_stat_unit_t unit_measure) {
-  ENVOY_LOG(trace, "[pulse.{}] recordHistogramValue", elements);
-  ASSERT(dispatcher_->isThreadSafe(), "pulse calls must run from dispatcher's context");
-  Stats::StatNameTagVector tags_vctr =
-      Stats::Utility::transformToStatNameTagVector(tags, stat_name_set_);
-  std::string name = Stats::Utility::sanitizeStatsName(elements);
-  Stats::Histogram::Unit envoy_unit_measure = Stats::Histogram::Unit::Unspecified;
-  switch (unit_measure) {
-  case MILLISECONDS:
-    envoy_unit_measure = Stats::Histogram::Unit::Milliseconds;
-    break;
-  case MICROSECONDS:
-    envoy_unit_measure = Stats::Histogram::Unit::Microseconds;
-    break;
-  case BYTES:
-    envoy_unit_measure = Stats::Histogram::Unit::Bytes;
-    break;
-  case UNSPECIFIED:
-    envoy_unit_measure = Stats::Histogram::Unit::Unspecified;
-    break;
-  }
-
-  Stats::Utility::histogramFromElements(*client_scope_, {Stats::DynamicName(name)},
-                                        envoy_unit_measure, tags_vctr)
-      .recordValue(value);
   return ENVOY_SUCCESS;
 }
 

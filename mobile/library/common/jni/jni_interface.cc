@@ -231,20 +231,6 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
   return result;
 }
 
-extern "C" JNIEXPORT jint JNICALL
-Java_io_envoyproxy_envoymobile_engine_JniLibrary_recordHistogramDuration(JNIEnv* env,
-                                                                         jclass, // class
-                                                                         jlong engine,
-                                                                         jstring elements,
-                                                                         jobjectArray tags,
-                                                                         jint durationMs) {
-  const char* native_elements = env->GetStringUTFChars(elements, nullptr);
-  jint result = record_histogram_value(engine, native_elements, to_native_tags(env, tags),
-                                       durationMs, MILLISECONDS);
-  env->ReleaseStringUTFChars(elements, native_elements);
-  return result;
-}
-
 extern "C" JNIEXPORT void JNICALL
 Java_io_envoyproxy_envoymobile_engine_JniLibrary_flushStats(JNIEnv* env,
                                                             jclass, // class
@@ -268,20 +254,6 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_dumpStats(JNIEnv* env,
   release_envoy_data(data);
 
   return str;
-}
-
-extern "C" JNIEXPORT jint JNICALL
-Java_io_envoyproxy_envoymobile_engine_JniLibrary_recordHistogramValue(JNIEnv* env,
-                                                                      jclass, // class
-                                                                      jlong engine,
-                                                                      jstring elements,
-                                                                      jobjectArray tags,
-                                                                      jint value) {
-  const char* native_elements = env->GetStringUTFChars(elements, nullptr);
-  jint result = record_histogram_value(engine, native_elements, to_native_tags(env, tags), value,
-                                       UNSPECIFIED);
-  env->ReleaseStringUTFChars(elements, native_elements);
-  return result;
 }
 
 // JvmCallbackContext

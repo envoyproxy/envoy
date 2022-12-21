@@ -144,19 +144,11 @@ public class MainActivity extends Activity {
     final Gauge gauge =
         engine.pulseClient().gauge(new Element("foo"), new Element("bar"), new Element("gauge"));
 
-    final Timer timer =
-        engine.pulseClient().timer(new Element("foo"), new Element("bar"), new Element("timer"));
-    final Distribution distribution = engine.pulseClient().distribution(
-        new Element("foo"), new Element("bar"), new Element("distribution"));
-
     counter.increment(1);
     counter.increment(5);
 
     gauge.set(5);
     gauge.add(10);
     gauge.sub(1);
-
-    timer.recordDuration(15);
-    distribution.recordValue(15);
   }
 }

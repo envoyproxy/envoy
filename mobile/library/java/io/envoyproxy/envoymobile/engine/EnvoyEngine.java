@@ -84,26 +84,6 @@ public interface EnvoyEngine {
    */
   int recordGaugeSub(String elements, Map<String, String> tags, int amount);
 
-  /**
-   * Add another recorded duration in ms to the timer histogram with the given string of elements.
-   *
-   * @param elements Elements of the histogram stat.
-   * @param tags Tags of the histogram stat.
-   * @param durationMs Duration value to record in the histogram timer distribution.
-   * @return A status indicating if the action was successful.
-   */
-  int recordHistogramDuration(String elements, Map<String, String> tags, int durationMs);
-
-  /**
-   * Add another recorded value to the generic histogram with the given string of elements.
-   *
-   * @param elements Elements of the histogram stat.
-   * @param tags Tags of the histogram stat.
-   * @param value Amount to record as a new value for the histogram distribution.
-   * @return A status indicating if the action was successful.
-   */
-  int recordHistogramValue(String elements, Map<String, String> tags, int value);
-
   int registerStringAccessor(String accessor_name, EnvoyStringAccessor accessor);
 
   /**

@@ -27,27 +27,4 @@ public protocol PulseClient: AnyObject {
   ///
   /// - returns: A Gauge based on the joined elements and along with tags
   func gauge(elements: [Element], tags: Tags) -> Gauge
-
-  /// - parameter elements: Elements to identify a timer
-  ///
-  /// - returns: A Timer based on the joined elements to track a distribution of durations
-  func timer(elements: [Element]) -> Timer
-
-  /// - parameter elements: Elements to identify a timer
-  /// - parameter tags:     Tags of the timer
-  ///
-  /// - returns: A Timer based on the joined elements and with tags
-  ///            to track a distribution of durations
-  func timer(elements: [Element], tags: Tags) -> Timer
-
-  /// - parameter elements: Elements to identify a distribution
-  ///
-  /// - returns: A Distribution based on the joined elements to track quantile stats
-  func distribution(elements: [Element]) -> Distribution
-
-  /// - parameter elements: Elements to identify a distribution
-  /// - parameter tags:     Tags of the distribution
-  ///
-  /// - returns: A Distribution based on the joined elements and along with tags
-  func distribution(elements: [Element], tags: Tags) -> Distribution
 }
