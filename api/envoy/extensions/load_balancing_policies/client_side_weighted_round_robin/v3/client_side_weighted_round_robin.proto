@@ -22,9 +22,9 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // how the endpoint weights are determined. In the ROUND_ROBIN policy,
 // the endpoint weights are sent by the control plane via EDS. However,
 // in this policy, the endpoint weights are instead determined via
-// qps and CPU utilization metrics sent by the endpoint using the ORCA
-// protocol. The weight of a given endpoint is computed as
-// qps / cpu_utilization.
+// qps and CPU utilization metrics sent by the endpoint using the Open
+// Request Cost Aggregation (ORCA) protocol. The weight of a given endpoint
+// is computed as qps / cpu_utilization.
 //
 // See the :ref:`load balancing architecture overview<arch_overview_load_balancing_types>` for more information.
 message ClientSideWeightedRoundRobin {
