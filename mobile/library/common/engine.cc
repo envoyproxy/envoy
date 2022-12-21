@@ -195,45 +195,6 @@ envoy_status_t Engine::recordCounterInc(const std::string& elements, envoy_stats
   return ENVOY_SUCCESS;
 }
 
-envoy_status_t Engine::recordGaugeSet(const std::string& elements, envoy_stats_tags tags,
-                                      uint64_t value) {
-  ENVOY_LOG(trace, "[pulse.{}] recordGaugeSet", elements);
-  ASSERT(dispatcher_->isThreadSafe(), "pulse calls must run from dispatcher's context");
-  Stats::StatNameTagVector tags_vctr =
-      Stats::Utility::transformToStatNameTagVector(tags, stat_name_set_);
-  std::string name = Stats::Utility::sanitizeStatsName(elements);
-  Stats::Utility::gaugeFromElements(*client_scope_, {Stats::DynamicName(name)},
-                                    Stats::Gauge::ImportMode::NeverImport, tags_vctr)
-      .set(value);
-  return ENVOY_SUCCESS;
-}
-
-envoy_status_t Engine::recordGaugeAdd(const std::string& elements, envoy_stats_tags tags,
-                                      uint64_t amount) {
-  ENVOY_LOG(trace, "[pulse.{}] recordGaugeAdd", elements);
-  ASSERT(dispatcher_->isThreadSafe(), "pulse calls must run from dispatcher's context");
-  Stats::StatNameTagVector tags_vctr =
-      Stats::Utility::transformToStatNameTagVector(tags, stat_name_set_);
-  std::string name = Stats::Utility::sanitizeStatsName(elements);
-  Stats::Utility::gaugeFromElements(*client_scope_, {Stats::DynamicName(name)},
-                                    Stats::Gauge::ImportMode::NeverImport, tags_vctr)
-      .add(amount);
-  return ENVOY_SUCCESS;
-}
-
-envoy_status_t Engine::recordGaugeSub(const std::string& elements, envoy_stats_tags tags,
-                                      uint64_t amount) {
-  ENVOY_LOG(trace, "[pulse.{}] recordGaugeSub", elements);
-  ASSERT(dispatcher_->isThreadSafe(), "pulse calls must run from dispatcher's context");
-  Stats::StatNameTagVector tags_vctr =
-      Stats::Utility::transformToStatNameTagVector(tags, stat_name_set_);
-  std::string name = Stats::Utility::sanitizeStatsName(elements);
-  Stats::Utility::gaugeFromElements(*client_scope_, {Stats::DynamicName(name)},
-                                    Stats::Gauge::ImportMode::NeverImport, tags_vctr)
-      .sub(amount);
-  return ENVOY_SUCCESS;
-}
-
 envoy_status_t Engine::makeAdminCall(absl::string_view path, absl::string_view method,
                                      envoy_data& out) {
   ENVOY_LOG(trace, "admin call {} {}", method, path);

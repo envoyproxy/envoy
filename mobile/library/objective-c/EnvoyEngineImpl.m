@@ -551,18 +551,6 @@ static void ios_track_event(envoy_map map, const void *context) {
   return record_counter_inc(_engineHandle, elements.UTF8String, toNativeStatsTags(tags), count);
 }
 
-- (int)recordGaugeSet:(NSString *)elements tags:(EnvoyTags *)tags value:(NSUInteger)value {
-  return record_gauge_set(_engineHandle, elements.UTF8String, toNativeStatsTags(tags), value);
-}
-
-- (int)recordGaugeAdd:(NSString *)elements tags:(EnvoyTags *)tags amount:(NSUInteger)amount {
-  return record_gauge_add(_engineHandle, elements.UTF8String, toNativeStatsTags(tags), amount);
-}
-
-- (int)recordGaugeSub:(NSString *)elements tags:(EnvoyTags *)tags amount:(NSUInteger)amount {
-  return record_gauge_sub(_engineHandle, elements.UTF8String, toNativeStatsTags(tags), amount);
-}
-
 - (void)flushStats {
   flush_stats(_engineHandle);
 }

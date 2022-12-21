@@ -16,15 +16,4 @@ public protocol PulseClient: AnyObject {
   ///
   /// - returns: A Counter based on the joined elements and along with tags
   func counter(elements: [Element], tags: Tags) -> Counter
-
-  /// - parameter elements: Elements to identify a gauge
-  ///
-  /// - returns: A Gauge based on the joined elements.
-  func gauge(elements: [Element]) -> Gauge
-
-  /// - parameter elements: Elements to identify a gauge
-  /// - parameter tags:     Tags of the gauge
-  ///
-  /// - returns: A Gauge based on the joined elements and along with tags
-  func gauge(elements: [Element], tags: Tags) -> Gauge
 }

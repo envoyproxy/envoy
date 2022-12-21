@@ -54,36 +54,6 @@ public interface EnvoyEngine {
    */
   int recordCounterInc(String elements, Map<String, String> tags, int count);
 
-  /**
-   * Set a gauge of a given string of elements with the given value.
-   *
-   * @param elements Elements of the gauge stat.
-   * @param tags Tags of the gauge stat.
-   * @param value Value to set to the gauge.
-   * @return A status indicating if the action was successful.
-   */
-  int recordGaugeSet(String elements, Map<String, String> tags, int value);
-
-  /**
-   * Add the gauge with the given string of elements and by the given amount.
-   *
-   * @param elements Elements of the gauge stat.
-   * @param tags Tags of the gauge stat.
-   * @param amount Amount to add to the gauge.
-   * @return A status indicating if the action was successful.
-   */
-  int recordGaugeAdd(String elements, Map<String, String> tags, int amount);
-
-  /**
-   * Subtract from the gauge with the given string of elements and by the given amount.
-   *
-   * @param elements Elements of the gauge stat.
-   * @param tags Tags of the gauge stat.
-   * @param amount Amount to subtract from the gauge.
-   * @return A status indicating if the action was successful.
-   */
-  int recordGaugeSub(String elements, Map<String, String> tags, int amount);
-
   int registerStringAccessor(String accessor_name, EnvoyStringAccessor accessor);
 
   /**

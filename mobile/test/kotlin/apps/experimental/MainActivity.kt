@@ -161,13 +161,7 @@ class MainActivity : Activity() {
 
   private fun recordStats() {
     val counter = engine.pulseClient().counter(Element("foo"), Element("bar"), Element("counter"))
-    val gauge = engine.pulseClient().gauge(Element("foo"), Element("bar"), Element("gauge"))
-
     counter.increment()
     counter.increment(5)
-
-    gauge.set(5)
-    gauge.add(10)
-    gauge.sub(1)
   }
 }

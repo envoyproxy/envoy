@@ -72,32 +72,6 @@ public:
                                   uint64_t count);
 
   /**
-   * Set a gauge of a given string of elements with the given value.
-   * @param elements, joined elements of the timeseries.
-   * @param tags, custom tags of the reporting stat.
-   * @param value, value to set to the gauge.
-   */
-  envoy_status_t recordGaugeSet(const std::string& elements, envoy_stats_tags tags, uint64_t value);
-
-  /**
-   * Add to the gauge with the given string of elements and by the given amount.
-   * @param elements, joined elements of the timeseries.
-   * @param tags, custom tags of the reporting stat.
-   * @param amount, amount to add to the gauge.
-   */
-  envoy_status_t recordGaugeAdd(const std::string& elements, envoy_stats_tags tags,
-                                uint64_t amount);
-
-  /**
-   * Subtract from the gauge with the given string of elements and by the given amount.
-   * @param elements, joined elements of the timeseries.
-   * @param tags, custom tags of the reporting stat.
-   * @param amount, amount to subtract from the gauge.
-   */
-  envoy_status_t recordGaugeSub(const std::string& elements, envoy_stats_tags tags,
-                                uint64_t amount);
-
-  /**
    * Issue a call against the admin handler, populating the `out` parameter with the response if
    * the call was successful.
    * @param path the admin path to query.

@@ -18,15 +18,6 @@ final class MockEnvoyEngine: NSObject {
   /// Closure called when `recordCounterInc(_:tags:count:)` is called.
   static var onRecordCounter: (
     (_ elements: String, _ tags: [String: String], _ count: UInt) -> Void)?
-  /// Closure called when `recordGaugeSet(_:value:)` is called.
-  static var onRecordGaugeSet: (
-    (_ elements: String, _ tags: [String: String], _ value: UInt) -> Void)?
-  /// Closure called when `recordGaugeAdd(_:amount:)` is called.
-  static var onRecordGaugeAdd: (
-    (_ elements: String, _ tags: [String: String], _ amount: UInt) -> Void)?
-  /// Closure called when `recordGaugeSub(_:amount:)` is called.
-  static var onRecordGaugeSub: (
-    (_ elements: String, _ tags: [String: String], _ amount: UInt) -> Void)?
   static var onFlushStats: (() -> Void)?
 }
 
@@ -51,21 +42,6 @@ extension MockEnvoyEngine: EnvoyEngine {
 
   func recordCounterInc(_ elements: String, tags: [String: String], count: UInt) -> Int32 {
     MockEnvoyEngine.onRecordCounter?(elements, tags, count)
-    return kEnvoySuccess
-  }
-
-  func recordGaugeSet(_ elements: String, tags: [String: String], value: UInt) -> Int32 {
-    MockEnvoyEngine.onRecordGaugeSet?(elements, tags, value)
-    return kEnvoySuccess
-  }
-
-  func recordGaugeAdd(_ elements: String, tags: [String: String], amount: UInt) -> Int32 {
-    MockEnvoyEngine.onRecordGaugeAdd?(elements, tags, amount)
-    return kEnvoySuccess
-  }
-
-  func recordGaugeSub(_ elements: String, tags: [String: String], amount: UInt) -> Int32 {
-    MockEnvoyEngine.onRecordGaugeSub?(elements, tags, amount)
     return kEnvoySuccess
   }
 

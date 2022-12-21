@@ -9,7 +9,6 @@ import io.envoyproxy.envoymobile.AndroidEngineBuilder;
 import io.envoyproxy.envoymobile.Counter;
 import io.envoyproxy.envoymobile.Engine;
 import io.envoyproxy.envoymobile.Element;
-import io.envoyproxy.envoymobile.Gauge;
 import io.envoyproxy.envoymobile.LogLevel;
 import io.envoyproxy.envoymobile.RequestHeaders;
 import io.envoyproxy.envoymobile.RequestHeadersBuilder;
@@ -138,15 +137,7 @@ public class MainActivity extends Activity {
   private void recordStats() {
     final Counter counter = engine.pulseClient().counter(new Element("foo"), new Element("bar"),
                                                          new Element("counter"));
-
-    final Gauge gauge =
-        engine.pulseClient().gauge(new Element("foo"), new Element("bar"), new Element("gauge"));
-
     counter.increment(1);
     counter.increment(5);
-
-    gauge.set(5);
-    gauge.add(10);
-    gauge.sub(1);
   }
 }
