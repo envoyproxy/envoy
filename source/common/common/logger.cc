@@ -157,7 +157,7 @@ void DelegatingLogSink::setTlsDelegate(SinkDelegate* sink) { *tlsSink() = sink; 
 
 SinkDelegate* DelegatingLogSink::tlsDelegate() { return *tlsSink(); }
 
-static absl::Mutex current_context_mutex;
+ABSL_CONST_INIT static absl::Mutex current_context_mutex(absl::kConstInit);
 static Context* current_context ABSL_GUARDED_BY(current_context_mutex) = nullptr;
 
 Context::Context(spdlog::level::level_enum log_level, const std::string& log_format,
