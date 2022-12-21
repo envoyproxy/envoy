@@ -104,9 +104,7 @@ public:
               Common::AsyncFiles::AsyncFileManagerFactory::singleton(&context.singletonManager()),
               context.api().threadFactory());
         });
-    std::shared_ptr<FileSystemHttpCache> cache = caches->get(caches, config, context.scope());
-    cache->init();
-    return cache;
+    return caches->get(caches, config, context.scope());
   }
 };
 

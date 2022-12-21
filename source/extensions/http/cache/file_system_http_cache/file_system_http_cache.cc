@@ -86,7 +86,9 @@ FileSystemHttpCache::FileSystemHttpCache(
     Stats::Scope& stats_scope)
     : owner_(owner), config_(config), async_file_manager_(async_file_manager),
       stats_(generateStats(stats_scope, cachePath())),
-      cache_eviction_thread_(cache_eviction_thread) {}
+      cache_eviction_thread_(cache_eviction_thread) {
+  init();
+}
 
 FileSystemHttpCache::~FileSystemHttpCache() { cache_eviction_thread_.removeCache(*this); }
 

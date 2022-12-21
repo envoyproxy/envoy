@@ -64,7 +64,7 @@ void CacheEvictionThread::work() {
 
 void CacheEvictionThread::waitForIdle() {
   absl::MutexLock lock(&mu_);
-  auto cond = [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_) { return idle_; };
+  auto cond = [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_) { return idle_ && !signalled_; };
   mu_.Await(absl::Condition(&cond));
 }
 

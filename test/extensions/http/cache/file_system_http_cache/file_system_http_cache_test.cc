@@ -158,7 +158,7 @@ TEST_F(FileSystemHttpCacheTestWithNoDefaultCache, EvictsOldestFilesUntilUnderCou
 
 TEST_F(FileSystemHttpCacheTestWithNoDefaultCache, EvictsOldestFilesUntilUnderSizeLimit) {
   const std::string file_contents = "XXXXX";
-  const std::string large_file_contents = "XXXXXXXXXX";
+  const std::string large_file_contents = "XXXXXXXXXXXX";
   const uint64_t max_size = large_file_contents.size();
   ConfigProto cfg = testConfig();
   cfg.mutable_max_cache_size_bytes()->set_value(max_size);
@@ -174,6 +174,8 @@ TEST_F(FileSystemHttpCacheTestWithNoDefaultCache, EvictsOldestFilesUntilUnderSiz
   cache_ = std::dynamic_pointer_cast<FileSystemHttpCache>(
       http_cache_factory_->getCache(cacheConfig(cfg), context_));
   env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-c"), large_file_contents, true);
+  EXPECT_EQ(cache_->stats().size_bytes_.value(), file_contents.size() * 2);
+  EXPECT_EQ(cache_->stats().size_count_.value(), 2);
   cache_->trackFileAdded(large_file_contents.size());
   waitForEvictionThreadIdle();
   EXPECT_EQ(cache_->stats().size_bytes_.value(), large_file_contents.size());
