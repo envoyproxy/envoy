@@ -143,12 +143,6 @@ NSString *_REQUEST_SCHEME = @"https";
   [gauge setWithValue:5];
   [gauge addWithAmount:10];
   [gauge subWithAmount:1];
-
-  id<Timer> timer = [self.pulseClient timerWithElements:@[ elementFoo, elementBar, elementTimer ]];
-  [timer recordDurationWithDurationMs:15];
-  id<Distribution> distribution =
-      [self.pulseClient distributionWithElements:@[ elementFoo, elementBar, elementDistribution ]];
-  [distribution recordValueWithValue:15];
 }
 
 #pragma mark - UITableView
