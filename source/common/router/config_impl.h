@@ -1502,12 +1502,12 @@ private:
   HeaderParserPtr response_headers_parser_;
   const std::string name_;
   Stats::SymbolTable& symbol_table_;
-  const uint32_t max_direct_response_body_size_bytes_;
   std::vector<ShadowPolicyPtr> shadow_policies_;
   // Cluster specifier plugins/providers.
   absl::flat_hash_map<std::string, ClusterSpecifierPluginSharedPtr> cluster_specifier_plugins_;
   PerFilterConfigs per_filter_configs_;
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
+  const uint32_t max_direct_response_body_size_bytes_;
   const bool uses_vhds_ : 1;
   const bool most_specific_header_mutations_wins_ : 1;
   const bool ignore_path_parameters_in_path_matching_ : 1;
