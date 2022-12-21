@@ -25,26 +25,6 @@ class StatFlushIntegrationTest {
   }
 
   @Test
-  fun `concurrent flushes with histograms`() {
-    val countDownLatch = CountDownLatch(1)
-    engine = EngineBuilder()
-      .addLogLevel(LogLevel.DEBUG)
-      .addStatsFlushSeconds(1)
-      .setOnEngineRunning { countDownLatch.countDown() }
-      .build()
-
-    assertThat(countDownLatch.await(30, TimeUnit.SECONDS)).isTrue()
-
-    engine!!.pulseClient().distribution(Element("something")).recordValue(100)
-
-    // Verify that we can issue multiple concurrent stat flushes. Because stat flushes
-    // are async, running it multiple times in a row ends up executing them concurrently.
-    repeat(100) {
-      engine!!.flushStats()
-    }
-  }
-
-  @Test
   fun `multiple stat sinks configured`() {
     val countDownLatch = CountDownLatch(1)
     engine = EngineBuilder()
