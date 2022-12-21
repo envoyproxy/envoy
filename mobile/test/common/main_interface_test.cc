@@ -427,34 +427,6 @@ TEST(EngineTest, SubFromGauge) {
   ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
 }
 
-TEST(EngineTest, RecordHistogramValue) {
-  engine_test_context test_context{};
-  envoy_engine_callbacks engine_cbs{[](void* context) -> void {
-                                      auto* engine_running =
-                                          static_cast<engine_test_context*>(context);
-                                      engine_running->on_engine_running.Notify();
-                                    } /*on_engine_running*/,
-                                    [](void* context) -> void {
-                                      auto* exit = static_cast<engine_test_context*>(context);
-                                      exit->on_exit.Notify();
-                                    } /*on_exit*/,
-                                    &test_context /*context*/};
-  EXPECT_EQ(ENVOY_FAILURE,
-            record_histogram_value(0, "histogram", envoy_stats_notags, 99, MILLISECONDS));
-
-  envoy_engine_t engine_handle = init_engine(engine_cbs, {}, {});
-  run_engine(engine_handle, MINIMAL_TEST_CONFIG.c_str(), LEVEL_DEBUG.c_str(), "");
-  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
-
-  record_histogram_value(engine_handle, "histogram", envoy_stats_notags, 99, MILLISECONDS);
-
-  EXPECT_EQ(ENVOY_SUCCESS, record_histogram_value(engine_handle, "histogram", envoy_stats_notags,
-                                                  99, MILLISECONDS));
-
-  terminate_engine(engine_handle, /* release */ true);
-  ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
-}
-
 TEST(EngineTest, Logger) {
   engine_test_context test_context{};
   envoy_engine_callbacks engine_cbs{[](void* context) -> void {

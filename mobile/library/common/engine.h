@@ -98,16 +98,6 @@ public:
                                 uint64_t amount);
 
   /**
-   * Record a value for the histogram with the given string of elements and unit measurement
-   * @param elements, joined elements of the timeseries.
-   * @param tags, custom tags of the reporting stat.
-   * @param value, value to add to the aggregated distribution of values for quantile calculations
-   * @param unit_measure, the unit of measurement (e.g. milliseconds, bytes, etc.)
-   */
-  envoy_status_t recordHistogramValue(const std::string& elements, envoy_stats_tags tags,
-                                      uint64_t value, envoy_histogram_stat_unit_t unit_measure);
-
-  /**
    * Issue a call against the admin handler, populating the `out` parameter with the response if
    * the call was successful.
    * @param path the admin path to query.

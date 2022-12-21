@@ -182,32 +182,6 @@ public class EnvoyEngineImpl implements EnvoyEngine {
                                      amount);
   }
 
-  /**
-   * Add another recorded duration in ms to the timer histogram with the given string of elements.
-   *
-   * @param elements Elements of the histogram stat.
-   * @param tags Tags of the histogram stat.
-   * @param durationMs Duration value to record in the histogram timer distribution.
-   * @return A status indicating if the action was successful.
-   */
-  public int recordHistogramDuration(String elements, Map<String, String> tags, int durationMs) {
-    return JniLibrary.recordHistogramDuration(engineHandle, elements,
-                                              JniBridgeUtility.toJniTags(tags), durationMs);
-  }
-
-  /**
-   * Add another recorded value to the generic histogram with the given string of elements.
-   *
-   * @param elements Elements of the histogram stat.
-   * @param tags Tags of the histogram stat.
-   * @param value Amount to record as a new value for the histogram distribution.
-   * @return A status indicating if the action was successful.
-   */
-  public int recordHistogramValue(String elements, Map<String, String> tags, int value) {
-    return JniLibrary.recordHistogramValue(engineHandle, elements, JniBridgeUtility.toJniTags(tags),
-                                           value);
-  }
-
   @Override
   public int registerStringAccessor(String accessor_name, EnvoyStringAccessor accessor) {
     return JniLibrary.registerStringAccessor(accessor_name, new JvmStringAccessorContext(accessor));

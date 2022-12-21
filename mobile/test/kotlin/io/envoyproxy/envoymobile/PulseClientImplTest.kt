@@ -119,49 +119,4 @@ class PulseClientImplTest {
     assertThat(tagCaptorValue.get("testKey1")).isEqualTo("testValue1")
     assertThat(tagCaptorValue.get("testKey2")).isEqualTo("testValue2")
   }
-
-  @Test
-  fun `timer delegates to engine with tags and duration for record`() {
-    val pulseClient = PulseClientImpl(envoyEngine)
-    val timer = pulseClient.timer(
-      Element("test"), Element("stat"),
-      tags = TagsBuilder().add("testKey1", "testValue1").add("testKey2", "testValue2").build()
-    )
-
-    timer.recordDuration(5)
-
-    val durationCaptor = ArgumentCaptor.forClass(Int::class.java)
-    verify(envoyEngine).recordHistogramDuration(
-      elementsCaptor.capture(), tagsCaptor.capture(), durationCaptor.capture()
-    )
-    assertThat(elementsCaptor.getValue()).isEqualTo("test.stat")
-    assertThat(durationCaptor.getValue()).isEqualTo(5)
-
-    val tagCaptorValue = tagsCaptor.getValue()
-    assertThat(tagCaptorValue.get("testKey1")).isEqualTo("testValue1")
-    assertThat(tagCaptorValue.get("testKey2")).isEqualTo("testValue2")
-  }
-
-  @Test
-  fun `distribution delegates to engine with tags and value for record`() {
-    val pulseClient = PulseClientImpl(envoyEngine)
-    val distribution = pulseClient.distribution(
-      Element("test"), Element("stat"),
-      tags = TagsBuilder().add("testKey1", "testValue1").add("testKey2", "testValue2").build()
-    )
-
-    distribution.recordValue(5)
-
-    val valueCaptor = ArgumentCaptor.forClass(Int::class.java)
-
-    verify(envoyEngine).recordHistogramValue(
-      elementsCaptor.capture(), tagsCaptor.capture(), valueCaptor.capture()
-    )
-    assertThat(elementsCaptor.getValue()).isEqualTo("test.stat")
-    assertThat(valueCaptor.getValue()).isEqualTo(5)
-
-    val tagCaptorValue = tagsCaptor.getValue()
-    assertThat(tagCaptorValue.get("testKey1")).isEqualTo("testValue1")
-    assertThat(tagCaptorValue.get("testKey2")).isEqualTo("testValue2")
-  }
 }

@@ -116,11 +116,6 @@ final class ViewController: UITableViewController {
     gauge.set(value: 5)
     gauge.add(amount: 10)
     gauge.sub(amount: 1)
-
-    let timer = pulseClient.timer(elements: ["foo", "bar", "timer"])
-    let distribution = pulseClient.distribution(elements: ["foo", "bar", "distribution"])
-    timer.recordDuration(durationMs: 15)
-    distribution.recordValue(value: 15)
   }
   // MARK: - UITableView
 
