@@ -42,7 +42,7 @@ CMD ["envoy", "-c", "/etc/envoy/envoy.yaml"]
 
 # STAGE: envoy-distroless
 # gcr.io/distroless/base-debian11:nonroot
-FROM gcr.io/distroless/base-debian11:nonroot@sha256:4b22ca3c68018333c56f8dddcf1f8b55f32889f2dd12d28ab60856eba1130d04 AS envoy-distroless
+FROM gcr.io/distroless/base-debian11:nonroot@sha256:1390b366f268de7521e9921cff9856e2c82d3e5f92b45744b298e98c082eb760 AS envoy-distroless
 
 COPY --from=binary /usr/local/bin/envoy* /usr/local/bin/
 COPY --from=binary /etc/envoy/envoy.yaml /etc/envoy/envoy.yaml
