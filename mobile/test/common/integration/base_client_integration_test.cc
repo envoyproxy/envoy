@@ -175,7 +175,7 @@ std::shared_ptr<Platform::RequestHeaders> BaseClientIntegrationTest::envoyToMobi
 }
 
 void BaseClientIntegrationTest::threadRoutine(absl::Notification& engine_running) {
-  for (auto i = 0; i < num_engines_for_test_; i++) {
+  for (int i = 0; i < num_engines_for_test_; i++) {
     absl::Notification engine_notification;
     builder_.setOnEngineRunning([&]() { engine_notification.Notify(); });
     multi_engines_.push_back(builder_.build());

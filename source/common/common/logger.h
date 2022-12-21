@@ -314,7 +314,7 @@ private:
   Thread::BasicLockable& lock_;
   bool should_escape_;
   bool enable_fine_grain_logging_;
-  Context* const save_context_;
+  Context* save_context_;
 
   std::string fine_grain_log_format_;
   spdlog::level::level_enum fine_grain_default_level_ = spdlog::level::info;
