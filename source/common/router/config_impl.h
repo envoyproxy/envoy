@@ -333,12 +333,12 @@ private:
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
   PerFilterConfigs per_filter_configs_;
-  uint32_t retry_shadow_buffer_limit_{std::numeric_limits<uint32_t>::max()};
   std::unique_ptr<envoy::config::route::v3::RetryPolicy> retry_policy_;
   std::unique_ptr<envoy::config::route::v3::HedgePolicy> hedge_policy_;
   std::unique_ptr<const CatchAllVirtualCluster> virtual_cluster_catch_all_;
   Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher_;
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
+  uint32_t retry_shadow_buffer_limit_{std::numeric_limits<uint32_t>::max()};
   SslRequirements ssl_requirements_;
   const bool include_attempt_count_in_request_ : 1;
   const bool include_attempt_count_in_response_ : 1;
@@ -538,10 +538,10 @@ private:
 
   const std::string current_route_name_;
   const absl::flat_hash_set<Http::Code> redirect_response_codes_;
-  const uint32_t max_internal_redirects_{1};
   std::vector<std::pair<InternalRedirectPredicateFactory*, ProtobufTypes::MessagePtr>>
       predicate_factories_;
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
+  const uint32_t max_internal_redirects_{1};
   const bool enabled_{false};
   const bool allow_cross_scheme_redirect_{false};
 };
@@ -1105,7 +1105,6 @@ private:
   TlsContextMatchCriteriaConstPtr tls_context_match_criteria_;
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
-  uint32_t retry_shadow_buffer_limit_{std::numeric_limits<uint32_t>::max()};
   std::unique_ptr<const envoy::config::core::v3::Metadata> metadata_;
   std::unique_ptr<const RouteTypedMetadata> typed_metadata_;
   const std::vector<Envoy::Matchers::MetadataMatcher> dynamic_metadata_;
@@ -1123,6 +1122,7 @@ private:
   EarlyDataPolicyPtr early_data_policy_;
 
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
+  uint32_t retry_shadow_buffer_limit_{std::numeric_limits<uint32_t>::max()};
   const absl::optional<Http::Code> direct_response_code_;
   const Http::Code cluster_not_found_response_code_;
   const Upstream::ResourcePriority priority_;

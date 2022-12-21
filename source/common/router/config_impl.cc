@@ -504,8 +504,6 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       internal_redirect_policy_(
           buildInternalRedirectPolicy(route.route(), validator, route.name())),
       config_headers_(Http::HeaderUtility::buildHeaderDataVector(route.match().headers())),
-      retry_shadow_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          route, per_request_buffer_limit_bytes, vhost.retryShadowBufferLimit())),
       dynamic_metadata_(route.match().dynamic_metadata().begin(),
                         route.match().dynamic_metadata().end()),
       opaque_config_(parseOpaqueConfig(route)), decorator_(parseDecorator(route)),
@@ -517,6 +515,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                           validator),
       route_name_(route.name()), time_source_(factory_context.mainThreadDispatcher().timeSource()),
       random_value_header_name_(route.route().weighted_clusters().header_name()),
+      retry_shadow_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          route, per_request_buffer_limit_bytes, vhost.retryShadowBufferLimit())),
       direct_response_code_(ConfigUtility::parseDirectResponseCode(route)),
       cluster_not_found_response_code_(ConfigUtility::parseClusterNotFoundResponseCode(
           route.route().cluster_not_found_response_code())),
