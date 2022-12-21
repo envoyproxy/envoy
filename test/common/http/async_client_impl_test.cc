@@ -313,6 +313,47 @@ TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarking) {
   response_decoder_->decodeHeaders(std::move(response_headers), true);
 }
 
+TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarkingAndReset) {
+  auto headers = std::make_unique<TestRequestHeaderMapImpl>();
+  HttpTestUtility::addDefaultHeaders(*headers);
+  TestRequestHeaderMapImpl headers_copy = *headers;
+  headers_copy.addCopy("x-envoy-internal", "true");
+  headers_copy.addCopy("x-forwarded-for", "127.0.0.1");
+
+  std::unique_ptr<Buffer::OwnedImpl> data = std::make_unique<Buffer::OwnedImpl>("test data");
+  const Buffer::OwnedImpl data_copy("test data");
+
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke(
+          [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  stream_info_, {});
+            response_decoder_ = &decoder;
+            return nullptr;
+          }));
+
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers_copy), false));
+
+  auto* request =
+      client_.startRequest(std::move(headers), callbacks_, AsyncClient::RequestOptions());
+  EXPECT_NE(request, nullptr);
+
+  StrictMock<MockStreamDecoderFilterCallbacks> watermark_callbacks;
+  request->setWatermarkCallbacks(watermark_callbacks);
+
+  EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data_copy), false));
+  request->captureAndSendData(std::move(data), false);
+  // Upstream is blocked.
+  EXPECT_CALL(watermark_callbacks, onDecoderFilterAboveWriteBufferHighWatermark());
+  dynamic_cast<MockStream&>(stream_encoder_.getStream()).runHighWatermarkCallbacks();
+
+  // Reset the stream, which will call the low watermark callbacks.
+  EXPECT_CALL(watermark_callbacks, onDecoderFilterBelowWriteBufferLowWatermark());
+  expectSuccess(request, 503);
+  stream_encoder_.getStream().resetStream(StreamResetReason::RemoteReset);
+}
+
 TEST_F(AsyncClientImplTracingTest, Basic) {
   Tracing::MockSpan* child_span{new Tracing::MockSpan()};
   message_->body().add("test body");

@@ -403,6 +403,12 @@ TEST_P(Http2BufferWatermarksTest, ShouldTrackAllocatedBytesToShadowUpstream) {
   auto responses = sendRequests(num_requests, request_body_size, response_body_size,
                                 /*cluster_to_wait_for=*/"cluster_1");
 
+  // The main request should complete.
+  for (auto& response : responses) {
+    ASSERT_TRUE(response->waitForEndStream());
+    ASSERT_TRUE(response->complete());
+  }
+
   // Wait for all requests to have accounted for the requests we've sent.
   if (streamBufferAccounting()) {
     EXPECT_TRUE(
@@ -413,11 +419,7 @@ TEST_P(Http2BufferWatermarksTest, ShouldTrackAllocatedBytesToShadowUpstream) {
   }
 
   write_matcher_->setResumeWrites();
-
-  for (auto& response : responses) {
-    ASSERT_TRUE(response->waitForEndStream());
-    ASSERT_TRUE(response->complete());
-  }
+  test_server_->waitForCounterEq("cluster.cluster_1.upstream_rq_completed", num_requests);
 }
 
 TEST_P(Http2BufferWatermarksTest, ShouldTrackAllocatedBytesToDownstream) {

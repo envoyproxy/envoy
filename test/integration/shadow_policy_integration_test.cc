@@ -103,7 +103,7 @@ INSTANTIATE_TEST_SUITE_P(
     [](const ::testing::TestParamInfo<ShadowPolicyIntegrationTest::ParamType>& params) {
       return absl::StrCat(std::get<0>(params.param) == Network::Address::IpVersion::v4 ? "IPv4"
                                                                                        : "IPv6",
-                          "_", std::get<1>(params.param) ? "streaming_shadow" : "delayed_shadow");
+                          "_", std::get<1>(params.param) ? "streaming_shadow" : "buffered_shadow");
     });
 
 TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithDownstreamReset) {
@@ -111,9 +111,6 @@ TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithDownstreamReset) {
     GTEST_SKIP() << "Not applicable for non-streaming shadows.";
   }
   autonomous_upstream_ = false;
-  /*
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.remember_shadow", "true"}});*/
   initialConfigSetup("cluster_1", "");
   initialize();
 
@@ -125,32 +122,35 @@ TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithDownstreamReset) {
   auto& encoder = result.first;
   auto response = std::move(result.second);
 
-  FakeHttpConnectionPtr fake_upstream_connection_0;
-  FakeStreamPtr upstream_request_0;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_0));
-  ASSERT_TRUE(fake_upstream_connection_0->waitForNewStream(*dispatcher_, upstream_request_0));
-  FakeHttpConnectionPtr fake_upstream_connection_1;
-  FakeStreamPtr upstream_request_1;
-  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_1));
-  ASSERT_TRUE(fake_upstream_connection_1->waitForNewStream(*dispatcher_, upstream_request_1));
-  ASSERT_TRUE(upstream_request_0->waitForHeadersComplete());
-  ASSERT_TRUE(upstream_request_1->waitForHeadersComplete());
-  EXPECT_EQ(upstream_request_0->headers().get(Http::LowerCaseString("potato"))[0]->value(),
+  FakeHttpConnectionPtr fake_upstream_connection_main;
+  FakeStreamPtr upstream_request_main;
+  ASSERT_TRUE(
+      fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_main));
+  ASSERT_TRUE(fake_upstream_connection_main->waitForNewStream(*dispatcher_, upstream_request_main));
+  FakeHttpConnectionPtr fake_upstream_connection_shadow;
+  FakeStreamPtr upstream_request_shadow;
+  ASSERT_TRUE(
+      fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_shadow));
+  ASSERT_TRUE(
+      fake_upstream_connection_shadow->waitForNewStream(*dispatcher_, upstream_request_shadow));
+  ASSERT_TRUE(upstream_request_main->waitForHeadersComplete());
+  ASSERT_TRUE(upstream_request_shadow->waitForHeadersComplete());
+  EXPECT_EQ(upstream_request_main->headers().get(Http::LowerCaseString("potato"))[0]->value(),
             "salad");
-  EXPECT_EQ(upstream_request_1->headers().get(Http::LowerCaseString("potato"))[0]->value(),
+  EXPECT_EQ(upstream_request_shadow->headers().get(Http::LowerCaseString("potato"))[0]->value(),
             "salad");
 
   codec_client_->sendReset(encoder);
 
-  ASSERT_TRUE(upstream_request_0->waitForReset());
-  ASSERT_TRUE(upstream_request_1->waitForReset());
-  ASSERT_TRUE(fake_upstream_connection_0->close());
-  ASSERT_TRUE(fake_upstream_connection_1->close());
-  ASSERT_TRUE(fake_upstream_connection_0->waitForDisconnect());
-  ASSERT_TRUE(fake_upstream_connection_1->waitForDisconnect());
+  ASSERT_TRUE(upstream_request_main->waitForReset());
+  ASSERT_TRUE(upstream_request_shadow->waitForReset());
+  ASSERT_TRUE(fake_upstream_connection_main->close());
+  ASSERT_TRUE(fake_upstream_connection_shadow->close());
+  ASSERT_TRUE(fake_upstream_connection_main->waitForDisconnect());
+  ASSERT_TRUE(fake_upstream_connection_shadow->waitForDisconnect());
 
-  EXPECT_FALSE(upstream_request_0->complete());
-  EXPECT_FALSE(upstream_request_1->complete());
+  EXPECT_FALSE(upstream_request_main->complete());
+  EXPECT_FALSE(upstream_request_shadow->complete());
   EXPECT_FALSE(response->complete());
 
   cleanupUpstreamAndDownstream();
@@ -168,9 +168,6 @@ TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithMainUpstreamReset) {
     GTEST_SKIP() << "Not applicable for non-streaming shadows.";
   }
   autonomous_upstream_ = false;
-  /*
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.remember_shadow", "true"}});*/
   initialConfigSetup("cluster_1", "");
   initialize();
 
@@ -181,30 +178,33 @@ TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithMainUpstreamReset) {
       codec_client_->startRequest(request_headers, false);
   auto response = std::move(result.second);
 
-  FakeHttpConnectionPtr fake_upstream_connection_0;
-  FakeStreamPtr upstream_request_0;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_0));
-  ASSERT_TRUE(fake_upstream_connection_0->waitForNewStream(*dispatcher_, upstream_request_0));
-  FakeHttpConnectionPtr fake_upstream_connection_1;
-  FakeStreamPtr upstream_request_1;
-  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_1));
-  ASSERT_TRUE(fake_upstream_connection_1->waitForNewStream(*dispatcher_, upstream_request_1));
-  ASSERT_TRUE(upstream_request_0->waitForHeadersComplete());
-  ASSERT_TRUE(upstream_request_1->waitForHeadersComplete());
+  FakeHttpConnectionPtr fake_upstream_connection_main;
+  FakeStreamPtr upstream_request_main;
+  ASSERT_TRUE(
+      fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_main));
+  ASSERT_TRUE(fake_upstream_connection_main->waitForNewStream(*dispatcher_, upstream_request_main));
+  FakeHttpConnectionPtr fake_upstream_connection_shadow;
+  FakeStreamPtr upstream_request_shadow;
+  ASSERT_TRUE(
+      fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_shadow));
+  ASSERT_TRUE(
+      fake_upstream_connection_shadow->waitForNewStream(*dispatcher_, upstream_request_shadow));
+  ASSERT_TRUE(upstream_request_main->waitForHeadersComplete());
+  ASSERT_TRUE(upstream_request_shadow->waitForHeadersComplete());
 
   // Send upstream reset on main request.
-  upstream_request_0->encodeResetStream();
+  upstream_request_main->encodeResetStream();
   ASSERT_TRUE(response->waitForReset());
-  ASSERT_TRUE(upstream_request_1->waitForReset());
+  ASSERT_TRUE(upstream_request_shadow->waitForReset());
 
-  ASSERT_TRUE(upstream_request_1->waitForReset());
-  ASSERT_TRUE(fake_upstream_connection_0->close());
-  ASSERT_TRUE(fake_upstream_connection_1->close());
-  ASSERT_TRUE(fake_upstream_connection_0->waitForDisconnect());
-  ASSERT_TRUE(fake_upstream_connection_1->waitForDisconnect());
+  ASSERT_TRUE(upstream_request_shadow->waitForReset());
+  ASSERT_TRUE(fake_upstream_connection_main->close());
+  ASSERT_TRUE(fake_upstream_connection_shadow->close());
+  ASSERT_TRUE(fake_upstream_connection_main->waitForDisconnect());
+  ASSERT_TRUE(fake_upstream_connection_shadow->waitForDisconnect());
 
-  EXPECT_FALSE(upstream_request_0->complete());
-  EXPECT_FALSE(upstream_request_1->complete());
+  EXPECT_FALSE(upstream_request_main->complete());
+  EXPECT_FALSE(upstream_request_shadow->complete());
   EXPECT_TRUE(response->complete());
 
   cleanupUpstreamAndDownstream();
@@ -223,9 +223,6 @@ TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithShadowUpstreamReset) 
     GTEST_SKIP() << "Not applicable for non-streaming shadows.";
   }
   autonomous_upstream_ = false;
-  /*
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.remember_shadow", "true"}});*/
   initialConfigSetup("cluster_1", "");
   initialize();
 
@@ -237,33 +234,37 @@ TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithShadowUpstreamReset) 
   auto& encoder = result.first;
   auto response = std::move(result.second);
 
-  FakeHttpConnectionPtr fake_upstream_connection_0;
-  FakeStreamPtr upstream_request_0;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_0));
-  ASSERT_TRUE(fake_upstream_connection_0->waitForNewStream(*dispatcher_, upstream_request_0));
-  FakeHttpConnectionPtr fake_upstream_connection_1;
-  FakeStreamPtr upstream_request_1;
-  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_1));
-  ASSERT_TRUE(fake_upstream_connection_1->waitForNewStream(*dispatcher_, upstream_request_1));
-  ASSERT_TRUE(upstream_request_0->waitForHeadersComplete());
-  ASSERT_TRUE(upstream_request_1->waitForHeadersComplete());
+  FakeHttpConnectionPtr fake_upstream_connection_main;
+  FakeStreamPtr upstream_request_main;
+  ASSERT_TRUE(
+      fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_main));
+  ASSERT_TRUE(fake_upstream_connection_main->waitForNewStream(*dispatcher_, upstream_request_main));
+  FakeHttpConnectionPtr fake_upstream_connection_shadow;
+  FakeStreamPtr upstream_request_shadow;
+  ASSERT_TRUE(
+      fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_shadow));
+  ASSERT_TRUE(
+      fake_upstream_connection_shadow->waitForNewStream(*dispatcher_, upstream_request_shadow));
+  ASSERT_TRUE(upstream_request_main->waitForHeadersComplete());
+  ASSERT_TRUE(upstream_request_shadow->waitForHeadersComplete());
 
   // Send upstream reset on shadow request.
-  upstream_request_1->encodeResetStream();
-  ASSERT_TRUE(upstream_request_1->waitForReset());
+  upstream_request_shadow->encodeResetStream();
+  test_server_->waitForCounterEq("cluster.cluster_1.upstream_rq_rx_reset", 1,
+                                 std::chrono::milliseconds(1000));
 
   codec_client_->sendData(encoder, 20, true);
-  ASSERT_TRUE(upstream_request_0->waitForData(*dispatcher_, 20));
-  ASSERT_TRUE(upstream_request_0->waitForEndStream(*dispatcher_));
-  upstream_request_0->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(upstream_request_main->waitForData(*dispatcher_, 20));
+  ASSERT_TRUE(upstream_request_main->waitForEndStream(*dispatcher_));
+  upstream_request_main->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response->waitForEndStream());
-  ASSERT_TRUE(fake_upstream_connection_0->close());
-  ASSERT_TRUE(fake_upstream_connection_1->close());
-  ASSERT_TRUE(fake_upstream_connection_0->waitForDisconnect());
-  ASSERT_TRUE(fake_upstream_connection_1->waitForDisconnect());
+  ASSERT_TRUE(fake_upstream_connection_main->close());
+  ASSERT_TRUE(fake_upstream_connection_shadow->close());
+  ASSERT_TRUE(fake_upstream_connection_main->waitForDisconnect());
+  ASSERT_TRUE(fake_upstream_connection_shadow->waitForDisconnect());
 
-  EXPECT_TRUE(upstream_request_0->complete());
-  EXPECT_FALSE(upstream_request_1->complete());
+  EXPECT_TRUE(upstream_request_main->complete());
+  EXPECT_FALSE(upstream_request_shadow->complete());
   EXPECT_TRUE(response->complete());
 
   cleanupUpstreamAndDownstream();
@@ -281,9 +282,6 @@ TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithDownstreamTimeout) {
     GTEST_SKIP() << "Not applicable for non-streaming shadows.";
   }
   autonomous_upstream_ = false;
-  /*
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.remember_shadow", "true"}});*/
   initialConfigSetup("cluster_1", "");
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -302,30 +300,33 @@ TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithDownstreamTimeout) {
       codec_client_->startRequest(request_headers, false);
   auto response = std::move(result.second);
 
-  FakeHttpConnectionPtr fake_upstream_connection_0;
-  FakeStreamPtr upstream_request_0;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_0));
-  ASSERT_TRUE(fake_upstream_connection_0->waitForNewStream(*dispatcher_, upstream_request_0));
-  FakeHttpConnectionPtr fake_upstream_connection_1;
-  FakeStreamPtr upstream_request_1;
-  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_1));
-  ASSERT_TRUE(fake_upstream_connection_1->waitForNewStream(*dispatcher_, upstream_request_1));
-  ASSERT_TRUE(upstream_request_0->waitForHeadersComplete());
-  ASSERT_TRUE(upstream_request_1->waitForHeadersComplete());
+  FakeHttpConnectionPtr fake_upstream_connection_main;
+  FakeStreamPtr upstream_request_main;
+  ASSERT_TRUE(
+      fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_main));
+  ASSERT_TRUE(fake_upstream_connection_main->waitForNewStream(*dispatcher_, upstream_request_main));
+  FakeHttpConnectionPtr fake_upstream_connection_shadow;
+  FakeStreamPtr upstream_request_shadow;
+  ASSERT_TRUE(
+      fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_shadow));
+  ASSERT_TRUE(
+      fake_upstream_connection_shadow->waitForNewStream(*dispatcher_, upstream_request_shadow));
+  ASSERT_TRUE(upstream_request_main->waitForHeadersComplete());
+  ASSERT_TRUE(upstream_request_shadow->waitForHeadersComplete());
 
   // Eventually the request will time out.
   ASSERT_TRUE(response->waitForReset());
-  ASSERT_TRUE(upstream_request_0->waitForReset());
-  ASSERT_TRUE(upstream_request_1->waitForReset());
+  ASSERT_TRUE(upstream_request_main->waitForReset());
+  ASSERT_TRUE(upstream_request_shadow->waitForReset());
 
   // Clean up.
-  ASSERT_TRUE(fake_upstream_connection_0->close());
-  ASSERT_TRUE(fake_upstream_connection_1->close());
-  ASSERT_TRUE(fake_upstream_connection_0->waitForDisconnect());
-  ASSERT_TRUE(fake_upstream_connection_1->waitForDisconnect());
+  ASSERT_TRUE(fake_upstream_connection_main->close());
+  ASSERT_TRUE(fake_upstream_connection_shadow->close());
+  ASSERT_TRUE(fake_upstream_connection_main->waitForDisconnect());
+  ASSERT_TRUE(fake_upstream_connection_shadow->waitForDisconnect());
 
-  EXPECT_FALSE(upstream_request_0->complete());
-  EXPECT_FALSE(upstream_request_1->complete());
+  EXPECT_FALSE(upstream_request_main->complete());
+  EXPECT_FALSE(upstream_request_shadow->complete());
 
   cleanupUpstreamAndDownstream();
 
@@ -343,9 +344,6 @@ TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithShadowBackpressure) {
     GTEST_SKIP() << "Not applicable for non-streaming shadows.";
   }
   autonomous_upstream_ = false;
-  /*
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.remember_shadow", "true"}});*/
   initialConfigSetup("cluster_1", "");
   // Shrink the shadow buffer size.
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bs) {
@@ -362,16 +360,19 @@ TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithShadowBackpressure) {
   auto& encoder = result.first;
   auto response = std::move(result.second);
 
-  FakeHttpConnectionPtr fake_upstream_connection_0;
-  FakeStreamPtr upstream_request_0;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_0));
-  ASSERT_TRUE(fake_upstream_connection_0->waitForNewStream(*dispatcher_, upstream_request_0));
-  FakeHttpConnectionPtr fake_upstream_connection_1;
-  FakeStreamPtr upstream_request_1;
-  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_1));
-  ASSERT_TRUE(fake_upstream_connection_1->waitForNewStream(*dispatcher_, upstream_request_1));
-  ASSERT_TRUE(upstream_request_0->waitForHeadersComplete());
-  ASSERT_TRUE(upstream_request_1->waitForHeadersComplete());
+  FakeHttpConnectionPtr fake_upstream_connection_main;
+  FakeStreamPtr upstream_request_main;
+  ASSERT_TRUE(
+      fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_main));
+  ASSERT_TRUE(fake_upstream_connection_main->waitForNewStream(*dispatcher_, upstream_request_main));
+  FakeHttpConnectionPtr fake_upstream_connection_shadow;
+  FakeStreamPtr upstream_request_shadow;
+  ASSERT_TRUE(
+      fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_shadow));
+  ASSERT_TRUE(
+      fake_upstream_connection_shadow->waitForNewStream(*dispatcher_, upstream_request_shadow));
+  ASSERT_TRUE(upstream_request_main->waitForHeadersComplete());
+  ASSERT_TRUE(upstream_request_shadow->waitForHeadersComplete());
 
   // This will result in one call of high watermark on the shadow stream, as
   // end_stream will not trigger watermark calls.
@@ -379,20 +380,20 @@ TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithShadowBackpressure) {
   test_server_->waitForCounterGe("http.config_test.downstream_flow_control_paused_reading_total",
                                  1);
   codec_client_->sendData(encoder, 2048, true);
-  ASSERT_TRUE(upstream_request_0->waitForData(*dispatcher_, 2048 * 2));
-  ASSERT_TRUE(upstream_request_1->waitForData(*dispatcher_, 2048 * 2));
+  ASSERT_TRUE(upstream_request_main->waitForData(*dispatcher_, 2048 * 2));
+  ASSERT_TRUE(upstream_request_shadow->waitForData(*dispatcher_, 2048 * 2));
 
-  ASSERT_TRUE(upstream_request_0->waitForEndStream(*dispatcher_));
-  ASSERT_TRUE(upstream_request_1->waitForEndStream(*dispatcher_));
-  upstream_request_0->encodeHeaders(default_response_headers_, true);
-  upstream_request_1->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(upstream_request_main->waitForEndStream(*dispatcher_));
+  ASSERT_TRUE(upstream_request_shadow->waitForEndStream(*dispatcher_));
+  upstream_request_main->encodeHeaders(default_response_headers_, true);
+  upstream_request_shadow->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response->waitForEndStream());
-  ASSERT_TRUE(fake_upstream_connection_0->close());
-  ASSERT_TRUE(fake_upstream_connection_1->close());
-  ASSERT_TRUE(fake_upstream_connection_0->waitForDisconnect());
-  ASSERT_TRUE(fake_upstream_connection_1->waitForDisconnect());
-  EXPECT_TRUE(upstream_request_0->complete());
-  EXPECT_TRUE(upstream_request_1->complete());
+  ASSERT_TRUE(fake_upstream_connection_main->close());
+  ASSERT_TRUE(fake_upstream_connection_shadow->close());
+  ASSERT_TRUE(fake_upstream_connection_main->waitForDisconnect());
+  ASSERT_TRUE(fake_upstream_connection_shadow->waitForDisconnect());
+  EXPECT_TRUE(upstream_request_main->complete());
+  EXPECT_TRUE(upstream_request_shadow->complete());
   EXPECT_TRUE(response->complete());
 
   cleanupUpstreamAndDownstream();

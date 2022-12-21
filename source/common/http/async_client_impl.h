@@ -100,6 +100,7 @@ public:
                   const AsyncClient::StreamOptions& options);
   ~AsyncStreamImpl() override {
     router_.onDestroy();
+    ENVOY_BUG(high_watermark_calls_ == 0, "Excess high watermark calls after async stream ended.");
     for (uint32_t i = 0; i < high_watermark_calls_; ++i) {
       watermark_callbacks_->get().onDecoderFilterBelowWriteBufferLowWatermark();
     }
