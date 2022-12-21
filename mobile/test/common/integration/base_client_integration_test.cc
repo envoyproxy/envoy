@@ -1,13 +1,17 @@
-#include "test/common/integration/base_client_integration_test.h"
+#include "base_client_integration_test.h"
 
 #include <string>
 
 #include "test/common/http/common.h"
+#include "test/test_common/utility.h"
 
+#include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 #include "library/cc/bridge_utility.h"
 #include "library/cc/log_level.h"
 #include "library/common/config/internal.h"
+#include "library/common/engine.h"
+#include "library/common/engine_handle.h"
 #include "library/common/http/header_utility.h"
 #include "spdlog/spdlog.h"
 
@@ -198,6 +202,38 @@ void BaseClientIntegrationTest::createEnvoy() {
   envoy_thread_ = api_->threadFactory().createThread(
       [this, &engine_running]() -> void { threadRoutine(engine_running); });
   engine_running.WaitForNotification();
+}
+
+uint64_t BaseClientIntegrationTest::getCounterValue(const std::string& name) {
+  uint64_t counter_value = 0UL;
+  uint64_t* counter_value_ptr = &counter_value;
+  absl::Notification counter_value_set;
+  EXPECT_EQ(ENVOY_SUCCESS,
+            EngineHandle::runOnEngineDispatcher(
+                rawEngine(), [counter_value_ptr, &name, &counter_value_set](Envoy::Engine& engine) {
+                  Stats::CounterSharedPtr counter =
+                      TestUtility::findCounter(engine.getStatsStore(), name);
+                  if (counter != nullptr) {
+                    *counter_value_ptr = counter->value();
+                  }
+                  counter_value_set.Notify();
+                }));
+  EXPECT_TRUE(counter_value_set.WaitForNotificationWithTimeout(absl::Seconds(5)));
+  return counter_value;
+}
+
+testing::AssertionResult BaseClientIntegrationTest::waitForCounterGe(const std::string& name,
+                                                                     uint64_t value) {
+  constexpr std::chrono::milliseconds timeout = TestUtility::DefaultTimeout;
+  Event::TestTimeSystem::RealTimeBound bound(timeout);
+  while (getCounterValue(name) < value) {
+    timeSystem().advanceTimeWait(std::chrono::milliseconds(10));
+    if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
+      return testing::AssertionFailure()
+             << fmt::format("timed out waiting for {} to be {}", name, value);
+    }
+  }
+  return testing::AssertionSuccess();
 }
 
 void BaseClientIntegrationTest::cleanup() {
