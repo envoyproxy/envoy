@@ -20,7 +20,7 @@ jobs:
       run: mobile/docs/build.sh
     - name: Set up deploy key
       if: github.ref == 'refs/heads/main'
-      uses: shimataro/ssh-key-action@193316a178ec055fcc7b018f7f76bbf64085c628
+      uses: shimataro/ssh-key-action@d3bad3234b1dbb32b2b99e21cf04b5c7df18b3e9
       with:
         key: ${{ secrets.ENVOY_MOBILE_WEBSITE_DEPLOY_KEY }}
         known_hosts: unnecessary
