@@ -25,6 +25,7 @@ void CacheEvictionThread::removeCache(FileSystemHttpCache& cache) {
   ASSERT(removed);
   if (caches_.empty()) {
     terminate();
+    thread_->join();
   }
 }
 
