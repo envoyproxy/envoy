@@ -157,8 +157,8 @@ void DelegatingLogSink::setTlsDelegate(SinkDelegate* sink) { *tlsSink() = sink; 
 
 SinkDelegate* DelegatingLogSink::tlsDelegate() { return *tlsSink(); }
 
-static Context* current_context = nullptr;
 static absl::Mutex current_context_mutex;
+static Context* current_context ABSL_GUARDED_BY(current_context_mutex) = nullptr;
 
 Context::Context(spdlog::level::level_enum log_level, const std::string& log_format,
                  Thread::BasicLockable& lock, bool should_escape, bool enable_fine_grain_logging)
@@ -228,7 +228,7 @@ void Context::disableFineGrainLogger() {
 }
 
 std::string Context::getFineGrainLogFormat() {
-  absl::MutexLock context_lock(&current_context_mutex);
+  absl::ReaderMutexLock context_lock(&current_context_mutex);
   if (!current_context) { // Context is not instantiated in benchmark test
     return kDefaultFineGrainLogFormat;
   }
@@ -236,7 +236,7 @@ std::string Context::getFineGrainLogFormat() {
 }
 
 spdlog::level::level_enum Context::getFineGrainDefaultLevel() {
-  absl::MutexLock context_lock(&current_context_mutex);
+  absl::ReaderMutexLock context_lock(&current_context_mutex);
   if (!current_context) {
     return spdlog::level::info;
   }
