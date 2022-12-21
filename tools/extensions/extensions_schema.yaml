@@ -9,6 +9,7 @@ builtin:
 - envoy.matching.inputs.request_trailers
 - envoy.matching.inputs.response_headers
 - envoy.matching.inputs.response_trailers
+- envoy.matching.inputs.query_params
 - envoy.matching.inputs.destination_ip
 - envoy.matching.inputs.destination_port
 - envoy.matching.inputs.source_ip
