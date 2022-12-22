@@ -363,7 +363,8 @@ public:
                                            : Network::UdpListenerConfigOptRef();
   }
   Network::InternalListenerConfigOptRef internalListenerConfig() override {
-    return makeOptRefFromPtr(internal_listener_config_.get());
+    return internal_listener_config_ != nullptr ? *internal_listener_config_
+                                                : Network::InternalListenerConfigOptRef();
   }
   Network::ConnectionBalancer&
   connectionBalancer(const Network::Address::Instance& address) override {

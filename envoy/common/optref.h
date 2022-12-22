@@ -1,6 +1,6 @@
 #pragma once
 
-#include "absl/types/optional.h"
+#include "absl/types/optional.h" // required for absl::nullopt
 
 namespace Envoy {
 
@@ -13,6 +13,9 @@ namespace Envoy {
 //
 // Using absl::optional directly you must write optref.value().method() which is
 // a bit more awkward.
+//
+// This class also consumes less memory -- e.g. 8 bytes for a pointer rather
+// than 16 bytes for a pointer plus a bool with alignment padding.
 template <class T> struct OptRef {
   OptRef(T& t) : ptr_(&t) {}
   OptRef() : ptr_(nullptr) {}
