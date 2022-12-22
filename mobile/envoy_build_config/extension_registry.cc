@@ -65,6 +65,7 @@ void ExtensionRegistry::registerFactories() {
   Envoy::Extensions::HttpFilters::RouterFilter::forceRegisterRouterFilterConfig();
   Envoy::Extensions::HttpFilters::NetworkConfiguration::
       forceRegisterNetworkConfigurationFilterFactory();
+  Envoy::Extensions::KeyValue::forceRegisterPlatformKeyValueStoreFactory();
   Envoy::Extensions::NetworkFilters::HttpConnectionManager::
       forceRegisterHttpConnectionManagerFilterConfigFactory();
   Envoy::Extensions::Retry::Options::
@@ -84,7 +85,6 @@ void ExtensionRegistry::registerFactories() {
   Envoy::Extensions::RequestId::forceRegisterUUIDRequestIDExtensionFactory();
   Envoy::Server::forceRegisterDefaultListenerManagerFactoryImpl();
   Envoy::Server::forceRegisterApiListenerManagerFactoryImpl();
-  Envoy::Extensions::KeyValue::forceRegisterPlatformKeyValueStoreFactory();
 
 #ifdef ENVOY_ENABLE_QUIC
   Quic::forceRegisterQuicServerTransportSocketConfigFactory();
