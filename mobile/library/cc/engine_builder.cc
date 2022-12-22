@@ -240,7 +240,6 @@ std::string EngineBuilder::generateConfigStr() const {
                         app_version_, app_id_),
         },
         {"max_connections_per_host", fmt::format("{}", max_connections_per_host_)},
-        {"stats_domain", stats_domain_},
         {"stats_flush_interval", fmt::format("{}s", stats_flush_seconds_)},
         {"stream_idle_timeout", fmt::format("{}s", stream_idle_timeout_seconds_)},
         {"trust_chain_verification",
@@ -251,6 +250,9 @@ std::string EngineBuilder::generateConfigStr() const {
         {"force_ipv6", "true"},
 #endif
   };
+  if (!stats_domain_.empty()) {
+    replacements.push_back({"stats_domain", stats_domain_});
+  }
 
   // NOTE: this does not include support for custom filters
   // which are not yet supported in the C++ platform implementation

@@ -97,6 +97,18 @@ const char* socket_tag_config_insert = R"(
       "@type": type.googleapis.com/envoymobile.extensions.filters.http.socket_tag.SocketTag
 )";
 
+const char* persistent_dns_cache_config_insert = R"(
+- &persistent_dns_cache_config
+  config:
+    name: "envoy.key_value.platform"
+    typed_config:
+      "@type": type.googleapis.com/envoymobile.extensions.key_value.platform.PlatformKeyValueStoreConfig
+      key: dns_persistent_cache
+      save_interval:
+        seconds: 0
+      max_entries: 100
+)";
+
 // clang-format off
 const std::string config_header = R"(
 !ignore default_defs:
@@ -109,6 +121,7 @@ const std::string config_header = R"(
 - &dns_preresolve_hostnames []
 - &dns_query_timeout 25s
 - &dns_refresh_rate 60s
+- &persistent_dns_cache_config NULL
 - &force_ipv6 false
 )"
 #if defined(__APPLE__)
@@ -193,6 +206,7 @@ const char* config_template = R"(
     typed_dns_resolver_config:
       name: *dns_resolver_name
       typed_config: *dns_resolver_config
+    key_value_config: *persistent_dns_cache_config
 
 !ignore router_defs: &router_config
   "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router

@@ -2088,6 +2088,26 @@ TEST_F(HttpConnectionManagerConfigTest, UnknownOriginalIPDetectionExtension) {
                           "'envoy.http.original_ip_detection.UnknownOriginalIPDetectionExtension'");
 }
 
+TEST_F(HttpConnectionManagerConfigTest, UnknownEarlyHeaderMutationExtension) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  early_header_mutation_extensions:
+  - name: envoy.http.early_header_mutation.UnknownEarlyHeaderMutationExtension
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(createHttpConnectionManagerConfig(yaml_string), EnvoyException,
+                          "Early header mutation extension not found: "
+                          "'envoy.http.early_header_mutation.UnknownEarlyHeaderMutationExtension'");
+}
+
 namespace {
 
 class OriginalIPDetectionExtensionNotCreatedFactory : public Http::OriginalIPDetectionFactory {
@@ -2103,6 +2123,22 @@ public:
 
   std::string name() const override {
     return "envoy.http.original_ip_detection.OriginalIPDetectionExtensionNotCreated";
+  }
+};
+
+class EarlyHeaderMutationExtensionNotCreatedFactory : public Http::EarlyHeaderMutationFactory {
+public:
+  Http::EarlyHeaderMutationPtr createExtension(const Protobuf::Message&,
+                                               Server::Configuration::FactoryContext&) override {
+    return nullptr;
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::UInt32Value>();
+  }
+
+  std::string name() const override {
+    return "envoy.http.early_header_mutation.EarlyHeaderMutationExtensionNotCreated";
   }
 };
 
@@ -2132,6 +2168,30 @@ TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtensionNotCreated) 
       "'envoy.http.original_ip_detection.OriginalIPDetectionExtensionNotCreated'");
 }
 
+TEST_F(HttpConnectionManagerConfigTest, EarlyHeaderMutationExtensionNotCreated) {
+  EarlyHeaderMutationExtensionNotCreatedFactory factory;
+  Registry::InjectFactory<Http::EarlyHeaderMutationFactory> registration(factory);
+
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  early_header_mutation_extensions:
+  - name: envoy.http.early_header_mutation.EarlyHeaderMutationExtensionNotCreated
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.UInt32Value
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(
+      createHttpConnectionManagerConfig(yaml_string), EnvoyException,
+      "Early header mutation extension could not be created: "
+      "'envoy.http.early_header_mutation.EarlyHeaderMutationExtensionNotCreated'");
+}
+
 TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtension) {
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http
@@ -2155,6 +2215,32 @@ TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtension) {
 
   const auto& original_ip_detection_extensions = config.originalIpDetectionExtensions();
   EXPECT_EQ(1, original_ip_detection_extensions.size());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, EarlyHeaderMutationExtension) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  early_header_mutation_extensions:
+  - name: envoy.http.early_header_mutation.header_mutation
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.http.early_header_mutation.header_mutation.v3.HeaderMutation
+      mutations:
+      - remove: "flag-header"
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+
+  const auto& early_header_mutation_extensions = config.earlyHeaderMutationExtensions();
+  EXPECT_EQ(1, early_header_mutation_extensions.size());
 }
 
 TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtensionMixedWithUseRemoteAddress) {
@@ -2579,6 +2665,31 @@ TEST_F(HttpConnectionManagerConfigTest, PathWithEscapedSlashesActionDefaultOverr
   EXPECT_EQ(envoy::extensions::filters::network::http_connection_manager::v3::
                 HttpConnectionManager::KEEP_UNCHANGED,
             config.pathWithEscapedSlashesAction());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, SetCurrentClientCertDetailsCertAndChain) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  forward_client_cert_details: APPEND_FORWARD
+  set_current_client_cert_details:
+    cert: true
+    chain: true
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+  EXPECT_EQ(Http::ForwardClientCertType::AppendForward, config.forwardClientCert());
+  EXPECT_EQ(2, config.setCurrentClientCertDetails().size());
+  EXPECT_EQ(Http::ClientCertDetailsType::Cert, config.setCurrentClientCertDetails()[0]);
+  EXPECT_EQ(Http::ClientCertDetailsType::Chain, config.setCurrentClientCertDetails()[1]);
 }
 
 namespace {
