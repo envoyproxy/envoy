@@ -133,12 +133,12 @@ envoy_cc_library(
 envoy_cc_library(
     name = "stats_request_lib",
     srcs = [
-        "prometheus_stats_render.cc",
+        "base_stats_request.cc",
         "prometheus_stats_request.cc",
         "stats_request.cc",
     ],
     hdrs = [
-        "prometheus_stats_render.h",
+        "base_stats_request.h",
         "prometheus_stats_request.h",
         "stats_request.h",
     ],
@@ -167,6 +167,7 @@ envoy_cc_library(
     ]),
     deps = [
         ":stats_params_lib",
+        ":prometheus_stats_lib",
         ":utils_lib",
         "//envoy/server:admin_interface",
         "//source/common/buffer:buffer_lib",

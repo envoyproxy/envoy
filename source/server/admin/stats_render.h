@@ -95,5 +95,27 @@ private:
   std::string value_buffer_; // Used for Json::sanitize for text-readout values.
 };
 
+// Implements the Render interface for textual representation of Prometheus stats.
+class PrometheusStatsRender : public StatsRender {
+public:
+  // StatsRender
+  void generate(Buffer::Instance& response, const std::string& name, uint64_t value) override;
+  void generate(Buffer::Instance& response, const std::string& name,
+                const std::string& value) override;
+  void generate(Buffer::Instance& response, const std::string& prefixed_tag_extracted_name,
+                const Stats::ParentHistogram& histogram) override;
+  void finalize(Buffer::Instance&) override;
+
+  // these methods are specific to the Prometheus rendering
+  void generate(Buffer::Instance& response, const std::string& prefixed_tag_extracted_name,
+                const Stats::Gauge& gauge);
+
+  void generate(Buffer::Instance& response, const std::string& prefixed_tag_extracted_name,
+                const Stats::Counter& counter);
+
+  void generate(Buffer::Instance& response, const std::string& prefixed_tag_extracted_name,
+                const Stats::TextReadout& text_readout);
+};
+
 } // namespace Server
 } // namespace Envoy
