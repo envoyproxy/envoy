@@ -40,7 +40,8 @@ NSString *_REQUEST_SCHEME = @"https";
   EngineBuilder *builder = [[EngineBuilder alloc] init];
   [builder addLogLevel:LogLevelDebug];
   [builder enableDNSCache:YES];
-  [builder addKeyValueStore:@"reserved.platform_store" keyValueStore: UserDefaults.standard];
+  [builder addKeyValueStoreWithName:@"reserved.platform_store"
+                      keyValueStore:NSUserDefaults.standardUserDefaults];
   [builder setOnEngineRunningWithClosure:^{
     NSLog(@"Envoy async internal setup completed");
   }];
