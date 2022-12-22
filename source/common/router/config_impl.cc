@@ -923,6 +923,7 @@ RouteEntryImplBase::getPathRewrite(const Http::RequestHeaderMap& headers,
 
   // Return the regex rewrite substitution for redirects, if set.
   // redirect_config_ is known to not be nullptr here, because of the isRedirect check above.
+  ASSERT(redirect_config_ != nullptr);
   if (redirect_config_->regex_rewrite_redirect_ != nullptr) {
     // Copy just the path and rewrite it using the regex.
     //
