@@ -12,6 +12,8 @@ import org.junit.After
 import org.junit.Ignore
 import org.junit.Test
 
+// TODO(abeyad): Fix the test and re-enable.
+// See https://github.com/envoyproxy/envoy/issues/24657.
 @Ignore
 class StatFlushIntegrationTest {
   private var engine: Engine? = null
