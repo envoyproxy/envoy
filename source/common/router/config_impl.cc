@@ -458,6 +458,43 @@ const envoy::type::v3::FractionalPercent& RouteTracingImpl::getOverallSampling()
 }
 const Tracing::CustomTagMap& RouteTracingImpl::getCustomTags() const { return custom_tags_; }
 
+OptionalTimeouts::OptionalTimeouts(const envoy::config::route::v3::RouteAction& route)
+    : has_idle_timeout_(false), has_max_stream_duration_(false),
+      has_grpc_timeout_header_max_(false), has_grpc_timeout_header_offset_(false),
+      has_max_grpc_timeout_(false), has_grpc_timeout_offset_(false) {
+  if (route.has_idle_timeout()) {
+    has_idle_timeout_ = true;
+    idle_timeout_ = std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(route, idle_timeout));
+  }
+  if (route.has_max_grpc_timeout()) {
+    has_max_grpc_timeout_ = true;
+    max_grpc_timeout_ =
+        std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(route, max_grpc_timeout));
+  }
+  if (route.has_grpc_timeout_offset()) {
+    has_grpc_timeout_offset_ = true;
+    grpc_timeout_offset_ =
+        std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(route, grpc_timeout_offset));
+  }
+  if (route.has_max_stream_duration()) {
+    if (route.max_stream_duration().has_max_stream_duration()) {
+      has_max_stream_duration_ = true;
+      max_stream_duration_ = std::chrono::milliseconds(
+          PROTOBUF_GET_MS_REQUIRED(route.max_stream_duration(), max_stream_duration));
+    }
+    if (route.max_stream_duration().has_grpc_timeout_header_max()) {
+      has_grpc_timeout_header_max_ = true;
+      grpc_timeout_header_max_ = std::chrono::milliseconds(
+          PROTOBUF_GET_MS_REQUIRED(route.max_stream_duration(), grpc_timeout_header_max));
+    }
+    if (route.max_stream_duration().has_grpc_timeout_header_offset()) {
+      has_grpc_timeout_header_offset_ = true;
+      grpc_timeout_header_offset_ = std::chrono::milliseconds(
+          PROTOBUF_GET_MS_REQUIRED(route.max_stream_duration(), grpc_timeout_header_offset));
+    }
+  }
+}
+
 RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                                        const envoy::config::route::v3::Route& route,
                                        const OptionalHttpFilters& optional_http_filters,
@@ -481,16 +518,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
               : ""),
       cluster_name_(route.route().cluster()), cluster_header_name_(route.route().cluster_header()),
       timeout_(PROTOBUF_GET_MS_OR_DEFAULT(route.route(), timeout, DEFAULT_ROUTE_TIMEOUT_MS)),
-      idle_timeout_(PROTOBUF_GET_OPTIONAL_MS(route.route(), idle_timeout)),
-      max_stream_duration_(
-          PROTOBUF_GET_OPTIONAL_MS(route.route().max_stream_duration(), max_stream_duration)),
-      grpc_timeout_header_max_(
-          PROTOBUF_GET_OPTIONAL_MS(route.route().max_stream_duration(), grpc_timeout_header_max)),
-      grpc_timeout_header_offset_(PROTOBUF_GET_OPTIONAL_MS(route.route().max_stream_duration(),
-                                                           grpc_timeout_header_offset)),
-      max_grpc_timeout_(PROTOBUF_GET_OPTIONAL_MS(route.route(), max_grpc_timeout)),
-      grpc_timeout_offset_(PROTOBUF_GET_OPTIONAL_MS(route.route(), grpc_timeout_offset)),
-      loader_(factory_context.runtime()), runtime_(loadRuntimeData(route.match())),
+      optional_timeouts_(buildOptionalTimeouts(route.route())), loader_(factory_context.runtime()),
+      runtime_(loadRuntimeData(route.match())),
       scheme_redirect_(route.redirect().scheme_redirect()),
       host_redirect_(route.redirect().host_redirect()),
       port_redirect_(route.redirect().port_redirect()
@@ -1192,6 +1221,16 @@ std::unique_ptr<InternalRedirectPolicyImpl> RouteEntryImplBase::buildInternalRed
   }
   return std::make_unique<InternalRedirectPolicyImpl>(policy_config, validator, current_route_name);
 }
+
+std::unique_ptr<OptionalTimeouts> RouteEntryImplBase::buildOptionalTimeouts(
+    const envoy::config::route::v3::RouteAction& route) const {
+  if (route.has_idle_timeout() || route.has_max_grpc_timeout() || route.has_grpc_timeout_offset() ||
+      route.has_max_stream_duration()) {
+    return std::make_unique<OptionalTimeouts>(route);
+  }
+  return nullptr;
+}
+
 PathRewriterSharedPtr
 RouteEntryImplBase::buildPathRewriter(envoy::config::route::v3::Route route,
                                       ProtobufMessage::ValidationVisitor& validator) const {
