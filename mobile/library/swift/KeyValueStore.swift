@@ -3,7 +3,8 @@ import Foundation
 
 /// `KeyValueStore` is an interface that may be implemented to provide access to an arbitrary
 /// key-value store implementation that may be made accessible to native Envoy Mobile code.
-@objc public protocol KeyValueStore {
+@objc
+public protocol KeyValueStore {
   /// Read a value from the key value store implementation.
   ///
   /// - parameter key: The key whose value should be read.
