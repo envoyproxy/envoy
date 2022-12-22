@@ -564,19 +564,17 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
   // the criteria from the route.
   if (route.route().cluster_specifier_case() ==
       envoy::config::route::v3::RouteAction::ClusterSpecifierCase::kWeightedClusters) {
-    weighted_clusters_config_ = std::make_unique<WeightedClustersConfig>();
-    weighted_clusters_config_->random_value_header_name_ =
-        route.route().weighted_clusters().header_name();
-
     uint64_t total_weight = 0UL;
     const std::string& runtime_key_prefix = route.route().weighted_clusters().runtime_key_prefix();
 
+    std::vector<WeightedClusterEntrySharedPtr> weighted_clusters;
+    weighted_clusters.reserve(route.route().weighted_clusters().clusters().size());
     for (const auto& cluster : route.route().weighted_clusters().clusters()) {
       auto cluster_entry = std::make_unique<WeightedClusterEntry>(
           this, runtime_key_prefix + "." + cluster.name(), factory_context, validator, cluster,
           optional_http_filters);
-      weighted_clusters_config_->weighted_clusters_.emplace_back(std::move(cluster_entry));
-      total_weight += weighted_clusters_config_->weighted_clusters_.back()->clusterWeight();
+      weighted_clusters.emplace_back(std::move(cluster_entry));
+      total_weight += weighted_clusters.back()->clusterWeight();
     }
 
     // Reject the config if the total_weight of all clusters is 0.
@@ -584,7 +582,9 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       throw EnvoyException("Sum of weights in the weighted_cluster must be greater than 0.");
     }
 
-    weighted_clusters_config_->total_cluster_weight_ = total_weight;
+    weighted_clusters_config_ = std::make_unique<WeightedClustersConfig>(
+        weighted_clusters, total_weight, route.route().weighted_clusters().header_name());
+
   } else if (route.route().cluster_specifier_case() ==
              envoy::config::route::v3::RouteAction::ClusterSpecifierCase::
                  kInlineClusterSpecifierPlugin) {
