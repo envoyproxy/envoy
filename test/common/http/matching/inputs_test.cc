@@ -115,7 +115,7 @@ TEST(MatchingData, HttpRequestQueryParamsDataInput) {
 
   {
     HttpRequestQueryParamsDataInput input("user name");
-    TestRequestHeaderMapImpl request_headers({{":path", "/test?user\%20name=foo\%20bar"}});
+    TestRequestHeaderMapImpl request_headers({{":path", "/test?user%20name=foo%20bar"}});
     data.onRequestHeaders(request_headers);
 
     EXPECT_EQ(input.get(data).data_, "foo bar");
