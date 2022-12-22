@@ -211,6 +211,9 @@ private:
   // potential to go "less than zero" due to not having sole control of the file cache;
   // gauge values don't have fine enough control to prevent that, and aren't allowed to
   // be negative.
+  //
+  // See comment on size_bytes and size_count in stats.h for explanation of how stat
+  // values can be out of sync with the actionable cache.
   std::atomic<uint64_t> size_count_;
   std::atomic<uint64_t> size_bytes_;
 };
