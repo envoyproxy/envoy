@@ -164,6 +164,7 @@ private:
     }
     bool streamErrorOnInvalidHttpMessage() const override { return false; }
     void setRequestDecoder(RequestDecoder& /*decoder*/) override{};
+    void setDeferredLoggingHeadersAndTrailers(Http::DeferredLoggingHeadersAndTrailers&) override {}
 
     void encodeMetadata(const MetadataMapVector&) override { PANIC("not implemented"); }
 
