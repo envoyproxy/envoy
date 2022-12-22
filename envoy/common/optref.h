@@ -101,30 +101,26 @@ template <class T> struct OptRef {
   void emplace(T& ref) { ptr_ = &ref; }
 
   /**
-   * Used in call-sites which would be needed if they were using
-   * optional<reference_wrapper<T>> directly without OptRef. Having this
-   * function makes it easier upgrade to using OptRef without having to change
-   * all call-sites.
+   * The value method has no intrinsic value to OptRef, but is left here for
+   * compatibility reasons. This is used in call-sites which would be needed if
+   * they were using optional<reference_wrapper<T>> directly without
+   * OptRef. Having this function makes it easier upgrade to using OptRef
+   * without having to change all call-sites.
+   *
+   * Usage of this method in the Envoy codebase appears to expect
+   * const-stripping: We are expecting to get a non-const T& out of a const
+   * OptRef<T>&. This should be investigated. It was not necessary when OptRef
+   * inherited from absl::optional<std::reference_wrapper<T>>. One place
+   * where this const-stripping expectation occurs is
+   * source/common/http/async_client_impl.cc where the constructor has an
+   * arg const AsyncClient::StreamOptions& options, that is used to populate
+   * a non-const Config reference.
    *
    * This must be called with has_value() true.
    *
    * @return a reference_wrapper around the value.
    */
   std::reference_wrapper<T> value() const { return std::reference_wrapper<T>(*ptr_); }
-
-  /**
-   * This awkward cast operator to optional<reference_wrapper<T>> is needed due
-   * to a few places in the codebase where OptRef and
-   * optional<reference_wrapper<T>> are co-mingled at call-sites. We can drop
-   * this if those are cleaned up.
-   */
-  operator absl::optional<std::reference_wrapper<T>>() const {
-    absl::optional<std::reference_wrapper<T>> ret;
-    if (has_value()) {
-      ret = *ptr_;
-    }
-    return ret;
-  }
 
   /**
    * Clears any current reference.
@@ -155,7 +151,7 @@ template <class T> OptRef<T> makeOptRefFromPtr(T* ptr) {
   return {*ptr};
 }
 
-// Overloads for copmaring OptRef against absl::nullopt.
+// Overloads for comparing OptRef against absl::nullopt.
 template <class T> bool operator!=(const OptRef<T>& optref, absl::nullopt_t) {
   return optref.has_value();
 }
