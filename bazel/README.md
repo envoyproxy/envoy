@@ -128,7 +128,7 @@ for how to update or override dependencies.
     ### macOS
     On macOS, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):
     ```console
-    brew install coreutils wget cmake libtool go bazel automake ninja clang-format autoconf aspell python@3.10
+    brew install coreutils wget cmake libtool go bazel automake ninja clang-format autoconf aspell python@3.10 ninja
     ```
     _notes_: `coreutils` is used for `realpath`, `gmd5sum` and `gsha256sum`
 
