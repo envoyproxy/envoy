@@ -5,6 +5,8 @@
 #include "source/extensions/http/header_validators/envoy_default/character_tables.h"
 #include "source/extensions/http/header_validators/envoy_default/header_validator.h"
 
+#include "test/test_common/utility.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Http {
@@ -23,8 +25,8 @@ public:
   BaseHttpHeaderValidator(
       const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&
           config,
-      Protocol protocol, StreamInfo::StreamInfo& stream_info, HeaderValidatorStats& stats)
-      : HeaderValidator(config, protocol, stream_info, stats) {}
+      Protocol protocol, HeaderValidatorStats& stats)
+      : HeaderValidator(config, protocol, stats) {}
 
   HeaderEntryValidationResult validateRequestHeaderEntry(const HeaderString&,
                                                          const HeaderString&) override {
@@ -54,8 +56,7 @@ protected:
         typed_config;
     TestUtility::loadFromYaml(std::string(config_yaml), typed_config);
 
-    return std::make_unique<BaseHttpHeaderValidator>(typed_config, Protocol::Http11, stream_info_,
-                                                     stats_);
+    return std::make_unique<BaseHttpHeaderValidator>(typed_config, Protocol::Http11, stats_);
   }
 };
 

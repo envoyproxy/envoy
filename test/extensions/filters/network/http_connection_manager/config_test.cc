@@ -2703,9 +2703,9 @@ public:
   }
 
   Http::HeaderValidatorFactoryPtr createFromProto(const Protobuf::Message&,
-                                                  Server::Configuration::FactoryContext&) override {
+                                                  ProtobufMessage::ValidationVisitor&) override {
     auto header_validator = std::make_unique<StrictMock<Http::MockHeaderValidatorFactory>>();
-    EXPECT_CALL(*header_validator, create(Http::Protocol::Http2, _, _))
+    EXPECT_CALL(*header_validator, create(Http::Protocol::Http2, _))
         .WillOnce(InvokeWithoutArgs(
             []() { return std::make_unique<StrictMock<Http::MockHeaderValidator>>(); }));
     return header_validator;
@@ -2729,17 +2729,17 @@ public:
 
   Http::HeaderValidatorFactoryPtr
   createFromProto(const Protobuf::Message& message,
-                  Server::Configuration::FactoryContext& context) override {
+                  ProtobufMessage::ValidationVisitor& validation_visitor) override {
     auto mptr = ::Envoy::Config::Utility::translateAnyToFactoryConfig(
-        dynamic_cast<const ProtobufWkt::Any&>(message), context.messageValidationVisitor(), *this);
+        dynamic_cast<const ProtobufWkt::Any&>(message), validation_visitor, *this);
     const auto& proto_config =
         MessageUtil::downcastAndValidate<const ::envoy::extensions::http::header_validators::
                                              envoy_default::v3::HeaderValidatorConfig&>(
-            *mptr, context.messageValidationVisitor());
+            *mptr, validation_visitor);
 
     config_ = proto_config;
     auto header_validator = std::make_unique<StrictMock<Http::MockHeaderValidatorFactory>>();
-    EXPECT_CALL(*header_validator, create(Http::Protocol::Http2, _, _))
+    EXPECT_CALL(*header_validator, create(Http::Protocol::Http2, _))
         .WillOnce(InvokeWithoutArgs(
             []() { return std::make_unique<StrictMock<Http::MockHeaderValidator>>(); }));
     return header_validator;
@@ -2778,8 +2778,7 @@ TEST_F(HttpConnectionManagerConfigTest, HeaderValidatorConfig) {
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
                                      filter_config_provider_manager_);
-  StrictMock<StreamInfo::MockStreamInfo> stream_info;
-  EXPECT_NE(nullptr, config.makeHeaderValidator(Http::Protocol::Http2, stream_info));
+  EXPECT_NE(nullptr, config.makeHeaderValidator(Http::Protocol::Http2));
 #else
   // If UHV is disabled, providing config should result in rejection
   EXPECT_THROW(
@@ -2816,9 +2815,8 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultHeaderValidatorConfig) {
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
                                      filter_config_provider_manager_);
-  StrictMock<StreamInfo::MockStreamInfo> stream_info;
 #ifdef ENVOY_ENABLE_UHV
-  EXPECT_NE(nullptr, config.makeHeaderValidator(Http::Protocol::Http2, stream_info));
+  EXPECT_NE(nullptr, config.makeHeaderValidator(Http::Protocol::Http2));
   EXPECT_FALSE(proto_config.restrict_http_methods());
   EXPECT_TRUE(proto_config.uri_path_normalization_options().skip_path_normalization());
   EXPECT_TRUE(proto_config.uri_path_normalization_options().skip_merging_slashes());
@@ -2828,7 +2826,7 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultHeaderValidatorConfig) {
   EXPECT_FALSE(proto_config.http1_protocol_options().allow_chunked_length());
 #else
   // If UHV is disabled, config should be accepted and factory should be nullptr
-  EXPECT_EQ(nullptr, config.makeHeaderValidator(Http::Protocol::Http2, stream_info));
+  EXPECT_EQ(nullptr, config.makeHeaderValidator(Http::Protocol::Http2));
 #endif
 }
 
@@ -2860,9 +2858,8 @@ TEST_F(HttpConnectionManagerConfigTest, TranslateLegacyConfigToDefaultHeaderVali
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
                                      filter_config_provider_manager_);
-  StrictMock<StreamInfo::MockStreamInfo> stream_info;
 #ifdef ENVOY_ENABLE_UHV
-  EXPECT_NE(nullptr, config.makeHeaderValidator(Http::Protocol::Http2, stream_info));
+  EXPECT_NE(nullptr, config.makeHeaderValidator(Http::Protocol::Http2));
   EXPECT_FALSE(proto_config.restrict_http_methods());
   EXPECT_FALSE(proto_config.uri_path_normalization_options().skip_path_normalization());
   EXPECT_FALSE(proto_config.uri_path_normalization_options().skip_merging_slashes());
@@ -2872,7 +2869,7 @@ TEST_F(HttpConnectionManagerConfigTest, TranslateLegacyConfigToDefaultHeaderVali
   EXPECT_TRUE(proto_config.http1_protocol_options().allow_chunked_length());
 #else
   // If UHV is disabled, config should be accepted and factory should be nullptr
-  EXPECT_EQ(nullptr, config.makeHeaderValidator(Http::Protocol::Http2, stream_info));
+  EXPECT_EQ(nullptr, config.makeHeaderValidator(Http::Protocol::Http2));
 #endif
 }
 

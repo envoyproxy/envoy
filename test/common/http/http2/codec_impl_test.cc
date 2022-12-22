@@ -343,7 +343,7 @@ public:
             headers_with_underscores_action_));
     header_validator_ =
         std::make_unique<Extensions::Http::HeaderValidators::EnvoyDefault::Http2HeaderValidator>(
-            header_validator_config_, Protocol::Http2, stream_info_, server_->http2CodecStats());
+            header_validator_config_, Protocol::Http2, server_->http2CodecStats());
   }
 
   TestScopedRuntime scoped_runtime_;
@@ -391,7 +391,6 @@ public:
       headers_with_underscores_action_{envoy::config::core::v3::HttpProtocolOptions::ALLOW};
   envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       header_validator_config_;
-  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
   HeaderValidatorPtr header_validator_;
 };
 
