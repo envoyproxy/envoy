@@ -547,6 +547,60 @@ private:
 };
 using DefaultInternalRedirectPolicy = ConstSingleton<InternalRedirectPolicyImpl>;
 
+// Manages various optional route timeouts. We pack them in a separate data structure for memory
+// efficiency:
+// - Sharing one bool avoids the overhead of `absl::optional`, saving 8 bytes per timeout
+// - If none of the timeouts are configured, we avoid allocating any of the `std::duration` values,
+// saving another 8 bytes per timeout
+class OptionalTimeouts {
+public:
+  OptionalTimeouts(const envoy::config::route::v3::RouteAction& route);
+
+  absl::optional<std::chrono::milliseconds> idleTimeout() const {
+    return has_idle_timeout_ ? absl::optional<std::chrono::milliseconds>(idle_timeout_)
+                             : absl::nullopt;
+  }
+  absl::optional<std::chrono::milliseconds> maxStreamDuration() const {
+    return has_max_stream_duration_
+               ? absl::optional<std::chrono::milliseconds>(max_stream_duration_)
+               : absl::nullopt;
+  }
+  absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderMax() const {
+    return has_grpc_timeout_header_max_
+               ? absl::optional<std::chrono::milliseconds>(grpc_timeout_header_max_)
+               : absl::nullopt;
+  }
+  absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderOffset() const {
+    return has_grpc_timeout_header_offset_
+               ? absl::optional<std::chrono::milliseconds>(grpc_timeout_header_offset_)
+               : absl::nullopt;
+  }
+  absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const {
+    return has_max_grpc_timeout_ ? absl::optional<std::chrono::milliseconds>(max_grpc_timeout_)
+                                 : absl::nullopt;
+  }
+  absl::optional<std::chrono::milliseconds> grpcTimeoutOffset() const {
+    return has_grpc_timeout_offset_
+               ? absl::optional<std::chrono::milliseconds>(grpc_timeout_offset_)
+               : absl::nullopt;
+  }
+
+private:
+  std::chrono::milliseconds idle_timeout_;
+  std::chrono::milliseconds max_stream_duration_;
+  std::chrono::milliseconds grpc_timeout_header_max_;
+  std::chrono::milliseconds grpc_timeout_header_offset_;
+  std::chrono::milliseconds max_grpc_timeout_;
+  std::chrono::milliseconds grpc_timeout_offset_;
+  // Keep small members at the end of class, to reduce alignment overhead.
+  bool has_idle_timeout_ : 1;
+  bool has_max_stream_duration_ : 1;
+  bool has_grpc_timeout_header_max_ : 1;
+  bool has_grpc_timeout_header_offset_ : 1;
+  bool has_max_grpc_timeout_ : 1;
+  bool has_grpc_timeout_offset_ : 1;
+};
+
 /**
  * Base implementation for all route entries.q
  */
@@ -657,22 +711,26 @@ public:
     return vhost_.virtualClusterFromEntries(headers);
   }
   std::chrono::milliseconds timeout() const override { return timeout_; }
-  absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
+  absl::optional<std::chrono::milliseconds> idleTimeout() const override {
+    return optional_timeouts_ != nullptr ? optional_timeouts_->idleTimeout() : absl::nullopt;
+  }
   bool usingNewTimeouts() const override { return using_new_timeouts_; }
   absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
-    return max_stream_duration_;
+    return optional_timeouts_ != nullptr ? optional_timeouts_->maxStreamDuration() : absl::nullopt;
   }
   absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderMax() const override {
-    return grpc_timeout_header_max_;
+    return optional_timeouts_ != nullptr ? optional_timeouts_->grpcTimeoutHeaderMax()
+                                         : absl::nullopt;
   }
   absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderOffset() const override {
-    return grpc_timeout_header_offset_;
+    return optional_timeouts_ != nullptr ? optional_timeouts_->grpcTimeoutHeaderOffset()
+                                         : absl::nullopt;
   }
   absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const override {
-    return max_grpc_timeout_;
+    return optional_timeouts_ != nullptr ? optional_timeouts_->maxGrpcTimeout() : absl::nullopt;
   }
   absl::optional<std::chrono::milliseconds> grpcTimeoutOffset() const override {
-    return grpc_timeout_offset_;
+    return optional_timeouts_ != nullptr ? optional_timeouts_->grpcTimeoutOffset() : absl::nullopt;
   }
   const VirtualHost& virtualHost() const override { return vhost_; }
   bool autoHostRewrite() const override { return auto_host_rewrite_; }
@@ -1048,6 +1106,9 @@ private:
                               ProtobufMessage::ValidationVisitor& validator,
                               absl::string_view current_route_name) const;
 
+  std::unique_ptr<OptionalTimeouts>
+  buildOptionalTimeouts(const envoy::config::route::v3::RouteAction& route) const;
+
   PathMatcherSharedPtr buildPathMatcher(envoy::config::route::v3::Route route,
                                         ProtobufMessage::ValidationVisitor& validator) const;
 
@@ -1076,12 +1137,7 @@ private:
   const Http::LowerCaseString cluster_header_name_;
   ClusterSpecifierPluginSharedPtr cluster_specifier_plugin_;
   const std::chrono::milliseconds timeout_;
-  const absl::optional<std::chrono::milliseconds> idle_timeout_;
-  const absl::optional<std::chrono::milliseconds> max_stream_duration_;
-  const absl::optional<std::chrono::milliseconds> grpc_timeout_header_max_;
-  const absl::optional<std::chrono::milliseconds> grpc_timeout_header_offset_;
-  const absl::optional<std::chrono::milliseconds> max_grpc_timeout_;
-  const absl::optional<std::chrono::milliseconds> grpc_timeout_offset_;
+  std::unique_ptr<const OptionalTimeouts> optional_timeouts_;
   Runtime::Loader& loader_;
   std::unique_ptr<const RuntimeData> runtime_;
   const std::string scheme_redirect_;
