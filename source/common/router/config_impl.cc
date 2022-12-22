@@ -1061,7 +1061,7 @@ std::string RouteEntryImplBase::newPath(const Http::RequestHeaderMap& headers) c
   absl::string_view final_path;
 
   if (redirect_config_ != nullptr && !redirect_config_->scheme_redirect_.empty()) {
-    final_scheme = scheme_redirect_.c_str();
+    final_scheme = redirect_config_->scheme_redirect_.c_str();
   } else if (redirect_config_ != nullptr && redirect_config_->https_redirect_) {
     final_scheme = Http::Headers::get().SchemeValues.Https;
   } else {
