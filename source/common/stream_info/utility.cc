@@ -54,7 +54,8 @@ OptRef<const UpstreamTiming> getUpstreamTiming(const StreamInfo& stream_info) {
   if (!info.has_value()) {
     return {};
   }
-  return info.value().get().upstreamTiming();
+  // return info.value().get().upstreamTiming();
+  return info->upstreamTiming();
 }
 
 absl::optional<std::chrono::nanoseconds> duration(const absl::optional<MonotonicTime>& time,
