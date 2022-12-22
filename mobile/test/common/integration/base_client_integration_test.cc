@@ -96,6 +96,11 @@ BaseClientIntegrationTest::BaseClientIntegrationTest(Network::Address::IpVersion
   defer_listener_finalization_ = true;
 
   builder_.addLogLevel(getPlatformLogLevelFromOptions());
+  // The admin interface gets added by default in the ConfigHelper's constructor. Since the admin
+  // interface gets compiled out by default in Envoy Mobile, remove it from the ConfigHelper's
+  // bootstrap config.
+  config_helper_.addConfigModifier(
+      [](envoy::config::bootstrap::v3::Bootstrap& bootstrap) { bootstrap.clear_admin(); });
 }
 
 void BaseClientIntegrationTest::initialize() {
@@ -192,6 +197,8 @@ void BaseClientIntegrationTest::createEnvoy() {
   finalizeConfigWithPorts(config_helper_, ports, use_lds_);
 
   if (override_builder_config_) {
+    ASSERT_FALSE(config_helper_.bootstrap().has_admin())
+        << "Bootstrap config should not have `admin` configured in Envoy Mobile";
     builder_.setOverrideConfigForTests(
         MessageUtil::getYamlStringFromMessage(config_helper_.bootstrap()));
   } else {
