@@ -49,6 +49,8 @@ TEST(OptRefTest, Const) {
   EXPECT_EQ(5, optref->size());
   EXPECT_EQ("Hello", optref.ref());
   EXPECT_EQ("Hello", *optref);
+  std::reference_wrapper<const std::string> value = optref.value();
+  EXPECT_EQ("Hello", value.get());
   absl::optional<std::string> copy = optref.copy();
   EXPECT_TRUE(copy);
   EXPECT_FALSE(!copy);

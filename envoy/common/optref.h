@@ -110,20 +110,12 @@ template <class T> struct OptRef {
    * OptRef. Having this function makes it easier upgrade to using OptRef
    * without having to change all call-sites.
    *
-   * Usage of this method in the Envoy codebase appears to expect
-   * const-stripping: We are expecting to get a non-const T& out of a const
-   * OptRef<T>&. This should be investigated. It was not necessary when OptRef
-   * inherited from absl::optional<std::reference_wrapper<T>>. One place
-   * where this const-stripping expectation occurs is
-   * source/common/http/async_client_impl.cc where the constructor has an
-   * arg const AsyncClient::StreamOptions& options, that is used to populate
-   * a non-const Config reference.
-   *
    * This must be called with has_value() true.
    *
    * @return a reference_wrapper around the value.
    */
-  std::reference_wrapper<T> value() const { return std::reference_wrapper<T>(*ptr_); }
+  std::reference_wrapper<const T> value() const { return std::reference_wrapper<T>(*ptr_); }
+  std::reference_wrapper<T> value() { return std::reference_wrapper<T>(*ptr_); }
 
   /**
    * Clears any current reference.
