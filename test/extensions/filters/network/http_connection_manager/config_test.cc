@@ -2667,6 +2667,31 @@ TEST_F(HttpConnectionManagerConfigTest, PathWithEscapedSlashesActionDefaultOverr
             config.pathWithEscapedSlashesAction());
 }
 
+TEST_F(HttpConnectionManagerConfigTest, SetCurrentClientCertDetailsCertAndChain) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  forward_client_cert_details: APPEND_FORWARD
+  set_current_client_cert_details:
+    cert: true
+    chain: true
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+  EXPECT_EQ(Http::ForwardClientCertType::AppendForward, config.forwardClientCert());
+  EXPECT_EQ(2, config.setCurrentClientCertDetails().size());
+  EXPECT_EQ(Http::ClientCertDetailsType::Cert, config.setCurrentClientCertDetails()[0]);
+  EXPECT_EQ(Http::ClientCertDetailsType::Chain, config.setCurrentClientCertDetails()[1]);
+}
+
 namespace {
 
 class TestHeaderValidatorFactoryConfig : public Http::HeaderValidatorFactoryConfig {
