@@ -961,7 +961,7 @@ public:
   using WeightedClusterEntrySharedPtr = std::shared_ptr<WeightedClusterEntry>;
   // Container for route config elements that pertain to a weightless clusters.
   // We keep them in a separate data structure to avoid memory overhead for the routes that do not
-  // use weighless clusters.
+  // use weightless clusters.
   struct WeightedClustersConfig {
     std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
     uint64_t total_cluster_weight_;
