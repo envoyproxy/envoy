@@ -1109,7 +1109,7 @@ private:
   std::vector<ShadowPolicyPtr> shadow_policies_;
   std::vector<Http::HeaderUtility::HeaderDataPtr> config_headers_;
   std::vector<ConfigUtility::QueryParameterMatcherPtr> config_query_parameters_;
-  std::unique_ptr<WeightedClustersConfig> weighted_clusters_config_;
+  std::unique_ptr<const WeightedClustersConfig> weighted_clusters_config_;
 
   UpgradeMap upgrade_map_;
   std::unique_ptr<const Http::HashPolicyImpl> hash_policy_;
