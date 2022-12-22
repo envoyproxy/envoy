@@ -550,7 +550,7 @@ using DefaultInternalRedirectPolicy = ConstSingleton<InternalRedirectPolicyImpl>
 // Manages various optional route timeouts. We pack them in a separate data structure for memory
 // efficiency:
 // - Sharing one bool avoids the overhead of `absl::optional`, saving 8 bytes per timeout
-// - If none of the timeouts are configured, we avoid tracking any of the `std::duration` values,
+// - If none of the timeouts are configured, we avoid allocating any of the `std::duration` values,
 // saving another 8 bytes per timeout
 class OptionalTimeouts {
 public:
