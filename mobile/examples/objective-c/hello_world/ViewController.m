@@ -131,18 +131,10 @@ NSString *_REQUEST_SCHEME = @"https";
   Element *elementFoo = [[Element alloc] initWithStringLiteral:@"foo"];
   Element *elementBar = [[Element alloc] initWithStringLiteral:@"bar"];
   Element *elementCounter = [[Element alloc] initWithStringLiteral:@"counter"];
-  Element *elementGauge = [[Element alloc] initWithStringLiteral:@"gauge"];
-  Element *elementTimer = [[Element alloc] initWithStringLiteral:@"timer"];
-  Element *elementDistribution = [[Element alloc] initWithStringLiteral:@"distribution"];
   id<Counter> counter =
       [self.pulseClient counterWithElements:@[ elementFoo, elementBar, elementCounter ]];
   [counter incrementWithCount:1];
   [counter incrementWithCount:5];
-
-  id<Gauge> gauge = [self.pulseClient gaugeWithElements:@[ elementFoo, elementBar, elementGauge ]];
-  [gauge setWithValue:5];
-  [gauge addWithAmount:10];
-  [gauge subWithAmount:1];
 }
 
 #pragma mark - UITableView

@@ -140,48 +140,6 @@ public class EnvoyEngineImpl implements EnvoyEngine {
                                        count);
   }
 
-  /**
-   * Set a gauge of a given string of elements with the given value.
-   *
-   * @param elements Elements of the gauge stat.
-   * @param tags Tags of the gauge stat.
-   * @param value Value to set to the gauge.
-   * @return A status indicating if the action was successful.
-   */
-  @Override
-  public int recordGaugeSet(String elements, Map<String, String> tags, int value) {
-    return JniLibrary.recordGaugeSet(engineHandle, elements, JniBridgeUtility.toJniTags(tags),
-                                     value);
-  }
-
-  /**
-   * Add the gauge with the given string of elements and by the given amount.
-   *
-   * @param elements Elements of the gauge stat.
-   * @param tags Tags of the gauge stat.
-   * @param amount Amount to add to the gauge.
-   * @return A status indicating if the action was successful.
-   */
-  @Override
-  public int recordGaugeAdd(String elements, Map<String, String> tags, int amount) {
-    return JniLibrary.recordGaugeAdd(engineHandle, elements, JniBridgeUtility.toJniTags(tags),
-                                     amount);
-  }
-
-  /**
-   * Subtract from the gauge with the given string of elements and by the given amount.
-   *
-   * @param elements Elements of the gauge stat.
-   * @param tags Tags of the gauge stat.
-   * @param amount Amount to subtract from the gauge.
-   * @return A status indicating if the action was successful.
-   */
-  @Override
-  public int recordGaugeSub(String elements, Map<String, String> tags, int amount) {
-    return JniLibrary.recordGaugeSub(engineHandle, elements, JniBridgeUtility.toJniTags(tags),
-                                     amount);
-  }
-
   @Override
   public int registerStringAccessor(String accessor_name, EnvoyStringAccessor accessor) {
     return JniLibrary.registerStringAccessor(accessor_name, new JvmStringAccessorContext(accessor));
