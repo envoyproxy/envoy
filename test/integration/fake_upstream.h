@@ -225,7 +225,6 @@ public:
     RELEASE_ASSERT(false, "initialize if this is needed");
     return *stream_info_;
   }
-  std::shared_ptr<StreamInfo::StreamInfo> streamInfoSharedPtr() override { return stream_info_; }
   std::list<AccessLog::InstanceSharedPtr> accessLogHandlers() override {
     return access_log_handlers_;
   }

@@ -487,6 +487,17 @@ SubstitutionFormatParser::getKnownFormatters() {
         {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
          [](const std::string& key, absl::optional<size_t>& max_length) {
            return std::make_unique<EnvironmentFormatter>(key, max_length);
+         }}},
+       {"STREAM_INFO_REQ",
+        {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
+         [](const std::string& format, absl::optional<size_t>& max_length) {
+           std::string main_header, alternative_header;
+
+           SubstitutionFormatParser::parseSubcommandHeaders(format, main_header,
+                                                            alternative_header);
+
+           return std::make_unique<RequestHeaderFormatter>(main_header, alternative_header,
+                                                           max_length);
          }}}});
 }
 
@@ -2190,6 +2201,23 @@ ProtobufWkt::Value EnvironmentFormatter::formatValue(const Http::RequestHeaderMa
                                                      const StreamInfo::StreamInfo&,
                                                      absl::string_view) const {
   return str_;
+}
+
+StreamInfoRequestHeaderFormatter::StreamInfoRequestHeaderFormatter(
+    const std::string& main_header, const std::string& alternative_header,
+    absl::optional<size_t> max_length)
+    : HeaderFormatter(main_header, alternative_header, max_length) {}
+
+absl::optional<std::string> StreamInfoRequestHeaderFormatter::format(
+    const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&,
+    const StreamInfo::StreamInfo& stream_info, absl::string_view) const {
+  return HeaderFormatter::format(*stream_info.getRequestHeaders());
+}
+
+ProtobufWkt::Value StreamInfoRequestHeaderFormatter::formatValue(
+    const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&,
+    const StreamInfo::StreamInfo& stream_info, absl::string_view) const {
+  return HeaderFormatter::formatValue(*stream_info.getRequestHeaders());
 }
 
 } // namespace Formatter

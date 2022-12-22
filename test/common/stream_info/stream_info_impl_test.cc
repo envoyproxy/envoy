@@ -6,6 +6,7 @@
 #include "envoy/upstream/host_description.h"
 
 #include "source/common/common/fmt.h"
+#include "source/common/network/address_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/stream_info/stream_id_provider_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
@@ -231,22 +232,51 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
 TEST_F(StreamInfoImplTest, SetFrom) {
   StreamInfoImpl s1(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
 
+  // For testing setFromForRecreateStream
   s1.addBytesReceived(1);
   s1.downstreamTiming().onLastDownstreamRxByteReceived(test_time_.timeSystem());
+
+  // For testing setFrom
+  s1.setRouteName("foo");
+  s1.setVirtualClusterName(absl::optional<std::string>("bar"));
+  s1.setResponseCode(200);
+  s1.setResponseCodeDetails("OK");
+  s1.setConnectionTerminationDetails("baz");
+  s1.setUpstreamInfo(std::make_shared<UpstreamInfoImpl>());
+  s1.upstreamInfo()->upstreamTiming().onLastUpstreamTxByteSent(test_time_.timeSystem());
+  s1.onRequestComplete();
+  s1.setResponseFlag(FailedLocalHealthCheck);
+  s1.healthCheck(true);
+  s1.route_ = std::make_shared<NiceMock<Router::MockRoute>>();
+  s1.setDynamicMetadata("com.test", MessageUtil::keyValueStruct("test_key", "test_value"));
+  s1.filterState()->setData("test", std::make_unique<TestIntAccessor>(1),
+                            FilterState::StateType::ReadOnly, FilterState::LifeSpan::FilterChain);
+  Http::TestRequestHeaderMapImpl headers1;
+  s1.setRequestHeaders(headers1);
+  Upstream::ClusterInfoConstSharedPtr cluster_info(new NiceMock<Upstream::MockClusterInfo>());
+  s1.setUpstreamClusterInfo(cluster_info);
+  s1.setStreamIdProvider(
+      std::make_shared<StreamIdProviderImpl>("a121e9e1-feae-4136-9e0e-6fac343d56c9"));
+  s1.setTraceReason(Tracing::Reason::ClientForced);
+  s1.setFilterChainName("foobar");
+  s1.setAttemptCount(5);
 
 #ifdef __clang__
 #if defined(__linux__)
 #if defined(__has_feature) && !(__has_feature(thread_sanitizer))
-  ASSERT_TRUE(sizeof(s1) == 856 || sizeof(s1) == 872 || sizeof(s1) == 896)
+  ASSERT_TRUE(sizeof(s1) == 840)
       << "If adding fields to StreamInfoImpl, please check to see if you "
-         "need to add them to setFromForRecreateStream! Current size "
+         "need to add them to setFromForRecreateStream or setFrom! Current size "
       << sizeof(s1);
 #endif
 #endif
 #endif
 
   StreamInfoImpl s2(Http::Protocol::Http11, test_time_.timeSystem(), nullptr);
-  s2.setFromForRecreateStream(s1);
+  Http::TestRequestHeaderMapImpl headers2;
+  s2.setFrom(s1, &headers2);
+
+  // Copied by setFromForRecreateStream
   EXPECT_EQ(s1.startTime(), s2.startTime());
   EXPECT_EQ(s1.startTimeMonotonic(), s2.startTimeMonotonic());
   EXPECT_EQ(s1.downstreamTiming().lastDownstreamRxByteReceived(),
@@ -254,6 +284,36 @@ TEST_F(StreamInfoImplTest, SetFrom) {
   EXPECT_EQ(s1.protocol(), s2.protocol());
   EXPECT_EQ(s1.bytesReceived(), s2.bytesReceived());
   EXPECT_EQ(s1.getDownstreamBytesMeter(), s2.getDownstreamBytesMeter());
+
+  // Copied by setFrom
+  EXPECT_EQ(s1.getRouteName(), s2.getRouteName());
+  EXPECT_EQ(s1.virtualClusterName(), s2.virtualClusterName());
+  EXPECT_EQ(s1.responseCode(), s2.responseCode());
+  EXPECT_EQ(s1.responseCodeDetails(), s2.responseCodeDetails());
+  EXPECT_EQ(s1.connectionTerminationDetails(), s2.connectionTerminationDetails());
+  EXPECT_EQ(s1.upstreamInfo()->upstreamTiming().last_upstream_tx_byte_sent_,
+            s2.upstreamInfo()->upstreamTiming().last_upstream_tx_byte_sent_);
+  EXPECT_EQ(s1.requestComplete(), s2.requestComplete());
+  EXPECT_EQ(s1.responseFlags(), s2.responseFlags());
+  EXPECT_EQ(s1.healthCheck(), s2.healthCheck());
+  EXPECT_NE(s1.route(), nullptr);
+  EXPECT_EQ(s1.route(), s2.route());
+  EXPECT_EQ(
+      Config::Metadata::metadataValue(&s1.dynamicMetadata(), "com.test", "test_key").string_value(),
+      Config::Metadata::metadataValue(&s2.dynamicMetadata(), "com.test", "test_key")
+          .string_value());
+  EXPECT_EQ(s1.filterState()->getDataReadOnly<TestIntAccessor>("test")->access(),
+            s2.filterState()->getDataReadOnly<TestIntAccessor>("test")->access());
+  EXPECT_EQ(*s1.getRequestHeaders(), headers1);
+  EXPECT_EQ(*s2.getRequestHeaders(), headers2);
+  EXPECT_TRUE(s2.upstreamClusterInfo().has_value());
+  EXPECT_EQ(s1.upstreamClusterInfo(), s2.upstreamClusterInfo());
+  EXPECT_EQ(s1.getStreamIdProvider().value().get().toStringView().value(),
+            s2.getStreamIdProvider().value().get().toStringView().value());
+  EXPECT_EQ(s1.traceReason(), s2.traceReason());
+  EXPECT_EQ(s1.filterChainName(), s2.filterChainName());
+  EXPECT_EQ(s1.attemptCount(), s2.attemptCount());
+  EXPECT_EQ(s1.getUpstreamBytesMeter(), s2.getUpstreamBytesMeter());
 }
 
 TEST_F(StreamInfoImplTest, DynamicMetadataTest) {

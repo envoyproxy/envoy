@@ -1035,20 +1035,17 @@ public:
                           StreamInfo::FilterState::LifeSpan filter_state_life_span)
       : FilterManager(filter_manager_callbacks, dispatcher, connection, stream_id, account,
                       proxy_100_continue, buffer_limit, filter_chain_factory),
-        stream_info_(std::make_shared<OverridableRemoteConnectionInfoSetterStreamInfo>(
-            protocol, time_source, connection.connectionInfoProviderSharedPtr(),
-            parent_filter_state, filter_state_life_span)),
+        stream_info_(protocol, time_source, connection.connectionInfoProviderSharedPtr(),
+                     parent_filter_state, filter_state_life_span),
         local_reply_(local_reply) {}
 
   // TODO(snowp): This should probably return a StreamInfo instead of the impl.
-  StreamInfo::StreamInfoImpl& streamInfo() override { return *stream_info_; }
-  const StreamInfo::StreamInfoImpl& streamInfo() const override { return *stream_info_; }
-
-  std::shared_ptr<StreamInfo::StreamInfoImpl> streamInfoSharedPtr() { return stream_info_; }
+  StreamInfo::StreamInfoImpl& streamInfo() override { return stream_info_; }
+  const StreamInfo::StreamInfoImpl& streamInfo() const override { return stream_info_; }
 
   void setDownstreamRemoteAddress(
       const Network::Address::InstanceConstSharedPtr& downstream_remote_address) {
-    stream_info_->setDownstreamRemoteAddress(downstream_remote_address);
+    stream_info_.setDownstreamRemoteAddress(downstream_remote_address);
   }
 
   /**
@@ -1092,7 +1089,7 @@ private:
                             const absl::optional<Grpc::Status::GrpcStatus> grpc_status);
 
 private:
-  std::shared_ptr<OverridableRemoteConnectionInfoSetterStreamInfo> stream_info_;
+  OverridableRemoteConnectionInfoSetterStreamInfo stream_info_;
   const LocalReply::LocalReply& local_reply_;
 };
 

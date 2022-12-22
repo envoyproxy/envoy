@@ -1168,8 +1168,13 @@ TEST_P(QuicHttpIntegrationTest, MultipleNetworkFilters) {
 }
 
 TEST_P(QuicHttpIntegrationTest, DeferredLogging) {
-  useAccessLog("%PROTOCOL%,%ROUNDTRIP_DURATION%,%REQUEST_DURATION%,%RESPONSE_DURATION%,%RESPONSE_"
-               "CODE%,%BYTES_RECEIVED%");
+  useAccessLog(
+      "%PROTOCOL%,%ROUNDTRIP_DURATION%,%REQUEST_DURATION%,%RESPONSE_DURATION%,%RESPONSE_"
+      "CODE%,%BYTES_RECEIVED%,%ROUTE_NAME%,%VIRTUAL_CLUSTER_NAME%,%RESPONSE_CODE_DETAILS%,%"
+      "CONNECTION_TERMINATION_DETAILS%,%START_TIME%,%UPSTREAM_HOST%,%DURATION%,%BYTES_SENT%,%"
+      "RESPONSE_FLAGS%,%DOWNSTREAM_LOCAL_ADDRESS%,%UPSTREAM_CLUSTER%,%STREAM_ID%,%DYNAMIC_"
+      "METADATA("
+      "udp.proxy.session:bytes_sent)%,%REQ(:path)%,%STREAM_INFO_REQ(:path)%");
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   sendRequestAndWaitForResponse(default_request_headers_, /*request_size=*/0,
@@ -1181,20 +1186,28 @@ TEST_P(QuicHttpIntegrationTest, DeferredLogging) {
   std::string log = waitForAccessLog(access_log_name_);
 
   std::vector<std::string> metrics = absl::StrSplit(log, ",");
-  ASSERT_EQ(metrics.size(), 6);
+  ASSERT_EQ(metrics.size(), 21);
   EXPECT_EQ(/* PROTOCOL */ metrics.at(0), "HTTP/3");
   EXPECT_GT(/* ROUNDTRIP_DURATION */ std::stoi(metrics.at(1)), 0);
   EXPECT_GT(/* REQUEST_DURATION */ std::stoi(metrics.at(2)), 0);
   EXPECT_GT(/* RESPONSE_DURATION */ std::stoi(metrics.at(3)), 0);
   EXPECT_EQ(/* RESPONSE_CODE */ metrics.at(4), "200");
   EXPECT_EQ(/* BYTES_RECEIVED */ metrics.at(5), "0");
+  // Ensure that request headers from top-level access logger parameter and stream info are
+  // consistent.
+  EXPECT_EQ(/* request headers */ metrics.at(19), metrics.at(20));
 }
 
 TEST_P(QuicHttpIntegrationTest, DeferredLoggingDisabled) {
   config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_defer_logging_to_ack_listener",
                                     "false");
-  useAccessLog("%PROTOCOL%,%ROUNDTRIP_DURATION%,%REQUEST_DURATION%,%RESPONSE_DURATION%,%RESPONSE_"
-               "CODE%,%BYTES_RECEIVED%");
+  useAccessLog(
+      "%PROTOCOL%,%ROUNDTRIP_DURATION%,%REQUEST_DURATION%,%RESPONSE_DURATION%,%RESPONSE_"
+      "CODE%,%BYTES_RECEIVED%,%ROUTE_NAME%,%VIRTUAL_CLUSTER_NAME%,%RESPONSE_CODE_DETAILS%,%"
+      "CONNECTION_TERMINATION_DETAILS%,%START_TIME%,%UPSTREAM_HOST%,%DURATION%,%BYTES_SENT%,%"
+      "RESPONSE_FLAGS%,%DOWNSTREAM_LOCAL_ADDRESS%,%UPSTREAM_CLUSTER%,%STREAM_ID%,%DYNAMIC_"
+      "METADATA("
+      "udp.proxy.session:bytes_sent)%,%REQ(:path)%,%STREAM_INFO_REQ(:path)%");
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   sendRequestAndWaitForResponse(default_request_headers_, /*request_size=*/0,
@@ -1206,18 +1219,24 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingDisabled) {
   // Do not flush client acks.
   std::string log = waitForAccessLog(access_log_name_, 0, false, nullptr);
   std::vector<std::string> metrics = absl::StrSplit(log, ",");
-  ASSERT_EQ(metrics.size(), 6);
+  ASSERT_EQ(metrics.size(), 21);
   EXPECT_EQ(/* PROTOCOL */ metrics.at(0), "HTTP/3");
   EXPECT_EQ(/* ROUNDTRIP_DURATION */ metrics.at(1), "-");
   EXPECT_GT(/* REQUEST_DURATION */ std::stoi(metrics.at(2)), 0);
   EXPECT_GT(/* RESPONSE_DURATION */ std::stoi(metrics.at(3)), 0);
   EXPECT_EQ(/* RESPONSE_CODE */ metrics.at(4), "200");
   EXPECT_EQ(/* BYTES_RECEIVED */ metrics.at(5), "0");
+  EXPECT_EQ(/* request headers */ metrics.at(19), metrics.at(20));
 }
 
 TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithReset) {
-  useAccessLog("%PROTOCOL%,%ROUNDTRIP_DURATION%,%REQUEST_DURATION%,%RESPONSE_DURATION%,%RESPONSE_"
-               "CODE%,%BYTES_RECEIVED%");
+  useAccessLog(
+      "%PROTOCOL%,%ROUNDTRIP_DURATION%,%REQUEST_DURATION%,%RESPONSE_DURATION%,%RESPONSE_"
+      "CODE%,%BYTES_RECEIVED%,%ROUTE_NAME%,%VIRTUAL_CLUSTER_NAME%,%RESPONSE_CODE_DETAILS%,%"
+      "CONNECTION_TERMINATION_DETAILS%,%START_TIME%,%UPSTREAM_HOST%,%DURATION%,%BYTES_SENT%,%"
+      "RESPONSE_FLAGS%,%DOWNSTREAM_LOCAL_ADDRESS%,%UPSTREAM_CLUSTER%,%STREAM_ID%,%DYNAMIC_"
+      "METADATA("
+      "udp.proxy.session:bytes_sent)%,%REQ(:path)%,%STREAM_INFO_REQ(:path)%");
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
@@ -1228,18 +1247,24 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithReset) {
 
   std::string log = waitForAccessLog(access_log_name_);
   std::vector<std::string> metrics = absl::StrSplit(log, ",");
-  ASSERT_EQ(metrics.size(), 6);
+  ASSERT_EQ(metrics.size(), 21);
   EXPECT_EQ(/* PROTOCOL */ metrics.at(0), "HTTP/3");
   EXPECT_EQ(/* ROUNDTRIP_DURATION */ metrics.at(1), "-");
   EXPECT_GT(/* REQUEST_DURATION */ std::stoi(metrics.at(2)), 0);
   EXPECT_EQ(/* RESPONSE_DURATION */ metrics.at(3), "-");
   EXPECT_EQ(/* RESPONSE_CODE */ metrics.at(4), "0");
   EXPECT_EQ(/* BYTES_RECEIVED */ metrics.at(5), "0");
+  EXPECT_EQ(/* request headers */ metrics.at(19), metrics.at(20));
 }
 
 TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithQuicReset) {
-  useAccessLog("%PROTOCOL%,%ROUNDTRIP_DURATION%,%REQUEST_DURATION%,%RESPONSE_DURATION%,%RESPONSE_"
-               "CODE%,%BYTES_RECEIVED%");
+  useAccessLog(
+      "%PROTOCOL%,%ROUNDTRIP_DURATION%,%REQUEST_DURATION%,%RESPONSE_DURATION%,%RESPONSE_"
+      "CODE%,%BYTES_RECEIVED%,%ROUTE_NAME%,%VIRTUAL_CLUSTER_NAME%,%RESPONSE_CODE_DETAILS%,%"
+      "CONNECTION_TERMINATION_DETAILS%,%START_TIME%,%UPSTREAM_HOST%,%DURATION%,%BYTES_SENT%,%"
+      "RESPONSE_FLAGS%,%DOWNSTREAM_LOCAL_ADDRESS%,%UPSTREAM_CLUSTER%,%STREAM_ID%,%DYNAMIC_"
+      "METADATA("
+      "udp.proxy.session:bytes_sent)%,%REQ(:path)%,%STREAM_INFO_REQ(:path)%");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -1255,18 +1280,24 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithQuicReset) {
 
   std::string log = waitForAccessLog(access_log_name_);
   std::vector<std::string> metrics = absl::StrSplit(log, ",");
-  ASSERT_EQ(metrics.size(), 6);
+  ASSERT_EQ(metrics.size(), 21);
   EXPECT_EQ(/* PROTOCOL */ metrics.at(0), "HTTP/3");
   EXPECT_EQ(/* ROUNDTRIP_DURATION */ metrics.at(1), "-");
   EXPECT_EQ(/* REQUEST_DURATION */ metrics.at(2), "-");
   EXPECT_EQ(/* RESPONSE_DURATION */ metrics.at(3), "-");
   EXPECT_EQ(/* RESPONSE_CODE */ metrics.at(4), "400");
   EXPECT_EQ(/* BYTES_RECEIVED */ metrics.at(5), "0");
+  EXPECT_EQ(/* request headers */ metrics.at(19), metrics.at(20));
 }
 
 TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithInternalRedirect) {
-  useAccessLog("%PROTOCOL%,%ROUNDTRIP_DURATION%,%REQUEST_DURATION%,%RESPONSE_DURATION%,%RESPONSE_"
-               "CODE%,%BYTES_RECEIVED%,%RESPONSE_CODE_DETAILS%,%RESP(test-header)%");
+  useAccessLog(
+      "%PROTOCOL%,%ROUNDTRIP_DURATION%,%REQUEST_DURATION%,%RESPONSE_DURATION%,%RESPONSE_"
+      "CODE%,%BYTES_RECEIVED%,%ROUTE_NAME%,%VIRTUAL_CLUSTER_NAME%,%RESPONSE_CODE_DETAILS%,%"
+      "CONNECTION_TERMINATION_DETAILS%,%START_TIME%,%UPSTREAM_HOST%,%DURATION%,%BYTES_SENT%,%"
+      "RESPONSE_FLAGS%,%DOWNSTREAM_LOCAL_ADDRESS%,%UPSTREAM_CLUSTER%,%STREAM_ID%,%DYNAMIC_"
+      "METADATA("
+      "udp.proxy.session:bytes_sent)%,%REQ(:path)%,%STREAM_INFO_REQ(:path)%,%RESP(test-header)%");
   auto handle = config_helper_.createVirtualHost("handle.internal.redirect");
   handle.mutable_routes(0)->set_name("redirect");
   handle.mutable_routes(0)->mutable_route()->mutable_internal_redirect_policy();
@@ -1291,7 +1322,7 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithInternalRedirect) {
   upstream_request_->encodeHeaders(redirect_response, true);
   std::string log = waitForAccessLog(access_log_name_, 0);
   std::vector<std::string> metrics = absl::StrSplit(log, ",");
-  ASSERT_EQ(metrics.size(), 8);
+  ASSERT_EQ(metrics.size(), 22);
   EXPECT_EQ(/* PROTOCOL */ metrics.at(0), "HTTP/3");
   // no roundtrip duration for internal redirect.
   EXPECT_EQ(/* ROUNDTRIP_DURATION */ metrics.at(1), "-");
@@ -1299,8 +1330,9 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithInternalRedirect) {
   EXPECT_GT(/* RESPONSE_DURATION */ std::stoi(metrics.at(3)), 0);
   EXPECT_EQ(/* RESPONSE_CODE */ metrics.at(4), "302");
   EXPECT_EQ(/* BYTES_RECEIVED */ metrics.at(5), "0");
-  EXPECT_EQ(/* RESPONSE_CODE_DETAILS */ metrics.at(6), "internal_redirect");
-  EXPECT_EQ(/* RESP(test-header) */ metrics.at(7), "test-header-value");
+  EXPECT_EQ(/* request headers */ metrics.at(19), metrics.at(20));
+  EXPECT_EQ(/* RESPONSE_CODE_DETAILS */ metrics.at(8), "internal_redirect");
+  EXPECT_EQ(/* RESP(test-header) */ metrics.at(21), "test-header-value");
 
   waitForNextUpstreamRequest();
   ASSERT(upstream_request_->headers().EnvoyOriginalUrl() != nullptr);
@@ -1322,7 +1354,7 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithInternalRedirect) {
 
   log = waitForAccessLog(access_log_name_, 1);
   metrics = absl::StrSplit(log, ",");
-  ASSERT_EQ(metrics.size(), 8);
+  ASSERT_EQ(metrics.size(), 22);
   EXPECT_EQ(/* PROTOCOL */ metrics.at(0), "HTTP/3");
   // roundtrip duration populated on final log.
   EXPECT_GT(/* ROUNDTRIP_DURATION */ std::stoi(metrics.at(1)), 0);
@@ -1330,9 +1362,10 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithInternalRedirect) {
   EXPECT_GT(/* RESPONSE_DURATION */ std::stoi(metrics.at(3)), 0);
   EXPECT_EQ(/* RESPONSE_CODE */ metrics.at(4), "200");
   EXPECT_EQ(/* BYTES_RECEIVED */ metrics.at(5), "0");
-  EXPECT_EQ(/* RESPONSE_CODE_DETAILS */ metrics.at(6), "via_upstream");
+  EXPECT_EQ(/* request headers */ metrics.at(19), metrics.at(20));
+  EXPECT_EQ(/* RESPONSE_CODE_DETAILS */ metrics.at(8), "via_upstream");
   // no test header
-  EXPECT_EQ(/* RESP(test-header) */ metrics.at(7), "-");
+  EXPECT_EQ(/* RESP(test-header) */ metrics.at(21), "-");
 }
 
 class QuicInplaceLdsIntegrationTest : public QuicHttpIntegrationTest {

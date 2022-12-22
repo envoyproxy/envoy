@@ -22,7 +22,6 @@ public:
 
   void setRequestDecoder(Http::RequestDecoder& decoder) override {
     request_decoder_ = &decoder;
-    stats_gatherer_->setStreamInfo(request_decoder_->streamInfoSharedPtr());
     stats_gatherer_->setAccessLogHandlers(request_decoder_->accessLogHandlers());
   }
 
@@ -39,8 +38,8 @@ public:
     return http3_options_.override_stream_error_on_invalid_http_message().value();
   }
   void setDeferredLoggingHeadersAndTrailers(
-      Http::DeferredLoggingHeadersAndTrailers headers_and_trailers) override {
-    stats_gatherer_->setDeferredLoggingHeadersAndTrailers(std::move(headers_and_trailers));
+      Http::DeferredLoggingHeadersAndTrailers& headers_and_trailers) override {
+    stats_gatherer_->setDeferredLoggingHeadersAndTrailers(headers_and_trailers);
   };
 
   // Http::Stream

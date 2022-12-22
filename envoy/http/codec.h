@@ -139,6 +139,7 @@ struct DeferredLoggingHeadersAndTrailers {
   Http::RequestHeaderMapSharedPtr request_header_map = nullptr;
   Http::ResponseHeaderMapSharedPtr response_header_map = nullptr;
   Http::ResponseTrailerMapSharedPtr response_trailer_map = nullptr;
+  std::unique_ptr<StreamInfo::StreamInfo> stream_info = nullptr;
 };
 
 /**
@@ -186,8 +187,8 @@ public:
    * Set headers and trailers for deferred logging.
    * @param headers_and_trailers Headers and trailers from this stream.
    */
-  virtual void
-  setDeferredLoggingHeadersAndTrailers(DeferredLoggingHeadersAndTrailers headers_and_trailers) PURE;
+  virtual void setDeferredLoggingHeadersAndTrailers(
+      DeferredLoggingHeadersAndTrailers& headers_and_trailers) PURE;
 };
 
 /**
@@ -250,11 +251,6 @@ public:
    * @return StreamInfo::StreamInfo& the stream_info for this stream.
    */
   virtual StreamInfo::StreamInfo& streamInfo() PURE;
-
-  /**
-   * @return shared pointer to the stream_info for this stream.
-   */
-  virtual std::shared_ptr<StreamInfo::StreamInfo> streamInfoSharedPtr() PURE;
 
   /**
    * @return List of shared pointers to access loggers for this stream.

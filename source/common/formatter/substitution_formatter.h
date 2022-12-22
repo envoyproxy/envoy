@@ -661,5 +661,25 @@ private:
   ProtobufWkt::Value str_;
 };
 
+/**
+ * FormatterProvider for request headers from StreamInfo (rather than the request_headers param).
+ * Purely for testing.
+ */
+class StreamInfoRequestHeaderFormatter : public FormatterProvider, HeaderFormatter {
+public:
+  StreamInfoRequestHeaderFormatter(const std::string& main_header,
+                                   const std::string& alternative_header,
+                                   absl::optional<size_t> max_length);
+
+  // FormatterProvider
+  absl::optional<std::string> format(const Http::RequestHeaderMap& request_headers,
+                                     const Http::ResponseHeaderMap&,
+                                     const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
+                                     absl::string_view) const override;
+  ProtobufWkt::Value formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
+                                 const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
+                                 absl::string_view) const override;
+};
+
 } // namespace Formatter
 } // namespace Envoy

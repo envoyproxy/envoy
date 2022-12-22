@@ -54,7 +54,6 @@ public:
             envoy::config::core::v3::HttpProtocolOptions::ALLOW)),
         response_headers_{{":status", "200"}, {"response-key", "response-value"}},
         response_trailers_{{"trailer-key", "trailer-value"}} {
-    EXPECT_CALL(stream_decoder_, streamInfoSharedPtr());
     EXPECT_CALL(stream_decoder_, accessLogHandlers());
     quic_stream_->setRequestDecoder(stream_decoder_);
     quic_stream_->addCallbacks(stream_callbacks_);
@@ -104,10 +103,8 @@ public:
   }
 
   void setStatsGathererDetails(std::list<AccessLog::InstanceSharedPtr> access_loggers,
-                               std::shared_ptr<StreamInfo::StreamInfo> stream_info,
-                               Http::DeferredLoggingHeadersAndTrailers headers_and_trailers) {
+                               Http::DeferredLoggingHeadersAndTrailers& headers_and_trailers) {
     quic_stream_->stats_gatherer_->setAccessLogHandlers(access_loggers);
-    quic_stream_->stats_gatherer_->setStreamInfo(stream_info);
     quic_stream_->stats_gatherer_->setDeferredLoggingHeadersAndTrailers(headers_and_trailers);
   }
 
@@ -774,11 +771,12 @@ TEST_F(EnvoyQuicServerStreamTest, StatsGathererLogsOnStreamDestruction) {
   std::shared_ptr<AccessLog::MockInstance> mock_logger(new NiceMock<AccessLog::MockInstance>());
   std::list<AccessLog::InstanceSharedPtr> loggers = {mock_logger};
   Event::GlobalTimeSystem test_time_;
-  Envoy::StreamInfo::StreamInfoImpl s1(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
-  std::shared_ptr<Envoy::StreamInfo::StreamInfo> stream_info =
-      std::make_shared<Envoy::StreamInfo::StreamInfoImpl>(s1);
+  std::unique_ptr<Envoy::StreamInfo::StreamInfo> stream_info =
+      std::make_unique<Envoy::StreamInfo::StreamInfoImpl>(Http::Protocol::Http2,
+                                                          test_time_.timeSystem(), nullptr);
   Http::DeferredLoggingHeadersAndTrailers headers_and_trailers;
-  setStatsGathererDetails(loggers, stream_info, headers_and_trailers);
+  headers_and_trailers.stream_info = std::move(stream_info);
+  setStatsGathererDetails(loggers, headers_and_trailers);
 
   receiveRequest(request_body_, false, request_body_.size() * 2);
   quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/true);

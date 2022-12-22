@@ -201,9 +201,6 @@ private:
                         absl::string_view details) override {
       return filter_manager_.sendLocalReply(code, body, modify_headers, grpc_status, details);
     }
-    std::shared_ptr<StreamInfo::StreamInfo> streamInfoSharedPtr() override {
-      return filter_manager_.streamInfoSharedPtr();
-    }
     std::list<AccessLog::InstanceSharedPtr> accessLogHandlers() override {
       return filter_manager_.accessLogHandlers();
     }
@@ -218,7 +215,15 @@ private:
       if (responseTrailers()) {
         headers_and_trailers.response_trailer_map = response_trailers_;
       }
-      response_encoder_->setDeferredLoggingHeadersAndTrailers(std::move(headers_and_trailers));
+      // Copy this stream's StreamInfo into the deferred logging object, ensuring that the request
+      // headers pointed to by the StreamInfo lives beyond stream destruction.
+      std::unique_ptr<StreamInfo::StreamInfoImpl> stream_info =
+          std::make_unique<StreamInfo::StreamInfoImpl>(
+              connection_manager_.codec_->protocol(), connection_manager_.time_source_,
+              connection_manager_.read_callbacks_->connection().connectionInfoProviderSharedPtr());
+      stream_info->setFrom(streamInfo(), request_headers_.get());
+      headers_and_trailers.stream_info = std::move(stream_info);
+      response_encoder_->setDeferredLoggingHeadersAndTrailers(headers_and_trailers);
     }
 
     // ScopeTrackedObject

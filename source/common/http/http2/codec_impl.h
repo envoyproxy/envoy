@@ -498,8 +498,7 @@ protected:
       encodeTrailersBase(trailers);
     }
     void setRequestDecoder(Http::RequestDecoder& decoder) override { request_decoder_ = &decoder; }
-    void setDeferredLoggingHeadersAndTrailers(
-        Http::DeferredLoggingHeadersAndTrailers /*headers_and_trailers*/) override {}
+    void setDeferredLoggingHeadersAndTrailers(Http::DeferredLoggingHeadersAndTrailers&) override {}
 
     // ScopeTrackedObject
     void dumpState(std::ostream& os, int indent_level) const override;

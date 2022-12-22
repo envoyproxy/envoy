@@ -29,18 +29,13 @@ public:
   }
   // Log this stream using available stream info and access loggers.
   void maybeDoDeferredLog(bool record_ack_timing = true);
-  // Add a pointer to stream info that should be logged. This can be overwritten
-  // in case of an internal redirect.
-  void setStreamInfo(std::shared_ptr<StreamInfo::StreamInfo> stream_info) {
-    stream_info_ = stream_info;
-  }
   // Set list of pointers to access loggers.
   void setAccessLogHandlers(std::list<AccessLog::InstanceSharedPtr> handlers) {
     access_log_handlers_ = handlers;
   }
   // Set headers and trailers used for deferred logging.
   void setDeferredLoggingHeadersAndTrailers(
-      Http::DeferredLoggingHeadersAndTrailers headers_and_trailers) {
+      Http::DeferredLoggingHeadersAndTrailers& headers_and_trailers) {
     deferred_logging_headers_and_trailers_ =
         absl::make_optional<Http::DeferredLoggingHeadersAndTrailers>(
             std::move(headers_and_trailers));
@@ -51,7 +46,6 @@ public:
 private:
   uint64_t bytes_outstanding_ = 0;
   bool fin_sent_ = false;
-  std::shared_ptr<StreamInfo::StreamInfo> stream_info_ = nullptr;
   std::list<AccessLog::InstanceSharedPtr> access_log_handlers_{};
   // Headers and trailers required for deferred logging. nullopt indicates that deferred logging
   // should be skipped.
