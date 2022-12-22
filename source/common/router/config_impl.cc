@@ -514,7 +514,6 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       per_filter_configs_(route.typed_per_filter_config(), optional_http_filters, factory_context,
                           validator),
       route_name_(route.name()), time_source_(factory_context.mainThreadDispatcher().timeSource()),
-      random_value_header_name_(route.route().weighted_clusters().header_name()),
       retry_shadow_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           route, per_request_buffer_limit_bytes, vhost.retryShadowBufferLimit())),
       direct_response_code_(ConfigUtility::parseDirectResponseCode(route)),
@@ -565,6 +564,9 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
   // the criteria from the route.
   if (route.route().cluster_specifier_case() ==
       envoy::config::route::v3::RouteAction::ClusterSpecifierCase::kWeightedClusters) {
+    weighted_clusters_config_ = std::make_unique<WeightedClustersConfig>();
+    weighted_clusters_config_->random_value_header_name_ =
+        route.route().weighted_clusters().header_name();
 
     uint64_t total_weight = 0UL;
     const std::string& runtime_key_prefix = route.route().weighted_clusters().runtime_key_prefix();
@@ -573,8 +575,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       auto cluster_entry = std::make_unique<WeightedClusterEntry>(
           this, runtime_key_prefix + "." + cluster.name(), factory_context, validator, cluster,
           optional_http_filters);
-      weighted_clusters_.emplace_back(std::move(cluster_entry));
-      total_weight += weighted_clusters_.back()->clusterWeight();
+      weighted_clusters_config_->weighted_clusters_.emplace_back(std::move(cluster_entry));
+      total_weight += weighted_clusters_config_->weighted_clusters_.back()->clusterWeight();
     }
 
     // Reject the config if the total_weight of all clusters is 0.
@@ -582,7 +584,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       throw EnvoyException("Sum of weights in the weighted_cluster must be greater than 0.");
     }
 
-    total_cluster_weight_ = total_weight;
+    weighted_clusters_config_->total_cluster_weight_ = total_weight;
   } else if (route.route().cluster_specifier_case() ==
              envoy::config::route::v3::RouteAction::ClusterSpecifierCase::
                  kInlineClusterSpecifierPlugin) {
@@ -1296,7 +1298,7 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::RequestHeaderMa
                                                      uint64_t random_value) const {
   // Gets the route object chosen from the list of weighted clusters
   // (if there is one) or returns self.
-  if (weighted_clusters_.empty()) {
+  if (weighted_clusters_config_ == nullptr) {
     if (!cluster_name_.empty() || isDirectResponse()) {
       return shared_from_this();
     } else if (!cluster_header_name_.get().empty()) {
@@ -1317,8 +1319,12 @@ RouteConstSharedPtr RouteEntryImplBase::pickWeightedCluster(const Http::HeaderMa
                                                             const bool ignore_overflow) const {
   absl::optional<uint64_t> random_value_from_header;
   // Retrieve the random value from the header if corresponding header name is specified.
-  if (!random_value_header_name_.empty()) {
-    const auto header_value = headers.get(Envoy::Http::LowerCaseString(random_value_header_name_));
+  // weighted_clusters_config_ is known not to be nullptr here. If it were, pickWeightedCluster
+  // would not be called.
+  ASSERT(weighted_clusters_config_ != nullptr);
+  if (!weighted_clusters_config_->random_value_header_name_.empty()) {
+    const auto header_value = headers.get(
+        Envoy::Http::LowerCaseString(weighted_clusters_config_->random_value_header_name_));
     if (!header_value.empty() && header_value.size() == 1) {
       // We expect single-valued header here, otherwise it will potentially cause inconsistent
       // weighted cluster picking throughout the process because different values are used to
@@ -1340,20 +1346,21 @@ RouteConstSharedPtr RouteEntryImplBase::pickWeightedCluster(const Http::HeaderMa
 
   const uint64_t selected_value =
       (random_value_from_header.has_value() ? random_value_from_header.value() : random_value) %
-      total_cluster_weight_;
+      weighted_clusters_config_->total_cluster_weight_;
   uint64_t begin = 0;
   uint64_t end = 0;
 
   // Find the right cluster to route to based on the interval in which
   // the selected value falls. The intervals are determined as
   // [0, cluster1_weight), [cluster1_weight, cluster1_weight+cluster2_weight),..
-  for (const WeightedClusterEntrySharedPtr& cluster : weighted_clusters_) {
+  for (const WeightedClusterEntrySharedPtr& cluster :
+       weighted_clusters_config_->weighted_clusters_) {
     end = begin + cluster->clusterWeight();
     if (!ignore_overflow) {
       // end > total_cluster_weight: This case can only occur with Runtimes,
       // when the user specifies invalid weights such that
       // sum(weights) > total_cluster_weight.
-      ASSERT(end <= total_cluster_weight_);
+      ASSERT(end <= weighted_clusters_config_->total_cluster_weight_);
     }
 
     if (selected_value >= begin && selected_value < end) {
@@ -1386,8 +1393,9 @@ void RouteEntryImplBase::validateClusters(
     if (!cluster_info_maps.hasCluster(cluster_name_)) {
       throw EnvoyException(fmt::format("route: unknown cluster '{}'", cluster_name_));
     }
-  } else if (!weighted_clusters_.empty()) {
-    for (const WeightedClusterEntrySharedPtr& cluster : weighted_clusters_) {
+  } else if (weighted_clusters_config_ != nullptr) {
+    for (const WeightedClusterEntrySharedPtr& cluster :
+         weighted_clusters_config_->weighted_clusters_) {
       if (!cluster->clusterName().empty()) {
         if (!cluster_info_maps.hasCluster(cluster->clusterName())) {
           throw EnvoyException(
