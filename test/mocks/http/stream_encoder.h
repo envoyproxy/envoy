@@ -49,6 +49,8 @@ public:
   MOCK_METHOD(void, encodeHeaders, (const ResponseHeaderMap& headers, bool end_stream));
   MOCK_METHOD(void, encodeTrailers, (const ResponseTrailerMap& trailers));
   MOCK_METHOD(void, setRequestDecoder, (RequestDecoder & decoder));
+  MOCK_METHOD(void, setDeferredLoggingHeadersAndTrailers,
+              (DeferredLoggingHeadersAndTrailers & headers_and_trailers));
 
   // Http::StreamEncoder
   MOCK_METHOD(void, encodeData, (Buffer::Instance & data, bool end_stream));
