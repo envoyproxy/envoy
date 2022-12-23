@@ -979,7 +979,7 @@ Router::RouteConstSharedPtr ConnectionManager::ActiveRpc::route() {
           parent_.config_.routerConfig().route(*metadata_, stream_id_);
       cached_route_ = std::move(route);
     } else {
-      cached_route_ = nullptr;
+      cached_route_ = absl::optional<Router::RouteConstSharedPtr>();
     }
   }
 
@@ -1052,6 +1052,10 @@ ThriftFilters::ResponseStatus ConnectionManager::ActiveRpc::upstreamData(Buffer:
     onError(ex.what());
     return ThriftFilters::ResponseStatus::Reset;
   }
+}
+
+void ConnectionManager::ActiveRpc::clearRouteCache() {
+  cached_route_ = absl::optional<Router::RouteConstSharedPtr>();
 }
 
 void ConnectionManager::ActiveRpc::resetDownstreamConnection() {
