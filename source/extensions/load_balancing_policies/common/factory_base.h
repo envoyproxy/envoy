@@ -17,7 +17,7 @@ public:
   Upstream::ThreadAwareLoadBalancerPtr create(const Upstream::ClusterInfo& cluster_info,
                                               const Upstream::PrioritySet& priority_set,
                                               Runtime::Loader& runtime,
-                                              Random::RandomGenerator& random,
+                                              Envoy::Random::RandomGenerator& random,
                                               TimeSource& time_source) override {
     return std::make_unique<ThreadAwareLb>(
         std::make_shared<LbFactory>(cluster_info, priority_set, runtime, random, time_source));
@@ -33,7 +33,8 @@ private:
   class LbFactory : public Upstream::LoadBalancerFactory {
   public:
     LbFactory(const Upstream::ClusterInfo& cluster_info, const Upstream::PrioritySet& priority_set,
-              Runtime::Loader& runtime, Random::RandomGenerator& random, TimeSource& time_source)
+              Runtime::Loader& runtime, Envoy::Random::RandomGenerator& random,
+              TimeSource& time_source)
         : cluster_info_(cluster_info), priority_set_(priority_set), runtime_(runtime),
           random_(random), time_source_(time_source) {}
 
@@ -46,7 +47,7 @@ private:
     const Upstream::ClusterInfo& cluster_info_;
     const Upstream::PrioritySet& priority_set_;
     Runtime::Loader& runtime_;
-    Random::RandomGenerator& random_;
+    Envoy::Random::RandomGenerator& random_;
     TimeSource& time_source_;
   };
 
