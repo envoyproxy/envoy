@@ -7,10 +7,10 @@
 #include "source/server/admin/stats_params.h"
 #include "source/server/admin/stats_render.h"
 #include "source/server/admin/utils.h"
+#include "source/server/admin/base_stats_request.h"
 
 #include "absl/container/btree_map.h"
 #include "absl/types/variant.h"
-#include "base_stats_request.h"
 
 namespace Envoy {
 namespace Server {
@@ -21,19 +21,10 @@ class PrometheusStatsRequest
           std::vector<Stats::GaugeSharedPtr>, std::vector<Stats::HistogramSharedPtr>> {
 
 public:
+
   PrometheusStatsRequest(Stats::Store& stats, const StatsParams& params,
                          Stats::CustomStatNamespaces& custom_namespaces,
                          UrlHandlerFn url_handler_fn = nullptr);
-
-  // Admin::Request
-  Http::Code start(Http::ResponseHeaderMap& response_headers) override;
-
-  bool nextChunk(Buffer::Instance& response) override;
-
-  // StatsRequestBase
-  void startPhase();
-
-  void populateStatsForCurrentPhase(const ScopeVec& scope_vec);
 
   template <class StatType> void populateStatsFromScopes(const ScopeVec& scope_vec);
 

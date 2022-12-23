@@ -320,5 +320,13 @@ void PrometheusStatsRender::generate(Buffer::Instance& response,
                            stats.sampleCount()));
 }
 
+void PrometheusStatsRender::finalize(Buffer::Instance&) {}
+
+void PrometheusStatsRender::generate(Buffer::Instance& , const std::string& ,
+                               const std::string& ) {}
+
+void PrometheusStatsRender::generate(Buffer::Instance& , const std::string& ,
+                               uint64_t ) {}
+
 } // namespace Server
 } // namespace Envoy

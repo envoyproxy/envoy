@@ -1,11 +1,8 @@
-#include "base_stats_request.h"
 #include "source/server/admin/base_stats_request.h"
 
 #include <iostream>
 #include <string>
 #include <vector>
-
-#include "source/server/admin/prometheus_stats.h"
 
 #include "stats_params.h"
 
@@ -16,14 +13,11 @@
 namespace Envoy {
 namespace Server {
 
-template <class TextReadoutType, class CounterType, class GaugeType, class HistogramType>
-StatsRequestBase<TextReadoutType, CounterType, GaugeType, HistogramType>::StatsRequestBase(
+template <class TR, class C, class G, class H> StatsRequestBase<TR, C, G, H>::StatsRequestBase(
     Stats::Store& stats, const StatsParams& params, UrlHandlerFn url_handler_fn)
-    : stats_(stats), params_(params), url_handler_fn_(url_handler_fn) {}
+    : params_(params), stats_(stats), url_handler_fn_(url_handler_fn) {}
 
-template <class TextReadoutType, class CounterType, class GaugeType, class HistogramType>
-Http::Code StatsRequestBase<TextReadoutType, CounterType, GaugeType, HistogramType>::start(
-    Http::ResponseHeaderMap& response_headers) {
+template <class TR, class C, class G, class H> Http::Code StatsRequestBase<TR, C, G, H>::start(Http::ResponseHeaderMap& response_headers) {
   switch (params_.format_) {
   case StatsFormat::Json:
     render_ = std::make_unique<StatsJsonRender>(response_headers, response_, params_);
@@ -61,8 +55,7 @@ Http::Code StatsRequestBase<TextReadoutType, CounterType, GaugeType, HistogramTy
   return Http::Code::OK;
 }
 
-template <class TextReadoutType, class CounterType, class GaugeType, class HistogramType>
-bool StatsRequestBase<TextReadoutType, CounterType, GaugeType, HistogramType>::nextChunk(
+template <class TR, class C, class G, class H> bool StatsRequestBase<TR, C, G, H>::nextChunk(
     Buffer::Instance& response) {
   if (response_.length() > 0) {
     ASSERT(response.length() == 0);
@@ -76,7 +69,7 @@ bool StatsRequestBase<TextReadoutType, CounterType, GaugeType, HistogramType>::n
   while (response.length() - starting_response_length < chunk_size_) {
     while (stat_map_.empty()) {
       if (phase_stat_count_ == 0) {
-        render_->noStats(response, phases_.get(phase_).phase_label);
+        render_->noStats(response, phases_.at(phase_).phase_label);
       } else {
         phase_stat_count_ = 0;
       }
@@ -85,7 +78,8 @@ bool StatsRequestBase<TextReadoutType, CounterType, GaugeType, HistogramType>::n
         return false;
       }
 
-      // check if we have gone through all phases
+      // check if we are at the last phase: in that case, we are done;
+      // if not, move phase index at next phase and start next phase
       if (phase_ == phases_.size() - 1) {
         render_->finalize(response);
         return false;
@@ -109,19 +103,19 @@ bool StatsRequestBase<TextReadoutType, CounterType, GaugeType, HistogramType>::n
       populateStatsForCurrentPhase(absl::get<ScopeVec>(variant));
       break;
     case StatOrScopesIndex::TextReadout:
-      handleTextReadout(variant);
+      handleTextReadout(response, variant);
       stat_map_.erase(iter);
       break;
     case StatOrScopesIndex::Counter:
-      handleCounter(variant);
+      handleCounter(response,variant);
       stat_map_.erase(iter);
       break;
     case StatOrScopesIndex::Gauge:
-      handleGauge(variant);
+      handleGauge(response, variant);
       stat_map_.erase(iter);
       break;
     case StatOrScopesIndex::Histogram:
-      handleHistogram(variant);
+      handleHistogram(response, variant);
       stat_map_.erase(iter);
       break;
     }
@@ -129,8 +123,7 @@ bool StatsRequestBase<TextReadoutType, CounterType, GaugeType, HistogramType>::n
   return true;
 }
 
-template <class TextReadoutType, class CounterType, class GaugeType, class HistogramType>
-void StatsRequestBase<TextReadoutType, CounterType, GaugeType, HistogramType>::startPhase() {
+template <class TR, class C, class G, class H> void StatsRequestBase<TR, C, G, H>::startPhase() {
   ASSERT(stat_map_.empty());
 
   // Insert all the scopes in the alphabetically ordered map. As we iterate
@@ -145,10 +138,9 @@ void StatsRequestBase<TextReadoutType, CounterType, GaugeType, HistogramType>::s
   }
 }
 
-template <class TextReadoutType, class CounterType, class GaugeType, class HistogramType>
-void StatsRequestBase<TextReadoutType, CounterType, GaugeType,
-                      HistogramType>::populateStatsForCurrentPhase(const ScopeVec& scope_vec) {
-  Phase current_phase = phases_.get(phase_);
+template <class TR, class C, class G, class H>
+void StatsRequestBase<TR, C, G, H>::populateStatsForCurrentPhase(const ScopeVec& scope_vec) {
+  Phase current_phase = phases_.at(phase_);
   switch (current_phase.phase) {
   case PhaseName::TextReadouts:
     populateStatsFromScopes<Stats::TextReadout>(scope_vec);
@@ -172,6 +164,17 @@ void StatsRequestBase<TextReadoutType, CounterType, GaugeType,
     break;
   }
 }
+
+// these will be overriden by concrete subclasses
+template <class TR, class C, class G, class H>
+template <class StatType>
+void StatsRequestBase<TR, C, G, H>::populateStatsFromScopes(const ScopeVec& ) {}
+
+template <class TR, class C, class G, class H>
+template <class SharedStatType>
+void StatsRequestBase<TR, C, G, H>::renderStat(const std::string& , Buffer::Instance& , const StatOrScopes&) {}
+
+template class StatsRequestBase<std::vector<Stats::TextReadoutSharedPtr>, std::vector<Stats::CounterSharedPtr>, std::vector<Stats::GaugeSharedPtr>, std::vector<Stats::HistogramSharedPtr>>;
 
 } // namespace Server
 } // namespace Envoy
