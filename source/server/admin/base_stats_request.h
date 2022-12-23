@@ -15,7 +15,7 @@
 namespace Envoy {
 namespace Server {
 
-template <class TextReadoutType, class CounterType, class GaugeType, class HistogramType>
+template <class TR, class C, class G, class H>
 class StatsRequestBase : public Admin::Request {
 protected:
   enum class StatOrScopesIndex { Scopes, TextReadout, Counter, Gauge, Histogram };
@@ -28,17 +28,17 @@ protected:
     Histograms,
   };
 
-  using ScopeVec = std::vector<Stats::ConstScopeSharedPtr>;
-
-  using StatOrScopes =
-      absl::variant<ScopeVec, TextReadoutType, CounterType, GaugeType, HistogramType>;
-
-public:
   struct Phase {
   public:
     PhaseName phase;
     std::string phase_label;
   };
+
+public:
+  using ScopeVec = std::vector<Stats::ConstScopeSharedPtr>;
+
+  using StatOrScopes = absl::variant<ScopeVec, TR, C, G, H>;
+
 
   using UrlHandlerFn = std::function<Admin::UrlHandler()>;
 
@@ -46,6 +46,8 @@ public:
 
   StatsRequestBase(Stats::Store& stats, const StatsParams& params,
                    UrlHandlerFn url_handler_fn = nullptr);
+
+  virtual ~StatsRequestBase() = default;
 
   // Admin::Request
   Http::Code start(Http::ResponseHeaderMap& response_headers) override;
@@ -82,7 +84,7 @@ protected:
   UrlHandlerFn url_handler_fn_;
   uint64_t chunk_size_{DefaultChunkSize};
 
-  // phase related fields
+  // phase-related state
   uint64_t phase_stat_count_{0};
   unsigned short phase_;
   std::vector<Phase> phases_;

@@ -2,6 +2,8 @@
 
 #include <string>
 #include <vector>
+#include <iostream>
+
 
 #include "source/server/admin/prometheus_stats.h"
 
@@ -92,7 +94,7 @@ void PrometheusStatsRequest::handleHistogram(Buffer::Instance& response,
   }
 }
 
-template <class StatType>
+template <typename StatType>
 void PrometheusStatsRequest::populateStatsFromScopes(const ScopeVec& scope_vec) {
   Stats::IterateFn<StatType> check_stat = [this](const Stats::RefcountPtr<StatType>& stat) -> bool {
     if (params_.used_only_ && !stat->used()) {
