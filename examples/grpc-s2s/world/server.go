@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/envoy/examples/grpc-s2s/service"
 	"golang.org/x/net/context"
@@ -57,6 +60,19 @@ func main() {
 		service.World_ServiceDesc.ServiceName,
 		healthsvc.HealthCheckResponse_SERVING,
 	)
+
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGUSR1)
+
+	go func() {
+		<-sigs
+		log.Printf("Marking service %s as unhealthy", service.World_ServiceDesc.ServiceName)
+		updateServiceHealth(
+			healthServer,
+			service.World_ServiceDesc.ServiceName,
+			healthsvc.HealthCheckResponse_NOT_SERVING,
+		)
+	}()
 
 	log.Printf("starting grpc on :%d\n", *port)
 	gs.Serve(lis)

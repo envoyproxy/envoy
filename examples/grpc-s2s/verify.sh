@@ -1,24 +1,32 @@
 #!/bin/bash -e
 
-export NAME=grpc-bridge
-# this allows us to bring up the stack manually after generating stubs
-export MANUAL=true
+export NAME=grpc-s2s
+export PORT_PROXY="${FRONT_PROXY_PORT_PROXY:-12000}"
 
 # shellcheck source=examples/verify-common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
 
+# TODO network=host
+run_log "Make an example request"
+docker run --network=host fullstorydev/grpcurl -plaintext "localhost:${PORT_PROXY}" Hello/Greet
 
-run_log "Generate protocol stubs"
-"$DOCKER_COMPOSE" -f docker-compose-protos.yaml up
-docker rm grpc-bridge_stubs_go_1 grpc-bridge_stubs_python_1
+run_log "Render an instance of Hello unhealthy"
+docker-compose exec --index 1 hello kill -SIGUSR1 1
 
-ls client/kv/kv_pb2.py
-ls server/kv/kv.pb.go
+sleep 60
+curl "http://localhost:9090/clusters" | grep failed_active_hc
 
-bring_up_example
+docker run --network=host fullstorydev/grpcurl -plaintext "localhost:${PORT_PROXY}" Hello/Greet
 
-run_log "Set key value foo=bar"
-"$DOCKER_COMPOSE" exec -T grpc-client /client/grpc-kv-client.py set foo bar | grep setf
+run_log "Render an instance of World unhealthy"
+docker-compose exec --index 1 world kill -SIGUSR1 1
+sleep 60
+curl "http://localhost:9091/clusters" | grep failed_active_hc
 
-run_log "Get key foo"
-"$DOCKER_COMPOSE" exec -T grpc-client /client/grpc-kv-client.py get foo | grep bar
+docker run --network=host fullstorydev/grpcurl -plaintext "localhost:${PORT_PROXY}" Hello/Greet
+
+
+run_log "Query healthcheck metrics"
+curl "http://localhost:9090/stats" | grep cluster.hello.health_check
+curl "http://localhost:9091/stats" | grep cluster.world.health_check
+

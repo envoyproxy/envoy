@@ -1,32 +1,52 @@
 version: "3.8"
 services:
-
-  #client:
+  stubs_go:
+    build:
+      context: .
+      dockerfile: Dockerfile-grpc-go
+    command: protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative hello.proto world.proto
+    volumes:
+    - ./protos:/protos
 
   envoy-hello:
     build:
       context: .
       dockerfile: Dockerfile-envoy-hello
     ports:
-    - "${PORT_PROXY:-10000}:8080"
+    - "${PORT_PROXY:-12000}:8080"
     - 9090:9090
+    depends_on:
+      hello:
+        condition: service_healthy
 
   hello:
     build:
       context: .
       dockerfile: Dockerfile-hello
     command: ["/bin/server", "-world-addr=envoy-world:8080"]
+    depends_on:
+      - stubs_go
+    deploy:
+      mode: replicated
+      replicas: 2
 
   envoy-world:
     build:
       context: .
       dockerfile: Dockerfile-envoy-world
     ports:
-    - "${PORT_PROXY:-10000}:8080"
-    - 9090:9090
+    - 9091:9090
+    depends_on:
+      world:
+        condition: service_healthy
 
   world:
     build:
       context: .
       dockerfile: Dockerfile-world
     command: ["/bin/server"]
+    depends_on:
+      - stubs_go
+    deploy:
+      mode: replicated
+      replicas: 2

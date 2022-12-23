@@ -1,5 +1,7 @@
 FROM golang:1.19.3-bullseye as builder
 
+RUN go install github.com/grpc-ecosystem/grpc-health-probe@v0.4.14
+
 WORKDIR /build
 
 COPY hello /build/hello
@@ -13,9 +15,18 @@ ENV CGO_ENABLED=0
 WORKDIR /build/hello
 RUN go build -o server
 
-# Build the main container (Linux Runtime)
 FROM debian:bullseye-slim
-WORKDIR /root/
 
-# Copy the linux amd64 binary
+RUN apt-get -y update && apt-get -y install procps
+WORKDIR /root/
+# Copy the grpc-health-probe binary
+COPY --from=builder /go/bin/grpc-health-probe /bin
+# Copy the application binary
 COPY --from=builder /build/hello /bin/
+
+HEALTHCHECK \
+    --interval=1s \
+    --timeout=1s \
+    --start-period=1s \
+    --retries=3 \
+    CMD grpc-health-probe -addr=localhost:8081

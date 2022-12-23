@@ -38,12 +38,13 @@ static_resources:
           http2_protocol_options: {}
     common_lb_config:
       healthy_panic_threshold:
-        value: 50
+        value: 0
     health_checks:
       - timeout: "1s"
-        interval: "5s"
-        unhealthy_threshold: 5
-        healthy_threshold: 5
+        interval: "0.001s"
+        unhealthy_threshold: 1
+        healthy_threshold: 1
+        event_log_path: "/dev/stdout"
         grpc_health_check:
           service_name: "World"
           authority: ""
@@ -58,3 +59,10 @@ static_resources:
               socket_address:
                 address: world
                 port_value: 8082
+
+stats_flush_on_admin: true
+admin:
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 9090
