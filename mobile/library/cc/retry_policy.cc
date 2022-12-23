@@ -49,7 +49,7 @@ RawHeaderMap RetryPolicy::asRawHeaderMap() const {
     retry_on.push_back(retryRuleToString(retry_rule));
   }
 
-  if (!this->retry_status_codes.size().empty()) {
+  if (!this->retry_status_codes.empty()) {
     retry_on.push_back("retriable-status-codes");
     std::vector<std::string> retry_status_codes;
     retry_status_codes.reserve(this->retry_status_codes.size());
@@ -59,7 +59,7 @@ RawHeaderMap RetryPolicy::asRawHeaderMap() const {
     outbound_headers["x-envoy-retriable-status-codes"] = retry_status_codes;
   }
 
-  if (!retry_on.size().empty()) {
+  if (!retry_on.empty()) {
     outbound_headers["x-envoy-retry-on"] = retry_on;
   }
 
