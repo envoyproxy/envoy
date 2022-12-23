@@ -44,20 +44,22 @@ RawHeaderMap RetryPolicy::asRawHeaderMap() const {
   }
 
   std::vector<std::string> retry_on;
+  retry_on.reserve(this->retry_on.size());
   for (const auto& retry_rule : this->retry_on) {
     retry_on.push_back(retryRuleToString(retry_rule));
   }
 
-  if (this->retry_status_codes.size() > 0) {
+  if (!this->retry_status_codes.size().empty()) {
     retry_on.push_back("retriable-status-codes");
     std::vector<std::string> retry_status_codes;
+    retry_status_codes.reserve(this->retry_status_codes.size());
     for (const auto& status_code : this->retry_status_codes) {
       retry_status_codes.push_back(std::to_string(status_code));
     }
     outbound_headers["x-envoy-retriable-status-codes"] = retry_status_codes;
   }
 
-  if (retry_on.size() > 0) {
+  if (!retry_on.size().empty()) {
     outbound_headers["x-envoy-retry-on"] = retry_on;
   }
 
