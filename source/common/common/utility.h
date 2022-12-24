@@ -790,7 +790,6 @@ struct VarLengthIntegers {
   }
 };
 
-
 /**
  * Intermediate representation for a stat-name. This helps store multiple
  * names in a single packed allocation. First we encode each desired name,
@@ -798,7 +797,7 @@ struct VarLengthIntegers {
  * store MetricImpl's tags and tagExtractedName.
  */
 class NumericEncoding {
- public:
+public:
   /**
    * Before destructing SymbolEncoding, you must call moveToMemBlock. This
    * transfers ownership, and in particular, the responsibility to call
@@ -813,7 +812,7 @@ class NumericEncoding {
    *
    * @param numbers the numbers to encode.
    */
-  template<class Sequence> void addSymbols(const Sequence& numbers) {
+  template <class Sequence> void addSymbols(const Sequence& numbers) {
     ASSERT(data_bytes_required_ == 0);
     for (auto number : numbers) {
       data_bytes_required_ += encodingSizeBytes(number);
@@ -885,7 +884,7 @@ class NumericEncoding {
    */
   static std::pair<uint64_t, size_t> decodeNumber(const uint8_t* encoding);
 
- private:
+private:
   size_t data_bytes_required_{0};
   MemBlockBuilder<uint8_t> mem_block_;
 };
@@ -931,7 +930,7 @@ private:
 };
 
 class TinyString {
- public:
+public:
   TinyString() = default;
   TinyString(absl::string_view str) { populateFromStringView(str); }
   TinyString(TinyString&& src) : data_(std::move(src.data_)) { src.data_.reset(); }

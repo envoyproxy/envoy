@@ -145,9 +145,9 @@ private:
 #endif
 };
 
-void SymbolTable::decodeTokens(
-    StatName stat_name, const std::function<void(Symbol)>& symbol_token_fn,
-    const std::function<void(absl::string_view)>& string_view_token_fn) {
+void SymbolTable::decodeTokens(StatName stat_name,
+                               const std::function<void(Symbol)>& symbol_token_fn,
+                               const std::function<void(absl::string_view)>& string_view_token_fn) {
   SymbolTable::TokenIter iter(stat_name);
   TokenIter::TokenType type;
   while ((type = iter.next()) != TokenIter::TokenType::End) {
@@ -351,7 +351,8 @@ DynamicSpans SymbolTable::getDynamicSpans(StatName stat_name) const {
   // Note that with fake symbol tables, the Symbol lambda is called
   // once for each character in the string, and no dynamics will
   // be recorded.
-  decodeTokens(stat_name, [&index](Symbol) { ++index; }, record_dynamic);
+  decodeTokens(
+      stat_name, [&index](Symbol) { ++index; }, record_dynamic);
   return dynamic_spans;
 }
 
@@ -445,12 +446,10 @@ bool SymbolTable::lessThanLockHeld(const StatName& a, const StatName& b) const
       continue; // matching symbols don't need to be decoded to strings
     }
 
-    absl::string_view a_token = a_type == TokenIter::TokenType::Symbol
-                                    ? fromSymbol(a_iter.symbol())
-                                    : a_iter.stringView();
-    absl::string_view b_token = b_type == TokenIter::TokenType::Symbol
-                                    ? fromSymbol(b_iter.symbol())
-                                    : b_iter.stringView();
+    absl::string_view a_token =
+        a_type == TokenIter::TokenType::Symbol ? fromSymbol(a_iter.symbol()) : a_iter.stringView();
+    absl::string_view b_token =
+        b_type == TokenIter::TokenType::Symbol ? fromSymbol(b_iter.symbol()) : b_iter.stringView();
     if (a_token != b_token) {
       return a_token < b_token;
     }
