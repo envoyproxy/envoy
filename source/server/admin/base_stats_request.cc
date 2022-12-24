@@ -79,7 +79,7 @@ template <class TR, class C, class G, class H> bool StatsRequestBase<TR, C, G, H
       }
 
       // check if we are at the last phase: in that case, we are done;
-      // if not, move phase index at next phase and start next phase
+      // if not, increment phase index and start next phase
       if (phase_ == phases_.size() - 1) {
         render_->finalize(response);
         return false;
