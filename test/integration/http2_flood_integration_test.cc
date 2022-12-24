@@ -241,7 +241,7 @@ void Http2FloodMitigationTest::prefillOutboundDownstreamQueue(uint32_t data_fram
   test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 0);
   // Verify that pre-fill did not trigger flood protection
   EXPECT_EQ(0, test_server_->counter("http2.outbound_flood")->value());
-  EXPECT_EQ(data_frame_count + 1, test_server_->gauge("http2.outbound_frames_active")->value());
+  EXPECT_EQ(data_frame_count, test_server_->gauge("http2.outbound_frames_active")->value());
 }
 
 IntegrationStreamDecoderPtr
