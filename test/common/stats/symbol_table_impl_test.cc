@@ -28,7 +28,7 @@ protected:
   }
 
   SymbolVec getSymbols(StatName stat_name) {
-    return SymbolTableImpl::Encoding::decodeSymbols(stat_name);
+    return SymbolTableImpl::decodeSymbols(stat_name);
   }
   Symbol monotonicCounter() { return table_.monotonicCounter(); }
   std::string encodeDecode(absl::string_view stat_name) {

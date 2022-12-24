@@ -280,27 +280,26 @@ std::vector<uint64_t> TestStore::histogramValues(const std::string& name, bool c
 // and fuzz tests. But those have different checking macros, e.g. EXPECT_EQ vs
 // FUZZ_ASSERT.
 std::vector<uint8_t> serializeDeserializeNumber(uint64_t number) {
-  uint64_t num_bytes = SymbolTableImpl::Encoding::encodingSizeBytes(number);
+  uint64_t num_bytes = NumericEncoding::encodingSizeBytes(number);
   const uint64_t block_size = 10;
   MemBlockBuilder<uint8_t> mem_block(block_size);
-  SymbolTableImpl::Encoding::appendEncoding(number, mem_block);
+  NumericEncoding::appendEncoding(number, mem_block);
   num_bytes += mem_block.capacityRemaining();
   RELEASE_ASSERT(block_size == num_bytes, absl::StrCat("Encoding size issue: block_size=",
                                                        block_size, " num_bytes=", num_bytes));
   absl::Span<uint8_t> span = mem_block.span();
-  RELEASE_ASSERT(number == SymbolTableImpl::Encoding::decodeNumber(span.data()).first, "");
+  RELEASE_ASSERT(number == NumericEncoding::decodeNumber(span.data()).first, "");
   return std::vector<uint8_t>(span.data(), span.data() + span.size());
 }
 
 void serializeDeserializeString(absl::string_view in) {
-  MemBlockBuilder<uint8_t> mem_block(SymbolTableImpl::Encoding::totalSizeBytes(in.size()));
-  SymbolTableImpl::Encoding::appendEncoding(in.size(), mem_block);
+  MemBlockBuilder<uint8_t> mem_block(NumericEncoding::totalSizeBytes(in.size()));
+  NumericEncoding::appendEncoding(in.size(), mem_block);
   const uint8_t* data = reinterpret_cast<const uint8_t*>(in.data());
   mem_block.appendData(absl::MakeSpan(data, data + in.size()));
   RELEASE_ASSERT(mem_block.capacityRemaining() == 0, "");
   absl::Span<uint8_t> span = mem_block.span();
-  const std::pair<uint64_t, uint64_t> number_consumed =
-      SymbolTableImpl::Encoding::decodeNumber(span.data());
+  const std::pair<uint64_t, uint64_t> number_consumed = NumericEncoding::decodeNumber(span.data());
   RELEASE_ASSERT(number_consumed.first == in.size(), absl::StrCat("size matches: ", in));
   span.remove_prefix(number_consumed.second);
   const absl::string_view out(reinterpret_cast<const char*>(span.data()), span.size());

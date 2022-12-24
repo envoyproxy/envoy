@@ -1095,6 +1095,54 @@ TEST(InlineStorageTest, InlineString) {
   EXPECT_EQ("Hello, world!", hello->toString());
 }
 
+TEST(TinyStringTest, Empty) {
+  TinyString no_value;
+  EXPECT_FALSE(no_value.hasValue());
+  TinyString copy_no_value(no_value);
+  EXPECT_FALSE(copy_no_value.hasValue());
+  TinyString assign_no_value = no_value;
+  EXPECT_FALSE(assign_no_value.hasValue());
+  TinyString empty("");
+  EXPECT_TRUE(empty.hasValue());
+  EXPECT_EQ("", empty.toStringView());
+}
+
+TEST(TinyStringTest, Small) {
+  TinyString hello("Hello, world!");
+  EXPECT_EQ("Hello, world!", hello.toStringView());
+  EXPECT_EQ("Hello, world!", hello.toString());
+}
+
+TEST(TinyStringTest, TwoByte) {
+  std::string a200(200, 'a');
+  TinyString ta(a200);
+  EXPECT_EQ(a200, ta.toStringView());
+  EXPECT_EQ(a200, ta.toString());
+}
+
+TEST(TinyStringTest, ThreeByte) {
+  std::string a20k(20000, 'a');
+  TinyString ta(a20k);
+  EXPECT_EQ(a20k, ta.toStringView());
+  EXPECT_EQ(a20k, ta.toString());
+}
+
+TEST(TinyStringTest, Copy) {
+  TinyString hello("Hello, world!");
+  TinyString h2(hello);
+  EXPECT_EQ("Hello, world!", h2.toStringView());
+}
+
+TEST(TinyStringTest, Move) {
+  TinyString hello("Hello, world!");
+  TinyString h2(std::move(hello));
+  EXPECT_EQ("Hello, world!", h2.toStringView());
+  EXPECT_FALSE(hello.hasValue());
+  hello = std::move(h2);
+  EXPECT_FALSE(h2.hasValue());
+  EXPECT_EQ("Hello, world!", hello.toStringView());
+}
+
 #ifdef WIN32
 TEST(ErrorDetailsTest, WindowsFormatMessage) {
   // winsock2 error

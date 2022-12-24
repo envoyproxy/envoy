@@ -14,13 +14,6 @@
 namespace Envoy {
 namespace Stats {
 
-// Masks used for variable-length encoding of arbitrary-sized integers into a
-// uint8-array. The integers are typically small, so we try to store them in as
-// few bytes as possible. The bottom 7 bits hold values, and the top bit is used
-// to determine whether another byte is needed for more data.
-static constexpr uint32_t SpilloverMask = 0x80;
-static constexpr uint32_t Low7Bits = 0x7f;
-
 // When storing Symbol arrays, we disallow Symbol 0, which is the only Symbol
 // that will decode into uint8_t array starting (and ending) with {0}. Thus we
 // can use a leading 0 in the first byte to indicate that what follows is
@@ -35,7 +28,7 @@ size_t StatName::dataSize() const {
   if (size_and_data_ == nullptr) {
     return 0;
   }
-  return SymbolTable::Encoding::decodeNumber(size_and_data_).first;
+  return NumericEncoding::decodeNumber(size_and_data_).first;
 }
 
 #ifndef ENVOY_CONFIG_COVERAGE
@@ -51,7 +44,7 @@ void StatName::debugPrint() {
     for (size_t i = 0; i < nbytes; ++i) {
       std::cerr << " " << static_cast<uint64_t>(data()[i]);
     }
-    const SymbolVec encoding = SymbolTable::Encoding::decodeSymbols(*this);
+    const SymbolVec encoding = SymbolTable::decodeSymbols(*this);
     std::cerr << ", numSymbols=" << encoding.size() << ":";
     for (Symbol symbol : encoding) {
       std::cerr << " " << symbol;
@@ -61,62 +54,7 @@ void StatName::debugPrint() {
 }
 #endif
 
-SymbolTable::Encoding::~Encoding() {
-  // Verifies that moveToMemBlock() was called on this encoding. Failure
-  // to call moveToMemBlock() will result in leaks symbols.
-  ASSERT(mem_block_.capacity() == 0);
-}
-
-size_t SymbolTable::Encoding::encodingSizeBytes(uint64_t number) {
-  size_t num_bytes = 0;
-  do {
-    ++num_bytes;
-    number >>= 7;
-  } while (number != 0);
-  return num_bytes;
-}
-
-void SymbolTable::Encoding::appendEncoding(uint64_t number, MemBlockBuilder<uint8_t>& mem_block) {
-  // UTF-8-like encoding where a value 127 or less gets written as a single
-  // byte. For higher values we write the low-order 7 bits with a 1 in
-  // the high-order bit. Then we right-shift 7 bits and keep adding more bytes
-  // until we have consumed all the non-zero bits in symbol.
-  //
-  // When decoding, we stop consuming uint8_t when we see a uint8_t with
-  // high-order bit 0.
-  do {
-    if (number < (1 << 7)) {
-      mem_block.appendOne(number); // number <= 127 gets encoded in one byte.
-    } else {
-      mem_block.appendOne((number & Low7Bits) | SpilloverMask); // >= 128 need spillover bytes.
-    }
-    number >>= 7;
-  } while (number != 0);
-}
-
-void SymbolTable::Encoding::addSymbols(const std::vector<Symbol>& symbols) {
-  ASSERT(data_bytes_required_ == 0);
-  for (Symbol symbol : symbols) {
-    data_bytes_required_ += encodingSizeBytes(symbol);
-  }
-  mem_block_.setCapacity(data_bytes_required_);
-  for (Symbol symbol : symbols) {
-    appendEncoding(symbol, mem_block_);
-  }
-}
-
-std::pair<uint64_t, size_t> SymbolTable::Encoding::decodeNumber(const uint8_t* encoding) {
-  uint64_t number = 0;
-  uint64_t uc = SpilloverMask;
-  const uint8_t* start = encoding;
-  for (uint32_t shift = 0; (uc & SpilloverMask) != 0; ++encoding, shift += 7) {
-    uc = static_cast<uint32_t>(*encoding);
-    number |= (uc & Low7Bits) << shift;
-  }
-  return std::make_pair(number, encoding - start);
-}
-
-SymbolVec SymbolTable::Encoding::decodeSymbols(StatName stat_name) {
+SymbolVec SymbolTable::decodeSymbols(StatName stat_name) {
   SymbolVec symbol_vec;
   symbol_vec.reserve(stat_name.dataSize());
   decodeTokens(
@@ -136,7 +74,7 @@ SymbolVec SymbolTable::Encoding::decodeSymbols(StatName stat_name) {
 // The array-version of decodeSymbols is still a good approach for converting a
 // StatName to a string as the intermediate array of string_view is needed to
 // allocate the right size for the joined string.
-class SymbolTable::Encoding::TokenIter {
+class SymbolTable::TokenIter {
 public:
   // The type of token reached.
   enum class TokenType { StringView, Symbol, End };
@@ -158,7 +96,7 @@ public:
       ASSERT(size_ > 1);
       ++array_;
       --size_;
-      std::pair<uint64_t, size_t> length_consumed = decodeNumber(array_);
+      std::pair<uint64_t, size_t> length_consumed = NumericEncoding::decodeNumber(array_);
       uint64_t length = length_consumed.first;
       array_ += length_consumed.second;
       size_ -= length_consumed.second;
@@ -171,7 +109,7 @@ public:
 #endif
       return TokenType::StringView;
     }
-    std::pair<uint64_t, size_t> symbol_consumed = decodeNumber(array_);
+    std::pair<uint64_t, size_t> symbol_consumed = NumericEncoding::decodeNumber(array_);
     symbol_ = symbol_consumed.first;
     size_ -= symbol_consumed.second;
     array_ += symbol_consumed.second;
@@ -207,10 +145,10 @@ private:
 #endif
 };
 
-void SymbolTable::Encoding::decodeTokens(
+void SymbolTable::decodeTokens(
     StatName stat_name, const std::function<void(Symbol)>& symbol_token_fn,
     const std::function<void(absl::string_view)>& string_view_token_fn) {
-  TokenIter iter(stat_name);
+  SymbolTable::TokenIter iter(stat_name);
   TokenIter::TokenType type;
   while ((type = iter.next()) != TokenIter::TokenType::End) {
     if (type == TokenIter::TokenType::StringView) {
@@ -223,7 +161,7 @@ void SymbolTable::Encoding::decodeTokens(
 }
 
 bool StatName::startsWith(StatName prefix) const {
-  using TokenIter = SymbolTable::Encoding::TokenIter;
+  using TokenIter = SymbolTable::TokenIter;
   TokenIter prefix_iter(prefix);
   TokenIter this_iter(*this);
   while (true) {
@@ -252,28 +190,12 @@ bool StatName::startsWith(StatName prefix) const {
 std::vector<absl::string_view> SymbolTable::decodeStrings(StatName stat_name) const {
   std::vector<absl::string_view> strings;
   Thread::LockGuard lock(lock_);
-  Encoding::decodeTokens(
+  decodeTokens(
       stat_name,
       [this, &strings](Symbol symbol)
           ABSL_NO_THREAD_SAFETY_ANALYSIS { strings.push_back(fromSymbol(symbol)); },
       [&strings](absl::string_view str) { strings.push_back(str); });
   return strings;
-}
-
-void SymbolTable::Encoding::moveToMemBlock(MemBlockBuilder<uint8_t>& mem_block) {
-  appendEncoding(data_bytes_required_, mem_block);
-  mem_block.appendBlock(mem_block_);
-  mem_block_.reset(); // Logically transfer ownership, enabling empty assert on destruct.
-}
-
-void SymbolTable::Encoding::appendToMemBlock(StatName stat_name,
-                                             MemBlockBuilder<uint8_t>& mem_block) {
-  const uint8_t* data = stat_name.dataIncludingSize();
-  if (data == nullptr) {
-    mem_block.appendOne(0);
-  } else {
-    mem_block.appendData(absl::MakeSpan(data, stat_name.size()));
-  }
 }
 
 SymbolTable::SymbolTable()
@@ -291,7 +213,7 @@ SymbolTable::~SymbolTable() {
 // TODO(ambuc): There is a possible performance optimization here for avoiding
 // the encoding of IPs / numbers if they appear in stat names. We don't want to
 // waste time symbolizing an integer as an integer, if we can help it.
-void SymbolTable::addTokensToEncoding(const absl::string_view name, Encoding& encoding) {
+void SymbolTable::addTokensToEncoding(const absl::string_view name, NumericEncoding& encoding) {
   if (name.empty()) {
     return;
   }
@@ -332,7 +254,7 @@ std::string SymbolTable::toString(const StatName& stat_name) const {
 
 void SymbolTable::incRefCount(const StatName& stat_name) {
   // Before taking the lock, decode the array of symbols from the SymbolTable::Storage.
-  const SymbolVec symbols = Encoding::decodeSymbols(stat_name);
+  const SymbolVec symbols = decodeSymbols(stat_name);
 
   Thread::LockGuard lock(lock_);
   for (Symbol symbol : symbols) {
@@ -354,7 +276,7 @@ void SymbolTable::incRefCount(const StatName& stat_name) {
 
 void SymbolTable::free(const StatName& stat_name) {
   // Before taking the lock, decode the array of symbols from the SymbolTable::Storage.
-  const SymbolVec symbols = Encoding::decodeSymbols(stat_name);
+  const SymbolVec symbols = decodeSymbols(stat_name);
 
   Thread::LockGuard lock(lock_);
   for (Symbol symbol : symbols) {
@@ -429,8 +351,7 @@ DynamicSpans SymbolTable::getDynamicSpans(StatName stat_name) const {
   // Note that with fake symbol tables, the Symbol lambda is called
   // once for each character in the string, and no dynamics will
   // be recorded.
-  Encoding::decodeTokens(
-      stat_name, [&index](Symbol) { ++index; }, record_dynamic);
+  decodeTokens(stat_name, [&index](Symbol) { ++index; }, record_dynamic);
   return dynamic_spans;
 }
 
@@ -509,25 +430,25 @@ bool SymbolTable::lessThan(const StatName& a, const StatName& b) const {
 
 bool SymbolTable::lessThanLockHeld(const StatName& a, const StatName& b) const
     ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
-  Encoding::TokenIter a_iter(a), b_iter(b);
+  TokenIter a_iter(a), b_iter(b);
   while (true) {
-    Encoding::TokenIter::TokenType a_type = a_iter.next();
-    Encoding::TokenIter::TokenType b_type = b_iter.next();
-    if (b_type == Encoding::TokenIter::TokenType::End) {
+    TokenIter::TokenType a_type = a_iter.next();
+    TokenIter::TokenType b_type = b_iter.next();
+    if (b_type == TokenIter::TokenType::End) {
       return false; // "x.y.z" > "x.y", "x.y" == "x.y"
     }
-    if (a_type == Encoding::TokenIter::TokenType::End) {
+    if (a_type == TokenIter::TokenType::End) {
       return true; // "x.y" < "x.y.z"
     }
-    if (a_type == b_type && a_type == Encoding::TokenIter::TokenType::Symbol &&
+    if (a_type == b_type && a_type == TokenIter::TokenType::Symbol &&
         a_iter.symbol() == b_iter.symbol()) {
       continue; // matching symbols don't need to be decoded to strings
     }
 
-    absl::string_view a_token = a_type == Encoding::TokenIter::TokenType::Symbol
+    absl::string_view a_token = a_type == TokenIter::TokenType::Symbol
                                     ? fromSymbol(a_iter.symbol())
                                     : a_iter.stringView();
-    absl::string_view b_token = b_type == Encoding::TokenIter::TokenType::Symbol
+    absl::string_view b_token = b_type == TokenIter::TokenType::Symbol
                                     ? fromSymbol(b_iter.symbol())
                                     : b_iter.stringView();
     if (a_token != b_token) {
@@ -554,9 +475,9 @@ void SymbolTable::debugPrint() const {
 
 SymbolTable::StoragePtr SymbolTable::encode(absl::string_view name) {
   name = StringUtil::removeTrailingCharacters(name, '.');
-  Encoding encoding;
+  NumericEncoding encoding;
   addTokensToEncoding(name, encoding);
-  MemBlockBuilder<uint8_t> mem_block(Encoding::totalSizeBytes(encoding.bytesRequired()));
+  MemBlockBuilder<uint8_t> mem_block(NumericEncoding::totalSizeBytes(encoding.bytesRequired()));
   encoding.moveToMemBlock(mem_block);
   return mem_block.release();
 }
@@ -586,16 +507,16 @@ SymbolTable::StoragePtr SymbolTable::makeDynamicStorage(absl::string_view name) 
 
   // payload_bytes is the total number of bytes needed to represent the
   // characters in name, plus their encoded size, plus the literal indicator.
-  const size_t payload_bytes = Encoding::totalSizeBytes(name.size()) + 1;
+  const size_t payload_bytes = NumericEncoding::totalSizeBytes(name.size()) + 1;
 
   // total_bytes includes the payload_bytes, plus the LiteralStringIndicator, and
   // the length of those.
-  const size_t total_bytes = Encoding::totalSizeBytes(payload_bytes);
+  const size_t total_bytes = NumericEncoding::totalSizeBytes(payload_bytes);
   MemBlockBuilder<uint8_t> mem_block(total_bytes);
 
-  Encoding::appendEncoding(payload_bytes, mem_block);
+  NumericEncoding::appendEncoding(payload_bytes, mem_block);
   mem_block.appendOne(LiteralStringIndicator);
-  Encoding::appendEncoding(name.size(), mem_block);
+  NumericEncoding::appendEncoding(name.size(), mem_block);
   mem_block.appendData(absl::MakeSpan(reinterpret_cast<const uint8_t*>(name.data()), name.size()));
   ASSERT(mem_block.capacityRemaining() == 0);
   return mem_block.release();
@@ -670,8 +591,8 @@ SymbolTable::StoragePtr SymbolTable::join(const StatNameVec& stat_names) const {
       num_bytes += stat_name.dataSize();
     }
   }
-  MemBlockBuilder<uint8_t> mem_block(Encoding::totalSizeBytes(num_bytes));
-  Encoding::appendEncoding(num_bytes, mem_block);
+  MemBlockBuilder<uint8_t> mem_block(NumericEncoding::totalSizeBytes(num_bytes));
+  NumericEncoding::appendEncoding(num_bytes, mem_block);
   for (StatName stat_name : stat_names) {
     stat_name.appendDataToMemBlock(mem_block);
   }
@@ -695,7 +616,7 @@ void SymbolTable::populateList(const StatName* names, uint32_t num_names, StatNa
   mem_block.appendOne(num_names);
   for (uint32_t i = 0; i < num_names; ++i) {
     const StatName stat_name = names[i];
-    Encoding::appendToMemBlock(stat_name, mem_block);
+    NumericEncoding::appendToMemBlock(stat_name.dataIncludingSize(), stat_name.size(), mem_block);
     incRefCount(stat_name);
   }
 

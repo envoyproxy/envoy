@@ -13,6 +13,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/hash.h"
+#include "source/common/common/mem_block_builder.h"
 #include "source/common/common/non_copyable.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -768,6 +769,127 @@ protected:
   }
 };
 
+// Utility functions to efficiently encode and decode unsigned integers into a
+// uint8-array, optimizing for space consumed when the values are small.
+//  * Values less than 2^7 (128) are encoded in 1 byte
+//  * Values less than 2^14 (16k) are encoded in 2 bytes
+//  * Values less than 2^21 (2M) are encoded in 3 bytes.
+struct VarLengthIntegers {
+  /**
+   * @param number A number to encode in a variable length byte-array.
+   * @return The number of bytes it would take to encode the number.
+   */
+  static size_t encodingSizeBytes(uint64_t number);
+
+  /**
+   * @param num_data_bytes The number of bytes in a data-block.
+   * @return The total number of bytes required for the data-block and its encoded size.
+   */
+  static size_t totalSizeBytes(size_t num_data_bytes) {
+    return encodingSizeBytes(num_data_bytes) + num_data_bytes;
+  }
+};
+
+
+/**
+ * Intermediate representation for a stat-name. This helps store multiple
+ * names in a single packed allocation. First we encode each desired name,
+ * then sum their sizes for the single packed allocation. This is used to
+ * store MetricImpl's tags and tagExtractedName.
+ */
+class NumericEncoding {
+ public:
+  /**
+   * Before destructing SymbolEncoding, you must call moveToMemBlock. This
+   * transfers ownership, and in particular, the responsibility to call
+   * SymbolTable::clear() on all referenced symbols. If we ever wanted to be
+   * able to destruct a SymbolEncoding without transferring it we could add a
+   * clear(SymbolTable&) method.
+   */
+  ~NumericEncoding();
+
+  /**
+   * Adds a sequence of tokens into the encoding.
+   *
+   * @param numbers the numbers to encode.
+   */
+  template<class Sequence> void addSymbols(const Sequence& numbers) {
+    ASSERT(data_bytes_required_ == 0);
+    for (auto number : numbers) {
+      data_bytes_required_ += encodingSizeBytes(number);
+    }
+    mem_block_.setCapacity(data_bytes_required_);
+    for (auto number : numbers) {
+      appendEncoding(number, mem_block_);
+    }
+  }
+
+  /**
+   * Returns the number of bytes required to represent StatName as a uint8_t
+   * array, including the encoded size.
+   */
+  size_t bytesRequired() const {
+    return data_bytes_required_ + encodingSizeBytes(data_bytes_required_);
+  }
+
+  /**
+   * Moves the contents of the vector into an allocated array. The array
+   * must have been allocated with bytesRequired() bytes.
+   *
+   * @param mem_block_builder memory block to receive the encoded bytes.
+   */
+  void moveToMemBlock(MemBlockBuilder<uint8_t>& mem_block_builder);
+
+  /**
+   * @param number A number to encode in a variable length byte-array.
+   * @return The number of bytes it would take to encode the number.
+   */
+  static size_t encodingSizeBytes(uint64_t number);
+
+  /**
+   * @param num_data_bytes The number of bytes in a data-block.
+   * @return The total number of bytes required for the data-block and its encoded size.
+   */
+  static size_t totalSizeBytes(size_t num_data_bytes) {
+    return encodingSizeBytes(num_data_bytes) + num_data_bytes;
+  }
+
+  /**
+   * Saves the specified number into the byte array, returning the next byte.
+   * There is no guarantee that bytes will be aligned, so we can't cast to a
+   * uint16_t* and assign, but must individually copy the bytes.
+   *
+   * Requires that the buffer be sized to accommodate encodingSizeBytes(number).
+   *
+   * @param number the number to write.
+   * @param mem_block the memory into which to append the number.
+   */
+  static void appendEncoding(uint64_t number, MemBlockBuilder<uint8_t>& mem_block);
+
+  /**
+   * Appends stat_name's bytes into mem_block, which must have been allocated to
+   * allow for stat_name.size() bytes.
+   *
+   * @param data the data to encode
+   * @param size the number of bytes of data
+   * @param mem_block the block of memory to append to.
+   */
+  static void appendToMemBlock(const uint8_t* data, size_t size,
+                               MemBlockBuilder<uint8_t>& mem_block);
+
+  /**
+   * Decodes a byte-array containing a variable-length number.
+   *
+   * @param The encoded byte array, written previously by appendEncoding.
+   * @return A pair containing the decoded number, and the number of bytes consumed from encoding.
+   */
+  static std::pair<uint64_t, size_t> decodeNumber(const uint8_t* encoding);
+
+ private:
+  size_t data_bytes_required_{0};
+  MemBlockBuilder<uint8_t> mem_block_;
+};
+
 class InlineString;
 using InlineStringPtr = std::unique_ptr<InlineString>;
 
@@ -806,6 +928,60 @@ private:
 
   uint32_t size_;
   char data_[];
+};
+
+class TinyString {
+ public:
+  TinyString() = default;
+  TinyString(absl::string_view str) { populateFromStringView(str); }
+  TinyString(TinyString&& src) : data_(std::move(src.data_)) { src.data_.reset(); }
+  TinyString(const TinyString& src) {
+    if (src.hasValue()) {
+      populateFromTinyString(src);
+    }
+  }
+
+  TinyString& operator=(const TinyString& src) {
+    if (&src != this) {
+      if (src.hasValue()) {
+        populateFromTinyString(src);
+      } else {
+        data_.reset();
+      }
+    }
+    return *this;
+  }
+
+  void operator=(TinyString&& src) {
+    if (&src != this) {
+      data_ = std::move(src.data_);
+    }
+  }
+
+  /**
+   * Caller must ensure hasValue() is true.
+   *
+   * @return a std::string copy of the TinyString
+   */
+  std::string toString() const { return std::string(toStringView()); }
+
+  /**
+   * Caller must ensure hasValue() is true.
+   *
+   * @return a string_view into the TinyString.
+   */
+  absl::string_view toStringView() const;
+
+  /**
+   * @return whether the string has a value (distinct from having an empty string)
+   */
+  bool hasValue() const { return data_ != nullptr; }
+
+private:
+  void populateFromStringView(absl::string_view str);
+  void populateFromTinyString(const TinyString& src);
+
+  std::unique_ptr<uint8_t[]> data_;
 };
 
 class SetUtil {
