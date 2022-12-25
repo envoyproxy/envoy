@@ -657,17 +657,16 @@ void TinyString::populateFromStringView(absl::string_view str) {
 }
 
 void TinyString::populateFromTinyString(const TinyString& src) {
-  std::pair<uint64_t, size_t> size_consumed = NumericEncoding::decodeNumber(src.data_.get());
-  size_t total_length = size_consumed.first + size_consumed.second;
+  const auto& [size, consumed] = NumericEncoding::decodeNumber(src.data_.get());
+  size_t total_length = size + consumed;
   MemBlockBuilder<uint8_t> mem_block(total_length);
   mem_block.appendData(absl::MakeSpan(src.data_.get(), total_length));
   data_ = mem_block.release();
 }
 
 absl::string_view TinyString::toStringView() const {
-  std::pair<uint64_t, size_t> size_consumed = NumericEncoding::decodeNumber(data_.get());
-  return absl::string_view(reinterpret_cast<const char*>(data_.get() + size_consumed.second),
-                           size_consumed.first);
+  const auto& [size, consumed] = NumericEncoding::decodeNumber(data_.get());
+  return absl::string_view(reinterpret_cast<const char*>(data_.get() + consumed), size);
 }
 
 void ExceptionUtil::throwEnvoyException(const std::string& message) {

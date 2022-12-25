@@ -926,6 +926,11 @@ using InlineStringPtr = std::unique_ptr<InlineString>;
 // object. These cannot be copied or held by value; they must be created
 // as unique pointers.
 //
+// This is similar to TinyString, below, except TinyString is a little more
+// space efficient, and InlineString is slightly faster. TinyString has a more
+// explicit usage model as an 'optional' (no value, vs empty value), although
+// InlineStringPtr can serve that purpose as well.
+//
 // Note: this is not yet proven better (smaller or faster) than std::string for
 // all applications, but memory-size improvements have been measured for one
 // application (Stats::SymbolTableImpl). This is presented here to serve as an
