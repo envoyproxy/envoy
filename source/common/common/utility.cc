@@ -31,13 +31,6 @@ namespace Envoy {
 
 namespace {
 
-// Masks used for variable-length encoding of arbitrary-sized integers into a
-// uint8-array. The integers are typically small, so we try to store them in as
-// few bytes as possible. The bottom 7 bits hold values, and the top bit is used
-// to determine whether another byte is needed for more data.
-//static constexpr uint32_t SpilloverMask = 0x80;
-//static constexpr uint32_t Low7Bits = 0x7f;
-
 class SpecifierConstantValues {
 public:
   // This captures three groups: subsecond-specifier, subsecond-specifier width and
