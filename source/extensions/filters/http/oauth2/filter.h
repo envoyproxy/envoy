@@ -108,11 +108,14 @@ struct CookieNames {
               const std::string& oauth_expires)
       : bearer_token_(bearer_token.empty() ? "BearerToken" : bearer_token),
         oauth_hmac_(oauth_hmac.empty() ? "OauthHMAC" : oauth_hmac),
-        oauth_expires_(oauth_expires.empty() ? "OauthExpires" : oauth_expires) {}
+        oauth_expires_(oauth_expires.empty() ? "OauthExpires" : oauth_expires),
+        id_token_("IdToken"), refresh_token_("RefreshToken") {}
 
   const std::string bearer_token_;
   const std::string oauth_hmac_;
   const std::string oauth_expires_;
+  const std::string id_token_;
+  const std::string refresh_token_;
 };
 
 /**
@@ -146,6 +149,7 @@ public:
   const std::string& encodedResourceQueryParams() const { return encoded_resource_query_params_; }
   const CookieNames& cookieNames() const { return cookie_names_; }
   const AuthType& authType() const { return auth_type_; }
+  bool useRefreshToken() const { return use_refresh_token_; }
 
 private:
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -164,6 +168,7 @@ private:
   const std::vector<Http::HeaderUtility::HeaderData> pass_through_header_matchers_;
   const CookieNames cookie_names_;
   const AuthType auth_type_;
+  const bool use_refresh_token_ : 1;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -183,8 +188,10 @@ class CookieValidator {
 public:
   virtual ~CookieValidator() = default;
   virtual const std::string& token() const PURE;
+  virtual const std::string& refreshToken() const PURE;
   virtual void setParams(const Http::RequestHeaderMap& headers, const std::string& secret) PURE;
   virtual bool isValid() const PURE;
+  virtual bool canUpdateTokenByRefreshToken() const PURE;
 };
 
 class OAuth2CookieValidator : public CookieValidator {
@@ -193,10 +200,13 @@ public:
       : time_source_(time_source), cookie_names_(cookie_names) {}
 
   const std::string& token() const override { return token_; }
+  const std::string& refreshToken() const override { return refresh_token_; }
+
   void setParams(const Http::RequestHeaderMap& headers, const std::string& secret) override;
   bool isValid() const override;
   bool hmacIsValid() const;
   bool timestampIsValid() const;
+  bool canUpdateTokenByRefreshToken() const override;
 
 private:
   std::string token_;
@@ -215,23 +225,32 @@ private:
  * receive incoming requests and decide at what state of the OAuth workflow they are in. Logic
  * beyond that is broken into component classes.
  */
-class OAuth2Filter : public Http::PassThroughDecoderFilter, public FilterCallbacks {
+class OAuth2Filter : public Http::PassThroughFilter, public FilterCallbacks {
 public:
   OAuth2Filter(FilterConfigSharedPtr config, std::unique_ptr<OAuth2Client>&& oauth_client,
                TimeSource& time_source);
 
-  // Http::PassThroughDecoderFilter
+  // Http::PassThroughFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers, bool) override;
 
   // FilterCallbacks
   void onGetAccessTokenSuccess(const std::string& access_code, const std::string& id_token,
                                const std::string& refresh_token,
                                std::chrono::seconds expires_in) override;
+
+  void onUpdateAccessTokenSuccess(const std::string& access_code, const std::string& id_token,
+                                  const std::string& refresh_token,
+                                  std::chrono::seconds expires_in) override;
+
+  void onUpdateAccessTokenFailure() override;
+
   // a catch-all function used for request failures. we don't retry, as a user can simply refresh
   // the page in the case of a network blip.
   void sendUnauthorizedResponse() override;
 
-  void finishFlow();
+  void finishGetAccessTokenFlow();
+  void finishUpdateAccessTokenFlow();
 
 private:
   friend class OAuth2Test;
@@ -247,6 +266,7 @@ private:
   absl::string_view host_;
   std::string state_;
   Http::RequestHeaderMap* request_headers_{nullptr};
+  Http::ResponseHeaderMapPtr response_headers_to_add_;
 
   std::unique_ptr<OAuth2Client> oauth_client_;
   FilterConfigSharedPtr config_;
@@ -255,9 +275,15 @@ private:
   // Determines whether or not the current request can skip the entire OAuth flow (HMAC is valid,
   // connection is mTLS, etc.)
   bool canSkipOAuth(Http::RequestHeaderMap& headers) const;
+  void redirectToOAuthServer(Http::RequestHeaderMap& headers) const;
 
   Http::FilterHeadersStatus signOutUser(const Http::RequestHeaderMap& headers);
 
+  void updateTokens(const std::string& access_code, const std::string& id_token,
+                    const std::string& refresh_token, std::chrono::seconds expires_in);
+
+  std::string getEncodedToken() const;
+  Http::ResponseHeaderMapPtr fillResponseHeader(const std::string& encoded_token) const;
   const std::string& bearerPrefix() const;
 };
 

@@ -58,6 +58,9 @@ class MockOAuth2CookieValidator : public CookieValidator {
 public:
   MOCK_METHOD(std::string&, username, (), (const));
   MOCK_METHOD(std::string&, token, (), (const));
+  MOCK_METHOD(std::string&, refreshToken, (), (const));
+
+  MOCK_METHOD(bool, canUpdateTokenByRefreshToken, (), (const));
   MOCK_METHOD(bool, isValid, (), (const));
   MOCK_METHOD(void, setParams, (const Http::RequestHeaderMap& headers, const std::string& secret));
 };
@@ -72,6 +75,10 @@ public:
 
   MOCK_METHOD(void, asyncGetAccessToken,
               (const std::string&, const std::string&, const std::string&, const std::string&,
+               Envoy::Extensions::HttpFilters::Oauth2::AuthType));
+
+  MOCK_METHOD(void, asyncUpdateAccessToken,
+              (const std::string&, const std::string&, const std::string&,
                Envoy::Extensions::HttpFilters::Oauth2::AuthType));
 };
 
@@ -92,6 +99,7 @@ public:
     config_ = config;
     filter_ = std::make_shared<OAuth2Filter>(config_, std::move(oauth_client_ptr), test_time_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+    filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     validator_ = std::make_shared<MockOAuth2CookieValidator>();
     filter_->validator_ = validator_;
   }
@@ -108,6 +116,7 @@ public:
     p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
     p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
     p.set_forward_bearer_token(forward_bearer_token);
+    p.set_use_refresh_token(false);
     p.add_auth_scopes("user");
     p.add_auth_scopes("openid");
     p.add_auth_scopes("email");
@@ -185,6 +194,7 @@ public:
   NiceMock<Event::MockTimer>* attachmentTimeout_timer_{};
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   NiceMock<Upstream::MockClusterManager> cm_;
   std::shared_ptr<MockOAuth2CookieValidator> validator_;
   std::shared_ptr<OAuth2Filter> filter_;
@@ -821,6 +831,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
   };
 
   // Fail the validation to trigger the OAuth flow.
+
   EXPECT_CALL(*validator_, setParams(_, _));
   EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
 
@@ -873,7 +884,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
   EXPECT_CALL(decoder_callbacks_,
               encodeHeaders_(HeaderMapEqualRef(&second_response_headers), true));
 
-  filter_->finishFlow();
+  filter_->finishGetAccessTokenFlow();
 }
 
 TEST_F(OAuth2Test, OAuthBearerTokenFlowFromHeader) {

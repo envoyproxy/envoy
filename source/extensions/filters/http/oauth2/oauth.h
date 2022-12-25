@@ -23,6 +23,13 @@ public:
                                        const std::string& refresh_token,
                                        std::chrono::seconds expires_in) PURE;
 
+  virtual void onUpdateAccessTokenSuccess(const std::string& access_token,
+                                          const std::string& id_token,
+                                          const std::string& refresh_token,
+                                          std::chrono::seconds expires_in) PURE;
+
+  virtual void onUpdateAccessTokenFailure() PURE;
+
   virtual void sendUnauthorizedResponse() PURE;
 };
 
