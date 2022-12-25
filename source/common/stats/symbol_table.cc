@@ -264,7 +264,11 @@ void SymbolTable::incRefCount(const StatName& stat_name) {
            "Please see "
            "https://github.com/envoyproxy/envoy/blob/main/source/docs/stats.md#"
            "debugging-symbol-table-assertions");
+#if SYMBOL_TABLE_USE_TINY_STRINGS
+    auto encode_search = encode_map_.find(decode_search->second.toStringView());
+#else
     auto encode_search = encode_map_.find(decode_search->second->toStringView());
+#endif
     ASSERT(encode_search != encode_map_.end(),
            "Please see "
            "https://github.com/envoyproxy/envoy/blob/main/source/docs/stats.md#"
@@ -283,7 +287,11 @@ void SymbolTable::free(const StatName& stat_name) {
     auto decode_search = decode_map_.find(symbol);
     ASSERT(decode_search != decode_map_.end());
 
+#if SYMBOL_TABLE_USE_TINY_STRINGS
+    auto encode_search = encode_map_.find(decode_search->second.toStringView());
+#else
     auto encode_search = encode_map_.find(decode_search->second->toStringView());
+#endif
     ASSERT(encode_search != encode_map_.end());
 
     // If that was the last remaining client usage of the symbol, erase the
@@ -386,8 +394,13 @@ Symbol SymbolTable::toSymbol(absl::string_view sv) {
     // a string_view pointing to it in the encode_map_. This allows us to only
     // store the string once. We use unique_ptr so copies are not made as
     // flat_hash_map moves values around.
+#if SYMBOL_TABLE_USE_TINY_STRINGS
+    TinyString str(sv);
+    auto encode_insert = encode_map_.insert({str.toStringView(), SharedSymbol(next_symbol_)});
+#else
     InlineStringPtr str = InlineString::create(sv);
     auto encode_insert = encode_map_.insert({str->toStringView(), SharedSymbol(next_symbol_)});
+#endif
     ASSERT(encode_insert.second);
     auto decode_insert = decode_map_.insert({next_symbol_, std::move(str)});
     ASSERT(decode_insert.second);
@@ -407,7 +420,11 @@ absl::string_view SymbolTable::fromSymbol(const Symbol symbol) const
     ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
   auto search = decode_map_.find(symbol);
   RELEASE_ASSERT(search != decode_map_.end(), "no such symbol");
+#if SYMBOL_TABLE_USE_TINY_STRINGS
+  return search->second.toStringView();
+#else
   return search->second->toStringView();
+#endif
 }
 
 void SymbolTable::newSymbol() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
@@ -465,7 +482,11 @@ void SymbolTable::debugPrint() const {
   }
   std::sort(symbols.begin(), symbols.end());
   for (Symbol symbol : symbols) {
+#if SYMBOL_TABLE_USE_TINY_STRINGS
+    const TinyString& token = decode_map_.find(symbol)->second;
+#else
     const InlineString& token = *decode_map_.find(symbol)->second;
+#endif
     const SharedSymbol& shared_symbol = encode_map_.find(token.toStringView())->second;
     ENVOY_LOG_MISC(info, "{}: '{}' ({})", symbol, token.toStringView(), shared_symbol.ref_count_);
   }

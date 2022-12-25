@@ -20,6 +20,8 @@
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
 
+#define SYMBOL_TABLE_USE_TINY_STRINGS 1
+
 namespace Envoy {
 namespace Stats {
 
@@ -376,7 +378,11 @@ private:
   // The encode map stores both the symbol and the ref count of that symbol.
   // Using absl::string_view lets us only store the complete string once, in the decode map.
   using EncodeMap = absl::flat_hash_map<absl::string_view, SharedSymbol>;
+#if SYMBOL_TABLE_USE_TINY_STRINGS
+  using DecodeMap = absl::flat_hash_map<Symbol, TinyString>;
+#else
   using DecodeMap = absl::flat_hash_map<Symbol, InlineStringPtr>;
+#endif
   EncodeMap encode_map_ ABSL_GUARDED_BY(lock_);
   DecodeMap decode_map_ ABSL_GUARDED_BY(lock_);
 
