@@ -1131,6 +1131,8 @@ TEST(TinyStringTest, Copy) {
   TinyString hello("Hello, world!");
   TinyString h2(hello);
   EXPECT_EQ("Hello, world!", h2.toStringView());
+  TinyString h3 = h2;
+  EXPECT_EQ("Hello, world!", h3.toStringView());
 }
 
 TEST(TinyStringTest, Move) {

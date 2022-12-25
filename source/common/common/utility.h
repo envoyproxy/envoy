@@ -769,50 +769,38 @@ protected:
   }
 };
 
-// Utility functions to efficiently encode and decode unsigned integers into a
-// uint8-array, optimizing for space consumed when the values are small.
+// Utility functions and stateful representation to efficiently encode and
+// decode unsigned integers into a uint8-array, optimizing for space consumed
+// when the values are small.
 //  * Values less than 2^7 (128) are encoded in 1 byte
 //  * Values less than 2^14 (16k) are encoded in 2 bytes
 //  * Values less than 2^21 (2M) are encoded in 3 bytes.
-struct VarLengthIntegers {
-  /**
-   * @param number A number to encode in a variable length byte-array.
-   * @return The number of bytes it would take to encode the number.
-   */
-  static size_t encodingSizeBytes(uint64_t number);
-
-  /**
-   * @param num_data_bytes The number of bytes in a data-block.
-   * @return The total number of bytes required for the data-block and its encoded size.
-   */
-  static size_t totalSizeBytes(size_t num_data_bytes) {
-    return encodingSizeBytes(num_data_bytes) + num_data_bytes;
-  }
-};
-
-/**
- * Intermediate representation for a stat-name. This helps store multiple
- * names in a single packed allocation. First we encode each desired name,
- * then sum their sizes for the single packed allocation. This is used to
- * store MetricImpl's tags and tagExtractedName.
- */
 class NumericEncoding {
 public:
-  /**
-   * Before destructing SymbolEncoding, you must call moveToMemBlock. This
-   * transfers ownership, and in particular, the responsibility to call
-   * SymbolTable::clear() on all referenced symbols. If we ever wanted to be
-   * able to destruct a SymbolEncoding without transferring it we could add a
-   * clear(SymbolTable&) method.
-   */
-  ~NumericEncoding();
+  // Masks used for variable-length encoding of arbitrary-sized integers into a
+  // uint8-array. The integers are typically small, so we try to store them in as
+  // few bytes as possible. The bottom 7 bits hold values, and the top bit is used
+  // to determine whether another byte is needed for more data.
+  static constexpr uint32_t SpilloverMask = 0x80;
+  static constexpr uint32_t Low7Bits = 0x7f;
 
   /**
-   * Adds a sequence of tokens into the encoding.
+   * Before destructing NumericEncoding, you must call moveToMemBlock. This
+   * transfers ownership. If we ever wanted to be able to destruct a
+   * NumericEncoding without transferring it we could add a clear method.
+   */
+  ~NumericEncoding() {
+    // Verifies that moveToMemBlock() was called on this encoding. Failure
+    // to call moveToMemBlock() will result in leaked memory.
+    ASSERT(mem_block_.capacity() == 0);
+  }
+
+  /**
+   * Adds a sequence of numbers  into the encoding.
    *
    * @param numbers the numbers to encode.
    */
-  template <class Sequence> void addSymbols(const Sequence& numbers) {
+  template <class Sequence> void addNumbers(const Sequence& numbers) {
     ASSERT(data_bytes_required_ == 0);
     for (auto number : numbers) {
       data_bytes_required_ += encodingSizeBytes(number);
@@ -835,15 +823,26 @@ public:
    * Moves the contents of the vector into an allocated array. The array
    * must have been allocated with bytesRequired() bytes.
    *
-   * @param mem_block_builder memory block to receive the encoded bytes.
+   * @param mem_block memory block to receive the encoded bytes.
    */
-  void moveToMemBlock(MemBlockBuilder<uint8_t>& mem_block_builder);
+  void moveToMemBlock(MemBlockBuilder<uint8_t>& mem_block) {
+    appendEncoding(data_bytes_required_, mem_block);
+    mem_block.appendBlock(mem_block_);
+    mem_block_.reset(); // Logically transfer ownership, enabling empty assert on destruct.
+  }
 
   /**
    * @param number A number to encode in a variable length byte-array.
    * @return The number of bytes it would take to encode the number.
    */
-  static size_t encodingSizeBytes(uint64_t number);
+  static size_t encodingSizeBytes(uint64_t number) {
+    size_t num_bytes = 0;
+    do {
+      ++num_bytes;
+      number >>= 7;
+    } while (number != 0);
+    return num_bytes;
+  }
 
   /**
    * @param num_data_bytes The number of bytes in a data-block.
@@ -863,7 +862,23 @@ public:
    * @param number the number to write.
    * @param mem_block the memory into which to append the number.
    */
-  static void appendEncoding(uint64_t number, MemBlockBuilder<uint8_t>& mem_block);
+  static void appendEncoding(uint64_t number, MemBlockBuilder<uint8_t>& mem_block) {
+    // UTF-8-like encoding where a value 127 or less gets written as a single
+    // byte. For higher values we write the low-order 7 bits with a 1 in
+    // the high-order bit. Then we right-shift 7 bits and keep adding more bytes
+    // until we have consumed all the non-zero bits in the number.
+    //
+    // When decoding, we stop consuming uint8_t when we see a uint8_t with
+    // high-order bit 0.
+    do {
+      if (number < (1 << 7)) {
+        mem_block.appendOne(number); // number <= 127 gets encoded in one byte.
+      } else {
+        mem_block.appendOne((number & Low7Bits) | SpilloverMask); // >= 128 need spillover bytes.
+      }
+      number >>= 7;
+    } while (number != 0);
+  }
 
   /**
    * Appends stat_name's bytes into mem_block, which must have been allocated to
@@ -874,7 +889,13 @@ public:
    * @param mem_block the block of memory to append to.
    */
   static void appendToMemBlock(const uint8_t* data, size_t size,
-                               MemBlockBuilder<uint8_t>& mem_block);
+                               MemBlockBuilder<uint8_t>& mem_block) {
+    if (data == nullptr) {
+      mem_block.appendOne(0);
+    } else {
+      mem_block.appendData(absl::MakeSpan(data, size));
+    }
+  }
 
   /**
    * Decodes a byte-array containing a variable-length number.
@@ -882,7 +903,16 @@ public:
    * @param The encoded byte array, written previously by appendEncoding.
    * @return A pair containing the decoded number, and the number of bytes consumed from encoding.
    */
-  static std::pair<uint64_t, size_t> decodeNumber(const uint8_t* encoding);
+  static std::pair<uint64_t, size_t> decodeNumber(const uint8_t* encoding) {
+    uint64_t number = 0;
+    uint64_t uc = SpilloverMask;
+    const uint8_t* start = encoding;
+    for (uint32_t shift = 0; (uc & SpilloverMask) != 0; ++encoding, shift += 7) {
+      uc = static_cast<uint32_t>(*encoding);
+      number |= (uc & Low7Bits) << shift;
+    }
+    return std::make_pair(number, encoding - start);
+  }
 
 private:
   size_t data_bytes_required_{0};

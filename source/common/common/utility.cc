@@ -35,8 +35,8 @@ namespace {
 // uint8-array. The integers are typically small, so we try to store them in as
 // few bytes as possible. The bottom 7 bits hold values, and the top bit is used
 // to determine whether another byte is needed for more data.
-static constexpr uint32_t SpilloverMask = 0x80;
-static constexpr uint32_t Low7Bits = 0x7f;
+//static constexpr uint32_t SpilloverMask = 0x80;
+//static constexpr uint32_t Low7Bits = 0x7f;
 
 class SpecifierConstantValues {
 public:
@@ -649,65 +649,6 @@ double WelfordStandardDeviation::computeStandardDeviation() const {
   // It seems very difficult for variance to go negative, but from the calculation in update()
   // above, I can't quite convince myself it's impossible, so put in a guard to be sure.
   return (std::isnan(variance) || variance < 0) ? std::nan("") : sqrt(variance);
-}
-
-NumericEncoding::~NumericEncoding() {
-  // Verifies that moveToMemBlock() was called on this encoding. Failure
-  // to call moveToMemBlock() will result in leaks symbols.
-  ASSERT(mem_block_.capacity() == 0);
-}
-
-size_t NumericEncoding::encodingSizeBytes(uint64_t number) {
-  size_t num_bytes = 0;
-  do {
-    ++num_bytes;
-    number >>= 7;
-  } while (number != 0);
-  return num_bytes;
-}
-
-void NumericEncoding::appendEncoding(uint64_t number, MemBlockBuilder<uint8_t>& mem_block) {
-  // UTF-8-like encoding where a value 127 or less gets written as a single
-  // byte. For higher values we write the low-order 7 bits with a 1 in
-  // the high-order bit. Then we right-shift 7 bits and keep adding more bytes
-  // until we have consumed all the non-zero bits in symbol.
-  //
-  // When decoding, we stop consuming uint8_t when we see a uint8_t with
-  // high-order bit 0.
-  do {
-    if (number < (1 << 7)) {
-      mem_block.appendOne(number); // number <= 127 gets encoded in one byte.
-    } else {
-      mem_block.appendOne((number & Low7Bits) | SpilloverMask); // >= 128 need spillover bytes.
-    }
-    number >>= 7;
-  } while (number != 0);
-}
-
-std::pair<uint64_t, size_t> NumericEncoding::decodeNumber(const uint8_t* encoding) {
-  uint64_t number = 0;
-  uint64_t uc = SpilloverMask;
-  const uint8_t* start = encoding;
-  for (uint32_t shift = 0; (uc & SpilloverMask) != 0; ++encoding, shift += 7) {
-    uc = static_cast<uint32_t>(*encoding);
-    number |= (uc & Low7Bits) << shift;
-  }
-  return std::make_pair(number, encoding - start);
-}
-
-void NumericEncoding::moveToMemBlock(MemBlockBuilder<uint8_t>& mem_block) {
-  appendEncoding(data_bytes_required_, mem_block);
-  mem_block.appendBlock(mem_block_);
-  mem_block_.reset(); // Logically transfer ownership, enabling empty assert on destruct.
-}
-
-void NumericEncoding::appendToMemBlock(const uint8_t* data, size_t size,
-                                       MemBlockBuilder<uint8_t>& mem_block) {
-  if (data == nullptr) {
-    mem_block.appendOne(0);
-  } else {
-    mem_block.appendData(absl::MakeSpan(data, size));
-  }
 }
 
 InlineString::InlineString(const char* str, size_t size) : size_(size) {

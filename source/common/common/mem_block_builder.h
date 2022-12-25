@@ -99,7 +99,9 @@ public:
    */
   std::unique_ptr<T[]> release() {
     write_span_ = absl::MakeSpan(static_cast<T*>(nullptr), 0);
-    return std::move(data_);
+    std::unique_ptr<T[]> ret = std::move(data_);
+    data_.reset();
+    return ret;
   }
 
   /**

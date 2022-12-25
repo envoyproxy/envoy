@@ -239,7 +239,7 @@ void SymbolTable::addTokensToEncoding(const absl::string_view name, NumericEncod
   }
 
   // Now efficiently encode the array of 32-bit symbols into a uint8_t array.
-  encoding.addSymbols(symbols);
+  encoding.addNumbers(symbols);
 }
 
 uint64_t SymbolTable::numSymbols() const {
