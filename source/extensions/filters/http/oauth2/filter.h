@@ -86,7 +86,9 @@ private:
   COUNTER(oauth_unauthorized_rq)                                                                   \
   COUNTER(oauth_failure)                                                                           \
   COUNTER(oauth_passthrough)                                                                       \
-  COUNTER(oauth_success)
+  COUNTER(oauth_success)                                                                           \
+  COUNTER(oauth_refreshtoken_success)                                                              \
+  COUNTER(oauth_refreshtoken_failure)
 
 /**
  * Wrapper struct filter stats. @see stats_macros.h

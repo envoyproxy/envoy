@@ -540,11 +540,13 @@ void OAuth2Filter::finishUpdateAccessTokenFlow() {
   response_headers_to_add_.reset();
   response_headers_to_add_ = fillResponseHeader(getEncodedToken());
 
+  config_->stats().oauth_refreshtoken_success_.inc();
   decoder_callbacks_->continueDecoding();
 }
 
 void OAuth2Filter::onUpdateAccessTokenFailure() {
-  // access token wasn't get by refresh token, send user to auth point
+  config_->stats().oauth_refreshtoken_failure_.inc();
+  // the access token hasn't been got using by refresh token, send a user to oauth endpoint
   redirectToOAuthServer(*request_headers_);
 }
 
