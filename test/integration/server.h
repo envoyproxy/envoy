@@ -71,22 +71,18 @@ namespace Stats {
  */
 class TestScopeWrapper : public Scope {
 public:
-  TestScopeWrapper(Thread::MutexBasicLockable& lock, ScopeSharedPtr wrapped_scope)
-      : lock_(lock), wrapped_scope_(std::move(wrapped_scope)) {}
+  TestScopeWrapper(Thread::MutexBasicLockable& lock, ScopeSharedPtr wrapped_scope, Store& store)
+      : lock_(lock), wrapped_scope_(wrapped_scope), store_(store) {}
 
   ScopeSharedPtr createScope(const std::string& name) override {
     Thread::LockGuard lock(lock_);
-    return ScopeSharedPtr{new TestScopeWrapper(lock_, wrapped_scope_->createScope(name))};
+    return std::make_shared<TestScopeWrapper>(lock_, wrapped_scope_->createScope(name), store_);
   }
 
   ScopeSharedPtr scopeFromStatName(StatName name) override {
     Thread::LockGuard lock(lock_);
-    return ScopeSharedPtr{new TestScopeWrapper(lock_, wrapped_scope_->scopeFromStatName(name))};
-  }
-
-  void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
-    Thread::LockGuard lock(lock_);
-    wrapped_scope_->deliverHistogramToSinks(histogram, value);
+    return std::make_shared<TestScopeWrapper>(lock_, wrapped_scope_->scopeFromStatName(name),
+                                              store_);
   }
 
   Counter& counterFromStatNameWithTags(const StatName& name,
@@ -111,10 +107,6 @@ public:
                                                StatNameTagVectorOptConstRef tags) override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->textReadoutFromStatNameWithTags(name, tags);
-  }
-
-  NullGaugeImpl& nullGauge(const std::string& str) override {
-    return wrapped_scope_->nullGauge(str);
   }
 
   Counter& counterFromString(const std::string& name) override {
@@ -165,10 +157,13 @@ public:
     return wrapped_scope_->iterate(fn);
   }
   StatName prefix() const override { return wrapped_scope_->prefix(); }
+  Store& store() override { return store_; }
+  const Store& constStore() const override { return store_; }
 
 private:
   Thread::MutexBasicLockable& lock_;
   ScopeSharedPtr wrapped_scope_;
+  Store& store_;
 };
 
 // A counter which signals on a condition variable when it is incremented.
@@ -278,12 +273,7 @@ private:
  */
 class TestIsolatedStoreImpl : public StoreRoot {
 public:
-  // Stats::Scope
-  Counter& counterFromStatNameWithTags(const StatName& name,
-                                       StatNameTagVectorOptConstRef tags) override {
-    Thread::LockGuard lock(lock_);
-    return store_.counterFromStatNameWithTags(name, tags);
-  }
+  // Stats::Store
   void forEachCounter(Stats::SizeFn f_size, StatFn<Counter> f_stat) const override {
     Thread::LockGuard lock(lock_);
     store_.forEachCounter(f_size, f_stat);
@@ -320,63 +310,21 @@ public:
   void setSinkPredicates(std::unique_ptr<SinkPredicates>&& sink_predicates) override {
     UNREFERENCED_PARAMETER(sink_predicates);
   }
-
-  Counter& counterFromString(const std::string& name) override {
+  void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
     Thread::LockGuard lock(lock_);
-    return store_.counterFromString(name);
+    store_.deliverHistogramToSinks(histogram, value);
   }
-  ScopeSharedPtr createScope(const std::string& name) override {
+  NullGaugeImpl& nullGauge() override { return store_.nullGauge(); }
+  NullCounterImpl& nullCounter() override { return store_.nullCounter(); }
+  ScopeSharedPtr rootScope() override {
     Thread::LockGuard lock(lock_);
-    return ScopeSharedPtr{new TestScopeWrapper(lock_, store_.createScope(name))};
+    if (lazy_default_scope_ == nullptr) {
+      lazy_default_scope_ = std::make_shared<TestScopeWrapper>(lock_, store_.rootScope(), *this);
+    }
+    return lazy_default_scope_;
   }
-  ScopeSharedPtr scopeFromStatName(StatName name) override {
-    Thread::LockGuard lock(lock_);
-    return ScopeSharedPtr{new TestScopeWrapper(lock_, store_.scopeFromStatName(name))};
-  }
-  void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
-  Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                   Gauge::ImportMode import_mode) override {
-    Thread::LockGuard lock(lock_);
-    return store_.gaugeFromStatNameWithTags(name, tags, import_mode);
-  }
-  Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) override {
-    Thread::LockGuard lock(lock_);
-    return store_.gaugeFromString(name, import_mode);
-  }
-  Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                           Histogram::Unit unit) override {
-    Thread::LockGuard lock(lock_);
-    return store_.histogramFromStatNameWithTags(name, tags, unit);
-  }
-  NullGaugeImpl& nullGauge(const std::string& name) override { return store_.nullGauge(name); }
-  Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) override {
-    Thread::LockGuard lock(lock_);
-    return store_.histogramFromString(name, unit);
-  }
-  TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
-                                               StatNameTagVectorOptConstRef tags) override {
-    Thread::LockGuard lock(lock_);
-    return store_.textReadoutFromStatNameWithTags(name, tags);
-  }
-  TextReadout& textReadoutFromString(const std::string& name) override {
-    Thread::LockGuard lock(lock_);
-    return store_.textReadoutFromString(name);
-  }
-  CounterOptConstRef findCounter(StatName name) const override {
-    Thread::LockGuard lock(lock_);
-    return store_.findCounter(name);
-  }
-  GaugeOptConstRef findGauge(StatName name) const override {
-    Thread::LockGuard lock(lock_);
-    return store_.findGauge(name);
-  }
-  HistogramOptConstRef findHistogram(StatName name) const override {
-    Thread::LockGuard lock(lock_);
-    return store_.findHistogram(name);
-  }
-  TextReadoutOptConstRef findTextReadout(StatName name) const override {
-    Thread::LockGuard lock(lock_);
-    return store_.findTextReadout(name);
+  ConstScopeSharedPtr constRootScope() const override {
+    return const_cast<TestIsolatedStoreImpl*>(this)->rootScope();
   }
   const SymbolTable& constSymbolTable() const override { return store_.constSymbolTable(); }
   SymbolTable& symbolTable() override { return store_.symbolTable(); }
@@ -398,7 +346,6 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.textReadouts();
   }
-  StatName prefix() const override { return store_.prefix(); }
 
   bool iterate(const IterateFn<Counter>& fn) const override { return store_.iterate(fn); }
   bool iterate(const IterateFn<Gauge>& fn) const override { return store_.iterate(fn); }
@@ -420,6 +367,7 @@ private:
   mutable Thread::MutexBasicLockable lock_;
   IsolatedStoreImpl store_;
   PostMergeCb merge_cb_;
+  ScopeSharedPtr lazy_default_scope_;
 };
 
 } // namespace Stats

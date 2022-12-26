@@ -1,9 +1,12 @@
 #include "source/extensions/http/header_validators/envoy_default/http2_header_validator.h"
 
+#include "envoy/http/header_validator_errors.h"
+
 #include "source/extensions/http/header_validators/envoy_default/character_tables.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/container/node_hash_set.h"
+#include "absl/strings/match.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -16,6 +19,7 @@ using ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderVal
 using ::Envoy::Http::HeaderString;
 using ::Envoy::Http::LowerCaseString;
 using ::Envoy::Http::Protocol;
+using ::Envoy::Http::UhvResponseCodeDetail;
 using HeaderValidatorFunction =
     HeaderValidator::HeaderValueValidationResult (Http2HeaderValidator::*)(const HeaderString&);
 
@@ -37,8 +41,8 @@ using Http2ResponseCodeDetail = ConstSingleton<Http2ResponseCodeDetailValues>;
  *
  */
 Http2HeaderValidator::Http2HeaderValidator(const HeaderValidatorConfig& config, Protocol protocol,
-                                           StreamInfo::StreamInfo& stream_info)
-    : HeaderValidator(config, protocol, stream_info) {}
+                                           ::Envoy::Http::HeaderValidatorStats& stats)
+    : HeaderValidator(config, protocol, stats) {}
 
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
 Http2HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
@@ -405,9 +409,11 @@ Http2HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
 
   if (has_underscore) {
     if (underscore_action == HeaderValidatorConfig::REJECT_REQUEST) {
+      stats_.incRequestsRejectedWithUnderscoresInHeaders();
       return {HeaderEntryValidationResult::Action::Reject,
               UhvResponseCodeDetail::get().InvalidUnderscore};
     } else if (underscore_action == HeaderValidatorConfig::DROP_HEADER) {
+      stats_.incDroppedHeadersWithUnderscores();
       return {HeaderEntryValidationResult::Action::DropHeader,
               UhvResponseCodeDetail::get().InvalidUnderscore};
     }

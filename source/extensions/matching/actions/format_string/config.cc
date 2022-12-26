@@ -12,8 +12,9 @@ namespace Matching {
 namespace Actions {
 namespace FormatString {
 
-const Network::FilterChain* ActionImpl::get(const Server::FilterChainsByName& filter_chains_by_name,
-                                            const StreamInfo::StreamInfo& info) const {
+const Network::FilterChain*
+ActionImpl::get(const Server::Configuration::FilterChainsByName& filter_chains_by_name,
+                const StreamInfo::StreamInfo& info) const {
   const std::string name =
       formatter_->format(*Http::StaticEmptyHeaders::get().request_headers,
                          *Http::StaticEmptyHeaders::get().response_headers,
@@ -27,7 +28,7 @@ const Network::FilterChain* ActionImpl::get(const Server::FilterChainsByName& fi
 
 Matcher::ActionFactoryCb
 ActionFactory::createActionFactoryCb(const Protobuf::Message& proto_config,
-                                     Server::FilterChainActionFactoryContext& context,
+                                     FilterChainActionFactoryContext& context,
                                      ProtobufMessage::ValidationVisitor& validator) {
   const auto& config =
       MessageUtil::downcastAndValidate<const envoy::config::core::v3::SubstitutionFormatString&>(
@@ -37,7 +38,7 @@ ActionFactory::createActionFactoryCb(const Protobuf::Message& proto_config,
   return [formatter]() { return std::make_unique<ActionImpl>(formatter); };
 }
 
-REGISTER_FACTORY(ActionFactory, Matcher::ActionFactory<Server::FilterChainActionFactoryContext>);
+REGISTER_FACTORY(ActionFactory, Matcher::ActionFactory<FilterChainActionFactoryContext>);
 
 } // namespace FormatString
 } // namespace Actions

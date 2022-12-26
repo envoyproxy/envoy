@@ -1515,6 +1515,8 @@ TEST_P(ProtocolIntegrationTest, MaxStreamDurationWithRetryPolicyWhenRetryUpstrea
 // Verify that headers with underscores in their names are dropped from client requests
 // but remain in upstream responses.
 TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresDropped) {
+  config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
+  config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
@@ -1523,21 +1525,39 @@ TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresDropped) {
       });
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/test/long/url"},
-                                     {":scheme", "http"},
-                                     {":authority", "sni.lyft.com"},
-                                     {"foo_bar", "baz"}});
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "sni.lyft.com"},
+                                                                 {"foo_bar", "baz"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  codec_client_->sendData(*request_encoder_, 1, false);
+  codec_client_->sendTrailers(
+      *request_encoder_,
+      Http::TestRequestTrailerMapImpl{{"trailer1", "value1"}, {"trailer_2", "value2"}});
   waitForNextUpstreamRequest();
 
   EXPECT_THAT(upstream_request_->headers(), Not(HeaderHasValueRef("foo_bar", "baz")));
+  // Headers with underscores should be dropped from request headers and trailers.
+#ifndef ENVOY_ENABLE_UHV
+  // UHV does not support trailer validation yet.
+  EXPECT_THAT(*upstream_request_->trailers(), Not(HeaderHasValueRef("trailer_2", "value2")));
+#endif
   upstream_request_->encodeHeaders(
-      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"bar_baz", "fooz"}}, true);
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"bar_baz", "fooz"}}, false);
+  upstream_request_->encodeData("b", false);
+  upstream_request_->encodeTrailers(
+      Http::TestResponseTrailerMapImpl{{"trailer1", "value1"}, {"response_trailer", "ok"}});
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
+  // Both response headers and trailers must retain headers with underscores.
   EXPECT_THAT(response->headers(), HeaderHasValueRef("bar_baz", "fooz"));
+  EXPECT_THAT(*response->trailers(), HeaderHasValueRef("response_trailer", "ok"));
+#ifndef ENVOY_ENABLE_UHV
+  // UHV does not support trailer validation yet.
   Stats::Store& stats = test_server_->server().stats();
   std::string stat_name;
   switch (downstreamProtocol()) {
@@ -1554,7 +1574,8 @@ TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresDropped) {
     RELEASE_ASSERT(false, fmt::format("Unknown downstream protocol {}",
                                       static_cast<int>(downstream_protocol_)));
   };
-  EXPECT_EQ(1L, TestUtility::findCounter(stats, stat_name)->value());
+  EXPECT_EQ(2L, TestUtility::findCounter(stats, stat_name)->value());
+#endif
 }
 
 // Verify that by default headers with underscores in their names remain in both requests and
@@ -1580,7 +1601,7 @@ TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresRemainByDefault) {
 }
 
 // Verify that request with headers containing underscores is rejected when configured.
-TEST_P(DownstreamProtocolIntegrationTest, HeadersWithUnderscoresCauseRequestRejectedByDefault) {
+TEST_P(DownstreamProtocolIntegrationTest, HeadersWithUnderscoresCauseRequestRejected) {
   useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -1608,6 +1629,79 @@ TEST_P(DownstreamProtocolIntegrationTest, HeadersWithUnderscoresCauseRequestReje
     EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
   }
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("unexpected_underscore"));
+}
+
+#ifndef ENVOY_ENABLE_UHV
+// UHV does not implement trailer validation just yet
+// Verify that request with trailers containing underscores is rejected when configured.
+TEST_P(DownstreamProtocolIntegrationTest, HeadersWithUnderscoresInTrailersCauseRequestRejected) {
+  useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
+  config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
+  config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.mutable_common_http_protocol_options()->set_headers_with_underscores_action(
+            envoy::config::core::v3::HttpProtocolOptions::REJECT_REQUEST);
+      });
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "sni.lyft.com"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  codec_client_->sendData(*request_encoder_, 1, false);
+  codec_client_->sendTrailers(
+      *request_encoder_,
+      Http::TestRequestTrailerMapImpl{{"trailer1", "value1"}, {"trailer_2", "value2"}});
+
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("400", response->headers().getStatusValue());
+  } else {
+    ASSERT_TRUE(response->waitForReset());
+    codec_client_->close();
+    ASSERT_TRUE(response->reset());
+    EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
+  }
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("unexpected_underscore"));
+}
+#endif
+
+// Verify that headers with underscores in response do not cause request to be rejected.
+TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresInResponseAllowRequest) {
+  config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
+  config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.mutable_common_http_protocol_options()->set_headers_with_underscores_action(
+            envoy::config::core::v3::HttpProtocolOptions::REJECT_REQUEST);
+      });
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"}});
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"bar_baz", "fooz"}}, false);
+  upstream_request_->encodeData("b", false);
+  upstream_request_->encodeTrailers(
+      Http::TestResponseTrailerMapImpl{{"trailer1", "value1"}, {"response_trailer", "ok"}});
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  // Both response headers and trailers must retain headers with underscores.
+  EXPECT_THAT(response->headers(), HeaderHasValueRef("bar_baz", "fooz"));
+  EXPECT_THAT(*response->trailers(), HeaderHasValueRef("response_trailer", "ok"));
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, ValidZeroLengthContent) {
@@ -3904,9 +3998,6 @@ TEST_P(ProtocolIntegrationTest, LocalInterfaceNameForUpstreamConnection) {
 }
 #endif
 
-#ifdef NDEBUG
-// These tests send invalid request and response header names which violate ASSERT while creating
-// such request/response headers. So they can only be run in NDEBUG mode.
 TEST_P(DownstreamProtocolIntegrationTest, InvalidRequestHeaderName) {
   if (GetParam().http1_implementation == Http1ParserImpl::BalsaParser) {
     // TODO(#21245): Re-enable this test for BalsaParser.
@@ -3917,11 +4008,12 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidRequestHeaderName) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
+  // } is invalid character in header name
   auto encoder_decoder =
       codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                                                  {":path", "/test/long/url"},
                                                                  {":authority", "sni.lyft.com"},
-                                                                 {"foo\nname", "foo_value"}});
+                                                                 {"foo}name", "foo_value"}});
   auto response = std::move(encoder_decoder.second);
 
   if (downstream_protocol_ == Http::CodecType::HTTP1) {
@@ -3936,14 +4028,19 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidRequestHeaderName) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, InvalidResponseHeaderName) {
+  if (GetParam().http1_implementation == Http1ParserImpl::BalsaParser) {
+    // TODO(#21245): Re-enable this test for BalsaParser.
+    return;
+  }
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
+  // } is invalid character in header name
   upstream_request_->encodeHeaders(
-      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"foo\rname", "foo_value"}}, false);
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"foo}name", "foo_value"}}, false);
 
   ASSERT_TRUE(response->waitForEndStream());
 
@@ -3951,7 +4048,6 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidResponseHeaderName) {
   EXPECT_EQ("502", response->headers().getStatusValue());
   test_server_->waitForCounterGe("http.config_test.downstream_rq_5xx", 1);
 }
-#endif
 
 TEST_P(DownstreamProtocolIntegrationTest, InvalidSchemeHeaderWithWhitespace) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");

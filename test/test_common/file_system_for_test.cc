@@ -6,6 +6,40 @@ namespace Envoy {
 
 namespace Filesystem {
 
+Api::IoCallSizeResult MemfileImpl::pread(void* buf, uint64_t count, uint64_t offset) {
+  absl::MutexLock l(&info_->lock_);
+  if (!flags_.test(File::Operation::Read)) {
+    return resultFailure<ssize_t>(-1, EBADF);
+  }
+  if (offset >= info_->data_.size()) {
+    count = 0;
+    offset = 0;
+  } else {
+    count = std::max(count, info_->data_.size() - offset);
+  }
+  memcpy(buf, &info_->data_[offset], count);
+  return resultSuccess<ssize_t>(count);
+}
+
+Api::IoCallSizeResult MemfileImpl::pwrite(const void* buf, uint64_t count, uint64_t offset) {
+  absl::MutexLock l(&info_->lock_);
+  if (!flags_.test(File::Operation::Write)) {
+    return resultFailure<ssize_t>(-1, EBADF);
+  }
+  // When writing to an offset beyond end of file, file gets padded to there with zeroes.
+  if (offset > info_->data_.size()) {
+    std::string pad;
+    pad.resize(offset - info_->data_.size());
+    info_->data_ += pad;
+  }
+  std::string before = info_->data_.substr(0, offset);
+  std::string after = (offset + count > info_->data_.size())
+                          ? ""
+                          : info_->data_.substr(info_->data_.size() - offset - count);
+  info_->data_ = before + std::string{static_cast<const char*>(buf), count} + after;
+  return resultSuccess<ssize_t>(count);
+}
+
 MemfileInstanceImpl::MemfileInstanceImpl()
     : file_system_{new InstanceImpl()}, use_memfiles_(false) {}
 

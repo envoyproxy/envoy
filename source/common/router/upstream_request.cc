@@ -210,7 +210,7 @@ void UpstreamRequest::cleanUp() {
 
   while (downstream_data_disabled_ != 0) {
     parent_.callbacks()->onDecoderFilterBelowWriteBufferLowWatermark();
-    parent_.cluster()->trafficStats().upstream_flow_control_drained_total_.inc();
+    parent_.cluster()->trafficStats()->upstream_flow_control_drained_total_.inc();
     --downstream_data_disabled_;
   }
   if (allow_upstream_filters_) {
@@ -766,7 +766,7 @@ UpstreamToDownstream& UpstreamRequest::upstreamToDownstream() {
 }
 
 void UpstreamRequest::onStreamMaxDurationReached() {
-  upstream_host_->cluster().trafficStats().upstream_rq_max_duration_reached_.inc();
+  upstream_host_->cluster().trafficStats()->upstream_rq_max_duration_reached_.inc();
 
   // The upstream had closed then try to retry along with retry policy.
   parent_.onStreamMaxDurationReached(*this);
@@ -793,7 +793,7 @@ void UpstreamRequest::DownstreamWatermarkManager::onAboveWriteBufferHighWatermar
   // The downstream connection is overrun. Pause reads from upstream.
   // If there are multiple calls to readDisable either the codec (H2) or the underlying
   // Network::Connection (H1) will handle reference counting.
-  parent_.parent_.cluster()->trafficStats().upstream_flow_control_paused_reading_total_.inc();
+  parent_.parent_.cluster()->trafficStats()->upstream_flow_control_paused_reading_total_.inc();
   parent_.upstream_->readDisable(true);
 }
 
@@ -802,7 +802,7 @@ void UpstreamRequest::DownstreamWatermarkManager::onBelowWriteBufferLowWatermark
 
   // One source of connection blockage has buffer available. Pass this on to the stream, which
   // will resume reads if this was the last remaining high watermark.
-  parent_.parent_.cluster()->trafficStats().upstream_flow_control_resumed_reading_total_.inc();
+  parent_.parent_.cluster()->trafficStats()->upstream_flow_control_resumed_reading_total_.inc();
   parent_.upstream_->readDisable(false);
 }
 
@@ -817,7 +817,7 @@ void UpstreamRequest::disableDataFromDownstreamForFlowControl() {
   // the per try timeout timer is started only after downstream_end_stream_
   // is true.
   ASSERT(parent_.upstreamRequests().size() == 1 || parent_.downstreamEndStream());
-  parent_.cluster()->trafficStats().upstream_flow_control_backed_up_total_.inc();
+  parent_.cluster()->trafficStats()->upstream_flow_control_backed_up_total_.inc();
   parent_.callbacks()->onDecoderFilterAboveWriteBufferHighWatermark();
   ++downstream_data_disabled_;
 }
@@ -833,7 +833,7 @@ void UpstreamRequest::enableDataFromDownstreamForFlowControl() {
   // the per try timeout timer is started only after downstream_end_stream_
   // is true.
   ASSERT(parent_.upstreamRequests().size() == 1 || parent_.downstreamEndStream());
-  parent_.cluster()->trafficStats().upstream_flow_control_drained_total_.inc();
+  parent_.cluster()->trafficStats()->upstream_flow_control_drained_total_.inc();
   parent_.callbacks()->onDecoderFilterBelowWriteBufferLowWatermark();
   ASSERT(downstream_data_disabled_ != 0);
   if (downstream_data_disabled_ > 0) {

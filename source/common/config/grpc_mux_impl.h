@@ -8,6 +8,7 @@
 #include "envoy/common/time.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
+#include "envoy/config/xds_config_tracker.h"
 #include "envoy/config/xds_resources_delegate.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/grpc/status.h"
@@ -39,6 +40,7 @@ public:
               Random::RandomGenerator& random, Stats::Scope& scope,
               const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node,
               CustomConfigValidatorsPtr&& config_validators,
+              XdsConfigTrackerOptRef xds_config_tracker,
               XdsResourcesDelegateOptRef xds_resources_delegate,
               const std::string& target_xds_authority);
 
@@ -182,6 +184,7 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   const bool skip_subsequent_node_;
   CustomConfigValidatorsPtr config_validators_;
+  XdsConfigTrackerOptRef xds_config_tracker_;
   XdsResourcesDelegateOptRef xds_resources_delegate_;
   const std::string target_xds_authority_;
   bool first_stream_request_;

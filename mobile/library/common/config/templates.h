@@ -87,6 +87,11 @@ extern const char* socket_tag_config_insert;
 extern const char* route_cache_reset_filter_insert;
 
 /**
+ * Insert that enables persistent DNS cache.
+ */
+extern const char* persistent_dns_cache_config_insert;
+
+/**
  * Config template which uses Envoy's built-in certificates validator to verify
  * certificate chain.
  */
