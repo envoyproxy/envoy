@@ -3998,9 +3998,6 @@ TEST_P(ProtocolIntegrationTest, LocalInterfaceNameForUpstreamConnection) {
 }
 #endif
 
-#ifdef NDEBUG
-// These tests send invalid request and response header names which violate ASSERT while creating
-// such request/response headers. So they can only be run in NDEBUG mode.
 TEST_P(DownstreamProtocolIntegrationTest, InvalidRequestHeaderName) {
   if (GetParam().http1_implementation == Http1ParserImpl::BalsaParser) {
     // TODO(#21245): Re-enable this test for BalsaParser.
@@ -4011,11 +4008,12 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidRequestHeaderName) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
+  // } is invalid character in header name
   auto encoder_decoder =
       codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                                                  {":path", "/test/long/url"},
                                                                  {":authority", "sni.lyft.com"},
-                                                                 {"foo\nname", "foo_value"}});
+                                                                 {"foo}name", "foo_value"}});
   auto response = std::move(encoder_decoder.second);
 
   if (downstream_protocol_ == Http::CodecType::HTTP1) {
@@ -4030,14 +4028,19 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidRequestHeaderName) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, InvalidResponseHeaderName) {
+  if (GetParam().http1_implementation == Http1ParserImpl::BalsaParser) {
+    // TODO(#21245): Re-enable this test for BalsaParser.
+    return;
+  }
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
+  // } is invalid character in header name
   upstream_request_->encodeHeaders(
-      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"foo\rname", "foo_value"}}, false);
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"foo}name", "foo_value"}}, false);
 
   ASSERT_TRUE(response->waitForEndStream());
 
@@ -4045,7 +4048,6 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidResponseHeaderName) {
   EXPECT_EQ("502", response->headers().getStatusValue());
   test_server_->waitForCounterGe("http.config_test.downstream_rq_5xx", 1);
 }
-#endif
 
 TEST_P(DownstreamProtocolIntegrationTest, InvalidSchemeHeaderWithWhitespace) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");

@@ -17,9 +17,9 @@ final class StatFlushIntegrationTest: XCTestCase {
     XCTAssertEqual(XCTWaiter.wait(for: [engineExpectation], timeout: 10), .completed)
 
     let pulseClient = engine.pulseClient()
-    let distribution = pulseClient.distribution(elements: ["foo", "bar", "distribution"])
+    let counter = pulseClient.counter(elements: ["foo", "bar", "distribution"])
 
-    distribution.recordValue(value: 100)
+    counter.increment(count: 100)
 
     // Hit flushStats() many times in a row to make sure that there are no issues with
     // concurrent flushing.

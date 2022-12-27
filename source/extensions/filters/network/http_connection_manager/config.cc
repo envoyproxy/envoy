@@ -125,10 +125,10 @@ envoy::extensions::filters::network::http_connection_manager::v3::HttpConnection
       KEEP_UNCHANGED;
 }
 
-Http::HeaderValidatorFactoryPtr
-createHeaderValidatorFactory([[maybe_unused]] const envoy::extensions::filters::network::
-                                 http_connection_manager::v3::HttpConnectionManager& config,
-                             [[maybe_unused]] Server::Configuration::FactoryContext& context) {
+Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
+    [[maybe_unused]] const envoy::extensions::filters::network::http_connection_manager::v3::
+        HttpConnectionManager& config,
+    [[maybe_unused]] ProtobufMessage::ValidationVisitor& validation_visitor) {
 
   Http::HeaderValidatorFactoryPtr header_validator_factory;
 #ifdef ENVOY_ENABLE_UHV
@@ -170,7 +170,7 @@ createHeaderValidatorFactory([[maybe_unused]] const envoy::extensions::filters::
   }
 
   header_validator_factory =
-      factory->createFromProto(header_validator_config.typed_config(), context);
+      factory->createFromProto(header_validator_config.typed_config(), validation_visitor);
   if (!header_validator_factory) {
     throw EnvoyException(fmt::format("Header validator extension could not be created: '{}'",
                                      header_validator_config.name()));
@@ -382,7 +382,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
                                ? std::make_unique<HttpConnectionManagerProto::ProxyStatusConfig>(
                                      config.proxy_status_config())
                                : nullptr),
-      header_validator_factory_(createHeaderValidatorFactory(config, context)),
+      header_validator_factory_(
+          createHeaderValidatorFactory(config, context.messageValidationVisitor())),
       append_x_forwarded_port_(config.append_x_forwarded_port()) {
   if (!idle_timeout_) {
     idle_timeout_ = std::chrono::hours(1);

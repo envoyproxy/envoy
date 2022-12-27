@@ -71,6 +71,9 @@ minor_behavior_changes:
   change: |
     reverting the behavioral change to have ``CONNECT`` and upgrade requests over HTTP/1.1 not delay close.  One can reinstate
     delay close for upgrades by setting ``envoy.reloadable_features.no_delay_close_for_upgrades`` to ``true``.
+- area: tcp
+  change: |
+    added :ref:`idle_timeout <envoy_v3_api_field_extensions.upstreams.tcp.v3.TcpProtocolOptions.idle_timeout>` to support per client idle timeout for tcp connection pool. The timeout is guarded by ``envoy.reloadable_features.tcp_pool_idle_timeout`` and timeout defaults to 10 minutes if runtime flag is enabled.
 
 
 bug_fixes:
@@ -113,6 +116,9 @@ bug_fixes:
 - area: jwt_authn
   change: |
     fix a bug that jwt_cache breaks the :ref:`provider_and_audiences <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtRequirement.provider_and_audiences>` JWT requirement.
+- area: health_checker
+  change: |
+    prevent writing pending data for health checkers by introducing ``ConnectionCloseType::Abort`` to avoid cascading handshake overhead from health checker's requests on timeout. This fix is related to `issue \#23718 <https://github.com/envoyproxy/envoy/issues/23718>`_.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -206,6 +212,9 @@ new_features:
 - area: thrift_proxy
   change: |
     added ``envoy.reloadable_features.thrift_allow_negative_field_ids`` to support negative field ids for legacy thrift service.
+- area: bandwidth_limit
+  change: |
+    added two new response trailers ``bandwidth-request-filter-delay-ms`` and ``bandwidth-response-filter-delay-ms`` to measure the delays added by this filter.
 - area: udp_proxy
   change: |
     added support for :ref:`proxy_access_log <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.proxy_access_log>`.
@@ -248,6 +257,9 @@ new_features:
 - area: http
   change: |
     added :ref:`append_x_forwarded_port <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.append_x_forwarded_port>` to append the ``x-forwarded-port`` header to HTTP upstream requests.
+- area: tcp
+  change: |
+    added :ref:`idle_timeout <envoy_v3_api_field_extensions.upstreams.tcp.v3.TcpProtocolOptions.idle_timeout>` to support per client idle timeout for tcp connection pool. See also minor_behavior_changes.
 - area: ext_authz
   change: |
     added support to allowlist headers included in the check request to gRPC authorization server (previously only available for HTTP authorization server).
