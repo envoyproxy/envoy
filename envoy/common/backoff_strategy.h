@@ -28,6 +28,14 @@ public:
    * @param base_interval the new base interval for the backoff strategy.
    */
   virtual void reset(uint64_t base_interval) PURE;
+
+  /**
+   * Checks if a time interval is greater than the maximum time interval configured for a backoff
+   * strategy.
+   * @param interval time interval to be checked.
+   * @return returns true if interval is greater than the maximum time interval
+   */
+  virtual bool isOverTimeLimit(uint64_t interval_ms) PURE;
 };
 
 using BackOffStrategyPtr = std::unique_ptr<BackOffStrategy>;

@@ -32,10 +32,10 @@ class NewGrpcMuxImpl
       Logger::Loggable<Logger::Id::config> {
 public:
   NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
-                 const Protobuf::MethodDescriptor& service_method, Random::RandomGenerator& random,
-                 Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
+                 const Protobuf::MethodDescriptor& service_method, Stats::Scope& scope,
+                 const RateLimitSettings& rate_limit_settings,
                  const LocalInfo::LocalInfo& local_info,
-                 CustomConfigValidatorsPtr&& config_validators,
+                 CustomConfigValidatorsPtr&& config_validators, BackOffStrategyPtr backoff_strategy,
                  XdsConfigTrackerOptRef xds_config_tracker);
 
   ~NewGrpcMuxImpl() override;

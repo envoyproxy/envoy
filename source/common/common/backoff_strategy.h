@@ -33,6 +33,7 @@ public:
     base_interval_ = base_interval;
     reset();
   }
+  bool isOverTimeLimit(uint64_t interval_ms) override { return interval_ms > max_interval_; }
 
 private:
   uint64_t base_interval_;
@@ -58,6 +59,7 @@ public:
   uint64_t nextBackOffMs() override;
   void reset() override {}
   void reset(uint64_t min_interval) override { min_interval_ = min_interval; }
+  bool isOverTimeLimit(uint64_t interval_ms) override { return interval_ms > min_interval_; }
 
 private:
   uint64_t min_interval_;
@@ -80,6 +82,7 @@ public:
   uint64_t nextBackOffMs() override;
   void reset() override {}
   void reset(uint64_t interval_ms) override { interval_ms_ = interval_ms; }
+  bool isOverTimeLimit(uint64_t interval_ms) override { return interval_ms > interval_ms_; }
 
 private:
   uint64_t interval_ms_;

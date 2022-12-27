@@ -62,9 +62,8 @@ public:
   GrpcMuxImpl(std::unique_ptr<F> subscription_state_factory, bool skip_subsequent_node,
               const LocalInfo::LocalInfo& local_info, Grpc::RawAsyncClientPtr&& async_client,
               Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
-              Random::RandomGenerator& random, Stats::Scope& scope,
-              const RateLimitSettings& rate_limit_settings,
-              CustomConfigValidatorsPtr&& config_validators,
+              Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
+              CustomConfigValidatorsPtr&& config_validators, BackOffStrategyPtr backoff_strategy,
               XdsConfigTrackerOptRef xds_config_tracker,
               XdsResourcesDelegateOptRef xds_resources_delegate = absl::nullopt,
               const std::string& target_xds_authority = "");
@@ -222,11 +221,10 @@ class GrpcMuxDelta : public GrpcMuxImpl<DeltaSubscriptionState, DeltaSubscriptio
                                         envoy::service::discovery::v3::DeltaDiscoveryResponse> {
 public:
   GrpcMuxDelta(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
-               const Protobuf::MethodDescriptor& service_method, Random::RandomGenerator& random,
-               Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
-               const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node,
-               CustomConfigValidatorsPtr&& config_validators,
-               XdsConfigTrackerOptRef xds_config_tracker);
+               const Protobuf::MethodDescriptor& service_method, Stats::Scope& scope,
+               const RateLimitSettings& rate_limit_settings, const LocalInfo::LocalInfo& local_info,
+               bool skip_subsequent_node, CustomConfigValidatorsPtr&& config_validators,
+               BackOffStrategyPtr backoff_strategy, XdsConfigTrackerOptRef xds_config_tracker);
 
   // GrpcStreamCallbacks
   void requestOnDemandUpdate(const std::string& type_url,
@@ -238,11 +236,10 @@ class GrpcMuxSotw : public GrpcMuxImpl<SotwSubscriptionState, SotwSubscriptionSt
                                        envoy::service::discovery::v3::DiscoveryResponse> {
 public:
   GrpcMuxSotw(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
-              const Protobuf::MethodDescriptor& service_method, Random::RandomGenerator& random,
-              Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
-              const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node,
-              CustomConfigValidatorsPtr&& config_validators,
-              XdsConfigTrackerOptRef xds_config_tracker,
+              const Protobuf::MethodDescriptor& service_method, Stats::Scope& scope,
+              const RateLimitSettings& rate_limit_settings, const LocalInfo::LocalInfo& local_info,
+              bool skip_subsequent_node, CustomConfigValidatorsPtr&& config_validators,
+              BackOffStrategyPtr backoff_strategy, XdsConfigTrackerOptRef xds_config_tracker,
               XdsResourcesDelegateOptRef xds_resources_delegate = absl::nullopt,
               const std::string& target_xds_authority = "");
 

@@ -41,6 +41,9 @@ namespace Config {
 
 constexpr absl::string_view Wildcard = "*";
 
+static constexpr uint64_t RetryBaseIntervalMs = 500;
+static constexpr uint64_t RetryMaxIntervalMs = 30000;
+
 /**
  * Constant Api Type Values, used by envoy::config::core::v3::ApiConfigSource.
  */
@@ -530,6 +533,39 @@ public:
                                                                   random);
     }
     return std::make_unique<FixedBackOffStrategy>(dns_refresh_rate_ms);
+  }
+
+  /**
+   * Prepares the backoff strategy given the configuration containing the retry policy.
+   * @param config configuration that contains the retry policy.
+   * @param random random generator.
+   * @return BackOffStrategyPtr
+   */
+  template <typename T>
+  static BackOffStrategyPtr prepareBackoffStrategy(const T& config,
+                                                   Random::RandomGenerator& random) {
+
+    uint64_t base_interval_ms = RetryBaseIntervalMs;
+    uint64_t max_interval_ms = RetryMaxIntervalMs;
+
+    if (config.has_retry_policy()) {
+      if (config.retry_policy().has_retry_back_off()) {
+        base_interval_ms =
+            PROTOBUF_GET_MS_REQUIRED(config.retry_policy().retry_back_off(), base_interval);
+
+        max_interval_ms = PROTOBUF_GET_MS_OR_DEFAULT(config.retry_policy().retry_back_off(),
+                                                     max_interval, base_interval_ms * 10);
+
+        if (max_interval_ms < base_interval_ms) {
+          ExceptionUtil::throwEnvoyException(fmt::format("Retry Backoff max_interval {} must be "
+                                                         "greater than"
+                                                         "or equal to the base_interval {}",
+                                                         max_interval_ms, base_interval_ms));
+        }
+      }
+    }
+    return std::make_unique<JitteredExponentialBackOffStrategy>(base_interval_ms, max_interval_ms,
+                                                                random);
   }
 };
 
