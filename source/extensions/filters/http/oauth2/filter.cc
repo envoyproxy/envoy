@@ -541,6 +541,7 @@ void OAuth2Filter::finishUpdateAccessTokenFlow() {
   response_headers_to_add_ = fillResponseHeader(getEncodedToken());
 
   config_->stats().oauth_refreshtoken_success_.inc();
+  config_->stats().oauth_success_.inc();
   decoder_callbacks_->continueDecoding();
 }
 
