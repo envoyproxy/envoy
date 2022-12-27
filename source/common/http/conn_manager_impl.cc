@@ -1460,6 +1460,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
   // See if we want to drain/close the connection. Send the go away frame prior to encoding the
   // header block.
   if (connection_manager_.drain_state_ == DrainState::NotDraining &&
+      connection_manager_.codec_->protocol() == Protocol::Http11 &&
       (connection_manager_.drain_close_.drainClose() || drain_connection_due_to_overload)) {
 
     // This doesn't really do anything for HTTP/1.1 other then give the connection another boost
