@@ -13,7 +13,7 @@ namespace FileSystemHttpCache {
  *
  * Note that size_bytes and size_count may drift away from true values, due to:
  * - Changes to the filesystem may be made outside of the process, which will not be
- *   accounted for.
+ *   accounted for. (Including, during hot restart, overlapping envoy processes.)
  * - Files completed while pre-cache-purge measurement is in progress may not be counted.
  * - Changes in file size due to header updates are assumed to be negligible, and are ignored.
  *
