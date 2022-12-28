@@ -140,14 +140,16 @@ public:
   const envoy::config::core::v3::HttpUri& oauthTokenEndpoint() const {
     return oauth_token_endpoint_;
   }
-  const std::string& authorizationEndpoint() const { return authorization_endpoint_; }
+  const Http::Utility::Url& authorizationEndpointUrl() const { return authorization_endpoint_url_; }
+  const Http::Utility::QueryParams& authorizationQueryParams() const {
+    return authorization_query_params_;
+  }
   const std::string& redirectUri() const { return redirect_uri_; }
   const Matchers::PathMatcher& redirectPathMatcher() const { return redirect_matcher_; }
   const Matchers::PathMatcher& signoutPath() const { return signout_path_; }
   std::string clientSecret() const { return secret_reader_->clientSecret(); }
   std::string tokenSecret() const { return secret_reader_->tokenSecret(); }
   FilterStats& stats() { return stats_; }
-  const std::string& encodedAuthScopes() const { return encoded_auth_scopes_; }
   const std::string& encodedResourceQueryParams() const { return encoded_resource_query_params_; }
   const CookieNames& cookieNames() const { return cookie_names_; }
   const AuthType& authType() const { return auth_type_; }
@@ -157,7 +159,10 @@ private:
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
 
   const envoy::config::core::v3::HttpUri oauth_token_endpoint_;
+  // Owns the data exposed by authorization_endpoint_url_.
   const std::string authorization_endpoint_;
+  Http::Utility::Url authorization_endpoint_url_;
+  const Http::Utility::QueryParams authorization_query_params_;
   const std::string client_id_;
   const std::string redirect_uri_;
   const Matchers::PathMatcher redirect_matcher_;

@@ -292,6 +292,21 @@ TEST_F(OAuth2Test, InvalidCluster) {
                             "specify which cluster to direct OAuth requests to.");
 }
 
+// Verifies that we fail constructing the filter if the authorization endpoint isn't a valid URL.
+TEST_F(OAuth2Test, InvalidAuthorizationEndpoint) {
+  // Create a filter config with an invalid authorization_endpoint URL.
+  envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
+  auto* endpoint = p.mutable_token_endpoint();
+  endpoint->set_cluster("auth.example.com");
+  p.set_authorization_endpoint("INVALID_URL");
+  auto secret_reader = std::make_shared<MockSecretReader>();
+
+  EXPECT_THROW_WITH_MESSAGE(
+      std::make_shared<FilterConfig>(p, factory_context_.cluster_manager_, secret_reader, scope_,
+                                     "test."),
+      EnvoyException, "OAuth2 filter: invalid authorization endpoint URL 'INVALID_URL' in config.");
+}
+
 // Verifies that the OAuth config is created with a default value for auth_scopes field when it is
 // not set in proto/yaml.
 TEST_F(OAuth2Test, DefaultAuthScope) {
@@ -324,9 +339,6 @@ TEST_F(OAuth2Test, DefaultAuthScope) {
   test_config_ = std::make_shared<FilterConfig>(p, factory_context_.cluster_manager_, secret_reader,
                                                 scope_, "test.");
 
-  // Auth_scopes was not set, should return default value.
-  EXPECT_EQ(test_config_->encodedAuthScopes(), TEST_DEFAULT_SCOPE);
-
   // resource is optional
   EXPECT_EQ(test_config_->encodedResourceQueryParams(), "");
 
@@ -345,16 +357,70 @@ TEST_F(OAuth2Test, DefaultAuthScope) {
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
-           TEST_CLIENT_ID + "&scope=" + TEST_DEFAULT_SCOPE +
-           "&response_type=code&"
-           "redirect_uri=http%3A%2F%2Ftraffic.example.com%2F"
-           "_oauth&state=http%3A%2F%2Ftraffic.example.com%2Fnot%2F_oauth"},
+           TEST_CLIENT_ID +
+           "&redirect_uri=http%3A%2F%2Ftraffic.example.com%2F_oauth"
+           "&response_type=code"
+           "&scope=" +
+           TEST_DEFAULT_SCOPE + "&state=http%3A%2F%2Ftraffic.example.com%2Fnot%2F_oauth"},
   };
 
   // explicitly tell the validator to fail the validation.
   EXPECT_CALL(*validator_, setParams(_, _));
   EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
 
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+}
+
+// Verifies that query parameters in the authorization_endpoint URL are preserved.
+TEST_F(OAuth2Test, PreservesQueryParametersInAuthorizationEndpoint) {
+  // Create a filter config with an authorization_endpoint URL with query parameters.
+  envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
+  auto* endpoint = p.mutable_token_endpoint();
+  endpoint->set_cluster("auth.example.com");
+  endpoint->set_uri("auth.example.com/_oauth");
+  endpoint->mutable_timeout()->set_seconds(1);
+  p.set_redirect_uri("%REQ(:scheme)%://%REQ(:authority)%" + TEST_CALLBACK);
+  p.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
+  p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/?foo=bar");
+  p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
+  auto credentials = p.mutable_credentials();
+  credentials->set_client_id(TEST_CLIENT_ID);
+  credentials->mutable_token_secret()->set_name("secret");
+  credentials->mutable_hmac_secret()->set_name("hmac");
+
+  // Create the OAuth config.
+  auto secret_reader = std::make_shared<MockSecretReader>();
+  FilterConfigSharedPtr test_config_;
+  test_config_ = std::make_shared<FilterConfig>(p, factory_context_.cluster_manager_, secret_reader,
+                                                scope_, "test.");
+  init(test_config_);
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/not/_oauth"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "http"},
+  };
+
+  // Explicitly tell the validator to fail the validation.
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+
+  // Verify that the foo=bar query parameter is preserved in the redirect.
+  Http::TestResponseHeaderMapImpl response_headers{
+      {Http::Headers::get().Status.get(), "302"},
+      {Http::Headers::get().Location.get(),
+       "https://auth.example.com/oauth/"
+       "authorize/?client_id=" +
+           TEST_CLIENT_ID +
+           "&foo=bar"
+           "&redirect_uri=http%3A%2F%2Ftraffic.example.com%2F_oauth"
+           "&response_type=code"
+           "&scope=" +
+           TEST_DEFAULT_SCOPE + "&state=http%3A%2F%2Ftraffic.example.com%2Fnot%2F_oauth"},
+  };
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
@@ -500,10 +566,12 @@ TEST_F(OAuth2Test, OAuthErrorNonOAuthHttpCallback) {
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
-           TEST_CLIENT_ID + "&scope=" + TEST_ENCODED_AUTH_SCOPES +
-           "&response_type=code&"
-           "redirect_uri=http%3A%2F%2Ftraffic.example.com%2F"
-           "_oauth&state=http%3A%2F%2Ftraffic.example.com%2Fnot%2F_oauth"
+           TEST_CLIENT_ID +
+           "&redirect_uri=http%3A%2F%2Ftraffic.example.com%2F_oauth"
+           "&response_type=code"
+           "&scope=" +
+           TEST_ENCODED_AUTH_SCOPES +
+           "&state=http%3A%2F%2Ftraffic.example.com%2Fnot%2F_oauth"
            "&resource=oauth2-resource&resource=http%3A%2F%2Fexample.com"
            "&resource=https%3A%2F%2Fexample.com"},
   };
@@ -839,11 +907,12 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
-           TEST_CLIENT_ID + "&scope=" + TEST_ENCODED_AUTH_SCOPES +
-           "&response_type=code&"
-           "redirect_uri=https%3A%2F%2Ftraffic.example.com%2F"
-           "_oauth&state=https%3A%2F%2Ftraffic.example.com%2Ftest%"
-           "3Fname%3Dadmin%26level%3Dtrace"
+           TEST_CLIENT_ID +
+           "&redirect_uri=https%3A%2F%2Ftraffic.example.com%2F_oauth"
+           "&response_type=code"
+           "&scope=" +
+           TEST_ENCODED_AUTH_SCOPES +
+           "&state=https%3A%2F%2Ftraffic.example.com%2Ftest%3Fname%3Dadmin%26level%3Dtrace"
            "&resource=oauth2-resource&resource=http%3A%2F%2Fexample.com"
            "&resource=https%3A%2F%2Fexample.com"},
   };
@@ -955,11 +1024,12 @@ TEST_F(OAuth2Test, OAuthTestFullFlowWithUseRefreshToken) {
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
-           TEST_CLIENT_ID + "&scope=" + TEST_ENCODED_AUTH_SCOPES +
-           "&response_type=code&"
-           "redirect_uri=https%3A%2F%2Ftraffic.example.com%2F"
-           "_oauth&state=https%3A%2F%2Ftraffic.example.com%2Ftest%"
-           "3Fname%3Dadmin%26level%3Dtrace"
+           TEST_CLIENT_ID +
+           "&redirect_uri=https%3A%2F%2Ftraffic.example.com%2F_oauth"
+           "&response_type=code"
+           "&scope=" +
+           TEST_ENCODED_AUTH_SCOPES +
+           "&state=https%3A%2F%2Ftraffic.example.com%2Ftest%3Fname%3Dadmin%26level%3Dtrace"
            "&resource=oauth2-resource&resource=http%3A%2F%2Fexample.com"
            "&resource=https%3A%2F%2Fexample.com"},
   };
@@ -1085,11 +1155,12 @@ TEST_F(OAuth2Test, OAuthTestUpdateAccessTokenByRefreshTokenFail) {
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
-           TEST_CLIENT_ID + "&scope=" + TEST_ENCODED_AUTH_SCOPES +
-           "&response_type=code&"
-           "redirect_uri=https%3A%2F%2Ftraffic.example.com%2F"
-           "_oauth&state=https%3A%2F%2Ftraffic.example.com%2Ftest%"
-           "3Fname%3Dadmin%26level%3Dtrace"
+           TEST_CLIENT_ID +
+           "&redirect_uri=https%3A%2F%2Ftraffic.example.com%2F_oauth"
+           "&response_type=code"
+           "&scope=" +
+           TEST_ENCODED_AUTH_SCOPES +
+           "&state=https%3A%2F%2Ftraffic.example.com%2Ftest%3Fname%3Dadmin%26level%3Dtrace"
            "&resource=oauth2-resource&resource=http%3A%2F%2Fexample.com"
            "&resource=https%3A%2F%2Fexample.com"},
   };
