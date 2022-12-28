@@ -421,7 +421,7 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
                                              *Http::ResponseTrailerMapImpl::create(),
                                              decoder_callbacks_->streamInfo(), "");
   const std::string escaped_redirect_uri =
-          Http::Utility::PercentEncoding::encode(redirect_uri, ":/=&?");
+      Http::Utility::PercentEncoding::encode(redirect_uri, ":/=&?");
 
   auto query_params = config_->authorizationQueryParams();
   query_params["redirect_uri"] = escaped_redirect_uri;
@@ -429,7 +429,7 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
   // Copy the authorization endpoint URL to replace its query params.
   auto authorization_endpoint_url = config_->authorizationEndpointUrl();
   const std::string path_and_query_params = Http::Utility::replaceQueryString(
-          Http::HeaderString(authorization_endpoint_url.pathAndQueryParams()), query_params);
+      Http::HeaderString(authorization_endpoint_url.pathAndQueryParams()), query_params);
   authorization_endpoint_url.setPathAndQueryParams(path_and_query_params);
   const std::string new_url = authorization_endpoint_url.toString();
 

@@ -283,11 +283,11 @@ TEST_F(OAuth2ClientTest, NetworkError) {
 TEST_F(OAuth2ClientTest, UpdateTokenNetworkError) {
   EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillRepeatedly(
-           Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
-                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-             callbacks_.push_back(&cb);
-             return &request_;
-           }));
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            callbacks_.push_back(&cb);
+            return &request_;
+          }));
 
   client_->setCallbacks(*mock_callbacks_);
   client_->asyncUpdateAccessToken("a", "b", "c");

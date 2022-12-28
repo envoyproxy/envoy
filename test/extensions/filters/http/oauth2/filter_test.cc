@@ -730,15 +730,16 @@ TEST_F(OAuth2Test, CookieValidatorInvalidExpiresAt) {
 // Validates the behavior of the cookie validator when the expires_at value is not a valid integer.
 TEST_F(OAuth2Test, CookieValidatorCanUpdateToken) {
   Http::TestRequestHeaderMapImpl request_headers{
-          {Http::Headers::get().Host.get(), "traffic.example.com"},
-          {Http::Headers::get().Path.get(), "/anypath"},
-          {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-          {Http::Headers::get().Cookie.get(), "OauthExpires=notanumber;version=test"},
-          {Http::Headers::get().Cookie.get(), "BearerToken=xyztoken;version=test;RefreshToken=dsdtoken;"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Path.get(), "/anypath"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Cookie.get(), "OauthExpires=notanumber;version=test"},
+      {Http::Headers::get().Cookie.get(),
+       "BearerToken=xyztoken;version=test;RefreshToken=dsdtoken;"},
   };
 
   auto cookie_validator = std::make_shared<OAuth2CookieValidator>(
-          test_time_, CookieNames{"BearerToken", "OauthHMAC", "OauthExpires"});
+      test_time_, CookieNames{"BearerToken", "OauthHMAC", "OauthExpires"});
   cookie_validator->setParams(request_headers, "mock-secret");
 
   EXPECT_TRUE(cookie_validator->canUpdateTokenByRefreshToken());
