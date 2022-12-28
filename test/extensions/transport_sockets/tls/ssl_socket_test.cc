@@ -1558,6 +1558,12 @@ TEST_P(SslSocketTest, MultiCertPickRSAOnSniMatch) {
 
 // On SNI mismatch, if full scan is disabled, validate that the first cert is used.
 TEST_P(SslSocketTest, MultiCertWithFullScanDisabledOnSniMismatch) {
+  // This test is specific for no full scan case, i.e, below flag is true case.
+  // If the flag is false, the test needs to be skipped.
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.no_full_scan_certs_on_sni_mismatch")) {
+    return;
+  }
   const std::string client_ctx_yaml = absl::StrCat(R"EOF(
     sni: "nomatch.example.com"
     common_tls_context:
