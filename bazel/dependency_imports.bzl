@@ -35,6 +35,7 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
     rust_register_toolchains(
         allocator_library = "@envoy//source/rust_common:rust_alloc_lib",
         extra_target_triples = [
+            "x86_64-pc-windows-msvc",
             "wasm32-unknown-unknown",
             "wasm32-wasi",
         ],
