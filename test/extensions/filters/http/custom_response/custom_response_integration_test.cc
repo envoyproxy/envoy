@@ -582,7 +582,7 @@ TEST_P(CustomResponseIntegrationTest, ModifyRequestHeaders) {
                                     [](RedirectPolicyProto& policy) {
                                       auto action = policy.mutable_modify_request_headers_action();
                                       action->set_name("modify-request-headers-action");
-                                      action->mutable_typed_config()->mutable_type_url()->assign(
+                                      action->mutable_typed_config()->set_type_url(
                                           "type.googleapis.com/google.protobuf.Struct");
                                     });
 
