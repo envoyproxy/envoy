@@ -56,6 +56,7 @@ The following sandboxes are available:
     fault_injection
     front_proxy
     grpc_bridge
+    grpc-s2s
     gzip
     jaeger_native_tracing
     jaeger_tracing
