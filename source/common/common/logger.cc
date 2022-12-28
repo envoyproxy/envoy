@@ -164,17 +164,22 @@ Context::Context(spdlog::level::level_enum log_level, const std::string& log_for
                  Thread::BasicLockable& lock, bool should_escape, bool enable_fine_grain_logging)
     : log_level_(log_level), log_format_(log_format), lock_(lock), should_escape_(should_escape),
       enable_fine_grain_logging_(enable_fine_grain_logging) {
-  absl::MutexLock context_lock(&current_context_mutex);
-  save_context_ = current_context;
-  current_context = this;
+  {
+    absl::MutexLock context_lock(&current_context_mutex);
+    save_context_ = current_context;
+    current_context = this;
+  } // context_lock
   activate();
 }
 
 Context::~Context() {
-  absl::MutexLock context_lock(&current_context_mutex);
-  current_context = save_context_;
-  if (current_context != nullptr) {
-    current_context->activate();
+  {
+    absl::MutexLock context_lock(&current_context_mutex);
+    current_context = save_context_;
+  } // context_lock
+
+  if (save_context_ != nullptr) {
+    save_context_->activate();
   } else {
     Registry::getSink()->clearLock();
   }
