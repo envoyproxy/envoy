@@ -35,4 +35,3 @@ docker run --network=host fullstorydev/grpcurl -plaintext "localhost:${PORT_PROX
 run_log "Query healthcheck metrics"
 curl "http://localhost:9090/stats" | grep cluster.hello.health_check
 curl "http://localhost:9091/stats" | grep cluster.world.health_check
-

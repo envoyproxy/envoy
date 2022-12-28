@@ -2,7 +2,8 @@ syntax = "proto3";
 
 option go_package = "github.com/envoy/examples/grpc-s2s/service";
 
-message HelloRequest {}
+message HelloRequest {
+}
 
 message HelloResponse {
   string reply = 1;
