@@ -17,7 +17,7 @@ RUN go build -o server
 
 FROM debian:bullseye-slim
 
-RUN apt-get -y update && apt-get -y install procps
+RUN apt-get -y update && apt-get -y install procps iproute2
 WORKDIR /root/
 # Copy the grpc-health-probe binary
 COPY --from=builder /go/bin/grpc-health-probe /bin

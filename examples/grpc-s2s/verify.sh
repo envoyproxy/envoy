@@ -11,20 +11,26 @@ run_log "Make an example request"
 docker run --network=host fullstorydev/grpcurl -plaintext "localhost:${PORT_PROXY}" Hello/Greet
 
 run_log "Render an instance of Hello unhealthy"
+docker-compose exec --index 1 hello date
+docker-compose exec --index 1 hello ip addr
 docker-compose exec --index 1 hello kill -SIGUSR1 1
 
-sleep 60
+# To allow the host to be evicted
+sleep 1
 curl "http://localhost:9090/clusters" | grep failed_active_hc
 
 docker run --network=host fullstorydev/grpcurl -plaintext "localhost:${PORT_PROXY}" Hello/Greet
 
 run_log "Render an instance of World unhealthy"
+docker-compose exec --index 1 world date
+docker-compose exec --index 1 world ip addr
 docker-compose exec --index 1 world kill -SIGUSR1 1
-sleep 60
+
+# To allow the host to be evicted
+sleep 1
 curl "http://localhost:9091/clusters" | grep failed_active_hc
 
 docker run --network=host fullstorydev/grpcurl -plaintext "localhost:${PORT_PROXY}" Hello/Greet
-
 
 run_log "Query healthcheck metrics"
 curl "http://localhost:9090/stats" | grep cluster.hello.health_check

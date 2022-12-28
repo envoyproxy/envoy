@@ -41,7 +41,8 @@ static_resources:
         value: 0
     health_checks:
       - timeout: "1s"
-        interval: "0.001s"
+        interval: "1s"
+        no_traffic_interval: "0.001s"
         unhealthy_threshold: 1
         healthy_threshold: 1
         event_log_path: "/dev/stdout"
