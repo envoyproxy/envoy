@@ -22,6 +22,8 @@ public:
   explicit AsyncFileContextThreadPool(AsyncFileManager& manager, int fd);
 
   absl::StatusOr<CancelFunction>
+  stat(std::function<void(absl::StatusOr<struct stat>)> on_complete) override;
+  absl::StatusOr<CancelFunction>
   createHardLink(absl::string_view filename,
                  std::function<void(absl::Status)> on_complete) override;
   absl::Status close(std::function<void(absl::Status)> on_complete) override;

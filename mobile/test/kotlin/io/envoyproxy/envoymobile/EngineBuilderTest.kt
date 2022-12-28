@@ -111,6 +111,25 @@ class EngineBuilderTest {
   }
 
   @Test
+  fun `DNS cache is disabled by default`() {
+    engineBuilder = EngineBuilder(Standard())
+    engineBuilder.addEngineType { envoyEngine }
+
+    val engine = engineBuilder.build() as EngineImpl
+    assertThat(engine.envoyConfiguration.enableDNSCache).isFalse()
+  }
+
+  @Test
+  fun `enabling DNS cache overrides default`() {
+    engineBuilder = EngineBuilder(Standard())
+    engineBuilder.addEngineType { envoyEngine }
+    engineBuilder.enableDNSCache(true)
+
+    val engine = engineBuilder.build() as EngineImpl
+    assertThat(engine.envoyConfiguration.enableDNSCache).isTrue()
+  }
+
+  @Test
   fun `specifying H2 Ping idle interval overrides default`() {
     engineBuilder = EngineBuilder(Standard())
     engineBuilder.addEngineType { envoyEngine }

@@ -551,12 +551,8 @@ bool Utility::isWebSocketUpgradeRequest(const RequestHeaderMap& headers) {
                                  Http::Headers::get().UpgradeValues.WebSocket));
 }
 
-void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode_functions,
-                             const LocalReplyData& local_reply_data) {
-  // encode_headers() may reset the stream, so the stream must not be reset before calling it.
-  ASSERT(!is_reset);
-
-  // rewrite_response will rewrite response code and body text.
+Utility::PreparedLocalReplyPtr Utility::prepareLocalReply(const EncodeFunctions& encode_functions,
+                                                          const LocalReplyData& local_reply_data) {
   Code response_code = local_reply_data.response_code_;
   std::string body_text(local_reply_data.body_text_);
   absl::string_view content_type(Headers::get().ContentTypeValues.Text);
@@ -574,7 +570,6 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
     has_custom_content_type = (content_type_value != response_headers->getContentTypeValue());
   }
 
-  // Respond with a gRPC trailers-only response if the request is gRPC
   if (local_reply_data.is_grpc_) {
     response_headers->setStatus(std::to_string(enumToInt(Code::OK)));
     response_headers->setReferenceContentType(Headers::get().ContentTypeValues.Grpc);
@@ -599,8 +594,13 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
     }
     // The `modify_headers` function may have added content-length, remove it.
     response_headers->removeContentLength();
-    encode_functions.encode_headers_(std::move(response_headers), true); // Trailers only response
-    return;
+
+    // TODO(kbaichoo): In C++20 we will be able to use make_unique with
+    // aggregate initialization.
+    // NOLINTNEXTLINE(modernize-make-unique)
+    return PreparedLocalReplyPtr(new PreparedLocalReply{
+        local_reply_data.is_grpc_, local_reply_data.is_head_request_, std::move(response_headers),
+        std::move(body_text), encode_functions.encode_headers_, encode_functions.encode_data_});
   }
 
   if (!body_text.empty()) {
@@ -617,17 +617,46 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
     response_headers->removeContentType();
   }
 
-  if (local_reply_data.is_head_request_) {
-    encode_functions.encode_headers_(std::move(response_headers), true);
+  // TODO(kbaichoo): In C++20 we will be able to use make_unique with
+  // aggregate initialization.
+  // NOLINTNEXTLINE(modernize-make-unique)
+  return PreparedLocalReplyPtr(new PreparedLocalReply{
+      local_reply_data.is_grpc_, local_reply_data.is_head_request_, std::move(response_headers),
+      std::move(body_text), encode_functions.encode_headers_, encode_functions.encode_data_});
+}
+
+void Utility::encodeLocalReply(const bool& is_reset, PreparedLocalReplyPtr prepared_local_reply) {
+  ASSERT(prepared_local_reply != nullptr);
+  ResponseHeaderMapPtr response_headers{std::move(prepared_local_reply->response_headers_)};
+
+  if (prepared_local_reply->is_grpc_request_) {
+    // Trailers only response
+    prepared_local_reply->encode_headers_(std::move(response_headers), true);
     return;
   }
 
-  encode_functions.encode_headers_(std::move(response_headers), body_text.empty());
-  // encode_headers() may have changed the referenced is_reset so we need to test it
-  if (!body_text.empty() && !is_reset) {
-    Buffer::OwnedImpl buffer(body_text);
-    encode_functions.encode_data_(buffer, true);
+  if (prepared_local_reply->is_head_request_) {
+    prepared_local_reply->encode_headers_(std::move(response_headers), true);
+    return;
   }
+
+  const bool bodyless_response = prepared_local_reply->response_body_.empty();
+  prepared_local_reply->encode_headers_(std::move(response_headers), bodyless_response);
+  // encode_headers() may have changed the referenced is_reset so we need to test it
+  if (!bodyless_response && !is_reset) {
+    Buffer::OwnedImpl buffer(prepared_local_reply->response_body_);
+    prepared_local_reply->encode_data_(buffer, true);
+  }
+}
+
+void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode_functions,
+                             const LocalReplyData& local_reply_data) {
+  // encode_headers() may reset the stream, so the stream must not be reset before calling it.
+  ASSERT(!is_reset);
+  PreparedLocalReplyPtr prepared_local_reply =
+      prepareLocalReply(encode_functions, local_reply_data);
+
+  encodeLocalReply(is_reset, std::move(prepared_local_reply));
 }
 
 Utility::GetLastAddressFromXffInfo

@@ -20,6 +20,8 @@ public:
   // appropriate MockAsyncFileAction on the MockAsyncFileManager (if one was provided).
   // These can be consumed by calling MockAsyncFileManager::nextActionCompletes
   // with the desired parameter to the on_complete callback.
+  MOCK_METHOD(absl::StatusOr<CancelFunction>, stat,
+              (std::function<void(absl::StatusOr<struct stat>)> on_complete));
   MOCK_METHOD(absl::StatusOr<CancelFunction>, createHardLink,
               (absl::string_view filename, std::function<void(absl::Status)> on_complete));
   MOCK_METHOD(absl::Status, close, (std::function<void(absl::Status)> on_complete));
@@ -61,6 +63,9 @@ public:
   MOCK_METHOD(CancelFunction, openExistingFile,
               (absl::string_view filename, Mode mode,
                std::function<void(absl::StatusOr<AsyncFileHandle>)> on_complete));
+  MOCK_METHOD(CancelFunction, stat,
+              (absl::string_view filename,
+               std::function<void(absl::StatusOr<struct stat>)> on_complete));
   MOCK_METHOD(CancelFunction, unlink,
               (absl::string_view filename, std::function<void(absl::Status)> on_complete));
   MOCK_METHOD(std::string, describe, (), (const));

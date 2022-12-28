@@ -1,5 +1,5 @@
 load("@rules_foreign_cc//foreign_cc:repositories.bzl", "rules_foreign_cc_dependencies")
-load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
+load("@io_bazel_rules_go//go:deps.bzl", "go_download_sdk", "go_register_toolchains", "go_rules_dependencies")
 load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
 load("@build_bazel_rules_apple//apple:repositories.bzl", "apple_rules_dependencies")
 load("@rules_fuzzing//fuzzing:repositories.bzl", "rules_fuzzing_dependencies")
@@ -25,25 +25,18 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
     rules_foreign_cc_dependencies(register_default_tools = False, register_built_tools = False)
     go_rules_dependencies()
     go_register_toolchains(go_version)
-    gazelle_dependencies()
+    envoy_download_go_sdks(go_version)
+    gazelle_dependencies(go_sdk = "go_sdk")
     apple_rules_dependencies()
     pip_dependencies()
     pip_fuzzing_dependencies()
     rules_pkg_dependencies()
     rules_rust_dependencies()
     rust_register_toolchains(
-        include_rustc_srcs = True,
         allocator_library = "@envoy//source/rust_common:rust_alloc_lib",
         extra_target_triples = [
-            "aarch64-apple-ios",
-            "aarch64-apple-ios-sim",
-            "aarch64-linux-android",
-            "armv7-linux-androideabi",
-            "i686-linux-android",
             "wasm32-unknown-unknown",
             "wasm32-wasi",
-            "x86_64-apple-ios",
-            "x86_64-linux-android",
         ],
     )
     shellcheck_dependencies()
@@ -127,4 +120,30 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
         # last_update = "2020-11-22"
         # use_category = ["api"],
         # source = "https://github.com/bufbuild/protoc-gen-validate/blob/v0.6.1/dependencies.bzl#L23-L28"
+    )
+
+def envoy_download_go_sdks(go_version):
+    go_download_sdk(
+        name = "go_linux_amd64",
+        goos = "linux",
+        goarch = "amd64",
+        version = go_version,
+    )
+    go_download_sdk(
+        name = "go_linux_arm64",
+        goos = "linux",
+        goarch = "arm64",
+        version = go_version,
+    )
+    go_download_sdk(
+        name = "go_darwin_amd64",
+        goos = "darwin",
+        goarch = "amd64",
+        version = go_version,
+    )
+    go_download_sdk(
+        name = "go_darwin_arm64",
+        goos = "darwin",
+        goarch = "arm64",
+        version = go_version,
     )

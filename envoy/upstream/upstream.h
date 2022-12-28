@@ -765,6 +765,12 @@ MAKE_STATS_STRUCT(ClusterLbStats, ClusterLbStatNames, ALL_CLUSTER_LB_STATS);
  */
 MAKE_STAT_NAMES_STRUCT(ClusterTrafficStatNames, ALL_CLUSTER_TRAFFIC_STATS);
 MAKE_STATS_STRUCT(ClusterTrafficStats, ClusterTrafficStatNames, ALL_CLUSTER_TRAFFIC_STATS);
+/*
+ * NOTE: LazyClusterTrafficStats for now is an alias of "std::unique_ptr<ClusterTrafficStats>",
+ * this is to make way for future lazy-init on trafficStats(). See
+ * https://github.com/envoyproxy/envoy/pull/23921#issuecomment-1335239116 for more context.
+ */
+using LazyClusterTrafficStats = std::unique_ptr<ClusterTrafficStats>;
 
 MAKE_STAT_NAMES_STRUCT(ClusterLoadReportStatNames, ALL_CLUSTER_LOAD_REPORT_STATS);
 MAKE_STATS_STRUCT(ClusterLoadReportStats, ClusterLoadReportStatNames,
@@ -860,9 +866,14 @@ public:
   virtual std::chrono::milliseconds connectTimeout() const PURE;
 
   /**
-   * @return the idle timeout for upstream connection pool connections.
+   * @return the idle timeout for upstream HTTP connection pool connections.
    */
   virtual const absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
+
+  /**
+   * @return the idle timeout for each connection in TCP connection pool.
+   */
+  virtual const absl::optional<std::chrono::milliseconds> tcpPoolIdleTimeout() const PURE;
 
   /**
    * @return optional maximum connection duration timeout for manager connections.
@@ -1060,9 +1071,9 @@ public:
   virtual ClusterEndpointStats& endpointStats() const PURE;
 
   /**
-   * @return ClusterTrafficStats& all traffic related stats for this cluster.
+   * @return  all traffic related stats for this cluster.
    */
-  virtual ClusterTrafficStats& trafficStats() const PURE;
+  virtual LazyClusterTrafficStats& trafficStats() const PURE;
 
   /**
    * @return the stats scope that contains all cluster stats. This can be used to produce dynamic

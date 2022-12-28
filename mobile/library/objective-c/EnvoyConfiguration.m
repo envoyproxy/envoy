@@ -13,12 +13,14 @@
                            dnsQueryTimeoutSeconds:(UInt32)dnsQueryTimeoutSeconds
                              dnsMinRefreshSeconds:(UInt32)dnsMinRefreshSeconds
                            dnsPreresolveHostnames:(NSString *)dnsPreresolveHostnames
+                                   enableDNSCache:(BOOL)enableDNSCache
                               enableHappyEyeballs:(BOOL)enableHappyEyeballs
                                        enableGzip:(BOOL)enableGzip
                                      enableBrotli:(BOOL)enableBrotli
                            enableInterfaceBinding:(BOOL)enableInterfaceBinding
                         enableDrainPostDnsRefresh:(BOOL)enableDrainPostDnsRefresh
                     enforceTrustChainVerification:(BOOL)enforceTrustChainVerification
+                                        forceIPv6:(BOOL)forceIPv6
               enablePlatformCertificateValidation:(BOOL)enablePlatformCertificateValidation
     h2ConnectionKeepaliveIdleIntervalMilliseconds:
         (UInt32)h2ConnectionKeepaliveIdleIntervalMilliseconds
@@ -58,12 +60,14 @@
   self.dnsQueryTimeoutSeconds = dnsQueryTimeoutSeconds;
   self.dnsMinRefreshSeconds = dnsMinRefreshSeconds;
   self.dnsPreresolveHostnames = dnsPreresolveHostnames;
+  self.enableDNSCache = enableDNSCache;
   self.enableHappyEyeballs = enableHappyEyeballs;
   self.enableGzip = enableGzip;
   self.enableBrotli = enableBrotli;
   self.enableInterfaceBinding = enableInterfaceBinding;
   self.enableDrainPostDnsRefresh = enableDrainPostDnsRefresh;
   self.enforceTrustChainVerification = enforceTrustChainVerification;
+  self.forceIPv6 = forceIPv6;
   self.enablePlatformCertificateValidation = enablePlatformCertificateValidation;
   self.h2ConnectionKeepaliveIdleIntervalMilliseconds =
       h2ConnectionKeepaliveIdleIntervalMilliseconds;
@@ -169,6 +173,7 @@
   [definitions appendFormat:@"- &trust_chain_verification %@\n", self.enforceTrustChainVerification
                                                                      ? @"VERIFY_TRUST_CHAIN"
                                                                      : @"ACCEPT_UNTRUSTED"];
+  [definitions appendFormat:@"- &force_ipv6 %@\n", self.forceIPv6 ? @"true" : @"false"];
   [definitions appendFormat:@"- &h2_connection_keepalive_idle_interval %.*fs\n", 3,
                             (double)self.h2ConnectionKeepaliveIdleIntervalMilliseconds / 1000.0];
   [definitions appendFormat:@"- &h2_connection_keepalive_timeout %lus\n",
@@ -191,6 +196,11 @@
                                           : @(default_cert_validation_context_template);
 
   [definitions appendFormat:@"%@\n", cert_validator_template];
+
+  if (self.enableDNSCache) {
+    NSString *persistent_dns_cache_config = @(persistent_dns_cache_config_insert);
+    [definitions appendFormat:@"- &persistent_dns_cache_config %@\n", persistent_dns_cache_config];
+  }
 
   NSMutableArray *stat_sinks_config = [self.statsSinks mutableCopy];
 

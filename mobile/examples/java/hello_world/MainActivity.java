@@ -7,16 +7,13 @@ import android.os.HandlerThread;
 import android.util.Log;
 import io.envoyproxy.envoymobile.AndroidEngineBuilder;
 import io.envoyproxy.envoymobile.Counter;
-import io.envoyproxy.envoymobile.Distribution;
 import io.envoyproxy.envoymobile.Engine;
 import io.envoyproxy.envoymobile.Element;
-import io.envoyproxy.envoymobile.Gauge;
 import io.envoyproxy.envoymobile.LogLevel;
 import io.envoyproxy.envoymobile.RequestHeaders;
 import io.envoyproxy.envoymobile.RequestHeadersBuilder;
 import io.envoyproxy.envoymobile.RequestMethod;
 import io.envoyproxy.envoymobile.ResponseHeaders;
-import io.envoyproxy.envoymobile.Timer;
 import androidx.recyclerview.widget.DividerItemDecoration;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -140,23 +137,7 @@ public class MainActivity extends Activity {
   private void recordStats() {
     final Counter counter = engine.pulseClient().counter(new Element("foo"), new Element("bar"),
                                                          new Element("counter"));
-
-    final Gauge gauge =
-        engine.pulseClient().gauge(new Element("foo"), new Element("bar"), new Element("gauge"));
-
-    final Timer timer =
-        engine.pulseClient().timer(new Element("foo"), new Element("bar"), new Element("timer"));
-    final Distribution distribution = engine.pulseClient().distribution(
-        new Element("foo"), new Element("bar"), new Element("distribution"));
-
     counter.increment(1);
     counter.increment(5);
-
-    gauge.set(5);
-    gauge.add(10);
-    gauge.sub(1);
-
-    timer.recordDuration(15);
-    distribution.recordValue(15);
   }
 }
