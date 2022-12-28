@@ -45,7 +45,7 @@ The following is an example configuration which will preserve HTTP/1 header case
 
 .. note::
 
-   When Stateful formatters are used, headers added by Envoy and in other filters like Lua will still be lowercased.
+   When Stateful formatters are used, headers added internally by Envoy or by filters (e.g. the Lua filter) will still be lowercased.
 
 .. literalinclude:: _include/preserve-case.yaml
     :language: yaml
