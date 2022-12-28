@@ -64,15 +64,15 @@ protected:
   Event::ProvisionalDispatcherPtr dispatcher_ = std::make_unique<Event::ProvisionalDispatcher>();
   envoy_http_callbacks bridge_callbacks_;
   ConditionalInitializer* terminal_callback_;
-  std::vector<std::unique_ptr<ConditionalInitializer>> multi_terminal_callbacks_;
+  std::vector<std::unique_ptr<ConditionalInitializer>> per_engine_terminal_callbacks_;
   callbacks_called* cc_;
-  std::vector<std::unique_ptr<callbacks_called>> multi_cc_;
+  std::vector<std::unique_ptr<callbacks_called>> per_engine_cc_;
   Http::TestRequestHeaderMapImpl default_request_headers_;
   Event::DispatcherPtr full_dispatcher_;
   Platform::StreamPrototypeSharedPtr stream_prototype_;
   std::vector<Platform::StreamPrototypeSharedPtr> multi_stream_prototypes_;
   Platform::StreamSharedPtr stream_;
-  std::vector<Platform::StreamSharedPtr> multi_streams_;
+  std::vector<Platform::StreamSharedPtr> per_engine_streams_;
   Platform::EngineSharedPtr engine_;
   std::vector<Platform::EngineSharedPtr> multi_engines_;
   Thread::ThreadPtr envoy_thread_;

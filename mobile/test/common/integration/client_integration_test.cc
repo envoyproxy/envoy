@@ -355,28 +355,28 @@ TEST_P(ClientIntegrationTest, MultipleEngines) {
       } else {
         EXPECT_EQ(c_data.length, 10);
       }
-      multi_cc_[i]->on_data_calls++;
+      per_engine_cc_[i]->on_data_calls++;
       release_envoy_data(c_data);
     });
 
-    multi_streams_[i]->sendHeaders(envoyToMobileHeaders(default_request_headers_), false);
+    per_engine_streams_[i]->sendHeaders(envoyToMobileHeaders(default_request_headers_), false);
 
     envoy_data c_data = Data::Utility::toBridgeData(request_data);
-    multi_streams_[i]->sendData(c_data);
+    per_engine_streams_[i]->sendData(c_data);
 
     Platform::RequestTrailersBuilder builder;
     std::shared_ptr<Platform::RequestTrailers> trailers =
         std::make_shared<Platform::RequestTrailers>(builder.build());
-    multi_streams_[i]->close(trailers);
+    per_engine_streams_[i]->close(trailers);
 
-    multi_terminal_callbacks_[i]->waitReady();
+    per_engine_terminal_callbacks_[i]->waitReady();
 
-    ASSERT_EQ(multi_cc_[i]->on_headers_calls, 1);
-    ASSERT_EQ(multi_cc_[i]->status, "200");
-    ASSERT_EQ(multi_cc_[i]->on_data_calls, 2);
-    ASSERT_EQ(multi_cc_[i]->on_complete_calls, 1);
-    ASSERT_EQ(multi_cc_[i]->on_header_consumed_bytes_from_response, 27);
-    ASSERT_EQ(multi_cc_[i]->on_complete_received_byte_count, 67);
+    ASSERT_EQ(per_engine_cc_[i]->on_headers_calls, 1);
+    ASSERT_EQ(per_engine_cc_[i]->status, "200");
+    ASSERT_EQ(per_engine_cc_[i]->on_data_calls, 2);
+    ASSERT_EQ(per_engine_cc_[i]->on_complete_calls, 1);
+    ASSERT_EQ(per_engine_cc_[i]->on_header_consumed_bytes_from_response, 27);
+    ASSERT_EQ(per_engine_cc_[i]->on_complete_received_byte_count, 67);
     // Request is freed by the engine and must be recreated
     request_data = Buffer::OwnedImpl("request body");
   }

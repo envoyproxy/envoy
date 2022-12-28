@@ -199,7 +199,7 @@ void Context::activate() {
 }
 
 bool Context::useFineGrainLogger() {
-  absl::MutexLock context_lock(&current_context_mutex);
+  absl::ReaderMutexLock context_lock(&current_context_mutex);
   if (current_context) {
     return current_context->enable_fine_grain_logging_;
   }
@@ -207,16 +207,26 @@ bool Context::useFineGrainLogger() {
 }
 
 void Context::enableFineGrainLogger() {
-  absl::MutexLock context_lock(&current_context_mutex);
-  if (current_context) {
-    current_context->enable_fine_grain_logging_ = true;
-    current_context->fine_grain_default_level_ = current_context->log_level_;
-    current_context->fine_grain_log_format_ = current_context->log_format_;
-    if (current_context->log_format_ == Logger::Logger::DEFAULT_LOG_FORMAT) {
-      current_context->fine_grain_log_format_ = kDefaultFineGrainLogFormat;
+  spdlog::level::level_enum fine_grain_default_level_stored;
+  std::string fine_grain_log_format_stored;
+  bool context_nonnull = false;
+  {
+    absl::MutexLock context_lock(&current_context_mutex);
+    if (current_context) {
+      context_nonnull = true;
+      current_context->enable_fine_grain_logging_ = true;
+      current_context->fine_grain_default_level_ = current_context->log_level_;
+      current_context->fine_grain_log_format_ = current_context->log_format_;
+      if (current_context->log_format_ == Logger::Logger::DEFAULT_LOG_FORMAT) {
+        current_context->fine_grain_log_format_ = kDefaultFineGrainLogFormat;
+      }
+      fine_grain_default_level_stored = current_context->fine_grain_default_level_;
+      fine_grain_log_format_stored = current_context->fine_grain_log_format_;
     }
-    getFineGrainLogContext().setDefaultFineGrainLogLevelFormat(
-        current_context->fine_grain_default_level_, current_context->fine_grain_log_format_);
+  } // context_lock
+  if (context_nonnull) {
+    getFineGrainLogContext().setDefaultFineGrainLogLevelFormat(fine_grain_default_level_stored,
+                                                               fine_grain_log_format_stored);
   }
 }
 
