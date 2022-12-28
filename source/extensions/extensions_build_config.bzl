@@ -19,6 +19,7 @@ EXTENSIONS = {
 
     "envoy.clusters.aggregate":                         "//source/extensions/clusters/aggregate:cluster",
     "envoy.clusters.dynamic_forward_proxy":             "//source/extensions/clusters/dynamic_forward_proxy:cluster",
+    "envoy.clusters.eds":                               "//source/extensions/clusters/eds:eds_lib",
     "envoy.clusters.redis":                             "//source/extensions/clusters/redis:redis_cluster",
     "envoy.clusters.static":                            "//source/extensions/clusters/static:static_cluster_lib",
     "envoy.clusters.strict_dns":                        "//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
@@ -76,6 +77,12 @@ EXTENSIONS = {
     "envoy.matching.common_inputs.environment_variable":       "//source/extensions/matching/common_inputs/environment_variable:config",
 
     #
+    # Matching actions
+    #
+
+    "envoy.matching.actions.format_string":             "//source/extensions/matching/actions/format_string:config",
+
+    #
     # HTTP filters
     #
 
@@ -92,6 +99,7 @@ EXTENSIONS = {
     "envoy.filters.http.cors":                          "//source/extensions/filters/http/cors:config",
     "envoy.filters.http.composite":                     "//source/extensions/filters/http/composite:config",
     "envoy.filters.http.csrf":                          "//source/extensions/filters/http/csrf:config",
+    "envoy.filters.http.custom_response":               "//source/extensions/filters/http/custom_response:factory",
     "envoy.filters.http.decompressor":                  "//source/extensions/filters/http/decompressor:config",
     "envoy.filters.http.dynamic_forward_proxy":         "//source/extensions/filters/http/dynamic_forward_proxy:config",
     "envoy.filters.http.ext_authz":                     "//source/extensions/filters/http/ext_authz:config",
@@ -108,6 +116,7 @@ EXTENSIONS = {
     "envoy.filters.http.health_check":                  "//source/extensions/filters/http/health_check:config",
     "envoy.filters.http.ip_tagging":                    "//source/extensions/filters/http/ip_tagging:config",
     "envoy.filters.http.jwt_authn":                     "//source/extensions/filters/http/jwt_authn:config",
+    "envoy.filters.http.rate_limit_quota":              "//source/extensions/filters/http/rate_limit_quota:config",
     # Disabled by default
     "envoy.filters.http.kill_request":                  "//source/extensions/filters/http/kill_request:kill_request_config",
     "envoy.filters.http.local_ratelimit":               "//source/extensions/filters/http/local_ratelimit:config",
@@ -236,7 +245,8 @@ EXTENSIONS = {
     #
     # CacheFilter plugins
     #
-    "envoy.extensions.http.cache.simple":               "//source/extensions/filters/http/cache/simple_http_cache:config",
+    "envoy.extensions.http.cache.file_system_http_cache": "//source/extensions/http/cache/file_system_http_cache:config",
+    "envoy.extensions.http.cache.simple":               "//source/extensions/http/cache/simple_http_cache:config",
 
     #
     # Internal redirect predicates
@@ -309,6 +319,13 @@ EXTENSIONS = {
     "envoy.http.stateful_session.header":                "//source/extensions/http/stateful_session/header:config",
 
     #
+    # Custom response policies
+    #
+
+    "envoy.http.custom_response.redirect_policy":             "//source/extensions/http/custom_response/redirect_policy:redirect_policy_lib",
+    "envoy.http.custom_response.local_response_policy":       "//source/extensions/http/custom_response/local_response_policy:local_response_policy_lib",
+
+    #
     # QUIC extensions
     #
 
@@ -374,6 +391,11 @@ EXTENSIONS = {
     #
 
     "envoy.route.early_data_policy.default":           "//source/extensions/early_data:default_early_data_policy_lib",
+
+    #
+    # HTTP Early Header Mutation
+    #
+    "envoy.http.early_header_mutation.header_mutation": "//source/extensions/http/early_header_mutation/header_mutation:config",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which
@@ -381,6 +403,7 @@ EXTENSIONS = {
 EXTENSION_CONFIG_VISIBILITY = ["//:extension_config", "//:contrib_library", "//:examples_library", "//:mobile_library"]
 EXTENSION_PACKAGE_VISIBILITY = ["//:extension_library", "//:contrib_library", "//:examples_library", "//:mobile_library"]
 CONTRIB_EXTENSION_PACKAGE_VISIBILITY = ["//:contrib_library"]
+MOBILE_PACKAGE_VISIBILITY = ["//:mobile_library"]
 
 # Set this variable to true to disable alwayslink for envoy_cc_library.
 # TODO(alyssawilk) audit uses of this in source/ and migrate all libraries to extensions.

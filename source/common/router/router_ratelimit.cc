@@ -241,6 +241,37 @@ bool HeaderValueMatchAction::populateDescriptor(RateLimit::DescriptorEntry& desc
   }
 }
 
+QueryParameterValueMatchAction::QueryParameterValueMatchAction(
+    const envoy::config::route::v3::RateLimit::Action::QueryParameterValueMatch& action)
+    : descriptor_value_(action.descriptor_value()),
+      descriptor_key_(!action.descriptor_key().empty() ? action.descriptor_key() : "query_match"),
+      expect_match_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(action, expect_match, true)),
+      action_query_parameters_(buildQueryParameterMatcherVector(action)) {}
+
+bool QueryParameterValueMatchAction::populateDescriptor(
+    RateLimit::DescriptorEntry& descriptor_entry, const std::string&,
+    const Http::RequestHeaderMap& headers, const StreamInfo::StreamInfo&) const {
+  Http::Utility::QueryParams query_parameters =
+      Http::Utility::parseAndDecodeQueryString(headers.getPathValue());
+  if (expect_match_ ==
+      ConfigUtility::matchQueryParams(query_parameters, action_query_parameters_)) {
+    descriptor_entry = {descriptor_key_, descriptor_value_};
+    return true;
+  } else {
+    return false;
+  }
+}
+
+std::vector<ConfigUtility::QueryParameterMatcherPtr>
+QueryParameterValueMatchAction::buildQueryParameterMatcherVector(
+    const envoy::config::route::v3::RateLimit::Action::QueryParameterValueMatch& action) {
+  std::vector<ConfigUtility::QueryParameterMatcherPtr> ret;
+  for (const auto& query_parameter : action.query_parameters()) {
+    ret.push_back(std::make_unique<ConfigUtility::QueryParameterMatcher>(query_parameter));
+  }
+  return ret;
+}
+
 RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
     const envoy::config::route::v3::RateLimit& config,
     ProtobufMessage::ValidationVisitor& validator)
@@ -304,6 +335,11 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kMaskedRemoteAddress:
       actions_.emplace_back(new MaskedRemoteAddressAction(action.masked_remote_address()));
       break;
+    case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::
+        kQueryParameterValueMatch:
+      actions_.emplace_back(
+          new QueryParameterValueMatchAction(action.query_parameter_value_match()));
+      break;
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::ACTION_SPECIFIER_NOT_SET:
       throw EnvoyException("invalid config");
     }
@@ -350,10 +386,13 @@ void RateLimitPolicyEntryImpl::populateLocalDescriptors(
   }
 }
 
+RateLimitPolicyImpl::RateLimitPolicyImpl()
+    : rate_limit_entries_reference_(RateLimitPolicyImpl::MAX_STAGE_NUMBER + 1) {}
+
 RateLimitPolicyImpl::RateLimitPolicyImpl(
     const Protobuf::RepeatedPtrField<envoy::config::route::v3::RateLimit>& rate_limits,
     ProtobufMessage::ValidationVisitor& validator)
-    : rate_limit_entries_reference_(RateLimitPolicyImpl::MAX_STAGE_NUMBER + 1) {
+    : RateLimitPolicyImpl() {
   for (const auto& rate_limit : rate_limits) {
     std::unique_ptr<RateLimitPolicyEntry> rate_limit_policy_entry(
         new RateLimitPolicyEntryImpl(rate_limit, validator));

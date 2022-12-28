@@ -5,8 +5,8 @@
 #include "source/extensions/http/header_validators/envoy_default/http1_header_validator.h"
 #include "source/extensions/http/header_validators/envoy_default/http2_header_validator.h"
 
-#include "test/mocks/server/factory_context.h"
-#include "test/mocks/stream_info/mocks.h"
+#include "test/mocks/http/header_validator.h"
+#include "test/mocks/protobuf/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -19,6 +19,7 @@ namespace EnvoyDefault {
 namespace {
 
 using ::Envoy::Http::Protocol;
+using ::testing::NiceMock;
 
 class HeaderValidatorFactoryTest : public testing::Test {
 protected:
@@ -31,13 +32,13 @@ protected:
     envoy::config::core::v3::TypedExtensionConfig typed_config;
     TestUtility::loadFromYaml(std::string(config_yaml), typed_config);
 
-    uhv_factory_ = factory->createFromProto(typed_config.typed_config(), context_);
-    return uhv_factory_->create(protocol, stream_info_);
+    uhv_factory_ = factory->createFromProto(typed_config.typed_config(), validation_visitor_);
+    return uhv_factory_->create(protocol, stats_);
   }
 
-  NiceMock<Server::Configuration::MockFactoryContext> context_;
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   ::Envoy::Http::HeaderValidatorFactoryPtr uhv_factory_;
-  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
+  NiceMock<Envoy::Http::MockHeaderValidatorStats> stats_;
 
   static constexpr absl::string_view empty_config = R"EOF(
     name: envoy.http.header_validators.envoy_default

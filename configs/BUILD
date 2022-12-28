@@ -34,14 +34,17 @@ filegroup(
             "using_deprecated_config.yaml",
             "**/*.template.yaml",
             "freebind/freebind.yaml",
+            "envoy-tap-config.yaml",
             "envoy-demo.yaml",
         ],
     ) + select({
         "//bazel:apple": ["envoy-demo.yaml"],
         "//bazel:windows_x86_64": [],
+        "//bazel:disable_admin_functionality": [],
         "//conditions:default": [
             "envoy-demo.yaml",
             "freebind/freebind.yaml",
+            "envoy-tap-config.yaml",
         ],
     }),
 )

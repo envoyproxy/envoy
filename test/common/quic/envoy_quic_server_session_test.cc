@@ -4,13 +4,13 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/event/libevent_scheduler.h"
-#include "source/common/quic/codec_impl.h"
 #include "source/common/quic/envoy_quic_alarm_factory.h"
 #include "source/common/quic/envoy_quic_connection_helper.h"
 #include "source/common/quic/envoy_quic_server_connection.h"
 #include "source/common/quic/envoy_quic_server_session.h"
 #include "source/common/quic/envoy_quic_server_stream.h"
 #include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/server_codec_impl.h"
 #include "source/server/configuration_impl.h"
 
 #include "test/common/quic/test_proof_source.h"
@@ -365,7 +365,7 @@ TEST_F(EnvoyQuicServerSessionTest, OnResetFrameIetfQuic) {
   stream1->encodeHeaders(response_headers, true);
 
   EXPECT_EQ(1U, TestUtility::findCounter(
-                    static_cast<Stats::IsolatedStoreImpl&>(listener_config_.listenerScope()),
+                    listener_config_.listenerScope().store(),
                     "http3.downstream.rx.quic_reset_stream_error_code_QUIC_ERROR_PROCESSING_STREAM")
                     ->value());
 
@@ -392,7 +392,7 @@ TEST_F(EnvoyQuicServerSessionTest, OnResetFrameIetfQuic) {
   envoy_quic_session_.OnStopSendingFrame(stop_sending2);
   envoy_quic_session_.OnRstStream(rst2);
   EXPECT_EQ(1U, TestUtility::findCounter(
-                    static_cast<Stats::IsolatedStoreImpl&>(listener_config_.listenerScope()),
+                    listener_config_.listenerScope().store(),
                     "http3.downstream.rx.quic_reset_stream_error_code_QUIC_REFUSED_STREAM")
                     ->value());
 
@@ -413,7 +413,7 @@ TEST_F(EnvoyQuicServerSessionTest, OnResetFrameIetfQuic) {
   envoy_quic_session_.OnRstStream(rst3);
   envoy_quic_session_.OnStopSendingFrame(stop_sending3);
   EXPECT_EQ(2U, TestUtility::findCounter(
-                    static_cast<Stats::IsolatedStoreImpl&>(listener_config_.listenerScope()),
+                    listener_config_.listenerScope().store(),
                     "http3.downstream.rx.quic_reset_stream_error_code_QUIC_REFUSED_STREAM")
                     ->value());
 }
@@ -499,7 +499,7 @@ TEST_F(EnvoyQuicServerSessionTest, FlushCloseWithDataToWrite) {
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
   EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::ConnectionTermination, _));
   // Unblock that stream to trigger actual connection close.
-  envoy_quic_session_.OnCanWrite();
+  quic_connection_->OnCanWrite();
   EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_.state());
   EXPECT_FALSE(quic_connection_->connected());
 }
@@ -518,7 +518,6 @@ TEST_F(EnvoyQuicServerSessionTest, WriteUpdatesDelayCloseTimer) {
       .WillRepeatedly(Return(quic::QuicBandwidth::Zero()));
 
   EXPECT_CALL(*quic_connection_, SendControlFrame(_)).Times(AnyNumber());
-
   // Bump connection flow control window large enough not to interfere
   // stream writing.
   envoy_quic_session_.flow_controller()->UpdateSendWindowOffset(
@@ -568,10 +567,15 @@ TEST_F(EnvoyQuicServerSessionTest, WriteUpdatesDelayCloseTimer) {
 
   time_system_.advanceTimeAndRun(std::chrono::milliseconds(10), *dispatcher_,
                                  Event::Dispatcher::RunType::NonBlock);
-  // Another write event without updating flow control window shouldn't trigger
-  // connection close, but it should update the timer.
-  envoy_quic_session_.OnCanWrite();
+  // Another write event with updated flow control window should unblock the stream and flush some
+  // stream data and update the timer. But it shouldn't close connection because there should still
+  // be data buffered.
+  quic::QuicWindowUpdateFrame window_update(quic::kInvalidControlFrameId, stream->id(),
+                                            quic::kDefaultFlowControlSendWindow + 1);
+  stream->OnWindowUpdateFrame(window_update);
+  quic_connection_->OnCanWrite();
   EXPECT_TRUE(envoy_quic_session_.HasDataToWrite());
+  EXPECT_TRUE(stream->IsFlowControlBlocked());
 
   // Timer shouldn't fire at original deadline.
   time_system_.advanceTimeAndRun(std::chrono::milliseconds(90), *dispatcher_,
@@ -660,7 +664,7 @@ TEST_F(EnvoyQuicServerSessionTest, FlushCloseNoTimeout) {
   EXPECT_EQ(Network::Connection::State::Open, envoy_quic_session_.state());
   // Another write event without updating flow control window shouldn't trigger
   // connection close.
-  envoy_quic_session_.OnCanWrite();
+  quic_connection_->OnCanWrite();
   EXPECT_TRUE(envoy_quic_session_.HasDataToWrite());
 
   // No timeout set, so alarm shouldn't fire.
@@ -725,18 +729,15 @@ TEST_F(EnvoyQuicServerSessionTest, FlushAndWaitForCloseWithTimeout) {
   // delayed.
   time_system_.advanceTimeAndRun(std::chrono::milliseconds(10), *dispatcher_,
                                  Event::Dispatcher::RunType::NonBlock);
-  envoy_quic_session_.OnCanWrite();
-  // delay close alarm should have been rescheduled.
-  time_system_.advanceTimeAndRun(std::chrono::milliseconds(90), *dispatcher_,
-                                 Event::Dispatcher::RunType::NonBlock);
+  quic_connection_->OnCanWrite();
   EXPECT_EQ(Network::Connection::State::Open, envoy_quic_session_.state());
 
+  // Advance the time to fire connection close timer.
   EXPECT_CALL(*quic_connection_,
               SendConnectionClosePacket(quic::QUIC_NO_ERROR, _, "Closed by application"));
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
   EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::ConnectionTermination, _));
-  // Advance the time to fire connection close timer.
-  time_system_.advanceTimeAndRun(std::chrono::milliseconds(10), *dispatcher_,
+  time_system_.advanceTimeAndRun(std::chrono::milliseconds(90), *dispatcher_,
                                  Event::Dispatcher::RunType::NonBlock);
   EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_.state());
   EXPECT_FALSE(quic_connection_->connected());
@@ -761,11 +762,7 @@ TEST_F(EnvoyQuicServerSessionTest, FlusWriteTransitToFlushWriteWithDelay) {
   envoy_quic_session_.close(Network::ConnectionCloseType::FlushWriteAndDelay);
   // Unblocking the stream shouldn't close the connection as it should be
   // delayed.
-  envoy_quic_session_.OnCanWrite();
-
-  // delay close alarm should have been rescheduled.
-  time_system_.advanceTimeAndRun(std::chrono::milliseconds(90), *dispatcher_,
-                                 Event::Dispatcher::RunType::NonBlock);
+  quic_connection_->OnCanWrite();
   EXPECT_EQ(Network::Connection::State::Open, envoy_quic_session_.state());
 
   EXPECT_CALL(*quic_connection_,
@@ -773,7 +770,7 @@ TEST_F(EnvoyQuicServerSessionTest, FlusWriteTransitToFlushWriteWithDelay) {
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
   EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::ConnectionTermination, _));
   // Advance the time to fire connection close timer.
-  time_system_.advanceTimeAndRun(std::chrono::milliseconds(10), *dispatcher_,
+  time_system_.advanceTimeAndRun(std::chrono::milliseconds(90), *dispatcher_,
                                  Event::Dispatcher::RunType::NonBlock);
   EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_.state());
   EXPECT_FALSE(quic_connection_->connected());

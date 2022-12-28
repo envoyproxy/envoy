@@ -1,6 +1,6 @@
-#include "mobile/library/common/extensions/filters/http/assertion/config.h"
+#include "library/common/extensions/filters/http/assertion/config.h"
 
-#include "mobile/library/common/extensions/filters/http/assertion/filter.h"
+#include "library/common/extensions/filters/http/assertion/filter.h"
 
 namespace Envoy {
 namespace Extensions {

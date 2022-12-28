@@ -6,6 +6,7 @@
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 
 #include "source/common/config/api_version.h"
+#include "source/common/network/raw_buffer_socket.h"
 #include "source/common/network/utility.h"
 #include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
 #include "source/extensions/transport_sockets/tls/context_manager_impl.h"

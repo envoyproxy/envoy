@@ -2,6 +2,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
     "envoy_package",
+    "envoy_select_admin_functionality",
     "envoy_sh_test",
 )
 
@@ -61,7 +62,7 @@ envoy_sh_test(
 
 envoy_cc_test(
     name = "main_common_test",
-    srcs = ["main_common_test.cc"],
+    srcs = envoy_select_admin_functionality(["main_common_test.cc"]),
     data = [
         "//test/config/integration:google_com_proxy_port_0",
     ],

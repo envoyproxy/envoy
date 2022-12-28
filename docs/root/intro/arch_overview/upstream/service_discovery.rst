@@ -105,7 +105,8 @@ When using the original destination cluster for HTTP upstreams, please set :ref:
 .. _arch_overview_service_discovery_types_eds:
 
 Endpoint discovery service (EDS)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. _extension_envoy.clusters.eds:
 
 The *endpoint discovery service* is a :ref:`xDS management server based on gRPC or REST-JSON API server
 <config_overview_management_server>` used by Envoy to fetch cluster members. The cluster members are called

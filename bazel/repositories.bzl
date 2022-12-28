@@ -7,6 +7,7 @@ load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_languag
 PPC_SKIP_TARGETS = ["envoy.filters.http.lua"]
 
 WINDOWS_SKIP_TARGETS = [
+    "envoy.extensions.http.cache.file_system_http_cache",
     "envoy.filters.http.file_system_buffer",
     "envoy.filters.http.language",
     "envoy.filters.http.sxg",
@@ -221,7 +222,12 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
     external_http_archive("envoy_build_tools")
-    external_http_archive("rules_pkg")
+
+    # TODO(keith): Remove patch when we update rules_pkg
+    external_http_archive(
+        "rules_pkg",
+        patches = ["@envoy//bazel:rules_pkg.patch"],
+    )
     external_http_archive("com_github_aignas_rules_shellcheck")
     external_http_archive("aspect_bazel_lib")
     _com_github_fdio_vpp_vcl()
@@ -393,12 +399,6 @@ def _com_github_intel_qatlib():
     external_http_archive(
         name = "com_github_intel_qatlib",
         build_file_content = BUILD_ALL_CONTENT,
-        patch_args = ["-p1"],
-        patches = [
-            "@envoy//bazel/foreign_cc:qatlib-0001-qat-Enable-disable-systemd-support-with-configure.ac.patch",
-            "@envoy//bazel/foreign_cc:qatlib-0002-qatlib-Remove-remaining-shared-flags.patch",
-            "@envoy//bazel/foreign_cc:qatlib-0003-configure-Check-if-pkg-config-is-installed-before-us.patch",
-        ],
     )
 
 def _com_github_jbeder_yaml_cpp():

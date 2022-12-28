@@ -1,7 +1,10 @@
+#include "envoy/http/header_validator_errors.h"
+
 #include "source/extensions/http/header_validators/envoy_default/character_tables.h"
 #include "source/extensions/http/header_validators/envoy_default/http2_header_validator.h"
 
 #include "test/extensions/http/header_validators/envoy_default/header_validator_test.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -13,6 +16,7 @@ namespace {
 using ::Envoy::Extensions::Http::HeaderValidators::EnvoyDefault::Http2HeaderValidator;
 using ::Envoy::Http::HeaderString;
 using ::Envoy::Http::Protocol;
+using ::Envoy::Http::UhvResponseCodeDetail;
 
 class Http2HeaderValidatorTest : public HeaderValidatorTest {
 protected:
@@ -21,7 +25,7 @@ protected:
         typed_config;
     TestUtility::loadFromYaml(std::string(config_yaml), typed_config);
 
-    return std::make_unique<Http2HeaderValidator>(typed_config, Protocol::Http2, stream_info_);
+    return std::make_unique<Http2HeaderValidator>(typed_config, Protocol::Http2, stats_);
   }
 };
 
@@ -402,12 +406,36 @@ TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderKeyDropUnderscores) {
   EXPECT_EQ(result.details(), UhvResponseCodeDetail::get().InvalidUnderscore);
 }
 
-TEST_F(Http2HeaderValidatorTest, ValidateGenericHeaderKeyRejectDropUnderscores) {
-  HeaderString invalid_with_underscore{"x_fo<o"};
-  auto uhv = createH2(drop_headers_with_underscores_config);
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapNormalizePath) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
+                                                  {":method", "GET"},
+                                                  {":path", "/./dir1/../dir2"},
+                                                  {":authority", "envoy.com"}};
+  auto uhv = createH2(empty_config);
 
-  auto result = uhv->validateGenericHeaderName(invalid_with_underscore);
-  EXPECT_REJECT_WITH_DETAILS(result, UhvResponseCodeDetail::get().InvalidNameCharacters);
+  EXPECT_TRUE(uhv->validateRequestHeaderMap(headers).ok());
+  EXPECT_EQ(headers.path(), "/dir2");
+}
+
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapRejectPath) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{
+      {":scheme", "https"}, {":method", "GET"}, {":path", "/.."}, {":authority", "envoy.com"}};
+  auto uhv = createH2(empty_config);
+  auto result = uhv->validateRequestHeaderMap(headers);
+  EXPECT_EQ(result.action(), HeaderValidator::RejectOrRedirectAction::Reject);
+  EXPECT_EQ(result.details(), UhvResponseCodeDetail::get().InvalidUrl);
+}
+
+TEST_F(Http2HeaderValidatorTest, ValidateRequestHeaderMapRedirectPath) {
+  ::Envoy::Http::TestRequestHeaderMapImpl headers{{":scheme", "https"},
+                                                  {":method", "GET"},
+                                                  {":path", "/dir1%2fdir2"},
+                                                  {":authority", "envoy.com"}};
+  auto uhv = createH2(redirect_encoded_slash_config);
+  auto result = uhv->validateRequestHeaderMap(headers);
+  EXPECT_EQ(result.action(), HeaderValidator::RejectOrRedirectAction::Redirect);
+  EXPECT_EQ(result.details(), "uhv.path_noramlization_redirect");
+  EXPECT_EQ(headers.path(), "/dir1/dir2");
 }
 
 } // namespace
