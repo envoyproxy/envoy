@@ -586,6 +586,7 @@ envoy_cc_test(
         "//source/extensions/filters/http/buffer:config",
         "//test/integration/filters:add_body_filter_config_lib",
         "//test/integration/filters:add_invalid_data_filter_lib",
+        "//test/integration/filters:assert_non_reentrant_filter_lib",
         "//test/integration/filters:buffer_continue_filter_lib",
         "//test/integration/filters:continue_after_local_reply_filter_lib",
         "//test/integration/filters:continue_headers_only_inject_body",

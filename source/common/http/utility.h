@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <memory>
 #include <string>
 
 #include "envoy/config/core/v3/http_uri.pb.h"
@@ -379,6 +380,20 @@ struct LocalReplyData {
   bool is_head_request_ = false;
 };
 
+// Prepared local reply after modifying headers and rewriting body.
+struct PreparedLocalReply {
+  bool is_grpc_request_ = false;
+  bool is_head_request_ = false;
+  ResponseHeaderMapPtr response_headers_;
+  std::string response_body_;
+  // Function to encode response headers.
+  std::function<void(ResponseHeaderMapPtr&& headers, bool end_stream)> encode_headers_;
+  // Function to encode the response body.
+  std::function<void(Buffer::Instance& data, bool end_stream)> encode_data_;
+};
+
+using PreparedLocalReplyPtr = std::unique_ptr<PreparedLocalReply>;
+
 /**
  * Create a locally generated response using the provided lambdas.
 
@@ -390,6 +405,23 @@ struct LocalReplyData {
  */
 void sendLocalReply(const bool& is_reset, const EncodeFunctions& encode_functions,
                     const LocalReplyData& local_reply_data);
+
+/**
+ * Prepares a locally generated response.
+ *
+ * @param encode_functions supplies the functions to encode response body and headers.
+ * @param local_reply_data struct which keeps data related to generate reply.
+ */
+PreparedLocalReplyPtr prepareLocalReply(const EncodeFunctions& encode_functions,
+                                        const LocalReplyData& local_reply_data);
+/**
+ * Encodes a prepared local reply.
+ * @param is_reset boolean reference that indicates whether a stream has been reset. It is the
+ *                 responsibility of the caller to ensure that this is set to false if onDestroy()
+ *                 is invoked in the context of sendLocalReply().
+ * @param prepared_local_reply supplies the local reply to encode.
+ */
+void encodeLocalReply(const bool& is_reset, PreparedLocalReplyPtr prepared_local_reply);
 
 struct GetLastAddressFromXffInfo {
   // Last valid address pulled from the XFF header.
