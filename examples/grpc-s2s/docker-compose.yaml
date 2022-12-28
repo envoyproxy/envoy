@@ -14,7 +14,7 @@ services:
       dockerfile: Dockerfile-envoy-hello
     ports:
     - "${PORT_PROXY:-12000}:8080"
-    - 9090:9090
+    - "${PORT_ADMIN_HELLO:-12800}:9090"
     depends_on:
       hello:
         condition: service_healthy
@@ -35,11 +35,10 @@ services:
       context: .
       dockerfile: Dockerfile-envoy-world
     ports:
-    - 9091:9090
+    - "${PORT_ADMIN_WORLD:-12801}:9090"
     depends_on:
       world:
         condition: service_healthy
-
   world:
     build:
       context: .
