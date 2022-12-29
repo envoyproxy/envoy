@@ -1329,12 +1329,12 @@ TEST_P(StatsHandlerPrometheusDefaultTest, StatsHandlerPrometheusDefaultTest) {
 
   createTestStats();
 
-  const std::string expected_response = R"EOF(# TYPE envoy_cluster_upstream_cx_active gauge
-envoy_cluster_upstream_cx_active{cluster="c1"} 11
-envoy_cluster_upstream_cx_active{cluster="c2"} 12
-# TYPE envoy_cluster_upstream_cx_total counter
+const std::string expected_response = R"EOF(# TYPE envoy_cluster_upstream_cx_total counter
 envoy_cluster_upstream_cx_total{cluster="c1"} 10
 envoy_cluster_upstream_cx_total{cluster="c2"} 20
+# TYPE envoy_cluster_upstream_cx_active gauge
+envoy_cluster_upstream_cx_active{cluster="c1"} 11
+envoy_cluster_upstream_cx_active{cluster="c2"} 12
 )EOF";
 
   const CodeResponse code_response = handlerStats(url);
@@ -1372,12 +1372,12 @@ TEST_P(StatsHandlerPrometheusWithTextReadoutsTest, StatsHandlerPrometheusWithTex
 
   createTestStats();
 
-  const std::string expected_response = R"EOF(# TYPE envoy_cluster_upstream_cx_active gauge
-envoy_cluster_upstream_cx_active{cluster="c1"} 11
-envoy_cluster_upstream_cx_active{cluster="c2"} 12
-# TYPE envoy_cluster_upstream_cx_total counter
+  const std::string expected_response = R"EOF(# TYPE envoy_cluster_upstream_cx_total counter
 envoy_cluster_upstream_cx_total{cluster="c1"} 10
 envoy_cluster_upstream_cx_total{cluster="c2"} 20
+# TYPE envoy_cluster_upstream_cx_active gauge
+envoy_cluster_upstream_cx_active{cluster="c1"} 11
+envoy_cluster_upstream_cx_active{cluster="c2"} 12
 # TYPE envoy_control_plane_identifier gauge
 envoy_control_plane_identifier{cluster="c1",text_value="cp-1"} 0
 )EOF";
