@@ -52,7 +52,7 @@ with Envoy's active health checking for upstream clusters using
 
 The Envoy proxy for the World service has healthchecks configured similarly:
 
-   .. literalinclude:: _include/grpc-s2s/world/envoy-proxy.yaml
+.. literalinclude:: _include/grpc-s2s/world/envoy-proxy.yaml
    :language: yaml
    :lines: 16-34
    :linenos:
