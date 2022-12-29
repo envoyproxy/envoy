@@ -59,6 +59,7 @@ Http::Code StatsRequestBase<TR, C, G, H>::start(Http::ResponseHeaderMap& respons
 
 template <class TR, class C, class G, class H>
 bool StatsRequestBase<TR, C, G, H>::nextChunk(Buffer::Instance& response) {
+  std::cout << " nextChunk: begin " << std::endl;
   if (response_.length() > 0) {
     ASSERT(response.length() == 0);
     response.move(response_);
@@ -126,6 +127,8 @@ bool StatsRequestBase<TR, C, G, H>::nextChunk(Buffer::Instance& response) {
 }
 
 template <class TR, class C, class G, class H> void StatsRequestBase<TR, C, G, H>::startPhase() {
+  Phase current_phase = phases_.at(phase_);
+  std::cout << " startPhase: begin " << current_phase.phase_label << std::endl;
   ASSERT(stat_map_.empty());
 
   // Insert all the scopes in the alphabetically ordered map. As we iterate
@@ -138,39 +141,40 @@ template <class TR, class C, class G, class H> void StatsRequestBase<TR, C, G, H
     }
     absl::get<ScopeVec>(variant).emplace_back(scope);
   }
+    std::cout << " startPhase: end " << std::endl;
 }
 
 template <class TR, class C, class G, class H>
 void StatsRequestBase<TR, C, G, H>::populateStatsForCurrentPhase(const ScopeVec& scope_vec) {
+  std::cout << "populateStatsForCurrentPhase: begin" << std::endl;
   Phase current_phase = phases_.at(phase_);
-  switch (current_phase.phase) {
-  case PhaseName::TextReadouts:
-    populateStatsFromScopes<Stats::TextReadout>(scope_vec);
-    break;
-  case PhaseName::CountersAndGauges:
-    if (params_.type_ != StatsType::Gauges) {
-      populateStatsFromScopes<Stats::Counter>(scope_vec);
+  for (const Stats::ConstScopeSharedPtr& scope : scope_vec) {
+    switch (current_phase.phase) {
+    case PhaseName::TextReadouts:
+      scope->iterate(checkStatForTextReadout());
+      break;
+    case PhaseName::CountersAndGauges:
+      if (params_.type_ != StatsType::Gauges) {
+        scope->iterate(checkStatForCounter());
+      }
+      if (params_.type_ != StatsType::Counters) {
+        scope->iterate(checkStatForGauge());
+      }
+      break;
+    case PhaseName::Counters:
+      scope->iterate(checkStatForCounter());
+      break;
+    case PhaseName::Gauges:
+      scope->iterate(checkStatForGauge());
+      break;
+    case PhaseName::Histograms:
+      scope->iterate(checkStatForHistogram());
+      break;
     }
-    if (params_.type_ != StatsType::Counters) {
-      populateStatsFromScopes<Stats::Gauge>(scope_vec);
-    }
-    break;
-  case PhaseName::Counters:
-    populateStatsFromScopes<Stats::Counter>(scope_vec);
-    break;
-  case PhaseName::Gauges:
-    populateStatsFromScopes<Stats::Gauge>(scope_vec);
-    break;
-  case PhaseName::Histograms:
-    populateStatsFromScopes<Stats::Histogram>(scope_vec);
-    break;
   }
 }
 
 // these will be overriden by concrete subclasses
-template <class TR, class C, class G, class H>
-template <class StatType>
-void StatsRequestBase<TR, C, G, H>::populateStatsFromScopes(const ScopeVec&) {}
 
 template <class TR, class C, class G, class H>
 template <class SharedStatType>

@@ -25,10 +25,15 @@ public:
                          Stats::CustomStatNamespaces& custom_namespaces,
                          UrlHandlerFn url_handler_fn = nullptr);
 
-  template <class StatType> void populateStatsFromScopes(const ScopeVec& scope_vec);
-
   template <class SharedStatType>
   void renderStat(const std::string& name, Buffer::Instance& response, const StatOrScopes& variant);
+
+  Stats::IterateFn<Stats::TextReadout> checkStatForTextReadout() override;
+  Stats::IterateFn<Stats::Gauge> checkStatForGauge() override;
+  Stats::IterateFn<Stats::Counter> checkStatForCounter() override;
+  Stats::IterateFn<Stats::Histogram> checkStatForHistogram() override;
+  template <class StatType> Stats::IterateFn<StatType> checkStat();
+
 
   void handleTextReadout(Buffer::Instance& response, const StatOrScopes& variant) override;
 

@@ -7,6 +7,7 @@
 #include "source/server/admin/prometheus_stats.h"
 
 #include "stats_params.h"
+#include "stats_render.h"
 
 namespace Envoy {
 namespace Server {
@@ -93,9 +94,8 @@ void PrometheusStatsRequest::handleHistogram(Buffer::Instance& response,
   }
 }
 
-template <typename StatType>
-void PrometheusStatsRequest::populateStatsFromScopes(const ScopeVec& scope_vec) {
-  Stats::IterateFn<StatType> check_stat = [this](const Stats::RefcountPtr<StatType>& stat) -> bool {
+template <class StatType> Stats::IterateFn<StatType> PrometheusStatsRequest::checkStat() {
+  return [this](const Stats::RefcountPtr<StatType>& stat) -> bool {
     if (params_.used_only_ && !stat->used()) {
       return true;
     }
@@ -120,10 +120,22 @@ void PrometheusStatsRequest::populateStatsFromScopes(const ScopeVec& scope_vec) 
     stat_map_[tag_extracted_name] = variant;
     return true;
   };
+}
 
-  for (const Stats::ConstScopeSharedPtr& scope : scope_vec) {
-    scope->iterate(check_stat);
-  }
+Stats::IterateFn<Stats::TextReadout> PrometheusStatsRequest::checkStatForTextReadout() {
+  return checkStat<Stats::TextReadout>();
+}
+
+Stats::IterateFn<Stats::Gauge> PrometheusStatsRequest::checkStatForGauge() {
+  return checkStat<Stats::Gauge>();
+}
+
+Stats::IterateFn<Stats::Counter> PrometheusStatsRequest::checkStatForCounter() {
+  return checkStat<Stats::Counter>();
+}
+
+Stats::IterateFn<Stats::Histogram> PrometheusStatsRequest::checkStatForHistogram() {
+  return checkStat<Stats::Histogram>();
 }
 
 template <class SharedStatType>
