@@ -24,6 +24,8 @@ docker-compose exec -ti --index 1 hello kill -SIGUSR1 1
 run_log "Render an instance of World unhealthy"
 docker-compose exec -ti --index 1 world kill -SIGUSR1 1
 
+sleep 1
+
 run_log "Ensure that we now only have one healthy instance of Hello"
 curl -s "http://localhost:${PORT_ADMIN_HELLO}/stats" | grep -q "cluster.hello.health_check.healthy: 1"
 
