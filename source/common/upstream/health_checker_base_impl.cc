@@ -294,13 +294,6 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess(bool degrade
       // no longer be excluded.
       host_->healthFlagClear(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
       host_->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
-      // If the host is ejected by outlier detection and active health check succeeds,
-      // we should treat this host as healthy.
-      if (Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.successful_active_health_check_uneject_host") &&
-          host_->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
-        host_->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
-      }
       parent_.incHealthy();
       changed_state = HealthTransition::Changed;
       if (parent_.event_logger_) {

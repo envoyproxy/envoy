@@ -394,14 +394,13 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xxViaHttpCodesWithActiveHC) {
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
   interval_timer_->invokeCallback();
 
-  hosts_[0]->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
-
   // Trigger the health checker callbacks and validate host is unejected.
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
   health_checker->runCallbacks(hosts_[0], HealthTransition::Changed);
   EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
+  EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
 
   // Eject host again to cause an ejection after an unejection has taken place
   hosts_[0]->outlierDetector().putResponseTime(std::chrono::milliseconds(5));
