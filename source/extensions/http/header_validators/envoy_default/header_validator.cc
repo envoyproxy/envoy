@@ -7,6 +7,7 @@
 #include "source/extensions/http/header_validators/envoy_default/character_tables.h"
 
 #include "absl/container/node_hash_set.h"
+#include "absl/strings/match.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -20,10 +21,9 @@ using ::Envoy::Http::Protocol;
 using ::Envoy::Http::UhvResponseCodeDetail;
 
 HeaderValidator::HeaderValidator(const HeaderValidatorConfig& config, Protocol protocol,
-                                 StreamInfo::StreamInfo& stream_info,
                                  ::Envoy::Http::HeaderValidatorStats& stats)
-    : config_(config), protocol_(protocol), stream_info_(stream_info),
-      header_values_(::Envoy::Http::Headers::get()), stats_(stats), path_normalizer_(config) {}
+    : config_(config), protocol_(protocol), header_values_(::Envoy::Http::Headers::get()),
+      stats_(stats), path_normalizer_(config) {}
 
 HeaderValidator::HeaderValueValidationResult
 HeaderValidator::validateMethodHeader(const HeaderString& value) {

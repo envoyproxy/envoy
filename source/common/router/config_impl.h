@@ -278,7 +278,7 @@ public:
       std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override;
 
 private:
-  enum class SslRequirements { None, ExternalOnly, All };
+  enum class SslRequirements : uint8_t { None, ExternalOnly, All };
 
   struct StatNameProvider {
     StatNameProvider(absl::string_view name, Stats::SymbolTable& symbol_table)
@@ -325,7 +325,6 @@ private:
   Stats::ScopeSharedPtr vcluster_scope_;
   std::vector<RouteEntryImplBaseConstSharedPtr> routes_;
   std::vector<VirtualClusterEntry> virtual_clusters_;
-  SslRequirements ssl_requirements_;
   std::unique_ptr<const RateLimitPolicyImpl> rate_limit_policy_;
   std::vector<ShadowPolicyPtr> shadow_policies_;
   std::unique_ptr<const CorsPolicyImpl> cors_policy_;
@@ -334,13 +333,15 @@ private:
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
   PerFilterConfigs per_filter_configs_;
-  uint32_t retry_shadow_buffer_limit_{std::numeric_limits<uint32_t>::max()};
-  const bool include_attempt_count_in_request_;
-  const bool include_attempt_count_in_response_;
   std::unique_ptr<envoy::config::route::v3::RetryPolicy> retry_policy_;
   std::unique_ptr<envoy::config::route::v3::HedgePolicy> hedge_policy_;
   std::unique_ptr<const CatchAllVirtualCluster> virtual_cluster_catch_all_;
   Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher_;
+  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
+  uint32_t retry_shadow_buffer_limit_{std::numeric_limits<uint32_t>::max()};
+  SslRequirements ssl_requirements_;
+  const bool include_attempt_count_in_request_ : 1;
+  const bool include_attempt_count_in_response_ : 1;
 };
 
 using VirtualHostSharedPtr = std::shared_ptr<VirtualHostImpl>;
@@ -537,14 +538,68 @@ private:
 
   const std::string current_route_name_;
   const absl::flat_hash_set<Http::Code> redirect_response_codes_;
+  std::vector<std::pair<InternalRedirectPredicateFactory*, ProtobufTypes::MessagePtr>>
+      predicate_factories_;
+  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   const uint32_t max_internal_redirects_{1};
   const bool enabled_{false};
   const bool allow_cross_scheme_redirect_{false};
-
-  std::vector<std::pair<InternalRedirectPredicateFactory*, ProtobufTypes::MessagePtr>>
-      predicate_factories_;
 };
 using DefaultInternalRedirectPolicy = ConstSingleton<InternalRedirectPolicyImpl>;
+
+// Manages various optional route timeouts. We pack them in a separate data structure for memory
+// efficiency:
+// - Sharing one bool avoids the overhead of `absl::optional`, saving 8 bytes per timeout
+// - If none of the timeouts are configured, we avoid allocating any of the `std::duration` values,
+// saving another 8 bytes per timeout
+class OptionalTimeouts {
+public:
+  OptionalTimeouts(const envoy::config::route::v3::RouteAction& route);
+
+  absl::optional<std::chrono::milliseconds> idleTimeout() const {
+    return has_idle_timeout_ ? absl::optional<std::chrono::milliseconds>(idle_timeout_)
+                             : absl::nullopt;
+  }
+  absl::optional<std::chrono::milliseconds> maxStreamDuration() const {
+    return has_max_stream_duration_
+               ? absl::optional<std::chrono::milliseconds>(max_stream_duration_)
+               : absl::nullopt;
+  }
+  absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderMax() const {
+    return has_grpc_timeout_header_max_
+               ? absl::optional<std::chrono::milliseconds>(grpc_timeout_header_max_)
+               : absl::nullopt;
+  }
+  absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderOffset() const {
+    return has_grpc_timeout_header_offset_
+               ? absl::optional<std::chrono::milliseconds>(grpc_timeout_header_offset_)
+               : absl::nullopt;
+  }
+  absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const {
+    return has_max_grpc_timeout_ ? absl::optional<std::chrono::milliseconds>(max_grpc_timeout_)
+                                 : absl::nullopt;
+  }
+  absl::optional<std::chrono::milliseconds> grpcTimeoutOffset() const {
+    return has_grpc_timeout_offset_
+               ? absl::optional<std::chrono::milliseconds>(grpc_timeout_offset_)
+               : absl::nullopt;
+  }
+
+private:
+  std::chrono::milliseconds idle_timeout_;
+  std::chrono::milliseconds max_stream_duration_;
+  std::chrono::milliseconds grpc_timeout_header_max_;
+  std::chrono::milliseconds grpc_timeout_header_offset_;
+  std::chrono::milliseconds max_grpc_timeout_;
+  std::chrono::milliseconds grpc_timeout_offset_;
+  // Keep small members at the end of class, to reduce alignment overhead.
+  bool has_idle_timeout_ : 1;
+  bool has_max_stream_duration_ : 1;
+  bool has_grpc_timeout_header_max_ : 1;
+  bool has_grpc_timeout_header_offset_ : 1;
+  bool has_max_grpc_timeout_ : 1;
+  bool has_grpc_timeout_offset_ : 1;
+};
 
 /**
  * Base implementation for all route entries.q
@@ -656,22 +711,26 @@ public:
     return vhost_.virtualClusterFromEntries(headers);
   }
   std::chrono::milliseconds timeout() const override { return timeout_; }
-  absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
+  absl::optional<std::chrono::milliseconds> idleTimeout() const override {
+    return optional_timeouts_ != nullptr ? optional_timeouts_->idleTimeout() : absl::nullopt;
+  }
   bool usingNewTimeouts() const override { return using_new_timeouts_; }
   absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
-    return max_stream_duration_;
+    return optional_timeouts_ != nullptr ? optional_timeouts_->maxStreamDuration() : absl::nullopt;
   }
   absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderMax() const override {
-    return grpc_timeout_header_max_;
+    return optional_timeouts_ != nullptr ? optional_timeouts_->grpcTimeoutHeaderMax()
+                                         : absl::nullopt;
   }
   absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderOffset() const override {
-    return grpc_timeout_header_offset_;
+    return optional_timeouts_ != nullptr ? optional_timeouts_->grpcTimeoutHeaderOffset()
+                                         : absl::nullopt;
   }
   absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const override {
-    return max_grpc_timeout_;
+    return optional_timeouts_ != nullptr ? optional_timeouts_->maxGrpcTimeout() : absl::nullopt;
   }
   absl::optional<std::chrono::milliseconds> grpcTimeoutOffset() const override {
-    return grpc_timeout_offset_;
+    return optional_timeouts_ != nullptr ? optional_timeouts_->grpcTimeoutOffset() : absl::nullopt;
   }
   const VirtualHost& virtualHost() const override { return vhost_; }
   bool autoHostRewrite() const override { return auto_host_rewrite_; }
@@ -960,7 +1019,6 @@ public:
   using WeightedClusterEntrySharedPtr = std::shared_ptr<WeightedClusterEntry>;
 
 protected:
-  const bool case_sensitive_;
   const std::string prefix_rewrite_;
   Regex::CompiledMatcherPtr regex_rewrite_;
   Regex::CompiledMatcherPtr regex_rewrite_redirect_;
@@ -969,9 +1027,9 @@ protected:
   std::string regex_rewrite_substitution_;
   std::string regex_rewrite_redirect_substitution_;
   const std::string host_rewrite_;
-  bool include_vh_rate_limits_;
   std::unique_ptr<ConnectConfig> connect_config_;
 
+  bool case_sensitive() const { return case_sensitive_; }
   RouteConstSharedPtr clusterEntry(const Http::RequestHeaderMap& headers,
                                    uint64_t random_value) const;
 
@@ -1048,6 +1106,9 @@ private:
                               ProtobufMessage::ValidationVisitor& validator,
                               absl::string_view current_route_name) const;
 
+  std::unique_ptr<OptionalTimeouts>
+  buildOptionalTimeouts(const envoy::config::route::v3::RouteAction& route) const;
+
   PathMatcherSharedPtr buildPathMatcher(envoy::config::route::v3::Route route,
                                         ProtobufMessage::ValidationVisitor& validator) const;
 
@@ -1068,40 +1129,27 @@ private:
   std::unique_ptr<const CorsPolicyImpl> cors_policy_;
   const VirtualHostImpl& vhost_; // See note in RouteEntryImplBase::clusterEntry() on why raw ref
                                  // to virtual host is currently safe.
-  const bool auto_host_rewrite_;
   const absl::optional<Http::LowerCaseString> auto_host_rewrite_header_;
   const Regex::CompiledMatcherPtr host_rewrite_path_regex_;
   const std::string host_rewrite_path_regex_substitution_;
-  const bool append_xfh_;
   const std::string cluster_name_;
   RouteStatsContextPtr route_stats_context_;
   const Http::LowerCaseString cluster_header_name_;
   ClusterSpecifierPluginSharedPtr cluster_specifier_plugin_;
-  const Http::Code cluster_not_found_response_code_;
   const std::chrono::milliseconds timeout_;
-  const absl::optional<std::chrono::milliseconds> idle_timeout_;
-  const absl::optional<std::chrono::milliseconds> max_stream_duration_;
-  const absl::optional<std::chrono::milliseconds> grpc_timeout_header_max_;
-  const absl::optional<std::chrono::milliseconds> grpc_timeout_header_offset_;
-  const absl::optional<std::chrono::milliseconds> max_grpc_timeout_;
-  const absl::optional<std::chrono::milliseconds> grpc_timeout_offset_;
+  std::unique_ptr<const OptionalTimeouts> optional_timeouts_;
   Runtime::Loader& loader_;
   std::unique_ptr<const RuntimeData> runtime_;
   const std::string scheme_redirect_;
   const std::string host_redirect_;
   const std::string port_redirect_;
   const std::string path_redirect_;
-  const bool path_redirect_has_query_;
-  const bool https_redirect_;
-  const bool using_new_timeouts_;
   const std::string prefix_rewrite_redirect_;
-  const bool strip_query_;
   std::unique_ptr<const HedgePolicyImpl> hedge_policy_;
   std::unique_ptr<const RetryPolicyImpl> retry_policy_;
   std::unique_ptr<const InternalRedirectPolicyImpl> internal_redirect_policy_;
   std::unique_ptr<const RateLimitPolicyImpl> rate_limit_policy_;
   std::vector<ShadowPolicyPtr> shadow_policies_;
-  const Upstream::ResourcePriority priority_;
   std::vector<Http::HeaderUtility::HeaderDataPtr> config_headers_;
   std::vector<ConfigUtility::QueryParameterMatcherPtr> config_query_parameters_;
   std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
@@ -1113,10 +1161,8 @@ private:
   TlsContextMatchCriteriaConstPtr tls_context_match_criteria_;
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
-  uint32_t retry_shadow_buffer_limit_{std::numeric_limits<uint32_t>::max()};
   std::unique_ptr<const envoy::config::core::v3::Metadata> metadata_;
   std::unique_ptr<const RouteTypedMetadata> typed_metadata_;
-  const bool match_grpc_;
   const std::vector<Envoy::Matchers::MetadataMatcher> dynamic_metadata_;
 
   // TODO(danielhochman): refactor multimap into unordered_map since JSON is unordered map.
@@ -1124,13 +1170,27 @@ private:
 
   const DecoratorConstPtr decorator_;
   const RouteTracingConstPtr route_tracing_;
-  const absl::optional<Http::Code> direct_response_code_;
   std::string direct_response_body_;
   PerFilterConfigs per_filter_configs_;
   const std::string route_name_;
   TimeSource& time_source_;
   const std::string random_value_header_name_;
   EarlyDataPolicyPtr early_data_policy_;
+
+  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
+  uint32_t retry_shadow_buffer_limit_{std::numeric_limits<uint32_t>::max()};
+  const absl::optional<Http::Code> direct_response_code_;
+  const Http::Code cluster_not_found_response_code_;
+  const Upstream::ResourcePriority priority_;
+  const bool auto_host_rewrite_ : 1;
+  const bool append_xfh_ : 1;
+  const bool path_redirect_has_query_ : 1;
+  const bool https_redirect_ : 1;
+  const bool using_new_timeouts_ : 1;
+  const bool strip_query_ : 1;
+  const bool match_grpc_ : 1;
+  const bool case_sensitive_ : 1;
+  bool include_vh_rate_limits_ : 1;
 };
 
 /**
@@ -1498,14 +1558,15 @@ private:
   HeaderParserPtr response_headers_parser_;
   const std::string name_;
   Stats::SymbolTable& symbol_table_;
-  const bool uses_vhds_;
-  const bool most_specific_header_mutations_wins_;
-  const uint32_t max_direct_response_body_size_bytes_;
   std::vector<ShadowPolicyPtr> shadow_policies_;
   // Cluster specifier plugins/providers.
   absl::flat_hash_map<std::string, ClusterSpecifierPluginSharedPtr> cluster_specifier_plugins_;
-  const bool ignore_path_parameters_in_path_matching_;
   PerFilterConfigs per_filter_configs_;
+  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
+  const uint32_t max_direct_response_body_size_bytes_;
+  const bool uses_vhds_ : 1;
+  const bool most_specific_header_mutations_wins_ : 1;
+  const bool ignore_path_parameters_in_path_matching_ : 1;
 };
 
 /**

@@ -1167,7 +1167,7 @@ public:
   /**
    * @return alternate protocols cache options for upstream connections.
    */
-  virtual const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+  virtual const absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>&
   alternateProtocolsCacheOptions() const PURE;
 
   /**

@@ -45,7 +45,8 @@ public:
       : async_file_manager_factory_(async_file_manager_factory) {}
 
   std::shared_ptr<FileSystemHttpCache> get(std::shared_ptr<CacheSingleton> singleton,
-                                           const ConfigProto& non_normalized_config) {
+                                           const ConfigProto& non_normalized_config,
+                                           Stats::Scope& stats_scope) {
     std::shared_ptr<FileSystemHttpCache> cache;
     ConfigProto config = normalizeConfig(non_normalized_config);
     auto key = config.cache_path();
@@ -57,7 +58,7 @@ public:
     if (!cache) {
       cache = std::make_shared<FileSystemHttpCache>(
           singleton, std::move(config),
-          async_file_manager_factory_->getAsyncFileManager(config.manager_config()));
+          async_file_manager_factory_->getAsyncFileManager(config.manager_config()), stats_scope);
       caches_[key] = cache;
     } else if (!Protobuf::util::MessageDifferencer::Equals(cache->config(), config)) {
       throw EnvoyException(
@@ -98,7 +99,9 @@ public:
           return std::make_shared<CacheSingleton>(
               Common::AsyncFiles::AsyncFileManagerFactory::singleton(&context.singletonManager()));
         });
-    return caches->get(caches, config);
+    std::shared_ptr<FileSystemHttpCache> cache = caches->get(caches, config, context.scope());
+    cache->init();
+    return cache;
   }
 };
 
