@@ -1,9 +1,8 @@
 #include "source/server/admin/prometheus_stats_request.h"
 
+#include <iostream>
 #include <string>
 #include <vector>
-#include <iostream>
-
 
 #include "source/server/admin/prometheus_stats.h"
 
