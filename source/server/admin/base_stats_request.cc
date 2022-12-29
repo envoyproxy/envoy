@@ -13,11 +13,13 @@
 namespace Envoy {
 namespace Server {
 
-template <class TR, class C, class G, class H> StatsRequestBase<TR, C, G, H>::StatsRequestBase(
-    Stats::Store& stats, const StatsParams& params, UrlHandlerFn url_handler_fn)
+template <class TR, class C, class G, class H>
+StatsRequestBase<TR, C, G, H>::StatsRequestBase(Stats::Store& stats, const StatsParams& params,
+                                                UrlHandlerFn url_handler_fn)
     : params_(params), stats_(stats), url_handler_fn_(url_handler_fn) {}
 
-template <class TR, class C, class G, class H> Http::Code StatsRequestBase<TR, C, G, H>::start(Http::ResponseHeaderMap& response_headers) {
+template <class TR, class C, class G, class H>
+Http::Code StatsRequestBase<TR, C, G, H>::start(Http::ResponseHeaderMap& response_headers) {
   switch (params_.format_) {
   case StatsFormat::Json:
     render_ = std::make_unique<StatsJsonRender>(response_headers, response_, params_);
@@ -55,8 +57,8 @@ template <class TR, class C, class G, class H> Http::Code StatsRequestBase<TR, C
   return Http::Code::OK;
 }
 
-template <class TR, class C, class G, class H> bool StatsRequestBase<TR, C, G, H>::nextChunk(
-    Buffer::Instance& response) {
+template <class TR, class C, class G, class H>
+bool StatsRequestBase<TR, C, G, H>::nextChunk(Buffer::Instance& response) {
   if (response_.length() > 0) {
     ASSERT(response.length() == 0);
     response.move(response_);
@@ -107,7 +109,7 @@ template <class TR, class C, class G, class H> bool StatsRequestBase<TR, C, G, H
       stat_map_.erase(iter);
       break;
     case StatOrScopesIndex::Counter:
-      handleCounter(response,variant);
+      handleCounter(response, variant);
       stat_map_.erase(iter);
       break;
     case StatOrScopesIndex::Gauge:
@@ -168,13 +170,16 @@ void StatsRequestBase<TR, C, G, H>::populateStatsForCurrentPhase(const ScopeVec&
 // these will be overriden by concrete subclasses
 template <class TR, class C, class G, class H>
 template <class StatType>
-void StatsRequestBase<TR, C, G, H>::populateStatsFromScopes(const ScopeVec& ) {}
+void StatsRequestBase<TR, C, G, H>::populateStatsFromScopes(const ScopeVec&) {}
 
 template <class TR, class C, class G, class H>
 template <class SharedStatType>
-void StatsRequestBase<TR, C, G, H>::renderStat(const std::string& , Buffer::Instance& , const StatOrScopes&) {}
+void StatsRequestBase<TR, C, G, H>::renderStat(const std::string&, Buffer::Instance&,
+                                               const StatOrScopes&) {}
 
-template class StatsRequestBase<std::vector<Stats::TextReadoutSharedPtr>, std::vector<Stats::CounterSharedPtr>, std::vector<Stats::GaugeSharedPtr>, std::vector<Stats::HistogramSharedPtr>>;
+template class StatsRequestBase<
+    std::vector<Stats::TextReadoutSharedPtr>, std::vector<Stats::CounterSharedPtr>,
+    std::vector<Stats::GaugeSharedPtr>, std::vector<Stats::HistogramSharedPtr>>;
 
 } // namespace Server
 } // namespace Envoy

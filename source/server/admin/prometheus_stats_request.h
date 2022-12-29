@@ -4,10 +4,10 @@
 
 #include "envoy/server/admin.h"
 
+#include "source/server/admin/base_stats_request.h"
 #include "source/server/admin/stats_params.h"
 #include "source/server/admin/stats_render.h"
 #include "source/server/admin/utils.h"
-#include "source/server/admin/base_stats_request.h"
 
 #include "absl/container/btree_map.h"
 #include "absl/types/variant.h"
@@ -21,7 +21,6 @@ class PrometheusStatsRequest
           std::vector<Stats::GaugeSharedPtr>, std::vector<Stats::HistogramSharedPtr>> {
 
 public:
-
   PrometheusStatsRequest(Stats::Store& stats, const StatsParams& params,
                          Stats::CustomStatNamespaces& custom_namespaces,
                          UrlHandlerFn url_handler_fn = nullptr);

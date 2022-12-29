@@ -15,8 +15,7 @@
 namespace Envoy {
 namespace Server {
 
-template <class TR, class C, class G, class H>
-class StatsRequestBase : public Admin::Request {
+template <class TR, class C, class G, class H> class StatsRequestBase : public Admin::Request {
 protected:
   enum class StatOrScopesIndex { Scopes, TextReadout, Counter, Gauge, Histogram };
 
@@ -38,7 +37,6 @@ public:
   using ScopeVec = std::vector<Stats::ConstScopeSharedPtr>;
 
   using StatOrScopes = absl::variant<ScopeVec, TR, C, G, H>;
-
 
   using UrlHandlerFn = std::function<Admin::UrlHandler()>;
 

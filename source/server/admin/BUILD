@@ -133,12 +133,12 @@ envoy_cc_library(
 envoy_cc_library(
     name = "erica_test_lib",
     srcs = [
-        "erica_test.cc",
         "erica_concrete.cc",
+        "erica_test.cc",
     ],
     hdrs = [
-        "erica_test.h",
         "erica_concrete.h",
+        "erica_test.h",
     ],
     deps = [
         ":handler_ctx_lib",
@@ -154,18 +154,17 @@ envoy_cc_library(
     ],
 )
 
-
 envoy_cc_library(
     name = "stats_request_lib",
     srcs = [
-        "stats_request.cc",
         "base_stats_request.cc",
         "prometheus_stats_request.cc",
+        "stats_request.cc",
     ],
     hdrs = [
-        "stats_request.h",
         "base_stats_request.h",
         "prometheus_stats_request.h",
+        "stats_request.h",
     ],
     deps = [
         ":handler_ctx_lib",
