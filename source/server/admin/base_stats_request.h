@@ -2,6 +2,7 @@
 
 #include <variant>
 #include <vector>
+#include <iostream>
 
 #include "envoy/server/admin.h"
 
@@ -57,7 +58,10 @@ public:
 
   void populateStatsForCurrentPhase(const ScopeVec& scope_vec);
 
-  template <class StatType> void populateStatsFromScopes(const ScopeVec& scope_vec);
+  virtual Stats::IterateFn<Stats::TextReadout> checkStatForTextReadout() PURE;
+  virtual Stats::IterateFn<Stats::Gauge> checkStatForGauge() PURE;
+  virtual Stats::IterateFn<Stats::Counter> checkStatForCounter() PURE;
+  virtual Stats::IterateFn<Stats::Histogram> checkStatForHistogram() PURE;
 
   template <class SharedStatType>
   void renderStat(const std::string& name, Buffer::Instance& response, const StatOrScopes& variant);
