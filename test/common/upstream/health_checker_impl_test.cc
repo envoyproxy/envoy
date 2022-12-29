@@ -2491,7 +2491,7 @@ TEST_F(HttpHealthCheckerImplTest, Timeout) {
   health_checker_->start();
 
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
-  EXPECT_CALL(*test_sessions_[0]->client_connection_, close(_));
+  EXPECT_CALL(*test_sessions_[0]->client_connection_, close(Network::ConnectionCloseType::Abort));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
   EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));
@@ -2521,7 +2521,7 @@ TEST_F(HttpHealthCheckerImplTest, TimeoutThenSuccess) {
 
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::ChangePending));
   EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));
-  EXPECT_CALL(*test_sessions_[0]->client_connection_, close(_));
+  EXPECT_CALL(*test_sessions_[0]->client_connection_, close(Network::ConnectionCloseType::Abort));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
   test_sessions_[0]->timeout_timer_->invokeCallback();
@@ -2552,7 +2552,7 @@ TEST_F(HttpHealthCheckerImplTest, TimeoutThenRemoteClose) {
   health_checker_->start();
 
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::ChangePending));
-  EXPECT_CALL(*test_sessions_[0]->client_connection_, close(_));
+  EXPECT_CALL(*test_sessions_[0]->client_connection_, close(Network::ConnectionCloseType::Abort));
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
   test_sessions_[0]->timeout_timer_->invokeCallback();
@@ -2591,7 +2591,7 @@ TEST_F(HttpHealthCheckerImplTest, TimeoutAfterDisconnect) {
   EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _)).Times(2);
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
   for (auto& session : test_sessions_) {
-    session->client_connection_->close(Network::ConnectionCloseType::NoFlush);
+    session->client_connection_->close(Network::ConnectionCloseType::Abort);
   }
 
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed));
@@ -2618,7 +2618,7 @@ TEST_F(HttpHealthCheckerImplTest, DynamicAddAndRemove) {
 
   HostVector removed{cluster_->prioritySet().getMockHostSet(0)->hosts_.back()};
   cluster_->prioritySet().getMockHostSet(0)->hosts_.clear();
-  EXPECT_CALL(*test_sessions_[0]->client_connection_, close(_));
+  EXPECT_CALL(*test_sessions_[0]->client_connection_, close(Network::ConnectionCloseType::Abort));
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
   cluster_->prioritySet().getMockHostSet(0)->runCallbacks({}, removed);
 }
@@ -2647,7 +2647,7 @@ TEST_F(HttpHealthCheckerImplTest, DynamicRemoveDisableHC) {
       envoy::config::core::v3::Locality(), health_check_config, 0, envoy::config::core::v3::UNKNOWN,
       simTime());
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {disable_host};
-  EXPECT_CALL(*test_sessions_[0]->client_connection_, close(_));
+  EXPECT_CALL(*test_sessions_[0]->client_connection_, close(Network::ConnectionCloseType::Abort));
   cluster_->prioritySet().runUpdateCallbacks(0, {disable_host}, {enable_host});
 }
 
@@ -4335,7 +4335,7 @@ TEST_F(TcpHealthCheckerImplTest, DataWithoutReusingConnection) {
   // Expected execution flow when a healthcheck is successful and reuse_connection is false.
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
-  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::Abort));
 
   Buffer::OwnedImpl response;
   addUint8(response, 2);
@@ -4396,7 +4396,7 @@ TEST_F(TcpHealthCheckerImplTest, TimeoutThenRemoteClose) {
   addUint8(response, 1);
   read_filter_->onData(response, false);
 
-  EXPECT_CALL(*connection_, close(_));
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::Abort));
   EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
@@ -4429,7 +4429,7 @@ TEST_F(TcpHealthCheckerImplTest, TimeoutThenRemoteClose) {
 
   HostVector removed{cluster_->prioritySet().getMockHostSet(0)->hosts_.back()};
   cluster_->prioritySet().getMockHostSet(0)->hosts_.clear();
-  EXPECT_CALL(*connection_, close(_));
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::Abort));
   cluster_->prioritySet().getMockHostSet(0)->runCallbacks({}, removed);
 }
 
@@ -4455,7 +4455,7 @@ TEST_F(TcpHealthCheckerImplTest, Timeout) {
   addUint8(response, 1);
   read_filter_->onData(response, false);
 
-  EXPECT_CALL(*connection_, close(_));
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::Abort));
   EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _));
   EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));
   EXPECT_CALL(*timeout_timer_, disableTimer());
@@ -4489,7 +4489,7 @@ TEST_F(TcpHealthCheckerImplTest, DoubleTimeout) {
   addUint8(response, 1);
   read_filter_->onData(response, false);
 
-  EXPECT_CALL(*connection_, close(_));
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::Abort));
   EXPECT_CALL(event_logger_, logUnhealthy(_, _, _, true));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
@@ -4506,7 +4506,7 @@ TEST_F(TcpHealthCheckerImplTest, DoubleTimeout) {
 
   connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
-  EXPECT_CALL(*connection_, close(_));
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::Abort));
   EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
@@ -4525,7 +4525,7 @@ TEST_F(TcpHealthCheckerImplTest, DoubleTimeout) {
 
   HostVector removed{cluster_->prioritySet().getMockHostSet(0)->hosts_.back()};
   cluster_->prioritySet().getMockHostSet(0)->hosts_.clear();
-  EXPECT_CALL(*connection_, close(_));
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::Abort));
   cluster_->prioritySet().getMockHostSet(0)->runCallbacks({}, removed);
 }
 
@@ -4547,7 +4547,7 @@ TEST_F(TcpHealthCheckerImplTest, TimeoutWithoutReusingConnection) {
   // Expected flow when a healthcheck is successful and reuse_connection is false.
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
-  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::Abort));
 
   Buffer::OwnedImpl response;
   addUint8(response, 2);
@@ -4613,7 +4613,7 @@ TEST_F(TcpHealthCheckerImplTest, NoData) {
   EXPECT_CALL(*timeout_timer_, enableTimer(_, _));
   health_checker_->start();
 
-  EXPECT_CALL(*connection_, close(_));
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::Abort));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   connection_->raiseEvent(Network::ConnectionEvent::Connected);
@@ -4651,7 +4651,7 @@ TEST_F(TcpHealthCheckerImplTest, PassiveFailure) {
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
 
   // A single success should not bring us back to healthy.
-  EXPECT_CALL(*connection_, close(_));
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::Abort));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
   connection_->raiseEvent(Network::ConnectionEvent::Connected);
@@ -4667,7 +4667,7 @@ TEST_F(TcpHealthCheckerImplTest, PassiveFailure) {
   EXPECT_CALL(*timeout_timer_, enableTimer(_, _));
   interval_timer_->invokeCallback();
 
-  EXPECT_CALL(*connection_, close(_));
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::Abort));
   EXPECT_CALL(event_logger_, logAddHealthy(_, _, false));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
@@ -4704,7 +4704,7 @@ TEST_F(TcpHealthCheckerImplTest, PassiveFailureCrossThreadRemoveHostRace) {
       HealthCheckHostMonitor::UnhealthyType::ImmediateHealthCheckFail);
 
   // Remove before the cross thread event comes in.
-  EXPECT_CALL(*connection_, close(_));
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::Abort));
   HostVector old_hosts = std::move(cluster_->prioritySet().getMockHostSet(0)->hosts_);
   cluster_->prioritySet().getMockHostSet(0)->runCallbacks({}, old_hosts);
   post_cb();
@@ -4734,7 +4734,7 @@ TEST_F(TcpHealthCheckerImplTest, PassiveFailureCrossThreadRemoveClusterRace) {
       HealthCheckHostMonitor::UnhealthyType::ImmediateHealthCheckFail);
 
   // Remove before the cross thread event comes in.
-  EXPECT_CALL(*connection_, close(_));
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::Abort));
   health_checker_.reset();
   post_cb();
 
@@ -5717,7 +5717,7 @@ TEST_F(GrpcHealthCheckerImplTest, DynamicAddAndRemove) {
 
   HostVector removed{cluster_->prioritySet().getMockHostSet(0)->hosts_.back()};
   cluster_->prioritySet().getMockHostSet(0)->hosts_.clear();
-  EXPECT_CALL(*test_sessions_[0]->client_connection_, close(_));
+  EXPECT_CALL(*test_sessions_[0]->client_connection_, close(Network::ConnectionCloseType::Abort));
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
   cluster_->prioritySet().getMockHostSet(0)->runCallbacks({}, removed);
 }

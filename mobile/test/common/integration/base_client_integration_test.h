@@ -28,6 +28,7 @@ typedef struct {
 Http::ResponseHeaderMapPtr toResponseHeaders(envoy_headers headers);
 
 // Creates a default bootstrap config from the EngineBuilder.
+// Only used to build the Engine if `override_builder_config_` is set to true.
 std::string defaultConfig();
 
 // A base class for Envoy Mobile client integration tests which interact with Envoy through the
@@ -59,6 +60,13 @@ protected:
   // Converts TestRequestHeaderMapImpl to Envoy::Platform::RequestHeadersSharedPtr
   Envoy::Platform::RequestHeadersSharedPtr
   envoyToMobileHeaders(const Http::TestRequestHeaderMapImpl& request_headers);
+
+  // Get the value of a Counter in the Envoy instance.
+  uint64_t getCounterValue(const std::string& counter);
+  // Wait until the Counter specified by `name` is >= `value`.
+  ABSL_MUST_USE_RESULT testing::AssertionResult waitForCounterGe(const std::string& name,
+                                                                 uint64_t value);
+
   Event::ProvisionalDispatcherPtr dispatcher_ = std::make_unique<Event::ProvisionalDispatcher>();
   envoy_http_callbacks bridge_callbacks_;
   ConditionalInitializer terminal_callback_;

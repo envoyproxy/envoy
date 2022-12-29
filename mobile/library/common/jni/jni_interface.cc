@@ -168,6 +168,13 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_brotliConfigInsert(JNIEnv* env,
 }
 
 extern "C" JNIEXPORT jstring JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_persistentDNSCacheConfigInsert(JNIEnv* env,
+                                                                                jclass) {
+  jstring result = env->NewStringUTF(persistent_dns_cache_config_insert);
+  return result;
+}
+
+extern "C" JNIEXPORT jstring JNICALL
 Java_io_envoyproxy_envoymobile_engine_JniLibrary_socketTagConfigInsert(JNIEnv* env, jclass) {
   jstring result = env->NewStringUTF(socket_tag_config_insert);
   return result;
@@ -190,50 +197,6 @@ extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
     jlong engine, jstring elements, jobjectArray tags, jint count) {
   const char* native_elements = env->GetStringUTFChars(elements, nullptr);
   jint result = record_counter_inc(engine, native_elements, to_native_tags(env, tags), count);
-  env->ReleaseStringUTFChars(elements, native_elements);
-  return result;
-}
-
-extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_recordGaugeSet(
-    JNIEnv* env,
-    jclass, // class
-    jlong engine, jstring elements, jobjectArray tags, jint value) {
-  const char* native_elements = env->GetStringUTFChars(elements, nullptr);
-  jint result = record_gauge_set(engine, native_elements, to_native_tags(env, tags), value);
-  env->ReleaseStringUTFChars(elements, native_elements);
-  return result;
-}
-
-extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_recordGaugeAdd(
-    JNIEnv* env,
-    jclass, // class
-    jlong engine, jstring elements, jobjectArray tags, jint amount) {
-  const char* native_elements = env->GetStringUTFChars(elements, nullptr);
-  jint result = record_gauge_add(engine, native_elements, to_native_tags(env, tags), amount);
-  env->ReleaseStringUTFChars(elements, native_elements);
-  return result;
-}
-
-extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_recordGaugeSub(
-    JNIEnv* env,
-    jclass, // class
-    jlong engine, jstring elements, jobjectArray tags, jint amount) {
-  const char* native_elements = env->GetStringUTFChars(elements, nullptr);
-  jint result = record_gauge_sub(engine, native_elements, to_native_tags(env, tags), amount);
-  env->ReleaseStringUTFChars(elements, native_elements);
-  return result;
-}
-
-extern "C" JNIEXPORT jint JNICALL
-Java_io_envoyproxy_envoymobile_engine_JniLibrary_recordHistogramDuration(JNIEnv* env,
-                                                                         jclass, // class
-                                                                         jlong engine,
-                                                                         jstring elements,
-                                                                         jobjectArray tags,
-                                                                         jint durationMs) {
-  const char* native_elements = env->GetStringUTFChars(elements, nullptr);
-  jint result = record_histogram_value(engine, native_elements, to_native_tags(env, tags),
-                                       durationMs, MILLISECONDS);
   env->ReleaseStringUTFChars(elements, native_elements);
   return result;
 }
@@ -261,20 +224,6 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_dumpStats(JNIEnv* env,
   release_envoy_data(data);
 
   return str;
-}
-
-extern "C" JNIEXPORT jint JNICALL
-Java_io_envoyproxy_envoymobile_engine_JniLibrary_recordHistogramValue(JNIEnv* env,
-                                                                      jclass, // class
-                                                                      jlong engine,
-                                                                      jstring elements,
-                                                                      jobjectArray tags,
-                                                                      jint value) {
-  const char* native_elements = env->GetStringUTFChars(elements, nullptr);
-  jint result = record_histogram_value(engine, native_elements, to_native_tags(env, tags), value,
-                                       UNSPECIFIED);
-  env->ReleaseStringUTFChars(elements, native_elements);
-  return result;
 }
 
 // JvmCallbackContext

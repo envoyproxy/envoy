@@ -152,9 +152,8 @@ public:
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return proxy_status_config_.get();
   }
-  HeaderValidatorPtr makeHeaderValidator(Protocol protocol,
-                                         StreamInfo::StreamInfo& stream_info) override {
-    return header_validator_factory_.create(protocol, stream_info, header_validator_stats_);
+  HeaderValidatorPtr makeHeaderValidator(Protocol protocol) override {
+    return header_validator_factory_.create(protocol, header_validator_stats_);
   }
   bool appendXForwardedPort() const override { return false; }
 
