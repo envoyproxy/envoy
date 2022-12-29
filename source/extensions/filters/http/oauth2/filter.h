@@ -258,6 +258,8 @@ public:
 
   void finishGetAccessTokenFlow();
   void finishUpdateAccessTokenFlow();
+  void updateTokens(const std::string& access_token, const std::string& id_token,
+                    const std::string& refresh_token, std::chrono::seconds expires_in);
 
 private:
   friend class OAuth2Test;
@@ -285,9 +287,6 @@ private:
   void redirectToOAuthServer(Http::RequestHeaderMap& headers) const;
 
   Http::FilterHeadersStatus signOutUser(const Http::RequestHeaderMap& headers);
-
-  void updateTokens(const std::string& access_code, const std::string& id_token,
-                    const std::string& refresh_token, std::chrono::seconds expires_in);
 
   std::string getEncodedToken() const;
   Http::ResponseHeaderMapPtr fillResponseHeader(const std::string& encoded_token) const;

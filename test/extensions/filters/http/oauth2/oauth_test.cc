@@ -260,6 +260,32 @@ TEST_F(OAuth2ClientTest, RequestUpdateAccessTokenErrorResponse) {
       [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
 }
 
+TEST_F(OAuth2ClientTest, DoubleCallUpdateTokenFailStateInvalid) {
+  Http::ResponseHeaderMapPtr mock_response_headers{new Http::TestResponseHeaderMapImpl{
+      {Http::Headers::get().Status.get(), "500"},
+      {Http::Headers::get().ContentType.get(), "application/json"},
+  }};
+  Http::ResponseMessagePtr mock_response(
+      new Http::ResponseMessageImpl(std::move(mock_response_headers)));
+
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillRepeatedly(
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            callbacks_.push_back(&cb);
+            return &request_;
+          }));
+
+  client_->setCallbacks(*mock_callbacks_);
+  client_->asyncUpdateAccessToken("a", "b", "c");
+  EXPECT_EQ(1, callbacks_.size());
+  EXPECT_CALL(*mock_callbacks_, onUpdateAccessTokenFailure());
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
+  ASSERT_TRUE(popPendingCallback([&](auto* callback) {
+    callback->onSuccess(request, std::move(mock_response));
+    EXPECT_THROW(callback->onSuccess(request, std::move(mock_response)), EnvoyException);
+  }));
+}
 TEST_F(OAuth2ClientTest, NetworkError) {
   EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillRepeatedly(
@@ -297,6 +323,28 @@ TEST_F(OAuth2ClientTest, UpdateTokenNetworkError) {
   Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   ASSERT_TRUE(popPendingCallback([&](auto* callback) {
     callback->onFailure(request, Http::AsyncClient::FailureReason::Reset);
+  }));
+}
+
+TEST_F(OAuth2ClientTest, NetworkErrorDoubleCallStateInvalid) {
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillRepeatedly(
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            callbacks_.push_back(&cb);
+            return &request_;
+          }));
+
+  client_->setCallbacks(*mock_callbacks_);
+  client_->asyncUpdateAccessToken("a", "b", "c");
+  EXPECT_EQ(1, callbacks_.size());
+
+  EXPECT_CALL(*mock_callbacks_, onUpdateAccessTokenFailure());
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
+  ASSERT_TRUE(popPendingCallback([&](auto* callback) {
+    callback->onFailure(request, Http::AsyncClient::FailureReason::Reset);
+    EXPECT_THROW(callback->onFailure(request, Http::AsyncClient::FailureReason::Reset),
+                 EnvoyException);
   }));
 }
 

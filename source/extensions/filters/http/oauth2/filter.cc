@@ -230,10 +230,6 @@ OAuth2Filter::OAuth2Filter(FilterConfigSharedPtr config,
   oauth_client_->setCallbacks(*this);
 }
 
-const std::string& OAuth2Filter::bearerPrefix() const {
-  CONSTRUCT_ON_FIRST_USE(std::string, "bearer ");
-}
-
 /**
  * primary cases:
  * 1) pass through header is matching
@@ -461,9 +457,9 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
   return Http::FilterHeadersStatus::StopIteration;
 }
 
-void OAuth2Filter::updateTokens(const std::string& access_code, const std::string& id_token,
+void OAuth2Filter::updateTokens(const std::string& access_token, const std::string& id_token,
                                 const std::string& refresh_token, std::chrono::seconds expires_in) {
-  access_token_ = access_code;
+  access_token_ = access_token;
   id_token_ = id_token;
   refresh_token_ = refresh_token;
 
