@@ -7,61 +7,60 @@ gRPC Service to Service
 
    .. include:: _include/docker-env-setup-link.rst
 
-This example demonstrates Envoy's support for routing `gRPC requests <https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/route/v3/route_components.proto#config-route-v3-routematch>`__.
+This example demonstrates Envoy's support for routing
+`gRPC traffic <https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/route/v3/route_components.proto#config-route-v3-routematch>`__ and integrating
+`gRPC health checks <https://github.com/grpc/grpc/blob/master/doc/health-checking.md>`__
+with Envoy's active health checking for upstream clusters using
+`GrpcHealthCheck <https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/core/v3/health_check.proto#envoy-v3-api-msg-config-core-v3-healthcheck-grpchealthcheck>`__.
 
-The sandbox consists of two gRPC services, `Hello` and `World`. Each service implements a Unary-Unary
-gRPC method, ``Greet()``. We run 2 instances of each service.
+The sandbox consists of two gRPC services, ``Hello`` and ``World``. Each service implements a Unary-Unary
+gRPC method, ``Greet()`` as described in :download:`hello.proto <_include/grpc-s2s/protos/hello.proto>`
+and :download:`world.proto <_include/grpc-s2s/protos/world.proto>`.
+
+We run 2 instances of each service using docker-compose's support for running a service
+in `replicated mode <https://docs.docker.com/compose/compose-file/deploy/#replicas>`__.
 
 Two separate Envoy instances, `envoy-hello` and `envoy-world` are configured as a proxy for both services.
-
-Using a gRPC client, `grpccurl`, we will make a request to the `Hello` service's `Greet()` method via
-the `envoy-hello` instance.
-
-.. literalinclude:: _include/grpc-s2s/hello/envoy-proxy.yaml
-   :language: yaml
-   :lines: 16-34
-   :linenos:
-   :emphasize-lines: 6-11
-   :caption: Envoy configuration with static route mirror policy :download:`front-envoy.yaml <_include/route-mirror/front-envoy.yaml>`
-
-The `Hello` service's `Greet()` method invokes the `Greet()` method of the `World` service
-via the `envoy-world` envoy proxy instance.
-
-.. literalinclude:: _include/grpc-s2s/world/envoy-proxy.yaml
-   :language: yaml
-   :lines: 16-34
-   :linenos:
-   :emphasize-lines: 6-11
-   :caption: Envoy configuration with static route mirror policy :download:`front-envoy.yaml <_include/route-mirror/front-envoy.yaml>`
 
 The request flow looks as follows for this sandbox:
 
 ``[client](gRPC) -> [envoy-hello] -> [hello](2 instances) -> [envoy-world] -> [world](2 instances)``
 
-Another feature demonstrated in this example is integrating
-`gRPC health checks <https://github.com/grpc/grpc/blob/master/doc/health-checking.md>`__
-with Envoy's active health checking for upstream clusters using
-`GrpcHealthCheck <https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/core/v3/health_check.proto#envoy-v3-api-msg-config-core-v3-healthcheck-grpchealthcheck>`__.
+Using a gRPC client, `grpccurl`, we will make a request to the `Hello` service's `Greet()` method via
+the `envoy-hello` instance.
+
+We define a route to match any gRPC request and forward it to the ``hello`` cluster:
 
 .. literalinclude:: _include/grpc-s2s/hello/envoy-proxy.yaml
    :language: yaml
-   :lines: 16-34
+   :lines: 9-25
    :linenos:
-   :emphasize-lines: 6-11
-   :caption: Envoy configuration with static route mirror policy :download:`front-envoy.yaml <_include/route-mirror/front-envoy.yaml>`
+   :emphasize-lines: 12-16
+   :caption: Forward all gRPC requests to the ``hello`` cluster:download:`envoy-proxy.yaml <_include/grpc-s2s/hello/envoy-proxy.yaml>`
 
-The Envoy proxy for the World service has healthchecks configured similarly:
+The cluster definition for ``hello`` must specify the ``http2_protocol_options`` to
+be able to accept gRPC traffic:
 
-.. literalinclude:: _include/grpc-s2s/world/envoy-proxy.yaml
+.. literalinclude:: _include/grpc-s2s/hello/envoy-proxy.yaml
    :language: yaml
-   :lines: 16-34
+   :lines: 30-38
    :linenos:
-   :emphasize-lines: 6-11
-   :caption: Envoy configuration with static route mirror policy :download:`front-envoy.yaml <_include/route-mirror/front-envoy.yaml>`
+   :emphasize-lines: 1-3
+   :caption: Accept gRPC traffic in the ``hello`` cluster :download:`envoy-proxy.yaml <_include/grpc-s2s/hello/envoy-proxy.yaml>`
+
+.. literalinclude:: _include/grpc-s2s/hello/envoy-proxy.yaml
+   :language: yaml
+   :lines: 30-38
+   :linenos:
+   :emphasize-lines: 1-6
+   :caption: Forward all gRPC requests to the ``hello`` cluster:download:`envoy-proxy.yaml <_include/grpc-s2s/hello/envoy-proxy.yaml>`
+
 
 .. note::
 
    Mention the stuff about specifying the configuration specifically for the sandbox
+   also mention `panic threshold <https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/load_balancing/panic_threshold#arch-overview-load-balancing-panic-threshold>`__ 
+   and it's impact on the traffic being forwarded
 
 
 Step 1: Build the sandbox
