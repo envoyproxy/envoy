@@ -116,6 +116,10 @@ envoy_cc_library(
     hdrs = [
         "header_validator_factory.h",
     ],
+    visibility = [
+        "//test/common/http/http2:__subpackages__",
+        "//test/extensions/http/header_validators/envoy_default:__subpackages__",
+    ],
     deps = [
         ":http1_header_validator",
         ":http2_header_validator",

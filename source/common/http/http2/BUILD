@@ -41,6 +41,7 @@ envoy_cc_library(
         "//envoy/http:codec_interface",
         "//envoy/http:codes_interface",
         "//envoy/http:header_map_interface",
+        "//envoy/http:header_validator_interface",
         "//envoy/network:connection_interface",
         "//envoy/stats:stats_interface",
         "//source/common/buffer:buffer_lib",

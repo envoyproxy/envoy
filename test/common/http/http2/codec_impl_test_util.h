@@ -97,11 +97,12 @@ public:
                            const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                            Random::RandomGenerator& random, uint32_t max_request_headers_kb,
                            uint32_t max_request_headers_count,
-                           Http2SessionFactory& http2_session_factory)
+                           Http2SessionFactory& http2_session_factory,
+                           Envoy::Http::HeaderValidatorFactorySharedPtr header_validator_factory)
       : TestCodecStatsProvider(scope),
         ClientConnectionImpl(connection, callbacks, http2CodecStats(), random, http2_options,
                              max_request_headers_kb, max_request_headers_count,
-                             http2_session_factory) {}
+                             http2_session_factory, header_validator_factory) {}
 
   http2::adapter::Http2Adapter* adapter() { return adapter_.get(); }
   // Submits an H/2 METADATA frame to the peer.

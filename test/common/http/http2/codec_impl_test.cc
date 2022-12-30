@@ -11,6 +11,7 @@
 #include "source/common/http/exception.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/http2/codec_impl.h"
+#include "source/extensions/http/header_validators/envoy_default/header_validator_factory.h"
 #include "source/extensions/http/header_validators/envoy_default/http2_header_validator.h"
 
 #include "test/common/http/common.h"
@@ -177,9 +178,11 @@ public:
 
     http2OptionsFromTuple(client_http2_options_, client_settings_);
     http2OptionsFromTuple(server_http2_options_, server_settings_);
+    Envoy::Http::HeaderValidatorFactorySharedPtr header_validator_factory;
     client_ = std::make_unique<TestClientConnectionImpl>(
         client_connection_, client_callbacks_, client_stats_store_, client_http2_options_, random_,
-        max_request_headers_kb_, max_response_headers_count_, ProdNghttp2SessionFactory::get());
+        max_request_headers_kb_, max_response_headers_count_, ProdNghttp2SessionFactory::get(),
+        makeHeaderValidatorFactory());
     client_wrapper_ = std::make_unique<ConnectionWrapper>(client_.get());
     server_ = std::make_unique<TestServerConnectionImpl>(
         server_connection_, server_callbacks_, server_stats_store_, server_http2_options_, random_,
@@ -344,6 +347,18 @@ public:
     header_validator_ =
         std::make_unique<Extensions::Http::HeaderValidators::EnvoyDefault::Http2HeaderValidator>(
             header_validator_config_, Protocol::Http2, server_->http2CodecStats());
+  }
+
+  Envoy::Http::HeaderValidatorFactorySharedPtr makeHeaderValidatorFactory() {
+#ifdef ENVOY_ENABLE_UHV
+    envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
+        header_validator_config;
+    return std::make_shared<
+        Extensions::Http::HeaderValidators::EnvoyDefault::HeaderValidatorFactory>(
+        header_validator_config);
+#else
+    return nullptr;
+#endif
   }
 
   TestScopedRuntime scoped_runtime_;
@@ -2409,7 +2424,8 @@ TEST_P(Http2CodecImplStreamLimitTest, MaxClientStreams) {
   http2OptionsFromTuple(server_http2_options_, ::testing::get<1>(GetParam()));
   client_ = std::make_unique<TestClientConnectionImpl>(
       client_connection_, client_callbacks_, client_stats_store_, client_http2_options_, random_,
-      max_request_headers_kb_, max_response_headers_count_, ProdNghttp2SessionFactory::get());
+      max_request_headers_kb_, max_response_headers_count_, ProdNghttp2SessionFactory::get(),
+      nullptr);
   client_wrapper_ = std::make_unique<ConnectionWrapper>(client_.get());
   server_ = std::make_unique<TestServerConnectionImpl>(
       server_connection_, server_callbacks_, server_stats_store_, server_http2_options_, random_,
@@ -4415,6 +4431,38 @@ TEST_P(Http2CodecImplTest, CheckHeaderValueValidation) {
   }
 }
 
+TEST_P(Http2CodecImplTest, BadResponseHeader) {
+  // Since the client coded will trigger a protocol error, its buffer
+  // will not be fully drained
+  expect_buffered_data_on_teardown_ = true;
+  initialize();
+
+  InSequence s;
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  request_headers.setMethod("POST");
+
+  // Encode request headers.
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
+  driveToCompletion();
+
+  // { is illegal in header name
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"foo{bar", "baz"}};
+
+  // Encode response headers. The decodeHeaders on the client side will not be called
+  // due to protocol error
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, _)).Times(0);
+  response_encoder_->encodeHeaders(response_headers, true);
+
+  driveToCompletion();
+
+  EXPECT_FALSE(client_wrapper_->status_.ok());
+  EXPECT_TRUE(isCodecProtocolError(client_wrapper_->status_));
+  EXPECT_EQ(1, client_stats_store_.counter("http2.rx_messaging_error").value());
+  EXPECT_TRUE(server_wrapper_->status_.ok());
+}
+
 class TestNghttp2SessionFactory;
 
 // Test client for H/2 METADATA frame edge cases.
@@ -4427,7 +4475,7 @@ public:
       uint32_t max_request_headers_count, Http2SessionFactory& http2_session_factory)
       : TestClientConnectionImpl(connection, callbacks, scope, http2_options, random,
                                  max_request_headers_kb, max_request_headers_count,
-                                 http2_session_factory) {}
+                                 http2_session_factory, nullptr) {}
 
   // Overrides TestClientConnectionImpl::submitMetadata().
   bool submitMetadata(const MetadataMapVector& metadata_map_vector, int32_t stream_id) override {

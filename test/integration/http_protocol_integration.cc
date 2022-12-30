@@ -94,24 +94,23 @@ std::string HttpProtocolIntegrationTest::protocolTestParamsToString(
 }
 
 void HttpProtocolIntegrationTest::setUpstreamOverrideStreamErrorOnInvalidHttpMessage() {
-  config_helper_.addConfigModifier(
-      [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-        RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
-        ConfigHelper::HttpProtocolOptions protocol_options;
-        if (upstreamProtocol() == Http::CodecType::HTTP2) {
-          protocol_options.mutable_explicit_http_config()
-              ->mutable_http2_protocol_options()
-              ->mutable_override_stream_error_on_invalid_http_message()
-              ->set_value(true);
-        } else {
-          protocol_options.mutable_explicit_http_config()
-              ->mutable_http3_protocol_options()
-              ->mutable_override_stream_error_on_invalid_http_message()
-              ->set_value(true);
-        }
-        ConfigHelper::setProtocolOptions(
-            *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
-      });
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    if (upstreamProtocol() == Http::CodecType::HTTP2) {
+      protocol_options.mutable_explicit_http_config()
+          ->mutable_http2_protocol_options()
+          ->mutable_override_stream_error_on_invalid_http_message()
+          ->set_value(true);
+    } else {
+      protocol_options.mutable_explicit_http_config()
+          ->mutable_http3_protocol_options()
+          ->mutable_override_stream_error_on_invalid_http_message()
+          ->set_value(true);
+    }
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
+  });
 }
 
 void HttpProtocolIntegrationTest::setDownstreamOverrideStreamErrorOnInvalidHttpMessage() {

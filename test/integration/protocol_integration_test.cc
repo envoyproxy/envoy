@@ -4079,7 +4079,8 @@ TEST_P(ProtocolIntegrationTest, InvalidResponseHeaderName) {
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("502", response->headers().getStatusValue());
   test_server_->waitForCounterGe("http.config_test.downstream_rq_5xx", 1);
-  EXPECT_EQ(waitForAccessLog(access_log_name_), "upstream_reset_before_response_started{protocol_error}");
+  EXPECT_EQ(waitForAccessLog(access_log_name_),
+            "upstream_reset_before_response_started{protocol_error}");
 }
 
 TEST_P(ProtocolIntegrationTest, InvalidResponseHeaderNameStreamError) {
@@ -4105,7 +4106,8 @@ TEST_P(ProtocolIntegrationTest, InvalidResponseHeaderNameStreamError) {
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("502", response->headers().getStatusValue());
   test_server_->waitForCounterGe("http.config_test.downstream_rq_5xx", 1);
-  EXPECT_EQ(waitForAccessLog(access_log_name_), "upstream_reset_before_response_started{protocol_error}");
+  EXPECT_EQ(waitForAccessLog(access_log_name_),
+            "upstream_reset_before_response_started{protocol_error}");
   // Upstream connection should stay up
   ASSERT_TRUE(fake_upstream_connection_->connected());
 }

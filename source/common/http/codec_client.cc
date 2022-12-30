@@ -215,7 +215,8 @@ NoConnectCodecClientProd::NoConnectCodecClientProd(
     codec_ = std::make_unique<Http2::ClientConnectionImpl>(
         *connection_, *this, host->cluster().http2CodecStats(), random_generator,
         host->cluster().http2Options(), Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
-        host->cluster().maxResponseHeadersCount(), Http2::ProdNghttp2SessionFactory::get());
+        host->cluster().maxResponseHeadersCount(), Http2::ProdNghttp2SessionFactory::get(),
+        host->cluster().headerValidatorFactory());
     break;
   }
   case CodecType::HTTP3: {

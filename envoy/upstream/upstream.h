@@ -1186,7 +1186,10 @@ public:
    */
   virtual Http::Http3::CodecStats& http3CodecStats() const PURE;
 
-  virtual Http::HeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol) const PURE;
+  /**
+   * @return the header validator factory. Returns nullptr if ENVOY_ENABLE_UHV is undefined.
+   */
+  virtual Http::HeaderValidatorFactorySharedPtr headerValidatorFactory() const PURE;
 
 protected:
   /**

@@ -62,7 +62,6 @@ public:
     client_ = std::make_unique<CodecClientForTest>(CodecType::HTTP1, std::move(connection), codec_,
                                                    nullptr, host_, dispatcher_);
     ON_CALL(*connection_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
-    ON_CALL(*codec_, protocol()).WillByDefault(Return(Http::Protocol::Http11));
   }
 
   ~CodecClientTest() override { EXPECT_EQ(0U, client_->numActiveRequests()); }

@@ -1635,25 +1635,8 @@ Http::Http3::CodecStats& ClusterInfoImpl::http3CodecStats() const {
   return Http::Http3::CodecStats::atomicGet(http3_codec_stats_, *stats_scope_);
 }
 
-::Envoy::Http::HeaderValidatorStats&
-ClusterInfoImpl::getHeaderValidatorStats([[maybe_unused]] Http::Protocol protocol) const {
-  switch (protocol) {
-  case Http::Protocol::Http10:
-  case Http::Protocol::Http11:
-    return http1CodecStats();
-  case Http::Protocol::Http2:
-    return http2CodecStats();
-  case Http::Protocol::Http3:
-    return http2CodecStats();
-  }
-  PANIC_DUE_TO_CORRUPT_ENUM;
-}
-
-Http::HeaderValidatorPtr ClusterInfoImpl::makeHeaderValidator(Http::Protocol protocol) const {
-  return http_protocol_options_->header_validator_factory_
-             ? http_protocol_options_->header_validator_factory_->create(
-                   protocol, getHeaderValidatorStats(protocol))
-             : nullptr;
+Http::HeaderValidatorFactorySharedPtr ClusterInfoImpl::headerValidatorFactory() const {
+  return http_protocol_options_->header_validator_factory_;
 }
 
 std::pair<absl::optional<double>, absl::optional<uint32_t>> ClusterInfoImpl::getRetryBudgetParams(

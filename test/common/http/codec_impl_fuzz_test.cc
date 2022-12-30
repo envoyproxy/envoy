@@ -587,7 +587,7 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
     client = std::make_unique<Http2::ClientConnectionImpl>(
         client_connection, client_callbacks, Http2::CodecStats::atomicGet(http2_stats, stats_store),
         random, client_http2_options, max_request_headers_kb, max_response_headers_count,
-        Http2::ProdNghttp2SessionFactory::get());
+        Http2::ProdNghttp2SessionFactory::get(), nullptr);
   } else {
     client = std::make_unique<Http1::ClientConnectionImpl>(
         client_connection, Http1::CodecStats::atomicGet(http1_stats, stats_store), client_callbacks,

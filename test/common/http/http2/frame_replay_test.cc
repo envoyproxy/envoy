@@ -93,7 +93,7 @@ TEST_F(ResponseFrameCommentTest, SimpleExampleHuffman) {
   TestClientConnectionImpl connection(
       codec.client_connection_, codec.client_callbacks_, codec.stats_store_, codec.options_,
       codec.random_, Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
-      ProdNghttp2SessionFactory::get());
+      ProdNghttp2SessionFactory::get(), nullptr);
   setupStream(codec, connection);
 
   EXPECT_TRUE(codec.write(WellKnownFrames::defaultSettingsFrame(), connection).ok());
@@ -173,7 +173,7 @@ TEST_F(ResponseFrameCommentTest, SimpleExamplePlain) {
   TestClientConnectionImpl connection(
       codec.client_connection_, codec.client_callbacks_, codec.stats_store_, codec.options_,
       codec.random_, Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
-      ProdNghttp2SessionFactory::get());
+      ProdNghttp2SessionFactory::get(), nullptr);
   setupStream(codec, connection);
 
   EXPECT_TRUE(codec.write(WellKnownFrames::defaultSettingsFrame(), connection).ok());
@@ -236,7 +236,7 @@ TEST_F(ResponseFrameCommentTest, SingleByteNulCrLfInHeaderFrame) {
       TestClientConnectionImpl connection(
           codec.client_connection_, codec.client_callbacks_, codec.stats_store_, codec.options_,
           codec.random_, Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
-          ProdNghttp2SessionFactory::get());
+          ProdNghttp2SessionFactory::get(), nullptr);
       setupStream(codec, connection);
 
       EXPECT_TRUE(codec.write(WellKnownFrames::defaultSettingsFrame(), connection).ok());
@@ -309,7 +309,7 @@ TEST_F(ResponseFrameCommentTest, SingleByteNulCrLfInHeaderField) {
       TestClientConnectionImpl connection(
           codec.client_connection_, codec.client_callbacks_, codec.stats_store_, codec.options_,
           codec.random_, Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
-          ProdNghttp2SessionFactory::get());
+          ProdNghttp2SessionFactory::get(), nullptr);
       setupStream(codec, connection);
 
       EXPECT_TRUE(codec.write(WellKnownFrames::defaultSettingsFrame(), connection).ok());
