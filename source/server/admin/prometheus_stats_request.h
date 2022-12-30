@@ -25,27 +25,23 @@ public:
                          Stats::CustomStatNamespaces& custom_namespaces,
                          UrlHandlerFn url_handler_fn = nullptr);
 
-  template <class SharedStatType>
-  void renderStat(const std::string& name, Buffer::Instance& response, const StatOrScopes& variant);
-
   Stats::IterateFn<Stats::TextReadout> checkStatForTextReadout() override;
   Stats::IterateFn<Stats::Gauge> checkStatForGauge() override;
   Stats::IterateFn<Stats::Counter> checkStatForCounter() override;
   Stats::IterateFn<Stats::Histogram> checkStatForHistogram() override;
   template <class StatType> Stats::IterateFn<StatType> checkStat();
 
-
-  void handleTextReadout(Buffer::Instance& response, const StatOrScopes& variant) override;
-
-  void handleGauge(Buffer::Instance& response, const StatOrScopes& variant) override;
-
-  void handleCounter(Buffer::Instance& response, const StatOrScopes& variant) override;
-
-  void handleHistogram(Buffer::Instance& response, const StatOrScopes& variant) override;
+  void processTextReadout(Buffer::Instance& response, const StatOrScopes& variant) override;
+  void processGauge(Buffer::Instance& response, const StatOrScopes& variant) override;
+  void processCounter(Buffer::Instance& response, const StatOrScopes& variant) override;
+  void processHistogram(Buffer::Instance& response, const StatOrScopes& variant) override;
 
   // PrometheusStatsRequest
   template <class SharedStatType>
   absl::optional<std::string> prefixedTagExtractedName(const StatOrScopes& variant);
+
+  template <class SharedStatType>
+  void renderStat(Buffer::Instance& response, const StatOrScopes& variant);
 
 private:
   Stats::CustomStatNamespaces& custom_namespaces_;

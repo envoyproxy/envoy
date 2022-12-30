@@ -1329,7 +1329,7 @@ TEST_P(StatsHandlerPrometheusDefaultTest, StatsHandlerPrometheusDefaultTest) {
 
   createTestStats();
 
-const std::string expected_response = R"EOF(# TYPE envoy_cluster_upstream_cx_total counter
+  const std::string expected_response = R"EOF(# TYPE envoy_cluster_upstream_cx_total counter
 envoy_cluster_upstream_cx_total{cluster="c1"} 10
 envoy_cluster_upstream_cx_total{cluster="c2"} 20
 # TYPE envoy_cluster_upstream_cx_active gauge
