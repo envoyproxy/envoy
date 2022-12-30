@@ -1100,8 +1100,11 @@ TEST(TinyStringTest, Empty) {
   EXPECT_FALSE(no_value.hasValue());
   TinyString copy_no_value(no_value);
   EXPECT_FALSE(copy_no_value.hasValue());
-  TinyString assign_no_value = no_value;
+  TinyString assign_no_value;
+  assign_no_value = no_value;
   EXPECT_FALSE(assign_no_value.hasValue());
+  TinyString assign_construct_no_value = no_value;
+  EXPECT_FALSE(assign_construct_no_value.hasValue());
   TinyString empty("");
   EXPECT_TRUE(empty.hasValue());
   EXPECT_EQ("", empty.toStringView());
@@ -1131,7 +1134,8 @@ TEST(TinyStringTest, Copy) {
   TinyString hello("Hello, world!");
   TinyString h2(hello);
   EXPECT_EQ("Hello, world!", h2.toStringView());
-  TinyString h3 = h2;
+  TinyString h3;
+  h3 = h2;
   EXPECT_EQ("Hello, world!", h3.toStringView());
 }
 
