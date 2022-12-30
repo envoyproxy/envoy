@@ -114,6 +114,14 @@ TEST(MatchingData, HttpRequestQueryParamsDataInput) {
   HttpMatchingDataImpl data(connection_info_provider);
 
   {
+    HttpRequestQueryParamsDataInput input("arg");
+    auto result = input.get(data);
+    EXPECT_EQ(result.data_availability_,
+              Matcher::DataInputGetResult::DataAvailability::NotAvailable);
+    EXPECT_EQ(result.data_, absl::nullopt);
+  }
+
+  {
     HttpRequestQueryParamsDataInput input("user name");
     TestRequestHeaderMapImpl request_headers({{":path", "/test?user%20name=foo%20bar"}});
     data.onRequestHeaders(request_headers);
