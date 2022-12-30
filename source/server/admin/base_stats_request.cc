@@ -1,6 +1,5 @@
 #include "source/server/admin/base_stats_request.h"
 
-#include <iostream>
 #include <string>
 #include <vector>
 
@@ -59,7 +58,6 @@ Http::Code StatsRequestBase<TR, C, G, H>::start(Http::ResponseHeaderMap& respons
 
 template <class TR, class C, class G, class H>
 bool StatsRequestBase<TR, C, G, H>::nextChunk(Buffer::Instance& response) {
-  std::cout << " nextChunk: begin " << std::endl;
   if (response_.length() > 0) {
     ASSERT(response.length() == 0);
     response.move(response_);
@@ -106,19 +104,19 @@ bool StatsRequestBase<TR, C, G, H>::nextChunk(Buffer::Instance& response) {
       populateStatsForCurrentPhase(absl::get<ScopeVec>(variant));
       break;
     case StatOrScopesIndex::TextReadout:
-      handleTextReadout(response, variant);
+      processTextReadout(response, variant);
       stat_map_.erase(iter);
       break;
     case StatOrScopesIndex::Counter:
-      handleCounter(response, variant);
+      processCounter(response, variant);
       stat_map_.erase(iter);
       break;
     case StatOrScopesIndex::Gauge:
-      handleGauge(response, variant);
+      processGauge(response, variant);
       stat_map_.erase(iter);
       break;
     case StatOrScopesIndex::Histogram:
-      handleHistogram(response, variant);
+      processHistogram(response, variant);
       stat_map_.erase(iter);
       break;
     }
@@ -128,7 +126,6 @@ bool StatsRequestBase<TR, C, G, H>::nextChunk(Buffer::Instance& response) {
 
 template <class TR, class C, class G, class H> void StatsRequestBase<TR, C, G, H>::startPhase() {
   Phase current_phase = phases_.at(phase_);
-  std::cout << " startPhase: begin " << current_phase.phase_label << std::endl;
   ASSERT(stat_map_.empty());
 
   // Insert all the scopes in the alphabetically ordered map. As we iterate
@@ -141,12 +138,10 @@ template <class TR, class C, class G, class H> void StatsRequestBase<TR, C, G, H
     }
     absl::get<ScopeVec>(variant).emplace_back(scope);
   }
-    std::cout << " startPhase: end " << std::endl;
 }
 
 template <class TR, class C, class G, class H>
 void StatsRequestBase<TR, C, G, H>::populateStatsForCurrentPhase(const ScopeVec& scope_vec) {
-  std::cout << "populateStatsForCurrentPhase: begin" << std::endl;
   Phase current_phase = phases_.at(phase_);
   for (const Stats::ConstScopeSharedPtr& scope : scope_vec) {
     switch (current_phase.phase) {
@@ -173,13 +168,6 @@ void StatsRequestBase<TR, C, G, H>::populateStatsForCurrentPhase(const ScopeVec&
     }
   }
 }
-
-// these will be overriden by concrete subclasses
-
-template <class TR, class C, class G, class H>
-template <class SharedStatType>
-void StatsRequestBase<TR, C, G, H>::renderStat(const std::string&, Buffer::Instance&,
-                                               const StatOrScopes&) {}
 
 template class StatsRequestBase<
     std::vector<Stats::TextReadoutSharedPtr>, std::vector<Stats::CounterSharedPtr>,

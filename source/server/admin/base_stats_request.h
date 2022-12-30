@@ -1,8 +1,8 @@
 #pragma once
 
+#include <iostream>
 #include <variant>
 #include <vector>
-#include <iostream>
 
 #include "envoy/server/admin.h"
 
@@ -63,16 +63,10 @@ public:
   virtual Stats::IterateFn<Stats::Counter> checkStatForCounter() PURE;
   virtual Stats::IterateFn<Stats::Histogram> checkStatForHistogram() PURE;
 
-  template <class SharedStatType>
-  void renderStat(const std::string& name, Buffer::Instance& response, const StatOrScopes& variant);
-
-  virtual void handleTextReadout(Buffer::Instance& response, const StatOrScopes& variant) PURE;
-
-  virtual void handleGauge(Buffer::Instance& response, const StatOrScopes& variant) PURE;
-
-  virtual void handleCounter(Buffer::Instance& response, const StatOrScopes& variant) PURE;
-
-  virtual void handleHistogram(Buffer::Instance& response, const StatOrScopes& variant) PURE;
+  virtual void processTextReadout(Buffer::Instance& response, const StatOrScopes& variant) PURE;
+  virtual void processGauge(Buffer::Instance& response, const StatOrScopes& variant) PURE;
+  virtual void processCounter(Buffer::Instance& response, const StatOrScopes& variant) PURE;
+  virtual void processHistogram(Buffer::Instance& response, const StatOrScopes& variant) PURE;
 
   void setChunkSize(uint64_t chunk_size) { chunk_size_ = chunk_size; }
 
