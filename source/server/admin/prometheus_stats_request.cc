@@ -24,25 +24,18 @@ PrometheusStatsRequest::PrometheusStatsRequest(Stats::Store& stats, const StatsP
                                                UrlHandlerFn url_handler_fn)
     : StatsRequestBase(stats, params, url_handler_fn), custom_namespaces_(custom_namespaces) {
 
-  phases_ = {Phase{PhaseName::Counters, "Counters"}, Phase{PhaseName::Gauges, "Gauges"},
-             Phase{PhaseName::TextReadouts, "Text Readouts"},
-             Phase{PhaseName::Histograms, "Histograms"}};
-
-  switch (params_.type_) {
-  case StatsType::All:
-  case StatsType::Counters:
-    phase_ = 0;
-    break;
-  case StatsType::Gauges:
-    phase_ = 1;
-    break;
-  case StatsType::TextReadouts:
-    phase_ = 2;
-    break;
-  case StatsType::Histograms:
-    phase_ = 3;
-    break;
+  // the "type" query param is ignored for prometheus stats, so always start from
+  // counters; also, skip the TextReadouts phase unless that stat type is explicitly
+  // requested via query param
+  if (params_.prometheus_text_readouts_) {
+    phases_ = {Phase{PhaseName::Counters, "Counters"}, Phase{PhaseName::Gauges, "Gauges"},
+               Phase{PhaseName::TextReadouts, "Text Readouts"},
+               Phase{PhaseName::Histograms, "Histograms"}};
+  } else {
+    phases_ = {Phase{PhaseName::Counters, "Counters"}, Phase{PhaseName::Gauges, "Gauges"},
+               Phase{PhaseName::Histograms, "Histograms"}};
   }
+  phase_ = 0;
 }
 
 template <class StatType> Stats::IterateFn<StatType> PrometheusStatsRequest::checkStat() {
@@ -62,7 +55,8 @@ template <class StatType> Stats::IterateFn<StatType> PrometheusStatsRequest::che
       return true;
     }
 
-    // capture stat by either adding to a pre-existing variant or by creating a new variant
+    // capture stat by either adding to a pre-existing variant or by creating a new variant and
+    // storing it into the map
     const Stats::SymbolTable& global_symbol_table = stat->constSymbolTable();
     std::string tag_extracted_name = global_symbol_table.toString(stat->tagExtractedStatName());
 
@@ -118,9 +112,7 @@ void PrometheusStatsRequest::renderStat(Buffer::Instance& response, const StatOr
 
 void PrometheusStatsRequest::processTextReadout(Buffer::Instance& response,
                                                 const StatOrScopes& variant) {
-  if (params_.prometheus_text_readouts_) {
-    renderStat<Stats::TextReadoutSharedPtr>(response, variant);
-  }
+  renderStat<Stats::TextReadoutSharedPtr>(response, variant);
 }
 
 void PrometheusStatsRequest::processCounter(Buffer::Instance& response,
