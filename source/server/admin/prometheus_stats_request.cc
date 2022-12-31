@@ -55,8 +55,8 @@ template <class StatType> Stats::IterateFn<StatType> PrometheusStatsRequest::che
       return true;
     }
 
-    // capture stat by either adding to a pre-existing variant or by creating a new variant and
-    // storing it into the map
+    // capture stat by either adding to a pre-existing variant or by creating a new variant, and
+    // then storing the variant into the map
     const Stats::SymbolTable& global_symbol_table = stat->constSymbolTable();
     std::string tag_extracted_name = global_symbol_table.toString(stat->tagExtractedStatName());
 
@@ -87,8 +87,9 @@ Stats::IterateFn<Stats::Histogram> PrometheusStatsRequest::checkStatForHistogram
 }
 
 template <class SharedStatType>
-void PrometheusStatsRequest::renderStat(Buffer::Instance& response, const StatOrScopes& variant) {
-  auto prefixed_tag_extracted_name = prefixedTagExtractedName<SharedStatType>(variant);
+void PrometheusStatsRequest::renderStat(const std::string& name, Buffer::Instance& response,
+                                        const StatOrScopes& variant) {
+  auto prefixed_tag_extracted_name = prefixedTagExtractedName<SharedStatType>(name);
   if (prefixed_tag_extracted_name.has_value()) {
     PrometheusStatsRender* const prometheus_render =
         dynamic_cast<PrometheusStatsRender*>(render_.get());
@@ -110,24 +111,25 @@ void PrometheusStatsRequest::renderStat(Buffer::Instance& response, const StatOr
   }
 }
 
-void PrometheusStatsRequest::processTextReadout(Buffer::Instance& response,
+void PrometheusStatsRequest::processTextReadout(const std::string& name, Buffer::Instance& response,
                                                 const StatOrScopes& variant) {
-  renderStat<Stats::TextReadoutSharedPtr>(response, variant);
+  renderStat<Stats::TextReadoutSharedPtr>(name, response, variant);
 }
 
-void PrometheusStatsRequest::processCounter(Buffer::Instance& response,
+void PrometheusStatsRequest::processCounter(const std::string& name, Buffer::Instance& response,
                                             const StatOrScopes& variant) {
-  renderStat<Stats::CounterSharedPtr>(response, variant);
+  renderStat<Stats::CounterSharedPtr>(name, response, variant);
 }
 
-void PrometheusStatsRequest::processGauge(Buffer::Instance& response, const StatOrScopes& variant) {
-  renderStat<Stats::GaugeSharedPtr>(response, variant);
+void PrometheusStatsRequest::processGauge(const std::string& name, Buffer::Instance& response,
+                                          const StatOrScopes& variant) {
+  renderStat<Stats::GaugeSharedPtr>(name, response, variant);
 }
 
-void PrometheusStatsRequest::processHistogram(Buffer::Instance& response,
+void PrometheusStatsRequest::processHistogram(const std::string& name, Buffer::Instance& response,
                                               const StatOrScopes& variant) {
   auto histogram = absl::get<std::vector<Stats::HistogramSharedPtr>>(variant);
-  auto prefixed_tag_extracted_name = prefixedTagExtractedName<Stats::HistogramSharedPtr>(variant);
+  auto prefixed_tag_extracted_name = prefixedTagExtractedName<Stats::HistogramSharedPtr>(name);
 
   if (prefixed_tag_extracted_name.has_value()) {
     // increment stats count
@@ -149,17 +151,9 @@ void PrometheusStatsRequest::processHistogram(Buffer::Instance& response,
 
 template <class SharedStatType>
 absl::optional<std::string>
-PrometheusStatsRequest::prefixedTagExtractedName(const StatOrScopes& variant) {
-  std::vector<SharedStatType> group = absl::get<std::vector<SharedStatType>>(variant);
-
-  if (!group.empty()) {
-    const Stats::SymbolTable& global_symbol_table = group.front()->constSymbolTable();
-    std::string tag_extracted_name =
-        global_symbol_table.toString(group.front()->tagExtractedStatName());
-    return Envoy::Server::PrometheusStatsFormatter::metricName(tag_extracted_name,
-                                                               custom_namespaces_);
-  }
-  return {};
+PrometheusStatsRequest::prefixedTagExtractedName(const std::string& tag_extracted_name) {
+  return Envoy::Server::PrometheusStatsFormatter::metricName(tag_extracted_name,
+                                                             custom_namespaces_);
 }
 
 } // namespace Server

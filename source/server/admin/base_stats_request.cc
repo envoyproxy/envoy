@@ -104,19 +104,19 @@ bool StatsRequestBase<TR, C, G, H>::nextChunk(Buffer::Instance& response) {
       populateStatsForCurrentPhase(absl::get<ScopeVec>(variant));
       break;
     case StatOrScopesIndex::TextReadout:
-      processTextReadout(response, variant);
+      processTextReadout(iter->first, response, variant);
       stat_map_.erase(iter);
       break;
     case StatOrScopesIndex::Counter:
-      processCounter(response, variant);
+      processCounter(iter->first, response, variant);
       stat_map_.erase(iter);
       break;
     case StatOrScopesIndex::Gauge:
-      processGauge(response, variant);
+      processGauge(iter->first, response, variant);
       stat_map_.erase(iter);
       break;
     case StatOrScopesIndex::Histogram:
-      processHistogram(response, variant);
+      processHistogram(iter->first, response, variant);
       stat_map_.erase(iter);
       break;
     }
@@ -168,6 +168,9 @@ void StatsRequestBase<TR, C, G, H>::populateStatsForCurrentPhase(const ScopeVec&
     }
   }
 }
+
+template class StatsRequestBase<Stats::TextReadoutSharedPtr, Stats::CounterSharedPtr,
+                                Stats::GaugeSharedPtr, Stats::HistogramSharedPtr>;
 
 template class StatsRequestBase<
     std::vector<Stats::TextReadoutSharedPtr>, std::vector<Stats::CounterSharedPtr>,
