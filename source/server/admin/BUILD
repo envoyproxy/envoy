@@ -131,30 +131,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "erica_test_lib",
-    srcs = [
-        "erica_concrete.cc",
-        "erica_test.cc",
-    ],
-    hdrs = [
-        "erica_concrete.h",
-        "erica_test.h",
-    ],
-    deps = [
-        ":handler_ctx_lib",
-        ":prometheus_stats_lib",
-        ":stats_params_lib",
-        ":stats_render_lib",
-        ":utils_lib",
-        "//envoy/http:codes_interface",
-        "//source/common/http:codes_lib",
-        "//source/common/http:header_map_lib",
-        "//source/common/stats:histogram_lib",
-        "@com_google_absl//absl/container:btree",
-    ],
-)
-
-envoy_cc_library(
     name = "stats_request_lib",
     srcs = [
         "base_stats_request.cc",
