@@ -85,7 +85,7 @@ public:
   // For text/JSON/HTML stats, we do 3 passes through all the scopes_, and we emit
   // text-readouts first, then the intermingled counters and gauges, and finally
   // the histograms. For prometheus stats, we do 3 or 4 passes (this depends on whether Text
-  // Readouts are explicilty requested) through all the scopes_, and we emit counters first,
+  // Readouts are explicitly requested) through all the scopes_, and we emit counters first,
   // then gauges, possibly text readouts and finally histograms.
   bool nextChunk(Buffer::Instance& response) override;
 
@@ -115,10 +115,14 @@ public:
   virtual Stats::IterateFn<Stats::Counter> checkStatForCounter() PURE;
   virtual Stats::IterateFn<Stats::Histogram> checkStatForHistogram() PURE;
 
-  virtual void processTextReadout(Buffer::Instance& response, const StatOrScopes& variant) PURE;
-  virtual void processGauge(Buffer::Instance& response, const StatOrScopes& variant) PURE;
-  virtual void processCounter(Buffer::Instance& response, const StatOrScopes& variant) PURE;
-  virtual void processHistogram(Buffer::Instance& response, const StatOrScopes& variant) PURE;
+  virtual void processTextReadout(const std::string& name, Buffer::Instance& response,
+                                  const StatOrScopes& variant) PURE;
+  virtual void processGauge(const std::string& name, Buffer::Instance& response,
+                            const StatOrScopes& variant) PURE;
+  virtual void processCounter(const std::string& name, Buffer::Instance& response,
+                              const StatOrScopes& variant) PURE;
+  virtual void processHistogram(const std::string& name, Buffer::Instance& response,
+                                const StatOrScopes& variant) PURE;
 
   // Sets the chunk size.
   void setChunkSize(uint64_t chunk_size) { chunk_size_ = chunk_size; }
