@@ -84,7 +84,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // * A server may choose to examine all or part of the HTTP message bodies depending
 //   on the content of the headers.
 // * A server may choose to immediately reject some messages based on their HTTP
-//   headers (or other dynamic metadata) and more carefully examine others
+//   headers (or other dynamic metadata) and more carefully examine others.
 // * A server may asynchronously monitor traffic coming through the filter by inspecting
 //   headers, bodies, or both, and then decide to switch to a synchronous processing
 //   mode, either permanently or temporarily.
@@ -142,7 +142,7 @@ message ExternalProcessor {
   // when the filter is running in synchronous mode. Whenever
   // the proxy sends a message on the stream that requires a response, it will
   // reset this timer, and will stop processing and return an error (subject
-  // to the processing mode) if the timer expires before a matching response.
+  // to the processing mode) if the timer expires before a matching response
   // is received. There is no timeout when the filter is running in asynchronous
   // mode. Default is 200 milliseconds.
   google.protobuf.Duration message_timeout = 7;

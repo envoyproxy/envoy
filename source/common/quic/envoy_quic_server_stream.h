@@ -18,7 +18,7 @@ public:
                         envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
                             headers_with_underscores_action);
 
-  void setRequestDecoder(Http::RequestDecoder& decoder) { request_decoder_ = &decoder; }
+  void setRequestDecoder(Http::RequestDecoder& decoder) override { request_decoder_ = &decoder; }
 
   // Http::StreamEncoder
   void encode1xxHeaders(const Http::ResponseHeaderMap& headers) override;

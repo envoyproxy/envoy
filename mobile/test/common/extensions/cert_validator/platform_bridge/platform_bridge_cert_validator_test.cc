@@ -46,7 +46,8 @@ public:
   ~MockValidateResultCallback() override = default;
 
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
-  MOCK_METHOD(void, onCertValidationResult, (bool, const std::string&, uint8_t));
+  MOCK_METHOD(void, onCertValidationResult,
+              (bool, Envoy::Ssl::ClientValidationStatus, const std::string&, uint8_t));
 };
 
 class MockValidator {
@@ -120,7 +121,6 @@ protected:
   Ssl::MockCertificateValidationContextConfig config_;
   std::string empty_string_;
   SSLContextPtr ssl_ctx_;
-  TestSslExtendedSocketInfo ssl_extended_info_;
   CertValidator::ExtraValidationContext validation_context_;
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   std::unique_ptr<MockValidateResultCallback> callback_;
@@ -174,8 +174,8 @@ TEST_P(PlatformBridgeCertValidatorTest, NoCallback) {
   EXPECT_ENVOY_BUG(
       {
         validator.doVerifyCertChain(*cert_chain, Ssl::ValidateResultCallbackPtr(),
-                                    &ssl_extended_info_, transport_socket_options_, *ssl_ctx_,
-                                    validation_context_, is_server_, hostname);
+                                    transport_socket_options_, *ssl_ctx_, validation_context_,
+                                    is_server_, hostname);
       },
       "No callback specified");
 }
@@ -187,15 +187,14 @@ TEST_P(PlatformBridgeCertValidatorTest, EmptyCertChain) {
   bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
   std::string hostname = "www.example.com";
 
-  ValidationResults results = validator.doVerifyCertChain(
-      *cert_chain, std::move(callback_), &ssl_extended_info_, transport_socket_options_, *ssl_ctx_,
-      validation_context_, is_server_, hostname);
+  ValidationResults results =
+      validator.doVerifyCertChain(*cert_chain, std::move(callback_), transport_socket_options_,
+                                  *ssl_ctx_, validation_context_, is_server_, hostname);
   EXPECT_EQ(ValidationResults::ValidationStatus::Failed, results.status);
   EXPECT_FALSE(results.tls_alert.has_value());
   ASSERT_TRUE(results.error_details.has_value());
   EXPECT_EQ("verify cert chain failed: empty cert chain.", results.error_details.value());
-  EXPECT_EQ(Envoy::Ssl::ClientValidationStatus::NotValidated,
-            ssl_extended_info_.certificateValidationStatus());
+  EXPECT_EQ(Envoy::Ssl::ClientValidationStatus::NotValidated, results.detailed_status);
 }
 
 TEST_P(PlatformBridgeCertValidatorTest, ValidCertificate) {
@@ -211,15 +210,17 @@ TEST_P(PlatformBridgeCertValidatorTest, ValidCertificate) {
   auto& callback_ref = *callback_;
   EXPECT_CALL(callback_ref, dispatcher()).WillRepeatedly(ReturnRef(*dispatcher_));
 
-  ValidationResults results = validator.doVerifyCertChain(
-      *cert_chain, std::move(callback_), &ssl_extended_info_, transport_socket_options_, *ssl_ctx_,
-      validation_context_, is_server_, hostname);
+  ValidationResults results =
+      validator.doVerifyCertChain(*cert_chain, std::move(callback_), transport_socket_options_,
+                                  *ssl_ctx_, validation_context_, is_server_, hostname);
   EXPECT_EQ(ValidationResults::ValidationStatus::Pending, results.status);
 
-  EXPECT_CALL(callback_ref, onCertValidationResult(true, "", 46)).WillOnce(Invoke([this]() {
-    EXPECT_EQ(main_thread_id_, std::this_thread::get_id());
-    dispatcher_->exit();
-  }));
+  EXPECT_CALL(callback_ref,
+              onCertValidationResult(true, Envoy::Ssl::ClientValidationStatus::Validated, "", 46))
+      .WillOnce(Invoke([this]() {
+        EXPECT_EQ(main_thread_id_, std::this_thread::get_id());
+        dispatcher_->exit();
+      }));
   EXPECT_FALSE(waitForDispatcherToExit());
 }
 
@@ -236,14 +237,14 @@ TEST_P(PlatformBridgeCertValidatorTest, ValidCertificateButInvalidSni) {
   auto& callback_ref = *callback_;
   EXPECT_CALL(callback_ref, dispatcher()).WillRepeatedly(ReturnRef(*dispatcher_));
 
-  ValidationResults results = validator.doVerifyCertChain(
-      *cert_chain, std::move(callback_), &ssl_extended_info_, transport_socket_options_, *ssl_ctx_,
-      validation_context_, is_server_, hostname);
+  ValidationResults results =
+      validator.doVerifyCertChain(*cert_chain, std::move(callback_), transport_socket_options_,
+                                  *ssl_ctx_, validation_context_, is_server_, hostname);
   EXPECT_EQ(ValidationResults::ValidationStatus::Pending, results.status);
 
   EXPECT_CALL(callback_ref,
               onCertValidationResult(
-                  acceptInvalidCertificates(),
+                  acceptInvalidCertificates(), Envoy::Ssl::ClientValidationStatus::Failed,
                   "PlatformBridgeCertValidator_verifySubjectAltName failed: SNI mismatch.",
                   SSL_AD_BAD_CERTIFICATE))
       .WillOnce(Invoke([this]() { dispatcher_->exit(); }));
@@ -268,15 +269,15 @@ TEST_P(PlatformBridgeCertValidatorTest, ValidCertificateSniOverride) {
   transport_socket_options_ =
       std::make_shared<Network::TransportSocketOptionsImpl>("", std::move(subject_alt_names));
 
-  ValidationResults results = validator.doVerifyCertChain(
-      *cert_chain, std::move(callback_), &ssl_extended_info_, transport_socket_options_, *ssl_ctx_,
-      validation_context_, is_server_, hostname);
+  ValidationResults results =
+      validator.doVerifyCertChain(*cert_chain, std::move(callback_), transport_socket_options_,
+                                  *ssl_ctx_, validation_context_, is_server_, hostname);
   EXPECT_EQ(ValidationResults::ValidationStatus::Pending, results.status);
 
   // The cert will be validated against the overridden name not the invalid name "server2".
-  EXPECT_CALL(callback_ref, onCertValidationResult(true, "", 46)).WillOnce(Invoke([this]() {
-    dispatcher_->exit();
-  }));
+  EXPECT_CALL(callback_ref,
+              onCertValidationResult(true, Envoy::Ssl::ClientValidationStatus::Validated, "", 46))
+      .WillOnce(Invoke([this]() { dispatcher_->exit(); }));
   EXPECT_FALSE(waitForDispatcherToExit());
 }
 
@@ -294,9 +295,9 @@ TEST_P(PlatformBridgeCertValidatorTest, DeletedWithValidationPending) {
   auto& callback_ref = *callback_;
   EXPECT_CALL(callback_ref, dispatcher()).WillRepeatedly(ReturnRef(*dispatcher_));
 
-  ValidationResults results = validator->doVerifyCertChain(
-      *cert_chain, std::move(callback_), &ssl_extended_info_, transport_socket_options_, *ssl_ctx_,
-      validation_context_, is_server_, hostname);
+  ValidationResults results =
+      validator->doVerifyCertChain(*cert_chain, std::move(callback_), transport_socket_options_,
+                                   *ssl_ctx_, validation_context_, is_server_, hostname);
   EXPECT_EQ(ValidationResults::ValidationStatus::Pending, results.status);
 
   validator.reset();

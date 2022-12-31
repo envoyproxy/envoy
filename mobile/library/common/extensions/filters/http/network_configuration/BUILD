@@ -21,6 +21,7 @@ envoy_cc_extension(
     repository = "@envoy",
     deps = [
         ":filter_cc_proto",
+        "//library/common/http:header_utility_lib",
         "//library/common/http:internal_headers_lib",
         "//library/common/network:connectivity_manager_lib",
         "//library/common/stream_info:extra_stream_info_lib",

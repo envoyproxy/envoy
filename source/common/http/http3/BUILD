@@ -19,6 +19,7 @@ envoy_cc_library(
         "//source/common/http:codec_client_lib",
         "//source/common/http:conn_pool_base_lib",
         "//source/common/quic:client_connection_factory_lib",
+        "@com_github_google_quiche//:quic_core_deterministic_connection_id_generator_lib",
     ],
 )
 
@@ -26,6 +27,7 @@ envoy_cc_library(
     name = "codec_stats_lib",
     hdrs = ["codec_stats.h"],
     deps = [
+        "//envoy/http:header_validator_interface",
         "//envoy/stats:stats_interface",
         "//envoy/stats:stats_macros",
         "//source/common/common:thread_lib",

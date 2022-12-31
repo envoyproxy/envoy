@@ -1,5 +1,6 @@
 #pragma once
 
+#include "contrib/kafka/filters/network/source/mesh/librdkafka_utils.h"
 #include "gmock/gmock.h"
 #include "librdkafka/rdkafkacpp.h"
 
@@ -9,35 +10,38 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
 
-class MockKafkaProducer : public RdKafka::Producer {
-public:
-  // Producer API.
-  MOCK_METHOD(RdKafka::ErrorCode, produce,
-              (RdKafka::Topic*, int32_t, int, void*, size_t, const std::string*, void*), ());
-  MOCK_METHOD(RdKafka::ErrorCode, produce,
-              (RdKafka::Topic*, int32_t, int, void*, size_t, const void*, size_t, void*), ());
-  MOCK_METHOD(RdKafka::ErrorCode, produce,
-              (const std::string, int32_t, int, void*, size_t, const void*, size_t, int64_t, void*),
-              ());
-  MOCK_METHOD(RdKafka::ErrorCode, produce,
-              (const std::string, int32_t, int, void*, size_t, const void*, size_t, int64_t,
-               RdKafka::Headers*, void*),
-              ());
-  MOCK_METHOD(RdKafka::ErrorCode, produce,
-              (RdKafka::Topic*, int32_t, const std::vector<char>*, const std::vector<char>*, void*),
-              ());
-  MOCK_METHOD(RdKafka::ErrorCode, flush, (int), ());
-  MOCK_METHOD(RdKafka::ErrorCode, purge, (int), ());
-  MOCK_METHOD(RdKafka::Error*, init_transactions, (int), ());
-  MOCK_METHOD(RdKafka::Error*, begin_transaction, (), ());
-  MOCK_METHOD(RdKafka::Error*, send_offsets_to_transaction,
-              (const std::vector<RdKafka::TopicPartition*>&, const RdKafka::ConsumerGroupMetadata*,
-               int),
-              ());
-  MOCK_METHOD(RdKafka::Error*, commit_transaction, (int), ());
-  MOCK_METHOD(RdKafka::Error*, abort_transaction, (int), ());
+// This file defines all librdkafka-related mocks.
 
-  // Handle API (unused by us).
+class MockConsumerAssignment : public ConsumerAssignment {};
+
+class MockLibRdKafkaUtils : public LibRdKafkaUtils {
+public:
+  MOCK_METHOD(RdKafka::Conf::ConfResult, setConfProperty,
+              (RdKafka::Conf&, const std::string&, const std::string&, std::string&), (const));
+  MOCK_METHOD(RdKafka::Conf::ConfResult, setConfDeliveryCallback,
+              (RdKafka::Conf&, RdKafka::DeliveryReportCb*, std::string&), (const));
+  MOCK_METHOD((std::unique_ptr<RdKafka::Producer>), createProducer,
+              (RdKafka::Conf*, std::string& errstr), (const));
+  MOCK_METHOD((std::unique_ptr<RdKafka::KafkaConsumer>), createConsumer,
+              (RdKafka::Conf*, std::string& errstr), (const));
+  MOCK_METHOD(RdKafka::Headers*, convertHeaders,
+              ((const std::vector<std::pair<absl::string_view, absl::string_view>>&)), (const));
+  MOCK_METHOD(void, deleteHeaders, (RdKafka::Headers * librdkafka_headers), (const));
+  MOCK_METHOD(ConsumerAssignmentConstPtr, assignConsumerPartitions,
+              (RdKafka::KafkaConsumer&, const std::string&, int32_t), (const));
+
+  MockLibRdKafkaUtils() {
+    ON_CALL(*this, convertHeaders(testing::_))
+        .WillByDefault(testing::Return(headers_holder_.get()));
+  }
+
+private:
+  std::unique_ptr<RdKafka::Headers> headers_holder_{RdKafka::Headers::create()};
+};
+
+// Base class for librdkafka objects.
+class MockKafkaHandle : public virtual RdKafka::Handle {
+public:
   MOCK_METHOD(const std::string, name, (), (const));
   MOCK_METHOD(const std::string, memberid, (), (const));
   MOCK_METHOD(int, poll, (int), ());
@@ -68,6 +72,34 @@ public:
   MOCK_METHOD(void, mem_free, (void*), ());
 };
 
+class MockKafkaProducer : public RdKafka::Producer, public MockKafkaHandle {
+public:
+  MOCK_METHOD(RdKafka::ErrorCode, produce,
+              (RdKafka::Topic*, int32_t, int, void*, size_t, const std::string*, void*), ());
+  MOCK_METHOD(RdKafka::ErrorCode, produce,
+              (RdKafka::Topic*, int32_t, int, void*, size_t, const void*, size_t, void*), ());
+  MOCK_METHOD(RdKafka::ErrorCode, produce,
+              (const std::string, int32_t, int, void*, size_t, const void*, size_t, int64_t, void*),
+              ());
+  MOCK_METHOD(RdKafka::ErrorCode, produce,
+              (const std::string, int32_t, int, void*, size_t, const void*, size_t, int64_t,
+               RdKafka::Headers*, void*),
+              ());
+  MOCK_METHOD(RdKafka::ErrorCode, produce,
+              (RdKafka::Topic*, int32_t, const std::vector<char>*, const std::vector<char>*, void*),
+              ());
+  MOCK_METHOD(RdKafka::ErrorCode, flush, (int), ());
+  MOCK_METHOD(RdKafka::ErrorCode, purge, (int), ());
+  MOCK_METHOD(RdKafka::Error*, init_transactions, (int), ());
+  MOCK_METHOD(RdKafka::Error*, begin_transaction, (), ());
+  MOCK_METHOD(RdKafka::Error*, send_offsets_to_transaction,
+              (const std::vector<RdKafka::TopicPartition*>&, const RdKafka::ConsumerGroupMetadata*,
+               int),
+              ());
+  MOCK_METHOD(RdKafka::Error*, commit_transaction, (int), ());
+  MOCK_METHOD(RdKafka::Error*, abort_transaction, (int), ());
+};
+
 class MockKafkaMessage : public RdKafka::Message {
 public:
   MOCK_METHOD(std::string, errstr, (), (const));
@@ -89,6 +121,38 @@ public:
   MOCK_METHOD(RdKafka::Headers*, headers, ());
   MOCK_METHOD(RdKafka::Headers*, headers, (RdKafka::ErrorCode*));
   MOCK_METHOD(int32_t, broker_id, (), (const));
+};
+
+class MockKafkaConsumer : public RdKafka::KafkaConsumer, public MockKafkaHandle {
+public:
+  MOCK_METHOD(RdKafka::ErrorCode, assignment, (std::vector<RdKafka::TopicPartition*>&), ());
+  MOCK_METHOD(RdKafka::ErrorCode, subscription, (std::vector<std::string>&), ());
+  MOCK_METHOD(RdKafka::ErrorCode, subscribe, (const std::vector<std::string>&), ());
+  MOCK_METHOD(RdKafka::ErrorCode, unsubscribe, (), ());
+  MOCK_METHOD(RdKafka::ErrorCode, assign, (const std::vector<RdKafka::TopicPartition*>&), ());
+  MOCK_METHOD(RdKafka::ErrorCode, unassign, (), ());
+  MOCK_METHOD(RdKafka::Message*, consume, (int), ());
+  MOCK_METHOD(RdKafka::ErrorCode, commitSync, (), ());
+  MOCK_METHOD(RdKafka::ErrorCode, commitAsync, (), ());
+  MOCK_METHOD(RdKafka::ErrorCode, commitSync, (RdKafka::Message*), ());
+  MOCK_METHOD(RdKafka::ErrorCode, commitAsync, (RdKafka::Message*), ());
+  MOCK_METHOD(RdKafka::ErrorCode, commitSync, (std::vector<RdKafka::TopicPartition*>&), ());
+  MOCK_METHOD(RdKafka::ErrorCode, commitAsync, (const std::vector<RdKafka::TopicPartition*>&), ());
+  MOCK_METHOD(RdKafka::ErrorCode, commitSync, (RdKafka::OffsetCommitCb*), ());
+  MOCK_METHOD(RdKafka::ErrorCode, commitSync,
+              (std::vector<RdKafka::TopicPartition*>&, RdKafka::OffsetCommitCb*), ());
+  MOCK_METHOD(RdKafka::ErrorCode, committed, (std::vector<RdKafka::TopicPartition*>&, int), ());
+  MOCK_METHOD(RdKafka::ErrorCode, position, (std::vector<RdKafka::TopicPartition*>&), ());
+  MOCK_METHOD(RdKafka::ErrorCode, close, (), ());
+  MOCK_METHOD(RdKafka::ErrorCode, seek, (const RdKafka::TopicPartition&, int), ());
+  MOCK_METHOD(RdKafka::ErrorCode, offsets_store, (std::vector<RdKafka::TopicPartition*>&), ());
+  MOCK_METHOD(RdKafka::ConsumerGroupMetadata*, groupMetadata, (), ());
+  MOCK_METHOD(bool, assignment_lost, (), ());
+  MOCK_METHOD(std::string, rebalance_protocol, (), ());
+  MOCK_METHOD(RdKafka::Error*, incremental_assign, (const std::vector<RdKafka::TopicPartition*>&),
+              ());
+  MOCK_METHOD(RdKafka::Error*, incremental_unassign, (const std::vector<RdKafka::TopicPartition*>&),
+              ());
 };
 
 } // namespace Mesh

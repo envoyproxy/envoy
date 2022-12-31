@@ -846,9 +846,9 @@ void MainPrioritySetImpl::updateCrossPriorityHostMap(const HostVector& hosts_add
   }
 }
 
-ClusterTrafficStats ClusterInfoImpl::generateStats(Stats::Scope& scope,
-                                                   const ClusterTrafficStatNames& stat_names) {
-  return {stat_names, scope};
+LazyClusterTrafficStats ClusterInfoImpl::generateStats(Stats::Scope& scope,
+                                                       const ClusterTrafficStatNames& stat_names) {
+  return std::make_unique<ClusterTrafficStats>(stat_names, scope);
 }
 
 ClusterRequestResponseSizeStats ClusterInfoImpl::generateRequestResponseSizeStats(
@@ -976,6 +976,8 @@ ClusterInfoImpl::ClusterInfoImpl(
                         extensionProtocolOptionsTyped<HttpProtocolOptionsConfigImpl>(
                             "envoy.extensions.upstreams.http.v3.HttpProtocolOptions"),
                         factory_context.messageValidationVisitor())),
+      tcp_protocol_options_(extensionProtocolOptionsTyped<TcpProtocolOptionsConfigImpl>(
+          "envoy.extensions.upstreams.tcp.v3.TcpProtocolOptions")),
       max_requests_per_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           http_protocol_options_->common_http_protocol_options_, max_requests_per_connection,
           config.max_requests_per_connection().value())),
@@ -992,7 +994,8 @@ ClusterInfoImpl::ClusterInfoImpl(
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       socket_matcher_(std::move(socket_matcher)), stats_scope_(std::move(stats_scope)),
-      stats_(generateStats(*stats_scope_, factory_context.clusterManager().clusterStatNames())),
+      traffic_stats_(
+          generateStats(*stats_scope_, factory_context.clusterManager().clusterStatNames())),
       config_update_stats_(factory_context.clusterManager().clusterConfigUpdateStatNames(),
                            *stats_scope_),
       lb_stats_(factory_context.clusterManager().clusterLbStatNames(), *stats_scope_),
@@ -1104,6 +1107,15 @@ ClusterInfoImpl::ClusterInfoImpl(
     }
   } else {
     idle_timeout_ = std::chrono::hours(1);
+  }
+
+  if (tcp_protocol_options_ && tcp_protocol_options_->idleTimeout().has_value()) {
+    tcp_pool_idle_timeout_ = tcp_protocol_options_->idleTimeout();
+    if (tcp_pool_idle_timeout_.value().count() == 0) {
+      tcp_pool_idle_timeout_ = absl::nullopt;
+    }
+  } else {
+    tcp_pool_idle_timeout_ = std::chrono::minutes(10);
   }
 
   if (http_protocol_options_->common_http_protocol_options_.has_max_connection_duration()) {
@@ -1592,7 +1604,8 @@ ClusterInfoImpl::generateCircuitBreakersStats(Stats::Scope& scope, Stats::StatNa
                                              Stats::Gauge::ImportMode::Accumulate);
   };
 
-#define REMAINING_GAUGE(stat_name) track_remaining ? make_gauge(stat_name) : scope.nullGauge("")
+#define REMAINING_GAUGE(stat_name)                                                                 \
+  track_remaining ? make_gauge(stat_name) : scope.store().nullGauge()
 
   return {
       make_gauge(stat_names.cx_open_),
@@ -2101,21 +2114,23 @@ getDnsLookupFamilyFromCluster(const envoy::config::cluster::v3::Cluster& cluster
 
 void reportUpstreamCxDestroy(const Upstream::HostDescriptionConstSharedPtr& host,
                              Network::ConnectionEvent event) {
-  host->cluster().trafficStats().upstream_cx_destroy_.inc();
+  Upstream::ClusterTrafficStats& stats = *host->cluster().trafficStats();
+  stats.upstream_cx_destroy_.inc();
   if (event == Network::ConnectionEvent::RemoteClose) {
-    host->cluster().trafficStats().upstream_cx_destroy_remote_.inc();
+    stats.upstream_cx_destroy_remote_.inc();
   } else {
-    host->cluster().trafficStats().upstream_cx_destroy_local_.inc();
+    stats.upstream_cx_destroy_local_.inc();
   }
 }
 
 void reportUpstreamCxDestroyActiveRequest(const Upstream::HostDescriptionConstSharedPtr& host,
                                           Network::ConnectionEvent event) {
-  host->cluster().trafficStats().upstream_cx_destroy_with_active_rq_.inc();
+  Upstream::ClusterTrafficStats& stats = *host->cluster().trafficStats();
+  stats.upstream_cx_destroy_with_active_rq_.inc();
   if (event == Network::ConnectionEvent::RemoteClose) {
-    host->cluster().trafficStats().upstream_cx_destroy_remote_with_active_rq_.inc();
+    stats.upstream_cx_destroy_remote_with_active_rq_.inc();
   } else {
-    host->cluster().trafficStats().upstream_cx_destroy_local_with_active_rq_.inc();
+    stats.upstream_cx_destroy_local_with_active_rq_.inc();
   }
 }
 

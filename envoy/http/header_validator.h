@@ -6,8 +6,7 @@
 #include "envoy/config/typed_config.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/protocol.h"
-#include "envoy/server/factory_context.h"
-#include "envoy/stream_info/stream_info.h"
+#include "envoy/protobuf/message_validator.h"
 
 namespace Envoy {
 namespace Http {
@@ -100,6 +99,17 @@ public:
 using HeaderValidatorPtr = std::unique_ptr<HeaderValidator>;
 
 /**
+ * Interface for stats.
+ */
+class HeaderValidatorStats {
+public:
+  virtual ~HeaderValidatorStats() = default;
+
+  virtual void incDroppedHeadersWithUnderscores() PURE;
+  virtual void incRequestsRejectedWithUnderscoresInHeaders() PURE;
+};
+
+/**
  * Interface for creating header validators.
  */
 class HeaderValidatorFactory {
@@ -109,7 +119,7 @@ public:
   /**
    * Create a new header validator for the specified protocol.
    */
-  virtual HeaderValidatorPtr create(Protocol protocol, StreamInfo::StreamInfo& stream_info) PURE;
+  virtual HeaderValidatorPtr create(Protocol protocol, HeaderValidatorStats& stats) PURE;
 };
 
 using HeaderValidatorFactoryPtr = std::unique_ptr<HeaderValidatorFactory>;
@@ -121,7 +131,7 @@ class HeaderValidatorFactoryConfig : public Config::TypedFactory {
 public:
   virtual HeaderValidatorFactoryPtr
   createFromProto(const Protobuf::Message& config,
-                  Server::Configuration::FactoryContext& context) PURE;
+                  ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
 
   std::string category() const override { return "envoy.http.header_validators"; }
 };
