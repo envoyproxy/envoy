@@ -2,11 +2,13 @@ syntax = "proto3";
 
 package envoy.config.common.mutation_rules.v3;
 
+import "envoy/config/core/v3/base.proto";
 import "envoy/type/matcher/v3/regex.proto";
 
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.common.mutation_rules.v3";
 option java_outer_classname = "MutationRulesProto";
@@ -83,4 +85,19 @@ message HeaderMutationRules {
   // cause the ``rejected_header_mutations`` counter to be incremented.
   // Default is false.
   google.protobuf.BoolValue disallow_is_error = 7;
+}
+
+// The HeaderMutation structure specifies an action that may be taken on HTTP
+// headers.
+message HeaderMutation {
+  oneof action {
+    option (validate.required) = true;
+
+    // Remove the specified header if it exists.
+    string remove = 1
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+
+    // Append new header by the specified HeaderValueOption.
+    core.v3.HeaderValueOption append = 2;
+  }
 }

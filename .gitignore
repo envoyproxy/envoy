@@ -6,6 +6,7 @@
 !\.bazelrc
 !\.bazelproject
 !\.bazelversion
+!\.circleci
 !\.clang-format
 !\.clang-tidy
 !\.coveragerc

@@ -274,12 +274,18 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/filters/http/header_to_metadata @zuercher @JuniorHsu
 # zookeeper
 /*/extensions/filters/network/zookeeper_proxy @snowp @JuniorHsu
+# Custom response filter
+/*/extensions/filters/http/custom_response @pradeepcrao @yanavlasov
+/*/extensions/http/custom_response/redirect_policy @pradeepcrao @yanavlasov
+/*/extensions/http/custom_response/local_response_policy @pradeepcrao @yanavlasov
 # path match by pattern
 /*/extensions/path/match/uri_template @alyssawilk @yanjunxiang-google
 # path rewrite by pattern
 /*/extensions/path/rewrite/uri_template @alyssawilk @yanjunxiang-google
 # Dubbo codec
 /*/extensions/common/dubbo @wbpcode @lizan
+# Early header mutation
+/*/extensions/http/early_header_mutation/header_mutation @wbpcode @UNOWNED
 
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED
@@ -291,6 +297,7 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/clusters/logical_dns/ @UNOWNED @UNOWNED
 /*/extensions/clusters/common/ @UNOWNED @UNOWNED
 /*/extensions/clusters/eds/ @UNOWNED @UNOWNED
+/*/source/extensions/listener_managers/listener_manager @UNOWNED @UNOWNED
 
 # URL Pattern Match and Rewrite Library
 /*/extensions/path/uri_template_lib @alyssawilk @yanjunxiang-google

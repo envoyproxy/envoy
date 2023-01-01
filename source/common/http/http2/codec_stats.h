@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/http/header_validator.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
@@ -39,14 +40,24 @@ namespace Http2 {
 /**
  * Wrapper struct for the HTTP/2 codec stats. @see stats_macros.h
  */
-struct CodecStats {
+struct CodecStats : public ::Envoy::Http::HeaderValidatorStats {
   using AtomicPtr = Thread::AtomicPtr<CodecStats, Thread::AtomicPtrAllocMode::DeleteOnDestruct>;
+
+  CodecStats(ALL_HTTP2_CODEC_STATS(GENERATE_CONSTRUCTOR_COUNTER_PARAM,
+                                   GENERATE_CONSTRUCTOR_GAUGE_PARAM)...)
+      : ::Envoy::Http::HeaderValidatorStats()
+            ALL_HTTP2_CODEC_STATS(GENERATE_CONSTRUCTOR_INIT_LIST, GENERATE_CONSTRUCTOR_INIT_LIST) {}
 
   static CodecStats& atomicGet(AtomicPtr& ptr, Stats::Scope& scope) {
     return *ptr.get([&scope]() -> CodecStats* {
       return new CodecStats{ALL_HTTP2_CODEC_STATS(POOL_COUNTER_PREFIX(scope, "http2."),
                                                   POOL_GAUGE_PREFIX(scope, "http2."))};
     });
+  }
+
+  void incDroppedHeadersWithUnderscores() override { dropped_headers_with_underscores_.inc(); }
+  void incRequestsRejectedWithUnderscoresInHeaders() override {
+    requests_rejected_with_underscores_in_headers_.inc();
   }
 
   ALL_HTTP2_CODEC_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)

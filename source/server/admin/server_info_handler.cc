@@ -2,9 +2,10 @@
 
 #include "envoy/admin/v3/memory.pb.h"
 
+#include "source/common/http/headers.h"
 #include "source/common/memory/stats.h"
 #include "source/common/version/version.h"
-#include "source/server/admin/utils.h"
+#include "source/server/utils.h"
 
 namespace Envoy {
 namespace Server {

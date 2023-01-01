@@ -13,19 +13,52 @@ envoy_cc_library(
     name = "header_validator_common",
     srcs = [
         "header_validator.cc",
+    ],
+    hdrs = [
+        "header_validator.h",
+    ],
+    visibility = [
+        "//test/common/http/http1:__subpackages__",
+        "//test/extensions/http/header_validators/envoy_default:__subpackages__",
+    ],
+    deps = [
+        ":character_tables",
+        ":path_normalizer",
+        "//envoy/http:header_validator_errors",
+        "//envoy/http:header_validator_interface",
+        "//external:abseil_node_hash_set",
+        "//source/common/http:headers_lib",
+        "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "character_tables",
+    hdrs = [
+        "character_tables.h",
+    ],
+    visibility = [
+        "//test/common/http/http1:__subpackages__",
+        "//test/extensions/http/header_validators/envoy_default:__subpackages__",
+    ],
+)
+
+envoy_cc_library(
+    name = "path_normalizer",
+    srcs = [
         "path_normalizer.cc",
     ],
     hdrs = [
-        "character_tables.h",
-        "header_validator.h",
         "path_normalizer.h",
     ],
     visibility = [
         "//test/common/http/http1:__subpackages__",
+        "//test/extensions/http/header_validators/envoy_default:__subpackages__",
     ],
     deps = [
+        ":character_tables",
+        "//envoy/http:header_validator_errors",
         "//envoy/http:header_validator_interface",
-        "//external:abseil_node_hash_set",
         "//source/common/http:headers_lib",
         "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto",
     ],
@@ -41,9 +74,11 @@ envoy_cc_library(
     ],
     visibility = [
         "//test/common/http/http1:__subpackages__",
+        "//test/extensions/http/header_validators/envoy_default:__subpackages__",
     ],
     deps = [
         ":header_validator_common",
+        "//envoy/http:header_validator_errors",
         "//envoy/http:header_validator_interface",
         "//external:abseil_node_hash_set",
         "//source/common/http:headers_lib",
@@ -60,10 +95,12 @@ envoy_cc_library(
         "http2_header_validator.h",
     ],
     visibility = [
-        "//test/common/http/http1:__subpackages__",
+        "//test/common/http/http2:__subpackages__",
+        "//test/extensions/http/header_validators/envoy_default:__subpackages__",
     ],
     deps = [
         ":header_validator_common",
+        "//envoy/http:header_validator_errors",
         "//envoy/http:header_validator_interface",
         "//external:abseil_node_hash_map",
         "//external:abseil_node_hash_set",

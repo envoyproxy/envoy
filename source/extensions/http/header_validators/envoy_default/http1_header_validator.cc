@@ -1,5 +1,7 @@
 #include "source/extensions/http/header_validators/envoy_default/http1_header_validator.h"
 
+#include "envoy/http/header_validator_errors.h"
+
 #include "source/common/http/utility.h"
 #include "source/extensions/http/header_validators/envoy_default/character_tables.h"
 
@@ -17,6 +19,7 @@ using ::Envoy::Http::HeaderString;
 using ::Envoy::Http::LowerCaseString;
 using ::Envoy::Http::Protocol;
 using ::Envoy::Http::RequestHeaderMap;
+using ::Envoy::Http::UhvResponseCodeDetail;
 using HeaderValidatorFunction =
     HeaderValidator::HeaderValueValidationResult (Http1HeaderValidator::*)(const HeaderString&);
 
@@ -39,8 +42,8 @@ using Http1ResponseCodeDetail = ConstSingleton<Http1ResponseCodeDetailValues>;
  *
  */
 Http1HeaderValidator::Http1HeaderValidator(const HeaderValidatorConfig& config, Protocol protocol,
-                                           StreamInfo::StreamInfo& stream_info)
-    : HeaderValidator(config, protocol, stream_info) {}
+                                           ::Envoy::Http::HeaderValidatorStats& stats)
+    : HeaderValidator(config, protocol, stats) {}
 
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
 Http1HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
