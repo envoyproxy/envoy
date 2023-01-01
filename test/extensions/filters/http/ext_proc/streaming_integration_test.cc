@@ -671,11 +671,28 @@ TEST_P(StreamingIntegrationTest, PostAndProcessBufferedRequestBodyTooBig) {
         stream->Write(response);
 
         ProcessingRequest header_resp;
-        if (stream->Read(&header_resp)) {
-          ASSERT_TRUE(header_resp.has_response_headers());
+        bool seen_response_headers = false;
+
+        // Reading from the stream, we might receive the response headers
+        // later if we execute the local reply after the filter executes.
+        const int num_reads_for_response_headers =
+            Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.http_filter_avoid_reentrant_local_reply")
+                ? 2
+                : 1;
+        for (int i = 0; i < num_reads_for_response_headers; ++i) {
+          if (stream->Read(&header_resp) && header_resp.has_response_headers()) {
+            seen_response_headers = true;
+            break;
+          }
         }
+
+        ASSERT_TRUE(seen_response_headers);
       });
 
+  // Increase beyond the default to avoid timing out before getting the
+  // sidecar response.
+  proto_config_.mutable_message_timeout()->set_seconds(2);
   initializeConfig();
   HttpIntegrationTest::initialize();
   sendPostRequest(num_chunks, chunk_size, [total_size](Http::HeaderMap& headers) {

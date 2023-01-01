@@ -208,16 +208,5 @@ inline std::vector<std::string> parseHttpData(const test::fuzz::HttpData& data) 
   return data_chunks;
 }
 
-// Returns a vector of differences between expected and actual. An empty array indicates
-// expected==actual
-std::vector<std::string> fuzzFindDiffs(absl::string_view expected, absl::string_view actual);
-
-#define FUZZ_ASSERT_EQ(expected, actual, annotation)                                               \
-  {                                                                                                \
-    std::vector<std::string> diffs = fuzzFindDiffs(expected, actual);                              \
-    RELEASE_ASSERT(expected == actual, absl::StrCat(annotation, ": ", expected, " != ", actual,    \
-                                                    "\n  ", absl::StrJoin(diffs, "\n  ")));        \
-  }
-
 } // namespace Fuzz
 } // namespace Envoy

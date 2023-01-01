@@ -37,7 +37,8 @@ public:
   MOCK_METHOD(Tcp::ConnectionPool::InstancePtr, allocateTcpConnPool,
               (Event::Dispatcher & dispatcher, HostConstSharedPtr host, ResourcePriority priority,
                const Network::ConnectionSocket::OptionsSharedPtr& options,
-               Network::TransportSocketOptionsConstSharedPtr, ClusterConnectivityState& state));
+               Network::TransportSocketOptionsConstSharedPtr, ClusterConnectivityState& state,
+               absl::optional<std::chrono::milliseconds> tcp_pool_idle_timeout));
 
   MOCK_METHOD((std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>), clusterFromProto,
               (const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,

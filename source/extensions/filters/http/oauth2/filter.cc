@@ -56,9 +56,6 @@ constexpr const char* CookieTailFormatString = ";version=1;path=/;Max-Age={};sec
 constexpr const char* CookieTailHttpOnlyFormatString =
     ";version=1;path=/;Max-Age={};secure;HttpOnly";
 
-const char* AuthorizationEndpointFormat =
-    "{}?client_id={}&scope={}&response_type=code&redirect_uri={}&state={}";
-
 constexpr absl::string_view UnauthorizedBodyMessage = "OAuth flow failed.";
 
 const std::string& queryParamsError() { CONSTRUCT_ON_FIRST_USE(std::string, "error"); }
@@ -137,6 +134,15 @@ getAuthType(envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType 
   }
 }
 
+Http::Utility::QueryParams buildAutorizationQueryParams(
+    const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& proto_config) {
+  auto query_params = Http::Utility::parseQueryString(proto_config.authorization_endpoint());
+  query_params["client_id"] = proto_config.credentials().client_id();
+  query_params["response_type"] = "code";
+  query_params["scope"] = Http::Utility::PercentEncoding::encode(
+      absl::StrJoin(authScopesList(proto_config.auth_scopes()), " "), ":/=&? ");
+  return query_params;
+}
 } // namespace
 
 FilterConfig::FilterConfig(
@@ -145,13 +151,12 @@ FilterConfig::FilterConfig(
     Stats::Scope& scope, const std::string& stats_prefix)
     : oauth_token_endpoint_(proto_config.token_endpoint()),
       authorization_endpoint_(proto_config.authorization_endpoint()),
+      authorization_query_params_(buildAutorizationQueryParams(proto_config)),
       client_id_(proto_config.credentials().client_id()),
       redirect_uri_(proto_config.redirect_uri()),
       redirect_matcher_(proto_config.redirect_path_matcher()),
       signout_path_(proto_config.signout_path()), secret_reader_(secret_reader),
       stats_(FilterConfig::generateStats(stats_prefix, scope)),
-      encoded_auth_scopes_(Http::Utility::PercentEncoding::encode(
-          absl::StrJoin(authScopesList(proto_config.auth_scopes()), " "), ":/=&? ")),
       encoded_resource_query_params_(encodeResourceList(proto_config.resources())),
       forward_bearer_token_(proto_config.forward_bearer_token()),
       pass_through_header_matchers_(headerMatchers(proto_config.pass_through_matcher())),
@@ -161,6 +166,12 @@ FilterConfig::FilterConfig(
     throw EnvoyException(fmt::format("OAuth2 filter: unknown cluster '{}' in config. Please "
                                      "specify which cluster to direct OAuth requests to.",
                                      oauth_token_endpoint_.cluster()));
+  }
+  if (!authorization_endpoint_url_.initialize(authorization_endpoint_,
+                                              /*is_connect_request=*/false)) {
+    throw EnvoyException(
+        fmt::format("OAuth2 filter: invalid authorization endpoint URL '{}' in config.",
+                    authorization_endpoint_));
   }
 }
 
@@ -329,9 +340,15 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     const std::string escaped_redirect_uri =
         Http::Utility::PercentEncoding::encode(redirect_uri, ":/=&?");
 
-    const std::string new_url = fmt::format(
-        AuthorizationEndpointFormat, config_->authorizationEndpoint(), config_->clientId(),
-        config_->encodedAuthScopes(), escaped_redirect_uri, escaped_state);
+    auto query_params = config_->authorizationQueryParams();
+    query_params["redirect_uri"] = escaped_redirect_uri;
+    query_params["state"] = escaped_state;
+    // Copy the authorization endpoint URL to replace its query params.
+    auto authorization_endpoint_url = config_->authorizationEndpointUrl();
+    const std::string path_and_query_params = Http::Utility::replaceQueryString(
+        Http::HeaderString(authorization_endpoint_url.pathAndQueryParams()), query_params);
+    authorization_endpoint_url.setPathAndQueryParams(path_and_query_params);
+    const std::string new_url = authorization_endpoint_url.toString();
 
     response_headers->setLocation(new_url + config_->encodedResourceQueryParams());
     decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_FOR_CREDENTIALS);

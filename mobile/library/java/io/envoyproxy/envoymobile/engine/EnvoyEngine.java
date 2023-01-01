@@ -54,56 +54,6 @@ public interface EnvoyEngine {
    */
   int recordCounterInc(String elements, Map<String, String> tags, int count);
 
-  /**
-   * Set a gauge of a given string of elements with the given value.
-   *
-   * @param elements Elements of the gauge stat.
-   * @param tags Tags of the gauge stat.
-   * @param value Value to set to the gauge.
-   * @return A status indicating if the action was successful.
-   */
-  int recordGaugeSet(String elements, Map<String, String> tags, int value);
-
-  /**
-   * Add the gauge with the given string of elements and by the given amount.
-   *
-   * @param elements Elements of the gauge stat.
-   * @param tags Tags of the gauge stat.
-   * @param amount Amount to add to the gauge.
-   * @return A status indicating if the action was successful.
-   */
-  int recordGaugeAdd(String elements, Map<String, String> tags, int amount);
-
-  /**
-   * Subtract from the gauge with the given string of elements and by the given amount.
-   *
-   * @param elements Elements of the gauge stat.
-   * @param tags Tags of the gauge stat.
-   * @param amount Amount to subtract from the gauge.
-   * @return A status indicating if the action was successful.
-   */
-  int recordGaugeSub(String elements, Map<String, String> tags, int amount);
-
-  /**
-   * Add another recorded duration in ms to the timer histogram with the given string of elements.
-   *
-   * @param elements Elements of the histogram stat.
-   * @param tags Tags of the histogram stat.
-   * @param durationMs Duration value to record in the histogram timer distribution.
-   * @return A status indicating if the action was successful.
-   */
-  int recordHistogramDuration(String elements, Map<String, String> tags, int durationMs);
-
-  /**
-   * Add another recorded value to the generic histogram with the given string of elements.
-   *
-   * @param elements Elements of the histogram stat.
-   * @param tags Tags of the histogram stat.
-   * @param value Amount to record as a new value for the histogram distribution.
-   * @return A status indicating if the action was successful.
-   */
-  int recordHistogramValue(String elements, Map<String, String> tags, int value);
-
   int registerStringAccessor(String accessor_name, EnvoyStringAccessor accessor);
 
   /**

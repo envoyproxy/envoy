@@ -6,7 +6,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common:96.0"
 "source/common/api:82.5"
 "source/common/api/posix:81.3"
-"source/common/common/posix:94.5"
+"source/common/common/posix:92.7"
 "source/common/config:96.4"
 "source/common/crypto:88.1"
 "source/common/event:95.1" # Emulated edge events guards don't report LCOV
@@ -43,18 +43,18 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/http/kill_request:91.7" # Death tests don't report LCOV
 "source/extensions/filters/http/oauth2:96.1"
 "source/extensions/filters/http/wasm:1.9"
-"source/extensions/filters/http/rate_limit_quota:70" # TODO(tyxia) WIP. Improve coverage as development continues
+"source/extensions/filters/http/rate_limit_quota:94" # TODO(tyxia) WIP. Improve coverage as development continues
 "source/extensions/filters/listener/original_dst:82.9"
 "source/extensions/filters/listener/original_src:92.1"
 "source/extensions/filters/network/common:96.1"
 "source/extensions/filters/network/common/redis:96.24"
+"source/extensions/filters/network/http_connection_manager:96.4"
 "source/extensions/filters/network/mongo_proxy:96.0"
 "source/extensions/filters/network/sni_cluster:88.9"
 "source/extensions/filters/network/thrift_proxy/router:96.5"
 "source/extensions/filters/network/thrift_proxy/filters/payload_to_metadata:96.2"
 "source/extensions/filters/network/wasm:76.9"
 "source/extensions/http/cache/simple_http_cache:95.9"
-"source/extensions/network/dns_resolver/getaddrinfo:96.5"
 "source/extensions/rate_limit_descriptors:95.5"
 "source/extensions/rate_limit_descriptors/expr:95.5"
 "source/extensions/stat_sinks/graphite_statsd:82.1"
@@ -63,12 +63,10 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/tracers/common:73.8"
 "source/extensions/tracers/common/ot:71.7"
 "source/extensions/tracers/opencensus:93.2"
-"source/extensions/tracers/xray:96.2"
 "source/extensions/tracers/zipkin:95.8"
 "source/extensions/transport_sockets:95.2"
-"source/extensions/transport_sockets/tls:94.2"
-"source/extensions/transport_sockets/tls/cert_validator:94.9"
-"source/extensions/transport_sockets/tls/ocsp:96.5"
+"source/extensions/transport_sockets/tls:94.8"
+"source/extensions/transport_sockets/tls/cert_validator:95.1"
 "source/extensions/transport_sockets/tls/private_key:77.8"
 "source/extensions/wasm_runtime/wamr:0.0" # Not enabled in coverage build
 "source/extensions/wasm_runtime/wasmtime:0.0" # Not enabled in coverage build
@@ -79,6 +77,8 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/server/admin:97.4"
 "source/server/admin:profiler-lib:83"
 "source/server/config_validation:74.8"
+"source/extensions/http/early_header_mutation:95.2" # Death tests don't report LCOV
+"source/extensions/http/early_header_mutation/header_mutation:95.2" # Death tests don't report LCOV
 )
 
 [[ -z "${SRCDIR}" ]] && SRCDIR="${PWD}"

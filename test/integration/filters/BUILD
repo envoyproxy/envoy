@@ -278,6 +278,22 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "assert_non_reentrant_filter_lib",
+    srcs = [
+        "assert_non_reentrant_filter.cc",
+    ],
+    deps = [
+        ":common_lib",
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+    ],
+)
+
+envoy_cc_test_library(
     name = "add_trailers_filter_config_lib",
     srcs = [
         "add_trailers_filter.cc",
@@ -332,6 +348,7 @@ envoy_cc_test_library(
         "//envoy/server:filter_config_interface",
         "//source/common/stats:symbol_table_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
     ],
 )

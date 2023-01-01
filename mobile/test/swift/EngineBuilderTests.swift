@@ -137,6 +137,20 @@ final class EngineBuilderTests: XCTestCase {
     self.waitForExpectations(timeout: 0.01)
   }
 
+  func testForceIPv6AddsToConfigurationWhenRunningEnvoy() {
+    let expectation = self.expectation(description: "Run called with force IPv6")
+    MockEnvoyEngine.onRunWithConfig = { config, _ in
+      XCTAssertTrue(config.forceIPv6)
+      expectation.fulfill()
+    }
+
+    _ = EngineBuilder()
+      .addEngineType(MockEnvoyEngine.self)
+      .forceIPv6(true)
+      .build()
+    self.waitForExpectations(timeout: 0.01)
+  }
+
   func testAddinggrpcStatsDomainAddsToConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
@@ -451,12 +465,14 @@ final class EngineBuilderTests: XCTestCase {
       dnsQueryTimeoutSeconds: 800,
       dnsMinRefreshSeconds: 100,
       dnsPreresolveHostnames: "[test]",
+      enableDNSCache: false,
       enableHappyEyeballs: true,
       enableGzip: true,
       enableBrotli: false,
       enableInterfaceBinding: true,
       enableDrainPostDnsRefresh: false,
       enforceTrustChainVerification: false,
+      forceIPv6: false,
       enablePlatformCertificateValidation: false,
       h2ConnectionKeepaliveIdleIntervalMilliseconds: 1,
       h2ConnectionKeepaliveTimeoutSeconds: 333,
@@ -490,6 +506,7 @@ final class EngineBuilderTests: XCTestCase {
     XCTAssertTrue(resolvedYAML.contains("&dns_preresolve_hostnames [test]"))
     XCTAssertTrue(resolvedYAML.contains("&dns_lookup_family ALL"))
     XCTAssertTrue(resolvedYAML.contains("&dns_multiple_addresses true"))
+    XCTAssertFalse(resolvedYAML.contains("&persistent_dns_cache_config"))
     XCTAssertTrue(resolvedYAML.contains("&enable_interface_binding true"))
     XCTAssertTrue(resolvedYAML.contains("&trust_chain_verification ACCEPT_UNTRUSTED"))
     XCTAssertTrue(resolvedYAML.contains("""
@@ -544,12 +561,14 @@ final class EngineBuilderTests: XCTestCase {
       dnsQueryTimeoutSeconds: 800,
       dnsMinRefreshSeconds: 100,
       dnsPreresolveHostnames: "[test]",
+      enableDNSCache: true,
       enableHappyEyeballs: false,
       enableGzip: false,
       enableBrotli: true,
       enableInterfaceBinding: false,
       enableDrainPostDnsRefresh: true,
       enforceTrustChainVerification: true,
+      forceIPv6: false,
       enablePlatformCertificateValidation: true,
       h2ConnectionKeepaliveIdleIntervalMilliseconds: 1,
       h2ConnectionKeepaliveTimeoutSeconds: 333,
@@ -575,6 +594,21 @@ final class EngineBuilderTests: XCTestCase {
     )
     let resolvedYAML = try XCTUnwrap(config.resolveTemplate(kMockTemplate))
     XCTAssertTrue(resolvedYAML.contains("&dns_lookup_family V4_PREFERRED"))
+// swiftlint:disable line_length
+    XCTAssertTrue(resolvedYAML.contains(
+"""
+- &persistent_dns_cache_config
+  config:
+    name: "envoy.key_value.platform"
+    typed_config:
+      "@type": type.googleapis.com/envoymobile.extensions.key_value.platform.PlatformKeyValueStoreConfig
+      key: dns_persistent_cache
+      save_interval:
+        seconds: 0
+      max_entries: 100
+"""
+    ))
+// swiftlint:enable line_length
     XCTAssertTrue(resolvedYAML.contains("&dns_multiple_addresses false"))
     XCTAssertTrue(resolvedYAML.contains("&enable_interface_binding false"))
     XCTAssertTrue(resolvedYAML.contains("&trust_chain_verification VERIFY_TRUST_CHAIN"))
@@ -604,12 +638,14 @@ final class EngineBuilderTests: XCTestCase {
       dnsQueryTimeoutSeconds: 800,
       dnsMinRefreshSeconds: 100,
       dnsPreresolveHostnames: "[test]",
+      enableDNSCache: false,
       enableHappyEyeballs: false,
       enableGzip: false,
       enableBrotli: false,
       enableInterfaceBinding: false,
       enableDrainPostDnsRefresh: false,
       enforceTrustChainVerification: true,
+      forceIPv6: false,
       enablePlatformCertificateValidation: true,
       h2ConnectionKeepaliveIdleIntervalMilliseconds: 222,
       h2ConnectionKeepaliveTimeoutSeconds: 333,

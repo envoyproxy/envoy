@@ -432,6 +432,34 @@ TEST(PathMatcher, MatchPrefixPathIgnoreCase) {
   EXPECT_FALSE(matcher->match("/prefiz#/prefix"));
 }
 
+TEST(PathMatcher, SlashPrefixMatcherShared) {
+  // Create 3 matchers and verify that the same instance is being reused for them.
+  const auto matcher1 = Envoy::Matchers::PathMatcher::createPrefix("/", false);
+  const auto matcher2 = Envoy::Matchers::PathMatcher::createPrefix("/", false);
+  const auto matcher3 = Envoy::Matchers::PathMatcher::createPrefix("/", true);
+
+  EXPECT_EQ(matcher1, matcher2);
+  EXPECT_EQ(matcher1, matcher3);
+
+  // Sanity check that the matcher works as expected.
+  EXPECT_TRUE(matcher1->match("/bla"));
+  EXPECT_FALSE(matcher1->match("bla"));
+}
+
+TEST(PathMatcher, EmptyPrefixMatcherShared) {
+  // Create 3 matchers and verify that the same instance is being reused for them.
+  const auto matcher1 = Envoy::Matchers::PathMatcher::createPrefix("", false);
+  const auto matcher2 = Envoy::Matchers::PathMatcher::createPrefix("", false);
+  const auto matcher3 = Envoy::Matchers::PathMatcher::createPrefix("", true);
+
+  EXPECT_EQ(matcher1, matcher2);
+  EXPECT_EQ(matcher1, matcher3);
+
+  // Sanity check that the matcher works as expected.
+  EXPECT_TRUE(matcher1->match("/bla"));
+  EXPECT_TRUE(matcher1->match("bla"));
+}
+
 TEST(PathMatcher, MatchSuffixPath) {
   envoy::type::matcher::v3::PathMatcher matcher;
   matcher.mutable_path()->set_suffix("suffix");
