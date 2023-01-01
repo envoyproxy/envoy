@@ -184,9 +184,15 @@ private:
       parent_.upstream_callbacks_.onUpstreamData(data, end_stream);
       if (end_stream) {
         parent_.doneReading();
+        done_reading_called_ = true;
       }
     }
-    void decodeTrailers(Http::ResponseTrailerMapPtr&&) override {}
+    void decodeTrailers(Http::ResponseTrailerMapPtr&&) override {
+      if (!done_reading_called_) {
+        parent_.doneReading();
+        done_reading_called_ = true;
+      }
+    }
     void decodeMetadata(Http::MetadataMapPtr&&) override {}
     void dumpState(std::ostream& os, int indent_level) const override {
       DUMP_STATE_UNIMPLEMENTED(DecoderShim);
@@ -194,6 +200,7 @@ private:
 
   private:
     HttpUpstream& parent_;
+    bool done_reading_called_{};
   };
   DecoderShim response_decoder_;
   Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks_;
