@@ -21,7 +21,7 @@ StatsRequest::StatsRequest(Stats::Store& stats, const StatsParams& params,
     phase_ = 1;
     break;
   case StatsType::Histograms:
-    phase_ = 3;
+    phase_ = 2;
     break;
   }
 }
