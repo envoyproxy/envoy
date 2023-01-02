@@ -183,14 +183,14 @@ private:
     void decodeData(Buffer::Instance& data, bool end_stream) override {
       parent_.upstream_callbacks_.onUpstreamData(data, end_stream);
       if (end_stream) {
-        parent_.doneReading();
         done_reading_called_ = true;
+        parent_.doneReading();
       }
     }
     void decodeTrailers(Http::ResponseTrailerMapPtr&&) override {
       if (!done_reading_called_) {
-        parent_.doneReading();
         done_reading_called_ = true;
+        parent_.doneReading();
       }
     }
     void decodeMetadata(Http::MetadataMapPtr&&) override {}
