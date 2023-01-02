@@ -190,6 +190,7 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   }
   if (Http::HeaderUtility::requestHeadersValid(*headers) != absl::nullopt ||
       Http::HeaderUtility::checkRequiredRequestHeaders(*headers) != Http::okStatus() ||
+      Http::HeaderUtility::checkValidRequestHeaders(*headers) != Http::okStatus() ||
       (headers->Protocol() && !spdy_session()->allow_extended_connect())) {
     details_ = Http3ResponseCodeDetailValues::invalid_http_header;
     onStreamError(absl::nullopt);

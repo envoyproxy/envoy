@@ -3650,6 +3650,153 @@ TEST_P(ProtocolIntegrationTest, FragmentStrippedFromPathWithOverride) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
+TEST_P(DownstreamProtocolIntegrationTest, ValidateUpstreamHeaders) {
+  if (upstreamProtocol() == Http::CodecType::HTTP3) {
+    // For QUIC, even through the headers are not sent upstream, the stream will
+    // be created. Use the autonomous upstream and allow incomplete streams.
+    autonomous_allow_incomplete_streams_ = true;
+    autonomous_upstream_ = true;
+  }
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  config_helper_.prependFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
+                               "type.googleapis.com/google.protobuf.Empty } }");
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"x-add-invalid-header-value", "true"}});
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  if (upstreamProtocol() != Http::CodecType::HTTP3) {
+    EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("invalid_header_value_for:_x-foo"));
+  }
+}
+
+TEST_P(ProtocolIntegrationTest, ValidateUpstreamMixedCaseHeaders) {
+#ifdef ENVOY_ENABLE_UHV
+  // UHV does not support this case so far.
+  return;
+#endif
+  if (upstreamProtocol() != Http::CodecType::HTTP1) {
+    autonomous_allow_incomplete_streams_ = true;
+    autonomous_upstream_ = true;
+  }
+  if (upstreamProtocol() == Http::CodecType::HTTP3) {
+    testing_upstream_intentionally_ = true;
+  }
+  config_helper_.prependFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
+                               "type.googleapis.com/google.protobuf.Empty } }");
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  // Tell the invalid-header-filter to add a header with mixed case name.
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"x-add-mixed-case-header-key", "true"}});
+
+  // HTTP/1 upstream codec allows mixed case headers
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    waitForNextUpstreamRequest();
+
+    // Note that the fake upstream will change the header name to lowercase
+    EXPECT_EQ("some value here", upstream_request_->headers()
+                                     .get(Http::LowerCaseString("x-mixed-case"))[0]
+                                     ->value()
+                                     .getStringView());
+
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+  } else {
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("503", response->headers().getStatusValue());
+  }
+}
+
+TEST_P(ProtocolIntegrationTest, ValidateUpstreamHeadersWithOverride) {
+  if (skipForH2Uhv()) {
+    // TODO(#23288) - UHV upstream response support
+    return;
+  }
+
+  if (upstreamProtocol() == Http::CodecType::HTTP3) {
+    testing_upstream_intentionally_ = true;
+  }
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.validate_upstream_headers", "false");
+  config_helper_.prependFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
+                               "type.googleapis.com/google.protobuf.Empty } }");
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"x-add-invalid-header-key", "true"}});
+
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    // HTTP/1 upstream will parse the invalid header as two values: x-foo and x-oops.
+    // This is a defined and known behavior when the runtime guard is disabled.
+    waitForNextUpstreamRequest();
+
+    EXPECT_EQ("hello", upstream_request_->headers()
+                           .get(Http::LowerCaseString("x-foo"))[0]
+                           ->value()
+                           .getStringView());
+    EXPECT_EQ("yes", upstream_request_->headers()
+                         .get(Http::LowerCaseString("x-oops"))[0]
+                         ->value()
+                         .getStringView());
+
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+  } else if (upstreamProtocol() == Http::CodecType::HTTP2) {
+    // nghttp2 throws an error when parsing the invalid header value, resets the
+    // upstream connection, and sends back a local 503 reply.
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+    response->waitForHeaders();
+
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+
+    EXPECT_EQ("503", response->headers().getStatusValue());
+    EXPECT_THAT(waitForAccessLog(access_log_name_),
+                HasSubstr("upstream_reset_before_response_started{connection_termination}"));
+  } else {
+    response->waitForHeaders();
+
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+
+    EXPECT_EQ("503", response->headers().getStatusValue());
+  }
+}
+
 // Test buffering and then continuing after too many response bytes to buffer.
 TEST_P(ProtocolIntegrationTest, BufferContinue) {
   // Bytes sent is configured for http/2 flow control windows.
@@ -3905,6 +4052,8 @@ TEST_P(ProtocolIntegrationTest, LocalInterfaceNameForUpstreamConnection) {
 // These tests send invalid request and response header names which violate ASSERT while creating
 // such request/response headers. So they can only be run in NDEBUG mode.
 TEST_P(DownstreamProtocolIntegrationTest, InvalidReqestHeaderName) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.validate_upstream_headers", "false");
+
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -3928,6 +4077,8 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidReqestHeaderName) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, InvalidResponseHeaderName) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.validate_upstream_headers", "false");
+
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
