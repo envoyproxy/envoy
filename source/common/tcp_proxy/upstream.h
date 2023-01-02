@@ -171,9 +171,10 @@ private:
     // Http::ResponseDecoder
     void decode1xxHeaders(Http::ResponseHeaderMapPtr&&) override {}
     void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override {
-         parent_.config_.propagateResponseHeaders(std::move(headers),
-         parent_.downstream_info_.filterState());
-      if (!parent_.isValidResponse(*headers) || end_stream) {
+      bool isValidResponse = parent_.isValidResponse(*headers);
+      parent_.config_.propagateResponseHeaders(std::move(headers),
+                                               parent_.downstream_info_.filterState());
+      if (!isValidResponse || end_stream) {
         parent_.resetEncoder(Network::ConnectionEvent::LocalClose);
       } else if (parent_.conn_pool_callbacks_ != nullptr) {
         parent_.conn_pool_callbacks_->onSuccess(*parent_.request_encoder_);
