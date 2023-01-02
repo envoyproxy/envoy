@@ -59,7 +59,7 @@ be able to accept gRPC traffic:
 .. note::
 
    Mention the stuff about specifying the configuration specifically for the sandbox
-   also mention `panic threshold <https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/load_balancing/panic_threshold#arch-overview-load-balancing-panic-threshold>`__ 
+   also mention `panic threshold <https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/load_balancing/panic_threshold#arch-overview-load-balancing-panic-threshold>`__
    and it's impact on the traffic being forwarded
 
 
