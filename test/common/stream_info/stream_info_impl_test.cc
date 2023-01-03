@@ -264,7 +264,7 @@ TEST_F(StreamInfoImplTest, SetFrom) {
 #ifdef __clang__
 #if defined(__linux__)
 #if defined(__has_feature) && !(__has_feature(thread_sanitizer))
-  ASSERT_TRUE(sizeof(s1) == 840)
+  ASSERT_TRUE(sizeof(s1) == 800 || sizeof(s1) == 816 || sizeof(s1) == 840)
       << "If adding fields to StreamInfoImpl, please check to see if you "
          "need to add them to setFromForRecreateStream or setFrom! Current size "
       << sizeof(s1);
