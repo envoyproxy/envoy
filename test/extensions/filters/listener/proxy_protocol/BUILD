@@ -27,7 +27,7 @@ envoy_extension_cc_test(
         "//source/common/stats:stats_lib",
         "//source/extensions/filters/listener/proxy_protocol:config",
         "//source/extensions/filters/listener/proxy_protocol:proxy_protocol_lib",
-        "//source/server:connection_handler_lib",
+        "//source/extensions/listener_managers/listener_manager:connection_handler_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/network:network_mocks",

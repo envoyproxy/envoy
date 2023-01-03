@@ -28,9 +28,7 @@ public:
 
 class MockHeaderValidatorFactory : public HeaderValidatorFactory {
 public:
-  MOCK_METHOD(HeaderValidatorPtr, create,
-              (Protocol protocol, StreamInfo::StreamInfo& stream_info,
-               HeaderValidatorStats& stats));
+  MOCK_METHOD(HeaderValidatorPtr, create, (Protocol protocol, HeaderValidatorStats& stats));
 };
 
 } // namespace Http

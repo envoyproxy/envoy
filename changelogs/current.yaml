@@ -46,12 +46,18 @@ minor_behavior_changes:
 - area: cache_filter
   change: |
     api path of work-in-progress extension changed from ``api/extensions/cache/simple_http_cache`` to ``api/extensions/http/cache/simple_http_cache``, and source code moved, to match extension category.
+- area: http filter
+  change: |
+    Avoid re-entrant filter invocations if we do a local reply via the filter chain when executing decoder filters. This behavioral change can be temporarily reverted by setting runtime guard ``envoy_reloadable_features_http_filter_avoid_reentrant_local_reply`` to false.
 - area: http filters
   change: |
     change ``StreamEncoderFilter::encode1xxHeaders`` to use its own enum class ``Http::Filter1xxHeadersStatus``. Previously we shared the same enum class for general headers, but the implementation did not support most of them. We also fixed ``StreamEncoderFilter::encode1xxHeaders`` to send local replies without trailing 1xx headers afterward.
 - area: oauth2
   change: |
     Requests which match the passthrough header now have their own metric ``oauth_passthrough`` and aren't included in ``oauth_success`` anymore.
+- area: oauth2
+  change: |
+    query parameters in the :ref:`authorization_endpoint <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.authorization_endpoint>` are now preserved.
 - area: upstream
   change: |
     detailed health status is used for override host selection. This behavior can be reverted by setting runtime flag ``envoy.reloadable_features.validate_detailed_override_host_statuses`` to false.
@@ -116,6 +122,9 @@ bug_fixes:
 - area: jwt_authn
   change: |
     fix a bug that jwt_cache breaks the :ref:`provider_and_audiences <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtRequirement.provider_and_audiences>` JWT requirement.
+- area: health_checker
+  change: |
+    prevent writing pending data for health checkers by introducing ``ConnectionCloseType::Abort`` to avoid cascading handshake overhead from health checker's requests on timeout. This fix is related to `issue \#23718 <https://github.com/envoyproxy/envoy/issues/23718>`_.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
