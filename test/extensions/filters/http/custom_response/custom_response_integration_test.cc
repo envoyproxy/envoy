@@ -578,13 +578,12 @@ TEST_P(CustomResponseIntegrationTest, ModifyRequestHeaders) {
   // Add modify_request_headers_action to the config. This will enable
   // TestModifyRequestHeadersAction to add "x-envoy-cer-backend" header to the
   // request before being redirected.
-  modifyPolicy<RedirectPolicyProto>(custom_response_filter_config_, "520_action",
-                                    [](RedirectPolicyProto& policy) {
-                                      auto action = policy.mutable_modify_request_headers_action();
-                                      action->set_name("modify-request-headers-action");
-                                      action->mutable_typed_config()->set_type_url(
-                                          "type.googleapis.com/google.protobuf.Struct");
-                                    });
+  modifyPolicy<RedirectPolicyProto>(
+      custom_response_filter_config_, "520_action", [](RedirectPolicyProto& policy) {
+        auto action = policy.mutable_modify_request_headers_action();
+        action->set_name("modify-request-headers-action");
+        action->mutable_typed_config()->set_type_url("type.googleapis.com/google.protobuf.Struct");
+      });
 
   // Add TestModifyRequestHeaders extension that will add the
   // "x-envoy-cer-backend" header to the redirected request, which is required
