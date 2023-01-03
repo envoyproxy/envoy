@@ -26,7 +26,7 @@ public:
    * @param timeout supplies the shadowed request timeout.
    */
   virtual void shadow(const std::string& cluster, Http::RequestMessagePtr&& request,
-                      const Http::AsyncClient::RequestOptions& options) PURE;
+                      Http::AsyncClient::RequestOptions& options) PURE;
 };
 
 using ShadowWriterPtr = std::unique_ptr<ShadowWriter>;

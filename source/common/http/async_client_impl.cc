@@ -54,7 +54,7 @@ AsyncClientImpl::~AsyncClientImpl() {
 
 AsyncClient::Request* AsyncClientImpl::send(RequestMessagePtr&& request,
                                             AsyncClient::Callbacks& callbacks,
-                                            const AsyncClient::RequestOptions& options) {
+                                            AsyncClient::RequestOptions& options) {
   AsyncRequestImpl* async_request =
       new AsyncRequestImpl(std::move(request), *this, callbacks, options);
   async_request->initialize();
@@ -71,17 +71,16 @@ AsyncClient::Request* AsyncClientImpl::send(RequestMessagePtr&& request,
 }
 
 AsyncClient::Stream* AsyncClientImpl::start(AsyncClient::StreamCallbacks& callbacks,
-                                            const AsyncClient::StreamOptions& options) {
+                                            AsyncClient::StreamOptions& options) {
   std::unique_ptr<AsyncStreamImpl> new_stream{new AsyncStreamImpl(*this, callbacks, options)};
   LinkedList::moveIntoList(std::move(new_stream), active_streams_);
   return active_streams_.front().get();
 }
 
 AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
-                                 const AsyncClient::StreamOptions& options)
+                                 AsyncClient::StreamOptions& options)
     : parent_(parent), stream_callbacks_(callbacks), stream_id_(parent.config_.random_.random()),
-      router_(options.filter_config_ ? const_cast<Router::FilterConfig&>(*options.filter_config_)
-                                     : parent.config_,
+      router_(options.filter_config_ ? *options.filter_config_ : parent.config_,
               parent.config_.async_stats_),
       stream_info_(Protocol::Http11, parent.dispatcher().timeSource(), nullptr),
       tracing_config_(Tracing::EgressConfig::get()),
@@ -255,7 +254,7 @@ void AsyncStreamImpl::resetStream(Http::StreamResetReason, absl::string_view) {
 
 AsyncRequestImpl::AsyncRequestImpl(RequestMessagePtr&& request, AsyncClientImpl& parent,
                                    AsyncClient::Callbacks& callbacks,
-                                   const AsyncClient::RequestOptions& options)
+                                   AsyncClient::RequestOptions& options)
     : AsyncStreamImpl(parent, *this, options), request_(std::move(request)), callbacks_(callbacks) {
   if (nullptr != options.parent_span_) {
     const std::string child_span_name =

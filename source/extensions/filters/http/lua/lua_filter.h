@@ -312,7 +312,7 @@ private:
 
   enum Timestamp::Resolution getTimestampResolution(absl::string_view unit_parameter);
 
-  int doHttpCall(lua_State* state, const HttpCallOptions& options);
+  int doHttpCall(lua_State* state, HttpCallOptions& options);
 
   // Filters::Common::Lua::BaseLuaObject
   void onMarkDead() override {

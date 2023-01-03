@@ -148,7 +148,7 @@ void buildHeadersFromTable(Http::HeaderMap& headers, lua_State* state, int table
 }
 
 Http::AsyncClient::Request* makeHttpCall(lua_State* state, Filter& filter,
-                                         const Http::AsyncClient::RequestOptions& options,
+                                         Http::AsyncClient::RequestOptions& options,
                                          Http::AsyncClient::Callbacks& callbacks) {
   const std::string cluster = luaL_checkstring(state, 2);
   luaL_checktype(state, 3, LUA_TTABLE);
@@ -370,7 +370,7 @@ int StreamHandleWrapper::luaHttpCall(lua_State* state) {
   return doHttpCall(state, options);
 }
 
-int StreamHandleWrapper::doHttpCall(lua_State* state, const HttpCallOptions& options) {
+int StreamHandleWrapper::doHttpCall(lua_State* state, HttpCallOptions& options) {
   if (options.is_async_request_) {
     makeHttpCall(state, filter_, options.request_options_, noopCallbacks());
     return 0;

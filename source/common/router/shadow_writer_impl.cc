@@ -12,7 +12,7 @@ namespace Envoy {
 namespace Router {
 
 void ShadowWriterImpl::shadow(const std::string& cluster, Http::RequestMessagePtr&& request,
-                              const Http::AsyncClient::RequestOptions& options) {
+                              Http::AsyncClient::RequestOptions& options) {
   // It's possible that the cluster specified in the route configuration no longer exists due
   // to a CDS removal. Check that it still exists before shadowing.
   // TODO(mattklein123): Optimally we would have a stat but for now just fix the crashing issue.
@@ -29,13 +29,14 @@ void ShadowWriterImpl::shadow(const std::string& cluster, Http::RequestMessagePt
   request->headers().setHost(parts.size() == 2
                                  ? absl::StrJoin(parts, "-shadow:")
                                  : absl::StrCat(request->headers().getHostValue(), "-shadow"));
-  const auto& shadow_options = options.is_shadow ? options : [options] {
+  // This is basically fire and forget. We don't handle cancelling.
+  if (options.is_shadow) {
+    thread_local_cluster->httpAsyncClient().send(std::move(request), *this, options);
+  } else {
     Http::AsyncClient::RequestOptions actual_options(options);
     actual_options.setIsShadow(true);
-    return actual_options;
-  }();
-  // This is basically fire and forget. We don't handle cancelling.
-  thread_local_cluster->httpAsyncClient().send(std::move(request), *this, shadow_options);
+    thread_local_cluster->httpAsyncClient().send(std::move(request), *this, actual_options);
+  }
 }
 
 } // namespace Router
