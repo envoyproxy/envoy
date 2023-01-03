@@ -1,6 +1,7 @@
+#include "source/extensions/health_checkers/cached/hiredis.h"
+
 #include "source/common/common/assert.h"
 #include "source/common/event/dispatcher_impl.h"
-#include "source/extensions/health_checkers/cached/hiredis.h"
 
 namespace Envoy {
 namespace Extensions {

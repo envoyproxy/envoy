@@ -24,6 +24,7 @@ envoy_cc_library(
     name = "hiredis",
     srcs = ["hiredis.cc"],
     hdrs = ["hiredis.h"],
+    external_deps = ["hiredis"],
     deps = [
         ":client_interface",
         "//source/common/common:assert_lib",
@@ -31,8 +32,8 @@ envoy_cc_library(
         "//source/common/event:dispatcher_lib",
         "//source/common/json:json_loader_lib",
     ],
-    external_deps = ["hiredis"],
 )
+
 envoy_cc_library(
     name = "client_lib",
     srcs = ["client_impl.cc"],

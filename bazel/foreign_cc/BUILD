@@ -325,8 +325,8 @@ envoy_cmake(
         ],
     }),
     deps = [
-        "//external:ssl",
         "//external:crypto",
+        "//external:ssl",
     ],
 )
 

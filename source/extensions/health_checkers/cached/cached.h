@@ -7,9 +7,8 @@
 #include "envoy/data/core/v3/health_check_event.pb.h"
 #include "envoy/extensions/health_checkers/cached/v3/cached.pb.h"
 
-#include "source/common/upstream/health_checker_base_impl.h"
-
 #include "source/common/config/utility.h"
+#include "source/common/upstream/health_checker_base_impl.h"
 #include "source/extensions/health_checkers/cached/client.h"
 
 namespace Envoy {

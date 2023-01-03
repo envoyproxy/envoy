@@ -4,8 +4,8 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/config/utility.h"
-#include "source/extensions/health_checkers/cached/utility.h"
 #include "source/extensions/health_checkers/cached/client_impl.h"
+#include "source/extensions/health_checkers/cached/utility.h"
 
 namespace Envoy {
 namespace Extensions {
