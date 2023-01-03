@@ -2903,11 +2903,6 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectStreamRejection) {
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/12131
 TEST_P(DownstreamProtocolIntegrationTest, Test100AndDisconnect) {
-  if (GetParam().http1_implementation == Http1ParserImpl::BalsaParser) {
-    // TODO(#21245): Re-enable this test for BalsaParser.
-    return;
-  }
-
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
