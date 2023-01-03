@@ -549,6 +549,8 @@ protected:
 private:
   friend class UpstreamRequest;
 
+  enum class TimeoutRetry { Yes, No };
+
   void onPerTryTimeoutCommon(UpstreamRequest& upstream_request, Stats::Counter& error_counter,
                              const std::string& response_code_details);
   Stats::StatName upstreamZone(Upstream::HostDescriptionConstSharedPtr upstream_host);
@@ -574,7 +576,7 @@ private:
 
   void maybeDoShadowing();
   bool maybeRetryReset(Http::StreamResetReason reset_reason, UpstreamRequest& upstream_request,
-                       bool is_timeout_retry);
+                       TimeoutRetry is_timeout_retry);
   uint32_t numRequestsAwaitingHeaders();
   void onGlobalTimeout();
   void onRequestComplete();
@@ -602,7 +604,7 @@ private:
                                                 uint64_t status_code);
   void updateOutlierDetection(Upstream::Outlier::Result result, UpstreamRequest& upstream_request,
                               absl::optional<uint64_t> code);
-  void doRetry(bool can_send_early_data, bool can_use_http3, bool is_timeout_retry);
+  void doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry is_timeout_retry);
   void runRetryOptionsPredicates(UpstreamRequest& retriable_request);
   // Called immediately after a non-5xx header is received from upstream, performs stats accounting
   // and handle difference between gRPC and non-gRPC requests.

@@ -1004,7 +1004,7 @@ void Filter::onSoftPerTryTimeout(UpstreamRequest& upstream_request) {
           // Without any knowledge about what's going on in the connection pool, retry the request
           // with the safest settings which is no early data but keep using or not using alt-svc as
           // before. In this way, QUIC won't be falsely marked as broken.
-          doRetry(/*can_send_early_data*/ false, can_use_http3, /*is_timeout_retry*/ true);
+          doRetry(/*can_send_early_data*/ false, can_use_http3, TimeoutRetry::Yes);
         });
 
     if (retry_status == RetryStatus::Yes) {
@@ -1054,8 +1054,7 @@ void Filter::onPerTryTimeoutCommon(UpstreamRequest& upstream_request, Stats::Cou
   updateOutlierDetection(Upstream::Outlier::Result::LocalOriginTimeout, upstream_request,
                          absl::optional<uint64_t>(enumToInt(timeout_response_code_)));
 
-  if (maybeRetryReset(Http::StreamResetReason::LocalReset, upstream_request,
-                      /*is_timeout_retry*/ true)) {
+  if (maybeRetryReset(Http::StreamResetReason::LocalReset, upstream_request, TimeoutRetry::Yes)) {
     return;
   }
 
@@ -1069,8 +1068,7 @@ void Filter::onPerTryTimeoutCommon(UpstreamRequest& upstream_request, Stats::Cou
 void Filter::onStreamMaxDurationReached(UpstreamRequest& upstream_request) {
   upstream_request.resetStream();
 
-  if (maybeRetryReset(Http::StreamResetReason::LocalReset, upstream_request,
-                      /*is_timeout_retry*/ false)) {
+  if (maybeRetryReset(Http::StreamResetReason::LocalReset, upstream_request, TimeoutRetry::No)) {
     return;
   }
 
@@ -1158,7 +1156,7 @@ void Filter::onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_
 }
 
 bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
-                             UpstreamRequest& upstream_request, bool is_timeout_retry) {
+                             UpstreamRequest& upstream_request, TimeoutRetry is_timeout_retry) {
   // We don't retry if we already started the response, don't have a retry policy defined,
   // or if we've already retried this upstream request (currently only possible if a per
   // try timeout occurred and hedge_on_per_try_timeout is enabled).
@@ -1216,7 +1214,7 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
   updateOutlierDetection(Upstream::Outlier::Result::LocalOriginConnectFailed, upstream_request,
                          absl::nullopt);
 
-  if (maybeRetryReset(reset_reason, upstream_request, /*is_timeout_retry*/ false)) {
+  if (maybeRetryReset(reset_reason, upstream_request, TimeoutRetry::No)) {
     return;
   }
 
@@ -1407,8 +1405,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
           [this, can_use_http3 = upstream_request.upstreamStreamOptions().can_use_http3_,
            had_early_data = upstream_request.upstreamStreamOptions().can_send_early_data_](
               bool disable_early_data) -> void {
-            doRetry((disable_early_data ? false : had_early_data), can_use_http3,
-                    /*is_timeout_retry*/ false);
+            doRetry((disable_early_data ? false : had_early_data), can_use_http3, TimeoutRetry::No);
           });
       if (retry_status == RetryStatus::Yes) {
         runRetryOptionsPredicates(upstream_request);
@@ -1782,7 +1779,7 @@ void Filter::runRetryOptionsPredicates(UpstreamRequest& retriable_request) {
   }
 }
 
-void Filter::doRetry(bool can_send_early_data, bool can_use_http3, bool is_timeout_retry) {
+void Filter::doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry is_timeout_retry) {
   ENVOY_STREAM_LOG(debug, "performing retry", *callbacks_);
 
   is_retry_ = true;
@@ -1812,7 +1809,8 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3, bool is_timeo
   }
 
   if (include_timeout_retry_header_in_request_) {
-    downstream_headers_->setEnvoyIsTimeoutRetry(is_timeout_retry ? "true" : "false");
+    downstream_headers_->setEnvoyIsTimeoutRetry(is_timeout_retry == TimeoutRetry::Yes ? "true"
+                                                                                      : "false");
   }
 
   // The request timeouts only account for time elapsed since the downstream request completed
