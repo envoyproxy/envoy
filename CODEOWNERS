@@ -304,7 +304,7 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/path/uri_template_lib/proto @alyssawilk @yanjunxiang-google
 
 # cached health checker extension
-/*/extensions/health_checkers/cached @hudayou @mainx07
+/*/extensions/health_checkers/cached @hudayou @mainx07 @@mattklein123
 
 # mobile
 /mobile/ @jpsim @Augustyniak @RyanTheOptimist @alyssawilk @abeyad
