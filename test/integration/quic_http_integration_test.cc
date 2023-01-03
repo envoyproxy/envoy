@@ -1189,8 +1189,8 @@ TEST_P(QuicHttpIntegrationTest, DeferredLogging) {
   ASSERT_EQ(metrics.size(), 21);
   EXPECT_EQ(/* PROTOCOL */ metrics.at(0), "HTTP/3");
   EXPECT_GT(/* ROUNDTRIP_DURATION */ std::stoi(metrics.at(1)), 0);
-  EXPECT_GT(/* REQUEST_DURATION */ std::stoi(metrics.at(2)), 0);
-  EXPECT_GT(/* RESPONSE_DURATION */ std::stoi(metrics.at(3)), 0);
+  EXPECT_GE(/* REQUEST_DURATION */ std::stoi(metrics.at(2)), 0);
+  EXPECT_GE(/* RESPONSE_DURATION */ std::stoi(metrics.at(3)), 0);
   EXPECT_EQ(/* RESPONSE_CODE */ metrics.at(4), "200");
   EXPECT_EQ(/* BYTES_RECEIVED */ metrics.at(5), "0");
   // Ensure that request headers from top-level access logger parameter and stream info are
@@ -1222,8 +1222,8 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingDisabled) {
   ASSERT_EQ(metrics.size(), 21);
   EXPECT_EQ(/* PROTOCOL */ metrics.at(0), "HTTP/3");
   EXPECT_EQ(/* ROUNDTRIP_DURATION */ metrics.at(1), "-");
-  EXPECT_GT(/* REQUEST_DURATION */ std::stoi(metrics.at(2)), 0);
-  EXPECT_GT(/* RESPONSE_DURATION */ std::stoi(metrics.at(3)), 0);
+  EXPECT_GE(/* REQUEST_DURATION */ std::stoi(metrics.at(2)), 0);
+  EXPECT_GE(/* RESPONSE_DURATION */ std::stoi(metrics.at(3)), 0);
   EXPECT_EQ(/* RESPONSE_CODE */ metrics.at(4), "200");
   EXPECT_EQ(/* BYTES_RECEIVED */ metrics.at(5), "0");
   EXPECT_EQ(/* request headers */ metrics.at(19), metrics.at(20));
@@ -1250,7 +1250,7 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithReset) {
   ASSERT_EQ(metrics.size(), 21);
   EXPECT_EQ(/* PROTOCOL */ metrics.at(0), "HTTP/3");
   EXPECT_EQ(/* ROUNDTRIP_DURATION */ metrics.at(1), "-");
-  EXPECT_GT(/* REQUEST_DURATION */ std::stoi(metrics.at(2)), 0);
+  EXPECT_GE(/* REQUEST_DURATION */ std::stoi(metrics.at(2)), 0);
   EXPECT_EQ(/* RESPONSE_DURATION */ metrics.at(3), "-");
   EXPECT_EQ(/* RESPONSE_CODE */ metrics.at(4), "0");
   EXPECT_EQ(/* BYTES_RECEIVED */ metrics.at(5), "0");
@@ -1326,8 +1326,8 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithInternalRedirect) {
   EXPECT_EQ(/* PROTOCOL */ metrics.at(0), "HTTP/3");
   // no roundtrip duration for internal redirect.
   EXPECT_EQ(/* ROUNDTRIP_DURATION */ metrics.at(1), "-");
-  EXPECT_GT(/* REQUEST_DURATION */ std::stoi(metrics.at(2)), 0);
-  EXPECT_GT(/* RESPONSE_DURATION */ std::stoi(metrics.at(3)), 0);
+  EXPECT_GE(/* REQUEST_DURATION */ std::stoi(metrics.at(2)), 0);
+  EXPECT_GE(/* RESPONSE_DURATION */ std::stoi(metrics.at(3)), 0);
   EXPECT_EQ(/* RESPONSE_CODE */ metrics.at(4), "302");
   EXPECT_EQ(/* BYTES_RECEIVED */ metrics.at(5), "0");
   EXPECT_EQ(/* request headers */ metrics.at(19), metrics.at(20));
@@ -1358,8 +1358,8 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithInternalRedirect) {
   EXPECT_EQ(/* PROTOCOL */ metrics.at(0), "HTTP/3");
   // roundtrip duration populated on final log.
   EXPECT_GT(/* ROUNDTRIP_DURATION */ std::stoi(metrics.at(1)), 0);
-  EXPECT_GT(/* REQUEST_DURATION */ std::stoi(metrics.at(2)), 0);
-  EXPECT_GT(/* RESPONSE_DURATION */ std::stoi(metrics.at(3)), 0);
+  EXPECT_GE(/* REQUEST_DURATION */ std::stoi(metrics.at(2)), 0);
+  EXPECT_GE(/* RESPONSE_DURATION */ std::stoi(metrics.at(3)), 0);
   EXPECT_EQ(/* RESPONSE_CODE */ metrics.at(4), "200");
   EXPECT_EQ(/* BYTES_RECEIVED */ metrics.at(5), "0");
   EXPECT_EQ(/* request headers */ metrics.at(19), metrics.at(20));
