@@ -44,6 +44,7 @@ RUNTIME_GUARD(envoy_reloadable_features_expand_agnostic_stream_lifetime);
 RUNTIME_GUARD(envoy_reloadable_features_finish_reading_on_decode_trailers);
 RUNTIME_GUARD(envoy_reloadable_features_fix_hash_key);
 RUNTIME_GUARD(envoy_reloadable_features_format_ports_as_numbers);
+RUNTIME_GUARD(envoy_reloadable_features_http1_use_balsa_parser);
 RUNTIME_GUARD(envoy_reloadable_features_http2_decode_metadata_with_quiche);
 RUNTIME_GUARD(envoy_reloadable_features_http2_validate_authority_with_quiche);
 RUNTIME_GUARD(envoy_reloadable_features_http_allow_partial_urls_in_referer);
@@ -90,8 +91,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_unified_mux);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_defer_processing_backedup_streams);
 // TODO(birenroy) flip after a burn-in period
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
-// TODO(bencebeky): Finish BalsaParser implementation, then enable by default. See issue #21245.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_http1_use_balsa_parser);
 // Used to track if runtime is initialized.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_runtime_initialized);
 // TODO(mattklein123): Flip this to true and/or remove completely once verified by Envoy Mobile.
