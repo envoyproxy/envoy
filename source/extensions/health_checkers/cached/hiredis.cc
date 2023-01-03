@@ -8,6 +8,125 @@ namespace Extensions {
 namespace HealthCheckers {
 namespace CachedHealthChecker {
 
+namespace {
+
+static inline bool isError(redisReply& reply) { return reply.type == REDIS_REPLY_ERROR; }
+
+static inline void throwError(const redisContext& ctx, const std::string& err_info) {
+  auto err_code = ctx.err;
+  const auto* err_str = ctx.errstr;
+  if (err_str == nullptr) {
+    throw EnvoyException(err_info + static_cast<std::string>(": null error message: ") +
+                         std::to_string(err_code));
+  } else {
+    auto err_msg = err_info + static_cast<std::string>(": ") + err_str;
+    throw EnvoyException(err_msg);
+  }
+}
+
+static inline void throwError(const redisReply& reply) {
+  ASSERT(reply.type == REDIS_REPLY_ERROR);
+
+  if (reply.str == nullptr) {
+    throw EnvoyException("Null error reply");
+  }
+
+  auto err_str = std::string(reply.str, reply.len);
+
+  throw EnvoyException(err_str);
+}
+
+static inline timeval toTimeval(const std::chrono::milliseconds& dur) {
+  auto sec = std::chrono::duration_cast<std::chrono::seconds>(dur);
+  auto msec = std::chrono::duration_cast<std::chrono::microseconds>(dur - sec);
+
+  timeval t;
+  t.tv_sec = sec.count();
+  t.tv_usec = msec.count();
+  return t;
+}
+
+} // namespace
+
+Command::Command(char* data, int len) : data_(data), size_(len) {
+  if (data == nullptr || len < 0) {
+    throw EnvoyException("failed to format command");
+  }
+}
+
+Command::Command(Command&& that) noexcept { move(std::move(that)); }
+
+Command& Command::operator=(Command&& that) noexcept {
+  if (this != &that) {
+    move(std::move(that));
+  }
+
+  return *this;
+}
+
+Command::~Command() noexcept {
+  if (data_ != nullptr) {
+    redisFreeCommand(data_);
+  }
+}
+
+const char* Command::data() const noexcept { return data_; }
+
+int Command::size() const noexcept { return size_; }
+
+void Command::move(Command&& that) noexcept {
+  data_ = that.data_;
+  size_ = that.size_;
+  that.data_ = nullptr;
+  that.size_ = 0;
+}
+
+template <typename... Args> Command cmd(const char* format, Args&&... args) {
+  char* data = nullptr;
+  auto len = redisFormatCommand(&data, format, std::forward<Args>(args)...);
+
+  return Command(data, len);
+}
+
+template <typename Callback> class Handler {
+public:
+  Handler(Callback c) : c_(c) {}
+
+  static void callback(redisAsyncContext* ctx, void* reply, void* privdata) {
+    (static_cast<Handler<Callback>*>(privdata))->operator()(ctx, reply);
+  }
+
+  void operator()(redisAsyncContext* ctx, void* reply) {
+    c_(static_cast<redisReply*>(reply));
+    redisContext* c = &(ctx->c);
+    if (c->flags & REDIS_SUBSCRIBED)
+      return;
+    delete (this);
+  }
+
+private:
+  Callback c_;
+};
+
+template <typename Callback> class CommandEvent : public BaseEvent {
+public:
+  explicit CommandEvent(Command cmd, Handler<Callback>* cb)
+      : cmd_(std::move(cmd)), cb_(std::move(cb)) {}
+
+  void handle(redisAsyncContext* ctx) override {
+    if (redisAsyncFormattedCommand(ctx, Handler<Callback>::callback, cb_, cmd_.data(),
+                                   cmd_.size()) != REDIS_OK) {
+      throwError(ctx->c, "failed to send command");
+    }
+  }
+
+private:
+  Command cmd_;
+  Handler<Callback>* cb_;
+};
+
+template <typename Callback> using CommandEventUPtr = std::unique_ptr<CommandEvent<Callback>>;
+
 Connection::Connection(ConnectionOptionsPtr opts, Event::Dispatcher& dispatcher, CachePtr cache,
                        Random::RandomGenerator& random, bool subscribed)
     : opts_(opts), dispatcher_(dispatcher), cache_(cache), subscribed_(subscribed),
@@ -405,6 +524,46 @@ CAsyncContextPtr Connection::connect(const ConnectionOptions& opts) {
 
 void Connection::setRetryTimer() {
   retry_timer_->enableTimer(std::chrono::milliseconds(backoff_strategy_->nextBackOffMs()));
+}
+
+CacheImpl::CacheImpl(ConnectionOptionsPtr opts, Event::Dispatcher& dispatcher,
+                     Random::RandomGenerator& random)
+    : get_connection_(opts, dispatcher, static_cast<CachePtr>(this), random, false),
+      set_connection_(opts, dispatcher, static_cast<CachePtr>(this), random, true) {}
+
+void CacheImpl::onGetCache(const std::string& hostname, const std::string& status) {
+  if (!host_status_map_.contains(hostname)) {
+    return;
+  }
+  try {
+    const std::string status_document_value = std::string(status);
+    Json::ObjectSharedPtr document_json;
+    document_json = Json::Factory::loadFromString(status_document_value);
+    const bool is_healthy = document_json->getBoolean(IS_HEALTHY);
+    host_status_map_.insert_or_assign(hostname, is_healthy);
+  } catch (EnvoyException& e) {
+    ENVOY_LOG(error,
+              "CachedHealthChecker Cache onGetCache. Could not parse health status for host "
+              "'{}': {}",
+              hostname, e.what());
+  }
+}
+
+void CacheImpl::add(const std::string& hostname) {
+  if (!host_status_map_.contains(hostname)) {
+    host_status_map_.emplace(hostname, false);
+  }
+  getCache(hostname);
+}
+
+bool CacheImpl::get(const std::string& hostname) {
+  auto itr = host_status_map_.find(hostname);
+  if (itr == host_status_map_.end()) {
+    host_status_map_.emplace(hostname, false);
+    getCache(hostname);
+    return false;
+  }
+  return itr->second;
 }
 
 } // namespace CachedHealthChecker
