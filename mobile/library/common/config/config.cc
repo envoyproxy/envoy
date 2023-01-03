@@ -496,28 +496,22 @@ stats_config:
   stats_matcher:
     inclusion_list:
       patterns:
-        - safe_regex:
-            regex: '^cluster\.[\w]+?\.upstream_cx_[\w]+'
-        - safe_regex:
-            regex: '^cluster\.[\w]+?\.upstream_rq_[\w]+'
-        - safe_regex:
-            regex: '^cluster\.[\w]+?\.update_(attempt|success|failure)'
-        - safe_regex:
-            regex: '^cluster\.[\w]+?\.http2.keepalive_timeout'
-        - safe_regex:
-            regex: '^dns.apple.*'
-        - safe_regex:
-            regex: '^http.client.*'
-        - safe_regex:
-            regex: '^http.dispatcher.*'
-        - safe_regex:
-            regex: '^http.hcm.decompressor.*'
-        - safe_regex:
-            regex: '^http.hcm.downstream_rq_[\w]+'
-        - safe_regex:
-            regex: '^pbf_filter.*'
-        - safe_regex:
-            regex: '^pulse.*'
+        - prefix: cluster.base.upstream_cx_
+        - prefix: cluster.base_h2.upstream_cx_
+        - prefix: cluster.stats.upstream_cx_
+        - prefix: cluster.base.upstream_rq_
+        - prefix: cluster.base_h2.upstream_rq_
+        - prefix: cluster.stats.upstream_rq_
+        - prefix: cluster.base.http2.keepalive_timeout
+        - prefix: cluster.base_h2.http2.keepalive_timeout
+        - prefix: cluster.stats.http2.keepalive_timeout
+        - prefix: dns.apple.
+        - prefix: http.client.
+        - prefix: http.dispatcher.
+        - prefix: http.hcm.decompressor.
+        - prefix: http.hcm.downstream_rq_
+        - prefix: pbf_filter.
+        - prefix: pulse.
         - safe_regex:
             regex: '^vhost\.[\w]+\.vcluster\.[\w]+?\.upstream_rq_(?:[12345]xx|[3-5][0-9][0-9]|retry|total)'
   use_all_default_tags:
