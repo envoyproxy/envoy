@@ -210,7 +210,7 @@ TEST_F(AsyncClientImplTest, BasicOngoingRequest) {
   TestRequestHeaderMapImpl headers_copy = *headers;
 
   Buffer::OwnedImpl data("test data");
-  const Buffer::OwnedImpl data_copy(data);
+  const Buffer::OwnedImpl data_copy(data.toString());
 
   auto trailers = std::make_unique<TestRequestTrailerMapImpl>();
   trailers->addCopy("some", "trailer");
@@ -263,7 +263,7 @@ TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarking) {
   headers_copy.addCopy("x-forwarded-for", "127.0.0.1");
 
   Buffer::OwnedImpl data("test data");
-  const Buffer::OwnedImpl data_copy(data);
+  const Buffer::OwnedImpl data_copy(data.toString());
 
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(Invoke(
@@ -305,7 +305,8 @@ TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarking) {
   request->setWatermarkCallbacks(watermark_callbacks);
 
   EXPECT_CALL(stream_encoder_, encodeData(BufferStringEqual(""), true));
-  request->sendData(Buffer::OwnedImpl(), true);
+  Buffer::OwnedImpl empty;
+  request->sendData(empty, true);
 
   ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
   // On request end, we expect to run the low watermark callbacks.
@@ -321,7 +322,7 @@ TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarkingAndReset) {
   headers_copy.addCopy("x-forwarded-for", "127.0.0.1");
 
   Buffer::OwnedImpl data("test data");
-  const Buffer::OwnedImpl data_copy(data);
+  const Buffer::OwnedImpl data_copy(data.toString());
 
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(Invoke(
