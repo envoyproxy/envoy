@@ -388,8 +388,11 @@ ClusterManagerImpl::ClusterManagerImpl(
             validation_context.dynamicValidationVisitor(), server,
             dyn_resources.ads_config().config_validators());
 
-    BackOffStrategyPtr backoff_strategy = Envoy::Config::Utility::prepareBackoffStrategy(
-        dyn_resources.ads_config().grpc_services()[0], random_);
+    BackOffStrategyPtr backoff_strategy =
+        (dyn_resources.ads_config().grpc_services_size() > 0)
+            ? Config::Utility::prepareBackoffStrategy(dyn_resources.ads_config().grpc_services()[0],
+                                                      random_)
+            : Config::Utility::prepareDefaultBackoffStrategy(random_);
 
     if (dyn_resources.ads_config().api_type() ==
         envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {

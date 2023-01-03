@@ -567,6 +567,16 @@ public:
     return std::make_unique<JitteredExponentialBackOffStrategy>(base_interval_ms, max_interval_ms,
                                                                 random);
   }
+
+  /**
+   * Returns retry policy with default time values.
+   * @param random random generator.
+   * @return BackOffStrategyPtr
+   */
+  static BackOffStrategyPtr prepareDefaultBackoffStrategy(Random::RandomGenerator& random) {
+    return std::make_unique<JitteredExponentialBackOffStrategy>(RetryBaseIntervalMs,
+                                                                RetryMaxIntervalMs, random);
+  }
 };
 
 } // namespace Config
