@@ -260,13 +260,13 @@ public:
 
   // Router::ShadowWriter
   void shadow(const std::string& cluster, Http::RequestMessagePtr&& request,
-              Http::AsyncClient::RequestOptions& options) override {
+              const Http::AsyncClient::RequestOptions& options) override {
     shadow_(cluster, request, options);
   }
 
   MOCK_METHOD(void, shadow_,
               (const std::string& cluster, Http::RequestMessagePtr& request,
-               Http::AsyncClient::RequestOptions& options));
+               const Http::AsyncClient::RequestOptions& options));
 };
 
 class TestVirtualCluster : public VirtualCluster {

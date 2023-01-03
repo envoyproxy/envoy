@@ -65,8 +65,8 @@ public:
 
   // Http::AsyncClient
   Request* send(RequestMessagePtr&& request, Callbacks& callbacks,
-                AsyncClient::RequestOptions& options) override;
-  Stream* start(StreamCallbacks& callbacks, AsyncClient::StreamOptions& options) override;
+                const AsyncClient::RequestOptions& options) override;
+  Stream* start(StreamCallbacks& callbacks, const AsyncClient::StreamOptions& options) override;
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
 
 private:
@@ -92,7 +92,7 @@ class AsyncStreamImpl : public AsyncClient::Stream,
                         public ScopeTrackedObject {
 public:
   AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
-                  AsyncClient::StreamOptions& options);
+                  const AsyncClient::StreamOptions& options);
   ~AsyncStreamImpl() override { router_.onDestroy(); }
 
   // Http::AsyncClient::Stream
@@ -469,7 +469,7 @@ class AsyncRequestImpl final : public AsyncClient::Request,
                                AsyncClient::StreamCallbacks {
 public:
   AsyncRequestImpl(RequestMessagePtr&& request, AsyncClientImpl& parent,
-                   AsyncClient::Callbacks& callbacks, AsyncClient::RequestOptions& options);
+                   AsyncClient::Callbacks& callbacks, const AsyncClient::RequestOptions& options);
 
   // AsyncClient::Request
   void cancel() override;

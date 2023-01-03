@@ -347,7 +347,7 @@ public:
    */
 
   virtual Request* send(RequestMessagePtr&& request, Callbacks& callbacks,
-                        RequestOptions& options) PURE;
+                        const RequestOptions& options) PURE;
 
   /**
    * Start an HTTP stream asynchronously.
@@ -357,7 +357,7 @@ public:
    *         onResetStream() has already been called inline. The client owns the stream and
    *         the handle can be used to send more messages or close the stream.
    */
-  virtual Stream* start(StreamCallbacks& callbacks, StreamOptions& options) PURE;
+  virtual Stream* start(StreamCallbacks& callbacks, const StreamOptions& options) PURE;
 
   /**
    * @return Event::Dispatcher& the dispatcher backing this client.

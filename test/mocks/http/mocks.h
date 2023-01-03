@@ -475,14 +475,15 @@ public:
   MOCK_METHOD(void, onRequestDestroy, ());
 
   // Http::AsyncClient
-  Request* send(RequestMessagePtr&& request, Callbacks& callbacks, RequestOptions& args) override {
+  Request* send(RequestMessagePtr&& request, Callbacks& callbacks,
+                const RequestOptions& args) override {
     return send_(request, callbacks, args);
   }
 
   MOCK_METHOD(Request*, send_,
               (RequestMessagePtr & request, Callbacks& callbacks, const RequestOptions& args));
 
-  MOCK_METHOD(Stream*, start, (StreamCallbacks & callbacks, StreamOptions& args));
+  MOCK_METHOD(Stream*, start, (StreamCallbacks & callbacks, const StreamOptions& args));
 
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
 
