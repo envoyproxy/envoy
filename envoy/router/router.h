@@ -1086,10 +1086,11 @@ public:
   virtual const UpgradeMap& upgradeMap() const PURE;
 
   using ConnectConfig = envoy::config::route::v3::RouteAction::UpgradeConfig::ConnectConfig;
+  using ConnectConfigOptRef = OptRef<ConnectConfig>;
   /**
    * If present, informs how to handle proxying CONNECT requests on this route.
    */
-  virtual const absl::optional<ConnectConfig>& connectConfig() const PURE;
+  virtual const ConnectConfigOptRef connectConfig() const PURE;
 
   /**
    * @return std::string& the name of the route.

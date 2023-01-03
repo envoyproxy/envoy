@@ -34,6 +34,7 @@ public class EnvoyConfiguration {
   public final Integer dnsQueryTimeoutSeconds;
   public final Integer dnsMinRefreshSeconds;
   public final String dnsPreresolveHostnames;
+  public final Boolean enableDNSCache;
   public final Boolean enableDrainPostDnsRefresh;
   public final Boolean enableHttp3;
   public final Boolean enableGzip;
@@ -82,6 +83,7 @@ public class EnvoyConfiguration {
    *     refresh DNS.
    * @param dnsPreresolveHostnames                        hostnames to preresolve on Envoy Client
    *     construction.
+   * @param enableDNSCache                                whether to enable DNS cache.
    * @param enableDrainPostDnsRefresh                     whether to drain connections after soft
    *     DNS refresh.
    * @param enableHttp3                                   whether to enable experimental support for
@@ -123,12 +125,12 @@ public class EnvoyConfiguration {
       boolean adminInterfaceEnabled, String grpcStatsDomain, int connectTimeoutSeconds,
       int dnsRefreshSeconds, int dnsFailureRefreshSecondsBase, int dnsFailureRefreshSecondsMax,
       int dnsQueryTimeoutSeconds, int dnsMinRefreshSeconds, String dnsPreresolveHostnames,
-      boolean enableDrainPostDnsRefresh, boolean enableHttp3, boolean enableGzip,
-      boolean enableBrotli, boolean enableSocketTagging, boolean enableHappyEyeballs,
-      boolean enableInterfaceBinding, int h2ConnectionKeepaliveIdleIntervalMilliseconds,
-      int h2ConnectionKeepaliveTimeoutSeconds, boolean h2ExtendKeepaliveTimeout,
-      int maxConnectionsPerHost, int statsFlushSeconds, int streamIdleTimeoutSeconds,
-      int perTryIdleTimeoutSeconds, String appVersion, String appId,
+      boolean enableDNSCache, boolean enableDrainPostDnsRefresh, boolean enableHttp3,
+      boolean enableGzip, boolean enableBrotli, boolean enableSocketTagging,
+      boolean enableHappyEyeballs, boolean enableInterfaceBinding,
+      int h2ConnectionKeepaliveIdleIntervalMilliseconds, int h2ConnectionKeepaliveTimeoutSeconds,
+      boolean h2ExtendKeepaliveTimeout, int maxConnectionsPerHost, int statsFlushSeconds,
+      int streamIdleTimeoutSeconds, int perTryIdleTimeoutSeconds, String appVersion, String appId,
       TrustChainVerification trustChainVerification, String virtualClusters,
       List<EnvoyNativeFilterConfig> nativeFilterChain,
       List<EnvoyHTTPFilterFactory> httpPlatformFilterFactories,
@@ -144,6 +146,7 @@ public class EnvoyConfiguration {
     this.dnsQueryTimeoutSeconds = dnsQueryTimeoutSeconds;
     this.dnsMinRefreshSeconds = dnsMinRefreshSeconds;
     this.dnsPreresolveHostnames = dnsPreresolveHostnames;
+    this.enableDNSCache = enableDNSCache;
     this.enableDrainPostDnsRefresh = enableDrainPostDnsRefresh;
     this.enableHttp3 = enableHttp3;
     this.enableGzip = enableGzip;
@@ -180,6 +183,11 @@ public class EnvoyConfiguration {
    * @param platformFilterTemplate helper template to build platform http filters.
    * @param nativeFilterTemplate helper template to build native http filters.
    * @param altProtocolCacheFilterInsert helper insert to include the alt protocol cache filter.
+   * @param gzipFilterInsert helper to include to enable gzip compression.
+   * @param brotliFilterInsert helper to include to enable brotli compression.
+   * @param socketTagFilterInsert helper to include to enable socket tagging.
+   * @param persistentDNSCacheConfigInsert helper to include to enable DNS cache.
+   * @param certValidationTemplate helper template to enable cert validation.
    * @return String, the resolved template.
    * @throws ConfigurationException, when the template provided is not fully
    *                                 resolved.
@@ -188,6 +196,7 @@ public class EnvoyConfiguration {
                          final String nativeFilterTemplate,
                          final String altProtocolCacheFilterInsert, final String gzipFilterInsert,
                          final String brotliFilterInsert, final String socketTagFilterInsert,
+                         final String persistentDNSCacheConfigInsert,
                          final String certValidationTemplate) {
     final StringBuilder customFiltersBuilder = new StringBuilder();
 
@@ -255,6 +264,11 @@ public class EnvoyConfiguration {
         .append("- &virtual_clusters ")
         .append(virtualClusters)
         .append("\n");
+
+    if (enableDNSCache) {
+      configBuilder.append(
+          String.format("- &persistent_dns_cache_config %s\n", persistentDNSCacheConfigInsert));
+    }
 
     configBuilder.append(String.format("- &stats_flush_interval %ss\n", statsFlushSeconds));
 

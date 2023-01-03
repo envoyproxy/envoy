@@ -1201,5 +1201,22 @@ TEST_P(FilterIntegrationTest, ResetFilter) {
   EXPECT_FALSE(response->complete());
 }
 
+TEST_P(FilterIntegrationTest, LocalReplyViaFilterChainDoesNotConcurrentlyInvokeFilter) {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http_filter_avoid_reentrant_local_reply")) {
+    return;
+  }
+  prependFilter(R"EOF(
+  name: assert-non-reentrant-filter
+  )EOF");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("AssertNonReentrantFilter local reply during decodeHeaders.", response->body());
+}
+
 } // namespace
 } // namespace Envoy

@@ -83,7 +83,7 @@ envoy_cc_test(
         "//source/common/network:udp_packet_writer_handler_lib",
         "//source/common/stats:stats_lib",
         "//source/extensions/listener_managers/listener_manager:active_raw_udp_listener_config",
-        "//source/server:connection_handler_lib",
+        "//source/extensions/listener_managers/listener_manager:connection_handler_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/api:api_mocks",
         "//test/mocks/network:network_mocks",
@@ -104,7 +104,7 @@ envoy_cc_test(
         "//source/common/network:address_lib",
         "//source/common/network:connection_balancer_lib",
         "//source/common/stats:stats_lib",
-        "//source/server:connection_handler_lib",
+        "//source/extensions/listener_managers/listener_manager:connection_handler_lib",
         "//test/mocks/network:io_handle_mocks",
         "//test/mocks/network:network_mocks",
         "//test/test_common:network_utility_lib",
@@ -377,4 +377,12 @@ envoy_cc_benchmark_binary(
 envoy_benchmark_test(
     name = "server_stats_flush_benchmark_test",
     benchmark_binary = "server_stats_flush_benchmark",
+)
+
+envoy_cc_test(
+    name = "utils_test",
+    srcs = envoy_select_admin_functionality(["utils_test.cc"]),
+    deps = [
+        "//source/server:utils_lib",
+    ],
 )

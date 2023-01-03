@@ -16,14 +16,14 @@ HeaderValidatorFactory::HeaderValidatorFactory(const HeaderValidatorConfig& conf
     : config_(config) {}
 
 ::Envoy::Http::HeaderValidatorPtr
-HeaderValidatorFactory::create(Protocol protocol, StreamInfo::StreamInfo& stream_info) {
+HeaderValidatorFactory::create(Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats) {
   switch (protocol) {
   case Protocol::Http3:
   case Protocol::Http2:
-    return std::make_unique<Http2HeaderValidator>(config_, protocol, stream_info);
+    return std::make_unique<Http2HeaderValidator>(config_, protocol, stats);
   case Protocol::Http11:
   case Protocol::Http10:
-    return std::make_unique<Http1HeaderValidator>(config_, protocol, stream_info);
+    return std::make_unique<Http1HeaderValidator>(config_, protocol, stats);
   }
 
   RELEASE_ASSERT(false, fmt::format("Unexpected protocol: {}", static_cast<int>(protocol)));

@@ -77,6 +77,8 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
   // Check that the Runtime config is from the static layer.
   EXPECT_TRUE(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
 
+  const std::string load_success_counter = "runtime.load_success";
+  uint64_t load_success_value = getCounterValue(load_success_counter);
   // Send a RTDS request and get back the RTDS response.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "", {"some_rtds_layer"},
                                       {"some_rtds_layer"}, {}, true));
@@ -89,7 +91,7 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
   sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
       Config::TypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1");
   // Wait until the RTDS updates from the DiscoveryResponse have been applied.
-  ASSERT_TRUE(waitForCounterGe("runtime.load_success", 1));
+  ASSERT_TRUE(waitForCounterGe(load_success_counter, load_success_value + 1));
 
   // Verify that the Runtime config values are from the RTDS response.
   EXPECT_FALSE(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));

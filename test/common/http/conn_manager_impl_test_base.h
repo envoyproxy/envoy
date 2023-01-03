@@ -145,13 +145,15 @@ public:
   originalIpDetectionExtensions() const override {
     return ip_detection_extensions_;
   }
+  const std::vector<Http::EarlyHeaderMutationPtr>& earlyHeaderMutationExtensions() const override {
+    return early_header_mutations_;
+  }
   uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return proxy_status_config_.get();
   }
-  HeaderValidatorPtr makeHeaderValidator(Protocol protocol,
-                                         StreamInfo::StreamInfo& stream_info) override {
-    return header_validator_factory_.create(protocol, stream_info);
+  HeaderValidatorPtr makeHeaderValidator(Protocol protocol) override {
+    return header_validator_factory_.create(protocol, header_validator_stats_);
   }
   bool appendXForwardedPort() const override { return false; }
 
@@ -242,6 +244,7 @@ public:
   NiceMock<Tcp::ConnectionPool::MockInstance> conn_pool_; // for websocket tests
   RequestIDExtensionSharedPtr request_id_extension_;
   std::vector<Http::OriginalIPDetectionSharedPtr> ip_detection_extensions_{};
+  std::vector<Http::EarlyHeaderMutationPtr> early_header_mutations_{};
 
   const LocalReply::LocalReplyPtr local_reply_;
 
@@ -257,6 +260,7 @@ public:
   bool strip_trailing_host_dot_ = false;
   std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;
   NiceMock<MockHeaderValidatorFactory> header_validator_factory_;
+  NiceMock<MockHeaderValidatorStats> header_validator_stats_;
 };
 
 } // namespace Http
