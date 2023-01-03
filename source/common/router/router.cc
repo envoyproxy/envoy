@@ -283,14 +283,11 @@ Filter::~Filter() {
   ASSERT(upstream_requests_.empty());
   ASSERT(!retry_state_);
 
-  // Unregister from shadow stream notifications.
-  for (auto& [shadow_stream, ended] : shadow_streams_) {
-    if (!ended) {
-      // we have not yet sent an end stream to the shadows; cancel them.
-      shadow_stream->cancel();
-    }
+  // Unregister from shadow stream notifications and cancel active streams.
+  for (auto* shadow_stream : shadow_streams_) {
     shadow_stream->removeDestructorCallback();
     shadow_stream->removeWatermarkCallbacks();
+    shadow_stream->cancel();
   }
 }
 
@@ -736,7 +733,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
         Http::AsyncClient::OngoingRequest* shadow_stream = config_.shadowWriter().streamingShadow(
             std::string(shadow_cluster_name.value()), std::move(shadow_headers), options);
         if (shadow_stream != nullptr) {
-          shadow_streams_[shadow_stream] = end_stream;
+          shadow_streams_.insert(shadow_stream);
           shadow_stream->setDestructorCallback(
               [this, shadow_stream]() { shadow_streams_.erase(shadow_stream); });
           shadow_stream->setWatermarkCallbacks(*callbacks_);
@@ -841,9 +838,15 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     callbacks_->addDecodedData(many_copied_buffer.nextBuffer(), true);
   }
   if (streaming_shadows_ && !shadow_streams_.empty()) {
-    for (auto& [shadow_stream, ended] : shadow_streams_) {
-      shadow_stream->captureAndSendData(many_copied_buffer.nextBufferOwned(), end_stream);
-      ended = end_stream;
+    for (auto* shadow_stream : shadow_streams_) {
+      if (end_stream) {
+        shadow_stream->removeDestructorCallback();
+        shadow_stream->removeWatermarkCallbacks();
+      }
+      shadow_stream->sendData(many_copied_buffer.nextBuffer(), end_stream);
+    }
+    if (end_stream) {
+      shadow_streams_.clear();
     }
   }
 
@@ -872,11 +875,13 @@ Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap& trail
     upstream_requests_.front()->acceptTrailersFromRouter(trailers);
   }
   if (streaming_shadows_) {
-    for (auto& [shadow_stream, ended] : shadow_streams_) {
+    for (auto* shadow_stream : shadow_streams_) {
+      shadow_stream->removeDestructorCallback();
+      shadow_stream->removeWatermarkCallbacks();
       shadow_stream->captureAndSendTrailers(
           Http::createHeaderMap<Http::RequestTrailerMapImpl>(*shadow_trailers_));
-      ended = true;
     }
+    shadow_streams_.clear();
   }
   onRequestComplete();
   return Http::FilterTrailersStatus::StopIteration;

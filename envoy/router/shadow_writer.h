@@ -34,7 +34,8 @@ public:
    * @param cluster supplies the cluster name to shadow to.
    * @param headers supplies the headers for initializing the shadow.
    * @param options supplies the request options for the underlying asynchronous request.
-   * @return OngoingRequest* pointer which can have additional data and trailers sent to it.
+   * @return OngoingRequest* pointer owned by the AsyncClient which can have additional data and
+   *                         trailers sent to it.
    */
   virtual Http::AsyncClient::OngoingRequest*
   streamingShadow(const std::string& cluster, Http::RequestHeaderMapPtr&& headers,

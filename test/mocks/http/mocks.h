@@ -566,13 +566,9 @@ class MockAsyncClientOngoingRequest : public virtual AsyncClient::OngoingRequest
                                       public MockAsyncClientRequest {
 public:
   MockAsyncClientOngoingRequest(MockAsyncClient* client) : MockAsyncClientRequest(client) {}
-  void captureAndSendData(Buffer::InstancePtr&& data, bool end_stream) override {
-    return captureAndSendData_(*data, end_stream);
-  }
   void captureAndSendTrailers(RequestTrailerMapPtr&& trailers) override {
     return captureAndSendTrailers_(*trailers);
   }
-  MOCK_METHOD(void, captureAndSendData_, (Buffer::Instance & data, bool end_stream), ());
   MOCK_METHOD(void, captureAndSendTrailers_, (RequestTrailerMap & trailers), ());
 };
 

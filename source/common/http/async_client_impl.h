@@ -101,7 +101,7 @@ public:
   ~AsyncStreamImpl() override {
     router_.onDestroy();
     ENVOY_BUG(high_watermark_calls_ == 0, "Excess high watermark calls after async stream ended.");
-    for (uint32_t i = 0; i < high_watermark_calls_; ++i) {
+    for (uint32_t i = 0; i < high_watermark_calls_ && watermark_callbacks_.has_value(); ++i) {
       watermark_callbacks_->get().onDecoderFilterBelowWriteBufferLowWatermark();
     }
     if (destructor_callback_.has_value()) {
@@ -113,6 +113,7 @@ public:
     ASSERT(!destructor_callback_);
     destructor_callback_.emplace(callback);
   }
+
   void removeDestructorCallback() override {
     ASSERT(destructor_callback_);
     destructor_callback_.reset();
@@ -125,6 +126,7 @@ public:
       watermark_callbacks_->get().onDecoderFilterAboveWriteBufferHighWatermark();
     }
   }
+
   void removeWatermarkCallbacks() override {
     ASSERT(watermark_callbacks_);
     for (uint32_t i = 0; i < high_watermark_calls_; ++i) {
@@ -553,10 +555,6 @@ public:
         request_headers_(std::move(request_headers)) {
     ASSERT(request_headers_);
   }
-  void captureAndSendData(Buffer::InstancePtr&& data, bool end_stream) override {
-    request_data_ = std::move(data);
-    sendData(*request_data_, end_stream);
-  }
   void captureAndSendTrailers(RequestTrailerMapPtr&& trailers) override {
     request_trailers_ = std::move(trailers);
     sendTrailers(*request_trailers_);
@@ -566,7 +564,6 @@ private:
   void initialize();
 
   RequestHeaderMapPtr request_headers_;
-  Buffer::InstancePtr request_data_;
   RequestTrailerMapPtr request_trailers_;
 
   friend class AsyncClientImpl;

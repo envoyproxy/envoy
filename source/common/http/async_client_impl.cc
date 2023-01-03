@@ -298,6 +298,7 @@ void AsyncRequestImpl::initialize() {
     // sendHeaders; guards handle this within AsyncStreamImpl.
     sendData(request_->body(), true);
   }
+  std::cout << request_->bodyAsString() << "\n";
   // TODO(mattklein123): Support request trailers.
 }
 

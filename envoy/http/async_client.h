@@ -209,14 +209,7 @@ public:
   class OngoingRequest : public virtual Request, public virtual Stream {
   public:
     /***
-     * Take ownership of data, and sends it to the underlying stream.
-     * @param data owned buffer to pass to upstream.
-     * @param end_stream whether to end the stream.
-     */
-    virtual void captureAndSendData(Buffer::InstancePtr&& data, bool end_stream) PURE;
-
-    /***
-     * Take ownership of trailers, and sends it to the underlying stream.
+     * Takes ownership of trailers, and sends it to the underlying stream.
      * @param trailers owned trailers to pass to upstream.
      */
     virtual void captureAndSendTrailers(RequestTrailerMapPtr&& trailers) PURE;
@@ -320,6 +313,7 @@ public:
 
     envoy::config::core::v3::Metadata metadata;
 
+    // Buffer memory account for tracking bytes.
     Buffer::BufferMemoryAccountSharedPtr account_{nullptr};
 
     absl::optional<uint32_t> buffer_limit_;

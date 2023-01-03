@@ -657,8 +657,8 @@ private:
 
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   Network::Socket::OptionsSharedPtr upstream_options_;
-  // map from shadow stream to whether or not we've sent end stream to it.
-  absl::flat_hash_map<Http::AsyncClient::OngoingRequest*, bool> shadow_streams_;
+  // Set of active shadow stream.
+  absl::flat_hash_set<Http::AsyncClient::OngoingRequest*> shadow_streams_;
   const bool streaming_shadows_;
 };
 
