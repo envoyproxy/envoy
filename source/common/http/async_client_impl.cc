@@ -80,8 +80,7 @@ AsyncClient::Stream* AsyncClientImpl::start(AsyncClient::StreamCallbacks& callba
 AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
                                  const AsyncClient::StreamOptions& options)
     : parent_(parent), stream_callbacks_(callbacks), stream_id_(parent.config_.random_.random()),
-      router_(options.filter_config_ ? const_cast<Router::FilterConfig&>(*options.filter_config_)
-                                     : parent.config_,
+      router_(options.filter_config_ ? *options.filter_config_ : parent.config_,
               parent.config_.async_stats_),
       stream_info_(Protocol::Http11, parent.dispatcher().timeSource(), nullptr),
       tracing_config_(Tracing::EgressConfig::get()),

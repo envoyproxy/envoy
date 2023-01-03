@@ -39,7 +39,7 @@ TEST(OptRefTest, NonConst) {
   EXPECT_EQ("Bye", *optref);
 }
 
-TEST(OptRefTest, Const) {
+TEST(OptRefTest, ConstOptRef) {
   std::string str("Hello");
   const OptRef<std::string> optref(str);
   EXPECT_TRUE(optref.has_value());
@@ -54,6 +54,24 @@ TEST(OptRefTest, Const) {
   absl::optional<std::string> copy = optref.copy();
   EXPECT_TRUE(copy);
   EXPECT_FALSE(!copy);
+
+  // Modifying non-const T from const OptRef.
+  *optref += ", World!";
+  EXPECT_EQ("Hello, World!", *optref);
+}
+
+TEST(OptRefTest, ConstObject) {
+  std::string str("Hello");
+  const OptRef<const std::string> optref(str);
+  EXPECT_TRUE(optref.has_value());
+  EXPECT_NE(optref, absl::nullopt);
+  EXPECT_NE(absl::nullopt, optref);
+  EXPECT_EQ("Hello", *optref);
+  EXPECT_EQ(5, optref->size());
+  EXPECT_EQ("Hello", optref.ref());
+  EXPECT_EQ("Hello", *optref);
+  std::reference_wrapper<const std::string> value = optref.value();
+  EXPECT_EQ("Hello", value.get());
 }
 
 class Foo {};

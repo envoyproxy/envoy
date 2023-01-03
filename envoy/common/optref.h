@@ -35,38 +35,25 @@ template <class T> struct OptRef {
   }
 
   /**
-   * Helper to call a method on T. The caller is responsible for ensuring
-   * has_value() is true.
-   */
-  T* operator->() { return ptr_; }
-
-  /**
    * Helper to call a const method on T. The caller is responsible for ensuring
    * has_value() is true.
    */
-  const T* operator->() const { return ptr_; }
+  T* operator->() const { return ptr_; }
 
   /**
    * Helper to convert a OptRef into a pointer. If the optional is not set, returns a nullptr.
    */
-  T* ptr() { return ptr_; }
-
-  /**
-   * Helper to convert a OptRef into a pointer. If the optional is not set, returns a nullptr.
-   */
-  const T* ptr() const { return ptr_; }
+  T* ptr() const { return ptr_; }
 
   /**
    * Helper to convert a OptRef into a ref. Behavior if !has_value() is undefined.
    */
-  T& ref() { return *ptr_; }
-  const T& ref() const { return *ptr_; }
+  T& ref() const { return *ptr_; }
 
   /**
    * Helper to dereference an OptRef. Behavior if !has_value() is undefined.
    */
-  T& operator*() { return *ptr_; }
-  const T& operator*() const { return *ptr_; }
+  T& operator*() const { return *ptr_; }
 
   /**
    * @return true if the object has a value.
