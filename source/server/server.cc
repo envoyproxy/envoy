@@ -54,7 +54,6 @@
 #include "source/common/upstream/cluster_manager_impl.h"
 #include "source/common/version/version.h"
 #include "source/server/configuration_impl.h"
-#include "source/server/connection_handler_impl.h"
 #include "source/server/guarddog_impl.h"
 #include "source/server/listener_hooks.h"
 #include "source/server/listener_manager_factory.h"
@@ -64,6 +63,19 @@
 
 namespace Envoy {
 namespace Server {
+namespace {
+std::unique_ptr<ConnectionHandler> getHandler(Event::Dispatcher& dispatcher) {
+
+  auto* factory = Config::Utility::getFactoryByName<ConnectionHandlerFactory>(
+      "envoy.connection_handler.default");
+  if (factory) {
+    return factory->createConnectionHandler(dispatcher, absl::nullopt);
+  }
+  ENVOY_LOG_MISC(debug, "Unable to find envoy.connection_handler.default factory");
+  return nullptr;
+}
+
+} // namespace
 
 InstanceImpl::InstanceImpl(
     Init::Manager& init_manager, const Options& options, Event::TimeSystem& time_system,
@@ -88,8 +100,8 @@ InstanceImpl::InstanceImpl(
       access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
                           store),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
-      handler_(new ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
-      worker_factory_(thread_local_, *api_, hooks), terminated_(false),
+      handler_(getHandler(*dispatcher_)), worker_factory_(thread_local_, *api_, hooks),
+      terminated_(false),
       mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
                                                   : nullptr),
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),

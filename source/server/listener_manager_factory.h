@@ -20,5 +20,18 @@ public:
   std::string category() const override { return "envoy.listener_manager_impl"; }
 };
 
+class ConnectionHandler : public Network::TcpConnectionHandler,
+                          public Network::UdpConnectionHandler,
+                          public Network::InternalListenerManager {};
+
+class ConnectionHandlerFactory : public Config::UntypedFactory {
+public:
+  virtual std::unique_ptr<ConnectionHandler>
+  createConnectionHandler(Event::Dispatcher& dispatcher,
+                          absl::optional<uint32_t> worker_index) PURE;
+
+  std::string category() const override { return "envoy.connection_handler"; }
+};
+
 } // namespace Server
 } // namespace Envoy

@@ -1,4 +1,4 @@
-#include "source/server/connection_handler_impl.h"
+#include "source/extensions/listener_managers/listener_manager/connection_handler_impl.h"
 
 #include <chrono>
 
@@ -10,7 +10,8 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/runtime/runtime_features.h"
-#include "source/server/active_tcp_listener.h"
+#include "source/extensions/listener_managers/listener_manager/active_tcp_listener.h"
+#include "source/server/listener_manager_factory.h"
 
 namespace Envoy {
 namespace Server {
@@ -373,6 +374,8 @@ ConnectionHandlerImpl::getBalancedHandlerByAddress(const Network::Address::Insta
                        .get())
              : absl::nullopt;
 }
+
+REGISTER_FACTORY(ConnectionHandlerFactoryImpl, ConnectionHandlerFactory);
 
 } // namespace Server
 } // namespace Envoy

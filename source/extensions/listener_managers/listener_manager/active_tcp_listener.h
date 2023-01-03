@@ -5,9 +5,9 @@
 #include "envoy/stream_info/stream_info.h"
 
 #include "source/common/common/linked_object.h"
+#include "source/extensions/listener_managers/listener_manager/active_stream_listener_base.h"
+#include "source/extensions/listener_managers/listener_manager/active_tcp_socket.h"
 #include "source/server/active_listener_base.h"
-#include "source/server/active_stream_listener_base.h"
-#include "source/server/active_tcp_socket.h"
 
 namespace Envoy {
 namespace Server {
