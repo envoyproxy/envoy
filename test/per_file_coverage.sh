@@ -17,31 +17,31 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/network:94.4" # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl`, listener_socket do not always report LCOV
 "source/common/network/dns_resolver:91.6"  # A few lines of MacOS code not tested in linux scripts. Tested in MacOS scripts
 "source/common/protobuf:96.3"
-"source/common/quic:92.6"
+"source/common/quic:93.0"
 "source/common/router:96.1"
 "source/common/secret:95.0"
 "source/common/signal:87.2" # Death tests don't report LCOV
 "source/common/singleton:95.7"
-"source/common/tcp:90.8"
+"source/common/tcp:91.1"
 "source/common/thread:0.0" # Death tests don't report LCOV
-"source/common/tracing:96.14"
+"source/common/tracing:96.4"
 "source/common/upstream:96.1"
 "source/common/watchdog:58.6" # Death tests don't report LCOV
-"source/exe:93.9"
+"source/exe:94.5"
 "source/extensions/access_loggers/wasm:93.5"
 "source/extensions/clusters/common:91.5"
 "source/extensions/common:92.9"
 "source/extensions/common/tap:94.2"
 "source/extensions/common/wasm:87.5" # flaky: be careful adjusting
 "source/extensions/common/wasm/ext:92.0"
-"source/extensions/filters/common:96.15"
+"source/extensions/filters/common:96.5"
 "source/extensions/filters/common/fault:94.5"
 "source/extensions/filters/common/rbac:90.5"
 "source/extensions/filters/http/cache:93.3"
 "source/extensions/filters/http/grpc_json_transcoder:95.2"
 "source/extensions/filters/http/ip_tagging:88.0"
 "source/extensions/filters/http/kill_request:91.7" # Death tests don't report LCOV
-"source/extensions/filters/http/oauth2:96.1"
+"source/extensions/filters/http/oauth2:96.2"
 "source/extensions/filters/http/wasm:1.9"
 "source/extensions/filters/http/rate_limit_quota:94" # TODO(tyxia) WIP. Improve coverage as development continues
 "source/extensions/filters/listener/original_dst:82.9"
@@ -66,7 +66,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/transport_sockets:95.2"
 "source/extensions/transport_sockets/tls:94.8"
 "source/extensions/transport_sockets/tls/cert_validator:95.1"
-"source/extensions/transport_sockets/tls/private_key:77.8"
+"source/extensions/transport_sockets/tls/private_key:88.9"
 "source/extensions/wasm_runtime/wamr:0.0" # Not enabled in coverage build
 "source/extensions/wasm_runtime/wasmtime:0.0" # Not enabled in coverage build
 "source/extensions/wasm_runtime/wavm:0.0" # Not enabled in coverage build
@@ -75,7 +75,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/server:93.3" # flaky: be careful adjusting. See https://github.com/envoyproxy/envoy/issues/15239
 "source/server/admin:97.4"
 "source/server/admin:profiler-lib:83"
-"source/server/config_validation:74.8"
+"source/server/config_validation:80.8"
 "source/extensions/http/early_header_mutation:95.2" # Death tests don't report LCOV
 "source/extensions/http/early_header_mutation/header_mutation:95.2" # Death tests don't report LCOV
 )
@@ -124,6 +124,12 @@ do
     echo "Code coverage for ${DIRECTORY} is lower than limit of ${DIRECTORY_THRESHOLD} (${COVERAGE_VALUE})"
     FAILED=1
   fi
+  if [[ -n ${VERBOSE} && ${COVERAGE_VALUE} > ${DIRECTORY_THRESHOLD} ]]; then
+    if [[ ${DIRECTORY_THRESHOLD} < $DEFAULT_COVERAGE_THRESHOLD ]]; then
+      echo "Code coverage for ${DIRECTORY} is now ${COVERAGE_VALUE} (previously ${DIRECTORY_THRESHOLD})"
+    fi
+  fi
+
 done <<< "$SOURCES"
 
 exit $FAILED
