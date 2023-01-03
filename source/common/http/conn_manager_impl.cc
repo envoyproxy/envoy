@@ -681,8 +681,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
                       StreamInfo::FilterState::LifeSpan::Connection),
       request_response_timespan_(new Stats::HistogramCompletableTimespanImpl(
           connection_manager_.stats_.named_.downstream_rq_time_, connection_manager_.timeSource())),
-      header_validator_(connection_manager.config_.makeHeaderValidator(
-          connection_manager.codec_->protocol(), filter_manager_.streamInfo())) {
+      header_validator_(
+          connection_manager.config_.makeHeaderValidator(connection_manager.codec_->protocol())) {
   ASSERT(!connection_manager.config_.isRoutable() ||
              ((connection_manager.config_.routeConfigProvider() == nullptr &&
                connection_manager.config_.scopedRouteConfigProvider() != nullptr) ||

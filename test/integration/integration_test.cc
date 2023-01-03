@@ -986,11 +986,6 @@ TEST_P(IntegrationTest, TestClientAllowChunkedLength) {
 }
 
 TEST_P(IntegrationTest, BadFirstline) {
-  if (http1_implementation_ == Http1ParserImpl::BalsaParser) {
-    // TODO(#21245): Re-enable this test for BalsaParser.
-    return;
-  }
-
   initialize();
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"), "hello", &response);
@@ -1560,13 +1555,7 @@ TEST_P(IntegrationTest, Connect) {
 }
 
 // Test that Envoy returns HTTP code 502 on upstream protocol error.
-TEST_P(IntegrationTest, UpstreamProtocolError) {
-  if (http1_implementation_ == Http1ParserImpl::BalsaParser) {
-    // TODO(#21245): Re-enable this test for BalsaParser.
-    return;
-  }
-  testRouterUpstreamProtocolError("502", "UPE");
-}
+TEST_P(IntegrationTest, UpstreamProtocolError) { testRouterUpstreamProtocolError("502", "UPE"); }
 
 TEST_P(IntegrationTest, TestHead) {
   initialize();

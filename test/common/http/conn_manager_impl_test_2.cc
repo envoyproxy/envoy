@@ -3158,7 +3158,7 @@ TEST_F(HttpConnectionManagerImplTest, DirectLocalReplyCausesDisconnect) {
 // Header validator rejects header map for HTTP/1.x protocols
 TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectHttp1) {
   setup(false, "");
-  EXPECT_CALL(header_validator_factory_, create(Protocol::Http11, _, _))
+  EXPECT_CALL(header_validator_factory_, create(Protocol::Http11, _))
       .WillOnce(InvokeWithoutArgs([]() {
         auto header_validator = std::make_unique<testing::StrictMock<MockHeaderValidator>>();
         EXPECT_CALL(*header_validator, validateRequestHeaderMap(_))
@@ -3212,7 +3212,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectHttp1) {
 TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectHttp2) {
   codec_->protocol_ = Protocol::Http2;
   setup(false, "");
-  EXPECT_CALL(header_validator_factory_, create(Protocol::Http2, _, _))
+  EXPECT_CALL(header_validator_factory_, create(Protocol::Http2, _))
       .WillOnce(InvokeWithoutArgs([]() {
         auto header_validator = std::make_unique<testing::StrictMock<MockHeaderValidator>>();
         EXPECT_CALL(*header_validator, validateRequestHeaderMap(_))
@@ -3249,7 +3249,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectHttp2) {
 TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectGrpcRequest) {
   codec_->protocol_ = Protocol::Http2;
   setup(false, "");
-  EXPECT_CALL(header_validator_factory_, create(_, _, _)).WillOnce(InvokeWithoutArgs([]() {
+  EXPECT_CALL(header_validator_factory_, create(_, _)).WillOnce(InvokeWithoutArgs([]() {
     auto header_validator = std::make_unique<testing::StrictMock<MockHeaderValidator>>();
     EXPECT_CALL(*header_validator, validateRequestHeaderMap(_)).WillOnce(InvokeWithoutArgs([]() {
       return HeaderValidator::RequestHeaderMapValidationResult(
@@ -3284,7 +3284,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectGrpcRequest) {
 // Header validator redirects
 TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRedirect) {
   setup(false, "");
-  EXPECT_CALL(header_validator_factory_, create(_, _, _)).WillOnce(InvokeWithoutArgs([]() {
+  EXPECT_CALL(header_validator_factory_, create(_, _)).WillOnce(InvokeWithoutArgs([]() {
     auto header_validator = std::make_unique<testing::StrictMock<MockHeaderValidator>>();
     EXPECT_CALL(*header_validator, validateRequestHeaderMap(_))
         .WillOnce(Invoke([](RequestHeaderMap& header_map) {
@@ -3320,7 +3320,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRedirect) {
 TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRedirectGrpcRequest) {
   codec_->protocol_ = Protocol::Http2;
   setup(false, "");
-  EXPECT_CALL(header_validator_factory_, create(_, _, _)).WillOnce(InvokeWithoutArgs([]() {
+  EXPECT_CALL(header_validator_factory_, create(_, _)).WillOnce(InvokeWithoutArgs([]() {
     auto header_validator = std::make_unique<testing::StrictMock<MockHeaderValidator>>();
     EXPECT_CALL(*header_validator, validateRequestHeaderMap(_))
         .WillOnce(Invoke([](RequestHeaderMap& header_map) {
@@ -3448,7 +3448,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectTrailersAfterResponse
 // Request completes normally if header validator accepts it
 TEST_F(HttpConnectionManagerImplTest, HeaderValidatorAccept) {
   setup(false, "");
-  EXPECT_CALL(header_validator_factory_, create(_, _, _)).WillOnce(InvokeWithoutArgs([]() {
+  EXPECT_CALL(header_validator_factory_, create(_, _)).WillOnce(InvokeWithoutArgs([]() {
     auto header_validator = std::make_unique<testing::StrictMock<MockHeaderValidator>>();
     EXPECT_CALL(*header_validator, validateRequestHeaderMap(_)).WillOnce(InvokeWithoutArgs([]() {
       return HeaderValidator::RequestHeaderMapValidationResult::success();

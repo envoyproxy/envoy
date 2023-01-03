@@ -4,6 +4,7 @@
 #include "source/extensions/http/header_validators/envoy_default/http2_header_validator.h"
 
 #include "test/extensions/http/header_validators/envoy_default/header_validator_test.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -24,8 +25,7 @@ protected:
         typed_config;
     TestUtility::loadFromYaml(std::string(config_yaml), typed_config);
 
-    return std::make_unique<Http2HeaderValidator>(typed_config, Protocol::Http2, stream_info_,
-                                                  stats_);
+    return std::make_unique<Http2HeaderValidator>(typed_config, Protocol::Http2, stats_);
   }
 };
 

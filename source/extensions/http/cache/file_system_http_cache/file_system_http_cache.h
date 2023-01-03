@@ -6,6 +6,7 @@
 
 #include "source/extensions/common/async_files/async_file_manager.h"
 #include "source/extensions/filters/http/cache/http_cache.h"
+#include "source/extensions/http/cache/file_system_http_cache/stats.h"
 
 #include "absl/base/thread_annotations.h"
 #include "absl/container/flat_hash_map.h"
@@ -25,7 +26,8 @@ class FileSystemHttpCache : public HttpCache,
                             public Logger::Loggable<Logger::Id::cache_filter> {
 public:
   FileSystemHttpCache(Singleton::InstanceSharedPtr owner, ConfigProto config,
-                      std::shared_ptr<Common::AsyncFiles::AsyncFileManager>&& async_file_manager);
+                      std::shared_ptr<Common::AsyncFiles::AsyncFileManager>&& async_file_manager,
+                      Stats::Scope& stats_scope);
 
   // Overrides for HttpCache
   LookupContextPtr makeLookupContext(LookupRequest&& lookup,
@@ -33,6 +35,7 @@ public:
   InsertContextPtr makeInsertContext(LookupContextPtr&& lookup_context,
                                      Http::StreamEncoderFilterCallbacks& callbacks) override;
   CacheInfo cacheInfo() const override;
+  const CacheStats& stats() const { return stats_; }
 
   /**
    * Replaces the headers of a cache entry.
@@ -149,6 +152,23 @@ public:
     return async_file_manager_;
   }
 
+  /**
+   * Measures initial state of cache path, to facilitate stats and timely eviction.
+   */
+  void init();
+
+  /**
+   * Updates stats to reflect that a file has been added to the cache.
+   * @param file_size The size in bytes of the file that was added.
+   */
+  void trackFileAdded(uint64_t file_size);
+
+  /**
+   * Updates stats to reflect that a file has been removed from the cache.
+   * @param file_size The size in bytes of the file that was removed.
+   */
+  void trackFileRemoved(uint64_t file_size);
+
   // UpdateHeaders copies an existing cache entry to a new file. This value is
   // the size of a copy-chunk. It's public for unit tests only, as the chunk size
   // is totally irrelevant to the outward-facing API.
@@ -185,6 +205,17 @@ private:
       entries_being_written_ ABSL_GUARDED_BY(cache_mu_);
 
   std::shared_ptr<Common::AsyncFiles::AsyncFileManager> async_file_manager_;
+  CacheStats stats_;
+
+  // These are part of stats, but we have to track them separately because there is
+  // potential to go "less than zero" due to not having sole control of the file cache;
+  // gauge values don't have fine enough control to prevent that, and aren't allowed to
+  // be negative.
+  //
+  // See comment on size_bytes and size_count in stats.h for explanation of how stat
+  // values can be out of sync with the actionable cache.
+  std::atomic<uint64_t> size_count_;
+  std::atomic<uint64_t> size_bytes_;
 };
 
 } // namespace FileSystemHttpCache
