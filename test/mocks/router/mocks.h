@@ -433,7 +433,7 @@ public:
   MOCK_METHOD(const PathMatchCriterion&, pathMatchCriterion, (), (const));
   MOCK_METHOD(bool, includeAttemptCountInRequest, (), (const));
   MOCK_METHOD(bool, includeAttemptCountInResponse, (), (const));
-  MOCK_METHOD(const absl::optional<ConnectConfig>&, connectConfig, (), (const));
+  MOCK_METHOD(const ConnectConfigOptRef, connectConfig, (), (const));
   MOCK_METHOD(const UpgradeMap&, upgradeMap, (), (const));
   MOCK_METHOD(const std::string&, routeName, (), (const));
   MOCK_METHOD(const EarlyDataPolicy&, earlyDataPolicy, (), (const));

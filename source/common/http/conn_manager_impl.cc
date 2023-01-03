@@ -13,6 +13,7 @@
 #include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/http/header_map.h"
+#include "envoy/http/header_validator_errors.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/router/router.h"
 #include "envoy/ssl/connection.h"
@@ -680,8 +681,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
                       StreamInfo::FilterState::LifeSpan::Connection),
       request_response_timespan_(new Stats::HistogramCompletableTimespanImpl(
           connection_manager_.stats_.named_.downstream_rq_time_, connection_manager_.timeSource())),
-      header_validator_(connection_manager.config_.makeHeaderValidator(
-          connection_manager.codec_->protocol(), filter_manager_.streamInfo())) {
+      header_validator_(
+          connection_manager.config_.makeHeaderValidator(connection_manager.codec_->protocol())) {
   ASSERT(!connection_manager.config_.isRoutable() ||
              ((connection_manager.config_.routeConfigProvider() == nullptr &&
                connection_manager.config_.scopedRouteConfigProvider() != nullptr) ||
@@ -888,9 +889,18 @@ bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
         grpc_status = Grpc::Status::WellKnownGrpcStatus::Internal;
       }
 
-      sendLocalReply(response_code, "", modify_headers, grpc_status, validation_result.details());
-      if (!response_encoder_->streamErrorOnInvalidHttpMessage()) {
-        connection_manager_.handleCodecError(validation_result.details());
+      // H/2 codec was resetting requests that were rejected due to headers with underscores,
+      // instead of sending 400. Preserving this behavior for now.
+      // TODO(#24466): Make H/2 behavior consistent with H/1 and H/3.
+      if (validation_result.details() == UhvResponseCodeDetail::get().InvalidUnderscore &&
+          connection_manager_.codec_->protocol() == Protocol::Http2) {
+        filter_manager_.streamInfo().setResponseCodeDetails(validation_result.details());
+        resetStream();
+      } else {
+        sendLocalReply(response_code, "", modify_headers, grpc_status, validation_result.details());
+        if (!response_encoder_->streamErrorOnInvalidHttpMessage()) {
+          connection_manager_.handleCodecError(validation_result.details());
+        }
       }
       return false;
     }

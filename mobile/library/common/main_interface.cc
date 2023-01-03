@@ -90,38 +90,6 @@ envoy_status_t record_counter_inc(envoy_engine_t e, const char* elements, envoy_
       });
 }
 
-envoy_status_t record_gauge_set(envoy_engine_t e, const char* elements, envoy_stats_tags tags,
-                                uint64_t value) {
-  return Envoy::EngineHandle::runOnEngineDispatcher(
-      e, [name = std::string(elements), tags, value](auto& engine) -> void {
-        engine.recordGaugeSet(name, tags, value);
-      });
-}
-
-envoy_status_t record_gauge_add(envoy_engine_t e, const char* elements, envoy_stats_tags tags,
-                                uint64_t amount) {
-  return Envoy::EngineHandle::runOnEngineDispatcher(
-      e, [name = std::string(elements), tags, amount](auto& engine) -> void {
-        engine.recordGaugeAdd(name, tags, amount);
-      });
-}
-
-envoy_status_t record_gauge_sub(envoy_engine_t e, const char* elements, envoy_stats_tags tags,
-                                uint64_t amount) {
-  return Envoy::EngineHandle::runOnEngineDispatcher(
-      e, [name = std::string(elements), tags, amount](auto& engine) -> void {
-        engine.recordGaugeSub(name, tags, amount);
-      });
-}
-
-envoy_status_t record_histogram_value(envoy_engine_t e, const char* elements, envoy_stats_tags tags,
-                                      uint64_t value, envoy_histogram_stat_unit_t unit_measure) {
-  return Envoy::EngineHandle::runOnEngineDispatcher(
-      e, [name = std::string(elements), tags, value, unit_measure](auto& engine) -> void {
-        engine.recordHistogramValue(name, tags, value, unit_measure);
-      });
-}
-
 namespace {
 struct AdminCallContext {
   envoy_status_t status_{};

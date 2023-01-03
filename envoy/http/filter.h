@@ -668,6 +668,12 @@ public:
   /**
    * This routine may be called to change the buffer limit for decoder filters.
    *
+   * It is recommended (but not required) that filters calling this function should
+   * generally only perform increases to the buffer limit, to avoid potentially
+   * conflicting with the buffer requirements of other filters in the chain, i.e.
+   *
+   * if (desired_limit > decoderBufferLimit()) {setDecoderBufferLimit(desired_limit);}
+   *
    * @param limit supplies the desired buffer limit.
    */
   virtual void setDecoderBufferLimit(uint32_t limit) PURE;
@@ -1002,6 +1008,12 @@ public:
 
   /**
    * This routine may be called to change the buffer limit for encoder filters.
+   *
+   * It is recommended (but not required) that filters calling this function should
+   * generally only perform increases to the buffer limit, to avoid potentially
+   * conflicting with the buffer requirements of other filters in the chain, i.e.
+   *
+   * if (desired_limit > encoderBufferLimit()) {setEncoderBufferLimit(desired_limit);}
    *
    * @param limit supplies the desired buffer limit.
    */

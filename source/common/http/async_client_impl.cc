@@ -29,7 +29,7 @@ const AsyncStreamImpl::NullConfig AsyncStreamImpl::NullVirtualHost::route_config
 const std::multimap<std::string, std::string> AsyncStreamImpl::RouteEntryImpl::opaque_config_;
 const AsyncStreamImpl::NullPathMatchCriterion
     AsyncStreamImpl::RouteEntryImpl::path_match_criterion_;
-const absl::optional<envoy::config::route::v3::RouteAction::UpgradeConfig::ConnectConfig>
+const AsyncStreamImpl::RouteEntryImpl::ConnectConfigOptRef
     AsyncStreamImpl::RouteEntryImpl::connect_config_nullopt_;
 const std::list<LowerCaseString> AsyncStreamImpl::NullConfig::internal_only_headers_;
 

@@ -239,10 +239,14 @@ public:
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return proxy_status_config_.get();
   }
-  Http::HeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol,
-                                               StreamInfo::StreamInfo& stream_info) override {
-    return header_validator_factory_ ? header_validator_factory_->create(protocol, stream_info)
-                                     : nullptr;
+  Http::HeaderValidatorPtr makeHeaderValidator([[maybe_unused]] Http::Protocol protocol) override {
+#ifdef ENVOY_ENABLE_UHV
+    return header_validator_factory_
+               ? header_validator_factory_->create(protocol, getHeaderValidatorStats(protocol))
+               : nullptr;
+#else
+    return nullptr;
+#endif
   }
   bool appendXForwardedPort() const override { return append_x_forwarded_port_; }
 
@@ -256,6 +260,8 @@ private:
                              bool last_filter_in_current_config);
   void createFilterChainForFactories(Http::FilterChainManager& manager,
                                      const FilterFactoriesList& filter_factories);
+
+  ::Envoy::Http::HeaderValidatorStats& getHeaderValidatorStats(Http::Protocol protocol);
 
   /**
    * Determines what tracing provider to use for a given

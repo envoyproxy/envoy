@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.grpc_json_transcoder.v3;
 
+import "google/protobuf/wrappers.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -16,7 +18,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // gRPC-JSON transcoder :ref:`configuration overview <config_http_filters_grpc_json_transcoder>`.
 // [#extension: envoy.filters.http.grpc_json_transcoder]
 
-// [#next-free-field: 15]
+// [#next-free-field: 17]
 // GrpcJsonTranscoder filter configuration.
 // The filter itself can be used per route / per virtual host or on the general level. The most
 // specific one is being used for a given route. If the list of services is empty - filter
@@ -270,4 +272,20 @@ message GrpcJsonTranscoder {
   // Proto enum values are supposed to be in upper cases when used in JSON.
   // Set this to true if your JSON request uses non uppercase enum values.
   bool case_insensitive_enum_parsing = 14;
+
+  // The maximum size of a request body to be transcoded, in bytes. A body exceeding this size will
+  // provoke a ``HTTP 413 Request Entity Too Large`` response.
+  //
+  // Large values may cause envoy to use a lot of memory if there are many concurrent requests.
+  //
+  // If unset, the current stream buffer size is used.
+  google.protobuf.UInt32Value max_request_body_size = 15 [(validate.rules).uint32 = {gt: 0}];
+
+  // The maximum size of a response body to be transcoded, in bytes. A body exceeding this size will
+  // provoke a ``HTTP 500 Internal Server Error`` response.
+  //
+  // Large values may cause envoy to use a lot of memory if there are many concurrent requests.
+  //
+  // If unset, the current stream buffer size is used.
+  google.protobuf.UInt32Value max_response_body_size = 16 [(validate.rules).uint32 = {gt: 0}];
 }

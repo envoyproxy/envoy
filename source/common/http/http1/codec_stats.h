@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/http/header_validator.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
@@ -21,13 +22,22 @@ namespace Http1 {
 /**
  * Wrapper struct for the HTTP/1 codec stats. @see stats_macros.h
  */
-struct CodecStats {
+struct CodecStats : public ::Envoy::Http::HeaderValidatorStats {
   using AtomicPtr = Thread::AtomicPtr<CodecStats, Thread::AtomicPtrAllocMode::DeleteOnDestruct>;
+
+  CodecStats(ALL_HTTP1_CODEC_STATS(GENERATE_CONSTRUCTOR_COUNTER_PARAM)...)
+      : ::Envoy::Http::HeaderValidatorStats()
+            ALL_HTTP1_CODEC_STATS(GENERATE_CONSTRUCTOR_INIT_LIST) {}
 
   static CodecStats& atomicGet(AtomicPtr& ptr, Stats::Scope& scope) {
     return *ptr.get([&scope]() -> CodecStats* {
       return new CodecStats{ALL_HTTP1_CODEC_STATS(POOL_COUNTER_PREFIX(scope, "http1."))};
     });
+  }
+
+  void incDroppedHeadersWithUnderscores() override { dropped_headers_with_underscores_.inc(); }
+  void incRequestsRejectedWithUnderscoresInHeaders() override {
+    requests_rejected_with_underscores_in_headers_.inc();
   }
 
   ALL_HTTP1_CODEC_STATS(GENERATE_COUNTER_STRUCT)

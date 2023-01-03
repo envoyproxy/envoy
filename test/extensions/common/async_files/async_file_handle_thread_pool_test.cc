@@ -26,6 +26,7 @@ namespace Common {
 namespace AsyncFiles {
 
 using StatusHelpers::IsOkAndHolds;
+using StatusHelpers::StatusIs;
 using ::testing::_;
 using ::testing::Eq;
 using ::testing::Return;
@@ -206,7 +207,7 @@ public:
     posix.close(fd_);
     posix.unlink(template_);
   }
-  std::string name() { return std::string(template_); }
+  std::string name() { return {template_}; }
 
 private:
   int fd_;
@@ -420,6 +421,36 @@ TEST_F(AsyncFileHandleWithMockPosixTest, CancellingFailedCreateHardLinkInProgres
   close(handle);
 }
 
+TEST_F(AsyncFileHandleWithMockPosixTest, StatSuccessReturnsPopulatedStatStruct) {
+  auto handle = createAnonymousFile();
+  struct stat expected_stat = {};
+  expected_stat.st_size = 9876;
+  EXPECT_CALL(mock_posix_file_operations_, fstat(_, _)).WillOnce([&](int, struct stat* buffer) {
+    *buffer = expected_stat;
+    return Api::SysCallIntResult{0, 0};
+  });
+  std::promise<absl::StatusOr<struct stat>> fstat_status_promise;
+  EXPECT_OK(handle->stat([&](absl::StatusOr<struct stat> status) {
+    fstat_status_promise.set_value(std::move(status));
+  }));
+  auto fstat_status = fstat_status_promise.get_future().get();
+  EXPECT_THAT(fstat_status, IsOkAndHolds(testing::Field(&stat::st_size, expected_stat.st_size)));
+  close(handle);
+}
+
+TEST_F(AsyncFileHandleWithMockPosixTest, StatFailureReportsError) {
+  auto handle = createAnonymousFile();
+  EXPECT_CALL(mock_posix_file_operations_, fstat(_, _))
+      .WillOnce(Return(Api::SysCallIntResult{-1, EBADF}));
+  std::promise<absl::StatusOr<struct stat>> fstat_status_promise;
+  EXPECT_OK(handle->stat([&](absl::StatusOr<struct stat> status) {
+    fstat_status_promise.set_value(std::move(status));
+  }));
+  auto fstat_status = fstat_status_promise.get_future().get();
+  EXPECT_THAT(fstat_status, StatusIs(absl::StatusCode::kFailedPrecondition));
+  close(handle);
+}
+
 TEST_F(AsyncFileHandleWithMockPosixTest, CloseFailureReportsError) {
   auto handle = createAnonymousFile();
   EXPECT_CALL(mock_posix_file_operations_, close(1))
@@ -438,8 +469,7 @@ TEST_F(AsyncFileHandleWithMockPosixTest, DuplicateFailureReportsError) {
   EXPECT_OK(handle->duplicate(
       [&](absl::StatusOr<AsyncFileHandle> status) { dup_status_promise.set_value(status); }));
   auto dup_status = dup_status_promise.get_future().get();
-  EXPECT_EQ(absl::StatusCode::kFailedPrecondition, dup_status.status().code())
-      << dup_status.status();
+  EXPECT_THAT(dup_status, StatusIs(absl::StatusCode::kFailedPrecondition));
   close(handle);
 }
 
