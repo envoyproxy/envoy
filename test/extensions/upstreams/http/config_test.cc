@@ -258,6 +258,30 @@ TEST_F(ConfigTest, TranslateExplicitLegacyConfigToDefaultHeaderValidatorConfig) 
 #endif
 }
 
+TEST_F(ConfigTest, TranslateExplicitH2LegacyConfigToDefaultHeaderValidatorConfig) {
+  const std::string yaml_string = R"EOF(
+  explicit_http_config:
+    http2_protocol_options:
+      allow_connect: true
+  )EOF";
+
+  ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
+      proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml_string, options_);
+  DefaultHeaderValidatorFactoryConfigOverride factory(proto_config);
+  Registry::InjectFactory<::Envoy::Http::HeaderValidatorFactoryConfig> registration(factory);
+  NiceMock<::Envoy::Http::MockHeaderValidatorStats> stats;
+  ProtocolOptionsConfigImpl config(options_, validation_visitor_);
+#ifdef ENVOY_ENABLE_UHV
+  EXPECT_NE(nullptr,
+            config.header_validator_factory_->create(::Envoy::Http::Protocol::Http2, stats));
+  EXPECT_FALSE(proto_config.http1_protocol_options().allow_chunked_length());
+#else
+  // If UHV is disabled, config should be accepted and factory should be nullptr
+  EXPECT_EQ(nullptr, config.header_validator_factory_);
+#endif
+}
+
 } // namespace Http
 } // namespace Upstreams
 } // namespace Extensions
