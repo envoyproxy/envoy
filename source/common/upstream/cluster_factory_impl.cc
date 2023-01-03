@@ -123,7 +123,7 @@ ClusterFactoryImplBase::create(Server::Configuration::ServerFactoryContext& serv
       new_cluster_pair.first->setHealthChecker(HealthCheckerFactory::create(
           cluster.health_checks()[0], *new_cluster_pair.first, context.runtime(),
           context.mainThreadDispatcher(), context.logManager(), context.messageValidationVisitor(),
-          context.api()));
+          context.api(), context.singletonManager()));
     }
   }
 

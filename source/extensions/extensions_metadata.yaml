@@ -736,6 +736,13 @@ envoy.health_checkers.thrift:
   status: alpha
   type_urls:
   - envoy.extensions.health_checkers.thrift.v3.Thrift
+envoy.health_checkers.cached:
+  categories:
+  - envoy.health_checkers
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.health_checkers.cached.v3.Cached
 envoy.http.original_ip_detection.custom_header:
   categories:
   - envoy.http.original_ip_detection

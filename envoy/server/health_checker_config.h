@@ -4,6 +4,7 @@
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/singleton/manager.h"
 #include "envoy/upstream/health_checker.h"
 
 namespace Envoy {
@@ -46,6 +47,11 @@ public:
    * @return Api::Api& the API used by the server.
    */
   virtual Api::Api& api() PURE;
+
+  /**
+   * @return Singleton::Manager& the server-wide singleton manager.
+   */
+  virtual Singleton::Manager& singletonManager() PURE;
 };
 
 /**

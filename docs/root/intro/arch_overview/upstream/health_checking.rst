@@ -19,6 +19,9 @@ unhealthy, successes required before marking a host healthy, etc.):
 * **L3/L4**: During L3/L4 health checking, Envoy will send a configurable byte buffer to the
   upstream host. It expects the byte buffer to be echoed in the response if the host is to be
   considered healthy. Envoy also supports connect only L3/L4 health checking.
+* **Cached**: With cached health checking, Envoy will subscribe to a Redis cache and get the cached
+  health check result once receiving the keyspace key set events from it. See
+  :ref:`<envoy_v3_api_msg_extensions.health_checkers.cached.v3.Cached>`.
 * **Redis**: Envoy will send a Redis PING command and expect a PONG response. The upstream Redis
   server can respond with anything other than PONG to cause an immediate active health check
   failure. Optionally, Envoy can perform EXISTS on a user-specified key. If the key does not exist

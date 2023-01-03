@@ -32,6 +32,7 @@ enum HealthCheckerType {
   GRPC = 2;
   REDIS = 3;
   THRIFT = 4;
+  CACHED = 5;
 }
 
 // [#next-free-field: 10]

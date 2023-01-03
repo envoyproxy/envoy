@@ -6,5 +6,6 @@ Health checkers
 .. toctree::
   :maxdepth: 2
 
+  cached
   redis
   thrift

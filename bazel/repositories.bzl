@@ -194,6 +194,7 @@ def envoy_dependencies(skip_targets = []):
     _com_google_protobuf()
     _io_opencensus_cpp()
     _com_github_curl()
+    _com_github_hiredis()
     _com_github_envoyproxy_sqlparser()
     _v8()
     _com_googlesource_chromium_base_trace_event_common()
@@ -860,6 +861,20 @@ cc_library(name = "curl", visibility = ["//visibility:public"], deps = ["@envoy/
     native.bind(
         name = "curl",
         actual = "@envoy//bazel/foreign_cc:curl",
+    )
+
+def _com_github_hiredis():
+    external_http_archive(
+        name = "com_github_hiredis",
+        build_file_content = BUILD_ALL_CONTENT + """
+cc_library(name = "hiredis", visibility = ["//visibility:public"], deps = ["@envoy//bazel/foreign_cc:hiredis"])
+""",
+        patches = [],
+        patch_args = ["-p1"],
+    )
+    native.bind(
+        name = "hiredis",
+        actual = "@envoy//bazel/foreign_cc:hiredis",
     )
 
 def _v8():

@@ -190,12 +190,19 @@ TEST(HealthCheckerFactoryTest, CreateThriftViaUpstreamHealthCheckerFactory) {
   Event::MockDispatcher dispatcher;
   AccessLog::MockAccessLogManager log_manager;
   NiceMock<Api::MockApi> api;
+  class FakeSingletonManager : public Singleton::Manager {
+  public:
+    Singleton::InstanceSharedPtr get(const std::string&, Singleton::SingletonFactoryCb) override {
+      return nullptr;
+    }
+  };
+  FakeSingletonManager fsm;
 
   EXPECT_NE(nullptr,
             dynamic_cast<CustomThriftHealthChecker*>(
                 Upstream::HealthCheckerFactory::create(
                     Upstream::parseHealthCheckFromV3Yaml(yaml), cluster, runtime, dispatcher,
-                    log_manager, ProtobufMessage::getStrictValidationVisitor(), api)
+                    log_manager, ProtobufMessage::getStrictValidationVisitor(), api, fsm)
                     .get()));
 }
 

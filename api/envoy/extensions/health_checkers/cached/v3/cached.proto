@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package envoy.extensions.health_checkers.cached.v3;
+
+import "google/protobuf/duration.proto";
+
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.health_checkers.cached.v3";
+option java_outer_classname = "CachedProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/health_checkers/cached/v3;cachedv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Cached]
+// Cached health checker :ref:`configuration overview <config_health_checkers_cached>`.
+// [#extension: envoy.health_checkers.cached]
+
+message Cached {
+  message TlsOptions {
+    // whether tls is enabled for the cache server.
+    bool enabled = 1;
+
+    // cacert is an optional name of a CA certificate/bundle file to load
+    // and use for validation of the cache server.
+    string cacert = 2;
+
+    // capath is an optional directory path where trusted CA certificate files are
+    // stored in an OpenSSL-compatible structure.
+    string capath = 3;
+
+    // cert and key are optional names of a client side
+    // certificate and private key files to use for authentication. They need to
+    // be both specified or omitted.
+    string cert = 4;
+
+    // cert and key are optional names of a client side
+    // certificate and private key files to use for authentication. They need to
+    // be both specified or omitted.
+    string key = 5;
+
+    // sni is an optional and will be used as a server name indication
+    // (SNI) TLS extension.
+    string sni = 6;
+  }
+
+  // hostname of the cache server.
+  string host = 1;
+
+  // port number of the cache server.
+  uint32 port = 2 [(validate.rules).uint32 = {lte: 65535}];
+
+  // username used to authenticate with the cache server.
+  string user = 3;
+
+  // password used to authenticate with the cache server.
+  string password = 4;
+
+  // database number of the cache server.
+  uint32 db = 5 [(validate.rules).uint32 = {lt: 2147483647}];
+
+  // connect timeout of the cache server.
+  google.protobuf.Duration connect_timeout = 6;
+
+  // command timeout of the cache server.
+  google.protobuf.Duration command_timeout = 7;
+
+  // tls options of the cache server.
+  TlsOptions tls_options = 8;
+}

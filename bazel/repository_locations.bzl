@@ -1047,6 +1047,23 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "curl",
         license_url = "https://github.com/curl/curl/blob/curl-{underscore_version}/COPYING",
     ),
+    com_github_hiredis = dict(
+        project_name = "hiredis",
+        project_desc = "Minimalistic C client for Redis >= 1.2",
+        project_url = "https://github.com/redis/hiredis",
+        version = "1.1.0",
+        sha256 = "fe6d21741ec7f3fc9df409d921f47dfc73a4d8ff64f4ac6f1d95f951bf7f53d6",
+        strip_prefix = "hiredis-{version}",
+        urls = ["https://github.com/redis/hiredis/archive/refs/tags/v{version}.tar.gz"],
+        use_category = ["dataplane_ext"],
+        extensions = [
+            "envoy.health_checkers.cached",
+        ],
+        release_date = "2022-11-15",
+        cpe = "N/A",
+        license = "BSD-3-Clause",
+        license_url = "https://github.com/redis/hiredis/blob/v{version}/COPYING",
+    ),
     v8 = dict(
         project_name = "V8",
         project_desc = "Google’s open source high-performance JavaScript and WebAssembly engine, written in C++",

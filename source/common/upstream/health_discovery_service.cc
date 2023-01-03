@@ -423,7 +423,7 @@ void HdsCluster::updateHealthchecks(
       auto new_health_checker = Upstream::HealthCheckerFactory::create(
           health_check, *this, server_context_.runtime(), server_context_.mainThreadDispatcher(),
           server_context_.accessLogManager(), server_context_.messageValidationVisitor(),
-          server_context_.api());
+          server_context_.api(), server_context_.singletonManager());
       health_checkers_map.insert({health_check, new_health_checker});
       health_checkers.push_back(new_health_checker);
 
@@ -536,7 +536,7 @@ void HdsCluster::initHealthchecks() {
     auto health_checker = Upstream::HealthCheckerFactory::create(
         health_check, *this, server_context_.runtime(), server_context_.mainThreadDispatcher(),
         server_context_.accessLogManager(), server_context_.messageValidationVisitor(),
-        server_context_.api());
+        server_context_.api(), server_context_.singletonManager());
 
     health_checkers_.push_back(health_checker);
     health_checkers_map_.insert({health_check, health_checker});

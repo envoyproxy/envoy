@@ -29,12 +29,21 @@ public:
   MOCK_METHOD(Envoy::Runtime::Loader&, runtime, ());
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
   MOCK_METHOD(Api::Api&, api, ());
+  MOCK_METHOD(Singleton::Manager&, singletonManager, ());
   Upstream::HealthCheckEventLoggerPtr eventLogger() override {
     if (!event_logger_) {
       event_logger_ = std::make_unique<testing::NiceMock<Upstream::MockHealthCheckEventLogger>>();
     }
     return std::move(event_logger_);
   }
+
+  class FakeSingletonManager : public Singleton::Manager {
+  public:
+    Singleton::InstanceSharedPtr get(const std::string&, Singleton::SingletonFactoryCb) override {
+      return nullptr;
+    }
+  };
+  FakeSingletonManager manager_;
 
   testing::NiceMock<Upstream::MockClusterMockPrioritySet> cluster_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;

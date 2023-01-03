@@ -311,6 +311,26 @@ envoy_cmake(
 )
 
 envoy_cmake(
+    name = "hiredis",
+    cache_entries = {
+        "ENABLE_SSL": "on",
+    },
+    env = {
+    },
+    lib_source = "@com_github_hiredis//:all",
+    out_static_libs = select({
+        "//conditions:default": [
+            "libhiredis.a",
+            "libhiredis_ssl.a",
+        ],
+    }),
+    deps = [
+        "//external:ssl",
+        "//external:crypto",
+    ],
+)
+
+envoy_cmake(
     name = "event",
     cache_entries = {
         "EVENT__DISABLE_OPENSSL": "on",

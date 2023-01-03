@@ -76,10 +76,17 @@ TEST(HealthCheckerFactoryTest, GrpcHealthCheckHTTP2NotConfiguredException) {
   AccessLog::MockAccessLogManager log_manager;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
   Api::MockApi api;
+  class FakeSingletonManager : public Singleton::Manager {
+  public:
+    Singleton::InstanceSharedPtr get(const std::string&, Singleton::SingletonFactoryCb) override {
+      return nullptr;
+    }
+  };
+  FakeSingletonManager fsm;
 
   EXPECT_THROW_WITH_MESSAGE(
       HealthCheckerFactory::create(createGrpcHealthCheckConfig(), cluster, runtime, dispatcher,
-                                   log_manager, validation_visitor, api),
+                                   log_manager, validation_visitor, api, fsm),
       EnvoyException, "fake_cluster cluster must support HTTP/2 for gRPC healthchecking");
 }
 
@@ -94,11 +101,18 @@ TEST(HealthCheckerFactoryTest, CreateGrpc) {
   AccessLog::MockAccessLogManager log_manager;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
   NiceMock<Api::MockApi> api;
+  class FakeSingletonManager : public Singleton::Manager {
+  public:
+    Singleton::InstanceSharedPtr get(const std::string&, Singleton::SingletonFactoryCb) override {
+      return nullptr;
+    }
+  };
+  FakeSingletonManager fsm;
 
   EXPECT_NE(nullptr,
             dynamic_cast<GrpcHealthCheckerImpl*>(
                 HealthCheckerFactory::create(createGrpcHealthCheckConfig(), cluster, runtime,
-                                             dispatcher, log_manager, validation_visitor, api)
+                                             dispatcher, log_manager, validation_visitor, api, fsm)
                     .get()));
 }
 

@@ -74,10 +74,10 @@ public:
                                   Event::Dispatcher& dispatcher,
                                   HealthCheckEventLoggerPtr&& event_logger,
                                   ProtobufMessage::ValidationVisitor& validation_visitor,
-                                  Api::Api& api)
+                                  Api::Api& api, Singleton::Manager& singleton_manager)
       : cluster_(cluster), runtime_(runtime), dispatcher_(dispatcher),
-        event_logger_(std::move(event_logger)), validation_visitor_(validation_visitor), api_(api) {
-  }
+        event_logger_(std::move(event_logger)), validation_visitor_(validation_visitor), api_(api),
+        singleton_manager_(singleton_manager) {}
   Upstream::Cluster& cluster() override { return cluster_; }
   Envoy::Runtime::Loader& runtime() override { return runtime_; }
   Event::Dispatcher& mainThreadDispatcher() override { return dispatcher_; }
@@ -86,6 +86,7 @@ public:
     return validation_visitor_;
   }
   Api::Api& api() override { return api_; }
+  Singleton::Manager& singletonManager() override { return singleton_manager_; }
 
 private:
   Upstream::Cluster& cluster_;
@@ -94,13 +95,16 @@ private:
   HealthCheckEventLoggerPtr event_logger_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   Api::Api& api_;
+  Singleton::Manager& singleton_manager_;
 };
 
-HealthCheckerSharedPtr HealthCheckerFactory::create(
-    const envoy::config::core::v3::HealthCheck& health_check_config, Upstream::Cluster& cluster,
-    Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
-    AccessLog::AccessLogManager& log_manager,
-    ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api) {
+HealthCheckerSharedPtr
+HealthCheckerFactory::create(const envoy::config::core::v3::HealthCheck& health_check_config,
+                             Upstream::Cluster& cluster, Runtime::Loader& runtime,
+                             Event::Dispatcher& dispatcher,
+                             AccessLog::AccessLogManager& log_manager,
+                             ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
+                             Singleton::Manager& singleton_manager) {
   HealthCheckEventLoggerPtr event_logger;
   if (!health_check_config.event_log_path().empty()) {
     event_logger = std::make_unique<HealthCheckEventLoggerImpl>(
@@ -130,7 +134,7 @@ HealthCheckerSharedPtr HealthCheckerFactory::create(
             health_check_config.custom_health_check());
     std::unique_ptr<Server::Configuration::HealthCheckerFactoryContext> context(
         new HealthCheckerFactoryContextImpl(cluster, runtime, dispatcher, std::move(event_logger),
-                                            validation_visitor, api));
+                                            validation_visitor, api, singleton_manager));
     return factory.createCustomHealthChecker(health_check_config, *context);
   }
   }
