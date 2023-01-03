@@ -170,13 +170,6 @@ bool LocalRateLimiterImpl::requestAllowed(
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.local_ratelimit_match_all_descriptors")) {
 
-    bool allow = requestAllowedHelper(tokens_);
-    // Global token is not enough. Since global token is not sorted, so we suggest it should be
-    // larger than other descriptors.
-    if (!allow) {
-      return allow;
-    }
-
     if (!descriptors_.empty() && !request_descriptors.empty()) {
       for (const auto& descriptor : sorted_descriptors_) {
         for (const auto& request_descriptor : request_descriptors) {
@@ -191,7 +184,9 @@ bool LocalRateLimiterImpl::requestAllowed(
         }
       }
     }
-    return allow;
+
+    // Since global token is not sorted, so we suggest it should be larger than other descriptors.
+    return requestAllowedHelper(tokens_);
   }
   auto descriptor = descriptorHelper(request_descriptors);
 
