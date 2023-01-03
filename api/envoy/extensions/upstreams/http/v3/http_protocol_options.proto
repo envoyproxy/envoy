@@ -165,10 +165,10 @@ message HttpProtocolOptions {
   // [#extension-category: envoy.filters.http.upstream]
   repeated filters.network.http_connection_manager.v3.HttpFilter http_filters = 6;
 
-  // Configuration options for Header Validation (UHV).
+  // Configuration options for Unified Header Validation (UHV).
   // UHV is an extensible mechanism for checking validity of HTTP responses.
   //
-  // The default UHV checks the following:
+  // The default implementation of UHV (envoy.http.header_validators.default) checks the following:
   //
   // #. HTTP/1 header map validity according to `RFC 7230 section 3.2<https://datatracker.ietf.org/doc/html/rfc7230#section-3.2>`_
   // #. Syntax of HTTP/1 response line
