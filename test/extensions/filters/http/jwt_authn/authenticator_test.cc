@@ -271,7 +271,7 @@ TEST_F(AuthenticatorTest, TestSetExpiredJwtToGetStatus) {
                                                                .at("jwt-failure-reason")
                                                                .struct_value()
                                                                .fields()
-                                                               .find("status")
+                                                               .find("code")
                                                                ->second.string_value());
 }
 
