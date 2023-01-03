@@ -373,16 +373,24 @@ void AuthenticatorImpl::doneWithStatus(const Status& status) {
   ENVOY_LOG(debug, "{}: JWT token verification completed with: {}", name(),
             ::google::jwt_verify::getStatusString(status));
 
-  if(Status::Ok != status) {
-    //Forward the failed status to dynamic metadata
+  if (Status::Ok != status) {
+    // Forward the failed status to dynamic metadata
+    ENVOY_LOG(debug, "status is: {}", ::google::jwt_verify::getStatusString(status));
 
-    if ((jwks_data_ != nullptr) &&
-        !jwks_data_->getJwtProvider().failed_status_in_metadata().empty()) {
+    if (!jwks_cache_.findByProvider(*provider_)
+             ->getJwtProvider()
+             .failed_status_in_metadata()
+             .empty()) {
+
       ProtobufWkt::Struct failed_status;
       auto& failed_status_fields = *failed_status.mutable_fields();
-      failed_status_fields["status"].set_string_value(std::to_string(status));
-      ENVOY_LOG(debug, "Writing to metada failure reason: {}",google::jwt_verify::getStatusString(enumToInt(status)));
-      set_extracted_jwt_data_cb_(jwks_data_->getJwtProvider().failed_status_in_metadata(), failed_status);
+      failed_status_fields["status"].set_string_value(std::to_string(enumToInt(status)));
+      ENVOY_LOG(debug, "Code: {}\nMessage: {}",
+                std::to_string(enumToInt(status))
+                google::jwt_verify::getStatusString(status));
+      set_extracted_jwt_data_cb_(
+          jwks_cache_.findByProvider(*provider_)->getJwtProvider().failed_status_in_metadata(),
+          failed_status);
     }
   }
   

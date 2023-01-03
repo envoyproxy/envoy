@@ -251,6 +251,30 @@ TEST_F(AuthenticatorTest, TestSetHeader) {
       TestUtility::protoEqual(expected_payload, out_extracted_data_.fields().at("my_header")));
 }
 
+// This test verifies jwt status in failed status in metadata
+TEST_F(AuthenticatorTest, TestSetExpiredJwtToGetStatus) {
+  // Config failed_status_in_metadata flag
+  auto& provider = (*proto_config_.mutable_providers())[std::string(ProviderName)];
+  provider.set_failed_status_in_metadata("jwt-failure-reason");
+  createAuthenticator();
+  EXPECT_CALL(*raw_fetcher_, fetch(_, _)).Times(0);
+
+  // Test JwtExpired pubkey and its cache
+  Http::TestRequestHeaderMapImpl headers{{"Authorization", "Bearer " + std::string(ExpiredToken)}};
+
+  expectVerifyStatus(Status::JwtExpired, headers);
+
+  // Only one field is set.
+  EXPECT_EQ(1, out_extracted_data_.fields().size());
+
+  EXPECT_EQ(std::to_string(enumToInt(Status::JwtExpired)), out_extracted_data_.fields()
+                                                               .at("jwt-failure-reason")
+                                                               .struct_value()
+                                                               .fields()
+                                                               .find("status")
+                                                               ->second.string_value());
+}
+
 // This test verifies setting the extracted payload and header to metadata.
 TEST_F(AuthenticatorTest, TestSetPayloadAndHeader) {
   // Set the extracted payload and header to metadata.

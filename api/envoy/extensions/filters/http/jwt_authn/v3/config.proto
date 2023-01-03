@@ -270,6 +270,20 @@ message JwtProvider {
   //
   string header_in_metadata = 14;
 
+  // If non empty, the failure status `::google::jwt_verify::Status` for a non verified JWT will be written to StreamInfo DynamicMetadata
+  // in the format as: ``namespace`` is the jwt_authn filter name as ````envoy.filters.http.jwt_authn````
+  // The value is the ``protobuf::Struct``. The value of this field will be ``status``
+  // and the value is the JWT authentication failure status.
+  //
+  // For example, if failed_status_in_metadata is ``my_auth_failure_status``:
+  //
+  // .. code-block:: yaml
+  //
+  //   envoy.filters.http.jwt_authn:
+  //     my_auth_failure_status:
+  //       status: 1
+  string failed_status_in_metadata = 16;
+
   // Specify the clock skew in seconds when verifying JWT time constraint,
   // such as ``exp``, and ``nbf``. If not specified, default is 60 seconds.
   uint32 clock_skew_seconds = 10;
