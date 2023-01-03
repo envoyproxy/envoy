@@ -1059,7 +1059,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = [
             "envoy.health_checkers.cached",
         ],
-        release_date = "2022-11-15",
+        release_date = "2022-11-16",
         cpe = "N/A",
         license = "BSD-3-Clause",
         license_url = "https://github.com/redis/hiredis/blob/v{version}/COPYING",
