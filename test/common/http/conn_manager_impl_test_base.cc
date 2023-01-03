@@ -310,7 +310,7 @@ void HttpConnectionManagerImplTest::testPathNormalization(
 }
 
 void HttpConnectionManagerImplTest::expectUhvTrailerCheckFail() {
-  EXPECT_CALL(header_validator_factory_, create(codec_->protocol_, _, _))
+  EXPECT_CALL(header_validator_factory_, create(codec_->protocol_, _))
       .WillOnce(InvokeWithoutArgs([]() {
         auto header_validator = std::make_unique<testing::StrictMock<MockHeaderValidator>>();
         EXPECT_CALL(*header_validator, validateRequestHeaderMap(_))

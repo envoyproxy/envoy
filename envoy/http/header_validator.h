@@ -77,10 +77,10 @@ public:
   /**
    * Validate the entire request header map.
    * This method may mutate the header map as well, for example by normalizing URI path.
-   * Returning the Reject value form this method causes HTTP requests to be rejected with 400
-   * status, and gRPC requests with the the INTERNAL (13) error code. Returning the Redirect value
-   * causes HTTP requests to be redirected to the :path presudo header in the request map. gRPC
-   * requests will still be rejected with the INTERNAL (13) error code.
+   * Returning the Reject value form this method causes HTTP request to be rejected with 400
+   * status, and gRPC request with the the INTERNAL (13) error code. Returning the Redirect value
+   * causes HTTP request to be redirected to the :path presudo header in the request map. gRPC
+   * request will still be rejected with the INTERNAL (13) error code.
    */
   using RequestHeaderMapValidationResult = RejectOrRedirectResult;
   virtual RequestHeaderMapValidationResult
@@ -88,8 +88,8 @@ public:
 
   /**
    * Validate the entire response header map.
-   * Returning the Reject value causes HTTP requests to be rejected with the 502 status,
-   * and gRPC requests with the the UNAVAILABLE (14) error code.
+   * Returning the Reject value causes HTTP request to be rejected with the 502 status,
+   * and gRPC request with the the UNAVAILABLE (14) error code.
    */
   using ResponseHeaderMapValidationResult = RejectResult;
   virtual ResponseHeaderMapValidationResult
@@ -97,8 +97,8 @@ public:
 
   /**
    * Validate the entire request trailer map.
-   * Returning the Reject value causes HTTP requests to be rejected with the 502 status,
-   * and gRPC requests with the the UNAVAILABLE (14) error code.
+   * Returning the Reject value causes HTTP request to be rejected with the 502 status,
+   * and gRPC request with the the UNAVAILABLE (14) error code.
    * If response headers have already been sent the request is reset.
    */
   using TrailerValidationResult = RejectResult;
@@ -106,7 +106,7 @@ public:
 
   /**
    * Validate the entire response trailer map.
-   * Returning the Reject value causes HTTP requests to be reset.
+   * Returning the Reject value causes HTTP request to be reset.
    */
   virtual TrailerValidationResult validateResponseTrailerMap(ResponseTrailerMap& trailer_map) PURE;
 };
