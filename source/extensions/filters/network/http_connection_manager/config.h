@@ -239,13 +239,11 @@ public:
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return proxy_status_config_.get();
   }
-  Http::HeaderValidatorPtr
-  makeHeaderValidator([[maybe_unused]] Http::Protocol protocol,
-                      [[maybe_unused]] StreamInfo::StreamInfo& stream_info) override {
+  Http::HeaderValidatorPtr makeHeaderValidator([[maybe_unused]] Http::Protocol protocol) override {
 #ifdef ENVOY_ENABLE_UHV
-    return header_validator_factory_ ? header_validator_factory_->create(
-                                           protocol, stream_info, getHeaderValidatorStats(protocol))
-                                     : nullptr;
+    return header_validator_factory_
+               ? header_validator_factory_->create(protocol, getHeaderValidatorStats(protocol))
+               : nullptr;
 #else
     return nullptr;
 #endif
