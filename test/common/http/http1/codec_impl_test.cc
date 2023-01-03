@@ -298,7 +298,8 @@ void Http1ServerConnectionImplTest::testTrailersExceedLimit(std::string trailer_
   EXPECT_TRUE(status.ok());
   buffer = Buffer::OwnedImpl(trailer_string);
   if (enable_trailers) {
-    EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
+    EXPECT_CALL(decoder, sendLocalReply(Http::Code::RequestHeaderFieldsTooLarge,
+                                        "Request Header Fields Too Large", _, _, _));
     status = codec_->dispatch(buffer);
     EXPECT_TRUE(isCodecProtocolError(status));
     EXPECT_EQ(status.message(), error_message);

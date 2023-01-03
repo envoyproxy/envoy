@@ -73,14 +73,7 @@ TEST_P(DrainCloseIntegrationTest, DrainCloseImmediate) {
   }
 }
 
-TEST_P(DrainCloseIntegrationTest, AdminDrain) {
-  if (GetParam().http1_implementation == Http1ParserImpl::BalsaParser) {
-    // TODO(#21245): Re-enable this test for BalsaParser.
-    return;
-  }
-
-  testAdminDrain(downstreamProtocol());
-}
+TEST_P(DrainCloseIntegrationTest, AdminDrain) { testAdminDrain(downstreamProtocol()); }
 
 TEST_P(DrainCloseIntegrationTest, AdminGracefulDrain) {
   drain_strategy_ = Server::DrainStrategy::Immediate;
