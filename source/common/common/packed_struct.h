@@ -63,7 +63,7 @@ namespace Envoy {
  *
  *   // Create packed structs from the proto.
  *   RedirectStringsFromProto<std::string, envoy::config::route::v3::RedirectAction>
- redirect_strings( redirect_action);
+ *       redirect_strings( redirect_action);
  *   TimeoutsFromProto<std::chrono::milliseconds, envoy::config::route::v3::RouteAction> timeouts(
       route);
  */
@@ -78,12 +78,13 @@ public:
       : data_(capacity > 0 ? new T[capacity] : nullptr), capacity_(capacity) {
     RELEASE_ASSERT(capacity < 0x7f, "size must be less than 0x7f");
   }
+
+  // Accessors.
   T& operator[](size_t idx) {
     RELEASE_ASSERT(idx < size_,
                    absl::StrCat("Index ", idx, " is out of bounds. Size is (", size_, ")"));
     return (data_.get())[idx];
   }
-
   const T& operator[](size_t idx) const {
     RELEASE_ASSERT(idx < size_,
                    absl::StrCat("Index ", idx, " is out of bounds. Size is (", size_, ")"));
@@ -107,7 +108,9 @@ public:
     // If we're at capacity, increase capacity by 1.
     if (size_ == capacity_) {
       std::unique_ptr<T[]> tmp(new T[++capacity_]);
-      std::memcpy(tmp.get(), data_.get(), sizeof(T) * size_); // NOLINT(safe-memcpy)
+      for (size_t idx = 0; idx < size_; ++idx) {
+        swap(tmp.get()[idx], data_.get()[idx]);
+      }
       swap(data_, tmp);
     }
     data_.get()[size_++] = t;
@@ -171,6 +174,7 @@ private:
   template <class Type, class ProtoType> struct PackedStructName {                                 \
   public:                                                                                          \
     ALL_ELEMENTS(ACCESSOR)                                                                         \
+    PackedStructName() = delete;                                                                   \
                                                                                                    \
     PackedStructName(const ProtoType& proto) : packed_struct_(getSize(proto)) {                    \
       ALL_ELEMENTS(ASSIGNMENT)                                                                     \
@@ -184,7 +188,6 @@ private:
     }                                                                                              \
                                                                                                    \
     ALL_ELEMENTS(GENERATE_PACKED_STRUCT_SETTER)                                                    \
-                                                                                                   \
     PackedStruct<Type> packed_struct_;                                                             \
     ALL_ELEMENTS(GENERATE_PACKED_STRUCT_IDX)                                                       \
   }
