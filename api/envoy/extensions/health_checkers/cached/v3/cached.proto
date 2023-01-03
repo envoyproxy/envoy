@@ -18,7 +18,9 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Cached health checker :ref:`configuration overview <config_health_checkers_cached>`.
 // [#extension: envoy.health_checkers.cached]
 
+// [#next-free-field: 9]
 message Cached {
+  // [#next-free-field: 7]
   message TlsOptions {
     // whether tls is enabled for the cache server.
     bool enabled = 1;
