@@ -5,7 +5,6 @@
 #include <hiredis/hiredis_ssl.h>
 
 #include <atomic>
-#include <mutex>
 #include <vector>
 
 #include "envoy/common/exception.h"
@@ -13,6 +12,7 @@
 
 #include "source/common/common/backoff_strategy.h"
 #include "source/common/common/c_smart_ptr.h"
+#include "source/common/common/thread.h"
 #include "source/common/config/utility.h"
 #include "source/common/json/json_loader.h"
 #include "source/extensions/health_checkers/cached/client.h"
@@ -162,7 +162,8 @@ private:
   CTlsContextPtr tls_ctx_;
   redisAsyncContext* ctx_ = nullptr;
   std::vector<std::unique_ptr<BaseEvent>> events_;
-  std::mutex mtx_;
+  Thread::MutexBasicLockable events_lock_;
+  Thread::MutexBasicLockable opts_lock_;
   bool run_disconnect_callback_ = true;
 
   BackOffStrategyPtr backoff_strategy_;

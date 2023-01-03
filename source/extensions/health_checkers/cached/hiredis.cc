@@ -351,7 +351,7 @@ void Connection::disableDisconnectCallback() {
 
 void Connection::send(BaseEventUPtr event) {
   {
-    std::lock_guard<std::mutex> lock(mtx_);
+    Thread::LockGuard write_lock(events_lock_);
 
     events_.push_back(std::move(event));
   }
@@ -375,7 +375,7 @@ void Connection::send() {
 std::vector<BaseEventUPtr> Connection::getEvents() {
   std::vector<BaseEventUPtr> events;
   {
-    std::lock_guard<std::mutex> lock(mtx_);
+    Thread::LockGuard write_lock(events_lock_);
 
     events.swap(events_);
   }
@@ -404,9 +404,10 @@ CTlsContextPtr Connection::secureConnection(redisContext& ctx, const TlsOptions&
 }
 
 ConnectionOptions& Connection::options() {
-  std::lock_guard<std::mutex> lock(mtx_);
-
-  return *opts_;
+  {
+    Thread::LockGuard lock(opts_lock_);
+    return *opts_;
+  }
 }
 
 void Connection::connect() {
