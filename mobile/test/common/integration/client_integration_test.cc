@@ -340,5 +340,44 @@ TEST_P(ClientIntegrationTest, DirectResponse) {
   stream_.reset();
 }
 
+TEST_P(ClientIntegrationTest, ForceAdmin) {
+  override_builder_config_ = true;
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.use_api_listener", "false");
+  initialize();
+
+  Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
+  default_request_headers_.addCopy(AutonomousStream::EXPECT_REQUEST_SIZE_BYTES,
+                                   std::to_string(request_data.length()));
+
+  stream_prototype_->setOnData([this](envoy_data c_data, bool end_stream) {
+    if (end_stream) {
+      EXPECT_EQ(Data::Utility::copyToString(c_data), "");
+    } else {
+      EXPECT_EQ(c_data.length, 10);
+    }
+    cc_.on_data_calls++;
+    release_envoy_data(c_data);
+  });
+
+  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), false);
+
+  envoy_data c_data = Data::Utility::toBridgeData(request_data);
+  stream_->sendData(c_data);
+
+  Platform::RequestTrailersBuilder builder;
+  std::shared_ptr<Platform::RequestTrailers> trailers =
+      std::make_shared<Platform::RequestTrailers>(builder.build());
+  stream_->close(trailers);
+
+  terminal_callback_.waitReady();
+
+  ASSERT_EQ(cc_.on_headers_calls, 1);
+  ASSERT_EQ(cc_.status, "200");
+  ASSERT_EQ(cc_.on_data_calls, 2);
+  ASSERT_EQ(cc_.on_complete_calls, 1);
+  ASSERT_EQ(cc_.on_header_consumed_bytes_from_response, 27);
+  ASSERT_EQ(cc_.on_complete_received_byte_count, 67);
+}
+
 } // namespace
 } // namespace Envoy
