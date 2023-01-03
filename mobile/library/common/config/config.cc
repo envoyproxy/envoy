@@ -496,20 +496,12 @@ stats_config:
   stats_matcher:
     inclusion_list:
       patterns:
-        - prefix: cluster.base.upstream_cx_
-        - prefix: cluster.base_h2.upstream_cx_
-        - prefix: cluster.stats.upstream_cx_
-        - prefix: cluster.base.upstream_rq_
-        - prefix: cluster.base_h2.upstream_rq_
-        - prefix: cluster.stats.upstream_rq_
-        - prefix: cluster.base.http2.keepalive_timeout
-        - prefix: cluster.base_h2.http2.keepalive_timeout
-        - prefix: cluster.stats.http2.keepalive_timeout
-        - prefix: dns.apple.
+        - prefix: cluster.base.
+        - prefix: cluster.base_h2.
+        - prefix: cluster.stats.
         - prefix: http.client.
         - prefix: http.dispatcher.
-        - prefix: http.hcm.decompressor.
-        - prefix: http.hcm.downstream_rq_
+        - prefix: http.hcm.
         - prefix: pbf_filter.
         - prefix: pulse.
         - safe_regex:
