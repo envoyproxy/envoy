@@ -20,7 +20,7 @@ CONTRIB_EXTENSIONS = {
     "envoy.filters.network.postgres_proxy":                     "//contrib/postgres_proxy/filters/network/source:config",
     "envoy.filters.network.rocketmq_proxy":                     "//contrib/rocketmq_proxy/filters/network/source:config",
     "envoy.filters.network.generic_proxy":                      "//contrib/generic_proxy/filters/network/source:config",
-
+    "envoy.filters.network.smtp_proxy":                         "//contrib/smtp_proxy/filters/network/source:config",
     #
     # Sip proxy
     #
