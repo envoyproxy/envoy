@@ -206,42 +206,6 @@ public class JniLibrary {
                                                int count);
 
   /**
-   * Set a gauge of a given string of elements with the given value.
-   *
-   * @param engine,  handle to the engine that owns the gauge.
-   * @param elements Elements of the gauge stat.
-   * @param tags Tags of the gauge.
-   * @param value Value to set to the gauge.
-   * @return A status indicating if the action was successful.
-   */
-  protected static native int recordGaugeSet(long engine, String elements, byte[][] tags,
-                                             int value);
-
-  /**
-   * Add the gauge with the given string of elements and by the given amount.
-   *
-   * @param engine,  handle to the engine that owns the gauge.
-   * @param elements Elements of the gauge stat.
-   * @param tags Tags of the gauge.
-   * @param amount Amount to add to the gauge.
-   * @return A status indicating if the action was successful.
-   */
-  protected static native int recordGaugeAdd(long engine, String elements, byte[][] tags,
-                                             int amount);
-
-  /**
-   * Subtract from the gauge with the given string of elements and by the given amount.
-   *
-   * @param engine,  handle to the engine that owns the gauge.
-   * @param elements Elements of the gauge stat.
-   * @param tags Tags of the gauge.
-   * @param amount Amount to subtract from the gauge.
-   * @return A status indicating if the action was successful.
-   */
-  protected static native int recordGaugeSub(long engine, String elements, byte[][] tags,
-                                             int amount);
-
-  /**
    * Flush the stats sinks outside of a flushing interval.
    * Note: stat flushing is done asynchronously, this function will never block.
    * This is a noop if called before the underlying EnvoyEngine has started.

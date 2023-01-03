@@ -72,8 +72,6 @@ swift_library(
         "stats/Counter.swift",
         "stats/CounterImpl.swift",
         "stats/Element.swift",
-        "stats/Gauge.swift",
-        "stats/GaugeImpl.swift",
         "stats/Tags.swift",
         "stats/TagsBuilder.swift",
     ] + ["@envoy_mobile_extra_swift_sources//:extra_swift_srcs"],

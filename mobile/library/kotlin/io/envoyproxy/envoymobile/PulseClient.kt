@@ -17,14 +17,4 @@ interface PulseClient {
    * @return A counter based on the joined elements with tags.
    */
   fun counter(vararg elements: Element, tags: Tags): Counter
-
-  /**
-   * @return A gauge based on the joined elements.
-   */
-  fun gauge(vararg elements: Element): Gauge
-
-  /**
-   * @return A gauge based on the joined elements with tags.
-   */
-  fun gauge(vararg elements: Element, tags: Tags): Gauge
 }

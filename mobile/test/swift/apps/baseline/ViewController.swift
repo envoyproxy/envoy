@@ -111,11 +111,6 @@ final class ViewController: UITableViewController {
     let counter = pulseClient.counter(elements: ["foo", "bar", "counter"])
     counter.increment()
     counter.increment(count: 5)
-
-    let gauge = pulseClient.gauge(elements: ["foo", "bar", "gauge"])
-    gauge.set(value: 5)
-    gauge.add(amount: 10)
-    gauge.sub(amount: 1)
   }
   // MARK: - UITableView
 
