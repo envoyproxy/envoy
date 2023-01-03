@@ -175,6 +175,9 @@ Context::Context(spdlog::level::level_enum log_level, const std::string& log_for
 Context::~Context() {
   {
     absl::MutexLock context_lock(&current_context_mutex);
+    // Contexts are created on a stack, so they must be deleted
+    // in reverse order of initialization. This assert verifies that.
+    assert(current_context == this);
     current_context = save_context_;
   } // context_lock
 
