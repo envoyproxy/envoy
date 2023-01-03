@@ -747,7 +747,7 @@ absl::string_view
 RouteEntryImplBase::sanitizePathBeforePathMatching(const absl::string_view path) const {
   absl::string_view ret = path;
   if (vhost_.globalRouteConfig().ignorePathParametersInPathMatching()) {
-    auto pos = ret.find_first_of(";");
+    auto pos = ret.find_first_of(';');
     if (pos != absl::string_view::npos) {
       ret.remove_suffix(ret.length() - pos);
     }

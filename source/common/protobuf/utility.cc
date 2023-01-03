@@ -28,7 +28,7 @@ namespace Envoy {
 namespace {
 
 absl::string_view filenameFromPath(absl::string_view full_path) {
-  size_t index = full_path.rfind("/");
+  size_t index = full_path.rfind('/');
   if (index == std::string::npos || index == full_path.size()) {
     return full_path;
   }
