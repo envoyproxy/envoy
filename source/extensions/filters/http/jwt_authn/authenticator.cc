@@ -387,14 +387,13 @@ void AuthenticatorImpl::doneWithStatus(const Status& status) {
       failed_status_fields["code"].set_string_value(std::to_string(enumToInt(status)));
       failed_status_fields["message"].set_string_value(google::jwt_verify::getStatusString(status));
       ENVOY_LOG(debug, "Code: {}\nMessage: {}",
-                std::to_string(enumToInt(status))
-                google::jwt_verify::getStatusString(status));
+                std::to_string(enumToInt(status)), google::jwt_verify::getStatusString(status));
       set_extracted_jwt_data_cb_(
           jwks_cache_.findByProvider(*provider_)->getJwtProvider().failed_status_in_metadata(),
           failed_status);
     }
   }
-  
+
   // If a request has multiple tokens, all of them must be valid. Otherwise it may have
   // following security hole: a request has a good token and a bad one, it will pass
   // verification, forwarded to the backend, and the backend may mistakenly use the bad
