@@ -1419,7 +1419,7 @@ Status ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
 }
 
 Status ConnectionImpl::onStreamClose(int32_t stream_id, uint32_t error_code) {
-  return onStreamClose(getStream(stream_id), error_code);
+  return onStreamClose(getStreamUnchecked(stream_id), error_code);
 }
 
 int ConnectionImpl::onMetadataReceived(int32_t stream_id, const uint8_t* data, size_t len) {
@@ -2118,22 +2118,28 @@ Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
   return ConnectionImpl::dispatch(data);
 }
 
-absl::optional<int>
-ServerConnectionImpl::checkHeaderNameForUnderscores(absl::string_view header_name) {
+absl::optional<int> ServerConnectionImpl::checkHeaderNameForUnderscores(
+    [[maybe_unused]] absl::string_view header_name) {
+#ifndef ENVOY_ENABLE_UHV
+  // This check has been moved to UHV
   if (headers_with_underscores_action_ != envoy::config::core::v3::HttpProtocolOptions::ALLOW &&
       Http::HeaderUtility::headerNameContainsUnderscore(header_name)) {
     if (headers_with_underscores_action_ ==
         envoy::config::core::v3::HttpProtocolOptions::DROP_HEADER) {
       ENVOY_CONN_LOG(debug, "Dropping header with invalid characters in its name: {}", connection_,
                      header_name);
-      stats_.dropped_headers_with_underscores_.inc();
+      stats_.incDroppedHeadersWithUnderscores();
       return 0;
     }
     ENVOY_CONN_LOG(debug, "Rejecting request due to header name with underscores: {}", connection_,
                    header_name);
-    stats_.requests_rejected_with_underscores_in_headers_.inc();
+    stats_.incRequestsRejectedWithUnderscoresInHeaders();
     return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
   }
+#else
+  // Workaround for gcc not understanding [[maybe_unused]] for class members.
+  (void)headers_with_underscores_action_;
+#endif
   return absl::nullopt;
 }
 

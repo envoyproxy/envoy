@@ -48,6 +48,7 @@ RUNTIME_GUARD(envoy_reloadable_features_fix_hash_key);
 RUNTIME_GUARD(envoy_reloadable_features_get_route_config_factory_by_type);
 RUNTIME_GUARD(envoy_reloadable_features_http2_delay_keepalive_timeout);
 RUNTIME_GUARD(envoy_reloadable_features_http3_sends_early_data);
+RUNTIME_GUARD(envoy_reloadable_features_http_filter_avoid_reentrant_local_reply);
 RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
 RUNTIME_GUARD(envoy_reloadable_features_http_response_half_close);
 RUNTIME_GUARD(envoy_reloadable_features_http_skip_adding_content_length_to_upgrade);
@@ -55,6 +56,7 @@ RUNTIME_GUARD(envoy_reloadable_features_http_strip_fragment_from_path_unsafe_if_
 RUNTIME_GUARD(envoy_reloadable_features_local_ratelimit_match_all_descriptors);
 RUNTIME_GUARD(envoy_reloadable_features_lua_respond_with_send_local_reply);
 RUNTIME_GUARD(envoy_reloadable_features_no_extension_lookup_by_name);
+RUNTIME_GUARD(envoy_reloadable_features_no_full_scan_certs_on_sni_mismatch);
 RUNTIME_GUARD(envoy_reloadable_features_oauth_header_passthrough_fix);
 RUNTIME_GUARD(envoy_reloadable_features_original_dst_rely_on_idle_timeout);
 RUNTIME_GUARD(envoy_reloadable_features_postpone_h3_client_connect_to_next_loop);
@@ -62,8 +64,10 @@ RUNTIME_GUARD(envoy_reloadable_features_quic_defer_logging_to_ack_listener);
 RUNTIME_GUARD(envoy_reloadable_features_quic_defer_send_in_response_to_packet);
 RUNTIME_GUARD(envoy_reloadable_features_reject_require_client_certificate_with_quic);
 RUNTIME_GUARD(envoy_reloadable_features_skip_dns_lookup_for_proxied_requests);
+RUNTIME_GUARD(envoy_reloadable_features_tcp_pool_idle_timeout);
 RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
 RUNTIME_GUARD(envoy_reloadable_features_thrift_allow_negative_field_ids);
+RUNTIME_GUARD(envoy_reloadable_features_thrift_connection_draining);
 RUNTIME_GUARD(envoy_reloadable_features_tls_async_cert_validation);
 RUNTIME_GUARD(envoy_reloadable_features_udp_proxy_connect);
 RUNTIME_GUARD(envoy_reloadable_features_unified_header_formatter);
@@ -82,8 +86,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_unified_mux);
 // TODO(kbaichoo): Make this enabled by default when fairness and chunking
 // are implemented, and we've had more cpu time.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_defer_processing_backedup_streams);
-// TODO(rgs1): Make this enabled after Pinterest tests
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_thrift_connection_draining);
 // TODO(birenroy) flip after a burn-in period
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
 // TODO(bencebeky): Finish BalsaParser implementation, then enable by default. See issue #21245.

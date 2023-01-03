@@ -336,9 +336,18 @@ ClusterManagerImpl::ClusterManagerImpl(
         validation_context.dynamicValidationVisitor(), api, main_thread_dispatcher);
   }
 
+  if (bootstrap.has_xds_config_tracker_extension()) {
+    auto& tracer_factory = Config::Utility::getAndCheckFactory<Config::XdsConfigTrackerFactory>(
+        bootstrap.xds_config_tracker_extension());
+    xds_config_tracker_ = tracer_factory.createXdsConfigTracker(
+        bootstrap.xds_config_tracker_extension().typed_config(),
+        validation_context.dynamicValidationVisitor(), main_thread_dispatcher, stats);
+  }
+
   subscription_factory_ = std::make_unique<Config::SubscriptionFactoryImpl>(
       local_info, main_thread_dispatcher, *this, validation_context.dynamicValidationVisitor(), api,
-      server, makeOptRefFromPtr(xds_resources_delegate_.get()));
+      server, makeOptRefFromPtr(xds_resources_delegate_.get()),
+      makeOptRefFromPtr(xds_config_tracker_.get()));
 
   const auto& dyn_resources = bootstrap.dynamic_resources();
 
@@ -394,7 +403,7 @@ ClusterManagerImpl::ClusterManagerImpl(
             random_, stats_,
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
             dyn_resources.ads_config().set_node_on_first_message_only(),
-            std::move(custom_config_validators));
+            std::move(custom_config_validators), makeOptRefFromPtr(xds_config_tracker_.get()));
       } else {
         ads_mux_ = std::make_shared<Config::NewGrpcMuxImpl>(
             Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
@@ -405,7 +414,7 @@ ClusterManagerImpl::ClusterManagerImpl(
                 "envoy.service.discovery.v3.AggregatedDiscoveryService.DeltaAggregatedResources"),
             random_, stats_,
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
-            std::move(custom_config_validators));
+            std::move(custom_config_validators), makeOptRefFromPtr(xds_config_tracker_.get()));
       }
     } else {
       Config::Utility::checkTransportVersion(dyn_resources.ads_config());
@@ -425,7 +434,8 @@ ClusterManagerImpl::ClusterManagerImpl(
             random_, stats_,
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
             bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only(),
-            std::move(custom_config_validators), xds_delegate_opt_ref, target_xds_authority);
+            std::move(custom_config_validators), makeOptRefFromPtr(xds_config_tracker_.get()),
+            xds_delegate_opt_ref, target_xds_authority);
       } else {
         ads_mux_ = std::make_shared<Config::GrpcMuxImpl>(
             local_info,
@@ -438,7 +448,8 @@ ClusterManagerImpl::ClusterManagerImpl(
             random_, stats_,
             Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
             bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only(),
-            std::move(custom_config_validators), xds_delegate_opt_ref, target_xds_authority);
+            std::move(custom_config_validators), makeOptRefFromPtr(xds_config_tracker_.get()),
+            xds_delegate_opt_ref, target_xds_authority);
       }
     }
   } else {
@@ -1156,7 +1167,7 @@ Host::CreateConnectionData ClusterManagerImpl::ThreadLocalClusterManagerImpl::Cl
     }
     return conn_info;
   } else {
-    cluster_info_->trafficStats().upstream_cx_none_healthy_.inc();
+    cluster_info_->trafficStats()->upstream_cx_none_healthy_.inc();
     return {nullptr, nullptr};
   }
 }
@@ -1628,7 +1639,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImp
   if (!host) {
     if (!peek) {
       ENVOY_LOG(debug, "no healthy host for HTTP connection pool");
-      cluster_info_->trafficStats().upstream_cx_none_healthy_.inc();
+      cluster_info_->trafficStats()->upstream_cx_none_healthy_.inc();
     }
     return nullptr;
   }
@@ -1758,7 +1769,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPoolImpl
   if (!host) {
     if (!peek) {
       ENVOY_LOG(debug, "no healthy host for TCP connection pool");
-      cluster_info_->trafficStats().upstream_cx_none_healthy_.inc();
+      cluster_info_->trafficStats()->upstream_cx_none_healthy_.inc();
     }
     return nullptr;
   }
@@ -1801,7 +1812,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPoolImpl
             parent_.thread_local_dispatcher_, host, priority,
             !upstream_options->empty() ? upstream_options : nullptr,
             have_transport_socket_options ? context->upstreamTransportSocketOptions() : nullptr,
-            parent_.cluster_manager_state_));
+            parent_.cluster_manager_state_, cluster_info_->tcpPoolIdleTimeout()));
     ASSERT(inserted);
     pool_iter->second->addIdleCallback(
         [&parent = parent_, host, hash_key]() { parent.tcpConnPoolIsIdle(host, hash_key); });
@@ -1941,10 +1952,11 @@ Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
     Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority,
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
-    ClusterConnectivityState& state) {
+    ClusterConnectivityState& state,
+    absl::optional<std::chrono::milliseconds> tcp_pool_idle_timeout) {
   ENVOY_LOG_MISC(debug, "Allocating TCP conn pool");
-  return std::make_unique<Tcp::ConnPoolImpl>(dispatcher, host, priority, options,
-                                             transport_socket_options, state);
+  return std::make_unique<Tcp::ConnPoolImpl>(
+      dispatcher, host, priority, options, transport_socket_options, state, tcp_pool_idle_timeout);
 }
 
 std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ProdClusterManagerFactory::clusterFromProto(

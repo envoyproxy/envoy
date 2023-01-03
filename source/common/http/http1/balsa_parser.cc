@@ -154,6 +154,13 @@ size_t BalsaParser::execute(const char* slice, int len) {
       ((message_type_ == MessageType::Response && hasTransferEncoding()) ||
        !headers_.content_length_valid())) {
     MessageDone();
+    return 0;
+  }
+
+  if (first_byte_processed_ && len == 0) {
+    status_ = ParserStatus::Error;
+    error_message_ = "HPE_INVALID_EOF_STATE";
+    return 0;
   }
 
   return framer_.ProcessInput(slice, len);
@@ -172,7 +179,9 @@ CallbackResult BalsaParser::pause() {
 
 ParserStatus BalsaParser::getStatus() const { return status_; }
 
-uint16_t BalsaParser::statusCode() const { return headers_.parsed_response_code(); }
+Http::Code BalsaParser::statusCode() const {
+  return static_cast<Http::Code>(headers_.parsed_response_code());
+}
 
 bool BalsaParser::isHttp11() const {
   if (message_type_ == MessageType::Request) {
@@ -293,6 +302,7 @@ void BalsaParser::MessageDone() {
   status_ = convertResult(connection_->onMessageComplete());
   framer_.Reset();
   first_byte_processed_ = false;
+  headers_done_ = false;
 }
 
 void BalsaParser::HandleError(BalsaFrameEnums::ErrorCode error_code) {

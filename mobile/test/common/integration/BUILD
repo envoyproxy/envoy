@@ -84,6 +84,7 @@ envoy_cc_test_library(
         "//library/common/types:c_types_lib",
         "@envoy//test/common/http:common_lib",
         "@envoy//test/integration:http_integration_lib",
+        "@envoy//test/test_common:utility_lib",
     ],
 )
 

@@ -49,6 +49,14 @@ public:
   openExistingFile(absl::string_view filename, Mode mode,
                    std::function<void(absl::StatusOr<AsyncFileHandle>)> on_complete) PURE;
 
+  // Action to stat a file.
+  // on_complete receives a stat structure on success, or an error on failure.
+  //
+  // Returns a cancellation function, which aborts the operation
+  // unless the callback has already been called.
+  virtual CancelFunction stat(absl::string_view filename,
+                              std::function<void(absl::StatusOr<struct stat>)> on_complete) PURE;
+
   // Action to delete a named file.
   // on_complete receives OK on success, or an error on failure.
   //
