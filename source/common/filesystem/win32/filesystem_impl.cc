@@ -39,6 +39,10 @@ Api::IoCallBoolResult FileImplWin32::open(FlagSet in) {
   if (fd_ == INVALID_HANDLE) {
     return resultFailure(false, ::GetLastError());
   }
+  if (in.test(File::Operation::Write) && !in.test(File::Operation::Append) &&
+      !in.test(File::Operation::KeepExistingData)) {
+    SetEndOfFile(fd_);
+  }
   return resultSuccess(true);
 }
 
@@ -73,15 +77,37 @@ Api::IoCallSizeResult FileImplWin32::write(absl::string_view buffer) {
 Api::IoCallBoolResult FileImplWin32::close() {
   ASSERT(isOpen());
 
-  if (truncate_) {
-    SetEndOfFile(fd_);
-  }
   BOOL result = CloseHandle(fd_);
   fd_ = INVALID_HANDLE;
   if (result == 0) {
     return resultFailure(false, ::GetLastError());
   }
   return resultSuccess(true);
+}
+
+static OVERLAPPED overlappedForOffset(uint64_t offset) {
+  OVERLAPPED overlapped{};
+  overlapped.Offset = offset & 0xffffffff;
+  overlapped.OffsetHigh = offset >> 32;
+  return overlapped;
+}
+
+Api::IoCallSizeResult FileImplWin32::pread(void* buf, uint64_t count, uint64_t offset) {
+  ASSERT(isOpen());
+  DWORD read_count;
+  OVERLAPPED overlapped = overlappedForOffset(offset);
+  BOOL result = ReadFile(fd_, buf, count, &read_count, &overlapped);
+  return result ? resultSuccess(static_cast<ssize_t>(read_count))
+                : resultFailure<ssize_t>(-1, ::GetLastError());
+}
+
+Api::IoCallSizeResult FileImplWin32::pwrite(const void* buf, uint64_t count, uint64_t offset) {
+  ASSERT(isOpen());
+  DWORD write_count;
+  OVERLAPPED overlapped = overlappedForOffset(offset);
+  BOOL result = WriteFile(fd_, buf, count, &write_count, &overlapped);
+  return result ? resultSuccess(static_cast<ssize_t>(write_count))
+                : resultFailure<ssize_t>(-1, ::GetLastError());
 }
 
 FileImplWin32::FlagsAndMode FileImplWin32::translateFlag(FlagSet in) {
@@ -94,9 +120,6 @@ FileImplWin32::FlagsAndMode FileImplWin32::translateFlag(FlagSet in) {
 
   if (in.test(File::Operation::Write)) {
     access = GENERIC_WRITE;
-    if (!in.test(File::Operation::Append)) {
-      truncate_ = true;
-    }
   }
 
   // Order of tests matter here. There reason for that

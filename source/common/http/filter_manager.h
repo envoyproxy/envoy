@@ -21,6 +21,7 @@
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/matching/data_impl.h"
+#include "source/common/http/utility.h"
 #include "source/common/local_reply/local_reply.h"
 #include "source/common/matcher/matcher.h"
 #include "source/common/protobuf/utility.h"
@@ -747,6 +748,16 @@ public:
                               const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
                               const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                               absl::string_view details) PURE;
+  /**
+   * Executes a prepared, but not yet propagated, local reply.
+   * Prepared local replies can occur in the decoder filter chain iteration.
+   */
+  virtual void executeLocalReplyIfPrepared() PURE;
+
+  /**
+   * Whether the Filter Manager has a prepared local reply that it has not sent.
+   */
+  virtual bool hasPreparedLocalReply() const PURE;
 
   // Possibly increases buffer_limit_ to the value of limit.
   void setBufferLimit(uint32_t limit);
@@ -1037,7 +1048,13 @@ public:
                       proxy_100_continue, buffer_limit, filter_chain_factory),
         stream_info_(protocol, time_source, connection.connectionInfoProviderSharedPtr(),
                      parent_filter_state, filter_state_life_span),
-        local_reply_(local_reply) {}
+        local_reply_(local_reply),
+        avoid_reentrant_filter_invocation_during_local_reply_(Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.http_filter_avoid_reentrant_local_reply")) {}
+  ~DownstreamFilterManager() override {
+    ASSERT(prepared_local_reply_ == nullptr,
+           "Filter Manager destroyed without executing prepared local reply");
+  }
 
   // TODO(snowp): This should probably return a StreamInfo instead of the impl.
   StreamInfo::StreamInfoImpl& streamInfo() override { return stream_info_; }
@@ -1073,11 +1090,28 @@ private:
   /**
    * Sends a local reply by constructing a response and passing it through all the encoder
    * filters. The resulting response will be passed out via the FilterManagerCallbacks.
+   * This will be deprecated in favor of prepareLocalReplyViaFilterChain.
    */
   void sendLocalReplyViaFilterChain(
       bool is_grpc_request, Code code, absl::string_view body,
       const std::function<void(ResponseHeaderMap& headers)>& modify_headers, bool is_head_request,
       const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details);
+
+  /**
+   * Prepares a local reply that will be sent along the encoder filters in
+   * executeLocalReplyViaFilterChain.
+   */
+  void prepareLocalReplyViaFilterChain(
+      bool is_grpc_request, Code code, absl::string_view body,
+      const std::function<void(ResponseHeaderMap& headers)>& modify_headers, bool is_head_request,
+      const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details);
+
+  /**
+   * Executes a prepared local reply along the encoder filters.
+   */
+  void executeLocalReplyIfPrepared() override;
+
+  bool hasPreparedLocalReply() const override { return prepared_local_reply_ != nullptr; }
 
   /**
    * Sends a local reply by constructing a response and skipping the encoder filters. The
@@ -1090,6 +1124,8 @@ private:
 
   OverridableRemoteConnectionInfoSetterStreamInfo stream_info_;
   const LocalReply::LocalReply& local_reply_;
+  const bool avoid_reentrant_filter_invocation_during_local_reply_;
+  Utility::PreparedLocalReplyPtr prepared_local_reply_{nullptr};
 };
 
 } // namespace Http

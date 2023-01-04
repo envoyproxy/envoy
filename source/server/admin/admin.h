@@ -213,7 +213,7 @@ public:
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return proxy_status_config_.get();
   }
-  Http::HeaderValidatorPtr makeHeaderValidator(Http::Protocol, StreamInfo::StreamInfo&) override {
+  Http::HeaderValidatorPtr makeHeaderValidator(Http::Protocol) override {
     // TODO(yanavlasov): admin interface should use the default validator
     return nullptr;
   }

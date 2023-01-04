@@ -16,6 +16,7 @@
 #include "source/extensions/filters/network/http_connection_manager/config.h"
 #include "source/extensions/http/header_formatters/preserve_case/config.h"
 #include "source/extensions/http/original_ip_detection/xff/config.h"
+#include "source/extensions/listener_managers/listener_manager/connection_handler_impl.h"
 #include "source/extensions/listener_managers/listener_manager/listener_manager_impl.h"
 #include "source/extensions/network/dns_resolver/getaddrinfo/getaddrinfo.h"
 #include "source/extensions/request_id/uuid/config.h"
@@ -37,6 +38,7 @@
 #include "library/common/extensions/filters/http/network_configuration/config.h"
 #include "library/common/extensions/filters/http/platform_bridge/config.h"
 #include "library/common/extensions/filters/http/route_cache_reset/config.h"
+#include "library/common/extensions/key_value/platform/config.h"
 #include "library/common/extensions/listener_managers/api_listener_manager/api_listener_manager.h"
 #include "library/common/extensions/retry/options/network_configuration/config.h"
 
@@ -64,6 +66,7 @@ void ExtensionRegistry::registerFactories() {
   Envoy::Extensions::HttpFilters::RouterFilter::forceRegisterRouterFilterConfig();
   Envoy::Extensions::HttpFilters::NetworkConfiguration::
       forceRegisterNetworkConfigurationFilterFactory();
+  Envoy::Extensions::KeyValue::forceRegisterPlatformKeyValueStoreFactory();
   Envoy::Extensions::NetworkFilters::HttpConnectionManager::
       forceRegisterHttpConnectionManagerFilterConfigFactory();
   Envoy::Extensions::Retry::Options::
@@ -83,6 +86,7 @@ void ExtensionRegistry::registerFactories() {
   Envoy::Extensions::RequestId::forceRegisterUUIDRequestIDExtensionFactory();
   Envoy::Server::forceRegisterDefaultListenerManagerFactoryImpl();
   Envoy::Server::forceRegisterApiListenerManagerFactoryImpl();
+  Envoy::Server::forceRegisterConnectionHandlerFactoryImpl();
 
 #ifdef ENVOY_ENABLE_QUIC
   Quic::forceRegisterQuicServerTransportSocketConfigFactory();

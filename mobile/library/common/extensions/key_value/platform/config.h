@@ -1,4 +1,5 @@
 #include "envoy/common/key_value_store.h"
+#include "envoy/registry/registry.h"
 
 #include "source/common/common/key_value_store_base.h"
 
@@ -54,6 +55,8 @@ public:
 
   std::string name() const override { return "envoy.key_value.platform"; }
 };
+
+DECLARE_FACTORY(PlatformKeyValueStoreFactory);
 
 } // namespace KeyValue
 } // namespace Extensions

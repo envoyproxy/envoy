@@ -28,6 +28,7 @@ envoy_cc_library(
         "@envoy//source/extensions/filters/http/router:config",
         "@envoy//source/extensions/filters/network/http_connection_manager:config",
         "@envoy//source/extensions/http/header_formatters/preserve_case:config",
+        "@envoy//source/extensions/listener_managers/listener_manager:connection_handler_lib",
         "@envoy//source/extensions/network/dns_resolver/getaddrinfo:config",
         "@envoy//source/extensions/request_id/uuid:config",
         "@envoy//source/extensions/stat_sinks/metrics_service:config",
@@ -44,6 +45,7 @@ envoy_cc_library(
         "@envoy_mobile//library/common/extensions/filters/http/platform_bridge:config",
         "@envoy_mobile//library/common/extensions/filters/http/route_cache_reset:config",
         "@envoy_mobile//library/common/extensions/filters/http/socket_tag:config",
+        "@envoy_mobile//library/common/extensions/key_value/platform:config",
         "@envoy_mobile//library/common/extensions/listener_managers/api_listener_manager:api_listener_manager_lib",
         "@envoy_mobile//library/common/extensions/retry/options/network_configuration:config",
     ] + envoy_select_enable_http3(
