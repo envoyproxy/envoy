@@ -166,6 +166,11 @@ removed_config_or_runtime:
     removed ``envoy.reloadable_features.do_not_await_headers_on_upstream_timeout_to_emit_stats`` and legacy code paths.
 
 new_features:
+- area: aws
+  change: |
+    added support to prefer fetching AWS instance role credentials securily
+    (`IMDSv2 <https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-service.html>`_)
+    from EC2 instance metadata by getting the token first or fallback to insecure way (IMDSv1) if token fetch fails.
 - area: grpc_json_transcoder
   change: |
     added ``max_request_body_size`` and ``max_response_body_size`` fields, which can either increase or decrease
@@ -277,6 +282,9 @@ new_features:
 - area: router
   change: |
     added :ref:`RouteList <envoy_v3_api_msg_config.route.v3.RouteList>` to support route list in :ref:`VirtualHost.matcher <envoy_v3_api_field_config.route.v3.VirtualHost.matcher>`.
+- area: router
+  change: |
+    added a :ref:`x-envoy-is-timeout-retry <config_http_filters_router_x-envoy-is-timeout-retry>` request header on retries initiated by request timeouts; enabled by setting :ref:`include_is_timeout_retry_header <envoy_v3_api_field_config.route.v3.VirtualHost.include_is_timeout_retry_header>` to ``true``.
 - area: upstream
   change: |
     allow configuring :ref:`cluster bind config <envoy_v3_api_field_config.cluster.v3.Cluster.upstream_bind_config>` and
