@@ -1,5 +1,5 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 3d52d0c..0db4097 100644
+index 3d52d0c..e03b5d4 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -44,9 +44,7 @@ IF(WIN32)
@@ -12,7 +12,7 @@ index 3d52d0c..0db4097 100644
  ADD_LIBRARY(hiredis::hiredis_static ALIAS hiredis_static)
  
  IF(NOT MSVC)
-@@ -54,9 +52,6 @@ IF(NOT MSVC)
+@@ -54,25 +52,18 @@ IF(NOT MSVC)
          PROPERTIES OUTPUT_NAME hiredis)
  ENDIF()
  
@@ -22,7 +22,15 @@ index 3d52d0c..0db4097 100644
  IF(MSVC)
      SET_TARGET_PROPERTIES(hiredis_static
          PROPERTIES COMPILE_FLAGS /Z7)
-@@ -72,7 +67,6 @@ ELSEIF(CMAKE_SYSTEM_NAME MATCHES "SunOS")
+ ENDIF()
+ IF(WIN32 OR MINGW)
+-    TARGET_LINK_LIBRARIES(hiredis PUBLIC ws2_32 crypt32)
+     TARGET_LINK_LIBRARIES(hiredis_static PUBLIC ws2_32 crypt32)
+ ELSEIF(CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
+-    TARGET_LINK_LIBRARIES(hiredis PUBLIC m)
+     TARGET_LINK_LIBRARIES(hiredis_static PUBLIC m)
+ ELSEIF(CMAKE_SYSTEM_NAME MATCHES "SunOS")
+-    TARGET_LINK_LIBRARIES(hiredis PUBLIC socket)
      TARGET_LINK_LIBRARIES(hiredis_static PUBLIC socket)
  ENDIF()
  
@@ -30,7 +38,7 @@ index 3d52d0c..0db4097 100644
  TARGET_INCLUDE_DIRECTORIES(hiredis_static PUBLIC $<INSTALL_INTERFACE:include> $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
  
  CONFIGURE_FILE(hiredis.pc.in hiredis.pc @ONLY)
-@@ -103,7 +97,7 @@ set(CPACK_RPM_PACKAGE_AUTOREQPROV ON)
+@@ -103,7 +94,7 @@ set(CPACK_RPM_PACKAGE_AUTOREQPROV ON)
  
  include(CPack)
  
@@ -39,7 +47,7 @@ index 3d52d0c..0db4097 100644
      EXPORT hiredis-targets
      RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
      LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-@@ -161,8 +155,6 @@ IF(ENABLE_SSL)
+@@ -161,8 +152,6 @@ IF(ENABLE_SSL)
      FIND_PACKAGE(OpenSSL REQUIRED)
      SET(hiredis_ssl_sources
          ssl.c)
@@ -48,7 +56,7 @@ index 3d52d0c..0db4097 100644
      ADD_LIBRARY(hiredis_ssl_static STATIC
              ${hiredis_ssl_sources})
      IF(NOT MSVC)
-@@ -174,26 +166,19 @@ IF(ENABLE_SSL)
+@@ -174,26 +163,19 @@ IF(ENABLE_SSL)
          SET_PROPERTY(TARGET hiredis_ssl PROPERTY LINK_FLAGS "-Wl,-undefined -Wl,dynamic_lookup")
      ENDIF()
  
