@@ -1061,11 +1061,6 @@ TEST_P(IntegrationTest, InvalidCharacterInFirstline) {
 }
 
 TEST_P(IntegrationTest, InvalidVersion) {
-  if (http1_implementation_ == Http1ParserImpl::BalsaParser) {
-    // TODO(#21245): Re-enable this test for BalsaParser.
-    return;
-  }
-
   initialize();
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.01\r\nHost: host\r\n\r\n",

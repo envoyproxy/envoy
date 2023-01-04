@@ -5,6 +5,7 @@
 #include <cstdint>
 
 #include "source/common/common/assert.h"
+#include "source/common/common/regex.h"
 #include "source/common/http/headers.h"
 
 #include "absl/strings/match.h"
@@ -101,6 +102,17 @@ bool isUrlValid(absl::string_view url, bool is_connect) {
   // as long as they are not consecutive.
   return std::all_of(host.begin(), host.end(), valid_host_char) && !absl::StrContains(host, "@@") &&
          std::all_of(path_query.begin(), path_query.end(), is_valid_path_query_char);
+}
+
+bool isVersionValid(absl::string_view version_input) {
+  // HTTP-version is defined at
+  // https://www.rfc-editor.org/rfc/rfc7230.html#section-2.6. HTTP/0.9 requests
+  // have no http-version, so empty `version_input` is also accepted.
+  envoy::type::matcher::v3::RegexMatcher matcher;
+  *matcher.mutable_google_re2() = envoy::type::matcher::v3::RegexMatcher::GoogleRE2();
+  matcher.set_regex("|HTTP/[0-9]\\.[0-9]");
+  const auto regex = Regex::Utility::parseRegex(matcher);
+  return regex->match(version_input);
 }
 
 } // anonymous namespace
@@ -242,7 +254,7 @@ void BalsaParser::ProcessTrailers(const BalsaHeaders& /*trailer*/) {}
 void BalsaParser::OnRequestFirstLineInput(absl::string_view /*line_input*/,
                                           absl::string_view method_input,
                                           absl::string_view request_uri,
-                                          absl::string_view /*version_input*/) {
+                                          absl::string_view version_input) {
   if (status_ == ParserStatus::Error) {
     return;
   }
@@ -254,18 +266,27 @@ void BalsaParser::OnRequestFirstLineInput(absl::string_view /*line_input*/,
   const bool is_connect = method_input == Headers::get().MethodValues.Connect;
   if (!isUrlValid(request_uri, is_connect)) {
     status_ = ParserStatus::Error;
-    // Error message matching that of http-parser.
     error_message_ = "HPE_INVALID_URL";
+    return;
+  }
+  if (!isVersionValid(version_input)) {
+    status_ = ParserStatus::Error;
+    error_message_ = "HPE_INVALID_VERSION";
     return;
   }
   status_ = convertResult(connection_->onUrl(request_uri.data(), request_uri.size()));
 }
 
 void BalsaParser::OnResponseFirstLineInput(absl::string_view /*line_input*/,
-                                           absl::string_view /*version_input*/,
+                                           absl::string_view version_input,
                                            absl::string_view /*status_input*/,
                                            absl::string_view reason_input) {
   if (status_ == ParserStatus::Error) {
+    return;
+  }
+  if (!isVersionValid(version_input)) {
+    status_ = ParserStatus::Error;
+    error_message_ = "HPE_INVALID_VERSION";
     return;
   }
   status_ = convertResult(connection_->onStatus(reason_input.data(), reason_input.size()));
@@ -307,7 +328,6 @@ void BalsaParser::MessageDone() {
 
 void BalsaParser::HandleError(BalsaFrameEnums::ErrorCode error_code) {
   status_ = ParserStatus::Error;
-  // Specific error messages to match http-parser behavior.
   switch (error_code) {
   case BalsaFrameEnums::UNKNOWN_TRANSFER_ENCODING:
     error_message_ = "unsupported transfer encoding";

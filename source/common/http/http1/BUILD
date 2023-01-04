@@ -126,6 +126,7 @@ envoy_cc_library(
     deps = [
         ":parser_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:regex_lib",
         "//source/common/http:headers_lib",
         "@com_github_google_quiche//:quiche_balsa_balsa_enums_lib",
         "@com_github_google_quiche//:quiche_balsa_balsa_frame_lib",

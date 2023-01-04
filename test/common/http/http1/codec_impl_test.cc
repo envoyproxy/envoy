@@ -920,6 +920,37 @@ TEST_P(Http1ServerConnectionImplTest, Http10MultipleResponses) {
   }
 }
 
+TEST_P(Http1ServerConnectionImplTest, Http09) {
+  initialize();
+
+  InSequence sequence;
+
+  MockRequestDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+  EXPECT_CALL(decoder, decodeHeaders_(_, true));
+
+  Buffer::OwnedImpl buffer("GET /\r\n\r\n");
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
+}
+
+TEST_P(Http1ServerConnectionImplTest, InvalidVersion) {
+  initialize();
+
+  InSequence sequence;
+
+  MockRequestDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+  EXPECT_CALL(decoder,
+              sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.01\r\n\r\n");
+  auto status = codec_->dispatch(buffer);
+
+  EXPECT_TRUE(isCodecProtocolError(status));
+  EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_VERSION");
+}
+
 TEST_P(Http1ServerConnectionImplTest, Http11AbsolutePath1) {
   initialize();
 
@@ -3808,6 +3839,20 @@ TEST_P(Http1ClientConnectionImplTest, ResponseHttpVersion) {
     EXPECT_TRUE(status.ok());
     EXPECT_EQ(http_version, codec_->protocol());
   }
+}
+
+TEST_P(Http1ClientConnectionImplTest, InvalidVersion) {
+  initialize();
+
+  StrictMock<MockResponseDecoder> response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
+
+  Buffer::OwnedImpl response("HTTP/1.01 200 OK\r\nContent-Length: 0\r\n\r\n");
+  auto status = codec_->dispatch(response);
+  EXPECT_TRUE(isCodecProtocolError(status));
+  EXPECT_EQ(status.message(), "http/1.1 protocol error: HPE_INVALID_VERSION");
 }
 
 // 304 responses must not have a body.
