@@ -323,8 +323,8 @@ envoy_cmake(
     lib_source = "@com_github_hiredis//:all",
     out_static_libs = select({
         "//bazel:windows_x86_64": [
-            "hiredis.lib",
-            "hiredis_ssl.lib",
+            "hiredis_static.lib",
+            "hiredis_ssl_static.lib",
         ],
         "//conditions:default": [
             "libhiredis.a",
