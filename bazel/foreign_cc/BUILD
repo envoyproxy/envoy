@@ -317,6 +317,8 @@ envoy_cmake(
         "DISABLE_TESTS": "on",
     },
     env = {
+        "CXXFLAGS": "-fPIC",
+        "CFLAGS": "-fPIC",
     },
     lib_source = "@com_github_hiredis//:all",
     out_static_libs = select({
