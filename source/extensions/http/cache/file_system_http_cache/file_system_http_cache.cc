@@ -1,10 +1,12 @@
 #include "source/extensions/http/cache/file_system_http_cache/file_system_http_cache.h"
 
+#include "source/common/filesystem/directory.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/extensions/http/cache/file_system_http_cache/cache_file_fixed_block.h"
 #include "source/extensions/http/cache/file_system_http_cache/cache_file_header_proto_util.h"
 #include "source/extensions/http/cache/file_system_http_cache/insert_context.h"
 #include "source/extensions/http/cache/file_system_http_cache/lookup_context.h"
+#include "source/extensions/http/cache/file_system_http_cache/stats.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -70,8 +72,10 @@ absl::string_view FileSystemHttpCache::name() {
 
 FileSystemHttpCache::FileSystemHttpCache(
     Singleton::InstanceSharedPtr owner, ConfigProto config,
-    std::shared_ptr<Common::AsyncFiles::AsyncFileManager>&& async_file_manager)
-    : owner_(owner), config_(config), async_file_manager_(async_file_manager) {}
+    std::shared_ptr<Common::AsyncFiles::AsyncFileManager>&& async_file_manager,
+    Stats::Scope& stats_scope)
+    : owner_(owner), config_(config), async_file_manager_(async_file_manager),
+      stats_(generateStats(stats_scope, cachePath())) {}
 
 CacheInfo FileSystemHttpCache::cacheInfo() const {
   CacheInfo info;
@@ -327,6 +331,61 @@ InsertContextPtr FileSystemHttpCache::makeInsertContext(LookupContextPtr&& looku
     return std::make_unique<DontInsertContext>();
   }
   return std::make_unique<FileInsertContext>(shared_from_this(), std::move(file_lookup_context));
+}
+
+void FileSystemHttpCache::init() {
+  size_bytes_ = 0;
+  size_count_ = 0;
+  for (const Filesystem::DirectoryEntry& entry : Filesystem::Directory(std::string{cachePath()})) {
+    if (entry.type_ != Filesystem::FileType::Regular) {
+      continue;
+    }
+    if (!absl::StartsWith(entry.name_, "cache-")) {
+      continue;
+    }
+    size_count_++;
+    size_bytes_ += entry.size_bytes_.value_or(0);
+  }
+  stats_.size_count_.set(size_count_);
+  stats_.size_bytes_.set(size_bytes_);
+  if (config().has_max_cache_size_bytes()) {
+    stats_.size_limit_bytes_.set(config().max_cache_size_bytes().value());
+  }
+  if (config().has_max_cache_entry_count()) {
+    stats_.size_limit_count_.set(config().max_cache_entry_count().value());
+  }
+}
+
+void FileSystemHttpCache::trackFileAdded(uint64_t file_size) {
+  size_count_++;
+  size_bytes_ += file_size;
+  stats_.size_count_.inc();
+  stats_.size_bytes_.add(file_size);
+  // TODO(ravenblack): potentially trigger cache cleanup operation.
+}
+
+void FileSystemHttpCache::trackFileRemoved(uint64_t file_size) {
+  // Atomically decrement-but-clamp-at-zero the count of files in the cache.
+  //
+  // It is an error to try to set a gauge to less than zero, so we must actively
+  // prevent that underflow.
+  //
+  // See comment on size_bytes and size_count in stats.h for explanation of how stat
+  // values can be out of sync with the actionable cache.
+  uint64_t count = size_count_;
+  while (count > 0 && !size_count_.compare_exchange_weak(count, count - 1)) {
+  }
+  stats_.size_count_.set(size_count_);
+  // Atomically decrease-but-clamp-at-zero the size of files in the cache, by file_size.
+  //
+  // See comment above for why; the same rationale applies here.
+  uint64_t size = size_bytes_;
+  while (size >= file_size && !size_bytes_.compare_exchange_weak(size, size - file_size)) {
+  }
+  if (size < file_size) {
+    size_bytes_ = 0;
+  }
+  stats_.size_bytes_.set(size_bytes_);
 }
 
 } // namespace FileSystemHttpCache

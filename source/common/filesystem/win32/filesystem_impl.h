@@ -17,6 +17,8 @@ protected:
   Api::IoCallBoolResult open(FlagSet flag) override;
   Api::IoCallSizeResult write(absl::string_view buffer) override;
   Api::IoCallBoolResult close() override;
+  Api::IoCallSizeResult pread(void* buf, uint64_t count, uint64_t offset) override;
+  Api::IoCallSizeResult pwrite(const void* buf, uint64_t count, uint64_t offset) override;
 
   struct FlagsAndMode {
     DWORD access_ = 0;
@@ -27,7 +29,6 @@ protected:
 
 private:
   friend class FileSystemImplTest;
-  bool truncate_{};
 };
 
 class TmpFileImplWin32 : public FileImplWin32 {

@@ -42,6 +42,7 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
   private int mDnsQueryTimeoutSeconds = 25;
   private int mDnsMinRefreshSeconds = 60;
   private String mDnsPreresolveHostnames = "[]";
+  private boolean mEnableDNSCache = false;
   private List<String> mDnsFallbackNameservers = Collections.emptyList();
   private boolean mEnableDnsFilterUnroutableFamilies = true;
   private boolean mDnsUseSystemResolver = true;
@@ -122,8 +123,8 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
     return new EnvoyConfiguration(
         mAdminInterfaceEnabled, mGrpcStatsDomain, mConnectTimeoutSeconds, mDnsRefreshSeconds,
         mDnsFailureRefreshSecondsBase, mDnsFailureRefreshSecondsMax, mDnsQueryTimeoutSeconds,
-        mDnsMinRefreshSeconds, mDnsPreresolveHostnames, mEnableDrainPostDnsRefresh, quicEnabled(),
-        mEnableGzip, brotliEnabled(), mEnableSocketTag, mEnableHappyEyeballs,
+        mDnsMinRefreshSeconds, mDnsPreresolveHostnames, mEnableDNSCache, mEnableDrainPostDnsRefresh,
+        quicEnabled(), mEnableGzip, brotliEnabled(), mEnableSocketTag, mEnableHappyEyeballs,
         mEnableInterfaceBinding, mH2ConnectionKeepaliveIdleIntervalMilliseconds,
         mH2ConnectionKeepaliveTimeoutSeconds, mH2ExtendKeepaliveTimeout, mMaxConnectionsPerHost,
         mStatsFlushSeconds, mStreamIdleTimeoutSeconds, mPerTryIdleTimeoutSeconds, mAppVersion,

@@ -101,9 +101,43 @@ protected:
   HttpCacheFactory* http_cache_factory_;
 };
 
+class FileSystemHttpCacheTestWithNoDefaultCache : public FileSystemCacheTestContext,
+                                                  public ::testing::Test {};
+
+TEST_F(FileSystemHttpCacheTestWithNoDefaultCache, InitialStatsAreSetCorrectly) {
+  const std::string file_1_contents = "XXXXX";
+  const std::string file_2_contents = "YYYYYYYYYY";
+  const uint64_t max_count = 99;
+  const uint64_t max_size = 87654321;
+  ConfigProto cfg = testConfig();
+  cfg.mutable_max_cache_entry_count()->set_value(max_count);
+  cfg.mutable_max_cache_size_bytes()->set_value(max_size);
+  env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-a"), file_1_contents, true);
+  env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-b"), file_2_contents, true);
+  cache_ = std::dynamic_pointer_cast<FileSystemHttpCache>(
+      http_cache_factory_->getCache(cacheConfig(cfg), context_));
+  EXPECT_EQ(cache_->stats().size_limit_bytes_.value(), max_size);
+  EXPECT_EQ(cache_->stats().size_limit_count_.value(), max_count);
+  EXPECT_EQ(cache_->stats().size_bytes_.value(), file_1_contents.size() + file_2_contents.size());
+  EXPECT_EQ(cache_->stats().size_count_.value(), 2);
+}
+
 class FileSystemHttpCacheTest : public FileSystemCacheTestContext, public ::testing::Test {
   void SetUp() override { initCache(); }
 };
+
+TEST_F(FileSystemHttpCacheTest, TrackFileRemovedClampsAtZero) {
+  cache_->trackFileAdded(1);
+  EXPECT_EQ(cache_->stats().size_bytes_.value(), 1);
+  EXPECT_EQ(cache_->stats().size_count_.value(), 1);
+  cache_->trackFileRemoved(8);
+  EXPECT_EQ(cache_->stats().size_bytes_.value(), 0);
+  EXPECT_EQ(cache_->stats().size_count_.value(), 0);
+  // Remove a second time to ensure that count going below zero also clamps at zero.
+  cache_->trackFileRemoved(8);
+  EXPECT_EQ(cache_->stats().size_bytes_.value(), 0);
+  EXPECT_EQ(cache_->stats().size_count_.value(), 0);
+}
 
 TEST_F(FileSystemHttpCacheTest, ExceptionOnTryingToCreateCachesWithDistinctConfigsOnSamePath) {
   ConfigProto cfg = testConfig();
@@ -362,6 +396,7 @@ TEST_F(FileSystemHttpCacheTestWithMockFiles, InsertWithMultipleChunksBeforeCallb
   inserter->insertTrailers(response_trailers_, expect_true_callback_);
   EXPECT_EQ(0, true_callbacks_called_);
   EXPECT_CALL(*mock_async_file_handle_, write(_, _, _)).Times(6);
+  EXPECT_CALL(*mock_async_file_manager_, stat(_, _));
   EXPECT_CALL(*mock_async_file_manager_, unlink(_, _));
   EXPECT_CALL(*mock_async_file_handle_, createHardLink(_, _));
   // Open file
@@ -378,15 +413,21 @@ TEST_F(FileSystemHttpCacheTestWithMockFiles, InsertWithMultipleChunksBeforeCallb
   mock_async_file_manager_->nextActionCompletes(absl::StatusOr<size_t>(body2.size()));
   // Trailers
   mock_async_file_manager_->nextActionCompletes(absl::StatusOr<size_t>(trailers_size_));
-  // Updated pre-header (which triggers createHardLink)
+  // Updated pre-header (which triggers stat/unlink/createHardLink sequence)
   mock_async_file_manager_->nextActionCompletes(
       absl::StatusOr<size_t>(CacheFileFixedBlock::size()));
+  // Stat
+  mock_async_file_manager_->nextActionCompletes(
+      absl::StatusOr<struct stat>{absl::UnknownError("intentionally failed stat")});
   // Unlink
-  mock_async_file_manager_->nextActionCompletes(absl::OkStatus());
+  mock_async_file_manager_->nextActionCompletes(absl::UnknownError("intentionally failed unlink"));
   // createHardLink
   mock_async_file_manager_->nextActionCompletes(absl::OkStatus());
   // Should have been 4 callbacks; insertHeaders, insertBody, insertBody, insertTrailers.
   EXPECT_EQ(true_callbacks_called_, 4);
+  EXPECT_EQ(cache_->stats().size_bytes_.value(), headers_size_ + body1.size() + body2.size() +
+                                                     trailers_size_ + CacheFileFixedBlock::size());
+  EXPECT_EQ(cache_->stats().size_count_.value(), 1);
 }
 
 TEST_F(FileSystemHttpCacheTestWithMockFiles, FailedOpenForReadReturnsMiss) {
@@ -403,6 +444,11 @@ TEST_F(FileSystemHttpCacheTestWithMockFiles, FailedOpenForReadReturnsMiss) {
 }
 
 TEST_F(FileSystemHttpCacheTestWithMockFiles, FailedReadOfHeaderBlockInvalidatesTheCacheEntry) {
+  // Fake-add two files of size 12345, so we can validate the stats decrease of removing a file.
+  cache_->trackFileAdded(12345);
+  cache_->trackFileAdded(12345);
+  EXPECT_EQ(cache_->stats().size_bytes_.value(), 2 * 12345);
+  EXPECT_EQ(cache_->stats().size_count_.value(), 2);
   auto lookup = testLookupContext();
   absl::Cleanup destroy_lookup([&lookup]() { lookup->onDestroy(); });
   LookupResult result;
@@ -411,12 +457,23 @@ TEST_F(FileSystemHttpCacheTestWithMockFiles, FailedReadOfHeaderBlockInvalidatesT
   lookup->getHeaders([&](LookupResult&& r) { result = std::move(r); });
   mock_async_file_manager_->nextActionCompletes(
       absl::StatusOr<AsyncFileHandle>(mock_async_file_handle_));
+  EXPECT_CALL(*mock_async_file_manager_, stat(_, _));
   EXPECT_CALL(*mock_async_file_manager_, unlink(_, _));
   mock_async_file_manager_->nextActionCompletes(
       absl::StatusOr<Buffer::InstancePtr>(absl::UnknownError("intentional failure to read")));
-  mock_async_file_manager_->nextActionCompletes(
-      absl::UnknownError("intentionally failed to unlink, for coverage"));
+  struct stat stat_result = {};
+  stat_result.st_size = 12345;
+  // stat
+  mock_async_file_manager_->nextActionCompletes(absl::StatusOr<struct stat>{stat_result});
+  // unlink
+  mock_async_file_manager_->nextActionCompletes(absl::OkStatus());
   EXPECT_EQ(result.cache_entry_status_, CacheEntryStatus::Unusable);
+  // Should have deducted the size of the file that got deleted. Since we started at 2 * 12345,
+  // this should make the value 12345.
+  EXPECT_EQ(cache_->stats().size_bytes_.value(), 12345);
+  // Should have deducted one file for the file that got deleted. Since we started at 2,
+  // this should make the value 1.
+  EXPECT_EQ(cache_->stats().size_count_.value(), 1);
 }
 
 Buffer::InstancePtr invalidHeaderBlock() {
@@ -438,9 +495,12 @@ TEST_F(FileSystemHttpCacheTestWithMockFiles, ReadWithInvalidHeaderBlockInvalidat
   lookup->getHeaders([&](LookupResult&& r) { result = std::move(r); });
   mock_async_file_manager_->nextActionCompletes(
       absl::StatusOr<AsyncFileHandle>(mock_async_file_handle_));
+  EXPECT_CALL(*mock_async_file_manager_, stat(_, _));
   EXPECT_CALL(*mock_async_file_manager_, unlink(_, _));
   mock_async_file_manager_->nextActionCompletes(
       absl::StatusOr<Buffer::InstancePtr>(invalidHeaderBlock()));
+  mock_async_file_manager_->nextActionCompletes(absl::StatusOr<struct stat>{
+      absl::UnknownError("intentionally failed to stat, for coverage")});
   mock_async_file_manager_->nextActionCompletes(
       absl::UnknownError("intentionally failed to unlink, for coverage"));
   EXPECT_EQ(result.cache_entry_status_, CacheEntryStatus::Unusable);
@@ -458,9 +518,12 @@ TEST_F(FileSystemHttpCacheTestWithMockFiles, FailedReadOfHeaderProtoInvalidatesT
       absl::StatusOr<AsyncFileHandle>(mock_async_file_handle_));
   mock_async_file_manager_->nextActionCompletes(
       absl::StatusOr<Buffer::InstancePtr>(testHeaderBlock(0)));
+  EXPECT_CALL(*mock_async_file_manager_, stat(_, _));
   EXPECT_CALL(*mock_async_file_manager_, unlink(_, _));
   mock_async_file_manager_->nextActionCompletes(
       absl::StatusOr<Buffer::InstancePtr>(absl::UnknownError("intentional failure to read")));
+  mock_async_file_manager_->nextActionCompletes(absl::StatusOr<struct stat>{
+      absl::UnknownError("intentionally failed to stat, for coverage")});
   mock_async_file_manager_->nextActionCompletes(
       absl::UnknownError("intentionally failed to unlink, for coverage"));
   EXPECT_EQ(result.cache_entry_status_, CacheEntryStatus::Unusable);
@@ -485,9 +548,12 @@ TEST_F(FileSystemHttpCacheTestWithMockFiles, FailedReadOfBodyInvalidatesTheCache
   EXPECT_CALL(*mock_async_file_handle_, read(_, _, _));
   lookup->getBody(AdjustedByteRange(0, 8),
                   [&](Buffer::InstancePtr body) { EXPECT_EQ(body.get(), nullptr); });
+  EXPECT_CALL(*mock_async_file_manager_, stat(_, _));
   EXPECT_CALL(*mock_async_file_manager_, unlink(_, _));
   mock_async_file_manager_->nextActionCompletes(
       absl::StatusOr<Buffer::InstancePtr>(absl::UnknownError("intentional failure to read")));
+  mock_async_file_manager_->nextActionCompletes(absl::StatusOr<struct stat>{
+      absl::UnknownError("intentionally failed to stat, for coverage")});
   mock_async_file_manager_->nextActionCompletes(
       absl::UnknownError("intentionally failed to unlink, for coverage"));
 }
@@ -517,9 +583,12 @@ TEST_F(FileSystemHttpCacheTestWithMockFiles, FailedReadOfTrailersInvalidatesTheC
   // No point validating that the trailers are empty since that's not even particularly
   // desirable behavior - it's a quirk of the filter that we can't properly signify an error.
   lookup->getTrailers([&](Http::ResponseTrailerMapPtr) {});
+  EXPECT_CALL(*mock_async_file_manager_, stat(_, _));
   EXPECT_CALL(*mock_async_file_manager_, unlink(_, _));
   mock_async_file_manager_->nextActionCompletes(absl::StatusOr<Buffer::InstancePtr>(
       absl::UnknownError("intentional failure to read trailers")));
+  mock_async_file_manager_->nextActionCompletes(absl::StatusOr<struct stat>{
+      absl::UnknownError("intentionally failed to stat, for coverage")});
   mock_async_file_manager_->nextActionCompletes(
       absl::UnknownError("intentionally failed to unlink, for coverage"));
 }
@@ -679,6 +748,7 @@ TEST_F(FileSystemHttpCacheTestWithMockFiles, InsertAbortsOnFailureToLinkFile) {
   absl::Cleanup destroy_inserter([&inserter]() { inserter->onDestroy(); });
   EXPECT_CALL(*mock_async_file_manager_, createAnonymousFile(_, _));
   EXPECT_CALL(*mock_async_file_handle_, write(_, _, _)).Times(5);
+  EXPECT_CALL(*mock_async_file_manager_, stat(_, _));
   EXPECT_CALL(*mock_async_file_manager_, unlink(_, _));
   EXPECT_CALL(*mock_async_file_handle_, createHardLink(_, _));
   inserter->insertHeaders(response_headers_, metadata_, expect_true_callback_, false);
@@ -694,6 +764,8 @@ TEST_F(FileSystemHttpCacheTestWithMockFiles, InsertAbortsOnFailureToLinkFile) {
   mock_async_file_manager_->nextActionCompletes(absl::StatusOr<size_t>(trailers_size_));
   mock_async_file_manager_->nextActionCompletes(
       absl::StatusOr<size_t>(CacheFileFixedBlock::size()));
+  mock_async_file_manager_->nextActionCompletes(absl::StatusOr<struct stat>{
+      absl::UnknownError("intentionally failed to stat, for coverage")});
   mock_async_file_manager_->nextActionCompletes(absl::OkStatus());
   mock_async_file_manager_->nextActionCompletes(
       absl::UnknownError("intentionally failed to link cache file"));
