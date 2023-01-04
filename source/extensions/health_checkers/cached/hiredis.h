@@ -26,7 +26,7 @@
 #define strncasecmp strnicmp
 #endif
 
-#endif /* _MSC_VER */
+#endif
 
 namespace Envoy {
 namespace Extensions {
