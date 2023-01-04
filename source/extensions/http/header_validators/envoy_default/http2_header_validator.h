@@ -41,6 +41,9 @@ public:
 
   HeaderEntryValidationResult
   validateGenericHeaderName(const ::Envoy::Http::HeaderString& name) override;
+
+private:
+  const HeaderValidatorMap request_header_validator_map_;
 };
 
 using Http2HeaderValidatorPtr = std::unique_ptr<Http2HeaderValidator>;

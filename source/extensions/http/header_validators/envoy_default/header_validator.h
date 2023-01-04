@@ -1,10 +1,14 @@
 #pragma once
 
+#include <functional>
+
 #include "envoy/extensions/http/header_validators/envoy_default/v3/header_validator.pb.h"
 #include "envoy/http/header_validator.h"
 
 #include "source/common/http/headers.h"
 #include "source/extensions/http/header_validators/envoy_default/path_normalizer.h"
+
+#include "absl/container/node_hash_map.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -27,14 +31,12 @@ public:
   /*
    * Validate the :method pseudo header, honoring the restrict_http_methods configuration option.
    */
-  virtual HeaderValueValidationResult
-  validateMethodHeader(const ::Envoy::Http::HeaderString& value);
+  HeaderValueValidationResult validateMethodHeader(const ::Envoy::Http::HeaderString& value);
 
   /*
    * Validate the :status response pseudo header based on the range of valid response statuses.
    */
-  virtual HeaderValueValidationResult
-  validateStatusHeader(const ::Envoy::Http::HeaderString& value);
+  HeaderValueValidationResult validateStatusHeader(const ::Envoy::Http::HeaderString& value);
 
   /*
    * Validate any request or response header name.
@@ -45,8 +47,7 @@ public:
   /*
    * Validate any request or response header value.
    */
-  virtual HeaderValueValidationResult
-  validateGenericHeaderValue(const ::Envoy::Http::HeaderString& value);
+  HeaderValueValidationResult validateGenericHeaderValue(const ::Envoy::Http::HeaderString& value);
 
   /*
    * Validate the Content-Length request and response header as a whole number integer. The RFC
@@ -55,26 +56,24 @@ public:
    * rejected. We can add an option to allow multiple Content-Length values in the future if
    * needed.
    */
-  virtual HeaderValueValidationResult
-  validateContentLengthHeader(const ::Envoy::Http::HeaderString& value);
+  HeaderValueValidationResult validateContentLengthHeader(const ::Envoy::Http::HeaderString& value);
 
   /*
    * Validate the :scheme pseudo header.
    */
-  virtual HeaderValueValidationResult
-  validateSchemeHeader(const ::Envoy::Http::HeaderString& value);
+  HeaderValueValidationResult validateSchemeHeader(const ::Envoy::Http::HeaderString& value);
 
   /*
    * Validate the Host header or :authority pseudo header. This method does not allow the
    * userinfo component (user:pass@host).
    */
-  virtual HeaderValueValidationResult validateHostHeader(const ::Envoy::Http::HeaderString& value);
+  HeaderValueValidationResult validateHostHeader(const ::Envoy::Http::HeaderString& value);
 
   /*
    * Validate the :path pseudo header. This method only validates that the :path header only
    * contains valid characters and does not validate the syntax or form of the path URI.
    */
-  virtual HeaderValueValidationResult
+  HeaderValueValidationResult
   validatePathHeaderCharacters(const ::Envoy::Http::HeaderString& value);
 
   /*
@@ -130,6 +129,21 @@ protected:
    * stored in the return details on success.
    */
   HostHeaderValidationResult validateHostHeaderRegName(absl::string_view host);
+
+  /*
+   * Validate a header value. The header_validator_map contains validation function for
+   * specific header keys. If the header key is not found in the header_validator_map
+   * the validateGenericHeaderName is invoked with the `key` (Note that validateGenericHeaderName is
+   * virtual and has different behavior for H/1 and H/2, H/3 validators) and the
+   * validateGenericHeaderValue is invoked with the `value`.
+   */
+  using HeaderValidatorFunction = std::function<HeaderValidator::HeaderValueValidationResult(
+      const ::Envoy::Http::HeaderString&)>;
+  using HeaderValidatorMap = absl::node_hash_map<absl::string_view, HeaderValidatorFunction>;
+  ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
+  validateGenericRequestHeaderEntry(const ::Envoy::Http::HeaderString& key,
+                                    const ::Envoy::Http::HeaderString& value,
+                                    const HeaderValidatorMap& header_validator_map);
 
   const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       config_;

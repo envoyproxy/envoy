@@ -434,6 +434,40 @@ bool HeaderValidator::hasChunkedTransferEncoding(const HeaderString& value) {
   return false;
 }
 
+::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
+HeaderValidator::validateGenericRequestHeaderEntry(const ::Envoy::Http::HeaderString& key,
+                                                   const ::Envoy::Http::HeaderString& value,
+                                                   const HeaderValidatorMap& header_validator_map) {
+  const auto& key_string_view = key.getStringView();
+  if (key_string_view.empty()) {
+    // reject empty header names
+    return {HeaderEntryValidationResult::Action::Reject,
+            UhvResponseCodeDetail::get().EmptyHeaderName};
+  }
+
+  auto validator_it = header_validator_map.find(key_string_view);
+  if (validator_it != header_validator_map.end()) {
+    const auto& validator = validator_it->second;
+    return validator(value);
+  }
+
+  if (key_string_view.at(0) != ':') {
+    // Validate the (non-pseudo) header name
+    auto name_result = validateGenericHeaderName(key);
+    if (!name_result) {
+      return name_result;
+    }
+  } else {
+    // header_validator_map contains every known pseudo header. If the header name starts with ":"
+    // and we don't have a validator registered in the map, then the header name is an unknown
+    // pseudo header.
+    return {HeaderEntryValidationResult::Action::Reject,
+            UhvResponseCodeDetail::get().InvalidPseudoHeader};
+  }
+
+  return validateGenericHeaderValue(value);
+}
+
 } // namespace EnvoyDefault
 } // namespace HeaderValidators
 } // namespace Http

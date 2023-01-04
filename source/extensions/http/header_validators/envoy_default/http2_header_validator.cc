@@ -6,6 +6,7 @@
 
 #include "absl/container/node_hash_map.h"
 #include "absl/container/node_hash_set.h"
+#include "absl/functional/bind_front.h"
 #include "absl/strings/match.h"
 #include "absl/strings/string_view.h"
 
@@ -20,7 +21,7 @@ using ::Envoy::Http::HeaderString;
 using ::Envoy::Http::LowerCaseString;
 using ::Envoy::Http::Protocol;
 using ::Envoy::Http::UhvResponseCodeDetail;
-using HeaderValidatorFunction =
+using HeaderValidatorFunction1 =
     HeaderValidator::HeaderValueValidationResult (Http2HeaderValidator::*)(const HeaderString&);
 
 struct Http2ResponseCodeDetailValues {
@@ -42,50 +43,24 @@ using Http2ResponseCodeDetail = ConstSingleton<Http2ResponseCodeDetailValues>;
  */
 Http2HeaderValidator::Http2HeaderValidator(const HeaderValidatorConfig& config, Protocol protocol,
                                            ::Envoy::Http::HeaderValidatorStats& stats)
-    : HeaderValidator(config, protocol, stats) {}
+    : HeaderValidator(config, protocol, stats),
+      request_header_validator_map_{
+          {":method", absl::bind_front(&HeaderValidator::validateMethodHeader, this)},
+          {":authority", absl::bind_front(&Http2HeaderValidator::validateAuthorityHeader, this)},
+          {":scheme", absl::bind_front(&HeaderValidator::validateSchemeHeader, this)},
+          {":path", absl::bind_front(&HeaderValidator::validatePathHeaderCharacters, this)},
+          {"te", absl::bind_front(&Http2HeaderValidator::validateTEHeader, this)},
+          {"content-length",
+           absl::bind_front(&Http2HeaderValidator::validateContentLengthHeader, this)},
+      } {}
 
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
 Http2HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
                                                  const HeaderString& value) {
-  static const absl::node_hash_map<absl::string_view, HeaderValidatorFunction> kHeaderValidatorMap{
-      {":method", &Http2HeaderValidator::validateMethodHeader},
-      {":authority", &Http2HeaderValidator::validateAuthorityHeader},
-      {":scheme", &Http2HeaderValidator::validateSchemeHeader},
-      {":path", &Http2HeaderValidator::validatePathHeaderCharacters},
-      {"te", &Http2HeaderValidator::validateTEHeader},
-      {"content-length", &Http2HeaderValidator::validateContentLengthHeader},
-  };
   // TODO(#23286) - Add support for validating the :protocol pseudo header for extended CONNECT
   // requests.
 
-  const auto& key_string_view = key.getStringView();
-  if (key_string_view.empty()) {
-    // reject empty header names
-    return {HeaderEntryValidationResult::Action::Reject,
-            UhvResponseCodeDetail::get().EmptyHeaderName};
-  }
-
-  auto validator_it = kHeaderValidatorMap.find(key_string_view);
-  if (validator_it != kHeaderValidatorMap.end()) {
-    const auto& validator = validator_it->second;
-    return (*this.*validator)(value);
-  }
-
-  if (key_string_view.at(0) != ':') {
-    // Validate the (non-pseudo) header name
-    auto name_result = validateGenericHeaderName(key);
-    if (!name_result) {
-      return name_result;
-    }
-  } else {
-    // kHeaderValidatorMap contains every known pseudo header. If the header name starts with ":"
-    // and we don't have a validator registered in the map, then the header name is an unknown
-    // pseudo header.
-    return {HeaderEntryValidationResult::Action::Reject,
-            UhvResponseCodeDetail::get().InvalidPseudoHeader};
-  }
-
-  return validateGenericHeaderValue(value);
+  return validateGenericRequestHeaderEntry(key, value, request_header_validator_map_);
 }
 
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult

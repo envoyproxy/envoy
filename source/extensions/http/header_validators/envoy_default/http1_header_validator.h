@@ -33,7 +33,10 @@ public:
    * Validate the Transfer-Encoding header.
    */
   HeaderValueValidationResult
-  validateTransferEncodingHeader(const ::Envoy::Http::HeaderString& value);
+  validateTransferEncodingHeader(const ::Envoy::Http::HeaderString& value) const;
+
+private:
+  const HeaderValidatorMap request_header_validator_map_;
 };
 
 using Http1HeaderValidatorPtr = std::unique_ptr<Http1HeaderValidator>;
