@@ -277,6 +277,9 @@ new_features:
 - area: router
   change: |
     added :ref:`RouteList <envoy_v3_api_msg_config.route.v3.RouteList>` to support route list in :ref:`VirtualHost.matcher <envoy_v3_api_field_config.route.v3.VirtualHost.matcher>`.
+- area: router
+  change: |
+    added a :ref:`x-envoy-is-timeout-retry <config_http_filters_router_x-envoy-is-timeout-retry>` request header on retries initiated by request timeouts; enabled by setting :ref:`include_is_timeout_retry_header <envoy_v3_api_field_config.route.v3.VirtualHost.include_is_timeout_retry_header>` to ``true``.
 - area: upstream
   change: |
     allow configuring :ref:`cluster bind config <envoy_v3_api_field_config.cluster.v3.Cluster.upstream_bind_config>` and
