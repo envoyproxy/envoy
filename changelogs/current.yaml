@@ -167,6 +167,9 @@ bug_fixes:
 - area: oauth2
   change: |
     fixed a bug where the oauth2 filter would crash if it received a redirect URL without a state query param set.
+- area: lua
+  change: |
+    lua coroutine should not execute after local reply is sent.
 
 removed_config_or_runtime:
 - area: config
