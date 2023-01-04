@@ -869,7 +869,8 @@ def _com_github_hiredis():
         build_file_content = BUILD_ALL_CONTENT + """
 cc_library(name = "hiredis", visibility = ["//visibility:public"], deps = ["@envoy//bazel/foreign_cc:hiredis"])
 """,
-        patches = [],
+        # To fix wincrypt symbols conflict
+        patches = ["@envoy//bazel/foreign_cc:hiredis.patch"],
         patch_args = ["-p1"],
     )
     native.bind(

@@ -314,11 +314,16 @@ envoy_cmake(
     name = "hiredis",
     cache_entries = {
         "ENABLE_SSL": "on",
+        "DISABLE_TESTS": "on",
     },
     env = {
     },
     lib_source = "@com_github_hiredis//:all",
     out_static_libs = select({
+        "//bazel:windows_x86_64": [
+            "hiredis.lib",
+            "hiredis_ssl.lib",
+        ],
         "//conditions:default": [
             "libhiredis.a",
             "libhiredis_ssl.a",

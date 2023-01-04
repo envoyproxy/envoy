@@ -1,0 +1,17 @@
+diff --git a/ssl.c b/ssl.c
+index 7d7ff66..491ce5a 100644
+--- a/ssl.c
++++ b/ssl.c
+@@ -40,6 +40,12 @@
+ #ifdef _WIN32
+ #include <windows.h>
+ #include <wincrypt.h>
++#undef X509_NAME
++#undef X509_EXTENSIONS
++#undef PKCS7_ISSUER_AND_SERIAL
++#undef PKCS7_SIGNER_INFO
++#undef OCSP_REQUEST
++#undef OCSP_RESPONSE
+ #else
+ #include <pthread.h>
+ #endif
