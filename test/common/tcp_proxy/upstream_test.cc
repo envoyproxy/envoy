@@ -183,6 +183,22 @@ TYPED_TEST(HttpUpstreamTest, OnFailureCalledOnInvalidResponse) {
   this->upstream_->responseDecoder().decodeHeaders(std::move(headers), false);
 }
 
+TYPED_TEST(HttpUpstreamTest, PropagateResponseHeadersInCaseOfInvalidResponse) {
+  this->setupUpstream();
+  auto conn_pool_callbacks = std::make_unique<MockHttpConnPoolCallbacks>();
+  auto conn_pool_callbacks_raw = conn_pool_callbacks.get();
+  this->upstream_->setConnPoolCallbacks(std::move(conn_pool_callbacks));
+  EXPECT_CALL(*conn_pool_callbacks_raw, onFailure()).Times(0); 
+  EXPECT_CALL(*conn_pool_callbacks_raw, onSuccess(_)).Times(0);  
+  Http::ResponseHeaderMapPtr headers{new Http::TestResponseHeaderMapImpl{{":status", "600"}}};
+  NiceMock<MockDownstreamInfo> downstream_info;
+  NiceMock<MockFilterState> filter_state;  
+  EXPECT_CALL(filter_state, add(headers)).Times(1);
+  downstream_info.filter_state_ = &filter_state;
+  this->upstream_->downstream_info_ = downstream_info;
+  this->upstream_->responseDecoder().decodeHeaders(std::move(headers), false);
+}
+  
 TYPED_TEST(HttpUpstreamTest, DumpsResponseDecoderWithoutAllocatingMemory) {
   std::array<char, 256> buffer;
   OutputBufferStream ostream{buffer.data(), buffer.size()};
