@@ -23,3 +23,16 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "integration_test",
+    srcs = ["integration_test.cc"],
+    extension_names = ["envoy.load_balancing_policies.random"],
+    deps = [
+        "//source/common/protobuf",
+        "//source/extensions/load_balancing_policies/random:config",
+        "//test/integration:http_integration_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+    ],
+)
