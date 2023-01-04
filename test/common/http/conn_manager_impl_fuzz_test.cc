@@ -218,7 +218,7 @@ public:
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return proxy_status_config_.get();
   }
-  Http::HeaderValidatorPtr makeHeaderValidator(Protocol, StreamInfo::StreamInfo&) override {
+  Http::HeaderValidatorPtr makeHeaderValidator(Protocol) override {
     // TODO(yanavlasov): fuzz test interface should use the default validator, although this could
     // be changed too
     return nullptr;

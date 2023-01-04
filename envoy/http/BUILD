@@ -240,8 +240,7 @@ envoy_cc_library(
         "//envoy/config:typed_config_interface",
         "//envoy/http:header_map_interface",
         "//envoy/http:protocol_interface",
-        "//envoy/server:factory_context_interface",
-        "//envoy/stream_info:stream_info_interface",
+        "//envoy/protobuf:message_validator_interface",
     ],
 )
 
