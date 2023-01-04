@@ -435,10 +435,14 @@ bool HeaderValidator::hasChunkedTransferEncoding(const HeaderString& value) {
 }
 
 // For all (H/1, H/2 and H/3) protocols, trailers should only contain generic headers. As such a
-// common validation method can be used. For H/2, per
-// https://www.rfc-editor.org/rfc/rfc9113#section-8.1 trailers MUST NOT contain H/2 pseudo header
-// fields. For H/1 per https://www.rfc-editor.org/rfc/rfc9110#section-6.5 there are no specific
-// prohibitions.
+// common validation method can be used.
+// More in depth explanation for using common function:
+// For H/2 (and so H/3), per
+// https://www.rfc-editor.org/rfc/rfc9113#section-8.1 trailers MUST NOT contain pseudo header
+// fields.
+// For H/1 the codec will never produce H/2 pseudo headers and per
+// https://www.rfc-editor.org/rfc/rfc9110#section-6.5 there are no other prohibitions.
+// As a result this common function can cover trailer validation for all protocols.
 HeaderValidator::TrailerValidationResult
 HeaderValidator::validateTrailers(::Envoy::Http::HeaderMap& trailers) {
   std::string reject_details;
