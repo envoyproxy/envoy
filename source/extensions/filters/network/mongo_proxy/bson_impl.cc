@@ -98,7 +98,7 @@ std::string BufferHelper::removeString(Buffer::Instance& data) {
   }
 
   char* start = reinterpret_cast<char*>(data.linearize(length));
-  std::string ret(start, length);
+  std::string ret(start, length > 0 ? length - 1 : 0);
   data.drain(length);
   return ret;
 }
