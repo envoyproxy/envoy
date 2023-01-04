@@ -3682,6 +3682,7 @@ envoy_cc_library(
         ":quic_core_versions_lib",
         ":quic_platform",
         ":quic_platform_socket_address",
+        ":quic_stream_priority_lib",
     ],
 )
 
@@ -4152,6 +4153,26 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "quic_stream_priority_lib",
+    srcs = [
+        "quiche/quic/core/quic_stream_priority.cc",
+    ],
+    hdrs = [
+        "quiche/quic/core/quic_stream_priority.h",
+    ],
+    copts = quiche_copts,
+    external_deps = ["ssl"],
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quic_platform_export",
+        ":quiche_common_platform_bug_tracker",
+        ":quiche_common_structured_headers_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "quic_core_session_lib",
     srcs = [
         "quiche/quic/core/legacy_quic_stream_id_manager.cc",
@@ -4214,6 +4235,8 @@ envoy_cc_library(
         ":quic_core_versions_lib",
         ":quic_platform",
         ":quic_server_crypto_crypto_handshake_lib",
+        ":quic_stream_priority_lib",
+        ":quiche_common_structured_headers_lib",
         ":quiche_common_text_utils_lib",
         ":spdy_core_protocol_lib",
     ],
@@ -5368,6 +5391,7 @@ envoy_cc_test_library(
         ":quiche_common_platform",
         ":quiche_common_platform_iovec",
         ":quiche_common_platform_test",
+        "@com_googlesource_googleurl//url",
         "@envoy//test/common/quic/platform:quiche_test_helpers_impl_lib",
         "@envoy//test/common/quic/platform:quiche_test_impl_lib",
     ],

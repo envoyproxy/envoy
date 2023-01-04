@@ -454,8 +454,8 @@ TEST_F(SslContextImplTest, TestNoCert) {
   EXPECT_TRUE(context->getCertChainInformation().empty());
 }
 
-// Multiple RSA certificates with the same exact DNS SAN are rejected.
-TEST_F(SslContextImplTest, AtMostOneRsaCertSameExactDNSSan) {
+// Multiple RSA certificates with the same exact DNS SAN are allowed.
+TEST_F(SslContextImplTest, DuplicateRsaCertSameExactDNSSan) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   const std::string tls_context_yaml = R"EOF(
   common_tls_context:
@@ -471,14 +471,11 @@ TEST_F(SslContextImplTest, AtMostOneRsaCertSameExactDNSSan) {
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
   ServerContextConfigImpl server_context_config(tls_context, factory_context_);
-  EXPECT_THROW_WITH_REGEX(manager_.createSslServerContext(store_, server_context_config, {}),
-                          EnvoyException,
-                          "at most one certificate of a given type may be specified for each DNS "
-                          "SAN entry or Subject CN");
+  EXPECT_NO_THROW(loadConfig(server_context_config));
 }
 
-// Multiple RSA certificates with the same wildcard DNS SAN are rejected.
-TEST_F(SslContextImplTest, AtMostOneRsaCertSameWildcardDNSSan) {
+// Multiple RSA certificates with the same wildcard DNS SAN are allowed.
+TEST_F(SslContextImplTest, DuplicateRsaCertSameWildcardDNSSan) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   const std::string tls_context_yaml = R"EOF(
   common_tls_context:
@@ -494,10 +491,7 @@ TEST_F(SslContextImplTest, AtMostOneRsaCertSameWildcardDNSSan) {
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
   ServerContextConfigImpl server_context_config(tls_context, factory_context_);
-  EXPECT_THROW_WITH_REGEX(manager_.createSslServerContext(store_, server_context_config, {}),
-                          EnvoyException,
-                          "at most one certificate of a given type may be specified for each DNS "
-                          "SAN entry or Subject CN");
+  EXPECT_NO_THROW(loadConfig(server_context_config));
 }
 
 // Multiple RSA certificates with different exact DNS SAN are acceptable.
@@ -520,8 +514,8 @@ TEST_F(SslContextImplTest, AcceptableMultipleRsaCerts) {
   EXPECT_NO_THROW(loadConfig(server_context_config));
 }
 
-// Multiple ECDSA certificates with the same exact DNS SAN are rejected.
-TEST_F(SslContextImplTest, AtMostOneEcdsaCert) {
+// Multiple ECDSA certificates with the same exact DNS SAN are allowed.
+TEST_F(SslContextImplTest, DuplicateEcdsaCert) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   const std::string tls_context_yaml = R"EOF(
   common_tls_context:
@@ -537,13 +531,10 @@ TEST_F(SslContextImplTest, AtMostOneEcdsaCert) {
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
   ServerContextConfigImpl server_context_config(tls_context, factory_context_);
-  EXPECT_THROW_WITH_REGEX(manager_.createSslServerContext(store_, server_context_config, {}),
-                          EnvoyException,
-                          "at most one certificate of a given type may be specified for each DNS "
-                          "SAN entry or Subject CN");
+  EXPECT_NO_THROW(loadConfig(server_context_config));
 }
 
-// Multiple ECDSA certificates with different exact DNS SAN are acceptable.
+// Multiple ECDSA certificates with different DNS SAN are acceptable.
 TEST_F(SslContextImplTest, AcceptableMultipleEcdsaCerts) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   const std::string tls_context_yaml = R"EOF(

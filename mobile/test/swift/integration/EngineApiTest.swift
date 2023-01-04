@@ -17,7 +17,7 @@ final class EngineApiTest: XCTestCase {
     XCTAssertEqual(XCTWaiter.wait(for: [engineExpectation], timeout: 10), .completed)
 
     let pulseClient = engine.pulseClient()
-    pulseClient.gauge(elements: ["foo", "bar"]).set(value: 1)
+    pulseClient.counter(elements: ["foo", "bar"]).increment(count: 1)
 
     XCTAssertTrue(engine.dumpStats().contains("foo.bar: 1"))
 

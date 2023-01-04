@@ -66,6 +66,9 @@ stages:
     pool:
       vmImage: "ubuntu-20.04"
     steps:
+    - checkout: self
+      fetchDepth: 0
+      fetchTags: true
     - bash: |
         set -e
 

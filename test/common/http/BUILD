@@ -237,6 +237,7 @@ envoy_cc_test(
         "//source/extensions/request_id/uuid:config",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/event:event_mocks",
+        "//test/mocks/http:early_header_mutation_mock",
         "//test/mocks/http:header_validator_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/local_info:local_info_mocks",
@@ -349,6 +350,7 @@ envoy_cc_test(
     srcs = ["header_utility_test.cc"],
     deps = [
         "//source/common/http:header_utility_lib",
+        "//test/mocks/http:header_validator_mocks",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
