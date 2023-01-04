@@ -68,73 +68,54 @@ namespace Envoy {
       route);
  */
 
-/**
- * Helper class to store elements in an array. Overhead of using this class is 8
- * + 2 unaligned bytes.
- */
-template <class T> class PackedStruct {
-public:
-  PackedStruct(size_t capacity = 0)
-      : data_(capacity > 0 ? new T[capacity] : nullptr), capacity_(capacity) {
-    RELEASE_ASSERT(capacity < 0x7f, "size must be less than 0x7f");
-  }
-
-  // Accessors.
-  T& operator[](size_t idx) {
-    RELEASE_ASSERT(idx < size_,
-                   absl::StrCat("Index ", idx, " is out of bounds. Size is (", size_, ")"));
-    return (data_.get())[idx];
-  }
-  const T& operator[](size_t idx) const {
-    RELEASE_ASSERT(idx < size_,
-                   absl::StrCat("Index ", idx, " is out of bounds. Size is (", size_, ")"));
-    return (data_.get())[idx];
-  }
-
-  // Disable copying
-  PackedStruct(const PackedStruct&) = delete;
-
-  friend void swap(PackedStruct& first, PackedStruct& second) {
-    using std::swap;
-    swap(first.data_, second.data_);
-    swap(first.size_, second.size_);
-    swap(first.capacity_, second.capacity_);
-  }
-
-  PackedStruct(PackedStruct&& other) noexcept : PackedStruct(0) { swap(*this, other); }
-
-  void push_back(T t) {
-    RELEASE_ASSERT(size_ == 0 || size_ - 1 < 0x7f, "size must be less than 0x7f");
-    // If we're at capacity, increase capacity by 1.
-    if (size_ == capacity_) {
-      std::unique_ptr<T[]> tmp(new T[++capacity_]);
-      for (size_t idx = 0; idx < size_; ++idx) {
-        swap(tmp.get()[idx], data_.get()[idx]);
-      }
-      swap(data_, tmp);
-    }
-    data_.get()[size_++] = t;
-  }
-
-  uint8_t size() const { return size_; }
-  uint8_t capacity() const { return capacity_; }
-
-private:
-  std::unique_ptr<T[]> data_;
-  uint8_t size_ = 0;
+#define PACKED_DATA(T)                                                                             \
+  std::unique_ptr<T[]> createData(size_t capacity = 0) {                                           \
+    std::unique_ptr<T[]> data(capacity > 0 ? new T[capacity] : nullptr);                           \
+    RELEASE_ASSERT(capacity < 0x7f, "size must be less than 0x7f");                                \
+    return data;                                                                                   \
+  }                                                                                                \
+                                                                                                   \
+  T& at(size_t idx) {                                                                              \
+    RELEASE_ASSERT(idx < size_,                                                                    \
+                   absl::StrCat("Index ", idx, " is out of bounds. Size is (", size_, ")"));       \
+    return (data_.get())[idx];                                                                     \
+  }                                                                                                \
+  const T& at(size_t idx) const {                                                                  \
+    RELEASE_ASSERT(idx < size_,                                                                    \
+                   absl::StrCat("Index ", idx, " is out of bounds. Size is (", size_, ")"));       \
+    return (data_.get())[idx];                                                                     \
+  }                                                                                                \
+                                                                                                   \
+  void push_back(T t) {                                                                            \
+    RELEASE_ASSERT(size_ == 0 || size_ - 1 < 0x7f, "size must be less than 0x7f");                 \
+    if (size_ == capacity_) {                                                                      \
+      std::unique_ptr<T[]> tmp(new T[++capacity_]);                                                \
+      for (size_t idx = 0; idx < size_; ++idx) {                                                   \
+        swap(tmp.get()[idx], data_.get()[idx]);                                                    \
+      }                                                                                            \
+      swap(data_, tmp);                                                                            \
+    }                                                                                              \
+    data_.get()[size_++] = t;                                                                      \
+  }                                                                                                \
+                                                                                                   \
+  std::unique_ptr<T[]> data_;                                                                      \
+  uint8_t size_ = 0;                                                                               \
   uint8_t capacity_ = 0;
-};
 
 #define GENERATE_PACKED_STRUCT_ACCESSOR(NAME, ...)                                                 \
   const Type& NAME() const {                                                                       \
     RELEASE_ASSERT(NAME##_idx_ != -1, #NAME "_ is unset.");                                        \
-    return packed_struct_[NAME##_idx_];                                                            \
+    return at(NAME##_idx_);                                                                        \
+  }                                                                                                \
+  Type& NAME() {                                                                                   \
+    RELEASE_ASSERT(NAME##_idx_ != -1, #NAME "_ is unset.");                                        \
+    return at(NAME##_idx_);                                                                        \
   }                                                                                                \
   bool has_##NAME() const { return NAME##_idx_ != -1; }
 
 #define GENERATE_PACKED_STRUCT_OPTIONAL_ACCESSOR(NAME, ...)                                        \
   absl::optional<Type> NAME() const {                                                              \
-    return NAME##_idx_ != -1 ? absl::optional<Type>(packed_struct_[NAME##_idx_]) : absl::nullopt;  \
+    return NAME##_idx_ != -1 ? absl::optional<Type>(at(NAME##_idx_)) : absl::nullopt;              \
   }
 
 #define GENERATE_PACKED_STRUCT_IDX(NAME, ...) int8_t NAME##_idx_ = -1;
@@ -162,11 +143,11 @@ private:
 #define GENERATE_PACKED_STRUCT_SETTER(NAME, ...)                                                   \
   void set_##NAME(Type t) {                                                                        \
     if (NAME##_idx_ == -1) {                                                                       \
-      NAME##_idx_ = packed_struct_.size();                                                         \
-      packed_struct_.push_back(t);                                                                 \
+      NAME##_idx_ = size_;                                                                         \
+      push_back(t);                                                                                \
       return;                                                                                      \
     }                                                                                              \
-    packed_struct_[NAME##_idx_] = t;                                                               \
+    at(NAME##_idx_) = t;                                                                           \
   }
 
 #define MAKE_PACKED_STRUCT_FROM_PROTO(PackedStructName, ALL_ELEMENTS, ACCESSOR, HAS_CHECK,         \
@@ -176,7 +157,8 @@ private:
     ALL_ELEMENTS(ACCESSOR)                                                                         \
     PackedStructName() = delete;                                                                   \
                                                                                                    \
-    PackedStructName(const ProtoType& proto) : packed_struct_(getSize(proto)) {                    \
+    PackedStructName(const ProtoType& proto) : capacity_(getSize(proto)) {                         \
+      data_ = createData(capacity_);                                                               \
       ALL_ELEMENTS(ASSIGNMENT)                                                                     \
     }                                                                                              \
                                                                                                    \
@@ -188,7 +170,7 @@ private:
     }                                                                                              \
                                                                                                    \
     ALL_ELEMENTS(GENERATE_PACKED_STRUCT_SETTER)                                                    \
-    PackedStruct<Type> packed_struct_;                                                             \
+    PACKED_DATA(Type)                                                                              \
     ALL_ELEMENTS(GENERATE_PACKED_STRUCT_IDX)                                                       \
   }
 
@@ -198,10 +180,10 @@ private:
     ALL_ELEMENTS(ACCESSOR)                                                                         \
     ALL_ELEMENTS(SETTER)                                                                           \
     PackedStructName() = delete;                                                                   \
-    PackedStructName(size_t size) : packed_struct_(size) {}                                        \
+    PackedStructName(size_t size) : data_{createData(size)}, capacity_(size) {}                    \
                                                                                                    \
   private:                                                                                         \
-    PackedStruct<Type> packed_struct_;                                                             \
+    PACKED_DATA(Type)                                                                              \
     ALL_ELEMENTS(GENERATE_PACKED_STRUCT_IDX)                                                       \
   }
 
