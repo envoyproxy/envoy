@@ -20,6 +20,14 @@
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/str_format.h"
 
+#ifdef _MSC_VER
+
+#ifndef strncasecmp
+#define strncasecmp strnicmp
+#endif
+
+#endif /* _MSC_VER */
+
 namespace Envoy {
 namespace Extensions {
 namespace HealthCheckers {
