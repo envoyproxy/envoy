@@ -477,7 +477,7 @@ RedirectConfig::RedirectConfig(const envoy::config::route::v3::Route& route)
     regex_rewrite_redirect_substitution_ = rewrite_spec.substitution();
   }
 }
-    
+
 OptionalTimeouts::OptionalTimeouts(const envoy::config::route::v3::RouteAction& route)
     : has_idle_timeout_(false), has_max_stream_duration_(false),
       has_grpc_timeout_header_max_(false), has_grpc_timeout_header_offset_(false),
