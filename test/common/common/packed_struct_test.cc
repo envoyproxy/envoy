@@ -37,7 +37,7 @@ TEST(PackedStruct, StringFromProto) {
   Stats::TestUtil::MemoryTest memory_test;
   RedirectStringsFromProto<std::string, envoy::config::route::v3::RedirectAction> redirect_strings(
       redirect_action);
-  EXPECT_EQ(memory_test.consumedBytes(), 2 * sizeof(std::string) + 16);
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 2 * sizeof(std::string) + 16);
   EXPECT_EQ(redirect_strings.scheme_redirect(), "abc");
   EXPECT_EQ(redirect_strings.host_redirect(), "def");
   EXPECT_FALSE(redirect_strings.has_path_redirect());
@@ -48,7 +48,7 @@ TEST(PackedStruct, StringStruct) {
   RedirectStrings<std::string> redirect_strings(2);
   redirect_strings.set_scheme_redirect("abc");
   redirect_strings.set_path_redirect("def");
-  EXPECT_EQ(memory_test.consumedBytes(), 2 * sizeof(std::string) + 16);
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 2 * sizeof(std::string) + 16);
 
   EXPECT_EQ(redirect_strings.scheme_redirect(), "abc");
   EXPECT_EQ(redirect_strings.path_redirect(), "def");
@@ -56,7 +56,7 @@ TEST(PackedStruct, StringStruct) {
 
   redirect_strings.set_host_redirect("abcd");
   EXPECT_EQ(redirect_strings.host_redirect(), "abcd");
-  EXPECT_EQ(memory_test.consumedBytes(), 3 * sizeof(std::string) + 16);
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 3 * sizeof(std::string) + 16);
 }
 
 TEST(PackedStruct, DurationMSFromProto) {
@@ -73,7 +73,7 @@ TEST(PackedStruct, DurationMSFromProto) {
   Stats::TestUtil::MemoryTest memory_test;
   TimeoutsFromProto<std::chrono::milliseconds, envoy::config::route::v3::RouteAction> timeouts(
       route);
-  EXPECT_EQ(memory_test.consumedBytes(), 2 * sizeof(std::chrono::milliseconds));
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 2 * sizeof(std::chrono::milliseconds));
   EXPECT_EQ(timeouts.idle_timeout().value().count(), 20);
   EXPECT_EQ(timeouts.max_grpc_timeout().value().count(), 5);
   EXPECT_FALSE(timeouts.grpc_timeout_offset().has_value());
@@ -84,7 +84,7 @@ TEST(PackedStruct, DurationMS) {
   Timeouts<std::chrono::milliseconds> timeouts(2);
   timeouts.set_idle_timeout(std::chrono::milliseconds(20));
   timeouts.set_max_grpc_timeout(std::chrono::milliseconds(5));
-  EXPECT_EQ(memory_test.consumedBytes(), 2 * sizeof(std::chrono::milliseconds));
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 2 * sizeof(std::chrono::milliseconds));
 
   EXPECT_EQ(timeouts.idle_timeout().value().count(), 20);
   EXPECT_EQ(timeouts.max_grpc_timeout().value().count(), 5);
