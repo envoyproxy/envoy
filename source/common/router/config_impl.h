@@ -258,6 +258,7 @@ public:
   const RouteSpecificFilterConfig* mostSpecificPerFilterConfig(const std::string&) const override;
   bool includeAttemptCountInRequest() const override { return include_attempt_count_in_request_; }
   bool includeAttemptCountInResponse() const override { return include_attempt_count_in_response_; }
+  bool includeIsTimeoutRetryHeader() const override { return include_is_timeout_retry_header_; }
   const std::vector<ShadowPolicyPtr>& shadowPolicies() const { return shadow_policies_; }
   RetryPolicyConstOptRef retryPolicy() const {
     if (retry_policy_ != nullptr) {
@@ -342,6 +343,7 @@ private:
   SslRequirements ssl_requirements_;
   const bool include_attempt_count_in_request_ : 1;
   const bool include_attempt_count_in_response_ : 1;
+  const bool include_is_timeout_retry_header_ : 1;
 };
 
 using VirtualHostSharedPtr = std::shared_ptr<VirtualHostImpl>;

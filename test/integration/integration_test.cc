@@ -519,6 +519,53 @@ TEST_P(IntegrationTest, EnvoyProxying1xxWithDecodeDataPause) {
   testEnvoyProxying1xx(true);
 }
 
+// Test the x-envoy-is-timeout-retry header is set to false for retries that are not
+// initiated by timeouts.
+TEST_P(IntegrationTest, RouterIsTimeoutRetryHeader) {
+  auto host = config_helper_.createVirtualHost("example.com", "/test_retry");
+  host.set_include_is_timeout_retry_header(true);
+  config_helper_.addVirtualHost(host);
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/test_retry"},
+                                     {":scheme", "http"},
+                                     {":authority", "example.com"},
+                                     {"x-forwarded-for", "10.0.0.1"},
+                                     {"x-envoy-retry-on", "5xx"}},
+      1024);
+  waitForNextUpstreamRequest();
+  // Send a non-timeout failure response.
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
+
+  if (fake_upstreams_[0]->httpType() == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  } else {
+    ASSERT_TRUE(upstream_request_->waitForReset());
+  }
+  // 5XX responses are retried.
+  waitForNextUpstreamRequest();
+
+  // The request did not fail due to a timeout, therefore we expect the x-envoy-is-timeout-retry
+  // header to be false.
+  EXPECT_EQ(upstream_request_->headers().getEnvoyIsTimeoutRetryValue(), "false");
+
+  // Return 200 to the retry.
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(512, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(1024U, upstream_request_->bodyLength());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(512U, response->body().size());
+}
+
 // Verifies that we can construct a match tree with a filter, and that we are able to skip
 // filter invocation through the match tree.
 TEST_P(IntegrationTest, MatchingHttpFilterConstruction) {

@@ -298,6 +298,7 @@ public:
               (const));
   MOCK_METHOD(bool, includeAttemptCountInRequest, (), (const));
   MOCK_METHOD(bool, includeAttemptCountInResponse, (), (const));
+  MOCK_METHOD(bool, includeIsTimeoutRetryHeader, (), (const));
   MOCK_METHOD(Upstream::RetryPrioritySharedPtr, retryPriority, ());
   MOCK_METHOD(Upstream::RetryHostPredicateSharedPtr, retryHostPredicate, ());
   MOCK_METHOD(uint32_t, retryShadowBufferLimit, (), (const));

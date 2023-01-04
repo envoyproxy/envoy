@@ -164,6 +164,7 @@ private:
     const Router::Config& routeConfig() const override { return route_configuration_; }
     bool includeAttemptCountInRequest() const override { return false; }
     bool includeAttemptCountInResponse() const override { return false; }
+    bool includeIsTimeoutRetryHeader() const override { return false; }
     uint32_t retryShadowBufferLimit() const override {
       return std::numeric_limits<uint32_t>::max();
     }

@@ -1741,7 +1741,8 @@ VirtualHostImpl::VirtualHostImpl(
       retry_shadow_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           virtual_host, per_request_buffer_limit_bytes, std::numeric_limits<uint32_t>::max())),
       include_attempt_count_in_request_(virtual_host.include_request_attempt_count()),
-      include_attempt_count_in_response_(virtual_host.include_attempt_count_in_response()) {
+      include_attempt_count_in_response_(virtual_host.include_attempt_count_in_response()),
+      include_is_timeout_retry_header_(virtual_host.include_is_timeout_retry_header()) {
   if (!virtual_host.request_headers_to_add().empty() ||
       !virtual_host.request_headers_to_remove().empty()) {
     request_headers_parser_ = HeaderParser::configure(virtual_host.request_headers_to_add(),
