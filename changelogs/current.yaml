@@ -166,6 +166,11 @@ removed_config_or_runtime:
     removed ``envoy.reloadable_features.do_not_await_headers_on_upstream_timeout_to_emit_stats`` and legacy code paths.
 
 new_features:
+- area: aws
+  change: |
+    added support to prefer fetching AWS instance role credentials securily
+    (`IMDSv2 <https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-service.html>`_)
+    from EC2 instance metadata by getting the token first or fallback to insecure way (IMDSv1) if token fetch fails.
 - area: grpc_json_transcoder
   change: |
     added ``max_request_body_size`` and ``max_response_body_size`` fields, which can either increase or decrease
