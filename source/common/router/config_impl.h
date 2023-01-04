@@ -602,6 +602,27 @@ private:
 };
 
 /**
+ * Container for route config elements that pertain to a redirect.
+ *
+ * We keep them in a separate data structure to avoid memory overhead for the routes that do not use
+ * redirect.
+ */
+struct RedirectConfig {
+  RedirectConfig(const envoy::config::route::v3::Route& route);
+  const std::string scheme_redirect_;
+  const std::string host_redirect_;
+  const std::string port_redirect_;
+  const std::string path_redirect_;
+  const std::string prefix_rewrite_redirect_;
+  std::string regex_rewrite_redirect_substitution_;
+  Regex::CompiledMatcherPtr regex_rewrite_redirect_;
+  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
+  const bool path_redirect_has_query_;
+  const bool https_redirect_;
+  const bool strip_query_;
+};
+
+/**
  * Base implementation for all route entries.q
  */
 class RouteEntryImplBase : public RouteEntryAndRoute,
@@ -625,8 +646,12 @@ public:
     if (!isDirectResponse()) {
       return false;
     }
-    return !host_redirect_.empty() || !path_redirect_.empty() ||
-           !prefix_rewrite_redirect_.empty() || regex_rewrite_redirect_ != nullptr;
+    if (redirect_config_ == nullptr) {
+      return false;
+    }
+    return !redirect_config_->host_redirect_.empty() || !redirect_config_->path_redirect_.empty() ||
+           !redirect_config_->prefix_rewrite_redirect_.empty() ||
+           redirect_config_->regex_rewrite_redirect_ != nullptr;
   }
 
   bool matchRoute(const Http::RequestHeaderMap& headers, const StreamInfo::StreamInfo& stream_info,
@@ -1034,11 +1059,9 @@ public:
 protected:
   const std::string prefix_rewrite_;
   Regex::CompiledMatcherPtr regex_rewrite_;
-  Regex::CompiledMatcherPtr regex_rewrite_redirect_;
   const PathMatcherSharedPtr path_matcher_;
   const PathRewriterSharedPtr path_rewriter_;
   std::string regex_rewrite_substitution_;
-  std::string regex_rewrite_redirect_substitution_;
   const std::string host_rewrite_;
   std::unique_ptr<ConnectConfig> connect_config_;
 
@@ -1153,11 +1176,7 @@ private:
   std::unique_ptr<const OptionalTimeouts> optional_timeouts_;
   Runtime::Loader& loader_;
   std::unique_ptr<const RuntimeData> runtime_;
-  const std::string scheme_redirect_;
-  const std::string host_redirect_;
-  const std::string port_redirect_;
-  const std::string path_redirect_;
-  const std::string prefix_rewrite_redirect_;
+  std::unique_ptr<const RedirectConfig> redirect_config_;
   std::unique_ptr<const HedgePolicyImpl> hedge_policy_;
   std::unique_ptr<const RetryPolicyImpl> retry_policy_;
   std::unique_ptr<const InternalRedirectPolicyImpl> internal_redirect_policy_;
@@ -1195,10 +1214,7 @@ private:
   const Upstream::ResourcePriority priority_;
   const bool auto_host_rewrite_ : 1;
   const bool append_xfh_ : 1;
-  const bool path_redirect_has_query_ : 1;
-  const bool https_redirect_ : 1;
   const bool using_new_timeouts_ : 1;
-  const bool strip_query_ : 1;
   const bool match_grpc_ : 1;
   const bool case_sensitive_ : 1;
   bool include_vh_rate_limits_ : 1;

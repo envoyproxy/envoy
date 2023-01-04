@@ -459,6 +459,25 @@ const envoy::type::v3::FractionalPercent& RouteTracingImpl::getOverallSampling()
 }
 const Tracing::CustomTagMap& RouteTracingImpl::getCustomTags() const { return custom_tags_; }
 
+RedirectConfig::RedirectConfig(const envoy::config::route::v3::Route& route)
+    : scheme_redirect_(route.redirect().scheme_redirect()),
+      host_redirect_(route.redirect().host_redirect()),
+      port_redirect_(route.redirect().port_redirect()
+                         ? ":" + std::to_string(route.redirect().port_redirect())
+                         : ""),
+      path_redirect_(route.redirect().path_redirect()),
+      prefix_rewrite_redirect_(route.redirect().prefix_rewrite()),
+      path_redirect_has_query_(path_redirect_.find('?') != absl::string_view::npos),
+      https_redirect_(route.redirect().https_redirect()),
+      strip_query_(route.redirect().strip_query()) {
+  if (route.redirect().has_regex_rewrite()) {
+    ASSERT(prefix_rewrite_redirect_.empty());
+    auto rewrite_spec = route.redirect().regex_rewrite();
+    regex_rewrite_redirect_ = Regex::Utility::parseRegex(rewrite_spec.pattern());
+    regex_rewrite_redirect_substitution_ = rewrite_spec.substitution();
+  }
+}
+
 OptionalTimeouts::OptionalTimeouts(const envoy::config::route::v3::RouteAction& route)
     : has_idle_timeout_(false), has_max_stream_duration_(false),
       has_grpc_timeout_header_max_(false), has_grpc_timeout_header_offset_(false),
@@ -521,13 +540,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       timeout_(PROTOBUF_GET_MS_OR_DEFAULT(route.route(), timeout, DEFAULT_ROUTE_TIMEOUT_MS)),
       optional_timeouts_(buildOptionalTimeouts(route.route())), loader_(factory_context.runtime()),
       runtime_(loadRuntimeData(route.match())),
-      scheme_redirect_(route.redirect().scheme_redirect()),
-      host_redirect_(route.redirect().host_redirect()),
-      port_redirect_(route.redirect().port_redirect()
-                         ? ":" + std::to_string(route.redirect().port_redirect())
-                         : ""),
-      path_redirect_(route.redirect().path_redirect()),
-      prefix_rewrite_redirect_(route.redirect().prefix_rewrite()),
+      redirect_config_(route.has_redirect() ? std::make_unique<RedirectConfig>(route) : nullptr),
       hedge_policy_(buildHedgePolicy(vhost.hedgePolicy(), route.route())),
       retry_policy_(
           buildRetryPolicy(vhost.retryPolicy(), route.route(), validator, factory_context)),
@@ -552,10 +565,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       priority_(ConfigUtility::parsePriority(route.route().priority())),
       auto_host_rewrite_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), auto_host_rewrite, false)),
       append_xfh_(route.route().append_x_forwarded_host()),
-      path_redirect_has_query_(path_redirect_.find('?') != absl::string_view::npos),
-      https_redirect_(route.redirect().https_redirect()),
       using_new_timeouts_(route.route().has_max_stream_duration()),
-      strip_query_(route.redirect().strip_query()), match_grpc_(route.match().has_grpc()),
+      match_grpc_(route.match().has_grpc()),
       case_sensitive_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.match(), case_sensitive, true)) {
   if (!route.request_headers_to_add().empty() || !route.request_headers_to_remove().empty()) {
     request_headers_parser_ =
@@ -707,18 +718,12 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     }
   }
 
-  if (route.redirect().has_regex_rewrite()) {
-    ASSERT(prefix_rewrite_redirect_.empty());
-    auto rewrite_spec = route.redirect().regex_rewrite();
-    regex_rewrite_redirect_ = Regex::Utility::parseRegex(rewrite_spec.pattern());
-    regex_rewrite_redirect_substitution_ = rewrite_spec.substitution();
-  }
-
-  if (path_redirect_has_query_ && strip_query_) {
+  if (redirect_config_ != nullptr && redirect_config_->path_redirect_has_query_ &&
+      redirect_config_->strip_query_) {
     ENVOY_LOG(warn,
               "`strip_query` is set to true, but `path_redirect` contains query string and it will "
               "not be stripped: {}",
-              path_redirect_);
+              redirect_config_->path_redirect_);
   }
   if (!route.stat_prefix().empty()) {
     route_stats_context_ = std::make_unique<RouteStatsContextImpl>(
@@ -949,19 +954,21 @@ RouteEntryImplBase::getPathRewrite(const Http::RequestHeaderMap& headers,
   }
 
   // Return the regex rewrite substitution for redirects, if set.
-  if (regex_rewrite_redirect_ != nullptr) {
+  // redirect_config_ is known to not be nullptr here, because of the isRedirect check above.
+  ASSERT(redirect_config_ != nullptr);
+  if (redirect_config_->regex_rewrite_redirect_ != nullptr) {
     // Copy just the path and rewrite it using the regex.
     //
     // Store the result in the output container, and return a reference to the underlying string.
     auto just_path(Http::PathUtil::removeQueryAndFragment(headers.getPathValue()));
-    container =
-        regex_rewrite_redirect_->replaceAll(just_path, regex_rewrite_redirect_substitution_);
+    container = redirect_config_->regex_rewrite_redirect_->replaceAll(
+        just_path, redirect_config_->regex_rewrite_redirect_substitution_);
 
     return container.value();
   }
 
   // Otherwise, return the prefix rewrite used for redirects.
-  return prefix_rewrite_redirect_;
+  return redirect_config_->prefix_rewrite_redirect_;
 }
 
 void RouteEntryImplBase::finalizePathHeader(Http::RequestHeaderMap& headers,
@@ -1000,7 +1007,7 @@ absl::optional<std::string> RouteEntryImplBase::currentUrlPathAfterRewriteWithMa
   // TODO(perf): can we avoid the string copy for the common case?
   std::string path(headers.getPathValue());
   if (!rewrite.empty()) {
-    if (regex_rewrite_redirect_ != nullptr) {
+    if (redirect_config_ != nullptr && redirect_config_->regex_rewrite_redirect_ != nullptr) {
       // As the rewrite constant may contain the result of a regex rewrite for a redirect, we must
       // replace the full path if this is the case. This is because the matched path does not need
       // to correspond to the full path, e.g. in the case of prefix matches.
@@ -1086,9 +1093,9 @@ std::string RouteEntryImplBase::newPath(const Http::RequestHeaderMap& headers) c
   absl::string_view final_port;
   absl::string_view final_path;
 
-  if (!scheme_redirect_.empty()) {
-    final_scheme = scheme_redirect_.c_str();
-  } else if (https_redirect_) {
+  if (redirect_config_ != nullptr && !redirect_config_->scheme_redirect_.empty()) {
+    final_scheme = redirect_config_->scheme_redirect_.c_str();
+  } else if (redirect_config_ != nullptr && redirect_config_->https_redirect_) {
     final_scheme = Http::Headers::get().SchemeValues.Https;
   } else {
     // Serve the redirect URL based on the scheme of the original URL, not the
@@ -1096,35 +1103,35 @@ std::string RouteEntryImplBase::newPath(const Http::RequestHeaderMap& headers) c
     final_scheme = headers.getSchemeValue();
   }
 
-  if (!port_redirect_.empty()) {
-    final_port = port_redirect_.c_str();
+  if (redirect_config_ != nullptr && !redirect_config_->port_redirect_.empty()) {
+    final_port = redirect_config_->port_redirect_.c_str();
   } else {
     final_port = "";
   }
 
-  if (!host_redirect_.empty()) {
-    final_host = host_redirect_.c_str();
+  if (redirect_config_ != nullptr && !redirect_config_->host_redirect_.empty()) {
+    final_host = redirect_config_->host_redirect_.c_str();
   } else {
     ASSERT(headers.Host());
     final_host = processRequestHost(headers, final_scheme, final_port);
   }
 
   std::string final_path_value;
-  if (!path_redirect_.empty()) {
+  if (redirect_config_ != nullptr && !redirect_config_->path_redirect_.empty()) {
     // The path_redirect query string, if any, takes precedence over the request's query string,
     // and it will not be stripped regardless of `strip_query`.
-    if (path_redirect_has_query_) {
-      final_path = path_redirect_.c_str();
+    if (redirect_config_->path_redirect_has_query_) {
+      final_path = redirect_config_->path_redirect_.c_str();
     } else {
       const absl::string_view current_path = headers.getPathValue();
       const size_t path_end = current_path.find('?');
       const bool current_path_has_query = path_end != absl::string_view::npos;
       if (current_path_has_query) {
-        final_path_value = path_redirect_;
+        final_path_value = redirect_config_->path_redirect_;
         final_path_value.append(current_path.data() + path_end, current_path.length() - path_end);
         final_path = final_path_value;
       } else {
-        final_path = path_redirect_.c_str();
+        final_path = redirect_config_->path_redirect_.c_str();
       }
     }
   } else {
@@ -1136,7 +1143,8 @@ std::string RouteEntryImplBase::newPath(const Http::RequestHeaderMap& headers) c
     final_path = final_path_value;
   }
 
-  if (!path_redirect_has_query_ && strip_query_) {
+  if (redirect_config_ != nullptr && !redirect_config_->path_redirect_has_query_ &&
+      redirect_config_->strip_query_) {
     const size_t path_end = final_path.find('?');
     if (path_end != absl::string_view::npos) {
       final_path = final_path.substr(0, path_end);
