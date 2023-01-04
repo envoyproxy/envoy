@@ -139,8 +139,8 @@ void ConnectionImpl::close(ConnectionCloseType type) {
                        data_to_write, enumToInt(type));
   const bool delayed_close_timeout_set = delayed_close_timeout_.count() > 0;
   if (data_to_write == 0 || type == ConnectionCloseType::NoFlush ||
-      !transport_socket_->canFlushClose()) {
-    if (data_to_write > 0) {
+      type == ConnectionCloseType::Abort || !transport_socket_->canFlushClose()) {
+    if (data_to_write > 0 && type != ConnectionCloseType::Abort) {
       // We aren't going to wait to flush, but try to write as much as we can if there is pending
       // data.
       transport_socket_->doWrite(*write_buffer_, true);
@@ -266,6 +266,11 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
 
   // Call the base class directly as close() is called in the destructor.
   ConnectionImpl::raiseEvent(close_type);
+}
+
+void ConnectionImpl::onConnected() {
+  ASSERT(!connecting_);
+  transport_socket_->onConnected();
 }
 
 void ConnectionImpl::noDelay(bool enable) {
@@ -683,7 +688,6 @@ void ConnectionImpl::onWriteReady() {
       ENVOY_CONN_LOG_EVENT(debug, "connection_connected", "connected", *this);
       connecting_ = false;
       onConnected();
-      transport_socket_->onConnected();
       // It's possible that we closed during the connect callback.
       if (state() != State::Open) {
         ENVOY_CONN_LOG_EVENT(debug, "connection_closed_callback", "close during connected callback",
@@ -811,9 +815,9 @@ void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
 ServerConnectionImpl::ServerConnectionImpl(Event::Dispatcher& dispatcher,
                                            ConnectionSocketPtr&& socket,
                                            TransportSocketPtr&& transport_socket,
-                                           StreamInfo::StreamInfo& stream_info, bool connected)
+                                           StreamInfo::StreamInfo& stream_info)
     : ConnectionImpl(dispatcher, std::move(socket), std::move(transport_socket), stream_info,
-                     connected) {}
+                     true) {}
 
 void ServerConnectionImpl::setTransportSocketConnectTimeout(std::chrono::milliseconds timeout,
                                                             Stats::Counter& timeout_stat) {
@@ -842,6 +846,17 @@ void ServerConnectionImpl::raiseEvent(ConnectionEvent event) {
     transport_socket_connect_timer_.reset();
   }
   ConnectionImpl::raiseEvent(event);
+}
+bool ServerConnectionImpl::initializeReadFilters() {
+  bool initialized = ConnectionImpl::initializeReadFilters();
+  if (initialized) {
+    // Server connection starts as connected, and we must explicitly signal to
+    // the downstream transport socket that the underlying socket is connected.
+    // We delay this step until after the filters are initialized and can
+    // receive the connection events.
+    onConnected();
+  }
+  return initialized;
 }
 
 void ServerConnectionImpl::onTransportSocketConnectTimeout() {

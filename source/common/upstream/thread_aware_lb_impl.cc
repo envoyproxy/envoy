@@ -190,7 +190,7 @@ double ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::hostOverload
   // TODO(scheler): This will not work if rq_active cluster stat is disabled, need to detect
   // and alert the user if that's the case.
 
-  const uint32_t overall_active = host.cluster().stats().upstream_rq_active_.value();
+  const uint32_t overall_active = host.cluster().trafficStats()->upstream_rq_active_.value();
   const uint32_t host_active = host.stats().rq_active_.value();
 
   const uint32_t total_slots = ((overall_active + 1) * hash_balance_factor_ + 99) / 100;

@@ -386,13 +386,13 @@ void XdsFuzzTest::verifyState() {
 }
 
 envoy::admin::v3::ListenersConfigDump XdsFuzzTest::getListenersConfigDump() {
-  auto message_ptr = test_server_->server().admin().getConfigTracker().getCallbacksMap().at(
+  auto message_ptr = test_server_->server().admin()->getConfigTracker().getCallbacksMap().at(
       "listeners")(Matchers::UniversalStringMatcher());
   return dynamic_cast<const envoy::admin::v3::ListenersConfigDump&>(*message_ptr);
 }
 
 std::vector<envoy::config::route::v3::RouteConfiguration> XdsFuzzTest::getRoutesConfigDump() {
-  auto map = test_server_->server().admin().getConfigTracker().getCallbacksMap();
+  auto map = test_server_->server().admin()->getConfigTracker().getCallbacksMap();
 
   // There is no route config dump before envoy has a route.
   if (map.find("routes") == map.end()) {

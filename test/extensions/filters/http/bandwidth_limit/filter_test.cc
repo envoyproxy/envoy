@@ -86,6 +86,8 @@ TEST_F(FilterTest, Disabled) {
   EXPECT_EQ(0U, findCounter("test.http_bandwidth_limit.response_enabled"));
   EXPECT_EQ(false, response_trailers_.has("bandwidth-request-delay-ms"));
   EXPECT_EQ(false, response_trailers_.has("bandwidth-response-delay-ms"));
+  EXPECT_EQ(false, response_trailers_.has("bandwidth-request-filter-delay-ms"));
+  EXPECT_EQ(false, response_trailers_.has("bandwidth-response-filter-delay-ms"));
 }
 
 TEST_F(FilterTest, LimitOnDecode) {
@@ -193,6 +195,8 @@ TEST_F(FilterTest, LimitOnDecode) {
   EXPECT_EQ(0, findGauge("test.http_bandwidth_limit.request_pending"));
   EXPECT_EQ(false, response_trailers_.has("test-bandwidth-request-delay-ms"));
   EXPECT_EQ(false, response_trailers_.has("test-bandwidth-response-delay-ms"));
+  EXPECT_EQ(false, response_trailers_.has("test-bandwidth-request-filter-delay-ms"));
+  EXPECT_EQ(false, response_trailers_.has("test-bandwidth-response-filter-delay-ms"));
 
   filter_->onDestroy();
 }
@@ -218,7 +222,7 @@ TEST_F(FilterTest, LimitOnEncode) {
   EXPECT_EQ(1UL, config_->limit());
   EXPECT_EQ(50UL, config_->fillInterval().count());
 
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   Http::MetadataMap metadata_map;
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata_map));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
@@ -305,6 +309,8 @@ TEST_F(FilterTest, LimitOnEncode) {
 
   EXPECT_EQ(false, response_trailers_.has("test-bandwidth-request-delay-ms"));
   EXPECT_EQ("2150", trailers_.get_("test-bandwidth-response-delay-ms"));
+  EXPECT_EQ(false, response_trailers_.has("test-bandwidth-request-filter-delay-ms"));
+  EXPECT_EQ("150", trailers_.get_("test-bandwidth-response-filter-delay-ms"));
 
   filter_->onDestroy();
 }
@@ -333,7 +339,7 @@ TEST_F(FilterTest, LimitOnDecodeAndEncode) {
   EXPECT_EQ(1UL, config_->limit());
   EXPECT_EQ(50UL, config_->fillInterval().count());
 
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   Http::MetadataMap metadata_map;
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
@@ -439,6 +445,10 @@ TEST_F(FilterTest, LimitOnDecodeAndEncode) {
   response_timer->invokeCallback();
   EXPECT_EQ("2200", trailers_.get_("test-bandwidth-request-delay-ms"));
   EXPECT_EQ("2200", trailers_.get_("test-bandwidth-response-delay-ms"));
+  // Only waiting for 1 unit
+  EXPECT_EQ("50", trailers_.get_("test-bandwidth-request-filter-delay-ms"));
+  // Waiting for 4 units
+  EXPECT_EQ("200", trailers_.get_("test-bandwidth-response-filter-delay-ms"));
 
   filter_->onDestroy();
 }
@@ -465,7 +475,7 @@ TEST_F(FilterTest, WithTrailers) {
   EXPECT_EQ(1UL, config_->limit());
   EXPECT_EQ(50UL, config_->fillInterval().count());
 
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   Http::MetadataMap metadata_map;
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
@@ -512,8 +522,11 @@ TEST_F(FilterTest, WithTrailers) {
               injectEncodedDataToFilterChain(BufferStringEqual(std::string(5, 'e')), false));
   response_timer->invokeCallback();
   EXPECT_EQ(0, findGauge("test.http_bandwidth_limit.response_pending"));
+  // No delay triggers since enable_response_trailers is false by default
   EXPECT_EQ(false, response_trailers_.has("test-bandwidth-request-delay-ms"));
   EXPECT_EQ(false, response_trailers_.has("test-bandwidth-response-delay-ms"));
+  EXPECT_EQ(false, response_trailers_.has("test-bandwidth-request-filter-delay-ms"));
+  EXPECT_EQ(false, response_trailers_.has("test-bandwidth-response-filter-delay-ms"));
 }
 
 TEST_F(FilterTest, WithTrailersNoEndStream) {
@@ -538,7 +551,7 @@ TEST_F(FilterTest, WithTrailersNoEndStream) {
   EXPECT_EQ(1UL, config_->limit());
   EXPECT_EQ(50UL, config_->fillInterval().count());
 
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   Http::MetadataMap metadata_map;
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
@@ -588,6 +601,8 @@ TEST_F(FilterTest, WithTrailersNoEndStream) {
 
   EXPECT_EQ("50", response_trailers_.get_("bandwidth-request-delay-ms"));
   EXPECT_EQ("150", response_trailers_.get_("bandwidth-response-delay-ms"));
+  EXPECT_EQ("50", response_trailers_.get_("bandwidth-request-filter-delay-ms"));
+  EXPECT_EQ("50", response_trailers_.get_("bandwidth-response-filter-delay-ms"));
 }
 
 } // namespace BandwidthLimitFilter

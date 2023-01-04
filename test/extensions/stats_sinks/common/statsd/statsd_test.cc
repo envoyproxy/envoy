@@ -225,22 +225,22 @@ TEST_F(TcpStatsdSinkTest, Overflow) {
 
   // Synthetically set buffer above high watermark. Make sure we don't write anything.
   cluster_manager_.active_clusters_["fake_cluster"]
-      ->info_->stats()
-      .upstream_cx_tx_bytes_buffered_.set(1024 * 1024 * 17);
+      ->info_->trafficStats()
+      ->upstream_cx_tx_bytes_buffered_.set(1024 * 1024 * 17);
   sink_->flush(snapshot_);
 
   // Lower and make sure we write.
   cluster_manager_.active_clusters_["fake_cluster"]
-      ->info_->stats()
-      .upstream_cx_tx_bytes_buffered_.set(1024 * 1024 * 15);
+      ->info_->trafficStats()
+      ->upstream_cx_tx_bytes_buffered_.set(1024 * 1024 * 15);
   expectCreateConnection();
   EXPECT_CALL(*connection_, write(BufferStringEqual("envoy.test_counter:1|c\n"), _));
   sink_->flush(snapshot_);
 
   // Raise and make sure we don't write and kill connection.
   cluster_manager_.active_clusters_["fake_cluster"]
-      ->info_->stats()
-      .upstream_cx_tx_bytes_buffered_.set(1024 * 1024 * 17);
+      ->info_->trafficStats()
+      ->upstream_cx_tx_bytes_buffered_.set(1024 * 1024 * 17);
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
   sink_->flush(snapshot_);
 

@@ -42,6 +42,7 @@ JwtProvider
 * *from_params*: extract JWT from query parameters.
 * *from_cookies*: extract JWT from HTTP request cookies.
 * *forward_payload_header*: forward the JWT payload in the specified HTTP header.
+* *claim_to_headers*: copy JWT claim to HTTP header.
 * *jwt_cache_config*: Enables JWT cache, its size can be specified by *jwt_cache_size*. Only valid JWT tokens are cached.
 
 Default Extract Location
@@ -246,3 +247,29 @@ Above config uses more complex *group* requirements:
 
 * The first *rule* specifies *requires_any*; if any of **provider1** or **provider2** requirement is satisfied, the request is OK to proceed.
 * The second *rule* specifies *requires_all*; only if both **provider1** and **provider2** requirements are satisfied, the request is OK to proceed.
+
+Copy validated JWT claims to HTTP request headers example
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If a JWT is valid, you can add some of its claims of type (string, integer, boolean) to a new HTTP header to pass to the upstream. You can specify claims and headers in
+`claim_to_headers` field. Nested claims are also supported.
+
+The field :ref:`claim_to_headers <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.claim_to_headers>` is a repeat of message :ref:`JWTClaimToHeader <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JWTClaimToHeader>` which has two fields:
+
+* Field *header_name* specifies the name of new http header reserved for jwt claim. If this header is already present with some other value then it will be replaced with the claim value. If the claim value doesn't exist then this header wouldn't be available for any other value.
+* Field *claim_name* specifies the claim from verified jwt token.
+
+.. code-block:: yaml
+
+  providers:
+    provider_name2:
+      issuer: https://example2.com
+      claim_to_headers:
+      - header_name: x-jwt-claim-sub
+        claim_name: sub
+      - header_name: x-jwt-claim-nested-key
+        claim_name: nested.claim.key
+
+JWT claim ("sub" and "nested.claim.key") will be added to HTTP headers as following format::
+    x-jwt-claim-sub: <JWT Claim>
+    x-jwt-claim-nested-key: <JWT Claim>

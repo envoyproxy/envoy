@@ -21,6 +21,7 @@
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/matching/data_impl.h"
+#include "source/common/http/utility.h"
 #include "source/common/local_reply/local_reply.h"
 #include "source/common/matcher/matcher.h"
 #include "source/common/protobuf/utility.h"
@@ -43,16 +44,17 @@ struct ActiveStreamFilterBase;
  */
 struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
                                 Logger::Loggable<Logger::Id::http> {
-  ActiveStreamFilterBase(FilterManager& parent, bool dual_filter, FilterContext filter_context)
+  ActiveStreamFilterBase(FilterManager& parent, bool is_encoder_decoder_filter,
+                         FilterContext filter_context)
       : parent_(parent), iteration_state_(IterationState::Continue),
         filter_context_(std::move(filter_context)), iterate_from_current_filter_(false),
         headers_continued_(false), continued_1xx_headers_(false), end_stream_(false),
-        dual_filter_(dual_filter), decode_headers_called_(false), encode_headers_called_(false) {}
+        is_encoder_decoder_filter_(is_encoder_decoder_filter), processed_headers_(false) {}
 
   // Functions in the following block are called after the filter finishes processing
   // corresponding data. Those functions handle state updates and data storage (if needed)
   // according to the status returned by filter's callback functions.
-  bool commonHandleAfter1xxHeadersCallback(FilterHeadersStatus status);
+  bool commonHandleAfter1xxHeadersCallback(Filter1xxHeadersStatus status);
   bool commonHandleAfterHeadersCallback(FilterHeadersStatus status, bool& end_stream);
   bool commonHandleAfterDataCallback(FilterDataStatus status, Buffer::Instance& provided_data,
                                      bool& buffer_was_streaming);
@@ -157,9 +159,9 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   bool continued_1xx_headers_ : 1;
   // If true, end_stream is called for this filter.
   bool end_stream_ : 1;
-  const bool dual_filter_ : 1;
-  bool decode_headers_called_ : 1;
-  bool encode_headers_called_ : 1;
+  const bool is_encoder_decoder_filter_ : 1;
+  // If true, the filter has processed headers.
+  bool processed_headers_ : 1;
 };
 
 /**
@@ -169,8 +171,8 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
                                    public StreamDecoderFilterCallbacks,
                                    LinkedObject<ActiveStreamDecoderFilter> {
   ActiveStreamDecoderFilter(FilterManager& parent, StreamDecoderFilterSharedPtr filter,
-                            bool dual_filter, FilterContext filter_context)
-      : ActiveStreamFilterBase(parent, dual_filter, std::move(filter_context)),
+                            bool is_encoder_decoder_filter, FilterContext filter_context)
+      : ActiveStreamFilterBase(parent, is_encoder_decoder_filter, std::move(filter_context)),
         handle_(std::move(filter)) {
     handle_->setDecoderFilterCallbacks(*this);
   }
@@ -263,8 +265,8 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
                                    public StreamEncoderFilterCallbacks,
                                    LinkedObject<ActiveStreamEncoderFilter> {
   ActiveStreamEncoderFilter(FilterManager& parent, StreamEncoderFilterSharedPtr filter,
-                            bool dual_filter, FilterContext filter_context)
-      : ActiveStreamFilterBase(parent, dual_filter, std::move(filter_context)),
+                            bool is_encoder_decoder_filter, FilterContext filter_context)
+      : ActiveStreamFilterBase(parent, is_encoder_decoder_filter, std::move(filter_context)),
         handle_(std::move(filter)) {
     handle_->setEncoderFilterCallbacks(*this);
   }
@@ -675,7 +677,7 @@ public:
 
     for (auto& filter : encoder_filters_) {
       // Do not call onStreamComplete twice for dual registered filters.
-      if (!filter->dual_filter_) {
+      if (!filter->is_encoder_decoder_filter_) {
         filter->handle_->onStreamComplete();
       }
     }
@@ -690,7 +692,7 @@ public:
 
     for (auto& filter : encoder_filters_) {
       // Do not call on destroy twice for dual registered filters.
-      if (!filter->dual_filter_) {
+      if (!filter->is_encoder_decoder_filter_) {
         filter->handle_->onDestroy();
       }
     }
@@ -743,6 +745,16 @@ public:
                               const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
                               const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                               absl::string_view details) PURE;
+  /**
+   * Executes a prepared, but not yet propagated, local reply.
+   * Prepared local replies can occur in the decoder filter chain iteration.
+   */
+  virtual void executeLocalReplyIfPrepared() PURE;
+
+  /**
+   * Whether the Filter Manager has a prepared local reply that it has not sent.
+   */
+  virtual bool hasPreparedLocalReply() const PURE;
 
   // Possibly increases buffer_limit_ to the value of limit.
   void setBufferLimit(uint32_t limit);
@@ -1005,6 +1017,10 @@ private:
       // Used to indicate that we're processing the final [En|De]codeData frame,
       // i.e. end_stream = true
       static constexpr uint32_t LastDataFrame = 0x80;
+
+      // Masks for filter call state.
+      static constexpr uint32_t IsDecodingMask = DecodeHeaders | DecodeData | DecodeTrailers;
+      static constexpr uint32_t IsEncodingMask = EncodeHeaders | Encode1xxHeaders | EncodeData | EncodeTrailers;
     };
   // clang-format on
 
@@ -1029,7 +1045,13 @@ public:
                       proxy_100_continue, buffer_limit, filter_chain_factory),
         stream_info_(protocol, time_source, connection.connectionInfoProviderSharedPtr(),
                      parent_filter_state, filter_state_life_span),
-        local_reply_(local_reply) {}
+        local_reply_(local_reply),
+        avoid_reentrant_filter_invocation_during_local_reply_(Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.http_filter_avoid_reentrant_local_reply")) {}
+  ~DownstreamFilterManager() override {
+    ASSERT(prepared_local_reply_ == nullptr,
+           "Filter Manager destroyed without executing prepared local reply");
+  }
 
   // TODO(snowp): This should probably return a StreamInfo instead of the impl.
   StreamInfo::StreamInfoImpl& streamInfo() override { return stream_info_; }
@@ -1050,23 +1072,6 @@ public:
                       const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                       absl::string_view details) override;
-  /**
-   * Sends a local reply by constructing a response and passing it through all the encoder
-   * filters. The resulting response will be passed out via the FilterManagerCallbacks.
-   */
-  void sendLocalReplyViaFilterChain(
-      bool is_grpc_request, Code code, absl::string_view body,
-      const std::function<void(ResponseHeaderMap& headers)>& modify_headers, bool is_head_request,
-      const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details);
-
-  /**
-   * Sends a local reply by constructing a response and skipping the encoder filters. The
-   * resulting response will be passed out via the FilterManagerCallbacks.
-   */
-  void sendDirectLocalReply(Code code, absl::string_view body,
-                            const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
-                            bool is_head_request,
-                            const absl::optional<Grpc::Status::GrpcStatus> grpc_status);
 
   /**
    * Whether remote processing has been marked as complete.
@@ -1079,8 +1084,45 @@ public:
   }
 
 private:
+  /**
+   * Sends a local reply by constructing a response and passing it through all the encoder
+   * filters. The resulting response will be passed out via the FilterManagerCallbacks.
+   * This will be deprecated in favor of prepareLocalReplyViaFilterChain.
+   */
+  void sendLocalReplyViaFilterChain(
+      bool is_grpc_request, Code code, absl::string_view body,
+      const std::function<void(ResponseHeaderMap& headers)>& modify_headers, bool is_head_request,
+      const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details);
+
+  /**
+   * Prepares a local reply that will be sent along the encoder filters in
+   * executeLocalReplyViaFilterChain.
+   */
+  void prepareLocalReplyViaFilterChain(
+      bool is_grpc_request, Code code, absl::string_view body,
+      const std::function<void(ResponseHeaderMap& headers)>& modify_headers, bool is_head_request,
+      const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details);
+
+  /**
+   * Executes a prepared local reply along the encoder filters.
+   */
+  void executeLocalReplyIfPrepared() override;
+
+  bool hasPreparedLocalReply() const override { return prepared_local_reply_ != nullptr; }
+
+  /**
+   * Sends a local reply by constructing a response and skipping the encoder filters. The
+   * resulting response will be passed out via the FilterManagerCallbacks.
+   */
+  void sendDirectLocalReply(Code code, absl::string_view body,
+                            const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
+                            bool is_head_request,
+                            const absl::optional<Grpc::Status::GrpcStatus> grpc_status);
+
   OverridableRemoteConnectionInfoSetterStreamInfo stream_info_;
   const LocalReply::LocalReply& local_reply_;
+  const bool avoid_reentrant_filter_invocation_during_local_reply_;
+  Utility::PreparedLocalReplyPtr prepared_local_reply_{nullptr};
 };
 
 } // namespace Http

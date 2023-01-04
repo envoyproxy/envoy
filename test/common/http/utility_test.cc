@@ -27,6 +27,28 @@ using testing::Return;
 
 namespace Envoy {
 namespace Http {
+namespace {
+
+void sendLocalReplyTestHelper(const bool& is_reset, StreamDecoderFilterCallbacks& callbacks,
+                              const Utility::LocalReplyData& local_reply_data) {
+  absl::string_view details;
+  if (callbacks.streamInfo().responseCodeDetails().has_value()) {
+    details = callbacks.streamInfo().responseCodeDetails().value();
+  };
+
+  Utility::sendLocalReply(
+      is_reset,
+      Utility::EncodeFunctions{nullptr, nullptr,
+                               [&](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
+                                 callbacks.encodeHeaders(std::move(headers), end_stream, details);
+                               },
+                               [&](Buffer::Instance& data, bool end_stream) -> void {
+                                 callbacks.encodeData(data, end_stream);
+                               }},
+      local_reply_data);
+}
+
+} // namespace
 
 TEST(HttpUtility, parseQueryString) {
   EXPECT_EQ(Utility::QueryParams(), Utility::parseQueryString("/hello"));
@@ -843,7 +865,7 @@ TEST(HttpUtility, SendLocalReply) {
   EXPECT_CALL(callbacks, encodeHeaders_(_, false));
   EXPECT_CALL(callbacks, encodeData(_, true));
   EXPECT_CALL(callbacks, streamInfo());
-  Utility::sendLocalReply(
+  sendLocalReplyTestHelper(
       is_reset, callbacks,
       Utility::LocalReplyData{false, Http::Code::PayloadTooLarge, "large", absl::nullopt, false});
 }
@@ -862,7 +884,7 @@ TEST(HttpUtility, SendLocalGrpcReply) {
         EXPECT_NE(headers.GrpcMessage(), nullptr);
         EXPECT_EQ(headers.getGrpcMessageValue(), "large");
       }));
-  Utility::sendLocalReply(
+  sendLocalReplyTestHelper(
       is_reset, callbacks,
       Utility::LocalReplyData{true, Http::Code::PayloadTooLarge, "large", absl::nullopt, false});
 }
@@ -881,7 +903,7 @@ TEST(HttpUtility, SendLocalGrpcReplyGrpcStatusAlreadyExists) {
         EXPECT_NE(headers.GrpcMessage(), nullptr);
         EXPECT_EQ(headers.getGrpcMessageValue(), "large");
       }));
-  Utility::sendLocalReply(
+  sendLocalReplyTestHelper(
       is_reset, callbacks,
       Utility::LocalReplyData{true, Http::Code::PayloadTooLarge, "large",
                               Grpc::Status::WellKnownGrpcStatus::InvalidArgument, false});
@@ -940,7 +962,7 @@ TEST(HttpUtility, SendLocalGrpcReplyWithUpstreamJsonPayload) {
         const auto& encoded = Utility::PercentEncoding::encode(json);
         EXPECT_EQ(headers.getGrpcMessageValue(), encoded);
       }));
-  Utility::sendLocalReply(
+  sendLocalReplyTestHelper(
       is_reset, callbacks,
       Utility::LocalReplyData{true, Http::Code::Unauthorized, json, absl::nullopt, false});
 }
@@ -955,7 +977,7 @@ TEST(HttpUtility, RateLimitedGrpcStatus) {
         EXPECT_EQ(headers.getGrpcStatusValue(),
                   std::to_string(enumToInt(Grpc::Status::WellKnownGrpcStatus::Unavailable)));
       }));
-  Utility::sendLocalReply(
+  sendLocalReplyTestHelper(
       false, callbacks,
       Utility::LocalReplyData{true, Http::Code::TooManyRequests, "", absl::nullopt, false});
 
@@ -965,7 +987,7 @@ TEST(HttpUtility, RateLimitedGrpcStatus) {
         EXPECT_EQ(headers.getGrpcStatusValue(),
                   std::to_string(enumToInt(Grpc::Status::WellKnownGrpcStatus::ResourceExhausted)));
       }));
-  Utility::sendLocalReply(
+  sendLocalReplyTestHelper(
       false, callbacks,
       Utility::LocalReplyData{true, Http::Code::TooManyRequests, "",
                               absl::make_optional<Grpc::Status::GrpcStatus>(
@@ -982,7 +1004,7 @@ TEST(HttpUtility, SendLocalReplyDestroyedEarly) {
     is_reset = true;
   }));
   EXPECT_CALL(callbacks, encodeData(_, true)).Times(0);
-  Utility::sendLocalReply(
+  sendLocalReplyTestHelper(
       is_reset, callbacks,
       Utility::LocalReplyData{false, Http::Code::PayloadTooLarge, "large", absl::nullopt, false});
 }
@@ -995,7 +1017,7 @@ TEST(HttpUtility, SendLocalReplyHeadRequest) {
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ(headers.getContentLengthValue(), fmt::format("{}", strlen("large")));
       }));
-  Utility::sendLocalReply(
+  sendLocalReplyTestHelper(
       is_reset, callbacks,
       Utility::LocalReplyData{false, Http::Code::PayloadTooLarge, "large", absl::nullopt, true});
 }
@@ -1177,8 +1199,7 @@ num_retries: 10
 
   envoy::config::core::v3::RetryPolicy core_retry_policy2;
   TestUtility::loadFromYaml(core_policy2, core_retry_policy2);
-  EXPECT_THROW_WITH_MESSAGE(Utility::convertCoreToRouteRetryPolicy(core_retry_policy2, "5xx"),
-                            EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(Utility::validateCoreRetryPolicy(core_retry_policy2), EnvoyException,
                             "max_interval must be greater than or equal to the base_interval");
 }
 

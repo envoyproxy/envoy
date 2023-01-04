@@ -47,18 +47,21 @@ public:
     // Create counters
     for (uint64_t idx = 0; idx < num_stats; ++idx) {
       auto stat_name = pool_.add(absl::StrCat("counter.", idx));
-      stats_store_.counterFromStatName(stat_name).inc();
+      stats_store_.rootScope()->counterFromStatName(stat_name).inc();
     }
     // Create gauges
     for (uint64_t idx = 0; idx < num_stats; ++idx) {
       auto stat_name = pool_.add(absl::StrCat("gauge.", idx));
-      stats_store_.gaugeFromStatName(stat_name, Stats::Gauge::ImportMode::NeverImport).set(idx);
+      stats_store_.rootScope()
+          ->gaugeFromStatName(stat_name, Stats::Gauge::ImportMode::NeverImport)
+          .set(idx);
     }
 
     // Create text readouts
     for (uint64_t idx = 0; idx < num_stats; ++idx) {
       auto stat_name = pool_.add(absl::StrCat("text_readout.", idx));
-      stats_store_.textReadoutFromStatName(stat_name).set(absl::StrCat("text_readout.", idx));
+      stats_store_.rootScope()->textReadoutFromStatName(stat_name).set(
+          absl::StrCat("text_readout.", idx));
     }
 
     // Create histograms

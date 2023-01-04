@@ -73,7 +73,7 @@ public:
     encoder_filter_ = new NiceMock<MockStreamEncoderFilter>();
 
     EXPECT_CALL(filter_factory_, createFilterChain(_))
-        .WillOnce(Invoke([this](FilterChainManager& manager) -> void {
+        .WillOnce(Invoke([this](FilterChainManager& manager) -> bool {
           FilterFactoryCb decoder_filter_factory = [this](FilterChainFactoryCallbacks& callbacks) {
             callbacks.addStreamDecoderFilter(StreamDecoderFilterSharedPtr{decoder_filter_});
           };
@@ -83,6 +83,7 @@ public:
 
           manager.applyFilterFactoryCb({}, decoder_filter_factory);
           manager.applyFilterFactoryCb({}, encoder_filter_factory);
+          return true;
         }));
     EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
         .WillOnce(Invoke([this](StreamDecoderFilterCallbacks& callbacks) -> void {
@@ -93,8 +94,7 @@ public:
     EXPECT_CALL(filter_factory_, createUpgradeFilterChain("WebSocket", _, _))
         .WillRepeatedly(Invoke([&](absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
                                    FilterChainManager& manager) -> bool {
-          filter_factory_.createFilterChain(manager);
-          return true;
+          return filter_factory_.createFilterChain(manager);
         }));
   }
 
@@ -211,15 +211,19 @@ public:
   originalIpDetectionExtensions() const override {
     return ip_detection_extensions_;
   }
+  const std::vector<Http::EarlyHeaderMutationPtr>& earlyHeaderMutationExtensions() const override {
+    return early_header_mutations_;
+  }
   uint64_t maxRequestsPerConnection() const override { return 0; }
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return proxy_status_config_.get();
   }
-  Http::HeaderValidatorPtr makeHeaderValidator(Protocol, StreamInfo::StreamInfo&) override {
+  Http::HeaderValidatorPtr makeHeaderValidator(Protocol) override {
     // TODO(yanavlasov): fuzz test interface should use the default validator, although this could
     // be changed too
     return nullptr;
   }
+  bool appendXForwardedPort() const override { return false; }
 
   const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
       config_;
@@ -267,6 +271,7 @@ public:
   bool normalize_path_{true};
   LocalReply::LocalReplyPtr local_reply_;
   std::vector<Http::OriginalIPDetectionSharedPtr> ip_detection_extensions_{};
+  std::vector<Http::EarlyHeaderMutationPtr> early_header_mutations_;
   std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;
 };
 

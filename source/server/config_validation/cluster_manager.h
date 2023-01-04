@@ -21,7 +21,7 @@ public:
   using ProdClusterManagerFactory::ProdClusterManagerFactory;
 
   explicit ValidationClusterManagerFactory(
-      Server::Admin& admin, Runtime::Loader& runtime, Stats::Store& stats,
+      OptRef<Server::Admin> admin, Runtime::Loader& runtime, Stats::Store& stats,
       ThreadLocal::Instance& tls, LazyCreateDnsResolver dns_resolver_fn,
       Ssl::ContextManager& ssl_context_manager, Event::Dispatcher& main_thread_dispatcher,
       const LocalInfo::LocalInfo& local_info, Secret::SecretManager& secret_manager,

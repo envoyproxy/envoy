@@ -51,7 +51,7 @@ void initializeUpstreamTlsContextConfig(
     yaml_plain += R"EOF(
     tls_certificates:
       certificate_chain:
-        filename: "{{ test_rundir }}/test/config/integration/certs/client2cert.pem"
+        filename: "{{ test_rundir }}/test/config/integration/certs/client2_chain.pem"
       private_key:
         filename: "{{ test_rundir }}/test/config/integration/certs/client2key.pem"
 )EOF";
@@ -133,7 +133,7 @@ createUpstreamSslContext(ContextManager& context_manager, Api::Api& api, bool us
   auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
       tls_context, mock_factory_ctx);
 
-  static Stats::Scope* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
+  static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
   if (!use_http3) {
     return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
         std::move(cfg), context_manager, *upstream_stats_store, std::vector<std::string>{});
@@ -162,7 +162,7 @@ Network::DownstreamTransportSocketFactoryPtr createFakeUpstreamSslContext(
   auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
       tls_context, factory_context);
 
-  static Stats::Scope* upstream_stats_store = new Stats::IsolatedStoreImpl();
+  static auto* upstream_stats_store = new Stats::IsolatedStoreImpl();
   return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
       std::move(cfg), context_manager, *upstream_stats_store, std::vector<std::string>{});
 }

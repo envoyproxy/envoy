@@ -291,19 +291,19 @@ void AdsIntegrationTest::testBasicFlow() {
 }
 
 envoy::admin::v3::ClustersConfigDump AdsIntegrationTest::getClustersConfigDump() {
-  auto message_ptr = test_server_->server().admin().getConfigTracker().getCallbacksMap().at(
+  auto message_ptr = test_server_->server().admin()->getConfigTracker().getCallbacksMap().at(
       "clusters")(Matchers::UniversalStringMatcher());
   return dynamic_cast<const envoy::admin::v3::ClustersConfigDump&>(*message_ptr);
 }
 
 envoy::admin::v3::ListenersConfigDump AdsIntegrationTest::getListenersConfigDump() {
-  auto message_ptr = test_server_->server().admin().getConfigTracker().getCallbacksMap().at(
+  auto message_ptr = test_server_->server().admin()->getConfigTracker().getCallbacksMap().at(
       "listeners")(Matchers::UniversalStringMatcher());
   return dynamic_cast<const envoy::admin::v3::ListenersConfigDump&>(*message_ptr);
 }
 
 envoy::admin::v3::RoutesConfigDump AdsIntegrationTest::getRoutesConfigDump() {
-  auto message_ptr = test_server_->server().admin().getConfigTracker().getCallbacksMap().at(
+  auto message_ptr = test_server_->server().admin()->getConfigTracker().getCallbacksMap().at(
       "routes")(Matchers::UniversalStringMatcher());
   return dynamic_cast<const envoy::admin::v3::RoutesConfigDump&>(*message_ptr);
 }

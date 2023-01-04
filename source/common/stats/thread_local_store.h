@@ -150,55 +150,19 @@ public:
 
   ThreadLocalStoreImpl(Allocator& alloc);
   ~ThreadLocalStoreImpl() override;
-
-  // Stats::Scope
-  Counter& counterFromStatNameWithTags(const StatName& name,
-                                       StatNameTagVectorOptConstRef tags) override {
-    return default_scope_->counterFromStatNameWithTags(name, tags);
-  }
-  Counter& counterFromString(const std::string& name) override {
-    return default_scope_->counterFromString(name);
-  }
-  ScopeSharedPtr createScope(const std::string& name) override;
-  ScopeSharedPtr scopeFromStatName(StatName name) override;
-  void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
-    return default_scope_->deliverHistogramToSinks(histogram, value);
-  }
-  Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                   Gauge::ImportMode import_mode) override {
-    return default_scope_->gaugeFromStatNameWithTags(name, tags, import_mode);
-  }
-  Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) override {
-    return default_scope_->gaugeFromString(name, import_mode);
-  }
-  Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                           Histogram::Unit unit) override {
-    return default_scope_->histogramFromStatNameWithTags(name, tags, unit);
-  }
-  Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) override {
-    return default_scope_->histogramFromString(name, unit);
-  }
-  TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
-                                               StatNameTagVectorOptConstRef tags) override {
-    return default_scope_->textReadoutFromStatNameWithTags(name, tags);
-  }
-  TextReadout& textReadoutFromString(const std::string& name) override {
-    return default_scope_->textReadoutFromString(name);
-  }
-  NullGaugeImpl& nullGauge(const std::string&) override { return null_gauge_; }
+  // Stats::Store
+  NullCounterImpl& nullCounter() override { return null_counter_; }
+  NullGaugeImpl& nullGauge() override { return null_gauge_; }
+  ScopeSharedPtr rootScope() override { return default_scope_; }
+  ConstScopeSharedPtr constRootScope() const override { return default_scope_; }
   const SymbolTable& constSymbolTable() const override { return alloc_.constSymbolTable(); }
   SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
-  const TagProducer& tagProducer() const { return *tag_producer_; }
-  CounterOptConstRef findCounter(StatName name) const override;
-  GaugeOptConstRef findGauge(StatName name) const override;
-  HistogramOptConstRef findHistogram(StatName name) const override;
-  TextReadoutOptConstRef findTextReadout(StatName name) const override;
+
   bool iterate(const IterateFn<Counter>& fn) const override { return iterHelper(fn); }
   bool iterate(const IterateFn<Gauge>& fn) const override { return iterHelper(fn); }
   bool iterate(const IterateFn<Histogram>& fn) const override { return iterHelper(fn); }
   bool iterate(const IterateFn<TextReadout>& fn) const override { return iterHelper(fn); }
 
-  // Stats::Store
   std::vector<CounterSharedPtr> counters() const override;
   std::vector<GaugeSharedPtr> gauges() const override;
   std::vector<TextReadoutSharedPtr> textReadouts() const override;
@@ -221,6 +185,7 @@ public:
                            ThreadLocal::Instance& tls) override;
   void shutdownThreading() override;
   void mergeHistograms(PostMergeCb merge_cb) override;
+  void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override;
 
   Histogram& tlsHistogram(ParentHistogramImpl& parent, uint64_t id);
 
@@ -244,6 +209,8 @@ public:
 
   bool decHistogramRefCount(ParentHistogramImpl& histogram, std::atomic<uint32_t>& ref_count);
   void releaseHistogramCrossThread(uint64_t histogram_id);
+
+  const TagProducer& tagProducer() const { return *tag_producer_; }
 
 private:
   friend class ThreadLocalStoreTestingPeer;
@@ -302,7 +269,6 @@ private:
     // Stats::Scope
     Counter& counterFromStatNameWithTags(const StatName& name,
                                          StatNameTagVectorOptConstRef tags) override;
-    void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override;
     Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                      Gauge::ImportMode import_mode) override;
     Histogram& histogramFromStatNameWithTags(const StatName& name,
@@ -310,13 +276,8 @@ private:
                                              Histogram::Unit unit) override;
     TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
                                                  StatNameTagVectorOptConstRef tags) override;
-    ScopeSharedPtr createScope(const std::string& name) override {
-      return parent_.createScope(symbolTable().toString(prefix_.statName()) + "." + name);
-    }
-    ScopeSharedPtr scopeFromStatName(StatName name) override {
-      SymbolTable::StoragePtr joined = symbolTable().join({prefix_.statName(), name});
-      return parent_.scopeFromStatName(StatName(joined.get()));
-    }
+    ScopeSharedPtr createScope(const std::string& name) override;
+    ScopeSharedPtr scopeFromStatName(StatName name) override;
     const SymbolTable& constSymbolTable() const final { return parent_.constSymbolTable(); }
     SymbolTable& symbolTable() final { return parent_.symbolTable(); }
 
@@ -337,8 +298,6 @@ private:
       StatNameManagedStorage storage(name, symbolTable());
       return textReadoutFromStatName(storage.statName());
     }
-
-    NullGaugeImpl& nullGauge(const std::string&) override { return parent_.null_gauge_; }
 
     template <class StatMap, class StatFn> bool iterHelper(StatFn fn, const StatMap& map) const {
       for (auto& iter : map) {
@@ -378,6 +337,8 @@ private:
     bool iterateLockHeld(const IterateFn<TextReadout>& fn) const {
       return iterHelper(fn, centralCacheLockHeld()->text_readouts_);
     }
+    ThreadLocalStoreImpl& store() override { return parent_; }
+    const ThreadLocalStoreImpl& constStore() const override { return parent_; }
 
     // NOTE: The find methods assume that `name` is fully-qualified.
     // Implementations will not add the scope prefix.
@@ -510,8 +471,6 @@ private:
         [fn](const ScopeImplSharedPtr& scope) -> bool { return scope->iterateLockHeld(fn); });
   }
 
-  StatName prefix() const override { return StatName(); }
-
   std::string getTagsForName(const std::string& name, TagVector& tags) const;
   void clearScopesFromCaches();
   void clearHistogramsFromCaches();
@@ -530,6 +489,7 @@ private:
                                  StatNameStorageSet& central_rejected_stats,
                                  StatNameHashSet* tls_rejected_stats);
   TlsCache& tlsCache() { return **tls_cache_; }
+  void addScope(std::shared_ptr<ScopeImpl>& new_scope);
 
   OptRef<SinkPredicates> sink_predicates_;
   Allocator& alloc_;

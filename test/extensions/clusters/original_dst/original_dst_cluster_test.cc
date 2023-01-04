@@ -72,12 +72,11 @@ public:
   void setupFromYaml(const std::string& yaml) { setup(parseClusterFromV3Yaml(yaml)); }
 
   void setup(const envoy::config::cluster::v3::Cluster& cluster_config) {
-    NiceMock<MockClusterManager> cm;
     Envoy::Stats::ScopeSharedPtr scope = stats_store_.createScope(fmt::format(
         "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                               : cluster_config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        server_context_, ssl_context_manager_, *scope, cm, stats_store_, validation_visitor_);
+        server_context_, ssl_context_manager_, *scope, cm_, stats_store_, validation_visitor_);
     cluster_ = std::make_shared<OriginalDstCluster>(server_context_, cluster_config, runtime_,
                                                     factory_context, std::move(scope), false);
     priority_update_cb_ = cluster_->prioritySet().addPriorityUpdateCb(
@@ -86,7 +85,7 @@ public:
         });
     cluster_->initialize([&]() -> void { initialized_.ready(); });
   }
-
+  NiceMock<MockClusterManager> cm_;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   Stats::TestUtil::TestStore stats_store_;
   Ssl::MockContextManager ssl_context_manager_;

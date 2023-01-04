@@ -160,8 +160,8 @@ ResponsePtr DubboMessageCreator::response(Status status, const Request& origin_r
 }
 
 CodecFactoryPtr
-DubboCodecFactoryConfig::createFactory(const Protobuf::Message&,
-                                       Envoy::Server::Configuration::FactoryContext&) {
+DubboCodecFactoryConfig::createCodecFactory(const Protobuf::Message&,
+                                            Envoy::Server::Configuration::FactoryContext&) {
   return std::make_unique<DubboCodecFactory>();
 }
 

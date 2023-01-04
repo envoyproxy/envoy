@@ -4,7 +4,6 @@
 
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/quic_network_connection.h"
-#include "source/server/connection_handler_impl.h"
 
 #include "quiche/quic/core/quic_connection.h"
 
@@ -26,6 +25,7 @@ public:
   // quic::QuicConnection
   // Overridden to set connection_socket_ with initialized self address and retrieve filter chain.
   bool OnPacketHeader(const quic::QuicPacketHeader& header) override;
+  void OnCanWrite() override;
 
   bool deferSend() const { return defer_send_; }
 

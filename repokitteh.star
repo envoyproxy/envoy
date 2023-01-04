@@ -18,10 +18,28 @@ use(
       "github_status_label": "v2 freeze violations",
     },
     {
+       "owner": "envoyproxy/coverage-shephards",
+       "path": "(test/per_file_coverage.sh)",
+       "github_status_label": "changes to Envoy coverage scripts",
+       "auto_assign": True,
+    },
+    {
+       "owner": "envoyproxy/runtime-guard-changes",
+       "path": "(source/common/runtime/runtime_features.cc)",
+       "github_status_label": "changes to Envoy runtime guards",
+    },
+    {
       "owner": "envoyproxy/api-shepherds!",
       "path": "(api/envoy/|docs/root/api-docs/)",
       "label": "api",
       "github_status_label": "any API change",
+      "auto_assign": True,
+    },
+    {
+      "owner": "envoyproxy/mobile-maintainers",
+      "path": "(mobile/)",
+      "label": "mobile",
+      "github_status_label": "changes to Envoy Mobile",
       "auto_assign": True,
     },
     {

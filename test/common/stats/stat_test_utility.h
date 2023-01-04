@@ -120,19 +120,48 @@ public:
 // and symbol strings as production.
 class TestStore : public SymbolTableProvider, public IsolatedStoreImpl {
 public:
-  TestStore() : IsolatedStoreImpl(*global_symbol_table_) {}
+  TestStore();
 
   // Constructs a store using a symbol table, allowing for explicit sharing.
-  explicit TestStore(SymbolTable& symbol_table) : IsolatedStoreImpl(symbol_table) {}
+  explicit TestStore(SymbolTable& symbol_table);
 
-  Counter& counter(const std::string& name) { return counterFromString(name); }
+  Counter& counter(const std::string& name) { return rootScope()->counterFromString(name); }
   Gauge& gauge(const std::string& name, Gauge::ImportMode import_mode) {
-    return gaugeFromString(name, import_mode);
+    return rootScope()->gaugeFromString(name, import_mode);
   }
   Histogram& histogram(const std::string& name, Histogram::Unit unit) {
-    return histogramFromString(name, unit);
+    return rootScope()->histogramFromString(name, unit);
   }
-  TextReadout& textReadout(const std::string& name) { return textReadoutFromString(name); }
+  TextReadout& textReadout(const std::string& name) {
+    return rootScope()->textReadoutFromString(name);
+  }
+  void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
+    histogram_values_map_[histogram.name()].push_back(value);
+  }
+
+  // New APIs available for tests.
+  CounterOptConstRef findCounterByString(const std::string& name) const;
+  GaugeOptConstRef findGaugeByString(const std::string& name) const;
+  HistogramOptConstRef findHistogramByString(const std::string& name) const;
+  std::vector<uint64_t> histogramValues(const std::string& name, bool clear);
+
+protected:
+  ScopeSharedPtr makeScope(StatName name) override;
+
+private:
+  friend class TestScope;
+
+  // The Store keeps a flat map of all the counters in all scopes.
+  absl::flat_hash_map<std::string, Counter*> counter_map_;
+  absl::flat_hash_map<std::string, Gauge*> gauge_map_;
+  absl::flat_hash_map<std::string, Histogram*> histogram_map_;
+  absl::flat_hash_map<std::string, std::vector<uint64_t>> histogram_values_map_;
+};
+
+class TestScope : public IsolatedScopeImpl {
+public:
+  TestScope(const std::string& prefix, TestStore& store);
+  TestScope(StatName prefix, TestStore& store);
 
   // Override the Stats::Store methods for name-based lookup of stats, to use
   // and update the string-maps in this class. Note that IsolatedStoreImpl
@@ -143,37 +172,28 @@ public:
   Counter& counterFromString(const std::string& name) override;
   Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) override;
   Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) override;
-  Counter& counterFromStatNameWithTags(const StatName& name,
+  Counter& counterFromStatNameWithTags(const StatName& stat_name,
                                        StatNameTagVectorOptConstRef tags) override;
-  Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
+  Gauge& gaugeFromStatNameWithTags(const StatName& stat_name, StatNameTagVectorOptConstRef tags,
                                    Gauge::ImportMode import_mode) override;
-  Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
+  Histogram& histogramFromStatNameWithTags(const StatName& stat_name,
+                                           StatNameTagVectorOptConstRef tags,
                                            Histogram::Unit unit) override;
-
-  // New APIs available for tests.
-  CounterOptConstRef findCounterByString(const std::string& name) const;
-  GaugeOptConstRef findGaugeByString(const std::string& name) const;
-  HistogramOptConstRef findHistogramByString(const std::string& name) const;
-
-  void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
-    histogram_values_map_[histogram.name()].push_back(value);
-  }
-
-  std::vector<uint64_t> histogramValues(const std::string& name, bool clear) {
-    auto it = histogram_values_map_.find(name);
-    ASSERT(it != histogram_values_map_.end(), absl::StrCat("Couldn't find histogram ", name));
-    std::vector<uint64_t> copy = it->second;
-    if (clear) {
-      it->second.clear();
-    }
-    return copy;
-  }
+  TestStore& store() override { return store_; }
+  const TestStore& constStore() const override { return store_; }
 
 private:
-  absl::flat_hash_map<std::string, Counter*> counter_map_;
-  absl::flat_hash_map<std::string, Gauge*> gauge_map_;
-  absl::flat_hash_map<std::string, Histogram*> histogram_map_;
-  absl::flat_hash_map<std::string, std::vector<uint64_t>> histogram_values_map_;
+  static std::string addDot(const std::string& prefix) {
+    if (prefix.empty() || prefix[prefix.size() - 1] == '.') {
+      return prefix;
+    }
+    return prefix + ".";
+  }
+
+  void verifyConsistency(StatName ref_stat_name, StatName stat_name);
+
+  TestStore& store_;
+  const std::string prefix_str_;
 };
 
 // Compares the memory consumed against an exact expected value, but only on

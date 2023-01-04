@@ -112,7 +112,7 @@ public:
                                     Network::UdpReadFilterCallbacks&) override {}
 
   // Http::FilterChainFactory
-  void createFilterChain(Http::FilterChainManager& manager) const override;
+  bool createFilterChain(Http::FilterChainManager& manager, bool) const override;
   bool createUpgradeFilterChain(absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
                                 Http::FilterChainManager&) const override {
     return false;
@@ -198,9 +198,12 @@ public:
   originalIpDetectionExtensions() const override {
     return detection_extensions_;
   }
+  const std::vector<Http::EarlyHeaderMutationPtr>& earlyHeaderMutationExtensions() const override {
+    return early_header_mutations_;
+  }
   Http::Code request(absl::string_view path_and_query, absl::string_view method,
                      Http::ResponseHeaderMap& response_headers, std::string& body) override;
-  void closeSocket();
+  void closeSocket() override;
   void addListenerToHandler(Network::ConnectionHandler* handler) override;
 
   GenRequestFn createRequestFunction() const {
@@ -210,10 +213,11 @@ public:
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return proxy_status_config_.get();
   }
-  Http::HeaderValidatorPtr makeHeaderValidator(Http::Protocol, StreamInfo::StreamInfo&) override {
+  Http::HeaderValidatorPtr makeHeaderValidator(Http::Protocol) override {
     // TODO(yanavlasov): admin interface should use the default validator
     return nullptr;
   }
+  bool appendXForwardedPort() const override { return false; }
 
 private:
   friend class AdminTestingPeer;
@@ -494,6 +498,7 @@ private:
   const AdminInternalAddressConfig internal_address_config_;
   const LocalReply::LocalReplyPtr local_reply_;
   const std::vector<Http::OriginalIPDetectionSharedPtr> detection_extensions_{};
+  const std::vector<Http::EarlyHeaderMutationPtr> early_header_mutations_{};
   const absl::optional<std::string> scheme_{};
   const bool ignore_global_conn_limit_;
   std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;
