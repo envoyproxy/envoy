@@ -501,7 +501,7 @@ TEST_P(QuicHttpIntegrationTest, GetRequestAndEmptyResponse) {
 }
 
 TEST_P(QuicHttpIntegrationTest, GetPeerAndLocalCertsInfo) {
-  // These are not implmented yet, but configuring them shouldn't cause crash.
+  // These are not implemented yet, but configuring them shouldn't cause crash.
   useAccessLog("%DOWNSTREAM_PEER_CERT% %DOWNSTREAM_PEER_ISSUER% %DOWNSTREAM_PEER_SERIAL% "
                "%DOWNSTREAM_PEER_FINGERPRINT_1% %DOWNSTREAM_PEER_FINGERPRINT_256% "
                "%DOWNSTREAM_LOCAL_SUBJECT% %DOWNSTREAM_PEER_SUBJECT% %DOWNSTREAM_LOCAL_URI_SAN% "
