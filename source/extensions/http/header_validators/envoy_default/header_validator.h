@@ -131,6 +131,9 @@ protected:
    */
   HostHeaderValidationResult validateHostHeaderRegName(absl::string_view host);
 
+  // Common method for validating request or response trailers.
+  TrailerValidationResult validateTrailers(::Envoy::Http::HeaderMap& trailers);
+
   const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       config_;
   ::Envoy::Http::Protocol protocol_;
