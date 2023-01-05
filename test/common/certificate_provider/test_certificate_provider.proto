@@ -1,0 +1,7 @@
+// Provides protos for testing.
+syntax = "proto3";
+
+package test.common.certificate_provider;
+
+message TestCertificateProviderConfig {
+}
