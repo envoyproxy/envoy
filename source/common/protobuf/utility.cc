@@ -797,6 +797,35 @@ void MessageUtil::wireCast(const Protobuf::Message& src, Protobuf::Message& dst)
   }
 }
 
+std::string MessageUtil::sanitizeUtf8String(absl::string_view input) {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.service_sanitize_non_utf8_strings")) {
+    return std::string(input);
+  }
+
+  // This returns the original string if it was already valid, and returns a pointer to
+  // `result.data()` if it needed to coerce. The coerced string is always
+  // the same length as the source string.
+  //
+  // Initializing `result` to `input` ensures that `result` is correctly sized to receive the
+  // modified string, or in the case where no modification is needed it already contains the correct
+  // value, so `result` can be returned in both cases.
+  //
+  // The choice of '!' is somewhat arbitrary, but we wanted to avoid any character that has
+  // special semantic meaning in URLs or similar.
+  std::string result(input);
+  const char* sanitized = google::protobuf::internal::UTF8CoerceToStructurallyValid(
+      google::protobuf::StringPiece(input.data(), input.length()), result.data(), '!');
+  ASSERT(sanitized == result.data() || sanitized == input.data());
+
+  // Validate requirement that if the input string is returned from
+  // `UTF8CoerceToStructurallyValid`, no modification was made to result so it still contains the
+  // correct return value.
+  ASSERT(sanitized == result.data() || result == input);
+
+  return result;
+}
+
 ProtobufWkt::Value ValueUtil::loadFromYaml(const std::string& yaml) {
   TRY_ASSERT_MAIN_THREAD { return parseYamlNode(YAML::Load(yaml)); }
   END_TRY
