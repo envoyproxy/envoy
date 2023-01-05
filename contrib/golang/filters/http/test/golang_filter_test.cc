@@ -121,8 +121,8 @@ public:
     Event::SimulatedTimeSystem test_time;
     test_time.setSystemTime(std::chrono::microseconds(1583879145572237));
 
-    filter_ = std::make_unique<TestFilter>(server_factory_context_.grpcContext(), config_, 1,
-                                           Dso::DsoInstanceManager::getDsoInstanceByID(so_id));
+    filter_ =
+        std::make_unique<TestFilter>(config_, Dso::DsoInstanceManager::getDsoInstanceByID(so_id));
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }

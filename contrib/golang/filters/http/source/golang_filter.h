@@ -30,14 +30,12 @@ public:
   // TODO: delete config in Go
   virtual ~FilterConfig() = default;
 
-  const std::string& filterChain() const { return filter_chain_; }
   const std::string& soId() const { return so_id_; }
   const std::string& soPath() const { return so_path_; }
   const std::string& pluginName() const { return plugin_name_; }
   uint64_t getConfigId();
 
 private:
-  const std::string filter_chain_;
   const std::string plugin_name_;
   const std::string so_id_;
   const std::string so_path_;
@@ -101,12 +99,8 @@ class Filter : public Http::StreamFilter,
                Logger::Loggable<Logger::Id::http>,
                public AccessLog::Instance {
 public:
-  explicit Filter(Grpc::Context& context, FilterConfigSharedPtr config, uint64_t sid,
-                  Dso::DsoInstancePtr dynamic_lib)
-      : config_(config), dynamic_lib_(dynamic_lib), decoding_state_(*this), encoding_state_(*this),
-        context_(context), stream_id_(sid) {
-    UNREFERENCED_PARAMETER(context_);
-    UNREFERENCED_PARAMETER(stream_id_);
+  explicit Filter(FilterConfigSharedPtr config, Dso::DsoInstancePtr dynamic_lib)
+      : config_(config), dynamic_lib_(dynamic_lib), decoding_state_(*this), encoding_state_(*this) {
   }
 
   // Http::StreamFilterBase
@@ -144,14 +138,7 @@ public:
            const Http::ResponseTrailerMap* response_trailers,
            const StreamInfo::StreamInfo& stream_info) override;
 
-  void onStreamComplete() override;
-
-  // create metadata for golang.extension namespace
-  void addGolangMetadata(const std::string& k, const uint64_t v);
-
-  static std::atomic<uint64_t>& getGlobalStreamId() {
-    MUTABLE_CONSTRUCT_ON_FIRST_USE(std::atomic<uint64_t>, 0);
-  }
+  void onStreamComplete() override {}
 
   void continueStatus(GolangStatus status);
 
@@ -206,12 +193,6 @@ private:
   DecodingProcessorState decoding_state_;
   EncodingProcessorState encoding_state_;
 
-  Grpc::Context& context_;
-  uint64_t cost_time_decode_{0};
-  uint64_t cost_time_encode_{0};
-  uint64_t cost_time_mem_{0};
-  uint64_t stream_id_{0};
-
   httpRequestInternal* req_{nullptr};
 
   // lock for has_destroyed_ and the functions get/set/copy/remove/etc that operate on the
@@ -236,21 +217,6 @@ struct httpRequestInternal : httpRequest {
   std::string strValue;
   httpRequestInternal(std::weak_ptr<Filter> f) { filter_ = f; }
   std::weak_ptr<Filter> weakFilter() { return filter_; }
-};
-
-// used to count function execution time
-template <typename T = std::chrono::microseconds> struct Measure {
-  template <typename F, typename... Args> static typename T::rep execution(F func, Args&&... args) {
-    auto start = std::chrono::steady_clock::now(); // NO_CHECK_FORMAT(real_time)
-
-    func(std::forward<Args>(args)...);
-
-    auto duration = std::chrono::duration_cast<T>(
-        std::chrono::steady_clock::now() - // NO_CHECK_FORMAT(real_time)
-        start);
-
-    return duration.count();
-  }
 };
 
 } // namespace Golang

@@ -14,7 +14,7 @@ namespace Golang {
 
 Http::FilterFactoryCb GolangFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
-    const std::string&, Server::Configuration::FactoryContext& context) {
+    const std::string&, Server::Configuration::FactoryContext&) {
 
   FilterConfigSharedPtr config = std::make_shared<FilterConfig>(proto_config);
 
@@ -30,10 +30,9 @@ Http::FilterFactoryCb GolangFilterConfig::createFilterFactoryFromProtoTyped(
         fmt::format("golang_filter: load library failed: {} {}", config->soId(), config->soPath()));
   }
 
-  return [&context, config](Http::FilterChainFactoryCallbacks& callbacks) {
-    auto filter =
-        std::make_shared<Filter>(context.grpcContext(), config, (Filter::getGlobalStreamId())++,
-                                 Dso::DsoInstanceManager::getDsoInstanceByID(config->soId()));
+  return [config](Http::FilterChainFactoryCallbacks& callbacks) {
+    auto filter = std::make_shared<Filter>(
+        config, Dso::DsoInstanceManager::getDsoInstanceByID(config->soId()));
     callbacks.addStreamFilter(filter);
     callbacks.addAccessLogHandler(filter);
   };

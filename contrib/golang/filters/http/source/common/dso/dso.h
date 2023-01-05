@@ -63,12 +63,6 @@ public:
    */
   static DsoInstancePtr getDsoInstanceByID(std::string dso_id);
 
-  /**
-   * Get the full amount of dynamic library information.
-   * @return all so ids separated by commas.
-   */
-  static std::string show();
-
 private:
   using DsoMapType = std::map<std::string, DsoInstancePtr>;
   struct DsoStoreType {

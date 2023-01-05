@@ -32,17 +32,6 @@ DsoInstancePtr DsoInstanceManager::getDsoInstanceByID(std::string dso_id) {
   return nullptr;
 }
 
-std::string DsoInstanceManager::show() {
-  DsoStoreType& dsoStore = DsoInstanceManager::getDsoStore();
-  absl::ReaderMutexLock lock(&dsoStore.mutex_);
-  std::string ids = "";
-  for (auto& it : dsoStore.map_) {
-    ids += it.first;
-    ids += ",";
-  }
-  return ids;
-}
-
 template <typename T>
 bool dlsymInternal(T& fn, void* handler, const std::string name, const std::string symbol) {
   if (!handler) {

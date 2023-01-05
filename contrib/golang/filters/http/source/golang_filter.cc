@@ -195,20 +195,6 @@ void Filter::onDestroy() {
   dynamic_lib_->envoyGoFilterOnHttpDestroy(req_, int(reason));
 }
 
-void Filter::onStreamComplete() {
-  addGolangMetadata("cost_decode", cost_time_decode_);
-  addGolangMetadata("cost_encode", cost_time_encode_);
-  addGolangMetadata("cost_total", cost_time_decode_ + cost_time_encode_ + cost_time_mem_);
-}
-
-void Filter::addGolangMetadata(const std::string& k, const uint64_t v) {
-  ProtobufWkt::Struct value;
-  ProtobufWkt::Value val;
-  val.set_number_value(static_cast<double>(v));
-  (*value.mutable_fields())[k] = val;
-  decoding_state_.getFilterCallbacks()->streamInfo().setDynamicMetadata("golang.extension", value);
-}
-
 // access_log is executed before the log of the stream filter
 void Filter::log(const Http::RequestHeaderMap*, const Http::ResponseHeaderMap*,
                  const Http::ResponseTrailerMap*, const StreamInfo::StreamInfo&) {
