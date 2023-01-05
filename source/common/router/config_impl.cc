@@ -1036,7 +1036,7 @@ absl::optional<std::string> RouteEntryImplBase::currentUrlPathAfterRewriteWithMa
       return std::string(headers.getPathValue());
     }
 
-    return *std::move(new_path);
+    return path.replace(0, just_path.size(), new_path.value());
   }
 
   // There are no rewrites configured.
