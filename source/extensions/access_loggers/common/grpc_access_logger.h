@@ -93,8 +93,8 @@ protected:
   const Http::AsyncClient::RequestOptions opts_;
 
 private:
-  Http::AsyncClient::RequestOptions createRequestOptionsForRetry(
-      const absl::optional<envoy::config::core::v3::RetryPolicy>&& retry_policy) {
+  Http::AsyncClient::RequestOptions
+  createRequestOptionsForRetry(OptRef<const envoy::config::core::v3::RetryPolicy> retry_policy) {
     auto opt = Http::AsyncClient::RequestOptions();
 
     if (!retry_policy) {
