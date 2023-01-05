@@ -97,7 +97,7 @@ class GRPCStreamTest {
   fun `cancel calls a stream callback`() {
     val countDownLatch = CountDownLatch(1)
     val streamClient = MockStreamClient { stream ->
-      stream.onCancel = { 
+      stream.onCancel = {
         countDownLatch.countDown()
       }
     }
