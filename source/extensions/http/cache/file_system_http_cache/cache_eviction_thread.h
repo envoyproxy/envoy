@@ -4,10 +4,11 @@
 #include <memory>
 #include <vector>
 
-#include "source/common/api/os_sys_calls_impl.h"
-
 #include "absl/base/thread_annotations.h"
+#include "absl/container/flat_hash_set.h"
 #include "absl/synchronization/mutex.h"
+
+#include "envoy/thread/thread.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -70,15 +71,14 @@ private:
   // We must store the caches as unowned references so they can be destroyed
   // during config changes - that destruction is the only signal that a cache
   // instance should be removed.
-  std::set<FileSystemHttpCache*> caches_ ABSL_GUARDED_BY(cache_mu_);
-  Api::OsSysCalls& os_sys_calls_;
+  absl::flat_hash_set<FileSystemHttpCache*> caches_ ABSL_GUARDED_BY(cache_mu_);
 
   // Allow test access to waitForIdle for synchronization.
   friend class FileSystemCacheTestContext;
   bool idle_ ABSL_GUARDED_BY(mu_) = false;
   void waitForIdle();
 
-  // thread_ must be initialized last, as it starts a thread which can access other members.
+  Thread::ThreadFactory& thread_factory_;
   Thread::ThreadPtr thread_;
 };
 

@@ -183,7 +183,7 @@ public:
    * size thresholds, and if so, least recently touched files are erased to bring
    * it back under those thresholds.
    */
-  void maybeEvict(Api::OsSysCalls& os_sys_calls);
+  void maybeEvict();
 
 private:
   /**

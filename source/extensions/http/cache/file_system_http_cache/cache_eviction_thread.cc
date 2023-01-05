@@ -1,6 +1,6 @@
 #include "source/extensions/http/cache/file_system_http_cache/cache_eviction_thread.h"
 
-#include "source/common/api/os_sys_calls_impl.h"
+#include "envoy/thread/thread.h"
 #include "source/extensions/http/cache/file_system_http_cache/file_system_http_cache.h"
 
 namespace Envoy {
@@ -10,11 +10,13 @@ namespace Cache {
 namespace FileSystemHttpCache {
 
 CacheEvictionThread::CacheEvictionThread(Thread::ThreadFactory& thread_factory)
-    : os_sys_calls_(Api::OsSysCallsSingleton::get()),
-      thread_(thread_factory.createThread([this]() { work(); })) {}
+    : thread_factory_(thread_factory) {}
 
 void CacheEvictionThread::addCache(FileSystemHttpCache& cache) {
   absl::MutexLock lock(&cache_mu_);
+  if (caches_.empty()) {
+    thread_ = thread_factory_.createThread([this]() { work(); });
+  }
   bool inserted = caches_.emplace(&cache).second;
   ASSERT(inserted);
 }
@@ -46,8 +48,7 @@ bool CacheEvictionThread::waitForSignal() {
   // until idle_ is false again, so waitForIdle will not return until `signalled_`
   // stays false for the duration of an eviction cycle.
   idle_ = true;
-  auto cond = [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_) { return signalled_; };
-  mu_.Await(absl::Condition(&cond));
+  mu_.Await(absl::Condition(&signalled_));
   signalled_ = false;
   idle_ = false;
   return !terminating_;
@@ -57,7 +58,7 @@ void CacheEvictionThread::work() {
   while (waitForSignal()) {
     absl::MutexLock lock(&cache_mu_);
     for (FileSystemHttpCache* cache : caches_) {
-      cache->maybeEvict(os_sys_calls_);
+      cache->maybeEvict();
     }
   }
 }

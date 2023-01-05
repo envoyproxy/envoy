@@ -1,5 +1,6 @@
 #include "source/extensions/http/cache/file_system_http_cache/file_system_http_cache.h"
 
+#include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/filesystem/directory.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/extensions/http/cache/file_system_http_cache/cache_eviction_thread.h"
@@ -374,6 +375,9 @@ void FileSystemHttpCache::trackFileAdded(uint64_t file_size) {
   size_bytes_ += file_size;
   stats_.size_count_.inc();
   stats_.size_bytes_.add(file_size);
+  // Signalling the cache eviction thread doesn't necessarily do any eviction work - the
+  // thread will first check whether the configured cache limits are exceeded, and any
+  // other configured criteria that can be checked without touching disk.
   cache_eviction_thread_.signal();
 }
 
@@ -401,7 +405,7 @@ void FileSystemHttpCache::trackFileRemoved(uint64_t file_size) {
   stats_.size_bytes_.set(size_bytes_);
 }
 
-void FileSystemHttpCache::maybeEvict(Api::OsSysCalls& os_sys_calls) {
+void FileSystemHttpCache::maybeEvict() {
   uint64_t size_to_evict = 0;
   uint64_t count_to_evict = 0;
   if (config().has_max_cache_size_bytes()) {
@@ -424,6 +428,7 @@ void FileSystemHttpCache::maybeEvict(Api::OsSysCalls& os_sys_calls) {
     return;
   }
 
+  auto os_sys_calls = Api::OsSysCallsSingleton::get();
   uint64_t size = 0;
   uint64_t count = 0;
   uint64_t proposed_size_evicted = 0;
