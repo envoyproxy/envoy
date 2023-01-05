@@ -17,6 +17,14 @@ bug_fixes:
 - area: lua
   change: |
     lua coroutine should not execute after local reply is sent.
+- area: grpc
+  change: |
+    When Envoy was configured to use ext_authz, ext_proc, tap, ratelimit filters, and grpc access log service and an http header with non-UTF-8 data was received,
+    Envoy would generate an invalid protobuf message and send it to the configured service. The receiving service would typically generate an error when decoding
+    the protobuf message. For ext_authz that was configured with ``failure_mode_allow: true``, the request would have been allowed in this case. For the other services, this
+    could have resulted in other unforseen errors such as a lack of visibility into requests (eg request not logged). Envoy will now by default sanitize the values sent
+    in gRPC service calls to be valid UTF-8, replacing data that is not valid UTF-8 with a '!' character. This behavioral change can be temporarily reverted by
+    setting runtime guard ``envoy.reloadable_features.service_sanitize_non_utf8_strings`` to false.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`

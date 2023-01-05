@@ -82,36 +82,42 @@ void HttpGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
   // TODO(mattklein123): Populate port field.
   auto* request_properties = log_entry.mutable_request();
   if (request_headers.Scheme() != nullptr) {
-    request_properties->set_scheme(std::string(request_headers.getSchemeValue()));
+    request_properties->set_scheme(
+        MessageUtil::sanitizeUtf8String(request_headers.getSchemeValue()));
   }
   if (request_headers.Host() != nullptr) {
-    request_properties->set_authority(std::string(request_headers.getHostValue()));
+    request_properties->set_authority(
+        MessageUtil::sanitizeUtf8String(request_headers.getHostValue()));
   }
   if (request_headers.Path() != nullptr) {
-    request_properties->set_path(std::string(request_headers.getPathValue()));
+    request_properties->set_path(MessageUtil::sanitizeUtf8String(request_headers.getPathValue()));
   }
   if (request_headers.UserAgent() != nullptr) {
-    request_properties->set_user_agent(std::string(request_headers.getUserAgentValue()));
+    request_properties->set_user_agent(
+        MessageUtil::sanitizeUtf8String(request_headers.getUserAgentValue()));
   }
   if (request_headers.getInline(referer_handle.handle()) != nullptr) {
     request_properties->set_referer(
-        std::string(request_headers.getInlineValue(referer_handle.handle())));
+        MessageUtil::sanitizeUtf8String(request_headers.getInlineValue(referer_handle.handle())));
   }
   if (request_headers.ForwardedFor() != nullptr) {
-    request_properties->set_forwarded_for(std::string(request_headers.getForwardedForValue()));
+    request_properties->set_forwarded_for(
+        MessageUtil::sanitizeUtf8String(request_headers.getForwardedForValue()));
   }
   if (request_headers.RequestId() != nullptr) {
-    request_properties->set_request_id(std::string(request_headers.getRequestIdValue()));
+    request_properties->set_request_id(
+        MessageUtil::sanitizeUtf8String(request_headers.getRequestIdValue()));
   }
   if (request_headers.EnvoyOriginalPath() != nullptr) {
-    request_properties->set_original_path(std::string(request_headers.getEnvoyOriginalPathValue()));
+    request_properties->set_original_path(
+        MessageUtil::sanitizeUtf8String(request_headers.getEnvoyOriginalPathValue()));
   }
   request_properties->set_request_headers_bytes(request_headers.byteSize());
   request_properties->set_request_body_bytes(stream_info.bytesReceived());
   if (request_headers.Method() != nullptr) {
     envoy::config::core::v3::RequestMethod method = envoy::config::core::v3::METHOD_UNSPECIFIED;
-    envoy::config::core::v3::RequestMethod_Parse(std::string(request_headers.getMethodValue()),
-                                                 &method);
+    envoy::config::core::v3::RequestMethod_Parse(
+        MessageUtil::sanitizeUtf8String(request_headers.getMethodValue()), &method);
     request_properties->set_request_method(method);
   }
   if (!request_headers_to_log_.empty()) {
@@ -120,7 +126,8 @@ void HttpGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
     for (const auto& header : request_headers_to_log_) {
       const auto all_values = Http::HeaderUtility::getAllOfHeaderAsString(request_headers, header);
       if (all_values.result().has_value()) {
-        logged_headers->insert({header.get(), std::string(all_values.result().value())});
+        logged_headers->insert(
+            {header.get(), MessageUtil::sanitizeUtf8String(all_values.result().value())});
       }
     }
   }
@@ -141,7 +148,8 @@ void HttpGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
     for (const auto& header : response_headers_to_log_) {
       const auto all_values = Http::HeaderUtility::getAllOfHeaderAsString(response_headers, header);
       if (all_values.result().has_value()) {
-        logged_headers->insert({header.get(), std::string(all_values.result().value())});
+        logged_headers->insert(
+            {header.get(), MessageUtil::sanitizeUtf8String(all_values.result().value())});
       }
     }
   }
@@ -153,7 +161,8 @@ void HttpGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
       const auto all_values =
           Http::HeaderUtility::getAllOfHeaderAsString(response_trailers, header);
       if (all_values.result().has_value()) {
-        logged_headers->insert({header.get(), std::string(all_values.result().value())});
+        logged_headers->insert(
+            {header.get(), MessageUtil::sanitizeUtf8String(all_values.result().value())});
       }
     }
   }
