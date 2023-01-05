@@ -22,13 +22,7 @@ import java.util.concurrent.TimeUnit
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
 
-private const val emhcmType =
-  "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.EnvoyMobileHttpConnectionManager"
-private const val lefType =
-  "type.googleapis.com/envoymobile.extensions.filters.http.local_error.LocalError"
-private const val pbfType = "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge"
-private const val filterName = "cancel_validation_filter"
-private val remotePort = (10001..11000).random()
+private val filterName = "cancel_validation_filter"
 private val config =
 """
 static_resources:
@@ -38,7 +32,7 @@ static_resources:
       socket_address: { protocol: TCP, address: 0.0.0.0, port_value: 10000 }
     api_listener:
       api_listener:
-        "@type": $emhcmType
+        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.EnvoyMobileHttpConnectionManager
         config:
           stat_prefix: api_hcm
           route_config:
@@ -52,10 +46,10 @@ static_resources:
           http_filters:
           - name: envoy.filters.http.local_error
             typed_config:
-              "@type": $lefType
+              "@type": type.googleapis.com/envoymobile.extensions.filters.http.local_error.LocalError
           - name: envoy.filters.http.platform_bridge
             typed_config:
-              "@type": $pbfType
+              "@type": type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge
               platform_filter_name: $filterName
           - name: envoy.router
             typed_config:
@@ -71,17 +65,17 @@ static_resources:
       - lb_endpoints:
         - endpoint:
             address:
-              socket_address: { address: 127.0.0.1, port_value: $remotePort }
+              socket_address: { address: 127.0.0.1, port_value: ${(10001..11000).random()} }
 """
 
-class CancelStreamTest {
+class CancelGRPCStreamTest {
 
   init {
     JniLibrary.loadTestLibrary()
   }
 
   private val filterExpectation = CountDownLatch(1)
-  private val runExpectation = CountDownLatch(1)
+  private val onCancelCallbackExpectation = CountDownLatch(1)
 
   class CancelValidationFilter(
     private val latch: CountDownLatch
@@ -121,7 +115,7 @@ class CancelStreamTest {
   fun `cancel grpc stream calls onCancel callback`() {
     val engine = EngineBuilder(Custom(config))
       .addPlatformFilter(
-        name = "cancel_validation_filter",
+        name = filterName,
         factory = { CancelValidationFilter(filterExpectation) }
       )
       .setOnEngineRunning {}
@@ -138,18 +132,18 @@ class CancelStreamTest {
 
     client.newGRPCStreamPrototype()
       .setOnCancel { _ ->
-        runExpectation.countDown()
+        onCancelCallbackExpectation.countDown()
       }
       .start(Executors.newSingleThreadExecutor())
       .sendHeaders(requestHeaders, false)
       .cancel()
 
     filterExpectation.await(10, TimeUnit.SECONDS)
-    runExpectation.await(10, TimeUnit.SECONDS)
+    onCancelCallbackExpectation.await(10, TimeUnit.SECONDS)
 
     engine.terminate()
 
     assertThat(filterExpectation.count).isEqualTo(0)
-    assertThat(runExpectation.count).isEqualTo(0)
+    assertThat(onCancelCallbackExpectation.count).isEqualTo(0)
   }
 }
