@@ -4,9 +4,10 @@ import Foundation
 import XCTest
 
 final class CancelGRPCStreamTests: XCTestCase {
-
   func testCancelGRPCStream() {
     let filterName = "cancel_validation_filter"
+
+// swiftlint:disable line_length
     let config =
 """
 static_resources:
@@ -51,6 +52,7 @@ static_resources:
             address:
               socket_address: { address: 127.0.0.1, port_value: \(Int.random(in: 10001...11000)) }
 """
+// swiftlint:enable line_length
 
     struct CancelValidationFilter: ResponseFilter {
       let expectation: XCTestExpectation
@@ -108,7 +110,8 @@ static_resources:
       .sendHeaders(requestHeaders, endStream: false)
       .cancel()
 
-    XCTAssertEqual(XCTWaiter.wait(for: [filterExpectation, onCancelCallbackExpectation], timeout: 3), .completed)
+    let expectations = [filterExpectation, onCancelCallbackExpectation]
+    XCTAssertEqual(XCTWaiter.wait(for: expectations, timeout: 3, enforceOrder: true), .completed)
 
     engine.terminate()
   }
