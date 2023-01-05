@@ -40,6 +40,7 @@ ar
 btree
 CAS
 CB
+cartid
 cbor
 CDN
 CDS
@@ -279,6 +280,7 @@ Oauth
 OCSP
 OD
 ODCDS
+middlewildcard
 mpd
 oghttp
 OID
@@ -1062,6 +1064,7 @@ qdtext
 qps
 quantile
 quantiles
+querydetails
 quiesce
 quitquitquit
 qvalue
@@ -1386,6 +1389,8 @@ xid
 xmodem
 xxhash
 xxs
+xyz
+xyzwebservices
 zag
 zig
 zipkin

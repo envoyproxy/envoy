@@ -9294,7 +9294,6 @@ virtual_hosts:
   EXPECT_EQ("path.prefix.com", headers.get_(Http::Headers::get().Host));
 }
 
-
 TEST_F(RouteMatcherTest, PatternMatchWildcardFilenameUnnamed) {
 
   const std::string yaml = R"EOF(
@@ -9321,14 +9320,22 @@ virtual_hosts:
   factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
-  Http::TestRequestHeaderMapImpl headers = genHeaders("path.prefix.com", "/rest/one/two/song.m3u8", "GET");
+  Http::TestRequestHeaderMapImpl headers =
+      genHeaders("path.prefix.com", "/rest/one/two/song.m3u8", "GET");
   const RouteEntry* route = config.route(headers, 0)->routeEntry();
   EXPECT_EQ("/rest/one/two", route->currentUrlPathAfterRewrite(headers));
   route->finalizeRequestHeaders(headers, stream_info, true);
   EXPECT_EQ("/rest/one/two", headers.get_(Http::Headers::get().Path));
   EXPECT_EQ("path.prefix.com", headers.get_(Http::Headers::get().Host));
-}
 
+  Http::TestRequestHeaderMapImpl headers_multi =
+      genHeaders("path.prefix.com", "/rest/one/two/item/another/song.m3u8", "GET");
+  const RouteEntry* route_multi = config.route(headers_multi, 0)->routeEntry();
+  EXPECT_EQ("/rest/one/two", route_multi->currentUrlPathAfterRewrite(headers_multi));
+  route->finalizeRequestHeaders(headers_multi, stream_info, true);
+  EXPECT_EQ("/rest/one/two", headers_multi.get_(Http::Headers::get().Path));
+  EXPECT_EQ("path.prefix.com", headers_multi.get_(Http::Headers::get().Host));
+}
 
 TEST_F(RouteMatcherTest, PatternMatchWildcardFilename) {
 
@@ -9356,14 +9363,14 @@ virtual_hosts:
   factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
-  Http::TestRequestHeaderMapImpl headers = genHeaders("path.prefix.com", "/rest/one/two/song.m3u8", "GET");
+  Http::TestRequestHeaderMapImpl headers =
+      genHeaders("path.prefix.com", "/rest/one/two/song.m3u8", "GET");
   const RouteEntry* route = config.route(headers, 0)->routeEntry();
   EXPECT_EQ("/rest/one/two", route->currentUrlPathAfterRewrite(headers));
   route->finalizeRequestHeaders(headers, stream_info, true);
   EXPECT_EQ("/rest/one/two", headers.get_(Http::Headers::get().Path));
   EXPECT_EQ("path.prefix.com", headers.get_(Http::Headers::get().Host));
 }
-
 
 TEST_F(RouteMatcherTest, PatternMatchWildcardComplexWildcardWithQueryParameter) {
 
@@ -9391,14 +9398,19 @@ virtual_hosts:
   factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
-  Http::TestRequestHeaderMapImpl headers = genHeaders("path.prefix.com", "/xyzwebservices/v2/xyz/users/abc@xyz.com/carts/FL0001090004/entries?fields=FULL&client_type=WEB", "GET");
+  Http::TestRequestHeaderMapImpl headers =
+      genHeaders("path.prefix.com",
+                 "/xyzwebservices/v2/xyz/users/abc@xyz.com/carts/FL0001090004/"
+                 "entries?fields=FULL&client_type=WEB",
+                 "GET");
   const RouteEntry* route = config.route(headers, 0)->routeEntry();
-  EXPECT_EQ("/abc@xyz.com-FL0001090004/entries?fields=FULL&client_type=WEB", route->currentUrlPathAfterRewrite(headers));
+  EXPECT_EQ("/abc@xyz.com-FL0001090004/entries?fields=FULL&client_type=WEB",
+            route->currentUrlPathAfterRewrite(headers));
   route->finalizeRequestHeaders(headers, stream_info, true);
-  EXPECT_EQ("/abc@xyz.com-FL0001090004/entries?fields=FULL&client_type=WEB", headers.get_(Http::Headers::get().Path));
+  EXPECT_EQ("/abc@xyz.com-FL0001090004/entries?fields=FULL&client_type=WEB",
+            headers.get_(Http::Headers::get().Path));
   EXPECT_EQ("path.prefix.com", headers.get_(Http::Headers::get().Host));
 }
-
 
 TEST_F(RouteMatcherTest, PatternMatchWildcardFilenameDir) {
 
@@ -9426,7 +9438,8 @@ virtual_hosts:
   factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
-  Http::TestRequestHeaderMapImpl headers = genHeaders("path.prefix.com", "/rest/one/two/root/sub/song.mp4", "GET");
+  Http::TestRequestHeaderMapImpl headers =
+      genHeaders("path.prefix.com", "/rest/one/two/root/sub/song.mp4", "GET");
   const RouteEntry* route = config.route(headers, 0)->routeEntry();
   EXPECT_EQ("/root/sub", route->currentUrlPathAfterRewrite(headers));
   route->finalizeRequestHeaders(headers, stream_info, true);
