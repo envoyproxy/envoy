@@ -1,6 +1,7 @@
 #include "source/extensions/http/cache/file_system_http_cache/cache_eviction_thread.h"
 
 #include "envoy/thread/thread.h"
+
 #include "source/extensions/http/cache/file_system_http_cache/file_system_http_cache.h"
 
 namespace Envoy {

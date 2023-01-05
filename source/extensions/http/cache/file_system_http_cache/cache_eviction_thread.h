@@ -4,11 +4,11 @@
 #include <memory>
 #include <vector>
 
+#include "envoy/thread/thread.h"
+
 #include "absl/base/thread_annotations.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/synchronization/mutex.h"
-
-#include "envoy/thread/thread.h"
 
 namespace Envoy {
 namespace Extensions {
