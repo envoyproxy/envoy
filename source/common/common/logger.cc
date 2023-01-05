@@ -158,14 +158,13 @@ void DelegatingLogSink::setTlsDelegate(SinkDelegate* sink) { *tlsSink() = sink; 
 SinkDelegate* DelegatingLogSink::tlsDelegate() { return *tlsSink(); }
 
 ABSL_CONST_INIT static absl::Mutex current_context_mutex(absl::kConstInit);
-static Context* current_context ABSL_GUARDED_BY(current_context_mutex) = nullptr;
+static Context* current_context = nullptr;
 
 Context::Context(spdlog::level::level_enum log_level, const std::string& log_format,
                  Thread::BasicLockable& lock, bool should_escape, bool enable_fine_grain_logging)
     : log_level_(log_level), log_format_(log_format), lock_(lock), should_escape_(should_escape),
       enable_fine_grain_logging_(enable_fine_grain_logging) {
   {
-    absl::MutexLock context_lock(&current_context_mutex);
     save_context_ = current_context;
     current_context = this;
   } // context_lock
@@ -174,7 +173,6 @@ Context::Context(spdlog::level::level_enum log_level, const std::string& log_for
 
 Context::~Context() {
   {
-    absl::MutexLock context_lock(&current_context_mutex);
     // Contexts are created on a stack, so they must be deleted
     // in reverse order of initialization. This assert verifies that.
     assert(current_context == this);
@@ -207,7 +205,6 @@ void Context::activate() {
 }
 
 bool Context::useFineGrainLogger() {
-  absl::ReaderMutexLock context_lock(&current_context_mutex);
   if (current_context) {
     return current_context->enable_fine_grain_logging_;
   }
@@ -219,7 +216,6 @@ void Context::enableFineGrainLogger() {
   std::string fine_grain_log_format_stored;
   bool context_nonnull = false;
   {
-    absl::MutexLock context_lock(&current_context_mutex);
     if (current_context) {
       context_nonnull = true;
       current_context->enable_fine_grain_logging_ = true;
@@ -239,14 +235,12 @@ void Context::enableFineGrainLogger() {
 }
 
 void Context::disableFineGrainLogger() {
-  absl::MutexLock context_lock(&current_context_mutex);
   if (current_context) {
     current_context->enable_fine_grain_logging_ = false;
   }
 }
 
 std::string Context::getFineGrainLogFormat() {
-  absl::ReaderMutexLock context_lock(&current_context_mutex);
   if (!current_context) { // Context is not instantiated in benchmark test
     return kDefaultFineGrainLogFormat;
   }
@@ -254,7 +248,6 @@ std::string Context::getFineGrainLogFormat() {
 }
 
 spdlog::level::level_enum Context::getFineGrainDefaultLevel() {
-  absl::ReaderMutexLock context_lock(&current_context_mutex);
   if (!current_context) {
     return spdlog::level::info;
   }

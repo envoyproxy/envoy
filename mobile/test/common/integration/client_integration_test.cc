@@ -380,6 +380,7 @@ TEST_P(ClientIntegrationTest, MultipleEngines) {
     // Request is freed by the engine and must be recreated
     request_data = Buffer::OwnedImpl("request body");
   }
+  exit(0);
 }
 
 } // namespace
