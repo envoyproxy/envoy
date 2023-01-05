@@ -28,13 +28,15 @@ public:
     cleanup();
     BaseClientIntegrationTest::TearDown();
   }
+
+  void basicTest();
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ClientIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(ClientIntegrationTest, Basic) {
+void ClientIntegrationTest::basicTest() {
   initialize();
 
   Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
@@ -69,6 +71,11 @@ TEST_P(ClientIntegrationTest, Basic) {
   ASSERT_EQ(cc_.on_complete_calls, 1);
   ASSERT_EQ(cc_.on_header_consumed_bytes_from_response, 27);
   ASSERT_EQ(cc_.on_complete_received_byte_count, 67);
+}
+
+TEST_P(ClientIntegrationTest, Basic) {
+  basicTest();
+  TearDown();
 }
 
 TEST_P(ClientIntegrationTest, BasicNon2xx) {
@@ -342,41 +349,22 @@ TEST_P(ClientIntegrationTest, DirectResponse) {
 
 TEST_P(ClientIntegrationTest, ForceAdmin) {
   override_builder_config_ = true;
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.use_api_listener", "false");
-  initialize();
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.use_api_listener", "true");
+  basicTest();
+  TearDown();
+}
 
-  Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
-  default_request_headers_.addCopy(AutonomousStream::EXPECT_REQUEST_SIZE_BYTES,
-                                   std::to_string(request_data.length()));
+TEST_P(ClientIntegrationTest, ForceAdminViaBootstrap) {
+  override_builder_config_ = true;
 
-  stream_prototype_->setOnData([this](envoy_data c_data, bool end_stream) {
-    if (end_stream) {
-      EXPECT_EQ(Data::Utility::copyToString(c_data), "");
-    } else {
-      EXPECT_EQ(c_data.length, 10);
-    }
-    cc_.on_data_calls++;
-    release_envoy_data(c_data);
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    envoy::config::listener::v3::ApiListenerManager api;
+    auto* boostrap_extension = bootstrap.add_bootstrap_extensions();
+    boostrap_extension->mutable_typed_config()->PackFrom(api);
+    boostrap_extension->set_name("envoy.listener_manager_impl.api");
   });
 
-  stream_->sendHeaders(envoyToMobileHeaders(default_request_headers_), false);
-
-  envoy_data c_data = Data::Utility::toBridgeData(request_data);
-  stream_->sendData(c_data);
-
-  Platform::RequestTrailersBuilder builder;
-  std::shared_ptr<Platform::RequestTrailers> trailers =
-      std::make_shared<Platform::RequestTrailers>(builder.build());
-  stream_->close(trailers);
-
-  terminal_callback_.waitReady();
-
-  ASSERT_EQ(cc_.on_headers_calls, 1);
-  ASSERT_EQ(cc_.status, "200");
-  ASSERT_EQ(cc_.on_data_calls, 2);
-  ASSERT_EQ(cc_.on_complete_calls, 1);
-  ASSERT_EQ(cc_.on_header_consumed_bytes_from_response, 27);
-  ASSERT_EQ(cc_.on_complete_received_byte_count, 67);
+  basicTest();
 }
 
 } // namespace

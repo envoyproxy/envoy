@@ -5,20 +5,13 @@
 
 namespace Envoy {
 
-const char* api_listener = "envoy.listener_manager_impl.api";
-// Allows for using the new API listener when building with --copt=-DUSE_API_LISTENER
-#ifdef USE_API_LISTENER
-const char* default_listener_type = "envoy.listener_manager_impl.api";
-#else
-const char* default_listener_type = "envoy.listener_manager_impl.default";
-#endif
-
 std::string hotRestartVersion(bool) { return "disabled"; }
 
 EngineCommon::EngineCommon(int argc, const char* const* argv)
-    : options_(argc, argv, &hotRestartVersion, spdlog::level::info, default_listener_type) {
-  if (absl::StrContains(options_.configYaml(), "envoy.reloadable_features.use_api_listener")) {
-    options_.setListenerManager(api_listener);
+    : options_(argc, argv, &hotRestartVersion, spdlog::level::info) {
+  // TODO(alyssar) when this defaults true, move E-M default config over to boostrap config.
+  if (absl::StrContains(options_.configYaml(), "use_api_listener: true")) {
+    options_.setListenerManager("envoy.listener_manager_impl.api");
   }
 
   base_ = std::make_unique<StrippedMainBase>(
