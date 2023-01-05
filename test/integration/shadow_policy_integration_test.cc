@@ -286,6 +286,13 @@ TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithEarlyDownstreamTimeou
     GTEST_SKIP() << "Not applicable for non-streaming shadows.";
   }
   autonomous_upstream_ = false;
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        // 100 millisecond timeout.
+        hcm.mutable_stream_idle_timeout()->set_seconds(0);
+        hcm.mutable_stream_idle_timeout()->set_nanos(100 * 1000 * 1000);
+      });
   initialConfigSetup("cluster_1", "");
   config_helper_.disableDelayClose();
   initialize();
