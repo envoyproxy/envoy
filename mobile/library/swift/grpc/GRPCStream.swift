@@ -68,4 +68,9 @@ public final class GRPCStream: NSObject {
     // https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#requests
     self.underlyingStream.close(data: Data())
   }
+
+  /// Cancel this connection.
+  public func cancel() {
+    self.underlying.cancel()
+  }
 }

@@ -56,4 +56,11 @@ class GRPCStream(
   fun close() {
     underlyingStream.close(ByteBuffer.allocate(0))
   }
+
+  /**
+   * Cancel this connection.
+   */
+  fun cancel() {
+    underlyingStream.cancel()
+  }
 }
