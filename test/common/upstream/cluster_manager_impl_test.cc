@@ -1028,6 +1028,49 @@ TEST_F(ClusterManagerImplTest, ClusterProvidedLbNotConfigured) {
                             "'cluster_0' provided one. Check cluster documentation.");
 }
 
+// Verify that multiple load balancing policies can be specified, and Envoy selects the first
+// policy that it has a factory for.
+TEST_F(ClusterManagerImplTest, LbPolicyConfig) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
+
+  // envoy.load_balancers.custom_lb is registered by linking in
+  // //test/integration/load_balancers:custom_lb_policy.
+  const std::string yaml = fmt::format(R"EOF(
+ static_resources:
+  clusters:
+  - name: cluster_1
+    connect_timeout: 0.250s
+    type: STATIC
+    lb_policy: LOAD_BALANCING_POLICY_CONFIG
+    load_balancing_policy:
+      policies:
+      - typed_extension_config:
+          name: envoy.load_balancers.unknown_lb
+      - typed_extension_config:
+          name: envoy.load_balancers.custom_lb
+    load_assignment:
+      cluster_name: cluster_1
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 8000
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 8001
+  )EOF");
+
+  create(parseBootstrapFromV3Yaml(yaml));
+  const auto& cluster = cluster_manager_->clusters().getCluster("cluster_1");
+  EXPECT_NE(cluster, absl::nullopt);
+  EXPECT_NE(cluster->get().info()->loadBalancingPolicy(), nullptr);
+}
+
 class ClusterManagerImplThreadAwareLbTest : public ClusterManagerImplTest {
 public:
   void doTest(LoadBalancerType lb_type) {
