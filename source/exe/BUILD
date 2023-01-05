@@ -67,7 +67,7 @@ envoy_cc_library(
     srcs = ["stripped_main_base.cc"],
     hdrs = ["stripped_main_base.h"],
     deps = [
-        ":envoy_common_lib",
+        ":envoy_common_with_core_extensions_lib",
         ":platform_impl_lib",
         ":process_wide_lib",
         "//source/common/thread_local:thread_local_lib",
