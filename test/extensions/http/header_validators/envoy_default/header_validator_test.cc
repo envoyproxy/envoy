@@ -45,6 +45,14 @@ public:
   ResponseHeaderMapValidationResult validateResponseHeaderMap(ResponseHeaderMap&) override {
     return ResponseHeaderMapValidationResult::success();
   }
+
+  TrailerValidationResult validateRequestTrailerMap(::Envoy::Http::RequestTrailerMap&) override {
+    return TrailerValidationResult::success();
+  }
+
+  TrailerValidationResult validateResponseTrailerMap(::Envoy::Http::ResponseTrailerMap&) override {
+    return TrailerValidationResult::success();
+  }
 };
 
 using BaseHttpHeaderValidatorPtr = std::unique_ptr<BaseHttpHeaderValidator>;

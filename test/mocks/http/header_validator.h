@@ -18,6 +18,10 @@ public:
               (RequestHeaderMap & header_map));
   MOCK_METHOD(ResponseHeaderMapValidationResult, validateResponseHeaderMap,
               (ResponseHeaderMap & header_map));
+  MOCK_METHOD(TrailerValidationResult, validateRequestTrailerMap,
+              (RequestTrailerMap & trailer_map));
+  MOCK_METHOD(TrailerValidationResult, validateResponseTrailerMap,
+              (ResponseTrailerMap & trailer_map));
 };
 
 class MockHeaderValidatorStats : public HeaderValidatorStats {
