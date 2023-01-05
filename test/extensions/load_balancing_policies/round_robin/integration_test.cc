@@ -36,21 +36,23 @@ public:
         - endpoint:
             address:
               socket_address:
-                address: 127.0.0.1
+                address: {}
                 port_value: 0
         - endpoint:
             address:
               socket_address:
-                address: 127.0.0.1
+                address: {}
                 port_value: 0
         - endpoint:
             address:
               socket_address:
-                address: 127.0.0.1
+                address: {}
                 port_value: 0
       )EOF";
 
-      TestUtility::loadFromYaml(endpoints_yaml, *endpoint);
+      const std::string local_address = Network::Test::getLoopbackAddressString(GetParam());
+      TestUtility::loadFromYaml(
+          fmt::format(endpoints_yaml, local_address, local_address, local_address), *endpoint);
 
       auto* policy = cluster_0->mutable_load_balancing_policy();
 
