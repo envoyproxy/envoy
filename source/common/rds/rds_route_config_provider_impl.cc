@@ -16,12 +16,12 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
   });
   // It should be 1:1 mapping due to shared rds config.
   ASSERT(subscription_->routeConfigProvider() == nullptr);
-  subscription_->routeConfigProvider() == this;
+  subscription_->routeConfigProvider() = this;
 }
 
 RdsRouteConfigProviderImpl::~RdsRouteConfigProviderImpl() {
   ASSERT(subscription_->routeConfigProvider() != nullptr);
-  subscription_->routeConfigProvider() == nullptr;
+  subscription_->routeConfigProvider() = nullptr;
 }
 
 const absl::optional<RouteConfigProvider::ConfigInfo>&
