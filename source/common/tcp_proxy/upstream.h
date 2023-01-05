@@ -187,7 +187,9 @@ private:
       }
     }
     void decodeTrailers(Http::ResponseTrailerMapPtr&&) override {
-      parent_.doneReading();
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.finish_reading_on_decode_trailers")) {
+        parent_.doneReading();
+      }
     }
     void decodeMetadata(Http::MetadataMapPtr&&) override {}
     void dumpState(std::ostream& os, int indent_level) const override {
