@@ -104,7 +104,19 @@ void FileLookupContext::getHeadersWithLock(LookupHeadersCallback cb) {
 }
 
 void FileLookupContext::invalidateCacheEntry() {
-  cache_.asyncFileManager()->unlink(filepath(), [](absl::Status) {});
+  cache_.asyncFileManager()->stat(
+      filepath(), [file = filepath(),
+                   cache = cache_.shared_from_this()](absl::StatusOr<struct stat> stat_result) {
+        size_t file_size = 0;
+        if (stat_result.ok()) {
+          file_size = stat_result.value().st_size;
+        }
+        cache->asyncFileManager()->unlink(file, [cache, file_size](absl::Status unlink_result) {
+          if (unlink_result.ok()) {
+            cache->trackFileRemoved(file_size);
+          }
+        });
+      });
 }
 
 void FileLookupContext::getBody(const AdjustedByteRange& range, LookupBodyCallback&& cb) {

@@ -868,9 +868,14 @@ public:
   virtual std::chrono::milliseconds connectTimeout() const PURE;
 
   /**
-   * @return the idle timeout for upstream connection pool connections.
+   * @return the idle timeout for upstream HTTP connection pool connections.
    */
   virtual const absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
+
+  /**
+   * @return the idle timeout for each connection in TCP connection pool.
+   */
+  virtual const absl::optional<std::chrono::milliseconds> tcpPoolIdleTimeout() const PURE;
 
   /**
    * @return optional maximum connection duration timeout for manager connections.
@@ -1163,7 +1168,7 @@ public:
   /**
    * @return alternate protocols cache options for upstream connections.
    */
-  virtual const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+  virtual const absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>&
   alternateProtocolsCacheOptions() const PURE;
 
   /**

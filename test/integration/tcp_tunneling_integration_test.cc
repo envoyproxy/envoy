@@ -1,6 +1,7 @@
 #include <memory>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/core/v3/proxy_protocol.pb.h"
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/extensions/upstreams/http/tcp/v3/tcp_connection_pool.pb.h"
@@ -19,6 +20,8 @@ public:
   ConnectTerminationIntegrationTest() { enableHalfClose(true); }
 
   void initialize() override {
+    useAccessLog("%UPSTREAM_WIRE_BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED% "
+                 "%UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_HEADER_BYTES_RECEIVED%");
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) {
@@ -91,6 +94,30 @@ public:
       ASSERT_TRUE(response_->waitForEndStream());
       ASSERT_FALSE(response_->reset());
     }
+
+    // expected_header_bytes_* is 0 as we do not use proxy protocol.
+    // expected_wire_bytes_sent is 9 as the Envoy sends "hello,bye".
+    // expected_wire_bytes_received is 9 as the Upstream sends "there!ack".
+    const int expected_wire_bytes_sent = 9;
+    const int expected_wire_bytes_received = 9;
+    const int expected_header_bytes_sent = 0;
+    const int expected_header_bytes_received = 0;
+    checkAccessLogOutput(expected_wire_bytes_sent, expected_wire_bytes_received,
+                         expected_header_bytes_sent, expected_header_bytes_received);
+  }
+
+  void checkAccessLogOutput(int expected_wire_bytes_sent, int expected_wire_bytes_received,
+                            int expected_header_bytes_sent, int expected_header_bytes_received) {
+    std::string log = waitForAccessLog(access_log_name_);
+    std::vector<std::string> log_entries = absl::StrSplit(log, ' ');
+    const int wire_bytes_sent = std::stoi(log_entries[0]),
+              wire_bytes_received = std::stoi(log_entries[1]),
+              header_bytes_sent = std::stoi(log_entries[2]),
+              header_bytes_received = std::stoi(log_entries[3]);
+    EXPECT_EQ(wire_bytes_sent, expected_wire_bytes_sent);
+    EXPECT_EQ(wire_bytes_received, expected_wire_bytes_received);
+    EXPECT_EQ(header_bytes_sent, expected_header_bytes_sent);
+    EXPECT_EQ(header_bytes_received, expected_header_bytes_received);
   }
 
   FakeRawConnectionPtr fake_raw_upstream_connection_;
@@ -165,6 +192,13 @@ TEST_P(ConnectTerminationIntegrationTest, DownstreamClose) {
   // Tear down by closing the client connection.
   codec_client_->close();
   ASSERT_TRUE(fake_raw_upstream_connection_->waitForHalfClose());
+  const int expected_wire_bytes_sent = 5;     // Envoy sends "hello".
+  const int expected_wire_bytes_received = 6; // Upstream sends "there!".
+  // expected_header_bytes_* is 0 as we do not use proxy protocol.
+  const int expected_header_bytes_sent = 0;
+  const int expected_header_bytes_received = 0;
+  checkAccessLogOutput(expected_wire_bytes_sent, expected_wire_bytes_received,
+                       expected_header_bytes_sent, expected_header_bytes_received);
 }
 
 TEST_P(ConnectTerminationIntegrationTest, DownstreamReset) {
@@ -180,6 +214,14 @@ TEST_P(ConnectTerminationIntegrationTest, DownstreamReset) {
   // Tear down by resetting the client stream.
   codec_client_->sendReset(*request_encoder_);
   ASSERT_TRUE(fake_raw_upstream_connection_->waitForHalfClose());
+
+  const int expected_wire_bytes_sent = 5;     // Envoy sends "hello".
+  const int expected_wire_bytes_received = 6; // Upstream sends "there!".
+  // expected_header_bytes_* is 0 as we do not use proxy protocol.
+  const int expected_header_bytes_sent = 0;
+  const int expected_header_bytes_received = 0;
+  checkAccessLogOutput(expected_wire_bytes_sent, expected_wire_bytes_received,
+                       expected_header_bytes_sent, expected_header_bytes_received);
 }
 
 TEST_P(ConnectTerminationIntegrationTest, UpstreamClose) {
@@ -200,6 +242,13 @@ TEST_P(ConnectTerminationIntegrationTest, UpstreamClose) {
   } else {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   }
+  const int expected_wire_bytes_sent = 5;     // Envoy sends "hello".
+  const int expected_wire_bytes_received = 6; // Upstream sends "there!".
+  // expected_header_bytes_* is 0 as we do not use proxy protocol.
+  const int expected_header_bytes_sent = 0;
+  const int expected_header_bytes_received = 0;
+  checkAccessLogOutput(expected_wire_bytes_sent, expected_wire_bytes_received,
+                       expected_header_bytes_sent, expected_header_bytes_received);
 }
 
 TEST_P(ConnectTerminationIntegrationTest, TestTimeout) {
@@ -284,6 +333,101 @@ TEST_P(ConnectTerminationIntegrationTest, IgnoreH11HostField) {
       "':method', 'CONNECT'",
       sendRawHttpAndWaitForResponse(lookupPort("http"), full_request.c_str(), &response, true););
 }
+
+INSTANTIATE_TEST_SUITE_P(HttpAndIpVersions, ConnectTerminationIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             {Http::CodecType::HTTP1, Http::CodecType::HTTP2,
+                              Http::CodecType::HTTP3},
+                             {Http::CodecType::HTTP1})),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+using Params = std::tuple<Network::Address::IpVersion, Http::CodecType>;
+
+// Test with proxy protocol headers.
+class ProxyProtocolConnectTerminationIntegrationTest : public ConnectTerminationIntegrationTest {
+protected:
+  void initialize() override {
+    useAccessLog("%UPSTREAM_WIRE_BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED% "
+                 "%UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_HEADER_BYTES_RECEIVED%");
+    config_helper_.addConfigModifier(
+        [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) {
+          hcm.mutable_delayed_close_timeout()->set_seconds(1);
+          ConfigHelper::setConnectConfig(hcm, !terminate_via_cluster_config_, allow_post_,
+                                         downstream_protocol_ == Http::CodecType::HTTP3,
+                                         proxy_protocol_version_);
+        });
+    HttpIntegrationTest::initialize();
+  }
+
+  envoy::config::core::v3::ProxyProtocolConfig::Version proxy_protocol_version_{
+      envoy::config::core::v3::ProxyProtocolConfig::V1};
+
+  void sendBidirectionalDataAndCleanShutdownWithProxyProtocol() {
+    sendBidirectionalData("hello", "hello", "there!", "there!");
+    // Send a second set of data to make sure for example headers are only sent once.
+    sendBidirectionalData(",bye", "hello,bye", "ack", "there!ack");
+
+    // Send an end stream. This should result in half close upstream.
+    codec_client_->sendData(*request_encoder_, "", true);
+    ASSERT_TRUE(fake_raw_upstream_connection_->waitForHalfClose());
+
+    // Now send a FIN from upstream. This should result in clean shutdown downstream.
+    ASSERT_TRUE(fake_raw_upstream_connection_->close());
+    if (downstream_protocol_ == Http::CodecType::HTTP1) {
+      ASSERT_TRUE(codec_client_->waitForDisconnect());
+    } else {
+      ASSERT_TRUE(response_->waitForEndStream());
+      ASSERT_FALSE(response_->reset());
+    }
+    const bool is_ipv4 = version_ == Network::Address::IpVersion::v4;
+
+    // expected_header_bytes_sent is based on the proxy protocol header sent to
+    //  the upstream.
+    // expected_header_bytes_received is zero since Envoy initiates the proxy
+    // protocol.
+    // expected_wire_bytes_sent changes depending on the proxy protocol header
+    // size which varies based on ip version. Envoy also sends "hello,bye".
+    // expected_wire_bytes_received is 9 as the Upstream sends "there!ack".
+    int expected_wire_bytes_sent;
+    int expected_header_bytes_sent;
+    if (proxy_protocol_version_ == envoy::config::core::v3::ProxyProtocolConfig::V1) {
+      expected_wire_bytes_sent = is_ipv4 ? 53 : 41;
+      expected_header_bytes_sent = is_ipv4 ? 44 : 32;
+    } else {
+      expected_wire_bytes_sent = is_ipv4 ? 37 : 61;
+      expected_header_bytes_sent = is_ipv4 ? 28 : 52;
+    }
+    const int expected_wire_bytes_received = 9;
+    const int expected_header_bytes_received = 0;
+    checkAccessLogOutput(expected_wire_bytes_sent, expected_wire_bytes_received,
+                         expected_header_bytes_sent, expected_header_bytes_received);
+  }
+};
+
+TEST_P(ProxyProtocolConnectTerminationIntegrationTest, SendsProxyProtoHeadersv1) {
+  initialize();
+  clearExtendedConnectHeaders();
+
+  setUpConnection();
+  sendBidirectionalDataAndCleanShutdownWithProxyProtocol();
+}
+
+TEST_P(ProxyProtocolConnectTerminationIntegrationTest, SendsProxyProtoHeadersv2) {
+  proxy_protocol_version_ = envoy::config::core::v3::ProxyProtocolConfig::V2;
+  initialize();
+  clearExtendedConnectHeaders();
+
+  setUpConnection();
+  sendBidirectionalDataAndCleanShutdownWithProxyProtocol();
+}
+
+INSTANTIATE_TEST_SUITE_P(HttpAndIpVersions, ProxyProtocolConnectTerminationIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             {Http::CodecType::HTTP1, Http::CodecType::HTTP2,
+                              Http::CodecType::HTTP3},
+                             {Http::CodecType::HTTP1})),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 // For this class, forward the CONNECT request upstream
 class ProxyingConnectIntegrationTest : public HttpProtocolIntegrationTest {
@@ -486,15 +630,6 @@ TEST_P(ProxyingConnectIntegrationTest, ProxyConnectWithIP) {
 
   cleanupUpstreamAndDownstream();
 }
-
-INSTANTIATE_TEST_SUITE_P(HttpAndIpVersions, ConnectTerminationIntegrationTest,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             {Http::CodecType::HTTP1, Http::CodecType::HTTP2,
-                              Http::CodecType::HTTP3},
-                             {Http::CodecType::HTTP1})),
-                         HttpProtocolIntegrationTest::protocolTestParamsToString);
-
-using Params = std::tuple<Network::Address::IpVersion, Http::CodecType>;
 
 // Tunneling downstream TCP over an upstream HTTP CONNECT tunnel.
 class TcpTunnelingIntegrationTest : public HttpProtocolIntegrationTest {
@@ -982,8 +1117,8 @@ TEST_P(TcpTunnelingIntegrationTest, UpstreamConnectingDownstreamDisconnect) {
     proxy_config.set_cluster("cluster_0");
     proxy_config.mutable_tunneling_config()->set_hostname("foo.lyft.com:80");
 
-    // Enable retries. The crash is due to retrying after the downstream connection is closed, which
-    // can't occur if retries are not enabled.
+    // Enable retries. The crash is due to retrying after the downstream connection is closed,
+    // which can't occur if retries are not enabled.
     proxy_config.mutable_max_connect_attempts()->set_value(2);
 
     auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();

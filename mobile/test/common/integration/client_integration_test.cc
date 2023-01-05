@@ -241,7 +241,7 @@ TEST_P(ClientIntegrationTest, CaseSensitive) {
 }
 
 TEST_P(ClientIntegrationTest, TimeoutOnRequestPath) {
-  setStreamIdleTimeoutSeconds(1);
+  builder_.setStreamIdleTimeoutSeconds(1);
 
   autonomous_upstream_ = false;
   initialize();
@@ -263,7 +263,7 @@ TEST_P(ClientIntegrationTest, TimeoutOnRequestPath) {
 }
 
 TEST_P(ClientIntegrationTest, TimeoutOnResponsePath) {
-  setStreamIdleTimeoutSeconds(1);
+  builder_.setStreamIdleTimeoutSeconds(1);
   autonomous_upstream_ = false;
   initialize();
 
@@ -291,7 +291,7 @@ TEST_P(ClientIntegrationTest, TimeoutOnResponsePath) {
 
 // TODO(alyssawilk) get this working in a follow-up.
 TEST_P(ClientIntegrationTest, DISABLED_Proxying) {
-  addLogLevel(Platform::LogLevel::trace);
+  builder_.addLogLevel(Platform::LogLevel::trace);
   initialize();
   if (version_ == Network::Address::IpVersion::v6) {
     // Localhost only resolves to an ipv4 address - alas no kernel happy eyeballs.

@@ -42,8 +42,8 @@ using Http1ResponseCodeDetail = ConstSingleton<Http1ResponseCodeDetailValues>;
  *
  */
 Http1HeaderValidator::Http1HeaderValidator(const HeaderValidatorConfig& config, Protocol protocol,
-                                           StreamInfo::StreamInfo& stream_info)
-    : HeaderValidator(config, protocol, stream_info) {}
+                                           ::Envoy::Http::HeaderValidatorStats& stats)
+    : HeaderValidator(config, protocol, stats) {}
 
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
 Http1HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
@@ -271,7 +271,7 @@ Http1HeaderValidator::validateRequestHeaderMap(RequestHeaderMap& header_map) {
     // port value will be validated later on. For a host in reg-name form the delimiter existence
     // check is sufficient. For IPv6, we need to verify that the port delimiter occurs *after* the
     // IPv6 address (following a "]" character).
-    std::size_t port_delim = host.rfind(":");
+    std::size_t port_delim = host.rfind(':');
     if (port_delim == absl::string_view::npos || port_delim == 0) {
       // The uri-host is missing the port
       return {RequestHeaderMapValidationResult::Action::Reject,
@@ -415,6 +415,16 @@ Http1HeaderValidator::validateTransferEncodingHeader(const HeaderString& value) 
   }
 
   return HeaderValueValidationResult::success();
+}
+
+HeaderValidator::TrailerValidationResult
+Http1HeaderValidator::validateRequestTrailerMap(::Envoy::Http::RequestTrailerMap& trailer_map) {
+  return validateTrailers(trailer_map);
+}
+
+HeaderValidator::TrailerValidationResult
+Http1HeaderValidator::validateResponseTrailerMap(::Envoy::Http::ResponseTrailerMap& trailer_map) {
+  return validateTrailers(trailer_map);
 }
 
 } // namespace EnvoyDefault

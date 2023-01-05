@@ -3322,11 +3322,10 @@ TEST(PrioritySet, MainPrioritySetTest) {
   EXPECT_EQ(nullptr, priority_set.mutableHostMapForTest().get());
 }
 
-class ClusterInfoImplTest : public testing::TestWithParam<bool> {
+class ClusterInfoImplTest : public testing::Test {
 public:
   ClusterInfoImplTest() : api_(Api::createApiForTest(stats_, random_)) {
     ON_CALL(server_context_, api()).WillByDefault(ReturnRef(*api_));
-    ON_CALL(server_context_.stats_config_, enableLazyInitStats()).WillByDefault(Return(GetParam()));
   }
 
   std::unique_ptr<StrictDnsClusterImpl> makeCluster(const std::string& yaml) {
@@ -3392,7 +3391,7 @@ public:
 };
 
 // Cluster metadata and common config retrieval.
-TEST_P(ClusterInfoImplTest, Metadata) {
+TEST_F(ClusterInfoImplTest, Metadata) {
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -3427,7 +3426,7 @@ TEST_P(ClusterInfoImplTest, Metadata) {
 }
 
 // Verify retry budget default values are honored.
-TEST_P(ClusterInfoImplTest, RetryBudgetDefaultPopulation) {
+TEST_F(ClusterInfoImplTest, RetryBudgetDefaultPopulation) {
   std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -3490,7 +3489,7 @@ TEST_P(ClusterInfoImplTest, RetryBudgetDefaultPopulation) {
   EXPECT_EQ(min_retry_concurrency, 123UL);
 }
 
-TEST_P(ClusterInfoImplTest, UnsupportedPerHostFields) {
+TEST_F(ClusterInfoImplTest, UnsupportedPerHostFields) {
   std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -3510,7 +3509,7 @@ TEST_P(ClusterInfoImplTest, UnsupportedPerHostFields) {
 }
 
 // Eds service_name is populated.
-TEST_P(ClusterInfoImplTest, EdsServiceNamePopulation) {
+TEST_F(ClusterInfoImplTest, EdsServiceNamePopulation) {
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -3557,7 +3556,7 @@ TEST_P(ClusterInfoImplTest, EdsServiceNamePopulation) {
 }
 
 // Typed metadata loading throws exception.
-TEST_P(ClusterInfoImplTest, BrokenTypedMetadata) {
+TEST_F(ClusterInfoImplTest, BrokenTypedMetadata) {
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -3585,7 +3584,7 @@ TEST_P(ClusterInfoImplTest, BrokenTypedMetadata) {
 }
 
 // Cluster extension protocol options fails validation when configured for an unregistered filter.
-TEST_P(ClusterInfoImplTest, ExtensionProtocolOptionsForUnknownFilter) {
+TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForUnknownFilter) {
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -3611,7 +3610,7 @@ TEST_P(ClusterInfoImplTest, ExtensionProtocolOptionsForUnknownFilter) {
                             "protocol options implementation for name: 'no_such_filter'");
 }
 
-TEST_P(ClusterInfoImplTest, TypedExtensionProtocolOptionsForUnknownFilter) {
+TEST_F(ClusterInfoImplTest, TypedExtensionProtocolOptionsForUnknownFilter) {
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -3635,7 +3634,7 @@ TEST_P(ClusterInfoImplTest, TypedExtensionProtocolOptionsForUnknownFilter) {
                             "protocol options implementation for name: 'no_such_filter'");
 }
 
-TEST_P(ClusterInfoImplTest, TestTrackRequestResponseSizesNotSetInConfig) {
+TEST_F(ClusterInfoImplTest, TestTrackRequestResponseSizesNotSetInConfig) {
   const std::string yaml_disabled = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -3670,7 +3669,7 @@ TEST_P(ClusterInfoImplTest, TestTrackRequestResponseSizesNotSetInConfig) {
   EXPECT_FALSE(cluster->info()->requestResponseSizeStats().has_value());
 }
 
-TEST_P(ClusterInfoImplTest, TestTrackRequestResponseSizes) {
+TEST_F(ClusterInfoImplTest, TestTrackRequestResponseSizes) {
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -3691,7 +3690,7 @@ TEST_P(ClusterInfoImplTest, TestTrackRequestResponseSizes) {
   EXPECT_EQ(Stats::Histogram::Unit::Bytes, req_resp_stats.upstream_rs_body_size_.unit());
 }
 
-TEST_P(ClusterInfoImplTest, TestTrackRemainingResourcesGauges) {
+TEST_F(ClusterInfoImplTest, TestTrackRemainingResourcesGauges) {
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -3738,7 +3737,7 @@ TEST_P(ClusterInfoImplTest, TestTrackRemainingResourcesGauges) {
   EXPECT_EQ(4U, high_remaining_retries.value());
 }
 
-TEST_P(ClusterInfoImplTest, DefaultConnectTimeout) {
+TEST_F(ClusterInfoImplTest, DefaultConnectTimeout) {
   const std::string yaml = R"EOF(
   name: cluster1
   type: STRICT_DNS
@@ -3752,7 +3751,7 @@ TEST_P(ClusterInfoImplTest, DefaultConnectTimeout) {
   EXPECT_EQ(std::chrono::seconds(5), cluster->info()->connectTimeout());
 }
 
-TEST_P(ClusterInfoImplTest, MaxConnectionDurationTest) {
+TEST_F(ClusterInfoImplTest, MaxConnectionDurationTest) {
   const std::string yaml_base = R"EOF(
   name: {}
   type: STRICT_DNS
@@ -3779,7 +3778,7 @@ TEST_P(ClusterInfoImplTest, MaxConnectionDurationTest) {
   EXPECT_EQ(absl::nullopt, cluster3->info()->maxConnectionDuration());
 }
 
-TEST_P(ClusterInfoImplTest, Timeouts) {
+TEST_F(ClusterInfoImplTest, Timeouts) {
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -3870,7 +3869,31 @@ TEST_P(ClusterInfoImplTest, Timeouts) {
   }
 }
 
-TEST_P(ClusterInfoImplTest, TestTrackTimeoutBudgetsNotSetInConfig) {
+TEST_F(ClusterInfoImplTest, TcpPoolIdleTimeout) {
+  const std::string yaml_base = R"EOF(
+  name: {}
+  type: STRICT_DNS
+  lb_policy: ROUND_ROBIN
+  )EOF";
+
+  const std::string yaml_set_tcp_pool_idle_timeout = yaml_base + R"EOF(
+  typed_extension_protocol_options:
+    envoy.extensions.upstreams.tcp.v3.TcpProtocolOptions:
+      "@type": type.googleapis.com/envoy.extensions.upstreams.tcp.v3.TcpProtocolOptions
+      idle_timeout: {}
+  )EOF";
+
+  auto cluster1 = makeCluster(fmt::format(yaml_base, "cluster1"));
+  EXPECT_EQ(std::chrono::minutes(10), cluster1->info()->tcpPoolIdleTimeout());
+
+  auto cluster2 = makeCluster(fmt::format(yaml_set_tcp_pool_idle_timeout, "cluster2", "9s"));
+  EXPECT_EQ(std::chrono::seconds(9), cluster2->info()->tcpPoolIdleTimeout());
+
+  auto cluster3 = makeCluster(fmt::format(yaml_set_tcp_pool_idle_timeout, "cluster3", "0s"));
+  EXPECT_EQ(absl::nullopt, cluster3->info()->tcpPoolIdleTimeout());
+}
+
+TEST_F(ClusterInfoImplTest, TestTrackTimeoutBudgetsNotSetInConfig) {
   // Check that without the flag specified, the histogram is null.
   const std::string yaml_disabled = R"EOF(
     name: name
@@ -3906,7 +3929,7 @@ TEST_P(ClusterInfoImplTest, TestTrackTimeoutBudgetsNotSetInConfig) {
   EXPECT_FALSE(cluster->info()->timeoutBudgetStats().has_value());
 }
 
-TEST_P(ClusterInfoImplTest, TestTrackTimeoutBudgets) {
+TEST_F(ClusterInfoImplTest, TestTrackTimeoutBudgets) {
   // Check that with the flag, the histogram is created.
   const std::string yaml = R"EOF(
     name: name
@@ -3927,7 +3950,7 @@ TEST_P(ClusterInfoImplTest, TestTrackTimeoutBudgets) {
             tb_stats.upstream_rq_timeout_budget_per_try_percent_used_.unit());
 }
 
-TEST_P(ClusterInfoImplTest, DEPRECATED_FEATURE_TEST(TestTrackTimeoutBudgetsOld)) {
+TEST_F(ClusterInfoImplTest, DEPRECATED_FEATURE_TEST(TestTrackTimeoutBudgetsOld)) {
   // Check that without the flag specified, the histogram is null.
   const std::string yaml_disabled = R"EOF(
     name: name
@@ -3961,7 +3984,7 @@ TEST_P(ClusterInfoImplTest, DEPRECATED_FEATURE_TEST(TestTrackTimeoutBudgetsOld))
 }
 
 // Validates HTTP2 SETTINGS config.
-TEST_P(ClusterInfoImplTest, Http2ProtocolOptions) {
+TEST_F(ClusterInfoImplTest, Http2ProtocolOptions) {
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -4067,7 +4090,7 @@ struct TestFilterProtocolOptionsConfig : public Upstream::ProtocolOptionsConfig 
 
 // Cluster extension protocol options fails validation when configured for filter that does not
 // support options.
-TEST_P(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithoutOptions) {
+TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithoutOptions) {
   TestFilterConfigFactoryBase factoryBase(
       []() -> ProtobufTypes::MessagePtr { return nullptr; },
       [](const Protobuf::Message&) -> Upstream::ProtocolOptionsConfigConstSharedPtr {
@@ -4108,7 +4131,7 @@ TEST_P(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithoutOptions) {
   }
 }
 
-TEST_P(ClusterInfoImplTest, TypedExtensionProtocolOptionsForFilterWithoutOptions) {
+TEST_F(ClusterInfoImplTest, TypedExtensionProtocolOptionsForFilterWithoutOptions) {
   TestFilterConfigFactoryBase factoryBase(
       []() -> ProtobufTypes::MessagePtr { return nullptr; },
       [](const Protobuf::Message&) -> Upstream::ProtocolOptionsConfigConstSharedPtr {
@@ -4147,7 +4170,7 @@ TEST_P(ClusterInfoImplTest, TypedExtensionProtocolOptionsForFilterWithoutOptions
 }
 
 // Cluster retrieval of typed extension protocol options.
-TEST_P(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithOptions) {
+TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithOptions) {
   auto protocol_options = std::make_shared<TestFilterProtocolOptionsConfig>();
 
   TestFilterConfigFactoryBase factoryBase(
@@ -4241,7 +4264,7 @@ TEST_P(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithOptions) {
   }
 }
 
-TEST_P(ClusterInfoImplTest, UseDownstreamHttpProtocolWithDowngrade) {
+TEST_F(ClusterInfoImplTest, UseDownstreamHttpProtocolWithDowngrade) {
   const std::string yaml = R"EOF(
   name: name
   connect_timeout: 0.25s
@@ -4263,7 +4286,7 @@ TEST_P(ClusterInfoImplTest, UseDownstreamHttpProtocolWithDowngrade) {
             cluster->info()->upstreamHttpProtocol({Http::Protocol::Http3})[0]);
 }
 
-TEST_P(ClusterInfoImplTest, UpstreamHttp2Protocol) {
+TEST_F(ClusterInfoImplTest, UpstreamHttp2Protocol) {
   const std::string yaml = R"EOF(
   name: name
   connect_timeout: 0.25s
@@ -4283,7 +4306,7 @@ TEST_P(ClusterInfoImplTest, UpstreamHttp2Protocol) {
             cluster->info()->upstreamHttpProtocol({Http::Protocol::Http2})[0]);
 }
 
-TEST_P(ClusterInfoImplTest, UpstreamHttp11Protocol) {
+TEST_F(ClusterInfoImplTest, UpstreamHttp11Protocol) {
   const std::string yaml = R"EOF(
   name: name
   connect_timeout: 0.25s
@@ -4303,7 +4326,7 @@ TEST_P(ClusterInfoImplTest, UpstreamHttp11Protocol) {
 }
 
 #ifdef ENVOY_ENABLE_QUIC
-TEST_P(ClusterInfoImplTest, Http3) {
+TEST_F(ClusterInfoImplTest, Http3) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -4380,7 +4403,7 @@ TEST_P(ClusterInfoImplTest, Http3) {
       downstream_h3->info()->http3Options().quic_protocol_options().has_max_concurrent_streams());
 }
 
-TEST_P(ClusterInfoImplTest, Http3BadConfig) {
+TEST_F(ClusterInfoImplTest, Http3BadConfig) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -4429,7 +4452,7 @@ TEST_P(ClusterInfoImplTest, Http3BadConfig) {
                           "HTTP3 requires a QuicUpstreamTransport transport socket: name.*");
 }
 
-TEST_P(ClusterInfoImplTest, Http3Auto) {
+TEST_F(ClusterInfoImplTest, Http3Auto) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -4492,7 +4515,7 @@ TEST_P(ClusterInfoImplTest, Http3Auto) {
       auto_h3->info()->http3Options().quic_protocol_options().max_concurrent_streams().value(), 2);
 }
 
-TEST_P(ClusterInfoImplTest, UseDownstreamHttpProtocolWithoutDowngrade) {
+TEST_F(ClusterInfoImplTest, UseDownstreamHttpProtocolWithoutDowngrade) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -4549,7 +4572,7 @@ TEST_P(ClusterInfoImplTest, UseDownstreamHttpProtocolWithoutDowngrade) {
 }
 
 #else
-TEST_P(ClusterInfoImplTest, Http3BadConfig) {
+TEST_F(ClusterInfoImplTest, Http3BadConfig) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -4578,7 +4601,7 @@ TEST_P(ClusterInfoImplTest, Http3BadConfig) {
 }
 #endif // ENVOY_ENABLE_QUIC
 
-TEST_P(ClusterInfoImplTest, Http2Auto) {
+TEST_F(ClusterInfoImplTest, Http2Auto) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -4634,7 +4657,7 @@ TEST_P(ClusterInfoImplTest, Http2Auto) {
             auto_h2->info()->upstreamHttpProtocol({Http::Protocol::Http10})[0]);
 }
 
-TEST_P(ClusterInfoImplTest, Http2AutoNoAlpn) {
+TEST_F(ClusterInfoImplTest, Http2AutoNoAlpn) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -4669,7 +4692,7 @@ TEST_P(ClusterInfoImplTest, Http2AutoNoAlpn) {
                           ".*which has a non-ALPN transport socket:.*");
 }
 
-TEST_P(ClusterInfoImplTest, Http2AutoWithNonAlpnMatcher) {
+TEST_F(ClusterInfoImplTest, Http2AutoWithNonAlpnMatcher) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -5076,7 +5099,7 @@ TEST(HostPartitionTest, PartitionHosts) {
   EXPECT_EQ(hosts[4], update_hosts_params.excluded_hosts_per_locality->get()[1][1]);
 }
 
-TEST_P(ClusterInfoImplTest, MaxRequestsPerConnectionValidation) {
+TEST_F(ClusterInfoImplTest, MaxRequestsPerConnectionValidation) {
   const std::string yaml = R"EOF(
   name: cluster1
   type: STRICT_DNS
@@ -5095,7 +5118,7 @@ TEST_P(ClusterInfoImplTest, MaxRequestsPerConnectionValidation) {
                             "HttpProtocolOptions can be specified");
 }
 
-TEST_P(ClusterInfoImplTest, DeprecatedMaxRequestsPerConnection) {
+TEST_F(ClusterInfoImplTest, DeprecatedMaxRequestsPerConnection) {
   const std::string yaml = R"EOF(
   name: cluster1
   type: STRICT_DNS
@@ -5108,7 +5131,7 @@ TEST_P(ClusterInfoImplTest, DeprecatedMaxRequestsPerConnection) {
   EXPECT_EQ(3U, cluster->info()->maxRequestsPerConnection());
 }
 
-TEST_P(ClusterInfoImplTest, FilterChain) {
+TEST_F(ClusterInfoImplTest, FilterChain) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -5128,8 +5151,6 @@ TEST_P(ClusterInfoImplTest, FilterChain) {
   EXPECT_CALL(manager, applyFilterFactoryCb(_, _));
   cluster->info()->createFilterChain(manager);
 }
-
-INSTANTIATE_TEST_SUITE_P(ClusterInfoTestWithParams, ClusterInfoImplTest, ::testing::Bool());
 
 } // namespace
 } // namespace Upstream

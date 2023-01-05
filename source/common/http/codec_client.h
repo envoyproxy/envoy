@@ -76,7 +76,7 @@ public:
    * Close the underlying network connection. This is immediate and will not attempt to flush any
    * pending write data.
    */
-  void close();
+  void close(Network::ConnectionCloseType type = Network::ConnectionCloseType::NoFlush);
 
   /**
    * Send a codec level go away indication to the peer.

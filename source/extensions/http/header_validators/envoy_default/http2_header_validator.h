@@ -13,7 +13,7 @@ public:
   Http2HeaderValidator(
       const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&
           config,
-      ::Envoy::Http::Protocol protocol, StreamInfo::StreamInfo& stream_info);
+      ::Envoy::Http::Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats);
 
   HeaderEntryValidationResult
   validateRequestHeaderEntry(const ::Envoy::Http::HeaderString& key,
@@ -28,6 +28,12 @@ public:
 
   ResponseHeaderMapValidationResult
   validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap& header_map) override;
+
+  TrailerValidationResult
+  validateRequestTrailerMap(::Envoy::Http::RequestTrailerMap& trailer_map) override;
+
+  TrailerValidationResult
+  validateResponseTrailerMap(::Envoy::Http::ResponseTrailerMap& trailer_map) override;
 
   /*
    * Validate the TE header.
