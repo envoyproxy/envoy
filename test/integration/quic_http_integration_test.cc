@@ -497,7 +497,7 @@ TEST_P(QuicHttpIntegrationTest, GetRequestAndEmptyResponse) {
   useAccessLog("%DOWNSTREAM_TLS_VERSION% %DOWNSTREAM_TLS_CIPHER% %DOWNSTREAM_TLS_SESSION_ID%");
   testRouterHeaderOnlyRequestAndResponse();
   std::string log = waitForAccessLog(access_log_name_);
-  EXPECT_THAT(log, testing::HasSubstr("TLSv1.3 TLS_AES_128_GCM_SHA256 -"));
+  EXPECT_THAT(log, testing::MatchesRegex("TLSv1.3 TLS_(AES_128_GCM|CHACHA20_POLY1305)_SHA256 -"));
 }
 
 TEST_P(QuicHttpIntegrationTest, GetPeerAndLocalCertsInfo) {
