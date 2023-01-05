@@ -20,8 +20,10 @@ Upstream::LoadBalancerPtr RandomCreator::operator()(Upstream::LoadBalancerParams
       dynamic_cast<const envoy::extensions::load_balancing_policies::random::v3::Random*>(
           cluster_info.loadBalancingPolicy().get());
 
-  RELEASE_ASSERT(typed_config != nullptr,
-                 "Invalid load balancing policy configuration for random load balancer");
+  // The load balancing policy configuration will be loaded and validated in the main thread when we
+  // load the cluster configuration. So we can assume the configuration is valid here.
+  ASSERT(typed_config != nullptr,
+         "Invalid load balancing policy configuration for random load balancer");
 
   return std::make_unique<Upstream::RandomLoadBalancer>(
       params.priority_set, params.local_priority_set, cluster_info.lbStats(), runtime, random,

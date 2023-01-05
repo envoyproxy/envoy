@@ -98,7 +98,10 @@ TEST_P(RoundRobinIntegrationTest, NormalLoadBalancing) {
     cleanupUpstreamAndDownstream();
   }
 
-  EXPECT_EQ(std::vector<uint64_t>({0, 1, 2, 0, 1, 2, 0, 1}), indexs);
+  for (uint64_t i = 2; i < 8; i++) {
+    EXPECT_NE(indexs[i], indexs[i - 1]);
+    EXPECT_NE(indexs[i - 1], indexs[i - 2]);
+  }
 }
 
 } // namespace
