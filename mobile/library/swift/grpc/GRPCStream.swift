@@ -61,7 +61,7 @@ public final class GRPCStream: NSObject {
     return self
   }
 
-  /// Close this connection.
+  /// Close the stream, wait for the peer to finish before actually closing the stream.
   public func close() {
     // The gRPC protocol requires the client stream to close with a DATA frame.
     // More information here:
@@ -69,7 +69,7 @@ public final class GRPCStream: NSObject {
     self.underlyingStream.close(data: Data())
   }
 
-  /// Cancel this connection.
+  /// Cancel the stream forcefully regardless of whether the peer has more data to send.
   public func cancel() {
     self.underlying.cancel()
   }
