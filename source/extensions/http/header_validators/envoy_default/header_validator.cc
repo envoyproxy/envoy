@@ -468,6 +468,53 @@ HeaderValidator::validateGenericRequestHeaderEntry(const ::Envoy::Http::HeaderSt
   return validateGenericHeaderValue(value);
 }
 
+// For all (H/1, H/2 and H/3) protocols, trailers should only contain generic headers. As such a
+// common validation method can be used.
+// More in depth explanation for using common function:
+// For H/2 (and so H/3), per
+// https://www.rfc-editor.org/rfc/rfc9113#section-8.1 trailers MUST NOT contain pseudo header
+// fields.
+// For H/1 the codec will never produce H/2 pseudo headers and per
+// https://www.rfc-editor.org/rfc/rfc9110#section-6.5 there are no other prohibitions.
+// As a result this common function can cover trailer validation for all protocols.
+HeaderValidator::TrailerValidationResult
+HeaderValidator::validateTrailers(::Envoy::Http::HeaderMap& trailers) {
+  std::string reject_details;
+  std::vector<absl::string_view> drop_headers;
+  trailers.iterate(
+      [this, &reject_details, &drop_headers](
+          const ::Envoy::Http::HeaderEntry& header_entry) -> ::Envoy::Http::HeaderMap::Iterate {
+        const auto& header_name = header_entry.key();
+        const auto& header_value = header_entry.value();
+
+        auto entry_name_result = validateGenericHeaderName(header_name);
+        if (entry_name_result.action() == HeaderEntryValidationResult::Action::DropHeader) {
+          // drop the header, continue processing the request
+          drop_headers.push_back(header_name.getStringView());
+        } else if (!entry_name_result) {
+          reject_details = static_cast<std::string>(entry_name_result.details());
+        } else {
+          auto entry_value_result = validateGenericHeaderValue(header_value);
+          if (!entry_value_result) {
+            reject_details = static_cast<std::string>(entry_value_result.details());
+          }
+        }
+
+        return reject_details.empty() ? ::Envoy::Http::HeaderMap::Iterate::Continue
+                                      : ::Envoy::Http::HeaderMap::Iterate::Break;
+      });
+
+  if (!reject_details.empty()) {
+    return {TrailerValidationResult::Action::Reject, reject_details};
+  }
+
+  for (auto& name : drop_headers) {
+    trailers.remove(::Envoy::Http::LowerCaseString(name));
+  }
+
+  return TrailerValidationResult::success();
+}
+
 } // namespace EnvoyDefault
 } // namespace HeaderValidators
 } // namespace Http

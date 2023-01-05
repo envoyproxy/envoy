@@ -1732,16 +1732,14 @@ VirtualHostImpl::VirtualHostImpl(
     ProtobufMessage::ValidationVisitor& validator,
     const absl::optional<Upstream::ClusterManager::ClusterInfoMaps>& validation_clusters)
     : stat_name_storage_(virtual_host.name(), factory_context.scope().symbolTable()),
-      vcluster_scope_(Stats::Utility::scopeFromStatNames(
-          scope, {stat_name_storage_.statName(),
-                  factory_context.routerContext().virtualClusterStatNames().vcluster_})),
       global_route_config_(global_route_config),
       per_filter_configs_(virtual_host.typed_per_filter_config(), optional_http_filters,
                           factory_context, validator),
       retry_shadow_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           virtual_host, per_request_buffer_limit_bytes, std::numeric_limits<uint32_t>::max())),
       include_attempt_count_in_request_(virtual_host.include_request_attempt_count()),
-      include_attempt_count_in_response_(virtual_host.include_attempt_count_in_response()) {
+      include_attempt_count_in_response_(virtual_host.include_attempt_count_in_response()),
+      include_is_timeout_retry_header_(virtual_host.include_is_timeout_retry_header()) {
   if (!virtual_host.request_headers_to_add().empty() ||
       !virtual_host.request_headers_to_remove().empty()) {
     request_headers_parser_ = HeaderParser::configure(virtual_host.request_headers_to_add(),
@@ -1815,6 +1813,9 @@ VirtualHostImpl::VirtualHostImpl(
   }
 
   if (!virtual_host.virtual_clusters().empty()) {
+    vcluster_scope_ = Stats::Utility::scopeFromStatNames(
+        scope, {stat_name_storage_.statName(),
+                factory_context.routerContext().virtualClusterStatNames().vcluster_});
     virtual_cluster_catch_all_ = std::make_unique<CatchAllVirtualCluster>(
         *vcluster_scope_, factory_context.routerContext().virtualClusterStatNames());
     for (const auto& virtual_cluster : virtual_host.virtual_clusters()) {

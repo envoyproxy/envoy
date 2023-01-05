@@ -145,6 +145,11 @@ protected:
                                     const ::Envoy::Http::HeaderString& value,
                                     const HeaderValidatorMap& header_validator_map);
 
+  /*
+   * Common method for validating request or response trailers.
+   */
+  TrailerValidationResult validateTrailers(::Envoy::Http::HeaderMap& trailers);
+
   const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       config_;
   ::Envoy::Http::Protocol protocol_;
