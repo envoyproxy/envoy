@@ -657,7 +657,7 @@ private:
 
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   Network::Socket::OptionsSharedPtr upstream_options_;
-  // Set of active shadow stream.
+  // Set of ongoing shadow streams which have not yet received end stream.
   absl::flat_hash_set<Http::AsyncClient::OngoingRequest*> shadow_streams_;
   const bool streaming_shadows_;
 };
