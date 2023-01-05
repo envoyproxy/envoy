@@ -2728,6 +2728,7 @@ TEST_F(StaticClusterImplTest, LbPolicyConfig) {
                               std::move(scope), true);
 
     EXPECT_NE(nullptr, cluster.info()->loadBalancingPolicy());
+    EXPECT_NE(nullptr, cluster.info()->loadBalancerFactory());
   });
 }
 
