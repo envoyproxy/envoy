@@ -562,6 +562,12 @@ public:
    * @throw EnvoyException if a conversion error occurs.
    */
   static void wireCast(const Protobuf::Message& src, Protobuf::Message& dst);
+
+  /**
+   * Sanitizes a string to contain only valid UTF-8. Invalid UTF-8 characters will be replaced. If
+   * the input string is valid UTF-8, it will be returned unmodified.
+   */
+  static std::string sanitizeUtf8String(absl::string_view str);
 };
 
 class ValueUtil {

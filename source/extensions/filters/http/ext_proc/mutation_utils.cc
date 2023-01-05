@@ -5,6 +5,7 @@
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/str_cat.h"
 
@@ -28,7 +29,8 @@ void MutationUtils::headersToProto(const Http::HeaderMap& headers_in,
   headers_in.iterate([&proto_out](const Http::HeaderEntry& e) -> Http::HeaderMap::Iterate {
     auto* new_header = proto_out.add_headers();
     new_header->set_key(std::string(e.key().getStringView()));
-    new_header->set_value(std::string(e.value().getStringView()));
+    new_header->set_value(MessageUtil::sanitizeUtf8String(e.value().getStringView()));
+
     return Http::HeaderMap::Iterate::Continue;
   });
 }
