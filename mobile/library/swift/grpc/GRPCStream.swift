@@ -61,7 +61,8 @@ public final class GRPCStream: NSObject {
     return self
   }
 
-  /// Close the stream, wait for the peer to finish before actually closing the stream.
+  /// Close stream by sending the "end stream" signal to the peer and 
+  /// then waiting for the peer to finish before actually closing the stream.
   public func close() {
     // The gRPC protocol requires the client stream to close with a DATA frame.
     // More information here:
