@@ -192,6 +192,9 @@ new_features:
   change: |
     added :ref:`dubbo codec support <envoy_v3_api_msg_extensions.filters.network.generic_proxy.codecs.dubbo.v3.DubboCodecConfig>` to the
     :ref:`generic_proxy filter <envoy_v3_api_msg_extensions.filters.network.generic_proxy.v3.GenericProxy>`.
+- area: golang
+  change: |
+    added new :ref:`HTTP golang extension filter <config_http_filters_golang>`.
 - area: custom response http filter
   change: |
     added :ref:`custom response http filter <config_http_filters_custom_response>` which adds the ability to customize responses sent to downstreams using local or remote sources.
