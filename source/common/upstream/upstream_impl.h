@@ -703,8 +703,6 @@ public:
                   Stats::ScopeSharedPtr&& stats_scope, bool added_via_api,
                   Server::Configuration::TransportSocketFactoryContext&);
 
-  ~ClusterInfoImpl() { ENVOY_LOG_MISC(error, "DDD DDD Deleting clusterINFO: {}", this->name()); }
-
   static std::unique_ptr<LazyableClusterTrafficStats>
   generateStats(Stats::Scope& scope, const ClusterTrafficStatNames& cluster_stat_names,
                 bool lazyinit = false);

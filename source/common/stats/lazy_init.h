@@ -30,11 +30,9 @@ public:
             Stats::Gauge::ImportMode::NeverImport)),
         ctor_([&scope, &stat_names, this]() -> StatsStructType* {
           inited_.inc();
-          ENVOY_LOG_MISC(error, "DDDD III inc {} now : {}", inited_.name(), inited_.value());
           return new StatsStructType(stat_names, scope);
         }) {
     if (inited_.value() > 0) {
-      // Create the nested StatsStructType.
       instantiate();
     }
   }
@@ -44,7 +42,6 @@ public:
   ~LazyInit() {
     if (inited_.value() > 0) {
       inited_.dec();
-      ENVOY_LOG_MISC(error, "DDDD DDD dec {} now : {}", inited_.name(), inited_.value());
     }
   }
 

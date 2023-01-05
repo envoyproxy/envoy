@@ -236,6 +236,8 @@ TEST_P(CdsIntegrationTest, CdsClusterTeardownWhileConnecting) {
 
 // Test that TrafficStats lazyinit when configured.
 TEST_P(CdsIntegrationTest, TrafficStatsLazyInit) {
+  this->use_real_stats_ = true;
+
   initialize();
   // This line ensures that the ClusterInfoImpl is created already.
   test_server_->waitForCounterGe("cluster_manager.cluster_added", 1);
@@ -279,16 +281,24 @@ TEST_P(CdsIntegrationTest, TrafficStatsLazyInit) {
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster, {}, {},
                                                              {ClusterName1}, "42");
   test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
+  auto run_on_main_thread_and_wait_for_completion = [this]() {
+    absl::Notification notification;
+    test_server_->server().dispatcher().post([&notification]() {
+      ENVOY_LOG_MISC(info, "Run on main thread.");
+      notification.Notify();
+    });
+    notification.WaitForNotification();
+  };
+  run_on_main_thread_and_wait_for_completion();
   // Make sure the deferred deletion of "cluster_1" is done.
-  runOnWorkerThreadsAndWaitforCompletion(
-      test_server_->server(), []() { ENVOY_LOG_MISC(error, "DDD run on all threads."); });
-  absl::Notification notification;
-  test_server_->server().dispatcher().post([&notification]() { notification.Notify(); });
-  notification.WaitForNotification();
+  runOnWorkerThreadsAndWaitforCompletion(test_server_->server(),
+                                         []() { ENVOY_LOG_MISC(info, "Run on all threads."); });
+  run_on_main_thread_and_wait_for_completion();
+  runOnWorkerThreadsAndWaitforCompletion(test_server_->server(),
+                                         []() { ENVOY_LOG_MISC(info, "Run on all threads."); });
+
   // Now the stats are gone.
   if (this->enableLazyInitStats()) {
-    auto DDD = test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.inited");
-    ENVOY_LOG_MISC(error, "DDD {} ", DDD ? DDD->value() : -999);
     EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.inited"), nullptr);
   }
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total"), nullptr);
