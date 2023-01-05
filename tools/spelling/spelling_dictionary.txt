@@ -166,6 +166,7 @@ dnsresolvers
 endpos
 fo
 ghi
+golang
 guarddog
 GC
 GCC
