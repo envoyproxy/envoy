@@ -1187,22 +1187,25 @@ ClusterInfoImpl::ClusterInfoImpl(
 // Configures the load balancer based on config.load_balancing_policy
 void ClusterInfoImpl::configureLbPolicies(const envoy::config::cluster::v3::Cluster& config,
                                           Server::Configuration::ServerFactoryContext& context) {
-  if (config.has_lb_subset_config()) {
+  // Check if load_balancing_policy is set first.
+  if (!config.has_load_balancing_policy()) {
     throw EnvoyException(
-        fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
+        fmt::format("cluster: load_balancing_policy requires field load_balancing_policy to be set",
                     envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy())));
+  }
+
+  if (config.has_lb_subset_config()) {
+    throw EnvoyException("cluster: load_balancing_policy cannot be combined with lb_subset_config");
   }
 
   if (config.has_common_lb_config()) {
-    throw EnvoyException(
-        fmt::format("cluster: LB policy {} cannot be combined with common_lb_config",
-                    envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy())));
-  }
-
-  if (!config.has_load_balancing_policy()) {
-    throw EnvoyException(
-        fmt::format("cluster: LB policy {} requires load_balancing_policy to be set",
-                    envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy())));
+    const auto& lb_config = config.common_lb_config();
+    if (lb_config.has_zone_aware_lb_config() || lb_config.has_locality_weighted_lb_config() ||
+        lb_config.has_consistent_hashing_lb_config()) {
+      throw EnvoyException(
+          "cluster: load_balancing_policy be combined with partial fields (zone_aware_lb_config, "
+          "locality_weighted_lb_config, consistent_hashing_lb_config) of common_lb_config");
+    }
   }
 
   for (const auto& policy : config.load_balancing_policy().policies()) {
@@ -1223,7 +1226,8 @@ void ClusterInfoImpl::configureLbPolicies(const envoy::config::cluster::v3::Clus
 
   if (load_balancer_factory_ == nullptr) {
     throw EnvoyException(fmt::format(
-        "Didn't find a registered load balancer factory implementation for cluster: '{}'", name_));
+        "cluster: didn't find a registered load balancer factory implementation for cluster: '{}'",
+        name_));
   }
 
   lb_type_ = LoadBalancerType::LoadBalancingPolicyConfig;
