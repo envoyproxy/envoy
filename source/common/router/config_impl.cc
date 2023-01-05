@@ -1732,9 +1732,6 @@ VirtualHostImpl::VirtualHostImpl(
     ProtobufMessage::ValidationVisitor& validator,
     const absl::optional<Upstream::ClusterManager::ClusterInfoMaps>& validation_clusters)
     : stat_name_storage_(virtual_host.name(), factory_context.scope().symbolTable()),
-      vcluster_scope_(Stats::Utility::scopeFromStatNames(
-          scope, {stat_name_storage_.statName(),
-                  factory_context.routerContext().virtualClusterStatNames().vcluster_})),
       global_route_config_(global_route_config),
       per_filter_configs_(virtual_host.typed_per_filter_config(), optional_http_filters,
                           factory_context, validator),
@@ -1816,6 +1813,9 @@ VirtualHostImpl::VirtualHostImpl(
   }
 
   if (!virtual_host.virtual_clusters().empty()) {
+    vcluster_scope_ = Stats::Utility::scopeFromStatNames(
+        scope, {stat_name_storage_.statName(),
+                factory_context.routerContext().virtualClusterStatNames().vcluster_});
     virtual_cluster_catch_all_ = std::make_unique<CatchAllVirtualCluster>(
         *vcluster_scope_, factory_context.routerContext().virtualClusterStatNames());
     for (const auto& virtual_cluster : virtual_host.virtual_clusters()) {
