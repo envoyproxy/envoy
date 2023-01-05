@@ -204,6 +204,8 @@ private:
     std::list<AccessLog::InstanceSharedPtr> accessLogHandlers() override {
       return filter_manager_.accessLogHandlers();
     }
+    // Copy this stream's StreamInfo into the deferred logging object, ensuring that the request
+    // headers pointed to by the StreamInfo lives beyond stream destruction.
     void deferHeadersAndTrailers() {
       Http::DeferredLoggingHeadersAndTrailers headers_and_trailers;
       if (requestHeaders()) {
@@ -215,8 +217,6 @@ private:
       if (responseTrailers()) {
         headers_and_trailers.response_trailer_map = response_trailers_;
       }
-      // Copy this stream's StreamInfo into the deferred logging object, ensuring that the request
-      // headers pointed to by the StreamInfo lives beyond stream destruction.
       std::unique_ptr<StreamInfo::StreamInfoImpl> stream_info =
           std::make_unique<StreamInfo::StreamInfoImpl>(
               connection_manager_.codec_->protocol(), connection_manager_.time_source_,
