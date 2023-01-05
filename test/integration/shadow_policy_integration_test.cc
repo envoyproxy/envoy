@@ -1,3 +1,4 @@
+#include <chrono>
 #include <string>
 
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
@@ -6,6 +7,7 @@
 
 #include "test/integration/filters/repick_cluster_filter.h"
 #include "test/integration/http_integration.h"
+#include "test/integration/socket_interface_swap.h"
 #include "test/test_common/test_runtime.h"
 
 namespace Envoy {
@@ -13,7 +15,8 @@ namespace {
 
 class ShadowPolicyIntegrationTest
     : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
-      public HttpIntegrationTest {
+      public HttpIntegrationTest,
+      public SocketInterfaceSwap {
 public:
   ShadowPolicyIntegrationTest()
       : HttpIntegrationTest(Http::CodecType::HTTP2, std::get<0>(GetParam())) {
@@ -277,19 +280,13 @@ TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithShadowUpstreamReset) 
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_rq_completed")->value(), 1);
 }
 
-TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithDownstreamTimeout) {
+// Test a downstream timeout before end stream has been sent.
+TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithEarlyDownstreamTimeout) {
   if (!streaming_shadow_) {
     GTEST_SKIP() << "Not applicable for non-streaming shadows.";
   }
   autonomous_upstream_ = false;
   initialConfigSetup("cluster_1", "");
-  config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-             hcm) {
-        // 100 millisecond timeout.
-        hcm.mutable_stream_idle_timeout()->set_seconds(0);
-        hcm.mutable_stream_idle_timeout()->set_nanos(100 * 1000 * 1000);
-      });
   config_helper_.disableDelayClose();
   initialize();
 
@@ -332,11 +329,292 @@ TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithDownstreamTimeout) {
 
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 1);
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
-  // Main cluster saw remote reset; shadow cluster saw local reset.
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_tx_reset")->value(), 1);
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_rq_tx_reset")->value(), 1);
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_completed")->value(), 0);
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_rq_completed")->value(), 0);
+}
+
+// Test a downstream timeout after end stream has been sent by the client where the shadow request
+// completes.
+TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithLateDownstreamTimeoutAndShadowComplete) {
+  if (!streaming_shadow_) {
+    GTEST_SKIP() << "Not applicable for non-streaming shadows.";
+  }
+  autonomous_upstream_ = false;
+  initialConfigSetup("cluster_1", "");
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        // 100 millisecond timeout.
+        hcm.mutable_stream_idle_timeout()->set_seconds(0);
+        hcm.mutable_stream_idle_timeout()->set_nanos(100 * 1000 * 1000);
+      });
+  config_helper_.disableDelayClose();
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl request_headers = default_request_headers_;
+  request_headers.addCopy("potato", "salad");
+  // Send whole request.
+  std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr> result =
+      codec_client_->startRequest(request_headers, true);
+  auto response = std::move(result.second);
+
+  FakeHttpConnectionPtr fake_upstream_connection_main;
+  FakeStreamPtr upstream_request_main;
+  ASSERT_TRUE(
+      fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_main));
+  ASSERT_TRUE(fake_upstream_connection_main->waitForNewStream(*dispatcher_, upstream_request_main));
+  FakeHttpConnectionPtr fake_upstream_connection_shadow;
+  FakeStreamPtr upstream_request_shadow;
+  ASSERT_TRUE(
+      fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_shadow));
+  ASSERT_TRUE(
+      fake_upstream_connection_shadow->waitForNewStream(*dispatcher_, upstream_request_shadow));
+  ASSERT_TRUE(upstream_request_main->waitForHeadersComplete());
+  ASSERT_TRUE(upstream_request_shadow->waitForHeadersComplete());
+  upstream_request_shadow->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(fake_upstream_connection_shadow->close());
+  ASSERT_TRUE(fake_upstream_connection_shadow->waitForDisconnect());
+  EXPECT_TRUE(upstream_request_shadow->complete());
+
+  // Eventually the main request will time out.
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(upstream_request_main->waitForReset());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ(response->headers().getStatusValue(), "504");
+
+  // Clean up.
+  ASSERT_TRUE(fake_upstream_connection_main->close());
+  ASSERT_TRUE(fake_upstream_connection_main->waitForDisconnect());
+
+  cleanupUpstreamAndDownstream();
+
+  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 1);
+  EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
+  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_tx_reset")->value(), 1);
+  EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_rq_tx_reset")->value(), 0);
+  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_completed")->value(), 0);
+  EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_rq_completed")->value(), 1);
+}
+
+// Test a shadow timeout after the main request completes.
+TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithShadowOnlyTimeout) {
+  if (!streaming_shadow_) {
+    GTEST_SKIP() << "Not applicable for non-streaming shadows.";
+  }
+  autonomous_upstream_ = false;
+  initialConfigSetup("cluster_1", "");
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        // 100 millisecond timeout. The shadow inherits the timeout value from the route.
+        auto* route_config = hcm.mutable_route_config();
+        auto* virtual_host = route_config->mutable_virtual_hosts(0);
+        auto* route = virtual_host->mutable_routes(0)->mutable_route();
+        route->mutable_timeout()->set_seconds(0);
+        route->mutable_timeout()->set_nanos(100 * 1000 * 1000);
+      });
+  config_helper_.disableDelayClose();
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl request_headers = default_request_headers_;
+  request_headers.addCopy("potato", "salad");
+  // Send whole request.
+  std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr> result =
+      codec_client_->startRequest(request_headers, true);
+  auto response = std::move(result.second);
+
+  FakeHttpConnectionPtr fake_upstream_connection_main;
+  FakeStreamPtr upstream_request_main;
+  ASSERT_TRUE(
+      fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_main));
+  ASSERT_TRUE(fake_upstream_connection_main->waitForNewStream(*dispatcher_, upstream_request_main));
+  FakeHttpConnectionPtr fake_upstream_connection_shadow;
+  FakeStreamPtr upstream_request_shadow;
+  ASSERT_TRUE(
+      fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_shadow));
+  ASSERT_TRUE(
+      fake_upstream_connection_shadow->waitForNewStream(*dispatcher_, upstream_request_shadow));
+  ASSERT_TRUE(upstream_request_main->waitForHeadersComplete());
+  ASSERT_TRUE(upstream_request_shadow->waitForHeadersComplete());
+
+  upstream_request_main->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+
+  // Eventually the shadow request will time out.
+  ASSERT_TRUE(upstream_request_shadow->waitForReset());
+
+  // Clean up.
+  ASSERT_TRUE(fake_upstream_connection_main->close());
+  ASSERT_TRUE(fake_upstream_connection_main->waitForDisconnect());
+
+  cleanupUpstreamAndDownstream();
+
+  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 1);
+  EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
+  EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_rq_tx_reset")->value(), 1);
+  EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_rq_timeout")->value(), 1);
+}
+
+TEST_P(ShadowPolicyIntegrationTest, MainRequestOverBufferLimit) {
+  if (!streaming_shadow_) {
+    GTEST_SKIP() << "Not applicable for non-streaming shadows.";
+  }
+  autonomous_upstream_ = true;
+  cluster_with_custom_filter_ = 0;
+  filter_name_ = "encoder-decoder-buffer-filter";
+  initialConfigSetup("cluster_1", "");
+  config_helper_.setBufferLimits(1024, 1024);
+  config_helper_.disableDelayClose();
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl request_headers = default_request_headers_;
+  request_headers.addCopy("potato", "salad");
+  // Send whole (large) request.
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/dynamo/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"x-forwarded-for", "10.0.0.1"},
+                                     {"x-envoy-retry-on", "5xx"}},
+      1024 * 65);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+
+  cleanupUpstreamAndDownstream();
+
+  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 1);
+  EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
+  EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_rq_completed")->value(), 1);
+}
+
+TEST_P(ShadowPolicyIntegrationTest, ShadowRequestOverBufferLimit) {
+  if (!streaming_shadow_) {
+    GTEST_SKIP() << "Not applicable for non-streaming shadows.";
+  }
+  autonomous_upstream_ = true;
+  cluster_with_custom_filter_ = 1;
+  filter_name_ = "encoder-decoder-buffer-filter";
+  initialConfigSetup("cluster_1", "");
+  config_helper_.setBufferLimits(1024, 1024);
+  config_helper_.disableDelayClose();
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl request_headers = default_request_headers_;
+  request_headers.addCopy("potato", "salad");
+  // Send whole (large) request.
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/dynamo/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"x-forwarded-for", "10.0.0.1"},
+                                     {"x-envoy-retry-on", "5xx"}},
+      1024 * 65);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ(response->headers().getStatusValue(), "200");
+
+  cleanupUpstreamAndDownstream();
+
+  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 1);
+  EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
+  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_completed")->value(), 1);
+  // The request to the shadow upstream never completed due to buffer overflow.
+  EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_rq_completed")->value(), 0);
+}
+
+TEST_P(ShadowPolicyIntegrationTest, BackedUpConnectionBeforeShadowBegins) {
+  if (!streaming_shadow_) {
+    GTEST_SKIP() << "Not applicable for non-streaming shadows.";
+  }
+  autonomous_upstream_ = true;
+  autonomous_allow_incomplete_streams_ = true;
+  initialConfigSetup("cluster_1", "");
+  // Shrink the shadow buffer size.
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bs) {
+    auto* shadow_cluster = bs.mutable_static_resources()->mutable_clusters(1);
+    shadow_cluster->mutable_per_connection_buffer_limit_bytes()->set_value(1024);
+  });
+
+  // Add a route directly for the shadow.
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* route_1 = hcm.mutable_route_config()->mutable_virtual_hosts(0)->add_routes();
+        route_1->mutable_route()->set_cluster("cluster_1");
+        route_1->mutable_match()->set_prefix("/shadow");
+        hcm.mutable_route_config()
+            ->mutable_virtual_hosts(0)
+            ->mutable_routes(0)
+            ->mutable_match()
+            ->set_prefix("/main");
+      });
+  config_helper_.addRuntimeOverride(Runtime::defer_processing_backedup_streams, "true");
+  initialize();
+
+  write_matcher_->setDestinationPort(fake_upstreams_[1]->localAddress()->ip()->port());
+  write_matcher_->setWriteReturnsEgain();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  // Send an initial request to `cluster_1` directly, which will fill the connection buffer.
+  auto shadow_direct_response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/shadow"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"x-forwarded-for", "10.0.0.1"},
+                                     {"x-envoy-retry-on", "5xx"}},
+      1024 * 3);
+
+  // Initiate a request to the main route.
+  std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr> result =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/main"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "sni.lyft.com"},
+                                                                 {"x-forwarded-for", "10.0.0.1"},
+                                                                 {"x-envoy-retry-on", "5xx"}},
+                                  false);
+  auto& encoder = result.first;
+  auto main_response = std::move(result.second);
+
+  // Connecting to the shadow stream should cause backpressure due to connection backup.
+  test_server_->waitForCounterEq("http.config_test.downstream_flow_control_paused_reading_total", 1,
+                                 std::chrono::milliseconds(500));
+
+  codec_client_->sendData(encoder, 1023, false);
+
+  codec_client_->sendData(encoder, 10, true);
+  // Main request must not have been completed due to backpressure.
+  EXPECT_FALSE(main_response->waitForEndStream(std::chrono::milliseconds(500)));
+
+  // Unblock the port for `cluster_1`
+  write_matcher_->setResumeWrites();
+
+  EXPECT_TRUE(main_response->waitForEndStream());
+  EXPECT_TRUE(main_response->complete());
+  EXPECT_EQ(main_response->headers().getStatusValue(), "200");
+  EXPECT_TRUE(shadow_direct_response->waitForEndStream());
+  EXPECT_TRUE(shadow_direct_response->complete());
+  EXPECT_EQ(shadow_direct_response->headers().getStatusValue(), "200");
+
+  // Two requests were sent over a single connection to cluster_1.
+  EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
+  EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_rq_completed")->value(), 2);
+  EXPECT_EQ(test_server_->counter("http.config_test.downstream_flow_control_paused_reading_total")
+                ->value(),
+            1);
 }
 
 TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithShadowBackpressure) {
