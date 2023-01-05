@@ -110,7 +110,7 @@ static_resources:
       .sendHeaders(requestHeaders, endStream: false)
       .cancel()
 
-    let expectations = [filterExpectation, onCancelCallbackExpectation]
+    let expectations = [onCancelCallbackExpectation, filterExpectation]
     XCTAssertEqual(XCTWaiter.wait(for: expectations, timeout: 3, enforceOrder: true), .completed)
 
     engine.terminate()
