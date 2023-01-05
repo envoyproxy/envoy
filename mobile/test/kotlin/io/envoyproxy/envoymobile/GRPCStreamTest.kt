@@ -5,6 +5,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executor
+import java.util.concurrent.TimeUnit
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
 
@@ -90,6 +91,23 @@ class GRPCStreamTest {
       .close()
 
     assertThat(closedData).isEqualTo(ByteBuffer.allocate(0))
+  }
+
+  @Test
+  fun `cancel calls a stream callback`() {
+    val countDownLatch = CountDownLatch(1)
+    val streamClient = MockStreamClient { stream ->
+      stream.onCancel = { 
+        countDownLatch.countDown()
+      }
+    }
+
+    GRPCClient(streamClient)
+      .newGRPCStreamPrototype()
+      .start(Executor {})
+      .cancel()
+
+    assertThat(countDownLatch.await(2000, TimeUnit.MILLISECONDS)).isTrue()
   }
 
   // Response tests
