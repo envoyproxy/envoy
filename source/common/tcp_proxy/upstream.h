@@ -183,15 +183,11 @@ private:
     void decodeData(Buffer::Instance& data, bool end_stream) override {
       parent_.upstream_callbacks_.onUpstreamData(data, end_stream);
       if (end_stream) {
-        done_reading_called_ = true;
         parent_.doneReading();
       }
     }
     void decodeTrailers(Http::ResponseTrailerMapPtr&&) override {
-      if (!done_reading_called_) {
-        done_reading_called_ = true;
-        parent_.doneReading();
-      }
+      parent_.doneReading();
     }
     void decodeMetadata(Http::MetadataMapPtr&&) override {}
     void dumpState(std::ostream& os, int indent_level) const override {
@@ -200,7 +196,6 @@ private:
 
   private:
     HttpUpstream& parent_;
-    bool done_reading_called_{};
   };
   DecoderShim response_decoder_;
   Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks_;
