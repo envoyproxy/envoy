@@ -13,6 +13,9 @@ envoy_cc_library(
     hdrs = [
         "stream.h",
     ],
+    deps = [
+        "//envoy/tracing:trace_context_interface",
+    ],
 )
 
 envoy_cc_library(

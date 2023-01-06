@@ -5,6 +5,7 @@
 #include <string>
 
 #include "envoy/common/pure.h"
+#include "envoy/tracing/trace_context.h"
 
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
@@ -74,7 +75,7 @@ public:
   static constexpr absl::string_view name() { return "generic_proxy"; }
 };
 
-class Request : public StreamBase {
+class Request : public StreamBase, public Tracing::TraceContext {
 public:
   /**
    * Get request host.
@@ -92,7 +93,7 @@ public:
    * different application protocols. It typically should be RPC service name that used to
    * represents set of method or functionality provided by target service.
    */
-  virtual absl::string_view path() const PURE;
+  virtual absl::string_view path() const PURE; // NOLINT
 
   /**
    * Get request method.
@@ -100,7 +101,11 @@ public:
    * @return The method of generic request. The meaning of the return value may be different For
    * different application protocols.
    */
-  virtual absl::string_view method() const PURE;
+  virtual absl::string_view method() const PURE; // NOLINT
+
+  // TODO(wbpcode): remove this method after we update the authority() in the TraceContext to
+  // host().
+  absl::string_view authority() const final { return host(); }
 };
 using RequestPtr = std::unique_ptr<Request>;
 using RequestSharedPtr = std::shared_ptr<Request>;
