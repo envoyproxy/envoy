@@ -25,5 +25,5 @@ def envoy_dependencies_extra(python_version = PYTHON_VERSION):
 
     llvm_toolchain(
         name = "llvm_toolchain",
-        llvm_version = "14.0.0",
+        llvm_version = "15.0.6",
     )
