@@ -281,30 +281,27 @@ TEST_P(CdsIntegrationTest, TrafficStatsLazyInit) {
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster, {}, {},
                                                              {ClusterName1}, "42");
   test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
-  // This sleep is necessary to remove the race between testing thread and main thread, to make
-  // sure that the deferred deletion callbacks of the TLS 'cluster_1' queued in main and worker
-  // threads dispatchers first.
-  absl::SleepFor(absl::Seconds(1));
+  test_server_->waitForCounterGe("cluster_manager.cds.update_success", 3);
+  // Add "cluster_2".
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      Config::TypeUrl::get().Cluster, {cluster2_}, {cluster2_}, {ClusterName1}, "43");
+  test_server_->waitForCounterGe("cluster_manager.cds.update_success", 4);
+  EXPECT_EQ(test_server_->counter("cluster_manager.cluster_added")->value(), 3); // +1, +1, +2
 
-  auto run_on_main_thread_and_wait_for_completion = [this]() {
-    absl::Notification notification;
-    test_server_->server().dispatcher().post([&notification]() {
-      ENVOY_LOG_MISC(info, "Run on main thread.");
-      notification.Notify();
-    });
-    notification.WaitForNotification();
-  };
-  run_on_main_thread_and_wait_for_completion();
-  // Make sure the deferred deletion of "cluster_1" is done.
-  runOnWorkerThreadsAndWaitforCompletion(test_server_->server(),
-                                         []() { ENVOY_LOG_MISC(info, "Run on all threads."); });
-  run_on_main_thread_and_wait_for_completion();
-
-  // Now the stats are gone.
   if (this->enableLazyInitStats()) {
+    // Now the cluster_1 stats are gone, as well as the lazy init wrapper.
     EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.inited"), nullptr);
+    EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total"), nullptr);
+    // No cluster_2 stats yet.
+    EXPECT_NE(test_server_->gauge("cluster.cluster_2.ClusterTrafficStats.inited"), nullptr);
+    EXPECT_EQ(test_server_->gauge("cluster.cluster_2.ClusterTrafficStats.inited")->value(), 0);
+    EXPECT_EQ(test_server_->counter("cluster.cluster_2.upstream_cx_total"), nullptr);
+  } else {
+    // cluster_1 stats are gone.
+    EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total"), nullptr);
+    // cluster_2 stats created.
+    EXPECT_EQ(test_server_->counter("cluster.cluster_2.upstream_cx_total")->value(), 0);
   }
-  EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total"), nullptr);
 }
 
 // Test the fast addition and removal of clusters when they use ThreadAwareLb.
