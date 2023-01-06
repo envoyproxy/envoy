@@ -5,9 +5,7 @@ licenses(["notice"])  # Apache 2
 go_binary(
     name = "filter.so",
     srcs = [
-        "api.h",
         "config.go",
-        "export.go",
         "filter.go",
     ],
     out = "filter.so",

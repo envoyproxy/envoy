@@ -5,8 +5,6 @@ licenses(["notice"])  # Apache 2
 go_binary(
     name = "libgolang.so",
     srcs = [
-        "api.h",
-        "export.go",
         "main.go",
     ],
     out = "libgolang.so",

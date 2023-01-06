@@ -102,6 +102,7 @@ func getRequest(r *C.httpRequest) *httpRequest {
     return Requests.GetReq(r)
 }
 
+//export envoyGoFilterOnHttpHeader
 func envoyGoFilterOnHttpHeader(r *C.httpRequest, endStream, headerNum, headerBytes uint64) uint64 {
     var req *httpRequest
     phase := api.EnvoyRequestPhase(r.phase)
@@ -137,6 +138,7 @@ func envoyGoFilterOnHttpHeader(r *C.httpRequest, endStream, headerNum, headerByt
     return uint64(status)
 }
 
+//export envoyGoFilterOnHttpData
 func envoyGoFilterOnHttpData(r *C.httpRequest, endStream, buffer, length uint64) uint64 {
     req := getRequest(r)
 
@@ -158,6 +160,7 @@ func envoyGoFilterOnHttpData(r *C.httpRequest, endStream, buffer, length uint64)
     return uint64(status)
 }
 
+//export envoyGoFilterOnHttpDestroy
 func envoyGoFilterOnHttpDestroy(r *C.httpRequest, reason uint64) {
     req := getRequest(r)
 
