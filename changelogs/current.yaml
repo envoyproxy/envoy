@@ -128,6 +128,9 @@ bug_fixes:
 - area: router
   change: |
     fixed a bug that truncated query parameters from paths rewritten with a path_rewrite_policy, query parameters are now appended. ``envoy_reloadable_features_append_query_parameters_path_rewriter`` can be used to revert to truncation.
+- area: tcp_proxy
+  change: |
+    When tunneling TCP over HTTP, mark the upstream connection as done reading when upstream trailers are read. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.finish_reading_on_decode_trailers`` to false.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
