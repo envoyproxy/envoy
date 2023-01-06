@@ -1,5 +1,7 @@
 #include "source/extensions/http/cache/file_system_http_cache/file_system_http_cache.h"
 
+#include <chrono>
+
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/filesystem/directory.h"
 #include "source/common/http/header_map_impl.h"
@@ -9,7 +11,6 @@
 #include "source/extensions/http/cache/file_system_http_cache/insert_context.h"
 #include "source/extensions/http/cache/file_system_http_cache/lookup_context.h"
 #include "source/extensions/http/cache/file_system_http_cache/stats.h"
-#include <chrono>
 
 static constexpr Envoy::SystemTime timespecToChrono(const struct timespec& t) {
   return Envoy::SystemTime{std::chrono::duration_cast<std::chrono::system_clock::duration>(
