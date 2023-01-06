@@ -9337,7 +9337,6 @@ virtual_hosts:
   EXPECT_EQ("path.prefix.com", headers_multi.get_(Http::Headers::get().Host));
 }
 
-
 TEST_F(RouteMatcherTest, PatternMatchWildcardFilenameQueryParmeters) {
 
   const std::string yaml = R"EOF(
@@ -9364,8 +9363,8 @@ virtual_hosts:
   factory_context_.cluster_manager_.initializeClusters({"path-pattern-cluster-one"}, {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
-  Http::TestRequestHeaderMapImpl headers =
-      genHeaders("path.prefix.com", "/api/cart/item/one/song.m3u8?one=0&two=1&three=2&four=3&go=ls", "GET");
+  Http::TestRequestHeaderMapImpl headers = genHeaders(
+      "path.prefix.com", "/api/cart/item/one/song.m3u8?one=0&two=1&three=2&four=3&go=ls", "GET");
   const RouteEntry* route = config.route(headers, 0)->routeEntry();
   EXPECT_EQ("/one?one=0&two=1&three=2&four=3&go=ls", route->currentUrlPathAfterRewrite(headers));
   route->finalizeRequestHeaders(headers, stream_info, true);
