@@ -1036,7 +1036,12 @@ absl::optional<std::string> RouteEntryImplBase::currentUrlPathAfterRewriteWithMa
       return std::string(headers.getPathValue());
     }
 
-    return *std::move(new_path);
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.append_query_parameters_path_rewriter")) {
+      return path.replace(0, just_path.size(), new_path.value());
+    } else {
+      return *std::move(new_path);
+    }
   }
 
   // There are no rewrites configured.
