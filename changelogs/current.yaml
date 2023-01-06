@@ -299,5 +299,8 @@ new_features:
   change: |
     added an api configuration :ref:`xds_config_tracker_extension <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.xds_config_tracker_extension>` in the bootstrap
     to allow tracking xDS responses in external components, and provided the extension interface.
+- area: tracing
+  change: |
+    allow :ref:`grpc_service <envoy_v3_api_field_config.trace.v3.OpenTelemetryConfig.grpc_service>` to be optional. This enables a means to disable collection of traces.
 
 deprecated:
