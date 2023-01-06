@@ -852,10 +852,8 @@ TEST_P(ClusterManagerSubsetInitializationTest, SubsetLoadBalancerInitialization)
                     envoy::config::cluster::v3::Cluster::LbPolicy_Name(GetParam())));
 
   } else if (GetParam() == envoy::config::cluster::v3::Cluster::LOAD_BALANCING_POLICY_CONFIG) {
-    EXPECT_THROW_WITH_MESSAGE(
-        create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
-        fmt::format("cluster: load_balancing_policy requires field load_balancing_policy to be set",
-                    envoy::config::cluster::v3::Cluster::LbPolicy_Name(GetParam())));
+    EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
+                              "cluster: field load_balancing_policy need to be set");
   } else {
     create(parseBootstrapFromV3Yaml(yaml));
     checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);

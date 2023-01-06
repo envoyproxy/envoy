@@ -2496,8 +2496,7 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithoutConfiguration) {
         StaticClusterImpl cluster(server_context_, cluster_config, runtime_, factory_context,
                                   std::move(scope), true);
       },
-      EnvoyException,
-      "cluster: load_balancing_policy requires field load_balancing_policy to be set");
+      EnvoyException, "cluster: field load_balancing_policy need to be set");
 }
 
 // load_balancing_policy is set and common_lb_config is set.

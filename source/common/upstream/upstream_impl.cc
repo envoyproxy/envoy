@@ -1189,9 +1189,7 @@ void ClusterInfoImpl::configureLbPolicies(const envoy::config::cluster::v3::Clus
                                           Server::Configuration::ServerFactoryContext& context) {
   // Check if load_balancing_policy is set first.
   if (!config.has_load_balancing_policy()) {
-    throw EnvoyException(
-        fmt::format("cluster: load_balancing_policy requires field load_balancing_policy to be set",
-                    envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy())));
+    throw EnvoyException("cluster: field load_balancing_policy need to be set");
   }
 
   if (config.has_lb_subset_config()) {
