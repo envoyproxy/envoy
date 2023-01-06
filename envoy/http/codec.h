@@ -135,13 +135,6 @@ public:
   virtual void enableTcpTunneling() PURE;
 };
 
-struct DeferredLoggingHeadersAndTrailers {
-  Http::RequestHeaderMapSharedPtr request_header_map = nullptr;
-  Http::ResponseHeaderMapSharedPtr response_header_map = nullptr;
-  Http::ResponseTrailerMapSharedPtr response_trailer_map = nullptr;
-  std::unique_ptr<StreamInfo::StreamInfo> stream_info = nullptr;
-};
-
 /**
  * Stream encoder used for sending a response (server to client). Virtual inheritance is required
  * due to a parallel implementation split between the shared base class and the derived class.
@@ -184,11 +177,17 @@ public:
   virtual void setRequestDecoder(RequestDecoder& decoder) PURE;
 
   /**
-   * Set headers and trailers for deferred logging.
-   * @param headers_and_trailers Headers and trailers from this stream.
+   * Set headers, trailers, and stream info for deferred logging.
+   * @param request_header_map Request headers for this stream.
+   * @param response_header_map Response headers for this stream.
+   * @param response_trailer_map Response trailers for this stream.
+   * @param stream_info Stream info for this stream.
    */
-  virtual void setDeferredLoggingHeadersAndTrailers(
-      DeferredLoggingHeadersAndTrailers& headers_and_trailers) PURE;
+  virtual void
+  setDeferredLoggingHeadersAndTrailers(Http::RequestHeaderMapSharedPtr request_header_map,
+                                       Http::ResponseHeaderMapSharedPtr response_header_map,
+                                       Http::ResponseTrailerMapSharedPtr response_trailer_map,
+                                       std::unique_ptr<StreamInfo::StreamInfo> stream_info) PURE;
 };
 
 /**

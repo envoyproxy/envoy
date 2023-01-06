@@ -164,7 +164,10 @@ private:
     }
     bool streamErrorOnInvalidHttpMessage() const override { return false; }
     void setRequestDecoder(RequestDecoder& /*decoder*/) override{};
-    void setDeferredLoggingHeadersAndTrailers(Http::DeferredLoggingHeadersAndTrailers&) override {}
+    void setDeferredLoggingHeadersAndTrailers(Http::RequestHeaderMapSharedPtr,
+                                              Http::ResponseHeaderMapSharedPtr,
+                                              Http::ResponseTrailerMapSharedPtr,
+                                              std::unique_ptr<StreamInfo::StreamInfo>) override {}
 
     void encodeMetadata(const MetadataMapVector&) override { PANIC("not implemented"); }
 

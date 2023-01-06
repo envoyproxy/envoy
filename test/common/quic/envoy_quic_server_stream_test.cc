@@ -102,16 +102,6 @@ public:
     }
   }
 
-  void setStatsGathererDetails(std::list<AccessLog::InstanceSharedPtr> access_loggers,
-                               Http::DeferredLoggingHeadersAndTrailers& headers_and_trailers) {
-    quic_stream_->stats_gatherer_->setAccessLogHandlers(access_loggers);
-    quic_stream_->stats_gatherer_->setDeferredLoggingHeadersAndTrailers(headers_and_trailers);
-  }
-
-  uint64_t statsGathererBytesOutstanding() {
-    return quic_stream_->stats_gatherer_->bytesOutstanding();
-  }
-
   size_t receiveRequest(const std::string& payload, bool fin,
                         size_t decoder_buffer_high_watermark) {
     EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
@@ -774,16 +764,16 @@ TEST_F(EnvoyQuicServerStreamTest, StatsGathererLogsOnStreamDestruction) {
   std::unique_ptr<Envoy::StreamInfo::StreamInfo> stream_info =
       std::make_unique<Envoy::StreamInfo::StreamInfoImpl>(Http::Protocol::Http2,
                                                           test_time_.timeSystem(), nullptr);
-  Http::DeferredLoggingHeadersAndTrailers headers_and_trailers;
-  headers_and_trailers.stream_info = std::move(stream_info);
-  setStatsGathererDetails(loggers, headers_and_trailers);
+  quic_stream_->statsGatherer()->setAccessLogHandlers(loggers);
+  quic_stream_->setDeferredLoggingHeadersAndTrailers(nullptr, nullptr, nullptr,
+                                                     std::move(stream_info));
 
   receiveRequest(request_body_, false, request_body_.size() * 2);
   quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/true);
   EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, _));
   EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::LocalReset, _));
   // The stats gatherer has outstanding bytes that have not been acked.
-  EXPECT_GT(statsGathererBytesOutstanding(), 0);
+  EXPECT_GT(quic_stream_->statsGatherer()->bytesOutstanding(), 0);
   // Close the stream; incoming acks will no longer invoke the stats gatherer but
   // the stats gatherer should log on stream close despite not receiving final downstream ack.
   EXPECT_CALL(*mock_logger, log(_, _, _, _));

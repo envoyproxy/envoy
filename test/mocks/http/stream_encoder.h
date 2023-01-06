@@ -50,7 +50,10 @@ public:
   MOCK_METHOD(void, encodeTrailers, (const ResponseTrailerMap& trailers));
   MOCK_METHOD(void, setRequestDecoder, (RequestDecoder & decoder));
   MOCK_METHOD(void, setDeferredLoggingHeadersAndTrailers,
-              (DeferredLoggingHeadersAndTrailers & headers_and_trailers));
+              (Http::RequestHeaderMapSharedPtr request_header_map,
+               Http::ResponseHeaderMapSharedPtr response_header_map,
+               Http::ResponseTrailerMapSharedPtr response_trailer_map,
+               std::unique_ptr<StreamInfo::StreamInfo> stream_info));
 
   // Http::StreamEncoder
   MOCK_METHOD(void, encodeData, (Buffer::Instance & data, bool end_stream));

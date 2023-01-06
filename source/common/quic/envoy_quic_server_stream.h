@@ -24,6 +24,7 @@ public:
     request_decoder_ = &decoder;
     stats_gatherer_->setAccessLogHandlers(request_decoder_->accessLogHandlers());
   }
+  QuicStatsGatherer* statsGatherer() { return stats_gatherer_.get(); }
 
   // Http::StreamEncoder
   void encode1xxHeaders(const Http::ResponseHeaderMap& headers) override;
@@ -38,8 +39,12 @@ public:
     return http3_options_.override_stream_error_on_invalid_http_message().value();
   }
   void setDeferredLoggingHeadersAndTrailers(
-      Http::DeferredLoggingHeadersAndTrailers& headers_and_trailers) override {
-    stats_gatherer_->setDeferredLoggingHeadersAndTrailers(headers_and_trailers);
+      Http::RequestHeaderMapSharedPtr request_header_map,
+      Http::ResponseHeaderMapSharedPtr response_header_map,
+      Http::ResponseTrailerMapSharedPtr response_trailer_map,
+      std::unique_ptr<StreamInfo::StreamInfo> stream_info) override {
+    stats_gatherer_->setDeferredLoggingHeadersAndTrailers(
+        request_header_map, response_header_map, response_trailer_map, std::move(stream_info));
   };
 
   // Http::Stream
@@ -86,8 +91,6 @@ protected:
                 quic::QuicRstStreamErrorCode rst = quic::QUIC_BAD_APPLICATION_PAYLOAD) override;
 
 private:
-  friend class EnvoyQuicServerStreamTest;
-
   QuicFilterManagerConnectionImpl* filterManagerConnection();
 
   // Deliver awaiting trailers if body has been delivered.

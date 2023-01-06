@@ -33,12 +33,15 @@ public:
   void setAccessLogHandlers(std::list<AccessLog::InstanceSharedPtr> handlers) {
     access_log_handlers_ = handlers;
   }
-  // Set headers and trailers used for deferred logging.
-  void setDeferredLoggingHeadersAndTrailers(
-      Http::DeferredLoggingHeadersAndTrailers& headers_and_trailers) {
-    deferred_logging_headers_and_trailers_ =
-        absl::make_optional<Http::DeferredLoggingHeadersAndTrailers>(
-            std::move(headers_and_trailers));
+  // Set headers, trailers, and stream info used for deferred logging.
+  void setDeferredLoggingHeadersAndTrailers(Http::RequestHeaderMapSharedPtr request_header_map,
+                                            Http::ResponseHeaderMapSharedPtr response_header_map,
+                                            Http::ResponseTrailerMapSharedPtr response_trailer_map,
+                                            std::unique_ptr<StreamInfo::StreamInfo> stream_info) {
+    request_header_map_ = request_header_map;
+    response_header_map_ = response_header_map;
+    response_trailer_map_ = response_trailer_map;
+    stream_info_ = std::move(stream_info);
   }
   bool loggingDone() { return logging_done_; }
   uint64_t bytesOutstanding() { return bytes_outstanding_; }
@@ -47,9 +50,11 @@ private:
   uint64_t bytes_outstanding_ = 0;
   bool fin_sent_ = false;
   std::list<AccessLog::InstanceSharedPtr> access_log_handlers_{};
-  // Headers and trailers required for deferred logging. nullopt indicates that deferred logging
-  // should be skipped.
-  absl::optional<Http::DeferredLoggingHeadersAndTrailers> deferred_logging_headers_and_trailers_;
+  Http::RequestHeaderMapSharedPtr request_header_map_;
+  Http::ResponseHeaderMapSharedPtr response_header_map_;
+  Http::ResponseTrailerMapSharedPtr response_trailer_map_;
+  // nullptr indicates that deferred logging should be skipped.
+  std::unique_ptr<StreamInfo::StreamInfo> stream_info_;
   Envoy::TimeSource* time_source_ = nullptr;
   bool logging_done_ = false;
 };

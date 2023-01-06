@@ -15,23 +15,17 @@ void QuicStatsGatherer::OnPacketAcked(int acked_bytes,
 
 void QuicStatsGatherer::maybeDoDeferredLog(bool record_ack_timing) {
   logging_done_ = true;
-  if (!deferred_logging_headers_and_trailers_.has_value()) {
-    return;
-  }
-  Http::DeferredLoggingHeadersAndTrailers& headers_and_trailers =
-      deferred_logging_headers_and_trailers_.value();
-  if (headers_and_trailers.stream_info == nullptr) {
+  if (stream_info_ == nullptr) {
     return;
   }
   if (time_source_ != nullptr && record_ack_timing) {
-    headers_and_trailers.stream_info->downstreamTiming().onLastDownstreamAckReceived(*time_source_);
+    stream_info_->downstreamTiming().onLastDownstreamAckReceived(*time_source_);
   }
-  auto request_headers = headers_and_trailers.request_header_map.get();
-  auto response_headers = headers_and_trailers.response_header_map.get();
-  auto response_trailers = headers_and_trailers.response_trailer_map.get();
+  auto request_headers = request_header_map_.get();
+  auto response_headers = response_header_map_.get();
+  auto response_trailers = response_trailer_map_.get();
   for (const auto& log_handler : access_log_handlers_) {
-    log_handler->log(request_headers, response_headers, response_trailers,
-                     *headers_and_trailers.stream_info);
+    log_handler->log(request_headers, response_headers, response_trailers, *stream_info_);
   }
 }
 
