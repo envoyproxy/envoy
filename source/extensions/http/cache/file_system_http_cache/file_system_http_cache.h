@@ -82,7 +82,7 @@ public:
    * configs using the same path.
    * @return the config of this cache.
    */
-  const ConfigProto& config() { return config_; }
+  const ConfigProto& config() const { return config_; }
 
   /**
    * True if the given key currently has a stream writing to it.
@@ -184,6 +184,16 @@ public:
   // the size of a copy-chunk. It's public for unit tests only, as the chunk size
   // is totally irrelevant to the outward-facing API.
   static const size_t max_update_headers_copy_chunk_size_;
+
+  /**
+   * Called from maybeEvict to determine whether eviction is necessary.
+   * Returns true if eviction is required, and populates size_to_evict_out and
+   * count_to_evict_out.
+   * @param size_to_evict_out receives the size in bytes that must be evicted.
+   * @param count_to_evict_out receives the count of files that must be evicted.
+   * @return true if eviction is required.
+   */
+  bool needsEviction(uint64_t& size_to_evict_out, uint64_t& count_to_evict_out) const;
 
   /**
    * Called from CacheEvictionThread, this checks if the cache is over any of its

@@ -407,26 +407,34 @@ void FileSystemHttpCache::trackFileRemoved(uint64_t file_size) {
   stats_.size_bytes_.set(size_bytes_);
 }
 
-void FileSystemHttpCache::maybeEvict() {
-  uint64_t size_to_evict = 0;
-  uint64_t count_to_evict = 0;
+bool FileSystemHttpCache::needsEviction(uint64_t& size_to_evict_out,
+                                        uint64_t& count_to_evict_out) const {
   if (config().has_max_cache_size_bytes()) {
     // capture a value from the atomic because we're going to use it twice and don't want our
     // value to change in between.
     uint64_t seen_size = size_bytes_;
-    size_to_evict = seen_size > config().max_cache_size_bytes().value()
-                        ? seen_size - config().max_cache_size_bytes().value()
-                        : 0;
+    size_to_evict_out = seen_size > config().max_cache_size_bytes().value()
+                            ? seen_size - config().max_cache_size_bytes().value()
+                            : 0;
+  } else {
+    size_to_evict_out = 0;
   }
   if (config().has_max_cache_entry_count()) {
     // capture a value from the atomic because we're going to use it twice and don't want our
     // value to change in between.
     uint64_t seen_count = size_count_;
-    count_to_evict = seen_count > config().max_cache_entry_count().value()
-                         ? seen_count - config().max_cache_entry_count().value()
-                         : 0;
+    count_to_evict_out = seen_count > config().max_cache_entry_count().value()
+                             ? seen_count - config().max_cache_entry_count().value()
+                             : 0;
+  } else {
+    count_to_evict_out = 0;
   }
-  if (size_to_evict == 0 && count_to_evict == 0) {
+  return size_to_evict_out > 0 || count_to_evict_out > 0;
+}
+
+void FileSystemHttpCache::maybeEvict() {
+  uint64_t size_to_evict, count_to_evict;
+  if (!needsEviction(size_to_evict, count_to_evict)) {
     return;
   }
 
