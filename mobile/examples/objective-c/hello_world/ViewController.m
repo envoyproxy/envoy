@@ -48,7 +48,7 @@ NSString *_REQUEST_SCHEME = @"https";
   }];
 
   id<Engine> engine = [builder build];
-  NSLog(@"started Envoy, beginning requests...");
+  NSLog(@"started Envoy, beginning requeststest..");
   self.streamClient = [engine streamClient];
   self.pulseClient = [engine pulseClient];
   [self startRequests];
