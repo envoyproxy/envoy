@@ -24,6 +24,7 @@ namespace FileSystemHttpCache {
   GAUGE(size_count, NeverImport)                                                                   \
   GAUGE(size_limit_bytes, NeverImport)                                                             \
   GAUGE(size_limit_count, NeverImport)
+// TODO(ravenblack): Add other stats from DESIGN.md
 
 struct CacheStats {
   ALL_CACHE_STATS(GENERATE_GAUGE_STRUCT)
