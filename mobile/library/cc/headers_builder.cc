@@ -37,7 +37,7 @@ HeadersBuilder& HeadersBuilder::internalSet(std::string name, std::vector<std::s
 const RawHeaderMap& HeadersBuilder::allHeaders() const { return this->headers_; }
 
 bool HeadersBuilder::isRestrictedHeader(absl::string_view name) const {
-  return name.find(":") == 0 || name.find("x-envoy-mobile") == 0;
+  return name.find(':') == 0 || name.find("x-envoy-mobile") == 0;
 }
 
 } // namespace Platform
