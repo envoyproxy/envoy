@@ -132,7 +132,7 @@ Envoy::Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
 #else
   if (options.has_typed_header_validation_config()) {
     throw EnvoyException(
-        fmt::format("This Envoy binary does not support header validator extensions.: '{}'",
+        fmt::format("This Envoy binary does not support header validator extensions: '{}'",
                     options.typed_header_validation_config().name()));
   }
 #endif
