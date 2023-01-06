@@ -47,6 +47,7 @@ var (
     configCache        = &sync.Map{} // uint64 -> *anypb.Any
 )
 
+//export envoyGoFilterNewHttpPluginConfig
 func envoyGoFilterNewHttpPluginConfig(configPtr uint64, configLen uint64) uint64 {
     buf := utils.BytesToSlice(configPtr, configLen)
     var any anypb.Any
@@ -62,10 +63,12 @@ func envoyGoFilterNewHttpPluginConfig(configPtr uint64, configLen uint64) uint64
     return configNum
 }
 
+//export envoyGoFilterDestroyHttpPluginConfig
 func envoyGoFilterDestroyHttpPluginConfig(id uint64) {
     configCache.Delete(id)
 }
 
+//export envoyGoFilterMergeHttpPluginConfig
 func envoyGoFilterMergeHttpPluginConfig(parentId uint64, childId uint64) uint64 {
     if httpFilterConfigParser != nil {
         parent, ok := configCache.Load(parentId)

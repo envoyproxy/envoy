@@ -125,6 +125,9 @@ bug_fixes:
 - area: health_checker
   change: |
     prevent writing pending data for health checkers by introducing ``ConnectionCloseType::Abort`` to avoid cascading handshake overhead from health checker's requests on timeout. This fix is related to `issue \#23718 <https://github.com/envoyproxy/envoy/issues/23718>`_.
+- area: router
+  change: |
+    fixed a bug that truncated query parameters from paths rewritten with a path_rewrite_policy, query parameters are now appended. ``envoy_reloadable_features_append_query_parameters_path_rewriter`` can be used to revert to truncation.
 - area: tcp_proxy
   change: |
     When tunneling TCP over HTTP, mark the upstream connection as done reading when upstream trailers are read. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.finish_reading_on_decode_trailers`` to false.
