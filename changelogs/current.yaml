@@ -128,6 +128,9 @@ bug_fixes:
 - area: router
   change: |
     fixed a bug that truncated query parameters from paths rewritten with a path_rewrite_policy, query parameters are now appended. ``envoy_reloadable_features_append_query_parameters_path_rewriter`` can be used to revert to truncation.
+- area: grpc_http_bridge
+  change: |
+    fixed a bug where response data could be lost for requests that were upgraded from Protobuf.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
