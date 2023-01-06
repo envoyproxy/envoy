@@ -207,7 +207,7 @@ TYPED_TEST(HttpUpstreamTest, UpstreamTrailersNotMarksDoneReadingWhenFeatureDisab
   scoped_runtime.mergeValues({{"envoy.reloadable_features.finish_reading_on_decode_trailers", "false"}});
   
   this->setupUpstream();
-  EXPECT_CALL(this->encoder_.stream_, resetStream(_)).Times(1);
+  EXPECT_CALL(this->encoder_.stream_, resetStream(_));
   this->upstream_->doneWriting();
   Http::ResponseTrailerMapPtr trailers{new Http::TestResponseTrailerMapImpl{{"key", "value"}}};
   this->upstream_->responseDecoder().decodeTrailers(std::move(trailers));
