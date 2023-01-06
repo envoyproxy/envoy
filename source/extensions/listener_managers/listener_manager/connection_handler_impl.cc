@@ -289,7 +289,10 @@ void ConnectionHandlerImpl::setListenerRejectFraction(UnitFloat reject_fraction)
 Network::InternalListenerOptRef
 ConnectionHandlerImpl::findByAddress(const Network::Address::InstanceConstSharedPtr& address) {
   ASSERT(address->type() == Network::Address::Type::EnvoyInternal);
-  if (auto listener_it = internal_listener_map_by_address_.find(address);
+  Network::Address::InstanceConstSharedPtr internal_instance =
+      std::make_shared<Network::Address::EnvoyInternalInstance>(
+          address->envoyInternalAddress()->addressId());
+  if (auto listener_it = internal_listener_map_by_address_.find(internal_instance);
       listener_it != internal_listener_map_by_address_.end()) {
     return {listener_it->second->internalListener().value().get()};
   }
