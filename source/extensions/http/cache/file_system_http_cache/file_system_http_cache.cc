@@ -377,10 +377,9 @@ void FileSystemHttpCache::trackFileAdded(uint64_t file_size) {
   size_bytes_ += file_size;
   stats_.size_count_.inc();
   stats_.size_bytes_.add(file_size);
-  // Signalling the cache eviction thread doesn't necessarily do any eviction work - the
-  // thread will first check whether the configured cache limits are exceeded, and any
-  // other configured criteria that can be checked without touching disk.
-  cache_eviction_thread_.signal();
+  if (needsEviction()) {
+    cache_eviction_thread_.signal();
+  }
 }
 
 void FileSystemHttpCache::trackFileRemoved(uint64_t file_size) {
@@ -405,6 +404,18 @@ void FileSystemHttpCache::trackFileRemoved(uint64_t file_size) {
     size_bytes_ = 0;
   }
   stats_.size_bytes_.set(size_bytes_);
+}
+
+bool FileSystemHttpCache::needsEviction() const {
+  if (config().has_max_cache_size_bytes() &&
+      size_bytes_ > config().max_cache_size_bytes().value()) {
+    return true;
+  }
+  if (config().has_max_cache_entry_count() &&
+      size_count_ > config().max_cache_entry_count().value()) {
+    return true;
+  }
+  return false;
 }
 
 bool FileSystemHttpCache::needsEviction(uint64_t& size_to_evict_out,
@@ -482,6 +493,13 @@ void FileSystemHttpCache::maybeEvict() {
   size_bytes_ = size;
   size_count_ = count;
   for (const ProposedEviction& eviction : proposed_evictions) {
+    // Unlink is expected to fail occasionally, e.g. if another instance of Envoy is performing
+    // cleanup at the same time, or some external operator deleted the file. If it fails we
+    // don't reduce the estimated cache size, so another eviction run will happen sooner.
+    // TODO(ravenblack): might be worth checking the type of the error, or whether the file is gone
+    // - if there's a permissions issue, for example, then the cache might remain oversized and the
+    // eviction thread will be churning, trying and failing to remove a file, which would be worth
+    // logging a warning, versus if the file is already gone then there's no problem.
     if (os_sys_calls.unlink(absl::StrCat(cachePath(), eviction.name_).c_str()).return_value_ !=
         -1) {
       trackFileRemoved(eviction.size_);

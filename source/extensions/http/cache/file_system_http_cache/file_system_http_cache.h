@@ -186,7 +186,13 @@ public:
   static const size_t max_update_headers_copy_chunk_size_;
 
   /**
-   * Called from maybeEvict to determine whether eviction is necessary.
+   * Called when adding a file to the cache.
+   * @return true if eviction is required.
+   */
+  bool needsEviction() const;
+
+  /**
+   * Called from maybeEvict to determine how much eviction is necessary.
    * Returns true if eviction is required, and populates size_to_evict_out and
    * count_to_evict_out.
    * @param size_to_evict_out receives the size in bytes that must be evicted.
