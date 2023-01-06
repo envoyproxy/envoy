@@ -127,7 +127,7 @@ bug_fixes:
     prevent writing pending data for health checkers by introducing ``ConnectionCloseType::Abort`` to avoid cascading handshake overhead from health checker's requests on timeout. This fix is related to `issue \#23718 <https://github.com/envoyproxy/envoy/issues/23718>`_.
 - area: router
   change: |
-    fixed a bug that truncated query parameters from paths rewritten with a path_rewrite_policy, query parameters are now appened.
+    fixed a bug that truncated query parameters from paths rewritten with a path_rewrite_policy, query parameters are now appended.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
