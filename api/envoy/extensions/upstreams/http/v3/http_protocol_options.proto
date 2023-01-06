@@ -168,7 +168,7 @@ message HttpProtocolOptions {
   // Configuration options for Unified Header Validation (UHV).
   // UHV is an extensible mechanism for checking validity of HTTP responses.
   //
-  // [#comment:TODO(yanavlasov): Make it a link to the default header validator doc when it becomes visibile.]
+  // [#comment:TODO(yanavlasov): Make it a link to the default header validator doc when it becomes visible.]
   // Leaving this field unspecified, selects the default header validator ``envoy.http.header_validators.envoy_default``.
   //
   // [#not-implemented-hide:]
