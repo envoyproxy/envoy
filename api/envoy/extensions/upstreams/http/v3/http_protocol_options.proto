@@ -168,21 +168,8 @@ message HttpProtocolOptions {
   // Configuration options for Unified Header Validation (UHV).
   // UHV is an extensible mechanism for checking validity of HTTP responses.
   //
-  // Leaving this field unspecified, selects the default header validator, which uses the value of
-  // the ``http_protocol_options.allow_chunked_length`` field from one of the ``upstream_protocol_options`` fields for configuration.
-  // Using the default ``envoy.http.header_validators.envoy_default`` header validator overrides the
-  // ``http_protocol_options.allow_chunked_length`` in the specified ``upstream_protocol_options`` field.
-  //
-  // The default implementation of UHV (``envoy.http.header_validators.envoy_default``) checks the following:
-  //
-  // #. HTTP/1 header map validity according to `RFC 7230 section 3.2<https://datatracker.ietf.org/doc/html/rfc7230#section-3.2>`_
-  // #. Syntax of HTTP/1 response line
-  // #. HTTP/2 header map validity according to `RFC 7540 section 8.1.2<https://datatracker.ietf.org/doc/html/rfc7540#section-8.1.2`_
-  // #. Syntax of HTTP/2 pseudo headers
-  // #. HTTP/3 header map validity according to `RFC 9114 section 4.3 <https://www.rfc-editor.org/rfc/rfc9114.html>`_
-  // #. Syntax of HTTP/3 pseudo headers
-  // #. Syntax of ``Content-Length`` and ``Transfer-Encoding``
-  // #. Validation of HTTP/1 responses with both ``Content-Length`` and ``Transfer-Encoding`` headers
+  // [#comment:TODO(yanavlasov): Make it a link to the default header validator doc when it becomes visibile.]
+  // Leaving this field unspecified, selects the default header validator ``envoy.http.header_validators.envoy_default``.
   //
   // [#not-implemented-hide:]
   // [#extension-category: envoy.http.header_validators]
