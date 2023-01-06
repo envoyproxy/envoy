@@ -1,6 +1,5 @@
-#include "test/integration/filters/http/test_read/config.h"
-
-#include "test/integration/filters/http/test_read/filter.h"
+#include "library/common/extensions/filters/http/test_read/config.h"
+#include "library/common/extensions/filters/http/test_read/filter.h"
 
 namespace Envoy {
 namespace HttpFilters {
