@@ -839,9 +839,6 @@ FilterStatus ConnectionManager::ActiveRpc::messageBegin(MessageMetadataSharedPtr
     ASSERT(upgrade_handler_ != nullptr);
   }
 
-  // Filters could change cluster_header's value, which affect the routing decision.
-  // Therefore, we need to apply filter chain before the routing decision is made and cached.
-  // TODO(kuochunghsu): implement FilterCallbacks::clearRouteCache
   auto result = applyDecoderFilters(DecoderEvent::MessageBegin, metadata);
 
   const auto& route_ptr = route();
@@ -979,7 +976,7 @@ Router::RouteConstSharedPtr ConnectionManager::ActiveRpc::route() {
           parent_.config_.routerConfig().route(*metadata_, stream_id_);
       cached_route_ = std::move(route);
     } else {
-      cached_route_ = absl::optional<Router::RouteConstSharedPtr>();
+      cached_route_ = absl::nullopt;
     }
   }
 
@@ -1054,9 +1051,7 @@ ThriftFilters::ResponseStatus ConnectionManager::ActiveRpc::upstreamData(Buffer:
   }
 }
 
-void ConnectionManager::ActiveRpc::clearRouteCache() {
-  cached_route_ = absl::optional<Router::RouteConstSharedPtr>();
-}
+void ConnectionManager::ActiveRpc::clearRouteCache() { cached_route_ = absl::nullopt; }
 
 void ConnectionManager::ActiveRpc::resetDownstreamConnection() {
   ENVOY_CONN_LOG(debug, "resetting downstream connection", parent_.read_callbacks_->connection());
