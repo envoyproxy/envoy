@@ -36,6 +36,19 @@ std::chrono::nanoseconds checkDuration(std::chrono::nanoseconds last,
 
 class StreamInfoImplTest : public testing::Test {
 protected:
+  void assertStreamInfoSize(StreamInfoImpl stream_info) {
+#ifdef __clang__
+#if defined(__linux__)
+#if defined(__has_feature) && !(__has_feature(thread_sanitizer))
+    ASSERT_TRUE(sizeof(stream_info) == 800 || sizeof(stream_info) == 816 ||
+                sizeof(stream_info) == 840)
+        << "If adding fields to StreamInfoImpl, please check to see if you "
+           "need to add them to setFromForRecreateStream or setFrom! Current size "
+        << sizeof(stream_info);
+#endif
+#endif
+#endif
+  }
   DangerousDeprecatedTestTime test_time_;
 };
 
@@ -229,14 +242,33 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
   }
 }
 
-TEST_F(StreamInfoImplTest, SetFrom) {
+TEST_F(StreamInfoImplTest, SetFromForRecreateStream) {
   StreamInfoImpl s1(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
 
-  // For testing setFromForRecreateStream
   s1.addBytesReceived(1);
   s1.downstreamTiming().onLastDownstreamRxByteReceived(test_time_.timeSystem());
 
-  // For testing setFrom
+  assertStreamInfoSize(s1);
+
+  StreamInfoImpl s2(Http::Protocol::Http11, test_time_.timeSystem(), nullptr);
+  s2.setFromForRecreateStream(s1);
+  EXPECT_EQ(s1.startTime(), s2.startTime());
+  EXPECT_EQ(s1.startTimeMonotonic(), s2.startTimeMonotonic());
+  EXPECT_EQ(s1.downstreamTiming().lastDownstreamRxByteReceived(),
+            s2.downstreamTiming().lastDownstreamRxByteReceived());
+  EXPECT_EQ(s1.protocol(), s2.protocol());
+  EXPECT_EQ(s1.bytesReceived(), s2.bytesReceived());
+  EXPECT_EQ(s1.getDownstreamBytesMeter(), s2.getDownstreamBytesMeter());
+}
+
+TEST_F(StreamInfoImplTest, SetFrom) {
+  StreamInfoImpl s1(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
+
+  // setFromForRecreateStream
+  s1.addBytesReceived(1);
+  s1.downstreamTiming().onLastDownstreamRxByteReceived(test_time_.timeSystem());
+
+  // setFrom
   s1.setRouteName("foo");
   s1.setVirtualClusterName(absl::optional<std::string>("bar"));
   s1.setResponseCode(200);
@@ -261,16 +293,7 @@ TEST_F(StreamInfoImplTest, SetFrom) {
   s1.setFilterChainName("foobar");
   s1.setAttemptCount(5);
 
-#ifdef __clang__
-#if defined(__linux__)
-#if defined(__has_feature) && !(__has_feature(thread_sanitizer))
-  ASSERT_TRUE(sizeof(s1) == 800 || sizeof(s1) == 816 || sizeof(s1) == 840)
-      << "If adding fields to StreamInfoImpl, please check to see if you "
-         "need to add them to setFromForRecreateStream or setFrom! Current size "
-      << sizeof(s1);
-#endif
-#endif
-#endif
+  assertStreamInfoSize(s1);
 
   StreamInfoImpl s2(Http::Protocol::Http11, test_time_.timeSystem(), nullptr);
   Http::TestRequestHeaderMapImpl headers2;
