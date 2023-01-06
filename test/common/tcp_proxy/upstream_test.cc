@@ -204,7 +204,8 @@ TYPED_TEST(HttpUpstreamTest, UpstreamTrailersMarksDoneReading) {
 
 TYPED_TEST(HttpUpstreamTest, UpstreamTrailersNotMarksDoneReadingWhenFeatureDisabled) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.finish_reading_on_decode_trailers", "false"}});
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.finish_reading_on_decode_trailers", "false"}});
   
   this->setupUpstream();
   EXPECT_CALL(this->encoder_.stream_, resetStream(_));
