@@ -346,7 +346,9 @@ most_specific_header_mutations_wins: {0}
   ScopedInjectableLoader<Regex::Engine> engine_;
 };
 
-class RouteMatcherTest : public testing::Test, public ConfigImplTestBase,  public TestScopedRuntime {};
+class RouteMatcherTest : public testing::Test,
+                         public ConfigImplTestBase,
+                         public TestScopedRuntime {};
 
 TEST_F(RouteMatcherTest, TestConnectRoutes) {
   const std::string yaml = R"EOF(
@@ -9372,8 +9374,8 @@ virtual_hosts:
   EXPECT_EQ("path.prefix.com", headers.get_(Http::Headers::get().Host));
 }
 
-
-TEST_F(RouteMatcherTest, DEPRECATED_FEATURE_TEST(PatternMatchWildcardFilenameQueryParametersTruncated)) {
+TEST_F(RouteMatcherTest,
+       DEPRECATED_FEATURE_TEST(PatternMatchWildcardFilenameQueryParametersTruncated)) {
 
   mergeValues({{"envoy.reloadable_features.append_query_parameters_path_rewriter", "false"}});
 
