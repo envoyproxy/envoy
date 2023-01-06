@@ -101,6 +101,20 @@ envoy_mobile_jni_kt_test(
 )
 
 envoy_mobile_jni_kt_test(
+    name = "cancel_grpc_stream_test",
+    srcs = [
+        "CancelGRPCStreamTest.kt",
+    ],
+    native_deps = [
+        "//library/common/jni:libjava_jni_lib.so",
+        "//library/common/jni:java_jni_lib.jnilib",
+    ],
+    deps = [
+        "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+    ],
+)
+
+envoy_mobile_jni_kt_test(
     name = "reset_connectivity_state_test",
     srcs = [
         "ResetConnectivityStateTest.kt",
