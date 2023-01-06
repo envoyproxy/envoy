@@ -150,7 +150,7 @@ public:
   std::string generateFilename(const Key& key) const;
 
   /**
-   * Returns the path for this cache instance.
+   * Returns the path for this cache instance. Guaranteed to end in a path-separator.
    * @return the configured path for this cache instance.
    */
   absl::string_view cachePath() const;
