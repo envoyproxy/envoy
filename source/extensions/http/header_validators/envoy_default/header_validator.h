@@ -131,11 +131,12 @@ protected:
   HostHeaderValidationResult validateHostHeaderRegName(absl::string_view host);
 
   /*
-   * Validate a header value. The header_validator_map contains validation function for
-   * specific header keys. If the header key is not found in the header_validator_map
-   * the validateGenericHeaderName is invoked with the `key` (Note that validateGenericHeaderName is
-   * virtual and has different behavior for H/1 and H/2, H/3 validators) and the
-   * validateGenericHeaderValue is invoked with the `value`.
+   * Validate a header value. The `protocol_specific_header_validators` map contains validation
+   * function for protocol specific header keys. If the header key is not found in the
+   * `protocol_specific_header_validators` the header key is checked by calling the
+   * `validateGenericHeaderName` method (Note that `validateGenericHeaderName` is virtual and has
+   * different behavior for H/1 and H/2, H/3 validators) and the header value is checked by calling
+   * the `validateGenericHeaderValue` method.
    */
   using HeaderValidatorFunction = std::function<HeaderValidator::HeaderValueValidationResult(
       const ::Envoy::Http::HeaderString&)>;
@@ -143,7 +144,7 @@ protected:
   ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
   validateGenericRequestHeaderEntry(const ::Envoy::Http::HeaderString& key,
                                     const ::Envoy::Http::HeaderString& value,
-                                    const HeaderValidatorMap& header_validator_map);
+                                    const HeaderValidatorMap& protocol_specific_header_validators);
 
   /*
    * Common method for validating request or response trailers.

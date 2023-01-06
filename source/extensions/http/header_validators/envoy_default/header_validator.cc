@@ -435,9 +435,9 @@ bool HeaderValidator::hasChunkedTransferEncoding(const HeaderString& value) {
 }
 
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
-HeaderValidator::validateGenericRequestHeaderEntry(const ::Envoy::Http::HeaderString& key,
-                                                   const ::Envoy::Http::HeaderString& value,
-                                                   const HeaderValidatorMap& header_validator_map) {
+HeaderValidator::validateGenericRequestHeaderEntry(
+    const ::Envoy::Http::HeaderString& key, const ::Envoy::Http::HeaderString& value,
+    const HeaderValidatorMap& protocol_specific_header_validators) {
   const auto& key_string_view = key.getStringView();
   if (key_string_view.empty()) {
     // reject empty header names
@@ -445,8 +445,13 @@ HeaderValidator::validateGenericRequestHeaderEntry(const ::Envoy::Http::HeaderSt
             UhvResponseCodeDetail::get().EmptyHeaderName};
   }
 
-  auto validator_it = header_validator_map.find(key_string_view);
-  if (validator_it != header_validator_map.end()) {
+  // Protocol specific header validators use this map to check protocol specific headers. For
+  // example the transfer-encoding header checks are different for H/1 and H/2 or H/3.
+  // This map also contains validation methods for headers that have additional restrictions other
+  // than the generic character set (such as :method). The headers that are not part of this map,
+  // just need the character set validation.
+  auto validator_it = protocol_specific_header_validators.find(key_string_view);
+  if (validator_it != protocol_specific_header_validators.end()) {
     const auto& validator = validator_it->second;
     return validator(value);
   }
