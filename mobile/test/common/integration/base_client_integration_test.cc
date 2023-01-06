@@ -178,7 +178,11 @@ void BaseClientIntegrationTest::threadRoutine(absl::Notification& engine_running
   for (int i = 0; i < num_engines_for_test_; i++) {
     absl::Notification engine_notification;
     builder_.setOnEngineRunning([&]() { engine_notification.Notify(); });
-    multi_engines_.push_back(builder_.build());
+    if (i == 0) {
+      multi_engines_.push_back(builder_.build());
+    } else {
+      multi_engines_.push_back(builder_.build(false));
+    }
     engine_notification.WaitForNotification();
   };
   engine_running.Notify();

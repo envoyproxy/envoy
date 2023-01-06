@@ -17,9 +17,9 @@ envoy_engine_t EngineHandle::initEngine(envoy_engine_callbacks callbacks, envoy_
 }
 
 envoy_status_t EngineHandle::runEngine(envoy_engine_t handle, const char* config,
-                                       const char* log_level, const char* admin_address_path) {
+                                       const char* log_level, const char* admin_address_path, bool create_logger) {
   if (auto engine = reinterpret_cast<Envoy::Engine*>(handle)) {
-    engine->run(config, log_level, admin_address_path);
+    engine->run(config, log_level, admin_address_path, create_logger);
     return ENVOY_SUCCESS;
   }
   return ENVOY_FAILURE;

@@ -25,18 +25,18 @@ Engine::Engine(envoy_engine_callbacks callbacks, envoy_logger logger,
 }
 
 envoy_status_t Engine::run(const std::string config, const std::string log_level,
-                           const std::string admin_address_path) {
+                           const std::string admin_address_path, bool create_logger) {
   // Start the Envoy on the dedicated thread. Note: due to how the assignment operator works with
   // std::thread, main_thread_ is the same object after this call, but its state is replaced with
   // that of the temporary. The temporary object's state becomes the default state, which does
   // nothing.
   main_thread_ = std::thread(&Engine::main, this, std::string(config), std::string(log_level),
-                             admin_address_path);
+                             admin_address_path, create_logger);
   return ENVOY_SUCCESS;
 }
 
 envoy_status_t Engine::main(const std::string config, const std::string log_level,
-                            const std::string admin_address_path) {
+                            const std::string admin_address_path, bool create_logger) {
   // Using unique_ptr ensures main_common's lifespan is strictly scoped to this function.
   std::unique_ptr<EngineCommon> main_common;
   const std::string name = "envoy";
@@ -84,7 +84,7 @@ envoy_status_t Engine::main(const std::string config, const std::string log_leve
             std::make_unique<Logger::DefaultDelegate>(log_mutex_, Logger::Registry::getSink());
       }
 
-      main_common = std::make_unique<EngineCommon>(envoy_argv.size() - 1, envoy_argv.data());
+      main_common = std::make_unique<EngineCommon>(envoy_argv.size() - 1, envoy_argv.data(), create_logger);
       server_ = main_common->server();
       event_dispatcher_ = &server_->dispatcher();
 

@@ -205,7 +205,7 @@ envoy_engine_t init_engine(envoy_engine_callbacks callbacks, envoy_logger logger
  * @return envoy_status_t, the resulting status of the operation.
  */
 envoy_status_t run_engine(envoy_engine_t engine, const char* config, const char* log_level,
-                          const char* admin_path);
+                          const char* admin_path, bool create_logger = true);
 
 /**
  * Terminate an engine. Further interactions with a terminated engine, or streams created by a

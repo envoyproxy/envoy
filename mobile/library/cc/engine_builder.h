@@ -65,7 +65,7 @@ public:
   // this is separated from build() for the sake of testability
   std::string generateConfigStr() const;
 
-  EngineSharedPtr build();
+  EngineSharedPtr build(bool create_logger = true);
 
 protected:
   void setOverrideConfigForTests(std::string config) { config_override_for_tests_ = config; }

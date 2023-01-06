@@ -46,7 +46,8 @@ StrippedMainBase::StrippedMainBase(const Server::Options& options, Event::TimeSy
                                    Server::ComponentFactory& component_factory,
                                    std::unique_ptr<Server::Platform> platform_impl,
                                    std::unique_ptr<Random::RandomGenerator>&& random_generator,
-                                   std::unique_ptr<ProcessContext> process_context)
+                                   std::unique_ptr<ProcessContext> process_context,
+                                   bool create_logger)
     : platform_impl_(std::move(platform_impl)), options_(options),
       component_factory_(component_factory), stats_allocator_(symbol_table_) {
   // Process the option to disable extensions as early as possible,
@@ -72,11 +73,15 @@ StrippedMainBase::StrippedMainBase(const Server::Options& options, Event::TimeSy
     Thread::BasicLockable& log_lock = restarter_->logLock();
     Thread::BasicLockable& access_log_lock = restarter_->accessLogLock();
     auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
-    logging_context_ = std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(),
-                                                         log_lock, options_.logFormatEscaped(),
-                                                         options_.enableFineGrainLogging());
 
-    configureComponentLogLevels();
+    // In multi_engine envoy, we only create a logger in the first engine
+    if (create_logger) {
+      logging_context_ = std::make_unique<Logger::Context>(
+          options_.logLevel(), options_.logFormat(), log_lock, options_.logFormatEscaped(),
+          options_.enableFineGrainLogging());
+
+      configureComponentLogLevels();
+    }
 
     // Provide consistent behavior for out-of-memory, regardless of whether it occurs in a try/catch
     // block or not.
@@ -93,9 +98,11 @@ StrippedMainBase::StrippedMainBase(const Server::Options& options, Event::TimeSy
   }
   case Server::Mode::Validate:
     restarter_ = std::make_unique<Server::HotRestartNopImpl>();
-    logging_context_ =
-        std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(),
-                                          restarter_->logLock(), options_.logFormatEscaped());
+    if (create_logger) {
+      logging_context_ =
+          std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(),
+                                            restarter_->logLock(), options_.logFormatEscaped());
+    }
     break;
   }
 }

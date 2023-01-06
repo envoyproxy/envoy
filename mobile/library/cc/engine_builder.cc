@@ -314,7 +314,7 @@ std::string EngineBuilder::generateConfigStr() const {
   return config_str;
 }
 
-EngineSharedPtr EngineBuilder::build() {
+EngineSharedPtr EngineBuilder::build(bool create_logger) {
   envoy_logger null_logger;
   null_logger.log = nullptr;
   null_logger.release = envoy_noop_const_release;
@@ -346,7 +346,7 @@ EngineSharedPtr EngineBuilder::build() {
   }
 
   run_engine(envoy_engine, config_str.c_str(), logLevelToString(log_level_).c_str(),
-             admin_address_path_for_tests_.c_str());
+             admin_address_path_for_tests_.c_str(), create_logger);
 
   // we can't construct via std::make_shared
   // because Engine is only constructible as a friend

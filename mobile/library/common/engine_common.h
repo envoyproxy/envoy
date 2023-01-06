@@ -22,7 +22,7 @@ namespace Envoy {
  */
 class EngineCommon {
 public:
-  EngineCommon(int argc, const char* const* argv);
+  EngineCommon(int argc, const char* const* argv, bool create_logger = true);
   bool run() {
     base_.runServer();
     return true;
