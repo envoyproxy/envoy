@@ -23,6 +23,13 @@ using ConfigProto =
 
 class CacheEvictionThread;
 
+/**
+ * An instance of a cache. There may be multiple caches in a single envoy configuration.
+ * Caches are owned by filter configurations, and jointly own the CacheSingleton; if all
+ * cache instances are destroyed, the CacheSingleton is destroyed.
+ *
+ * See DESIGN.md for details of cache behavior.
+ */
 class FileSystemHttpCache : public HttpCache,
                             public std::enable_shared_from_this<FileSystemHttpCache>,
                             public Logger::Loggable<Logger::Id::cache_filter> {

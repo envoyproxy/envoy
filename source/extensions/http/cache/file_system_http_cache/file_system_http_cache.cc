@@ -9,9 +9,11 @@
 #include "source/extensions/http/cache/file_system_http_cache/insert_context.h"
 #include "source/extensions/http/cache/file_system_http_cache/lookup_context.h"
 #include "source/extensions/http/cache/file_system_http_cache/stats.h"
+#include <chrono>
 
-static bool operator<(const struct timespec& a, const struct timespec& b) {
-  return std::tie(a.tv_sec, a.tv_nsec) < std::tie(b.tv_sec, b.tv_nsec);
+static constexpr Envoy::SystemTime timespecToChrono(const struct timespec& t) {
+  return Envoy::SystemTime{std::chrono::duration_cast<std::chrono::system_clock::duration>(
+      std::chrono::seconds{t.tv_sec} + std::chrono::nanoseconds{t.tv_nsec})};
 }
 
 namespace Envoy {
@@ -435,7 +437,7 @@ void FileSystemHttpCache::maybeEvict() {
   struct ProposedEviction {
     std::string name_;
     uint64_t size_;
-    struct timespec last_touch_;
+    Envoy::SystemTime last_touch_;
     bool operator<(const ProposedEviction& other) const { return last_touch_ < other.last_touch_; }
   };
   std::multiset<ProposedEviction> proposed_evictions;
@@ -448,7 +450,8 @@ void FileSystemHttpCache::maybeEvict() {
     size += entry.size_bytes_.value_or(0);
     struct stat s;
     if (os_sys_calls.stat(absl::StrCat(cachePath(), entry.name_).c_str(), &s).return_value_ != -1) {
-      struct timespec last_touch = std::max(s.st_atim, s.st_ctim);
+      Envoy::SystemTime last_touch =
+          std::max(timespecToChrono(s.st_atim), timespecToChrono(s.st_ctim));
       if (proposed_size_evicted < size_to_evict || proposed_evictions.size() < count_to_evict ||
           last_touch < proposed_evictions.rbegin()->last_touch_) {
         // We either haven't evicted enough yet, or this eviction candidate is 'older'

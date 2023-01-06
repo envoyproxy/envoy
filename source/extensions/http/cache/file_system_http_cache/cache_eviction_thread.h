@@ -24,6 +24,12 @@ class FileSystemHttpCache;
  *
  * The instance of CacheEvictionThread is owned by the `CacheSingleton`, which is
  * destroyed only when all cache instances have been destroyed.
+ *
+ * The cache thread is created or destroyed during the first addCache and the last
+ * removeCache, rather than in the constructor/destructor, because the destructor can
+ * run on a different thread (and thread-join on a different thread is discouraged).
+ *
+ * See DESIGN.md for more details of the eviction process.
  **/
 class CacheEvictionThread {
 public:
