@@ -417,6 +417,16 @@ Http1HeaderValidator::validateTransferEncodingHeader(const HeaderString& value) 
   return HeaderValueValidationResult::success();
 }
 
+HeaderValidator::TrailerValidationResult
+Http1HeaderValidator::validateRequestTrailerMap(::Envoy::Http::RequestTrailerMap& trailer_map) {
+  return validateTrailers(trailer_map);
+}
+
+HeaderValidator::TrailerValidationResult
+Http1HeaderValidator::validateResponseTrailerMap(::Envoy::Http::ResponseTrailerMap& trailer_map) {
+  return validateTrailers(trailer_map);
+}
+
 } // namespace EnvoyDefault
 } // namespace HeaderValidators
 } // namespace Http
