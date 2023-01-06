@@ -97,6 +97,18 @@ const char* socket_tag_config_insert = R"(
       "@type": type.googleapis.com/envoymobile.extensions.filters.http.socket_tag.SocketTag
 )";
 
+const char* persistent_dns_cache_config_insert = R"(
+- &persistent_dns_cache_config
+  config:
+    name: "envoy.key_value.platform"
+    typed_config:
+      "@type": type.googleapis.com/envoymobile.extensions.key_value.platform.PlatformKeyValueStoreConfig
+      key: dns_persistent_cache
+      save_interval:
+        seconds: 0
+      max_entries: 100
+)";
+
 // clang-format off
 const std::string config_header = R"(
 !ignore default_defs:
@@ -109,6 +121,7 @@ const std::string config_header = R"(
 - &dns_preresolve_hostnames []
 - &dns_query_timeout 25s
 - &dns_refresh_rate 60s
+- &persistent_dns_cache_config NULL
 - &force_ipv6 false
 )"
 #if defined(__APPLE__)
@@ -156,7 +169,9 @@ R"(- &enable_drain_post_dns_refresh false
 
 !ignore tls_root_ca_defs: &tls_root_certs |
 )"
+#ifndef EXCLUDE_CERTIFICATES
 #include "certificates.inc"
+#endif
 R"(
 
 !ignore validation_context_defs:
@@ -191,6 +206,7 @@ const char* config_template = R"(
     typed_dns_resolver_config:
       name: *dns_resolver_name
       typed_config: *dns_resolver_config
+    key_value_config: *persistent_dns_cache_config
 
 !ignore router_defs: &router_config
   "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
@@ -267,7 +283,6 @@ const char* config_template = R"(
             - name: remote_service
               domains: ["*"]
               routes:
-#{fake_remote_responses}
               - match: { prefix: "/" }
                 direct_response: { status: 404, body: { inline_string: "not found" } }
                 request_headers_to_remove:
@@ -375,6 +390,15 @@ static_resources:
           route_config:
             name: api_router
             virtual_hosts:
+            - name: remote_service
+              domains: ["127.0.0.1"]
+              routes:
+#{fake_remote_responses}
+              - match: { prefix: "/" }
+                direct_response: { status: 404, body: { inline_string: "not found" } }
+                request_headers_to_remove:
+                - x-forwarded-proto
+                - x-envoy-mobile-cluster
 )"
 // The list of virtual hosts impacts directly the number of virtual cluster stats.
 // That's because we create a separate set of virtual clusters stats for every
@@ -472,30 +496,16 @@ stats_config:
   stats_matcher:
     inclusion_list:
       patterns:
+        - prefix: cluster.base.
+        - prefix: cluster.base_h2.
+        - prefix: cluster.stats.
+        - prefix: http.client.
+        - prefix: http.dispatcher.
+        - prefix: http.hcm.
+        - prefix: pbf_filter.
+        - prefix: pulse.
         - safe_regex:
-            regex: '^cluster\.[\w]+?\.upstream_cx_[\w]+'
-        - safe_regex:
-            regex: '^cluster\.[\w]+?\.upstream_rq_[\w]+'
-        - safe_regex:
-            regex: '^cluster\.[\w]+?\.update_(attempt|success|failure)'
-        - safe_regex:
-            regex: '^cluster\.[\w]+?\.http2.keepalive_timeout'
-        - safe_regex:
-            regex: '^dns.apple.*'
-        - safe_regex:
-            regex: '^http.client.*'
-        - safe_regex:
-            regex: '^http.dispatcher.*'
-        - safe_regex:
-            regex: '^http.hcm.decompressor.*'
-        - safe_regex:
-            regex: '^http.hcm.downstream_rq_[\w]+'
-        - safe_regex:
-            regex: '^pbf_filter.*'
-        - safe_regex:
-            regex: '^pulse.*'
-        - safe_regex:
-            regex: '^vhost\.[\w]+\.vcluster\.[\w]+?\.upstream_rq_(?:[12345]xx|[3-5][0-9][0-9]|retry.*|timeout|total)'
+            regex: '^vhost\.[\w]+\.vcluster\.[\w]+?\.upstream_rq_(?:[12345]xx|[3-5][0-9][0-9]|retry|total)'
   use_all_default_tags:
     false
 watchdogs:

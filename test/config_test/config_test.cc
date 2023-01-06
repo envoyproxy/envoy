@@ -6,6 +6,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
 
+#include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/fmt.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
@@ -67,6 +68,12 @@ public:
           return api_->fileSystem().fileReadToEnd(file);
         }));
     ON_CALL(os_sys_calls_, close(_)).WillByDefault(Return(Api::SysCallIntResult{0, 0}));
+    EXPECT_CALL(os_sys_calls_, getaddrinfo(_, _, _, _))
+        .WillRepeatedly(Invoke([&](const char* node, const char* service,
+                                   const struct addrinfo* hints, struct addrinfo** res) {
+          Api::OsSysCallsImpl real;
+          return real.getaddrinfo(node, service, hints, res);
+        }));
 
     // Here we setup runtime to mimic the actual deprecated feature list used in the
     // production code. Note that this test is actually more strict than production because

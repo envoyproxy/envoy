@@ -30,11 +30,14 @@
 using Envoy::Http::Headers;
 using Envoy::Http::HeaderValueOf;
 using Envoy::Http::HttpStatusIs;
+using testing::Combine;
 using testing::ContainsRegex;
 using testing::EndsWith;
 using testing::HasSubstr;
 using testing::Not;
 using testing::StartsWith;
+using testing::Values;
+using testing::ValuesIn;
 
 namespace Envoy {
 namespace {
@@ -55,11 +58,19 @@ void setAllowHttp10WithDefaultHost(
   hcm.mutable_http_protocol_options()->set_default_host_for_http_10("default.com");
 }
 
+std::string testParamToString(
+    const testing::TestParamInfo<std::tuple<Network::Address::IpVersion, Http1ParserImpl>>&
+        params) {
+  return absl::StrCat(TestUtility::ipVersionToString(std::get<0>(params.param)),
+                      TestUtility::http1ParserImplToString(std::get<1>(params.param)));
+}
+
 } // namespace
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, IntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersionsAndHttp1Parser, IntegrationTest,
+                         Combine(ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                                 Values(Http1ParserImpl::HttpParser, Http1ParserImpl::BalsaParser)),
+                         testParamToString);
 
 // Verify that we gracefully handle an invalid pre-bind socket option when using reuse_port.
 TEST_P(IntegrationTest, BadPrebindSocketOptionWithReusePort) {
@@ -131,7 +142,7 @@ TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
 
   // Per-worker listener stats.
   auto check_listener_stats = [this](uint64_t cx_active, uint64_t cx_total) {
-    if (GetParam() == Network::Address::IpVersion::v4) {
+    if (ip_version_ == Network::Address::IpVersion::v4) {
       test_server_->waitForGaugeEq("listener.127.0.0.1_0.worker_0.downstream_cx_active", cx_active);
       test_server_->waitForGaugeEq("listener.127.0.0.1_0.worker_1.downstream_cx_active", cx_active);
       test_server_->waitForCounterEq("listener.127.0.0.1_0.worker_0.downstream_cx_total", cx_total);
@@ -201,7 +212,7 @@ TEST_P(IntegrationTest, ConnectionBalanceFactory) {
   initialize();
 
   auto check_listener_stats = [this](uint64_t cx_active, uint64_t cx_total) {
-    if (GetParam() == Network::Address::IpVersion::v4) {
+    if (ip_version_ == Network::Address::IpVersion::v4) {
       test_server_->waitForGaugeEq("listener.127.0.0.1_0.worker_0.downstream_cx_active", cx_active);
       test_server_->waitForGaugeEq("listener.127.0.0.1_0.worker_1.downstream_cx_active", cx_active);
       test_server_->waitForCounterEq("listener.127.0.0.1_0.worker_0.downstream_cx_total", cx_total);
@@ -240,7 +251,7 @@ TEST_P(IntegrationTest, AllWorkersAreHandlingLoad) {
   initialize();
 
   std::string worker0_stat_name, worker1_stat_name;
-  if (GetParam() == Network::Address::IpVersion::v4) {
+  if (ip_version_ == Network::Address::IpVersion::v4) {
     worker0_stat_name = "listener.127.0.0.1_0.worker_0.downstream_cx_total";
     worker1_stat_name = "listener.127.0.0.1_0.worker_1.downstream_cx_total";
   } else {
@@ -506,6 +517,53 @@ TEST_P(IntegrationTest, EnvoyProxying1xxWithDecodeDataPause) {
     "@type": type.googleapis.com/test.integration.filters.StopAndContinueConfig
   )EOF");
   testEnvoyProxying1xx(true);
+}
+
+// Test the x-envoy-is-timeout-retry header is set to false for retries that are not
+// initiated by timeouts.
+TEST_P(IntegrationTest, RouterIsTimeoutRetryHeader) {
+  auto host = config_helper_.createVirtualHost("example.com", "/test_retry");
+  host.set_include_is_timeout_retry_header(true);
+  config_helper_.addVirtualHost(host);
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/test_retry"},
+                                     {":scheme", "http"},
+                                     {":authority", "example.com"},
+                                     {"x-forwarded-for", "10.0.0.1"},
+                                     {"x-envoy-retry-on", "5xx"}},
+      1024);
+  waitForNextUpstreamRequest();
+  // Send a non-timeout failure response.
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
+
+  if (fake_upstreams_[0]->httpType() == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  } else {
+    ASSERT_TRUE(upstream_request_->waitForReset());
+  }
+  // 5XX responses are retried.
+  waitForNextUpstreamRequest();
+
+  // The request did not fail due to a timeout, therefore we expect the x-envoy-is-timeout-retry
+  // header to be false.
+  EXPECT_EQ(upstream_request_->headers().getEnvoyIsTimeoutRetryValue(), "false");
+
+  // Return 200 to the retry.
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(512, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(1024U, upstream_request_->bodyLength());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(512U, response->body().size());
 }
 
 // Verifies that we can construct a match tree with a filter, and that we are able to skip
@@ -1003,6 +1061,11 @@ TEST_P(IntegrationTest, InvalidCharacterInFirstline) {
 }
 
 TEST_P(IntegrationTest, InvalidVersion) {
+  if (http1_implementation_ == Http1ParserImpl::BalsaParser) {
+    // TODO(#21245): Re-enable this test for BalsaParser.
+    return;
+  }
+
   initialize();
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.01\r\nHost: host\r\n\r\n",
@@ -1012,6 +1075,11 @@ TEST_P(IntegrationTest, InvalidVersion) {
 
 // Expect that malformed trailers to break the connection
 TEST_P(IntegrationTest, BadTrailer) {
+  if (http1_implementation_ == Http1ParserImpl::BalsaParser) {
+    // TODO(#21245): Re-enable this test for BalsaParser.
+    return;
+  }
+
   initialize();
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"),
@@ -1028,6 +1096,11 @@ TEST_P(IntegrationTest, BadTrailer) {
 
 // Expect malformed headers to break the connection
 TEST_P(IntegrationTest, BadHeader) {
+  if (http1_implementation_ == Http1ParserImpl::BalsaParser) {
+    // TODO(#21245): Re-enable this test for BalsaParser.
+    return;
+  }
+
   initialize();
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"),
@@ -1093,6 +1166,11 @@ TEST_P(IntegrationTest, Http09Enabled) {
 }
 
 TEST_P(IntegrationTest, Http09WithKeepalive) {
+  if (http1_implementation_ == Http1ParserImpl::BalsaParser) {
+    // TODO(#21245): Re-enable this test for BalsaParser.
+    return;
+  }
+
 #ifdef ENVOY_ENABLE_UHV
   // TODO(#23287) - Determine HTTP/0.9 and HTTP/1.0 support within UHV
   return;
@@ -1440,7 +1518,7 @@ TEST_P(IntegrationTest, AbsolutePathUsingHttpsAllowedInternally) {
 TEST_P(IntegrationTest, TestHostWithAddress) {
   useAccessLog("%REQ(Host)%");
   std::string address_string;
-  if (GetParam() == Network::Address::IpVersion::v4) {
+  if (ip_version_ == Network::Address::IpVersion::v4) {
     address_string = TestUtility::getIpv4Loopback();
   } else {
     address_string = "[::1]";
@@ -1588,7 +1666,7 @@ TEST_P(IntegrationTest, TestHeadWithExplicitTE) {
 
 TEST_P(IntegrationTest, TestBind) {
   std::string address_string;
-  if (GetParam() == Network::Address::IpVersion::v4) {
+  if (ip_version_ == Network::Address::IpVersion::v4) {
     address_string = TestUtility::getIpv4Loopback();
   } else {
     address_string = "::1";
@@ -1843,14 +1921,15 @@ TEST_P(IntegrationTest, TrailersDroppedDownstream) {
   testTrailers(10, 10, false, false);
 }
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, UpstreamEndpointIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersionsAndHttp1Parser, UpstreamEndpointIntegrationTest,
+                         Combine(ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                                 Values(Http1ParserImpl::HttpParser, Http1ParserImpl::BalsaParser)),
+                         testParamToString);
 
 TEST_P(UpstreamEndpointIntegrationTest, TestUpstreamEndpointAddress) {
   initialize();
   EXPECT_STREQ(fake_upstreams_[0]->localAddress()->ip()->addressAsString().c_str(),
-               Network::Test::getLoopbackAddressString(GetParam()).c_str());
+               Network::Test::getLoopbackAddressString(ip_version_).c_str());
 }
 
 // Send continuous pipelined requests while not reading responses, to check
@@ -2435,7 +2514,7 @@ TEST_P(IntegrationTest, SetRouteToDelegatingRouteWithClusterOverride) {
   initialize();
 
   const std::string ip_port_pair =
-      absl::StrCat(Network::Test::getLoopbackAddressUrlString(GetParam()), ":",
+      absl::StrCat(Network::Test::getLoopbackAddressUrlString(ip_version_), ":",
                    fake_upstreams_[1]->localAddress()->ip()->port());
 
   Http::TestRequestHeaderMapImpl request_headers{
@@ -2460,9 +2539,10 @@ TEST_P(IntegrationTest, SetRouteToDelegatingRouteWithClusterOverride) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 
   // Even though headers specify cluster_0, set_route_filter modifies cached route cluster of
-  // current request to cluster_override
-  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
-  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_rq_total")->value());
+  // current request to cluster_override.
+  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 0);
+  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_total")->value(), 0);
+
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_override.upstream_cx_total")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_override.upstream_rq_200")->value());
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("cluster_override"));

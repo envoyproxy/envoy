@@ -414,8 +414,7 @@ EnvoyQuicServerStream::validateHeader(absl::string_view header_name,
   }
   // Do request specific checks.
   result = Http::HeaderUtility::checkHeaderNameForUnderscores(
-      header_name, headers_with_underscores_action_, stats_.dropped_headers_with_underscores_,
-      stats_.requests_rejected_with_underscores_in_headers_);
+      header_name, headers_with_underscores_action_, stats_);
   if (result != Http::HeaderUtility::HeaderValidationResult::ACCEPT) {
     details_ = Http3ResponseCodeDetailValues::invalid_underscore;
   }

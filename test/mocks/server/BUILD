@@ -51,6 +51,7 @@ envoy_cc_mock(
     hdrs = ["options.h"],
     deps = [
         "//envoy/server:options_interface",
+        "//source/common/config:well_known_names",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],

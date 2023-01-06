@@ -46,6 +46,7 @@ CDS
 CEL
 CWND
 DLE
+DPE
 DSR
 DSS
 EBADF
@@ -165,6 +166,7 @@ dnsresolvers
 endpos
 fo
 ghi
+golang
 guarddog
 GC
 GCC
@@ -802,6 +804,8 @@ initializers
 inlined
 inlining
 inobservability
+inode
+inodes
 inotify
 inserter
 instantiation
