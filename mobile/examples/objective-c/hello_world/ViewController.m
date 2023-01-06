@@ -39,6 +39,7 @@ NSString *_REQUEST_SCHEME = @"https";
   NSLog(@"starting Envoy...");
   EngineBuilder *builder = [[EngineBuilder alloc] init];
   [builder addLogLevel:LogLevelDebug];
+  [builder addGrpcStatsDomain:@"example.com"];
   [builder enableDNSCache:YES];
   [builder addKeyValueStoreWithName:@"reserved.platform_store"
                       keyValueStore:NSUserDefaults.standardUserDefaults];
