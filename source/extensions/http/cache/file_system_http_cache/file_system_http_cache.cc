@@ -337,6 +337,7 @@ FileSystemHttpCache::setCacheEntryToVary(const Key& key,
 }
 
 std::string FileSystemHttpCache::generateFilename(const Key& key) const {
+  // TODO(ravenblack): Add support for directory tree structure.
   return absl::StrCat("cache-", stableHashKey(key));
 }
 
@@ -354,6 +355,7 @@ InsertContextPtr FileSystemHttpCache::makeInsertContext(LookupContextPtr&& looku
 void FileSystemHttpCache::init() {
   size_bytes_ = 0;
   size_count_ = 0;
+  // TODO(ravenblack): Add support for directory tree structure.
   for (const Filesystem::DirectoryEntry& entry : Filesystem::Directory(std::string{cachePath()})) {
     if (!isCacheFile(entry)) {
       continue;
@@ -461,6 +463,7 @@ void FileSystemHttpCache::maybeEvict() {
   };
   std::multiset<ProposedEviction> proposed_evictions;
 
+  // TODO(ravenblack): Add support for directory tree structure.
   for (const Filesystem::DirectoryEntry& entry : Filesystem::Directory(std::string{cachePath()})) {
     if (!isCacheFile(entry)) {
       continue;
