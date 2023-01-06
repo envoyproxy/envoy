@@ -459,9 +459,10 @@ void FileSystemHttpCache::maybeEvict() {
         proposed_evictions.insert(
             ProposedEviction{entry.name_, entry.size_bytes_.value_or(0), last_touch});
         proposed_size_evicted += entry.size_bytes_.value_or(0);
-        auto youngest = std::prev(proposed_evictions.end());
-        if (proposed_size_evicted - youngest->size_ >= size_to_evict &&
-            proposed_evictions.size() > count_to_evict) {
+        std::multiset<ProposedEviction>::iterator youngest;
+        while (proposed_evictions.size() > count_to_evict &&
+               proposed_size_evicted - (youngest = std::prev(proposed_evictions.end()))->size_ >=
+                   size_to_evict) {
           // We'd still be evicting enough if we don't evict the 'youngest' proposed eviction,
           // so we unpropose that one.
           proposed_size_evicted -= youngest->size_;
