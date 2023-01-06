@@ -24,6 +24,8 @@ protected:
   Api::IoCallBoolResult open(FlagSet flag) override;
   Api::IoCallSizeResult write(absl::string_view buffer) override;
   Api::IoCallBoolResult close() override;
+  Api::IoCallSizeResult pread(void* buf, uint64_t count, uint64_t offset) override;
+  Api::IoCallSizeResult pwrite(const void* buf, uint64_t count, uint64_t offset) override;
   FlagsAndMode translateFlag(FlagSet in);
   friend class FileSystemImplTest;
 };

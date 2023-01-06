@@ -6,6 +6,7 @@
 
 #include "absl/container/node_hash_map.h"
 #include "absl/container/node_hash_set.h"
+#include "absl/strings/match.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -40,9 +41,8 @@ using Http2ResponseCodeDetail = ConstSingleton<Http2ResponseCodeDetailValues>;
  *
  */
 Http2HeaderValidator::Http2HeaderValidator(const HeaderValidatorConfig& config, Protocol protocol,
-                                           StreamInfo::StreamInfo& stream_info,
                                            ::Envoy::Http::HeaderValidatorStats& stats)
-    : HeaderValidator(config, protocol, stream_info, stats) {}
+    : HeaderValidator(config, protocol, stats) {}
 
 ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
 Http2HeaderValidator::validateRequestHeaderEntry(const HeaderString& key,
@@ -420,6 +420,16 @@ Http2HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
   }
 
   return HeaderEntryValidationResult::success();
+}
+
+HeaderValidator::TrailerValidationResult
+Http2HeaderValidator::validateRequestTrailerMap(::Envoy::Http::RequestTrailerMap& trailer_map) {
+  return validateTrailers(trailer_map);
+}
+
+HeaderValidator::TrailerValidationResult
+Http2HeaderValidator::validateResponseTrailerMap(::Envoy::Http::ResponseTrailerMap& trailer_map) {
+  return validateTrailers(trailer_map);
 }
 
 } // namespace EnvoyDefault

@@ -1,7 +1,6 @@
 #include "envoy/extensions/http/header_validators/envoy_default/v3/header_validator.pb.h"
 
 #include "test/mocks/http/header_validator.h"
-#include "test/mocks/stream_info/mocks.h"
 
 #include "gtest/gtest.h"
 
@@ -29,8 +28,7 @@ protected:
     header_string.setCopyUnvalidatedForTestOnly(value);
   }
 
-  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
-  NiceMock<Envoy::Http::MockHeaderValidatorStats> stats_;
+  ::testing::NiceMock<Envoy::Http::MockHeaderValidatorStats> stats_;
 
   static constexpr absl::string_view empty_config = "{}";
 
