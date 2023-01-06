@@ -281,6 +281,11 @@ TEST_P(CdsIntegrationTest, TrafficStatsLazyInit) {
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster, {}, {},
                                                              {ClusterName1}, "42");
   test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
+  // This sleep is necessary to remove the race between testing thread and main thread, to make
+  // sure that the deferred deletion callbacks of the TLS 'cluster_1' queued in main and worker
+  // threads dispatchers first.
+  absl::SleepFor(absl::Seconds(1));
+
   auto run_on_main_thread_and_wait_for_completion = [this]() {
     absl::Notification notification;
     test_server_->server().dispatcher().post([&notification]() {
@@ -294,8 +299,6 @@ TEST_P(CdsIntegrationTest, TrafficStatsLazyInit) {
   runOnWorkerThreadsAndWaitforCompletion(test_server_->server(),
                                          []() { ENVOY_LOG_MISC(info, "Run on all threads."); });
   run_on_main_thread_and_wait_for_completion();
-  runOnWorkerThreadsAndWaitforCompletion(test_server_->server(),
-                                         []() { ENVOY_LOG_MISC(info, "Run on all threads."); });
 
   // Now the stats are gone.
   if (this->enableLazyInitStats()) {
