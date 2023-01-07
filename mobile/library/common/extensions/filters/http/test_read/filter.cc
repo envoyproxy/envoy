@@ -1,4 +1,4 @@
-#include "test/integration/filters/http/test_read/filter.h"
+#include "library/common/extensions/filters/http/test_read/filter.h"
 
 #include "envoy/server/filter_config.h"
 
