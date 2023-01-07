@@ -54,7 +54,12 @@ def envoy_cc_binary(
 # Compute the final linkopts based on various options.
 def _envoy_linkopts():
     return select({
-        "@envoy//bazel:apple": [],
+        "@envoy//bazel:apple": [
+            # https://github.com/envoyproxy/envoy/issues/24782
+            "-Wl,-framework,CoreFoundation",
+            # https://github.com/bazelbuild/bazel/pull/16414
+            "-Wl,-undefined,error",
+        ],
         "@envoy//bazel:windows_opt_build": [
             "-DEFAULTLIB:ws2_32.lib",
             "-DEFAULTLIB:iphlpapi.lib",
