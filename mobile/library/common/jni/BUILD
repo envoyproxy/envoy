@@ -42,9 +42,9 @@ cc_library(
         ":jni_utility_lib",
         ":ndk_jni_support",
         "//library/common:envoy_main_interface_lib",
+        "//library/common/api:c_types",
         "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
         "//library/common/extensions/key_value/platform:config",
-        "//library/common/api:c_types",
         "//library/common/types:managed_types_lib",
     ],
     # We need this to ensure that we link this into the .so even though there are no code references.
@@ -176,8 +176,8 @@ cc_library(
     deps = [
         ":java_jni_support",
         ":jni_utility_lib",
-        "//library/common/jni/import:jni_import_lib",
         "//library/common:envoy_main_interface_lib",
+        "//library/common/jni/import:jni_import_lib",
         "//library/common/types:c_types_lib",
         "//library/common/types:managed_types_lib",
         "@envoy//source/common/common:assert_lib",
