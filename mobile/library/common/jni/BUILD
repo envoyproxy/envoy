@@ -136,14 +136,11 @@ envoy_mobile_so_to_jni_lib(
 # Base binary (.so) for NDK testing
 cc_binary(
     name = "libndk_envoy_jni.so",
-    srcs = [
-        "android_test_jni_interface.cc",
-    ],
     linkopts = [
     ],
     linkshared = True,
     deps = [
-        ":base_java_jni_lib",
+        ":envoy_jni_lib",
         "//library/common:envoy_main_interface_lib",
         "//library/common/api:c_types",
         "//library/common/jni/import:jni_import_lib",
