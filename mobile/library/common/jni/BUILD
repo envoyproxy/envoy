@@ -180,7 +180,6 @@ cc_library(
         "//library/common/jni/import:jni_import_lib",
         "//library/common/types:c_types_lib",
         "//library/common/types:managed_types_lib",
-        "@envoy//source/common/common:assert_lib",
     ],
 )
 
@@ -257,6 +256,5 @@ cc_library(
         "//library/common/jni/import:jni_import_lib",
         "//library/common/types:c_types_lib",
         "@envoy//bazel:boringssl",
-        "@envoy//source/common/common:assert_lib",
     ],
 )
