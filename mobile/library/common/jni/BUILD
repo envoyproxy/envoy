@@ -117,7 +117,6 @@ cc_binary(
     linkshared = True,
     deps = [
         ":envoy_jni_lib",
-        "@envoy_mobile_extra_jni_deps//:extra_jni_dep",
     ],
 )
 
@@ -159,7 +158,6 @@ cc_binary(
     linkshared = True,
     deps = [
         ":envoy_jni_lib",
-        "@envoy_mobile_extra_jni_deps//:extra_jni_dep",
     ] + TEST_EXTENSIONS,
 )
 
