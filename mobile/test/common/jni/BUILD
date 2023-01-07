@@ -18,8 +18,6 @@ cc_binary(
     testonly = True,
     srcs = [
         "quic_test_server_jni_interface.cc",
-        "//library/common/jni:android_test_jni_interface.cc",
-        "//library/common/jni:jni_interface.cc",
         "@local_jdk//:jni_header",
     ],
     copts = ["-std=c++17"],

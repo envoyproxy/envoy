@@ -85,10 +85,7 @@ cc_library(
         "//conditions:default": [],
     }),
     deps = [
-        ":android_network_utility_lib",
-        ":jni_interface_lib",
-        ":jni_support_lib",
-        ":jni_utility_lib",
+        ":base_java_jni_lib",
         "//library/common:envoy_main_interface_lib",
         "//library/common/api:c_types",
         "//library/common/types:managed_types_lib",
@@ -151,7 +148,7 @@ cc_binary(
         "//library/common/api:c_types",
         "//library/common/jni/import:jni_import_lib",
         "//library/common/types:managed_types_lib",
-    ],
+    ] + TEST_EXTENSIONS,
 )
 
 # OS X binary (.jnilib) for JVM testing
@@ -170,7 +167,7 @@ cc_binary(
     deps = [
         ":base_java_jni_lib",
         "@envoy_mobile_extra_jni_deps//:extra_jni_dep",
-    ],
+    ] + TEST_EXTENSIONS,
 )
 
 cc_library(
@@ -183,7 +180,7 @@ cc_library(
         ":jni_interface_lib",
         ":jni_support_lib",
         ":jni_utility_lib",
-    ] + TEST_EXTENSIONS,
+    ],
     alwayslink = True,
 )
 
