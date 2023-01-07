@@ -17,7 +17,6 @@ cc_library(
     }),
     hdrs = ["jni_support.h"],
     linkopts = [
-        "-lm",
     ] + select({
         "@envoy//bazel:android": ["-llog"],
         "//conditions:default": [],
@@ -69,7 +68,6 @@ cc_library(
         "android_jni_interface.cc",
     ],
     linkopts = [
-        "-lm",
         "-ldl",
     ] + select({
         "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
@@ -103,7 +101,6 @@ config_setting(
 cc_binary(
     name = "libenvoy_jni.so",
     linkopts = [
-        "-lm",
     ] + select({
         "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
         "//conditions:default": [],
@@ -170,9 +167,6 @@ cc_library(
 # Base binary (.so) for JVM testing
 cc_binary(
     name = "libjava_jni_lib.so",
-    linkopts = [
-        "-lm",
-    ],
     linkshared = True,
     deps = [
         ":java_jni_base_lib",
@@ -182,9 +176,6 @@ cc_binary(
 
 cc_library(
     name = "base_java_jni_lib",
-    linkopts = [
-        "-lm",
-    ],
     deps = [
         ":jni_support_lib",
         ":jni_utility_lib",
