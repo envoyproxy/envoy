@@ -133,8 +133,6 @@ cc_binary(
     srcs = [
         "android_test_jni_interface.cc",
     ],
-    linkopts = [
-    ],
     linkshared = True,
     deps = [
         ":android_network_utility_lib",
