@@ -181,7 +181,6 @@ cc_library(
         "//library/common:envoy_main_interface_lib",
         "//library/common/types:c_types_lib",
         "//library/common/types:managed_types_lib",
-        "@envoy//source/common/common:assert_lib",
     ] + TEST_EXTENSIONS,
 )
 
@@ -223,6 +222,5 @@ cc_library(
         "//library/common/jni/import:jni_import_lib",
         "//library/common/types:c_types_lib",
         "@envoy//bazel:boringssl",
-        "@envoy//source/common/common:assert_lib",
     ],
 )
