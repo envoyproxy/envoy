@@ -141,10 +141,6 @@ cc_binary(
     linkshared = True,
     deps = [
         ":envoy_jni_lib",
-        "//library/common:envoy_main_interface_lib",
-        "//library/common/api:c_types",
-        "//library/common/jni/import:jni_import_lib",
-        "//library/common/types:managed_types_lib",
     ] + TEST_EXTENSIONS,
 )
 
@@ -162,7 +158,7 @@ cc_binary(
     ],
     linkshared = True,
     deps = [
-        ":base_java_jni_lib",
+        ":envoy_jni_lib",
         "@envoy_mobile_extra_jni_deps//:extra_jni_dep",
     ] + TEST_EXTENSIONS,
 )
