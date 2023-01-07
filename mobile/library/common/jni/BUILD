@@ -146,10 +146,7 @@ cc_binary(
     ],
     linkshared = True,
     deps = [
-        ":android_network_utility_lib",
         ":base_java_jni_lib",
-        ":jni_interface_lib",
-        ":jni_support_lib",
         "//library/common:envoy_main_interface_lib",
         "//library/common/api:c_types",
         "//library/common/jni/import:jni_import_lib",
@@ -163,16 +160,6 @@ envoy_mobile_so_to_jni_lib(
     native_dep = "libjava_jni_lib.so",
 )
 
-cc_library(
-    name = "java_jni_base_lib",
-    deps = [
-        ":android_network_utility_lib",
-        ":base_java_jni_lib",
-        ":jni_interface_lib",
-    ],
-    alwayslink = True,
-)
-
 # Base binary (.so) for JVM testing
 cc_binary(
     name = "libjava_jni_lib.so",
@@ -181,7 +168,7 @@ cc_binary(
     ],
     linkshared = True,
     deps = [
-        ":java_jni_base_lib",
+        ":base_java_jni_lib",
         "@envoy_mobile_extra_jni_deps//:extra_jni_dep",
     ],
 )
@@ -192,9 +179,12 @@ cc_library(
         "-lm",
     ],
     deps = [
+        ":android_network_utility_lib",
+        ":jni_interface_lib",
         ":jni_support_lib",
         ":jni_utility_lib",
     ] + TEST_EXTENSIONS,
+    alwayslink = True,
 )
 
 cc_library(
