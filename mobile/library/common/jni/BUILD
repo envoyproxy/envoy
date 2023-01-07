@@ -7,6 +7,26 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+# Suport for JNI using NDK on android and Java otherwise.
+cc_library(
+    name = "jni_support_lib",
+    srcs = [
+    ] + select({
+        "@envoy//bazel:android": ["ndk_jni_support.cc"],
+        "//conditions:default": ["java_jni_support.cc"],
+    }),
+    hdrs = ["jni_support.h"],
+    linkopts = [
+        "-lm",
+    ] + select({
+        "@envoy//bazel:android": ["-llog"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//library/common/jni/import:jni_import_lib",
+    ],
+)
+
 cc_library(
     name = "jni_utility_lib",
     srcs = [
@@ -14,11 +34,11 @@ cc_library(
         "jni_version.cc",
     ],
     hdrs = [
-        "jni_support.h",
         "jni_utility.h",
         "jni_version.h",
     ],
     deps = [
+        ":jni_support_lib",
         "//library/common/jni/import:jni_import_lib",
         "//library/common/types:c_types_lib",
         "//library/common/types:managed_types_lib",
@@ -34,9 +54,9 @@ cc_library(
     deps = [
         ":android_network_utility_lib",
         ":jni_utility_lib",
-        ":ndk_jni_support",
         "//library/common:envoy_main_interface_lib",
         "//library/common/api:c_types",
+        "//library/common/extensions/key_value/platform:config",
         "//library/common/types:managed_types_lib",
     ],
     # We need this to ensure that we link this into the .so even though there are no code references.
@@ -61,8 +81,8 @@ cc_library(
     deps = [
         ":android_network_utility_lib",
         ":jni_interface_lib",
+        ":jni_support_lib",
         ":jni_utility_lib",
-        ":ndk_jni_support",
         "//library/common:envoy_main_interface_lib",
         "//library/common/api:c_types",
         "//library/common/types:managed_types_lib",
@@ -122,8 +142,8 @@ cc_binary(
     deps = [
         ":android_network_utility_lib",
         ":base_java_jni_lib",
-        ":java_jni_support",
         ":jni_interface_lib",
+        ":jni_support_lib",
         "//library/common:envoy_main_interface_lib",
         "//library/common/api:c_types",
         "//library/common/jni/import:jni_import_lib",
@@ -166,7 +186,7 @@ cc_library(
         "-lm",
     ],
     deps = [
-        ":java_jni_support",
+        ":jni_support_lib",
         ":jni_utility_lib",
         "//library/common/jni/import:jni_import_lib",
         "//library/common:envoy_main_interface_lib",
@@ -174,41 +194,6 @@ cc_library(
         "//library/common/types:managed_types_lib",
         "@envoy//source/common/common:assert_lib",
     ] + TEST_EXTENSIONS,
-)
-
-# Utility implementation for Java JNI
-cc_library(
-    name = "java_jni_support",
-    srcs = [
-        "java_jni_support.cc",
-    ],
-    hdrs = ["jni_support.h"],
-    linkopts = [
-        "-lm",
-    ],
-    deps = [
-        "//library/common/jni/import:jni_import_lib",
-    ],
-)
-
-# Utility implementation for NDK JNI
-cc_library(
-    name = "ndk_jni_support",
-    srcs = [
-    ] + select({
-        "@envoy//bazel:android": ["ndk_jni_support.cc"],
-        "//conditions:default": [],
-    }),
-    hdrs = ["jni_support.h"],
-    linkopts = [
-        "-lm",
-    ] + select({
-        "@envoy//bazel:android": ["-llog"],
-        "//conditions:default": [],
-    }),
-    deps = [
-        "//library/common/jni/import:jni_import_lib",
-    ],
 )
 
 cc_library(
@@ -224,7 +209,7 @@ cc_library(
         "//library/common/types:c_types_lib",
     ] + select({
         "@envoy//bazel:android": [
-            ":ndk_jni_support",
+            ":jni_support_lib",
             ":jni_utility_lib",
             "//library/common/data:utility_lib",
             "//library/common/jni/import:jni_import_lib",
