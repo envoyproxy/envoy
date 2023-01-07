@@ -27,6 +27,7 @@ cc_library(
     ],
 )
 
+# Various JNI helper methods.
 cc_library(
     name = "jni_utility_lib",
     srcs = [
@@ -46,6 +47,10 @@ cc_library(
     ],
 )
 
+# Implementations of the various "native" Java methods for classes
+# in library/java/io/envoyproxy/envoymobile.
+# TODO(RyanTheOptimist): Is there a better name for this? I'm not sure what
+#     "interface" refers to in this file/lib.
 cc_library(
     name = "jni_interface_lib",
     srcs = [
@@ -56,6 +61,7 @@ cc_library(
         ":jni_utility_lib",
         "//library/common:envoy_main_interface_lib",
         "//library/common/api:c_types",
+        "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
         "//library/common/extensions/key_value/platform:config",
         "//library/common/types:managed_types_lib",
     ],
@@ -188,11 +194,6 @@ cc_library(
     deps = [
         ":jni_support_lib",
         ":jni_utility_lib",
-        "//library/common/jni/import:jni_import_lib",
-        "//library/common:envoy_main_interface_lib",
-        "//library/common/types:c_types_lib",
-        "//library/common/types:managed_types_lib",
-        "@envoy//source/common/common:assert_lib",
     ] + TEST_EXTENSIONS,
 )
 
@@ -234,6 +235,5 @@ cc_library(
         "//library/common/jni/import:jni_import_lib",
         "//library/common/types:c_types_lib",
         "@envoy//bazel:boringssl",
-        "@envoy//source/common/common:assert_lib",
     ],
 )
