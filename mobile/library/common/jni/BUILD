@@ -7,6 +7,7 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+# Various JNI helper methods.
 cc_library(
     name = "jni_utility_lib",
     srcs = [
@@ -26,6 +27,11 @@ cc_library(
     ],
 )
 
+# Implementations of the various "native" Java methods for classes
+# in library/java/io/envoyproxy/envoymobile.
+# TODO(RyanTheOptimist): Is there a better name for this? I'm not sure what
+#     "interface" refers to in this file/lib. Maybe we should have a convention
+#     where the name of the java classes are part of the file name?
 cc_library(
     name = "jni_interface_lib",
     srcs = [
@@ -36,6 +42,8 @@ cc_library(
         ":jni_utility_lib",
         ":ndk_jni_support",
         "//library/common:envoy_main_interface_lib",
+        "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
+        "//library/common/extensions/key_value/platform:config",
         "//library/common/api:c_types",
         "//library/common/types:managed_types_lib",
     ],
@@ -114,7 +122,7 @@ envoy_mobile_so_to_jni_lib(
 cc_binary(
     name = "libndk_envoy_jni.so",
     srcs = [
-        "android_test_jni_interface.cc",
+        "android_jni_interface.cc",
     ],
     linkopts = [
     ],
@@ -128,7 +136,7 @@ cc_binary(
         "//library/common/api:c_types",
         "//library/common/jni/import:jni_import_lib",
         "//library/common/types:managed_types_lib",
-    ],
+    ] + TEST_EXTENSIONS,
 )
 
 # OS X binary (.jnilib) for JVM testing
@@ -157,7 +165,7 @@ cc_binary(
     deps = [
         ":java_jni_base_lib",
         "@envoy_mobile_extra_jni_deps//:extra_jni_dep",
-    ],
+    ] + TEST_EXTENSIONS,
 )
 
 cc_library(
@@ -173,7 +181,7 @@ cc_library(
         "//library/common/types:c_types_lib",
         "//library/common/types:managed_types_lib",
         "@envoy//source/common/common:assert_lib",
-    ] + TEST_EXTENSIONS,
+    ],
 )
 
 # Utility implementation for Java JNI
