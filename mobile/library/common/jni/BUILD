@@ -69,6 +69,45 @@ cc_library(
     alwayslink = True,
 )
 
+# Cert verification related functions which call into AndroidNetworkLibrary.
+cc_library(
+    name = "android_network_utility_lib",
+    srcs = [
+        "android_network_utility.cc",
+    ],
+    hdrs = [
+        "android_network_utility.h",
+    ],
+    deps = [
+        ":jni_utility_lib",
+        "//library/common/api:c_types",
+        "//library/common/data:utility_lib",
+        "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
+        "//library/common/jni/import:jni_import_lib",
+        "//library/common/types:c_types_lib",
+        "@envoy//bazel:boringssl",
+    ],
+)
+
+# Implementations of the "native" Java methods for AndroidJniLibrary.java
+cc_library(
+    name = "android_jni_interface_lib",
+    srcs = [
+        "android_jni_interface.cc",
+    ],
+    deps = [
+        ":android_network_utility_lib",
+        ":jni_interface_lib",
+        ":jni_support_lib",
+        ":jni_utility_lib",
+        "//library/common:envoy_main_interface_lib",
+        "//library/common/jni/import:jni_import_lib",
+    ],
+    alwayslink = True,
+)
+
+# Library which contains all the JNI related targets and uses alwayslink to
+# ensure that the code is not stripped, ever if there are no code references.
 cc_library(
     name = "envoy_jni_lib",
     linkopts = [
@@ -116,13 +155,13 @@ android_debug_info(
 )
 
 ## Targets for local execution
-# OS X binary (.jnilib) for NDK testing
+# OS X binary (.jnilib) for testing
 envoy_mobile_so_to_jni_lib(
     name = "libndk_envoy_jni_jnilib",
     native_dep = "libndk_envoy_jni.so",
 )
 
-# Base binary (.so) for NDK testing
+# Base binary (.so) for testing
 cc_binary(
     name = "libndk_envoy_jni.so",
     linkshared = True,
@@ -138,18 +177,6 @@ cc_library(
         ":envoy_jni_lib",
     ] + TEST_EXTENSIONS,
     alwayslink = True,
-)
-
-cc_library(
-    name = "base_java_jni_lib",
-    deps = [
-        ":jni_support_lib",
-        ":jni_utility_lib",
-        "//library/common/jni/import:jni_import_lib",
-        "//library/common:envoy_main_interface_lib",
-        "//library/common/types:c_types_lib",
-        "//library/common/types:managed_types_lib",
-    ] + TEST_EXTENSIONS,
 )
 
 cc_library(
@@ -172,39 +199,4 @@ cc_library(
         ],
         "//conditions:default": [],
     }),
-)
-
-cc_library(
-    name = "android_network_utility_lib",
-    srcs = [
-        "android_network_utility.cc",
-    ],
-    hdrs = [
-        "android_network_utility.h",
-    ],
-    deps = [
-        ":jni_utility_lib",
-        "//library/common/api:c_types",
-        "//library/common/data:utility_lib",
-        "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
-        "//library/common/jni/import:jni_import_lib",
-        "//library/common/types:c_types_lib",
-        "@envoy//bazel:boringssl",
-    ],
-)
-
-cc_library(
-    name = "android_jni_interface_lib",
-    srcs = [
-        "android_jni_interface.cc",
-    ],
-    deps = [
-        ":android_network_utility_lib",
-        ":jni_interface_lib",
-        ":jni_support_lib",
-        ":jni_utility_lib",
-        "//library/common:envoy_main_interface_lib",
-        "//library/common/jni/import:jni_import_lib",
-    ],
-    alwayslink = True,
 )
