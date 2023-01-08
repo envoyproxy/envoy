@@ -38,8 +38,8 @@ envoy_mobile_android_test(
         "AndroidNetworkMonitorTest.java",
     ],
     native_deps = [
-        "//library/common/jni:libenvoy_jni_with_test_extensions.so",
-        "//library/common/jni:libenvoy_jni_with_test_extensions_jnilib",
+        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
+        "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
     ],
     deps = [
         "//library/java/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib",

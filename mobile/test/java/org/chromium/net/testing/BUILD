@@ -60,8 +60,8 @@ envoy_mobile_android_test(
         "CronetTestRuleTest.java",
     ],
     native_deps = [
-        "//library/common/jni:libenvoy_jni_with_test_extensions.so",
-        "//library/common/jni:libenvoy_jni_with_test_extensions_jnilib",
+        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
+        "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
     ],
     deps = [
         ":testing",
@@ -83,8 +83,8 @@ envoy_mobile_android_test(
         "sandboxNetwork": "standard",
     },
     native_deps = [
-        "//library/common/jni:libenvoy_jni_with_test_extensions.so",
-        "//library/common/jni:libenvoy_jni_with_test_extensions_jnilib",
+        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
+        "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
     ],
     deps = [
         ":testing",
@@ -102,8 +102,8 @@ envoy_mobile_android_test(
         "sandboxNetwork": "standard",
     },
     native_deps = [
-        "//library/common/jni:libenvoy_jni_with_test_extensions.so",
-        "//library/common/jni:libenvoy_jni_with_test_extensions_jnilib",
+        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
+        "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
     ],
     deps = [
         ":testing",
