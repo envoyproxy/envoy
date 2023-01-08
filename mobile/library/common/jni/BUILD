@@ -71,22 +71,17 @@ cc_library(
 
 cc_library(
     name = "envoy_jni_lib",
-    srcs = [
-        "android_jni_interface.cc",
-    ],
     linkopts = [
     ] + select({
         "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
         "//conditions:default": [],
     }),
     deps = [
+        ":android_jni_interface_lib",
         ":android_network_utility_lib",
         ":jni_interface_lib",
         ":jni_support_lib",
         ":jni_utility_lib",
-        "//library/common:envoy_main_interface_lib",
-        "//library/common/api:c_types",
-        "//library/common/types:managed_types_lib",
     ],
     # We need this to ensure that we link this into the .so even though there are no code references.
     alwayslink = True,
@@ -130,11 +125,9 @@ envoy_mobile_so_to_jni_lib(
 # Base binary (.so) for NDK testing
 cc_binary(
     name = "libndk_envoy_jni.so",
-    srcs = [
-        "android_jni_interface.cc",
-    ],
     linkshared = True,
     deps = [
+        ":android_jni_interface_lib",
         ":android_network_utility_lib",
         ":base_java_jni_lib",
         ":jni_interface_lib",
@@ -152,22 +145,14 @@ envoy_mobile_so_to_jni_lib(
     native_dep = "libjava_jni_lib.so",
 )
 
-cc_library(
-    name = "java_jni_base_lib",
-    deps = [
-        ":android_network_utility_lib",
-        ":base_java_jni_lib",
-        ":jni_interface_lib",
-    ],
-    alwayslink = True,
-)
-
 # Base binary (.so) for JVM testing
 cc_binary(
     name = "libjava_jni_lib.so",
     linkshared = True,
     deps = [
-        ":java_jni_base_lib",
+        ":android_network_utility_lib",
+        ":base_java_jni_lib",
+        ":jni_interface_lib",
         "@envoy_mobile_extra_jni_deps//:extra_jni_dep",
     ],
 )
@@ -222,5 +207,20 @@ cc_library(
         "//library/common/jni/import:jni_import_lib",
         "//library/common/types:c_types_lib",
         "@envoy//bazel:boringssl",
+    ],
+)
+
+cc_library(
+    name = "android_jni_interface_lib",
+    srcs = [
+        "android_jni_interface.cc",
+    ],
+    deps = [
+        ":android_network_utility_lib",
+        ":jni_interface_lib",
+        ":jni_support_lib",
+        ":jni_utility_lib",
+        "//library/common:envoy_main_interface_lib",
+        "//library/common/jni/import:jni_import_lib",
     ],
 )
