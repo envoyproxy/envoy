@@ -17,7 +17,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/loa
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Least Request Load Balancing Policy]
-// [#not-implemented-hide:]
+// [#extension: envoy.load_balancing_policies.least_request]
 
 // This configuration allows the built-in LEAST_REQUEST LB policy to be configured via the LB policy
 // extension point. See the :ref:`load balancing architecture overview

@@ -393,6 +393,13 @@ EXTENSIONS = {
     "envoy.route.early_data_policy.default":           "//source/extensions/early_data:default_early_data_policy_lib",
 
     #
+    # Load balancing policies for upstream
+    #
+    "envoy.load_balancing_policies.least_request":     "//source/extensions/load_balancing_policies/least_request:config",
+    "envoy.load_balancing_policies.random":            "//source/extensions/load_balancing_policies/random:config",
+    "envoy.load_balancing_policies.round_robin":       "//source/extensions/load_balancing_policies/round_robin:config",
+
+
     # HTTP Early Header Mutation
     #
     "envoy.http.early_header_mutation.header_mutation": "//source/extensions/http/early_header_mutation/header_mutation:config",

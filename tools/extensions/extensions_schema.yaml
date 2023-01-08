@@ -119,6 +119,7 @@ categories:
 - envoy.tls_handshakers
 - envoy.generic_proxy.filters
 - envoy.generic_proxy.codecs
+- envoy.load_balancing_policies
 - envoy.http.early_header_mutation
 - envoy.http.custom_response
 
