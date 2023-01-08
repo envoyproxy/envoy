@@ -75,12 +75,8 @@ cc_library(
         "android_jni_interface.cc",
     ],
     linkopts = [
-        "-ldl",
     ] + select({
         "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
-        "//conditions:default": [],
-    }) + select({
-        "@envoy//bazel:android": ["-llog"],
         "//conditions:default": [],
     }),
     deps = [
@@ -110,9 +106,6 @@ cc_binary(
     linkopts = [
     ] + select({
         "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
-        "//conditions:default": [],
-    }) + select({
-        "@envoy//bazel:android": ["-llog"],
         "//conditions:default": [],
     }),
     linkshared = True,
