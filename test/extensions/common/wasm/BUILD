@@ -99,6 +99,7 @@ envoy_cc_test_library(
         "//source/extensions/wasm_runtime/v8:config",
         "//source/extensions/wasm_runtime/wamr:config",
         "//source/extensions/wasm_runtime/wasmtime:config",
+        "//source/extensions/wasm_runtime/wasmedge:config",
         "//source/extensions/wasm_runtime/wavm:config",
     ],
 )

@@ -103,6 +103,12 @@ static void bmWasmSimpleCallSpeedTest(benchmark::State& state, std::string test,
                     std::string("null"));                                                          \
   BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, WasmSpeedTest_##_t, std::string(#_t),               \
                     std::string("wasmtime"));
+#elif defined(PROXY_WASM_HAS_RUNTIME_WASMEDGE)
+#define B(_t)                                                                                      \
+  BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, NullSpeedTest_##_t, std::string(#_t),               \
+                    std::string("null"));                                                          \
+  BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, WasmSpeedTest_##_t, std::string(#_t),               \
+                    std::string("wasmedge"));
 #else
 #define B(_t)                                                                                      \
   BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, NullSpeedTest_##_t, std::string(#_t),               \

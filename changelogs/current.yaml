@@ -289,6 +289,9 @@ new_features:
 - area: tcp
   change: |
     added :ref:`idle_timeout <envoy_v3_api_field_extensions.upstreams.tcp.v3.TcpProtocolOptions.idle_timeout>` to support per client idle timeout for tcp connection pool. See also minor_behavior_changes.
+- area: wasm
+  change: |
+    enabled WasmEdge as the Wasm VM.
 - area: ext_authz
   change: |
     added support to allowlist headers included in the check request to gRPC authorization server (previously only available for HTTP authorization server).

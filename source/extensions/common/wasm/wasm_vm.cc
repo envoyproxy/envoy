@@ -79,8 +79,8 @@ bool isWasmEngineAvailable(absl::string_view runtime) {
 
 absl::string_view getFirstAvailableWasmEngineName() {
   constexpr absl::string_view wasm_engines[] = {
-      "envoy.wasm.runtime.v8", "envoy.wasm.runtime.wasmtime", "envoy.wasm.runtime.wamr",
-      "envoy.wasm.runtime.wavm"};
+      "envoy.wasm.runtime.v8", "envoy.wasm.runtime.wasmtime", "envoy.wasm.runtime.wasmedge"
+      "envoy.wasm.runtime.wamr", "envoy.wasm.runtime.wavm"};
   for (const auto wasm_engine : wasm_engines) {
     if (isWasmEngineAvailable(wasm_engine)) {
       return wasm_engine;

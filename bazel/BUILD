@@ -462,6 +462,11 @@ config_setting(
 )
 
 config_setting(
+    name = "wasm_wasmedge",
+    values = {"define": "wasm=wasmedge"},
+)
+
+config_setting(
     name = "wasm_disabled",
     values = {"define": "wasm=disabled"},
 )

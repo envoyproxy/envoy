@@ -244,6 +244,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_wamr()
     _com_github_wavm_wavm()
     _com_github_wasmtime()
+    _com_github_wasmedge_wasmedge()
     _com_github_wasm_c_api()
 
     switched_rules_by_language(
@@ -1134,6 +1135,16 @@ def _com_github_wasmtime():
     external_http_archive(
         name = "com_github_wasmtime",
         build_file = "@envoy//bazel/external:wasmtime.BUILD",
+    )
+
+def _com_github_wasmedge_wasmedge():
+    external_http_archive(
+        name = "com_github_wasmedge_wasmedge",
+        build_file = "@envoy//bazel/external:wasmedge.BUILD",
+    )
+    native.bind(
+        name = "wasmedge",
+        actual = "@com_github_wasmedge_wasmedge//:wasmedge_lib",
     )
 
 def _com_github_wasm_c_api():

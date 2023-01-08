@@ -50,7 +50,7 @@ message VmConfig {
   string vm_id = 1;
 
   // The Wasm runtime type, defaults to the first available Wasm engine used at Envoy build-time.
-  // The priority to search for the available engine is: v8 -> wasmtime -> wamr -> wavm.
+  // The priority to search for the available engine is: v8 -> wasmtime -> wasmedge -> wamr -> wavm.
   // Available Wasm runtime types are registered as extensions. The following runtimes are included
   // in Envoy code base:
   //
@@ -78,6 +78,10 @@ message VmConfig {
   // **envoy.wasm.runtime.wasmtime**: `Wasmtime <https://wasmtime.dev/>`_-based WebAssembly runtime.
   // This runtime is not enabled in the official build.
   //
+  // .. _extension_envoy.wasm.runtime.wasmedge:
+  //
+  // **envoy.wasm.runtime.wasmedge**: `WasmEdge <https://wasmedge.org/>`_-based WebAssembly runtime.
+  // This runtime is not enabled in the official build.
   // [#extension-category: envoy.wasm.runtime]
   string runtime = 2;
 
