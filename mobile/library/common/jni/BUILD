@@ -148,10 +148,8 @@ envoy_mobile_so_to_jni_lib(
 cc_library(
     name = "java_jni_base_lib",
     deps = [
-        ":android_network_utility_lib",
-        ":base_java_jni_lib",
-        ":jni_interface_lib",
-    ],
+        ":envoy_jni_lib",
+    ] + TEST_EXTENSIONS,
     alwayslink = True,
 )
 
