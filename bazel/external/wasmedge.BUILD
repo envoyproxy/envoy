@@ -20,7 +20,7 @@ cmake(
     },
     env = {
         # cmake here detects gcc as the cxx compiler, so we specify the compiler explicitly
-        "CXX": "c++"
+        "CXX": "c++",
     },
     generate_args = ["-GNinja"],
     lib_source = ":srcs",
