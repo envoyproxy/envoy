@@ -127,15 +127,8 @@ cc_binary(
     name = "libndk_envoy_jni.so",
     linkshared = True,
     deps = [
-        ":android_jni_interface_lib",
-        ":android_network_utility_lib",
-        ":base_java_jni_lib",
-        ":jni_interface_lib",
-        ":jni_support_lib",
-        "//library/common:envoy_main_interface_lib",
-        "//library/common/api:c_types",
-        "//library/common/jni/import:jni_import_lib",
-        "//library/common/types:managed_types_lib",
+        ":java_jni_base_lib",
+        "@envoy_mobile_extra_jni_deps//:extra_jni_dep",
     ],
 )
 
