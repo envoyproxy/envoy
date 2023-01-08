@@ -26,6 +26,7 @@ cc_library(
     ],
 )
 
+# Various JNI helper methods.
 cc_library(
     name = "jni_utility_lib",
     srcs = [
@@ -45,6 +46,11 @@ cc_library(
     ],
 )
 
+# Implementations of the various "native" Java methods for classes
+# in library/java/io/envoyproxy/envoymobile.
+# TODO(RyanTheOptimist): Is there a better name for this? I'm not sure what
+#     "interface" refers to in this file/lib. Maybe we should have a convention
+#     where the name of the java classes are part of the file name?
 cc_library(
     name = "jni_interface_lib",
     srcs = [
@@ -55,6 +61,7 @@ cc_library(
         ":jni_utility_lib",
         "//library/common:envoy_main_interface_lib",
         "//library/common/api:c_types",
+        "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
         "//library/common/extensions/key_value/platform:config",
         "//library/common/types:managed_types_lib",
     ],
@@ -131,7 +138,7 @@ envoy_mobile_so_to_jni_lib(
 cc_binary(
     name = "libndk_envoy_jni.so",
     srcs = [
-        "android_test_jni_interface.cc",
+        "android_jni_interface.cc",
     ],
     linkshared = True,
     deps = [
