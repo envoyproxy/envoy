@@ -154,29 +154,32 @@ android_debug_info(
     dep = "libenvoy_jni.so",
 )
 
-## Targets for local execution
-# OS X binary (.jnilib) for testing
-envoy_mobile_so_to_jni_lib(
-    name = "libndk_envoy_jni_jnilib",
-    native_dep = "libndk_envoy_jni.so",
-)
-
-# Base binary (.so) for testing
-cc_binary(
-    name = "libndk_envoy_jni.so",
-    linkshared = True,
-    deps = [
-        ":java_jni_base_lib",
-        "@envoy_mobile_extra_jni_deps//:extra_jni_dep",
-    ],
-)
-
+# Library which contains all the JNI related targets and test extensions, and
+# uses alwayslink to ensure that the code is not stripped, ever if there are no
+# code references.
 cc_library(
-    name = "java_jni_base_lib",
+    name = "envoy_jni_with_test_extensions_lib",
     deps = [
         ":envoy_jni_lib",
     ] + TEST_EXTENSIONS,
     alwayslink = True,
+)
+
+# Base binary (.so) for testing
+cc_binary(
+    name = "libenvoy_jni_with_test_extensions.so",
+    linkshared = True,
+    deps = [
+        ":envoy_jni_with_test_extensions_lib",
+        "@envoy_mobile_extra_jni_deps//:extra_jni_dep",
+    ],
+)
+
+## Targets for local execution
+# OS X binary (.jnilib) for testing
+envoy_mobile_so_to_jni_lib(
+    name = "libenvoy_jni_with_test_extensions_jnilib",
+    native_dep = "libenvoy_jni_with_test_extensions.so",
 )
 
 cc_library(

@@ -18,12 +18,12 @@ cc_binary(
     testonly = True,
     srcs = [
         "quic_test_server_jni_interface.cc",
-        "@local_jdk//:jni_header",
+        "@bazel_tools//tools/jdk:current_java_runtime",
     ],
     copts = ["-std=c++17"],
     linkshared = True,
     deps = [
-        "//library/common/jni:java_jni_base_lib",
+        "//library/common/jni:envoy_jni_with_test_extensions_lib",
         "//test/common/integration:quic_test_server_interface_lib",
     ],
 )
