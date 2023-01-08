@@ -5,17 +5,15 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-# Suport for JNI using NDK on android and Java otherwise.
+# Suport for JNI, using NDK on android and Java otherwise.
 cc_library(
     name = "jni_support_lib",
-    srcs = [
-    ] + select({
+    srcs = select({
         "@envoy//bazel:android": ["ndk_jni_support.cc"],
         "//conditions:default": ["java_jni_support.cc"],
     }),
     hdrs = ["jni_support.h"],
-    linkopts = [
-    ] + select({
+    linkopts = select({
         "@envoy//bazel:android": ["-llog"],
         "//conditions:default": [],
     }),
@@ -101,15 +99,14 @@ cc_library(
         "//library/common:envoy_main_interface_lib",
         "//library/common/jni/import:jni_import_lib",
     ],
+    # We need this to ensure that we link this into the .so even though there are no code references.
     alwayslink = True,
 )
 
-# Library which contains all the JNI related targets and uses alwayslink to
-# ensure that the code is not stripped, ever if there are no code references.
+# Library which contains all the JNI related targets.
 cc_library(
     name = "envoy_jni_lib",
-    linkopts = [
-    ] + select({
+    linkopts = select({
         "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
         "//conditions:default": [],
     }),
@@ -120,8 +117,6 @@ cc_library(
         ":jni_support_lib",
         ":jni_utility_lib",
     ],
-    # We need this to ensure that we link this into the .so even though there are no code references.
-    alwayslink = True,
 )
 
 config_setting(
@@ -135,8 +130,7 @@ config_setting(
 # Main dynamic library for the Envoy Mobile aar
 cc_binary(
     name = "libenvoy_jni.so",
-    linkopts = [
-    ] + select({
+    linkopts = select({
         "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
         "//conditions:default": [],
     }),

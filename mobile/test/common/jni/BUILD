@@ -6,15 +6,12 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-# Library which contains all the JNI related targets and test extensions, and
-# uses alwayslink to ensure that the code is not stripped, ever if there are no
-# code references.
+# Library which contains all the JNI related targets and test extensions
 cc_library(
     name = "envoy_jni_with_test_extensions_lib",
     deps = [
         "//library/common/jni:envoy_jni_lib",
     ] + TEST_EXTENSIONS,
-    alwayslink = True,
 )
 
 # Base binary (.so) for testing
@@ -28,7 +25,7 @@ cc_binary(
 )
 
 ## Targets for local execution
-# OS X binary (.jnilib) for testing
+# macOS binary (.jnilib) for testing
 envoy_mobile_so_to_jni_lib(
     name = "libenvoy_jni_with_test_extensions_jnilib",
     native_dep = "libenvoy_jni_with_test_extensions.so",
@@ -48,7 +45,7 @@ cc_binary(
     ],
 )
 
-# OS X binary (.jnilib) for Quic Test Server
+# macOS binary (.jnilib) for Quic Test Server
 envoy_mobile_so_to_jni_lib(
     name = "libquic_test_server_jni_jnilib",
     testonly = True,
