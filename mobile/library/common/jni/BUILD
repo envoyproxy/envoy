@@ -231,4 +231,5 @@ cc_library(
         "//library/common:envoy_main_interface_lib",
         "//library/common/jni/import:jni_import_lib",
     ],
+    alwayslink = True,
 )
