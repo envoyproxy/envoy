@@ -1293,6 +1293,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.wasm.runtime.v8",
             "envoy.wasm.runtime.wamr",
             "envoy.wasm.runtime.wavm",
+            "envoy.wasm.runtime.wasmedge",
             "envoy.wasm.runtime.wasmtime",
         ],
         release_date = "2022-03-15",

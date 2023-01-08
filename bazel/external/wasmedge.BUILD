@@ -11,16 +11,16 @@ filegroup(
 
 cmake(
     name = "wasmedge_lib",
-    env = {
-        # cmake here detects gcc as the cxx compiler, so we specify the compiler explicitly
-        "CXX": "c++"
-    },
     cache_entries = {
         "WASMEDGE_BUILD_AOT_RUNTIME": "Off",
         "WASMEDGE_BUILD_SHARED_LIB": "Off",
         "WASMEDGE_BUILD_STATIC_LIB": "On",
         "WASMEDGE_BUILD_TOOLS": "Off",
         "WASMEDGE_FORCE_DISABLE_LTO": "On",
+    },
+    env = {
+        # cmake here detects gcc as the cxx compiler, so we specify the compiler explicitly
+        "CXX": "c++"
     },
     generate_args = ["-GNinja"],
     lib_source = ":srcs",
