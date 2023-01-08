@@ -117,6 +117,8 @@ cc_library(
         ":jni_support_lib",
         ":jni_utility_lib",
     ],
+    # We need this to ensure that we link this into the .so even though there are no code references.
+    alwayslink = True,
 )
 
 config_setting(
