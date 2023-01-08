@@ -145,14 +145,22 @@ envoy_mobile_so_to_jni_lib(
     native_dep = "libjava_jni_lib.so",
 )
 
+cc_library(
+    name = "java_jni_base_lib",
+    deps = [
+        ":android_network_utility_lib",
+        ":base_java_jni_lib",
+        ":jni_interface_lib",
+    ],
+    alwayslink = True,
+)
+
 # Base binary (.so) for JVM testing
 cc_binary(
     name = "libjava_jni_lib.so",
     linkshared = True,
     deps = [
-        ":android_network_utility_lib",
-        ":base_java_jni_lib",
-        ":jni_interface_lib",
+        ":java_jni_base_lib",
         "@envoy_mobile_extra_jni_deps//:extra_jni_dep",
     ],
 )
