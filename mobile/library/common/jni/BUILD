@@ -132,28 +132,12 @@ cc_binary(
     ],
 )
 
-# OS X binary (.jnilib) for JVM testing
-envoy_mobile_so_to_jni_lib(
-    name = "java_jni_lib.jnilib",
-    native_dep = "libjava_jni_lib.so",
-)
-
 cc_library(
     name = "java_jni_base_lib",
     deps = [
         ":envoy_jni_lib",
     ] + TEST_EXTENSIONS,
     alwayslink = True,
-)
-
-# Base binary (.so) for JVM testing
-cc_binary(
-    name = "libjava_jni_lib.so",
-    linkshared = True,
-    deps = [
-        ":java_jni_base_lib",
-        "@envoy_mobile_extra_jni_deps//:extra_jni_dep",
-    ],
 )
 
 cc_library(
