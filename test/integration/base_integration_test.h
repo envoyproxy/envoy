@@ -23,6 +23,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/test_time.h"
 
+#include "absl/strings/str_format.h"
 #include "absl/types/optional.h"
 
 #if defined(ENVOY_CONFIG_COVERAGE)
@@ -37,6 +38,14 @@
 #define DISABLE_UNDER_WINDOWS return
 #else
 #define DISABLE_UNDER_WINDOWS                                                                      \
+  do {                                                                                             \
+  } while (0)
+#endif
+
+#ifndef ENVOY_ADMIN_FUNCTIONALITY
+#define DISABLE_IF_ADMIN_DISABLED return
+#else
+#define DISABLE_IF_ADMIN_DISABLED                                                                  \
   do {                                                                                             \
   } while (0)
 #endif
@@ -88,6 +97,9 @@ public:
   void skipPortUsageValidation() { config_helper_.skipPortUsageValidation(); }
   // Make test more deterministic by using a fixed RNG value.
   void setDeterministicValue(uint64_t value = 0) { deterministic_value_ = value; }
+  // Get socket option for a specific listener's socket.
+  bool getSocketOption(const std::string& listener_name, int level, int optname, void* optval,
+                       socklen_t* optlen, int address_index = 0);
 
   Http::CodecType upstreamProtocol() const { return upstream_config_.upstream_protocol_; }
 
@@ -99,7 +111,8 @@ public:
   makeTcpConnection(uint32_t port,
                     const Network::ConnectionSocket::OptionsSharedPtr& options = nullptr,
                     Network::Address::InstanceConstSharedPtr source_address =
-                        Network::Address::InstanceConstSharedPtr());
+                        Network::Address::InstanceConstSharedPtr(),
+                    absl::string_view destination_address = "");
 
   // Test-wide port map.
   void registerPort(const std::string& key, uint32_t port);
@@ -403,10 +416,6 @@ protected:
   void setMaxRequestHeadersCount(uint32_t value) {
     upstream_config_.max_request_headers_count_ = value;
   }
-  void setHeadersWithUnderscoreAction(
-      envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction value) {
-    upstream_config_.headers_with_underscores_action_ = value;
-  }
 
   void setServerBufferFactory(Buffer::WatermarkFactorySharedPtr proxy_buffer_factory) {
     ASSERT(!test_server_, "Proxy buffer factory must be set before test server creation");
@@ -422,7 +431,7 @@ protected:
 
   void checkForMissingTagExtractionRules();
 
-  std::unique_ptr<Stats::Scope> upstream_stats_store_;
+  std::unique_ptr<Stats::Store> upstream_stats_store_;
 
   // Make sure the test server will be torn down after any fake client.
   // The test server owns the runtime, which is often accessed by client and

@@ -202,12 +202,6 @@ private:
       return filter_manager_.sendLocalReply(code, body, modify_headers, grpc_status, details);
     }
 
-    // Tracing::TracingConfig
-    Tracing::OperationName operationName() const override;
-    const Tracing::CustomTagMap* customTags() const override;
-    bool verbose() const override;
-    uint32_t maxPathTagLength() const override;
-
     // ScopeTrackedObject
     void dumpState(std::ostream& os, int indent_level = 0) const override {
       const char* spaces = spacesForLevel(indent_level);
@@ -283,7 +277,7 @@ private:
     void onRequestDataTooLarge() override;
     Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override;
     void onLocalReply(Code code) override;
-    Tracing::Config& tracingConfig() override;
+    OptRef<const Tracing::Config> tracingConfig() const override;
     const ScopeTrackedObject& scope() override;
     OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() override { return *this; }
 
@@ -361,7 +355,18 @@ private:
     // If header map failed validation, it sends an error response and returns false.
     bool validateHeaders();
 
+    // Note: this method is a noop unless ENVOY_ENABLE_UHV is defined
+    // Call header validator extension to validate the request trailer map after it was
+    // deserialized. If the trailer map failed validation, this method does the following:
+    // 1. For H/1 it sends 400 response and returns false.
+    // 2. For H/2 and H/3 it resets the stream (without error response). Issue #24735 is filed to
+    //    harmonize this behavior with H/1.
+    // 3. If the `stream_error_on_invalid_http_message` is set to `false` (it is by default) in the
+    // HTTP connection manager configuration, then the entire connection is closed.
+    bool validateTrailers();
+
     ConnectionManagerImpl& connection_manager_;
+    OptRef<const TracingConnectionManagerConfig> connection_manager_tracing_config_;
     // TODO(snowp): It might make sense to move this to the FilterManager to avoid storing it in
     // both locations, then refer to the FM when doing stream logs.
     const uint64_t stream_id_;
@@ -405,9 +410,29 @@ private:
     Http::HeaderValidatorPtr header_validator_;
 
     friend FilterManager;
+
+  private:
+    // Keep these methods private to ensure that these methods are only called by the reference
+    // returned by the public tracingConfig() method.
+    // Tracing::TracingConfig
+    Tracing::OperationName operationName() const override;
+    const Tracing::CustomTagMap* customTags() const override;
+    bool verbose() const override;
+    uint32_t maxPathTagLength() const override;
   };
 
   using ActiveStreamPtr = std::unique_ptr<ActiveStream>;
+
+  class HttpStreamIdProviderImpl : public StreamInfo::StreamIdProvider {
+  public:
+    HttpStreamIdProviderImpl(ActiveStream& parent) : parent_(parent) {}
+
+    // StreamInfo::StreamIdProvider
+    absl::optional<absl::string_view> toStringView() const override;
+    absl::optional<uint64_t> toInteger() const override;
+
+    ActiveStream& parent_;
+  };
 
   /**
    * Check to see if the connection can be closed after gracefully waiting to send pending codec

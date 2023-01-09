@@ -105,7 +105,7 @@ std::chrono::milliseconds HealthCheckerImplBase::interval(HealthState state,
   // If a connection has been established, we choose an interval based on the host's health. Please
   // refer to the HealthCheck API documentation for more details.
   uint64_t base_time_ms;
-  if (cluster_.info()->stats().upstream_cx_total_.used()) {
+  if (cluster_.info()->trafficStats()->upstream_cx_total_.used()) {
     // When healthy/unhealthy threshold is configured the health transition of a host will be
     // delayed. In this situation Envoy should use the edge interval settings between health checks.
     //
@@ -160,6 +160,9 @@ HealthCheckerImplBase::intervalWithJitter(uint64_t base_time_ms,
 
 void HealthCheckerImplBase::addHosts(const HostVector& hosts) {
   for (const HostSharedPtr& host : hosts) {
+    if (host->disableActiveHealthCheck()) {
+      continue;
+    }
     active_sessions_[host] = makeSession(host);
     host->setHealthChecker(
         HealthCheckHostMonitorPtr{new HealthCheckHostMonitorImpl(shared_from_this(), host)});
@@ -171,6 +174,9 @@ void HealthCheckerImplBase::onClusterMemberUpdate(const HostVector& hosts_added,
                                                   const HostVector& hosts_removed) {
   addHosts(hosts_added);
   for (const HostSharedPtr& host : hosts_removed) {
+    if (host->disableActiveHealthCheck()) {
+      continue;
+    }
     auto session_iter = active_sessions_.find(host);
     ASSERT(active_sessions_.end() != session_iter);
     // This deletion can happen inline in response to a host failure, so we deferred delete.
@@ -233,7 +239,8 @@ HealthCheckerImplBase::ActiveHealthCheckSession::ActiveHealthCheckSession(
     HealthCheckerImplBase& parent, HostSharedPtr host)
     : host_(host), parent_(parent),
       interval_timer_(parent.dispatcher_.createTimer([this]() -> void { onIntervalBase(); })),
-      timeout_timer_(parent.dispatcher_.createTimer([this]() -> void { onTimeoutBase(); })) {
+      timeout_timer_(parent.dispatcher_.createTimer([this]() -> void { onTimeoutBase(); })),
+      time_source_(parent.dispatcher_.timeSource()) {
 
   if (!host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
     parent.incHealthy();
@@ -274,6 +281,7 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess(bool degrade
   num_unhealthy_ = 0;
 
   HealthTransition changed_state = HealthTransition::Unchanged;
+
   if (host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
     // If this is the first time we ever got a check result on this host, we immediately move
     // it to healthy. This makes startup faster with a small reduction in overall reliability
@@ -285,7 +293,6 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess(bool degrade
       // A host that was told to exclude based on immediate failure, but is now passing, should
       // no longer be excluded.
       host_->healthFlagClear(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
-
       host_->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
       parent_.incHealthy();
       changed_state = HealthTransition::Changed;
@@ -295,6 +302,7 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess(bool degrade
     } else {
       changed_state = HealthTransition::ChangePending;
     }
+    host_->setLastHcPassTime(time_source_.monotonicTime());
   }
 
   changed_state = clearPendingFlag(changed_state);

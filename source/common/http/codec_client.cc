@@ -14,7 +14,7 @@
 #include "source/common/http/utility.h"
 
 #ifdef ENVOY_ENABLE_QUIC
-#include "source/common/quic/codec_impl.h"
+#include "source/common/quic/client_codec_impl.h"
 #endif
 
 namespace Envoy {
@@ -59,7 +59,7 @@ void CodecClient::connect() {
   }
 }
 
-void CodecClient::close() { connection_->close(Network::ConnectionCloseType::NoFlush); }
+void CodecClient::close(Network::ConnectionCloseType type) { connection_->close(type); }
 
 void CodecClient::deleteRequest(ActiveRequest& request) {
   connection_->dispatcher().deferredDelete(request.removeFromList(active_requests_));
@@ -171,7 +171,7 @@ void CodecClient::onData(Buffer::Instance& data) {
     if (!isPrematureResponseError(status) ||
         (!active_requests_.empty() ||
          getPrematureResponseHttpCode(status) != Code::RequestTimeout)) {
-      host_->cluster().stats().upstream_cx_protocol_error_.inc();
+      host_->cluster().trafficStats()->upstream_cx_protocol_error_.inc();
       protocol_error_ = true;
     }
     close();

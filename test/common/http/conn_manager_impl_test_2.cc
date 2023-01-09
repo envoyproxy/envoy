@@ -74,10 +74,11 @@ TEST_F(HttpConnectionManagerImplTest, ResponseStartBeforeRequestComplete) {
   // before the request completes, but don't finish the reply until after the request completes.
   MockStreamDecoderFilter* filter = new NiceMock<MockStreamDecoderFilter>();
   EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillOnce(Invoke([&](FilterChainManager& manager) -> void {
+      .WillOnce(Invoke([&](FilterChainManager& manager) -> bool {
         FilterFactoryCb factory =
             createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr{filter});
         manager.applyFilterFactoryCb({}, factory);
+        return true;
       }));
 
   EXPECT_CALL(*filter, decodeHeaders(_, false))
@@ -195,12 +196,13 @@ TEST_F(HttpConnectionManagerImplTest, TestDownstreamProtocolErrorAfterHeadersAcc
   std::shared_ptr<AccessLog::MockInstance> handler(new NiceMock<AccessLog::MockInstance>());
 
   EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillOnce(Invoke([&](FilterChainManager& manager) -> void {
+      .WillOnce(Invoke([&](FilterChainManager& manager) -> bool {
         FilterFactoryCb filter_factory = createDecoderFilterFactoryCb(filter);
         FilterFactoryCb handler_factory = createLogHandlerFactoryCb(handler);
 
         manager.applyFilterFactoryCb({}, filter_factory);
         manager.applyFilterFactoryCb({}, handler_factory);
+        return true;
       }));
 
   EXPECT_CALL(*handler, log(_, _, _, _))
@@ -284,9 +286,10 @@ TEST_F(HttpConnectionManagerImplTest, IdleTimeout) {
 
   MockStreamDecoderFilter* filter = new NiceMock<MockStreamDecoderFilter>();
   EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillOnce(Invoke([&](FilterChainManager& manager) -> void {
+      .WillOnce(Invoke([&](FilterChainManager& manager) -> bool {
         auto factory = createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr{filter});
         manager.applyFilterFactoryCb({}, factory);
+        return true;
       }));
 
   EXPECT_CALL(*idle_timer, disableTimer());
@@ -392,9 +395,10 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionDuration) {
 
   MockStreamDecoderFilter* filter = new NiceMock<MockStreamDecoderFilter>();
   EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillOnce(Invoke([&](FilterChainManager& manager) -> void {
+      .WillOnce(Invoke([&](FilterChainManager& manager) -> bool {
         auto factory = createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr{filter});
         manager.applyFilterFactoryCb({}, factory);
+        return true;
       }));
 
   EXPECT_CALL(*filter, decodeHeaders(_, false))
@@ -2240,9 +2244,10 @@ TEST_F(HttpConnectionManagerImplTest, DisableHttp1KeepAliveWhenOverloaded) {
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
   EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillOnce(Invoke([&](FilterChainManager& manager) -> void {
+      .WillOnce(Invoke([&](FilterChainManager& manager) -> bool {
         auto factory = createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr{filter});
         manager.applyFilterFactoryCb({}, factory);
+        return true;
       }));
 
   EXPECT_CALL(*codec_, dispatch(_))
@@ -2286,9 +2291,10 @@ TEST_F(HttpConnectionManagerImplTest, DisableHttp2KeepAliveWhenOverloaded) {
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
   EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillOnce(Invoke([&](FilterChainManager& manager) -> void {
+      .WillOnce(Invoke([&](FilterChainManager& manager) -> bool {
         auto factory = createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr{filter});
         manager.applyFilterFactoryCb({}, factory);
+        return true;
       }));
 
   EXPECT_CALL(*codec_, dispatch(_))
@@ -2414,9 +2420,10 @@ TEST_F(HttpConnectionManagerImplTest, DisableKeepAliveWhenDraining) {
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
   EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillOnce(Invoke([&](FilterChainManager& manager) -> void {
+      .WillOnce(Invoke([&](FilterChainManager& manager) -> bool {
         auto factory = createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr{filter});
         manager.applyFilterFactoryCb({}, factory);
+        return true;
       }));
 
   EXPECT_CALL(*codec_, dispatch(_))
@@ -2740,9 +2747,10 @@ TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponseUsingHttp3) {
   EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
 
   EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillOnce(Invoke([&](FilterChainManager& manager) -> void {
+      .WillOnce(Invoke([&](FilterChainManager& manager) -> bool {
         auto factory = createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr{filter});
         manager.applyFilterFactoryCb({}, factory);
+        return true;
       }));
 
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
@@ -3147,7 +3155,6 @@ TEST_F(HttpConnectionManagerImplTest, DirectLocalReplyCausesDisconnect) {
   EXPECT_EQ(1U, stats_.named_.rs_too_large_.value());
 }
 
-#ifdef ENVOY_ENABLE_UHV
 // Header validator rejects header map for HTTP/1.x protocols
 TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectHttp1) {
   setup(false, "");
@@ -3171,14 +3178,15 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectHttp1) {
     data.drain(4);
     return Http::okStatus();
   }));
-  EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage()).WillOnce(Return(true));
+  EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage()).WillRepeatedly(Return(false));
 
   // This test also verifies that decoder/encoder filters have onDestroy() called only once.
   auto* filter = new MockStreamFilter();
   EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillOnce(Invoke([&](FilterChainManager& manager) -> void {
+      .WillOnce(Invoke([&](FilterChainManager& manager) -> bool {
         auto factory = createStreamFilterFactoryCb(StreamFilterSharedPtr{filter});
         manager.applyFilterFactoryCb({}, factory);
+        return true;
       }));
   EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
   EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
@@ -3347,6 +3355,96 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRedirectGrpcRequest) {
   conn_manager_->onData(fake_input, false);
 }
 
+// Header validator rejects trailer map before response has started
+TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectTrailersBeforeResponseHttp1) {
+  codec_->protocol_ = Protocol::Http11;
+  setup(false, "");
+  expectUhvTrailerCheckFail();
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+        {":authority", "host"}, {":path", "/something"}, {":method", "GET"}}};
+    decoder_->decodeHeaders(std::move(headers), false);
+    RequestTrailerMapPtr trailers{
+        new TestRequestTrailerMapImpl{{"trailer1", "value1"}, {"trailer2", "value2"}}};
+    decoder_->decodeTrailers(std::move(trailers));
+    data.drain(4);
+    return Http::okStatus();
+  }));
+
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ("400", headers.getStatusValue());
+        EXPECT_EQ("bad_trailer_map", decoder_->streamInfo().responseCodeDetails().value());
+      }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
+TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectTrailersBeforeResponseHttp2) {
+  codec_->protocol_ = Protocol::Http2;
+  setup(false, "");
+  expectUhvTrailerCheckFail();
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+        {":authority", "host"}, {":path", "/something"}, {":method", "GET"}}};
+    decoder_->decodeHeaders(std::move(headers), false);
+    RequestTrailerMapPtr trailers{
+        new TestRequestTrailerMapImpl{{"trailer1", "value1"}, {"trailer2", "value2"}}};
+    decoder_->decodeTrailers(std::move(trailers));
+    data.drain(4);
+    return Http::okStatus();
+  }));
+
+  EXPECT_CALL(response_encoder_.stream_, resetStream(_));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
+// Header validator rejects trailer map after response has started
+TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectTrailersAfterResponse) {
+  codec_->protocol_ = Protocol::Http2;
+  setup(false, "");
+  setupFilterChain(1, 0, 1);
+  expectUhvTrailerCheckFail();
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+      .WillRepeatedly(Invoke([&](RequestHeaderMap&, bool) -> FilterHeadersStatus {
+        return FilterHeadersStatus::StopIteration;
+      }));
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+        {":authority", "host"}, {":path", "/something"}, {":method", "GET"}}};
+    decoder_->decodeHeaders(std::move(headers), false);
+
+    ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+    decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), false, "");
+
+    RequestTrailerMapPtr trailers{
+        new TestRequestTrailerMapImpl{{"trailer1", "value1"}, {"trailer2", "value2"}}};
+    decoder_->decodeTrailers(std::move(trailers));
+    data.drain(4);
+    return Http::okStatus();
+  }));
+
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false))
+      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ("200", headers.getStatusValue());
+      }));
+
+  EXPECT_CALL(response_encoder_.stream_, resetStream(_));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+  EXPECT_EQ("bad_trailer_map", decoder_->streamInfo().responseCodeDetails().value());
+}
+
 // Request completes normally if header validator accepts it
 TEST_F(HttpConnectionManagerImplTest, HeaderValidatorAccept) {
   setup(false, "");
@@ -3369,9 +3467,10 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorAccept) {
   EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
 
   EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> void {
+      .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
         auto factory = createDecoderFilterFactoryCb(filter);
         manager.applyFilterFactoryCb({}, factory);
+        return true;
       }));
 
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
@@ -3403,8 +3502,6 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorAccept) {
   EXPECT_EQ(1U, stats_.named_.downstream_rq_completed_.value());
   EXPECT_EQ(1U, listener_stats_.downstream_rq_completed_.value());
 }
-
-#endif // ENVOY_ENABLE_UHV
 
 } // namespace Http
 } // namespace Envoy

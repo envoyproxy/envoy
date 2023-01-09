@@ -3,6 +3,7 @@
 
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/test_time.h"
+#include "test/test_common/utility.h"
 
 using testing::HasSubstr;
 
@@ -31,6 +32,13 @@ public:
             auto* header = virtual_host->mutable_response_headers_to_add()->Add()->mutable_header();
             header->set_key("foo");
             header->set_value("bar");
+          }
+          if (enable_route_timeout_) {
+            auto* route_config = hcm.mutable_route_config();
+            auto* virtual_host = route_config->mutable_virtual_hosts(0);
+            auto* route = virtual_host->mutable_routes(0)->mutable_route();
+            route->mutable_timeout()->set_seconds(0);
+            route->mutable_timeout()->set_nanos(IdleTimeoutMs * 1000 * 1000);
           }
           if (enable_request_timeout_) {
             hcm.mutable_request_timeout()->set_seconds(0);
@@ -115,6 +123,7 @@ public:
   bool enable_global_idle_timeout_{false};
   bool enable_per_stream_idle_timeout_{false};
   bool enable_request_timeout_{false};
+  bool enable_route_timeout_{false};
   bool enable_per_try_idle_timeout_{false};
   DangerousDeprecatedTestTime test_time_;
 };
@@ -366,6 +375,22 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterUpstreamHeaders) {
   EXPECT_EQ("", response->body());
 }
 
+TEST_P(IdleTimeoutIntegrationTest, ResponseTimeout) {
+  enable_route_timeout_ = true;
+  initialize();
+
+  // Lock up fake upstream so that it won't accept connections.
+  absl::MutexLock l(&fake_upstreams_[0]->lock());
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("504", response->headers().getStatusValue());
+
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("response_timeout"));
+}
+
 // Per-try idle timeout after upstream headers have been sent.
 TEST_P(IdleTimeoutIntegrationTest, PerTryIdleTimeoutAfterUpstreamHeaders) {
   enable_per_try_idle_timeout_ = true;
@@ -473,7 +498,7 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutTriggersOnRawIncompleteRequestW
   initialize();
 
   std::string raw_response;
-  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.1", &raw_response, true);
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.1", &raw_response);
   EXPECT_THAT(raw_response, testing::HasSubstr("request timeout"));
 }
 
@@ -486,7 +511,7 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutDoesNotTriggerOnRawCompleteRequ
   initialize();
 
   std::string raw_response;
-  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.1\r\n\r\n", &raw_response, true);
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.1\r\n\r\n", &raw_response);
   EXPECT_THAT(raw_response, testing::Not(testing::HasSubstr("request timeout")));
 }
 

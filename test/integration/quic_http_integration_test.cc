@@ -509,7 +509,7 @@ TEST_P(QuicHttpIntegrationTest, Draft29NotSupportedByDefault) {
 TEST_P(QuicHttpIntegrationTest, RuntimeEnableDraft29) {
   supported_versions_ = {quic::ParsedQuicVersion::Draft29()};
   config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_disable_version_draft_29",
+      "envoy.reloadable_features.FLAGS_envoy_quic_reloadable_flag_quic_disable_version_draft_29",
       "false");
   initialize();
 
@@ -745,47 +745,6 @@ TEST_P(QuicHttpIntegrationTest, PortMigration) {
   quic_connection_->switchConnectionSocket(
       createConnectionSocket(server_addr_, local_addr, options));
   EXPECT_TRUE(codec_client_->disconnected());
-  cleanupUpstreamAndDownstream();
-}
-
-TEST_P(QuicHttpIntegrationTest, PortMigrationNoConnectionIdGenerator) {
-  SetQuicReloadableFlag(quic_connection_uses_abstract_connection_id_generator, false);
-  setConcurrency(2);
-  initialize();
-  uint32_t old_port = lookupPort("http");
-  codec_client_ = makeHttpConnection(old_port);
-  auto encoder_decoder =
-      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
-                                                                 {":path", "/test/long/url"},
-                                                                 {":scheme", "http"},
-                                                                 {":authority", "host"}});
-  request_encoder_ = &encoder_decoder.first;
-  auto response = std::move(encoder_decoder.second);
-
-  codec_client_->sendData(*request_encoder_, 1024u, false);
-  while (!quic_connection_->IsHandshakeConfirmed()) {
-    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  }
-
-  // Change to a new port by switching socket, and connection should still continue.
-  Network::Address::InstanceConstSharedPtr local_addr =
-      Network::Test::getCanonicalLoopbackAddress(version_);
-  quic_connection_->switchConnectionSocket(
-      createConnectionSocket(server_addr_, local_addr, nullptr));
-  EXPECT_NE(old_port, local_addr->ip()->port());
-  // Send the rest data.
-  codec_client_->sendData(*request_encoder_, 1024u, true);
-  waitForNextUpstreamRequest(0, TestUtility::DefaultTimeout);
-  // Send response headers, and end_stream if there is no response body.
-  const Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-  size_t response_size{5u};
-  upstream_request_->encodeHeaders(response_headers, false);
-  upstream_request_->encodeData(response_size, true);
-  ASSERT_TRUE(response->waitForEndStream());
-  verifyResponse(std::move(response), "200", response_headers, std::string(response_size, 'a'));
-
-  EXPECT_TRUE(upstream_request_->complete());
-  EXPECT_EQ(1024u * 2, upstream_request_->bodyLength());
   cleanupUpstreamAndDownstream();
 }
 

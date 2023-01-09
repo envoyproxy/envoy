@@ -39,12 +39,13 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info,
                          Random::RandomGenerator& random, Stats::Scope& scope,
                          const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node,
                          CustomConfigValidatorsPtr&& config_validators,
+                         XdsConfigTrackerOptRef xds_config_tracker,
                          XdsResourcesDelegateOptRef xds_resources_delegate,
                          const std::string& target_xds_authority)
     : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings),
       local_info_(local_info), skip_subsequent_node_(skip_subsequent_node),
-      config_validators_(std::move(config_validators)),
+      config_validators_(std::move(config_validators)), xds_config_tracker_(xds_config_tracker),
       xds_resources_delegate_(xds_resources_delegate), target_xds_authority_(target_xds_authority),
       first_stream_request_(true), dispatcher_(dispatcher),
       dynamic_update_callback_handle_(local_info.contextProvider().addDynamicContextUpdateCallback(
@@ -108,7 +109,7 @@ void GrpcMuxImpl::sendDiscoveryRequest(absl::string_view type_url) {
 }
 
 void GrpcMuxImpl::loadConfigFromDelegate(const std::string& type_url,
-                                         const std::vector<std::string>& resource_names) {
+                                         const absl::flat_hash_set<std::string>& resource_names) {
   if (!xds_resources_delegate_.has_value()) {
     return;
   }
@@ -201,11 +202,12 @@ ScopedResume GrpcMuxImpl::pause(const std::vector<std::string> type_urls) {
   return std::make_unique<Cleanup>([this, type_urls]() {
     for (const auto& type_url : type_urls) {
       ApiState& api_state = apiStateFor(type_url);
-      ENVOY_LOG(debug, "Resuming discovery requests for {} (previous count {})", type_url,
-                api_state.pauses_);
+      ENVOY_LOG(debug, "Decreasing pause count on discovery requests for {} (previous count {})",
+                type_url, api_state.pauses_);
       ASSERT(api_state.paused());
 
       if (--api_state.pauses_ == 0 && api_state.pending_ && api_state.subscribed_) {
+        ENVOY_LOG(debug, "Resuming discovery requests for {}", type_url);
         queueDiscoveryRequest(type_url);
         api_state.pending_ = false;
       }
@@ -218,6 +220,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
     ControlPlaneStats& control_plane_stats) {
   const std::string type_url = message->type_url();
   ENVOY_LOG(debug, "Received gRPC message for {} at version {}", type_url, message->version_info());
+
   if (api_state_.count(type_url) == 0) {
     // TODO(yuval-k): This should never happen. consider dropping the stream as this is a
     // protocol violation
@@ -285,6 +288,11 @@ void GrpcMuxImpl::onDiscoveryResponse(
 
     processDiscoveryResources(resources, api_state, type_url, message->version_info(),
                               /*call_delegate=*/true);
+
+    // Processing point when resources are successfully ingested.
+    if (xds_config_tracker_.has_value()) {
+      xds_config_tracker_->onConfigAccepted(type_url, resources);
+    }
   }
   END_TRY
   catch (const EnvoyException& e) {
@@ -295,6 +303,11 @@ void GrpcMuxImpl::onDiscoveryResponse(
     ::google::rpc::Status* error_detail = api_state.request_.mutable_error_detail();
     error_detail->set_code(Grpc::Status::WellKnownGrpcStatus::Internal);
     error_detail->set_message(Config::Utility::truncateGrpcStatusMessage(e.what()));
+
+    // Processing point when there is any exception during the parse and ingestion process.
+    if (xds_config_tracker_.has_value()) {
+      xds_config_tracker_->onConfigRejected(*message, error_detail->message());
+    }
   }
   previously_fetched_data_ = true;
   api_state.request_.set_response_nonce(message->nonce());
@@ -392,11 +405,11 @@ void GrpcMuxImpl::onEstablishmentFailure() {
       // connectivity is established with the xDS server.
       loadConfigFromDelegate(
           /*type_url=*/api_state.first,
-          std::vector<std::string>{api_state.second->request_.resource_names().begin(),
-                                   api_state.second->request_.resource_names().end()});
+          absl::flat_hash_set<std::string>{api_state.second->request_.resource_names().begin(),
+                                           api_state.second->request_.resource_names().end()});
+      previously_fetched_data_ = true;
     }
   }
-  previously_fetched_data_ = true;
 }
 
 void GrpcMuxImpl::queueDiscoveryRequest(absl::string_view queue_item) {

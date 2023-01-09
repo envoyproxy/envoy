@@ -29,6 +29,7 @@ BPF
 Bdecoded
 Bencoded
 GiB
+IPTOS
 Repick
 SION
 TRA
@@ -39,12 +40,14 @@ ar
 btree
 CAS
 CB
+cartid
 cbor
 CDN
 CDS
 CEL
 CWND
 DLE
+DPE
 DSR
 DSS
 EBADF
@@ -164,6 +167,7 @@ dnsresolvers
 endpos
 fo
 ghi
+golang
 guarddog
 GC
 GCC
@@ -277,6 +281,7 @@ Oauth
 OCSP
 OD
 ODCDS
+middlewildcard
 mpd
 oghttp
 OID
@@ -648,6 +653,7 @@ deserialize
 deserialized
 deserializer
 deserializers
+deserializes
 deserializing
 dest
 destructor
@@ -800,6 +806,8 @@ initializers
 inlined
 inlining
 inobservability
+inode
+inodes
 inotify
 inserter
 instantiation
@@ -1057,6 +1065,7 @@ qdtext
 qps
 quantile
 quantiles
+querydetails
 quiesce
 quitquitquit
 qvalue
@@ -1218,6 +1227,7 @@ struct
 structs
 subclassed
 subclasses
+subcomponent
 subdirectories
 subdirectory
 subdirs
@@ -1380,6 +1390,8 @@ xid
 xmodem
 xxhash
 xxs
+xyz
+xyzwebservices
 zag
 zig
 zipkin

@@ -54,8 +54,6 @@ void Cluster::addOrUpdateHost(
   Upstream::LogicalHostSharedPtr emplaced_host;
   {
     absl::WriterMutexLock lock{&host_map_lock_};
-    // We should never get a host with no address from the cache.
-    ASSERT(host_info->address() != nullptr);
 
     // NOTE: Right now we allow a DNS cache to be shared between multiple clusters. Though we have
     // connection/request circuit breakers on the cluster, we don't have any way to control the
@@ -171,7 +169,7 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
     if (host_it == cluster_.host_map_.end()) {
       return nullptr;
     } else {
-      if (host_it->second.logical_host_->health() == Upstream::Host::Health::Unhealthy) {
+      if (host_it->second.logical_host_->coarseHealth() == Upstream::Host::Health::Unhealthy) {
         return nullptr;
       }
       host_it->second.shared_host_info_->touch();

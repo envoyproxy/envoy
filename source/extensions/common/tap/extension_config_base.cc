@@ -10,7 +10,7 @@ namespace Tap {
 
 ExtensionConfigBase::ExtensionConfigBase(
     const envoy::extensions::common::tap::v3::CommonExtensionConfig proto_config,
-    TapConfigFactoryPtr&& config_factory, Server::Admin& admin,
+    TapConfigFactoryPtr&& config_factory, OptRef<Server::Admin> admin,
     Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
     Event::Dispatcher& main_thread_dispatcher)
     : proto_config_(proto_config), config_factory_(std::move(config_factory)), tls_slot_(tls) {

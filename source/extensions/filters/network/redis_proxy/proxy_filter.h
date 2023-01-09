@@ -12,6 +12,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
 #include "source/extensions/filters/network/common/redis/codec.h"
 #include "source/extensions/filters/network/redis_proxy/command_splitter.h"
 
@@ -45,11 +46,13 @@ struct ProxyStats {
 /**
  * Configuration for the redis proxy filter.
  */
-class ProxyFilterConfig {
+class ProxyFilterConfig : public Logger::Loggable<Logger::Id::redis> {
 public:
-  ProxyFilterConfig(const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy& config,
-                    Stats::Scope& scope, const Network::DrainDecision& drain_decision,
-                    Runtime::Loader& runtime, Api::Api& api);
+  ProxyFilterConfig(
+      const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy& config,
+      Stats::Scope& scope, const Network::DrainDecision& drain_decision, Runtime::Loader& runtime,
+      Api::Api& api,
+      Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory);
 
   const Network::DrainDecision& drain_decision_;
   Runtime::Loader& runtime_;
@@ -59,8 +62,14 @@ public:
   const std::string downstream_auth_username_;
   std::vector<std::string> downstream_auth_passwords_;
 
+  // DNS cache used for ASK/MOVED responses.
+  const Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr dns_cache_manager_;
+  const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache_{nullptr};
+
 private:
   static ProxyStats generateStats(const std::string& prefix, Stats::Scope& scope);
+  Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr
+  getCache(const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy& config);
 };
 
 using ProxyFilterConfigSharedPtr = std::shared_ptr<ProxyFilterConfig>;

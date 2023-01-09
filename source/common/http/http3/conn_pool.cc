@@ -39,9 +39,9 @@ std::string sni(const Network::TransportSocketOptionsConstSharedPtr& options,
 
 ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
                            Upstream::Host::CreateConnectionData& data)
-    : MultiplexedActiveClientBase(parent, getMaxStreams(parent.host()->cluster()),
-                                  getMaxStreams(parent.host()->cluster()),
-                                  parent.host()->cluster().stats().upstream_cx_http3_total_, data),
+    : MultiplexedActiveClientBase(
+          parent, getMaxStreams(parent.host()->cluster()), getMaxStreams(parent.host()->cluster()),
+          parent.host()->cluster().trafficStats()->upstream_cx_http3_total_, data),
       async_connect_callback_(parent_.dispatcher().createSchedulableCallback([this]() {
         if (state() != Envoy::ConnectionPool::ActiveClient::State::Connecting) {
           return;
@@ -123,18 +123,21 @@ Http3ConnPoolImpl::createClientConnection(Quic::QuicStatNames& quic_stat_names,
   if (crypto_config == nullptr) {
     return nullptr; // no secrets available yet.
   }
-  auto source_address_fn = host()->cluster().sourceAddressFn();
-  auto source_address = source_address_fn ? source_address_fn(host()->address()) : nullptr;
-  if (!source_address.get()) {
+
+  auto upstream_local_address_selector = host()->cluster().getUpstreamLocalAddressSelector();
+  auto upstream_local_address =
+      upstream_local_address_selector->getUpstreamLocalAddress(host()->address(), socketOptions());
+  auto source_address = upstream_local_address.address_;
+
+  if (source_address == nullptr) {
     auto host_address = host()->address();
     source_address = Network::Utility::getLocalAddress(host_address->ip()->version());
   }
-  Network::ConnectionSocket::OptionsSharedPtr socket_options =
-      Upstream::combineConnectionSocketOptions(host()->cluster(), socketOptions());
-  return Quic::createQuicNetworkConnection(quic_info_, std::move(crypto_config), server_id_,
-                                           dispatcher(), host()->address(), source_address,
-                                           quic_stat_names, rtt_cache, scope, socket_options,
-                                           transportSocketOptions(), connection_id_generator_);
+
+  return Quic::createQuicNetworkConnection(
+      quic_info_, std::move(crypto_config), server_id_, dispatcher(), host()->address(),
+      source_address, quic_stat_names, rtt_cache, scope, upstream_local_address.socket_options_,
+      transportSocketOptions(), connection_id_generator_);
 }
 
 std::unique_ptr<Http3ConnPoolImpl>

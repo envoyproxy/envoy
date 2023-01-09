@@ -32,6 +32,7 @@
 #include "source/common/config/grpc_mux_impl.h"
 #include "source/common/config/new_grpc_mux_impl.h"
 #include "source/common/config/utility.h"
+#include "source/common/config/well_known_names.h"
 #include "source/common/config/xds_mux/grpc_mux_impl.h"
 #include "source/common/config/xds_resource.h"
 #include "source/common/http/codes.h"
@@ -52,15 +53,29 @@
 #include "source/common/stats/timespan_impl.h"
 #include "source/common/upstream/cluster_manager_impl.h"
 #include "source/common/version/version.h"
-#include "source/server/admin/utils.h"
 #include "source/server/configuration_impl.h"
-#include "source/server/connection_handler_impl.h"
 #include "source/server/guarddog_impl.h"
 #include "source/server/listener_hooks.h"
+#include "source/server/listener_manager_factory.h"
+#include "source/server/regex_engine.h"
 #include "source/server/ssl_context_manager.h"
+#include "source/server/utils.h"
 
 namespace Envoy {
 namespace Server {
+namespace {
+std::unique_ptr<ConnectionHandler> getHandler(Event::Dispatcher& dispatcher) {
+
+  auto* factory = Config::Utility::getFactoryByName<ConnectionHandlerFactory>(
+      "envoy.connection_handler.default");
+  if (factory) {
+    return factory->createConnectionHandler(dispatcher, absl::nullopt);
+  }
+  ENVOY_LOG_MISC(debug, "Unable to find envoy.connection_handler.default factory");
+  return nullptr;
+}
+
+} // namespace
 
 InstanceImpl::InstanceImpl(
     Init::Manager& init_manager, const Options& options, Event::TimeSystem& time_system,
@@ -85,8 +100,7 @@ InstanceImpl::InstanceImpl(
       access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
                           store),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
-      handler_(new ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
-      listener_component_factory_(*this), worker_factory_(thread_local_, *api_, hooks),
+      handler_(getHandler(*dispatcher_)), worker_factory_(thread_local_, *api_, hooks),
       terminated_(false),
       mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
                                                   : nullptr),
@@ -448,19 +462,8 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   // Initialize the regex engine and inject to singleton.
   // Needs to happen before stats store initialization because the stats
   // matcher config can include regexes.
-  if (bootstrap_.has_default_regex_engine()) {
-    const auto& default_regex_engine = bootstrap_.default_regex_engine();
-    Regex::EngineFactory& factory =
-        Config::Utility::getAndCheckFactory<Regex::EngineFactory>(default_regex_engine);
-    auto config = Config::Utility::translateAnyToFactoryConfig(
-        default_regex_engine.typed_config(), messageValidationContext().staticValidationVisitor(),
-        factory);
-    regex_engine_ = factory.createEngine(*config, serverFactoryContext());
-  } else {
-    regex_engine_ = std::make_shared<Regex::GoogleReEngine>();
-  }
-  Regex::EngineSingleton::clear();
-  Regex::EngineSingleton::initialize(regex_engine_.get());
+  regex_engine_ = createRegexEngine(
+      bootstrap_, messageValidationContext().staticValidationVisitor(), serverFactoryContext());
 
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
   // stats.
@@ -504,6 +507,9 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   server_stats_->version_.set(version_int);
   if (VersionInfo::sslFipsCompliant()) {
     server_compilation_settings_stats_->fips_mode_.set(1);
+  } else {
+    // Set this explicitly so that "used" flag is set so that it can be pushed to stats sinks.
+    server_compilation_settings_stats_->fips_mode_.set(0);
   }
 
   // If user has set user_agent_name in the bootstrap config, use it.
@@ -555,12 +561,17 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
     enable_reuse_port_default_ =
         parent_admin_shutdown_response.value().enable_reuse_port_default_ ? true : false;
   }
+
+  OptRef<Server::ConfigTracker> config_tracker;
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
   admin_ = std::make_unique<AdminImpl>(initial_config.admin().profilePath(), *this,
                                        initial_config.admin().ignoreGlobalConnLimit());
 
-  loadServerFlags(initial_config.flagsPath());
+  config_tracker = admin_->getConfigTracker();
+#endif
+  secret_manager_ = std::make_unique<Secret::SecretManagerImpl>(config_tracker);
 
-  secret_manager_ = std::make_unique<Secret::SecretManagerImpl>(admin_->getConfigTracker());
+  loadServerFlags(initial_config.flagsPath());
 
   // Initialize the overload manager early so other modules can register for actions.
   overload_manager_ = std::make_unique<OverloadManagerImpl>(
@@ -608,11 +619,11 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
       Network::SocketInterfaceSingleton::initialize(sock);
     }
   }
-
   // Workers get created first so they register for thread local updates.
   listener_manager_ =
-      std::make_unique<ListenerManagerImpl>(*this, listener_component_factory_, worker_factory_,
-                                            bootstrap_.enable_dispatcher_stats(), quic_stat_names_);
+      Config::Utility::getAndCheckFactoryByName<ListenerManagerFactory>(options_.listenerManager())
+          .createListenerManager(*this, nullptr, worker_factory_,
+                                 bootstrap_.enable_dispatcher_stats(), quic_stat_names_);
 
   // The main thread is also registered for thread local updates so that code that does not care
   // whether it runs on the main thread or on workers can still use TLS.
@@ -660,6 +671,9 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   }
 
   if (initial_config.admin().address()) {
+    if (!admin_) {
+      throw EnvoyException("Admin address configured but admin support compiled out");
+    }
     admin_->startHttpListener(initial_config.admin().accessLogs(), options_.adminAddressPath(),
                               initial_config.admin().address(),
                               initial_config.admin().socketOptions(),
@@ -667,8 +681,10 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   } else {
     ENVOY_LOG(warn, "No admin address given, so no admin HTTP server started.");
   }
-  config_tracker_entry_ = admin_->getConfigTracker().add(
-      "bootstrap", [this](const Matchers::StringMatcher&) { return dumpBootstrapConfig(); });
+  if (admin_) {
+    config_tracker_entry_ = admin_->getConfigTracker().add(
+        "bootstrap", [this](const Matchers::StringMatcher&) { return dumpBootstrapConfig(); });
+  }
   if (initial_config.admin().address()) {
     admin_->addListenerToHandler(handler_.get());
   }
@@ -676,14 +692,9 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   // Once we have runtime we can initialize the SSL context manager.
   ssl_context_manager_ = createContextManager("ssl_context_manager", time_source_);
 
-  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-  Network::DnsResolverFactory& dns_resolver_factory =
-      Network::createDnsResolverFactoryFromProto(bootstrap_, typed_dns_resolver_config);
-  dns_resolver_ =
-      dns_resolver_factory.createDnsResolver(dispatcher(), api(), typed_dns_resolver_config);
-
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
-      serverFactoryContext(), *admin_, runtime(), stats_store_, thread_local_, dns_resolver_,
+      serverFactoryContext(), admin(), runtime(), stats_store_, thread_local_,
+      [this]() -> Network::DnsResolverSharedPtr { return this->getOrCreateDnsResolver(); },
       *ssl_context_manager_, *dispatcher_, *local_info_, *secret_manager_,
       messageValidationContext(), *api_, http_context_, grpc_context_, router_context_,
       access_log_manager_, *singleton_manager_, options_, quic_stat_names_, *this);
@@ -981,7 +992,9 @@ void InstanceImpl::shutdownAdmin() {
   ENVOY_LOG(warn, "shutting down admin due to child startup");
   stat_flush_timer_.reset();
   handler_->stopListeners();
-  admin_->closeSocket();
+  if (admin_) {
+    admin_->closeSocket();
+  }
 
   // If we still have a parent, it should be terminated now that we have a child.
   ENVOY_LOG(warn, "terminating parent process");
@@ -1037,6 +1050,17 @@ ProtobufTypes::MessagePtr InstanceImpl::dumpBootstrapConfig() {
   TimestampUtil::systemClockToTimestamp(bootstrap_config_update_time_,
                                         *(config_dump->mutable_last_updated()));
   return config_dump;
+}
+
+Network::DnsResolverSharedPtr InstanceImpl::getOrCreateDnsResolver() {
+  if (!dns_resolver_) {
+    envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+    Network::DnsResolverFactory& dns_resolver_factory =
+        Network::createDnsResolverFactoryFromProto(bootstrap_, typed_dns_resolver_config);
+    dns_resolver_ =
+        dns_resolver_factory.createDnsResolver(dispatcher(), api(), typed_dns_resolver_config);
+  }
+  return dns_resolver_;
 }
 
 bool InstanceImpl::enableReusePortDefault() { return enable_reuse_port_default_; }

@@ -23,6 +23,7 @@ public:
   MOCK_METHOD(uint32_t, bufferLimit, (), (const));
   MOCK_METHOD(const Network::ConnectionInfoProvider&, connectionInfoProvider, ());
   MOCK_METHOD(void, setFlushTimeout, (std::chrono::milliseconds timeout));
+  MOCK_METHOD(Buffer::BufferMemoryAccountSharedPtr, account, (), (const));
   MOCK_METHOD(void, setAccount, (Buffer::BufferMemoryAccountSharedPtr));
 
   // Use the same underlying structure as StreamCallbackHelper to insure iteration stability

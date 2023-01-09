@@ -1,24 +1,27 @@
-diff --git a/BUILD b/BUILD
-index 887e5e384..d5ecca55d 100644
---- a/BUILD
-+++ b/BUILD
-@@ -21,7 +21,7 @@ exports_files(["LICENSE"])
- # ZLIB configuration
- ################################################################################
- 
--ZLIB_DEPS = ["@zlib//:zlib"]
-+ZLIB_DEPS = ["//external:zlib"]
- 
- ################################################################################
- # Protobuf Runtime Library
-@@ -511,13 +511,68 @@ cc_library(
+diff --git a/BUILD.bazel b/BUILD.bazel
+index 0f6e41e3a..c0d2bbccf 100644
+--- a/BUILD.bazel
++++ b/BUILD.bazel
+@@ -138,7 +138,7 @@ cc_library(
+     visibility = ["//visibility:public"],
+     deps = [":protobuf_lite"] + select({
+         "//build_defs:config_msvc": [],
+-        "//conditions:default": ["@zlib//:zlib"],
++        "//conditions:default": ["//external:zlib"],
+     }),
  )
  
+@@ -454,14 +454,79 @@ cc_library(
+     deps = [":protobuf"],
+ )
+ 
++# Envoy: Patch
++
  cc_binary(
 -    name = "protoc",
 +    name = "compiled_protoc",
      srcs = ["src/google/protobuf/compiler/main.cc"],
-     linkopts = LINK_OPTS,
+     linkopts = LINK_OPTS + PROTOC_LINK_OPTS,
      visibility = ["//visibility:public"],
      deps = [":protoc_lib"],
  )
@@ -78,17 +81,34 @@ index 887e5e384..d5ecca55d 100644
 +    visibility = ["//visibility:public"],
 +)
 +
- 
++alias(
++    name = "protobuf_python_genproto",
++    actual = "well_known_types_py_pb2_genproto",
++    visibility = ["//visibility:public"],
++)
++
++# /Envoy: Patch
++
  ################################################################################
- # Generates protoc release artifacts.
+ # Tests
+ ################################################################################
+@@ -755,7 +820,7 @@ cc_test(
+         "@com_google_googletest//:gtest_main",
+     ] + select({
+         "//build_defs:config_msvc": [],
+-        "//conditions:default": ["@zlib//:zlib"],
++        "//conditions:default": ["//external:zlib"],
+     }),
+ )
+ 
 diff --git a/python/google/protobuf/__init__.py b/python/google/protobuf/__init__.py
-index 03f3b29ee..520c9ee4f 100644
+index e7555ee10..a93beb1c5 100644
 --- a/python/google/protobuf/__init__.py
 +++ b/python/google/protobuf/__init__.py
 @@ -31,3 +31,10 @@
  # Copyright 2007 Google Inc. All Rights Reserved.
  
- __version__ = '3.20.1'
+ __version__ = '4.21.12'
 +
 +
 +if __name__ != '__main__':
@@ -96,3 +116,19 @@ index 03f3b29ee..520c9ee4f 100644
 +        __import__('pkg_resources').declare_namespace(__name__)
 +    except ImportError:
 +        __path__ = __import__('pkgutil').extend_path(__path__, __name__)
+diff --git a/src/google/protobuf/generated_message_tctable_lite.cc b/src/google/protobuf/generated_message_tctable_lite.cc
+index 9993811dc..d80006af7 100644
+--- a/src/google/protobuf/generated_message_tctable_lite.cc
++++ b/src/google/protobuf/generated_message_tctable_lite.cc
+@@ -343,11 +343,6 @@ const char* TcParser::MiniParse(PROTOBUF_TC_PARAM_DECL) {
+ 
+ namespace {
+ 
+-// Offset returns the address `offset` bytes after `base`.
+-inline void* Offset(void* base, uint32_t offset) {
+-  return static_cast<uint8_t*>(base) + offset;
+-}
+-
+ // InvertPacked changes tag bits from the given wire type to length
+ // delimited. This is the difference expected between packed and non-packed
+ // repeated fields.

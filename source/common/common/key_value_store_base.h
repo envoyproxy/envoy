@@ -12,6 +12,7 @@
 #include "quiche/common/quiche_linked_hash_map.h"
 
 namespace Envoy {
+inline constexpr absl::string_view KV_STORE_TTL_KEY = "TTL";
 
 // This is the base implementation of the KeyValueStore. It handles the various
 // functions other than flush(), which will be implemented by subclasses.
@@ -38,12 +39,26 @@ public:
   void iterate(ConstIterateCb cb) const override;
 
 protected:
+  // Values in a KeyValueStore have an optional TTL.
+  struct ValueWithTtl {
+    ValueWithTtl(std::string value, absl::optional<std::chrono::seconds> ttl)
+        : value_(value), ttl_(ttl) {}
+    std::string value_;
+    absl::optional<std::chrono::seconds> ttl_;
+  };
+
+  using KeyValueMap = quiche::QuicheLinkedHashMap<std::string, ValueWithTtl>;
+
+  const KeyValueMap& store() { return store_; }
+
+private:
   const uint32_t max_entries_;
   const Event::TimerPtr flush_timer_;
   Config::TtlManager ttl_manager_;
-  quiche::QuicheLinkedHashMap<std::string, std::string> store_;
+  KeyValueMap store_;
   // Used for validation only.
   mutable bool under_iterate_{};
+  TimeSource& time_source_;
 };
 
 } // namespace Envoy

@@ -16,7 +16,7 @@ class PacketsToReadDelegate {
 public:
   virtual ~PacketsToReadDelegate() = default;
 
-  virtual size_t numPacketsExpectedPerEventLoop() PURE;
+  virtual size_t numPacketsExpectedPerEventLoop() const PURE;
 };
 
 // A client QuicConnection instance managing its own file events.
@@ -55,7 +55,7 @@ public:
   }
   size_t numPacketsExpectedPerEventLoop() const override {
     if (delegate_.has_value()) {
-      return delegate_.value().get().numPacketsExpectedPerEventLoop();
+      return delegate_->numPacketsExpectedPerEventLoop();
     }
     return DEFAULT_PACKETS_TO_READ_PER_CONNECTION;
   }
@@ -67,8 +67,10 @@ public:
   // Switch underlying socket with the given one. This is used in connection migration.
   void switchConnectionSocket(Network::ConnectionSocketPtr&& connection_socket);
 
+  // quic::QuicConnection
   // Potentially trigger migration.
   void OnPathDegradingDetected() override;
+  void OnCanWrite() override;
 
   // Called when port migration probing succeeds. Attempts to migrate this connection onto the new
   // socket extracted from context.

@@ -10,6 +10,7 @@
 #include "source/common/quic/envoy_quic_server_session.h"
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/quic_transport_socket_factory.h"
+#include "source/extensions/listener_managers/listener_manager/connection_handler_impl.h"
 #include "source/extensions/quic/crypto_stream/envoy_quic_crypto_server_stream.h"
 #include "source/server/configuration_impl.h"
 
@@ -186,12 +187,13 @@ public:
               {read_total, read_current, write_total, write_current, nullptr, nullptr});
         }});
     EXPECT_CALL(listener_config_, filterChainManager()).WillOnce(ReturnRef(filter_chain_manager));
-    EXPECT_CALL(filter_chain_manager, findFilterChain(_))
-        .WillOnce(Invoke([this](const Network::ConnectionSocket& socket) {
-          EXPECT_EQ("h3", socket.requestedApplicationProtocols()[0]);
-          EXPECT_EQ("test.example.com", socket.requestedServerName());
-          return &proof_source_->filterChain();
-        }));
+    EXPECT_CALL(filter_chain_manager, findFilterChain(_, _))
+        .WillOnce(
+            Invoke([this](const Network::ConnectionSocket& socket, const StreamInfo::StreamInfo&) {
+              EXPECT_EQ("h3", socket.requestedApplicationProtocols()[0]);
+              EXPECT_EQ("test.example.com", socket.requestedServerName());
+              return &proof_source_->filterChain();
+            }));
     EXPECT_CALL(proof_source_->filterChain(), networkFilterFactories())
         .WillOnce(ReturnRef(filter_factory));
     EXPECT_CALL(listener_config_, filterChainFactory());
@@ -271,7 +273,7 @@ TEST_P(EnvoyQuicDispatcherTest, CloseConnectionDuringFilterInstallation) {
         }});
 
     EXPECT_CALL(listener_config_, filterChainManager()).WillOnce(ReturnRef(filter_chain_manager));
-    EXPECT_CALL(filter_chain_manager, findFilterChain(_))
+    EXPECT_CALL(filter_chain_manager, findFilterChain(_, _))
         .WillOnce(Return(&proof_source_->filterChain()));
     EXPECT_CALL(proof_source_->filterChain(), networkFilterFactories())
         .WillOnce(ReturnRef(filter_factory));
@@ -324,7 +326,7 @@ TEST_P(EnvoyQuicDispatcherTest, CloseWithGivenFilterChain) {
             {read_total, read_current, write_total, write_current, nullptr, nullptr});
       }});
   EXPECT_CALL(listener_config_, filterChainManager()).WillOnce(ReturnRef(filter_chain_manager));
-  EXPECT_CALL(filter_chain_manager, findFilterChain(_))
+  EXPECT_CALL(filter_chain_manager, findFilterChain(_, _))
       .WillOnce(Return(&proof_source_->filterChain()));
   EXPECT_CALL(proof_source_->filterChain(), networkFilterFactories())
       .WillOnce(ReturnRef(filter_factory));

@@ -41,7 +41,9 @@ GrpcMuxImpl<S, F, RQ, RS>::GrpcMuxImpl(
     const LocalInfo::LocalInfo& local_info, Grpc::RawAsyncClientPtr&& async_client,
     Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
     Random::RandomGenerator& random, Stats::Scope& scope,
-    const RateLimitSettings& rate_limit_settings, CustomConfigValidatorsPtr&& config_validators)
+    const RateLimitSettings& rate_limit_settings, CustomConfigValidatorsPtr&& config_validators,
+    XdsConfigTrackerOptRef xds_config_tracker, XdsResourcesDelegateOptRef xds_resources_delegate,
+    const std::string& target_xds_authority)
     : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings),
       subscription_state_factory_(std::move(subscription_state_factory)),
@@ -50,7 +52,8 @@ GrpcMuxImpl<S, F, RQ, RS>::GrpcMuxImpl(
           [this](absl::string_view resource_type_url) {
             onDynamicContextUpdate(resource_type_url);
           })),
-      config_validators_(std::move(config_validators)) {
+      config_validators_(std::move(config_validators)), xds_config_tracker_(xds_config_tracker),
+      xds_resources_delegate_(xds_resources_delegate), target_xds_authority_(target_xds_authority) {
   Config::Utility::checkLocalInfo("ads", local_info);
   AllMuxes::get().insert(this);
 }
@@ -88,7 +91,9 @@ Config::GrpcMuxWatchPtr GrpcMuxImpl<S, F, RQ, RS>::addWatch(
                                                           *config_validators_.get()))
             .first;
     subscriptions_.emplace(type_url, subscription_state_factory_->makeSubscriptionState(
-                                         type_url, *watch_maps_[type_url], resource_decoder));
+                                         type_url, *watch_maps_[type_url], resource_decoder,
+                                         xds_config_tracker_, xds_resources_delegate_,
+                                         target_xds_authority_));
     subscription_ordering_.emplace_back(type_url);
   }
 
@@ -361,10 +366,11 @@ GrpcMuxDelta::GrpcMuxDelta(Grpc::RawAsyncClientPtr&& async_client, Event::Dispat
                            Random::RandomGenerator& random, Stats::Scope& scope,
                            const RateLimitSettings& rate_limit_settings,
                            const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node,
-                           CustomConfigValidatorsPtr&& config_validators)
+                           CustomConfigValidatorsPtr&& config_validators,
+                           XdsConfigTrackerOptRef xds_config_tracker)
     : GrpcMuxImpl(std::make_unique<DeltaSubscriptionStateFactory>(dispatcher), skip_subsequent_node,
                   local_info, std::move(async_client), dispatcher, service_method, random, scope,
-                  rate_limit_settings, std::move(config_validators)) {}
+                  rate_limit_settings, std::move(config_validators), xds_config_tracker) {}
 
 // GrpcStreamCallbacks for GrpcMuxDelta
 void GrpcMuxDelta::requestOnDemandUpdate(const std::string& type_url,
@@ -382,10 +388,14 @@ GrpcMuxSotw::GrpcMuxSotw(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatch
                          Random::RandomGenerator& random, Stats::Scope& scope,
                          const RateLimitSettings& rate_limit_settings,
                          const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node,
-                         CustomConfigValidatorsPtr&& config_validators)
+                         CustomConfigValidatorsPtr&& config_validators,
+                         XdsConfigTrackerOptRef xds_config_tracker,
+                         XdsResourcesDelegateOptRef xds_resources_delegate,
+                         const std::string& target_xds_authority)
     : GrpcMuxImpl(std::make_unique<SotwSubscriptionStateFactory>(dispatcher), skip_subsequent_node,
                   local_info, std::move(async_client), dispatcher, service_method, random, scope,
-                  rate_limit_settings, std::move(config_validators)) {}
+                  rate_limit_settings, std::move(config_validators), xds_config_tracker,
+                  xds_resources_delegate, target_xds_authority) {}
 
 Config::GrpcMuxWatchPtr NullGrpcMuxImpl::addWatch(const std::string&,
                                                   const absl::flat_hash_set<std::string>&,

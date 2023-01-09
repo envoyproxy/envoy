@@ -31,7 +31,7 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
-#include "nghttp2/nghttp2.h"
+#include "quiche/http2/adapter/http2_protocol.h"
 
 namespace Envoy {
 namespace Http2 {
@@ -39,17 +39,33 @@ namespace Utility {
 
 namespace {
 
+struct SettingsEntry {
+  uint16_t settings_id;
+  uint32_t value;
+};
+
+struct SettingsEntryHash {
+  size_t operator()(const SettingsEntry& entry) const {
+    return absl::Hash<decltype(entry.settings_id)>()(entry.settings_id);
+  }
+};
+
+struct SettingsEntryEquals {
+  bool operator()(const SettingsEntry& lhs, const SettingsEntry& rhs) const {
+    return lhs.settings_id == rhs.settings_id;
+  }
+};
+
 void validateCustomSettingsParameters(
     const envoy::config::core::v3::Http2ProtocolOptions& options) {
   std::vector<std::string> parameter_collisions, custom_parameter_collisions;
-  absl::node_hash_set<nghttp2_settings_entry, SettingsEntryHash, SettingsEntryEquals>
-      custom_parameters;
+  absl::node_hash_set<SettingsEntry, SettingsEntryHash, SettingsEntryEquals> custom_parameters;
   // User defined and named parameters with the same SETTINGS identifier can not both be set.
   for (const auto& it : options.custom_settings_parameters()) {
     ASSERT(it.identifier().value() <= std::numeric_limits<uint16_t>::max());
     // Check for custom parameter inconsistencies.
     const auto result = custom_parameters.insert(
-        {static_cast<int32_t>(it.identifier().value()), it.value().value()});
+        {static_cast<uint16_t>(it.identifier().value()), it.value().value()});
     if (!result.second) {
       if (result.first->value != it.value().value()) {
         custom_parameter_collisions.push_back(
@@ -58,28 +74,28 @@ void validateCustomSettingsParameters(
       }
     }
     switch (it.identifier().value()) {
-    case NGHTTP2_SETTINGS_ENABLE_PUSH:
+    case http2::adapter::ENABLE_PUSH:
       if (it.value().value() == 1) {
         throw EnvoyException("server push is not supported by Envoy and can not be enabled via a "
                              "SETTINGS parameter.");
       }
       break;
-    case NGHTTP2_SETTINGS_ENABLE_CONNECT_PROTOCOL:
+    case http2::adapter::ENABLE_CONNECT_PROTOCOL:
       // An exception is made for `allow_connect` which can't be checked for presence due to the
       // use of a primitive type (bool).
       throw EnvoyException("the \"allow_connect\" SETTINGS parameter must only be configured "
                            "through the named field");
-    case NGHTTP2_SETTINGS_HEADER_TABLE_SIZE:
+    case http2::adapter::HEADER_TABLE_SIZE:
       if (options.has_hpack_table_size()) {
         parameter_collisions.push_back("hpack_table_size");
       }
       break;
-    case NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS:
+    case http2::adapter::MAX_CONCURRENT_STREAMS:
       if (options.has_max_concurrent_streams()) {
         parameter_collisions.push_back("max_concurrent_streams");
       }
       break;
-    case NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE:
+    case http2::adapter::INITIAL_WINDOW_SIZE:
       if (options.has_initial_stream_window_size()) {
         parameter_collisions.push_back("initial_stream_window_size");
       }
@@ -371,6 +387,10 @@ bool Utility::Url::initialize(absl::string_view absolute_url, bool is_connect) {
   return true;
 }
 
+std::string Utility::Url::toString() const {
+  return absl::StrCat(scheme_, "://", host_and_port_, path_and_query_params_);
+}
+
 void Utility::appendXff(RequestHeaderMap& headers,
                         const Network::Address::Instance& remote_address) {
   if (remote_address.type() != Network::Address::Type::Ip) {
@@ -551,31 +571,8 @@ bool Utility::isWebSocketUpgradeRequest(const RequestHeaderMap& headers) {
                                  Http::Headers::get().UpgradeValues.WebSocket));
 }
 
-void Utility::sendLocalReply(const bool& is_reset, StreamDecoderFilterCallbacks& callbacks,
-                             const LocalReplyData& local_reply_data) {
-  absl::string_view details;
-  if (callbacks.streamInfo().responseCodeDetails().has_value()) {
-    details = callbacks.streamInfo().responseCodeDetails().value();
-  };
-
-  sendLocalReply(
-      is_reset,
-      Utility::EncodeFunctions{nullptr, nullptr,
-                               [&](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
-                                 callbacks.encodeHeaders(std::move(headers), end_stream, details);
-                               },
-                               [&](Buffer::Instance& data, bool end_stream) -> void {
-                                 callbacks.encodeData(data, end_stream);
-                               }},
-      local_reply_data);
-}
-
-void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode_functions,
-                             const LocalReplyData& local_reply_data) {
-  // encode_headers() may reset the stream, so the stream must not be reset before calling it.
-  ASSERT(!is_reset);
-
-  // rewrite_response will rewrite response code and body text.
+Utility::PreparedLocalReplyPtr Utility::prepareLocalReply(const EncodeFunctions& encode_functions,
+                                                          const LocalReplyData& local_reply_data) {
   Code response_code = local_reply_data.response_code_;
   std::string body_text(local_reply_data.body_text_);
   absl::string_view content_type(Headers::get().ContentTypeValues.Text);
@@ -593,7 +590,6 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
     has_custom_content_type = (content_type_value != response_headers->getContentTypeValue());
   }
 
-  // Respond with a gRPC trailers-only response if the request is gRPC
   if (local_reply_data.is_grpc_) {
     response_headers->setStatus(std::to_string(enumToInt(Code::OK)));
     response_headers->setReferenceContentType(Headers::get().ContentTypeValues.Grpc);
@@ -618,8 +614,13 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
     }
     // The `modify_headers` function may have added content-length, remove it.
     response_headers->removeContentLength();
-    encode_functions.encode_headers_(std::move(response_headers), true); // Trailers only response
-    return;
+
+    // TODO(kbaichoo): In C++20 we will be able to use make_unique with
+    // aggregate initialization.
+    // NOLINTNEXTLINE(modernize-make-unique)
+    return PreparedLocalReplyPtr(new PreparedLocalReply{
+        local_reply_data.is_grpc_, local_reply_data.is_head_request_, std::move(response_headers),
+        std::move(body_text), encode_functions.encode_headers_, encode_functions.encode_data_});
   }
 
   if (!body_text.empty()) {
@@ -627,33 +628,55 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
     // If the content-type is not set, set it.
     // Alternately if the `rewrite` function has changed body_text and the config didn't explicitly
     // set a content type header, set the content type to be based on the changed body.
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.allow_adding_content_type_in_local_replies")) {
-      if (response_headers->ContentType() == nullptr ||
-          (body_text != local_reply_data.body_text_ && !has_custom_content_type)) {
-        response_headers->setReferenceContentType(content_type);
-      }
-    } else {
-      if (body_text != local_reply_data.body_text_ || response_headers->ContentType() == nullptr) {
-        response_headers->setReferenceContentType(content_type);
-      }
+    if (response_headers->ContentType() == nullptr ||
+        (body_text != local_reply_data.body_text_ && !has_custom_content_type)) {
+      response_headers->setReferenceContentType(content_type);
     }
   } else {
     response_headers->removeContentLength();
     response_headers->removeContentType();
   }
 
-  if (local_reply_data.is_head_request_) {
-    encode_functions.encode_headers_(std::move(response_headers), true);
+  // TODO(kbaichoo): In C++20 we will be able to use make_unique with
+  // aggregate initialization.
+  // NOLINTNEXTLINE(modernize-make-unique)
+  return PreparedLocalReplyPtr(new PreparedLocalReply{
+      local_reply_data.is_grpc_, local_reply_data.is_head_request_, std::move(response_headers),
+      std::move(body_text), encode_functions.encode_headers_, encode_functions.encode_data_});
+}
+
+void Utility::encodeLocalReply(const bool& is_reset, PreparedLocalReplyPtr prepared_local_reply) {
+  ASSERT(prepared_local_reply != nullptr);
+  ResponseHeaderMapPtr response_headers{std::move(prepared_local_reply->response_headers_)};
+
+  if (prepared_local_reply->is_grpc_request_) {
+    // Trailers only response
+    prepared_local_reply->encode_headers_(std::move(response_headers), true);
     return;
   }
 
-  encode_functions.encode_headers_(std::move(response_headers), body_text.empty());
-  // encode_headers() may have changed the referenced is_reset so we need to test it
-  if (!body_text.empty() && !is_reset) {
-    Buffer::OwnedImpl buffer(body_text);
-    encode_functions.encode_data_(buffer, true);
+  if (prepared_local_reply->is_head_request_) {
+    prepared_local_reply->encode_headers_(std::move(response_headers), true);
+    return;
   }
+
+  const bool bodyless_response = prepared_local_reply->response_body_.empty();
+  prepared_local_reply->encode_headers_(std::move(response_headers), bodyless_response);
+  // encode_headers() may have changed the referenced is_reset so we need to test it
+  if (!bodyless_response && !is_reset) {
+    Buffer::OwnedImpl buffer(prepared_local_reply->response_body_);
+    prepared_local_reply->encode_data_(buffer, true);
+  }
+}
+
+void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode_functions,
+                             const LocalReplyData& local_reply_data) {
+  // encode_headers() may reset the stream, so the stream must not be reset before calling it.
+  ASSERT(!is_reset);
+  PreparedLocalReplyPtr prepared_local_reply =
+      prepareLocalReply(encode_functions, local_reply_data);
+
+  encodeLocalReply(is_reset, std::move(prepared_local_reply));
 }
 
 Utility::GetLastAddressFromXffInfo
@@ -1013,7 +1036,7 @@ std::string Utility::PercentEncoding::encode(absl::string_view value, const size
     if (ch < ' ' || ch >= '~' || reserved_char_set.find(ch) != reserved_char_set.end()) {
       // For consistency, URI producers should use uppercase hexadecimal digits for all
       // percent-encodings. https://tools.ietf.org/html/rfc3986#section-2.1.
-      absl::StrAppend(&encoded, fmt::format("%{:02X}", ch));
+      absl::StrAppend(&encoded, fmt::format("%{:02X}", static_cast<const unsigned char&>(ch)));
     } else {
       encoded.push_back(ch);
     }
@@ -1093,6 +1116,20 @@ Utility::AuthorityAttributes Utility::parseAuthority(absl::string_view host) {
   return {is_ip_address, host_to_resolve, port};
 }
 
+void Utility::validateCoreRetryPolicy(const envoy::config::core::v3::RetryPolicy& retry_policy) {
+  if (retry_policy.has_retry_back_off()) {
+    const auto& core_back_off = retry_policy.retry_back_off();
+
+    uint64_t base_interval_ms = PROTOBUF_GET_MS_REQUIRED(core_back_off, base_interval);
+    uint64_t max_interval_ms =
+        PROTOBUF_GET_MS_OR_DEFAULT(core_back_off, max_interval, base_interval_ms * 10);
+
+    if (max_interval_ms < base_interval_ms) {
+      throw EnvoyException("max_interval must be greater than or equal to the base_interval");
+    }
+  }
+}
+
 envoy::config::route::v3::RetryPolicy
 Utility::convertCoreToRouteRetryPolicy(const envoy::config::core::v3::RetryPolicy& retry_policy,
                                        const std::string& retry_on) {
@@ -1111,7 +1148,8 @@ Utility::convertCoreToRouteRetryPolicy(const envoy::config::core::v3::RetryPolic
         PROTOBUF_GET_MS_OR_DEFAULT(core_back_off, max_interval, base_interval_ms * 10);
 
     if (max_interval_ms < base_interval_ms) {
-      throw EnvoyException("max_interval must be greater than or equal to the base_interval");
+      ENVOY_BUG(false, "max_interval must be greater than or equal to the base_interval");
+      base_interval_ms = max_interval_ms / 2;
     }
   }
 
@@ -1142,13 +1180,10 @@ bool Utility::isSafeRequest(const Http::RequestHeaderMap& request_headers) {
 }
 
 Http::Code Utility::maybeRequestTimeoutCode(bool remote_decode_complete) {
-  return remote_decode_complete &&
-                 Runtime::runtimeFeatureEnabled(
-                     "envoy.reloadable_features.override_request_timeout_by_gateway_timeout")
-             ? Http::Code::GatewayTimeout
-             // Http::Code::RequestTimeout is more expensive because HTTP1 client cannot use the
-             // connection any more.
-             : Http::Code::RequestTimeout;
+  return remote_decode_complete ? Http::Code::GatewayTimeout
+                                // Http::Code::RequestTimeout is more expensive because HTTP1 client
+                                // cannot use the connection any more.
+                                : Http::Code::RequestTimeout;
 }
 
 } // namespace Http

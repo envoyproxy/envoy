@@ -91,11 +91,12 @@ private:
   // priority set could be empty, we cannot initialize LoadBalancerBase when priority set is empty.
   class LoadBalancerImpl : public Upstream::LoadBalancerBase {
   public:
-    LoadBalancerImpl(const PriorityContext& priority_context, Upstream::ClusterStats& stats,
+    LoadBalancerImpl(const PriorityContext& priority_context, Upstream::ClusterLbStats& lb_stats,
                      Runtime::Loader& runtime, Random::RandomGenerator& random,
                      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
-        : Upstream::LoadBalancerBase(priority_context.priority_set_, stats, runtime, random,
-                                     common_config),
+        : Upstream::LoadBalancerBase(priority_context.priority_set_, lb_stats, runtime, random,
+                                     PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
+                                         common_config, healthy_panic_threshold, 100, 50)),
           priority_context_(priority_context) {}
 
     // Upstream::LoadBalancer
@@ -147,6 +148,7 @@ struct AggregateLoadBalancerFactory : public Upstream::LoadBalancerFactory {
         cluster_.info(), cluster_.cluster_manager_, cluster_.runtime_, cluster_.random_,
         cluster_.clusters_);
   }
+  Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override { return create(); }
 
   const Cluster& cluster_;
 };

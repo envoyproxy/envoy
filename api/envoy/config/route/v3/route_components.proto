@@ -41,7 +41,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // host header. This allows a single listener to service multiple top level domain path trees. Once
 // a virtual host is selected based on the domain, the routes are processed in order to see which
 // upstream cluster to route to or whether to perform a redirect.
-// [#next-free-field: 23]
+// [#next-free-field: 24]
 message VirtualHost {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.VirtualHost";
 
@@ -206,6 +206,10 @@ message VirtualHost {
   // independently (e.g.: values are not inherited).
   HedgePolicy hedge_policy = 17;
 
+  // Decides whether to include the :ref:`x-envoy-is-timeout-retry <config_http_filters_router_x-envoy-is-timeout-retry>`
+  // request header in retries initiated by per try timeouts.
+  bool include_is_timeout_retry_header = 23;
+
   // The maximum bytes which will be buffered for retries and shadowing.
   // If set and a route-specific limit is not set, the bytes actually buffered will be the minimum
   // value of this and the listener per_connection_buffer_limit_bytes.
@@ -222,6 +226,13 @@ message FilterAction {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.FilterAction";
 
   google.protobuf.Any action = 1;
+}
+
+// This can be used in route matcher :ref:`VirtualHost.matcher <envoy_v3_api_field_config.route.v3.VirtualHost.matcher>`.
+// When the matcher matches, routes will be matched and run.
+message RouteList {
+  // The list of routes that will be matched and run, in order. The first route that matches will be used.
+  repeated Route routes = 1;
 }
 
 // A route is both a specification of how to match a request as well as an indication of what to do
@@ -1831,7 +1842,7 @@ message VirtualCluster {
 message RateLimit {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RateLimit";
 
-  // [#next-free-field: 11]
+  // [#next-free-field: 12]
   message Action {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RateLimit.Action";
@@ -2024,6 +2035,33 @@ message RateLimit {
       Source source = 4 [(validate.rules).enum = {defined_only: true}];
     }
 
+    // The following descriptor entry is appended to the descriptor:
+    //
+    // .. code-block:: cpp
+    //
+    //   ("query_match", "<descriptor_value>")
+    message QueryParameterValueMatch {
+      // The key to use in the descriptor entry. Defaults to ``query_match``.
+      string descriptor_key = 4;
+
+      // The value to use in the descriptor entry.
+      string descriptor_value = 1 [(validate.rules).string = {min_len: 1}];
+
+      // If set to true, the action will append a descriptor entry when the
+      // request matches the headers. If set to false, the action will append a
+      // descriptor entry when the request does not match the headers. The
+      // default value is true.
+      google.protobuf.BoolValue expect_match = 2;
+
+      // Specifies a set of query parameters that the rate limit action should match
+      // on. The action will check the request’s query parameters against all the
+      // specified query parameters in the config. A match will happen if all the
+      // query parameters in the config are present in the request with the same values
+      // (or based on presence if the value field is not in the config).
+      repeated QueryParameterMatcher query_parameters = 3
+          [(validate.rules).repeated = {min_items: 1}];
+    }
+
     oneof action_specifier {
       option (validate.required) = true;
 
@@ -2070,6 +2108,9 @@ message RateLimit {
 
       // Rate limit on masked remote address.
       MaskedRemoteAddress masked_remote_address = 10;
+
+      // Rate limit on the existence of query parameters.
+      QueryParameterValueMatch query_parameter_value_match = 11;
     }
   }
 
@@ -2132,7 +2173,9 @@ message RateLimit {
 //
 //     {
 //       "name": ":method",
-//       "exact_match": "POST"
+//       "string_match": {
+//         "exact": "POST"
+//       }
 //     }
 //
 // .. attention::

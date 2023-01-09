@@ -43,6 +43,12 @@ void TcpUpstream::addBytesSentCallback(Network::Connection::BytesSentCb cb) {
   upstream_conn_data_->connection().addBytesSentCallback(cb);
 }
 
+bool TcpUpstream::startUpstreamSecureTransport() {
+  return (upstream_conn_data_ == nullptr)
+             ? false
+             : upstream_conn_data_->connection().startSecureTransport();
+}
+
 Tcp::ConnectionPool::ConnectionData*
 TcpUpstream::onDownstreamEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose) {
@@ -281,7 +287,7 @@ void Http2Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, boo
   });
 
   if (config_.usePost()) {
-    headers->addReference(Http::Headers::get().Path, "/");
+    headers->addReference(Http::Headers::get().Path, config_.postPath());
     headers->addReference(Http::Headers::get().Scheme, scheme);
   } else if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_rfc_connect")) {
     headers->addReference(Http::Headers::get().Path, "/");
@@ -319,7 +325,7 @@ void Http1Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, boo
 
   if (config_.usePost()) {
     // Path is required for POST requests.
-    headers->addReference(Http::Headers::get().Path, "/");
+    headers->addReference(Http::Headers::get().Path, config_.postPath());
   }
 
   config_.headerEvaluator().evaluateHeaders(*headers,

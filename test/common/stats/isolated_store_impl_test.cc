@@ -16,9 +16,11 @@ namespace Stats {
 class StatsIsolatedStoreImplTest : public testing::Test {
 protected:
   StatsIsolatedStoreImplTest()
-      : store_(std::make_unique<IsolatedStoreImpl>(symbol_table_)), pool_(symbol_table_) {}
+      : store_(std::make_unique<IsolatedStoreImpl>(symbol_table_)), pool_(symbol_table_),
+        scope_(store_->rootScope()) {}
   ~StatsIsolatedStoreImplTest() override {
     pool_.clear();
+    scope_.reset();
     store_.reset();
     EXPECT_EQ(0, symbol_table_.numSymbols());
   }
@@ -28,11 +30,12 @@ protected:
   SymbolTableImpl symbol_table_;
   std::unique_ptr<IsolatedStoreImpl> store_;
   StatNamePool pool_;
+  ScopeSharedPtr scope_;
 };
 
 TEST_F(StatsIsolatedStoreImplTest, All) {
-  ScopeSharedPtr scope1 = store_->createScope("scope1.");
-  Counter& c1 = store_->counterFromString("c1");
+  ScopeSharedPtr scope1 = scope_->createScope("scope1.");
+  Counter& c1 = scope_->counterFromString("c1");
   Counter& c2 = scope1->counterFromString("c2");
   EXPECT_EQ("c1", c1.name());
   EXPECT_EQ("scope1.c2", c2.name());
@@ -48,14 +51,14 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
 
   StatNameManagedStorage c1_name("c1", store_->symbolTable());
   c1.add(100);
-  auto found_counter = store_->findCounter(c1_name.statName());
+  auto found_counter = scope_->findCounter(c1_name.statName());
   ASSERT_TRUE(found_counter.has_value());
   EXPECT_EQ(&c1, &found_counter->get());
   EXPECT_EQ(100, found_counter->get().value());
   c1.add(100);
   EXPECT_EQ(200, found_counter->get().value());
 
-  Gauge& g1 = store_->gaugeFromString("g1", Gauge::ImportMode::Accumulate);
+  Gauge& g1 = scope_->gaugeFromString("g1", Gauge::ImportMode::Accumulate);
   Gauge& g2 = scope1->gaugeFromString("g2", Gauge::ImportMode::Accumulate);
   EXPECT_EQ("g1", g1.name());
   EXPECT_EQ("scope1.g2", g2.name());
@@ -74,18 +77,18 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
 
   StatNameManagedStorage g1_name("g1", store_->symbolTable());
   g1.set(100);
-  auto found_gauge = store_->findGauge(g1_name.statName());
+  auto found_gauge = scope_->findGauge(g1_name.statName());
   ASSERT_TRUE(found_gauge.has_value());
   EXPECT_EQ(&g1, &found_gauge->get());
   EXPECT_EQ(100, found_gauge->get().value());
   g1.set(0);
   EXPECT_EQ(0, found_gauge->get().value());
 
-  Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
+  Histogram& h1 = scope_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
   EXPECT_TRUE(h1.used()); // hardcoded in impl to be true always.
   EXPECT_TRUE(h1.use_count() == 1);
   Histogram& h2 = scope1->histogramFromString("h2", Stats::Histogram::Unit::Unspecified);
-  scope1->deliverHistogramToSinks(h2, 0);
+  store_->deliverHistogramToSinks(h2, 0);
   EXPECT_EQ("h1", h1.name());
   EXPECT_EQ("scope1.h2", h2.name());
   EXPECT_EQ("h1", h1.tagExtractedName());
@@ -104,7 +107,7 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
   // behavior should be.
 
   StatNameManagedStorage h1_name("h1", store_->symbolTable());
-  auto found_histogram = store_->findHistogram(h1_name.statName());
+  auto found_histogram = scope_->findHistogram(h1_name.statName());
   ASSERT_TRUE(found_histogram.has_value());
   EXPECT_EQ(&h1, &found_histogram->get());
 
@@ -119,21 +122,21 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
   EXPECT_EQ(2UL, store_->gauges().size());
 
   StatNameManagedStorage nonexistent_name("nonexistent", store_->symbolTable());
-  EXPECT_EQ(store_->findCounter(nonexistent_name.statName()), absl::nullopt);
-  EXPECT_EQ(store_->findGauge(nonexistent_name.statName()), absl::nullopt);
-  EXPECT_EQ(store_->findHistogram(nonexistent_name.statName()), absl::nullopt);
+  EXPECT_EQ(scope_->findCounter(nonexistent_name.statName()), absl::nullopt);
+  EXPECT_EQ(scope_->findGauge(nonexistent_name.statName()), absl::nullopt);
+  EXPECT_EQ(scope_->findHistogram(nonexistent_name.statName()), absl::nullopt);
 }
 
 TEST_F(StatsIsolatedStoreImplTest, PrefixIsStatName) {
-  ScopeSharedPtr scope1 = store_->createScope("scope1");
+  ScopeSharedPtr scope1 = scope_->createScope("scope1");
   ScopeSharedPtr scope2 = scope1->scopeFromStatName(makeStatName("scope2"));
   Counter& c1 = scope2->counterFromString("c1");
   EXPECT_EQ("scope1.scope2.c1", c1.name());
 }
 
 TEST_F(StatsIsolatedStoreImplTest, AllWithSymbolTable) {
-  ScopeSharedPtr scope1 = store_->createScope("scope1.");
-  Counter& c1 = store_->counterFromStatName(makeStatName("c1"));
+  ScopeSharedPtr scope1 = scope_->createScope("scope1.");
+  Counter& c1 = scope_->counterFromStatName(makeStatName("c1"));
   Counter& c2 = scope1->counterFromStatName(makeStatName("c2"));
   EXPECT_EQ("c1", c1.name());
   EXPECT_EQ("scope1.c2", c2.name());
@@ -142,7 +145,7 @@ TEST_F(StatsIsolatedStoreImplTest, AllWithSymbolTable) {
   EXPECT_EQ(0, c1.tags().size());
   EXPECT_EQ(0, c1.tags().size());
 
-  Gauge& g1 = store_->gaugeFromStatName(makeStatName("g1"), Gauge::ImportMode::Accumulate);
+  Gauge& g1 = scope_->gaugeFromStatName(makeStatName("g1"), Gauge::ImportMode::Accumulate);
   Gauge& g2 = scope1->gaugeFromStatName(makeStatName("g2"), Gauge::ImportMode::Accumulate);
   EXPECT_EQ("g1", g1.name());
   EXPECT_EQ("scope1.g2", g2.name());
@@ -151,7 +154,7 @@ TEST_F(StatsIsolatedStoreImplTest, AllWithSymbolTable) {
   EXPECT_EQ(0, g1.tags().size());
   EXPECT_EQ(0, g2.tags().size());
 
-  TextReadout& b1 = store_->textReadoutFromStatName(makeStatName("b1"));
+  TextReadout& b1 = scope_->textReadoutFromStatName(makeStatName("b1"));
   TextReadout& b2 = scope1->textReadoutFromStatName(makeStatName("b2"));
   EXPECT_NE(&b1, &b2);
   EXPECT_EQ("b1", b1.name());
@@ -161,10 +164,10 @@ TEST_F(StatsIsolatedStoreImplTest, AllWithSymbolTable) {
   EXPECT_EQ(0, b1.tags().size());
   EXPECT_EQ(0, b2.tags().size());
   Histogram& h1 =
-      store_->histogramFromStatName(makeStatName("h1"), Stats::Histogram::Unit::Unspecified);
+      scope_->histogramFromStatName(makeStatName("h1"), Stats::Histogram::Unit::Unspecified);
   Histogram& h2 =
       scope1->histogramFromStatName(makeStatName("h2"), Stats::Histogram::Unit::Unspecified);
-  scope1->deliverHistogramToSinks(h2, 0);
+  store_->deliverHistogramToSinks(h2, 0);
   EXPECT_EQ("h1", h1.name());
   EXPECT_EQ("scope1.h2", h2.name());
   EXPECT_EQ("h1", h1.tagExtractedName());
@@ -241,7 +244,7 @@ TEST_F(StatsIsolatedStoreImplTest, NullImplCoverage) {
   NullCounterImpl& c = store_->nullCounter();
   c.inc();
   EXPECT_EQ(0, c.value());
-  NullGaugeImpl& g = store_->nullGauge("");
+  NullGaugeImpl& g = store_->nullGauge();
   g.inc();
   EXPECT_EQ(0, g.value());
 }

@@ -9,10 +9,10 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/protocol.h"
-#include "envoy/http/request_id_extension.h"
 #include "envoy/network/socket.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/stream_info/filter_state.h"
+#include "envoy/stream_info/stream_id_provider.h"
 #include "envoy/tracing/trace_reason.h"
 #include "envoy/upstream/host_description.h"
 
@@ -680,15 +680,14 @@ public:
   virtual absl::optional<Upstream::ClusterInfoConstSharedPtr> upstreamClusterInfo() const PURE;
 
   /**
-   * @param provider The requestID provider implementation this stream uses.
+   * @param provider The unique id implementation this stream uses.
    */
-  virtual void
-  setRequestIDProvider(const Http::RequestIdStreamInfoProviderSharedPtr& provider) PURE;
+  virtual void setStreamIdProvider(StreamIdProviderSharedPtr provider) PURE;
 
   /**
-   * @return the request ID provider for this stream if available.
+   * @return the unique id for this stream if available.
    */
-  virtual const Http::RequestIdStreamInfoProvider* getRequestIDProvider() const PURE;
+  virtual OptRef<const StreamIdProvider> getStreamIdProvider() const PURE;
 
   /**
    * Set the trace reason for the stream.
@@ -740,6 +739,8 @@ public:
    * @param downstream_bytes_meter, the bytes meter for downstream http stream.
    */
   virtual void setDownstreamBytesMeter(const BytesMeterSharedPtr& downstream_bytes_meter) PURE;
+
+  virtual bool isShadow() const PURE;
 
   static void syncUpstreamAndDownstreamBytesMeter(StreamInfo& downstream_info,
                                                   StreamInfo& upstream_info) {

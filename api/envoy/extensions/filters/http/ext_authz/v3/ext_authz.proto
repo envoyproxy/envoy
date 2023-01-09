@@ -10,6 +10,7 @@ import "envoy/type/matcher/v3/metadata.proto";
 import "envoy/type/matcher/v3/string.proto";
 import "envoy/type/v3/http_status.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/sensitive.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -25,7 +26,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 17]
+// [#next-free-field: 18]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v2.ExtAuthz";
@@ -79,8 +80,8 @@ message ExtAuthz {
   //
   bool clear_route_cache = 6;
 
-  // Sets the HTTP status that is returned to the client when there is a network error between the
-  // filter and the authorization server. The default status is HTTP 403 Forbidden.
+  // Sets the HTTP status that is returned to the client when the authorization server returns an error
+  // or cannot be reached. The default status is HTTP 403 Forbidden.
   type.v3.HttpStatus status_on_error = 7;
 
   // Specifies a list of metadata namespaces whose values, if present, will be passed to the
@@ -124,6 +125,10 @@ message ExtAuthz {
   // typed_per_filter_config for the path, requests will not be denied.
   //
   // If this field is not specified, all requests will be allowed when disabled.
+  //
+  // If a request is denied due to this setting, the response code in :ref:`status_on_error
+  // <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.status_on_error>` will
+  // be returned.
   config.core.v3.RuntimeFeatureFlag deny_at_disable = 11;
 
   // Specifies if the peer certificate is sent to the external service.
@@ -153,6 +158,27 @@ message ExtAuthz {
   // :ref:`destination<envoy_v3_api_field_service.auth.v3.AttributeContext.destination>`.
   // The labels will be read from :ref:`metadata<envoy_v3_api_msg_config.core.v3.Node>` with the specified key.
   string bootstrap_metadata_labels_key = 15;
+
+  // Check request to authorization server will include the client request headers that have a correspondent match
+  // in the :ref:`list <envoy_v3_api_msg_type.matcher.v3.ListStringMatcher>`. If this option isn't specified, then
+  // all client request headers are included in the check request to a gRPC authorization server, whereas no client request headers
+  // (besides the ones allowed by default - see note below) are included in the check request to an HTTP authorization server.
+  // This inconsistency between gRPC and HTTP servers is to maintain backwards compatibility with legacy behavior.
+  //
+  // .. note::
+  //
+  //  1. For requests to an HTTP authorization server: in addition to the the user's supplied matchers, ``Host``, ``Method``, ``Path``,
+  //     ``Content-Length``, and ``Authorization`` are **additionally included** in the list.
+  //
+  // .. note::
+  //
+  //  2. For requests to an HTTP authorization server: *Content-Length* will be set to 0 and the request to the
+  //  authorization server will not have a message body. However, the check request can include the buffered
+  //  client request body (controlled by :ref:`with_request_body
+  //  <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.with_request_body>` setting),
+  //  consequently the value of *Content-Length* of the authorization request reflects the size of
+  //  its payload size.
+  type.matcher.v3.ListStringMatcher allowed_headers = 17;
 }
 
 // Configuration for buffering the request data.
@@ -246,7 +272,10 @@ message AuthorizationRequest {
   //   <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.with_request_body>`
   //   setting) hence the value of its ``Content-Length`` reflects the size of its payload size.
   //
-  type.matcher.v3.ListStringMatcher allowed_headers = 1;
+  //   This field has been deprecated in favor of :ref:`allowed_headers
+  //   <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.allowed_headers>`.
+  type.matcher.v3.ListStringMatcher allowed_headers = 1
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Sets a list of headers that will be included to the request to authorization service. Note that
   // client request of the same key will be overridden.
@@ -268,14 +297,14 @@ message AuthorizationResponse {
   // that coexistent headers will be appended.
   type.matcher.v3.ListStringMatcher allowed_upstream_headers_to_append = 3;
 
-  // When this :ref:`list <envoy_v3_api_msg_type.matcher.v3.ListStringMatcher>`. is set, authorization
+  // When this :ref:`list <envoy_v3_api_msg_type.matcher.v3.ListStringMatcher>` is set, authorization
   // response headers that have a correspondent match will be added to the client's response. Note
   // that when this list is *not* set, all the authorization response headers, except ``Authority
   // (Host)`` will be in the response to the client. When a header is included in this list, ``Path``,
   // ``Status``, ``Content-Length``, ``WWWAuthenticate`` and ``Location`` are automatically added.
   type.matcher.v3.ListStringMatcher allowed_client_headers = 2;
 
-  // When this :ref:`list <envoy_v3_api_msg_type.matcher.v3.ListStringMatcher>`. is set, authorization
+  // When this :ref:`list <envoy_v3_api_msg_type.matcher.v3.ListStringMatcher>` is set, authorization
   // response headers that have a correspondent match will be added to the client's response when
   // the authorization response itself is successful, i.e. not failed or denied. When this list is
   // *not* set, no additional headers will be added to the client's response on success.

@@ -1,5 +1,5 @@
-Path Matcher
-=================
+Path matcher
+============
 
 .. toctree::
   :glob:

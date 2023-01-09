@@ -445,8 +445,6 @@ stat_prefix: test
     TestScopedRuntime scoped_runtime;
 
     if (draining) {
-      scoped_runtime.mergeValues(
-          {{"envoy.reloadable_features.thrift_connection_draining", "true"}});
       EXPECT_CALL(drain_decision_, drainClose()).WillOnce(Return(true));
     }
 
@@ -815,12 +813,13 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesProtocolError) {
                       0x80, 0x01, 0x00, 0x01,                     // binary, call
                       0x00, 0x00, 0x00, 0x04, 'n', 'a', 'm', 'e', // message name
                       0x00, 0x00, 0x00, 0x01,                     // sequence id
-                      0x08, 0xff, 0xff                            // illegal field id
+                      0x0d, 0x00, 0x01, 0x0b, 0xb,                // map, field id, string key/value
+                      0xff, 0xff, 0xff, 0xff,                     // negative length
                   });
 
-  std::string err = "invalid binary protocol field id -1";
+  std::string err = "negative binary protocol map size -1";
   addSeq(write_buffer_, {
-                            0x00, 0x00, 0x00, 0x42,                     // framed: 66 bytes
+                            0x00, 0x00, 0x00, 0x43,                     // framed: 67 bytes
                             0x80, 0x01, 0x00, 0x03,                     // binary, exception
                             0x00, 0x00, 0x00, 0x04, 'n', 'a', 'm', 'e', // message name
                             0x00, 0x00, 0x00, 0x01,                     // sequence id
@@ -1262,13 +1261,14 @@ TEST_F(ThriftConnectionManagerTest, RequestAndResponseProtocolError) {
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(1U, store_.counter("test.request_call").value());
 
-  // illegal field id
+  // illegal negative set length
   addSeq(write_buffer_, {
-                            0x00, 0x00, 0x00, 0x1f,                     // framed: 31 bytes
+                            0x00, 0x00, 0x00, 0x2f,                     // framed: 31 bytes
                             0x80, 0x01, 0x00, 0x02,                     // binary, reply
                             0x00, 0x00, 0x00, 0x04, 'n', 'a', 'm', 'e', // message name
                             0x00, 0x00, 0x00, 0x01,                     // sequence id
-                            0x08, 0xff, 0xff                            // illegal field id
+                            0x0e, 0x00, 0x00, 0x0b,                     // set, field id, strings
+                            0xff, 0xff, 0xff, 0xff,                     // negative length
                         });
 
   FramedTransportImpl transport;
@@ -1292,8 +1292,8 @@ TEST_F(ThriftConnectionManagerTest, RequestAndResponseProtocolError) {
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
   EXPECT_EQ(1U, store_.counter("test.response_decoding_error").value());
 
-  EXPECT_EQ(access_log_data_,
-            "name cluster passthrough_enabled=false framed binary call - - - - 0 0 0 -\n");
+  EXPECT_EQ(access_log_data_, "name cluster passthrough_enabled=false framed binary call framed "
+                              "binary reply success 0 0 0 -\n");
 }
 
 TEST_F(ThriftConnectionManagerTest, RequestAndTransportApplicationException) {
@@ -2082,7 +2082,6 @@ TEST_F(ThriftConnectionManagerTest, EncoderFiltersModifyRequests) {
 
 TEST_F(ThriftConnectionManagerTest, TransportEndWhenRemoteClose) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.thrift_connection_draining", "true"}});
 
   // We want the Drain header to be set by RemoteClose which triggers end downstream in local reply.
   EXPECT_CALL(drain_decision_, drainClose()).WillOnce(Return(false));

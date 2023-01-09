@@ -21,7 +21,10 @@ const Http::LowerCaseString DefaultRequestDelayTrailer =
     Http::LowerCaseString("bandwidth-request-delay-ms");
 const Http::LowerCaseString DefaultResponseDelayTrailer =
     Http::LowerCaseString("bandwidth-response-delay-ms");
-const std::chrono::milliseconds ZeroMilliseconds = std::chrono::milliseconds(0);
+const Http::LowerCaseString DefaultRequestFilterDelayTrailer =
+    Http::LowerCaseString("bandwidth-request-filter-delay-ms");
+const Http::LowerCaseString DefaultResponseFilterDelayTrailer =
+    Http::LowerCaseString("bandwidth-response-filter-delay-ms");
 } // namespace
 
 FilterConfig::FilterConfig(const BandwidthLimit& config, Stats::Scope& scope,
@@ -42,6 +45,16 @@ FilterConfig::FilterConfig(const BandwidthLimit& config, Stats::Scope& scope,
               ? DefaultResponseDelayTrailer
               : Http::LowerCaseString(absl::StrCat(config.response_trailer_prefix(), "-",
                                                    DefaultResponseDelayTrailer.get()))),
+      request_filter_delay_trailer_(
+          config.response_trailer_prefix().empty()
+              ? DefaultRequestFilterDelayTrailer
+              : Http::LowerCaseString(absl::StrCat(config.response_trailer_prefix(), "-",
+                                                   DefaultRequestFilterDelayTrailer.get()))),
+      response_filter_delay_trailer_(
+          config.response_trailer_prefix().empty()
+              ? DefaultResponseFilterDelayTrailer
+              : Http::LowerCaseString(absl::StrCat(config.response_trailer_prefix(), "-",
+                                                   DefaultResponseFilterDelayTrailer.get()))),
       enable_response_trailers_(config.enable_response_trailers()) {
   if (per_route && !config.has_limit_kbps()) {
     throw EnvoyException("bandwidthlimitfilter: limit must be set for per route filter config");
@@ -83,10 +96,12 @@ Http::FilterHeadersStatus BandwidthLimiter::decodeHeaders(Http::RequestHeaderMap
           updateStatsOnDecodeFinish();
           decoder_callbacks_->continueDecoding();
         },
-        [&config](uint64_t len, bool limit_enforced) {
+        [&config, this](uint64_t len, bool limit_enforced, std::chrono::milliseconds delay) {
           config.stats().request_allowed_size_.set(len);
+          config.stats().request_allowed_total_size_.add(len);
           if (limit_enforced) {
             config.stats().request_enforced_.inc();
+            request_delay_ += delay;
           }
         },
         const_cast<FilterConfig*>(&config)->timeSource(), decoder_callbacks_->dispatcher(),
@@ -107,6 +122,7 @@ Http::FilterDataStatus BandwidthLimiter::decodeData(Buffer::Instance& data, bool
       config.stats().request_pending_.inc();
     }
     config.stats().request_incoming_size_.set(data.length());
+    config.stats().request_incoming_total_size_.add(data.length());
 
     request_limiter_->writeData(data, end_stream);
     return Http::FilterDataStatus::StopIterationNoBuffer;
@@ -147,10 +163,12 @@ Http::FilterHeadersStatus BandwidthLimiter::encodeHeaders(Http::ResponseHeaderMa
           updateStatsOnEncodeFinish();
           encoder_callbacks_->continueEncoding();
         },
-        [&config](uint64_t len, bool limit_enforced) {
+        [&config, this](uint64_t len, bool limit_enforced, std::chrono::milliseconds delay) {
           config.stats().response_allowed_size_.set(len);
+          config.stats().response_allowed_total_size_.add(len);
           if (limit_enforced) {
             config.stats().response_enforced_.inc();
+            response_delay_ += delay;
           }
         },
         const_cast<FilterConfig*>(&config)->timeSource(), encoder_callbacks_->dispatcher(),
@@ -179,6 +197,7 @@ Http::FilterDataStatus BandwidthLimiter::encodeData(Buffer::Instance& data, bool
       config.stats().response_pending_.inc();
     }
     config.stats().response_incoming_size_.set(data.length());
+    config.stats().response_incoming_total_size_.add(data.length());
 
     response_limiter_->writeData(data, end_stream, trailer_added);
     return Http::FilterDataStatus::StopIterationNoBuffer;
@@ -217,12 +236,22 @@ void BandwidthLimiter::updateStatsOnEncodeFinish() {
 
     if (config.enableResponseTrailers() && trailers_ != nullptr) {
       auto response_duration = response_latency_.get()->elapsed();
-      if (request_duration_ > ZeroMilliseconds) {
+      if (request_duration_ > zero_milliseconds_) {
         trailers_->setCopy(config.requestDelayTrailer(), std::to_string(request_duration_.count()));
       }
-      if (response_duration > ZeroMilliseconds) {
+      if (request_delay_ > zero_milliseconds_) {
+        trailers_->setCopy(config.requestFilterDelayTrailer(),
+                           std::to_string(request_delay_.count()));
+        request_delay_ = zero_milliseconds_;
+      }
+      if (response_duration > zero_milliseconds_) {
         trailers_->setCopy(config.responseDelayTrailer(),
                            std::to_string(response_duration.count()));
+      }
+      if (response_delay_ > zero_milliseconds_) {
+        trailers_->setCopy(config.responseFilterDelayTrailer(),
+                           std::to_string(response_delay_.count()));
+        response_delay_ = zero_milliseconds_;
       }
     }
 

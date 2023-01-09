@@ -73,6 +73,8 @@ public:
   const LowerCaseString Etag{"etag"};
   const LowerCaseString Expires{"expires"};
   const LowerCaseString GrpcAcceptEncoding{"grpc-accept-encoding"};
+  const LowerCaseString GrpcEncoding{"grpc-encoding"};
+  const LowerCaseString GrpcMessageType{"grpc-message-type"};
   const LowerCaseString IfMatch{"if-match"};
   const LowerCaseString IfNoneMatch{"if-none-match"};
   const LowerCaseString IfModifiedSince{"if-modified-since"};
@@ -154,6 +156,7 @@ public:
       absl::StrCat(prefix(), "-hedge-on-per-try-timeout")};
   const LowerCaseString EnvoyImmediateHealthCheckFail{
       absl::StrCat(prefix(), "-immediate-health-check-fail")};
+  const LowerCaseString EnvoyIsTimeoutRetry{absl::StrCat(prefix(), "-is-timeout-retry")};
   const LowerCaseString EnvoyOriginalUrl{absl::StrCat(prefix(), "-original-url")};
   const LowerCaseString EnvoyInternalRequest{absl::StrCat(prefix(), "-internal")};
   // TODO(mattklein123): EnvoyIpTags should be a custom header registered with the IP tagging
@@ -195,6 +198,7 @@ public:
   const LowerCaseString ForwardedClientCert{"x-forwarded-client-cert"};
   const LowerCaseString ForwardedFor{"x-forwarded-for"};
   const LowerCaseString ForwardedHost{"x-forwarded-host"};
+  const LowerCaseString ForwardedPort{"x-forwarded-port"};
   const LowerCaseString ForwardedProto{"x-forwarded-proto"};
   const LowerCaseString GrpcMessage{"grpc-message"};
   const LowerCaseString GrpcStatus{"grpc-status"};

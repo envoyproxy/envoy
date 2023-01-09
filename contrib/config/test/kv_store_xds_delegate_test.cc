@@ -1,6 +1,8 @@
 #include "envoy/api/os_sys_calls.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.validate.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.validate.h"
 #include "envoy/service/runtime/v3/rtds.pb.h"
 #include "envoy/service/runtime/v3/rtds.pb.validate.h"
 
@@ -12,6 +14,7 @@
 #include "test/mocks/protobuf/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/resources.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "contrib/config/source/kv_store_xds_delegate.h"
@@ -70,7 +73,7 @@ protected:
 
   template <typename Resource>
   void checkSavedResources(const XdsSourceId& source_id,
-                           const std::vector<std::string>& resource_names,
+                           const absl::flat_hash_set<std::string>& resource_names,
                            const std::vector<DecodedResourceRef>& expected_resources) {
     // Retrieve the xDS resources.
     const auto retrieved_resources = xds_delegate_->getResources(source_id, resource_names);
@@ -87,6 +90,7 @@ protected:
   Api::ApiPtr api_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   Config::XdsResourcesDelegatePtr xds_delegate_;
+  Event::SimulatedTimeSystem time_source_;
 };
 
 TEST_F(KeyValueStoreXdsDelegateTest, SaveAndRetrieve) {
@@ -266,7 +270,70 @@ TEST_F(KeyValueStoreXdsDelegateTest, ResourceNotFound) {
   EXPECT_EQ(0, store_.counter("xds.kv_store.parse_failed").value());
 }
 
-// TODO(abeyad): add test for resource eviction.
+TEST_F(KeyValueStoreXdsDelegateTest, ResourcesWithTTL) {
+  const std::string authority_1 = "rtds_cluster";
+  auto runtime_resource_1 = parseYamlIntoRuntimeResource(R"EOF(
+    name: some_resource_1
+    layer:
+      foo: bar
+      baz: meh
+  )EOF");
+  auto runtime_resource_2 = parseYamlIntoRuntimeResource(R"EOF(
+    name: some_resource_2
+    layer:
+      abc: xyz
+  )EOF");
+  auto runtime_resource_3 = parseYamlIntoRuntimeResource(R"EOF(
+    name: some_resource_3
+    layer:
+      boo: yikes
+  )EOF");
+
+  // some_resource_1 has no TTL
+  // some_resource_2 has a TTL of 30 seconds.
+  // some_resource_3 has a TTL of 60 seconds.
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> resources;
+  auto* resource = resources.Add();
+  resource->set_name("some_resource_1");
+  resource->mutable_resource()->PackFrom(runtime_resource_1);
+  resource = resources.Add();
+  resource->set_name("some_resource_2");
+  resource->mutable_resource()->PackFrom(runtime_resource_2);
+  resource->mutable_ttl()->set_seconds(30);
+  resource = resources.Add();
+  resource->set_name("some_resource_3");
+  resource->mutable_resource()->PackFrom(runtime_resource_3);
+  resource->mutable_ttl()->set_seconds(60);
+
+  auto decoded_resources = TestUtility::decodeResources<envoy::service::runtime::v3::Runtime>(
+      resources, /*version=*/"1");
+
+  // Save xDS resources.
+  const XdsConfigSourceId source_id{authority_1, Config::TypeUrl::get().Runtime};
+  xds_delegate_->onConfigUpdated(source_id, decoded_resources.refvec_);
+
+  // TTL hasn't expired, so we should have all three xDS resources.
+  checkSavedResources<envoy::service::runtime::v3::Runtime>(
+      source_id, /*resource_names=*/{"some_resource_1", "some_resource_2", "some_resource_3"},
+      decoded_resources.refvec_);
+
+  // Advance time past the first TTL and let the timers fire.
+  time_source_.advanceTimeWait(std::chrono::seconds(45));
+
+  // We should only have resources 1 and 3.
+  decoded_resources.refvec_.erase(std::next(decoded_resources.refvec_.begin())); // delete 2nd entry
+  checkSavedResources<envoy::service::runtime::v3::Runtime>(
+      source_id, /*resource_names=*/{"some_resource_1", "some_resource_3"},
+      decoded_resources.refvec_);
+
+  // Advance time past the second TTL and let the timers fire.
+  time_source_.advanceTimeWait(std::chrono::seconds(45));
+
+  // We should only have resource 1.
+  decoded_resources.refvec_.erase(std::next(decoded_resources.refvec_.begin())); // delete 2nd entry
+  checkSavedResources<envoy::service::runtime::v3::Runtime>(
+      source_id, /*resource_names=*/{"some_resource_1"}, decoded_resources.refvec_);
+}
 
 } // namespace
 } // namespace Envoy

@@ -22,7 +22,10 @@ public:
   // Note that, outside of tests, we expect callbacks to always be a WatchMap.
   SotwSubscriptionState(std::string type_url, UntypedConfigUpdateCallbacks& callbacks,
                         Event::Dispatcher& dispatcher,
-                        OpaqueResourceDecoderSharedPtr resource_decoder);
+                        OpaqueResourceDecoderSharedPtr resource_decoder,
+                        XdsConfigTrackerOptRef xds_config_tracker,
+                        XdsResourcesDelegateOptRef xds_resources_delegate,
+                        const std::string& target_xds_authority);
   ~SotwSubscriptionState() override;
 
   // Update which resources we're interested in subscribing to.
@@ -35,6 +38,8 @@ public:
   void markStreamFresh() override;
 
   void ttlExpiryCallback(const std::vector<std::string>& expired) override;
+
+  void handleEstablishmentFailure() override;
 
   SotwSubscriptionState(const SotwSubscriptionState&) = delete;
   SotwSubscriptionState& operator=(const SotwSubscriptionState&) = delete;
@@ -69,9 +74,13 @@ public:
   ~SotwSubscriptionStateFactory() override = default;
   std::unique_ptr<SotwSubscriptionState>
   makeSubscriptionState(const std::string& type_url, UntypedConfigUpdateCallbacks& callbacks,
-                        OpaqueResourceDecoderSharedPtr resource_decoder) override {
+                        OpaqueResourceDecoderSharedPtr resource_decoder,
+                        XdsConfigTrackerOptRef xds_config_tracker,
+                        XdsResourcesDelegateOptRef xds_resources_delegate,
+                        const std::string& target_xds_authority) override {
     return std::make_unique<SotwSubscriptionState>(type_url, callbacks, dispatcher_,
-                                                   resource_decoder);
+                                                   resource_decoder, xds_config_tracker,
+                                                   xds_resources_delegate, target_xds_authority);
   }
 
 private:

@@ -525,6 +525,7 @@ message Cluster {
   // Specific configuration for the
   // :ref:`Original Destination <arch_overview_load_balancing_types_original_destination>`
   // load balancing policy.
+  // [#extension: envoy.clusters.original_dst]
   message OriginalDstLbConfig {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.Cluster.OriginalDstLbConfig";
@@ -1215,6 +1216,7 @@ message LoadBalancingPolicy {
 
     reserved "config", "name", "typed_config";
 
+    // [#extension-category: envoy.load_balancing_policies]
     core.v3.TypedExtensionConfig typed_extension_config = 4;
   }
 

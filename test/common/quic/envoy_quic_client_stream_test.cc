@@ -23,7 +23,7 @@ using testing::Invoke;
 
 class MockDelegate : public PacketsToReadDelegate {
 public:
-  MOCK_METHOD(size_t, numPacketsExpectedPerEventLoop, ());
+  MOCK_METHOD(size_t, numPacketsExpectedPerEventLoop, (), (const));
 };
 
 class EnvoyQuicClientStreamTest : public testing::Test {
@@ -70,7 +70,7 @@ public:
 
   void SetUp() override {
     quic_session_.Initialize();
-    quic_connection_->setEnvoyConnection(quic_session_);
+    quic_connection_->setEnvoyConnection(quic_session_, quic_session_);
     quic_connection_->SetEncrypter(
         quic::ENCRYPTION_FORWARD_SECURE,
         std::make_unique<quic::NullEncrypter>(quic::Perspective::IS_CLIENT));

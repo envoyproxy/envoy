@@ -164,6 +164,7 @@ private:
     const Router::Config& routeConfig() const override { return route_configuration_; }
     bool includeAttemptCountInRequest() const override { return false; }
     bool includeAttemptCountInResponse() const override { return false; }
+    bool includeIsTimeoutRetryHeader() const override { return false; }
     uint32_t retryShadowBufferLimit() const override {
       return std::numeric_limits<uint32_t>::max();
     }
@@ -288,9 +289,7 @@ private:
       return path_match_criterion_;
     }
 
-    const absl::optional<ConnectConfig>& connectConfig() const override {
-      return connect_config_nullopt_;
-    }
+    const ConnectConfigOptRef connectConfig() const override { return connect_config_nullopt_; }
 
     bool includeAttemptCountInRequest() const override { return false; }
     bool includeAttemptCountInResponse() const override { return false; }
@@ -314,7 +313,7 @@ private:
     Router::RouteEntry::UpgradeMap upgrade_map_;
     const std::string& cluster_name_;
     absl::optional<std::chrono::milliseconds> timeout_;
-    static const absl::optional<ConnectConfig> connect_config_nullopt_;
+    static const ConnectConfigOptRef connect_config_nullopt_;
     const std::string route_name_;
     // Pass early data option config through StreamOptions.
     std::unique_ptr<Router::EarlyDataPolicy> early_data_policy_{
@@ -363,7 +362,9 @@ private:
   // TODO(kbaichoo): Plumb account from owning request filter.
   Buffer::BufferMemoryAccountSharedPtr account() const override { return nullptr; }
   Tracing::Span& activeSpan() override { return active_span_; }
-  const Tracing::Config& tracingConfig() override { return tracing_config_; }
+  OptRef<const Tracing::Config> tracingConfig() const override {
+    return makeOptRef<const Tracing::Config>(tracing_config_);
+  }
   void continueDecoding() override {}
   RequestTrailerMap& addDecodedTrailers() override { PANIC("not implemented"); }
   void addDecodedData(Buffer::Instance&, bool) override {

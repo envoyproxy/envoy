@@ -94,6 +94,7 @@ public:
   MOCK_METHOD(SysCallPtrResult, mmap,
               (void* addr, size_t length, int prot, int flags, int fd, off_t offset));
   MOCK_METHOD(SysCallIntResult, stat, (const char* name, struct stat* stat));
+  MOCK_METHOD(SysCallIntResult, fstat, (os_fd_t fd, struct stat* stat));
   MOCK_METHOD(SysCallIntResult, chmod, (const std::string& name, mode_t mode));
   MOCK_METHOD(int, setsockopt_,
               (os_fd_t sockfd, int level, int optname, const void* optval, socklen_t optlen));

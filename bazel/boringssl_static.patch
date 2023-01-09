@@ -1,8 +1,17 @@
 diff --git a/BUILD b/BUILD
-index cfa695a44..e748f9b46 100644
+index 1ec2bdf18..50fe0f050 100644
 --- a/BUILD
 +++ b/BUILD
-@@ -101,7 +101,10 @@ linux_copts = posix_copts + [
+@@ -96,12 +96,19 @@ linux_copts = posix_copts + [
+     # it should not be set on Apple platforms, where it instead disables APIs
+     # we use. See compat(5) and sys/cdefs.h.
+     "-D_XOPEN_SOURCE=700",
++    # TODO(keith): Remove https://bugs.chromium.org/p/boringssl/issues/detail?id=492
++    "-Wno-array-bounds",
++    "-Wno-stringop-overflow",
++    "-Wno-unknown-warning-option",
+ ]
+ 
  boringssl_copts = select({
      "@platforms//os:linux": linux_copts,
      "@platforms//os:macos": posix_copts,
@@ -14,7 +23,7 @@ index cfa695a44..e748f9b46 100644
      "//conditions:default": [],
  })
  
-@@ -163,6 +166,7 @@ cc_library(
+@@ -163,6 +170,7 @@ cc_library(
          "@platforms//os:windows": ["-defaultlib:advapi32.lib"],
          "//conditions:default": ["-lpthread"],
      }),
@@ -22,7 +31,7 @@ index cfa695a44..e748f9b46 100644
      visibility = ["//visibility:public"],
  )
  
-@@ -172,6 +176,7 @@ cc_library(
+@@ -172,6 +180,7 @@ cc_library(
      hdrs = ssl_headers,
      copts = boringssl_copts_cxx,
      includes = ["src/include"],

@@ -33,6 +33,9 @@ public:
   // The method of the upstream HTTP request. True if using POST method, CONNECT otherwise.
   virtual bool usePost() const PURE;
 
+  // The path used for POST method.
+  virtual const std::string& postPath() const PURE;
+
   // The evaluator to add additional HTTP request headers to the upstream request.
   virtual Envoy::Http::HeaderEvaluator& headerEvaluator() const PURE;
 
@@ -131,6 +134,11 @@ public:
    */
   virtual Tcp::ConnectionPool::ConnectionData*
   onDownstreamEvent(Network::ConnectionEvent event) PURE;
+
+  /* Called to convert underlying transport socket from non-secure mode
+   * to secure mode. Implemented only by start_tls transport socket.
+   */
+  virtual bool startUpstreamSecureTransport() PURE;
 };
 
 using GenericConnPoolPtr = std::unique_ptr<GenericConnPool>;

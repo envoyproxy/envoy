@@ -114,6 +114,7 @@ public:
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void addBytesSentCallback(Network::Connection::BytesSentCb cb) override;
   Tcp::ConnectionPool::ConnectionData* onDownstreamEvent(Network::ConnectionEvent event) override;
+  bool startUpstreamSecureTransport() override;
 
 private:
   Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
@@ -136,6 +137,9 @@ public:
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void addBytesSentCallback(Network::Connection::BytesSentCb cb) override;
   Tcp::ConnectionPool::ConnectionData* onDownstreamEvent(Network::ConnectionEvent event) override;
+  // HTTP upstream must not implement converting upstream transport
+  // socket from non-secure to secure mode.
+  bool startUpstreamSecureTransport() override { return false; }
 
   // Http::StreamCallbacks
   void onResetStream(Http::StreamResetReason reason,

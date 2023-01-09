@@ -56,16 +56,19 @@ std::string invalidProtoKvStoreDelegateConfig() {
     )EOF";
 }
 
-class KeyValueStoreXdsDelegateIntegrationTest : public HttpIntegrationTest,
-                                                public Grpc::GrpcClientIntegrationParamTest {
+class KeyValueStoreXdsDelegateIntegrationTest
+    : public HttpIntegrationTest,
+      public Grpc::UnifiedOrLegacyMuxIntegrationParamTest {
 public:
   KeyValueStoreXdsDelegateIntegrationTest()
       : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion(),
                             ConfigHelper::baseConfigNoListeners()) {
     use_lds_ = false;
-    // TODO(abeyad): add UnifiedSotw tests too when implementation is ready.
-    sotw_or_delta_ = Grpc::SotwOrDelta::Sotw;
     skip_tag_extraction_rule_check_ = true;
+
+    if (isUnified()) {
+      config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux", "true");
+    }
 
     // Make the default cluster HTTP2.
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -276,7 +279,7 @@ protected:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, KeyValueStoreXdsDelegateIntegrationTest,
-                         GRPC_CLIENT_INTEGRATION_PARAMS);
+                         UNIFIED_LEGACY_GRPC_CLIENT_INTEGRATION_PARAMS);
 
 TEST_P(KeyValueStoreXdsDelegateIntegrationTest, BasicSuccess) {
   on_server_init_function_ = [this]() {
@@ -450,15 +453,17 @@ public:
 
 class InvalidProtoKeyValueStoreXdsDelegateIntegrationTest
     : public HttpIntegrationTest,
-      public Grpc::GrpcClientIntegrationParamTest {
+      public Grpc::UnifiedOrLegacyMuxIntegrationParamTest {
 public:
   InvalidProtoKeyValueStoreXdsDelegateIntegrationTest()
       : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion(),
                             ConfigHelper::baseConfigNoListeners()) {
     use_lds_ = false;
-    // TODO(abeyad): add UnifiedSotw tests too when implementation is ready.
-    sotw_or_delta_ = Grpc::SotwOrDelta::Sotw;
     skip_tag_extraction_rule_check_ = true;
+
+    if (isUnified()) {
+      config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux", "true");
+    }
 
     // One static CDS cluster and CDS config.
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -506,7 +511,7 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, InvalidProtoKeyValueStoreXdsDelegateIntegrationTest,
-                         GRPC_CLIENT_INTEGRATION_PARAMS);
+                         UNIFIED_LEGACY_GRPC_CLIENT_INTEGRATION_PARAMS);
 
 TEST_P(InvalidProtoKeyValueStoreXdsDelegateIntegrationTest, InvalidProto) {
   InvalidProtoKeyValueStoreFactory factory;

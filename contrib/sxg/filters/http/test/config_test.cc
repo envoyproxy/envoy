@@ -32,7 +32,7 @@ void expectCreateFilter(std::string yaml, bool is_sds_config) {
   // This returns non-nullptr for certificate and private_key.
   auto& secret_manager = context.cluster_manager_.cluster_manager_factory_.secretManager();
   if (is_sds_config) {
-    ON_CALL(secret_manager, findOrCreateGenericSecretProvider(_, _, _))
+    ON_CALL(secret_manager, findOrCreateGenericSecretProvider(_, _, _, _))
         .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
             envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
   } else {
@@ -45,6 +45,7 @@ void expectCreateFilter(std::string yaml, bool is_sds_config) {
   EXPECT_CALL(context, scope());
   EXPECT_CALL(context, timeSource());
   EXPECT_CALL(context, api());
+  EXPECT_CALL(context, initManager()).Times(2);
   EXPECT_CALL(context, getTransportSocketFactoryContext());
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;

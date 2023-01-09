@@ -1907,7 +1907,10 @@ public:
 
   void set(Http::RequestHeaderMap&, bool) override {}
   void setInResponse(Http::ResponseHeaderMap&, const Http::RequestHeaderMap&) override {}
-  absl::optional<uint64_t> toInteger(const Http::RequestHeaderMap&) const override {
+  absl::optional<absl::string_view> get(const Http::RequestHeaderMap&) const override {
+    return absl::nullopt;
+  }
+  absl::optional<uint64_t> getInteger(const Http::RequestHeaderMap&) const override {
     return absl::nullopt;
   }
   Tracing::Reason getTraceReason(const Http::RequestHeaderMap&) override {
@@ -2085,6 +2088,26 @@ TEST_F(HttpConnectionManagerConfigTest, UnknownOriginalIPDetectionExtension) {
                           "'envoy.http.original_ip_detection.UnknownOriginalIPDetectionExtension'");
 }
 
+TEST_F(HttpConnectionManagerConfigTest, UnknownEarlyHeaderMutationExtension) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  early_header_mutation_extensions:
+  - name: envoy.http.early_header_mutation.UnknownEarlyHeaderMutationExtension
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(createHttpConnectionManagerConfig(yaml_string), EnvoyException,
+                          "Early header mutation extension not found: "
+                          "'envoy.http.early_header_mutation.UnknownEarlyHeaderMutationExtension'");
+}
+
 namespace {
 
 class OriginalIPDetectionExtensionNotCreatedFactory : public Http::OriginalIPDetectionFactory {
@@ -2100,6 +2123,22 @@ public:
 
   std::string name() const override {
     return "envoy.http.original_ip_detection.OriginalIPDetectionExtensionNotCreated";
+  }
+};
+
+class EarlyHeaderMutationExtensionNotCreatedFactory : public Http::EarlyHeaderMutationFactory {
+public:
+  Http::EarlyHeaderMutationPtr createExtension(const Protobuf::Message&,
+                                               Server::Configuration::FactoryContext&) override {
+    return nullptr;
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::UInt32Value>();
+  }
+
+  std::string name() const override {
+    return "envoy.http.early_header_mutation.EarlyHeaderMutationExtensionNotCreated";
   }
 };
 
@@ -2129,6 +2168,30 @@ TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtensionNotCreated) 
       "'envoy.http.original_ip_detection.OriginalIPDetectionExtensionNotCreated'");
 }
 
+TEST_F(HttpConnectionManagerConfigTest, EarlyHeaderMutationExtensionNotCreated) {
+  EarlyHeaderMutationExtensionNotCreatedFactory factory;
+  Registry::InjectFactory<Http::EarlyHeaderMutationFactory> registration(factory);
+
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  early_header_mutation_extensions:
+  - name: envoy.http.early_header_mutation.EarlyHeaderMutationExtensionNotCreated
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.UInt32Value
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(
+      createHttpConnectionManagerConfig(yaml_string), EnvoyException,
+      "Early header mutation extension could not be created: "
+      "'envoy.http.early_header_mutation.EarlyHeaderMutationExtensionNotCreated'");
+}
+
 TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtension) {
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http
@@ -2152,6 +2215,32 @@ TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtension) {
 
   const auto& original_ip_detection_extensions = config.originalIpDetectionExtensions();
   EXPECT_EQ(1, original_ip_detection_extensions.size());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, EarlyHeaderMutationExtension) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  early_header_mutation_extensions:
+  - name: envoy.http.early_header_mutation.header_mutation
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.http.early_header_mutation.header_mutation.v3.HeaderMutation
+      mutations:
+      - remove: "flag-header"
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+
+  const auto& early_header_mutation_extensions = config.earlyHeaderMutationExtensions();
+  EXPECT_EQ(1, early_header_mutation_extensions.size());
 }
 
 TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtensionMixedWithUseRemoteAddress) {
@@ -2578,6 +2667,31 @@ TEST_F(HttpConnectionManagerConfigTest, PathWithEscapedSlashesActionDefaultOverr
             config.pathWithEscapedSlashesAction());
 }
 
+TEST_F(HttpConnectionManagerConfigTest, SetCurrentClientCertDetailsCertAndChain) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  forward_client_cert_details: APPEND_FORWARD
+  set_current_client_cert_details:
+    cert: true
+    chain: true
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_, http_tracer_manager_,
+                                     filter_config_provider_manager_);
+  EXPECT_EQ(Http::ForwardClientCertType::AppendForward, config.forwardClientCert());
+  EXPECT_EQ(2, config.setCurrentClientCertDetails().size());
+  EXPECT_EQ(Http::ClientCertDetailsType::Cert, config.setCurrentClientCertDetails()[0]);
+  EXPECT_EQ(Http::ClientCertDetailsType::Chain, config.setCurrentClientCertDetails()[1]);
+}
+
 namespace {
 
 class TestHeaderValidatorFactoryConfig : public Http::HeaderValidatorFactoryConfig {
@@ -2589,7 +2703,7 @@ public:
   }
 
   Http::HeaderValidatorFactoryPtr createFromProto(const Protobuf::Message&,
-                                                  Server::Configuration::FactoryContext&) override {
+                                                  ProtobufMessage::ValidationVisitor&) override {
     auto header_validator = std::make_unique<StrictMock<Http::MockHeaderValidatorFactory>>();
     EXPECT_CALL(*header_validator, create(Http::Protocol::Http2, _))
         .WillOnce(InvokeWithoutArgs(
@@ -2615,13 +2729,13 @@ public:
 
   Http::HeaderValidatorFactoryPtr
   createFromProto(const Protobuf::Message& message,
-                  Server::Configuration::FactoryContext& context) override {
+                  ProtobufMessage::ValidationVisitor& validation_visitor) override {
     auto mptr = ::Envoy::Config::Utility::translateAnyToFactoryConfig(
-        dynamic_cast<const ProtobufWkt::Any&>(message), context.messageValidationVisitor(), *this);
+        dynamic_cast<const ProtobufWkt::Any&>(message), validation_visitor, *this);
     const auto& proto_config =
         MessageUtil::downcastAndValidate<const ::envoy::extensions::http::header_validators::
                                              envoy_default::v3::HeaderValidatorConfig&>(
-            *mptr, context.messageValidationVisitor());
+            *mptr, validation_visitor);
 
     config_ = proto_config;
     auto header_validator = std::make_unique<StrictMock<Http::MockHeaderValidatorFactory>>();
@@ -2664,8 +2778,7 @@ TEST_F(HttpConnectionManagerConfigTest, HeaderValidatorConfig) {
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
                                      filter_config_provider_manager_);
-  StrictMock<StreamInfo::MockStreamInfo> stream_info;
-  EXPECT_NE(nullptr, config.makeHeaderValidator(Http::Protocol::Http2, stream_info));
+  EXPECT_NE(nullptr, config.makeHeaderValidator(Http::Protocol::Http2));
 #else
   // If UHV is disabled, providing config should result in rejection
   EXPECT_THROW(
@@ -2702,9 +2815,8 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultHeaderValidatorConfig) {
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
                                      filter_config_provider_manager_);
-  StrictMock<StreamInfo::MockStreamInfo> stream_info;
 #ifdef ENVOY_ENABLE_UHV
-  EXPECT_NE(nullptr, config.makeHeaderValidator(Http::Protocol::Http2, stream_info));
+  EXPECT_NE(nullptr, config.makeHeaderValidator(Http::Protocol::Http2));
   EXPECT_FALSE(proto_config.restrict_http_methods());
   EXPECT_TRUE(proto_config.uri_path_normalization_options().skip_path_normalization());
   EXPECT_TRUE(proto_config.uri_path_normalization_options().skip_merging_slashes());
@@ -2714,7 +2826,7 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultHeaderValidatorConfig) {
   EXPECT_FALSE(proto_config.http1_protocol_options().allow_chunked_length());
 #else
   // If UHV is disabled, config should be accepted and factory should be nullptr
-  EXPECT_EQ(nullptr, config.makeHeaderValidator(Http::Protocol::Http2, stream_info));
+  EXPECT_EQ(nullptr, config.makeHeaderValidator(Http::Protocol::Http2));
 #endif
 }
 
@@ -2746,9 +2858,8 @@ TEST_F(HttpConnectionManagerConfigTest, TranslateLegacyConfigToDefaultHeaderVali
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_, http_tracer_manager_,
                                      filter_config_provider_manager_);
-  StrictMock<StreamInfo::MockStreamInfo> stream_info;
 #ifdef ENVOY_ENABLE_UHV
-  EXPECT_NE(nullptr, config.makeHeaderValidator(Http::Protocol::Http2, stream_info));
+  EXPECT_NE(nullptr, config.makeHeaderValidator(Http::Protocol::Http2));
   EXPECT_FALSE(proto_config.restrict_http_methods());
   EXPECT_FALSE(proto_config.uri_path_normalization_options().skip_path_normalization());
   EXPECT_FALSE(proto_config.uri_path_normalization_options().skip_merging_slashes());
@@ -2758,7 +2869,7 @@ TEST_F(HttpConnectionManagerConfigTest, TranslateLegacyConfigToDefaultHeaderVali
   EXPECT_TRUE(proto_config.http1_protocol_options().allow_chunked_length());
 #else
   // If UHV is disabled, config should be accepted and factory should be nullptr
-  EXPECT_EQ(nullptr, config.makeHeaderValidator(Http::Protocol::Http2, stream_info));
+  EXPECT_EQ(nullptr, config.makeHeaderValidator(Http::Protocol::Http2));
 #endif
 }
 

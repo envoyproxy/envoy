@@ -1,7 +1,7 @@
-
 builtin:
 - envoy.request_id.uuid
 - envoy.upstreams.tcp.generic
+- envoy.upstreams.tcp.tcp_protocol_options
 - envoy.transport_sockets.tls
 - envoy.upstreams.http.http_protocol_options
 - envoy.upstreams.http.generic
@@ -77,9 +77,11 @@ categories:
 - envoy.internal_redirect_predicates
 - envoy.io_socket
 - envoy.http.original_ip_detection
+- envoy.listener_manager_impl
 - envoy.matching.common_inputs
 - envoy.matching.input_matchers
 - envoy.tls.key_providers
+- envoy.quic.connection_id_generator
 - envoy.quic.proof_source
 - envoy.quic.server.crypto_stream
 - envoy.rate_limit_descriptors
@@ -106,6 +108,7 @@ categories:
 - envoy.rbac.matchers
 - envoy.access_loggers.extension_filters
 - envoy.http.stateful_session
+- envoy.matching.action
 - envoy.matching.http.input
 - envoy.matching.http.custom_matchers
 - envoy.matching.network.input
@@ -114,6 +117,11 @@ categories:
 - envoy.path.match
 - envoy.path.rewrite
 - envoy.tls_handshakers
+- envoy.generic_proxy.filters
+- envoy.generic_proxy.codecs
+- envoy.load_balancing_policies
+- envoy.http.early_header_mutation
+- envoy.http.custom_response
 
 status_values:
 - name: stable

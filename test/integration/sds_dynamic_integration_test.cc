@@ -55,10 +55,10 @@ struct TestParams {
 };
 
 std::string sdsTestParamsToString(const ::testing::TestParamInfo<TestParams>& p) {
-  return fmt::format(
-      "{}_{}_{}", p.param.ip_version == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
-      p.param.sds_grpc_type == Grpc::ClientType::GoogleGrpc ? "GoogleGrpc" : "EnvoyGrpc",
-      p.param.test_quic ? "UsesQuic" : "UsesTcp");
+  return fmt::format("{}_{}_{}", TestUtility::ipVersionToString(p.param.ip_version),
+                     p.param.sds_grpc_type == Grpc::ClientType::GoogleGrpc ? "GoogleGrpc"
+                                                                           : "EnvoyGrpc",
+                     p.param.test_quic ? "UsesQuic" : "UsesTcp");
 }
 
 std::vector<TestParams> getSdsTestsParams(bool disable_quic = false) {
@@ -602,7 +602,7 @@ public:
 
     auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
         tls_context, factory_context_);
-    static Stats::Scope* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
+    static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
     return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
         std::move(cfg), context_manager_, *upstream_stats_store, std::vector<std::string>{});
   }

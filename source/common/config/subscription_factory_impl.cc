@@ -24,10 +24,10 @@ SubscriptionFactoryImpl::SubscriptionFactoryImpl(
     const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
     Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor,
     Api::Api& api, const Server::Instance& server,
-    XdsResourcesDelegateOptRef xds_resources_delegate)
+    XdsResourcesDelegateOptRef xds_resources_delegate, XdsConfigTrackerOptRef xds_config_tracker)
     : local_info_(local_info), dispatcher_(dispatcher), cm_(cm),
       validation_visitor_(validation_visitor), api_(api), server_(server),
-      xds_resources_delegate_(xds_resources_delegate) {}
+      xds_resources_delegate_(xds_resources_delegate), xds_config_tracker_(xds_config_tracker) {}
 
 SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
@@ -77,6 +77,8 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
       CustomConfigValidatorsPtr custom_config_validators =
           std::make_unique<CustomConfigValidatorsImpl>(validation_visitor_, server_,
                                                        api_config_source.config_validators());
+      const std::string control_plane_id =
+          Utility::getGrpcControlPlane(api_config_source).value_or("");
 
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
         mux = std::make_shared<Config::XdsMux::GrpcMuxSotw>(
@@ -85,8 +87,8 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
                 ->createUncachedRawAsyncClient(),
             dispatcher_, sotwGrpcMethod(type_url), api_.randomGenerator(), scope,
             Utility::parseRateLimitSettings(api_config_source), local_info_,
-            api_config_source.set_node_on_first_message_only(),
-            std::move(custom_config_validators));
+            api_config_source.set_node_on_first_message_only(), std::move(custom_config_validators),
+            xds_config_tracker_, xds_resources_delegate_, control_plane_id);
       } else {
         mux = std::make_shared<Config::GrpcMuxImpl>(
             local_info_,
@@ -96,7 +98,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
             dispatcher_, sotwGrpcMethod(type_url), api_.randomGenerator(), scope,
             Utility::parseRateLimitSettings(api_config_source),
             api_config_source.set_node_on_first_message_only(), std::move(custom_config_validators),
-            xds_resources_delegate_, Utility::getGrpcControlPlane(api_config_source).value_or(""));
+            xds_config_tracker_, xds_resources_delegate_, control_plane_id);
       }
       return std::make_unique<GrpcSubscriptionImpl>(
           std::move(mux), callbacks, resource_decoder, stats, type_url, dispatcher_,
@@ -115,8 +117,8 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
                 ->createUncachedRawAsyncClient(),
             dispatcher_, deltaGrpcMethod(type_url), api_.randomGenerator(), scope,
             Utility::parseRateLimitSettings(api_config_source), local_info_,
-            api_config_source.set_node_on_first_message_only(),
-            std::move(custom_config_validators));
+            api_config_source.set_node_on_first_message_only(), std::move(custom_config_validators),
+            xds_config_tracker_);
       } else {
         mux = std::make_shared<Config::NewGrpcMuxImpl>(
             Config::Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
@@ -124,7 +126,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
                 ->createUncachedRawAsyncClient(),
             dispatcher_, deltaGrpcMethod(type_url), api_.randomGenerator(), scope,
             Utility::parseRateLimitSettings(api_config_source), local_info_,
-            std::move(custom_config_validators));
+            std::move(custom_config_validators), xds_config_tracker_);
       }
       return std::make_unique<GrpcSubscriptionImpl>(
           std::move(mux), callbacks, resource_decoder, stats, type_url, dispatcher_,
@@ -190,7 +192,7 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
                     ->createUncachedRawAsyncClient(),
                 dispatcher_, deltaGrpcMethod(type_url), api_.randomGenerator(), scope,
                 Utility::parseRateLimitSettings(api_config_source), local_info_,
-                std::move(custom_config_validators)),
+                std::move(custom_config_validators), xds_config_tracker_),
             callbacks, resource_decoder, stats, dispatcher_,
             Utility::configSourceInitialFetchTimeout(config), false, options);
       }

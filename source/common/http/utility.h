@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <memory>
 #include <string>
 
 #include "envoy/config/core/v3/http_uri.pb.h"
@@ -19,7 +20,6 @@
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
-#include "nghttp2/nghttp2.h"
 
 namespace Envoy {
 namespace Http {
@@ -44,18 +44,6 @@ using AlpnNames = ConstSingleton<AlpnNameValues>;
 
 namespace Http2 {
 namespace Utility {
-
-struct SettingsEntryHash {
-  size_t operator()(const nghttp2_settings_entry& entry) const {
-    return absl::Hash<decltype(entry.settings_id)>()(entry.settings_id);
-  }
-};
-
-struct SettingsEntryEquals {
-  bool operator()(const nghttp2_settings_entry& lhs, const nghttp2_settings_entry& rhs) const {
-    return lhs.settings_id == rhs.settings_id;
-  }
-};
 
 // Limits and defaults for `envoy::config::core::v3::Http2ProtocolOptions` protos.
 struct OptionsLimits {
@@ -145,9 +133,16 @@ namespace Utility {
 class Url {
 public:
   bool initialize(absl::string_view absolute_url, bool is_connect_request);
-  absl::string_view scheme() { return scheme_; }
-  absl::string_view hostAndPort() { return host_and_port_; }
-  absl::string_view pathAndQueryParams() { return path_and_query_params_; }
+  absl::string_view scheme() const { return scheme_; }
+  absl::string_view hostAndPort() const { return host_and_port_; }
+  absl::string_view pathAndQueryParams() const { return path_and_query_params_; }
+
+  void setPathAndQueryParams(absl::string_view path_and_query_params) {
+    path_and_query_params_ = path_and_query_params;
+  }
+
+  /** Returns the fully qualified URL as a string. */
+  std::string toString() const;
 
 private:
   absl::string_view scheme_;
@@ -379,16 +374,19 @@ struct LocalReplyData {
   bool is_head_request_ = false;
 };
 
-/**
- * Create a locally generated response using filter callbacks.
- * @param is_reset boolean reference that indicates whether a stream has been reset. It is the
- *        responsibility of the caller to ensure that this is set to false if onDestroy()
- *        is invoked in the context of sendLocalReply().
- * @param callbacks supplies the filter callbacks to use.
- * @param local_reply_data struct which keeps data related to generate reply.
- */
-void sendLocalReply(const bool& is_reset, StreamDecoderFilterCallbacks& callbacks,
-                    const LocalReplyData& local_reply_data);
+// Prepared local reply after modifying headers and rewriting body.
+struct PreparedLocalReply {
+  bool is_grpc_request_ = false;
+  bool is_head_request_ = false;
+  ResponseHeaderMapPtr response_headers_;
+  std::string response_body_;
+  // Function to encode response headers.
+  std::function<void(ResponseHeaderMapPtr&& headers, bool end_stream)> encode_headers_;
+  // Function to encode the response body.
+  std::function<void(Buffer::Instance& data, bool end_stream)> encode_data_;
+};
+
+using PreparedLocalReplyPtr = std::unique_ptr<PreparedLocalReply>;
 
 /**
  * Create a locally generated response using the provided lambdas.
@@ -401,6 +399,23 @@ void sendLocalReply(const bool& is_reset, StreamDecoderFilterCallbacks& callback
  */
 void sendLocalReply(const bool& is_reset, const EncodeFunctions& encode_functions,
                     const LocalReplyData& local_reply_data);
+
+/**
+ * Prepares a locally generated response.
+ *
+ * @param encode_functions supplies the functions to encode response body and headers.
+ * @param local_reply_data struct which keeps data related to generate reply.
+ */
+PreparedLocalReplyPtr prepareLocalReply(const EncodeFunctions& encode_functions,
+                                        const LocalReplyData& local_reply_data);
+/**
+ * Encodes a prepared local reply.
+ * @param is_reset boolean reference that indicates whether a stream has been reset. It is the
+ *                 responsibility of the caller to ensure that this is set to false if onDestroy()
+ *                 is invoked in the context of sendLocalReply().
+ * @param prepared_local_reply supplies the local reply to encode.
+ */
+void encodeLocalReply(const bool& is_reset, PreparedLocalReplyPtr prepared_local_reply);
 
 struct GetLastAddressFromXffInfo {
   // Last valid address pulled from the XFF header.
@@ -587,6 +602,13 @@ struct AuthorityAttributes {
  * @return hostname parse result. that includes whether host is IP Address, hostname and port-name
  */
 AuthorityAttributes parseAuthority(absl::string_view host);
+
+/**
+ * It validates RetryPolicy defined in core api. It should be called at the main thread as
+ * it may throw exception.
+ * @param retry_policy core retry policy
+ */
+void validateCoreRetryPolicy(const envoy::config::core::v3::RetryPolicy& retry_policy);
 
 /**
  * It returns RetryPolicy defined in core api to route api.

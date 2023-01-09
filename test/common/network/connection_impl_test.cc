@@ -467,7 +467,7 @@ TEST_P(ConnectionImplTest, SetServerTransportSocketTimeout) {
   auto server_connection = std::make_unique<Network::ServerConnectionImpl>(
       *mocks.dispatcher_,
       std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
-      std::move(mocks.transport_socket_), stream_info_, true);
+      std::move(mocks.transport_socket_), stream_info_);
 
   EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(3 * 1000), _));
   Stats::MockCounter timeout_counter;
@@ -488,7 +488,7 @@ TEST_P(ConnectionImplTest, SetServerTransportSocketTimeoutAfterConnect) {
   auto server_connection = std::make_unique<Network::ServerConnectionImpl>(
       *mocks.dispatcher_,
       std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
-      std::move(mocks.transport_socket_), stream_info_, true);
+      std::move(mocks.transport_socket_), stream_info_);
 
   transport_socket->callbacks_->raiseEvent(ConnectionEvent::Connected);
   // This should be a no-op. No timer should be created.
@@ -512,7 +512,7 @@ TEST_P(ConnectionImplTest, ServerTransportSocketTimeoutDisabledOnConnect) {
   auto server_connection = std::make_unique<Network::ServerConnectionImpl>(
       *mocks.dispatcher_,
       std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
-      std::move(mocks.transport_socket_), stream_info_, true);
+      std::move(mocks.transport_socket_), stream_info_);
 
   bool timer_destroyed = false;
   mock_timer->timer_destroyed_ = &timer_destroyed;
@@ -2009,7 +2009,7 @@ TEST_P(ConnectionImplTest, NetworkConnectionDumpsWithoutAllocatingMemory) {
   auto server_connection = std::make_unique<Network::ServerConnectionImpl>(
       *mocks.dispatcher_,
       std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
-      std::move(mocks.transport_socket_), stream_info_, true);
+      std::move(mocks.transport_socket_), stream_info_);
 
   // Start measuring memory and dump state.
   Stats::TestUtil::MemoryTest memory_test;
@@ -2878,6 +2878,19 @@ TEST_F(PostCloseConnectionImplTest, NoReadAfterCloseFlushWriteWriteData) {
   EXPECT_CALL(*read_filter_, onData(_, _)).Times(0);
   EXPECT_CALL(*transport_socket_, doRead(_)).Times(0);
   file_ready_cb_(Event::FileReadyType::Read);
+}
+
+// Test that close(ConnectionCloseType::Abort) won't write and flush pending data.
+TEST_F(PostCloseConnectionImplTest, CloseAbort) {
+  InSequence s;
+  initialize();
+  writeSomeData();
+
+  // Connection abort. We have data written above in writeSomeData(),
+  // it won't be written and flushed due to ``ConnectionCloseType::Abort``.
+  EXPECT_CALL(*transport_socket_, doWrite(_, true)).Times(0);
+  EXPECT_CALL(*transport_socket_, closeSocket(_));
+  connection_->close(ConnectionCloseType::Abort);
 }
 
 class ReadBufferLimitTest : public ConnectionImplTest {

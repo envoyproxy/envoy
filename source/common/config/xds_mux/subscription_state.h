@@ -5,6 +5,8 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/config/subscription.h"
+#include "envoy/config/xds_config_tracker.h"
+#include "envoy/config/xds_resources_delegate.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
@@ -32,10 +34,15 @@ class BaseSubscriptionState : public SubscriptionState,
 public:
   // Note that, outside of tests, we expect callbacks to always be a WatchMap.
   BaseSubscriptionState(std::string type_url, UntypedConfigUpdateCallbacks& callbacks,
-                        Event::Dispatcher& dispatcher)
+                        Event::Dispatcher& dispatcher,
+                        XdsConfigTrackerOptRef xds_config_tracker = absl::nullopt,
+                        XdsResourcesDelegateOptRef xds_resources_delegate = absl::nullopt,
+                        const std::string& target_xds_authority = "")
       : ttl_([this](const std::vector<std::string>& expired) { ttlExpiryCallback(expired); },
              dispatcher, dispatcher.timeSource()),
-        type_url_(std::move(type_url)), callbacks_(callbacks), dispatcher_(dispatcher) {}
+        type_url_(std::move(type_url)), callbacks_(callbacks), dispatcher_(dispatcher),
+        xds_config_tracker_(xds_config_tracker), xds_resources_delegate_(xds_resources_delegate),
+        target_xds_authority_(target_xds_authority) {}
 
   virtual ~BaseSubscriptionState() = default;
 
@@ -63,12 +70,17 @@ public:
     TRY_ASSERT_MAIN_THREAD { handleGoodResponse(response); }
     END_TRY
     catch (const EnvoyException& e) {
+      if (xds_config_tracker_.has_value()) {
+        xds_config_tracker_->onConfigRejected(response,
+                                              Config::Utility::truncateGrpcStatusMessage(e.what()));
+      }
       handleBadResponse(e, ack);
     }
+    previously_fetched_data_ = true;
     return ack;
   }
 
-  void handleEstablishmentFailure() {
+  virtual void handleEstablishmentFailure() {
     ENVOY_LOG(debug, "SubscriptionState establishment failed for {}", typeUrl());
     callbacks().onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure,
                                      nullptr);
@@ -115,6 +127,10 @@ protected:
   Event::Dispatcher& dispatcher_;
   bool dynamic_context_changed_{};
   std::string control_plane_identifier_{};
+  XdsConfigTrackerOptRef xds_config_tracker_;
+  XdsResourcesDelegateOptRef xds_resources_delegate_;
+  const std::string target_xds_authority_;
+  bool previously_fetched_data_{};
 };
 
 template <class T> class SubscriptionStateFactory {
@@ -123,7 +139,10 @@ public:
   // Note that, outside of tests, we expect callbacks to always be a WatchMap.
   virtual std::unique_ptr<T>
   makeSubscriptionState(const std::string& type_url, UntypedConfigUpdateCallbacks& callbacks,
-                        OpaqueResourceDecoderSharedPtr resource_decoder) PURE;
+                        OpaqueResourceDecoderSharedPtr resource_decoder,
+                        XdsConfigTrackerOptRef xds_config_tracker = absl::nullopt,
+                        XdsResourcesDelegateOptRef xds_resources_delegate = absl::nullopt,
+                        const std::string& target_xds_authority = "") PURE;
 };
 
 } // namespace XdsMux

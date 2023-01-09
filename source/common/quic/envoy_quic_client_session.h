@@ -3,8 +3,8 @@
 #include "envoy/http/http_server_properties_cache.h"
 
 #include "source/common/quic/envoy_quic_client_connection.h"
+#include "source/common/quic/envoy_quic_client_crypto_stream_factory.h"
 #include "source/common/quic/envoy_quic_client_stream.h"
-#include "source/common/quic/envoy_quic_crypto_stream_factory.h"
 #include "source/common/quic/quic_filter_manager_connection_impl.h"
 #include "source/common/quic/quic_stat_names.h"
 
@@ -70,7 +70,7 @@ public:
   void OnProofVerifyDetailsAvailable(const quic::ProofVerifyDetails& verify_details) override;
 
   // PacketsToReadDelegate
-  size_t numPacketsExpectedPerEventLoop() override {
+  size_t numPacketsExpectedPerEventLoop() const override {
     // Do one round of reading per active stream, or to see if there's a new
     // active stream.
     return std::max<size_t>(1, GetNumActiveStreams()) * Network::NUM_DATAGRAMS_PER_RECEIVE;

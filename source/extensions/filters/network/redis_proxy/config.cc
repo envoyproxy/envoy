@@ -3,6 +3,7 @@
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 
+#include "source/extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
 #include "source/extensions/common/redis/cluster_refresh_manager_impl.h"
 #include "source/extensions/filters/network/common/redis/client_impl.h"
 #include "source/extensions/filters/network/common/redis/fault_impl.h"
@@ -41,8 +42,11 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
           context.singletonManager(), context.mainThreadDispatcher(), context.clusterManager(),
           context.timeSource());
 
-  ProxyFilterConfigSharedPtr filter_config(std::make_shared<ProxyFilterConfig>(
-      proto_config, context.scope(), context.drainDecision(), context.runtime(), context.api()));
+  Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl cache_manager_factory(
+      context);
+  auto filter_config =
+      std::make_shared<ProxyFilterConfig>(proto_config, context.scope(), context.drainDecision(),
+                                          context.runtime(), context.api(), cache_manager_factory);
 
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::PrefixRoutes prefix_routes(
       proto_config.prefix_routes());
@@ -68,7 +72,7 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
     auto conn_pool_ptr = std::make_shared<ConnPool::InstanceImpl>(
         cluster, context.clusterManager(), Common::Redis::Client::ClientFactoryImpl::instance_,
         context.threadLocal(), proto_config.settings(), context.api(), std::move(stats_scope),
-        redis_command_stats, refresh_manager);
+        redis_command_stats, refresh_manager, filter_config->dns_cache_);
     conn_pool_ptr->init();
     upstreams.emplace(cluster, conn_pool_ptr);
   }

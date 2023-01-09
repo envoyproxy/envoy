@@ -3,6 +3,11 @@ envoy.filters.http.dynamo:
   - envoy.filters.http
   security_posture: requires_trusted_downstream_and_upstream
   status: stable
+envoy.filters.http.golang:
+  categories:
+  - envoy.filters.http
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
 envoy.filters.http.squash:
   categories:
   - envoy.filters.http
@@ -97,4 +102,18 @@ envoy.filters.network.generic_proxy:
   categories:
   - envoy.filters.network
   security_posture: requires_trusted_downstream_and_upstream
-  status: alpha
+  status: wip
+envoy.filters.generic.router:
+  categories:
+  - envoy.generic_proxy.filters
+  security_posture: requires_trusted_downstream_and_upstream
+  status: wip
+  type_urls:
+  - envoy.extensions.filters.network.generic_proxy.router.v3.Router
+envoy.generic_proxy.codecs.dubbo:
+  categories:
+  - envoy.generic_proxy.codecs
+  security_posture: requires_trusted_downstream_and_upstream
+  status: wip
+  type_urls:
+  - envoy.extensions.filters.network.generic_proxy.codecs.dubbo.v3.DubboCodecConfig

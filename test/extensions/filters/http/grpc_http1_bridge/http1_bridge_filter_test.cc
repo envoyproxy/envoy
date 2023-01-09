@@ -96,7 +96,7 @@ TEST_F(GrpcHttp1BridgeFilterTest, Http2HeaderOnlyResponse) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 
   Http::TestResponseHeaderMapImpl continue_headers{{":status", "100"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(continue_headers));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(continue_headers));
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata_map));
 
@@ -258,7 +258,7 @@ TEST_F(GrpcHttp1BridgeFilterTest, ProtobufUpgradedToGrpc) {
   initialize(true);
   Http::TestRequestHeaderMapImpl request_headers{{"content-type", "application/x-protobuf"},
                                                  {":path", "/v1/spotify.Concat/Concat"}};
-  Buffer::OwnedImpl data("hello");
+  Buffer::OwnedImpl data("helloworld");
 
   EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
@@ -275,6 +275,9 @@ TEST_F(GrpcHttp1BridgeFilterTest, ProtobufUpgradedToGrpc) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->encodeHeaders(response_headers, false));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->encodeData(data, false));
+  EXPECT_EQ("world", data.toString());
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->encodeData(data, false));
+  EXPECT_EQ("world", data.toString());
   Http::TestResponseTrailerMapImpl response_trailers{{"hello", "world"}};
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
   EXPECT_EQ("200", response_headers.get_(":status"));

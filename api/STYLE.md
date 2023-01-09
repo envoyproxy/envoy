@@ -184,7 +184,7 @@ metadata. We describe these annotations below by category.
   the field will be promoted to a given `oneof` in the next API major version.
 * `[(udpa.annotations.sensitive) = true]` to denote sensitive fields that
   should be redacted in output such as logging or configuration dumps.
-* [PGV annotations](https://github.com/envoyproxy/protoc-gen-validate) to denote field
+* [PGV annotations](https://github.com/bufbuild/protoc-gen-validate) to denote field
   value constraints.
 
 ### Enum value level

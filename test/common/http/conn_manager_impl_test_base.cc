@@ -112,22 +112,27 @@ void HttpConnectionManagerImplTest::setupFilterChain(int num_decoder_filters,
   for (int req = 0; req < num_requests; req++) {
     EXPECT_CALL(filter_factory_, createFilterChain(_))
         .WillOnce(Invoke([num_decoder_filters, num_encoder_filters, req,
-                          this](FilterChainManager& manager) -> void {
+                          this](FilterChainManager& manager) -> bool {
+          bool applied_filters = false;
           if (log_handler_.get()) {
             auto factory = createLogHandlerFactoryCb(log_handler_);
             manager.applyFilterFactoryCb({}, factory);
+            applied_filters = true;
           }
           for (int i = 0; i < num_decoder_filters; i++) {
             auto factory = createDecoderFilterFactoryCb(
                 StreamDecoderFilterSharedPtr{decoder_filters_[req * num_decoder_filters + i]});
             manager.applyFilterFactoryCb({}, factory);
+            applied_filters = true;
           }
 
           for (int i = 0; i < num_encoder_filters; i++) {
             auto factory = createEncoderFilterFactoryCb(
                 StreamEncoderFilterSharedPtr{encoder_filters_[req * num_encoder_filters + i]});
             manager.applyFilterFactoryCb({}, factory);
+            applied_filters = true;
           }
+          return applied_filters;
         }));
 
     for (int i = 0; i < num_decoder_filters; i++) {
@@ -302,6 +307,23 @@ void HttpConnectionManagerImplTest::testPathNormalization(
 
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
+}
+
+void HttpConnectionManagerImplTest::expectUhvTrailerCheckFail() {
+  EXPECT_CALL(header_validator_factory_, create(codec_->protocol_, _))
+      .WillOnce(InvokeWithoutArgs([]() {
+        auto header_validator = std::make_unique<testing::StrictMock<MockHeaderValidator>>();
+        EXPECT_CALL(*header_validator, validateRequestHeaderMap(_))
+            .WillOnce(InvokeWithoutArgs(
+                []() { return HeaderValidator::RequestHeaderMapValidationResult::success(); }));
+
+        EXPECT_CALL(*header_validator, validateRequestTrailerMap(_))
+            .WillOnce(InvokeWithoutArgs([]() {
+              return HeaderValidator::TrailerValidationResult(
+                  HeaderValidator::TrailerValidationResult::Action::Reject, "bad_trailer_map");
+            }));
+        return header_validator;
+      }));
 }
 
 } // namespace Http

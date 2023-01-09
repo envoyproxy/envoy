@@ -82,15 +82,6 @@ public:
   using ConnectionImplType = ConnectionImpl;
   virtual ~Http2SessionFactory() = default;
 
-  // Returns a new nghttp2_session to be used with |connection|.
-  virtual nghttp2_session* createOld(const nghttp2_session_callbacks* callbacks,
-                                     ConnectionImplType* connection,
-                                     const nghttp2_option* options) PURE;
-
-  // Initializes the |session|.
-  virtual void initOld(nghttp2_session* session, ConnectionImplType* connection,
-                       const envoy::config::core::v3::Http2ProtocolOptions& options) PURE;
-
   // Returns a new HTTP/2 session to be used with |connection|.
   virtual std::unique_ptr<http2::adapter::Http2Adapter>
   create(const nghttp2_session_callbacks* callbacks, ConnectionImplType* connection,
@@ -108,12 +99,6 @@ public:
 
 class ProdNghttp2SessionFactory : public Http2SessionFactory {
 public:
-  nghttp2_session* createOld(const nghttp2_session_callbacks* callbacks, ConnectionImpl* connection,
-                             const nghttp2_option* options) override;
-
-  void initOld(nghttp2_session* session, ConnectionImpl* connection,
-               const envoy::config::core::v3::Http2ProtocolOptions& options) override;
-
   std::unique_ptr<http2::adapter::Http2Adapter>
   create(const nghttp2_session_callbacks* callbacks, ConnectionImpl* connection,
          const http2::adapter::OgHttp2Adapter::Options& options) override;
@@ -155,13 +140,7 @@ public:
   Protocol protocol() override { return Protocol::Http2; }
   void shutdownNotice() override;
   Status protocolErrorForTest(); // Used in tests to simulate errors.
-  bool wantsToWrite() override {
-    if (use_new_codec_wrapper_) {
-      return adapter_->want_write();
-    } else {
-      return nghttp2_session_want_write(session_);
-    }
-  }
+  bool wantsToWrite() override { return adapter_->want_write(); }
   // Propagate network connection watermark events to each stream on the connection.
   void onUnderlyingConnectionAboveWriteBufferHighWatermark() override {
     for (auto& stream : active_streams_) {
@@ -185,7 +164,7 @@ protected:
    */
   class Http2Callbacks {
   public:
-    explicit Http2Callbacks(bool use_new_codec_wrapper);
+    Http2Callbacks();
     ~Http2Callbacks();
 
     const nghttp2_session_callbacks* callbacks() { return callbacks_; }
@@ -243,8 +222,6 @@ protected:
     virtual void submitHeaders(const HeaderMap& headers, nghttp2_data_provider* provider) PURE;
     void encodeTrailersBase(const HeaderMap& headers);
     void submitTrailers(const HeaderMap& trailers);
-    // Called iff use_new_codec_wrapper_ is false.
-    void submitMetadata(uint8_t flags);
     // Returns true if the stream should defer the local reset stream until after the next call to
     // sendPendingFrames so pending outbound frames have one final chance to be flushed. If we
     // submit a reset, nghttp2 will cancel outbound frames that have not yet been sent.
@@ -270,6 +247,7 @@ protected:
       return parent_.connection_.connectionInfoProvider();
     }
     absl::string_view responseDetails() override { return details_; }
+    Buffer::BufferMemoryAccountSharedPtr account() const override { return buffer_memory_account_; }
     void setAccount(Buffer::BufferMemoryAccountSharedPtr account) override;
 
     // ScopeTrackedObject
@@ -519,16 +497,19 @@ protected:
     void encodeTrailers(const ResponseTrailerMap& trailers) override {
       encodeTrailersBase(trailers);
     }
+    void setRequestDecoder(Http::RequestDecoder& decoder) override { request_decoder_ = &decoder; }
 
     // ScopeTrackedObject
     void dumpState(std::ostream& os, int indent_level) const override;
 
-    RequestDecoder* request_decoder_{};
     absl::variant<RequestHeaderMapPtr, RequestTrailerMapPtr> headers_or_trailers_;
 
     bool streamErrorOnInvalidHttpMessage() const override {
       return parent_.stream_error_on_invalid_http_messaging_;
     }
+
+  private:
+    RequestDecoder* request_decoder_{};
   };
 
   using ServerStreamImplPtr = std::unique_ptr<ServerStreamImpl>;
@@ -601,14 +582,9 @@ protected:
   void scheduleProtocolConstraintViolationCallback();
   void onProtocolConstraintViolation();
 
-  // Uses a new wrapper API around the underlying HTTP/2 codec. Guarded by the
-  // "envoy.reloadable_features.http2_new_codec_wrapper" runtime feature flag.
-  const bool use_new_codec_wrapper_;
-  // Whether to use the new HTTP/2 library. Only has an effect if `use_new_codec_wrapper` is true.
+  // Whether to use the new HTTP/2 library.
   const bool use_oghttp2_library_;
-  // TODO(birenroy): Make this static again when removing
-  // use_new_codec_wrapper_.
-  Http2Callbacks http2_callbacks_;
+  static Http2Callbacks http2_callbacks_;
 
   // If deferred processing, the streams will be in LRU order based on when the
   // stream encoded to the http2 connection. The LRU property is used when
@@ -619,9 +595,6 @@ protected:
   // Tracks the stream id of the current stream we're processing.
   // This should only be set while we're in the context of dispatching to nghttp2.
   absl::optional<int32_t> current_stream_id_;
-  // Used iff use_new_codec_wrapper_ is false.
-  nghttp2_session* session_{};
-  // Used iff use_new_codec_wrapper_ is true.
   std::unique_ptr<http2::adapter::Http2VisitorInterface> visitor_;
   std::unique_ptr<http2::adapter::Http2Adapter> adapter_;
 
@@ -687,8 +660,6 @@ private:
   Status onStreamClose(StreamImpl* stream, uint32_t error_code);
   int onMetadataReceived(int32_t stream_id, const uint8_t* data, size_t len);
   int onMetadataFrameComplete(int32_t stream_id, bool end_metadata);
-  // Called iff use_new_codec_wrapper_ is false.
-  ssize_t packMetadata(int32_t stream_id, uint8_t* buf, size_t len);
 
   // Adds buffer fragment for a new outbound frame to the supplied Buffer::OwnedImpl.
   void addOutboundFrameFragment(Buffer::OwnedImpl& output, const uint8_t* data, size_t length);

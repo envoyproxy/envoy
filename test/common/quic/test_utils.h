@@ -11,6 +11,7 @@
 #include "source/common/stats/isolated_store_impl.h"
 
 #include "test/test_common/environment.h"
+#include "test/test_common/utility.h"
 
 #include "quiche/quic/core/http/quic_spdy_session.h"
 #include "quiche/quic/core/qpack/qpack_encoder.h"
@@ -75,8 +76,11 @@ public:
                        EnvoyQuicServerConnection* connection, Event::Dispatcher& dispatcher,
                        uint32_t send_buffer_limit)
       : quic::QuicSpdySession(connection, /*visitor=*/nullptr, config, supported_versions),
-        QuicFilterManagerConnectionImpl(*connection, connection->connection_id(), dispatcher,
-                                        send_buffer_limit, {nullptr}),
+        QuicFilterManagerConnectionImpl(
+            *connection, connection->connection_id(), dispatcher, send_buffer_limit, {nullptr},
+            std::make_unique<StreamInfo::StreamInfoImpl>(
+                dispatcher.timeSource(),
+                connection->connectionSocket()->connectionInfoProviderSharedPtr())),
         crypto_stream_(std::make_unique<TestQuicCryptoStream>(this)) {}
 
   void Initialize() override {
@@ -157,7 +161,12 @@ private:
   OptRef<quic::ProofVerifyContext> last_verify_context_;
 };
 
-class MockEnvoyQuicClientSession : public EnvoyQuicClientSession {
+class IsolatedStoreProvider {
+protected:
+  Stats::IsolatedStoreImpl stats_store_;
+};
+
+class MockEnvoyQuicClientSession : public IsolatedStoreProvider, public EnvoyQuicClientSession {
 public:
   MockEnvoyQuicClientSession(const quic::QuicConfig& config,
                              const quic::ParsedQuicVersionVector& supported_versions,
@@ -205,7 +214,6 @@ protected:
   }
   quic::QuicConnection* quicConnection() override { return initialized_ ? connection() : nullptr; }
 
-  Stats::IsolatedStoreImpl stats_store_;
   QuicStatNames quic_stat_names_{stats_store_.symbolTable()};
 };
 
@@ -270,8 +278,8 @@ std::vector<std::pair<Network::Address::IpVersion, quic::ParsedQuicVersion>> gen
 std::string testParamsToString(
     const ::testing::TestParamInfo<std::pair<Network::Address::IpVersion, quic::ParsedQuicVersion>>&
         params) {
-  std::string ip_version = params.param.first == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6";
-  return absl::StrCat(ip_version, quic::QuicVersionToString(params.param.second.transport_version));
+  return absl::StrCat(TestUtility::ipVersionToString(params.param.first),
+                      quic::QuicVersionToString(params.param.second.transport_version));
 }
 
 class MockProofVerifyContext : public EnvoyQuicProofVerifyContext {

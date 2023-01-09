@@ -249,38 +249,50 @@ HeaderFormatterPtr parseInternal(const envoy::config::core::v3::HeaderValue& hea
 
 } // namespace
 
+HeadersToAddEntry::HeadersToAddEntry(const HeaderValueOption& header_value_option)
+    : original_value_(header_value_option.header().value()),
+      add_if_empty_(header_value_option.keep_empty_value()) {
+
+  if (header_value_option.has_append()) {
+    // 'append' is set and ensure the 'append_action' value is equal to the default value.
+    if (header_value_option.append_action() != HeaderValueOption::APPEND_IF_EXISTS_OR_ADD) {
+      throw EnvoyException("Both append and append_action are set and it's not allowed");
+    }
+
+    append_action_ = header_value_option.append().value()
+                         ? HeaderValueOption::APPEND_IF_EXISTS_OR_ADD
+                         : HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD;
+  } else {
+    append_action_ = header_value_option.append_action();
+  }
+
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_header_formatter")) {
+    formatter_ = parseHttpHeaderFormatter(header_value_option.header());
+  } else {
+    // Use "old" implementation of header formatters.
+    formatter_ =
+        std::make_unique<HttpHeaderFormatterBridge>(parseInternal(header_value_option.header()));
+  }
+}
+
+HeadersToAddEntry::HeadersToAddEntry(const HeaderValue& header_value,
+                                     HeaderAppendAction append_action)
+    : original_value_(header_value.value()), append_action_(append_action) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_header_formatter")) {
+    formatter_ = parseHttpHeaderFormatter(header_value);
+  } else {
+    // Use "old" implementation of header formatters.
+    formatter_ = std::make_unique<HttpHeaderFormatterBridge>(parseInternal(header_value));
+  }
+}
+
 HeaderParserPtr
 HeaderParser::configure(const Protobuf::RepeatedPtrField<HeaderValueOption>& headers_to_add) {
   HeaderParserPtr header_parser(new HeaderParser());
-
   for (const auto& header_value_option : headers_to_add) {
-    HeaderAppendAction append_action;
-
-    if (header_value_option.has_append()) {
-      // 'append' is set and ensure the 'append_action' value is equal to the default value.
-      if (header_value_option.append_action() != HeaderValueOption::APPEND_IF_EXISTS_OR_ADD) {
-        throw EnvoyException("Both append and append_action are set and it's not allowed");
-      }
-
-      append_action = header_value_option.append().value()
-                          ? HeaderValueOption::APPEND_IF_EXISTS_OR_ADD
-                          : HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD;
-    } else {
-      append_action = header_value_option.append_action();
-    }
-
-    HttpHeaderFormatterPtr header_formatter;
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_header_formatter")) {
-      header_formatter = parseHttpHeaderFormatter(header_value_option.header());
-    } else {
-      // Use "old" implementation of header formatters.
-      header_formatter =
-          std::make_unique<HttpHeaderFormatterBridge>(parseInternal(header_value_option.header()));
-    }
     header_parser->headers_to_add_.emplace_back(
         Http::LowerCaseString(header_value_option.header().key()),
-        HeadersToAddEntry{std::move(header_formatter), header_value_option.header().value(),
-                          append_action, header_value_option.keep_empty_value()});
+        HeadersToAddEntry{header_value_option});
   }
 
   return header_parser;
@@ -292,16 +304,8 @@ HeaderParserPtr HeaderParser::configure(
   HeaderParserPtr header_parser(new HeaderParser());
 
   for (const auto& header_value : headers_to_add) {
-    HttpHeaderFormatterPtr header_formatter;
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_header_formatter")) {
-      header_formatter = parseHttpHeaderFormatter(header_value);
-    } else {
-      // Use "old" implementation of header formatters.
-      header_formatter = std::make_unique<HttpHeaderFormatterBridge>(parseInternal(header_value));
-    }
-    header_parser->headers_to_add_.emplace_back(
-        Http::LowerCaseString(header_value.key()),
-        HeadersToAddEntry{std::move(header_formatter), header_value.value(), append_action});
+    header_parser->headers_to_add_.emplace_back(Http::LowerCaseString(header_value.key()),
+                                                HeadersToAddEntry{header_value, append_action});
   }
 
   return header_parser;
@@ -342,27 +346,59 @@ void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
     headers.remove(header);
   }
 
+  // Temporary storage to hold evaluated values of headers to add and replace. This is required
+  // to execute all formatters using the original received headers.
+  // Only after all the formatters produced the new values of the headers, the headers are set.
+  // absl::InlinedVector is optimized for 4 headers. After that it behaves as normal std::vector.
+  // It is assumed that most of the use cases will add or modify fairly small number of headers
+  // (<=4). If this assumption changes, the number of inlined capacity should be increased.
+  // header_formatter_speed_test.cc provides micro-benchmark for evaluating speed of adding and
+  // replacing headers and should be used when modifying the code below to access the performance
+  // impact of code changes.
+  absl::InlinedVector<std::pair<const Http::LowerCaseString&, const std::string>, 4> headers_to_add,
+      headers_to_overwrite;
+  // value_buffer is used only when stream_info is a valid pointer and stores header value
+  // created by a formatter. It is declared outside of 'for' loop for performance reason to avoid
+  // stack allocation and unnecessary std::string's memory adjustments for each iteration. The
+  // actual value of the header is accessed via 'value' variable which is initialized differently
+  // depending whether stream_info and valid or nullptr. Based on performance tests implemented in
+  // header_formatter_speed_test.cc this approach strikes the best balance between performance and
+  // readability.
+  std::string value_buffer;
   for (const auto& [key, entry] : headers_to_add_) {
-    const std::string value =
-        stream_info != nullptr
-            ? entry.formatter_->format(request_headers, response_headers, *stream_info)
-            : entry.original_value_;
+    absl::string_view value;
+    if (stream_info != nullptr) {
+      value_buffer = entry.formatter_->format(request_headers, response_headers, *stream_info);
+      value = value_buffer;
+    } else {
+      value = entry.original_value_;
+    }
     if (!value.empty() || entry.add_if_empty_) {
       switch (entry.append_action_) {
         PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
       case HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
-        headers.addReferenceKey(key, value);
+        headers_to_add.emplace_back(key, value);
         break;
       case HeaderValueOption::ADD_IF_ABSENT:
         if (auto header_entry = headers.get(key); header_entry.empty()) {
-          headers.addReferenceKey(key, value);
+          headers_to_add.emplace_back(key, value);
         }
         break;
       case HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
-        headers.setReferenceKey(key, value);
+        headers_to_overwrite.emplace_back(key, value);
         break;
       }
     }
+  }
+
+  // First overwrite all headers which need to be overwritten.
+  for (const auto& header : headers_to_overwrite) {
+    headers.setReferenceKey(header.first, header.second);
+  }
+
+  // Now add headers which should be added.
+  for (const auto& header : headers_to_add) {
+    headers.addReferenceKey(header.first, header.second);
   }
 }
 

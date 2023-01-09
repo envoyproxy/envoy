@@ -14,6 +14,18 @@ namespace Compression {
 namespace Brotli {
 namespace Compressor {
 
+// Default input block size.
+const uint32_t DefaultInputBlockBits = 24;
+
+// Default compression window size.
+const uint32_t DefaultWindowBits = 18;
+
+// Default quality.
+const uint32_t DefaultQuality = 3;
+
+// Default zlib chunk size.
+const uint32_t DefaultChunkSize = 4096;
+
 namespace {
 
 const std::string& brotliStatsPrefix() { CONSTRUCT_ON_FIRST_USE(std::string, "brotli."); }

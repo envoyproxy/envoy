@@ -70,8 +70,9 @@ public:
                 Outlier::EventLoggerSharedPtr outlier_event_logger,
                 bool added_via_api) -> std::pair<ClusterSharedPtr, ThreadAwareLoadBalancer*> {
               auto result = ClusterFactoryImplBase::create(
-                  server_context_, cluster, cm, stats_, dns_resolver_, ssl_context_manager_,
-                  outlier_event_logger, added_via_api, validation_visitor_);
+                  server_context_, cluster, cm, stats_,
+                  [this]() -> Network::DnsResolverSharedPtr { return this->dns_resolver_; },
+                  ssl_context_manager_, outlier_event_logger, added_via_api, validation_visitor_);
               // Convert from load balancer unique_ptr -> raw pointer -> unique_ptr.
               return std::make_pair(result.first, result.second.release());
             }));
@@ -95,7 +96,8 @@ public:
   allocateTcpConnPool(Event::Dispatcher&, HostConstSharedPtr host, ResourcePriority,
                       const Network::ConnectionSocket::OptionsSharedPtr&,
                       Network::TransportSocketOptionsConstSharedPtr,
-                      Upstream::ClusterConnectivityState&) override {
+                      Upstream::ClusterConnectivityState&,
+                      absl::optional<std::chrono::milliseconds>) override {
     return Tcp::ConnectionPool::InstancePtr{allocateTcpConnPool_(host)};
   }
 
