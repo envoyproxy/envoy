@@ -1,5 +1,5 @@
-1.22.7 (Pending)
-================
+1.22.7 (February 7, 2022)
+=========================
 
 Incompatible Behavior Changes
 -----------------------------
@@ -21,6 +21,8 @@ Removed Config or Runtime
 
 New Features
 ------------
+
+* docker: use new ``nossl`` images for ``distroless`` Docker build.
 
 Deprecated
 ----------
