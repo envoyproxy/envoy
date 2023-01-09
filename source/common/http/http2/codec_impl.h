@@ -501,7 +501,7 @@ protected:
     void setDeferredLoggingHeadersAndTrailers(Http::RequestHeaderMapSharedPtr,
                                               Http::ResponseHeaderMapSharedPtr,
                                               Http::ResponseTrailerMapSharedPtr,
-                                              std::unique_ptr<StreamInfo::StreamInfo>) override {}
+                                              StreamInfo::StreamInfo&) override {}
 
     // ScopeTrackedObject
     void dumpState(std::ostream& os, int indent_level) const override;

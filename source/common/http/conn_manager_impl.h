@@ -204,16 +204,9 @@ private:
     std::list<AccessLog::InstanceSharedPtr> accessLogHandlers() override {
       return filter_manager_.accessLogHandlers();
     }
-    // Copy this stream's StreamInfo into the response encoder, ensuring that the request
-    // headers pointed to by the StreamInfo lives beyond stream destruction.
     void deferHeadersAndTrailers() {
-      std::unique_ptr<StreamInfo::StreamInfoImpl> stream_info =
-          std::make_unique<StreamInfo::StreamInfoImpl>(
-              connection_manager_.codec_->protocol(), connection_manager_.time_source_,
-              connection_manager_.read_callbacks_->connection().connectionInfoProviderSharedPtr());
-      stream_info->setFrom(streamInfo(), request_headers_.get());
-      response_encoder_->setDeferredLoggingHeadersAndTrailers(
-          request_headers_, response_headers_, response_trailers_, std::move(stream_info));
+      response_encoder_->setDeferredLoggingHeadersAndTrailers(request_headers_, response_headers_,
+                                                              response_trailers_, streamInfo());
     }
 
     // ScopeTrackedObject

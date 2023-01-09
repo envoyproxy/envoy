@@ -761,12 +761,10 @@ TEST_F(EnvoyQuicServerStreamTest, StatsGathererLogsOnStreamDestruction) {
   std::shared_ptr<AccessLog::MockInstance> mock_logger(new NiceMock<AccessLog::MockInstance>());
   std::list<AccessLog::InstanceSharedPtr> loggers = {mock_logger};
   Event::GlobalTimeSystem test_time_;
-  std::unique_ptr<Envoy::StreamInfo::StreamInfo> stream_info =
-      std::make_unique<Envoy::StreamInfo::StreamInfoImpl>(Http::Protocol::Http2,
-                                                          test_time_.timeSystem(), nullptr);
+  Envoy::StreamInfo::StreamInfoImpl stream_info{Http::Protocol::Http2, test_time_.timeSystem(),
+                                                nullptr};
   quic_stream_->statsGatherer()->setAccessLogHandlers(loggers);
-  quic_stream_->setDeferredLoggingHeadersAndTrailers(nullptr, nullptr, nullptr,
-                                                     std::move(stream_info));
+  quic_stream_->setDeferredLoggingHeadersAndTrailers(nullptr, nullptr, nullptr, stream_info);
 
   receiveRequest(request_body_, false, request_body_.size() * 2);
   quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/true);

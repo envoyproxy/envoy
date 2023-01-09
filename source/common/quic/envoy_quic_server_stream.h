@@ -38,13 +38,19 @@ public:
   bool streamErrorOnInvalidHttpMessage() const override {
     return http3_options_.override_stream_error_on_invalid_http_message().value();
   }
-  void setDeferredLoggingHeadersAndTrailers(
-      Http::RequestHeaderMapSharedPtr request_header_map,
-      Http::ResponseHeaderMapSharedPtr response_header_map,
-      Http::ResponseTrailerMapSharedPtr response_trailer_map,
-      std::unique_ptr<StreamInfo::StreamInfo> stream_info) override {
+  // Copy this stream's StreamInfo, ensuring that the request headers pointed to by the StreamInfo
+  // lives beyond stream destruction.
+  void setDeferredLoggingHeadersAndTrailers(Http::RequestHeaderMapSharedPtr request_header_map,
+                                            Http::ResponseHeaderMapSharedPtr response_header_map,
+                                            Http::ResponseTrailerMapSharedPtr response_trailer_map,
+                                            StreamInfo::StreamInfo& stream_info) override {
+    std::unique_ptr<StreamInfo::StreamInfoImpl> new_stream_info =
+        std::make_unique<StreamInfo::StreamInfoImpl>(
+            filterManagerConnection()->dispatcher().timeSource(),
+            filterManagerConnection()->connectionInfoProviderSharedPtr());
+    new_stream_info->setFrom(stream_info, request_header_map.get());
     stats_gatherer_->setDeferredLoggingHeadersAndTrailers(
-        request_header_map, response_header_map, response_trailer_map, std::move(stream_info));
+        request_header_map, response_header_map, response_trailer_map, std::move(new_stream_info));
   };
 
   // Http::Stream

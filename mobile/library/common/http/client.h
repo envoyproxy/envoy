@@ -167,7 +167,7 @@ private:
     void setDeferredLoggingHeadersAndTrailers(Http::RequestHeaderMapSharedPtr,
                                               Http::ResponseHeaderMapSharedPtr,
                                               Http::ResponseTrailerMapSharedPtr,
-                                              std::unique_ptr<StreamInfo::StreamInfo>) override {}
+                                              StreamInfo::StreamInfo&) override {}
 
     void encodeMetadata(const MetadataMapVector&) override { PANIC("not implemented"); }
 

@@ -187,7 +187,7 @@ public:
   setDeferredLoggingHeadersAndTrailers(Http::RequestHeaderMapSharedPtr request_header_map,
                                        Http::ResponseHeaderMapSharedPtr response_header_map,
                                        Http::ResponseTrailerMapSharedPtr response_trailer_map,
-                                       std::unique_ptr<StreamInfo::StreamInfo> stream_info) PURE;
+                                       StreamInfo::StreamInfo& stream_info) PURE;
 };
 
 /**

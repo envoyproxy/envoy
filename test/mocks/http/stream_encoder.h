@@ -53,7 +53,7 @@ public:
               (Http::RequestHeaderMapSharedPtr request_header_map,
                Http::ResponseHeaderMapSharedPtr response_header_map,
                Http::ResponseTrailerMapSharedPtr response_trailer_map,
-               std::unique_ptr<StreamInfo::StreamInfo> stream_info));
+               StreamInfo::StreamInfo& stream_info));
 
   // Http::StreamEncoder
   MOCK_METHOD(void, encodeData, (Buffer::Instance & data, bool end_stream));
