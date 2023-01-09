@@ -125,6 +125,12 @@ bug_fixes:
 - area: health_checker
   change: |
     prevent writing pending data for health checkers by introducing ``ConnectionCloseType::Abort`` to avoid cascading handshake overhead from health checker's requests on timeout. This fix is related to `issue \#23718 <https://github.com/envoyproxy/envoy/issues/23718>`_.
+- area: router
+  change: |
+    fixed a bug that truncated query parameters from paths rewritten with a path_rewrite_policy, query parameters are now appended. ``envoy_reloadable_features_append_query_parameters_path_rewriter`` can be used to revert to truncation.
+- area: grpc_http_bridge
+  change: |
+    fixed a bug where response data could be lost for requests that were upgraded from Protobuf.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -214,6 +220,15 @@ new_features:
 - area: http
   change: |
     allowing the dynamic forward proxy cluster to :ref:`allow_coalesced_connections <envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig.allow_coalesced_connections>`  for HTTP/2 and HTTP/3 connections.
+- area: upstream
+  change: |
+    added :ref:`least request extension <envoy_v3_api_msg_extensions.load_balancing_policies.least_request.v3.LeastRequest>` to suppport the :ref:`load balancer policy <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>`.
+- area: upstream
+  change: |
+    added :ref:`random extension <envoy_v3_api_msg_extensions.load_balancing_policies.random.v3.Random>` to suppport the :ref:`load balancer policy <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>`.
+- area: upstream
+  change: |
+    added :ref:`round robin extension <envoy_v3_api_msg_extensions.load_balancing_policies.round_robin.v3.RoundRobin>` to suppport the :ref:`load balancer policy <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>`.
 - area: generic_proxy
   change: |
     added :ref:`generic rds support <envoy_v3_api_field_extensions.filters.network.generic_proxy.v3.GenericProxy.generic_rds>`.
