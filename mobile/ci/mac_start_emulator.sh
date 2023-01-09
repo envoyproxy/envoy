@@ -8,6 +8,5 @@ ls "${ANDROID_HOME}/tools/bin/"
 
 nohup "${ANDROID_HOME}/emulator/emulator" -partition-size 1024 -avd test_android_emulator -no-snapshot > /dev/null 2>&1 & {
     # shellcheck disable=SC2016
-    # Wait at most 5 minutes (300 seconds) for the emulator to start.
-    "${ANDROID_HOME}/platform-tools/adb" wait-for-device shell 'i=0; while [[ $i -lt 300 && -z $(getprop sys.boot_completed | tr -d '\''\r'\'') ]]; do sleep 1; ((i++)); done; input keyevent 82'
+    "${ANDROID_HOME}/platform-tools/adb" wait-for-device shell 'while [[ -z $(getprop sys.boot_completed | tr -d '\''\r'\'') ]]; do sleep 1; done; input keyevent 82'
 }
