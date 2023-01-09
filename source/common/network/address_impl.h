@@ -332,10 +332,9 @@ public:
 
   void abslHashValue(absl::HashState state) const override {
     absl::HashState::combine(
-        absl::HashState::combine_contiguous(std::move(state), pipe_.address_.sun_path,
-                                            pipe_.address_.sun_path[0] == '\0'
-                                                ? pipe_.address_length_
-                                                : strlen(pipe_.address_.sun_path)),
+        absl::HashState::combine_contiguous(
+            std::move(state), pipe_.address_.sun_path,
+            pipe_.abstract_namespace_ ? pipe_.address_length_ : strlen(pipe_.address_.sun_path)),
         0);
   }
 
