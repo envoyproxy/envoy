@@ -1,0 +1,7 @@
+FROM envoyproxy/envoy-contrib-dev:latest
+RUN mkdir -p /usr/local/go-plugins/
+COPY ./lib/filter.so /usr/local/go-plugins/filter.so
+COPY ./envoy.yaml /etc/envoy.yaml
+RUN chmod go+r /etc/envoy.yaml /usr/local/go-plugins/filter.so
+ENV GODEBUG=gctrace=1,invalidptr=1,cgocheck=0,madvdontneed=1
+CMD ["/usr/local/bin/envoy", "-c", "/etc/envoy.yaml", "--service-cluster", "proxy"]
