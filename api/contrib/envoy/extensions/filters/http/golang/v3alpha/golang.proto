@@ -20,7 +20,6 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //
 // For an overview of the Golang filter please see the :ref:`configuration reference documentation <config_http_filters_golang>`.
 // [#extension: envoy.filters.http.golang]
-
 // [#next-free-field: 6]
 message Config {
   // The meanings are as follows:
