@@ -1,0 +1,18 @@
+version: "3.8"
+
+services:
+  go_plugin_compile:
+    image: envoyproxy/envoy-build-ubuntu:5c8e6ab946230d0232d6875344f28457a3c68dd7
+    network_mode: host
+    command: >
+      bash -c "
+      bazel build  //examples/golang/simple:filter.so
+      && cp -a ./bazel-bin/examples/golang/simple/filter.so /output"
+    environment:
+    - BUILD_UID=${UID:-1000}
+    - TEST_TMPDIR=${ENVOY_TEST_TMPDIR:-/tmp}
+    working_dir: /source
+    volumes:
+    - ${ENVOY_DOCKER_BUILD_DIR:-/tmp/envoy-docker-build}:/tmp
+    - ../..:/source
+    - ./lib:/output

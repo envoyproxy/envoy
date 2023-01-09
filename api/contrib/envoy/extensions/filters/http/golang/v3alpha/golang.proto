@@ -29,7 +29,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // API by the GO language to achieve the effects of Envoy native filter.
 //
 // The filter based on the APIs implementation ``StreamFilter <contrib/golang/filters/http/source/go/pkg/api.StreamFilter>``
-// For details, take a look at the :repo:`/contrib/golang/filters/http/test/test_data/echo`.
+// For details, take a look at the :ref:`golang plugin filter sandbox example <install_sandboxes_golang>`.
 //
 // Then put the GO plugin source code into the ${OUTPUT}/src/ directory with the name of the plugin
 // for GO plugin builds.
