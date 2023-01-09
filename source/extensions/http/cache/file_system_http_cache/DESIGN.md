@@ -28,7 +28,7 @@
 <a name="thundering-herd"></a>
 ### Thundering herd
 
-In the current implementation, if there are multiple requests for the same resource before the cache is populated, has only one of them perform an insert operation to the cache, and the rest simply bypass the cache. This can cause the "thundering herd" problem - if requests come in bursts the cache will not protect the upstream from that load.
+The current implementation, if there are multiple requests for the same resource before the cache is populated, has only one of them perform an insert operation to the cache, and the rest simply bypass the cache. This can cause the "thundering herd" problem - if requests come in bursts the cache will not protect the upstream from that load.
 
 One possible solution would be to have all requesters for the same cache entry stream as the cache entry is written. However, if we do that, and the inserting stream gets closed prematurely, all the dependent streams would be forced to drop their also-incomplete responses.
 
