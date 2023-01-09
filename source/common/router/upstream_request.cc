@@ -74,6 +74,8 @@ public:
     upstream_request_.parent_.callbacks()->sendLocalReply(code, body, modify_headers, grpc_status,
                                                           details);
   }
+  void executeLocalReplyIfPrepared() override {}
+  bool hasPreparedLocalReply() const override { return false; }
   UpstreamRequest& upstream_request_;
 };
 

@@ -49,15 +49,15 @@ public:
   const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>
       upstream_http_protocol_options_;
 
-  bool use_downstream_protocol_{};
-  bool use_http2_{};
-  bool use_http3_{};
-  bool use_alpn_{};
   using FiltersList = Protobuf::RepeatedPtrField<
       envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter>;
-  FiltersList http_filters_;
-  absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
+  const FiltersList http_filters_;
+  const absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>
       alternate_protocol_cache_options_;
+  const bool use_downstream_protocol_{};
+  const bool use_http2_{};
+  const bool use_http3_{};
+  const bool use_alpn_{};
 };
 
 class ProtocolOptionsConfigFactory : public Server::Configuration::ProtocolOptionsFactory {

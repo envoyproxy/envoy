@@ -69,13 +69,17 @@ Http::FilterHeadersStatus Http1BridgeFilter::encodeHeaders(Http::ResponseHeaderM
 Http::FilterDataStatus Http1BridgeFilter::encodeData(Buffer::Instance& data, bool end_stream) {
   if (!do_bridging_ || end_stream) {
     return Http::FilterDataStatus::Continue;
-  } else {
-    // Buffer until the complete request has been processed.
-    if (do_framing_) {
-      data.drain(Grpc::GRPC_FRAME_HEADER_SIZE);
-    }
-    return Http::FilterDataStatus::StopIterationAndBuffer;
   }
+
+  // If a Protobuf request has been upgraded to a gRPC request, then we need to do the reverse
+  // for the response and remove the gRPC frame header from the first chunk.
+  if (do_framing_) {
+    data.drain(Grpc::GRPC_FRAME_HEADER_SIZE);
+    do_framing_ = false;
+  }
+
+  // Buffer until the complete request has been processed.
+  return Http::FilterDataStatus::StopIterationAndBuffer;
 }
 
 Http::FilterTrailersStatus Http1BridgeFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
