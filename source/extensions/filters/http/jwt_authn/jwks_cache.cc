@@ -144,6 +144,13 @@ public:
     }
   }
 
+  JwksData* getDefault() override {
+    if (jwks_data_map_.size() == 1) {
+      return jwks_data_map_.begin()->second.get();
+    }
+    return nullptr;
+  }
+
   JwksData* findByIssuer(const std::string& issuer) override {
     JwksData* data = findIssuerMap(issuer);
     if (!data && !issuer.empty()) {

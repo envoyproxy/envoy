@@ -267,12 +267,167 @@ TEST_F(AuthenticatorTest, TestSetExpiredJwtToGetStatus) {
   // Only one field is set.
   EXPECT_EQ(1, out_extracted_data_.fields().size());
 
-  EXPECT_EQ(std::to_string(enumToInt(Status::JwtExpired)), out_extracted_data_.fields()
-                                                               .at("jwt-failure-reason")
-                                                               .struct_value()
-                                                               .fields()
-                                                               .find("code")
-                                                               ->second.string_value());
+  EXPECT_EQ(enumToInt(Status::JwtExpired), out_extracted_data_.fields()
+                                               .at("jwt-failure-reason")
+                                               .struct_value()
+                                               .fields()
+                                               .find("code")
+                                               ->second.number_value());
+
+  EXPECT_EQ(google::jwt_verify::getStatusString(Status::JwtExpired), out_extracted_data_.fields()
+                                                                         .at("jwt-failure-reason")
+                                                                         .struct_value()
+                                                                         .fields()
+                                                                         .find("message")
+                                                                         ->second.string_value());
+}
+
+// This test verifies jwt status in failed status in metadata with allow mising or failed
+TEST_F(AuthenticatorTest, TestSetInvalidJwtToGetStatus) {
+  // Config allow missing or failed
+  (*proto_config_.mutable_rules(0)->mutable_requires()->mutable_allow_missing_or_failed());
+  // Config failed_status_in_metadata flag
+  auto& provider = (*proto_config_.mutable_providers())[std::string(ProviderName)];
+  provider.set_failed_status_in_metadata("jwt-failure-reason");
+  createAuthenticator();
+  EXPECT_CALL(*raw_fetcher_, fetch(_, _)).Times(0);
+
+  // Test JwtAudienceNotAllowed pubkey and its cache
+  Http::TestRequestHeaderMapImpl headers{
+      {"Authorization", "Bearer " + std::string(InvalidAudToken)}};
+
+  expectVerifyStatus(Status::JwtAudienceNotAllowed, headers);
+
+  // Only one field is set.
+  EXPECT_EQ(1, out_extracted_data_.fields().size());
+
+  EXPECT_EQ(enumToInt(Status::JwtAudienceNotAllowed), out_extracted_data_.fields()
+                                                          .at("jwt-failure-reason")
+                                                          .struct_value()
+                                                          .fields()
+                                                          .find("code")
+                                                          ->second.number_value());
+
+  EXPECT_EQ(google::jwt_verify::getStatusString(Status::JwtAudienceNotAllowed),
+            out_extracted_data_.fields()
+                .at("jwt-failure-reason")
+                .struct_value()
+                .fields()
+                .find("message")
+                ->second.string_value());
+}
+
+// This test verifies jwt missing status in failed status in metadata with allow mising or failed
+TEST_F(AuthenticatorTest, TestSetMissingJwtToGetStatus) {
+  // Config allow missing or failed
+  (*proto_config_.mutable_rules(0)->mutable_requires()->mutable_allow_missing_or_failed());
+  // Config failed_status_in_metadata flag
+  auto& provider = (*proto_config_.mutable_providers())[std::string(ProviderName)];
+  provider.set_failed_status_in_metadata("jwt-failure-reason");
+  createAuthenticator();
+  EXPECT_CALL(*raw_fetcher_, fetch(_, _)).Times(0);
+
+  // Test JwtMissed
+  Http::TestRequestHeaderMapImpl headers{};
+
+  expectVerifyStatus(Status::JwtMissed, headers);
+
+  // Only one field is set.
+  EXPECT_EQ(1, out_extracted_data_.fields().size());
+
+  EXPECT_EQ(enumToInt(Status::JwtMissed), out_extracted_data_.fields()
+                                              .at("jwt-failure-reason")
+                                              .struct_value()
+                                              .fields()
+                                              .find("code")
+                                              ->second.number_value());
+
+  EXPECT_EQ(google::jwt_verify::getStatusString(Status::JwtMissed), out_extracted_data_.fields()
+                                                                        .at("jwt-failure-reason")
+                                                                        .struct_value()
+                                                                        .fields()
+                                                                        .find("message")
+                                                                        ->second.string_value());
+}
+
+// This test verifies invalid and valid jwt status in failed status in metadata with allow mising or
+// failed
+TEST_F(AuthenticatorTest, TestSetInvalidAndValidJwtToGetStatus) {
+  // Config allow missing or failed
+  (*proto_config_.mutable_rules(0)->mutable_requires()->mutable_allow_missing_or_failed());
+  // Config failed_status_in_metadata flag
+  auto& provider = (*proto_config_.mutable_providers())[std::string(ProviderName)];
+  provider.set_failed_status_in_metadata("jwt-failure-reason");
+
+  createAuthenticator(nullptr, absl::make_optional<std::string>(ProviderName),
+                      /*allow_failed=*/true, /*allow_missing=*/true);
+  EXPECT_CALL(*raw_fetcher_, fetch(_, _))
+      .WillOnce(Invoke([this](Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
+        receiver.onJwksSuccess(std::move(jwks_));
+      }));
+
+  // Expect to have a valid JWT.
+  Http::TestRequestHeaderMapImpl headers{
+      {"Authorization", "Bearer " + std::string(GoodToken)},
+      {":path", "/foo?access_token=" + std::string(InvalidAudToken)}};
+
+  expectVerifyStatus(Status::Ok, headers);
+
+  // Only one field is set.
+  EXPECT_EQ(1, out_extracted_data_.fields().size());
+
+  EXPECT_EQ(enumToInt(Status::JwtAudienceNotAllowed), out_extracted_data_.fields()
+                                                          .at("jwt-failure-reason")
+                                                          .struct_value()
+                                                          .fields()
+                                                          .find("code")
+                                                          ->second.number_value());
+
+  EXPECT_EQ(google::jwt_verify::getStatusString(Status::JwtAudienceNotAllowed),
+            out_extracted_data_.fields()
+                .at("jwt-failure-reason")
+                .struct_value()
+                .fields()
+                .find("message")
+                ->second.string_value());
+}
+
+// This test verifies two invalid jwt status in failed status in metadata with allow mising or
+// failed
+TEST_F(AuthenticatorTest, TestSetTwoInvalidJwtToGetStatus) {
+  // Config allow missing or failed
+  (*proto_config_.mutable_rules(0)->mutable_requires()->mutable_allow_missing_or_failed());
+  // Config failed_status_in_metadata flag
+  auto& provider = (*proto_config_.mutable_providers())[std::string(ProviderName)];
+  provider.set_failed_status_in_metadata("jwt-failure-reason");
+
+  createAuthenticator(nullptr, absl::make_optional<std::string>(ProviderName),
+                      /*allow_failed=*/true, /*allow_missing=*/true);
+  EXPECT_CALL(*raw_fetcher_, fetch(_, _)).Times(0);
+
+  // Expect to have a valid JWT.
+  Http::TestRequestHeaderMapImpl headers{
+      {"Authorization", "Bearer " + std::string(ExpiredToken)},
+      {":path", "/foo?access_token=" + std::string(InvalidAudToken)}};
+
+  expectVerifyStatus(Status::Ok, headers);
+
+  // Only one field is set.
+  EXPECT_EQ(1, out_extracted_data_.fields().size());
+
+  EXPECT_EQ(enumToInt(Status::JwtExpired), out_extracted_data_.fields()
+                                               .at("jwt-failure-reason")
+                                               .struct_value()
+                                               .fields()
+                                               .find("code")
+                                               ->second.number_value());
+
+  EXPECT_EQ(google::jwt_verify::getStatusString(Status::JwtExpired), out_extracted_data_.fields()
+                                                                         .at("jwt-failure-reason")
+                                                                         .struct_value()
+                                                                         .fields()
+                                                                         .find("message")
+                                                                         ->second.string_value());
 }
 
 // This test verifies setting the extracted payload and header to metadata.

@@ -72,6 +72,9 @@ public:
     virtual JwtCache& getJwtCache() PURE;
   };
 
+  // Lookup provider cache map. The cache only stores Jwks specified in the config.
+  virtual JwksData* getDefault() PURE;
+
   // Lookup issuer cache map. The cache only stores Jwks specified in the config.
   virtual JwksData* findByIssuer(const std::string& issuer) PURE;
 

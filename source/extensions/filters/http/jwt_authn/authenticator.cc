@@ -377,20 +377,24 @@ void AuthenticatorImpl::doneWithStatus(const Status& status) {
     // Forward the failed status to dynamic metadata
     ENVOY_LOG(debug, "status is: {}", ::google::jwt_verify::getStatusString(status));
 
-    if (!jwks_cache_.findByProvider(*provider_)
-             ->getJwtProvider()
-             .failed_status_in_metadata()
-             .empty()) {
+    std::string failed_status_in_metadata{};
+
+    if (jwks_data_) {
+      failed_status_in_metadata = jwks_data_->getJwtProvider().failed_status_in_metadata();
+    } else if (jwks_cache_.getDefault()) {
+      failed_status_in_metadata =
+          jwks_cache_.getDefault()->getJwtProvider().failed_status_in_metadata();
+    }
+
+    if (!failed_status_in_metadata.empty()) {
 
       ProtobufWkt::Struct failed_status;
       auto& failed_status_fields = *failed_status.mutable_fields();
-      failed_status_fields["code"].set_string_value(std::to_string(enumToInt(status)));
+      failed_status_fields["code"].set_number_value(enumToInt(status));
       failed_status_fields["message"].set_string_value(google::jwt_verify::getStatusString(status));
-      ENVOY_LOG(debug, "Code: {}\nMessage: {}", std::to_string(enumToInt(status)),
+      ENVOY_LOG(debug, "Code: {} Message: {}", std::to_string(enumToInt(status)),
                 google::jwt_verify::getStatusString(status));
-      set_extracted_jwt_data_cb_(
-          jwks_cache_.findByProvider(*provider_)->getJwtProvider().failed_status_in_metadata(),
-          failed_status);
+      set_extracted_jwt_data_cb_(failed_status_in_metadata, failed_status);
     }
   }
 
