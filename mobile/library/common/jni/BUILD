@@ -5,7 +5,8 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-# Suport for JNI, using NDK on android and Java otherwise.
+# Suport for JNI, using NDK on android and Java otherwise, since the JNI APIs
+# differ a bit between the two.
 cc_library(
     name = "jni_support_lib",
     srcs = select({
