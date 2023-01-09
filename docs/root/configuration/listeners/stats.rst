@@ -83,7 +83,7 @@ on either accepted or active connections.
    downstream_cx_total, Counter, Total connections on this handler.
    downstream_cx_active, Gauge, Total active connections on this handler.
 
-   .. _config_listener_manager_stats:
+.. _config_listener_manager_stats:
 
 Listener manager
 ----------------
