@@ -34,8 +34,12 @@ sudo-with-permissions (e.g. sudo setcap cap_bpf+ep). If multiple worker threads 
 log a warning on start-up if BPF is unsupported on the platform, or is attempted and fails.
 
 It is recommanded to monitor some UDP listener and QUIC connection stats:
-* :repo:`UDP listener downstream_rx_datagram_dropped </docs/root/configuration/listeners/stats.rst#udp-statistics>`: non-zero means kernel's UDP listen socket's receive buffer isn't large enough. In Linux, it can be configured via listener :ref:`socket_options <envoy_v3_api_field_config.listener.v3.Listener.socket_options>` by setting prebinding socket option SO_RCVBUF at SOL_SOCKET level.
-* :repo:`QUIC connection error codes and stream reset error codes </docs/root/configuration/http/http_conn_man/stats.rst#http3-per-listener-statistics>`: please refer to `quic_error_codes.h <https://github.com/google/quiche/blob/main/quiche/quic/core/quic_error_codes.h>`_ for the meaning of each error code.
+
+* :repo:`UDP listener downstream_rx_datagram_dropped </docs/root/configuration/listeners/stats.rst#udp-statistics>`: non-zero means kernel's UDP
+  listen socket's receive buffer isn't large enough. In Linux, it can be configured via listener :ref:`socket_options <envoy_v3_api_field_config.listener.v3.Listener.socket_options>`
+  by setting prebinding socket option SO_RCVBUF at SOL_SOCKET level.
+* :repo:`QUIC connection error codes and stream reset error codes </docs/root/configuration/http/http_conn_man/stats.rst#http3-per-listener-statistics>`: please
+  refer to `quic_error_codes.h <https://github.com/google/quiche/blob/main/quiche/quic/core/quic_error_codes.h>`_ for the meaning of each error code.
 
 HTTP3 upstream
 --------------
