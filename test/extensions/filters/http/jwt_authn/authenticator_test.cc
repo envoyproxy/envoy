@@ -282,7 +282,7 @@ TEST_F(AuthenticatorTest, TestSetExpiredJwtToGetStatus) {
                                                                          ->second.string_value());
 }
 
-// This test verifies jwt status in failed status in metadata with allow mising or failed
+// This test verifies jwt status in failed status in metadata with allow missing or failed
 TEST_F(AuthenticatorTest, TestSetInvalidJwtToGetStatus) {
   // Config allow missing or failed
   (*proto_config_.mutable_rules(0)->mutable_requires()->mutable_allow_missing_or_failed());
@@ -317,7 +317,7 @@ TEST_F(AuthenticatorTest, TestSetInvalidJwtToGetStatus) {
                 ->second.string_value());
 }
 
-// This test verifies jwt missing status in failed status in metadata with allow mising or failed
+// This test verifies jwt missing status in failed status in metadata with allow missing or failed
 TEST_F(AuthenticatorTest, TestSetMissingJwtToGetStatus) {
   // Config allow missing or failed
   (*proto_config_.mutable_rules(0)->mutable_requires()->mutable_allow_missing_or_failed());
@@ -350,8 +350,8 @@ TEST_F(AuthenticatorTest, TestSetMissingJwtToGetStatus) {
                                                                         ->second.string_value());
 }
 
-// This test verifies invalid and valid jwt status in failed status in metadata with allow mising or
-// failed
+// This test verifies invalid and valid jwt status in failed status in metadata with allow missing
+// or failed
 TEST_F(AuthenticatorTest, TestSetInvalidAndValidJwtToGetStatus) {
   // Config allow missing or failed
   (*proto_config_.mutable_rules(0)->mutable_requires()->mutable_allow_missing_or_failed());
@@ -392,7 +392,7 @@ TEST_F(AuthenticatorTest, TestSetInvalidAndValidJwtToGetStatus) {
                 ->second.string_value());
 }
 
-// This test verifies two invalid jwt status in failed status in metadata with allow mising or
+// This test verifies two invalid jwt status in failed status in metadata with allow missing or
 // failed
 TEST_F(AuthenticatorTest, TestSetTwoInvalidJwtToGetStatus) {
   // Config allow missing or failed
