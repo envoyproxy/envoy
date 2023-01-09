@@ -284,19 +284,18 @@ TEST_F(AuthenticatorTest, TestSetExpiredJwtToGetStatus) {
 
 // This test verifies jwt status in failed status in metadata with allow missing or failed
 TEST_F(AuthenticatorTest, TestSetInvalidJwtToGetStatus) {
-  // Config allow missing or failed
-  (*proto_config_.mutable_rules(0)->mutable_requires()->mutable_allow_missing_or_failed());
   // Config failed_status_in_metadata flag
   auto& provider = (*proto_config_.mutable_providers())[std::string(ProviderName)];
   provider.set_failed_status_in_metadata("jwt-failure-reason");
-  createAuthenticator();
+  createAuthenticator(nullptr, absl::make_optional<std::string>(ProviderName),
+                      /*allow_failed=*/true, /*allow_missing=*/true);
   EXPECT_CALL(*raw_fetcher_, fetch(_, _)).Times(0);
 
   // Test JwtAudienceNotAllowed pubkey and its cache
   Http::TestRequestHeaderMapImpl headers{
       {"Authorization", "Bearer " + std::string(InvalidAudToken)}};
 
-  expectVerifyStatus(Status::JwtAudienceNotAllowed, headers);
+  expectVerifyStatus(Status::Ok, headers);
 
   // Only one field is set.
   EXPECT_EQ(1, out_extracted_data_.fields().size());
@@ -319,18 +318,17 @@ TEST_F(AuthenticatorTest, TestSetInvalidJwtToGetStatus) {
 
 // This test verifies jwt missing status in failed status in metadata with allow missing or failed
 TEST_F(AuthenticatorTest, TestSetMissingJwtToGetStatus) {
-  // Config allow missing or failed
-  (*proto_config_.mutable_rules(0)->mutable_requires()->mutable_allow_missing_or_failed());
   // Config failed_status_in_metadata flag
   auto& provider = (*proto_config_.mutable_providers())[std::string(ProviderName)];
   provider.set_failed_status_in_metadata("jwt-failure-reason");
-  createAuthenticator();
+  createAuthenticator(nullptr, absl::make_optional<std::string>(ProviderName),
+                      /*allow_failed=*/true, /*allow_missing=*/true);
   EXPECT_CALL(*raw_fetcher_, fetch(_, _)).Times(0);
 
   // Test JwtMissed
   Http::TestRequestHeaderMapImpl headers{};
 
-  expectVerifyStatus(Status::JwtMissed, headers);
+  expectVerifyStatus(Status::Ok, headers);
 
   // Only one field is set.
   EXPECT_EQ(1, out_extracted_data_.fields().size());
@@ -353,8 +351,6 @@ TEST_F(AuthenticatorTest, TestSetMissingJwtToGetStatus) {
 // This test verifies invalid and valid jwt status in failed status in metadata with allow missing
 // or failed
 TEST_F(AuthenticatorTest, TestSetInvalidAndValidJwtToGetStatus) {
-  // Config allow missing or failed
-  (*proto_config_.mutable_rules(0)->mutable_requires()->mutable_allow_missing_or_failed());
   // Config failed_status_in_metadata flag
   auto& provider = (*proto_config_.mutable_providers())[std::string(ProviderName)];
   provider.set_failed_status_in_metadata("jwt-failure-reason");
@@ -395,8 +391,6 @@ TEST_F(AuthenticatorTest, TestSetInvalidAndValidJwtToGetStatus) {
 // This test verifies two invalid jwt status in failed status in metadata with allow missing or
 // failed
 TEST_F(AuthenticatorTest, TestSetTwoInvalidJwtToGetStatus) {
-  // Config allow missing or failed
-  (*proto_config_.mutable_rules(0)->mutable_requires()->mutable_allow_missing_or_failed());
   // Config failed_status_in_metadata flag
   auto& provider = (*proto_config_.mutable_providers())[std::string(ProviderName)];
   provider.set_failed_status_in_metadata("jwt-failure-reason");
