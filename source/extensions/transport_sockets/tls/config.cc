@@ -28,8 +28,8 @@ ProtobufTypes::MessagePtr UpstreamSslSocketFactory::createEmptyConfigProto() {
   return std::make_unique<envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext>();
 }
 
-REGISTER_FACTORY(UpstreamSslSocketFactory,
-                 Server::Configuration::UpstreamTransportSocketConfigFactory){"tls"};
+REGISTER_FACTORY_D(UpstreamSslSocketFactory,
+                   Server::Configuration::UpstreamTransportSocketConfigFactory, "tls");
 
 Network::DownstreamTransportSocketFactoryPtr
 DownstreamSslSocketFactory::createTransportSocketFactory(
@@ -48,8 +48,8 @@ ProtobufTypes::MessagePtr DownstreamSslSocketFactory::createEmptyConfigProto() {
   return std::make_unique<envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext>();
 }
 
-REGISTER_FACTORY(DownstreamSslSocketFactory,
-                 Server::Configuration::DownstreamTransportSocketConfigFactory){"tls"};
+REGISTER_FACTORY_D(DownstreamSslSocketFactory,
+                   Server::Configuration::DownstreamTransportSocketConfigFactory, "tls");
 
 Ssl::ContextManagerPtr SslContextManagerFactory::createContextManager(TimeSource& time_source) {
   return std::make_unique<ContextManagerImpl>(time_source);

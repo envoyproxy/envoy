@@ -21,6 +21,7 @@ load(
     _envoy_select_admin_functionality = "envoy_select_admin_functionality",
     _envoy_select_admin_html = "envoy_select_admin_html",
     _envoy_select_admin_no_html = "envoy_select_admin_no_html",
+    _envoy_select_static_extension_registration = "envoy_select_static_extension_registration",
     _envoy_select_boringssl = "envoy_select_boringssl",
     _envoy_select_disable_logging = "envoy_select_disable_logging",
     _envoy_select_enable_http3 = "envoy_select_enable_http3",
@@ -219,6 +220,7 @@ def envoy_google_grpc_external_deps():
 envoy_select_admin_html = _envoy_select_admin_html
 envoy_select_admin_no_html = _envoy_select_admin_no_html
 envoy_select_admin_functionality = _envoy_select_admin_functionality
+envoy_select_static_extension_registration = _envoy_select_static_extension_registration
 envoy_select_boringssl = _envoy_select_boringssl
 envoy_select_disable_logging = _envoy_select_disable_logging
 envoy_select_google_grpc = _envoy_select_google_grpc

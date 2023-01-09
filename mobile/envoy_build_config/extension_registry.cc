@@ -29,6 +29,7 @@
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/quic_transport_socket_factory.h"
+#include "source/common/quic/server_codec_impl.h"
 #endif
 
 #include "extension_registry_platform_additions.h"
@@ -45,6 +46,7 @@
 namespace Envoy {
 
 void ExtensionRegistry::registerFactories() {
+  Envoy::Extensions::Upstreams::Http::forceRegisterProtocolOptionsConfigFactory();
   Envoy::Upstream::forceRegisterStaticClusterFactory();
   Envoy::Extensions::Clusters::DynamicForwardProxy::forceRegisterClusterFactory();
   Envoy::Extensions::Compression::Brotli::Decompressor::
@@ -82,26 +84,20 @@ void ExtensionRegistry::registerFactories() {
   Envoy::Upstream::forceRegisterLogicalDnsClusterFactory();
   ExtensionRegistryPlatformAdditions::registerFactories();
   Router::forceRegisterUpstreamCodecFilterFactory();
+  Envoy::Network::Address::forceRegisterIpResolver();
+  Envoy::Network::forceRegisterDefaultClientConnectionFactory();
   Envoy::Network::forceRegisterGetAddrInfoDnsResolverFactory();
+  Envoy::Network::forceRegisterSocketInterfaceImpl();
   Envoy::Extensions::RequestId::forceRegisterUUIDRequestIDExtensionFactory();
   Envoy::Server::forceRegisterDefaultListenerManagerFactoryImpl();
   Envoy::Server::forceRegisterApiListenerManagerFactoryImpl();
   Envoy::Server::forceRegisterConnectionHandlerFactoryImpl();
 
 #ifdef ENVOY_ENABLE_QUIC
+  Quic::forceRegisterQuicClientTransportSocketConfigFactory();
   Quic::forceRegisterQuicServerTransportSocketConfigFactory();
+  Quic::forceRegisterQuicHttpServerConnectionFactoryImpl();
 #endif
-
-  // TODO: add a "force initialize" function to the upstream code, or clean up the upstream code
-  // in such a way that does not depend on the statically initialized variable.
-  // The current setup exposes in iOS the same problem as the one described in:
-  // https://github.com/envoyproxy/envoy/pull/7185 with the static variable declared in:
-  // https://github.com/envoyproxy/envoy/pull/11380/files#diff-8a5c90e5a39b2ea975170edc4434345bR138.
-  // For now force the compilation unit to run by creating an instance of the class declared in
-  // socket_interface_impl.h and immediately destroy.
-  { auto ptr = std::make_unique<Network::SocketInterfaceImpl>(); }
-
-  { auto ptr = std::make_unique<Network::DefaultClientConnectionFactory>(); }
 }
 
 } // namespace Envoy
