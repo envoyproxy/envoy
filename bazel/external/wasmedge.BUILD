@@ -18,10 +18,6 @@ cmake(
         "WASMEDGE_BUILD_TOOLS": "Off",
         "WASMEDGE_FORCE_DISABLE_LTO": "On",
     },
-    env = {
-        # cmake here detects gcc as the cxx compiler, so we specify the compiler explicitly
-        "CXX": "c++",
-    },
     generate_args = ["-GNinja"],
     lib_source = ":srcs",
     out_static_libs = ["libwasmedge.a"],
