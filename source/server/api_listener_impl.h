@@ -162,7 +162,6 @@ protected:
       const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
       void setDelayedCloseTimeout(std::chrono::milliseconds) override {}
       absl::string_view transportFailureReason() const override { return EMPTY_STRING; }
-      // TODO(kbaichoo): is this right thing?
       absl::string_view localCloseReason() const override { return EMPTY_STRING; }
       bool startSecureTransport() override {
         IS_ENVOY_BUG("Unexpected function call");

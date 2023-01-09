@@ -10,7 +10,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace {
 
-const char kLocalCloseReason[] = "Fuzz local close reason.";
+const char kLocalCloseReason[] = "fuzz_local_close_reason";
 
 } //  namespace
 

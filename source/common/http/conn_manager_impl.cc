@@ -190,8 +190,7 @@ void ConnectionManagerImpl::checkForDeferredClose(bool skip_delay_close) {
   if (drain_state_ == DrainState::Closing && streams_.empty() && !codec_->wantsToWrite()) {
     // We are closing a draining connection with no active streams and the codec has
     // nothing to write. As such the details are unnecessary.
-    doConnectionClose(close, absl::nullopt,
-                      Envoy::StreamInfo::ResponseCodeDetails::get().DeferredCloseOnDrainedStream);
+    doConnectionClose(close, absl::nullopt, "deferred_close_on_drained_connection");
   }
 }
 
@@ -457,12 +456,6 @@ void ConnectionManagerImpl::resetAllStreams(absl::optional<StreamInfo::ResponseF
       stream.filter_manager_.streamInfo().setResponseCodeDetails(
           stream.response_encoder_->getStream().responseDetails());
     } else if (!details.empty()) {
-      // TODO(kbaichoo): Remove this
-      // Record what clobbering
-      std::cerr << absl::StrCat(
-          "kbaichoo: clobbering :",
-          stream.filter_manager_.streamInfo().responseCodeDetails().value_or(""), "with ", details,
-          "\n");
       stream.filter_manager_.streamInfo().setResponseCodeDetails(details);
     }
     if (response_flag.has_value()) {
@@ -480,15 +473,20 @@ void ConnectionManagerImpl::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
 
-    absl::string_view details;
+    std::string details;
     if (event == Network::ConnectionEvent::RemoteClose) {
       remote_close_ = true;
       stats_.named_.downstream_cx_destroy_remote_.inc();
       details = StreamInfo::ResponseCodeDetails::get().DownstreamRemoteDisconnect;
     } else {
       // Local close.
-      details = read_callbacks_->connection().localCloseReason();
-      ENVOY_BUG(!details.empty(), "Local Close Reason was not set!");
+      absl::string_view local_close_reason = read_callbacks_->connection().localCloseReason();
+      ENVOY_BUG(!local_close_reason.empty(), "Local Close Reason was not set!");
+      details = absl::StrContains(local_close_reason, ' ')
+                    ? fmt::format(StreamInfo::ResponseCodeDetails::get().DownstreamLocalDisconnect,
+                                  absl::StrReplaceAll(local_close_reason, {{" ", "_"}}))
+                    : fmt::format(StreamInfo::ResponseCodeDetails::get().DownstreamLocalDisconnect,
+                                  local_close_reason);
     }
 
     // TODO(mattklein123): It is technically possible that something outside of the filter causes
@@ -649,7 +647,7 @@ void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestSrdsUpdate(
               if (scope_exist) {
                 parent_.refreshCachedRoute();
               }
-              (*cb)(scope_exist&& parent_.hasCachedRoute());
+              (*cb)(scope_exist && parent_.hasCachedRoute());
             }
           });
   scoped_route_config_provider_->onDemandRdsUpdate(std::move(scope_key), thread_local_dispatcher,

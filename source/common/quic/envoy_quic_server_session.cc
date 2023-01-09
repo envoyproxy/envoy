@@ -98,10 +98,7 @@ void EnvoyQuicServerSession::OnConnectionClosed(const quic::QuicConnectionCloseF
                                                 quic::ConnectionCloseSource source) {
   quic::QuicServerSessionBase::OnConnectionClosed(frame, source);
   if (source == quic::ConnectionCloseSource::FROM_SELF) {
-    // TODO(kbaichoo): probably pointing to this being its own field not
-    // clobbering the other one?
-    const std::string reason = absl::StrReplaceAll(frame.error_details, {{" ", "_"}});
-    setLocalCloseReason(reason);
+    setLocalCloseReason(frame.error_details);
   }
   onConnectionCloseEvent(frame, source, version());
   if (position_.has_value()) {

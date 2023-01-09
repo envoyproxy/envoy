@@ -135,11 +135,14 @@ public:
 
   /**
    * Close the connection.
+   * @param type the connection close type.
    */
   virtual void close(ConnectionCloseType type) PURE;
 
   /**
    * Close the connection.
+   * @param type the connection close type.
+   * @param details the reason the connection is being closed.
    */
   virtual void close(ConnectionCloseType type, absl::string_view details) PURE;
 

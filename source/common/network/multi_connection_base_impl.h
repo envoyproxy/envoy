@@ -125,15 +125,8 @@ public:
   // Methods implemented largely by this class itself.
   uint64_t id() const override;
   Event::Dispatcher& dispatcher() override;
-  void close(ConnectionCloseType type) override;
-  void close(ConnectionCloseType type, absl::string_view) override {
-    // TODO(kbaichoo): do pimpl where both methods impl or the other close w/o
-    // details calls this close but with empty details?
-    // if (!details.empty()) {
-    // local_close_reason_ = details;
-    //}
-    close(type);
-  }
+  void close(ConnectionCloseType type) override { close(type, ""); }
+  void close(ConnectionCloseType type, absl::string_view details) override;
   bool readEnabled() const override;
   bool aboveHighWatermark() const override;
   void hashKey(std::vector<uint8_t>& hash_key) const override;

@@ -55,7 +55,7 @@ void ActiveStreamListenerBase::newConnection(Network::ConnectionSocketPtr&& sock
   if (empty_filter_chain) {
     ENVOY_CONN_LOG(debug, "closing connection from {}: no filters", *server_conn_ptr,
                    server_conn_ptr->connectionInfoProvider().remoteAddress()->asString());
-    server_conn_ptr->close(Network::ConnectionCloseType::NoFlush, "No Filters");
+    server_conn_ptr->close(Network::ConnectionCloseType::NoFlush, "no_filters");
   }
   newActiveConnection(*filter_chain, std::move(server_conn_ptr), std::move(stream_info));
 }
@@ -152,7 +152,7 @@ void OwnedActiveStreamListenerBase::removeFilterChain(const Network::FilterChain
     auto& connections = iter->second->connections_;
     while (!connections.empty()) {
       connections.front()->connection_->close(Network::ConnectionCloseType::NoFlush,
-                                              "Filter Chain is being removed.");
+                                              "filter_chain_is_being_removed");
     }
     // Since is_deleting_ is on, we need to manually remove the map value and drive the
     // iterator. Defer delete connection container to avoid race condition in destroying

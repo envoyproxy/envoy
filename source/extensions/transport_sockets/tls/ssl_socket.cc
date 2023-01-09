@@ -176,7 +176,7 @@ void SslSocket::resumeHandshake() {
   if (action == PostIoAction::Close) {
     ENVOY_CONN_LOG(debug, "async handshake completion error", callbacks_->connection());
     callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite,
-                                   "failed to resume async handshake.");
+                                   "failed_resuming_async_handshake");
   }
 }
 

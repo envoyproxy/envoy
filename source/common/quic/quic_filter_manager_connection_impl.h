@@ -53,12 +53,10 @@ public:
   void enableHalfClose(bool enabled) override;
   bool isHalfCloseEnabled() override;
   void close(Network::ConnectionCloseType type) override;
-  void close(Network::ConnectionCloseType type, absl::string_view) override {
-    // TODO(kbaichoo): do pimpl where both methods impl or the other close w/o
-    // details calls this close but with empty details?
-    // if (!details.empty()) {
-    // local_close_reason_ = details;
-    //}
+  void close(Network::ConnectionCloseType type, absl::string_view details) override {
+    if (!details.empty()) {
+      local_close_reason_ = std::string(details);
+    }
     close(type);
   }
   Event::Dispatcher& dispatcher() override { return dispatcher_; }

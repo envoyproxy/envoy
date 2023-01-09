@@ -316,9 +316,9 @@ void MultiConnectionBaseImpl::removeConnectionCallbacks(ConnectionCallbacks& cb)
   IS_ENVOY_BUG("Failed to remove connection callbacks");
 }
 
-void MultiConnectionBaseImpl::close(ConnectionCloseType type) {
+void MultiConnectionBaseImpl::close(ConnectionCloseType type, absl::string_view details) {
   if (connect_finished_) {
-    connections_[0]->close(type);
+    connections_[0]->close(type, details);
     return;
   }
 
@@ -330,7 +330,7 @@ void MultiConnectionBaseImpl::close(ConnectionCloseType type) {
     if (i != 0) {
       // Wait to close the final connection until the post-connection callbacks
       // have been added.
-      connections_[i]->close(ConnectionCloseType::NoFlush);
+      connections_[i]->close(ConnectionCloseType::NoFlush, details);
     }
   }
   connections_.resize(1);
@@ -341,7 +341,7 @@ void MultiConnectionBaseImpl::close(ConnectionCloseType type) {
       connections_[0]->addConnectionCallbacks(*cb);
     }
   }
-  connections_[0]->close(type);
+  connections_[0]->close(type, details);
 }
 
 Event::Dispatcher& MultiConnectionBaseImpl::dispatcher() {
