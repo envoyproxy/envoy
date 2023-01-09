@@ -17,27 +17,28 @@ GeoipFilterConfig::GeoipFilterConfig(
       total_(stat_name_set_->add("total")), use_xff_(config.use_xff()),
       xff_num_trusted_hops_(config.xff_num_trusted_hops()) {
   auto geo_headers_to_add = config.geo_headers_to_add();
-  setupForGeolocationHeader(geo_country_header_, geo_headers_to_add.country());
-  setupForGeolocationHeader(geo_city_header_, geo_headers_to_add.city());
-  setupForGeolocationHeader(geo_region_header_, geo_headers_to_add.region());
-  setupForGeolocationHeader(geo_asn_header_, geo_headers_to_add.asn());
-  setupForGeolocationHeader(geo_anon_header_, geo_headers_to_add.is_anon());
-  setupForGeolocationHeader(geo_anon_vpn_header_, geo_headers_to_add.anon_vpn());
-  setupForGeolocationHeader(geo_anon_hosting_header_, geo_headers_to_add.anon_hosting());
-  setupForGeolocationHeader(geo_anon_tor_header_, geo_headers_to_add.anon_tor());
-  setupForGeolocationHeader(geo_anon_proxy_header_, geo_headers_to_add.anon_proxy());
+  geo_country_header_ = setupForGeolocationHeader(geo_headers_to_add.country());
+  geo_city_header_ = setupForGeolocationHeader(geo_headers_to_add.city());
+  geo_region_header_ = setupForGeolocationHeader(geo_headers_to_add.region());
+  geo_asn_header_ = setupForGeolocationHeader(geo_headers_to_add.asn());
+  geo_anon_header_ = setupForGeolocationHeader(geo_headers_to_add.is_anon());
+  geo_anon_vpn_header_ = setupForGeolocationHeader(geo_headers_to_add.anon_vpn());
+  geo_anon_hosting_header_ = setupForGeolocationHeader(geo_headers_to_add.anon_hosting());
+  geo_anon_tor_header_ = setupForGeolocationHeader(geo_headers_to_add.anon_tor());
+  geo_anon_proxy_header_ = setupForGeolocationHeader(geo_headers_to_add.anon_proxy());
   if (!at_least_one_geo_header_configured_) {
     throw EnvoyException("No geolocation headers configured");
   }
 }
 
-void GeoipFilterConfig::setupForGeolocationHeader(absl::optional<std::string>& geo_header,
-                                                  const std::string& configured_geo_header) {
+absl::optional<std::string> GeoipFilterConfig::setupForGeolocationHeader(absl::string_view configured_geo_header) {
   if (!configured_geo_header.empty()) {
-    geo_header = configured_geo_header;
     stat_name_set_->rememberBuiltin(absl::StrCat(configured_geo_header, ".hit"));
     stat_name_set_->rememberBuiltin(absl::StrCat(configured_geo_header, ".total"));
     at_least_one_geo_header_configured_ = true;
+    return configured_geo_header;
+  } else {
+    return absl::nullopt;
   }
 }
 

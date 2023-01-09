@@ -73,6 +73,7 @@ message Geoip {
     // See the geoip drivers for examples:
     //
     // - :ref:`MaxMindConfig <envoy_api_msg_config.geoip.v3.MaxMindConfig>`
+    // [#extension-category: envoy.geoip_providers]
     oneof config_type {
       google.protobuf.Any typed_config = 3;
     }

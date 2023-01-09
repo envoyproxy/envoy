@@ -52,8 +52,7 @@ public:
 
 private:
   void incCounter(Stats::StatName name);
-  void setupForGeolocationHeader(absl::optional<std::string>& geo_header,
-                                 const std::string& configured_geo_header);
+  absl::optional<std::string> setupForGeolocationHeader(absl::string_view configured_geo_header);
 
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
