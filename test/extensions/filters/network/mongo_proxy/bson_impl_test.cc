@@ -84,6 +84,23 @@ TEST(BufferHelperTest, InvalidSize) {
   }
 }
 
+TEST(BsonImplTest, StringContainsNullBytes) {
+  std::string s("hello\0world", 11);
+  Buffer::OwnedImpl buffer;
+  BufferHelper::writeString(buffer, s);
+  EXPECT_TRUE(BufferHelper::removeString(buffer) == s);
+}
+
+TEST(BsonImplTest, StringSizeObserved) {
+  char s[] = "helloworld";
+  Buffer::OwnedImpl buffer;
+
+  std::string hello("hello");
+  BufferHelper::writeInt32(buffer, hello.size() + 1);
+  buffer.add(s, sizeof(s));
+  EXPECT_TRUE(BufferHelper::removeString(buffer) == hello);
+}
+
 } // namespace Bson
 } // namespace MongoProxy
 } // namespace NetworkFilters
