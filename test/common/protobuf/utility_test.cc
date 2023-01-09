@@ -2187,4 +2187,18 @@ TEST_F(StructUtilTest, StructUtilUpdateRecursiveStruct) {
   EXPECT_TRUE(ValueUtil::equal(tags.at("tag1"), ValueUtil::stringValue("1")));
 }
 
+TEST_F(ProtobufUtilityTest, SubsequentLoadClearsExistingProtoValues) {
+  utility_test::message_field_wip::MultipleFields obj;
+  MessageUtil::loadFromYaml("foo: bar\nbar: qux", obj, ProtobufMessage::getNullValidationVisitor());
+  EXPECT_EQ(obj.foo(), "bar");
+  EXPECT_EQ(obj.bar(), "qux");
+  EXPECT_EQ(obj.baz(), 0);
+
+  // Subsequent load into a proto with some existing values, should clear them up.
+  MessageUtil::loadFromYaml("baz: 2", obj, ProtobufMessage::getNullValidationVisitor());
+  EXPECT_TRUE(obj.foo().empty());
+  EXPECT_TRUE(obj.bar().empty());
+  EXPECT_EQ(obj.baz(), 2);
+}
+
 } // namespace Envoy

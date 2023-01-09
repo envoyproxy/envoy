@@ -11,3 +11,9 @@ message Foo {
 message Bar {
   bool test_field = 1 [(xds.annotations.v3.field_status).work_in_progress = true];
 }
+
+message MultipleFields {
+  string foo = 1;
+  string bar = 2;
+  int32 baz = 3;
+}
