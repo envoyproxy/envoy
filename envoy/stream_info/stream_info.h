@@ -177,7 +177,7 @@ struct ResponseCodeDetailValues {
   // The client disconnected unexpectedly.
   const std::string DownstreamRemoteDisconnect = "downstream_remote_disconnect";
   // The client connection was locally closed for the given reason.
-  const std::string DownstreamLocalDisconnect = "downstream_local_disconnect{}";
+  const std::string DownstreamLocalDisconnect = "downstream_local_disconnect({})";
   // The max connection duration was exceeded.
   const std::string DurationTimeout = "duration_timeout";
   // The max request downstream header duration was exceeded.
