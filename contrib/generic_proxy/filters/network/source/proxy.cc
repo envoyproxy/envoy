@@ -11,10 +11,86 @@
 #include "contrib/generic_proxy/filters/network/source/interface/filter.h"
 #include "contrib/generic_proxy/filters/network/source/route.h"
 
+#include "source/common/tracing/custom_tag_impl.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace GenericProxy {
+
+namespace {
+using ProtoTracingConfig = envoy::extensions::filters::network::http_connection_manager::v3::
+    HttpConnectionManager::Tracing;
+
+// TODO(wbpcode): Move
+TracingConnectionManagerConfigPtr
+getTracingConfig(const ProtoTracingConfig& tracing_config,
+                 envoy::config::core::v3::TrafficDirection direction) {
+
+  Tracing::OperationName tracing_operation_name;
+
+  // Listener level traffic direction overrides the operation name
+  switch (direction) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+  case envoy::config::core::v3::UNSPECIFIED:
+    // Continuing legacy behavior; if unspecified, we treat this as ingress.
+    tracing_operation_name = Tracing::OperationName::Ingress;
+    break;
+  case envoy::config::core::v3::INBOUND:
+    tracing_operation_name = Tracing::OperationName::Ingress;
+    break;
+  case envoy::config::core::v3::OUTBOUND:
+    tracing_operation_name = Tracing::OperationName::Egress;
+    break;
+  }
+
+  Tracing::CustomTagMap custom_tags;
+  for (const auto& tag : tracing_config.custom_tags()) {
+    custom_tags.emplace(tag.tag(), Tracing::CustomTagUtility::createCustomTag(tag));
+  }
+
+  envoy::type::v3::FractionalPercent client_sampling;
+  client_sampling.set_numerator(
+      tracing_config.has_client_sampling() ? tracing_config.client_sampling().value() : 100);
+  envoy::type::v3::FractionalPercent random_sampling;
+  // TODO: Random sampling historically was an integer and default to out of 10,000. We should
+  // deprecate that and move to a straight fractional percent config.
+  uint64_t random_sampling_numerator{PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
+      tracing_config, random_sampling, 10000, 10000)};
+  random_sampling.set_numerator(random_sampling_numerator);
+  random_sampling.set_denominator(envoy::type::v3::FractionalPercent::TEN_THOUSAND);
+  envoy::type::v3::FractionalPercent overall_sampling;
+  uint64_t overall_sampling_numerator{PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
+      tracing_config, overall_sampling, 10000, 10000)};
+  overall_sampling.set_numerator(overall_sampling_numerator);
+  overall_sampling.set_denominator(envoy::type::v3::FractionalPercent::TEN_THOUSAND);
+
+  const uint32_t max_path_tag_length = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      tracing_config, max_path_tag_length, Tracing::DefaultMaxPathTagLength);
+
+  return std::make_unique<TracingConnectionManagerConfig>(TracingConnectionManagerConfig{
+      tracing_operation_name, custom_tags, client_sampling, random_sampling, overall_sampling,
+      tracing_config.verbose(), max_path_tag_length});
+}
+} // namespace
+
+FilterConfigImpl::FilterConfigImpl(const ProxyConfig& proto_config, const std::string& stat_prefix,
+                                   CodecFactoryPtr codec,
+                                   Rds::RouteConfigProviderSharedPtr route_config_provider,
+                                   std::vector<NamedFilterFactoryCb> factories,
+                                   Envoy::Server::Configuration::FactoryContext& context)
+    : stat_prefix_(stat_prefix), codec_factory_(std::move(codec)),
+      route_config_provider_(std::move(route_config_provider)), factories_(std::move(factories)),
+      drain_decision_(context.drainDecision()) {
+
+  if (proto_config.has_tracing()) {
+    if (!proto_config.tracing().has_provider()) {
+      throw EnvoyException("generic proxy: tracing configuration must have provider");
+    }
+
+    tracing_config_ = getTracingConfig(proto_config.tracing(), context.direction());
+  }
+}
 
 ActiveStream::ActiveStream(Filter& parent, RequestPtr request)
     : parent_(parent), downstream_request_stream_(std::move(request)) {}

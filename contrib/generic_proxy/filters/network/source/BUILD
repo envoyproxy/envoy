@@ -28,6 +28,7 @@ envoy_cc_library(
         "//source/common/common:linked_object",
         "//source/common/common:minimal_logger_lib",
         "//source/common/stream_info:stream_info_lib",
+        "//source/common/tracing:custom_tag_lib",
         "//source/extensions/filters/network/common:factory_base_lib",
         "@envoy_api//contrib/envoy/extensions/filters/network/generic_proxy/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

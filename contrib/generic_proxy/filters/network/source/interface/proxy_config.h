@@ -4,10 +4,15 @@
 #include "contrib/generic_proxy/filters/network/source/interface/filter.h"
 #include "contrib/generic_proxy/filters/network/source/interface/route.h"
 
+#include "source/common/http/conn_manager_config.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace GenericProxy {
+
+using TracingConnectionManagerConfig = Http::TracingConnectionManagerConfig;
+using TracingConnectionManagerConfigPtr = std::unique_ptr<TracingConnectionManagerConfig>;
 
 /**
  * Filter config interface for generic proxy read filter.
@@ -32,6 +37,16 @@ public:
    * determine if they should be doing graceful closes on connections when possible.
    */
   virtual const Network::DrainDecision& drainDecision() const PURE;
+
+  /**
+   *  @return Tracing::Driver tracing driver to use.
+   */
+  virtual OptRef<Tracing::Driver> tracingProvider() const PURE;
+
+  /**
+   * @return tracing config.
+   */
+  virtual OptRef<const TracingConnectionManagerConfig> tracingConfig() const PURE;
 };
 
 } // namespace GenericProxy

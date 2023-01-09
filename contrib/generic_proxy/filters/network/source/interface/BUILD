@@ -94,5 +94,6 @@ envoy_cc_library(
         ":codec_interface",
         ":filter_interface",
         ":route_interface",
+        "//source/common/http:conn_manager_config_interface",
     ],
 )
