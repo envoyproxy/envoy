@@ -30,20 +30,25 @@ def _internal_kt_test(name, srcs, deps = [], data = [], jvm_flags = [], reposito
         exec_properties = exec_properties,
     )
 
+# A simple macro to define the JVM flags that are common for envoy_mobile_jni_kt_test and
+# envoy_mobile_android_test.
+def jvm_flags(lib_name):
+    return [
+        "-Djava.library.path=library/common/jni:test/common/jni",
+        "-Denvoy_jni_library_name={}".format(lib_name),
+        "-Xcheck:jni",
+    ]
+
 # A basic macro to make it easier to declare and run kotlin tests which depend on a JNI lib
-# This will create the native .so binary (for linux) and a .jnilib (for OS X) look up
-def envoy_mobile_jni_kt_test(name, srcs, native_deps = [], deps = [], library_path = "library/common/jni:test/common/jni", repository = "", exec_properties = {}):
+# This will create the native .so binary (for linux) and a .jnilib (for macOS) look up
+def envoy_mobile_jni_kt_test(name, srcs, native_deps = [], deps = [], repository = "", exec_properties = {}):
     lib_name = native_lib_name(native_deps[0])[3:]
     _internal_kt_test(
         name,
         srcs,
         deps,
         data = native_deps,
-        jvm_flags = [
-            "-Djava.library.path={}".format(library_path),
-            "-Denvoy_jni_library_name={}".format(lib_name),
-            "-Xcheck:jni",
-        ],
+        jvm_flags = jvm_flags(lib_name),
         repository = repository,
         exec_properties = exec_properties,
     )
@@ -68,7 +73,7 @@ def envoy_mobile_kt_test(name, srcs, deps = [], repository = "", exec_properties
     _internal_kt_test(name, srcs, deps, repository = repository, exec_properties = exec_properties)
 
 # A basic macro to run android based (robolectric) tests with native dependencies
-def envoy_mobile_android_test(name, srcs, deps = [], native_deps = [], repository = "", library_path = "library/common/jni:test/common/jni", exec_properties = {}):
+def envoy_mobile_android_test(name, srcs, deps = [], native_deps = [], repository = "", exec_properties = {}):
     lib_name = native_lib_name(native_deps[0])[3:]
     android_library(
         name = name + "_test_lib",
@@ -106,9 +111,6 @@ def envoy_mobile_android_test(name, srcs, deps = [], native_deps = [], repositor
         manifest = repository + "//bazel:test_manifest.xml",
         custom_package = "io.envoyproxy.envoymobile.tests",
         test_class = "io.envoyproxy.envoymobile.bazel.EnvoyMobileTestSuite",
-        jvm_flags = [
-            "-Djava.library.path={}".format(library_path),
-            "-Denvoy_jni_library_name={}".format(lib_name),
-        ],
+        jvm_flags = jvm_flags(lib_name),
         exec_properties = exec_properties,
     )
