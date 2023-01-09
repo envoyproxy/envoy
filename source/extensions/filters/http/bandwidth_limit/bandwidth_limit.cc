@@ -98,6 +98,7 @@ Http::FilterHeadersStatus BandwidthLimiter::decodeHeaders(Http::RequestHeaderMap
         },
         [&config, this](uint64_t len, bool limit_enforced, std::chrono::milliseconds delay) {
           config.stats().request_allowed_size_.set(len);
+          config.stats().request_allowed_total_size_.add(len);
           if (limit_enforced) {
             config.stats().request_enforced_.inc();
             request_delay_ += delay;
@@ -121,6 +122,7 @@ Http::FilterDataStatus BandwidthLimiter::decodeData(Buffer::Instance& data, bool
       config.stats().request_pending_.inc();
     }
     config.stats().request_incoming_size_.set(data.length());
+    config.stats().request_incoming_total_size_.add(data.length());
 
     request_limiter_->writeData(data, end_stream);
     return Http::FilterDataStatus::StopIterationNoBuffer;
@@ -163,6 +165,7 @@ Http::FilterHeadersStatus BandwidthLimiter::encodeHeaders(Http::ResponseHeaderMa
         },
         [&config, this](uint64_t len, bool limit_enforced, std::chrono::milliseconds delay) {
           config.stats().response_allowed_size_.set(len);
+          config.stats().response_allowed_total_size_.add(len);
           if (limit_enforced) {
             config.stats().response_enforced_.inc();
             response_delay_ += delay;
@@ -194,6 +197,7 @@ Http::FilterDataStatus BandwidthLimiter::encodeData(Buffer::Instance& data, bool
       config.stats().response_pending_.inc();
     }
     config.stats().response_incoming_size_.set(data.length());
+    config.stats().response_incoming_total_size_.add(data.length());
 
     response_limiter_->writeData(data, end_stream, trailer_added);
     return Http::FilterDataStatus::StopIterationNoBuffer;
