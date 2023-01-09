@@ -15,7 +15,7 @@ namespace Http2 {
 class ProtocolConstraintsTest : public ::testing::Test {
 protected:
   Http::Http2::CodecStats& http2CodecStats() {
-    return Http::Http2::CodecStats::atomicGet(http2_codec_stats_, stats_store_);
+    return Http::Http2::CodecStats::atomicGet(http2_codec_stats_, *stats_store_.rootScope());
   }
 
   Stats::TestUtil::TestStore stats_store_;

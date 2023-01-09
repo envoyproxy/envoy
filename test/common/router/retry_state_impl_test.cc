@@ -172,8 +172,8 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   Stats::StatNameManagedStorage stat_name_{"fake_route", stats_store_.symbolTable()};
   RouteStatNames stat_names_{stats_store_.symbolTable()};
-  RouteStatsContextImpl route_stats_context_{stats_store_, stat_names_, stat_name_.statName(),
-                                             "fake_route"};
+  RouteStatsContextImpl route_stats_context_{*stats_store_.rootScope(), stat_names_,
+                                             stat_name_.statName(), "fake_route"};
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Random::MockRandomGenerator> random_;
   Event::MockDispatcher dispatcher_;
