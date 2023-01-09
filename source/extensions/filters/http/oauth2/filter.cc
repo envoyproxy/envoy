@@ -548,6 +548,9 @@ void OAuth2Filter::finishUpdateAccessTokenFlow() {
   }
 
   request_headers_->addReferenceKey(Http::Headers::get().Cookie, newCookies.getStringView());
+  if (config_->forwardBearerToken() && !access_token_.empty()) {
+    setBearerToken(*request_headers_, access_token_);
+  }
 
   // remember cookies for response(need for set cookie)
   response_headers_to_add_.reset();
