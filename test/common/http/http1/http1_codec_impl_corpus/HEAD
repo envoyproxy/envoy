@@ -1,0 +1,19 @@
+req {
+    method: "HEAD"
+    path: "/"
+}
+resp {
+    status: 200
+    msg: "OK"
+}
+headers {
+    headers {
+        key: "Host"
+        value: "localhost"
+    }
+    headers {
+        key: "Content-length"
+        value: "1"
+    }
+}
+body: "A"
