@@ -209,7 +209,10 @@ using SizeFn = std::function<void(std::size_t)>;
  */
 template <typename Stat> using StatFn = std::function<void(Stat&)>;
 
-// Template that lazy-init a StatsStruct.
+// Template that lazily initializes a StatsStruct.
+// The bootstrap config :ref:`enable_lazyinit_stats
+// <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.enable_lazyinit_stats>` decides if stats lazy
+// initialzation is enabled or not.
 template <typename StatsStructType> class LazyInit;
 template <typename StatsStructType> class DirectStats;
 

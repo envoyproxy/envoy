@@ -705,8 +705,8 @@ public:
                   Stats::ScopeSharedPtr&& stats_scope, bool added_via_api,
                   Server::Configuration::TransportSocketFactoryContext&);
 
-  static std::unique_ptr<LazyableClusterTrafficStats>
-  generateStats(Stats::Scope& scope, const ClusterTrafficStatNames& cluster_stat_names,
+  static std::unique_ptr<LazyCompatibleClusterTrafficStats>
+  generateStats(Stats::ScopeSharedPtr scope, const ClusterTrafficStatNames& cluster_stat_names,
                 bool lazyinit = false);
   static ClusterLoadReportStats
   generateLoadReportStats(Stats::Scope& scope, const ClusterLoadReportStatNames& stat_names);
@@ -797,7 +797,7 @@ public:
   const std::string& observabilityName() const override { return observability_name_; }
   ResourceManager& resourceManager(ResourcePriority priority) const override;
   TransportSocketMatcher& transportSocketMatcher() const override { return *socket_matcher_; }
-  LazyableClusterTrafficStats& trafficStats() const override {
+  LazyCompatibleClusterTrafficStats& trafficStats() const override {
     ASSERT(traffic_stats_ != nullptr);
     return *traffic_stats_;
   }
@@ -924,7 +924,7 @@ private:
   const uint32_t per_connection_buffer_limit_bytes_;
   TransportSocketMatcherPtr socket_matcher_;
   Stats::ScopeSharedPtr stats_scope_;
-  const std::unique_ptr<LazyableClusterTrafficStats> traffic_stats_;
+  const std::unique_ptr<LazyCompatibleClusterTrafficStats> traffic_stats_;
   mutable ClusterConfigUpdateStats config_update_stats_;
   mutable ClusterLbStats lb_stats_;
   mutable ClusterEndpointStats endpoint_stats_;

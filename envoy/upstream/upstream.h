@@ -34,7 +34,7 @@
 namespace Envoy {
 
 namespace Stats {
-template <typename StatsStructType> class LazyableInterface;
+template <typename StatsStructType> class LazyCompatibleInterface;
 }
 
 namespace Http {
@@ -772,7 +772,7 @@ MAKE_STAT_NAMES_STRUCT(ClusterTrafficStatNames, ALL_CLUSTER_TRAFFIC_STATS);
 MAKE_STATS_STRUCT(ClusterTrafficStats, ClusterTrafficStatNames, ALL_CLUSTER_TRAFFIC_STATS);
 using LazyInitClusterTrafficStats = Stats::LazyInit<ClusterTrafficStats>;
 using DirectInitClusterTrafficStats = Stats::DirectStats<ClusterTrafficStats>;
-using LazyableClusterTrafficStats = Stats::LazyableInterface<ClusterTrafficStats>;
+using LazyCompatibleClusterTrafficStats = Stats::LazyCompatibleInterface<ClusterTrafficStats>;
 
 MAKE_STAT_NAMES_STRUCT(ClusterLoadReportStatNames, ALL_CLUSTER_LOAD_REPORT_STATS);
 MAKE_STATS_STRUCT(ClusterLoadReportStats, ClusterLoadReportStatNames,
@@ -1075,7 +1075,7 @@ public:
   /**
    * @return  all traffic related stats for this cluster.
    */
-  virtual LazyableClusterTrafficStats& trafficStats() const PURE;
+  virtual LazyCompatibleClusterTrafficStats& trafficStats() const PURE;
   /**
    * @return the stats scope that contains all cluster stats. This can be used to produce dynamic
    *         stats that will be freed when the cluster is removed.

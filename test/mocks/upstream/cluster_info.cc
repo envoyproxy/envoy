@@ -61,7 +61,7 @@ MockClusterInfo::MockClusterInfo()
       cluster_circuit_breakers_stat_names_(stats_store_.symbolTable()),
       cluster_request_response_size_stat_names_(stats_store_.symbolTable()),
       cluster_timeout_budget_stat_names_(stats_store_.symbolTable()),
-      traffic_stats_(ClusterInfoImpl::generateStats(stats_store_, traffic_stat_names_)),
+      traffic_stats_(ClusterInfoImpl::generateStats(stats_store_.rootScope(), traffic_stat_names_)),
       config_update_stats_(config_update_stats_names_, stats_store_),
       lb_stats_(lb_stat_names_, stats_store_), endpoint_stats_(endpoint_stat_names_, stats_store_),
       transport_socket_matcher_(new NiceMock<Upstream::MockTransportSocketMatcher>()),

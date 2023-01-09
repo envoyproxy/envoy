@@ -164,6 +164,8 @@ message Bootstrap {
   repeated metrics.v3.StatsSink stats_sinks = 6;
 
   // When true, enable lazy init feature for stats that's of Stats::LazyInit<T> type.
+  // List of lazy init compatible stats:
+  //  * ClusterTrafficStats
   bool enable_lazyinit_stats = 37;
 
   // Configuration for internal processing of stats.
