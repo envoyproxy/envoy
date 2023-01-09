@@ -131,6 +131,9 @@ bug_fixes:
 - area: grpc_http_bridge
   change: |
     fixed a bug where response data could be lost for requests that were upgraded from Protobuf.
+- area: tcp_proxy
+  change: |
+    When tunneling TCP over HTTP, mark the upstream connection as done reading when upstream trailers are read. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.finish_reading_on_decode_trailers`` to false.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
