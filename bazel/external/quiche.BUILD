@@ -192,6 +192,7 @@ envoy_cc_library(
     hdrs = ["quiche/http2/adapter/http2_protocol.h"],
     copts = quiche_copts,
     repository = "@envoy",
+    visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_export",
     ],
