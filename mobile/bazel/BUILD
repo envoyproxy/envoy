@@ -22,6 +22,11 @@ config_setting(
     values = {"define": "include_ifaddrs=true"},
 )
 
+config_setting(
+    name = "exclude_certificates",
+    values = {"define": "exclude_certificates=true"},
+)
+
 exports_files([
     "pom_template.xml",
     "test_manifest.xml",

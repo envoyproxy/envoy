@@ -32,6 +32,7 @@
 #include "source/common/config/grpc_mux_impl.h"
 #include "source/common/config/new_grpc_mux_impl.h"
 #include "source/common/config/utility.h"
+#include "source/common/config/well_known_names.h"
 #include "source/common/config/xds_mux/grpc_mux_impl.h"
 #include "source/common/config/xds_resource.h"
 #include "source/common/http/codes.h"
@@ -53,31 +54,27 @@
 #include "source/common/upstream/cluster_manager_impl.h"
 #include "source/common/version/version.h"
 #include "source/server/configuration_impl.h"
-#include "source/server/connection_handler_impl.h"
 #include "source/server/guarddog_impl.h"
 #include "source/server/listener_hooks.h"
 #include "source/server/listener_manager_factory.h"
 #include "source/server/regex_engine.h"
 #include "source/server/ssl_context_manager.h"
+#include "source/server/utils.h"
 
 namespace Envoy {
 namespace Server {
 namespace {
-// TODO(alyssawilk) resolve the copy/paste code here.
-envoy::admin::v3::ServerInfo::State serverState(Init::Manager::State state,
-                                                bool health_check_failed) {
-  switch (state) {
-  case Init::Manager::State::Uninitialized:
-    return envoy::admin::v3::ServerInfo::PRE_INITIALIZING;
-  case Init::Manager::State::Initializing:
-    return envoy::admin::v3::ServerInfo::INITIALIZING;
-  case Init::Manager::State::Initialized:
-    return health_check_failed ? envoy::admin::v3::ServerInfo::DRAINING
-                               : envoy::admin::v3::ServerInfo::LIVE;
+std::unique_ptr<ConnectionHandler> getHandler(Event::Dispatcher& dispatcher) {
+
+  auto* factory = Config::Utility::getFactoryByName<ConnectionHandlerFactory>(
+      "envoy.connection_handler.default");
+  if (factory) {
+    return factory->createConnectionHandler(dispatcher, absl::nullopt);
   }
-  IS_ENVOY_BUG("unexpected server state enum");
-  return envoy::admin::v3::ServerInfo::PRE_INITIALIZING;
+  ENVOY_LOG_MISC(debug, "Unable to find envoy.connection_handler.default factory");
+  return nullptr;
 }
+
 } // namespace
 
 InstanceImpl::InstanceImpl(
@@ -103,8 +100,8 @@ InstanceImpl::InstanceImpl(
       access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
                           store),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
-      handler_(new ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
-      worker_factory_(thread_local_, *api_, hooks), terminated_(false),
+      handler_(getHandler(*dispatcher_)), worker_factory_(thread_local_, *api_, hooks),
+      terminated_(false),
       mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
                                                   : nullptr),
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
@@ -301,7 +298,8 @@ void InstanceImpl::updateServerStats() {
     server_stats_->seconds_until_first_ocsp_response_expiring_.set(
         secs_until_ocsp_response_expires.value());
   }
-  server_stats_->state_.set(enumToInt(serverState(initManager().state(), healthCheckFailed())));
+  server_stats_->state_.set(
+      enumToInt(Utility::serverState(initManager().state(), healthCheckFailed())));
   server_stats_->stats_recent_lookups_.set(
       stats_store_.symbolTable().getRecentLookups([](absl::string_view, uint64_t) {}));
 }
@@ -621,11 +619,9 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
       Network::SocketInterfaceSingleton::initialize(sock);
     }
   }
-
   // Workers get created first so they register for thread local updates.
   listener_manager_ =
-      Config::Utility::getAndCheckFactoryByName<ListenerManagerFactory>(
-          "envoy.listener_manager_impl.default")
+      Config::Utility::getAndCheckFactoryByName<ListenerManagerFactory>(options_.listenerManager())
           .createListenerManager(*this, nullptr, worker_factory_,
                                  bootstrap_.enable_dispatcher_stats(), quic_stat_names_);
 

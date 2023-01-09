@@ -1,7 +1,11 @@
 #include "test/extensions/http/header_validators/envoy_default/header_validator_test.h"
 
+#include "envoy/http/header_validator_errors.h"
+
 #include "source/extensions/http/header_validators/envoy_default/character_tables.h"
 #include "source/extensions/http/header_validators/envoy_default/header_validator.h"
+
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -10,17 +14,19 @@ namespace HeaderValidators {
 namespace EnvoyDefault {
 
 using ::Envoy::Http::HeaderString;
+using ::Envoy::Http::HeaderValidatorStats;
 using ::Envoy::Http::Protocol;
 using ::Envoy::Http::RequestHeaderMap;
 using ::Envoy::Http::ResponseHeaderMap;
+using ::Envoy::Http::UhvResponseCodeDetail;
 
 class BaseHttpHeaderValidator : public HeaderValidator {
 public:
   BaseHttpHeaderValidator(
       const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&
           config,
-      Protocol protocol, StreamInfo::StreamInfo& stream_info)
-      : HeaderValidator(config, protocol, stream_info) {}
+      Protocol protocol, HeaderValidatorStats& stats)
+      : HeaderValidator(config, protocol, stats) {}
 
   HeaderEntryValidationResult validateRequestHeaderEntry(const HeaderString&,
                                                          const HeaderString&) override {
@@ -39,6 +45,14 @@ public:
   ResponseHeaderMapValidationResult validateResponseHeaderMap(ResponseHeaderMap&) override {
     return ResponseHeaderMapValidationResult::success();
   }
+
+  TrailerValidationResult validateRequestTrailerMap(::Envoy::Http::RequestTrailerMap&) override {
+    return TrailerValidationResult::success();
+  }
+
+  TrailerValidationResult validateResponseTrailerMap(::Envoy::Http::ResponseTrailerMap&) override {
+    return TrailerValidationResult::success();
+  }
 };
 
 using BaseHttpHeaderValidatorPtr = std::unique_ptr<BaseHttpHeaderValidator>;
@@ -50,7 +64,7 @@ protected:
         typed_config;
     TestUtility::loadFromYaml(std::string(config_yaml), typed_config);
 
-    return std::make_unique<BaseHttpHeaderValidator>(typed_config, Protocol::Http11, stream_info_);
+    return std::make_unique<BaseHttpHeaderValidator>(typed_config, Protocol::Http11, stats_);
   }
 };
 

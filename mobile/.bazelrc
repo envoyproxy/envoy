@@ -23,6 +23,9 @@ build --workspace_status_command=../bazel/get_workspace_status
 build --xcode_version=14.1
 build --use_top_level_targets_for_symlinks
 build --experimental_repository_downloader_retries=2
+# We don't have a ton of Swift in Envoy Mobile, so always build with WMO
+# This also helps work around a bug in rules_swift: https://github.com/bazelbuild/rules_swift/issues/949
+build --swiftcopt=-wmo
 # https://github.com/bazelbuild/rules_jvm_external/issues/445
 build --repo_env=JAVA_HOME=../bazel_tools/jdk
 build --define disable_known_issue_asserts=true
@@ -31,9 +34,6 @@ build --define cxxopts=-std=c++17
 build --features=-per_object_debug_info
 # Suppress deprecated declaration warnings due to extensive transitive noise from protobuf.
 build --copt -Wno-deprecated-declarations
-# Abseil Flag literals are compiled out by default on mobile platforms. These flags are needed for
-# Envoy's runtime system. This option prevents them from being compiled out.
-build --copt -DABSL_FLAGS_STRIP_NAMES=0
 
 build:rules_xcodeproj --config=ios
 build:rules_xcodeproj --define=apple.experimental.tree_artifact_outputs=0

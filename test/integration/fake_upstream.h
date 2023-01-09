@@ -43,7 +43,7 @@
 #include "source/common/quic/quic_stat_names.h"
 #endif
 
-#include "source/server/active_raw_udp_listener_config.h"
+#include "source/extensions/listener_managers/listener_manager/active_raw_udp_listener_config.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/runtime/mocks.h"

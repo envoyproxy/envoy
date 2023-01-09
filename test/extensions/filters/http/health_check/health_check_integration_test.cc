@@ -147,11 +147,6 @@ TEST_P(HealthCheckIntegrationTest, HealthCheck) {
 TEST_P(HealthCheckIntegrationTest, HealthCheckWithoutServerStats) {
   DISABLE_IF_ADMIN_DISABLED;
 
-  if (GetParam().http1_implementation == Http1ParserImpl::BalsaParser) {
-    // TODO(#21245): Re-enable this test for BalsaParser.
-    return;
-  }
-
   envoy::config::metrics::v3::StatsMatcher stats_matcher;
   stats_matcher.mutable_exclusion_list()->add_patterns()->set_prefix("server.");
   config_helper_.addConfigModifier(
