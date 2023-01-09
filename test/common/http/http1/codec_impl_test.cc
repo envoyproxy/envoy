@@ -89,7 +89,7 @@ protected:
   }
 
   Http::Http1::CodecStats& http1CodecStats() {
-    return Http::Http1::CodecStats::atomicGet(http1_codec_stats_, store_);
+    return Http::Http1::CodecStats::atomicGet(http1_codec_stats_, *store_.rootScope());
   }
 
   TestScopedRuntime scoped_runtime_;

@@ -41,8 +41,8 @@ AsyncClientImpl::AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster,
                                  Router::ShadowWriterPtr&& shadow_writer,
                                  Http::Context& http_context, Router::Context& router_context)
     : cluster_(cluster),
-      config_(http_context.asyncClientStatPrefix(), local_info, stats_store, cm, runtime, random,
-              std::move(shadow_writer), true, false, false, false, false, {},
+      config_(http_context.asyncClientStatPrefix(), local_info, *stats_store.rootScope(), cm,
+              runtime, random, std::move(shadow_writer), true, false, false, false, false, {},
               dispatcher.timeSource(), http_context, router_context),
       dispatcher_(dispatcher), singleton_manager_(cm.clusterManagerFactory().singletonManager()) {}
 

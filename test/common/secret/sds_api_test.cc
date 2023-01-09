@@ -103,7 +103,7 @@ TEST_F(SdsApiTest, InitManagerInitialised) {
   Config::OpaqueResourceDecoderSharedPtr resource_decoder(
       std::make_shared<TestUtility::TestOpaqueResourceDecoderImpl<
           envoy::extensions::transport_sockets::tls::v3::Secret>>("name"));
-  Config::SubscriptionStats stats(Config::Utility::generateStats(stats_));
+  Config::SubscriptionStats stats(Config::Utility::generateStats(*stats_.rootScope()));
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
   envoy::config::core::v3::ConfigSource config_source;
 

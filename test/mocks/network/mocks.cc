@@ -41,7 +41,7 @@ MockListenerConfig::MockListenerConfig()
       .WillByDefault(ReturnRef(socket_->connectionInfoProvider().localAddress()));
   ON_CALL(*static_cast<MockListenSocketFactory*>(socket_factories_[0].get()), getListenSocket(_))
       .WillByDefault(Return(socket_));
-  ON_CALL(*this, listenerScope()).WillByDefault(ReturnRef(scope_));
+  ON_CALL(*this, listenerScope()).WillByDefault(ReturnRef(*store_.rootScope()));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
 }
 MockListenerConfig::~MockListenerConfig() = default;

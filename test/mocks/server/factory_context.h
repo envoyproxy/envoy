@@ -67,7 +67,8 @@ public:
   testing::NiceMock<MockServerLifecycleNotifier> lifecycle_notifier_;
   testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;
   testing::NiceMock<Envoy::Runtime::MockLoader> runtime_loader_;
-  testing::NiceMock<Stats::MockIsolatedStatsStore> scope_;
+  testing::NiceMock<Stats::MockIsolatedStatsStore> store_;
+  Stats::Scope& scope_{*store_.rootScope()};
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   testing::NiceMock<Server::MockOptions> options_;
   Singleton::ManagerPtr singleton_manager_;
@@ -91,7 +92,8 @@ public:
   MOCK_METHOD(Stats::Scope&, scope, ());
   testing::NiceMock<Init::MockManager> init_manager_;
   testing::NiceMock<MockServerFactoryContext> server_factory_context_;
-  testing::NiceMock<Stats::MockIsolatedStatsStore> scope_;
+  testing::NiceMock<Stats::MockIsolatedStatsStore> store_;
+  Stats::Scope& scope_{*store_.rootScope()};
 };
 
 } // namespace Configuration

@@ -82,7 +82,7 @@ public:
                             quic::QuicServerId("example.com", 443, false), crypto_config_, nullptr,
                             *dispatcher_,
                             /*send_buffer_limit*/ 1024 * 1024, crypto_stream_factory_,
-                            quic_stat_names_, {}, store_, transport_socket_options_),
+                            quic_stat_names_, {}, *store_.rootScope(), transport_socket_options_),
         stats_({ALL_HTTP3_CODEC_STATS(POOL_COUNTER_PREFIX(store_, "http3."),
                                       POOL_GAUGE_PREFIX(store_, "http3."))}),
         http_connection_(envoy_quic_session_, http_connection_callbacks_, stats_, http3_options_,

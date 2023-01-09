@@ -757,7 +757,7 @@ TEST_F(EnvoyQuicServerStreamTest, MetadataNotSupported) {
   metadata_map_vector.push_back(std::move(metadata_map_ptr));
   quic_stream_->encodeMetadata(metadata_map_vector);
   EXPECT_EQ(1,
-            TestUtility::findCounter(listener_config_.scope_, "http3.metadata_not_supported_error")
+            TestUtility::findCounter(listener_config_.store_, "http3.metadata_not_supported_error")
                 ->value());
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }
