@@ -1049,5 +1049,15 @@ TEST_F(EnvoyQuicServerSessionTest, GetRttAndCwnd) {
             quic::kInitialCongestionWindow * quic::kDefaultTCPMSS);
 }
 
+TEST_F(EnvoyQuicServerSessionTest, SslConnectionInfoDumbImplmention) {
+  installReadFilter();
+  EXPECT_FALSE(envoy_quic_session_.ssl()->peerCertificatePresented());
+  EXPECT_TRUE(envoy_quic_session_.ssl()->urlEncodedPemEncodedPeerCertificateChain().empty());
+  EXPECT_TRUE(envoy_quic_session_.ssl()->dnsSansPeerCertificate().empty());
+  EXPECT_TRUE(envoy_quic_session_.ssl()->dnsSansLocalCertificate().empty());
+  EXPECT_FALSE(envoy_quic_session_.ssl()->validFromPeerCertificate().has_value());
+  EXPECT_FALSE(envoy_quic_session_.ssl()->expirationPeerCertificate().has_value());
+}
+
 } // namespace Quic
 } // namespace Envoy
