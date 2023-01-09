@@ -183,6 +183,7 @@ public:
 
     auto cookie_validator = std::make_shared<OAuth2CookieValidator>(test_time_, cookie_names);
     EXPECT_EQ(cookie_validator->token(), "");
+    EXPECT_EQ(cookie_validator->refreshToken(), "");
     cookie_validator->setParams(request_headers, "mock-secret");
 
     EXPECT_TRUE(cookie_validator->hmacIsValid());
@@ -1215,6 +1216,60 @@ TEST_F(OAuth2Test, OAuthTestFullFlowWithUseRefreshToken) {
   filter_->finishUpdateAccessTokenFlow();
   EXPECT_EQ(1, config_->stats().oauth_refreshtoken_success_.value());
   EXPECT_EQ(2, config_->stats().oauth_success_.value());
+}
+
+TEST_F(OAuth2Test, OAuthTestUpdateAccessTokenByRefreshTokenSuccess) {
+
+  init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */));
+  // First construct the initial request to the oauth filter with URI parameters.
+  Http::TestRequestHeaderMapImpl first_request_headers{
+      {Http::Headers::get().Path.get(), "/test?name=admin&level=trace"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Post},
+      {Http::Headers::get().Scheme.get(), "https"},
+  };
+
+  std::string legit_token{"legit_token"};
+  EXPECT_CALL(*validator_, token()).WillRepeatedly(ReturnRef(legit_token));
+
+  std::string legit_refresh_token{"legit_refresh_token"};
+  EXPECT_CALL(*validator_, refreshToken()).WillRepeatedly(ReturnRef(legit_refresh_token));
+
+  // Fail the validation to trigger the OAuth flow with trying to get the access token using by
+  // refresh token.
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+  EXPECT_CALL(*validator_, canUpdateTokenByRefreshToken()).WillOnce(Return(true));
+
+  EXPECT_CALL(*oauth_client_,
+              asyncUpdateAccessToken(legit_refresh_token, TEST_CLIENT_ID, "asdf_client_secret_fdsa",
+                                     AuthType::UrlEncodedBody));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(first_request_headers, false));
+
+  Http::TestResponseHeaderMapImpl redirect_response_headers{
+      {Http::Headers::get().Status.get(), "302"},
+      {Http::Headers::get().Location.get(),
+       "https://auth.example.com/oauth/"
+       "authorize/?client_id=" +
+           TEST_CLIENT_ID +
+           "&redirect_uri=https%3A%2F%2Ftraffic.example.com%2F_oauth"
+           "&response_type=code"
+           "&scope=" +
+           TEST_ENCODED_AUTH_SCOPES +
+           "&state=https%3A%2F%2Ftraffic.example.com%2Ftest%3Fname%3Dadmin%26level%3Dtrace"
+           "&resource=oauth2-resource&resource=http%3A%2F%2Fexample.com"
+           "&resource=https%3A%2F%2Fexample.com"},
+  };
+
+  // Check that the redirect includes the escaped parameter characters, '?', '&' and '='.
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+
+  filter_->onUpdateAccessTokenSuccess("", "", "", std::chrono::seconds(10));
+
+  EXPECT_EQ(1, config_->stats().oauth_refreshtoken_success_.value());
+  EXPECT_EQ(1, config_->stats().oauth_success_.value());
 }
 
 TEST_F(OAuth2Test, OAuthTestUpdateAccessTokenByRefreshTokenFail) {
