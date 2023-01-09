@@ -42,7 +42,7 @@ public:
           return new StatsStructType(stat_names, *scope);
         }) {
     if (inited_.value() > 0) {
-      // instantiate();
+      instantiate();
     }
   }
   // Helper operators to get-or-create and return the StatsStructType object.
@@ -56,7 +56,10 @@ public:
 
 private:
   inline StatsStructType* instantiate() { return internal_stats_.get(ctor_); }
-  // For
+  // If the 'internal_stats_' is already instantiated, i.e. inited_>0, we need to instantiated again
+  // to keep the corresponding stats around. E.g. when ClusterManager updates a cluster, if its
+  // ClusterTrafficStats is instantiated, the new version ClusterTrafficStats need to point to the
+  // same set of stats before the old version is deleted by ClusterManager.
   Gauge& inited_;
   // TODO(stevenzzzz, jmarantz): Clean up this ctor_ by moving ownership to AtomicPtr, and drop it
   // when the nested object is created.

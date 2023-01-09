@@ -273,17 +273,11 @@ TEST_P(CdsIntegrationTest, TrafficStatsLazyInit) {
       Config::TypeUrl::get().Cluster, {cluster1_updated}, {cluster1_updated}, {}, "42");
   test_server_->waitForCounterGe("cluster_manager.cds.update_success", 2);
   // Now the ClusterTrafficStats.inited gauge is still 1.
-  // if (this->enableLazyInitStats()) {
-  // EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.inited")->value(), 1);
-  // }
-  absl::SleepFor(absl::Seconds(3));
   if (this->enableLazyInitStats()) {
-    // Cluster 1 traffic stats lost.
-    EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total"), nullptr);
-  } else {
-    // Cluster 1 traffic stats not lost.
-    EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
+    EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.inited")->value(), 1);
   }
+  // Cluster 1 traffic stats not lost.
+  EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
 
   // Remove "cluster_1".
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster, {}, {},
