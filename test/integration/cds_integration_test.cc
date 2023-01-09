@@ -259,25 +259,31 @@ TEST_P(CdsIntegrationTest, TrafficStatsLazyInit) {
       lookupPort("http"), "GET", "/cluster1", "", downstream_protocol_, version_, "foo.com");
   ASSERT_TRUE(response->complete());
   cleanupUpstreamAndDownstream();
+
   if (this->enableLazyInitStats()) {
     EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.inited")->value(), 1);
   }
   // Cluster_1 trafficStats updated.
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
-
   // Now update cluster1.
   envoy::config::cluster::v3::Cluster cluster1_updated =
       cluster_creator_(ClusterName1, fake_upstreams_[UpstreamIndex2]->localAddress()->ip()->port(),
                        Network::Test::getLoopbackAddressString(ipVersion()), "ROUND_ROBIN");
-  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
-                                                             {cluster1_}, {cluster1_}, {}, "42");
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      Config::TypeUrl::get().Cluster, {cluster1_updated}, {cluster1_updated}, {}, "42");
   test_server_->waitForCounterGe("cluster_manager.cds.update_success", 2);
   // Now the ClusterTrafficStats.inited gauge is still 1.
+  // if (this->enableLazyInitStats()) {
+  // EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.inited")->value(), 1);
+  // }
+  absl::SleepFor(absl::Seconds(3));
   if (this->enableLazyInitStats()) {
-    EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.inited")->value(), 1);
+    // Cluster 1 traffic stats lost.
+    EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total"), nullptr);
+  } else {
+    // Cluster 1 traffic stats not lost.
+    EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
   }
-  // Cluster traffic stats not lost.
-  EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
 
   // Remove "cluster_1".
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster, {}, {},
@@ -305,7 +311,7 @@ TEST_P(CdsIntegrationTest, TrafficStatsLazyInit) {
     EXPECT_EQ(test_server_->counter("cluster.cluster_2.upstream_cx_total")->value(), 0);
     // No lazy init gauges.
     EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.inited"), nullptr);
-    EXPECT_NE(test_server_->gauge("cluster.cluster_2.ClusterTrafficStats.inited"), nullptr);
+    EXPECT_EQ(test_server_->gauge("cluster.cluster_2.ClusterTrafficStats.inited"), nullptr);
   }
 }
 

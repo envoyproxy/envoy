@@ -42,7 +42,7 @@ public:
           return new StatsStructType(stat_names, *scope);
         }) {
     if (inited_.value() > 0) {
-      instantiate();
+      // instantiate();
     }
   }
   // Helper operators to get-or-create and return the StatsStructType object.
@@ -56,6 +56,7 @@ public:
 
 private:
   inline StatsStructType* instantiate() { return internal_stats_.get(ctor_); }
+  // For
   Gauge& inited_;
   // TODO(stevenzzzz, jmarantz): Clean up this ctor_ by moving ownership to AtomicPtr, and drop it
   // when the nested object is created.

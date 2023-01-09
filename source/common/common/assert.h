@@ -48,7 +48,7 @@ public:
   }
 
 private:
-  static const int kMaxStackDepth = 16;
+  static const int kMaxStackDepth = 30;
   void* stack_trace_[kMaxStackDepth];
   int stack_depth_{0};
 };
