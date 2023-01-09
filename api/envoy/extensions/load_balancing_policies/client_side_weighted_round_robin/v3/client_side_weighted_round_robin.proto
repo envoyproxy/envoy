@@ -49,7 +49,7 @@ message ClientSideWeightedRoundRobin {
   // then we stop using the reported weight. This ensures that we do
   // not continue to use very stale weights. Once we stop using a stale
   // value, if we later start seeing fresh reports again, the
-  // blackout_period applies. Defaults to 3 seconds.
+  // blackout_period applies. Defaults to 3 minutes.
   google.protobuf.Duration weight_expiration_period = 4;
 
   // How often endpoint weights are recalculated.  Default is 1 second.
