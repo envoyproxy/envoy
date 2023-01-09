@@ -140,24 +140,27 @@ public:
 
   void onStreamComplete() override {}
 
-  void continueStatus(GolangStatus status);
+  int continueStatus(GolangStatus status);
 
-  void sendLocalReply(Http::Code response_code, absl::string_view body_text,
-                      std::function<void(Http::ResponseHeaderMap& headers)> modify_headers,
-                      Grpc::Status::GrpcStatus grpc_status, absl::string_view details);
+  int sendLocalReply(Http::Code response_code, absl::string_view body_text,
+                     std::function<void(Http::ResponseHeaderMap& headers)> modify_headers,
+                     Grpc::Status::GrpcStatus grpc_status, absl::string_view details);
 
-  absl::optional<absl::string_view> getHeader(absl::string_view key);
-  void copyHeaders(GoString* go_strs, char* go_buf);
-  void setHeader(absl::string_view key, absl::string_view value);
-  void removeHeader(absl::string_view key);
-  void copyBuffer(Buffer::Instance* buffer, char* data);
-  void setBufferHelper(Buffer::Instance* buffer, absl::string_view& value, bufferAction action);
-  void copyTrailers(GoString* go_strs, char* go_buf);
-  void setTrailer(absl::string_view key, absl::string_view value);
-  void getStringValue(int id, GoString* value_str);
+  int getHeader(absl::string_view key, GoString* goValue);
+  int copyHeaders(GoString* go_strs, char* go_buf);
+  int setHeader(absl::string_view key, absl::string_view value);
+  int removeHeader(absl::string_view key);
+  int copyBuffer(Buffer::Instance* buffer, char* data);
+  int setBufferHelper(Buffer::Instance* buffer, absl::string_view& value, bufferAction action);
+  int copyTrailers(GoString* go_strs, char* go_buf);
+  int setTrailer(absl::string_view key, absl::string_view value);
+  int getStringValue(int id, GoString* value_str);
 
 private:
   ProcessorState& getProcessorState();
+
+  // check the filter state when invoking C API from Go.
+  int checkApiState();
 
   bool doHeaders(ProcessorState& state, Http::RequestOrResponseHeaderMap& headers, bool end_stream);
   GolangStatus doHeadersGo(ProcessorState& state, Http::RequestOrResponseHeaderMap& headers,

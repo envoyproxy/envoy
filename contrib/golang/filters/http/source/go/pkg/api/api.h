@@ -6,6 +6,13 @@
 extern "C" {
 #endif
 
+// This describes the return value of a C Api from Go.
+#define CAPIOK 0
+#define CAPIFilterIsGone -1
+#define CAPIFilterIsDestroy -2
+#define CAPINotInGo -3
+#define CAPIInvalidPhase -4
+
 typedef struct { // NOLINT(modernize-use-using)
   const char* data;
   unsigned long long int len;
@@ -23,23 +30,23 @@ typedef enum { // NOLINT(modernize-use-using)
   Prepend,
 } bufferAction;
 
-void envoyGoFilterHttpContinue(void* r, int status);
-void envoyGoFilterHttpSendLocalReply(void* r, int response_code, void* body_text, void* headers,
-                                     long long int grpc_status, void* details);
+int envoyGoFilterHttpContinue(void* r, int status);
+int envoyGoFilterHttpSendLocalReply(void* r, int response_code, void* body_text, void* headers,
+                                    long long int grpc_status, void* details);
 
-void envoyGoFilterHttpGetHeader(void* r, void* key, void* value);
-void envoyGoFilterHttpCopyHeaders(void* r, void* strs, void* buf);
-void envoyGoFilterHttpSetHeader(void* r, void* key, void* value);
-void envoyGoFilterHttpRemoveHeader(void* r, void* key);
+int envoyGoFilterHttpGetHeader(void* r, void* key, void* value);
+int envoyGoFilterHttpCopyHeaders(void* r, void* strs, void* buf);
+int envoyGoFilterHttpSetHeader(void* r, void* key, void* value);
+int envoyGoFilterHttpRemoveHeader(void* r, void* key);
 
-void envoyGoFilterHttpGetBuffer(void* r, unsigned long long int buffer, void* value);
-void envoyGoFilterHttpSetBufferHelper(void* r, unsigned long long int buffer, void* data,
-                                      int length, bufferAction action);
+int envoyGoFilterHttpGetBuffer(void* r, unsigned long long int buffer, void* value);
+int envoyGoFilterHttpSetBufferHelper(void* r, unsigned long long int buffer, void* data, int length,
+                                     bufferAction action);
 
-void envoyGoFilterHttpCopyTrailers(void* r, void* strs, void* buf);
-void envoyGoFilterHttpSetTrailer(void* r, void* key, void* value);
+int envoyGoFilterHttpCopyTrailers(void* r, void* strs, void* buf);
+int envoyGoFilterHttpSetTrailer(void* r, void* key, void* value);
 
-void envoyGoFilterHttpGetStringValue(void* r, int id, void* value);
+int envoyGoFilterHttpGetStringValue(void* r, int id, void* value);
 
 void envoyGoFilterHttpFinalize(void* r, int reason);
 
