@@ -237,7 +237,7 @@ TEST_P(CdsIntegrationTest, CdsClusterTeardownWhileConnecting) {
 }
 
 // Test that TrafficStats lazyinit when configured.
-TEST_P(CdsIntegrationTest, TrafficStatsLazyInit) {
+TEST_P(CdsIntegrationTest, TrafficStatsWithClusterCreateUpdateDelete) {
   this->use_real_stats_ = true;
 
   initialize();
@@ -307,6 +307,91 @@ TEST_P(CdsIntegrationTest, TrafficStatsLazyInit) {
     EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.inited"), nullptr);
     EXPECT_EQ(test_server_->gauge("cluster.cluster_2.ClusterTrafficStats.inited"), nullptr);
   }
+}
+
+// Test that TrafficStats lazyinit when configured.
+TEST_P(CdsIntegrationTest, TrafficStatsWithClusterCreateDeleteRecrete) {
+  this->use_real_stats_ = true;
+
+  initialize();
+  // Ensures that the ClusterInfoImpl is created already.
+  test_server_->waitForCounterGe("cluster_manager.cluster_added", 1);
+  if (this->enableLazyInitStats()) {
+    EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.inited")->value(), 0);
+    EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total"), nullptr);
+  } else {
+    EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 0);
+  }
+  auto send_http_request_to_cluster_1_and_wait_for_response = [&]() {
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":method", "GET"},
+        {":path", "/cluster1"},
+        {":scheme", "http"},
+        {":authority", "host"},
+    };
+    BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+        lookupPort("http"), "GET", "/cluster1", "", downstream_protocol_, version_, "foo.com");
+    ASSERT_TRUE(response->complete());
+    cleanupUpstreamAndDownstream();
+  };
+
+  send_http_request_to_cluster_1_and_wait_for_response();
+  if (this->enableLazyInitStats()) {
+    EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.inited")->value(), 1);
+  }
+  // Cluster_1 trafficStats updated.
+  EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
+  // Remove "cluster_1".
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster, {}, {},
+                                                             {ClusterName1}, "42");
+  // Add "cluster_2".
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      Config::TypeUrl::get().Cluster, {cluster2_}, {cluster2_}, {ClusterName1}, "43");
+  test_server_->waitForCounterGe("cluster_manager.cds.update_success", 4);
+  EXPECT_EQ(test_server_->counter("cluster_manager.cluster_added")->value(), 3);
+
+  if (this->enableLazyInitStats()) {
+    // Now the cluster_1 stats are gone, as well as the lazy init wrapper.
+    EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.inited"), nullptr);
+    EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total"), nullptr);
+    // No cluster_2 stats yet.
+    EXPECT_NE(test_server_->gauge("cluster.cluster_2.ClusterTrafficStats.inited"), nullptr);
+    EXPECT_EQ(test_server_->gauge("cluster.cluster_2.ClusterTrafficStats.inited")->value(), 0);
+    EXPECT_EQ(test_server_->counter("cluster.cluster_2.upstream_cx_total"), nullptr);
+  } else {
+    // cluster_1 stats are gone.
+    EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total"), nullptr);
+    // cluster_2 stats created.
+    EXPECT_EQ(test_server_->counter("cluster.cluster_2.upstream_cx_total")->value(), 0);
+    // No lazy init gauges.
+    EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.inited"), nullptr);
+    EXPECT_EQ(test_server_->gauge("cluster.cluster_2.ClusterTrafficStats.inited"), nullptr);
+  }
+
+  // Now readd cluster1.
+  envoy::config::cluster::v3::Cluster cluster1_updated =
+      cluster_creator_(ClusterName1, fake_upstreams_[UpstreamIndex2]->localAddress()->ip()->port(),
+                       Network::Test::getLoopbackAddressString(ipVersion()), "ROUND_ROBIN");
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      Config::TypeUrl::get().Cluster, {cluster1_updated}, {cluster1_updated}, {}, "42");
+  test_server_->waitForCounterGe("cluster_manager.cds.update_success", 2);
+  if (this->enableLazyInitStats()) {
+    // Now the ClusterTrafficStats.inited gauge is 0, since it didn't see previous http request.
+    EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.inited")->value(), 0);
+    EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total"), nullptr);
+  } else {
+    // No traffic yet.
+    EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 0);
+  }
+
+  send_http_request_to_cluster_1_and_wait_for_response();
+
+  if (this->enableLazyInitStats()) {
+    // Now the ClusterTrafficStats.inited gauge is 0, since it didn't see previous http request.
+    EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.inited")->value(), 1);
+  }
+  // cluster_1 traffic stats updated.
+  EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total"), nullptr);
 }
 
 // Test the fast addition and removal of clusters when they use ThreadAwareLb.
