@@ -39,9 +39,19 @@ message ClientSideWeightedRoundRobin {
 
   // A given endpoint must report load metrics continuously for at least
   // this long before the endpoint weight will be used. This avoids
-  // churn when the set of endpoint addresses changes. Default is 10 seconds.
+  // churn when the set of endpoint addresses changes. Takes effect
+  // both immediately after we establish a connection to an endpoint and
+  // after weight_expiration_period has caused us to stop using the most
+  // recent load metrics. Default is 10 seconds.
   google.protobuf.Duration blackout_period = 3;
 
+  // If a given endpoint has not reported load metrics in this long,
+  // then we stop using the reported weight. This ensures that we do
+  // not continue to use very stale weights. Once we stop using a stale
+  // value, if we later start seeing fresh reports again, the
+  // blackout_period applies. Defaults to 3 seconds.
+  google.protobuf.Duration weight_expiration_period = 4;
+
   // How often endpoint weights are recalculated.  Default is 1 second.
-  google.protobuf.Duration weight_update_period = 4;
+  google.protobuf.Duration weight_update_period = 5;
 }
