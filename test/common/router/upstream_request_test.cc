@@ -187,6 +187,11 @@ TEST_F(UpstreamRequestTest, DumpsStateWithoutAllocatingMemory) {
   EXPECT_THAT(ostream.contents(), HasSubstr("request_headers: \n"));
 }
 
+TEST_F(UpstreamRequestTest, TestSetStreamInfoFields) {
+  initialize();
+  EXPECT_EQ(upstream_request_->streamInfo().route(), router_filter_interface_.callbacks_.route());
+}
+
 } // namespace
 } // namespace Router
 } // namespace Envoy

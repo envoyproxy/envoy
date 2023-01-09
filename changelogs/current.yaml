@@ -131,6 +131,9 @@ bug_fixes:
 - area: grpc_http_bridge
   change: |
     fixed a bug where response data could be lost for requests that were upgraded from Protobuf.
+- area: router
+  change: |
+    fixed a bug that custom tags of the route metadata type are not set for upstream spans.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`

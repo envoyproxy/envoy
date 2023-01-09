@@ -108,7 +108,6 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
     }
   }
   stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
-  // route_ can be used to set route kind of metadata in custom tags.
   stream_info_.route_ = parent.callbacks()->route();
   parent_.callbacks()->streamInfo().setUpstreamInfo(stream_info_.upstreamInfo());
 
