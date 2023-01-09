@@ -592,7 +592,7 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
       bootstrap_extensions_.push_back(
           factory->createBootstrapExtension(*config, serverFactoryContext()));
     } else {
-      // For legacy reasons, the listener manager factory is not a boostrap factory and is special
+      // For legacy reasons, the listener manager factory is not a bootstrap factory and is special
       // cased.
       listener_manager_factory_ =
           Config::Utility::getAndCheckFactory<ListenerManagerFactory>(bootstrap_extension, false);
