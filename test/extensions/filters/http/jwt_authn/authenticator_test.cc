@@ -253,7 +253,7 @@ TEST_F(AuthenticatorTest, TestSetHeader) {
 
 // This test verifies jwt status in failed status in metadata
 TEST_F(AuthenticatorTest, TestSetExpiredJwtToGetStatus) {
-  // Config failed_status_in_metadata flag
+  // Config provider and failed status in metadata
   auto& provider = (*proto_config_.mutable_providers())[std::string(ProviderName)];
   provider.set_failed_status_in_metadata("jwt-failure-reason");
   createAuthenticator();
@@ -284,7 +284,7 @@ TEST_F(AuthenticatorTest, TestSetExpiredJwtToGetStatus) {
 
 // This test verifies jwt status in failed status in metadata with allow missing or failed
 TEST_F(AuthenticatorTest, TestSetInvalidJwtToGetStatus) {
-  // Config failed_status_in_metadata flag
+  // Config provider and failed status in metadata
   auto& provider = (*proto_config_.mutable_providers())[std::string(ProviderName)];
   provider.set_failed_status_in_metadata("jwt-failure-reason");
   createAuthenticator(nullptr, absl::make_optional<std::string>(ProviderName),
@@ -318,7 +318,7 @@ TEST_F(AuthenticatorTest, TestSetInvalidJwtToGetStatus) {
 
 // This test verifies jwt missing status in failed status in metadata with allow missing or failed
 TEST_F(AuthenticatorTest, TestSetMissingJwtToGetStatus) {
-  // Config failed_status_in_metadata flag
+  // Config provider and failed status in metadata
   auto& provider = (*proto_config_.mutable_providers())[std::string(ProviderName)];
   provider.set_failed_status_in_metadata("jwt-failure-reason");
   createAuthenticator(nullptr, absl::make_optional<std::string>(ProviderName),
@@ -351,7 +351,7 @@ TEST_F(AuthenticatorTest, TestSetMissingJwtToGetStatus) {
 // This test verifies invalid and valid jwt status in failed status in metadata with allow missing
 // or failed
 TEST_F(AuthenticatorTest, TestSetInvalidAndValidJwtToGetStatus) {
-  // Config failed_status_in_metadata flag
+  // Config provider and failed status in metadata
   auto& provider = (*proto_config_.mutable_providers())[std::string(ProviderName)];
   provider.set_failed_status_in_metadata("jwt-failure-reason");
 
@@ -391,7 +391,7 @@ TEST_F(AuthenticatorTest, TestSetInvalidAndValidJwtToGetStatus) {
 // This test verifies two invalid jwt status in failed status in metadata with allow missing or
 // failed
 TEST_F(AuthenticatorTest, TestSetTwoInvalidJwtToGetStatus) {
-  // Config failed_status_in_metadata flag
+  // Config provider and failed status in metadata
   auto& provider = (*proto_config_.mutable_providers())[std::string(ProviderName)];
   provider.set_failed_status_in_metadata("jwt-failure-reason");
 
