@@ -27,6 +27,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // is computed as qps / cpu_utilization.
 //
 // See the :ref:`load balancing architecture overview<arch_overview_load_balancing_types>` for more information.
+//
+// [#next-free-field: 6]
 message ClientSideWeightedRoundRobin {
   // Whether to enable out-of-band utilization reporting collection from
   // the endpoints. By default, per-request utilization reporting is used.
