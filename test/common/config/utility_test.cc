@@ -420,7 +420,7 @@ TEST(UtilityTest, prepareBackoffStrategyCustomValues) {
                           ->isOverTimeLimit(test_base_interval_ms * 10 + 1));
     }
 
-    // set max_interval > base_interval
+    // set max_interval < base_interval
     {
       envoy::config::core::v3::GrpcService grpc_service;
 

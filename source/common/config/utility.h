@@ -41,6 +41,9 @@ namespace Config {
 
 constexpr absl::string_view Wildcard = "*";
 
+/**
+ * Default Parameters for the retry backoff strategy.
+ * /
 static constexpr uint64_t RetryBaseIntervalMs = 500;
 static constexpr uint64_t RetryMaxIntervalMs = 30000;
 
