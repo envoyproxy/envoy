@@ -2585,7 +2585,8 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithCommonLbConfigAndSpecificFi
                                   std::move(scope), true);
       },
       EnvoyException,
-      "cluster: load_balancing_policy be combined with partial fields (zone_aware_lb_config, "
+      "cluster: load_balancing_policy cannot be combined with partial fields "
+      "(zone_aware_lb_config, "
       "locality_weighted_lb_config, consistent_hashing_lb_config) of common_lb_config");
 }
 
