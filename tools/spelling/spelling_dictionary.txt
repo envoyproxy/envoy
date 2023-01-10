@@ -288,6 +288,7 @@ OID
 OK
 OOM
 OOMs
+ORCA
 OS
 OSI
 OSS
@@ -960,6 +961,7 @@ ocagent
 offsetof
 oneof
 oneway
+oob
 opcode
 opencensus
 openssl
