@@ -527,7 +527,8 @@ std::string BaseIntegrationTest::waitForAccessLog(const std::string& filename, u
       return entries[entry];
     }
     if (i % 25 == 0 && client_connection != nullptr) {
-      // Wait 25 ms for default ack timer, then run dispatcher to send pending acks.
+      // The QUIC default delayed ack timer is 25ms. Wait for any pending ack timers to expire,
+      // then run dispatcher to send any pending acks.
       client_connection->dispatcher().run(Envoy::Event::Dispatcher::RunType::NonBlock);
     }
     absl::SleepFor(absl::Milliseconds(1));
