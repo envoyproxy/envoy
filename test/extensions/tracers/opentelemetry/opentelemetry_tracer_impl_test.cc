@@ -41,7 +41,7 @@ public:
     ON_CALL(factory_context, runtime()).WillByDefault(ReturnRef(runtime_));
     ON_CALL(factory_context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
         .WillByDefault(Return(ByMove(std::move(mock_client_factory))));
-    ON_CALL(factory_context, scope()).WillByDefault(ReturnRef(stats_));
+    ON_CALL(factory_context, scope()).WillByDefault(ReturnRef(scope_));
 
     driver_ = std::make_unique<Driver>(opentelemetry_config, context_);
   }
@@ -70,6 +70,7 @@ protected:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Event::MockTimer>* timer_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_;
+  Stats::Scope& scope_{*stats_.rootScope()};
 };
 
 TEST_F(OpenTelemetryDriverTest, InitializeDriverValidConfig) {

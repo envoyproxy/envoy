@@ -189,7 +189,8 @@ public:
         // Use smaller window than the default one to have test coverage of client codec buffer
         // exceeding high watermark.
         /*send_buffer_limit=*/2 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE,
-        persistent_info.crypto_stream_factory_, quic_stat_names_, cache, stats_store_, nullptr);
+        persistent_info.crypto_stream_factory_, quic_stat_names_, cache, *stats_store_.rootScope(),
+        nullptr);
     return session;
   }
 
@@ -260,7 +261,7 @@ public:
     ssl_client_option_.setAlpn(true).setSan(san_to_match_).setSni("lyft.com");
     NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context;
     ON_CALL(context, api()).WillByDefault(testing::ReturnRef(*api_));
-    ON_CALL(context, scope()).WillByDefault(testing::ReturnRef(stats_store_));
+    ON_CALL(context, scope()).WillByDefault(testing::ReturnRef(stats_scope_));
     ON_CALL(context, sslContextManager()).WillByDefault(testing::ReturnRef(context_manager_));
     envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport
         quic_transport_socket_config;

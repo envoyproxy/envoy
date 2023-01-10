@@ -44,7 +44,8 @@ protected:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   AdmissionControlFilterFactory::DualInfo dual_info_{context_};
-  Stats::IsolatedStoreImpl scope_;
+  Stats::IsolatedStoreImpl store_;
+  Stats::Scope& scope_{*store_.rootScope()};
   NiceMock<Random::MockRandomGenerator> random_;
 };
 

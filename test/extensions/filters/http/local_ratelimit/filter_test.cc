@@ -73,8 +73,8 @@ public:
 
     envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit config;
     TestUtility::loadFromYaml(yaml, config);
-    config_ = std::make_shared<FilterConfig>(config, local_info_, dispatcher_, stats_, runtime_,
-                                             per_route);
+    config_ = std::make_shared<FilterConfig>(config, local_info_, dispatcher_, *stats_.rootScope(),
+                                             runtime_, per_route);
     filter_ = std::make_shared<Filter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
 

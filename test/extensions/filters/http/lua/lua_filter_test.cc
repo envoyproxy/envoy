@@ -94,7 +94,7 @@ public:
                    envoy::extensions::filters::http::lua::v3::LuaPerRoute& per_route_proto_config) {
     // Setup filter config for Lua filter.
     config_ = std::make_shared<FilterConfig>(proto_config, tls_, cluster_manager_, api_,
-                                             stats_store_, "test.");
+                                             *stats_store_.rootScope(), "test.");
     // Setup per route config for Lua filter.
     per_route_config_ =
         std::make_shared<FilterConfigPerRoute>(per_route_proto_config, server_factory_context_);
@@ -246,7 +246,7 @@ TEST(LuaHttpFilterConfigTest, BadCode) {
   proto_config.mutable_default_source_code()->set_inline_string(SCRIPT);
 
   EXPECT_THROW_WITH_MESSAGE(
-      FilterConfig(proto_config, tls, cluster_manager, api, stats_store, "lua"),
+      FilterConfig(proto_config, tls, cluster_manager, api, *stats_store.rootScope(), "lua"),
       Filters::Common::Lua::LuaException,
       "script load error: [string \"...\"]:3: '=' expected near '<eof>'");
 }

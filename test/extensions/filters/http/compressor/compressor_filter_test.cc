@@ -65,8 +65,8 @@ public:
     TestUtility::loadFromJson(json, compressor);
     auto compressor_factory = std::make_unique<TestCompressorFactory>("test");
     compressor_factory_ = compressor_factory.get();
-    config_ = std::make_shared<CompressorFilterConfig>(compressor, "test.", stats_, runtime_,
-                                                       std::move(compressor_factory));
+    config_ = std::make_shared<CompressorFilterConfig>(compressor, "test.", *stats_.rootScope(),
+                                                       runtime_, std::move(compressor_factory));
     filter_ = std::make_unique<CompressorFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
@@ -763,8 +763,8 @@ protected:
                               compressor);
     auto compressor_factory1 = std::make_unique<TestCompressorFactory>("test1");
     compressor_factory1->setExpectedCompressCalls(0);
-    auto config1 = std::make_shared<CompressorFilterConfig>(compressor, "test1.", stats1_, runtime_,
-                                                            std::move(compressor_factory1));
+    auto config1 = std::make_shared<CompressorFilterConfig>(
+        compressor, "test1.", *stats1_.rootScope(), runtime_, std::move(compressor_factory1));
     filter1_ = std::make_unique<CompressorFilter>(config1);
 
     TestUtility::loadFromJson(R"EOF(
@@ -780,8 +780,8 @@ protected:
                               compressor);
     auto compressor_factory2 = std::make_unique<TestCompressorFactory>("test2");
     compressor_factory2->setExpectedCompressCalls(0);
-    auto config2 = std::make_shared<CompressorFilterConfig>(compressor, "test2.", stats2_, runtime_,
-                                                            std::move(compressor_factory2));
+    auto config2 = std::make_shared<CompressorFilterConfig>(
+        compressor, "test2.", *stats2_.rootScope(), runtime_, std::move(compressor_factory2));
     filter2_ = std::make_unique<CompressorFilter>(config2);
   }
 
@@ -886,8 +886,8 @@ protected:
                                           choose_first1),
                               compressor);
     auto compressor_factory1 = std::make_unique<TestCompressorFactory>("test1");
-    auto config1 = std::make_shared<CompressorFilterConfig>(compressor, "test1.", stats1_, runtime_,
-                                                            std::move(compressor_factory1));
+    auto config1 = std::make_shared<CompressorFilterConfig>(
+        compressor, "test1.", *stats1_.rootScope(), runtime_, std::move(compressor_factory1));
     filter1_ = std::make_unique<CompressorFilter>(config1);
 
     TestUtility::loadFromJson(fmt::format(R"EOF(
@@ -904,8 +904,8 @@ protected:
                                           choose_first2),
                               compressor);
     auto compressor_factory2 = std::make_unique<TestCompressorFactory>("test2");
-    auto config2 = std::make_shared<CompressorFilterConfig>(compressor, "test2.", stats2_, runtime_,
-                                                            std::move(compressor_factory2));
+    auto config2 = std::make_shared<CompressorFilterConfig>(
+        compressor, "test2.", *stats2_.rootScope(), runtime_, std::move(compressor_factory2));
     filter2_ = std::make_unique<CompressorFilter>(config2);
   }
 
@@ -1012,7 +1012,7 @@ TEST(CompressorFilterConfigTests, MakeCompressorTest) {
   EXPECT_CALL(*compressor_factory, createCompressor());
   EXPECT_CALL(*compressor_factory, statsPrefix());
   EXPECT_CALL(*compressor_factory, contentEncoding());
-  CompressorFilterConfig config(compressor_cfg, "test.compressor.", stats, runtime,
+  CompressorFilterConfig config(compressor_cfg, "test.compressor.", *stats.rootScope(), runtime,
                                 std::move(compressor_factory));
   Envoy::Compression::Compressor::CompressorPtr compressor = config.makeCompressor();
 }

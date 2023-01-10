@@ -227,7 +227,7 @@ protected:
   }
 
   std::unique_ptr<TestOverloadManager> createOverloadManager(const std::string& config) {
-    return std::make_unique<TestOverloadManager>(dispatcher_, stats_, thread_local_,
+    return std::make_unique<TestOverloadManager>(dispatcher_, *stats_.rootScope(), thread_local_,
                                                  parseConfig(config), validation_visitor_, *api_,
                                                  options_);
   }
