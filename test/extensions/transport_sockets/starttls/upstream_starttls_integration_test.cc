@@ -275,7 +275,7 @@ void StartTlsIntegrationTest::initialize() {
   static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
   tls_context_ = Network::DownstreamTransportSocketFactoryPtr{
       new Extensions::TransportSockets::Tls::ServerSslSocketFactory(
-          std::move(cfg), *tls_context_manager_, *client_stats_store, {})};
+          std::move(cfg), *tls_context_manager_, *client_stats_store->rootScope(), {})};
 
   BaseIntegrationTest::initialize();
 }
