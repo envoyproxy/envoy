@@ -16,7 +16,7 @@ class PacketsToReadDelegate {
 public:
   virtual ~PacketsToReadDelegate() = default;
 
-  virtual size_t numPacketsExpectedPerEventLoop() PURE;
+  virtual size_t numPacketsExpectedPerEventLoop() const PURE;
 };
 
 // A client QuicConnection instance managing its own file events.
@@ -55,7 +55,7 @@ public:
   }
   size_t numPacketsExpectedPerEventLoop() const override {
     if (delegate_.has_value()) {
-      return delegate_.value().get().numPacketsExpectedPerEventLoop();
+      return delegate_->numPacketsExpectedPerEventLoop();
     }
     return DEFAULT_PACKETS_TO_READ_PER_CONNECTION;
   }
