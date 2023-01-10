@@ -273,8 +273,8 @@ TEST_P(CdsIntegrationTest, TrafficStatsWithClusterCreateUpdateDelete) {
       Config::TypeUrl::get().Cluster, {cluster1_updated}, {cluster1_updated}, {}, "42");
   test_server_->waitForCounterGe("cluster_manager.cds.update_success", 2);
   if (this->enableLazyInitStats()) {
-    // Now the ClusterTrafficStats.inited gauge >= 1, since there is a small race window between the
-    // testing thread fetching the value before the old version ClusterTrafficStats gets deleted
+    // Now the ClusterTrafficStats 'inited_' gauge >= 1, since there is a small race window between
+    // the testing thread fetching the value before the old version ClusterTrafficStats gets deleted
     // from main thread and worker thread.
     EXPECT_GE(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.inited")->value(), 1);
   }
@@ -381,7 +381,7 @@ TEST_P(CdsIntegrationTest, TrafficStatsWithClusterCreateDeleteRecrete) {
       Config::TypeUrl::get().Cluster, {cluster1_updated}, {cluster1_updated}, {}, "42");
   test_server_->waitForCounterGe("cluster_manager.cds.update_success", 4);
   if (this->enableLazyInitStats()) {
-    // Now the ClusterTrafficStats.inited gauge is 0, since it didn't see previous http request.
+    // Now the ClusterTrafficStats 'inited_' gauge is 0, since it didn't see previous http request.
     EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.inited")->value(), 0);
     EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total"), nullptr);
   } else {
@@ -391,7 +391,7 @@ TEST_P(CdsIntegrationTest, TrafficStatsWithClusterCreateDeleteRecrete) {
 
   send_http_request_to_cluster_and_wait_for_response("cluster_1");
   if (this->enableLazyInitStats()) {
-    // Now the ClusterTrafficStats.inited gauge is 0, since it didn't see previous http request.
+    // Now the ClusterTrafficStats 'inited_' gauge is 0, since it didn't see previous http request.
     EXPECT_EQ(test_server_->gauge("cluster.cluster_1.ClusterTrafficStats.inited")->value(), 1);
   }
   // cluster_1 traffic stats updated.

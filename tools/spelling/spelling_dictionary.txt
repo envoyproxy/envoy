@@ -52,6 +52,7 @@ DSR
 DSS
 EBADF
 ECH
+enable_lazyinit_stats
 ENDIF
 ENOTCONN
 ENQ

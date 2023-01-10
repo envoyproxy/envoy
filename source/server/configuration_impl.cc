@@ -109,7 +109,7 @@ void MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstr
     server.listenerManager().addOrUpdateListener(listeners[i], "", false);
   }
   initializeWatchdogs(bootstrap, server);
-  // This has to happen after ClusterManager initilization, as it depends on config from
+  // This has to happen after ClusterManager initialization, as it depends on config from
   // ClusterManager.
   loadSinksIntoStatsConfig(bootstrap, server);
 }
