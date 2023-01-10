@@ -123,12 +123,29 @@ envoy_cc_test(
     name = "stats_request_test",
     srcs = envoy_select_admin_functionality(["stats_request_test.cc"]),
     deps = [
+        ":stats_request_test_base",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "stats_request_test_base",
+    srcs = envoy_select_admin_functionality(["stats_request_test_base.cc"]),
+    hdrs = ["stats_request_test_base.h"],
+    deps = [
         "//source/common/stats:thread_local_store_lib",
         "//source/server/admin:stats_request_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "prometheus_stats_request_test",
+    srcs = envoy_select_admin_functionality(["prometheus_stats_request_test.cc"]),
+    deps = [
+        ":stats_request_test_base",
     ],
 )
 
