@@ -41,6 +41,7 @@ public:
   uint64_t id_{next_id_++};
   bool read_enabled_{true};
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
+  std::string local_close_reason_{"unset_local_close_reason"};
   Connection::State state_{Connection::State::Open};
 };
 

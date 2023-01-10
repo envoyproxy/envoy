@@ -3885,7 +3885,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainCloseRaceWithClose) {
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Return(codecProtocolError("protocol error")));
   EXPECT_CALL(*drain_timer, disableTimer());
   EXPECT_CALL(filter_callbacks_.connection_,
-              close(Network::ConnectionCloseType::FlushWriteAndDelay))
+              close(Network::ConnectionCloseType::FlushWriteAndDelay, _))
       .WillOnce(Return());
   conn_manager_->onData(fake_input, false);
 
@@ -3983,7 +3983,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainClose) {
 
   EXPECT_CALL(*codec_, goAway());
   EXPECT_CALL(filter_callbacks_.connection_,
-              close(Network::ConnectionCloseType::FlushWriteAndDelay));
+              close(Network::ConnectionCloseType::FlushWriteAndDelay, _));
   EXPECT_CALL(*drain_timer, disableTimer());
   drain_timer->invokeCallback();
 
