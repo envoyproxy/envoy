@@ -1,35 +1,10 @@
-#include <memory>
-
-#include "source/common/buffer/buffer_impl.h"
-#include "source/common/stats/thread_local_store.h"
-#include "source/server/admin/stats_request.h"
-
-#include "test/mocks/event/mocks.h"
-#include "test/mocks/stats/mocks.h"
-#include "test/mocks/thread_local/mocks.h"
-#include "test/test_common/utility.h"
-
-#include "gtest/gtest.h"
-
-using testing::NiceMock;
-using testing::StartsWith;
+#include "test/server/admin/stats_request_test_base.h"
 
 namespace Envoy {
 namespace Server {
 
-class StatsRequestTest : public testing::Test {
+class StatsRequestTest : public StatsRequestTestBase<StatsRequest> {
 protected:
-  StatsRequestTest() : pool_(symbol_table_), alloc_(symbol_table_), store_(alloc_) {
-    store_.addSink(sink_);
-    store_.initializeThreading(main_thread_dispatcher_, tls_);
-  }
-
-  ~StatsRequestTest() override {
-    tls_.shutdownGlobalThreading();
-    store_.shutdownThreading();
-    tls_.shutdownThread();
-  }
-
   std::unique_ptr<StatsRequest> makeRequest(bool used_only, StatsFormat format, StatsType type) {
     StatsParams params;
     params.used_only_ = used_only;
@@ -37,53 +12,6 @@ protected:
     params.format_ = format;
     return std::make_unique<StatsRequest>(store_, params);
   }
-
-  // Executes a request, counting the chunks that were generated.
-  uint32_t iterateChunks(StatsRequest& request, bool drain = true,
-                         Http::Code expect_code = Http::Code::OK) {
-    Http::TestResponseHeaderMapImpl response_headers;
-    Http::Code code = request.start(response_headers);
-    EXPECT_EQ(expect_code, code);
-    if (code != Http::Code::OK) {
-      return 0;
-    }
-    Buffer::OwnedImpl data;
-    uint32_t num_chunks = 0;
-    bool more = true;
-    do {
-      more = request.nextChunk(data);
-      uint64_t size = data.length();
-      if (size > 0) {
-        ++num_chunks;
-        if (drain) {
-          data.drain(size);
-        }
-      }
-    } while (more);
-    return num_chunks;
-  }
-
-  // Executes a request, returning the rendered buffer as a string.
-  std::string response(StatsRequest& request) {
-    Http::TestResponseHeaderMapImpl response_headers;
-    Http::Code code = request.start(response_headers);
-    EXPECT_EQ(Http::Code::OK, code);
-    Buffer::OwnedImpl data;
-    while (request.nextChunk(data)) {
-    }
-    return data.toString();
-  }
-
-  Stats::StatName makeStatName(absl::string_view name) { return pool_.add(name); }
-
-  Stats::SymbolTableImpl symbol_table_;
-  Stats::StatNamePool pool_;
-  Stats::AllocatorImpl alloc_;
-  NiceMock<Stats::MockSink> sink_;
-  NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
-  NiceMock<ThreadLocal::MockInstance> tls_;
-  Stats::ThreadLocalStoreImpl store_;
-  Buffer::OwnedImpl response_;
 };
 
 TEST_F(StatsRequestTest, Empty) {
@@ -148,6 +76,7 @@ TEST_F(StatsRequestTest, OneStatUsedOnly) {
 }
 
 TEST_F(StatsRequestTest, OneStatJson) {
+<<<<<<< Updated upstream
   store_.rootScope()->counterFromStatName(makeStatName("foo"));
   EXPECT_THAT(response(*makeRequest(false, StatsFormat::Json, StatsType::All)), StartsWith("{"));
 }
@@ -161,6 +90,10 @@ TEST_F(StatsRequestTest, OneStatPrometheus) {
   EXPECT_ENVOY_BUG(iterateChunks(*makeRequest(false, StatsFormat::Prometheus, StatsType::All), true,
                                  Http::Code::BadRequest),
                    "reached Prometheus case in switch unexpectedly");
+=======
+  store_.counterFromStatName(makeStatName("foo"));
+  EXPECT_THAT(response(*makeRequest(false, StatsFormat::Json, StatsType::All)), testing::StartsWith("{"));
+>>>>>>> Stashed changes
 }
 
 } // namespace Server
