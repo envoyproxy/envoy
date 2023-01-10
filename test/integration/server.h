@@ -307,9 +307,14 @@ public:
     Thread::LockGuard lock(lock_);
     store_.forEachSinkedTextReadout(f_size, f_stat);
   }
+  void forEachSinkedHistogram(Stats::SizeFn f_size, StatFn<ParentHistogram> f_stat) const override {
+    Thread::LockGuard lock(lock_);
+    store_.forEachSinkedHistogram(f_size, f_stat);
+  }
   void setSinkPredicates(std::unique_ptr<SinkPredicates>&& sink_predicates) override {
     UNREFERENCED_PARAMETER(sink_predicates);
   }
+  OptRef<SinkPredicates> sinkPredicates() override { return OptRef<SinkPredicates>{}; }
   void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
     Thread::LockGuard lock(lock_);
     store_.deliverHistogramToSinks(histogram, value);
