@@ -4,6 +4,7 @@
 #include <memory>
 #include <vector>
 
+#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/scope.h"
@@ -136,6 +137,7 @@ public:
   virtual void forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const PURE;
   virtual void forEachSinkedGauge(SizeFn f_size, StatFn<Gauge> f_stat) const PURE;
   virtual void forEachSinkedTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const PURE;
+  virtual void forEachSinkedHistogram(SizeFn f_size, StatFn<ParentHistogram> f_stat) const PURE;
 
   /**
    * Calls 'fn' for every stat. Note that in the case of overlapping scopes, the
@@ -242,12 +244,14 @@ public:
   virtual void mergeHistograms(PostMergeCb merge_complete_cb) PURE;
 
   /**
-   * Set predicates for filtering counters, gauges and text readouts to be flushed to sinks.
+   * Set predicates for filtering stats to be flushed to sinks.
    * Note that if the sink predicates object is set, we do not send non-sink stats over to the
    * child process during hot restart. This will result in the admin stats console being wrong
    * during hot restart.
    */
   virtual void setSinkPredicates(std::unique_ptr<SinkPredicates>&& sink_predicates) PURE;
+
+  virtual OptRef<SinkPredicates> sinkPredicates() PURE;
 };
 
 using StoreRootPtr = std::unique_ptr<StoreRoot>;

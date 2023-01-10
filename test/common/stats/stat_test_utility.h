@@ -239,6 +239,34 @@ std::vector<uint8_t> serializeDeserializeNumber(uint64_t number);
 // Serializes a string into a MemBlock and then decodes it.
 void serializeDeserializeString(absl::string_view in);
 
+class TestSinkPredicates : public SinkPredicates {
+public:
+  ~TestSinkPredicates() override = default;
+
+  bool has(StatName name) { return sinked_stat_names_.find(name) != sinked_stat_names_.end(); }
+
+  // Note: The backing store for the StatName needs to live longer than the
+  // TestSinkPredicates object.
+  void add(StatName name) { sinked_stat_names_.insert(name); }
+
+  // SinkPredicates
+  bool includeCounter(const Counter& counter) override {
+    return sinked_stat_names_.find(counter.statName()) != sinked_stat_names_.end();
+  }
+  bool includeGauge(const Gauge& gauge) override {
+    return sinked_stat_names_.find(gauge.statName()) != sinked_stat_names_.end();
+  }
+  bool includeTextReadout(const TextReadout& text_readout) override {
+    return sinked_stat_names_.find(text_readout.statName()) != sinked_stat_names_.end();
+  }
+  bool includeHistogram(const Histogram& histogram) override {
+    return sinked_stat_names_.find(histogram.statName()) != sinked_stat_names_.end();
+  }
+
+private:
+  StatNameHashSet sinked_stat_names_;
+};
+
 } // namespace TestUtil
 } // namespace Stats
 } // namespace Envoy
