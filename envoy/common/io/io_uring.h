@@ -1,7 +1,11 @@
 #pragma once
 
+#include "envoy/buffer/buffer.h"
+#include "envoy/common/io/io_uring.h"
 #include "envoy/common/pure.h"
+#include "envoy/event/deferred_deletable.h"
 #include "envoy/network/address.h"
+#include "envoy/thread_local/thread_local.h"
 
 namespace Envoy {
 namespace Io {
@@ -94,6 +98,175 @@ public:
    * with the forEveryCompletion() method and try again.
    */
   virtual IoUringResult submit() PURE;
+};
+
+/**
+ * IoUring request type.
+ */
+enum class RequestType { Accept, Connect, Read, Write, Close, Cancel, Unknown };
+
+class IoUringSocket;
+
+/**
+ * Abstract for IoUring I/O Request.
+ */
+struct Request {
+  RequestType type_{RequestType::Unknown};
+  IoUringSocket& io_uring_socket_;
+};
+
+struct AcceptedSocketParam {
+  os_fd_t fd_;
+  sockaddr_storage* remote_addr_;
+  socklen_t remote_addr_len_;
+};
+
+struct ReadParam {
+  Buffer::Instance& pending_read_buf_;
+  int32_t result_;
+};
+
+struct WriteParam {
+  int32_t result_;
+};
+
+/**
+ * Abstract for each socket.
+ */
+class IoUringSocket : public Event::DeferredDeletable {
+public:
+  virtual ~IoUringSocket() = default;
+
+  /**
+   * Return the raw fd.
+   */
+  virtual os_fd_t fd() const PURE;
+
+  /**
+   * close the socket.
+   */
+  virtual void close() PURE;
+
+  /**
+   * Enable the socket.
+   */
+  virtual void enable() PURE;
+
+  /**
+   * Disable the socket.
+   */
+  virtual void disable() PURE;
+
+  /**
+   * Write data to the socket.
+   */
+  virtual uint64_t write(Buffer::Instance&) PURE;
+  virtual uint64_t writev(const Buffer::RawSlice*, uint64_t) PURE;
+
+  /**
+   * Connect to an address.
+   */
+  virtual void connect(const Network::Address::InstanceConstSharedPtr&) PURE;
+
+  /**
+   * On accept request completed.
+   */
+  virtual void onAccept(int32_t);
+
+  /**
+   * On close request completed.
+   */
+  virtual void onClose(int32_t);
+  virtual void onCancel(int32_t);
+  virtual void onConnect(int32_t);
+  virtual void onRead(int32_t);
+  virtual void onWrite(int32_t);
+};
+
+/**
+ * The handler for IoUring request completion.
+ */
+class IoUringHandler {
+public:
+  virtual ~IoUringHandler() = default;
+
+  virtual void onAcceptSocket(AcceptedSocketParam& param) PURE;
+  virtual void onRead(ReadParam& param) PURE;
+  virtual void onWrite(WriteParam& param) PURE;
+};
+
+/**
+ * Abstract for per-thread worker.
+ */
+class IoUringWorker : public ThreadLocal::ThreadLocalObject {
+public:
+  virtual ~IoUringWorker() = default;
+
+  /**
+   * Add an accept socket socket to the worker.
+   */
+  virtual IoUringSocket& addAcceptSocket(os_fd_t fd, IoUringHandler& handler) PURE;
+
+  /**
+   * Add an server socket socket to the worker.
+   */
+  virtual IoUringSocket& addServerSocket(os_fd_t fd, IoUringHandler& handler,
+                                         uint32_t read_buffer_size) PURE;
+
+  /**
+   * Add an client socket socket to the worker.
+   */
+  virtual IoUringSocket& addClientSocket(os_fd_t fd, IoUringHandler& handler,
+                                         uint32_t read_buffer_size) PURE;
+
+  /**
+   * Return the current thread's dispatcher.
+   */
+  virtual Event::Dispatcher& dispatcher() PURE;
+
+  /**
+   * Get IoUringSocket for specific fd.
+   */
+  virtual IoUringSocket& getIoUringSocket(os_fd_t fd) PURE;
+
+  /**
+   * Submit a accept request for a socket.
+   */
+  virtual Request* submitAcceptRequest(IoUringSocket& socket, sockaddr_storage* remote_addr,
+                                       socklen_t* remote_addr_len) PURE;
+
+  /**
+   * Submit a cancel request for a socket.
+   */
+  virtual Request* submitCancelRequest(IoUringSocket& socket, Request* request_to_cancel) PURE;
+
+  /**
+   * Submit a close request for a socket.
+   */
+  virtual Request* submitCloseRequest(IoUringSocket& socket) PURE;
+
+  /**
+   * Submit a read request for a socket.
+   */
+  virtual Request* submitReadRequest(IoUringSocket& socket, struct iovec* iov) PURE;
+
+  /**
+   * Submit a write request for a socket.
+   */
+  virtual Request* submitWritevRequest(IoUringSocket& socket, struct iovec* iovecs,
+                                       uint64_t num_vecs) PURE;
+
+  /**
+   * Submit a connect request for a socket.
+   */
+  virtual Request*
+  submitConnectRequest(IoUringSocket& socket,
+                       const Network::Address::InstanceConstSharedPtr& address) PURE;
+
+  /**
+   * Inject a completion to the fd.
+   */
+  virtual void injectCompletion(os_fd_t fd, RequestType type, int32_t result) PURE;
 };
 
 /**

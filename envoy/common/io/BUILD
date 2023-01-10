@@ -14,6 +14,8 @@ envoy_cc_library(
         "io_uring.h",
     ],
     deps = [
+        "//envoy/buffer:buffer_interface",
+        "//envoy/event:deferred_deletable",
         "//envoy/network:address_interface",
     ],
 )
