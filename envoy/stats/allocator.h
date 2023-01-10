@@ -95,7 +95,7 @@ public:
   virtual void forEachSinkedTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const PURE;
 
   /**
-   * Set the predicates to filter counters, gauges and text readouts for sink.
+   * Set the predicates to filter stats for sink.
    */
   virtual void setSinkPredicates(std::unique_ptr<SinkPredicates>&& sink_predicates) PURE;
 
