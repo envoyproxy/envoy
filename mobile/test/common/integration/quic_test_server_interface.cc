@@ -1,5 +1,7 @@
 #include "test/common/integration/quic_test_server_interface.h"
 
+#include "extension_registry.h"
+
 // NOLINT(namespace-envoy)
 
 static std::shared_ptr<Envoy::QuicTestServer> strong_quic_test_server_;
@@ -10,6 +12,7 @@ static std::shared_ptr<Envoy::QuicTestServer> quic_test_server() {
 }
 
 void start_server() {
+  Envoy::ExtensionRegistry::registerFactories();
   strong_quic_test_server_ = std::make_shared<Envoy::QuicTestServer>();
   weak_quic_test_server_ = strong_quic_test_server_;
 

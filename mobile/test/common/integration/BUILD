@@ -128,6 +128,7 @@ envoy_cc_test_library(
         "@envoy//test/config:utility_lib",
         "@envoy//test/mocks/server:transport_socket_factory_context_mocks",
         "@envoy//test/test_common:environment_lib",
+        "@envoy_build_config//:extension_registry",
     ] + select({
         "@envoy//bazel:disable_signal_trace": [],
         "//conditions:default": [
