@@ -58,11 +58,8 @@ jobs:
       name: 'Install dependencies'
     - name: 'Start simulator'
       if: steps.should_run.outputs.run_ci_job == 'true'
-      run: cd mobile && ./ci/mac_start_emulator.sh
+      run: mobile && ./bazelw mobile-install --fat_apk_cpu=x86_64 --start_app //examples/java/hello_world:hello_envoy
       timeout-minutes: 5
-    # Return to using:
-    #   cd mobile && ./bazelw mobile-install --fat_apk_cpu=x86_64 --start_app //examples/java/hello_world:hello_envoy
-    # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.
     - name: 'Start java app'
       if: steps.should_run.outputs.run_ci_job == 'true'
       env:
