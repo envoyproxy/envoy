@@ -1,5 +1,7 @@
 #pragma once
 
+#include <type_traits>
+
 #include "source/common/common/assert.h"
 #include "source/common/common/utility.h"
 #include "source/common/protobuf/utility.h"
@@ -7,11 +9,152 @@
 #include "absl/strings/str_cat.h"
 
 namespace Envoy {
+
+/**
+ * Helper class to pack elements of the same type into a struct like
+ * object, with the expectation that some or most of the elements are not set.
+ *
+ * The overhead of using this class as opposed to declaring the elements
+ * individually in another class or struct is 8 + (n+1) unaligned bytes, where n is
+ * the maximum number of elements in the struct.
+ *
+ * The way to use this class is to first define an enum class with the element
+ * names, and providing the enum class as the third template argument to
+ * PackedStruct, the first two being the type of element and number of element
+ * names. Instantiate the object with the number of elements that have values.
+ * Note that this can be increased after the fact but can (potentially) lead to
+ * memory fragmentation.
+ *
+ * For example:
+ *
+ * ```
+ *    enum class MyElementNames {
+ *      element0,
+ *      element1,
+ *      element2,
+ *      element3
+ *    };
+ *
+ *    using MyPackedStringStruct = PackedStruct<std::string, 4, MyElementNames>;
+ *
+ *    MyPackedStringStruct packed_struct(2); // For this instantiation, only 2
+ *                                           // elements are non-empty
+ *    packed_struct.set(MyElementNames::element1, "abc");
+ *    packed_struct.set(MyElementNames::element2, "def");
+ *
+ *    // Code that accesses the elements of the struct needs to check for existence first.
+ *    if (packed_struct.has(MyElementNames::element0) {
+ *      auto element0 = packed_struct.get(MyElements::element0);
+ *    }
+ * ```
+ */
+template <class T, uint8_t max_size, class ElementName> class PackedStruct {
+public:
+  PackedStruct(size_t a_capacity = 0) : data_(a_capacity > 0 ? new T[a_capacity] : nullptr) {
+    static_assert(std::is_enum_v<ElementName>);
+    static_assert(max_size > 0);
+
+    indices_.fill(max_size);
+    indices_[max_size] = a_capacity;
+  }
+
+  // Number of non-empty elements in the struct. Note that this can be less than
+  // capacity.
+  size_t size() const {
+    return std::accumulate(indices_.begin(), indices_.end() - 1, 0,
+                           [](uint8_t a, uint8_t b) { return b < max_size ? ++a : a; });
+  }
+
+  size_t capacity() const { return indices_[max_size]; }
+
+  // Disable copying
+  PackedStruct(const PackedStruct&) = delete;
+
+  friend void swap(PackedStruct& first, PackedStruct& second) {
+    using std::swap;
+    swap(first.data_, second.data_);
+    swap(first.indices_, second.indices_);
+  }
+
+  // Move constructor and assignment operator.
+  PackedStruct(PackedStruct&& other) noexcept : PackedStruct(0) { swap(*this, other); }
+  PackedStruct& operator=(PackedStruct&& other) {
+    swap(*this, other);
+    return *this;
+  }
+
+  ~PackedStruct() = default;
+
+  T& get(ElementName element_name) {
+    return (*this)[static_cast<std::underlying_type_t<ElementName>>(element_name)];
+  }
+  const T& get(ElementName element_name) const {
+    return (*this)[static_cast<std::underlying_type_t<ElementName>>(element_name)];
+  }
+  bool has(ElementName element_name) const {
+    return has(static_cast<std::underlying_type_t<ElementName>>(element_name));
+  }
+  void set(ElementName element_name, T t) {
+    return assign(static_cast<std::underlying_type_t<ElementName>>(element_name), t);
+  }
+
+private:
+  // Accessors.
+  T& operator[](size_t idx) {
+    RELEASE_ASSERT(idx < static_cast<size_t>(max_size),
+                   absl::StrCat("idx (", idx, ") should be less than ", max_size));
+    RELEASE_ASSERT(indices_[idx] < max_size,
+                   absl::StrCat("Element corresponding to index ", idx, " is not assigned"));
+    return (data_.get())[indices_[idx]];
+  }
+  const T& operator[](size_t idx) const {
+    RELEASE_ASSERT(idx < static_cast<size_t>(max_size),
+                   absl::StrCat("idx (", idx, ") should be less than ", max_size));
+    RELEASE_ASSERT(indices_[idx] < max_size,
+                   absl::StrCat("Element corresponding to index ", idx, " is not assigned"));
+    return (data_.get())[indices_[idx]];
+  }
+
+  bool has(size_t idx) const {
+    RELEASE_ASSERT(idx < static_cast<size_t>(max_size),
+                   absl::StrCat("idx (", idx, ") should be less than ", max_size));
+    return indices_[idx] < max_size;
+  }
+
+  void assign(size_t element_idx, T t) {
+    RELEASE_ASSERT(element_idx < static_cast<size_t>(max_size),
+                   absl::StrCat("element_idx (", element_idx, ") should be less than ", max_size));
+    auto const current_size = size();
+    // If we're at capacity and we don't have a slot for element_idx, increase capacity by 1.
+    if (!has(element_idx) && current_size == capacity()) {
+      std::unique_ptr<T[]> tmp(new T[++indices_[max_size]]);
+      for (size_t idx = 0; idx < current_size; ++idx) {
+        swap(tmp.get()[idx], data_.get()[idx]);
+      }
+      swap(data_, tmp);
+    }
+    if (!has(element_idx)) {
+      indices_[element_idx] = current_size;
+    }
+    data_.get()[indices_[element_idx]] = t;
+  }
+
+  // Storage for elements.
+  std::unique_ptr<T[]> data_;
+
+  // Use indices_[max_size] to store capacity.
+  std::array<uint8_t, static_cast<size_t>(max_size) + 1> indices_;
+};
+
 /**
  * These are helper macros to pack elements of the same type into a struct like
  * object, with the expectation that some or most of the elements are not set.
+ * The main advantage of using these instead of PackedStruct directly is that
+ * one does not need to define enums for element names, and accessors and
+ * modifiers for elements are more intuitive to use (if one can get over the
+ * complexity arising from having to use macros).
  *
- * The overhead of using these macros is 8 + (n+2) unaligned bytes, where n is
+ * The overhead of using these macros is 8 + (n+1) unaligned bytes, where n is
  * the maximum number of elements in the struct.
  *
  * The general flow looks like this:
@@ -68,57 +211,23 @@ namespace Envoy {
       route);
  */
 
-#define PACKED_DATA(T)                                                                             \
-  std::unique_ptr<T[]> createData(size_t capacity = 0) {                                           \
-    std::unique_ptr<T[]> data(capacity > 0 ? new T[capacity] : nullptr);                           \
-    RELEASE_ASSERT(capacity < 0x7f, "size must be less than 0x7f");                                \
-    return data;                                                                                   \
-  }                                                                                                \
-                                                                                                   \
-  T& at(size_t idx) {                                                                              \
-    RELEASE_ASSERT(idx < size_,                                                                    \
-                   absl::StrCat("Index ", idx, " is out of bounds. Size is (", size_, ")"));       \
-    return (data_.get())[idx];                                                                     \
-  }                                                                                                \
-  const T& at(size_t idx) const {                                                                  \
-    RELEASE_ASSERT(idx < size_,                                                                    \
-                   absl::StrCat("Index ", idx, " is out of bounds. Size is (", size_, ")"));       \
-    return (data_.get())[idx];                                                                     \
-  }                                                                                                \
-                                                                                                   \
-  void push_back(T t) {                                                                            \
-    RELEASE_ASSERT(size_ == 0 || size_ - 1 < 0x7f, "size must be less than 0x7f");                 \
-    if (size_ == capacity_) {                                                                      \
-      std::unique_ptr<T[]> tmp(new T[++capacity_]);                                                \
-      for (size_t idx = 0; idx < size_; ++idx) {                                                   \
-        swap(tmp.get()[idx], data_.get()[idx]);                                                    \
-      }                                                                                            \
-      swap(data_, tmp);                                                                            \
-    }                                                                                              \
-    data_.get()[size_++] = t;                                                                      \
-  }                                                                                                \
-                                                                                                   \
-  std::unique_ptr<T[]> data_;                                                                      \
-  uint8_t size_ = 0;                                                                               \
-  uint8_t capacity_ = 0;
-
 #define GENERATE_PACKED_STRUCT_ACCESSOR(NAME, ...)                                                 \
-  const Type& NAME() const {                                                                       \
-    RELEASE_ASSERT(NAME##_idx_ != -1, #NAME "_ is unset.");                                        \
-    return at(NAME##_idx_);                                                                        \
-  }                                                                                                \
-  Type& NAME() {                                                                                   \
-    RELEASE_ASSERT(NAME##_idx_ != -1, #NAME "_ is unset.");                                        \
-    return at(NAME##_idx_);                                                                        \
-  }                                                                                                \
-  bool has_##NAME() const { return NAME##_idx_ != -1; }
+  const Type& NAME() const { return data_.get(Elements::NAME); }                                   \
+  Type& NAME() { return data_.get(Elements::NAME); }                                               \
+  bool has_##NAME() const { return data_.has(Elements::NAME); }
 
 #define GENERATE_PACKED_STRUCT_OPTIONAL_ACCESSOR(NAME, ...)                                        \
   absl::optional<Type> NAME() const {                                                              \
-    return NAME##_idx_ != -1 ? absl::optional<Type>(at(NAME##_idx_)) : absl::nullopt;              \
+    return data_.has(Elements::NAME) ? absl::optional<Type>(data_.get(Elements::NAME))             \
+                                     : absl::nullopt;                                              \
   }
 
-#define GENERATE_PACKED_STRUCT_IDX(NAME, ...) int8_t NAME##_idx_ = -1;
+#define GENERATE_PACKED_STRUCT_ENUM(ALL_ELEMENTS, ...)                                             \
+  enum class Elements : uint8_t {                                                                  \
+    ALL_ELEMENTS(GENERATE_PACKED_STRUCT_ENUM_HELPER) packed_struct_max_elements                    \
+  };
+
+#define GENERATE_PACKED_STRUCT_ENUM_HELPER(NAME, ...) NAME,
 
 #define GENERATE_PACKED_STRUCT_CHECK(NAME, ...)                                                    \
   if (!proto.NAME().empty()) {                                                                     \
@@ -141,14 +250,7 @@ namespace Envoy {
   }
 
 #define GENERATE_PACKED_STRUCT_SETTER(NAME, ...)                                                   \
-  void set_##NAME(Type t) {                                                                        \
-    if (NAME##_idx_ == -1) {                                                                       \
-      NAME##_idx_ = size_;                                                                         \
-      push_back(t);                                                                                \
-      return;                                                                                      \
-    }                                                                                              \
-    at(NAME##_idx_) = t;                                                                           \
-  }
+  void set_##NAME(Type t) { data_.set(Elements::NAME, t); }
 
 #define MAKE_PACKED_STRUCT_FROM_PROTO(PackedStructName, ALL_ELEMENTS, ACCESSOR, HAS_CHECK,         \
                                       ASSIGNMENT)                                                  \
@@ -157,21 +259,22 @@ namespace Envoy {
     ALL_ELEMENTS(ACCESSOR)                                                                         \
     PackedStructName() = delete;                                                                   \
                                                                                                    \
-    PackedStructName(const ProtoType& proto) : capacity_(getSize(proto)) {                         \
-      data_ = createData(capacity_);                                                               \
+    PackedStructName(const ProtoType& proto) : data_(getSize(proto)) {                             \
+      ;                                                                                            \
       ALL_ELEMENTS(ASSIGNMENT)                                                                     \
     }                                                                                              \
                                                                                                    \
-  private:                                                                                         \
-    uint64_t getSize(const ProtoType& proto) {                                                     \
+    GENERATE_PACKED_STRUCT_ENUM(ALL_ELEMENTS) private : uint64_t getSize(const ProtoType& proto) { \
       size_t size = 0;                                                                             \
       ALL_ELEMENTS(HAS_CHECK)                                                                      \
       return size;                                                                                 \
     }                                                                                              \
                                                                                                    \
     ALL_ELEMENTS(GENERATE_PACKED_STRUCT_SETTER)                                                    \
-    PACKED_DATA(Type)                                                                              \
-    ALL_ELEMENTS(GENERATE_PACKED_STRUCT_IDX)                                                       \
+    PackedStruct<                                                                                  \
+        Type, static_cast<std::underlying_type_t<Elements>>(Elements::packed_struct_max_elements), \
+        Elements>                                                                                  \
+        data_;                                                                                     \
   }
 
 #define MAKE_PACKED_STRUCT_BASE(PackedStructName, ALL_ELEMENTS, ACCESSOR, SETTER)                  \
@@ -180,11 +283,14 @@ namespace Envoy {
     ALL_ELEMENTS(ACCESSOR)                                                                         \
     ALL_ELEMENTS(SETTER)                                                                           \
     PackedStructName() = delete;                                                                   \
-    PackedStructName(size_t size) : data_{createData(size)}, capacity_(size) {}                    \
+    PackedStructName(size_t size) : data_(size) {}                                                 \
                                                                                                    \
+    GENERATE_PACKED_STRUCT_ENUM(ALL_ELEMENTS)                                                      \
   private:                                                                                         \
-    PACKED_DATA(Type)                                                                              \
-    ALL_ELEMENTS(GENERATE_PACKED_STRUCT_IDX)                                                       \
+    PackedStruct<                                                                                  \
+        Type, static_cast<std::underlying_type_t<Elements>>(Elements::packed_struct_max_elements), \
+        Elements>                                                                                  \
+        data_;                                                                                     \
   }
 
 #define MAKE_PACKED_STRING_STRUCT(PackedStructName, ALL_ELEMENTS)                                  \
