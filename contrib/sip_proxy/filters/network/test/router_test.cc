@@ -40,7 +40,7 @@ class SipRouterTest : public testing::Test {
 public:
   SipRouterTest()
       : router_filter_config_(std::make_shared<NiceMock<MockRouterFilterConfig>>()),
-        router_stats_(RouterFilterConfigImpl::generateStats("test", store_)){};
+        router_stats_(RouterFilterConfigImpl::generateStats("test", *store_.rootScope())){};
   ~SipRouterTest() override { delete (filter_); }
 
   void initializeTrans(const std::string& sip_protocol_options_yaml = "",
@@ -111,7 +111,7 @@ public:
     context_.cluster_manager_.initializeThreadLocalClusters({cluster_name_});
 
     StreamInfo::StreamInfoImpl stream_info{time_source_, nullptr};
-    SipFilterStats stat = SipFilterStats::generateStats("test.", store_);
+    SipFilterStats stat = SipFilterStats::generateStats("test.", *store_.rootScope());
     EXPECT_CALL(config_, stats()).WillRepeatedly(ReturnRef(stat));
 
     filter_ =
