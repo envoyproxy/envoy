@@ -10,11 +10,6 @@ docker-compose -f docker-compose-go.yaml up --remove-orphans go_plugin_compile
 # shellcheck source=examples/verify-common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
 
-run_log "The provided golang library was compiled for the x86_64 arch and skip other scenes"
-if [[ $(uname -i) != "x86_64" ]]; then
-    exit 0
-fi
-
 run_log "Test golang plugin for header"
 responds_with_header \
     "rsp-header-from-go: bar-test" \
