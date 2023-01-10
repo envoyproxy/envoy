@@ -458,7 +458,7 @@ TEST_F(TcpConnPoolImplTest, IdleTimerCloseConnections) {
   // Note that this is pool level idle instead of client/connection level.
   EXPECT_TRUE(conn_pool_->isIdle());
 
-  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_idle_timeout_.value());
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_cx_idle_timeout_.value());
 }
 
 /**
