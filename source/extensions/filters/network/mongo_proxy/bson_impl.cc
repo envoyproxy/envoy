@@ -98,6 +98,9 @@ std::string BufferHelper::removeString(Buffer::Instance& data) {
   }
 
   char* start = reinterpret_cast<char*>(data.linearize(length));
+  // The BSON spec encodes both strings and cstrings with an additional null
+  // byte, however strings may contain embedded null bytes, therefore the
+  // constructor needs to be given the length of the string explicitly.
   std::string ret(start, length > 0 ? length - 1 : 0);
   data.drain(length);
   return ret;
