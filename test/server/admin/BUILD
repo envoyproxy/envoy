@@ -120,8 +120,8 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test(
-    name = "stats_request_test",
-    srcs = envoy_select_admin_functionality(["stats_request_test.cc"]),
+    name = "ungrouped_stats_request_test",
+    srcs = envoy_select_admin_functionality(["ungrouped_stats_request_test.cc"]),
     deps = [
         ":stats_request_test_base",
     ],
@@ -142,8 +142,8 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test(
-    name = "prometheus_stats_request_test",
-    srcs = envoy_select_admin_functionality(["prometheus_stats_request_test.cc"]),
+    name = "grouped_stats_request_test",
+    srcs = envoy_select_admin_functionality(["grouped_stats_request_test.cc"]),
     deps = [
         ":stats_request_test_base",
     ],

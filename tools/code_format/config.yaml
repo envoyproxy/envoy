@@ -192,10 +192,11 @@ paths:
     - source/common/stats/tag_extractor_impl.h
     - source/common/stats/tag_extractor_impl.cc
     - source/common/version/version.cc
+    - source/server/admin/grouped_stats_request.cc
+    - source/server/admin/ungrouped_stats_request.cc
     - source/server/admin/prometheus_stats.h
     - source/server/admin/prometheus_stats.cc
     - source/server/admin/stats_params.h
-    - source/server/admin/stats_request.cc
     - source/server/admin/utils.h
     - source/server/admin/utils.cc
     - tools/clang_tools/api_booster/main.cc
