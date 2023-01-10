@@ -37,17 +37,11 @@ std::chrono::nanoseconds checkDuration(std::chrono::nanoseconds last,
 class StreamInfoImplTest : public testing::Test {
 protected:
   void assertStreamInfoSize(StreamInfoImpl stream_info) {
-#ifdef __clang__
-#if defined(__linux__)
-#if defined(__has_feature) && !(__has_feature(thread_sanitizer))
     ASSERT_TRUE(sizeof(stream_info) == 800 || sizeof(stream_info) == 816 ||
                 sizeof(stream_info) == 840)
         << "If adding fields to StreamInfoImpl, please check to see if you "
            "need to add them to setFromForRecreateStream or setFrom! Current size "
         << sizeof(stream_info);
-#endif
-#endif
-#endif
   }
   DangerousDeprecatedTestTime test_time_;
 };
@@ -248,7 +242,13 @@ TEST_F(StreamInfoImplTest, SetFromForRecreateStream) {
   s1.addBytesReceived(1);
   s1.downstreamTiming().onLastDownstreamRxByteReceived(test_time_.timeSystem());
 
+#ifdef __clang__
+#if defined(__linux__)
+#if defined(__has_feature) && !(__has_feature(thread_sanitizer))
   assertStreamInfoSize(s1);
+#endif
+#endif
+#endif
 
   StreamInfoImpl s2(Http::Protocol::Http11, test_time_.timeSystem(), nullptr);
   s2.setFromForRecreateStream(s1);
@@ -293,7 +293,13 @@ TEST_F(StreamInfoImplTest, SetFrom) {
   s1.setFilterChainName("foobar");
   s1.setAttemptCount(5);
 
+#ifdef __clang__
+#if defined(__linux__)
+#if defined(__has_feature) && !(__has_feature(thread_sanitizer))
   assertStreamInfoSize(s1);
+#endif
+#endif
+#endif
 
   StreamInfoImpl s2(Http::Protocol::Http11, test_time_.timeSystem(), nullptr);
   Http::TestRequestHeaderMapImpl headers2;

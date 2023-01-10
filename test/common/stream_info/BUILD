@@ -21,7 +21,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "stream_info_impl_test",
     srcs = ["stream_info_impl_test.cc"],
-    copts = ["-Wno-unused-parameter"],
     deps = [
         ":test_int_accessor_lib",
         "//envoy/http:protocol_interface",
