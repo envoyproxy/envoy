@@ -318,9 +318,13 @@ public:
   void transferDrainTrackersTo(Slice& destination) {
     destination.drain_trackers_.splice(destination.drain_trackers_.end(), drain_trackers_);
     ASSERT(drain_trackers_.empty());
+<<<<<<< HEAD
     // The releasor needn't to be transferred, and actually if there is releasor, this
     // slice can't coalesce. Then there won't be a chance to calling this method.
     ASSERT(releasor_ == nullptr);
+=======
+    destination.releasor_.swap(releasor_);
+>>>>>>> a9947e47f9 (Move io_uring interface header file to "envoy/" directory)
   }
 
   /**
@@ -695,6 +699,8 @@ public:
 
   // LibEventInstance
   void postProcess() override;
+
+  void addSlice(Slice&& slice);
 
   /**
    * Create a new slice at the end of the buffer, and copy the supplied content into it.

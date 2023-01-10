@@ -103,6 +103,19 @@ Address::InstanceConstSharedPtr IoSocketHandleBaseImpl::peerAddress() {
   return Address::addressFromSockAddrOrThrow(ss, ss_len, socket_v6only_);
 }
 
+IoHandlePtr IoSocketHandleBaseImpl::duplicate() {
+  auto result = Api::OsSysCallsSingleton::get().duplicate(fd_);
+  RELEASE_ASSERT(result.return_value_ != -1,
+                 fmt::format("duplicate failed for '{}': ({}) {}", fd_, result.errno_,
+                             errorDetails(result.errno_)));
+  return SocketInterfaceImpl::makePlatformSpecificSocket(result.return_value_, socket_v6only_,
+                                                         domain_);
+}
+
+Api::SysCallIntResult IoSocketHandleBaseImpl::shutdown(int how) {
+  return Api::OsSysCallsSingleton::get().shutdown(fd_, how);
+}
+
 absl::optional<std::chrono::milliseconds> IoSocketHandleBaseImpl::lastRoundTripTime() {
   Api::EnvoyTcpInfo info;
   auto result = Api::OsSysCallsSingleton::get().socketTcpInfo(fd_, &info);

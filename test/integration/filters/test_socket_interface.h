@@ -106,8 +106,9 @@ public:
 
 private:
   // SocketInterfaceImpl
-  IoHandlePtr makeSocket(int socket_fd, bool socket_v6only,
+  IoHandlePtr makeSocket(int socket_fd, bool socket_v6only, Socket::Type socket_type,
                          absl::optional<int> domain) const override;
+  bool isBlockingSocket() const override;
 
   const TestIoSocketHandle::WriteOverrideProc write_override_proc_;
 };

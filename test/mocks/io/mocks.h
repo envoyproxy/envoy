@@ -33,10 +33,24 @@ public:
   MOCK_METHOD(void, removeInjectedCompletion, (os_fd_t fd));
 };
 
+class MockIoUringFactory : public IoUringFactory {
+public:
+  MOCK_METHOD(OptRef<IoUringWorker>, getIoUringWorker, ());
+  MOCK_METHOD(void, onWorkerThreadInitialized, ());
+  MOCK_METHOD(bool, currentThreadRegistered, ());
+};
+
 class MockIoUringSocket : public IoUringSocket {
 public:
-  MOCK_METHOD(IoUringWorker&, getIoUringWorker, (), (const));
   MOCK_METHOD(os_fd_t, fd, (), (const));
+  MOCK_METHOD(void, close, (bool, IoUringSocketOnClosedCb));
+  MOCK_METHOD(void, shutdown, (int32_t how));
+  MOCK_METHOD(void, enable, ());
+  MOCK_METHOD(void, disable, ());
+  MOCK_METHOD(void, enableCloseEvent, (bool enable));
+  MOCK_METHOD(void, connect, (const Network::Address::InstanceConstSharedPtr& address));
+  MOCK_METHOD(void, write, (Buffer::Instance & data));
+  MOCK_METHOD(uint64_t, write, (const Buffer::RawSlice* slices, uint64_t num_slice));
   MOCK_METHOD(void, onAccept, (Request * req, int32_t result, bool injected));
   MOCK_METHOD(void, onConnect, (Request * req, int32_t result, bool injected));
   MOCK_METHOD(void, onRead, (Request * req, int32_t result, bool injected));
@@ -45,6 +59,37 @@ public:
   MOCK_METHOD(void, onCancel, (Request * req, int32_t result, bool injected));
   MOCK_METHOD(void, onShutdown, (Request * req, int32_t result, bool injected));
   MOCK_METHOD(void, injectCompletion, (Request::RequestType type));
+  MOCK_METHOD(IoUringSocketStatus, getStatus, (), (const));
+  MOCK_METHOD(IoUringWorker&, getIoUringWorker, (), (const));
+  MOCK_METHOD(const OptRef<ReadParam>&, getReadParam, (), (const));
+  MOCK_METHOD(const OptRef<AcceptedSocketParam>&, getAcceptedSocketParam, (), (const));
+  MOCK_METHOD(const OptRef<WriteParam>&, getWriteParam, (), (const));
+  MOCK_METHOD(void, clearAcceptedSocketParam, ());
+  MOCK_METHOD(void, setFileReadyCb, (Event::FileReadyCb cb));
+};
+
+class MockIoUringWorker : public IoUringWorker {
+public:
+  MOCK_METHOD(IoUringSocket&, addAcceptSocket,
+              (os_fd_t fd, Event::FileReadyCb cb, bool enable_close_event));
+  MOCK_METHOD(IoUringSocket&, addServerSocket,
+              (os_fd_t fd, Event::FileReadyCb cb, bool enable_close_event));
+  MOCK_METHOD(IoUringSocket&, addServerSocket,
+              (os_fd_t fd, Buffer::Instance& read_buf, Event::FileReadyCb cb,
+               bool enable_close_event));
+  MOCK_METHOD(IoUringSocket&, addClientSocket,
+              (os_fd_t fd, Event::FileReadyCb cb, bool enable_close_event));
+  MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
+  MOCK_METHOD(Request*, submitAcceptRequest, (IoUringSocket & socket));
+  MOCK_METHOD(Request*, submitConnectRequest,
+              (IoUringSocket & socket, const Network::Address::InstanceConstSharedPtr& address));
+  MOCK_METHOD(Request*, submitReadRequest, (IoUringSocket & socket));
+  MOCK_METHOD(Request*, submitWriteRequest,
+              (IoUringSocket & socket, const Buffer::RawSliceVector& slices));
+  MOCK_METHOD(Request*, submitCloseRequest, (IoUringSocket & socket));
+  MOCK_METHOD(Request*, submitCancelRequest, (IoUringSocket & socket, Request* request_to_cancel));
+  MOCK_METHOD(Request*, submitShutdownRequest, (IoUringSocket & socket, int how));
+  MOCK_METHOD(uint32_t, getNumOfSockets, (), (const));
 };
 
 } // namespace Io

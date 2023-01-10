@@ -786,11 +786,11 @@ protected:
   void flushStats() {
     if (manual_flush_) {
       server_->flushStats();
-      server_->dispatcher().run(Event::Dispatcher::RunType::Block);
+      server_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
     } else {
       // Default flush interval is 5 seconds.
       simTime().advanceTimeAndRun(std::chrono::seconds(6), server_->dispatcher(),
-                                  Event::Dispatcher::RunType::Block);
+                                  Event::Dispatcher::RunType::NonBlock);
     }
   }
 
@@ -1410,6 +1410,7 @@ TEST_P(ServerInstanceImplTest, WithBootstrapExtensions) {
             EXPECT_NE(nullptr, proto);
             EXPECT_EQ(proto->a(), "foo");
             auto mock_extension = std::make_unique<MockBootstrapExtension>();
+            EXPECT_CALL(*mock_extension, onWorkerThreadInitialized());
             EXPECT_CALL(*mock_extension, onServerInitialized()).WillOnce(Invoke([&ctx]() {
               // call to cluster manager, to make sure it is not nullptr.
               ctx.clusterManager().clusters();

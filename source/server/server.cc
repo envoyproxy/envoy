@@ -641,13 +641,18 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
         std::move(safe_actions), std::move(unsafe_actions), api_->threadFactory());
   }
 
+  Network::SocketInterface* sock = nullptr;
   if (!bootstrap_.default_socket_interface().empty()) {
     auto& sock_name = bootstrap_.default_socket_interface();
-    auto sock = const_cast<Network::SocketInterface*>(Network::socketInterface(sock_name));
-    if (sock != nullptr) {
-      Network::SocketInterfaceSingleton::clear();
-      Network::SocketInterfaceSingleton::initialize(sock);
-    }
+    sock = const_cast<Network::SocketInterface*>(Network::socketInterface(sock_name));
+    ASSERT(sock != nullptr);
+    Network::SocketInterfaceSingleton::clear();
+    Network::SocketInterfaceSingleton::initialize(sock);
+  } else {
+    auto factory = dynamic_cast<Server::Configuration::BootstrapExtensionFactory*>(
+        Network::SocketInterfaceSingleton::getExisting());
+    bootstrap_extensions_.push_back(factory->createBootstrapExtension(
+        *factory->createEmptyConfigProto(), serverFactoryContext()));
   }
 
   ListenerManagerFactory* listener_manager_factory = nullptr;
@@ -732,6 +737,11 @@ void InstanceBase::initializeOrThrow(Network::Address::InstanceConstSharedPtr lo
       serverFactoryContext(), stats_store_, thread_local_, http_context_,
       [this]() -> Network::DnsResolverSharedPtr { return this->getOrCreateDnsResolver(); },
       *ssl_context_manager_, *secret_manager_, quic_stat_names_, *this);
+
+  // Now that the worker thread are initialized, notify the bootstrap extensions.
+  for (auto&& bootstrap_extension : bootstrap_extensions_) {
+    bootstrap_extension->onWorkerThreadInitialized();
+  }
 
   // Now the configuration gets parsed. The configuration may start setting
   // thread local data per above. See MainImpl::initialize() for why ConfigImpl

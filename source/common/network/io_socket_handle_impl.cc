@@ -61,9 +61,9 @@ Api::IoCallUint64Result IoSocketHandleImpl::close() {
   }
 
   ASSERT(SOCKET_VALID(fd_));
-  const int rc = Api::OsSysCallsSingleton::get().close(fd_).return_value_;
+  const Api::SysCallIntResult result = Api::OsSysCallsSingleton::get().close(fd_);
   SET_SOCKET_INVALID(fd_);
-  return {static_cast<unsigned long>(rc), Api::IoError::none()};
+  return sysCallResultToIoCallResult(result);
 }
 
 Api::IoCallUint64Result IoSocketHandleImpl::readv(uint64_t max_length, Buffer::RawSlice* slices,
@@ -492,15 +492,6 @@ Api::SysCallIntResult IoSocketHandleImpl::connect(Address::InstanceConstSharedPt
   return Api::OsSysCallsSingleton::get().connect(fd_, sockaddr_to_use, sockaddr_len_to_use);
 }
 
-IoHandlePtr IoSocketHandleImpl::duplicate() {
-  auto result = Api::OsSysCallsSingleton::get().duplicate(fd_);
-  RELEASE_ASSERT(result.return_value_ != -1,
-                 fmt::format("duplicate failed for '{}': ({}) {}", fd_, result.errno_,
-                             errorDetails(result.errno_)));
-  return SocketInterfaceImpl::makePlatformSpecificSocket(result.return_value_, socket_v6only_,
-                                                         domain_);
-}
-
 void IoSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
                                              Event::FileTriggerType trigger, uint32_t events) {
   ASSERT(file_event_ == nullptr, "Attempting to initialize two `file_event_` for the same "
@@ -522,10 +513,6 @@ void IoSocketHandleImpl::enableFileEvents(uint32_t events) {
   } else {
     ENVOY_BUG(false, "Null file_event_");
   }
-}
-
-Api::SysCallIntResult IoSocketHandleImpl::shutdown(int how) {
-  return Api::OsSysCallsSingleton::get().shutdown(fd_, how);
 }
 
 } // namespace Network

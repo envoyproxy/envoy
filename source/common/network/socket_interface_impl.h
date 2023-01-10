@@ -1,11 +1,25 @@
 #pragma once
 
+#include "envoy/common/io/io_uring.h"
 #include "envoy/network/socket.h"
 
 #include "source/common/network/socket_interface.h"
 
 namespace Envoy {
 namespace Network {
+
+class DefaultSocketInterfaceExtension : public Network::SocketInterfaceExtension {
+public:
+  DefaultSocketInterfaceExtension(Network::SocketInterface& sock_interface,
+                                  std::shared_ptr<Io::IoUringFactory> io_uring_factory)
+      : Network::SocketInterfaceExtension(sock_interface), io_uring_factory_(io_uring_factory) {}
+
+  // Server::BootstrapExtension
+  void onWorkerThreadInitialized() override;
+
+protected:
+  std::shared_ptr<Io::IoUringFactory> io_uring_factory_;
+};
 
 class SocketInterfaceImpl : public SocketInterfaceBase {
 public:
@@ -27,11 +41,26 @@ public:
   };
 
   static IoHandlePtr makePlatformSpecificSocket(int socket_fd, bool socket_v6only,
-                                                absl::optional<int> domain);
+                                                absl::optional<int> domain,
+                                                Io::IoUringFactory* io_uring_factory = nullptr);
+
+  // TODO (soulxu): making those configurable
+  // TODO (soulxu): we should handle when run out of all the entries.
+  static constexpr uint32_t DefaultIoUringSize = 300;
+  static constexpr uint32_t DefaultAcceptSize = 5;
+  static constexpr uint32_t DefaultReadBufferSize = 8192;
+  static constexpr uint32_t DefaultWriteTimeoutMs = 1000;
+  static constexpr bool UseSubmissionQueuePolling = false;
 
 protected:
-  virtual IoHandlePtr makeSocket(int socket_fd, bool socket_v6only,
+  virtual IoHandlePtr makeSocket(int socket_fd, bool socket_v6only, Socket::Type socket_type,
                                  absl::optional<int> domain) const;
+  virtual bool isBlockingSocket() const;
+
+  static bool hasIoUringFactory(Io::IoUringFactory* io_uring_factory);
+
+private:
+  std::weak_ptr<Io::IoUringFactory> io_uring_factory_;
 };
 
 DECLARE_FACTORY(SocketInterfaceImpl);

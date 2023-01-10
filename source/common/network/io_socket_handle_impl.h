@@ -58,14 +58,10 @@ public:
   void initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
                            Event::FileTriggerType trigger, uint32_t events) override;
 
-  IoHandlePtr duplicate() override;
-
   void activateFileEvents(uint32_t events) override;
   void enableFileEvents(uint32_t events) override;
 
   void resetFileEvents() override { file_event_.reset(); }
-
-  Api::SysCallIntResult shutdown(int how) override;
 
 protected:
   // Converts a SysCallSizeResult to IoCallUint64Result.

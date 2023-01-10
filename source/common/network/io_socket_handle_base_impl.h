@@ -30,6 +30,8 @@ public:
   absl::optional<int> domain() override;
   Address::InstanceConstSharedPtr localAddress() override;
   Address::InstanceConstSharedPtr peerAddress() override;
+  IoHandlePtr duplicate() override;
+  Api::SysCallIntResult shutdown(int how) override;
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override;
   absl::optional<uint64_t> congestionWindowInBytes() const override;
   absl::optional<std::string> interfaceName() override;

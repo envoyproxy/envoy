@@ -68,11 +68,13 @@ Api::SysCallIntResult TestIoSocketHandle::connect(Address::InstanceConstSharedPt
   return Test::IoSocketHandlePlatformImpl::connect(address);
 }
 
-IoHandlePtr TestSocketInterface::makeSocket(int socket_fd, bool socket_v6only,
+IoHandlePtr TestSocketInterface::makeSocket(int socket_fd, bool socket_v6only, Socket::Type,
                                             absl::optional<int> domain) const {
   return std::make_unique<TestIoSocketHandle>(write_override_proc_, socket_fd, socket_v6only,
                                               domain);
 }
+
+bool TestSocketInterface::isBlockingSocket() const { return false; }
 
 } // namespace Network
 } // namespace Envoy

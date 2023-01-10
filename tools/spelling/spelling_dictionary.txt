@@ -43,10 +43,12 @@ Repick
 Reserializer
 SION
 TRA
+WR
 Websockets
 abc
 abcd
 abd
+addrlen
 ar
 btree
 CAS
@@ -1395,6 +1397,7 @@ upstreams
 uptime
 upvalue
 urlencoded
+uring
 urls
 userdata
 userinfo
