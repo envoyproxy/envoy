@@ -480,7 +480,7 @@ envoy_cc_library(
         "abseil_node_hash_set",
         "abseil_optional",
         "http_parser",
-        "nghttp2",
+        "quiche_http2_protocol",
     ],
     deps = [
         ":exception_lib",

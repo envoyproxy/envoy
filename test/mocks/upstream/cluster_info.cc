@@ -62,19 +62,21 @@ MockClusterInfo::MockClusterInfo()
       cluster_request_response_size_stat_names_(stats_store_.symbolTable()),
       cluster_timeout_budget_stat_names_(stats_store_.symbolTable()),
       traffic_stats_(ClusterInfoImpl::generateStats(stats_store_.rootScope(), traffic_stat_names_)),
-      config_update_stats_(config_update_stats_names_, stats_store_),
-      lb_stats_(lb_stat_names_, stats_store_), endpoint_stats_(endpoint_stat_names_, stats_store_),
+      config_update_stats_(config_update_stats_names_, *stats_store_.rootScope()),
+      lb_stats_(lb_stat_names_, *stats_store_.rootScope()),
+      endpoint_stats_(endpoint_stat_names_, *stats_store_.rootScope()),
       transport_socket_matcher_(new NiceMock<Upstream::MockTransportSocketMatcher>()),
-      load_report_stats_(ClusterInfoImpl::generateLoadReportStats(load_report_stats_store_,
-                                                                  cluster_load_report_stat_names_)),
+      load_report_stats_(ClusterInfoImpl::generateLoadReportStats(
+          *load_report_stats_store_.rootScope(), cluster_load_report_stat_names_)),
       request_response_size_stats_(std::make_unique<ClusterRequestResponseSizeStats>(
           ClusterInfoImpl::generateRequestResponseSizeStats(
-              request_response_size_stats_store_, cluster_request_response_size_stat_names_))),
+              *request_response_size_stats_store_.rootScope(),
+              cluster_request_response_size_stat_names_))),
       timeout_budget_stats_(
           std::make_unique<ClusterTimeoutBudgetStats>(ClusterInfoImpl::generateTimeoutBudgetStats(
-              timeout_budget_stats_store_, cluster_timeout_budget_stat_names_))),
+              *timeout_budget_stats_store_.rootScope(), cluster_timeout_budget_stat_names_))),
       circuit_breakers_stats_(ClusterInfoImpl::generateCircuitBreakersStats(
-          stats_store_, cluster_circuit_breakers_stat_names_.default_, true,
+          *stats_store_.rootScope(), cluster_circuit_breakers_stat_names_.default_, true,
           cluster_circuit_breakers_stat_names_)),
       resource_manager_(new Upstream::ResourceManagerImpl(
           runtime_, "fake_key", 1, 1024, 1024, 1, std::numeric_limits<uint64_t>::max(),
@@ -103,7 +105,7 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, lbStats()).WillByDefault(ReturnRef(lb_stats_));
   ON_CALL(*this, configUpdateStats()).WillByDefault(ReturnRef(config_update_stats_));
   ON_CALL(*this, endpointStats()).WillByDefault(ReturnRef(endpoint_stats_));
-  ON_CALL(*this, statsScope()).WillByDefault(ReturnRef(stats_store_));
+  ON_CALL(*this, statsScope()).WillByDefault(ReturnRef(*stats_store_.rootScope()));
   // TODO(incfly): The following is a hack because it's not possible to directly embed
   // a mock transport socket factory matcher due to circular dependencies. Fix this up in a follow
   // up.

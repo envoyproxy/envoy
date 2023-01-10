@@ -35,7 +35,7 @@ namespace {
 class RdsTestBase : public testing::Test {
 public:
   RdsTestBase() {
-    ON_CALL(server_factory_context_, scope()).WillByDefault(ReturnRef(scope_));
+    ON_CALL(server_factory_context_, scope()).WillByDefault(ReturnRef(*scope_.rootScope()));
     ON_CALL(server_factory_context_, messageValidationContext())
         .WillByDefault(ReturnRef(validation_context_));
   }
