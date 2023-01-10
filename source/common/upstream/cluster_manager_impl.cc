@@ -406,8 +406,9 @@ ClusterManagerImpl::ClusterManagerImpl(
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                 "envoy.service.discovery.v3.AggregatedDiscoveryService."
                 "DeltaAggregatedResources"),
-            *stats_.rootScope(), Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
-            local_info, dyn_resources.ads_config().set_node_on_first_message_only(),
+            *stats_.rootScope(),
+            Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
+            dyn_resources.ads_config().set_node_on_first_message_only(),
             std::move(custom_config_validators), std::move(backoff_strategy),
             makeOptRefFromPtr(xds_config_tracker_.get()));
       } else {
@@ -418,8 +419,9 @@ ClusterManagerImpl::ClusterManagerImpl(
             main_thread_dispatcher,
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                 "envoy.service.discovery.v3.AggregatedDiscoveryService.DeltaAggregatedResources"),
-            *stats_.rootScope(), Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
-            local_info, std::move(custom_config_validators), std::move(backoff_strategy),
+            *stats_.rootScope(),
+            Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
+            std::move(custom_config_validators), std::move(backoff_strategy),
             makeOptRefFromPtr(xds_config_tracker_.get()));
       }
     } else {
@@ -437,8 +439,9 @@ ClusterManagerImpl::ClusterManagerImpl(
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                 "envoy.service.discovery.v3.AggregatedDiscoveryService."
                 "StreamAggregatedResources"),
-            *stats_.rootScope(), Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
-            local_info, bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only(),
+            *stats_.rootScope(),
+            Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
+            bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only(),
             std::move(custom_config_validators), std::move(backoff_strategy),
             makeOptRefFromPtr(xds_config_tracker_.get()), xds_delegate_opt_ref,
             target_xds_authority);
@@ -451,7 +454,8 @@ ClusterManagerImpl::ClusterManagerImpl(
             main_thread_dispatcher,
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                 "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
-            *stats_.rootScope(), Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
+            *stats_.rootScope(),
+            Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
             bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only(),
             std::move(custom_config_validators), std::move(backoff_strategy),
             makeOptRefFromPtr(xds_config_tracker_.get()), xds_delegate_opt_ref,

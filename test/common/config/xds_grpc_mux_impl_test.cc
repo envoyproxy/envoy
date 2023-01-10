@@ -75,8 +75,9 @@ public:
         std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-        *stats_.rootScope(), custom_rate_limit_settings, local_info_, true, std::move(config_validators_),
-        std::move(backoff_strategy_), /*xds_config_tracker=*/XdsConfigTrackerOptRef());
+        *stats_.rootScope(), custom_rate_limit_settings, local_info_, true,
+        std::move(config_validators_), std::move(backoff_strategy_),
+        /*xds_config_tracker=*/XdsConfigTrackerOptRef());
   }
 
   void expectSendMessage(const std::string& type_url,
