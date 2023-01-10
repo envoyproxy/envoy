@@ -22,6 +22,15 @@
 namespace Envoy {
 
 /**
+ * Converts a timespec structure to a std::chrono::time_point aka. Envoy::SystemTime.
+ * @param t the timespec
+ * @return Envoy::SystemTime the same time as a std::chrono::time_point.
+ */
+constexpr Envoy::SystemTime timespecToChrono(const struct timespec& t) {
+  return Envoy::SystemTime{std::chrono::seconds{t.tv_sec} + std::chrono::nanoseconds{t.tv_nsec}};
+}
+
+/**
  * Retrieve string description of error code
  * @param int error code
  * @return const std::string error detail description

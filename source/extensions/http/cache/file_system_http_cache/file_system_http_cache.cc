@@ -12,11 +12,6 @@
 #include "source/extensions/http/cache/file_system_http_cache/lookup_context.h"
 #include "source/extensions/http/cache/file_system_http_cache/stats.h"
 
-static constexpr Envoy::SystemTime timespecToChrono(const struct timespec& t) {
-  return Envoy::SystemTime{std::chrono::duration_cast<std::chrono::system_clock::duration>(
-      std::chrono::seconds{t.tv_sec} + std::chrono::nanoseconds{t.tv_nsec})};
-}
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {

@@ -29,6 +29,18 @@ using testing::Not;
 
 namespace Envoy {
 
+TEST(TimeSpecToChrono, convertsCorrectly) {
+  struct timespec t;
+  t.tv_nsec = 456789;
+  t.tv_sec = 1673368198;
+  auto expected = SystemTime{std::chrono::seconds{t.tv_sec} + std::chrono::nanoseconds{t.tv_nsec}};
+  EXPECT_EQ(expected, timespecToChrono(t));
+  t.tv_sec++;
+  EXPECT_NE(expected, timespecToChrono(t));
+  expected += std::chrono::seconds{1};
+  EXPECT_EQ(expected, timespecToChrono(t));
+}
+
 TEST(IntUtil, roundUpToMultiple) {
   // Round up to non-power-of-2
   EXPECT_EQ(3, IntUtil::roundUpToMultiple(1, 3));

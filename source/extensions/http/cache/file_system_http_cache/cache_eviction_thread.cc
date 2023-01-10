@@ -58,6 +58,10 @@ bool CacheEvictionThread::waitForSignal() {
 void CacheEvictionThread::work() {
   while (waitForSignal()) {
     absl::MutexLock lock(&cache_mu_);
+    // This lock must be held for the duration of the evictions, as the cache pointers
+    // are not owned by CacheEvictionThread, and can be deleted any time the lock is
+    // not held.
+    // This should only block filter configuration updates that change caches.
     for (FileSystemHttpCache* cache : caches_) {
       cache->maybeEvict();
     }
