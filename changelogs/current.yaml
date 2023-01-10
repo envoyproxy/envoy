@@ -297,6 +297,10 @@ new_features:
     added support to allowlist headers included in the check request to gRPC authorization server (previously only available for HTTP authorization server).
     Pre-existing field :ref:`allowed_headers <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.AuthorizationRequest.allowed_headers>` is deprecated in favour
     of the new field :ref:`allowed_headers <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.allowed_headers>`.
+- area: ext_authz
+  change: |
+    added a new field :ref:`allow_debugging_failures <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.allow_debugging_failures>` to control whether or
+    not to propagate the upstream headers back in case of 5XX failures. By default this flag is set to false in order to maintain the existing behavior.
 - area: attributes
   change: |
     added :ref:`attributes <arch_overview_attributes>` for looking up xDS configuration information.

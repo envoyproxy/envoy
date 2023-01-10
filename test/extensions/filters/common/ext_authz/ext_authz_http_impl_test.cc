@@ -179,6 +179,40 @@ public:
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 };
 
+// Verify that when a call to authorization server returns a 5xx and `allow_debugging_failures` is
+// set then we preserve the original status code, headers, etc.
+TEST_F(ExtAuthzHttpClientTest, AuthorizationRequest5xxNoError) {
+  const std::string yaml = R"EOF(
+    http_service:
+      server_uri:
+        uri: "ext_authz:9000"
+        cluster: "ext_authz"
+        timeout: 0.25s
+      authorization_response:
+        dynamic_metadata_from_headers:
+          patterns:
+          - prefix: "X-Metadata-"
+            ignore_case: true
+    allow_debugging_failures: true
+    )EOF";
+
+  initialize(yaml);
+
+  const auto expected_body = std::string{"test"};
+  const auto expected_headers = TestCommon::makeHeaderValueOption(
+      {{":status", "500", false}, {"foo", "bar", false}, {"honey", "bee", false}});
+  const auto authz_response = TestCommon::makeAuthzResponse(
+      CheckStatus::Error, Http::Code::InternalServerError, expected_body, expected_headers);
+
+  envoy::service::auth::v3::CheckRequest request;
+  client_->check(request_callbacks_, request, parent_span_, stream_info_);
+
+  EXPECT_CALL(request_callbacks_,
+              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzDeniedResponse(authz_response))));
+  client_->onSuccess(async_request_,
+                     TestCommon::makeMessageResponse(expected_headers, expected_body));
+}
+
 // Test HTTP client config default values.
 TEST_F(ExtAuthzHttpClientTest, ClientConfig) {
   const Http::LowerCaseString foo{"foo"};

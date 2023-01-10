@@ -114,6 +114,7 @@ ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3
           config.http_service().authorization_response().allowed_upstream_headers())),
       upstream_header_to_append_matchers_(toUpstreamMatchers(
           config.http_service().authorization_response().allowed_upstream_headers_to_append())),
+      failure_debugging_allowed_(config.allow_debugging_failures()),
       cluster_name_(config.http_service().server_uri().cluster()), timeout_(timeout),
       path_prefix_(path_prefix),
       tracing_name_(fmt::format("async {} egress", config.http_service().server_uri().cluster())),
@@ -275,7 +276,7 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
   // Set an error status if the call to the authorization server returns any of the 5xx HTTP error
   // codes. A Forbidden response is sent to the client if the filter has not been configured with
   // failure_mode_allow.
-  if (Http::CodeUtility::is5xx(status_code)) {
+  if (Http::CodeUtility::is5xx(status_code) && !config_->failureDebuggingAllowed()) {
     return std::make_unique<Response>(errorResponse());
   }
 
@@ -324,6 +325,29 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
                                 Http::Code::OK,
                                 ProtobufWkt::Struct{}}};
     return std::move(ok.response_);
+  }
+
+  // Checks whether the status is 5XX and creates an Error authorization response with headers
+  // status, body, and received from upstream.
+  if (Http::CodeUtility::is5xx(status_code)) {
+    SuccessResponse error{message->headers(),
+                          config_->clientHeaderMatchers(),
+                          config_->upstreamHeaderToAppendMatchers(),
+                          config_->clientHeaderOnSuccessMatchers(),
+                          config_->dynamicMetadataMatchers(),
+                          Response{CheckStatus::Error,
+                                   Http::HeaderVector{},
+                                   Http::HeaderVector{},
+                                   Http::HeaderVector{},
+                                   Http::HeaderVector{},
+                                   Http::HeaderVector{},
+                                   {{}},
+                                   Http::Utility::QueryParamsVector{},
+                                   {},
+                                   message->bodyAsString(),
+                                   static_cast<Http::Code>(status_code),
+                                   ProtobufWkt::Struct{}}};
+    return std::move(error.response_);
   }
 
   // Create a Denied authorization response.

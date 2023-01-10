@@ -430,6 +430,137 @@ TEST_F(HttpFilterTest, ImmediateErrorOpen) {
   EXPECT_EQ(1U, config_->stats().failure_mode_allowed_.value());
 }
 
+// Test when allow_debugging_failures is set then the original returned headers are propagated back
+// to the client.
+TEST_F(HttpFilterTest, ResponseHeadersGetPropagatedBackInFailureDebuggingMode) {
+  InSequence s;
+
+  initialize(R"EOF(
+  transport_api_version: V3
+  http_service:
+    server_uri:
+      uri: "http://localhost:8080"
+      cluster: "ext_authz_server"
+      timeout: "60s"
+  allow_debugging_failures: true
+  )EOF");
+  prepareCheck();
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "500"},
+                                                   {"content-length", "20"},
+                                                   {"content-type", "text/plain"},
+                                                   {"honey", "bee"}};
+
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_CALL(decoder_filter_callbacks_,
+              encodeHeaders_(HeaderMapEqualRef(&response_headers), false))
+      .WillOnce(Invoke([&](const Http::ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ(headers.getStatusValue(),
+                  std::to_string(enumToInt(Http::Code::InternalServerError)));
+      }));
+  EXPECT_CALL(decoder_filter_callbacks_, encodeData(_, true))
+      .WillOnce(Invoke([&](Buffer::Instance& data, bool) {
+        EXPECT_EQ(data.toString(), "something-went-wrong");
+      }));
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
+  response.status_code = Http::Code::InternalServerError;
+  response.body = std::string{"something-went-wrong"};
+  response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString{"honey"}, "bee"}};
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+
+  // Verify that both `failure_debugging_allowed` and `error` counters get incremented.
+  EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromString("ext_authz.error")
+                    .value());
+  EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromString("ext_authz.failure_debugging_allowed")
+                    .value());
+  EXPECT_EQ(1U, config_->stats().error_.value());
+  EXPECT_EQ(1U, config_->stats().failure_debugging_allowed_.value());
+  EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromString("upstream_rq_5xx")
+                    .value());
+  EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromString("upstream_rq_500")
+                    .value());
+}
+
+// Test when allow_debugging_failures is not set then the headers sent from upstream are not
+// propagated back to the client.
+TEST_F(HttpFilterTest, ResponseHeadersDoNotGetPropagatedWhenNotFailureDebuggingMode) {
+  InSequence s;
+
+  initialize(R"EOF(
+  transport_api_version: V3
+  http_service:
+    server_uri:
+      uri: "http://localhost:8080"
+      cluster: "ext_authz_server"
+      timeout: "60s"
+  allow_debugging_failures: false
+  )EOF");
+  prepareCheck();
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "403"}};
+  Buffer::OwnedImpl response_data{};
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data, false));
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
+  response.status_code = Http::Code::InternalServerError;
+  response.body = std::string{"something-went-wrong"};
+  response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString{"honey"}, "bee"}};
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+
+  // Verify that both `failure_debugging_allowed` and `error` counters get incremented.
+  EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromString("ext_authz.error")
+                    .value());
+  EXPECT_EQ(0U, decoder_filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromString("ext_authz.failure_debugging_allowed")
+                    .value());
+  EXPECT_EQ(1U, config_->stats().error_.value());
+  EXPECT_EQ(0U, config_->stats().failure_debugging_allowed_.value());
+  EXPECT_EQ(0U, decoder_filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromString("upstream_rq_5xx")
+                    .value());
+  EXPECT_EQ(0U, decoder_filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromString("upstream_rq_500")
+                    .value());
+}
+
 // Check a bad configuration results in validation exception.
 TEST_F(HttpFilterTest, BadConfig) {
   const std::string filter_config = R"EOF(
