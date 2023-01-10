@@ -35,8 +35,8 @@ LocalRateLimitFilterConfig::createRouteSpecificFilterConfigTyped(
 /**
  * Static registration for the rate limit filter. @see RegisterFactory.
  */
-REGISTER_FACTORY_D(LocalRateLimitFilterConfig,
-                   Server::Configuration::NamedHttpFilterConfigFactory, "envoy.local_rate_limit");
+REGISTER_FACTORY_D(LocalRateLimitFilterConfig, Server::Configuration::NamedHttpFilterConfigFactory,
+                   "envoy.local_rate_limit");
 
 } // namespace LocalRateLimitFilter
 } // namespace HttpFilters

@@ -28,8 +28,8 @@ Tracing::DriverSharedPtr DynamicOpenTracingTracerFactory::createTracerDriverType
 /**
  * Static registration for the dynamic opentracing tracer. @see RegisterFactory.
  */
-REGISTER_FACTORY_D(DynamicOpenTracingTracerFactory,
-                   Server::Configuration::TracerFactory, "envoy.dynamic.ot");
+REGISTER_FACTORY_D(DynamicOpenTracingTracerFactory, Server::Configuration::TracerFactory,
+                   "envoy.dynamic.ot");
 
 } // namespace DynamicOt
 } // namespace Tracers

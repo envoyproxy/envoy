@@ -614,35 +614,37 @@ private:
 /**
  * Macro used for static registration.
  */
-#define REGISTER_FACTORY(FACTORY, BASE)                                                              \
-  ABSL_ATTRIBUTE_UNUSED void forceRegister##FACTORY() {}                                             \
-  static Envoy::Registry::RegisterFactory</* NOLINT(fuchsia-statically-constructed-objects) */       \
-                                          FACTORY, BASE>                                             \
+#define REGISTER_FACTORY(FACTORY, BASE)                                                            \
+  ABSL_ATTRIBUTE_UNUSED void forceRegister##FACTORY() {}                                           \
+  static Envoy::Registry::RegisterFactory</* NOLINT(fuchsia-statically-constructed-objects) */     \
+                                          FACTORY, BASE>                                           \
       FACTORY##_registered
 /**
  * Macro used for static registration with deprecated name.
  */
-#define REGISTER_FACTORY_D(FACTORY, BASE, DEPRECATED_NAME)                                           \
-  ABSL_ATTRIBUTE_UNUSED void forceRegister##FACTORY() {}                                             \
-  static Envoy::Registry::RegisterFactory</* NOLINT(fuchsia-statically-constructed-objects) */       \
-                                          FACTORY, BASE>                                             \
-      FACTORY##_registered{DEPRECATED_NAME}
+#define REGISTER_FACTORY_D(FACTORY, BASE, DEPRECATED_NAME)                                         \
+  ABSL_ATTRIBUTE_UNUSED void forceRegister##FACTORY() {}                                           \
+  static Envoy::Registry::RegisterFactory</* NOLINT(fuchsia-statically-constructed-objects) */     \
+                                          FACTORY, BASE>                                           \
+      FACTORY##_registered {                                                                       \
+    DEPRECATED_NAME                                                                                \
+  }
 #else
 /**
  * Macro used to define a registration function.
  */
-#define REGISTER_FACTORY(FACTORY, BASE)                                                              \
-  Envoy::Registry::RegisterFactory<FACTORY, BASE> *FACTORY##_registered{nullptr};                    \
-  ABSL_ATTRIBUTE_UNUSED void forceRegister##FACTORY() {                                              \
-      FACTORY##_registered = new Envoy::Registry::RegisterFactory<FACTORY, BASE>({});                \
+#define REGISTER_FACTORY(FACTORY, BASE)                                                            \
+  Envoy::Registry::RegisterFactory<FACTORY, BASE>* FACTORY##_registered{nullptr};                  \
+  ABSL_ATTRIBUTE_UNUSED void forceRegister##FACTORY() {                                            \
+    FACTORY##_registered = new Envoy::Registry::RegisterFactory<FACTORY, BASE>({});                \
   }
 /**
  * Macro used to define a registration function with deprecated name.
  */
-#define REGISTER_FACTORY_D(FACTORY, BASE, DEPRECATED_NAME)                                           \
-  Envoy::Registry::RegisterFactory<FACTORY, BASE> *FACTORY##_registered{nullptr};                    \
-  ABSL_ATTRIBUTE_UNUSED void forceRegister##FACTORY() {                                              \
-      FACTORY##_registered = new Envoy::Registry::RegisterFactory<FACTORY, BASE>({DEPRECATED_NAME}); \
+#define REGISTER_FACTORY_D(FACTORY, BASE, DEPRECATED_NAME)                                         \
+  Envoy::Registry::RegisterFactory<FACTORY, BASE>* FACTORY##_registered{nullptr};                  \
+  ABSL_ATTRIBUTE_UNUSED void forceRegister##FACTORY() {                                            \
+    FACTORY##_registered = new Envoy::Registry::RegisterFactory<FACTORY, BASE>({DEPRECATED_NAME}); \
   }
 #endif
 

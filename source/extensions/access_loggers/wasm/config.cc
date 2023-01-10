@@ -71,8 +71,8 @@ std::string WasmAccessLogFactory::name() const { return "envoy.access_loggers.wa
 /**
  * Static registration for the wasm access log. @see RegisterFactory.
  */
-REGISTER_FACTORY_D(WasmAccessLogFactory,
-                   Server::Configuration::AccessLogInstanceFactory, "envoy.wasm_access_log");
+REGISTER_FACTORY_D(WasmAccessLogFactory, Server::Configuration::AccessLogInstanceFactory,
+                   "envoy.wasm_access_log");
 
 } // namespace Wasm
 } // namespace AccessLoggers

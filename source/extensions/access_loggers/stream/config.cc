@@ -46,8 +46,8 @@ std::string StdoutAccessLogFactory::name() const { return "envoy.access_loggers.
 /**
  * Static registration for the file access log. @see RegisterFactory.
  */
-REGISTER_FACTORY_D(StdoutAccessLogFactory,
-                   Server::Configuration::AccessLogInstanceFactory, "envoy.stdout_access_log");
+REGISTER_FACTORY_D(StdoutAccessLogFactory, Server::Configuration::AccessLogInstanceFactory,
+                   "envoy.stdout_access_log");
 
 AccessLog::InstanceSharedPtr StderrAccessLogFactory::createAccessLogInstance(
     const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
@@ -75,8 +75,8 @@ std::string StderrAccessLogFactory::name() const { return "envoy.access_loggers.
 /**
  * Static registration for the `stderr` access log. @see RegisterFactory.
  */
-REGISTER_FACTORY_D(StderrAccessLogFactory,
-                   Server::Configuration::AccessLogInstanceFactory, "envoy.stderr_access_log");
+REGISTER_FACTORY_D(StderrAccessLogFactory, Server::Configuration::AccessLogInstanceFactory,
+                   "envoy.stderr_access_log");
 
 } // namespace File
 } // namespace AccessLoggers
