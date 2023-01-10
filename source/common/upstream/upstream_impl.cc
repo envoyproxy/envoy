@@ -1207,6 +1207,7 @@ void ClusterInfoImpl::configureLbPolicies(const envoy::config::cluster::v3::Clus
     }
   }
 
+  absl::InlinedVector<absl::string_view, 4> missing_policies;
   for (const auto& policy : config.load_balancing_policy().policies()) {
     TypedLoadBalancerFactory* factory =
         Config::Utility::getAndCheckFactory<TypedLoadBalancerFactory>(
@@ -1221,12 +1222,13 @@ void ClusterInfoImpl::configureLbPolicies(const envoy::config::cluster::v3::Clus
       load_balancer_factory_ = factory;
       break;
     }
+    missing_policies.push_back(policy.typed_extension_config().name());
   }
 
   if (load_balancer_factory_ == nullptr) {
-    throw EnvoyException(fmt::format(
-        "cluster: didn't find a registered load balancer factory implementation for cluster: '{}'",
-        name_));
+    throw EnvoyException(fmt::format("cluster: didn't find a registered load balancer factory "
+                                     "implementation for cluster: '{}' with names from [{}]",
+                                     name_, absl::StrJoin(missing_policies, ", ")));
   }
 
   lb_type_ = LoadBalancerType::LoadBalancingPolicyConfig;

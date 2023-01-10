@@ -2680,7 +2680,8 @@ TEST_F(StaticClusterImplTest, LbPolicyConfigThrowsExceptionIfNoLbPoliciesFound) 
       },
       EnvoyException,
       "cluster: didn't find a registered load balancer factory implementation for cluster: "
-      "'cluster_1'");
+      "'cluster_1' with names from [envoy.load_balancers.unknown_lb_1, "
+      "envoy.load_balancers.unknown_lb_2]");
 }
 
 // load_balancing_policy should also be used when lb_policy is set to something else besides
