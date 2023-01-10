@@ -46,7 +46,7 @@ public:
   EdsSpeedTest(State& state, bool use_unified_mux)
       : state_(state), use_unified_mux_(use_unified_mux),
         type_url_("type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment"),
-        subscription_stats_(Config::Utility::generateStats(stats_)),
+        subscription_stats_(Config::Utility::generateStats(scope_)),
         async_client_(new Grpc::MockAsyncClient()),
         config_validators_(std::make_unique<NiceMock<Config::MockCustomConfigValidators>>()),
         backoff_strategy_(std::make_unique<JitteredExponentialBackOffStrategy>(
@@ -56,7 +56,7 @@ public:
           std::unique_ptr<Grpc::MockAsyncClient>(async_client_), server_context_.dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints"),
-          stats_, {}, local_info_, true, std::move(config_validators_),
+          scope_, {}, local_info_, true, std::move(config_validators_),
           std::move(backoff_strategy_),
           /*xds_config_tracker=*/Config::XdsConfigTrackerOptRef()));
     } else {
@@ -65,7 +65,7 @@ public:
           server_context_.dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints"),
-          stats_, {}, true, std::move(config_validators_), std::move(backoff_strategy_),
+          scope_, {}, true, std::move(config_validators_), std::move(backoff_strategy_),
           /*xds_config_tracker=*/Config::XdsConfigTrackerOptRef(),
           /*xds_resources_delegate=*/Config::XdsResourcesDelegateOptRef(),
           /*target_xds_authority=*/""));
@@ -93,11 +93,11 @@ public:
   void resetCluster(const std::string& yaml_config, Cluster::InitializePhase initialize_phase) {
     local_info_.node_.mutable_locality()->set_zone("us-east-1a");
     eds_cluster_ = parseClusterFromV3Yaml(yaml_config);
-    Envoy::Stats::ScopeSharedPtr scope = stats_.createScope(fmt::format(
+    Envoy::Stats::ScopeSharedPtr scope = stats_.rootScope()->createScope(fmt::format(
         "cluster.{}.",
         eds_cluster_.alt_stat_name().empty() ? eds_cluster_.name() : eds_cluster_.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        server_context_, ssl_context_manager_, *scope, server_context_.cluster_manager_, stats_,
+        server_context_, ssl_context_manager_, scope_, server_context_.cluster_manager_, stats_,
         validation_visitor_);
     cluster_ = std::make_shared<EdsClusterImpl>(server_context_, eds_cluster_, runtime_,
                                                 factory_context, std::move(scope), false);
@@ -170,6 +170,7 @@ public:
   uint64_t version_{};
   bool initialized_{};
   Stats::TestUtil::TestStore stats_;
+  Stats::Scope& scope_{*stats_.rootScope()};
   Config::SubscriptionStats subscription_stats_;
   Ssl::MockContextManager ssl_context_manager_;
   envoy::config::cluster::v3::Cluster eds_cluster_;

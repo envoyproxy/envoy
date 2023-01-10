@@ -38,6 +38,7 @@ public:
 private:
   uint64_t base_interval_;
   const uint64_t max_interval_{};
+  const uint64_t doubling_limit_{max_interval_ / 2u};
   uint64_t next_interval_;
   Random::RandomGenerator& random_;
 };
