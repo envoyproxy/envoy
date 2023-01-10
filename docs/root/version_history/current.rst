@@ -15,6 +15,7 @@ Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
+* lua: lua coroutine should not execute after local reply is sent.
 * oauth: fixed a bug where the oauth2 filter would crash if it received a redirect URL without a state query param set.
 
 Removed Config or Runtime

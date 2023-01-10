@@ -15,7 +15,9 @@ namespace {
 class LuaIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                            public HttpIntegrationTest {
 public:
-  LuaIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+  LuaIntegrationTest() : LuaIntegrationTest(Http::CodecType::HTTP1) {}
+  LuaIntegrationTest(Http::CodecType downstream_protocol)
+      : HttpIntegrationTest(downstream_protocol, GetParam()) {}
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
@@ -1177,6 +1179,60 @@ typed_config:
 )EOF";
 
   testRewriteResponse(FILTER_AND_CODE);
+}
+
+// Lua tests that need HTTP2.
+class Http2LuaIntegrationTest : public LuaIntegrationTest {
+protected:
+  Http2LuaIntegrationTest() : LuaIntegrationTest(Http::CodecType::HTTP2) {}
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, Http2LuaIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Test sending local reply due to too much data. HTTP2 is needed as it
+// will propagate the end stream from the downstream in the same decodeData
+// call the filter receives the downstream request body.
+TEST_P(Http2LuaIntegrationTest, LocalReplyWhenWaitingForBodyFollowedByHttpRequest) {
+  const std::string FILTER_AND_CODE =
+      R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  inline_code: |
+    function envoy_on_request(request_handle)
+      local initial_req_body = request_handle:body()
+      local headers, body = request_handle:httpCall(
+      "lua_cluster",
+      {
+        [":method"] = "POST",
+        [":path"] = "/",
+        [":authority"] = "lua_cluster"
+      },
+      "hello world",
+      1000)
+      request_handle:headers():replace("x-code", headers["code"] or "")
+    end
+)EOF";
+
+  // Set low buffer limits to allow us to trigger local reply easy.
+  const int buffer_limit = 65535;
+  config_helper_.setBufferLimits(buffer_limit, buffer_limit);
+
+  initializeFilter(FILTER_AND_CODE);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":scheme", "http"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":authority", "host"}});
+  auto request_encoder = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  codec_client_->sendData(*request_encoder, buffer_limit + 1, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
 }
 
 } // namespace
