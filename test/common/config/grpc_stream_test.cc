@@ -32,7 +32,7 @@ protected:
         grpc_stream_(&callbacks_, std::move(async_client_owner_),
                      *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                          "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints"),
-                     dispatcher_, stats_, std::move(backoff_strategy_), rate_limit_settings_) {}
+                     dispatcher_, *stats_.rootScope(), std::move(backoff_strategy_), rate_limit_settings_) {}
 
   NiceMock<Event::MockDispatcher> dispatcher_;
   Grpc::MockAsyncStream async_stream_;

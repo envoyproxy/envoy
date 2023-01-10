@@ -162,7 +162,8 @@ TEST(UtilityTest, ParseRateLimitSettings) {
 // API configs along the dimension of ApiConfigSource type.
 TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
   NiceMock<Grpc::MockAsyncClientManager> async_client_manager;
-  Stats::MockStore scope;
+  Stats::MockStore store;
+  Stats::Scope& scope = *store.rootScope();
 
   {
     envoy::config::core::v3::ApiConfigSource api_config_source;
