@@ -40,10 +40,11 @@ public:
   }
   // Copy this stream's StreamInfo, ensuring that the request headers pointed to by the StreamInfo
   // lives beyond stream destruction.
-  void setDeferredLoggingHeadersAndTrailers(Http::RequestHeaderMapSharedPtr request_header_map,
-                                            Http::ResponseHeaderMapSharedPtr response_header_map,
-                                            Http::ResponseTrailerMapSharedPtr response_trailer_map,
-                                            StreamInfo::StreamInfo& stream_info) override {
+  void
+  setDeferredLoggingHeadersAndTrailers(Http::RequestHeaderMapConstSharedPtr request_header_map,
+                                       Http::ResponseHeaderMapConstSharedPtr response_header_map,
+                                       Http::ResponseTrailerMapConstSharedPtr response_trailer_map,
+                                       StreamInfo::StreamInfo& stream_info) override {
     std::unique_ptr<StreamInfo::StreamInfoImpl> new_stream_info =
         std::make_unique<StreamInfo::StreamInfoImpl>(
             filterManagerConnection()->dispatcher().timeSource(),

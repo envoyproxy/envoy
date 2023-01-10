@@ -34,10 +34,11 @@ public:
     access_log_handlers_ = handlers;
   }
   // Set headers, trailers, and stream info used for deferred logging.
-  void setDeferredLoggingHeadersAndTrailers(Http::RequestHeaderMapSharedPtr request_header_map,
-                                            Http::ResponseHeaderMapSharedPtr response_header_map,
-                                            Http::ResponseTrailerMapSharedPtr response_trailer_map,
-                                            std::unique_ptr<StreamInfo::StreamInfo> stream_info) {
+  void
+  setDeferredLoggingHeadersAndTrailers(Http::RequestHeaderMapConstSharedPtr request_header_map,
+                                       Http::ResponseHeaderMapConstSharedPtr response_header_map,
+                                       Http::ResponseTrailerMapConstSharedPtr response_trailer_map,
+                                       std::unique_ptr<StreamInfo::StreamInfo> stream_info) {
     request_header_map_ = request_header_map;
     response_header_map_ = response_header_map;
     response_trailer_map_ = response_trailer_map;
@@ -50,9 +51,9 @@ private:
   uint64_t bytes_outstanding_ = 0;
   bool fin_sent_ = false;
   std::list<AccessLog::InstanceSharedPtr> access_log_handlers_{};
-  Http::RequestHeaderMapSharedPtr request_header_map_;
-  Http::ResponseHeaderMapSharedPtr response_header_map_;
-  Http::ResponseTrailerMapSharedPtr response_trailer_map_;
+  Http::RequestHeaderMapConstSharedPtr request_header_map_;
+  Http::ResponseHeaderMapConstSharedPtr response_header_map_;
+  Http::ResponseTrailerMapConstSharedPtr response_trailer_map_;
   // nullptr indicates that deferred logging should be skipped.
   std::unique_ptr<StreamInfo::StreamInfo> stream_info_;
   Envoy::TimeSource* time_source_ = nullptr;

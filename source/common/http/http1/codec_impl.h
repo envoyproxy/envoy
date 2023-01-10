@@ -155,9 +155,9 @@ public:
   bool streamErrorOnInvalidHttpMessage() const override {
     return stream_error_on_invalid_http_message_;
   }
-  void setDeferredLoggingHeadersAndTrailers(Http::RequestHeaderMapSharedPtr,
-                                            Http::ResponseHeaderMapSharedPtr,
-                                            Http::ResponseTrailerMapSharedPtr,
+  void setDeferredLoggingHeadersAndTrailers(Http::RequestHeaderMapConstSharedPtr,
+                                            Http::ResponseHeaderMapConstSharedPtr,
+                                            Http::ResponseTrailerMapConstSharedPtr,
                                             StreamInfo::StreamInfo&) override {}
 
   // For H/1, ResponseEncoder doesn't hold a pointer to RequestDecoder.

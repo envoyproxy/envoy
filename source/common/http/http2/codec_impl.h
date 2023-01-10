@@ -498,9 +498,9 @@ protected:
       encodeTrailersBase(trailers);
     }
     void setRequestDecoder(Http::RequestDecoder& decoder) override { request_decoder_ = &decoder; }
-    void setDeferredLoggingHeadersAndTrailers(Http::RequestHeaderMapSharedPtr,
-                                              Http::ResponseHeaderMapSharedPtr,
-                                              Http::ResponseTrailerMapSharedPtr,
+    void setDeferredLoggingHeadersAndTrailers(Http::RequestHeaderMapConstSharedPtr,
+                                              Http::ResponseHeaderMapConstSharedPtr,
+                                              Http::ResponseTrailerMapConstSharedPtr,
                                               StreamInfo::StreamInfo&) override {}
 
     // ScopeTrackedObject

@@ -50,9 +50,9 @@ public:
   MOCK_METHOD(void, encodeTrailers, (const ResponseTrailerMap& trailers));
   MOCK_METHOD(void, setRequestDecoder, (RequestDecoder & decoder));
   MOCK_METHOD(void, setDeferredLoggingHeadersAndTrailers,
-              (Http::RequestHeaderMapSharedPtr request_header_map,
-               Http::ResponseHeaderMapSharedPtr response_header_map,
-               Http::ResponseTrailerMapSharedPtr response_trailer_map,
+              (Http::RequestHeaderMapConstSharedPtr request_header_map,
+               Http::ResponseHeaderMapConstSharedPtr response_header_map,
+               Http::ResponseTrailerMapConstSharedPtr response_trailer_map,
                StreamInfo::StreamInfo& stream_info));
 
   // Http::StreamEncoder

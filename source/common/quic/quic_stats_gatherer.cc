@@ -21,9 +21,9 @@ void QuicStatsGatherer::maybeDoDeferredLog(bool record_ack_timing) {
   if (time_source_ != nullptr && record_ack_timing) {
     stream_info_->downstreamTiming().onLastDownstreamAckReceived(*time_source_);
   }
-  Http::RequestHeaderMap* request_headers = request_header_map_.get();
-  Http::ResponseHeaderMap* response_headers = response_header_map_.get();
-  Http::ResponseTrailerMap* response_trailers = response_trailer_map_.get();
+  const Http::RequestHeaderMap* request_headers = request_header_map_.get();
+  const Http::ResponseHeaderMap* response_headers = response_header_map_.get();
+  const Http::ResponseTrailerMap* response_trailers = response_trailer_map_.get();
   for (const AccessLog::InstanceSharedPtr& log_handler : access_log_handlers_) {
     log_handler->log(request_headers, response_headers, response_trailers, *stream_info_);
   }

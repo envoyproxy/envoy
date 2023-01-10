@@ -342,7 +342,7 @@ struct StreamInfoImpl : public StreamInfo {
   // * request_headers_ is a raw pointer; to avoid pointer lifetime issues, a request header pointer
   // is required to be passed in here.
   // * downstream_connection_info_provider_ is always set in the ctor.
-  void setFrom(StreamInfo& info, Http::RequestHeaderMap* request_headers) {
+  void setFrom(StreamInfo& info, const Http::RequestHeaderMap* request_headers) {
     setFromForRecreateStream(info);
     route_name_ = info.getRouteName();
     virtual_cluster_name_ = info.virtualClusterName();
