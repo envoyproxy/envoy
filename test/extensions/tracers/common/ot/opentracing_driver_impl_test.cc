@@ -51,7 +51,8 @@ public:
   setupValidDriver(OpenTracingDriver::PropagationMode propagation_mode =
                        OpenTracingDriver::PropagationMode::SingleHeader,
                    const opentracing::mocktracer::PropagationOptions& propagation_options = {}) {
-    driver_ = std::make_unique<TestDriver>(propagation_mode, propagation_options, stats_);
+    driver_ =
+        std::make_unique<TestDriver>(propagation_mode, propagation_options, *stats_.rootScope());
   }
 
   const std::string operation_name_{"test"};
