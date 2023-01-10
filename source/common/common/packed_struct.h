@@ -1,5 +1,6 @@
 #pragma once
 
+#include <limits>
 #include <type_traits>
 
 #include "source/common/common/assert.h"
@@ -44,7 +45,7 @@ namespace Envoy {
  *
  *    // Code that accesses the elements of the struct needs to check for existence first.
  *    if (packed_struct.has(MyElementNames::element0) {
- *      auto element0 = packed_struct.get(MyElements::element0);
+ *      auto& element0 = packed_struct.get(MyElements::element0);
  *    }
  * ```
  */
@@ -54,8 +55,23 @@ public:
     static_assert(std::is_enum_v<ElementName>);
     static_assert(max_size > 0);
 
+    RELEASE_ASSERT(a_capacity < std::numeric_limits<uint8_t>::max(),
+                   "capacity should fit in uint8_t.");
     indices_.fill(max_size);
     indices_[max_size] = a_capacity;
+  }
+
+  T& get(ElementName element_name) {
+    return (*this)[static_cast<std::underlying_type_t<ElementName>>(element_name)];
+  }
+  const T& get(ElementName element_name) const {
+    return (*this)[static_cast<std::underlying_type_t<ElementName>>(element_name)];
+  }
+  bool has(ElementName element_name) const {
+    return has(static_cast<std::underlying_type_t<ElementName>>(element_name));
+  }
+  void set(ElementName element_name, T t) {
+    return assign(static_cast<std::underlying_type_t<ElementName>>(element_name), t);
   }
 
   // Number of non-empty elements in the struct. Note that this can be less than
@@ -84,19 +100,6 @@ public:
   }
 
   ~PackedStruct() = default;
-
-  T& get(ElementName element_name) {
-    return (*this)[static_cast<std::underlying_type_t<ElementName>>(element_name)];
-  }
-  const T& get(ElementName element_name) const {
-    return (*this)[static_cast<std::underlying_type_t<ElementName>>(element_name)];
-  }
-  bool has(ElementName element_name) const {
-    return has(static_cast<std::underlying_type_t<ElementName>>(element_name));
-  }
-  void set(ElementName element_name, T t) {
-    return assign(static_cast<std::underlying_type_t<ElementName>>(element_name), t);
-  }
 
 private:
   // Accessors.
