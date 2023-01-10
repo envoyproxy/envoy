@@ -22,7 +22,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // .. warning::
 //
-//    On-demand CDS does not support SotW streams. Currently it only supports incremental xDS.
+//    Envoy currently only supports On-demand CDS when using Incremental-xDS and not State-of-the-World.
 //
 
 // Configuration of on-demand CDS.
