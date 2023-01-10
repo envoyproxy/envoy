@@ -1201,7 +1201,7 @@ void ClusterInfoImpl::configureLbPolicies(const envoy::config::cluster::v3::Clus
     if (lb_config.has_zone_aware_lb_config() || lb_config.has_locality_weighted_lb_config() ||
         lb_config.has_consistent_hashing_lb_config()) {
       throw EnvoyException(
-          "cluster: load_balancing_policy be combined with partial fields (zone_aware_lb_config, "
+          "cluster: load_balancing_policy cannot be combined with partial fields (zone_aware_lb_config, "
           "locality_weighted_lb_config, consistent_hashing_lb_config) of common_lb_config");
     }
   }
