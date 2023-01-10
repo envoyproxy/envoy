@@ -14,6 +14,7 @@
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/config/route/v3/route_components.pb.validate.h"
+#include "envoy/registry/registry.h"
 #include "envoy/router/cluster_specifier_plugin.h"
 #include "envoy/router/router.h"
 #include "envoy/runtime/runtime.h"
@@ -1447,6 +1448,8 @@ public:
   }
 };
 
+DECLARE_FACTORY(RouteMatchActionFactory);
+
 // Similar to RouteMatchAction, but accepts v3::RouteList instead of v3::Route.
 class RouteListMatchAction : public Matcher::ActionBase<envoy::config::route::v3::RouteList> {
 public:
@@ -1470,6 +1473,8 @@ public:
     return std::make_unique<envoy::config::route::v3::RouteList>();
   }
 };
+
+DECLARE_FACTORY(RouteListMatchActionFactory);
 
 /**
  * Wraps the route configuration which matches an incoming request headers to a backend cluster.
