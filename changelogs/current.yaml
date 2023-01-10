@@ -288,5 +288,8 @@ new_features:
   change: |
     added an api configuration :ref:`xds_config_tracker_extension <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.xds_config_tracker_extension>` in the bootstrap
     to allow tracking xDS responses in external components, and provided the extension interface.
+- area: oauth2
+  change: |
+    added :ref:`use_refresh_token <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.use_refresh_token>` to support updating an access token using by a refresh token if that is provided by authorization server.
 
 deprecated:
