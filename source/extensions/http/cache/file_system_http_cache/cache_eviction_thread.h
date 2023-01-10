@@ -34,6 +34,7 @@ class FileSystemHttpCache;
 class CacheEvictionThread {
 public:
   CacheEvictionThread(Thread::ThreadFactory& thread_factory);
+  ~CacheEvictionThread();
 
   /**
    * Adds the given cache to the caches that may be evicted from.
@@ -84,7 +85,9 @@ private:
   bool idle_ ABSL_GUARDED_BY(mu_) = false;
   void waitForIdle();
 
-  Thread::ThreadFactory& thread_factory_;
+  // It is important that thread_ be last, as the new thread runs with 'this' and
+  // may access any other members. If thread_ is not last, there can be a race between
+  // that thread and the initialization of other members.
   Thread::ThreadPtr thread_;
 };
 

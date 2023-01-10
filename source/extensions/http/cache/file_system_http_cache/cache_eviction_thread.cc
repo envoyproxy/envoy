@@ -11,13 +11,15 @@ namespace Cache {
 namespace FileSystemHttpCache {
 
 CacheEvictionThread::CacheEvictionThread(Thread::ThreadFactory& thread_factory)
-    : thread_factory_(thread_factory) {}
+    : thread_(thread_factory.createThread([this]() { work(); })) {}
+
+CacheEvictionThread::~CacheEvictionThread() {
+  terminate();
+  thread_->join();
+}
 
 void CacheEvictionThread::addCache(FileSystemHttpCache& cache) {
   absl::MutexLock lock(&cache_mu_);
-  if (caches_.empty()) {
-    thread_ = thread_factory_.createThread([this]() { work(); });
-  }
   bool inserted = caches_.emplace(&cache).second;
   ASSERT(inserted);
 }
@@ -26,10 +28,6 @@ void CacheEvictionThread::removeCache(FileSystemHttpCache& cache) {
   absl::MutexLock lock(&cache_mu_);
   bool removed = caches_.erase(&cache);
   ASSERT(removed);
-  if (caches_.empty()) {
-    terminate();
-    thread_->join();
-  }
 }
 
 void CacheEvictionThread::signal() {
