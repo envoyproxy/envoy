@@ -1,8 +1,7 @@
 #pragma once
 
 #include "envoy/common/pure.h"
-
-#include "source/common/network/address_impl.h"
+#include "envoy/network/address.h"
 
 namespace Envoy {
 namespace Io {
