@@ -160,7 +160,7 @@ public:
   // accessing the rootScope() to call these methods. The first in the series is
   // https://github.com/envoyproxy/envoy/pull/24567 which just takes care of
   // test/common/...
-  // operator Scope&() { return *rootScope(); }
+  operator Scope&() { return *rootScope(); }
 
   // Delegate some methods to the root scope; these are exposed to make it more
   // convenient to use stats_macros.h. We may consider dropping them if desired,
