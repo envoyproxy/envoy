@@ -45,8 +45,8 @@ Network::FilterFactoryCb ExtAuthzConfigFactory::createFilterFactoryFromProtoType
 /**
  * Static registration for the external authorization filter. @see RegisterFactory.
  */
-REGISTER_FACTORY(ExtAuthzConfigFactory,
-                 Server::Configuration::NamedNetworkFilterConfigFactory){"envoy.ext_authz"};
+REGISTER_FACTORY_D(ExtAuthzConfigFactory,
+                   Server::Configuration::NamedNetworkFilterConfigFactory, "envoy.ext_authz");
 
 } // namespace ExtAuthz
 } // namespace NetworkFilters
