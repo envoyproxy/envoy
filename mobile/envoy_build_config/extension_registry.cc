@@ -29,6 +29,7 @@
 #include "source/extensions/path/rewrite/uri_template/config.h"
 #include "source/extensions/request_id/uuid/config.h"
 #include "source/extensions/stat_sinks/metrics_service/config.h"
+#include "source/extensions/stat_sinks/statsd/config.h"
 #include "source/extensions/transport_sockets/http_11_proxy/config.h"
 #include "source/extensions/transport_sockets/raw_buffer/config.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/default_validator.h"
@@ -96,6 +97,7 @@ void ExtensionRegistry::registerFactories() {
   Extensions::RequestId::forceRegisterUUIDRequestIDExtensionFactory();
   Extensions::Retry::Options::forceRegisterNetworkConfigurationRetryOptionsPredicateFactory();
   Extensions::StatSinks::MetricsService::forceRegisterMetricsServiceSinkFactory();
+  Extensions::StatSinks::Statsd::forceRegisterStatsdSinkFactory();
   Extensions::TransportSockets::Http11Connect::
       forceRegisterUpstreamHttp11ConnectSocketConfigFactory();
   Extensions::TransportSockets::RawBuffer::forceRegisterDownstreamRawBufferSocketFactory();
