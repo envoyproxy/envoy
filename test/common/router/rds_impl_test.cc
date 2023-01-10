@@ -568,7 +568,7 @@ TEST_F(RdsImplTest, FailureInvalidConfig) {
   // SubscriptionCallbacks, so we has to use reinterpret_cast here.
   RdsRouteConfigSubscription* rds_subscription =
       reinterpret_cast<RdsRouteConfigSubscription*>(rds_callbacks_);
-  auto config_impl_pointer = rds_subscription->routeConfigProvider().value()->config();
+  auto config_impl_pointer = rds_subscription->routeConfigProvider()->config();
   // Now send an invalid config update.
   const std::string invalid_json =
       R"EOF(
@@ -596,7 +596,7 @@ TEST_F(RdsImplTest, FailureInvalidConfig) {
       "INVALID_NAME_FOR_route_config");
 
   // Verify that the config is still the old value.
-  ASSERT_EQ(config_impl_pointer, rds_subscription->routeConfigProvider().value()->config());
+  ASSERT_EQ(config_impl_pointer, rds_subscription->routeConfigProvider()->config());
 }
 
 // rds and vhds configurations change together
@@ -714,7 +714,7 @@ TEST_F(RdsImplTest, RdsRouteConfigProviderImplSubscriptionSetup) {
   EXPECT_CALL(init_watcher_, ready());
   RdsRouteConfigSubscription& subscription =
       dynamic_cast<RdsRouteConfigProviderImpl&>(*rds_).subscription();
-  EXPECT_EQ(rds_.get(), subscription.routeConfigProvider().value());
+  EXPECT_EQ(rds_.get(), subscription.routeConfigProvider());
 }
 
 class RdsRouteConfigSubscriptionTest : public RdsTestBase {

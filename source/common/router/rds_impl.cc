@@ -98,8 +98,8 @@ void RdsRouteConfigSubscription::beforeProviderUpdate(
     ASSERT(config_update_info_->configInfo().has_value());
     maybeCreateInitManager(routeConfigUpdate()->configInfo().value().version_, noop_init_manager,
                            resume_rds);
-    vhds_subscription_ = std::make_unique<VhdsSubscription>(
-        config_update_info_, factory_context_, stat_prefix_, route_config_provider_opt_);
+    vhds_subscription_ = std::make_unique<VhdsSubscription>(config_update_info_, factory_context_,
+                                                            stat_prefix_, route_config_provider_);
     vhds_subscription_->registerInitTargetWithInitManager(
         noop_init_manager == nullptr ? local_init_manager_ : *noop_init_manager);
   }
@@ -150,7 +150,7 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
   // The subscription referenced by the 'base_' and by 'this' is the same.
   // In it the provider is already set by the 'base_' so it points to that.
   // Need to set again to point to 'this'.
-  base_.subscription().routeConfigProvider().emplace(this);
+  base_.subscription().routeConfigProvider() = this;
 }
 
 RdsRouteConfigSubscription& RdsRouteConfigProviderImpl::subscription() {
