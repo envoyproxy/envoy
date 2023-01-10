@@ -133,14 +133,14 @@ envoy_cc_library(
 envoy_cc_library(
     name = "stats_request_lib",
     srcs = [
-        "base_stats_request.cc",
-        "prometheus_stats_request.cc",
+        "grouped_stats_request.cc",
         "stats_request.cc",
+        "ungrouped_stats_request.cc",
     ],
     hdrs = [
-        "base_stats_request.h",
-        "prometheus_stats_request.h",
+        "grouped_stats_request.h",
         "stats_request.h",
+        "ungrouped_stats_request.h",
     ],
     deps = [
         ":handler_ctx_lib",

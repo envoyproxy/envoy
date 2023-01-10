@@ -1,4 +1,4 @@
-#include "source/server/admin/prometheus_stats_request.h"
+#include "source/server/admin/grouped_stats_request.h"
 
 #include <string>
 #include <vector>
@@ -11,18 +11,11 @@
 namespace Envoy {
 namespace Server {
 
-namespace {
-bool metricLessThan(const Stats::RefcountPtr<Stats::Metric>& stat1,
-                    const Stats::RefcountPtr<Stats::Metric>& stat2) {
-  ASSERT(&stat1->constSymbolTable() == &stat2->constSymbolTable());
-  return stat1->constSymbolTable().lessThan(stat1->statName(), stat2->statName());
-}
-} // namespace
-
-PrometheusStatsRequest::PrometheusStatsRequest(Stats::Store& stats, const StatsParams& params,
-                                               Stats::CustomStatNamespaces& custom_namespaces,
-                                               UrlHandlerFn url_handler_fn)
-    : StatsRequestBase(stats, params, url_handler_fn), custom_namespaces_(custom_namespaces) {
+GroupedStatsRequest::GroupedStatsRequest(Stats::Store& stats, const StatsParams& params,
+                                         Stats::CustomStatNamespaces& custom_namespaces,
+                                         UrlHandlerFn url_handler_fn)
+    : StatsRequest(stats, params, url_handler_fn), custom_namespaces_(custom_namespaces),
+      global_symbol_table_(stats.constSymbolTable()) {
 
   // the "type" query param is ignored for prometheus stats, so always start from
   // counters; also, skip the TextReadouts phase unless that stat type is explicitly
@@ -38,7 +31,7 @@ PrometheusStatsRequest::PrometheusStatsRequest(Stats::Store& stats, const StatsP
   phase_ = 0;
 }
 
-template <class StatType> Stats::IterateFn<StatType> PrometheusStatsRequest::checkStat() {
+template <class StatType> Stats::IterateFn<StatType> GroupedStatsRequest::saveMatchingStat() {
   return [this](const Stats::RefcountPtr<StatType>& stat) -> bool {
     // check if unused
     if (params_.used_only_ && !stat->used()) {
@@ -56,39 +49,37 @@ template <class StatType> Stats::IterateFn<StatType> PrometheusStatsRequest::che
     }
 
     // capture stat by either adding to a pre-existing variant or by creating a new variant, and
-    // then storing the variant into the map
-    const Stats::SymbolTable& global_symbol_table = stat->constSymbolTable();
-    std::string tag_extracted_name = global_symbol_table.toString(stat->tagExtractedStatName());
+    std::string tag_extracted_name = global_symbol_table_.toString(stat->tagExtractedStatName());
 
-    StatOrScopes variant = stat_map_.contains(tag_extracted_name)
-                               ? stat_map_[tag_extracted_name]
-                               : std::vector<Stats::RefcountPtr<StatType>>();
-    absl::get<std::vector<Stats::RefcountPtr<StatType>>>(variant).emplace_back(stat);
-
-    stat_map_[tag_extracted_name] = variant;
+    StatOrScopes& variant = stat_map_[tag_extracted_name];
+    if (variant.index() == absl::variant_npos) {
+      variant = std::vector<Stats::RefcountPtr<StatType>>({stat});
+    } else {
+      absl::get<std::vector<Stats::RefcountPtr<StatType>>>(variant).emplace_back(stat);
+    }
     return true;
   };
 }
 
-Stats::IterateFn<Stats::TextReadout> PrometheusStatsRequest::checkStatForTextReadout() {
-  return checkStat<Stats::TextReadout>();
+Stats::IterateFn<Stats::TextReadout> GroupedStatsRequest::saveMatchingStatForTextReadout() {
+  return saveMatchingStat<Stats::TextReadout>();
 }
 
-Stats::IterateFn<Stats::Gauge> PrometheusStatsRequest::checkStatForGauge() {
-  return checkStat<Stats::Gauge>();
+Stats::IterateFn<Stats::Gauge> GroupedStatsRequest::saveMatchingStatForGauge() {
+  return saveMatchingStat<Stats::Gauge>();
 }
 
-Stats::IterateFn<Stats::Counter> PrometheusStatsRequest::checkStatForCounter() {
-  return checkStat<Stats::Counter>();
+Stats::IterateFn<Stats::Counter> GroupedStatsRequest::saveMatchingStatForCounter() {
+  return saveMatchingStat<Stats::Counter>();
 }
 
-Stats::IterateFn<Stats::Histogram> PrometheusStatsRequest::checkStatForHistogram() {
-  return checkStat<Stats::Histogram>();
+Stats::IterateFn<Stats::Histogram> GroupedStatsRequest::saveMatchingStatForHistogram() {
+  return saveMatchingStat<Stats::Histogram>();
 }
 
 template <class SharedStatType>
-void PrometheusStatsRequest::renderStat(const std::string& name, Buffer::Instance& response,
-                                        const StatOrScopes& variant) {
+void GroupedStatsRequest::renderStat(const std::string& name, Buffer::Instance& response,
+                                     const StatOrScopes& variant) {
   auto prefixed_tag_extracted_name = prefixedTagExtractedName<SharedStatType>(name);
   if (prefixed_tag_extracted_name.has_value()) {
     PrometheusStatsRender* const prometheus_render =
@@ -98,7 +89,11 @@ void PrometheusStatsRequest::renderStat(const std::string& name, Buffer::Instanc
 
     // sort group
     std::vector<SharedStatType> group = absl::get<std::vector<SharedStatType>>(variant);
-    std::sort(group.begin(), group.end(), metricLessThan);
+    std::sort(group.begin(), group.end(),
+              [this](const Stats::RefcountPtr<Stats::Metric>& stat1,
+                     const Stats::RefcountPtr<Stats::Metric>& stat2) -> bool {
+                return global_symbol_table_.lessThan(stat1->statName(), stat2->statName());
+              });
 
     // render group
     StatOrScopesIndex index = static_cast<StatOrScopesIndex>(variant.index());
@@ -111,23 +106,23 @@ void PrometheusStatsRequest::renderStat(const std::string& name, Buffer::Instanc
   }
 }
 
-void PrometheusStatsRequest::processTextReadout(const std::string& name, Buffer::Instance& response,
-                                                const StatOrScopes& variant) {
+void GroupedStatsRequest::processTextReadout(const std::string& name, Buffer::Instance& response,
+                                             const StatOrScopes& variant) {
   renderStat<Stats::TextReadoutSharedPtr>(name, response, variant);
 }
 
-void PrometheusStatsRequest::processCounter(const std::string& name, Buffer::Instance& response,
-                                            const StatOrScopes& variant) {
+void GroupedStatsRequest::processCounter(const std::string& name, Buffer::Instance& response,
+                                         const StatOrScopes& variant) {
   renderStat<Stats::CounterSharedPtr>(name, response, variant);
 }
 
-void PrometheusStatsRequest::processGauge(const std::string& name, Buffer::Instance& response,
-                                          const StatOrScopes& variant) {
+void GroupedStatsRequest::processGauge(const std::string& name, Buffer::Instance& response,
+                                       const StatOrScopes& variant) {
   renderStat<Stats::GaugeSharedPtr>(name, response, variant);
 }
 
-void PrometheusStatsRequest::processHistogram(const std::string& name, Buffer::Instance& response,
-                                              const StatOrScopes& variant) {
+void GroupedStatsRequest::processHistogram(const std::string& name, Buffer::Instance& response,
+                                           const StatOrScopes& variant) {
   auto histogram = absl::get<std::vector<Stats::HistogramSharedPtr>>(variant);
   auto prefixed_tag_extracted_name = prefixedTagExtractedName<Stats::HistogramSharedPtr>(name);
 
@@ -136,7 +131,11 @@ void PrometheusStatsRequest::processHistogram(const std::string& name, Buffer::I
     phase_stat_count_++;
 
     // sort group
-    std::sort(histogram.begin(), histogram.end(), metricLessThan);
+    std::sort(histogram.begin(), histogram.end(),
+              [this](const Stats::RefcountPtr<Stats::Metric>& stat1,
+                     const Stats::RefcountPtr<Stats::Metric>& stat2) -> bool {
+                return global_symbol_table_.lessThan(stat1->statName(), stat2->statName());
+              });
 
     // render group
     response.add(fmt::format("# TYPE {0} {1}\n", prefixed_tag_extracted_name.value(), "histogram"));
@@ -151,7 +150,7 @@ void PrometheusStatsRequest::processHistogram(const std::string& name, Buffer::I
 
 template <class SharedStatType>
 absl::optional<std::string>
-PrometheusStatsRequest::prefixedTagExtractedName(const std::string& tag_extracted_name) {
+GroupedStatsRequest::prefixedTagExtractedName(const std::string& tag_extracted_name) {
   return Envoy::Server::PrometheusStatsFormatter::metricName(tag_extracted_name,
                                                              custom_namespaces_);
 }
