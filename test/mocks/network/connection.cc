@@ -99,7 +99,9 @@ template <class T> static void initializeMockConnection(T& connection) {
   connection.stream_info_.setUpstreamBytesMeter(std::make_shared<StreamInfo::BytesMeter>());
   ON_CALL(connection, streamInfo()).WillByDefault(ReturnRef(connection.stream_info_));
   ON_CALL(Const(connection), streamInfo()).WillByDefault(ReturnRef(connection.stream_info_));
-  ON_CALL(connection, localCloseReason()).WillByDefault(Return(connection.local_close_reason_));
+  ON_CALL(connection, localCloseReason()).WillByDefault(Invoke([&connection]() {
+    return absl::string_view(connection.local_close_reason_);
+  }));
 }
 
 MockConnection::MockConnection() {

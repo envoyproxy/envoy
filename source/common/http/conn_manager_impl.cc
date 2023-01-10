@@ -479,14 +479,10 @@ void ConnectionManagerImpl::onEvent(Network::ConnectionEvent event) {
       stats_.named_.downstream_cx_destroy_remote_.inc();
       details = StreamInfo::ResponseCodeDetails::get().DownstreamRemoteDisconnect;
     } else {
-      // Local close.
       absl::string_view local_close_reason = read_callbacks_->connection().localCloseReason();
       ENVOY_BUG(!local_close_reason.empty(), "Local Close Reason was not set!");
-      details = absl::StrContains(local_close_reason, ' ')
-                    ? fmt::format(StreamInfo::ResponseCodeDetails::get().DownstreamLocalDisconnect,
-                                  absl::StrReplaceAll(local_close_reason, {{" ", "_"}}))
-                    : fmt::format(StreamInfo::ResponseCodeDetails::get().DownstreamLocalDisconnect,
-                                  local_close_reason);
+      details = fmt::format(StreamInfo::ResponseCodeDetails::get().DownstreamLocalDisconnect,
+                            StringUtil::replaceAllEmptySpace(local_close_reason));
     }
 
     // TODO(mattklein123): It is technically possible that something outside of the filter causes
