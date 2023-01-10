@@ -46,7 +46,7 @@ TEST(MiscFilesystemSubscriptionImplTest, BadWatch) {
   Stats::MockIsolatedStatsStore stats_store;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
   Api::ApiPtr api = Api::createApiForTest(stats_store);
-  SubscriptionStats stats{Utility::generateStats(stats_store)};
+  SubscriptionStats stats{Utility::generateStats(*stats_store.rootScope())};
   auto* watcher = new Filesystem::MockWatcher();
   EXPECT_CALL(dispatcher, createFilesystemWatcher_()).WillOnce(Return(watcher));
   EXPECT_CALL(*watcher, addWatch(_, _, _)).WillOnce(Throw(EnvoyException("bad path")));
@@ -90,7 +90,7 @@ class FilesystemCollectionSubscriptionImplTest : public testing::Test,
 public:
   FilesystemCollectionSubscriptionImplTest()
       : path_(makePathConfigSource(TestEnvironment::temporaryPath("lds.yaml"))),
-        stats_(Utility::generateStats(stats_store_)),
+        stats_(Utility::generateStats(*stats_store_.rootScope())),
         api_(Api::createApiForTest(stats_store_, simTime())), dispatcher_(setupDispatcher()),
         resource_decoder_(
             std::make_shared<

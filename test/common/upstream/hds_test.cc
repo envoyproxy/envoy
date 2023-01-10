@@ -95,8 +95,8 @@ protected:
         .WillRepeatedly(testing::ReturnNew<NiceMock<Event::MockTimer>>());
 
     hds_delegate_ = std::make_unique<HdsDelegate>(
-        server_context_, stats_store_, Grpc::RawAsyncClientPtr(async_client_), stats_store_,
-        ssl_context_manager_, test_factory_);
+        server_context_, *stats_store_.rootScope(), Grpc::RawAsyncClientPtr(async_client_),
+        stats_store_, ssl_context_manager_, test_factory_);
   }
 
   void expectCreateClientConnection() {
