@@ -19,7 +19,8 @@ public:
     m_ = std::make_unique<Matcher>(std::move(ranges), stat_prefix_, scope_);
   }
 
-  Stats::TestUtil::TestStore scope_;
+  Stats::TestUtil::TestStore store_;
+  Stats::Scope& scope_{*store_.rootScope()};
   std::string stat_prefix_{"ipmatcher.test"};
   std::unique_ptr<Matcher> m_;
 };
