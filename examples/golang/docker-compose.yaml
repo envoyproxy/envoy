@@ -9,11 +9,6 @@ services:
     - web_service
     ports:
     - "8080:8080"
-    command: |
-      /usr/local/bin/envoy -c /etc/envoy.yaml --log-level debug --service-cluster front-proxy
-    volumes:
-    - ./envoy-yaml_skip_config_test:/etc/envoy.yaml
-    - ./lib/filter.so:/usr/local/go-plugins/filter.so
 
   web_service:
     environment:
