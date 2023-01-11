@@ -58,7 +58,6 @@ TEST(OpenTelemetryTracerConfigTest, OpenTelemetryHttpTracerNoExporter) {
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
   auto opentelemetry_tracer = factory.createTracerDriver(*message, context);
-  std::cout << typeid(opentelemetry_tracer).name() << std::endl;
   EXPECT_NE(nullptr, opentelemetry_tracer);
 }
 
