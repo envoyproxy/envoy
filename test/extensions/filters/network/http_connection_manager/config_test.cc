@@ -216,8 +216,8 @@ http_filters:
     EXPECT_THROW_WITH_MESSAGE(
         HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string),
                                            context_, date_provider_, route_config_provider_manager_,
-                                           scoped_routes_config_provider_manager_,
-                                           tracer_manager_, filter_config_provider_manager_),
+                                           scoped_routes_config_provider_manager_, tracer_manager_,
+                                           filter_config_provider_manager_),
         EnvoyException, "HTTP/3 codec configured on non-QUIC listener.");
   }
   {
@@ -263,8 +263,8 @@ http_filters:
   EXPECT_THROW_WITH_MESSAGE(
       HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
                                          date_provider_, route_config_provider_manager_,
-                                         scoped_routes_config_provider_manager_,
-                                         tracer_manager_, filter_config_provider_manager_),
+                                         scoped_routes_config_provider_manager_, tracer_manager_,
+                                         filter_config_provider_manager_),
       EnvoyException, "Non-HTTP/3 codec configured on QUIC listener.");
 }
 
@@ -2785,8 +2785,8 @@ TEST_F(HttpConnectionManagerConfigTest, HeaderValidatorConfig) {
       {
         HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string),
                                            context_, date_provider_, route_config_provider_manager_,
-                                           scoped_routes_config_provider_manager_,
-                                           tracer_manager_, filter_config_provider_manager_);
+                                           scoped_routes_config_provider_manager_, tracer_manager_,
+                                           filter_config_provider_manager_);
       },
       EnvoyException);
 #endif

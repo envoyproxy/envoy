@@ -8,11 +8,11 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/tracing/http_tracer.h"
 
+#include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/tracing/common_values.h"
 #include "source/common/tracing/null_span_impl.h"
 #include "source/common/tracing/tracer_impl.h"
-#include "source/common/formatter/substitution_formatter.h"
 
 namespace Envoy {
 namespace Tracing {
