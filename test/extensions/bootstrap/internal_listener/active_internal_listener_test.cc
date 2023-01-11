@@ -307,7 +307,7 @@ public:
     bool continueOnListenerFiltersTimeout() const override {
       return continue_on_listener_filters_timeout_;
     }
-    Stats::Scope& listenerScope() override { return parent_.stats_store_; }
+    Stats::Scope& listenerScope() override { return *parent_.stats_store_.rootScope(); }
     uint64_t listenerTag() const override { return tag_; }
     const std::string& name() const override { return name_; }
     Network::UdpListenerConfigOptRef udpListenerConfig() override { return {}; }

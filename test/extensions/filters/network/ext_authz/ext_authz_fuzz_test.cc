@@ -65,7 +65,8 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::network::ext_authz::ExtAut
   envoy::extensions::filters::network::ext_authz::v3::ExtAuthz proto_config = input.config();
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
 
-  ConfigSharedPtr config = std::make_shared<Config>(proto_config, stats_store, bootstrap);
+  ConfigSharedPtr config =
+      std::make_shared<Config>(proto_config, *stats_store.rootScope(), bootstrap);
   std::unique_ptr<Filter> filter =
       std::make_unique<Filter>(config, Filters::Common::ExtAuthz::ClientPtr{client});
 

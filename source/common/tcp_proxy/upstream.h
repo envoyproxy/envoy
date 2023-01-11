@@ -187,7 +187,12 @@ private:
         parent_.doneReading();
       }
     }
-    void decodeTrailers(Http::ResponseTrailerMapPtr&&) override {}
+    void decodeTrailers(Http::ResponseTrailerMapPtr&&) override {
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.finish_reading_on_decode_trailers")) {
+        parent_.doneReading();
+      }
+    }
     void decodeMetadata(Http::MetadataMapPtr&&) override {}
     void dumpState(std::ostream& os, int indent_level) const override {
       DUMP_STATE_UNIMPLEMENTED(DecoderShim);
