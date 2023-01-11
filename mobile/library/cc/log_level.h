@@ -2,12 +2,12 @@
 
 #include <string>
 
-#include "source/common/common/base_logger.h"
+#include "source/common/common/base_logger.h" // IWYU: export
 
 namespace Envoy {
 namespace Platform {
 
-using LogLevel = Envoy::Logger::Logger::Levels;  // IWYU: export
+using LogLevel = Envoy::Logger::Logger::Levels;
 
 std::string logLevelToString(LogLevel method);
 LogLevel logLevelFromString(const std::string& str);
