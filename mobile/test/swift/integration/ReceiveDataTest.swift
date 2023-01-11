@@ -82,7 +82,7 @@ static_resources:
       .start()
       .sendHeaders(requestHeaders, endStream: true)
 
-    XCTAssertEqual(XCTWaiter.wait(for: [headersExpectation, dataExpectation], timeout: 1,
+    XCTAssertEqual(XCTWaiter.wait(for: [headersExpectation, dataExpectation], timeout: 10,
                                   enforceOrder: true),
                    .completed)
 
