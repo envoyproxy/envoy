@@ -134,7 +134,7 @@ struct WriteParam {
  */
 class IoUringSocket {
 public:
-  ~IoUringSocket() override = default;
+  virtual ~IoUringSocket() = default;
 
   /**
    * Return the raw fd.
