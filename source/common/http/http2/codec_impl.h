@@ -212,14 +212,12 @@ protected:
     void onPendingFlushTimer() override;
 
     StreamImpl* base() { return this; }
-    ssize_t onDataSourceRead(uint64_t length, uint32_t* data_flags);
-    void onDataSourceSend(const uint8_t* framehd, size_t length);
     void resetStreamWorker(StreamResetReason reason);
     static void buildHeaders(std::vector<nghttp2_nv>& final_headers, const HeaderMap& headers);
     static std::vector<http2::adapter::Header> buildHeaders(const HeaderMap& headers);
     void saveHeader(HeaderString&& name, HeaderString&& value);
     void encodeHeadersBase(const HeaderMap& headers, bool end_stream);
-    virtual void submitHeaders(const HeaderMap& headers, nghttp2_data_provider* provider) PURE;
+    virtual void submitHeaders(const HeaderMap& headers, bool end_stream) PURE;
     void encodeTrailersBase(const HeaderMap& headers);
     void submitTrailers(const HeaderMap& trailers);
     // Returns true if the stream should defer the local reset stream until after the next call to
@@ -400,6 +398,20 @@ protected:
     void grantPeerAdditionalStreamWindow();
   };
 
+  // Encapsulates the logic for sending DATA frames on a given stream.
+  class StreamDataFrameSource : public http2::adapter::DataFrameSource {
+  public:
+    explicit StreamDataFrameSource(StreamImpl& stream) : stream_(stream) {}
+
+    std::pair<int64_t, bool> SelectPayloadLength(size_t max_length) override;
+    bool Send(absl::string_view frame_header, size_t payload_length) override;
+    bool send_fin() const override { return send_fin_; }
+
+  private:
+    StreamImpl& stream_;
+    bool send_fin_ = true;
+  };
+
   using StreamImplPtr = std::unique_ptr<StreamImpl>;
 
   /**
@@ -416,7 +428,7 @@ protected:
     // to flush would be covered by a request/stream/etc. timeout.
     void setFlushTimeout(std::chrono::milliseconds /*timeout*/) override {}
     // StreamImpl
-    void submitHeaders(const HeaderMap& headers, nghttp2_data_provider* provider) override;
+    void submitHeaders(const HeaderMap& headers, bool end_stream) override;
     // Do not use deferred reset on upstream connections.
     bool useDeferredReset() const override { return false; }
     StreamDecoder& decoder() override { return response_decoder_; }
@@ -468,7 +480,7 @@ protected:
 
     // StreamImpl
     void destroy() override;
-    void submitHeaders(const HeaderMap& headers, nghttp2_data_provider* provider) override;
+    void submitHeaders(const HeaderMap& headers, bool end_stream) override;
     // Enable deferred reset on downstream connections so outbound HTTP internal error replies are
     // written out before force resetting the stream, assuming there is enough H2 connection flow
     // control window is available.
