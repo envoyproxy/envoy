@@ -13,6 +13,7 @@ envoy_cc_library(
         "engine_builder.h",
     ],
     repository = "@envoy",
+    visibility = ["//visibility:public"],
     deps = [
         ":envoy_engine_cc_lib_no_stamp",
         "@envoy//source/common/common:assert_lib",
@@ -88,6 +89,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "envoy_engine_cc_lib",
     repository = "@envoy",
+    visibility = ["//visibility:public"],
     deps = [
         ":engine_builder_lib",
         ":envoy_engine_cc_lib_no_stamp",

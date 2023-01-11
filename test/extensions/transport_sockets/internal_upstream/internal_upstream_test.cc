@@ -127,7 +127,9 @@ public:
   }
 
 protected:
-  void initialize() { config_ = std::make_unique<Config>(config_proto_, stats_store_); }
+  void initialize() {
+    config_ = std::make_unique<Config>(config_proto_, *stats_store_.rootScope());
+  }
   envoy::extensions::transport_sockets::internal_upstream::v3::InternalUpstreamTransport
       config_proto_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;

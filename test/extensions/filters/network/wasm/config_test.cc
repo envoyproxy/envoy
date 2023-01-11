@@ -28,7 +28,7 @@ class WasmNetworkFilterConfigTest
 protected:
   WasmNetworkFilterConfigTest() : api_(Api::createApiForTest(stats_store_)) {
     ON_CALL(context_, api()).WillByDefault(ReturnRef(*api_));
-    ON_CALL(context_, scope()).WillByDefault(ReturnRef(stats_store_));
+    ON_CALL(context_, scope()).WillByDefault(ReturnRef(stats_scope_));
     ON_CALL(context_, listenerMetadata()).WillByDefault(ReturnRef(listener_metadata_));
     ON_CALL(context_, initManager()).WillByDefault(ReturnRef(init_manager_));
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
@@ -48,6 +48,7 @@ protected:
 
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   Stats::IsolatedStoreImpl stats_store_;
+  Stats::Scope& stats_scope_{*stats_store_.rootScope()};
   Api::ApiPtr api_;
   envoy::config::core::v3::Metadata listener_metadata_;
   Init::ManagerImpl init_manager_{"init_manager"};

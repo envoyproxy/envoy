@@ -26,6 +26,7 @@ envoy_cc_library(
         ":path_normalizer",
         "//envoy/http:header_validator_errors",
         "//envoy/http:header_validator_interface",
+        "//external:abseil_node_hash_map",
         "//external:abseil_node_hash_set",
         "//source/common/http:headers_lib",
         "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto",
@@ -83,6 +84,7 @@ envoy_cc_library(
         "//external:abseil_node_hash_set",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
+        "@com_google_absl//absl/functional:bind_front",
     ],
 )
 
@@ -105,6 +107,7 @@ envoy_cc_library(
         "//external:abseil_node_hash_map",
         "//external:abseil_node_hash_set",
         "//source/common/http:headers_lib",
+        "@com_google_absl//absl/functional:bind_front",
     ],
 )
 

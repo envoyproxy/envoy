@@ -364,6 +364,16 @@ private:
     // If header map failed validation, it sends an error response and returns false.
     bool validateHeaders();
 
+    // Note: this method is a noop unless ENVOY_ENABLE_UHV is defined
+    // Call header validator extension to validate the request trailer map after it was
+    // deserialized. If the trailer map failed validation, this method does the following:
+    // 1. For H/1 it sends 400 response and returns false.
+    // 2. For H/2 and H/3 it resets the stream (without error response). Issue #24735 is filed to
+    //    harmonize this behavior with H/1.
+    // 3. If the `stream_error_on_invalid_http_message` is set to `false` (it is by default) in the
+    // HTTP connection manager configuration, then the entire connection is closed.
+    bool validateTrailers();
+
     ConnectionManagerImpl& connection_manager_;
     OptRef<const TracingConnectionManagerConfig> connection_manager_tracing_config_;
     // TODO(snowp): It might make sense to move this to the FilterManager to avoid storing it in
