@@ -189,7 +189,7 @@ void ConnectionManagerImpl::checkForDeferredClose(bool skip_delay_close) {
   }
   if (drain_state_ == DrainState::Closing && streams_.empty() && !codec_->wantsToWrite()) {
     // We are closing a draining connection with no active streams and the codec has
-    // nothing to write. As such the details are unnecessary.
+    // nothing to write.
     doConnectionClose(close, absl::nullopt, "deferred_close_on_drained_connection");
   }
 }
@@ -551,7 +551,7 @@ void ConnectionManagerImpl::onIdleTimeout() {
   if (!codec_) {
     // No need to delay close after flushing since an idle timeout has already fired. Attempt to
     // write out buffered data one last time and issue a local close if successful.
-    doConnectionClose(Network::ConnectionCloseType::FlushWrite, absl::nullopt, "");
+    doConnectionClose(Network::ConnectionCloseType::FlushWrite, absl::nullopt, "on_idle_timeout");
   } else if (drain_state_ == DrainState::NotDraining) {
     startDrainSequence();
   }
