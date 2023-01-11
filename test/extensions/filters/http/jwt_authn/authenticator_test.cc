@@ -283,7 +283,7 @@ TEST_F(AuthenticatorTest, TestSetExpiredJwtToGetStatus) {
 }
 
 // This test verifies writing InvalidAudience status into metadata
-// with allow_failed=true and allow_mssing=true
+// with allow_failed=true and allow_missing=true
 TEST_F(AuthenticatorTest, TestSetInvalidJwtInvalidAudienceToGetStatus) {
   // Config provider and failed status in metadata
   auto& provider = (*proto_config_.mutable_providers())[std::string(ProviderName)];
@@ -350,8 +350,8 @@ TEST_F(AuthenticatorTest, TestSetMissingJwtToGetStatus) {
 }
 
 // This test verifies two tokens, one is good another is with invalidAudience
-// with allow_failed=true and allow_mssing=true
-// expect writting invalidAudience to metadata
+// with allow_failed=true and allow_missing=true
+// expect writing invalidAudience to metadata
 TEST_F(AuthenticatorTest, TestSetInvalidAndValidJwtToGetStatus) {
   // Config provider and failed status in metadata
   auto& provider = (*proto_config_.mutable_providers())[std::string(ProviderName)];
@@ -391,8 +391,8 @@ TEST_F(AuthenticatorTest, TestSetInvalidAndValidJwtToGetStatus) {
 }
 
 // This test verifies two bad tokens, one is expired and another is with invalidAudience
-// with allow_failed=true and allow_mssing=true
-// expect writting JwtExpired to metadata as it is the last one.
+// with allow_failed=true and allow_missing=true
+// expect writing JwtExpired to metadata as it is the last one.
 TEST_F(AuthenticatorTest, TestSetTwoInvalidJwtToGetStatus) {
   // Config provider and failed status in metadata
   auto& provider = (*proto_config_.mutable_providers())[std::string(ProviderName)];
@@ -428,7 +428,7 @@ TEST_F(AuthenticatorTest, TestSetTwoInvalidJwtToGetStatus) {
 }
 
 // This test set two providers and send request without jwt
-// with allow_failed=true and allow_mssing=true
+// with allow_failed=true and allow_missing=true
 // expect jwt missing status shouldn't write to metadata.
 TEST_F(AuthenticatorTest, TestSetTwoProvidersJwtMissing) {
   // Config provider and failed status in metadata
