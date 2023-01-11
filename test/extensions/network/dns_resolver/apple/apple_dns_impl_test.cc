@@ -706,7 +706,8 @@ TEST_F(AppleDnsImplFakeApiTest, SynchronousTimeoutInGetAddrInfo) {
 
 TEST_F(AppleDnsImplFakeApiTest, QuerySynchronousCompletionUnroutableFamilies) {
   config_.set_include_unroutable_families(true);
-  resolver_ = std::make_unique<Network::AppleDnsResolverImpl>(config_, dispatcher_, stats_store_);
+  resolver_ = std::make_unique<Network::AppleDnsResolverImpl>(config_, dispatcher_,
+                                                              *stats_store_.rootScope());
 
   const std::string hostname = "foo.com";
   sockaddr_in addr4;
