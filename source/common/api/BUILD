@@ -30,6 +30,10 @@ envoy_cc_library(
             "posix/os_sys_calls_impl.cc",
             "posix/os_sys_calls_impl_linux.cc",
         ],
+        "//bazel:android": [
+            "posix/os_sys_calls_impl.cc",
+            "posix/os_sys_calls_impl_linux.cc",
+        ],
         "//bazel:windows_x86_64": ["win32/os_sys_calls_impl.cc"],
         "//conditions:default": ["posix/os_sys_calls_impl.cc"],
     }) + envoy_select_hot_restart(["posix/os_sys_calls_impl_hot_restart.cc"]),
