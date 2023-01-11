@@ -177,7 +177,10 @@ public:
   virtual void setRequestDecoder(RequestDecoder& decoder) PURE;
 
   /**
-   * Set headers, trailers, and stream info for deferred logging.
+   * Set headers, trailers, and stream info for deferred logging. This allows HCM to hand off
+   * stream-level details to the codec for logging after the stream may be destroyed (e.g. on
+   * receiving the final ack packet from the client). Note that headers and trailers are const
+   * as they will not be modified after this point.
    * @param request_header_map Request headers for this stream.
    * @param response_header_map Response headers for this stream.
    * @param response_trailer_map Response trailers for this stream.

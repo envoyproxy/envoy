@@ -38,8 +38,10 @@ public:
   bool streamErrorOnInvalidHttpMessage() const override {
     return http3_options_.override_stream_error_on_invalid_http_message().value();
   }
-  // Copy this stream's StreamInfo, ensuring that the request headers pointed to by the StreamInfo
-  // lives beyond stream destruction.
+
+  // Accept headers/trailers and stream info from HCM for deferred logging. We pass on the
+  // header/trailer shared pointers, but copy the non-shared stream info to avoid lifetime issues if
+  // the stream is destroyed before logging is complete.
   void
   setDeferredLoggingHeadersAndTrailers(Http::RequestHeaderMapConstSharedPtr request_header_map,
                                        Http::ResponseHeaderMapConstSharedPtr response_header_map,

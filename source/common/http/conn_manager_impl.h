@@ -204,6 +204,8 @@ private:
     std::list<AccessLog::InstanceSharedPtr> accessLogHandlers() override {
       return filter_manager_.accessLogHandlers();
     }
+    // Hand off headers/trailers and stream info to the codec's response encoder, for logging later
+    // (i.e. possibly after this stream has been destroyed).
     void deferHeadersAndTrailers() {
       response_encoder_->setDeferredLoggingHeadersAndTrailers(request_headers_, response_headers_,
                                                               response_trailers_, streamInfo());
