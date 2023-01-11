@@ -1169,6 +1169,43 @@ insensitive_typed_struct:
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
 
+TEST_F(ProtobufUtilityTest, SanitizeUTF8) {
+  {
+    absl::string_view original("already valid");
+    std::string sanitized = MessageUtil::sanitizeUtf8String(original);
+
+    EXPECT_EQ(sanitized, original);
+  }
+
+  {
+    // Create a string that isn't valid UTF-8, that contains multiple sections of
+    // invalid characters.
+    std::string original("valid_prefix");
+    original.append(1, char(0xc3));
+    original.append(1, char(0xc7));
+    original.append("valid_middle");
+    original.append(1, char(0xc4));
+    original.append("valid_suffix");
+
+    std::string sanitized = MessageUtil::sanitizeUtf8String(original);
+    EXPECT_EQ(absl::string_view("valid_prefix!!valid_middle!valid_suffix"), sanitized);
+    EXPECT_EQ(sanitized.length(), original.length());
+  }
+
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.service_sanitize_non_utf8_strings", "false"}});
+    std::string original("valid_prefix");
+    original.append(1, char(0xc3));
+    original.append(1, char(0xc7));
+    original.append("valid_suffix");
+
+    std::string non_sanitized = MessageUtil::sanitizeUtf8String(original);
+    EXPECT_EQ(non_sanitized, original);
+  }
+}
+
 TEST_F(ProtobufUtilityTest, KeyValueStruct) {
   const ProtobufWkt::Struct obj = MessageUtil::keyValueStruct("test_key", "test_value");
   EXPECT_EQ(obj.fields_size(), 1);
