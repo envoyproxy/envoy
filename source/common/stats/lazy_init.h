@@ -72,7 +72,8 @@ private:
 
   // To do that we keep an "inited" stat in the cluster's scope, which will be associated by name to
   // the previous generation's cluster's lazy-init block. We use the value in this shared gauge to
-  // determine whether to instantiate the lazy block on construction.  Gauge& inited_;
+  // determine whether to instantiate the lazy block on construction.
+    Gauge& inited_;
   // TODO(stevenzzzz, jmarantz): Clean up this ctor_ by moving ownership to AtomicPtr, and drop it
   // when the nested object is created.
   std::function<StatsStructType*()> ctor_;
