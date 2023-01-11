@@ -3,7 +3,6 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/io/io_uring.h"
 #include "envoy/common/pure.h"
-#include "envoy/event/deferred_deletable.h"
 #include "envoy/network/address.h"
 #include "envoy/thread_local/thread_local.h"
 
@@ -103,7 +102,7 @@ public:
 /**
  * IoUring request type.
  */
-enum class RequestType { Accept, Connect, Read, Write, Close, Cancel, Unknown };
+enum class RequestType { Accept, Connect, Read, Write, Close, Cancel };
 
 class IoUringSocket;
 
@@ -111,7 +110,7 @@ class IoUringSocket;
  * Abstract for IoUring I/O Request.
  */
 struct Request {
-  RequestType type_{RequestType::Unknown};
+  RequestType type_;
   IoUringSocket& io_uring_socket_;
 };
 
@@ -133,9 +132,9 @@ struct WriteParam {
 /**
  * Abstract for each socket.
  */
-class IoUringSocket : public Event::DeferredDeletable {
+class IoUringSocket {
 public:
-  virtual ~IoUringSocket() = default;
+  ~IoUringSocket() override = default;
 
   /**
    * Return the raw fd.
@@ -200,7 +199,7 @@ public:
  */
 class IoUringWorker : public ThreadLocal::ThreadLocalObject {
 public:
-  virtual ~IoUringWorker() = default;
+  ~IoUringWorker() override = default;
 
   /**
    * Add an accept socket socket to the worker.
@@ -223,11 +222,6 @@ public:
    * Return the current thread's dispatcher.
    */
   virtual Event::Dispatcher& dispatcher() PURE;
-
-  /**
-   * Get IoUringSocket for specific fd.
-   */
-  virtual IoUringSocket& getIoUringSocket(os_fd_t fd) PURE;
 
   /**
    * Submit a accept request for a socket.
@@ -264,9 +258,9 @@ public:
                        const Network::Address::InstanceConstSharedPtr& address) PURE;
 
   /**
-   * Inject a completion to the fd.
+   * Remove the socket from the worker.
    */
-  virtual void injectCompletion(os_fd_t fd, RequestType type, int32_t result) PURE;
+  virtual std::unique_ptr<IoUringSocket> removeSocket(IoUringSocket& socket) PURE;
 };
 
 /**

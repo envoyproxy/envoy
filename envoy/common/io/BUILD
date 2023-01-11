@@ -15,7 +15,6 @@ envoy_cc_library(
     ],
     deps = [
         "//envoy/buffer:buffer_interface",
-        "//envoy/event:deferred_deletable",
         "//envoy/network:address_interface",
     ],
 )

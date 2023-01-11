@@ -23,3 +23,20 @@ envoy_cc_library(
         "//envoy/thread_local:thread_local_interface",
     ],
 )
+
+envoy_cc_library(
+    name = "io_uring_worker_lib",
+    srcs = [
+        "io_uring_worker.cc",
+    ],
+    hdrs = [
+        "io_uring_worker.h",
+    ],
+    tags = ["nocompdb"],
+    deps = [
+        ":io_uring_impl_lib",
+        "//envoy/common/io:io_uring_interface",
+        "//envoy/event:file_event_interface",
+        "//source/common/buffer:buffer_lib",
+    ],
+)
