@@ -1204,26 +1204,27 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
   return okStatus();
 }
 
-int ConnectionImpl::onFrameSend(const nghttp2_frame* frame) {
-  // The nghttp2 library does not cleanly give us a way to determine whether we received invalid
+int ConnectionImpl::onFrameSend(int32_t stream_id, size_t length, uint8_t type, uint8_t flags,
+                                uint32_t error_code) {
+  // The codec library does not cleanly give us a way to determine whether we received invalid
   // data from our peer. Sometimes it raises the invalid frame callback, and sometimes it does not.
   // In all cases however it will attempt to send a GOAWAY frame with an error status. If we see
   // an outgoing frame of this type, we will return an error code so that we can abort execution.
   ENVOY_CONN_LOG(trace, "sent frame type={}, stream_id={}, length={}", connection_,
-                 static_cast<uint64_t>(frame->hd.type), frame->hd.stream_id, frame->hd.length);
-  StreamImpl* stream = getStream(frame->hd.stream_id);
+                 static_cast<uint64_t>(type), stream_id, length);
+  StreamImpl* stream = getStream(stream_id);
   if (stream != nullptr) {
-    if (frame->hd.type != METADATA_FRAME_TYPE) {
-      stream->bytes_meter_->addWireBytesSent(frame->hd.length + H2_FRAME_HEADER_SIZE);
+    if (type != METADATA_FRAME_TYPE) {
+      stream->bytes_meter_->addWireBytesSent(length + H2_FRAME_HEADER_SIZE);
     }
-    if (frame->hd.type == NGHTTP2_HEADERS || frame->hd.type == NGHTTP2_CONTINUATION) {
-      stream->bytes_meter_->addHeaderBytesSent(frame->hd.length + H2_FRAME_HEADER_SIZE);
+    if (type == NGHTTP2_HEADERS || type == NGHTTP2_CONTINUATION) {
+      stream->bytes_meter_->addHeaderBytesSent(length + H2_FRAME_HEADER_SIZE);
     }
   }
-  switch (frame->hd.type) {
+  switch (type) {
   case NGHTTP2_GOAWAY: {
-    ENVOY_CONN_LOG(debug, "sent goaway code={}", connection_, frame->goaway.error_code);
-    if (frame->goaway.error_code != NGHTTP2_NO_ERROR) {
+    ENVOY_CONN_LOG(debug, "sent goaway code={}", connection_, error_code);
+    if (error_code != NGHTTP2_NO_ERROR) {
       // TODO(mattklein123): Returning this error code abandons standard nghttp2 frame accounting.
       // As such, it is not reliable to call sendPendingFrames() again after this and we assume
       // that the connection is going to get torn down immediately. One byproduct of this is that
@@ -1239,15 +1240,14 @@ int ConnectionImpl::onFrameSend(const nghttp2_frame* frame) {
   }
 
   case NGHTTP2_RST_STREAM: {
-    ENVOY_CONN_LOG(debug, "sent reset code={}", connection_, frame->rst_stream.error_code);
+    ENVOY_CONN_LOG(debug, "sent reset code={}", connection_, error_code);
     stats_.tx_reset_.inc();
     break;
   }
 
   case NGHTTP2_HEADERS:
   case NGHTTP2_DATA: {
-    StreamImpl* stream = getStream(frame->hd.stream_id);
-    stream->local_end_stream_sent_ = frame->hd.flags & NGHTTP2_FLAG_END_STREAM;
+    stream->local_end_stream_sent_ = flags & NGHTTP2_FLAG_END_STREAM;
     break;
   }
   }
@@ -1306,15 +1306,15 @@ int ConnectionImpl::onInvalidFrame(int32_t stream_id, int error_code) {
   return NGHTTP2_ERR_CALLBACK_FAILURE;
 }
 
-int ConnectionImpl::onBeforeFrameSend(const nghttp2_frame* frame) {
+int ConnectionImpl::onBeforeFrameSend(int32_t /*stream_id*/, size_t /*length*/, uint8_t type,
+                                      uint8_t flags) {
   ENVOY_CONN_LOG(trace, "about to send frame type={}, flags={}", connection_,
-                 static_cast<uint64_t>(frame->hd.type), static_cast<uint64_t>(frame->hd.flags));
+                 static_cast<uint64_t>(type), static_cast<uint64_t>(flags));
   ASSERT(!is_outbound_flood_monitored_control_frame_);
   // Flag flood monitored outbound control frames.
   is_outbound_flood_monitored_control_frame_ =
-      ((frame->hd.type == NGHTTP2_PING || frame->hd.type == NGHTTP2_SETTINGS) &&
-       frame->hd.flags & NGHTTP2_FLAG_ACK) ||
-      frame->hd.type == NGHTTP2_RST_STREAM;
+      ((type == NGHTTP2_PING || type == NGHTTP2_SETTINGS) && flags & NGHTTP2_FLAG_ACK) ||
+      type == NGHTTP2_RST_STREAM;
   return 0;
 }
 
@@ -1704,12 +1704,23 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks() {
 
   nghttp2_session_callbacks_set_on_frame_send_callback(
       callbacks_, [](nghttp2_session*, const nghttp2_frame* frame, void* user_data) -> int {
-        return static_cast<ConnectionImpl*>(user_data)->onFrameSend(frame);
+        uint32_t error_code = 0;
+        switch (frame->hd.type) {
+        case NGHTTP2_GOAWAY:
+          error_code = frame->goaway.error_code;
+          break;
+        case NGHTTP2_RST_STREAM:
+          error_code = frame->rst_stream.error_code;
+          break;
+        }
+        return static_cast<ConnectionImpl*>(user_data)->onFrameSend(
+            frame->hd.stream_id, frame->hd.length, frame->hd.type, frame->hd.flags, error_code);
       });
 
   nghttp2_session_callbacks_set_before_frame_send_callback(
       callbacks_, [](nghttp2_session*, const nghttp2_frame* frame, void* user_data) -> int {
-        return static_cast<ConnectionImpl*>(user_data)->onBeforeFrameSend(frame);
+        return static_cast<ConnectionImpl*>(user_data)->onBeforeFrameSend(
+            frame->hd.stream_id, frame->hd.length, frame->hd.type, frame->hd.flags);
       });
 
   nghttp2_session_callbacks_set_on_frame_not_send_callback(

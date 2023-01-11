@@ -648,8 +648,9 @@ private:
   int onData(int32_t stream_id, const uint8_t* data, size_t len);
   Status onBeforeFrameReceived(const nghttp2_frame_hd* hd);
   Status onFrameReceived(const nghttp2_frame* frame);
-  int onBeforeFrameSend(const nghttp2_frame* frame);
-  int onFrameSend(const nghttp2_frame* frame);
+  int onBeforeFrameSend(int32_t stream_id, size_t length, uint8_t type, uint8_t flags);
+  int onFrameSend(int32_t stream_id, size_t length, uint8_t type, uint8_t flags,
+                  uint32_t error_code);
   int onError(absl::string_view error);
   virtual int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) PURE;
   int onInvalidFrame(int32_t stream_id, int error_code);
