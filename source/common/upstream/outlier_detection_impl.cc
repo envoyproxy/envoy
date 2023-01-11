@@ -308,12 +308,11 @@ void DetectorImpl::initialize(Cluster& cluster) {
 
   if (cluster.healthChecker() != nullptr) {
     cluster.healthChecker()->addHostCheckCompleteCb(
-        [this](HostSharedPtr host, HealthTransition changed_state) {
+        [this](HostSharedPtr host, HealthTransition) {
           // If the host is ejected by outlier detection and active health check succeeds,
           // we should treat this host as healthy.
           if (Runtime::runtimeFeatureEnabled(
                   "envoy.reloadable_features.successful_active_health_check_uneject_host") &&
-              changed_state == HealthTransition::Changed &&
               !host->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC) &&
               host->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
             host->healthFlagClear(Host::HealthFlag::FAILED_OUTLIER_CHECK);
