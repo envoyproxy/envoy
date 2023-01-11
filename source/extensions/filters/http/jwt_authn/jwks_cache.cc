@@ -144,7 +144,7 @@ public:
     }
   }
 
-  JwksData* getDefault() override {
+  JwksData* getSingleProvider() override {
     if (jwks_data_map_.size() == 1) {
       return jwks_data_map_.begin()->second.get();
     }
