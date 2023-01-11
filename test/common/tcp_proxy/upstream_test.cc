@@ -188,12 +188,11 @@ TYPED_TEST(HttpUpstreamTest, PropagateResponseHeadersInCaseOfInvalidResponse) {
   auto conn_pool_callbacks = std::make_unique<MockHttpConnPoolCallbacks>();
   auto conn_pool_callbacks_raw = conn_pool_callbacks.get();
   upstream_->setConnPoolCallbacks(std::move(conn_pool_callbacks));
-  EXPECT_CALL(*conn_pool_callbacks_raw, onFailure()).Times(0); 
-  EXPECT_CALL(*conn_pool_callbacks_raw, onSuccess(_)).Times(0);  
+  EXPECT_CALL(*conn_pool_callbacks_raw, onFailure()).Times(0);
+  EXPECT_CALL(*conn_pool_callbacks_raw, onSuccess(_)).Times(0);
   Http::ResponseHeaderMapPtr headers{new Http::TestResponseHeaderMapImpl{{":status", "418"}}};
   upstream_->responseDecoder().decodeHeaders(std::move(headers), false);
-}
-  
+}  
 TYPED_TEST(HttpUpstreamTest, DumpsResponseDecoderWithoutAllocatingMemory) {
   std::array<char, 256> buffer;
   OutputBufferStream ostream{buffer.data(), buffer.size()};
