@@ -635,7 +635,7 @@ ConnectionImpl::StreamDataFrameSource::SelectPayloadLength(size_t max_length) {
     stream_.data_deferred_ = true;
     return {kBlocked, false};
   } else {
-    const size_t length = std::min(max_length, stream_.pending_send_data_->length());
+    const size_t length = std::min<size_t>(max_length, stream_.pending_send_data_->length());
     bool end_data = false;
     if (stream_.local_end_stream_ && length == stream_.pending_send_data_->length()) {
       end_data = true;
