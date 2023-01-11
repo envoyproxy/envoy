@@ -33,7 +33,8 @@ LuaFilterConfig::createRouteSpecificFilterConfigTyped(
 /**
  * Static registration for the Lua filter. @see RegisterFactory.
  */
-REGISTER_FACTORY(LuaFilterConfig, Server::Configuration::NamedHttpFilterConfigFactory){"envoy.lua"};
+REGISTER_FACTORY_D(LuaFilterConfig, Server::Configuration::NamedHttpFilterConfigFactory,
+                   "envoy.lua");
 
 } // namespace Lua
 } // namespace HttpFilters

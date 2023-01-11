@@ -53,11 +53,11 @@ UpstreamStartTlsSocketFactory::createTransportSocketFactory(
                                                  std::move(tls_socket_factory));
 }
 
-REGISTER_FACTORY(DownstreamStartTlsSocketFactory,
-                 Server::Configuration::DownstreamTransportSocketConfigFactory){"starttls"};
+REGISTER_FACTORY_D(DownstreamStartTlsSocketFactory,
+                   Server::Configuration::DownstreamTransportSocketConfigFactory, "starttls");
 
-REGISTER_FACTORY(UpstreamStartTlsSocketFactory,
-                 Server::Configuration::UpstreamTransportSocketConfigFactory){"starttls"};
+REGISTER_FACTORY_D(UpstreamStartTlsSocketFactory,
+                   Server::Configuration::UpstreamTransportSocketConfigFactory, "starttls");
 
 } // namespace StartTls
 } // namespace TransportSockets

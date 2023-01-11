@@ -52,8 +52,8 @@ std::string GraphiteStatsdSinkFactory::name() const { return "envoy.stat_sinks.g
 /**
  * Static registration for the statsd sink factory. @see RegisterFactory.
  */
-REGISTER_FACTORY(GraphiteStatsdSinkFactory,
-                 Server::Configuration::StatsSinkFactory){"envoy.graphite_statsd"};
+REGISTER_FACTORY_D(GraphiteStatsdSinkFactory, Server::Configuration::StatsSinkFactory,
+                   "envoy.graphite_statsd");
 
 } // namespace GraphiteStatsd
 } // namespace StatSinks
