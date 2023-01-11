@@ -40,6 +40,10 @@ namespace BandwidthLimitFilter {
   GAUGE(response_incoming_size, Accumulate)                                                        \
   GAUGE(request_allowed_size, Accumulate)                                                          \
   GAUGE(response_allowed_size, Accumulate)                                                         \
+  COUNTER(request_incoming_total_size)                                                             \
+  COUNTER(response_incoming_total_size)                                                            \
+  COUNTER(request_allowed_total_size)                                                              \
+  COUNTER(response_allowed_total_size)                                                             \
   HISTOGRAM(request_transfer_duration, Milliseconds)                                               \
   HISTOGRAM(response_transfer_duration, Milliseconds)
 

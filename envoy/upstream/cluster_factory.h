@@ -74,9 +74,9 @@ public:
   virtual Outlier::EventLoggerSharedPtr outlierEventLogger() PURE;
 
   // Server::Configuration::FactoryContextBase
-  Stats::Scope& scope() override { return stats(); }
+  Stats::Scope& scope() override { return *stats().rootScope(); }
 
-  Stats::Scope& serverScope() override { return stats(); }
+  Stats::Scope& serverScope() override { return *stats().rootScope(); }
 };
 
 /**
