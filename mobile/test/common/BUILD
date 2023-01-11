@@ -10,7 +10,6 @@ envoy_cc_test(
     repository = "@envoy",
     deps = [
         "//library/common:engine_common_lib",
-        "@envoy//source/extensions/listener_managers/listener_manager:listener_manager_lib",
     ],
 )
 
