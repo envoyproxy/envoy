@@ -707,7 +707,7 @@ public:
 
   static std::unique_ptr<LazyCompatibleClusterTrafficStats>
   generateStats(Stats::ScopeSharedPtr scope, const ClusterTrafficStatNames& cluster_stat_names,
-                bool lazyinit = false);
+                bool lazyinit);
   static ClusterLoadReportStats
   generateLoadReportStats(Stats::Scope& scope, const ClusterLoadReportStatNames& stat_names);
   static ClusterCircuitBreakersStats

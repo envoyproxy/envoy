@@ -43,6 +43,7 @@ public:
         }) {
     if (inited_.value() > 0) {
       instantiate();
+      ctor_ = nullptr;
     }
   }
   // Helper operators to get-or-create and return the StatsStructType object.
@@ -56,11 +57,22 @@ public:
 
 private:
   inline StatsStructType* instantiate() { return internal_stats_.get(ctor_); }
-  // If the 'internal_stats_' is already instantiated, i.e. 'inited_'>0, we need to instantiated
-  // again to keep the corresponding stats around. E.g. when ClusterManager updates a cluster, if
-  // its ClusterTrafficStats is instantiated, the new version ClusterTrafficStats need to point to
-  // the same set of stats before the old version is deleted by ClusterManager.
-  Gauge& inited_;
+
+  // In order to preserve stat value continuity across a config reload, we need to automatically
+  // re-instantiate lazy stats when they are constructed, if there is already a live instantiation
+  // to the same stats. Consider the following alternate scenarios:
+
+  // Scenario 1: a cluster is instantiated but receives no requests, so its traffic-related stats
+  // are never instantiated. When this cluster gets reloaded on a config update, a new lazy-init
+  // block is created, but the stats should again not be instaniated.
+
+  // Scenario 2: a cluster is instantiated and receives traffic, so its traffic-related stats are
+  // instantiated. We must ensure that a new instance for the same cluster gets its lazy-stats
+  // instantiated before the previous cluster of the same name is destructed.
+
+  // To do that we keep an "inited" stat in the cluster's scope, which will be associated by name to
+  // the previous generation's cluster's lazy-init block. We use the value in this shared gauge to
+  // determine whether to instantiate the lazy block on construction.  Gauge& inited_;
   // TODO(stevenzzzz, jmarantz): Clean up this ctor_ by moving ownership to AtomicPtr, and drop it
   // when the nested object is created.
   std::function<StatsStructType*()> ctor_;

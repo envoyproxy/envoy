@@ -15,7 +15,6 @@
 #include "benchmark/benchmark.h"
 
 namespace Envoy {
-
 namespace Stats {
 
 using Upstream::ClusterTrafficStats;
@@ -29,7 +28,7 @@ public:
   void createStats(bool defer_init) {
     for (uint64_t i = 0; i < num_clusters_; ++i) {
       std::string new_cluster_name = absl::StrCat("cluster_", i);
-      auto scope = stat_store_.createScope(new_cluster_name);
+      Stats::ScopeSharedPtr scope = stat_store_.createScope(new_cluster_name);
       scopes_.push_back(scope);
       if (lazy_init_) {
         auto lazy_stat = std::make_shared<Stats::LazyInit<ClusterTrafficStats>>(stat_names_, scope);

@@ -62,7 +62,7 @@ private:
   std::list<Stats::SinkPtr> sinks_;
   std::chrono::milliseconds flush_interval_;
   bool flush_on_admin_{false};
-  bool enable_lazyinit_stats_ = false;
+  bool enable_lazyinit_stats_{false};
 };
 
 /**

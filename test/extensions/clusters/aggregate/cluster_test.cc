@@ -34,7 +34,7 @@ public:
   AggregateClusterTest()
       : stat_names_(stats_store_.symbolTable()),
         traffic_stats_(
-            Upstream::ClusterInfoImpl::generateStats(stats_store_.rootScope(), stat_names_)) {
+            Upstream::ClusterInfoImpl::generateStats(stats_store_.rootScope(), stat_names_, false)) {
     ON_CALL(*primary_info_, name()).WillByDefault(ReturnRef(primary_name));
     ON_CALL(*secondary_info_, name()).WillByDefault(ReturnRef(secondary_name));
   }
