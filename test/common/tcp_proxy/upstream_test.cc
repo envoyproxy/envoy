@@ -192,7 +192,8 @@ TYPED_TEST(HttpUpstreamTest, PropagateResponseHeadersInCaseOfInvalidResponse) {
   EXPECT_CALL(*conn_pool_callbacks_raw, onSuccess(_)).Times(0);
   Http::ResponseHeaderMapPtr headers{new Http::TestResponseHeaderMapImpl{{":status", "418"}}};
   upstream_->responseDecoder().decodeHeaders(std::move(headers), false);
-}  
+}
+  
 TYPED_TEST(HttpUpstreamTest, DumpsResponseDecoderWithoutAllocatingMemory) {
   std::array<char, 256> buffer;
   OutputBufferStream ostream{buffer.data(), buffer.size()};
