@@ -5,7 +5,7 @@
 #include "source/common/stats/custom_stat_namespaces_impl.h"
 #include "source/common/stats/thread_local_store.h"
 #include "source/server/admin/stats_handler.h"
-#include "source/server/admin/stats_request.h"
+#include "source/server/admin/ungrouped_stats_request.h"
 
 #include "test/mocks/server/admin_stream.h"
 #include "test/mocks/server/instance.h"
@@ -1183,7 +1183,7 @@ protected:
   }
 
   void statsEndpoint() {
-    StatsRequest request(*store_, StatsParams());
+    UngroupedStatsRequest request(*store_, StatsParams());
     Http::TestResponseHeaderMapImpl response_headers;
     request.start(response_headers);
     Buffer::OwnedImpl data;
