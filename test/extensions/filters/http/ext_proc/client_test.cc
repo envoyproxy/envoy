@@ -34,7 +34,8 @@ protected:
     EXPECT_CALL(client_manager_, getOrCreateRawAsyncClient(_, _, _))
         .WillOnce(Invoke(this, &ExtProcStreamTest::doFactory));
 
-    client_ = std::make_unique<ExternalProcessorClientImpl>(client_manager_, stats_store_);
+    client_ =
+        std::make_unique<ExternalProcessorClientImpl>(client_manager_, *stats_store_.rootScope());
   }
 
   Grpc::RawAsyncClientSharedPtr doFactory(Unused, Unused, Unused) {
