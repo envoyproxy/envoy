@@ -59,7 +59,18 @@ void CacheEvictionThread::work() {
     // This lock must be held for the duration of the evictions, as the cache pointers
     // are not owned by CacheEvictionThread, and can be deleted any time the lock is
     // not held.
-    // This should only block filter configuration updates that change caches.
+    //
+    // We can't use weak_ptr and transition to shared_ptr, because the caches own the
+    // CacheEvictionThread - if the CacheEvictionThread temporarily owns a cache, it
+    // can end up indirectly being the sole owner of itself, such that when those
+    // pointers go out of scope it can end up calling its own destructor - if that
+    // happens then it tries to pthread_join from the thread itself, which is an error.
+    //
+    // Therefore, we must have this distasteful long-lived hold on the mutex.
+    //
+    // The only other users of cache_mu_, however, are addCache and removeCache.
+    // Therefore this should only block filter configuration updates that create or
+    // destroy caches; as such the long-held lock should not be problematic in practice.
     for (FileSystemHttpCache* cache : caches_) {
       cache->maybeEvict();
     }
