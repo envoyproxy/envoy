@@ -3,33 +3,33 @@
 namespace Envoy {
 namespace Stats {
 
-ThreadLocalStoreNoMocksTestBase::ThreadLocalStoreNoMocksTestBase()
+ThreadLocalStoreNoMocksMixin::ThreadLocalStoreNoMocksMixin()
     : alloc_(symbol_table_), store_(std::make_unique<ThreadLocalStoreImpl>(alloc_)),
       scope_(*store_->rootScope()), pool_(symbol_table_) {}
 
-ThreadLocalStoreNoMocksTestBase::~ThreadLocalStoreNoMocksTestBase() {
+ThreadLocalStoreNoMocksMixin::~ThreadLocalStoreNoMocksMixin() {
   if (store_ != nullptr) {
     store_->shutdownThreading();
   }
 }
 
-StatName ThreadLocalStoreNoMocksTestBase::makeStatName(absl::string_view name) {
+StatName ThreadLocalStoreNoMocksMixin::makeStatName(absl::string_view name) {
   return pool_.add(name);
 }
 
-ThreadLocalRealThreadsTestBase::ThreadLocalRealThreadsTestBase(uint32_t num_threads)
+ThreadLocalRealThreadsMixin::ThreadLocalRealThreadsMixin(uint32_t num_threads)
     : RealThreadsTestHelper(num_threads) {
   runOnMainBlocking([this]() { store_->initializeThreading(*main_dispatcher_, *tls_); });
 }
 
-ThreadLocalRealThreadsTestBase::~ThreadLocalRealThreadsTestBase() {
+ThreadLocalRealThreadsMixin::~ThreadLocalRealThreadsMixin() {
   // TODO(chaoqin-li1123): clean this up when we figure out how to free the threading resources in
   // RealThreadsTestHelper.
   shutdownThreading();
   exitThreads([this]() { store_.reset(); });
 }
 
-void ThreadLocalRealThreadsTestBase::shutdownThreading() {
+void ThreadLocalRealThreadsMixin::shutdownThreading() {
   runOnMainBlocking([this]() {
     if (!tls_->isShutdown()) {
       tls_->shutdownGlobalThreading();
