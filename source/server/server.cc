@@ -581,22 +581,14 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   heap_shrinker_ = std::make_unique<Memory::HeapShrinker>(*dispatcher_, *overload_manager_,
                                                           *stats_store_.rootScope());
 
-  ListenerManagerFactory* listener_manager_factory_ = nullptr;
   for (const auto& bootstrap_extension : bootstrap_.bootstrap_extensions()) {
-    auto* factory = Config::Utility::getAndCheckFactory<Configuration::BootstrapExtensionFactory>(
-        bootstrap_extension, true /*optional*/);
-    if (factory) {
-      auto config = Config::Utility::translateAnyToFactoryConfig(
-          bootstrap_extension.typed_config(), messageValidationContext().staticValidationVisitor(),
-          *factory);
-      bootstrap_extensions_.push_back(
-          factory->createBootstrapExtension(*config, serverFactoryContext()));
-    } else {
-      // For legacy reasons, the listener manager factory is not a bootstrap factory and is special
-      // cased.
-      listener_manager_factory_ =
-          Config::Utility::getAndCheckFactory<ListenerManagerFactory>(bootstrap_extension, false);
-    }
+    auto& factory = Config::Utility::getAndCheckFactory<Configuration::BootstrapExtensionFactory>(
+        bootstrap_extension);
+    auto config = Config::Utility::translateAnyToFactoryConfig(
+        bootstrap_extension.typed_config(), messageValidationContext().staticValidationVisitor(),
+        factory);
+    bootstrap_extensions_.push_back(
+        factory.createBootstrapExtension(*config, serverFactoryContext()));
   }
 
   // Register the fatal actions.
@@ -627,10 +619,16 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
       Network::SocketInterfaceSingleton::initialize(sock);
     }
   }
-  if (!listener_manager_factory_) {
+
+  ListenerManagerFactory* listener_manager_factory_ = nullptr;
+  if (bootstrap_.has_listener_manager()) {
+    listener_manager_factory_ = Config::Utility::getAndCheckFactory<ListenerManagerFactory>(
+        bootstrap_.listener_manager(), false);
+  } else {
     listener_manager_factory_ = &Config::Utility::getAndCheckFactoryByName<ListenerManagerFactory>(
         options_.listenerManager());
   }
+
   // Workers get created first so they register for thread local updates.
   listener_manager_ = listener_manager_factory_->createListenerManager(
       *this, nullptr, worker_factory_, bootstrap_.enable_dispatcher_stats(), quic_stat_names_);

@@ -359,9 +359,9 @@ TEST_P(ClientIntegrationTest, ForceAdminViaBootstrap) {
 
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     envoy::config::listener::v3::ApiListenerManager api;
-    auto* boostrap_extension = bootstrap.add_bootstrap_extensions();
-    boostrap_extension->mutable_typed_config()->PackFrom(api);
-    boostrap_extension->set_name("envoy.listener_manager_impl.api");
+    auto* listener_manager = bootstrap.mutable_listener_manager();
+    listener_manager->mutable_typed_config()->PackFrom(api);
+    listener_manager->set_name("envoy.listener_manager_impl.api");
   });
 
   basicTest();
