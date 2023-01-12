@@ -60,7 +60,7 @@ message HealthStatusSet {
       [(validate.rules).repeated = {items {enum {defined_only: true}}}];
 }
 
-// [#next-free-field: 25]
+// [#next-free-field: 26]
 message HealthCheck {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.HealthCheck";
 
@@ -414,4 +414,6 @@ message HealthCheck {
   // the cluster's :ref:`transport socket <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket>`
   // will be used for health check socket configuration.
   google.protobuf.Struct transport_socket_match_criteria = 23;
+
+  bool enable_idle_hc = 25;
 }

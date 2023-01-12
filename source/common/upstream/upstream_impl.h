@@ -210,6 +210,16 @@ public:
   resolveTransportSocketFactory(const Network::Address::InstanceConstSharedPtr& dest_address,
                                 const envoy::config::core::v3::Metadata* metadata) const;
   absl::optional<MonotonicTime> lastHcPassTime() const override { return last_hc_pass_time_; }
+  MonotonicTime lastTrafficPassTime() const override { return last_traffic_pass_time_; }
+  MonotonicTime lastTrafficPassTime2xx() const override { return last_traffic_pass_time_2xx_; }
+
+  void setLastTrafficTime(MonotonicTime last_traffic_pass_time) const override {
+    last_traffic_pass_time_ = last_traffic_pass_time;
+  }
+
+  void setLastTrafficTime2xx(MonotonicTime last_traffic_pass_time) const override {
+    last_traffic_pass_time_2xx_ = last_traffic_pass_time;
+  }
 
   void setAddressList(const std::vector<Network::Address::InstanceConstSharedPtr>& address_list) {
     address_list_ = address_list;
@@ -255,6 +265,8 @@ private:
       socket_factory_ ABSL_GUARDED_BY(metadata_mutex_);
   const MonotonicTime creation_time_;
   absl::optional<MonotonicTime> last_hc_pass_time_;
+  mutable MonotonicTime last_traffic_pass_time_;
+  mutable MonotonicTime last_traffic_pass_time_2xx_;
 };
 
 /**
@@ -316,6 +328,7 @@ public:
   void setLastHcPassTime(MonotonicTime last_hc_pass_time) override {
     setLastHcPassTimeImpl(std::move(last_hc_pass_time));
   }
+
 
   Host::HealthStatus healthStatus() const override {
     // Evaluate active health status first.

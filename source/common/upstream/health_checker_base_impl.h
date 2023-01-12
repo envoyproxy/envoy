@@ -71,6 +71,7 @@ public:
   MetadataConstSharedPtr transportSocketMatchMetadata() const {
     return transport_socket_match_metadata_;
   }
+  virtual envoy::data::core::v3::HealthCheckerType healthCheckerType() const PURE;
 
 protected:
   class ActiveHealthCheckSession : public Event::DeferredDeletable {
@@ -119,9 +120,9 @@ protected:
   ~HealthCheckerImplBase() override;
 
   virtual ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) PURE;
-  virtual envoy::data::core::v3::HealthCheckerType healthCheckerType() const PURE;
 
   const bool always_log_health_check_failures_;
+  const bool enable_idle_hc_;
   const Cluster& cluster_;
   Event::Dispatcher& dispatcher_;
   const std::chrono::milliseconds timeout_;
