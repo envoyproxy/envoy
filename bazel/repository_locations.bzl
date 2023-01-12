@@ -1418,7 +1418,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/grailbio/bazel-toolchain/archive/{version}.tar.gz"],
         use_category = [],
         extensions = [],
-        release_date = "2023-01-05",
+        release_date = "2023-01-06",
         cpe = "N/A",
     ),
 )
