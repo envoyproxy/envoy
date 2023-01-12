@@ -404,46 +404,30 @@ void FileSystemHttpCache::trackFileRemoved(uint64_t file_size) {
   stats_.size_bytes_.set(size_bytes_);
 }
 
-bool FileSystemHttpCache::needsEviction() const {
-  if (config().has_max_cache_size_bytes() &&
-      size_bytes_ > config().max_cache_size_bytes().value()) {
-    return true;
-  }
-  if (config().has_max_cache_entry_count() &&
-      size_count_ > config().max_cache_entry_count().value()) {
-    return true;
-  }
-  return false;
-}
-
-bool FileSystemHttpCache::needsEviction(uint64_t& size_to_evict_out,
-                                        uint64_t& count_to_evict_out) const {
+FileSystemHttpCache::EvictionsRequired FileSystemHttpCache::needsEviction() const {
+  EvictionsRequired required;
   if (config().has_max_cache_size_bytes()) {
     // capture a value from the atomic because we're going to use it twice and don't want our
     // value to change in between.
     uint64_t seen_size = size_bytes_;
-    size_to_evict_out = seen_size > config().max_cache_size_bytes().value()
-                            ? seen_size - config().max_cache_size_bytes().value()
-                            : 0;
-  } else {
-    size_to_evict_out = 0;
+    required.size_bytes_ = seen_size > config().max_cache_size_bytes().value()
+                               ? seen_size - config().max_cache_size_bytes().value()
+                               : 0;
   }
   if (config().has_max_cache_entry_count()) {
     // capture a value from the atomic because we're going to use it twice and don't want our
     // value to change in between.
     uint64_t seen_count = size_count_;
-    count_to_evict_out = seen_count > config().max_cache_entry_count().value()
-                             ? seen_count - config().max_cache_entry_count().value()
-                             : 0;
-  } else {
-    count_to_evict_out = 0;
+    required.count_ = seen_count > config().max_cache_entry_count().value()
+                          ? seen_count - config().max_cache_entry_count().value()
+                          : 0;
   }
-  return size_to_evict_out > 0 || count_to_evict_out > 0;
+  return required;
 }
 
 void FileSystemHttpCache::maybeEvict() {
-  uint64_t size_to_evict, count_to_evict;
-  if (!needsEviction(size_to_evict, count_to_evict)) {
+  EvictionsRequired evictions_required = needsEviction();
+  if (!evictions_required) {
     return;
   }
 
@@ -470,7 +454,8 @@ void FileSystemHttpCache::maybeEvict() {
     if (os_sys_calls.stat(absl::StrCat(cachePath(), entry.name_).c_str(), &s).return_value_ != -1) {
       Envoy::SystemTime last_touch =
           std::max(timespecToChrono(s.st_atim), timespecToChrono(s.st_ctim));
-      if (proposed_size_evicted < size_to_evict || proposed_evictions.size() < count_to_evict ||
+      if (proposed_size_evicted < evictions_required.size_bytes_ ||
+          proposed_evictions.size() < evictions_required.count_ ||
           last_touch < proposed_evictions.rbegin()->last_touch_) {
         // We either haven't evicted enough yet, or this eviction candidate is 'older'
         // than our current 'youngest' eviction candidate. So add this one to candidates.
@@ -478,9 +463,9 @@ void FileSystemHttpCache::maybeEvict() {
             ProposedEviction{entry.name_, entry.size_bytes_.value_or(0), last_touch});
         proposed_size_evicted += entry.size_bytes_.value_or(0);
         std::multiset<ProposedEviction>::iterator youngest;
-        while (proposed_evictions.size() > count_to_evict &&
+        while (proposed_evictions.size() > evictions_required.count_ &&
                proposed_size_evicted - (youngest = std::prev(proposed_evictions.end()))->size_ >=
-                   size_to_evict) {
+                   evictions_required.size_bytes_) {
           // We'd still be evicting enough if we don't evict the 'youngest' proposed eviction,
           // so we unpropose that one.
           proposed_size_evicted -= youngest->size_;

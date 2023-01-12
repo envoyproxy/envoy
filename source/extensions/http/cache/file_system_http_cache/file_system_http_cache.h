@@ -185,21 +185,19 @@ public:
   // is totally irrelevant to the outward-facing API.
   static const size_t max_update_headers_copy_chunk_size_;
 
-  /**
-   * Called when adding a file to the cache.
-   * @return true if eviction is required.
-   */
-  bool needsEviction() const;
+  struct EvictionsRequired {
+    // The number of bytes that must be evicted to be under the threshold.
+    uint64_t size_bytes_ = 0;
+    // The number of files that must be evicted to be under the threshold.
+    uint64_t count_ = 0;
+    operator bool() const { return size_bytes_ > 0 || count_ > 0; }
+  };
 
   /**
-   * Called from maybeEvict to determine how much eviction is necessary.
-   * Returns true if eviction is required, and populates size_to_evict_out and
-   * count_to_evict_out.
-   * @param size_to_evict_out receives the size in bytes that must be evicted.
-   * @param count_to_evict_out receives the count of files that must be evicted.
-   * @return true if eviction is required.
+   * @return EvictionsRequired the amounts that need to be evicted to be under the configured
+   * thresholds.
    */
-  bool needsEviction(uint64_t& size_to_evict_out, uint64_t& count_to_evict_out) const;
+  EvictionsRequired needsEviction() const;
 
   /**
    * Called from CacheEvictionThread, this checks if the cache is over any of its
