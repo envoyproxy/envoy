@@ -53,11 +53,6 @@
 #include "library/common/extensions/filters/http/platform_bridge/config.h"
 #include "library/common/extensions/filters/http/route_cache_reset/config.h"
 #include "library/common/extensions/filters/http/socket_tag/config.h"
-#include "library/common/extensions/filters/http/test_accessor/config.h"
-#include "library/common/extensions/filters/http/test_event_tracker/config.h"
-#include "library/common/extensions/filters/http/test_kv_store/config.h"
-#include "library/common/extensions/filters/http/test_logger/config.h"
-#include "library/common/extensions/filters/http/test_read/config.h"
 #include "library/common/extensions/key_value/platform/config.h"
 #include "library/common/extensions/listener_managers/api_listener_manager/api_listener_manager.h"
 #include "library/common/extensions/retry/options/network_configuration/config.h"
@@ -87,10 +82,6 @@ void ExtensionRegistry::registerFactories() {
   Extensions::HttpFilters::RouteCacheReset::forceRegisterRouteCacheResetFilterFactory();
   Extensions::HttpFilters::RouterFilter::forceRegisterRouterFilterConfig();
   Extensions::HttpFilters::SocketTag::forceRegisterSocketTagFilterFactory();
-  Extensions::HttpFilters::TestAccessor::forceRegisterTestAccessorFilterFactory();
-  Extensions::HttpFilters::TestEventTracker::forceRegisterTestEventTrackerFilterFactory();
-  Extensions::HttpFilters::TestKeyValueStore::forceRegisterTestKeyValueStoreFilterFactory();
-  Extensions::HttpFilters::TestLogger::forceRegisterFactory();
   Extensions::KeyValue::forceRegisterPlatformKeyValueStoreFactory();
   Extensions::NetworkFilters::HttpConnectionManager::
       forceRegisterHttpConnectionManagerFilterConfigFactory();
@@ -113,7 +104,6 @@ void ExtensionRegistry::registerFactories() {
   Http::Matching::forceRegisterHttpRequestTrailersDataInputFactory();
   Http::Matching::forceRegisterHttpResponseHeadersDataInputFactory();
   Http::Matching::forceRegisterHttpResponseTrailersDataInputFactory();
-  HttpFilters::TestRead::forceRegisterTestReadFilterFactory();
   Network::Address::forceRegisterIpResolver();
   Network::forceRegisterDefaultClientConnectionFactory();
   Network::forceRegisterGetAddrInfoDnsResolverFactory();
