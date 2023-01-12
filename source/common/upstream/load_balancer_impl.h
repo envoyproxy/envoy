@@ -533,17 +533,15 @@ public:
       const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& stats,
       Runtime::Loader& runtime, Random::RandomGenerator& random,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
-      const absl::optional<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>
-          round_robin_config,
+      OptRef<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> round_robin_config,
       TimeSource& time_source)
       : EdfLoadBalancerBase(
-            priority_set, local_priority_set, stats, runtime, random,
-            PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(common_config, healthy_panic_threshold,
+            priority_set, local_priority_set, stats, runtime, random, PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(common_config, healthy_panic_threshold,
                                                            100, 50),
             LoadBalancerConfigHelper::localityLbConfigFromCommonLbConfig(common_config),
             round_robin_config.has_value()
                 ? LoadBalancerConfigHelper::slowStartConfigFromLegacyProto(
-                      round_robin_config.value())
+                      round_robin_config.ref())
                 : absl::nullopt,
             time_source) {
     initialize();
@@ -627,8 +625,7 @@ public:
       const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& stats,
       Runtime::Loader& runtime, Random::RandomGenerator& random,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
-      const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
-          least_request_config,
+      OptRef<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig> least_request_config,
       TimeSource& time_source)
       : EdfLoadBalancerBase(
             priority_set, local_priority_set, stats, runtime, random,
@@ -637,12 +634,12 @@ public:
             LoadBalancerConfigHelper::localityLbConfigFromCommonLbConfig(common_config),
             least_request_config.has_value()
                 ? LoadBalancerConfigHelper::slowStartConfigFromLegacyProto(
-                      least_request_config.value())
+                      least_request_config.ref())
                 : absl::nullopt,
             time_source),
         choice_count_(
             least_request_config.has_value()
-                ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(least_request_config.value(), choice_count, 2)
+                ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(least_request_config.ref(), choice_count, 2)
                 : 2),
         active_request_bias_runtime_(
             least_request_config.has_value() && least_request_config->has_active_request_bias()
