@@ -655,7 +655,6 @@ envoy_cc_library(
     copts = quiche_copts,
     repository = "@envoy",
     deps = [
-        ":http2_core_write_scheduler_lib",
         ":quiche_common_platform",
         ":spdy_core_intrusive_list_lib",
         ":spdy_core_protocol_lib",
@@ -668,7 +667,6 @@ envoy_cc_library(
     copts = quiche_copts,
     repository = "@envoy",
     deps = [
-        ":http2_core_write_scheduler_lib",
         ":quiche_common_circular_deque_lib",
         ":quiche_common_platform",
         ":spdy_core_protocol_lib",
@@ -687,17 +685,6 @@ envoy_cc_library(
         ":spdy_core_http2_deframer_lib",
         ":spdy_core_protocol_lib",
         ":spdy_core_recording_headers_handler_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "http2_core_write_scheduler_lib",
-    hdrs = ["quiche/http2/core/write_scheduler.h"],
-    copts = quiche_copts,
-    repository = "@envoy",
-    deps = [
-        ":quiche_common_platform_export",
-        ":spdy_core_protocol_lib",
     ],
 )
 
@@ -4087,6 +4074,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "quiche_web_transport_web_transport_lib",
+    hdrs = ["quiche/web_transport/web_transport.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    deps = [],
+)
+
+envoy_cc_library(
     name = "quic_core_web_transport_interface_lib",
     hdrs = ["quiche/quic/core/web_transport_interface.h"],
     copts = quiche_copts,
@@ -4096,6 +4092,7 @@ envoy_cc_library(
         ":quic_core_session_lib",
         ":quic_core_types_lib",
         ":quic_platform_export",
+        ":quiche_web_transport_web_transport_lib",
     ],
 )
 
