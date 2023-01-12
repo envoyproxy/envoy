@@ -911,7 +911,7 @@ ConnectionImpl::~ConnectionImpl() {
 void ConnectionImpl::sendKeepalive() {
   ASSERT(keepalive_timeout_timer_);
   if (keepalive_timeout_timer_->enabled()) {
-    ENVOY_CONN_LOG(trace, "Skipping PING: already awaiting PING ACK {}", connection_);
+    ENVOY_CONN_LOG(trace, "Skipping PING: already awaiting PING ACK", connection_);
     return;
   }
 
@@ -979,8 +979,8 @@ Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
     dispatching_ = true;
     ssize_t rc;
     rc = adapter_->ProcessBytes(absl::string_view(static_cast<char*>(slice.mem_), slice.len_));
-    if (!nghttp2_callback_status_.ok()) {
-      return nghttp2_callback_status_;
+    if (!codec_callback_status_.ok()) {
+      return codec_callback_status_;
     }
     // This error is returned when nghttp2 library detected a frame flood by one of its
     // internal mechanisms. Most flood protection is done by Envoy's codec and this error
@@ -1063,18 +1063,19 @@ Status ConnectionImpl::protocolErrorForTest() {
   return sendPendingFrames();
 }
 
-Status ConnectionImpl::onBeforeFrameReceived(const nghttp2_frame_hd* hd) {
+Status ConnectionImpl::onBeforeFrameReceived(int32_t stream_id, size_t length, uint8_t type,
+                                             uint8_t flags) {
   ENVOY_CONN_LOG(trace, "about to recv frame type={}, flags={}, stream_id={}", connection_,
-                 static_cast<uint64_t>(hd->type), static_cast<uint64_t>(hd->flags), hd->stream_id);
+                 static_cast<uint64_t>(type), static_cast<uint64_t>(flags), stream_id);
   ASSERT(connection_.state() == Network::Connection::State::Open);
 
-  current_stream_id_ = hd->stream_id;
+  current_stream_id_ = stream_id;
   // Track all the frames without padding here, since this is the only callback we receive
   // for some of them (e.g. CONTINUATION frame, frames sent on closed streams, etc.).
   // HEADERS frame is tracked in onBeginHeaders(), DATA frame is tracked in onFrameReceived().
   auto status = okStatus();
-  if (hd->type != NGHTTP2_HEADERS && hd->type != NGHTTP2_DATA) {
-    status = trackInboundFrames(hd, 0);
+  if (type != NGHTTP2_HEADERS && type != NGHTTP2_DATA) {
+    status = trackInboundFrames(stream_id, length, type, flags, 0);
   }
 
   return status;
@@ -1122,7 +1123,8 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
   }
 
   if (frame->hd.type == NGHTTP2_DATA) {
-    RETURN_IF_ERROR(trackInboundFrames(&frame->hd, frame->data.padlen));
+    RETURN_IF_ERROR(trackInboundFrames(frame->hd.stream_id, frame->hd.length, frame->hd.type,
+                                       frame->hd.flags, frame->data.padlen));
   }
 
   // Only raise GOAWAY once, since we don't currently expose stream information. Shutdown
@@ -1419,7 +1421,7 @@ Status ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
 }
 
 Status ConnectionImpl::onStreamClose(int32_t stream_id, uint32_t error_code) {
-  return onStreamClose(getStream(stream_id), error_code);
+  return onStreamClose(getStreamUnchecked(stream_id), error_code);
 }
 
 int ConnectionImpl::onMetadataReceived(int32_t stream_id, const uint8_t* data, size_t len) {
@@ -1598,15 +1600,15 @@ void ConnectionImpl::sendSettings(
   }
 }
 
-int ConnectionImpl::setAndCheckNghttp2CallbackStatus(Status&& status) {
+int ConnectionImpl::setAndCheckCodecCallbackStatus(Status&& status) {
   // Keep the error status that caused the original failure. Subsequent
   // error statuses are silently discarded.
-  nghttp2_callback_status_.Update(std::move(status));
-  if (nghttp2_callback_status_.ok() && connection_.state() != Network::Connection::State::Open) {
-    nghttp2_callback_status_ = codecProtocolError("Connection was closed while dispatching frames");
+  codec_callback_status_.Update(std::move(status));
+  if (codec_callback_status_.ok() && connection_.state() != Network::Connection::State::Open) {
+    codec_callback_status_ = codecProtocolError("Connection was closed while dispatching frames");
   }
 
-  return nghttp2_callback_status_.ok() ? 0 : NGHTTP2_ERR_CALLBACK_FAILURE;
+  return codec_callback_status_.ok() ? 0 : NGHTTP2_ERR_CALLBACK_FAILURE;
 }
 
 void ConnectionImpl::scheduleProtocolConstraintViolationCallback() {
@@ -1656,7 +1658,7 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks() {
   nghttp2_session_callbacks_set_on_begin_headers_callback(
       callbacks_, [](nghttp2_session*, const nghttp2_frame* frame, void* user_data) -> int {
         auto status = static_cast<ConnectionImpl*>(user_data)->onBeginHeaders(frame);
-        return static_cast<ConnectionImpl*>(user_data)->setAndCheckNghttp2CallbackStatus(
+        return static_cast<ConnectionImpl*>(user_data)->setAndCheckCodecCallbackStatus(
             std::move(status));
       });
 
@@ -1682,15 +1684,16 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks() {
 
   nghttp2_session_callbacks_set_on_begin_frame_callback(
       callbacks_, [](nghttp2_session*, const nghttp2_frame_hd* hd, void* user_data) -> int {
-        auto status = static_cast<ConnectionImpl*>(user_data)->onBeforeFrameReceived(hd);
-        return static_cast<ConnectionImpl*>(user_data)->setAndCheckNghttp2CallbackStatus(
+        auto status = static_cast<ConnectionImpl*>(user_data)->onBeforeFrameReceived(
+            hd->stream_id, hd->length, hd->type, hd->flags);
+        return static_cast<ConnectionImpl*>(user_data)->setAndCheckCodecCallbackStatus(
             std::move(status));
       });
 
   nghttp2_session_callbacks_set_on_frame_recv_callback(
       callbacks_, [](nghttp2_session*, const nghttp2_frame* frame, void* user_data) -> int {
         auto status = static_cast<ConnectionImpl*>(user_data)->onFrameReceived(frame);
-        return static_cast<ConnectionImpl*>(user_data)->setAndCheckNghttp2CallbackStatus(
+        return static_cast<ConnectionImpl*>(user_data)->setAndCheckCodecCallbackStatus(
             std::move(status));
       });
 
@@ -1698,7 +1701,7 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks() {
       callbacks_,
       [](nghttp2_session*, int32_t stream_id, uint32_t error_code, void* user_data) -> int {
         auto status = static_cast<ConnectionImpl*>(user_data)->onStreamClose(stream_id, error_code);
-        return static_cast<ConnectionImpl*>(user_data)->setAndCheckNghttp2CallbackStatus(
+        return static_cast<ConnectionImpl*>(user_data)->setAndCheckCodecCallbackStatus(
             std::move(status));
       });
 
@@ -1980,7 +1983,8 @@ Status ClientConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
   RELEASE_ASSERT(frame->headers.cat == NGHTTP2_HCAT_RESPONSE ||
                      frame->headers.cat == NGHTTP2_HCAT_HEADERS,
                  "");
-  RETURN_IF_ERROR(trackInboundFrames(&frame->hd, frame->headers.padlen));
+  RETURN_IF_ERROR(trackInboundFrames(frame->hd.stream_id, frame->hd.length, frame->hd.type,
+                                     frame->hd.flags, frame->headers.padlen));
   if (frame->headers.cat == NGHTTP2_HCAT_HEADERS) {
     StreamImpl* stream = getStream(frame->hd.stream_id);
     stream->allocTrailers();
@@ -1999,19 +2003,19 @@ int ClientConnectionImpl::onHeader(const nghttp2_frame* frame, HeaderString&& na
 }
 
 // TODO(yanavlasov): move to the base class once the runtime flag is removed.
-Status ClientConnectionImpl::trackInboundFrames(const nghttp2_frame_hd* hd,
-                                                uint32_t padding_length) {
+Status ClientConnectionImpl::trackInboundFrames(int32_t stream_id, size_t length, uint8_t type,
+                                                uint8_t flags, uint32_t padding_length) {
   Status result;
   ENVOY_CONN_LOG(trace, "track inbound frame type={} flags={} length={} padding_length={}",
-                 connection_, static_cast<uint64_t>(hd->type), static_cast<uint64_t>(hd->flags),
-                 static_cast<uint64_t>(hd->length), padding_length);
+                 connection_, static_cast<uint64_t>(type), static_cast<uint64_t>(flags),
+                 static_cast<uint64_t>(length), padding_length);
 
-  result = protocol_constraints_.trackInboundFrames(hd, padding_length);
+  result = protocol_constraints_.trackInboundFrames(length, type, flags, padding_length);
   if (!result.ok()) {
     ENVOY_CONN_LOG(trace, "error reading frame: {} received in this HTTP/2 session.", connection_,
                    result.message());
     if (isInboundFramesWithEmptyPayloadError(result)) {
-      ConnectionImpl::StreamImpl* stream = getStream(hd->stream_id);
+      ConnectionImpl::StreamImpl* stream = getStream(stream_id);
       if (stream) {
         stream->setDetails(Http2ResponseCodeDetails::get().inbound_empty_frame_flood);
       }
@@ -2061,7 +2065,8 @@ Status ServerConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
   // For a server connection, we should never get push promise frames.
   ASSERT(frame->hd.type == NGHTTP2_HEADERS);
   ASSERT(connection_.state() == Network::Connection::State::Open);
-  RETURN_IF_ERROR(trackInboundFrames(&frame->hd, frame->headers.padlen));
+  RETURN_IF_ERROR(trackInboundFrames(frame->hd.stream_id, frame->hd.length, frame->hd.type,
+                                     frame->hd.flags, frame->headers.padlen));
 
   if (frame->headers.cat != NGHTTP2_HCAT_REQUEST) {
     stats_.trailers_.inc();
@@ -2076,7 +2081,7 @@ Status ServerConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
   if (connection_.aboveHighWatermark()) {
     stream->runHighWatermarkCallbacks();
   }
-  stream->request_decoder_ = &callbacks_.newStream(*stream);
+  stream->setRequestDecoder(callbacks_.newStream(*stream));
   stream->stream_id_ = frame->hd.stream_id;
   LinkedList::moveIntoList(std::move(stream), active_streams_);
   adapter_->SetStreamUserData(frame->hd.stream_id, active_streams_.front().get());
@@ -2092,18 +2097,18 @@ int ServerConnectionImpl::onHeader(const nghttp2_frame* frame, HeaderString&& na
   return saveHeader(frame, std::move(name), std::move(value));
 }
 
-Status ServerConnectionImpl::trackInboundFrames(const nghttp2_frame_hd* hd,
-                                                uint32_t padding_length) {
+Status ServerConnectionImpl::trackInboundFrames(int32_t stream_id, size_t length, uint8_t type,
+                                                uint8_t flags, uint32_t padding_length) {
   ENVOY_CONN_LOG(trace, "track inbound frame type={} flags={} length={} padding_length={}",
-                 connection_, static_cast<uint64_t>(hd->type), static_cast<uint64_t>(hd->flags),
-                 static_cast<uint64_t>(hd->length), padding_length);
+                 connection_, static_cast<uint64_t>(type), static_cast<uint64_t>(flags),
+                 static_cast<uint64_t>(length), padding_length);
 
-  auto result = protocol_constraints_.trackInboundFrames(hd, padding_length);
+  auto result = protocol_constraints_.trackInboundFrames(length, type, flags, padding_length);
   if (!result.ok()) {
     ENVOY_CONN_LOG(trace, "error reading frame: {} received in this HTTP/2 session.", connection_,
                    result.message());
     if (isInboundFramesWithEmptyPayloadError(result)) {
-      ConnectionImpl::StreamImpl* stream = getStream(hd->stream_id);
+      ConnectionImpl::StreamImpl* stream = getStream(stream_id);
       if (stream) {
         stream->setDetails(Http2ResponseCodeDetails::get().inbound_empty_frame_flood);
       }
@@ -2118,22 +2123,28 @@ Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
   return ConnectionImpl::dispatch(data);
 }
 
-absl::optional<int>
-ServerConnectionImpl::checkHeaderNameForUnderscores(absl::string_view header_name) {
+absl::optional<int> ServerConnectionImpl::checkHeaderNameForUnderscores(
+    [[maybe_unused]] absl::string_view header_name) {
+#ifndef ENVOY_ENABLE_UHV
+  // This check has been moved to UHV
   if (headers_with_underscores_action_ != envoy::config::core::v3::HttpProtocolOptions::ALLOW &&
       Http::HeaderUtility::headerNameContainsUnderscore(header_name)) {
     if (headers_with_underscores_action_ ==
         envoy::config::core::v3::HttpProtocolOptions::DROP_HEADER) {
       ENVOY_CONN_LOG(debug, "Dropping header with invalid characters in its name: {}", connection_,
                      header_name);
-      stats_.dropped_headers_with_underscores_.inc();
+      stats_.incDroppedHeadersWithUnderscores();
       return 0;
     }
     ENVOY_CONN_LOG(debug, "Rejecting request due to header name with underscores: {}", connection_,
                    header_name);
-    stats_.requests_rejected_with_underscores_in_headers_.inc();
+    stats_.incRequestsRejectedWithUnderscoresInHeaders();
     return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
   }
+#else
+  // Workaround for gcc not understanding [[maybe_unused]] for class members.
+  (void)headers_with_underscores_action_;
+#endif
   return absl::nullopt;
 }
 

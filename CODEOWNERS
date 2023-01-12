@@ -80,6 +80,7 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/retry/host/previous_hosts @snowp @alyssawilk
 # HTTP caching extension
 /*/extensions/filters/http/cache @toddmgreer @jmarantz @penguingao @mpwarres @capoferro
+/*/extensions/http/cache/simple_http_cache @toddmgreer @jmarantz @penguingao @mpwarres @capoferro
 # aws_iam grpc credentials
 /*/extensions/grpc_credentials/aws_iam @lavignes @mattklein123 @tonya11en
 /*/extensions/common/aws @lavignes @mattklein123 @tonya11en
@@ -197,7 +198,7 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 # File system based extensions
 /*/extensions/common/async_files @mattklein123 @ravenblackx
 /*/extensions/filters/http/file_system_buffer @mattklein123 @ravenblackx
-/*/extensions/http/cache/file_system_http_cache @mattklein123 @ravenblackx
+/*/extensions/http/cache/file_system_http_cache @jmarantz @ravenblackx
 # Google Cloud Platform Authentication Filter
 /*/extensions/filters/http/gcp_authn @tyxia @yanavlasov
 # DNS resolution
@@ -273,12 +274,23 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/filters/http/header_to_metadata @zuercher @JuniorHsu
 # zookeeper
 /*/extensions/filters/network/zookeeper_proxy @snowp @JuniorHsu
+# Custom response filter
+/*/extensions/filters/http/custom_response @pradeepcrao @yanavlasov
+/*/extensions/http/custom_response/redirect_policy @pradeepcrao @yanavlasov
+/*/extensions/http/custom_response/local_response_policy @pradeepcrao @yanavlasov
 # path match by pattern
 /*/extensions/path/match/uri_template @alyssawilk @yanjunxiang-google
 # path rewrite by pattern
 /*/extensions/path/rewrite/uri_template @alyssawilk @yanjunxiang-google
 # Dubbo codec
 /*/extensions/common/dubbo @wbpcode @lizan
+# upstream load balancing policies
+/*/extensions/load_balancing_policies/common @wbpcode @UNOWNED
+/*/extensions/load_balancing_policies/least_request @wbpcode @UNOWNED
+/*/extensions/load_balancing_policies/random @wbpcode @UNOWNED
+/*/extensions/load_balancing_policies/round_robin @wbpcode @UNOWNED
+# Early header mutation
+/*/extensions/http/early_header_mutation/header_mutation @wbpcode @UNOWNED
 
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED
@@ -290,6 +302,7 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/clusters/logical_dns/ @UNOWNED @UNOWNED
 /*/extensions/clusters/common/ @UNOWNED @UNOWNED
 /*/extensions/clusters/eds/ @UNOWNED @UNOWNED
+/*/source/extensions/listener_managers/listener_manager @UNOWNED @UNOWNED
 
 # URL Pattern Match and Rewrite Library
 /*/extensions/path/uri_template_lib @alyssawilk @yanjunxiang-google

@@ -7,7 +7,6 @@
 #include "source/common/stats/stat_merger.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/common/stats/utility.h"
-#include "source/server/listener_impl.h"
 
 namespace Envoy {
 namespace Server {
@@ -86,7 +85,7 @@ void HotRestartingParent::onSocketEvent() {
 void HotRestartingParent::shutdown() { socket_event_.reset(); }
 
 HotRestartingParent::Internal::Internal(Server::Instance* server) : server_(server) {
-  Stats::Gauge& hot_restart_generation = hotRestartGeneration(server->stats());
+  Stats::Gauge& hot_restart_generation = hotRestartGeneration(*server->stats().rootScope());
   hot_restart_generation.inc();
 }
 

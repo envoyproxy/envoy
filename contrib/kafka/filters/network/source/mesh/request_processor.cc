@@ -3,6 +3,7 @@
 #include "envoy/common/exception.h"
 
 #include "contrib/kafka/filters/network/source/mesh/command_handlers/api_versions.h"
+#include "contrib/kafka/filters/network/source/mesh/command_handlers/list_offsets.h"
 #include "contrib/kafka/filters/network/source/mesh/command_handlers/metadata.h"
 #include "contrib/kafka/filters/network/source/mesh/command_handlers/produce.h"
 
@@ -29,6 +30,9 @@ void RequestProcessor::onMessage(AbstractRequestSharedPtr arg) {
   case PRODUCE_REQUEST_API_KEY:
     process(std::dynamic_pointer_cast<Request<ProduceRequest>>(arg));
     break;
+  case LIST_OFFSETS_REQUEST_API_KEY:
+    process(std::dynamic_pointer_cast<Request<ListOffsetsRequest>>(arg));
+    break;
   case METADATA_REQUEST_API_KEY:
     process(std::dynamic_pointer_cast<Request<MetadataRequest>>(arg));
     break;
@@ -44,6 +48,11 @@ void RequestProcessor::onMessage(AbstractRequestSharedPtr arg) {
 
 void RequestProcessor::process(const std::shared_ptr<Request<ProduceRequest>> request) const {
   auto res = std::make_shared<ProduceRequestHolder>(origin_, upstream_kafka_facade_, request);
+  origin_.onRequest(res);
+}
+
+void RequestProcessor::process(const std::shared_ptr<Request<ListOffsetsRequest>> request) const {
+  auto res = std::make_shared<ListOffsetsRequestHolder>(origin_, request);
   origin_.onRequest(res);
 }
 

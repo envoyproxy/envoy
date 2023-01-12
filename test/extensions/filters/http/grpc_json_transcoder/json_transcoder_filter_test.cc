@@ -580,7 +580,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPost) {
   EXPECT_TRUE(MessageDifferencer::Equals(expected_request, request));
 
   Http::TestResponseHeaderMapImpl continue_headers{{":status", "000"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encode1xxHeaders(continue_headers));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_.encode1xxHeaders(continue_headers));
 
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.encodeMetadata(metadata_map));
@@ -652,7 +652,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPostWithPackageServiceMetho
   EXPECT_TRUE(MessageDifferencer::Equals(expected_request, request));
   EXPECT_TRUE(filter_.shouldTranscodeResponse());
   Http::TestResponseHeaderMapImpl continue_headers{{":status", "000"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encode1xxHeaders(continue_headers));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_.encode1xxHeaders(continue_headers));
 
   Http::TestResponseHeaderMapImpl response_headers{{"content-type", "application/grpc"},
                                                    {":status", "200"}};
@@ -714,7 +714,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, ForwardUnaryPostGrpc) {
   EXPECT_TRUE(MessageDifferencer::Equals(expected_request, forwarded_request));
 
   Http::TestResponseHeaderMapImpl continue_headers{{":status", "000"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encode1xxHeaders(continue_headers));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_.encode1xxHeaders(continue_headers));
 
   Http::TestResponseHeaderMapImpl response_headers{{"content-type", "application/grpc"},
                                                    {":status", "200"}};
@@ -778,7 +778,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, ResponseBodyExceedsBufferLimit) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(request_data, true));
 
   Http::TestResponseHeaderMapImpl continue_headers{{":status", "000"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encode1xxHeaders(continue_headers));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_.encode1xxHeaders(continue_headers));
 
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.encodeMetadata(metadata_map));
@@ -1211,7 +1211,9 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamPostWithHttpBody) {
 // Streaming requests with HTTP bodies do not internally buffer any data.
 // The configured buffer limits will not apply.
 TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamPostWithHttpBodyNoBuffer) {
-  EXPECT_CALL(decoder_callbacks_, decoderBufferLimit()).Times(3).WillRepeatedly(Return(8));
+  EXPECT_CALL(decoder_callbacks_, decoderBufferLimit())
+      .Times(testing::AtLeast(3))
+      .WillRepeatedly(Return(8));
 
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"}, {":path", "/streamBody?arg=hi"}, {"content-type", "text/plain"}};
@@ -1316,6 +1318,54 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamWithFragmentedHttpBody) {
   // Second fragment contains entire body
   EXPECT_EQ(http_body.data(), fragment2->toString());
 }
+
+class GrpcJsonTranscoderFilterMaxMessageSizeTest : public GrpcJsonTranscoderFilterTest {
+public:
+  GrpcJsonTranscoderFilterMaxMessageSizeTest() : GrpcJsonTranscoderFilterTest(makeProtoConfig()) {}
+
+protected:
+  static const uint32_t max_request_body_size_ = 1024;
+  static const uint32_t max_response_body_size_ = 2048;
+
+private:
+  static const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder
+  makeProtoConfig() {
+    auto proto_config = bookstoreProtoConfig();
+    proto_config.mutable_max_request_body_size()->set_value(max_request_body_size_);
+    proto_config.mutable_max_response_body_size()->set_value(max_response_body_size_);
+    return proto_config;
+  }
+};
+
+TEST_F(GrpcJsonTranscoderFilterMaxMessageSizeTest, IncreasesBufferSize) {
+  EXPECT_CALL(encoder_callbacks_, encoderBufferLimit())
+      .Times(testing::AtLeast(1))
+      .WillRepeatedly(Return(8));
+  EXPECT_CALL(decoder_callbacks_, decoderBufferLimit())
+      .Times(testing::AtLeast(1))
+      .WillRepeatedly(Return(8));
+  EXPECT_CALL(decoder_callbacks_, setDecoderBufferLimit(max_request_body_size_));
+  EXPECT_CALL(encoder_callbacks_, setEncoderBufferLimit(max_response_body_size_));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", "application/json"}, {":method", "POST"}, {":path", "/shelf/123"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+};
+
+TEST_F(GrpcJsonTranscoderFilterMaxMessageSizeTest, DoesNotDecreaseBufferSize) {
+  EXPECT_CALL(encoder_callbacks_, encoderBufferLimit())
+      .Times(testing::AtLeast(1))
+      .WillRepeatedly(Return(2048));
+  EXPECT_CALL(decoder_callbacks_, decoderBufferLimit())
+      .Times(testing::AtLeast(1))
+      .WillRepeatedly(Return(2048));
+  EXPECT_CALL(encoder_callbacks_, setEncoderBufferLimit(_)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, setDecoderBufferLimit(_)).Times(0);
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", "application/json"}, {":method", "POST"}, {":path", "/shelf/123"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+};
 
 class GrpcJsonTranscoderFilterReportCollisionTest : public GrpcJsonTranscoderFilterTest {
 public:
@@ -1434,7 +1484,7 @@ public:
     EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(request_data, true));
 
     Http::TestResponseHeaderMapImpl continue_headers{{":status", "000"}};
-    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encode1xxHeaders(continue_headers));
+    EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_.encode1xxHeaders(continue_headers));
   }
 
 private:

@@ -11,6 +11,7 @@
 #include "gmock/gmock.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication;
+using envoy::extensions::filters::http::jwt_authn::v3::JwtRequirement;
 using ::google::jwt_verify::Status;
 using ::testing::Eq;
 using ::testing::NiceMock;
@@ -232,6 +233,69 @@ TEST_F(ProviderVerifierTest, TestRequiresNonexistentProvider) {
   proto_config_.mutable_rules(0)->mutable_requires()->set_provider_name("nosuchprovider");
 
   EXPECT_THROW(FilterConfigImpl(proto_config_, "", mock_factory_ctx_), EnvoyException);
+}
+
+class ProviderVerifiersJwtCacheTest : public ProviderVerifierTest,
+                                      public testing::WithParamInterface<bool> {};
+
+// Bool is for jwt_cache: with jwt_cache and without jwt_cache.
+INSTANTIATE_TEST_SUITE_P(ProviderVerifiersJwtCache, ProviderVerifiersJwtCacheTest,
+                         ::testing::Bool());
+
+// This test verifies that two JWT requirements with different audiences behave the same with
+// jwt_cache and without. The first requirement is checking audiences specified in the provider
+// which is "example_service". The second requirement is type "provider_and_audiences" and its
+// specified audiences is "other_service". The audience in the JWT token is "example_service". The
+// first requirement should work and the second one should fail.
+TEST_P(ProviderVerifiersJwtCacheTest, TestRequirementsWithAudiences) {
+  TestUtility::loadFromYaml(ExampleConfig, proto_config_);
+  // Turn on jwt_cache
+  if (GetParam()) {
+    (*proto_config_.mutable_providers())[std::string(ProviderName)]
+        .mutable_jwt_cache_config()
+        ->set_jwt_cache_size(1000);
+  }
+  createVerifier();
+
+  JwtRequirement require2;
+  auto* provider_and_audiences = require2.mutable_provider_and_audiences();
+  provider_and_audiences->set_provider_name("example_provider");
+  provider_and_audiences->add_audiences("other_service");
+  VerifierConstPtr verifier2 =
+      Verifier::create(require2, proto_config_.providers(), *filter_config_);
+
+  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
+
+  {
+    // First call, audience matched, so it is good.
+    EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
+      ASSERT_EQ(status, Status::Ok);
+    }));
+
+    auto headers =
+        Http::TestRequestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
+    verifier_->verify(Verifier::createContext(headers, parent_span_, &mock_cb_));
+  }
+
+  {
+    // Second call, audiences don't match, so it is rejected.
+    MockVerifierCallbacks mock_cb2;
+    EXPECT_CALL(mock_cb2, onComplete(_)).WillOnce(Invoke([](const Status& status) {
+      ASSERT_EQ(status, Status::JwtAudienceNotAllowed);
+    }));
+
+    auto headers =
+        Http::TestRequestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
+    verifier2->verify(Verifier::createContext(headers, parent_span_, &mock_cb2));
+  }
+
+  if (GetParam()) {
+    EXPECT_EQ(1U, filter_config_->stats().jwt_cache_hit_.value());
+    EXPECT_EQ(1U, filter_config_->stats().jwt_cache_miss_.value());
+  } else {
+    EXPECT_EQ(0U, filter_config_->stats().jwt_cache_hit_.value());
+    EXPECT_EQ(2U, filter_config_->stats().jwt_cache_miss_.value());
+  }
 }
 
 } // namespace

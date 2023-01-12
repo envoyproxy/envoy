@@ -4,7 +4,9 @@
 !\.bazelci
 !\.bazelignore
 !\.bazelrc
+!\.bazelproject
 !\.bazelversion
+!\.circleci
 !\.clang-format
 !\.clang-tidy
 !\.coveragerc
@@ -35,7 +37,7 @@ cscope.*
 *.pyc
 **/pyformat
 SOURCE_VERSION
-*.sw*
+*.s??
 tags
 TAGS
 /test/coverage/BUILD

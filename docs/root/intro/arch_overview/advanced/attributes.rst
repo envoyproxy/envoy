@@ -166,6 +166,24 @@ Data exchanged between filters is available as the following attributes:
 Note that these attributes may change during the life of a request as the data can be
 updated by filters at any point.
 
+Configuration attributes
+----------------------------
+
+Configuration identifiers and metadata related to the handling of the request or the connection is available as the
+following attributes:
+
+.. csv-table::
+   :header: Attribute, Type, Description
+   :widths: 1, 1, 4
+
+   xds.cluster_name, string, Upstream cluster name
+   xds.cluster_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Upstream cluster metadata
+   xds.route_name, string, Route name
+   xds.route_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Route metadata
+   xds.upstream_host_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Upstream host metadata
+   xds.filter_chain_name, string, Listener filter chain name
+
+
 Wasm attributes
 ---------------
 

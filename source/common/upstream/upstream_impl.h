@@ -57,6 +57,7 @@
 #include "source/common/upstream/transport_socket_match_impl.h"
 #include "source/common/upstream/upstream_http_factory_context_impl.h"
 #include "source/extensions/upstreams/http/config.h"
+#include "source/extensions/upstreams/tcp/config.h"
 #include "source/server/transport_socket_config_impl.h"
 
 #include "absl/container/node_hash_set.h"
@@ -72,7 +73,7 @@ class UpstreamLocalAddressSelectorImpl : public UpstreamLocalAddressSelector {
 public:
   UpstreamLocalAddressSelectorImpl(
       const envoy::config::cluster::v3::Cluster& config,
-      const envoy::config::core::v3::BindConfig& bootstrap_bind_config);
+      const absl::optional<envoy::config::core::v3::BindConfig>& bootstrap_bind_config);
 
   // UpstreamLocalAddressSelector
   UpstreamLocalAddress getUpstreamLocalAddress(
@@ -209,7 +210,7 @@ public:
   Network::UpstreamTransportSocketFactory&
   resolveTransportSocketFactory(const Network::Address::InstanceConstSharedPtr& dest_address,
                                 const envoy::config::core::v3::Metadata* metadata) const;
-  MonotonicTime creationTime() const override { return creation_time_; }
+  absl::optional<MonotonicTime> lastHcPassTime() const override { return last_hc_pass_time_; }
 
   void setAddressList(const std::vector<Network::Address::InstanceConstSharedPtr>& address_list) {
     address_list_ = address_list;
@@ -228,6 +229,10 @@ protected:
 
   void setOutlierDetectorImpl(Outlier::DetectorHostMonitorPtr&& outlier_detector) {
     outlier_detector_ = std::move(outlier_detector);
+  }
+
+  void setLastHcPassTimeImpl(MonotonicTime last_hc_pass_time) {
+    last_hc_pass_time_.emplace(std::move(last_hc_pass_time));
   }
 
 private:
@@ -250,6 +255,7 @@ private:
   std::reference_wrapper<Network::UpstreamTransportSocketFactory>
       socket_factory_ ABSL_GUARDED_BY(metadata_mutex_);
   const MonotonicTime creation_time_;
+  absl::optional<MonotonicTime> last_hc_pass_time_;
 };
 
 /**
@@ -306,6 +312,10 @@ public:
   }
   void setOutlierDetector(Outlier::DetectorHostMonitorPtr&& outlier_detector) override {
     setOutlierDetectorImpl(std::move(outlier_detector));
+  }
+
+  void setLastHcPassTime(MonotonicTime last_hc_pass_time) override {
+    setLastHcPassTimeImpl(std::move(last_hc_pass_time));
   }
 
   Host::HealthStatus healthStatus() const override {
@@ -686,14 +696,16 @@ class ClusterInfoImpl : public ClusterInfo,
 public:
   using HttpProtocolOptionsConfigImpl =
       Envoy::Extensions::Upstreams::Http::ProtocolOptionsConfigImpl;
+  using TcpProtocolOptionsConfigImpl = Envoy::Extensions::Upstreams::Tcp::ProtocolOptionsConfigImpl;
   ClusterInfoImpl(Init::Manager& info, Server::Configuration::ServerFactoryContext& server_context,
                   const envoy::config::cluster::v3::Cluster& config,
-                  const envoy::config::core::v3::BindConfig& bind_config, Runtime::Loader& runtime,
-                  TransportSocketMatcherPtr&& socket_matcher, Stats::ScopeSharedPtr&& stats_scope,
-                  bool added_via_api, Server::Configuration::TransportSocketFactoryContext&);
+                  const absl::optional<envoy::config::core::v3::BindConfig>& bind_config,
+                  Runtime::Loader& runtime, TransportSocketMatcherPtr&& socket_matcher,
+                  Stats::ScopeSharedPtr&& stats_scope, bool added_via_api,
+                  Server::Configuration::TransportSocketFactoryContext&);
 
-  static ClusterTrafficStats generateStats(Stats::Scope& scope,
-                                           const ClusterTrafficStatNames& cluster_stat_names);
+  static LazyClusterTrafficStats generateStats(Stats::Scope& scope,
+                                               const ClusterTrafficStatNames& cluster_stat_names);
   static ClusterLoadReportStats
   generateLoadReportStats(Stats::Scope& scope, const ClusterLoadReportStatNames& stat_names);
   static ClusterCircuitBreakersStats
@@ -717,6 +729,9 @@ public:
   std::chrono::milliseconds connectTimeout() const override { return connect_timeout_; }
   const absl::optional<std::chrono::milliseconds> idleTimeout() const override {
     return idle_timeout_;
+  }
+  const absl::optional<std::chrono::milliseconds> tcpPoolIdleTimeout() const override {
+    return tcp_pool_idle_timeout_;
   }
   const absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
     return max_connection_duration_;
@@ -780,7 +795,7 @@ public:
   const std::string& observabilityName() const override { return observability_name_; }
   ResourceManager& resourceManager(ResourcePriority priority) const override;
   TransportSocketMatcher& transportSocketMatcher() const override { return *socket_matcher_; }
-  ClusterTrafficStats& trafficStats() const override { return stats_; }
+  LazyClusterTrafficStats& trafficStats() const override { return traffic_stats_; }
   ClusterConfigUpdateStats& configUpdateStats() const override { return config_update_stats_; }
   ClusterLbStats& lbStats() const override { return lb_stats_; }
   ClusterEndpointStats& endpointStats() const override { return endpoint_stats_; }
@@ -826,7 +841,7 @@ public:
     return http_protocol_options_->upstream_http_protocol_options_;
   }
 
-  const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+  const absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>&
   alternateProtocolsCacheOptions() const override {
     return http_protocol_options_->alternate_protocol_cache_options_;
   }
@@ -892,17 +907,19 @@ private:
   const absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr>
       extension_protocol_options_;
   const std::shared_ptr<const HttpProtocolOptionsConfigImpl> http_protocol_options_;
+  const std::shared_ptr<const TcpProtocolOptionsConfigImpl> tcp_protocol_options_;
   const uint64_t max_requests_per_connection_;
   const uint32_t max_response_headers_count_;
   const std::chrono::milliseconds connect_timeout_;
   absl::optional<std::chrono::milliseconds> idle_timeout_;
+  absl::optional<std::chrono::milliseconds> tcp_pool_idle_timeout_;
   absl::optional<std::chrono::milliseconds> max_connection_duration_;
   const float per_upstream_preconnect_ratio_;
   const float peekahead_ratio_;
   const uint32_t per_connection_buffer_limit_bytes_;
   TransportSocketMatcherPtr socket_matcher_;
   Stats::ScopeSharedPtr stats_scope_;
-  mutable ClusterTrafficStats stats_;
+  mutable LazyClusterTrafficStats traffic_stats_;
   mutable ClusterConfigUpdateStats config_update_stats_;
   mutable ClusterLbStats lb_stats_;
   mutable ClusterEndpointStats endpoint_stats_;

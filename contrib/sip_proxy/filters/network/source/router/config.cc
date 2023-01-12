@@ -12,21 +12,24 @@ namespace NetworkFilters {
 namespace SipProxy {
 namespace Router {
 
-SipFilters::FilterFactoryCb RouterFilterConfig::createFilterFactoryFromProtoTyped(
+SipFilters::FilterFactoryCb RouterFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::sip_proxy::router::v3alpha::Router& proto_config,
     const std::string& stat_prefix, Server::Configuration::FactoryContext& context) {
   UNREFERENCED_PARAMETER(proto_config);
 
-  return [&context, stat_prefix](SipFilters::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addDecoderFilter(
-        std::make_shared<Router>(context.clusterManager(), stat_prefix, context.scope(), context));
+  std::shared_ptr<RouterFilterConfig> config(
+      new RouterFilterConfigImpl(proto_config, stat_prefix, context));
+
+  return [config, &context,
+          stat_prefix](SipFilters::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addDecoderFilter(std::make_shared<Router>(config, context.clusterManager(), context));
   };
 }
 
 /**
  * Static registration for the router filter. @see RegisterFactory.
  */
-REGISTER_FACTORY(RouterFilterConfig, SipFilters::NamedSipFilterConfigFactory);
+REGISTER_FACTORY(RouterFilterConfigFactory, SipFilters::NamedSipFilterConfigFactory);
 
 } // namespace Router
 } // namespace SipProxy

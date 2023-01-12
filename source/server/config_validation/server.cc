@@ -6,6 +6,7 @@
 
 #include "source/common/common/utility.h"
 #include "source/common/config/utility.h"
+#include "source/common/config/well_known_names.h"
 #include "source/common/event/real_time_system.h"
 #include "source/common/local_info/local_info_impl.h"
 #include "source/common/protobuf/utility.h"
@@ -97,13 +98,16 @@ void ValidationInstance::initialize(const Options& options,
       options.serviceZone(), options.serviceClusterName(), options.serviceNodeName());
 
   overload_manager_ = std::make_unique<OverloadManagerImpl>(
-      dispatcher(), stats(), threadLocal(), bootstrap_.overload_manager(),
+      dispatcher(), *stats().rootScope(), threadLocal(), bootstrap_.overload_manager(),
       messageValidationContext().staticValidationVisitor(), *api_, options_);
   Configuration::InitialImpl initial_config(bootstrap_);
   initial_config.initAdminAccessLog(bootstrap_, *this);
   admin_ = std::make_unique<Server::ValidationAdmin>(initial_config.admin().address());
   listener_manager_ =
-      std::make_unique<ListenerManagerImpl>(*this, *this, *this, false, quic_stat_names_);
+      Config::Utility::getAndCheckFactoryByName<ListenerManagerFactory>(
+          Config::ServerExtensionValues::get().DEFAULT_LISTENER)
+          .createListenerManager(*this, std::make_unique<ValidationListenerComponentFactory>(*this),
+                                 *this, false, quic_stat_names_);
   thread_local_.registerThread(*dispatcher_, true);
 
   Runtime::LoaderPtr runtime_ptr = component_factory.createRuntime(*this, initial_config);

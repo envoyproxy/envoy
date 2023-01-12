@@ -6,6 +6,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
 
+#include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/fmt.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
@@ -67,6 +68,12 @@ public:
           return api_->fileSystem().fileReadToEnd(file);
         }));
     ON_CALL(os_sys_calls_, close(_)).WillByDefault(Return(Api::SysCallIntResult{0, 0}));
+    EXPECT_CALL(os_sys_calls_, getaddrinfo(_, _, _, _))
+        .WillRepeatedly(Invoke([&](const char* node, const char* service,
+                                   const struct addrinfo* hints, struct addrinfo** res) {
+          Api::OsSysCallsImpl real;
+          return real.getaddrinfo(node, service, hints, res);
+        }));
 
     // Here we setup runtime to mimic the actual deprecated feature list used in the
     // production code. Note that this test is actually more strict than production because
@@ -163,10 +170,12 @@ public:
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   OptionsImpl options_;
   std::unique_ptr<Upstream::ProdClusterManagerFactory> cluster_manager_factory_;
-  NiceMock<Server::MockListenerComponentFactory> component_factory_;
+  std::unique_ptr<NiceMock<Server::MockListenerComponentFactory>> component_factory_ptr_{
+      std::make_unique<NiceMock<Server::MockListenerComponentFactory>>()};
+  NiceMock<Server::MockListenerComponentFactory>& component_factory_{*component_factory_ptr_};
   NiceMock<Server::MockWorkerFactory> worker_factory_;
-  Server::ListenerManagerImpl listener_manager_{server_, component_factory_, worker_factory_, false,
-                                                server_.quic_stat_names_};
+  Server::ListenerManagerImpl listener_manager_{server_, std::move(component_factory_ptr_),
+                                                worker_factory_, false, server_.quic_stat_names_};
   Random::RandomGeneratorImpl random_;
   std::shared_ptr<Runtime::MockSnapshot> snapshot_{
       std::make_shared<NiceMock<Runtime::MockSnapshot>>()};

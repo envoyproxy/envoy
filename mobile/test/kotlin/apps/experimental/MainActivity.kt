@@ -57,13 +57,15 @@ class MainActivity : Activity() {
       .addPlatformFilter(::AsyncDemoFilter)
       .h2ExtendKeepaliveTimeout(true)
       .enableAdminInterface()
+      .enableDNSCache(true)
+      // required by DNS cache
+      .addKeyValueStore("reserved.platform_store", SharedPreferencesStore(preferences))
       .enableInterfaceBinding(true)
       .enableSocketTagging(true)
       .enableProxying(true)
       .enableSkipDNSLookupForProxiedRequests(true)
       .addNativeFilter("envoy.filters.http.buffer", "{\"@type\":\"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer\",\"max_request_bytes\":5242880}")
       .addStringAccessor("demo-accessor", { "PlatformString" })
-      .addKeyValueStore("demo-kv-store", SharedPreferencesStore(preferences))
       .setOnEngineRunning { Log.d("MainActivity", "Envoy async internal setup completed") }
       .setEventTracker({
         for (entry in it.entries) {
@@ -159,19 +161,7 @@ class MainActivity : Activity() {
 
   private fun recordStats() {
     val counter = engine.pulseClient().counter(Element("foo"), Element("bar"), Element("counter"))
-    val gauge = engine.pulseClient().gauge(Element("foo"), Element("bar"), Element("gauge"))
-    val timer = engine.pulseClient().timer(Element("foo"), Element("bar"), Element("timer"))
-    val distribution =
-      engine.pulseClient().distribution(Element("foo"), Element("bar"), Element("distribution"))
-
     counter.increment()
     counter.increment(5)
-
-    gauge.set(5)
-    gauge.add(10)
-    gauge.sub(1)
-
-    timer.recordDuration(15)
-    distribution.recordValue(15)
   }
 }

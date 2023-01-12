@@ -33,12 +33,36 @@ Api::IoCallBoolResult FileImplWin32::open(FlagSet in) {
   }
 
   auto flags = translateFlag(in);
-  fd_ = CreateFileA(path().c_str(), flags.access_, FILE_SHARE_READ | FILE_SHARE_WRITE, 0,
-                    flags.creation_, 0, NULL);
+  fd_ = CreateFileA(path().c_str(), flags.access_,
+                    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, 0, flags.creation_, 0,
+                    NULL);
   if (fd_ == INVALID_HANDLE) {
     return resultFailure(false, ::GetLastError());
   }
+  if (in.test(File::Operation::Write) && !in.test(File::Operation::Append) &&
+      !in.test(File::Operation::KeepExistingData)) {
+    SetEndOfFile(fd_);
+  }
   return resultSuccess(true);
+}
+
+Api::IoCallBoolResult TmpFileImplWin32::open(FlagSet in) {
+  if (isOpen()) {
+    return resultSuccess(true);
+  }
+
+  auto flags = translateFlag(in);
+  for (int tries = 5; tries > 0; tries--) {
+    std::string try_path = generateTmpFilePath(path());
+    fd_ = CreateFileA(try_path.c_str(), flags.access_,
+                      FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, 0, CREATE_NEW,
+                      FILE_FLAG_DELETE_ON_CLOSE, NULL);
+    if (fd_ != INVALID_HANDLE) {
+      tmp_file_path_ = try_path;
+      return resultSuccess(true);
+    }
+  }
+  return resultFailure(false, ::GetLastError());
 }
 
 Api::IoCallSizeResult FileImplWin32::write(absl::string_view buffer) {
@@ -53,15 +77,37 @@ Api::IoCallSizeResult FileImplWin32::write(absl::string_view buffer) {
 Api::IoCallBoolResult FileImplWin32::close() {
   ASSERT(isOpen());
 
-  if (truncate_) {
-    SetEndOfFile(fd_);
-  }
   BOOL result = CloseHandle(fd_);
   fd_ = INVALID_HANDLE;
   if (result == 0) {
     return resultFailure(false, ::GetLastError());
   }
   return resultSuccess(true);
+}
+
+static OVERLAPPED overlappedForOffset(uint64_t offset) {
+  OVERLAPPED overlapped{};
+  overlapped.Offset = offset & 0xffffffff;
+  overlapped.OffsetHigh = offset >> 32;
+  return overlapped;
+}
+
+Api::IoCallSizeResult FileImplWin32::pread(void* buf, uint64_t count, uint64_t offset) {
+  ASSERT(isOpen());
+  DWORD read_count;
+  OVERLAPPED overlapped = overlappedForOffset(offset);
+  BOOL result = ReadFile(fd_, buf, count, &read_count, &overlapped);
+  return result ? resultSuccess(static_cast<ssize_t>(read_count))
+                : resultFailure<ssize_t>(-1, ::GetLastError());
+}
+
+Api::IoCallSizeResult FileImplWin32::pwrite(const void* buf, uint64_t count, uint64_t offset) {
+  ASSERT(isOpen());
+  DWORD write_count;
+  OVERLAPPED overlapped = overlappedForOffset(offset);
+  BOOL result = WriteFile(fd_, buf, count, &write_count, &overlapped);
+  return result ? resultSuccess(static_cast<ssize_t>(write_count))
+                : resultFailure<ssize_t>(-1, ::GetLastError());
 }
 
 FileImplWin32::FlagsAndMode FileImplWin32::translateFlag(FlagSet in) {
@@ -74,9 +120,6 @@ FileImplWin32::FlagsAndMode FileImplWin32::translateFlag(FlagSet in) {
 
   if (in.test(File::Operation::Write)) {
     access = GENERIC_WRITE;
-    if (!in.test(File::Operation::Append)) {
-      truncate_ = true;
-    }
   }
 
   // Order of tests matter here. There reason for that
@@ -98,6 +141,13 @@ FilePtr InstanceImplWin32::createFile(const FilePathAndType& file_info) {
   switch (file_info.file_type_) {
   case DestinationType::File:
     return std::make_unique<FileImplWin32>(file_info);
+  case DestinationType::TmpFile:
+    if (!file_info.path_.empty() &&
+        (file_info.path_.back() == '/' || file_info.path_.back() == '\\')) {
+      return std::make_unique<TmpFileImplWin32>(FilePathAndType{
+          DestinationType::TmpFile, file_info.path_.substr(0, file_info.path_.size() - 1)});
+    }
+    return std::make_unique<TmpFileImplWin32>(file_info);
   case DestinationType::Stderr:
     return std::make_unique<StdStreamFileImplWin32<STD_ERROR_HANDLE>>();
   case DestinationType::Stdout:

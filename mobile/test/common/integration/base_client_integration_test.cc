@@ -1,13 +1,19 @@
-#include "test/common/integration/base_client_integration_test.h"
+#include "base_client_integration_test.h"
 
 #include <string>
 
 #include "test/common/http/common.h"
+#include "test/test_common/utility.h"
 
+#include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 #include "library/cc/bridge_utility.h"
+#include "library/cc/log_level.h"
 #include "library/common/config/internal.h"
+#include "library/common/engine.h"
+#include "library/common/engine_handle.h"
 #include "library/common/http/header_utility.h"
+#include "spdlog/spdlog.h"
 
 namespace Envoy {
 namespace {
@@ -44,23 +50,57 @@ void validateStreamIntel(const envoy_final_stream_intel& final_intel, bool expec
   ASSERT_LE(final_intel.response_start_ms, final_intel.stream_end_ms);
 }
 
+// Gets the spdlog level from the test options and converts it to the Platform::LogLevel used by
+// the Envoy Mobile engine.
+Platform::LogLevel getPlatformLogLevelFromOptions() {
+  switch (TestEnvironment::getOptions().logLevel()) {
+  case spdlog::level::level_enum::trace:
+    return Platform::LogLevel::trace;
+  case spdlog::level::level_enum::debug:
+    return Platform::LogLevel::debug;
+  case spdlog::level::level_enum::info:
+    return Platform::LogLevel::info;
+  case spdlog::level::level_enum::warn:
+    return Platform::LogLevel::warn;
+  case spdlog::level::level_enum::err:
+    return Platform::LogLevel::error;
+  case spdlog::level::level_enum::critical:
+    return Platform::LogLevel::critical;
+  case spdlog::level::level_enum::off:
+    return Platform::LogLevel::off;
+  default:
+    ENVOY_LOG_MISC(warn, "Couldn't map spdlog level {}. Using `info` level.",
+                   TestEnvironment::getOptions().logLevel());
+    return Platform::LogLevel::info;
+  }
+}
+
+} // namespace
+
 // Use the Envoy mobile default config as much as possible in this test.
 // There are some config modifiers below which do result in deltas.
+// Note: This function is only used to build the Engine if `override_builder_config_` is true.
 std::string defaultConfig() {
   Platform::EngineBuilder builder;
   std::string config_str = absl::StrCat(config_header, builder.generateConfigStr());
   return config_str;
 }
 
-} // namespace
-
-BaseClientIntegrationTest::BaseClientIntegrationTest(Network::Address::IpVersion ip_version)
-    : BaseIntegrationTest(ip_version, defaultConfig()) {
+BaseClientIntegrationTest::BaseClientIntegrationTest(Network::Address::IpVersion ip_version,
+                                                     const std::string& bootstrap_config)
+    : BaseIntegrationTest(ip_version, bootstrap_config) {
   skip_tag_extraction_rule_check_ = true;
   full_dispatcher_ = api_->allocateDispatcher("fake_envoy_mobile");
   use_lds_ = false;
   autonomous_upstream_ = true;
   defer_listener_finalization_ = true;
+
+  builder_.addLogLevel(getPlatformLogLevelFromOptions());
+  // The admin interface gets added by default in the ConfigHelper's constructor. Since the admin
+  // interface gets compiled out by default in Envoy Mobile, remove it from the ConfigHelper's
+  // bootstrap config.
+  config_helper_.addConfigModifier(
+      [](envoy::config::bootstrap::v3::Bootstrap& bootstrap) { bootstrap.clear_admin(); });
 }
 
 void BaseClientIntegrationTest::initialize() {
@@ -79,7 +119,9 @@ void BaseClientIntegrationTest::initialize() {
   });
   stream_prototype_->setOnComplete(
       [this](envoy_stream_intel, envoy_final_stream_intel final_intel) {
-        validateStreamIntel(final_intel, expect_dns_, upstream_tls_, cc_.on_complete_calls == 0);
+        if (expect_data_streams_) {
+          validateStreamIntel(final_intel, expect_dns_, upstream_tls_, cc_.on_complete_calls == 0);
+        }
         cc_.on_complete_received_byte_count = final_intel.received_byte_count;
         cc_.on_complete_calls++;
         cc_.terminal_callback->setReady();
@@ -130,15 +172,14 @@ std::shared_ptr<Platform::RequestHeaders> BaseClientIntegrationTest::envoyToMobi
 }
 
 void BaseClientIntegrationTest::threadRoutine(absl::Notification& engine_running) {
-  setOnEngineRunning([&]() { engine_running.Notify(); });
-  engine_ = build();
+  builder_.setOnEngineRunning([&]() { engine_running.Notify(); });
+  engine_ = builder_.build();
   full_dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
 void BaseClientIntegrationTest::TearDown() {
   test_server_.reset();
   fake_upstreams_.clear();
-  engine_->terminate();
   engine_.reset();
   full_dispatcher_->exit();
   envoy_thread_->join();
@@ -155,7 +196,10 @@ void BaseClientIntegrationTest::createEnvoy() {
   finalizeConfigWithPorts(config_helper_, ports, use_lds_);
 
   if (override_builder_config_) {
-    setOverrideConfigForTests(MessageUtil::getYamlStringFromMessage(config_helper_.bootstrap()));
+    ASSERT_FALSE(config_helper_.bootstrap().has_admin())
+        << "Bootstrap config should not have `admin` configured in Envoy Mobile";
+    builder_.setOverrideConfigForTests(
+        MessageUtil::getYamlStringFromMessage(config_helper_.bootstrap()));
   } else {
     ENVOY_LOG_MISC(warn, "Using builder config and ignoring config modifiers");
   }
@@ -164,6 +208,38 @@ void BaseClientIntegrationTest::createEnvoy() {
   envoy_thread_ = api_->threadFactory().createThread(
       [this, &engine_running]() -> void { threadRoutine(engine_running); });
   engine_running.WaitForNotification();
+}
+
+uint64_t BaseClientIntegrationTest::getCounterValue(const std::string& name) {
+  uint64_t counter_value = 0UL;
+  uint64_t* counter_value_ptr = &counter_value;
+  absl::Notification counter_value_set;
+  EXPECT_EQ(ENVOY_SUCCESS,
+            EngineHandle::runOnEngineDispatcher(
+                rawEngine(), [counter_value_ptr, &name, &counter_value_set](Envoy::Engine& engine) {
+                  Stats::CounterSharedPtr counter =
+                      TestUtility::findCounter(engine.getStatsStore(), name);
+                  if (counter != nullptr) {
+                    *counter_value_ptr = counter->value();
+                  }
+                  counter_value_set.Notify();
+                }));
+  EXPECT_TRUE(counter_value_set.WaitForNotificationWithTimeout(absl::Seconds(5)));
+  return counter_value;
+}
+
+testing::AssertionResult BaseClientIntegrationTest::waitForCounterGe(const std::string& name,
+                                                                     uint64_t value) {
+  constexpr std::chrono::milliseconds timeout = TestUtility::DefaultTimeout;
+  Event::TestTimeSystem::RealTimeBound bound(timeout);
+  while (getCounterValue(name) < value) {
+    timeSystem().advanceTimeWait(std::chrono::milliseconds(10));
+    if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
+      return testing::AssertionFailure()
+             << fmt::format("timed out waiting for {} to be {}", name, value);
+    }
+  }
+  return testing::AssertionSuccess();
 }
 
 void BaseClientIntegrationTest::cleanup() {

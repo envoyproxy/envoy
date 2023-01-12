@@ -265,8 +265,8 @@ envoy_cc_test(
     deps = [
         ":stat_test_utility_lib",
         "//source/common/memory:stats_lib",
+        "//source/common/runtime:runtime_lib",
         "//source/common/stats:stats_matcher_lib",
-        "//source/common/stats:symbol_table_lib",
         "//source/common/stats:thread_local_store_lib",
         "//source/common/thread_local:thread_local_lib",
         "//test/mocks/event:event_mocks",

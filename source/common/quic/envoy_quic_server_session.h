@@ -3,8 +3,8 @@
 #include <memory>
 #include <ostream>
 
-#include "source/common/quic/envoy_quic_crypto_stream_factory.h"
 #include "source/common/quic/envoy_quic_server_connection.h"
+#include "source/common/quic/envoy_quic_server_crypto_stream_factory.h"
 #include "source/common/quic/envoy_quic_server_stream.h"
 #include "source/common/quic/quic_filter_manager_connection_impl.h"
 #include "source/common/quic/quic_stat_names.h"

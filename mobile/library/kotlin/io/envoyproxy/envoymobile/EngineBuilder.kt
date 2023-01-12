@@ -51,6 +51,7 @@ open class EngineBuilder(
   private var dnsQueryTimeoutSeconds = 25
   private var dnsMinRefreshSeconds = 60
   private var dnsPreresolveHostnames = "[]"
+  private var enableDNSCache = false
   private var enableDrainPostDnsRefresh = false
   private var enableHttp3 = false
   private var enableHappyEyeballs = true
@@ -205,6 +206,21 @@ open class EngineBuilder(
    */
   fun enableDrainPostDnsRefresh(enableDrainPostDnsRefresh: Boolean): EngineBuilder {
     this.enableDrainPostDnsRefresh = enableDrainPostDnsRefresh
+    return this
+  }
+
+  /**
+   * Specify whether to enable DNS cache.
+   *
+   * Note that DNS cache requires an addition of a key value store named
+   * 'reserved.platform_store'.
+   *
+   * @param enableDNSCache whether to enable DNS cache. Disabled by default.
+   *
+   * @return This builder.
+   */
+  fun enableDNSCache(enableDNSCache: Boolean): EngineBuilder {
+    this.enableDNSCache = enableDNSCache
     return this
   }
 
@@ -560,6 +576,9 @@ open class EngineBuilder(
    * used for development/debugging purposes only. Enabling it in production may open
    * your app to security vulnerabilities.
    *
+   * Note this will not work with the default production build, as it builds with admin
+   * functionality disabled via --define=admin_functionality=disabled
+   *
    * @return this builder.
    */
   fun enableAdminInterface(): EngineBuilder {
@@ -584,6 +603,7 @@ open class EngineBuilder(
       dnsQueryTimeoutSeconds,
       dnsMinRefreshSeconds,
       dnsPreresolveHostnames,
+      enableDNSCache,
       enableDrainPostDnsRefresh,
       enableHttp3,
       enableGzip,

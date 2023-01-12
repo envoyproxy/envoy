@@ -11,6 +11,7 @@
 #include "source/common/http/exception.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/http2/codec_impl.h"
+#include "source/extensions/http/header_validators/envoy_default/http2_header_validator.h"
 
 #include "test/common/http/common.h"
 #include "test/common/http/http2/http2_frame.h"
@@ -177,13 +178,16 @@ public:
     http2OptionsFromTuple(client_http2_options_, client_settings_);
     http2OptionsFromTuple(server_http2_options_, server_settings_);
     client_ = std::make_unique<TestClientConnectionImpl>(
-        client_connection_, client_callbacks_, client_stats_store_, client_http2_options_, random_,
-        max_request_headers_kb_, max_response_headers_count_, ProdNghttp2SessionFactory::get());
+        client_connection_, client_callbacks_, *client_stats_store_.rootScope(),
+        client_http2_options_, random_, max_request_headers_kb_, max_response_headers_count_,
+        ProdNghttp2SessionFactory::get());
     client_wrapper_ = std::make_unique<ConnectionWrapper>(client_.get());
     server_ = std::make_unique<TestServerConnectionImpl>(
-        server_connection_, server_callbacks_, server_stats_store_, server_http2_options_, random_,
-        max_request_headers_kb_, max_request_headers_count_, headers_with_underscores_action_);
+        server_connection_, server_callbacks_, *server_stats_store_.rootScope(),
+        server_http2_options_, random_, max_request_headers_kb_, max_request_headers_count_,
+        headers_with_underscores_action_);
     server_wrapper_ = std::make_unique<ConnectionWrapper>(server_.get());
+    createHeaderValidator();
     request_encoder_ = &client_->newStream(response_decoder_);
     setupDefaultConnectionMocks();
     driveToCompletion();
@@ -334,6 +338,16 @@ public:
         .sources_size();
   }
 
+  void createHeaderValidator() {
+    header_validator_config_.set_headers_with_underscores_action(
+        static_cast<::envoy::extensions::http::header_validators::envoy_default::v3::
+                        HeaderValidatorConfig::HeadersWithUnderscoresAction>(
+            headers_with_underscores_action_));
+    header_validator_ =
+        std::make_unique<Extensions::Http::HeaderValidators::EnvoyDefault::Http2HeaderValidator>(
+            header_validator_config_, Protocol::Http2, server_->http2CodecStats());
+  }
+
   TestScopedRuntime scoped_runtime_;
   absl::optional<const Http2SettingsTuple> client_settings_;
   absl::optional<const Http2SettingsTuple> server_settings_;
@@ -377,6 +391,9 @@ public:
       CommonUtility::OptionsLimits::DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT;
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_{envoy::config::core::v3::HttpProtocolOptions::ALLOW};
+  envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
+      header_validator_config_;
+  HeaderValidatorPtr header_validator_;
 };
 
 class Http2CodecImplTest : public ::testing::TestWithParam<Http2SettingsTestParam>,
@@ -2393,12 +2410,14 @@ TEST_P(Http2CodecImplStreamLimitTest, MaxClientStreams) {
   http2OptionsFromTuple(client_http2_options_, ::testing::get<0>(GetParam()));
   http2OptionsFromTuple(server_http2_options_, ::testing::get<1>(GetParam()));
   client_ = std::make_unique<TestClientConnectionImpl>(
-      client_connection_, client_callbacks_, client_stats_store_, client_http2_options_, random_,
-      max_request_headers_kb_, max_response_headers_count_, ProdNghttp2SessionFactory::get());
+      client_connection_, client_callbacks_, *client_stats_store_.rootScope(),
+      client_http2_options_, random_, max_request_headers_kb_, max_response_headers_count_,
+      ProdNghttp2SessionFactory::get());
   client_wrapper_ = std::make_unique<ConnectionWrapper>(client_.get());
   server_ = std::make_unique<TestServerConnectionImpl>(
-      server_connection_, server_callbacks_, server_stats_store_, server_http2_options_, random_,
-      max_request_headers_kb_, max_request_headers_count_, headers_with_underscores_action_);
+      server_connection_, server_callbacks_, *server_stats_store_.rootScope(),
+      server_http2_options_, random_, max_request_headers_kb_, max_request_headers_count_,
+      headers_with_underscores_action_);
   server_wrapper_ = std::make_unique<ConnectionWrapper>(server_.get());
   setupDefaultConnectionMocks();
   driveToCompletion();
@@ -2704,7 +2723,17 @@ TEST_P(Http2CodecImplTest, HeaderNameWithUnderscoreAreDropped) {
   HttpTestUtility::addDefaultHeaders(request_headers);
   TestRequestHeaderMapImpl expected_headers(request_headers);
   request_headers.addCopy("bad_header", "something");
+#ifdef ENVOY_ENABLE_UHV
+  // Header validation is done by the HCM when header map is fully parsed.
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, _))
+      .WillOnce(Invoke([this, &expected_headers](RequestHeaderMapPtr& headers, bool) -> void {
+        auto result = header_validator_->validateRequestHeaderMap(*headers);
+        EXPECT_THAT(headers, HeaderMapEqualIgnoreOrder(&expected_headers));
+        ASSERT_TRUE(result.ok());
+      }));
+#else
   EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), _));
+#endif
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
   driveToCompletion();
   EXPECT_EQ(1, server_stats_store_.counter("http2.dropped_headers_with_underscores").value());
@@ -2712,13 +2741,33 @@ TEST_P(Http2CodecImplTest, HeaderNameWithUnderscoreAreDropped) {
 
 // Tests that request with header names containing underscore are rejected when the option is set to
 // reject request.
-TEST_P(Http2CodecImplTest, HeaderNameWithUnderscoreAreRejectedByDefault) {
+TEST_P(Http2CodecImplTest, HeaderNameWithUnderscoreAreRejected) {
   headers_with_underscores_action_ = envoy::config::core::v3::HttpProtocolOptions::REJECT_REQUEST;
   initialize();
 
   TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   request_headers.addCopy("bad_header", "something");
+
+#ifdef ENVOY_ENABLE_UHV
+  // Header validation is done by the HCM when header map is fully parsed.
+  // This callback approximates handling of header validation error, when HCM calls
+  // sendLocalReply and closes network connection (based on the
+  // stream_error_on_invalid_http_message flag, which in this test is assumed to equal false).
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, _))
+      .WillOnce(Invoke([this](RequestHeaderMapPtr& headers, bool) -> void {
+        auto result = header_validator_->validateRequestHeaderMap(*headers);
+        ASSERT_FALSE(result.ok());
+        response_encoder_->encodeHeaders(TestResponseHeaderMapImpl{{":status", "400"},
+                                                                   {"connection", "close"},
+                                                                   {"content-length", "0"}},
+                                         true);
+        response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
+        server_connection_.state_ = Network::Connection::State::Closing;
+      }));
+  expect_buffered_data_on_teardown_ = true;
+#endif
+
   EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _));
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
   driveToCompletion();
@@ -2737,7 +2786,17 @@ TEST_P(Http2CodecImplTest, HeaderNameWithUnderscoreAllowed) {
   HttpTestUtility::addDefaultHeaders(request_headers);
   request_headers.addCopy("bad_header", "something");
   TestRequestHeaderMapImpl expected_headers(request_headers);
+#ifdef ENVOY_ENABLE_UHV
+  // Header validation is done by the HCM when header map is fully parsed.
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, _))
+      .WillOnce(Invoke([this, &expected_headers](RequestHeaderMapPtr& headers, bool) -> void {
+        auto result = header_validator_->validateRequestHeaderMap(*headers);
+        EXPECT_THAT(headers, HeaderMapEqualIgnoreOrder(&expected_headers));
+        ASSERT_TRUE(result.ok());
+      }));
+#else
   EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), _));
+#endif
   EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _)).Times(0);
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
   driveToCompletion();
@@ -4463,14 +4522,16 @@ protected:
     http2OptionsFromTuple(client_http2_options_, client_settings_);
     http2OptionsFromTuple(server_http2_options_, server_settings_);
     client_ = std::make_unique<MetadataTestClientConnectionImpl>(
-        client_connection_, client_callbacks_, client_stats_store_, client_http2_options_, random_,
-        max_request_headers_kb_, max_response_headers_count_, http2_session_factory_);
+        client_connection_, client_callbacks_, *client_stats_store_.rootScope(),
+        client_http2_options_, random_, max_request_headers_kb_, max_response_headers_count_,
+        http2_session_factory_);
     client_wrapper_ = std::make_unique<ConnectionWrapper>(client_.get());
     // SETTINGS are required as part of the preface.
     submitSettings(client_, {});
     server_ = std::make_unique<TestServerConnectionImpl>(
-        server_connection_, server_callbacks_, server_stats_store_, server_http2_options_, random_,
-        max_request_headers_kb_, max_request_headers_count_, headers_with_underscores_action_);
+        server_connection_, server_callbacks_, *server_stats_store_.rootScope(),
+        server_http2_options_, random_, max_request_headers_kb_, max_request_headers_count_,
+        headers_with_underscores_action_);
     server_wrapper_ = std::make_unique<ConnectionWrapper>(server_.get());
     setupDefaultConnectionMocks();
     driveToCompletion();

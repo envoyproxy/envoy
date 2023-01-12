@@ -116,17 +116,16 @@ TEST_F(ExtAuthzFilterHttpTest, ExtAuthzFilterFactoryTestHttp) {
   const std::string ext_authz_config_yaml = R"EOF(
   stat_prefix: "wall"
   transport_api_version: V3
+  allowed_headers:
+      patterns:
+      - exact: baz
+      - prefix: x-
   http_service:
     server_uri:
       uri: "ext_authz:9000"
       cluster: "ext_authz"
       timeout: 0.25s
-
     authorization_request:
-      allowed_headers:
-        patterns:
-        - exact: baz
-        - prefix: x-
       headers_to_add:
       - key: foo
         value: bar

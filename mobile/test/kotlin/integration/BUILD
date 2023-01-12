@@ -1,4 +1,5 @@
-load("@envoy_mobile//bazel:kotlin_test.bzl", "envoy_mobile_jni_kt_test")
+load("@envoy_mobile//bazel:kotlin_test.bzl", "envoy_mobile_android_test", "envoy_mobile_jni_kt_test")
+load("@envoy_mobile//bazel:kotlin_lib.bzl", "envoy_mobile_kt_library")
 
 envoy_mobile_jni_kt_test(
     name = "engine_start_test",
@@ -6,8 +7,8 @@ envoy_mobile_jni_kt_test(
         "EnvoyEngineSimpleIntegrationTest.kt",
     ],
     native_deps = [
-        "//library/common/jni:libjava_jni_lib.so",
-        "//library/common/jni:java_jni_lib.jnilib",
+        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
+        "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
     ],
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
@@ -20,8 +21,8 @@ envoy_mobile_jni_kt_test(
         "EngineApiTest.kt",
     ],
     native_deps = [
-        "//library/common/jni:libjava_jni_lib.so",
-        "//library/common/jni:java_jni_lib.jnilib",
+        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
+        "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
     ],
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
@@ -34,8 +35,8 @@ envoy_mobile_jni_kt_test(
         "KeyValueStoreTest.kt",
     ],
     native_deps = [
-        "//library/common/jni:libjava_jni_lib.so",
-        "//library/common/jni:java_jni_lib.jnilib",
+        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
+        "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
     ],
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
@@ -48,8 +49,8 @@ envoy_mobile_jni_kt_test(
         "SetEventTrackerTest.kt",
     ],
     native_deps = [
-        "//library/common/jni:libjava_jni_lib.so",
-        "//library/common/jni:java_jni_lib.jnilib",
+        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
+        "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
     ],
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
@@ -62,8 +63,8 @@ envoy_mobile_jni_kt_test(
         "SetLoggerTest.kt",
     ],
     native_deps = [
-        "//library/common/jni:libjava_jni_lib.so",
-        "//library/common/jni:java_jni_lib.jnilib",
+        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
+        "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
     ],
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
@@ -77,8 +78,8 @@ envoy_mobile_jni_kt_test(
         "TestStatsdServer.kt",
     ],
     native_deps = [
-        "//library/common/jni:libjava_jni_lib.so",
-        "//library/common/jni:java_jni_lib.jnilib",
+        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
+        "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
     ],
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
@@ -91,8 +92,22 @@ envoy_mobile_jni_kt_test(
         "CancelStreamTest.kt",
     ],
     native_deps = [
-        "//library/common/jni:libjava_jni_lib.so",
-        "//library/common/jni:java_jni_lib.jnilib",
+        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
+        "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
+    ],
+    deps = [
+        "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+    ],
+)
+
+envoy_mobile_jni_kt_test(
+    name = "cancel_grpc_stream_test",
+    srcs = [
+        "CancelGRPCStreamTest.kt",
+    ],
+    native_deps = [
+        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
+        "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
     ],
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
@@ -105,8 +120,8 @@ envoy_mobile_jni_kt_test(
         "ResetConnectivityStateTest.kt",
     ],
     native_deps = [
-        "//library/common/jni:libjava_jni_lib.so",
-        "//library/common/jni:java_jni_lib.jnilib",
+        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
+        "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
     ],
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
@@ -119,8 +134,8 @@ envoy_mobile_jni_kt_test(
         "GRPCReceiveErrorTest.kt",
     ],
     native_deps = [
-        "//library/common/jni:libjava_jni_lib.so",
-        "//library/common/jni:java_jni_lib.jnilib",
+        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
+        "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
     ],
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
@@ -137,8 +152,8 @@ envoy_mobile_jni_kt_test(
         "sandboxNetwork": "standard",
     },
     native_deps = [
-        "//library/common/jni:libjava_jni_lib.so",
-        "//library/common/jni:java_jni_lib.jnilib",
+        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
+        "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
     ],
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
@@ -151,8 +166,8 @@ envoy_mobile_jni_kt_test(
         "ReceiveErrorTest.kt",
     ],
     native_deps = [
-        "//library/common/jni:libjava_jni_lib.so",
-        "//library/common/jni:java_jni_lib.jnilib",
+        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
+        "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
     ],
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
@@ -165,8 +180,8 @@ envoy_mobile_jni_kt_test(
         "SendDataTest.kt",
     ],
     native_deps = [
-        "//library/common/jni:libjava_jni_lib.so",
-        "//library/common/jni:java_jni_lib.jnilib",
+        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
+        "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
     ],
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
@@ -179,8 +194,8 @@ envoy_mobile_jni_kt_test(
         "SendHeadersTest.kt",
     ],
     native_deps = [
-        "//library/common/jni:libjava_jni_lib.so",
-        "//library/common/jni:java_jni_lib.jnilib",
+        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
+        "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
     ],
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
@@ -193,10 +208,30 @@ envoy_mobile_jni_kt_test(
         "SendTrailersTest.kt",
     ],
     native_deps = [
-        "//library/common/jni:libjava_jni_lib.so",
-        "//library/common/jni:java_jni_lib.jnilib",
+        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
+        "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
     ],
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+    ],
+)
+
+envoy_mobile_android_test(
+    name = "filter_throwing_exception_test",
+    srcs = [
+        "FilterThrowingExceptionTest.kt",
+    ],
+    exec_properties = {
+        # TODO(lfpino): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
+        "sandboxNetwork": "standard",
+        "dockerNetwork": "standard",
+    },
+    native_deps = [
+        "//test/common/jni:libenvoy_jni_with_test_extensions.so",
+        "//test/common/jni:libenvoy_jni_with_test_extensions_jnilib",
+    ],
+    deps = [
+        "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+        "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
     ],
 )

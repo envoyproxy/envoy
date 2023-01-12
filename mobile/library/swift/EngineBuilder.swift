@@ -4,6 +4,7 @@ import Foundation
 /// Builder used for creating and running a new Engine instance.
 @objcMembers
 open class EngineBuilder: NSObject {
+  // swiftlint:disable:previous type_body_length
   private let base: BaseConfiguration
   private var engineType: EnvoyEngine.Type = EnvoyEngineImpl.self
   private var logLevel: LogLevel = .info
@@ -22,6 +23,7 @@ open class EngineBuilder: NSObject {
   private var dnsMinRefreshSeconds: UInt32 = 60
   private var dnsPreresolveHostnames: String = "[]"
   private var dnsRefreshSeconds: UInt32 = 60
+  private var enableDNSCache: Bool = false
   private var enableHappyEyeballs: Bool = true
   private var enableGzip: Bool = true
   private var enableBrotli: Bool = false
@@ -29,6 +31,7 @@ open class EngineBuilder: NSObject {
   private var enforceTrustChainVerification: Bool = true
   private var enablePlatformCertificateValidation: Bool = false
   private var enableDrainPostDnsRefresh: Bool = false
+  private var forceIPv6: Bool = false
   private var h2ConnectionKeepaliveIdleIntervalMilliseconds: UInt32 = 1
   private var h2ConnectionKeepaliveTimeoutSeconds: UInt32 = 10
   private var h2ExtendKeepaliveTimeout: Bool = false
@@ -171,6 +174,20 @@ open class EngineBuilder: NSObject {
     return self
   }
 
+  /// Specify whether to enable DNS cache.
+  ///
+  /// Note that DNS cache requires an addition of a key value store named
+  /// 'reserved.platform_store'.
+  ///
+  /// - parameter enableDNSCache: whether to enable DNS cache. Disabled by default.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func enableDNSCache(_ enableDNSCache: Bool) -> Self {
+    self.enableDNSCache = enableDNSCache
+    return self
+  }
+
   /// Specify whether to use Happy Eyeballs when multiple IP stacks may be supported. Defaults to
   /// true.
   ///
@@ -251,6 +268,18 @@ open class EngineBuilder: NSObject {
   public func enablePlatformCertificateValidation(
     _ enablePlatformCertificateValidation: Bool) -> Self {
     self.enablePlatformCertificateValidation = enablePlatformCertificateValidation
+    return self
+  }
+
+  /// Specify whether to remap IPv4 addresses to the IPv6 space and always force connections
+  /// to use IPv6. Note this is an experimental option and should be enabled with caution.
+  ///
+  /// - parameter forceIPv6: whether to force connections to use IPv6.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func forceIPv6(_ forceIPv6: Bool) -> Self {
+    self.forceIPv6 = forceIPv6
     return self
   }
 
@@ -487,6 +516,9 @@ open class EngineBuilder: NSObject {
   /// used for development/debugging purposes only. Enabling it in production may open
   /// your app to security vulnerabilities.
   ///
+  /// Note this will not work with the default production build, as it builds with admin
+  /// functionality disabled via --define=admin_functionality=disabled
+  ///
   /// - returns: This builder.
   @discardableResult
   public func enableAdminInterface() -> Self {
@@ -513,12 +545,14 @@ open class EngineBuilder: NSObject {
       dnsQueryTimeoutSeconds: self.dnsQueryTimeoutSeconds,
       dnsMinRefreshSeconds: self.dnsMinRefreshSeconds,
       dnsPreresolveHostnames: self.dnsPreresolveHostnames,
+      enableDNSCache: self.enableDNSCache,
       enableHappyEyeballs: self.enableHappyEyeballs,
       enableGzip: self.enableGzip,
       enableBrotli: self.enableBrotli,
       enableInterfaceBinding: self.enableInterfaceBinding,
       enableDrainPostDnsRefresh: self.enableDrainPostDnsRefresh,
       enforceTrustChainVerification: self.enforceTrustChainVerification,
+      forceIPv6: self.forceIPv6,
       enablePlatformCertificateValidation: self.enablePlatformCertificateValidation,
       h2ConnectionKeepaliveIdleIntervalMilliseconds:
         self.h2ConnectionKeepaliveIdleIntervalMilliseconds,

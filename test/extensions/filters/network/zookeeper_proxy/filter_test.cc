@@ -495,11 +495,11 @@ public:
   }
 
   Stats::HistogramOptConstRef findHistogram(const std::string& name) {
-    Stats::StatNameManagedStorage storage(name, scope_.symbolTable());
-    return scope_.findHistogram(storage.statName());
+    return store_.findHistogramByString(name);
   }
 
-  Stats::TestUtil::TestStore scope_;
+  Stats::TestUtil::TestStore store_;
+  Stats::Scope& scope_{*store_.rootScope()};
   ZooKeeperFilterConfigSharedPtr config_;
   std::unique_ptr<ZooKeeperFilter> filter_;
   std::string stat_prefix_{"test.zookeeper"};
@@ -612,7 +612,7 @@ TEST_F(ZooKeeperFilterTest, AuthRequest) {
   Buffer::OwnedImpl data = encodeAuth("digest");
 
   testRequest(data, {{{"opname", "auth"}}, {{"bytes", "36"}}},
-              scope_.counter("test.zookeeper.auth.digest_rq"), 36);
+              store_.counter("test.zookeeper.auth.digest_rq"), 36);
   testResponse({{{"opname", "auth_response"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
                config_->stats().auth_resp_, enumToSignedInt(XidCodes::AuthXid));
 }

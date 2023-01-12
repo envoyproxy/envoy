@@ -32,6 +32,7 @@
 #include "source/common/config/grpc_mux_impl.h"
 #include "source/common/config/new_grpc_mux_impl.h"
 #include "source/common/config/utility.h"
+#include "source/common/config/well_known_names.h"
 #include "source/common/config/xds_mux/grpc_mux_impl.h"
 #include "source/common/config/xds_resource.h"
 #include "source/common/http/codes.h"
@@ -53,30 +54,27 @@
 #include "source/common/upstream/cluster_manager_impl.h"
 #include "source/common/version/version.h"
 #include "source/server/configuration_impl.h"
-#include "source/server/connection_handler_impl.h"
 #include "source/server/guarddog_impl.h"
 #include "source/server/listener_hooks.h"
+#include "source/server/listener_manager_factory.h"
 #include "source/server/regex_engine.h"
 #include "source/server/ssl_context_manager.h"
+#include "source/server/utils.h"
 
 namespace Envoy {
 namespace Server {
 namespace {
-// TODO(alyssawilk) resolve the copy/paste code here.
-envoy::admin::v3::ServerInfo::State serverState(Init::Manager::State state,
-                                                bool health_check_failed) {
-  switch (state) {
-  case Init::Manager::State::Uninitialized:
-    return envoy::admin::v3::ServerInfo::PRE_INITIALIZING;
-  case Init::Manager::State::Initializing:
-    return envoy::admin::v3::ServerInfo::INITIALIZING;
-  case Init::Manager::State::Initialized:
-    return health_check_failed ? envoy::admin::v3::ServerInfo::DRAINING
-                               : envoy::admin::v3::ServerInfo::LIVE;
+std::unique_ptr<ConnectionHandler> getHandler(Event::Dispatcher& dispatcher) {
+
+  auto* factory = Config::Utility::getFactoryByName<ConnectionHandlerFactory>(
+      "envoy.connection_handler.default");
+  if (factory) {
+    return factory->createConnectionHandler(dispatcher, absl::nullopt);
   }
-  IS_ENVOY_BUG("unexpected server state enum");
-  return envoy::admin::v3::ServerInfo::PRE_INITIALIZING;
+  ENVOY_LOG_MISC(debug, "Unable to find envoy.connection_handler.default factory");
+  return nullptr;
 }
+
 } // namespace
 
 InstanceImpl::InstanceImpl(
@@ -102,8 +100,7 @@ InstanceImpl::InstanceImpl(
       access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
                           store),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
-      handler_(new ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
-      listener_component_factory_(*this), worker_factory_(thread_local_, *api_, hooks),
+      handler_(getHandler(*dispatcher_)), worker_factory_(thread_local_, *api_, hooks),
       terminated_(false),
       mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
                                                   : nullptr),
@@ -222,7 +219,7 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store, TimeSource& time_sou
         gauges_.push_back(gauge);
       });
 
-  store.forEachHistogram(
+  store.forEachSinkedHistogram(
       [this](std::size_t size) {
         snapped_histograms_.reserve(size);
         histograms_.reserve(size);
@@ -301,7 +298,8 @@ void InstanceImpl::updateServerStats() {
     server_stats_->seconds_until_first_ocsp_response_expiring_.set(
         secs_until_ocsp_response_expires.value());
   }
-  server_stats_->state_.set(enumToInt(serverState(initManager().state(), healthCheckFailed())));
+  server_stats_->state_.set(
+      enumToInt(Utility::serverState(initManager().state(), healthCheckFailed())));
   server_stats_->stats_recent_lookups_.set(
       stats_store_.symbolTable().getRecentLookups([](absl::string_view, uint64_t) {}));
 }
@@ -577,11 +575,11 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
 
   // Initialize the overload manager early so other modules can register for actions.
   overload_manager_ = std::make_unique<OverloadManagerImpl>(
-      *dispatcher_, stats_store_, thread_local_, bootstrap_.overload_manager(),
+      *dispatcher_, *stats_store_.rootScope(), thread_local_, bootstrap_.overload_manager(),
       messageValidationContext().staticValidationVisitor(), *api_, options_);
 
-  heap_shrinker_ =
-      std::make_unique<Memory::HeapShrinker>(*dispatcher_, *overload_manager_, stats_store_);
+  heap_shrinker_ = std::make_unique<Memory::HeapShrinker>(*dispatcher_, *overload_manager_,
+                                                          *stats_store_.rootScope());
 
   for (const auto& bootstrap_extension : bootstrap_.bootstrap_extensions()) {
     auto& factory = Config::Utility::getAndCheckFactory<Configuration::BootstrapExtensionFactory>(
@@ -621,11 +619,11 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
       Network::SocketInterfaceSingleton::initialize(sock);
     }
   }
-
   // Workers get created first so they register for thread local updates.
   listener_manager_ =
-      std::make_unique<ListenerManagerImpl>(*this, listener_component_factory_, worker_factory_,
-                                            bootstrap_.enable_dispatcher_stats(), quic_stat_names_);
+      Config::Utility::getAndCheckFactoryByName<ListenerManagerFactory>(options_.listenerManager())
+          .createListenerManager(*this, nullptr, worker_factory_,
+                                 bootstrap_.enable_dispatcher_stats(), quic_stat_names_);
 
   // The main thread is also registered for thread local updates so that code that does not care
   // whether it runs on the main thread or on workers can still use TLS.
@@ -636,7 +634,7 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
 
   // It's now safe to start writing stats from the main thread's dispatcher.
   if (bootstrap_.enable_dispatcher_stats()) {
-    dispatcher_->initializeStats(stats_store_, "server.");
+    dispatcher_->initializeStats(*stats_store_.rootScope(), "server.");
   }
 
   // The broad order of initialization from this point on is the following:
@@ -747,9 +745,9 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   // GuardDog (deadlock detection) object and thread setup before workers are
   // started and before our own run() loop runs.
   main_thread_guard_dog_ = std::make_unique<Server::GuardDogImpl>(
-      stats_store_, config_.mainThreadWatchdogConfig(), *api_, "main_thread");
+      *stats_store_.rootScope(), config_.mainThreadWatchdogConfig(), *api_, "main_thread");
   worker_guard_dog_ = std::make_unique<Server::GuardDogImpl>(
-      stats_store_, config_.workerWatchdogConfig(), *api_, "workers");
+      *stats_store_.rootScope(), config_.workerWatchdogConfig(), *api_, "workers");
 }
 
 void InstanceImpl::onClusterManagerPrimaryInitializationComplete() {
@@ -774,9 +772,9 @@ void InstanceImpl::onRuntimeReady() {
     TRY_ASSERT_MAIN_THREAD {
       Config::Utility::checkTransportVersion(hds_config);
       hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
-          serverFactoryContext(), stats_store_,
+          serverFactoryContext(), *stats_store_.rootScope(),
           Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config,
-                                                         stats_store_, false)
+                                                         *stats_store_.rootScope(), false)
               ->createUncachedRawAsyncClient(),
           stats_store_, *ssl_context_manager_, info_factory_);
     }

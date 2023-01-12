@@ -95,8 +95,8 @@ protected:
         .WillRepeatedly(testing::ReturnNew<NiceMock<Event::MockTimer>>());
 
     hds_delegate_ = std::make_unique<HdsDelegate>(
-        server_context_, stats_store_, Grpc::RawAsyncClientPtr(async_client_), stats_store_,
-        ssl_context_manager_, test_factory_);
+        server_context_, *stats_store_.rootScope(), Grpc::RawAsyncClientPtr(async_client_),
+        stats_store_, ssl_context_manager_, test_factory_);
   }
 
   void expectCreateClientConnection() {
@@ -320,6 +320,7 @@ TEST_F(HdsTest, TestHdsCluster) {
 
   auto* health_check = message->add_cluster_health_checks();
   health_check->set_cluster_name("test_cluster");
+  health_check->mutable_upstream_bind_config()->mutable_source_address()->set_address("1.1.1.1");
   auto* address = health_check->add_locality_endpoints()->add_endpoints()->mutable_address();
   address->mutable_socket_address()->set_address("127.0.0.2");
   address->mutable_socket_address()->set_port_value(1234);
