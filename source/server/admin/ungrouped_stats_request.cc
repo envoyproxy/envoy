@@ -14,14 +14,14 @@ UngroupedStatsRequest::UngroupedStatsRequest(Stats::Store& stats, const StatsPar
   switch (params_.type_) {
   case StatsType::TextReadouts:
   case StatsType::All:
-    phase_ = 0;
+    phase_index_ = 0;
     break;
   case StatsType::Counters:
   case StatsType::Gauges:
-    phase_ = 1;
+    phase_index_ = 1;
     break;
   case StatsType::Histograms:
-    phase_ = 2;
+    phase_index_ = 2;
     break;
   }
 }

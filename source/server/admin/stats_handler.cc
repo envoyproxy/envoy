@@ -10,11 +10,11 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
+#include "source/server/admin/grouped_stats_request.h"
 #include "source/server/admin/prometheus_stats.h"
-#include "source/server/admin/stats_request.h"
+#include "source/server/admin/ungrouped_stats_request.h"
 
 #include "absl/strings/numbers.h"
-#include "prometheus_stats_request.h"
 #include "stats_params.h"
 
 namespace Envoy {
@@ -97,55 +97,15 @@ Admin::RequestPtr StatsHandler::makeRequest(AdminStream& admin_stream) {
 }
 
 Admin::RequestPtr StatsHandler::makeRequest(Stats::Store& stats, const StatsParams& params,
-                                            StatsRequest::UrlHandlerFn url_handler_fn) {
-  return std::make_unique<StatsRequest>(stats, params, url_handler_fn);
+                                            UngroupedStatsRequest::UrlHandlerFn url_handler_fn) {
+  return std::make_unique<UngroupedStatsRequest>(stats, params, url_handler_fn);
 }
 
 Admin::RequestPtr
 StatsHandler::makePrometheusRequest(Stats::Store& stats, const StatsParams& params,
                                     Stats::CustomStatNamespaces& custom_namespaces,
-                                    PrometheusStatsRequest::UrlHandlerFn url_handler_fn) {
-  return std::make_unique<PrometheusStatsRequest>(stats, params, custom_namespaces, url_handler_fn);
-}
-
-Http::Code StatsHandler::handlerPrometheusStats(Http::ResponseHeaderMap&,
-                                                Buffer::Instance& response,
-                                                AdminStream& admin_stream) {
-  return prometheusStats(admin_stream.getRequestHeaders().getPathValue(), response);
-}
-
-Http::Code StatsHandler::prometheusStats(absl::string_view path_and_query,
-                                         Buffer::Instance& response) {
-  StatsParams params;
-  Http::Code code = params.parse(path_and_query, response);
-  if (code != Http::Code::OK) {
-    return code;
-  }
-
-  if (server_.statsConfig().flushOnAdmin()) {
-    server_.flushStats();
-  }
-
-  prometheusFlushAndRender(params, response);
-  return Http::Code::OK;
-}
-
-void StatsHandler::prometheusFlushAndRender(const StatsParams& params, Buffer::Instance& response) {
-  if (server_.statsConfig().flushOnAdmin()) {
-    server_.flushStats();
-  }
-  prometheusRender(server_.stats(), server_.api().customStatNamespaces(), params, response);
-}
-
-void StatsHandler::prometheusRender(Stats::Store& stats,
-                                    const Stats::CustomStatNamespaces& custom_namespaces,
-                                    const StatsParams& params, Buffer::Instance& response) {
-  const std::vector<Stats::TextReadoutSharedPtr>& text_readouts_vec =
-      params.prometheus_text_readouts_ ? stats.textReadouts()
-                                       : std::vector<Stats::TextReadoutSharedPtr>();
-  PrometheusStatsFormatter::statsAsPrometheus(stats.counters(), stats.gauges(), stats.histograms(),
-                                              text_readouts_vec, response, params,
-                                              custom_namespaces);
+                                    GroupedStatsRequest::UrlHandlerFn url_handler_fn) {
+  return std::make_unique<GroupedStatsRequest>(stats, params, custom_namespaces, url_handler_fn);
 }
 
 Http::Code StatsHandler::handlerContention(Http::ResponseHeaderMap& response_headers,

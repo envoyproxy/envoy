@@ -143,7 +143,7 @@ protected:
 
   // phase-related state
   uint64_t phase_stat_count_{0};
-  unsigned short phase_;
+  uint32_t phase_index_;
   std::vector<Phase> phases_;
 };
 
