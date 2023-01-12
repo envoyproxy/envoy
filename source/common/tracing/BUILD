@@ -44,6 +44,7 @@ envoy_cc_library(
         "//source/common/grpc:common_lib",
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/json:json_loader_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/metadata/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/tracing/v3:pkg_cc_proto",
