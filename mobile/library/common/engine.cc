@@ -37,24 +37,6 @@ envoy_status_t Engine::main(const std::string config, const std::string log_leve
                             const std::string admin_address_path) {
   // Using unique_ptr ensures main_common's lifespan is strictly scoped to this function.
   std::unique_ptr<EngineCommon> main_common;
-  const std::string name = "envoy";
-  const std::string config_flag = "--config-yaml";
-  const std::string composed_config = absl::StrCat(config_header, config);
-  const std::string log_flag = "-l";
-  const std::string concurrency_option = "--concurrency";
-  const std::string concurrency_arg = "0";
-  std::vector<const char*> envoy_argv = {name.c_str(),
-                                         config_flag.c_str(),
-                                         composed_config.c_str(),
-                                         concurrency_option.c_str(),
-                                         concurrency_arg.c_str(),
-                                         log_flag.c_str(),
-                                         log_level.c_str()};
-  if (!admin_address_path.empty()) {
-    envoy_argv.push_back("--admin-address-path");
-    envoy_argv.push_back(admin_address_path.c_str());
-  }
-  envoy_argv.push_back(nullptr);
   {
     Thread::LockGuard lock(mutex_);
     try {
@@ -82,7 +64,15 @@ envoy_status_t Engine::main(const std::string config, const std::string log_leve
             std::make_unique<Logger::DefaultDelegate>(log_mutex_, Logger::Registry::getSink());
       }
 
-      main_common = std::make_unique<EngineCommon>(envoy_argv.size() - 1, envoy_argv.data());
+      auto options = std::make_unique<Envoy::OptionsImpl>();
+      options->setConfigYaml(absl::StrCat(config_header, config));
+      options->parseAndValidateLogLevel(log_level.c_str());
+      options->setConcurrency(0);
+      if (!admin_address_path.empty()) {
+        options->setAdminAddressPath(admin_address_path);
+      }
+
+      main_common = std::make_unique<EngineCommon>(std::move(options));
       server_ = main_common->server();
       event_dispatcher_ = &server_->dispatcher();
 
