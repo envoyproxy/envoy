@@ -500,7 +500,7 @@ TEST_P(ShadowPolicyIntegrationTest, MainRequestOverBufferLimit) {
 
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 1);
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
-  EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_rq_completed")->value(), 1);
+  test_server_->waitForCounterEq("cluster.cluster_1.upstream_rq_completed", 1);
 }
 
 TEST_P(ShadowPolicyIntegrationTest, ShadowRequestOverBufferLimit) {
