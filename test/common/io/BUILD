@@ -23,3 +23,15 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "io_uring_worker_test",
+    srcs = ["io_uring_worker_test.cc"],
+    tags = [
+        "nocompdb",
+        "skip_on_windows",
+    ],
+    deps = [
+        "//source/common/io:io_uring_worker_lib",
+    ],
+)

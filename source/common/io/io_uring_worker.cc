@@ -2,14 +2,16 @@
 
 #include <sys/socket.h>
 
-#include "io_uring.h"
 #include "io_uring_impl.h"
 
 namespace Envoy {
 namespace Io {
 
-IoUringSocketEntry::IoUringSocketEntry(os_fd_t fd, IoUringWorker& parent) : fd_(fd), parent_(parent) {
+IoUringSocketEntry::IoUringSocketEntry(os_fd_t fd, IoUringWorkerImpl& parent)
+    : fd_(fd), parent_(parent) {}
 
+std::unique_ptr<IoUringSocketEntry> IoUringSocketEntry::unlink() {
+  return parent_.removeSocket(*this);
 }
 
 IoUringWorkerImpl::IoUringWorkerImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
@@ -21,19 +23,17 @@ IoUringWorkerImpl::~IoUringWorkerImpl() {
   dispatcher_.clearDeferredDeleteList();
 }
 
-IoUringSocket& IoUringWorkerImpl::addAcceptSocket(os_fd_t fd, IoUringHandler& handler) {
+IoUringSocket& IoUringWorkerImpl::addAcceptSocket(os_fd_t fd, IoUringHandler&) {
   ENVOY_LOG(trace, "add accept socket, fd = {}", fd);
   PANIC("not implemented");
 }
 
-IoUringSocket& IoUringWorkerImpl::addServerSocket(os_fd_t fd, IoUringHandler& handler,
-                                                  uint32_t read_buffer_size) {
+IoUringSocket& IoUringWorkerImpl::addServerSocket(os_fd_t fd, IoUringHandler&, uint32_t) {
   ENVOY_LOG(trace, "add server socket, fd = {}", fd);
   PANIC("not implemented");
 }
 
-IoUringSocket& IoUringWorkerImpl::addClientSocket(os_fd_t fd, IoUringHandler& handler,
-                                                  uint32_t read_buffer_size) {
+IoUringSocket& IoUringWorkerImpl::addClientSocket(os_fd_t fd, IoUringHandler&, uint32_t) {
   ENVOY_LOG(trace, "add client socket, fd = {}", fd);
   PANIC("not implemented");
 }
@@ -43,9 +43,7 @@ Event::Dispatcher& IoUringWorkerImpl::dispatcher() { return dispatcher_; }
 Request* IoUringWorkerImpl::submitAcceptRequest(IoUringSocket& socket,
                                                 sockaddr_storage* remote_addr,
                                                 socklen_t* remote_addr_len) {
-  Request* req = new Request();
-  req->type_ = RequestType::Accept;
-  req->io_uring_socket_ = socket;
+  Request* req = new Request{RequestType::Accept, socket};
 
   ENVOY_LOG(trace, "submit accept request, fd = {}, accept req = {}", socket.fd(), fmt::ptr(req));
 
@@ -64,9 +62,7 @@ Request* IoUringWorkerImpl::submitAcceptRequest(IoUringSocket& socket,
 }
 
 Request* IoUringWorkerImpl::submitCancelRequest(IoUringSocket& socket, Request* request_to_cancel) {
-  Request* req = new Request();
-  req->io_uring_socket_ = socket;
-  req->type_ = RequestType::Cancel;
+  Request* req = new Request{RequestType::Cancel, socket};
 
   ENVOY_LOG(trace, "submit cancel request, fd = {}, cancel req = {}", socket.fd(), fmt::ptr(req));
 
@@ -82,9 +78,7 @@ Request* IoUringWorkerImpl::submitCancelRequest(IoUringSocket& socket, Request* 
 }
 
 Request* IoUringWorkerImpl::submitCloseRequest(IoUringSocket& socket) {
-  Request* req = new Request();
-  req->io_uring_socket_ = socket;
-  req->type_ = RequestType::Close;
+  Request* req = new Request{RequestType::Close, socket};
 
   ENVOY_LOG(trace, "submit close request, fd = {}, close req = {}", socket.fd(), fmt::ptr(req));
 
@@ -100,9 +94,7 @@ Request* IoUringWorkerImpl::submitCloseRequest(IoUringSocket& socket) {
 }
 
 Request* IoUringWorkerImpl::submitReadRequest(IoUringSocket& socket, struct iovec* iov) {
-  Request* req = new Request();
-  req->io_uring_socket_ = socket;
-  req->type_ = RequestType::Read;
+  Request* req = new Request{RequestType::Read, socket};
 
   ENVOY_LOG(trace, "submit read request, fd = {}, read req = {}", socket.fd(), fmt::ptr(req));
 
@@ -119,9 +111,7 @@ Request* IoUringWorkerImpl::submitReadRequest(IoUringSocket& socket, struct iove
 
 Request* IoUringWorkerImpl::submitWritevRequest(IoUringSocket& socket, struct iovec* iovecs,
                                                 uint64_t num_vecs) {
-  Request* req = new Request();
-  req->io_uring_socket_ = socket;
-  req->type_ = RequestType::Write;
+  Request* req = new Request{RequestType::Write, socket};
 
   ENVOY_LOG(trace, "submit write request, fd = {}, req = {}", socket.fd(), fmt::ptr(req));
 
@@ -139,9 +129,7 @@ Request* IoUringWorkerImpl::submitWritevRequest(IoUringSocket& socket, struct io
 Request*
 IoUringWorkerImpl::submitConnectRequest(IoUringSocket& socket,
                                         const Network::Address::InstanceConstSharedPtr& address) {
-  Request* req = new Request();
-  req->io_uring_socket_ = socket;
-  req->type_ = RequestType::Connect;
+  Request* req = new Request{RequestType::Connect, socket};
 
   ENVOY_LOG(trace, "submit connect request, fd = {}, req = {}", socket.fd(), fmt::ptr(req));
 
@@ -166,33 +154,27 @@ void IoUringWorkerImpl::onFileEvent() {
 
     switch (req->type_) {
     case RequestType::Accept:
-      ENVOY_LOG(trace, "receive accept request completion, fd = {}",
-                req->io_uring_socket_.fd());
+      ENVOY_LOG(trace, "receive accept request completion, fd = {}", req->io_uring_socket_.fd());
       req->io_uring_socket_.onAccept(result);
       break;
     case RequestType::Connect:
-      ENVOY_LOG(trace, "receive connect request completion, fd = {}",
-                req->io_uring_socket_.fd());
+      ENVOY_LOG(trace, "receive connect request completion, fd = {}", req->io_uring_socket_.fd());
       req->io_uring_socket_.onConnect(result);
       break;
     case RequestType::Read:
-      ENVOY_LOG(trace, "receive Read request completion, fd = {}",
-                req->io_uring_socket_.fd(), fmt::ptr(req));
+      ENVOY_LOG(trace, "receive Read request completion, fd = {}", req->io_uring_socket_.fd());
       req->io_uring_socket_.onRead(result);
       break;
     case RequestType::Write:
-      ENVOY_LOG(trace, "receive write request completion, fd = {}",
-                req->io_uring_socket_.fd(), fmt::ptr(req));
-      req->io_uring_socket_.onWrite(result, req);
+      ENVOY_LOG(trace, "receive write request completion, fd = {}", req->io_uring_socket_.fd());
+      req->io_uring_socket_.onWrite(result);
       break;
     case RequestType::Close:
-      ENVOY_LOG(trace, "receive close request completion, fd = {}",
-                req->io_uring_socket_.fd());
+      ENVOY_LOG(trace, "receive close request completion, fd = {}", req->io_uring_socket_.fd());
       req->io_uring_socket_.onClose(result);
       break;
     case RequestType::Cancel:
-      ENVOY_LOG(trace, "receive cancel request completion, fd = {}",
-                req->io_uring_socket_.fd());
+      ENVOY_LOG(trace, "receive cancel request completion, fd = {}", req->io_uring_socket_.fd());
       req->io_uring_socket_.onCancel(result);
       break;
     }
@@ -204,9 +186,9 @@ void IoUringWorkerImpl::onFileEvent() {
 }
 
 void IoUringWorkerImpl::submit() {
-    if (!delay_submit_) {
-      io_uring_impl_.submit();
-    }
+  if (!delay_submit_) {
+    io_uring_impl_.submit();
+  }
 }
 
 std::unique_ptr<IoUringSocketEntry> IoUringWorkerImpl::removeSocket(IoUringSocketEntry& socket) {

@@ -6,26 +6,27 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/linked_object.h"
 #include "source/common/common/logger.h"
-#include "source/common/io/io_uring.h"
 #include "source/common/io/io_uring_impl.h"
 
 namespace Envoy {
 namespace Io {
 
-class IoUringSocketEntry : public IoUringSocket, public LinkedObject<IoUringSocketEntry>, public Event::DeferredDeletable {
+class IoUringWorkerImpl;
+
+class IoUringSocketEntry : public IoUringSocket,
+                           public LinkedObject<IoUringSocketEntry>,
+                           public Event::DeferredDeletable {
 public:
-  IoUringSocketEntry(os_fd_t fd, IoUringWorker& parent);
+  IoUringSocketEntry(os_fd_t fd, IoUringWorkerImpl& parent);
 
   // IoUringSocket
   os_fd_t fd() const override { return fd_; }
 
-  std::unique_ptr<IoUringSocket> unlink() const {
-    return parent_.removeSocket(*this);
-  }
+  std::unique_ptr<IoUringSocketEntry> unlink();
 
 private:
   os_fd_t fd_;
-  IoUringWorker& parent_;
+  IoUringWorkerImpl& parent_;
 };
 
 class IoUringWorkerImpl : public IoUringWorker, protected Logger::Loggable<Logger::Id::io> {
@@ -52,9 +53,10 @@ public:
                                uint64_t num_vecs) override;
   Request* submitConnectRequest(IoUringSocket& socket,
                                 const Network::Address::InstanceConstSharedPtr& address) override;
-  std::unique_ptr<IoUringSocketEntry> removeSocket(IoUringSocketEntry& socket) override;
 
-private:
+  std::unique_ptr<IoUringSocketEntry> removeSocket(IoUringSocketEntry& socket);
+
+protected:
   void onFileEvent();
   void submit();
 

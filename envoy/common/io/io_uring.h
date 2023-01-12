@@ -89,6 +89,13 @@ public:
   virtual IoUringResult prepareClose(os_fd_t fd, void* user_data) PURE;
 
   /**
+   * Prepares a cancellation and puts it into the submission queue.
+   * Returns IoUringResult::Failed in case the submission queue is full already
+   * and IoUringResult::Ok otherwise.
+   */
+  virtual IoUringResult prepareCancel(void* cancelling_user_data, void* user_data) PURE;
+
+  /**
    * Submits the entries in the submission queue to the kernel using the
    * `io_uring_enter()` system call.
    * Returns IoUringResult::Ok in case of success and may return
@@ -170,16 +177,16 @@ public:
   /**
    * On accept request completed.
    */
-  virtual void onAccept(int32_t);
+  virtual void onAccept(int32_t) PURE;
 
   /**
    * On close request completed.
    */
-  virtual void onClose(int32_t);
-  virtual void onCancel(int32_t);
-  virtual void onConnect(int32_t);
-  virtual void onRead(int32_t);
-  virtual void onWrite(int32_t);
+  virtual void onClose(int32_t) PURE;
+  virtual void onCancel(int32_t) PURE;
+  virtual void onConnect(int32_t) PURE;
+  virtual void onRead(int32_t) PURE;
+  virtual void onWrite(int32_t) PURE;
 };
 
 /**
@@ -256,11 +263,6 @@ public:
   virtual Request*
   submitConnectRequest(IoUringSocket& socket,
                        const Network::Address::InstanceConstSharedPtr& address) PURE;
-
-  /**
-   * Remove the socket from the worker.
-   */
-  virtual std::unique_ptr<IoUringSocket> removeSocket(IoUringSocket& socket) PURE;
 };
 
 /**
