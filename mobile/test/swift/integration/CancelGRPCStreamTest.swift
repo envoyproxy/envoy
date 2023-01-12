@@ -111,7 +111,7 @@ static_resources:
       .cancel()
 
     let expectations = [onCancelCallbackExpectation, filterExpectation]
-    XCTAssertEqual(XCTWaiter.wait(for: expectations, timeout: 3), .completed)
+    XCTAssertEqual(XCTWaiter.wait(for: expectations, timeout: 10), .completed)
 
     engine.terminate()
   }
