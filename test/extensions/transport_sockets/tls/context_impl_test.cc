@@ -1805,14 +1805,26 @@ TEST_F(ServerContextConfigImplTest, TlsCertificatesAndSdsConfig) {
       "SDS and non-SDS TLS certificates may not be mixed in server contexts");
 }
 
-TEST_F(ServerContextConfigImplTest, MultiSdsConfig) {
+TEST_F(ServerContextConfigImplTest, SdsConfigNoName) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-  tls_context.mutable_common_tls_context()->add_tls_certificate_sds_secret_configs();
   tls_context.mutable_common_tls_context()->add_tls_certificate_sds_secret_configs();
   EXPECT_THROW_WITH_REGEX(
       TestUtility::validate<envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext>(
           tls_context),
       EnvoyException, "Proto constraint validation failed");
+}
+
+TEST_F(ServerContextConfigImplTest, MultiSdsConfig) {
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  tls_context.mutable_common_tls_context()->add_tls_certificate_sds_secret_configs()->set_name(
+      "server_cert1");
+  tls_context.mutable_common_tls_context()->add_tls_certificate_sds_secret_configs()->set_name(
+      "server_cert2");
+  tls_context.mutable_common_tls_context()->add_tls_certificate_sds_secret_configs()->set_name(
+      "server_cert3");
+  EXPECT_NO_THROW(
+      TestUtility::validate<envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext>(
+          tls_context));
 }
 
 TEST_F(ServerContextConfigImplTest, SecretNotReady) {

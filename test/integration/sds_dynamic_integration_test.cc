@@ -25,6 +25,8 @@
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/config/integration/certs/clientcert_hash.h"
+#include "test/config/integration/certs/servercert_info.h"
+#include "test/config/integration/certs/server2cert_info.h"
 #include "test/extensions/transport_sockets/tls/test_private_key_method_provider.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/server.h"
@@ -197,6 +199,7 @@ protected:
   }
 
   const std::string server_cert_rsa_{"server_cert_rsa"};
+  const std::string server2_cert_rsa_{"server2_cert_rsa"};
   const std::string server_cert_ecdsa_{"server_cert_ecdsa"};
   const std::string validation_secret_{"validation_secret"};
   const std::string client_cert_{"client_cert"};
@@ -254,7 +257,7 @@ public:
 
     // Add an additional SDS config for an EC cert (the base test has SDS config for an RSA cert).
     // This is done via the filesystem instead of gRPC to simplify the test setup.
-    if (dual_cert_) {
+    if (dual_cert_ || multi_cert_) {
       auto* secret_config_ecdsa = common_tls_context.add_tls_certificate_sds_secret_configs();
 
       secret_config_ecdsa->set_name(server_cert_ecdsa_);
@@ -280,6 +283,38 @@ resources:
 
       auto sds_path =
           TestEnvironment::writeStringToFileForTest("server_cert_ecdsa.sds.yaml", sds_content);
+      config_source->mutable_path_config_source()->set_path(sds_path);
+      config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+    }
+
+    // Add one more additional SDS config to test multiple(>2) certs.
+    // This is done via the filesystem instead of gRPC to simplify the test setup.
+    if (multi_cert_) {
+      auto* secret_config_rsa_2 = common_tls_context.add_tls_certificate_sds_secret_configs();
+
+      secret_config_rsa_2->set_name(server2_cert_rsa_);
+      auto* config_source = secret_config_rsa_2->mutable_sds_config();
+      const std::string sds_template =
+          R"EOF(
+---
+version_info: "0"
+resources:
+- "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret
+  name: "{}"
+  tls_certificate:
+    certificate_chain:
+      filename: "{}"
+    private_key:
+      filename: "{}"
+)EOF";
+
+      const std::string sds_content = fmt::format(
+          sds_template, server2_cert_rsa_,
+          TestEnvironment::runfilesPath("test/config/integration/certs/server2cert.pem"),
+          TestEnvironment::runfilesPath("test/config/integration/certs/server2key.pem"));
+
+      auto sds_path =
+          TestEnvironment::writeStringToFileForTest("server2_cert_rsa.sds.yaml", sds_content);
       config_source->mutable_path_config_source()->set_path(sds_path);
       config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
     }
@@ -317,6 +352,7 @@ resources:
 protected:
   Network::UpstreamTransportSocketFactoryPtr client_ssl_ctx_;
   bool dual_cert_{false};
+  bool multi_cert_{false};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsDynamicDownstreamIntegrationTest,
@@ -474,6 +510,65 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, DualCert) {
               test_server_->counter(listenerStatPrefix("ssl.ciphers.ECDHE-ECDSA-AES128-GCM-SHA256"))
                   ->value());
   }
+}
+
+// A test that multiple(>) sds configs are provided. More than one RSA/ECDSA cert
+// is allowed if they has different server name pattern(DNS SAN or subject name),
+// different server name patterns will be used to match SNI in cert selection.
+// Detailed behaviors of cert selection are tested in SslSocketTest with static
+// tls_certificates config. This test is to verify multiple certificates can be loaed
+// via sds and give a simple case of selecting cert based on SNI.
+TEST_P(SdsDynamicDownstreamIntegrationTest, MultipleCerts) {
+  on_server_init_function_ = [this]() {
+    createSdsStream(*(fake_upstreams_[1]));
+    sendSdsResponse(getServerSecretRsa());
+  };
+
+  multi_cert_ = true;
+  initialize();
+
+  client_ssl_ctx_ = createClientSslTransportSocketFactory(
+      ClientSslTransportOptions()
+          .setSni("www.lyft.com")
+          .setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2)
+          .setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256"}),
+      context_manager_, *api_);
+  auto ssl_client1 = makeSslClientConnection();
+  codec_client_ = makeRawHttpConnection(std::move(ssl_client1), absl::nullopt);
+  EXPECT_TRUE(codec_client_->connected());
+  codec_client_->connection()->close(Network::ConnectionCloseType::NoFlush);
+  // peer certificate is not present when using QUIC
+  if (!test_quic_) {
+    EXPECT_EQ(TEST_SERVER_CERT_1_HASH,
+              codec_client_->connection()->ssl()->sha1PeerCertificateDigest());
+    EXPECT_EQ("www.lyft.com", codec_client_->connection()->ssl()->sni());
+  }
+
+  cleanupUpstreamAndDownstream();
+  client_ssl_ctx_ = createClientSslTransportSocketFactory(
+      ClientSslTransportOptions()
+          .setSni("www.lyft2.com")
+          .setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2)
+          .setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256"}),
+      context_manager_, *api_);
+  auto ssl_client2 = makeSslClientConnection();
+  codec_client_ = makeRawHttpConnection(std::move(ssl_client2), absl::nullopt);
+  EXPECT_TRUE(codec_client_->connected());
+  codec_client_->connection()->close(Network::ConnectionCloseType::NoFlush);
+  // peer certificate is not present when using QUIC
+  if (!test_quic_) {
+    EXPECT_EQ(TEST_SERVER2_CERT_1_HASH,
+              codec_client_->connection()->ssl()->sha1PeerCertificateDigest());
+    EXPECT_EQ("www.lyft2.com", codec_client_->connection()->ssl()->sni());
+  }
+
+  // Success
+  EXPECT_EQ(1, test_server_->counter("sds.server_cert_rsa.update_success")->value());
+  EXPECT_EQ(0, test_server_->counter("sds.server_cert_rsa.update_rejected")->value());
+  EXPECT_EQ(1, test_server_->counter("sds.server2_cert_rsa.update_success")->value());
+  EXPECT_EQ(0, test_server_->counter("sds.server2_cert_rsa.update_rejected")->value());
+  EXPECT_EQ(1, test_server_->counter("sds.server_cert_ecdsa.update_success")->value());
+  EXPECT_EQ(0, test_server_->counter("sds.server_cert_ecdsa.update_rejected")->value());
 }
 
 // A test that SDS server send a bad secret for a static listener,

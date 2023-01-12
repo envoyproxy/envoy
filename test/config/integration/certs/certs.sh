@@ -85,6 +85,11 @@ cat intermediate_cacert.pem intermediate_ca_2cert.pem > intermediate_partial_ca_
 generate_rsa_key server ca
 generate_x509_cert server ca
 generate_ocsp_response server ca
+generate_info_header server
+# Generate RSA cert for the server with different SAN
+generate_rsa_key server2 ca
+generate_x509_cert server2 ca
+generate_info_header server2
 # Generate ECDSA cert for the server.
 cp -f servercert.cfg server_ecdsacert.cfg
 generate_ecdsa_key server_ecdsa ca
