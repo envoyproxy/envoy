@@ -68,33 +68,12 @@ void normalizeLocalityWeights(const HostsPerLocality& hosts_per_locality,
   }
 }
 
-bool nonLocalityNormalize(const HostSet& host_set) {
-  const auto locality_weights = host_set.localityWeights();
-
-  // No locality weight.
-  if (locality_weights == nullptr || locality_weights->empty()) {
-    return true;
-  }
-
-  // Only one locality.
-  if (host_set.hostsPerLocality().get().size() < 2) {
-    return true;
-  }
-
-  // Total weight be zero.
-  uint32_t total_weight = std::accumulate(locality_weights->begin(), locality_weights->end(), 0);
-  if (total_weight == 0) {
-    return true;
-  }
-
-  // Locality normalize should be used in other cases.
-  return false;
-}
-
 void normalizeWeights(const HostSet& host_set, bool in_panic,
                       NormalizedHostWeightVector& normalized_host_weights,
-                      double& min_normalized_weight, double& max_normalized_weight) {
-  if (nonLocalityNormalize(host_set)) {
+                      double& min_normalized_weight, double& max_normalized_weight,
+                      bool locality_weighted_balancing) {
+  if (!locality_weighted_balancing || host_set.localityWeights() == nullptr ||
+      host_set.localityWeights()->empty()) {
     // If we're not dealing with locality weights, just normalize weights for the flat set of hosts.
     const auto& hosts = in_panic ? host_set.hosts() : host_set.healthyHosts();
     normalizeHostWeights(hosts, 1.0, normalized_host_weights, min_normalized_weight,
@@ -144,7 +123,7 @@ void ThreadAwareLoadBalancerBase::refresh() {
     double min_normalized_weight = 1.0;
     double max_normalized_weight = 0.0;
     normalizeWeights(*host_set, per_priority_state->global_panic_, normalized_host_weights,
-                     min_normalized_weight, max_normalized_weight);
+                     min_normalized_weight, max_normalized_weight, locality_weighted_balancing_);
     per_priority_state->current_lb_ = createLoadBalancer(
         std::move(normalized_host_weights), min_normalized_weight, max_normalized_weight);
   }

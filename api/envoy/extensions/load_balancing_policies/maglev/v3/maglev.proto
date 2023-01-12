@@ -30,4 +30,7 @@ message Maglev {
 
   // Common configuration for hashing-based load balancing policies.
   common.v3.ConsistentHashingLbConfig consistent_hashing_lb_config = 2;
+
+  // Enable locality weighted load balancing for maglev lb explicitly.
+  common.v3.LocalityLbConfig.LocalityWeightedLbConfig locality_weighted_lb_config = 3;
 }

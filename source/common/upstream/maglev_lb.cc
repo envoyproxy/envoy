@@ -99,7 +99,8 @@ MaglevLoadBalancer::MaglevLoadBalancer(
     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
     : ThreadAwareLoadBalancerBase(priority_set, stats, runtime, random,
                                   PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
-                                      common_config, healthy_panic_threshold, 100, 50)),
+                                      common_config, healthy_panic_threshold, 100, 50),
+                                  common_config.has_locality_weighted_lb_config()),
       scope_(scope.createScope("maglev_lb.")), stats_(generateStats(*scope_)),
       table_size_(config ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.value(), table_size,
                                                            MaglevTable::DefaultTableSize)
@@ -121,7 +122,8 @@ MaglevLoadBalancer::MaglevLoadBalancer(
     const PrioritySet& priority_set, ClusterLbStats& stats, Stats::Scope& scope,
     Runtime::Loader& runtime, Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
     const envoy::extensions::load_balancing_policies::maglev::v3::Maglev& config)
-    : ThreadAwareLoadBalancerBase(priority_set, stats, runtime, random, healthy_panic_threshold),
+    : ThreadAwareLoadBalancerBase(priority_set, stats, runtime, random, healthy_panic_threshold,
+                                  config.has_locality_weighted_lb_config()),
       scope_(scope.createScope("maglev_lb.")), stats_(generateStats(*scope_)),
       table_size_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, table_size, MaglevTable::DefaultTableSize)),
