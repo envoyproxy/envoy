@@ -120,9 +120,9 @@ public class CancelProofEnvoyStreamTest {
   public void sendHeaders_postponedCancelGetsExecutedToo() throws Exception {
     cancelProofEnvoyStream.setStream(mMockedStream);
     mSendHeadersBlock.close(); // Following Thread will block on executing sendHeaders
+    mStartLatch = new CountDownLatch(1); // Only one method to wait for.
     Thread thread = new Thread(() -> cancelProofEnvoyStream.sendHeaders(HEADERS, false));
     thread.start();
-    mStartLatch = new CountDownLatch(1); // Only one method to wait for.
     mStartLatch.await(); // Wait for the above Thread to enter the sendHeaders method.
     cancelProofEnvoyStream.cancel();
     mSendHeadersBlock.open();
@@ -163,9 +163,9 @@ public class CancelProofEnvoyStreamTest {
   public void sendData_postponedCancelGetsExecutedToo() throws Exception {
     cancelProofEnvoyStream.setStream(mMockedStream);
     mSendDataBlock.close(); // Following Thread will block on executing sendData
+    mStartLatch = new CountDownLatch(1); // Only one method to wait for.
     Thread thread = new Thread(() -> cancelProofEnvoyStream.sendData(BYTE_BUFFER, false));
     thread.start();
-    mStartLatch = new CountDownLatch(1); // Only one method to wait for.
     mStartLatch.await();                 // Wait for the above Thread to enter the sendData method.
     cancelProofEnvoyStream.cancel();
     mSendDataBlock.open();
@@ -206,9 +206,9 @@ public class CancelProofEnvoyStreamTest {
   public void readData_postponedCancelGetsExecutedToo() throws Exception {
     cancelProofEnvoyStream.setStream(mMockedStream);
     mReadDataBlock.close(); // Following Thread will block on executing readData
+    mStartLatch = new CountDownLatch(1); // Only one method to wait for.
     Thread thread = new Thread(() -> cancelProofEnvoyStream.readData(1));
     thread.start();
-    mStartLatch = new CountDownLatch(1); // Only one method to wait for.
     mStartLatch.await();                 // Wait for the above Thread to enter the readData method.
     cancelProofEnvoyStream.cancel();
     mReadDataBlock.open();
@@ -269,8 +269,8 @@ public class CancelProofEnvoyStreamTest {
   public void cancel_whileSendHeadersIsExecuting_cancelGetsPostponed() throws Exception {
     cancelProofEnvoyStream.setStream(mMockedStream);
     mSendHeadersBlock.close(); // Following Thread will block on executing sendHeaders
-    new Thread(() -> cancelProofEnvoyStream.sendHeaders(HEADERS, false)).start();
     mStartLatch = new CountDownLatch(1); // Only one method to wait for.
+    new Thread(() -> cancelProofEnvoyStream.sendHeaders(HEADERS, false)).start();
     mStartLatch.await(); // Wait for the above Thread to enter the sendHeaders method.
 
     cancelProofEnvoyStream.cancel();
@@ -283,8 +283,8 @@ public class CancelProofEnvoyStreamTest {
   public void cancel_whileSendDataIsExecuting_cancelGetsPostponed() throws Exception {
     cancelProofEnvoyStream.setStream(mMockedStream);
     mSendDataBlock.close(); // Following Thread will block on executing sendData
-    new Thread(() -> cancelProofEnvoyStream.sendData(BYTE_BUFFER, false)).start();
     mStartLatch = new CountDownLatch(1); // Only one method to wait for.
+    new Thread(() -> cancelProofEnvoyStream.sendData(BYTE_BUFFER, false)).start();
     mStartLatch.await();                 // Wait for the above Thread to enter the sendData method.
 
     cancelProofEnvoyStream.cancel();
@@ -297,8 +297,8 @@ public class CancelProofEnvoyStreamTest {
   public void cancel_whileReadDataIsExecuting_cancelGetsPostponed() throws Exception {
     cancelProofEnvoyStream.setStream(mMockedStream);
     mReadDataBlock.close(); // Following Thread will block on executing readData
-    new Thread(() -> cancelProofEnvoyStream.readData(1)).start();
     mStartLatch = new CountDownLatch(1); // Only one method to wait for.
+    new Thread(() -> cancelProofEnvoyStream.readData(1)).start();
     mStartLatch.await();                 // Wait for the above Thread to enter the readData method.
 
     cancelProofEnvoyStream.cancel();
