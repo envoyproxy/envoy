@@ -188,8 +188,9 @@ void ConnectionManagerImpl::checkForDeferredClose(bool skip_delay_close) {
     close = Network::ConnectionCloseType::FlushWrite;
   }
   if (drain_state_ == DrainState::Closing && streams_.empty() && !codec_->wantsToWrite()) {
-    doConnectionClose(close, absl::nullopt,
-                      StreamInfo::ResponseCodeDetails::get().DownstreamLocalDisconnect);
+    // We are closing a draining connection with no active streams and the codec has
+    // nothing to write.
+    doConnectionClose(close, absl::nullopt, "deferred_close_on_drained_connection");
   }
 }
 
@@ -471,14 +472,19 @@ void ConnectionManagerImpl::onEvent(Network::ConnectionEvent event) {
 
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
+
+    std::string details;
     if (event == Network::ConnectionEvent::RemoteClose) {
       remote_close_ = true;
       stats_.named_.downstream_cx_destroy_remote_.inc();
+      details = StreamInfo::ResponseCodeDetails::get().DownstreamRemoteDisconnect;
+    } else {
+      absl::string_view local_close_reason = read_callbacks_->connection().localCloseReason();
+      ENVOY_BUG(!local_close_reason.empty(), "Local Close Reason was not set!");
+      details = fmt::format(StreamInfo::ResponseCodeDetails::get().DownstreamLocalDisconnect,
+                            StringUtil::replaceAllEmptySpace(local_close_reason));
     }
-    absl::string_view details =
-        event == Network::ConnectionEvent::RemoteClose
-            ? StreamInfo::ResponseCodeDetails::get().DownstreamRemoteDisconnect
-            : StreamInfo::ResponseCodeDetails::get().DownstreamLocalDisconnect;
+
     // TODO(mattklein123): It is technically possible that something outside of the filter causes
     // a local connection close, so we still guard against that here. A better solution would be to
     // have some type of "pre-close" callback that we could hook for cleanup that would get called
@@ -530,7 +536,7 @@ void ConnectionManagerImpl::doConnectionClose(
   }
 
   if (close_type.has_value()) {
-    read_callbacks_->connection().close(close_type.value());
+    read_callbacks_->connection().close(close_type.value(), details);
   }
 }
 
@@ -545,7 +551,7 @@ void ConnectionManagerImpl::onIdleTimeout() {
   if (!codec_) {
     // No need to delay close after flushing since an idle timeout has already fired. Attempt to
     // write out buffered data one last time and issue a local close if successful.
-    doConnectionClose(Network::ConnectionCloseType::FlushWrite, absl::nullopt, "");
+    doConnectionClose(Network::ConnectionCloseType::FlushWrite, absl::nullopt, "on_idle_timeout");
   } else if (drain_state_ == DrainState::NotDraining) {
     startDrainSequence();
   }
@@ -909,6 +915,44 @@ bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
   return true;
 }
 
+bool ConnectionManagerImpl::ActiveStream::validateTrailers() {
+  if (!header_validator_) {
+    return true;
+  }
+
+  auto validation_result = header_validator_->validateRequestTrailerMap(*request_trailers_);
+  if (validation_result.ok()) {
+    return true;
+  }
+
+  Code response_code = Code::BadRequest;
+  absl::optional<Grpc::Status::GrpcStatus> grpc_status;
+  if (Grpc::Common::hasGrpcContentType(*request_headers_)) {
+    grpc_status = Grpc::Status::WellKnownGrpcStatus::Internal;
+  }
+
+  // H/2 codec was resetting requests that were rejected due to headers with underscores,
+  // instead of sending 400. Preserving this behavior for now.
+  // TODO(#24466): Make H/2 behavior consistent with H/1 and H/3.
+  if (validation_result.details() == UhvResponseCodeDetail::get().InvalidUnderscore &&
+      connection_manager_.codec_->protocol() == Protocol::Http2) {
+    filter_manager_.streamInfo().setResponseCodeDetails(validation_result.details());
+    resetStream();
+  } else {
+    // TODO(#24735): Harmonize H/2 and H/3 behavior with H/1
+    if (connection_manager_.codec_->protocol() < Protocol::Http2) {
+      sendLocalReply(response_code, "", nullptr, grpc_status, validation_result.details());
+    } else {
+      filter_manager_.streamInfo().setResponseCodeDetails(validation_result.details());
+      resetStream();
+    }
+    if (!response_encoder_->streamErrorOnInvalidHttpMessage()) {
+      connection_manager_.handleCodecError(validation_result.details());
+    }
+  }
+  return false;
+}
+
 void ConnectionManagerImpl::ActiveStream::maybeEndDecode(bool end_stream) {
   // If recreateStream is called, the HCM rewinds state and may send more encodeData calls.
   if (end_stream && !filter_manager_.remoteDecodeComplete()) {
@@ -1212,12 +1256,17 @@ void ConnectionManagerImpl::ActiveStream::decodeData(Buffer::Instance& data, boo
 }
 
 void ConnectionManagerImpl::ActiveStream::decodeTrailers(RequestTrailerMapPtr&& trailers) {
+  ENVOY_STREAM_LOG(debug, "request trailers complete:\n{}", *this, *trailers);
   ScopeTrackerScopeState scope(this,
                                connection_manager_.read_callbacks_->connection().dispatcher());
   resetIdleTimer();
 
   ASSERT(!request_trailers_);
   request_trailers_ = std::move(trailers);
+  if (!validateTrailers()) {
+    ENVOY_STREAM_LOG(debug, "request trailers validation failed:\n{}", *this, *request_trailers_);
+    return;
+  }
   maybeEndDecode(true);
   filter_manager_.decodeTrailers(*request_trailers_);
 }

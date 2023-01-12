@@ -90,11 +90,11 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
     : server_(server),
       request_id_extension_(Extensions::RequestId::UUIDRequestIDExtension::defaultInstance(
           server_.api().randomGenerator())),
-      profile_path_(profile_path),
-      stats_(Http::ConnectionManagerImpl::generateStats("http.admin.", server_.stats())),
+      profile_path_(profile_path), stats_(Http::ConnectionManagerImpl::generateStats(
+                                       "http.admin.", *server_.stats().rootScope())),
       null_overload_manager_(server_.threadLocal()),
-      tracing_stats_(
-          Http::ConnectionManagerImpl::generateTracingStats("http.admin.", no_op_store_)),
+      tracing_stats_(Http::ConnectionManagerImpl::generateTracingStats("http.admin.",
+                                                                       *no_op_store_.rootScope())),
       route_config_provider_(server.timeSource()),
       scoped_route_config_provider_(server.timeSource()), clusters_handler_(server),
       config_dump_handler_(config_tracker_, server), init_dump_handler_(server),
@@ -243,7 +243,7 @@ Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection
                                                  const Buffer::Instance& data,
                                                  Http::ServerConnectionCallbacks& callbacks) {
   return Http::ConnectionManagerUtility::autoCreateCodec(
-      connection, data, callbacks, server_.stats(), server_.api().randomGenerator(),
+      connection, data, callbacks, *server_.stats().rootScope(), server_.api().randomGenerator(),
       http1_codec_stats_, http2_codec_stats_, Http::Http1Settings(),
       ::Envoy::Http2::Utility::initializeAndValidateOptions(
           envoy::config::core::v3::Http2ProtocolOptions()),

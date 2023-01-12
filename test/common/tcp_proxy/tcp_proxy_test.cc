@@ -367,7 +367,7 @@ TEST_F(TcpProxyTest, ConnectAttemptsLimit) {
   EXPECT_CALL(upstream_hosts_.at(2)->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
 
-  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
 
   // Try both failure modes
   raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::Timeout);
@@ -441,7 +441,7 @@ TEST_F(TcpProxyTest, DownstreamDisconnectRemote) {
   EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response), _));
   upstream_callbacks_->onUpstreamData(response, false);
 
-  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::FlushWrite));
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::FlushWrite, _));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
@@ -458,14 +458,14 @@ TEST_F(TcpProxyTest, DownstreamDisconnectLocal) {
   EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response), _));
   upstream_callbacks_->onUpstreamData(response, false);
 
-  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush, _));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
 }
 
 TEST_F(TcpProxyTest, UpstreamConnectTimeout) {
   setup(1, accessLogConfig("%RESPONSE_FLAGS%"));
 
-  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
   raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::Timeout);
 
   filter_.reset();
@@ -484,7 +484,7 @@ TEST_F(TcpProxyTest, UpstreamClusterNotFound) {
 }
 
 TEST_F(TcpProxyTest, NoHost) {
-  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
   setup(0, accessLogConfig("%RESPONSE_FLAGS%"));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
   filter_.reset();
@@ -736,7 +736,7 @@ TEST_F(TcpProxyTest, LocalClosedBeforeUpstreamConnected) {
 TEST_F(TcpProxyTest, UpstreamConnectFailure) {
   setup(1, accessLogConfig("%RESPONSE_FLAGS%"));
 
-  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
   raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
 
   filter_.reset();
@@ -751,7 +751,7 @@ TEST_F(TcpProxyTest, UpstreamConnectionLimit) {
   // setup sets up expectation for tcpConnForCluster but this test is expected to NOT call that
   filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_);
   // The downstream connection closes if the proxy can't make an upstream connection.
-  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
   filter_->onNewConnection();
 
@@ -784,8 +784,8 @@ TEST_F(TcpProxyTest, IdleTimeout) {
   EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
   upstream_connections_.at(0)->raiseBytesSentCallbacks(2);
 
-  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush));
-  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush, _));
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
   EXPECT_CALL(*idle_timer, disableTimer());
   idle_timer->invokeCallback();
 }
@@ -858,11 +858,11 @@ TEST_F(TcpProxyTest, IdleTimeoutWithOutstandingDataFlushed) {
   // In this case we expect readDisable to not be called on the already closed
   // connection.
   EXPECT_CALL(filter_callbacks_.connection_, readDisable(true)).Times(0);
-  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush))
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush, _))
       .WillOnce(InvokeWithoutArgs(
           [&]() -> void { upstream_connections_.at(0)->runLowWatermarkCallbacks(); }));
 
-  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
   EXPECT_CALL(*idle_timer, disableTimer());
   idle_timer->invokeCallback();
 }
@@ -1000,8 +1000,7 @@ TEST_F(TcpProxyTest, UpstreamFlushNoTimeout) {
   setup(1);
   raiseEventUpstreamConnected(0);
 
-  EXPECT_CALL(*upstream_connections_.at(0),
-              close(Network::ConnectionCloseType::FlushWrite))
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::FlushWrite, _))
       .WillOnce(Return()); // Cancel default action of raising LocalClose
   EXPECT_CALL(*upstream_connections_.at(0), state())
       .WillOnce(Return(Network::Connection::State::Closing));
@@ -1031,8 +1030,7 @@ TEST_F(TcpProxyTest, UpstreamFlushTimeoutConfigured) {
   EXPECT_CALL(*idle_timer, enableTimer(_, _));
   raiseEventUpstreamConnected(0);
 
-  EXPECT_CALL(*upstream_connections_.at(0),
-              close(Network::ConnectionCloseType::FlushWrite))
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::FlushWrite, _))
       .WillOnce(Return()); // Cancel default action of raising LocalClose
   EXPECT_CALL(*upstream_connections_.at(0), state())
       .WillOnce(Return(Network::Connection::State::Closing));
@@ -1063,8 +1061,7 @@ TEST_F(TcpProxyTest, UpstreamFlushTimeoutExpired) {
   EXPECT_CALL(*idle_timer, enableTimer(_, _));
   raiseEventUpstreamConnected(0);
 
-  EXPECT_CALL(*upstream_connections_.at(0),
-              close(Network::ConnectionCloseType::FlushWrite))
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::FlushWrite, _))
       .WillOnce(Return()); // Cancel default action of raising LocalClose
   EXPECT_CALL(*upstream_connections_.at(0), state())
       .WillOnce(Return(Network::Connection::State::Closing));
@@ -1086,8 +1083,7 @@ TEST_F(TcpProxyTest, UpstreamFlushReceiveUpstreamData) {
   setup(1);
   raiseEventUpstreamConnected(0);
 
-  EXPECT_CALL(*upstream_connections_.at(0),
-              close(Network::ConnectionCloseType::FlushWrite))
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::FlushWrite, _))
       .WillOnce(Return()); // Cancel default action of raising LocalClose
   EXPECT_CALL(*upstream_connections_.at(0), state())
       .WillOnce(Return(Network::Connection::State::Closing));
@@ -1233,7 +1229,7 @@ TEST_F(TcpProxyTest, OnDemandCallbackStickToTheSelectedCluster) {
                     .counter("upstream_cx_connect_attempts_exceeded")
                     .value());
 
-  EXPECT_CALL(filter_callbacks_.connection_, close(_));
+  EXPECT_CALL(filter_callbacks_.connection_, close(_, _));
   std::invoke(*cluster_discovery_callback, Upstream::ClusterDiscoveryStatus::Missing);
 }
 
@@ -1308,7 +1304,7 @@ TEST_F(TcpProxyTest, OdcdsBasicDownstreamLocalClose) {
   EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response), _));
   upstream_callbacks_->onUpstreamData(response, false);
 
-  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush, _));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
 }
 
@@ -1331,7 +1327,7 @@ TEST_F(TcpProxyTest, OdcdsClusterMissingCauseConnectionClose) {
   setup(0, config);
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
-  EXPECT_CALL(filter_callbacks_.connection_, close(_));
+  EXPECT_CALL(filter_callbacks_.connection_, close(_, _));
   std::invoke(*cluster_discovery_callback, Upstream::ClusterDiscoveryStatus::Missing);
 }
 

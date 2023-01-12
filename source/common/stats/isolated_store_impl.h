@@ -196,6 +196,11 @@ public:
     forEachTextReadout(f_size, f_stat);
   }
 
+  void forEachSinkedHistogram(SizeFn f_size, StatFn<ParentHistogram> f_stat) const override {
+    UNREFERENCED_PARAMETER(f_size);
+    UNREFERENCED_PARAMETER(f_stat);
+  }
+
   NullCounterImpl& nullCounter() override { return *null_counter_; }
   NullGaugeImpl& nullGauge() override { return *null_gauge_; }
 

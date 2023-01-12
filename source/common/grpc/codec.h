@@ -103,7 +103,13 @@ protected:
   virtual void frameDataEnd() {}
 
   State state_{State::FhFlag};
-  uint32_t length_{0};
+  union {
+    // Note that this union does not rely on bytes being arranged accurately for a
+    // uint32_t, it merely shares the storage. absl::big_endian is used to deserialize
+    // the bytes correctly once they are populated.
+    uint32_t length_{0};
+    uint8_t length_as_bytes_[4];
+  };
   uint64_t count_{0};
 };
 

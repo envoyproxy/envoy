@@ -290,7 +290,7 @@ public:
   Stats::StatNameManagedStorage stat_name_{"fake_virtual_cluster", *symbol_table_};
   Stats::IsolatedStoreImpl stats_store_;
   VirtualClusterStatNames stat_names_{stats_store_.symbolTable()};
-  mutable VirtualClusterStats stats_{generateStats(stats_store_, stat_names_)};
+  mutable VirtualClusterStats stats_{generateStats(*stats_store_.rootScope(), stat_names_)};
 };
 
 class MockVirtualHost : public VirtualHost {
@@ -307,6 +307,7 @@ public:
               (const));
   MOCK_METHOD(bool, includeAttemptCountInRequest, (), (const));
   MOCK_METHOD(bool, includeAttemptCountInResponse, (), (const));
+  MOCK_METHOD(bool, includeIsTimeoutRetryHeader, (), (const));
   MOCK_METHOD(Upstream::RetryPrioritySharedPtr, retryPriority, ());
   MOCK_METHOD(Upstream::RetryHostPredicateSharedPtr, retryHostPredicate, ());
   MOCK_METHOD(uint32_t, retryShadowBufferLimit, (), (const));

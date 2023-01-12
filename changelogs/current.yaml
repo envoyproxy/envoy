@@ -122,9 +122,21 @@ bug_fixes:
 - area: jwt_authn
   change: |
     fix a bug that jwt_cache breaks the :ref:`provider_and_audiences <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtRequirement.provider_and_audiences>` JWT requirement.
+- area: skywalking
+  change: |
+    fixed a crash which could happen when skywalking tracer is enabled and illegal ``sw8`` header is received.
 - area: health_checker
   change: |
     prevent writing pending data for health checkers by introducing ``ConnectionCloseType::Abort`` to avoid cascading handshake overhead from health checker's requests on timeout. This fix is related to `issue \#23718 <https://github.com/envoyproxy/envoy/issues/23718>`_.
+- area: router
+  change: |
+    fixed a bug that truncated query parameters from paths rewritten with a path_rewrite_policy, query parameters are now appended. ``envoy_reloadable_features_append_query_parameters_path_rewriter`` can be used to revert to truncation.
+- area: grpc_http_bridge
+  change: |
+    fixed a bug where response data could be lost for requests that were upgraded from Protobuf.
+- area: tcp_proxy
+  change: |
+    When tunneling TCP over HTTP, mark the upstream connection as done reading when upstream trailers are read. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.finish_reading_on_decode_trailers`` to false.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -166,6 +178,11 @@ removed_config_or_runtime:
     removed ``envoy.reloadable_features.do_not_await_headers_on_upstream_timeout_to_emit_stats`` and legacy code paths.
 
 new_features:
+- area: aws
+  change: |
+    added support to prefer fetching AWS instance role credentials securily
+    (`IMDSv2 <https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-service.html>`_)
+    from EC2 instance metadata by getting the token first or fallback to insecure way (IMDSv1) if token fetch fails.
 - area: grpc_json_transcoder
   change: |
     added ``max_request_body_size`` and ``max_response_body_size`` fields, which can either increase or decrease
@@ -187,6 +204,9 @@ new_features:
   change: |
     added :ref:`dubbo codec support <envoy_v3_api_msg_extensions.filters.network.generic_proxy.codecs.dubbo.v3.DubboCodecConfig>` to the
     :ref:`generic_proxy filter <envoy_v3_api_msg_extensions.filters.network.generic_proxy.v3.GenericProxy>`.
+- area: golang
+  change: |
+    added new :ref:`HTTP golang extension filter <config_http_filters_golang>`.
 - area: custom response http filter
   change: |
     added :ref:`custom response http filter <config_http_filters_custom_response>` which adds the ability to customize responses sent to downstreams using local or remote sources.
@@ -200,12 +220,24 @@ new_features:
 - area: access_log
   change: |
     added support for :ref:`%STREAM_ID% <config_access_log_format_stream_id>` for stream unique identifier.
+- area: access_log
+  change: |
+    enhanced observability into local close for :ref:`%RESPONSE_CODE_DETAILS% <config_http_conn_man_details>`.
 - area: thrift
   change: |
     added payload to metadata filter which matches a given payload field's value would be extracted and attached to the request as dynamic metadata.
 - area: http
   change: |
     allowing the dynamic forward proxy cluster to :ref:`allow_coalesced_connections <envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig.allow_coalesced_connections>`  for HTTP/2 and HTTP/3 connections.
+- area: upstream
+  change: |
+    added :ref:`least request extension <envoy_v3_api_msg_extensions.load_balancing_policies.least_request.v3.LeastRequest>` to suppport the :ref:`load balancer policy <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>`.
+- area: upstream
+  change: |
+    added :ref:`random extension <envoy_v3_api_msg_extensions.load_balancing_policies.random.v3.Random>` to suppport the :ref:`load balancer policy <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>`.
+- area: upstream
+  change: |
+    added :ref:`round robin extension <envoy_v3_api_msg_extensions.load_balancing_policies.round_robin.v3.RoundRobin>` to suppport the :ref:`load balancer policy <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>`.
 - area: generic_proxy
   change: |
     added :ref:`generic rds support <envoy_v3_api_field_extensions.filters.network.generic_proxy.v3.GenericProxy.generic_rds>`.
@@ -248,6 +280,9 @@ new_features:
 - area: tracing
   change: |
     added support for setting the hostname used when sending spans to a Datadog collector using the :ref:`collector_hostname <envoy_v3_api_field_config.trace.v3.DatadogConfig.collector_hostname>` field.
+- area: stats
+  change: |
+    added ``includeHistogram()`` method to ``Stats::SinkPredicates`` to filter histograms to be flushed to stat sinks. Use ``envoy.reloadable_features.enable_include_histograms`` to enable this feature, which is disabled by default.
 - area: http
   change: |
     added support of :ref:`early header mutation <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.early_header_mutation_extensions>` to the HTTP connection manager.
@@ -277,6 +312,9 @@ new_features:
 - area: router
   change: |
     added :ref:`RouteList <envoy_v3_api_msg_config.route.v3.RouteList>` to support route list in :ref:`VirtualHost.matcher <envoy_v3_api_field_config.route.v3.VirtualHost.matcher>`.
+- area: router
+  change: |
+    added a :ref:`x-envoy-is-timeout-retry <config_http_filters_router_x-envoy-is-timeout-retry>` request header on retries initiated by request timeouts; enabled by setting :ref:`include_is_timeout_retry_header <envoy_v3_api_field_config.route.v3.VirtualHost.include_is_timeout_retry_header>` to ``true``.
 - area: upstream
   change: |
     allow configuring :ref:`cluster bind config <envoy_v3_api_field_config.cluster.v3.Cluster.upstream_bind_config>` and
