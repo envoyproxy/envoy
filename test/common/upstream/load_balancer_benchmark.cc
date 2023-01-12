@@ -155,11 +155,6 @@ public:
   RingHashTester(uint64_t num_hosts, uint64_t min_ring_size) : BaseTester(num_hosts) {
     config_ = envoy::config::cluster::v3::Cluster::RingHashLbConfig();
     config_.value().mutable_minimum_ring_size()->set_value(min_ring_size);
-<<<<<<< HEAD
-    ring_hash_lb_ =
-        std::make_unique<RingHashLoadBalancer>(priority_set_, stats_, *stats_store_.rootScope(),
-                                               runtime_, random_, config_, common_config_);
-=======
     ring_hash_lb_ = std::make_unique<RingHashLoadBalancer>(
         priority_set_, stats_, stats_store_, runtime_, random_,
         config_.has_value()
@@ -167,7 +162,6 @@ public:
                   config_.value())
             : absl::nullopt,
         common_config_);
->>>>>>> 1dca85fa14 (Change LBConfig types to save memory)
   }
 
   absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig> config_;
@@ -178,18 +172,12 @@ class MaglevTester : public BaseTester {
 public:
   MaglevTester(uint64_t num_hosts, uint32_t weighted_subset_percent = 0, uint32_t weight = 0)
       : BaseTester(num_hosts, weighted_subset_percent, weight) {
-<<<<<<< HEAD
-    maglev_lb_ =
-        std::make_unique<MaglevLoadBalancer>(priority_set_, stats_, *stats_store_.rootScope(),
-                                             runtime_, random_, config_, common_config_);
-=======
     maglev_lb_ = std::make_unique<MaglevLoadBalancer>(
         priority_set_, stats_, stats_store_, runtime_, random_,
         config_.has_value()
             ? makeOptRef<const envoy::config::cluster::v3::Cluster::MaglevLbConfig>(config_.value())
             : absl::nullopt,
         common_config_);
->>>>>>> 1dca85fa14 (Change LBConfig types to save memory)
   }
 
   absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig> config_;
