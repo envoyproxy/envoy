@@ -516,7 +516,7 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, DualCert) {
 // is allowed if they has different server name pattern(DNS SAN or subject name),
 // different server name patterns will be used to match SNI in cert selection.
 // Detailed behaviors of cert selection are tested in SslSocketTest with static
-// tls_certificates config. This test is to verify multiple certificates can be loaed
+// tls_certificates config. This test is to verify multiple certificates can be loaded
 // via sds and give a simple case of selecting cert based on SNI.
 TEST_P(SdsDynamicDownstreamIntegrationTest, MultipleCerts) {
   on_server_init_function_ = [this]() {
