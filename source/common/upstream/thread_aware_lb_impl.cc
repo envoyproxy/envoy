@@ -68,10 +68,34 @@ void normalizeLocalityWeights(const HostsPerLocality& hosts_per_locality,
   }
 }
 
+bool nonLocalityNormalize(const HostSet& host_set) {
+  // No locality weight.
+  if (host_set.localityWeights() == nullptr || host_set.localityWeights()->empty()) {
+    return true;
+  }
+
+  // Only one locality.
+  if (host_set.hostsPerLocality().get().size() < 2) {
+    return true;
+  }
+
+  // Total weight be zero.
+  uint32_t total_weight{};
+  for (uint32_t weight : *host_set.localityWeights()) {
+    total_weight += weight;
+  }
+  if (total_weight == 0) {
+    return true;
+  }
+
+  // Locality normalize should be used in other cases.
+  return false;
+}
+
 void normalizeWeights(const HostSet& host_set, bool in_panic,
                       NormalizedHostWeightVector& normalized_host_weights,
                       double& min_normalized_weight, double& max_normalized_weight) {
-  if (host_set.localityWeights() == nullptr || host_set.localityWeights()->empty()) {
+  if (nonLocalityNormalize(host_set)) {
     // If we're not dealing with locality weights, just normalize weights for the flat set of hosts.
     const auto& hosts = in_panic ? host_set.hosts() : host_set.healthyHosts();
     normalizeHostWeights(hosts, 1.0, normalized_host_weights, min_normalized_weight,
