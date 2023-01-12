@@ -1,7 +1,6 @@
-date: Pending
+date: January 12, 2023
 
 behavior_changes:
-# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 - area: listener
   change: |
     Previously a listener update with different :ref:`transparent <envoy_v3_api_field_config.listener.v3.Listener.transparent>`, :ref:`freebind <envoy_v3_api_field_config.listener.v3.Listener.freebind>`,
@@ -28,7 +27,6 @@ behavior_changes:
     Endpoints can now re-enter slow start if active health checking is configured per cluster, on each "unhealthy -> healthy" state transition.
 
 minor_behavior_changes:
-# *Changes that may cause incompatibilities for some users, but should not for most*
 - area: tls
   change: |
     added support for intermediate CA as trusted CA. The peer certificate issued by an intermediate CA will be trusted by
@@ -77,9 +75,7 @@ minor_behavior_changes:
   change: |
     added :ref:`idle_timeout <envoy_v3_api_field_extensions.upstreams.tcp.v3.TcpProtocolOptions.idle_timeout>` to support per client idle timeout for tcp connection pool. The timeout is guarded by ``envoy.reloadable_features.tcp_pool_idle_timeout`` and timeout defaults to 10 minutes if runtime flag is enabled.
 
-
 bug_fixes:
-# *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: aws_lambda
   change: |
     fix a bug when :ref:`PerRouteConfig <envoy_v3_api_msg_extensions.filters.http.aws_lambda.v3.PerRouteConfig>` is defined and was routing to a target cluster's AWS Lambda endpoint
@@ -135,7 +131,6 @@ bug_fixes:
     When tunneling TCP over HTTP, mark the upstream connection as done reading when upstream trailers are read. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.finish_reading_on_decode_trailers`` to false.
 
 removed_config_or_runtime:
-# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 - area: eds
   change: |
     removed ``envoy.reloadable_features.support_locality_update_on_eds_cluster_endpoints`` and legacy code paths.
@@ -319,5 +314,3 @@ new_features:
   change: |
     added an api configuration :ref:`xds_config_tracker_extension <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.xds_config_tracker_extension>` in the bootstrap
     to allow tracking xDS responses in external components, and provided the extension interface.
-
-deprecated:
