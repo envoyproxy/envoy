@@ -365,15 +365,22 @@ TEST_F(FilterStateImplTest, SharedWithUpstream) {
                          FilterState::StreamSharing::SharedWithUpstreamConnection);
   filter_state().setData("test_6", std::make_shared<SimpleType>(6), FilterState::StateType::Mutable,
                          FilterState::LifeSpan::Connection);
+  filter_state().setData("shared_7", std::make_shared<SimpleType>(7),
+                         FilterState::StateType::ReadOnly, FilterState::LifeSpan::Connection,
+                         FilterState::StreamSharing::SharedWithUpstreamConnectionOnce);
   auto objects = filter_state().objectsSharedWithUpstreamConnection();
-  EXPECT_EQ(objects->size(), 3);
-  EXPECT_EQ(objects->at(0).name_, "shared_5");
+  EXPECT_EQ(objects->size(), 4);
+  std::sort(objects->begin(), objects->end(),
+            [](const auto& lhs, const auto& rhs) -> bool { return lhs.name_ < rhs.name_; });
+  EXPECT_EQ(objects->at(0).name_, "shared_1");
   EXPECT_EQ(objects->at(0).state_type_, FilterState::StateType::ReadOnly);
+  EXPECT_EQ(objects->at(0).data_.get(), shared.get());
   EXPECT_EQ(objects->at(1).name_, "shared_4");
   EXPECT_EQ(objects->at(1).state_type_, FilterState::StateType::Mutable);
-  EXPECT_EQ(objects->at(2).name_, "shared_1");
+  EXPECT_EQ(objects->at(2).name_, "shared_5");
   EXPECT_EQ(objects->at(2).state_type_, FilterState::StateType::ReadOnly);
-  EXPECT_EQ(objects->at(2).data_.get(), shared.get());
+  EXPECT_EQ(objects->at(3).name_, "shared_7");
+  EXPECT_EQ(objects->at(3).state_type_, FilterState::StateType::ReadOnly);
 }
 
 TEST_F(FilterStateImplTest, HasDataAtOrAboveLifeSpan) {

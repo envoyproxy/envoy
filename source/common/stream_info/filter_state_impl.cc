@@ -96,8 +96,13 @@ FilterState::ObjectsPtr FilterStateImpl::objectsSharedWithUpstreamConnection() c
   auto objects = parent_ ? parent_->objectsSharedWithUpstreamConnection()
                          : std::make_unique<FilterState::Objects>();
   for (const auto& [name, object] : data_storage_) {
-    if (object->stream_sharing_ == StreamSharing::SharedWithUpstreamConnection) {
+    switch (object->stream_sharing_) {
+    case StreamSharing::SharedWithUpstreamConnection:
+    case StreamSharing::SharedWithUpstreamConnectionOnce:
       objects->push_back({object->data_, object->state_type_, object->stream_sharing_, name});
+      break;
+    default:
+      break;
     }
   }
   return objects;
