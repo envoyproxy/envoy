@@ -13,6 +13,12 @@
 namespace Envoy {
 namespace Upstream {
 
+#ifdef SHARD_ALGORITHM
+#ifndef SHARD_SHIFT
+#define SHARD_SHIFT 9
+#endif
+#endif
+
 /**
  * All ring hash load balancer stats. @see stats_macros.h
  */
@@ -65,6 +71,11 @@ private:
     HostConstSharedPtr chooseHost(uint64_t hash, uint32_t attempt) const override;
 
     std::vector<RingEntry> ring_;
+
+#ifdef SHARD_ALGORITHM
+    std::vector<uint64_t> ring_shard_;
+    uint64_t rightShift = SHARD_SHIFT;
+#endif
 
     RingHashLoadBalancerStats& stats_;
   };
