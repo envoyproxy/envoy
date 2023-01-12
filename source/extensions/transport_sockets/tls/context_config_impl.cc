@@ -349,6 +349,7 @@ ClientContextConfigImpl::ClientContextConfigImpl(
     : ContextConfigImpl(config.common_tls_context(), DEFAULT_MIN_VERSION, DEFAULT_MAX_VERSION,
                         DEFAULT_CIPHER_SUITES, DEFAULT_CURVES, factory_context),
       server_name_indication_(config.sni()), allow_renegotiation_(config.allow_renegotiation()),
+      enforce_rsa_key_usage_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enforce_rsa_key_usage, false)),
       max_session_keys_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_session_keys, 1)),
       sigalgs_(sigalgs) {
   // BoringSSL treats this as a C string, so embedded NULL characters will not

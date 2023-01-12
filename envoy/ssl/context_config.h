@@ -138,6 +138,12 @@ public:
    *         for names.
    */
   virtual const std::string& signingAlgorithmsForTest() const PURE;
+
+  /**
+   * @return true if the enforcement that handshake will fail if the keyUsage extension is present
+   * and incompatible with the TLS usage is enabled.
+   */
+  virtual bool enforceRsaKeyUsage() const PURE;
 };
 
 using ClientContextConfigPtr = std::unique_ptr<ClientContextConfig>;

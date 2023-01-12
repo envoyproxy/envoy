@@ -132,6 +132,7 @@ public:
   bool allowRenegotiation() const override { return allow_renegotiation_; }
   size_t maxSessionKeys() const override { return max_session_keys_; }
   const std::string& signingAlgorithmsForTest() const override { return sigalgs_; }
+  bool enforceRsaKeyUsage() const override { return enforce_rsa_key_usage_; }
 
 private:
   static const unsigned DEFAULT_MIN_VERSION;
@@ -139,6 +140,7 @@ private:
 
   const std::string server_name_indication_;
   const bool allow_renegotiation_;
+  const bool enforce_rsa_key_usage_;
   const size_t max_session_keys_;
   const std::string sigalgs_;
 };
