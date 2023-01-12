@@ -1103,42 +1103,6 @@ TEST(BufferHelperTest, AddFragments) {
     }
   }
 }
-
-TEST(ManyCopiedBufferTest, CopiesUnownedCorrectly) {
-  Buffer::OwnedImpl buffer;
-  std::string value = "aaaaaaa";
-  buffer.add(value);
-  auto many_copied_buffer = ManyCopiedBuffer(buffer, 3);
-  // Do the first copy:
-  auto& copy1 = many_copied_buffer.nextBuffer();
-  EXPECT_EQ(copy1.toString(), value);
-  copy1.drain(value.size());
-  EXPECT_EQ(buffer.toString(), value);
-  // Do the second copy:
-  auto& copy2 = many_copied_buffer.nextBuffer();
-  EXPECT_EQ(copy2.toString(), value);
-  copy2.drain(value.size());
-  EXPECT_EQ(buffer.toString(), value);
-  // Do the final copy (which just returns the original buffer)
-  auto& copy3 = many_copied_buffer.nextBuffer();
-  EXPECT_EQ(&copy3, &buffer);
-}
-
-TEST(ManyCopiedBufferTest, CopiesOwnedCorrectly) {
-  InstancePtr copy1, copy2, copy3;
-  std::string value = "aaaaaaa";
-  {
-    Buffer::OwnedImpl buffer(value);
-    auto many_copied_buffer = ManyCopiedBuffer(buffer, 3);
-    copy1 = many_copied_buffer.nextBufferOwned();
-    copy2 = many_copied_buffer.nextBufferOwned();
-    copy3 = many_copied_buffer.nextBufferOwned();
-    EXPECT_EQ(buffer.length(), 0);
-  }
-  EXPECT_EQ(copy1->toString(), value);
-  EXPECT_EQ(copy2->toString(), value);
-  EXPECT_EQ(copy3->toString(), value);
-}
 } // namespace
 } // namespace Buffer
 } // namespace Envoy

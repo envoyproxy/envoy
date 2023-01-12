@@ -825,29 +825,23 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   // already.
   ASSERT(buffering || !upstream_requests_.empty());
 
-  // We will need to make N copies of the data.
-  int num_copies = buffering +                   // one copy for the buffer.
-                   !upstream_requests_.empty() + // one copy for the main request.
-                   shadow_streams_.size();       // one copy for each shadow.
-  auto many_copied_buffer = Buffer::ManyCopiedBuffer(data, num_copies);
-
-  if (!upstream_requests_.empty()) {
-    upstream_requests_.front()->acceptDataFromRouter(many_copied_buffer.nextBuffer(), end_stream);
+  for (auto* shadow_stream : shadow_streams_) {
+    if (end_stream) {
+      shadow_stream->removeDestructorCallback();
+      shadow_stream->removeWatermarkCallbacks();
+    }
+    Buffer::OwnedImpl copy(data);
+    shadow_stream->sendData(copy, end_stream);
+  }
+  if (end_stream) {
+    shadow_streams_.clear();
   }
   if (buffering) {
-    callbacks_->addDecodedData(many_copied_buffer.nextBuffer(), true);
+    Buffer::OwnedImpl copy(data);
+    callbacks_->addDecodedData(copy, true);
   }
-  if (streaming_shadows_ && !shadow_streams_.empty()) {
-    for (auto* shadow_stream : shadow_streams_) {
-      if (end_stream) {
-        shadow_stream->removeDestructorCallback();
-        shadow_stream->removeWatermarkCallbacks();
-      }
-      shadow_stream->sendData(many_copied_buffer.nextBuffer(), end_stream);
-    }
-    if (end_stream) {
-      shadow_streams_.clear();
-    }
+  if (!upstream_requests_.empty()) {
+    upstream_requests_.front()->acceptDataFromRouter(data, end_stream);
   }
 
   if (end_stream) {
