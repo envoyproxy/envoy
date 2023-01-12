@@ -92,8 +92,6 @@ private:
   HashingLoadBalancerSharedPtr
   createLoadBalancer(const NormalizedHostWeightVector& normalized_host_weights,
                      double /* min_normalized_weight */, double max_normalized_weight) override {
-    std::cout << "table size: " << table_size_ << "xx" << std::endl;
-
     HashingLoadBalancerSharedPtr maglev_lb =
         std::make_shared<MaglevTable>(normalized_host_weights, max_normalized_weight, table_size_,
                                       use_hostname_for_hashing_, stats_);

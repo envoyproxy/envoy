@@ -75,7 +75,6 @@ MaglevTable::MaglevTable(const NormalizedHostWeightVector& normalized_host_weigh
 
 HostConstSharedPtr MaglevTable::chooseHost(uint64_t hash, uint32_t attempt) const {
   if (table_.empty()) {
-    std::cout << "table_.empty() ----------------------------------------->" << std::endl;
     return nullptr;
   }
 
