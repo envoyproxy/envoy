@@ -10,8 +10,8 @@ namespace Envoy {
 namespace Stats {
 
 // See full context https://github.com/envoyproxy/envoy/pull/23921
-// This is a helper calss used in thread_local_store_test.cc and the future
-// lazyinit_stats_speed_test.cc, which works as the base for ThreadLocalStore related tests.
+// This is a helper calss used in 'thread_local_store_test.cc' and the future
+// 'lazyinit_stats_speed_test.cc', which works as the base for ThreadLocalStore related tests.
 class ThreadLocalStoreNoMocksMixin {
 public:
   ThreadLocalStoreNoMocksMixin();
