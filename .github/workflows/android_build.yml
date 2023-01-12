@@ -60,7 +60,7 @@ jobs:
       if: steps.should_run.outputs.run_ci_job == 'true'
       name: 'Start emulator'
       with:
-        timeout_minutes: 10
+        timeout_minutes: 6
         max_attempts: 3
         command: cd mobile && ./ci/mac_start_emulator.sh
     # Return to using:
@@ -105,7 +105,7 @@ jobs:
       if: steps.should_run.outputs.run_ci_job == 'true'
       name: 'Start simulator'
       with:
-        timeout_minutes: 10
+        timeout_minutes: 6
         max_attempts: 3
         command: cd mobile && ./ci/mac_start_emulator.sh
     # Return to using:
@@ -150,7 +150,7 @@ jobs:
       if: steps.should_run.outputs.run_ci_job == 'true'
       name: 'Start simulator'
       with:
-        timeout_minutes: 10
+        timeout_minutes: 6
         max_attempts: 3
         command: cd mobile && ./ci/mac_start_emulator.sh
     # Return to using:
@@ -195,7 +195,7 @@ jobs:
       if: steps.should_run.outputs.run_ci_job == 'true'
       name: 'Start simulator'
       with:
-        timeout_minutes: 10
+        timeout_minutes: 6
         max_attempts: 3
         command: cd mobile && ./ci/mac_start_emulator.sh
     # Return to using:
