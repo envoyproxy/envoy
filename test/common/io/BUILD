@@ -33,5 +33,8 @@ envoy_cc_test(
     ],
     deps = [
         "//source/common/io:io_uring_worker_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/io:io_mocks",
+        "//test/test_common:utility_lib",
     ],
 )

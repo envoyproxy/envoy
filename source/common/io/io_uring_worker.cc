@@ -16,7 +16,13 @@ std::unique_ptr<IoUringSocketEntry> IoUringSocketEntry::unlink() {
 
 IoUringWorkerImpl::IoUringWorkerImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
                                      Event::Dispatcher& dispatcher)
-    : io_uring_impl_(io_uring_size, use_submission_queue_polling), dispatcher_(dispatcher) {}
+    : io_uring_instance_(
+          std::make_unique<IoUringImpl>(io_uring_size, use_submission_queue_polling)),
+      dispatcher_(dispatcher) {}
+
+IoUringWorkerImpl::IoUringWorkerImpl(std::unique_ptr<IoUring> io_uring_instance,
+                                     Event::Dispatcher& dispatcher)
+    : io_uring_instance_(std::move(io_uring_instance)), dispatcher_(dispatcher) {}
 
 IoUringWorkerImpl::~IoUringWorkerImpl() {
   ENVOY_LOG(trace, "destruct io uring worker");
@@ -48,13 +54,13 @@ Request* IoUringWorkerImpl::submitAcceptRequest(IoUringSocket& socket,
   ENVOY_LOG(trace, "submit accept request, fd = {}, accept req = {}", socket.fd(), fmt::ptr(req));
 
   *remote_addr_len = sizeof(sockaddr_storage);
-  auto res = io_uring_impl_.prepareAccept(
+  auto res = io_uring_instance_->prepareAccept(
       socket.fd(), reinterpret_cast<struct sockaddr*>(remote_addr), remote_addr_len, req);
   if (res == Io::IoUringResult::Failed) {
     // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
     submit();
-    res = io_uring_impl_.prepareAccept(socket.fd(), reinterpret_cast<struct sockaddr*>(remote_addr),
-                                       remote_addr_len, req);
+    res = io_uring_instance_->prepareAccept(
+        socket.fd(), reinterpret_cast<struct sockaddr*>(remote_addr), remote_addr_len, req);
     RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare accept");
   }
   submit();
@@ -66,11 +72,11 @@ Request* IoUringWorkerImpl::submitCancelRequest(IoUringSocket& socket, Request* 
 
   ENVOY_LOG(trace, "submit cancel request, fd = {}, cancel req = {}", socket.fd(), fmt::ptr(req));
 
-  auto res = io_uring_impl_.prepareCancel(request_to_cancel, req);
+  auto res = io_uring_instance_->prepareCancel(request_to_cancel, req);
   if (res == Io::IoUringResult::Failed) {
     // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
     submit();
-    res = io_uring_impl_.prepareCancel(request_to_cancel, req);
+    res = io_uring_instance_->prepareCancel(request_to_cancel, req);
     RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare cancel");
   }
   submit();
@@ -82,11 +88,11 @@ Request* IoUringWorkerImpl::submitCloseRequest(IoUringSocket& socket) {
 
   ENVOY_LOG(trace, "submit close request, fd = {}, close req = {}", socket.fd(), fmt::ptr(req));
 
-  auto res = io_uring_impl_.prepareClose(socket.fd(), req);
+  auto res = io_uring_instance_->prepareClose(socket.fd(), req);
   if (res == Io::IoUringResult::Failed) {
     // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
     submit();
-    res = io_uring_impl_.prepareClose(socket.fd(), req);
+    res = io_uring_instance_->prepareClose(socket.fd(), req);
     RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare close");
   }
   submit();
@@ -98,11 +104,11 @@ Request* IoUringWorkerImpl::submitReadRequest(IoUringSocket& socket, struct iove
 
   ENVOY_LOG(trace, "submit read request, fd = {}, read req = {}", socket.fd(), fmt::ptr(req));
 
-  auto res = io_uring_impl_.prepareReadv(socket.fd(), iov, 1, 0, req);
+  auto res = io_uring_instance_->prepareReadv(socket.fd(), iov, 1, 0, req);
   if (res == Io::IoUringResult::Failed) {
     // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
     submit();
-    res = io_uring_impl_.prepareReadv(socket.fd(), iov, 1, 0, req);
+    res = io_uring_instance_->prepareReadv(socket.fd(), iov, 1, 0, req);
     RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare readv");
   }
   submit();
@@ -115,11 +121,11 @@ Request* IoUringWorkerImpl::submitWritevRequest(IoUringSocket& socket, struct io
 
   ENVOY_LOG(trace, "submit write request, fd = {}, req = {}", socket.fd(), fmt::ptr(req));
 
-  auto res = io_uring_impl_.prepareWritev(socket.fd(), iovecs, num_vecs, 0, req);
+  auto res = io_uring_instance_->prepareWritev(socket.fd(), iovecs, num_vecs, 0, req);
   if (res == Io::IoUringResult::Failed) {
     // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
     submit();
-    res = io_uring_impl_.prepareWritev(socket.fd(), iovecs, num_vecs, 0, req);
+    res = io_uring_instance_->prepareWritev(socket.fd(), iovecs, num_vecs, 0, req);
     RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare writev");
   }
   submit();
@@ -133,11 +139,11 @@ IoUringWorkerImpl::submitConnectRequest(IoUringSocket& socket,
 
   ENVOY_LOG(trace, "submit connect request, fd = {}, req = {}", socket.fd(), fmt::ptr(req));
 
-  auto res = io_uring_impl_.prepareConnect(socket.fd(), address, req);
+  auto res = io_uring_instance_->prepareConnect(socket.fd(), address, req);
   if (res == Io::IoUringResult::Failed) {
     // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
     submit();
-    res = io_uring_impl_.prepareConnect(socket.fd(), address, req);
+    res = io_uring_instance_->prepareConnect(socket.fd(), address, req);
     RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare writev");
   }
   submit();
@@ -147,7 +153,7 @@ IoUringWorkerImpl::submitConnectRequest(IoUringSocket& socket,
 void IoUringWorkerImpl::onFileEvent() {
   ENVOY_LOG(trace, "io uring worker, on file event");
   delay_submit_ = true;
-  io_uring_impl_.forEveryCompletion([](void* user_data, int32_t result) {
+  io_uring_instance_->forEveryCompletion([](void* user_data, int32_t result) {
     auto req = static_cast<Io::Request*>(user_data);
 
     ENVOY_LOG(debug, "receive request completion, result = {}, req = {}", result, fmt::ptr(req));
@@ -187,7 +193,7 @@ void IoUringWorkerImpl::onFileEvent() {
 
 void IoUringWorkerImpl::submit() {
   if (!delay_submit_) {
-    io_uring_impl_.submit();
+    io_uring_instance_->submit();
   }
 }
 

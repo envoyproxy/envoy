@@ -33,6 +33,7 @@ class IoUringWorkerImpl : public IoUringWorker, protected Logger::Loggable<Logge
 public:
   IoUringWorkerImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
                     Event::Dispatcher& dispatcher);
+  IoUringWorkerImpl(std::unique_ptr<IoUring> io_uring_instance, Event::Dispatcher& dispatcher);
   ~IoUringWorkerImpl() override;
 
   // IoUringWorker
@@ -60,7 +61,7 @@ protected:
   void onFileEvent();
   void submit();
 
-  IoUringImpl io_uring_impl_;
+  std::unique_ptr<IoUring> io_uring_instance_;
   Event::FileEventPtr file_event_{nullptr};
   Event::Dispatcher& dispatcher_;
 
