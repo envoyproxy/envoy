@@ -4,18 +4,13 @@ import androidx.annotation.IntDef;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 
-@IntDef({
-  NetworkQualityObservationSource.HTTP,
-  NetworkQualityObservationSource.TCP,
-  NetworkQualityObservationSource.QUIC,
-  NetworkQualityObservationSource.HTTP_CACHED_ESTIMATE,
-  NetworkQualityObservationSource.DEFAULT_HTTP_FROM_PLATFORM,
-  NetworkQualityObservationSource.DEPRECATED_HTTP_EXTERNAL_ESTIMATE,
-  NetworkQualityObservationSource.TRANSPORT_CACHED_ESTIMATE,
-  NetworkQualityObservationSource.DEFAULT_TRANSPORT_FROM_PLATFORM,
-  NetworkQualityObservationSource.H2_PINGS,
-  NetworkQualityObservationSource.MAX
-})
+@IntDef({NetworkQualityObservationSource.HTTP, NetworkQualityObservationSource.TCP,
+         NetworkQualityObservationSource.QUIC, NetworkQualityObservationSource.HTTP_CACHED_ESTIMATE,
+         NetworkQualityObservationSource.DEFAULT_HTTP_FROM_PLATFORM,
+         NetworkQualityObservationSource.DEPRECATED_HTTP_EXTERNAL_ESTIMATE,
+         NetworkQualityObservationSource.TRANSPORT_CACHED_ESTIMATE,
+         NetworkQualityObservationSource.DEFAULT_TRANSPORT_FROM_PLATFORM,
+         NetworkQualityObservationSource.H2_PINGS, NetworkQualityObservationSource.MAX})
 @Retention(RetentionPolicy.SOURCE)
 public @interface NetworkQualityObservationSource {
   /**
@@ -59,4 +54,3 @@ public @interface NetworkQualityObservationSource {
 
   int MAX = 9;
 }
-

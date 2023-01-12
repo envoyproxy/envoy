@@ -4,12 +4,10 @@ import androidx.annotation.IntDef;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 
-@IntDef({
-  EffectiveConnectionType.TYPE_UNKNOWN, EffectiveConnectionType.TYPE_OFFLINE,
-  EffectiveConnectionType.TYPE_SLOW_2G, EffectiveConnectionType.TYPE_2G,
-  EffectiveConnectionType.TYPE_3G, EffectiveConnectionType.TYPE_4G,
-  EffectiveConnectionType.TYPE_LAST
-})
+@IntDef({EffectiveConnectionType.TYPE_UNKNOWN, EffectiveConnectionType.TYPE_OFFLINE,
+         EffectiveConnectionType.TYPE_SLOW_2G, EffectiveConnectionType.TYPE_2G,
+         EffectiveConnectionType.TYPE_3G, EffectiveConnectionType.TYPE_4G,
+         EffectiveConnectionType.TYPE_LAST})
 @Retention(RetentionPolicy.SOURCE)
 public @interface EffectiveConnectionType {
   /** Effective connection type reported when the network quality is unknown. */
@@ -36,4 +34,3 @@ public @interface EffectiveConnectionType {
   /** Last value of the effective connection type. This value is unused. */
   int TYPE_LAST = 6;
 }
-
