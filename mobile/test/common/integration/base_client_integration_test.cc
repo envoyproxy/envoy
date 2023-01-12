@@ -180,12 +180,12 @@ void BaseClientIntegrationTest::threadRoutine(absl::Notification& engine_running
 void BaseClientIntegrationTest::TearDown() {
   test_server_.reset();
   fake_upstreams_.clear();
-  stream_.reset();
-  stream_prototype_.reset();
   if (engine_) {
     engine_->terminate();
     engine_.reset();
   }
+  stream_.reset();
+  stream_prototype_.reset();
   full_dispatcher_->exit();
   if (envoy_thread_) {
     envoy_thread_->join();
