@@ -28,7 +28,7 @@ GroupedStatsRequest::GroupedStatsRequest(Stats::Store& stats, const StatsParams&
     phases_ = {Phase{PhaseName::Counters, "Counters"}, Phase{PhaseName::Gauges, "Gauges"},
                Phase{PhaseName::Histograms, "Histograms"}};
   }
-  phase_ = 0;
+  phase_index_ = 0;
 }
 
 template <class StatType> Stats::IterateFn<StatType> GroupedStatsRequest::saveMatchingStat() {
@@ -48,14 +48,12 @@ template <class StatType> Stats::IterateFn<StatType> GroupedStatsRequest::saveMa
       return true;
     }
 
-    // capture stat by either adding to a pre-existing variant or by creating a new variant, and
+    // capture stat by either adding to a pre-existing variant or by creating a new variant
     std::string tag_extracted_name = global_symbol_table_.toString(stat->tagExtractedStatName());
-
-    StatOrScopes& variant = stat_map_[tag_extracted_name];
-    if (variant.index() == absl::variant_npos) {
-      variant = std::vector<Stats::RefcountPtr<StatType>>({stat});
-    } else {
-      absl::get<std::vector<Stats::RefcountPtr<StatType>>>(variant).emplace_back(stat);
+    auto [iterator, inserted] = stat_map_.try_emplace(
+        tag_extracted_name, std::vector<Stats::RefcountPtr<StatType>>({stat}));
+    if (!inserted) {
+      absl::get<std::vector<Stats::RefcountPtr<StatType>>>(iterator->second).emplace_back(stat);
     }
     return true;
   };
