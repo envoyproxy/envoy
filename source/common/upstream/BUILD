@@ -389,6 +389,7 @@ envoy_cc_library(
         ":thread_aware_lb_lib",
         ":upstream_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/load_balancing_policies/maglev/v3:pkg_cc_proto",
     ],
 )
 
@@ -403,6 +404,7 @@ envoy_cc_library(
         ":thread_aware_lb_lib",
         "//source/common/common:minimal_logger_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/load_balancing_policies/ring_hash/v3:pkg_cc_proto",
     ],
 )
 

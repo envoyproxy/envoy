@@ -26,6 +26,8 @@ void normalizeHostWeights(const HostVector& hosts, double normalized_locality_we
   }
 
   for (const auto& host : hosts) {
+    std::cout << "sum: " << sum << " weight: " << host->weight() << std::endl;
+
     const double weight = host->weight() * normalized_locality_weight / sum;
     normalized_host_weights.push_back({host, weight});
     min_normalized_weight = std::min(min_normalized_weight, weight);
@@ -37,6 +39,9 @@ void normalizeLocalityWeights(const HostsPerLocality& hosts_per_locality,
                               const LocalityWeights& locality_weights,
                               NormalizedHostWeightVector& normalized_host_weights,
                               double& min_normalized_weight, double& max_normalized_weight) {
+
+  std::cout << "locaility weights" << std::endl;
+
   ASSERT(locality_weights.size() == hosts_per_locality.get().size());
 
   // sum should be at most uint32_t max value, so we can validate it by accumulating into unit64_t
@@ -109,6 +114,8 @@ void ThreadAwareLoadBalancerBase::refresh() {
       std::make_shared<DegradedLoad>(per_priority_load_.degraded_priority_load_);
 
   for (const auto& host_set : priority_set_.hostSetsPerPriority()) {
+    std::cout << "host set size: " << host_set->hosts().size() << std::endl;
+
     const uint32_t priority = host_set->priority();
     (*per_priority_state_vector)[priority] = std::make_unique<PerPriorityState>();
     const auto& per_priority_state = (*per_priority_state_vector)[priority];

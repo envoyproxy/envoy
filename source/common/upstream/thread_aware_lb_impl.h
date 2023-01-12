@@ -106,13 +106,10 @@ public:
   }
 
 protected:
-  ThreadAwareLoadBalancerBase(
-      const PrioritySet& priority_set, ClusterLbStats& stats, Runtime::Loader& runtime,
-      Random::RandomGenerator& random,
-      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
-      : LoadBalancerBase(priority_set, stats, runtime, random,
-                         PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
-                             common_config, healthy_panic_threshold, 100, 50)),
+  ThreadAwareLoadBalancerBase(const PrioritySet& priority_set, ClusterLbStats& stats,
+                              Runtime::Loader& runtime, Random::RandomGenerator& random,
+                              uint32_t healthy_panic_threshold)
+      : LoadBalancerBase(priority_set, stats, runtime, random, healthy_panic_threshold),
         factory_(new LoadBalancerFactoryImpl(stats, random)) {}
 
 private:
