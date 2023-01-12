@@ -536,12 +536,12 @@ public:
       OptRef<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> round_robin_config,
       TimeSource& time_source)
       : EdfLoadBalancerBase(
-            priority_set, local_priority_set, stats, runtime, random, PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(common_config, healthy_panic_threshold,
+            priority_set, local_priority_set, stats, runtime, random,
+            PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(common_config, healthy_panic_threshold,
                                                            100, 50),
             LoadBalancerConfigHelper::localityLbConfigFromCommonLbConfig(common_config),
             round_robin_config.has_value()
-                ? LoadBalancerConfigHelper::slowStartConfigFromLegacyProto(
-                      round_robin_config.ref())
+                ? LoadBalancerConfigHelper::slowStartConfigFromLegacyProto(round_robin_config.ref())
                 : absl::nullopt,
             time_source) {
     initialize();
