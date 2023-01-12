@@ -769,41 +769,36 @@ public:
   lbRoundRobinConfig() const override {
     if (lb_round_robin_config_ == nullptr) {
       return absl::nullopt;
-    } else {
-      return *lb_round_robin_config_;
     }
+    return *lb_round_robin_config_;
   }
   OptRef<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
   lbLeastRequestConfig() const override {
     if (lb_least_request_config_ == nullptr) {
       return absl::nullopt;
-    } else {
-      return *lb_least_request_config_;
     }
+    return *lb_least_request_config_;
   }
   OptRef<const envoy::config::cluster::v3::Cluster::RingHashLbConfig>
   lbRingHashConfig() const override {
     if (lb_ring_hash_config_ == nullptr) {
       return absl::nullopt;
-    } else {
-      return *lb_ring_hash_config_;
     }
+    return *lb_ring_hash_config_;
   }
   OptRef<const envoy::config::cluster::v3::Cluster::MaglevLbConfig>
   lbMaglevConfig() const override {
     if (lb_maglev_config_ == nullptr) {
       return absl::nullopt;
-    } else {
-      return *lb_maglev_config_;
     }
+    return *lb_maglev_config_;
   }
   OptRef<const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>
   lbOriginalDstConfig() const override {
     if (lb_original_dst_config_ == nullptr) {
       return absl::nullopt;
-    } else {
-      return *lb_original_dst_config_;
     }
+    return *lb_original_dst_config_;
   }
   const absl::optional<envoy::config::core::v3::TypedExtensionConfig>&
   upstreamConfig() const override {

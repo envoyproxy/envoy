@@ -36,22 +36,22 @@ SubsetLoadBalancer::SubsetLoadBalancer(
       lb_ring_hash_config_(
           lb_ring_hash_config.has_value()
               ? std::make_unique<const envoy::config::cluster::v3::Cluster::RingHashLbConfig>(
-                    lb_ring_hash_config.value())
+                    lb_ring_hash_config.ref())
               : nullptr),
       lb_maglev_config_(
           lb_maglev_config.has_value()
               ? std::make_unique<const envoy::config::cluster::v3::Cluster::MaglevLbConfig>(
-                    lb_maglev_config.value())
+                    lb_maglev_config.ref())
               : nullptr),
       round_robin_config_(
           round_robin_config.has_value()
               ? std::make_unique<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>(
-                    round_robin_config.value())
+                    round_robin_config.ref())
               : nullptr),
       least_request_config_(
           least_request_config.has_value()
               ? std::make_unique<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>(
-                    least_request_config.value())
+                    least_request_config.ref())
               : nullptr),
       common_config_(common_config), stats_(stats), scope_(scope), runtime_(runtime),
       random_(random), fallback_policy_(subsets.fallbackPolicy()),

@@ -359,34 +359,30 @@ private:
   OptRef<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> lbRoundRobinConfig() const {
     if (round_robin_config_ != nullptr) {
       return *round_robin_config_;
-    } else {
-      return absl::nullopt;
     }
+    return absl::nullopt;
   }
 
   OptRef<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
   lbLeastRequestConfig() const {
     if (round_robin_config_ != nullptr) {
       return *least_request_config_;
-    } else {
-      return absl::nullopt;
     }
+    return absl::nullopt;
   }
 
   OptRef<const envoy::config::cluster::v3::Cluster::MaglevLbConfig> lbMaglevConfig() const {
     if (lb_maglev_config_ != nullptr) {
       return *lb_maglev_config_;
-    } else {
-      return absl::nullopt;
     }
+    return absl::nullopt;
   }
 
   OptRef<const envoy::config::cluster::v3::Cluster::RingHashLbConfig> lbRingHashConfig() const {
     if (lb_ring_hash_config_ != nullptr) {
       return *lb_ring_hash_config_;
-    } else {
-      return absl::nullopt;
     }
+    return absl::nullopt;
   }
 
   const LoadBalancerType lb_type_;
