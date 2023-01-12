@@ -3,7 +3,6 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/http1/codec_impl.h"
 
-#include "test/common/http/http1/http1_codec_impl_fuzz.pb.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"
 #include "test/mocks/http/mocks.h"
@@ -75,55 +74,10 @@ private:
 static std::unique_ptr<Http1Harness> harness;
 static void reset_harness() { harness = nullptr; }
 
-// KISS fuzz
-//  1) RequestDecoder for untrusted downstreams
-//  2) ResponseDecoder for untrusted upstreams.
-// In HTTP1, requests and responses are quite similar. Let the fuzzer generate
-// one set of headers and body to be used with both and some artifacts for the
-// HTTP Request and HTTP Response lines. To improve performance, requests and
-// responses are encoded s.t. they resemble valid HTTP streams. This
-// is a trade-off and subject to opinion. E.g. coverage could be gained by
-// relaxing the constraints on the output of the mutator at the cost of
-// performance.
+// Fuzzing strategy
+// Unconstrained fuzzing, rely on corpus for coverage
 
-using FuzzCase = test::common::http::http1::Http1CodecImplFuzzTestCase;
-static void convertFuzzCase(const FuzzCase& input, Buffer::Instance& request,
-                            Buffer::Instance& response) {
-  // Intentionally do not *validate* input in any way!
-  auto add_headers = [&input](Buffer::Instance& buf) {
-    if (input.has_headers()) {
-      auto hdrs = input.headers();
-      for (int i = 0; i < hdrs.headers_size(); i++) {
-        auto hdr = hdrs.headers(i);
-        std::string header = absl::Substitute("$0: $1\r\n", hdr.key(), hdr.value());
-        buf.add(header);
-      }
-    }
-  };
-  auto add_body = [&input](Buffer::Instance& buf) {
-    absl::string_view clrf = "\r\n";
-    buf.add(clrf);
-    buf.add(input.body());
-  };
-
-  if (input.has_req()) {
-    auto req = input.req();
-    std::string request_line = absl::Substitute("$0 $1 HTTP/1.1\r\n", req.method(), req.path());
-    request.add(request_line);
-    add_headers(request);
-    add_body(request);
-  }
-
-  if (input.has_resp()) {
-    auto resp = input.resp();
-    std::string response_line = absl::Substitute("$0 $1", resp.status(), resp.msg());
-    response.add(response_line);
-    add_headers(response);
-    add_body(response);
-  }
-}
-
-DEFINE_PROTO_FUZZER(const FuzzCase& input) {
+DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   if (harness == nullptr) {
     Http1Settings server_settings = fromHttp1Settings();
     Http1Settings client_settings = fromHttp1Settings();
@@ -131,10 +85,10 @@ DEFINE_PROTO_FUZZER(const FuzzCase& input) {
     atexit(reset_harness);
   }
 
-  Buffer::OwnedImpl request, response;
-  convertFuzzCase(input, request, response);
-  harness->fuzz_request(request);
-  harness->fuzz_response(response);
+  Buffer::OwnedImpl httpmsg;
+  httpmsg.add(buf, len);
+  harness->fuzz_request(httpmsg);
+  harness->fuzz_response(httpmsg);
 }
 
 } // namespace

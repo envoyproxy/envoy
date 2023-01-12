@@ -3,7 +3,6 @@ load(
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
     "envoy_package",
-    "envoy_proto_library",
 )
 
 licenses(["notice"])  # Apache 2
@@ -72,18 +71,11 @@ envoy_cc_test(
     ],
 )
 
-envoy_proto_library(
-    name = "http1_codec_impl_fuzz_proto",
-    srcs = ["http1_codec_impl_fuzz.proto"],
-    deps = ["//test/fuzz:common_proto"],
-)
-
 envoy_cc_fuzz_test(
     name = "http1_codec_impl_fuzz_test",
     srcs = ["http1_codec_impl_fuzz_test.cc"],
     corpus = "http1_codec_impl_corpus",
     deps = [
-        ":http1_codec_impl_fuzz_proto_cc_proto",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http/http1:codec_lib",
