@@ -301,7 +301,8 @@ void StreamEncoderImpl::endEncode() {
   if (connect_request_ || is_tcp_tunneling_ ||
       (is_response_to_connect_request_ &&
        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.no_delay_close_for_upgrades"))) {
-    connection_.connection().close(Network::ConnectionCloseType::FlushWrite);
+    connection_.connection().close(Network::ConnectionCloseType::FlushWrite,
+                                   "close_for_connect_request_or_tcp_tunneling");
   }
 }
 
