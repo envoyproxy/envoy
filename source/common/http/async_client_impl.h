@@ -100,7 +100,7 @@ public:
                   const AsyncClient::StreamOptions& options);
   ~AsyncStreamImpl() override {
     router_.onDestroy();
-    // UpstreamRequest::onCleanup() is guaranteed to reset the high watermark calls.
+    // UpstreamRequest::cleanUp() is guaranteed to reset the high watermark calls.
     ENVOY_BUG(high_watermark_calls_ == 0, "Excess high watermark calls after async stream ended.");
     if (destructor_callback_.has_value()) {
       (*destructor_callback_)();
@@ -467,7 +467,7 @@ private:
   }
   void addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
   void removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
-  void setDecoderBufferLimit(uint32_t limit) override {
+  void setDecoderBufferLimit(uint32_t) override {
     IS_ENVOY_BUG("decoder buffer limits should not be overridden on async streams.");
   }
   uint32_t decoderBufferLimit() override { return buffer_limit_.value_or(0); }

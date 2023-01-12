@@ -872,15 +872,14 @@ Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap& trail
   if (!upstream_requests_.empty()) {
     upstream_requests_.front()->acceptTrailersFromRouter(trailers);
   }
-  if (streaming_shadows_) {
-    for (auto* shadow_stream : shadow_streams_) {
-      shadow_stream->removeDestructorCallback();
-      shadow_stream->removeWatermarkCallbacks();
-      shadow_stream->captureAndSendTrailers(
-          Http::createHeaderMap<Http::RequestTrailerMapImpl>(*shadow_trailers_));
-    }
-    shadow_streams_.clear();
+  for (auto* shadow_stream : shadow_streams_) {
+    shadow_stream->removeDestructorCallback();
+    shadow_stream->removeWatermarkCallbacks();
+    shadow_stream->captureAndSendTrailers(
+        Http::createHeaderMap<Http::RequestTrailerMapImpl>(*shadow_trailers_));
   }
+  shadow_streams_.clear();
+
   onRequestComplete();
   return Http::FilterTrailersStatus::StopIteration;
 }
