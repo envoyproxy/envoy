@@ -497,7 +497,7 @@ private:
  * unit. For an example of a typical use case, @see NamedNetworkFilterConfigFactory.
  *
  * Example registration: REGISTER_FACTORY(SpecificFactory, BaseFactory);
- *                       REGISTER_FACTORY_D(SpecificFactory, BaseFactory, "deprecated_name");
+ *                       LEGACY_REGISTER_FACTORY(SpecificFactory, BaseFactory, "deprecated_name");
  */
 template <class T, class Base> class RegisterFactory {
 public:
@@ -621,7 +621,7 @@ private:
 /**
  * Macro used for static registration with deprecated name.
  */
-#define REGISTER_FACTORY_D(FACTORY, BASE, DEPRECATED_NAME)                                         \
+#define LEGACY_REGISTER_FACTORY(FACTORY, BASE, DEPRECATED_NAME)                                    \
   ABSL_ATTRIBUTE_UNUSED void forceRegister##FACTORY() {}                                           \
   static Envoy::Registry::RegisterFactory</* NOLINT(fuchsia-statically-constructed-objects) */     \
                                           FACTORY, BASE>                                           \

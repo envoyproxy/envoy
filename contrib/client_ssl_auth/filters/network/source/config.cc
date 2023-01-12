@@ -29,8 +29,9 @@ Network::FilterFactoryCb ClientSslAuthConfigFactory::createFilterFactoryFromProt
 /**
  * Static registration for the client SSL auth filter. @see RegisterFactory.
  */
-REGISTER_FACTORY_D(ClientSslAuthConfigFactory,
-                   Server::Configuration::NamedNetworkFilterConfigFactory, "envoy.client_ssl_auth");
+LEGACY_REGISTER_FACTORY(ClientSslAuthConfigFactory,
+                        Server::Configuration::NamedNetworkFilterConfigFactory,
+                        "envoy.client_ssl_auth");
 
 } // namespace ClientSslAuth
 } // namespace NetworkFilters

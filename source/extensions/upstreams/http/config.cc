@@ -149,8 +149,8 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
       upstream_http_protocol_options_(upstream_options),
       use_downstream_protocol_(use_downstream_protocol), use_http2_(use_http2) {}
 
-REGISTER_FACTORY_D(ProtocolOptionsConfigFactory, Server::Configuration::ProtocolOptionsFactory,
-                   "envoy.upstreams.http.http_protocol_options");
+LEGACY_REGISTER_FACTORY(ProtocolOptionsConfigFactory, Server::Configuration::ProtocolOptionsFactory,
+                        "envoy.upstreams.http.http_protocol_options");
 } // namespace Http
 } // namespace Upstreams
 } // namespace Extensions

@@ -36,8 +36,8 @@ std::string MinimumClustersValidatorFactory::typeUrl() const {
 /**
  * Static registration for this config validator factory. @see RegisterFactory.
  */
-REGISTER_FACTORY_D(MinimumClustersValidatorFactory, Envoy::Config::ConfigValidatorFactory,
-                   "envoy.config.validators.minimum_clusters");
+LEGACY_REGISTER_FACTORY(MinimumClustersValidatorFactory, Envoy::Config::ConfigValidatorFactory,
+                        "envoy.config.validators.minimum_clusters");
 
 } // namespace Validators
 } // namespace Config
