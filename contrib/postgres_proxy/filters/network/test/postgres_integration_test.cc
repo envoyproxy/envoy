@@ -320,7 +320,7 @@ public:
     Network::DownstreamTransportSocketFactoryPtr tls_context =
         Network::DownstreamTransportSocketFactoryPtr{
             new Extensions::TransportSockets::Tls::ServerSslSocketFactory(
-                std::move(cfg), *tls_context_manager, *client_stats_store, {})};
+                std::move(cfg), *tls_context_manager, *(client_stats_store->rootScope()), {})};
 
     Network::TransportSocketPtr ts = tls_context->createDownstreamTransportSocket();
     // Synchronization object used to suspend execution
