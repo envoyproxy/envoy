@@ -36,7 +36,8 @@ Api::IoCallSizeResult MemfileImpl::pwrite(const void* buf, uint64_t count, uint6
   std::string after = (offset + count > info_->data_.size())
                           ? ""
                           : info_->data_.substr(info_->data_.size() - offset - count);
-  info_->data_ = before + std::string{static_cast<const char*>(buf), count} + after;
+  info_->data_ =
+      before + std::string{static_cast<const char*>(buf), static_cast<size_t>(count)} + after;
   return resultSuccess<ssize_t>(count);
 }
 
