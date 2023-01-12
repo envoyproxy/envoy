@@ -69,8 +69,10 @@ void normalizeLocalityWeights(const HostsPerLocality& hosts_per_locality,
 }
 
 bool nonLocalityNormalize(const HostSet& host_set) {
+  const auto locality_weights = host_set.localityWeights();
+
   // No locality weight.
-  if (host_set.localityWeights() == nullptr || host_set.localityWeights()->empty()) {
+  if (locality_weights == nullptr || locality_weights->empty()) {
     return true;
   }
 
@@ -80,10 +82,7 @@ bool nonLocalityNormalize(const HostSet& host_set) {
   }
 
   // Total weight be zero.
-  uint32_t total_weight{};
-  for (uint32_t weight : *host_set.localityWeights()) {
-    total_weight += weight;
-  }
+  uint32_t total_weight = std::accumulate(locality_weights->begin(), locality_weights->end(), 0);
   if (total_weight == 0) {
     return true;
   }
