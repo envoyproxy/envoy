@@ -468,9 +468,7 @@ private:
   void addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
   void removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
   void setDecoderBufferLimit(uint32_t limit) override {
-    if (buffer_limit_) {
-      buffer_limit_ = limit;
-    }
+    IS_ENVOY_BUG("decoder buffer limits should not be overridden on async streams.");
   }
   uint32_t decoderBufferLimit() override { return buffer_limit_.value_or(0); }
   bool recreateStream(const ResponseHeaderMap*) override { return false; }
