@@ -31,12 +31,13 @@ GeoipFilterConfig::GeoipFilterConfig(
   }
 }
 
-absl::optional<std::string> GeoipFilterConfig::setupForGeolocationHeader(absl::string_view configured_geo_header) {
+absl::optional<std::string>
+GeoipFilterConfig::setupForGeolocationHeader(absl::string_view configured_geo_header) {
   if (!configured_geo_header.empty()) {
     stat_name_set_->rememberBuiltin(absl::StrCat(configured_geo_header, ".hit"));
     stat_name_set_->rememberBuiltin(absl::StrCat(configured_geo_header, ".total"));
     at_least_one_geo_header_configured_ = true;
-    return configured_geo_header;
+    return absl::make_optional(std::string(configured_geo_header));
   } else {
     return absl::nullopt;
   }
@@ -55,6 +56,12 @@ GeoipFilter::~GeoipFilter() = default;
 void GeoipFilter::onDestroy() {}
 
 Http::FilterHeadersStatus GeoipFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
+  // Reset these flags for geolocation callbacks.
+  all_lookups_invoked_ = false;
+  num_lookups_to_perform_ = 0;
+  // Save request headers for later header manipulation once geolocation lookups are complete.
+  request_headers_ = &headers;
+
   Network::Address::InstanceConstSharedPtr remote_address;
   if (config_->use_xff() && config_->xffNumTrustedHops() > 0) {
     remote_address =
@@ -62,56 +69,50 @@ Http::FilterHeadersStatus GeoipFilter::decodeHeaders(Http::RequestHeaderMap& hea
   }
   // If `config_->use_xff() == false` or xff header has not been populated for some reason.
   if (!remote_address) {
-    remote_address = callbacks_->streamInfo().downstreamAddressProvider().remoteAddress();
+    remote_address = decoder_callbacks_->streamInfo().downstreamAddressProvider().remoteAddress();
   }
-  lookupGeolocationData(config_->geoCountryHeader(), remote_address, &Driver::getCountry, headers);
-  lookupGeolocationData(config_->geoCityHeader(), remote_address, &Driver::getCity, headers);
-  lookupGeolocationData(config_->geoRegionHeader(), remote_address, &Driver::getRegion, headers);
-  lookupGeolocationData(config_->geoAsnHeader(), remote_address, &Driver::getAsn, headers);
+  lookupGeolocationData(config_->geoCountryHeader(), remote_address, &Driver::getCountry);
+  lookupGeolocationData(config_->geoCityHeader(), remote_address, &Driver::getCity);
+  lookupGeolocationData(config_->geoRegionHeader(), remote_address, &Driver::getRegion);
+  lookupGeolocationData(config_->geoAsnHeader(), remote_address, &Driver::getAsn);
   // todo(nezdolik) switch to batch lookup for anon data. Such lookup is supported by maxmind lib.
-  lookupGeolocationAnonData(config_->geoAnonHeader(), remote_address, &Driver::getIsAnonymous,
-                            headers);
-  lookupGeolocationAnonData(config_->geoAnonVpnHeader(), remote_address, &Driver::getIsAnonymousVpn,
-                            headers);
+  lookupGeolocationAnonData(config_->geoAnonHeader(), remote_address, &Driver::getIsAnonymous);
+  lookupGeolocationAnonData(config_->geoAnonVpnHeader(), remote_address,
+                            &Driver::getIsAnonymousVpn);
   lookupGeolocationAnonData(config_->geoAnonHostingHeader(), remote_address,
-                            &Driver::getIsAnonymousHostingProvider, headers);
+                            &Driver::getIsAnonymousHostingProvider);
   lookupGeolocationAnonData(config_->geoAnonTorHeader(), remote_address,
-                            &Driver::getIsAnonymousTorExitNode, headers);
+                            &Driver::getIsAnonymousTorExitNode);
   lookupGeolocationAnonData(config_->geoAnonProxyHeader(), remote_address,
-                            &Driver::getIsAnonymousPublicProxy, headers);
+                            &Driver::getIsAnonymousPublicProxy);
+  all_lookups_invoked_ = true;
 
-  return Http::FilterHeadersStatus::Continue;
+  // Stop the iteration for headers for the current filter and the filters following.
+  return allLookupsComplete() ? Http::FilterHeadersStatus::Continue
+                              : Http::FilterHeadersStatus::StopIteration;
 }
 
 void GeoipFilter::lookupGeolocationData(
     const absl::optional<std::string>& geo_header,
     const Network::Address::InstanceConstSharedPtr& remote_address,
-    const absl::optional<std::string>& (Driver::*func)(
-        const Network::Address::InstanceConstSharedPtr& address) const,
-    Http::RequestHeaderMap& headers) {
+    void (Driver::*func)(const Network::Address::InstanceConstSharedPtr& address,
+                         const LookupCallbacks& callbacks,
+                         const absl::optional<std::string>& geo_header) const) {
   if (geo_header) {
-    auto lookupResult = ((*driver_).*func)(remote_address);
-    if (lookupResult) {
-      headers.setCopy(Http::LowerCaseString(geo_header.value()), lookupResult.value());
-      config_->incHit(geo_header.value());
-    }
-    config_->incTotal(geo_header.value());
+    ++num_lookups_to_perform_;
+    ((*driver_).*func)(remote_address, *this, geo_header);
   }
 }
 
 void GeoipFilter::lookupGeolocationAnonData(
     const absl::optional<std::string>& geo_header,
     const Network::Address::InstanceConstSharedPtr& remote_address,
-    const absl::optional<bool>& (Driver::*func)(
-        const Network::Address::InstanceConstSharedPtr& address) const,
-    Http::RequestHeaderMap& headers) {
+    void (Driver::*func)(const Network::Address::InstanceConstSharedPtr& address,
+                         const LookupCallbacks& callbacks,
+                         const absl::optional<std::string>& geo_header) const) {
   if (geo_header) {
-    auto lookupResult = ((*driver_).*func)(remote_address);
-    if (lookupResult) {
-      headers.addCopy(Http::LowerCaseString(geo_header.value()), lookupResult.value() ? "true" : "false");
-      config_->incHit(geo_header.value());
-    }
-    config_->incTotal(geo_header.value());
+    ++num_lookups_to_perform_;
+    ((*driver_).*func)(remote_address, *this, geo_header);
   }
 }
 
@@ -124,7 +125,30 @@ Http::FilterTrailersStatus GeoipFilter::decodeTrailers(Http::RequestTrailerMap&)
 }
 
 void GeoipFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
-  callbacks_ = &callbacks;
+  decoder_callbacks_ = &callbacks;
+}
+
+void GeoipFilter::onLookupComplete(const absl::optional<std::string>& lookup_result,
+                                   const absl::optional<std::string>& geo_header) {
+  if (!request_headers_) {
+    ENVOY_LOG(debug, "Geoip filter: no header to decorate in reguest");
+    return;
+  }
+  ASSERT(num_lookups_to_perform_ > 0);
+  --num_lookups_to_perform_;
+  if (lookup_result) {
+    request_headers_->setCopy(Http::LowerCaseString(geo_header.value()), lookup_result.value());
+    config_->incHit(geo_header.value());
+  }
+  config_->incTotal(geo_header.value());
+  if (allLookupsComplete()) {
+    ENVOY_LOG(debug, "Geoip filter: finished decoding geolocation headers");
+    decoder_callbacks_->continueDecoding();
+  }
+}
+
+bool GeoipFilter::allLookupsComplete() {
+  return all_lookups_invoked_ && num_lookups_to_perform_ == 0;
 }
 
 } // namespace Geoip

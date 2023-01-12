@@ -76,7 +76,9 @@ private:
 
 using GeoipFilterConfigSharedPtr = std::shared_ptr<GeoipFilterConfig>;
 
-class GeoipFilter : public Http::StreamDecoderFilter {
+class GeoipFilter : public Http::StreamDecoderFilter,
+                    public LookupCallbacks,
+                    public Logger::Loggable<Logger::Id::filter> {
 public:
   GeoipFilter(GeoipFilterConfigSharedPtr config, DriverSharedPtr driver);
   ~GeoipFilter() override;
@@ -90,23 +92,32 @@ public:
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
+  // LookupCallbacks
+  void onLookupComplete(const absl::optional<std::string>& lookup_result,
+                        const absl::optional<std::string>& geo_header) override;
 
 private:
-  void lookupGeolocationData(const absl::optional<std::string>& geo_header,
-                             const Network::Address::InstanceConstSharedPtr& remote_address,
-                             const absl::optional<std::string>& (Driver::*func)(
-                                 const Network::Address::InstanceConstSharedPtr& address) const,
-                             Http::RequestHeaderMap& headers);
-  void lookupGeolocationAnonData(const absl::optional<std::string>& geo_header,
-                                 const Network::Address::InstanceConstSharedPtr& remote_address,
-                                 const absl::optional<bool>& (Driver::*func)(
-                                     const Network::Address::InstanceConstSharedPtr& address) const,
-                                 Http::RequestHeaderMap& headers);
+  void lookupGeolocationData(
+      const absl::optional<std::string>& geo_header,
+      const Network::Address::InstanceConstSharedPtr& remote_address,
+      void (Driver::*func)(const Network::Address::InstanceConstSharedPtr& address,
+                           const LookupCallbacks& callbacks,
+                           const absl::optional<std::string>& geo_header) const);
+  void lookupGeolocationAnonData(
+      const absl::optional<std::string>& geo_header,
+      const Network::Address::InstanceConstSharedPtr& remote_address,
+      void (Driver::*func)(const Network::Address::InstanceConstSharedPtr& address,
+                           const LookupCallbacks& callbacks,
+                           const absl::optional<std::string>& geo_header) const);
+  bool allLookupsComplete();
   // Allow the unit test to have access to private members.
   friend class GeoipFilterPeer;
   GeoipFilterConfigSharedPtr config_;
-  Http::StreamDecoderFilterCallbacks* callbacks_{};
+  Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   DriverSharedPtr driver_;
+  bool all_lookups_invoked_{false};
+  Envoy::Http::RequestHeaderMap* request_headers_ = nullptr;
+  uint32_t num_lookups_to_perform_{0};
 };
 
 } // namespace Geoip

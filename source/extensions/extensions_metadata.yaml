@@ -244,7 +244,7 @@ envoy.filters.http.geoip:
   security_posture: unknown
   status: wip
   type_urls:
-  - envoy.extensions.filters.http.geoip.v3.GeoipConfig
+  - envoy.extensions.filters.http.geoip.v3.Geoip
 envoy.filters.http.upstream_codec:
   categories:
   - envoy.filters.http.upstream
@@ -719,6 +719,13 @@ envoy.formatter.req_without_query:
   status: alpha
   type_urls:
   - envoy.extensions.formatter.req_without_query.v3.ReqWithoutQuery
+envoy.geoip_providers.maxmind:
+  categories:
+  - envoy.geoip_providers
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.config.geoip.v3.MaxMindConfig
 envoy.grpc_credentials.aws_iam:
   categories:
   - envoy.grpc_credentials

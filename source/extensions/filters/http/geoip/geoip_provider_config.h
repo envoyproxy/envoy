@@ -11,6 +11,26 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Geoip {
 
+/**
+ * Async callbacks used for geolocation provider lookups.
+ */
+class LookupCallbacks {
+public:
+  virtual ~LookupCallbacks() = default;
+
+  /**
+   * Called when lookup in geolocation database is complete.
+   *
+   * @param lookup_result result of lookup in the geolocation database. absl::nullopt result is
+   * returned when the address was not found in the database.
+   * @param gelocation header name for which the lookup was invoked.
+   */
+  virtual void onLookupComplete(const absl::optional<std::string>& lookup_result,
+                                const absl::optional<std::string>& geo_header) PURE;
+};
+
+using LookupCallbacksPtr = std::unique_ptr<LookupCallbacks>;
+
 class Driver {
 public:
   virtual ~Driver() = default;
@@ -18,92 +38,111 @@ public:
   /**
    *  Looks up a city that is associated with the given IP address.
    *
-   *  @param   address IP address (IPv4, IPv6) to perform lookup for.
-   *  @returns city for the IP address or absl::nullopt if address is not found in the geolocation
-   * database.
+   *  @param address IP address (IPv4, IPv6) to perform lookup for.
+   *  @param callbacks supplies the callbacks to notify when lookup is complete.
+   *  @param geo_header header for which the lookup is invoked. Once lookup is complete, this header
+   * is passed back to filter, so that filter knows which header to decorate.
    */
-  virtual const absl::optional<std::string>&
-  getCity(const Network::Address::InstanceConstSharedPtr& address) const PURE;
+  virtual void getCity(const Network::Address::InstanceConstSharedPtr& address,
+                       const LookupCallbacks& callbacks,
+                       const absl::optional<std::string>& geo_header) const PURE;
 
   /**
-   *  Looks up a country that is associated with the given IP address.
+   *  Looks up a country ISO code that is associated with the given IP address.
    *
    *  @param address IP address (IPv4, IPv6) to perform lookup for.
-   *  @returns country ISO code for the IP address or absl::nullopt if address is not found in the
-   * geolocation database.
+   *  @param callbacks supplies the callbacks to notify when lookup is complete.
+   *  @param geo_header header for which the lookup is invoked. Once lookup is complete, this header
+   * is passed back to filter, so that filter knows which header to decorate.
    */
-  virtual const absl::optional<std::string>&
-  getCountry(const Network::Address::InstanceConstSharedPtr& address) const PURE;
+  virtual void getCountry(const Network::Address::InstanceConstSharedPtr& address,
+                          const LookupCallbacks& callbacks,
+                          const absl::optional<std::string>& geo_header) const PURE;
 
   /**
-   *  Looks up a region that is associated with the given IP address.
+   *  Looks up a region ISO code that is associated with the given IP address.
    *
    *  @param address IP address (IPv4, IPv6) to perform lookup for.
-   *  @returns region ISO code for the IP address or absl::nullopt if address is not found in the
-   * geolocation database.
+   *  @param callbacks supplies the callbacks to notify when lookup is complete.
+   *  @param geo_header header for which the lookup is invoked. Once lookup is complete, this header
+   * is passed back to filter, so that filter knows which header to decorate.
    */
-  virtual const absl::optional<std::string>&
-  getRegion(const Network::Address::InstanceConstSharedPtr& address) const PURE;
+  virtual void getRegion(const Network::Address::InstanceConstSharedPtr& address,
+                         const LookupCallbacks& callbacks,
+                         const absl::optional<std::string>& geo_header) const PURE;
 
   /**
-   *  Looks up an ASN that is associated with the given IP address.
+   *  Looks up an ASN of the IP provider that is associated with the given IP address.
    *
    *  @param address IP address (IPv4, IPv6) to perform lookup for.
-   *  @returns ASN of the IP provider for the IP address or absl::nullopt if address is not found in
-   * the geolocation database.
+   *  @param callbacks supplies the callbacks to notify when lookup is complete.
+   *  @param geo_header header for which the lookup is invoked. Once lookup is complete, this header
+   * is passed back to filter, so that filter knows which header to decorate.
    */
-  virtual const absl::optional<std::string>&
-  getAsn(const Network::Address::InstanceConstSharedPtr& address) const PURE;
+  virtual void getAsn(const Network::Address::InstanceConstSharedPtr& address,
+                      const LookupCallbacks& callbacks,
+                      const absl::optional<std::string>& geo_header) const PURE;
 
   /**
    *  Checks if a given IP address belongs to any type of anonymization network.
    *
    *  @param address IP address (IPv4, IPv6) to perform lookup for.
-   *  @returns true if IP belongs to an anonymization network, false if it does not,
-   *           absl::nullopt if address is not found in the geolocation database.
+   *  @param callbacks supplies the callbacks to notify when lookup is complete.
+   *  @param geo_header header for which the lookup is invoked. Once lookup is complete, this header
+   * is passed back to filter, so that filter knows which header to decorate.
    */
-  virtual const absl::optional<bool>&
-  getIsAnonymous(const Network::Address::InstanceConstSharedPtr& address) const PURE;
+  virtual void getIsAnonymous(const Network::Address::InstanceConstSharedPtr& address,
+                              const LookupCallbacks& callbacks,
+                              const absl::optional<std::string>& geo_header) const PURE;
 
   /**
    *  Checks if a given IP address belongs to a VPN.
    *
    *  @param address IP address (IPv4, IPv6) to perform lookup for.
-   *  @returns true if IP belongs to a VPN, false if it does not,
-   *           absl::nullopt if address is not found in the geolocation database.
+   *  @param callbacks supplies the callbacks to notify when lookup is complete.
+   *  @param geo_header header for which the lookup is invoked. Once lookup is complete, this header
+   * is passed back to filter, so that filter knows which header to decorate.
    */
-  virtual const absl::optional<bool>&
-  getIsAnonymousVpn(const Network::Address::InstanceConstSharedPtr& address) const PURE;
+  virtual void getIsAnonymousVpn(const Network::Address::InstanceConstSharedPtr& address,
+                                 const LookupCallbacks& callbacks,
+                                 const absl::optional<std::string>& geo_header) const PURE;
 
   /**
-   *  Checks if a given IP address belongs to a hosting provider.
+   *  Checks if a given IP address belongs to an anonymous hosting provider.
    *
    *  @param address IP address (IPv4, IPv6) to perform lookup for.
-   *  @returns true if IP belongs to an anonymous hosting provider, false if it does not,
-   *           absl::nullopt if address is not found in the geolocation database.
+   *  @param callbacks supplies the callbacks to notify when lookup is complete.
+   *  @param geo_header header for which the lookup is invoked. Once lookup is complete, this header
+   * is passed back to filter, so that filter knows which header to decorate.
    */
-  virtual const absl::optional<bool>&
-  getIsAnonymousHostingProvider(const Network::Address::InstanceConstSharedPtr& address) const PURE;
+  virtual void
+  getIsAnonymousHostingProvider(const Network::Address::InstanceConstSharedPtr& address,
+                                const LookupCallbacks& callbacks,
+                                const absl::optional<std::string>& geo_header) const PURE;
 
   /**
    *  Checks if a given IP address belongs to a public proxy.
    *
    *  @param address IP address (IPv4, IPv6) to perform lookup for.
-   *  @returns true if IP belongs to a public proxy, false if it does not,
-   *           absl::nullopt if address is not found in the geolocation database.
+   *  @param callbacks supplies the callbacks to notify when lookup is complete.
+   *  @param geo_header header for which the lookup is invoked. Once lookup is complete, this header
+   * is passed back to filter, so that filter knows which header to decorate.
    */
-  virtual const absl::optional<bool>&
-  getIsAnonymousPublicProxy(const Network::Address::InstanceConstSharedPtr& address) const PURE;
+  virtual void getIsAnonymousPublicProxy(const Network::Address::InstanceConstSharedPtr& address,
+                                         const LookupCallbacks& callbacks,
+                                         const absl::optional<std::string>& geo_header) const PURE;
 
   /**
    *  Checks if a given IP address belongs to a TOR exit node.
    *
    *  @param address IP address (IPv4, IPv6) to perform lookup for.
-   *  @returns true if IP belongs to a TOR exit node, false if it does not,
-   *           absl::nullopt if address is not found in the geolocation database.
+   *  @param callbacks supplies the callbacks to notify when lookup is complete.
+   *  @param geo_header header for which the lookup is invoked. Once lookup is complete, this header
+   * is passed back to filter, so that filter knows which header to decorate.
    */
-  virtual const absl::optional<bool>&
-  getIsAnonymousTorExitNode(const Network::Address::InstanceConstSharedPtr& address) const PURE;
+  virtual void getIsAnonymousTorExitNode(const Network::Address::InstanceConstSharedPtr& address,
+                                         const LookupCallbacks& callbacks,
+                                         const absl::optional<std::string>& geo_header) const PURE;
 };
 
 using DriverSharedPtr = std::shared_ptr<Driver>;
