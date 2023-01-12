@@ -103,7 +103,7 @@ jobs:
       run: cd mobile && ./ci/mac_ci_setup.sh --android
     - uses: nick-fields/retry@943e742917ac94714d2f408a0e8320f2d1fcafcd
       if: steps.should_run.outputs.run_ci_job == 'true'
-      name: 'Start simulator'
+      name: 'Start emulator'
       with:
         timeout_minutes: 6
         max_attempts: 3
@@ -148,7 +148,7 @@ jobs:
       run: cd mobile && ./ci/mac_ci_setup.sh --android
     - uses: nick-fields/retry@943e742917ac94714d2f408a0e8320f2d1fcafcd
       if: steps.should_run.outputs.run_ci_job == 'true'
-      name: 'Start simulator'
+      name: 'Start emulator'
       with:
         timeout_minutes: 6
         max_attempts: 3
@@ -193,7 +193,7 @@ jobs:
       run: cd mobile && ./ci/mac_ci_setup.sh --android
     - uses: nick-fields/retry@943e742917ac94714d2f408a0e8320f2d1fcafcd
       if: steps.should_run.outputs.run_ci_job == 'true'
-      name: 'Start simulator'
+      name: 'Start emulator'
       with:
         timeout_minutes: 6
         max_attempts: 3
