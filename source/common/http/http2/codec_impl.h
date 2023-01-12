@@ -403,8 +403,12 @@ protected:
   public:
     explicit StreamDataFrameSource(StreamImpl& stream) : stream_(stream) {}
 
+    // Returns a pair of the next payload length, and whether that payload is the end of the data
+    // for this stream.
     std::pair<int64_t, bool> SelectPayloadLength(size_t max_length) override;
+    // Queues the frame header and a DATA frame payload of the specified length for writing.
     bool Send(absl::string_view frame_header, size_t payload_length) override;
+    // Whether the codec should send the END_STREAM flag on the final DATA frame.
     bool send_fin() const override { return send_fin_; }
 
   private:
