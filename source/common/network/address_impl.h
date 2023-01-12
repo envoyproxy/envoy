@@ -145,8 +145,7 @@ public:
   static absl::Status validateProtocolSupported();
 
   void abslHashValue(absl::HashState state) const override {
-    absl::HashState::combine(std::move(state), ip_.ipv4_.address_.sin_addr.s_addr,
-                             ip_.ipv4_.address_.sin_port);
+    absl::HashState::combine(std::move(state), ip_.ipv4_.address(), ip_.port());
   }
 
 private:
@@ -238,10 +237,8 @@ public:
   static absl::Status validateProtocolSupported();
 
   void abslHashValue(absl::HashState state) const override {
-    absl::HashState::combine(
-        absl::HashState::combine_contiguous(std::move(state), ip_.ipv6_.address_.sin6_addr.s6_addr,
-                                            sizeof(ip_.ipv6_.address_.sin6_addr.s6_addr)),
-        ip_.ipv6_.address_.sin6_port, ip_.ipv6_.address_.sin6_scope_id);
+    absl::HashState::combine(std::move(state), ip_.ipv6_.address(), ip_.port(),
+                             ip_.ipv6_.scopeId());
   }
 
 private:
@@ -330,6 +327,8 @@ public:
   }
   absl::string_view addressType() const override { return "default"; }
 
+  // The `operator==` is based on friendly address string. That string is based on `sockaddr_un`
+  // also. So `operator==` can be used for hash.
   void abslHashValue(absl::HashState state) const override {
     absl::HashState::combine(
         absl::HashState::combine_contiguous(
@@ -384,6 +383,8 @@ public:
   socklen_t sockAddrLen() const override { return 0; }
   absl::string_view addressType() const override { return "envoy_internal"; }
 
+  // The `operator==` is based on the friendly address string, and that string is based on
+  // address id and endpoint id also. So `operator==` can be used for hash.
   void abslHashValue(absl::HashState state) const override {
     absl::HashState::combine(std::move(state), internal_address_.address_id_,
                              internal_address_.endpoint_id_);
