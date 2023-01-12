@@ -700,6 +700,68 @@ TEST_P(ExtProcIntegrationTest, GetAndSetOnlyTrailersOnResponse) {
 }
 
 // Test the filter with a response body callback enabled using an
+// an ext_proc server is okay to buffer more than buffer limit on last onData(xxx, end_stream=true)
+// call, while waiting for the headers response.
+TEST_P(ExtProcIntegrationTest, ResponseBodySentWithEndStreamBiggerThanBufferLimitWillBeBuffered) {
+  // Make sure that we have control over when buffers will fill up.
+  config_helper_.setBufferLimits(/*upstream_buffer_limit=*/10, /*downstream_buffer_limit=*/100);
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::BUFFERED);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+
+  // Make sure onData(end_stream=true) is called while waiting for header response.
+  absl::Notification body_sent_notification;
+  absl::Notification headers_sent_notification;
+
+  // Pretend to be the upstream.
+  Thread::ThreadPtr backend_thread = api_->threadFactory().createThread([&, this]() {
+    // Make sure that the headers is sent to server.
+    headers_sent_notification.WaitForNotification();
+    // Send body in one big chunk.
+    upstream_request_->encodeData(10000, true);
+    body_sent_notification.Notify();
+  });
+
+  processResponseHeadersMessage(
+      *grpc_upstreams_[0], false, [&](const HttpHeaders&, HeadersResponse& headers_resp) {
+        headers_sent_notification.Notify();
+        auto* content_length =
+            headers_resp.mutable_response()->mutable_header_mutation()->add_set_headers();
+        content_length->mutable_header()->set_key("content-length");
+        content_length->mutable_header()->set_value("13");
+        // Make sure encodeData is called with end_stream before header response is sent.
+        body_sent_notification.WaitForNotification();
+        return true;
+      });
+  backend_thread->join();
+
+  // Should get just one message with the body, with a length bigger than the buffer limit.
+  processResponseBodyMessage(
+      *grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse& body_resp) {
+        EXPECT_TRUE(body.end_of_stream());
+        EXPECT_EQ(body.body().size(), 10000);
+        auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
+        body_mut->set_body("Hello, World!");
+        auto* header_mut = body_resp.mutable_response()->mutable_header_mutation();
+        auto* header_add = header_mut->add_set_headers();
+        header_add->mutable_header()->set_key("x-testing-response-header");
+        header_add->mutable_header()->set_value("Yes");
+        return true;
+      });
+
+  verifyDownstreamResponse(*response, 200);
+  EXPECT_THAT(response->headers(), SingleHeaderValueIs("x-testing-response-header", "Yes"));
+  EXPECT_EQ("Hello, World!", response->body());
+}
+
+// Test the filter with a response body callback enabled using an
 // an ext_proc server that responds to the response_body message
 // by requesting to modify the response body and headers.
 TEST_P(ExtProcIntegrationTest, GetAndSetBodyAndHeadersOnResponse) {

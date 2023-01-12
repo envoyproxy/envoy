@@ -225,15 +225,13 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     ENVOY_LOG(trace, "Header processing still in progress -- holding body data");
     // We don't know what to do with the body until the response comes back.
     // We must buffer it in case we need it when that happens.
-    if (end_stream) {
-      state.setPaused(true);
-      return FilterDataStatus::StopIterationAndBuffer;
-    } else {
-      // Raise a watermark to prevent a buffer overflow until the response comes back.
-      state.setPaused(true);
-      state.requestWatermark();
-      return FilterDataStatus::StopIterationAndWatermark;
-    }
+    // Raise a watermark to prevent a buffer overflow until the response comes back.
+    // Raise watermark even when end_stream is true, so that if the accumulated buffer size goes
+    // above high watermark, it doesn't cause a request/response failure (500 on response path and
+    // 4xx on request path).
+    state.setPaused(true);
+    state.requestWatermark();
+    return FilterDataStatus::StopIterationAndWatermark;
   }
   if (state.callbackState() == ProcessorState::CallbackState::StreamedBodyCallbackFinishing) {
     // We were previously streaming the body, but there are more chunks waiting

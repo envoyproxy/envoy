@@ -652,7 +652,8 @@ TEST_F(HttpFilterTest, PostAndChangeRequestBodyBufferedComesFast) {
   buffered_data.add(req_data_2);
   EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(req_data_3, false));
   buffered_data.add(req_data_3);
-  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(req_data_4, true));
+  // when end_stream is true, we still do buffering.
+  EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(req_data_4, true));
   buffered_data.add(req_data_4);
 
   EXPECT_CALL(decoder_callbacks_, onDecoderFilterBelowWriteBufferLowWatermark());
@@ -1031,7 +1032,7 @@ TEST_F(HttpFilterTest, PostFastRequestPartialBuffering) {
   EXPECT_CALL(decoder_callbacks_, onDecoderFilterAboveWriteBufferHighWatermark());
   EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(req_data_1, false));
   buffered_data.add(req_data_1);
-  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(req_data_2, true));
+  EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(req_data_2, true));
   buffered_data.add(req_data_2);
 
   // Now the headers response comes in and we are all done
