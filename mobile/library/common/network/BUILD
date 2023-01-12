@@ -10,7 +10,7 @@ envoy_cc_library(
         "connectivity_manager.cc",
         "android.cc",
     ] + select({
-        "//bazel:include_ifaddrs": [
+        "@envoy//bazel:android": [
             "//third_party:android/ifaddrs-android.h",
             "//third_party:android/LocalArray.h",
             "//third_party:android/ScopedFd.h",
@@ -22,10 +22,6 @@ envoy_cc_library(
         "connectivity_manager.h",
         "proxy_settings.h",
     ],
-    copts = select({
-        "//bazel:include_ifaddrs": ["-DINCLUDE_IFADDRS"],
-        "//conditions:default": [],
-    }),
     repository = "@envoy",
     deps = [
         "//library/common/network:src_addr_socket_option_lib",

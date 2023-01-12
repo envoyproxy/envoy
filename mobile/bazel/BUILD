@@ -18,11 +18,6 @@ kt_jvm_library(
 )
 
 config_setting(
-    name = "include_ifaddrs",
-    values = {"define": "include_ifaddrs=true"},
-)
-
-config_setting(
     name = "exclude_certificates",
     values = {"define": "exclude_certificates=true"},
 )

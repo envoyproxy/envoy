@@ -19,7 +19,7 @@ namespace Network {
 namespace Android {
 namespace Utility {
 
-#if defined(INCLUDE_IFADDRS)
+#if defined(__ANDROID_API__)
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wold-style-cast"
 namespace {
@@ -29,7 +29,7 @@ namespace {
 #endif
 
 void setAlternateGetifaddrs() {
-#if defined(INCLUDE_IFADDRS)
+#if defined(__ANDROID_API__)
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
   ENVOY_BUG(!os_syscalls.supportsGetifaddrs(),
             "setAlternateGetifaddrs should only be called when supportsGetifaddrs is false");
