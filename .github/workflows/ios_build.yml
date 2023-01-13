@@ -75,7 +75,7 @@ jobs:
       if: steps.should_run.outputs.run_ci_job == 'true'
       name: 'Check connectivity'
     - run: cat /tmp/envoy.log
-      if: ${{ failure() || cancelled() }}
+      # if: ${{ failure() || cancelled() }}
       name: 'Log app run'
   swiftbaselineapp:
     name: swift_baseline_app
@@ -122,7 +122,7 @@ jobs:
       if: steps.should_run.outputs.run_ci_job == 'true'
       name: 'Check connectivity'
     - run: cat /tmp/envoy.log
-      if: ${{ failure() || cancelled() }}
+      # if: ${{ failure() || cancelled() }}
       name: 'Log app run'
   swiftexperimentalapp:
     name: swift_experimental_app
@@ -169,7 +169,7 @@ jobs:
       if: steps.should_run.outputs.run_ci_job == 'true'
       name: 'Check connectivity'
     - run: cat /tmp/envoy.log
-      if: ${{ failure() || cancelled() }}
+      # if: ${{ failure() || cancelled() }}
       name: 'Log app run'
   swiftasyncawait:
     name: swift_async_await
@@ -216,7 +216,7 @@ jobs:
       if: steps.should_run.outputs.run_ci_job == 'true'
       name: 'Check upload succeeded'
     - run: cat /tmp/envoy.log
-      if: ${{ failure() || cancelled() }}
+      # if: ${{ failure() || cancelled() }}
       name: 'Log app run'
   objchelloworld:
     name: objc_helloworld
@@ -263,5 +263,5 @@ jobs:
       if: steps.should_run.outputs.run_ci_job == 'true'
       name: 'Check connectivity'
     - run: cat /tmp/envoy.log
-      if: ${{ failure() || cancelled() }}
+      # if: ${{ failure() || cancelled() }}
       name: 'Log app run'
