@@ -79,12 +79,12 @@ BENCHMARK(benchmarkLazyInitCreationInstantiateSameThread)
     ->ArgsProduct({{0, 1}, {1000, 10000, 20000}})
     ->Unit(::benchmark::kMillisecond);
 
-class MultiThreadLazyinitStatsTest : public ThreadLocalRealThreadsTestBase,
+class MultiThreadLazyinitStatsTest : public ThreadLocalRealThreadsMixin,
                                      public LazyInitStatsBenchmarkBase {
 public:
   MultiThreadLazyinitStatsTest(bool lazy, const uint64_t n_clusters)
-      : ThreadLocalRealThreadsTestBase(5),
-        LazyInitStatsBenchmarkBase(lazy, n_clusters, *ThreadLocalRealThreadsTestBase::store_) {}
+      : ThreadLocalRealThreadsMixin(5),
+        LazyInitStatsBenchmarkBase(lazy, n_clusters, *ThreadLocalRealThreadsMixin::store_) {}
 
   ~MultiThreadLazyinitStatsTest() {
     shutdownThreading();

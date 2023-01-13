@@ -775,7 +775,7 @@ TEST_F(StatsThreadLocalStoreTest, SharedScopes) {
   tls_.shutdownThread();
 }
 
-class LookupWithStatNameTest : public ThreadLocalStoreNoMocksTestBase, public testing::Test {};
+class LookupWithStatNameTest : public ThreadLocalStoreNoMocksMixin, public testing::Test {};
 
 TEST_F(LookupWithStatNameTest, All) {
   ScopeSharedPtr scope1 = scope_.scopeFromStatName(makeStatName("scope1"));
@@ -1683,10 +1683,10 @@ TEST_F(HistogramTest, ForEachHistogram) {
   EXPECT_EQ(deleted_histogram.unit(), Histogram::Unit::Unspecified);
 }
 
-class OneWorkerThread : public ThreadLocalRealThreadsTestBase, public testing::Test {
+class OneWorkerThread : public ThreadLocalRealThreadsMixin, public testing::Test {
 protected:
   static constexpr uint32_t NumThreads = 1;
-  OneWorkerThread() : ThreadLocalRealThreadsTestBase(NumThreads) {}
+  OneWorkerThread() : ThreadLocalRealThreadsMixin(NumThreads) {}
 };
 
 // Reproduces a race-condition between forEachScope and scope deletion. If we
@@ -1727,13 +1727,13 @@ TEST_F(OneWorkerThread, DeleteForEachRace) {
   wait_for_main();
 }
 
-class ClusterShutdownCleanupStarvationTest : public ThreadLocalRealThreadsTestBase,
+class ClusterShutdownCleanupStarvationTest : public ThreadLocalRealThreadsMixin,
                                              public testing::Test {
 protected:
   static constexpr uint32_t NumThreads = 2;
 
   ClusterShutdownCleanupStarvationTest()
-      : ThreadLocalRealThreadsTestBase(NumThreads), my_counter_name_(pool_.add("my_counter")),
+      : ThreadLocalRealThreadsMixin(NumThreads), my_counter_name_(pool_.add("my_counter")),
         my_counter_scoped_name_(pool_.add("scope.my_counter")),
         start_time_(time_system_.monotonicTime()) {}
 
@@ -1812,11 +1812,11 @@ TEST_F(ClusterShutdownCleanupStarvationTest, TwelveThreadsWithoutBlockade) {
   store_->sync().signal(ThreadLocalStoreImpl::MainDispatcherCleanupSync);
 }
 
-class HistogramThreadTest : public ThreadLocalRealThreadsTestBase, public testing::Test {
+class HistogramThreadTest : public ThreadLocalRealThreadsMixin, public testing::Test {
 protected:
   static constexpr uint32_t NumThreads = 10;
 
-  HistogramThreadTest() : ThreadLocalRealThreadsTestBase(NumThreads) {}
+  HistogramThreadTest() : ThreadLocalRealThreadsMixin(NumThreads) {}
 
   void mergeHistograms() {
     BlockingBarrier blocking_barrier(1);

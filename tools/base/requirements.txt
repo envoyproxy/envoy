@@ -339,9 +339,9 @@ envoy-base-utils==0.3.8 \
     #   envoy-docs-sphinx-runner
     #   envoy-github-release
     #   envoy-gpg-sign
-envoy-code-check==0.3.4 \
-    --hash=sha256:5e59ae096603042d2540511c85534d2e5eba2ac0b8096da48e17434349331220 \
-    --hash=sha256:b755e6aacd2fe8f87784c3aa959e99bdf4891033e6be99c8ec1aa1a3f0debe47
+envoy-code-check==0.3.5 \
+    --hash=sha256:290cda68ccd29239ce35c81a594e0c196737231c37d3d8ec3cc86d9f387731d4 \
+    --hash=sha256:d37fa940d585fbc569328128c0ab0053da42ea6a79f4bf734d1f687f0fb21565
     # via -r requirements.in
 envoy-dependency-check==0.1.5 \
     --hash=sha256:2394626236e7b43c0273d4a0a43e1e13d3990ebde9ebdacea253464000927961 \
@@ -867,6 +867,12 @@ requests==2.26.0 \
     # via
     #   pygithub
     #   sphinx
+setuptools==65.7.0 \
+    --hash=sha256:4d3c92fac8f1118bb77a22181355e29c239cabfe2b9effdaa665c66b711136d7 \
+    --hash=sha256:8ab4f1dbf2b4a65f7eec5ad0c620e84c34111a68d3349833494b9088212214dd
+    # via
+    #   -r requirements.in
+    #   yamllint
 six==1.16.0 \
     --hash=sha256:1e61c37477a1626458e36f7b1d82aa5c9b094fa4802892072e49de9c60c4c926 \
     --hash=sha256:8abb2f1d86890a2dfb989f9a77cfcfd3e47c2a354b01111771326f8aa26e0254
@@ -1090,11 +1096,3 @@ yarl==1.8.2 \
     # via
     #   -r requirements.in
     #   aiohttp
-
-# The following packages are considered to be unsafe in a requirements file:
-setuptools==65.6.3 \
-    --hash=sha256:57f6f22bde4e042978bcd50176fdb381d7c21a9efa4041202288d3737a0c6a54 \
-    --hash=sha256:a7620757bf984b58deaf32fc8a4577a9bbc0850cf92c20e1ce41c38c19e5fb75
-    # via
-    #   -r requirements.in
-    #   yamllint

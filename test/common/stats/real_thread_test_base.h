@@ -9,10 +9,13 @@
 namespace Envoy {
 namespace Stats {
 
-class ThreadLocalStoreNoMocksTestBase {
+// See full context https://github.com/envoyproxy/envoy/pull/23921
+// This is a helper class used in thread local store test and the future
+// lazy init stats speed test, which works as the base for ThreadLocalStore related tests.
+class ThreadLocalStoreNoMocksMixin {
 public:
-  ThreadLocalStoreNoMocksTestBase();
-  ~ThreadLocalStoreNoMocksTestBase();
+  ThreadLocalStoreNoMocksMixin();
+  ~ThreadLocalStoreNoMocksMixin();
 
   StatName makeStatName(absl::string_view name);
 
@@ -24,17 +27,16 @@ public:
 };
 
 // Helper base class for thread local stats testing in multiple-workers setup.
-// This is used in thread local store tests.
-class ThreadLocalRealThreadsTestBase : public Thread::RealThreadsTestHelper,
-                                       public ThreadLocalStoreNoMocksTestBase {
+class ThreadLocalRealThreadsMixin : public Thread::RealThreadsTestHelper,
+                                    public ThreadLocalStoreNoMocksMixin {
 protected:
   static constexpr uint32_t NumScopes = 1000;
   static constexpr uint32_t NumIters = 35;
 
 public:
-  ThreadLocalRealThreadsTestBase(uint32_t num_threads);
+  ThreadLocalRealThreadsMixin(uint32_t num_threads);
 
-  ~ThreadLocalRealThreadsTestBase();
+  ~ThreadLocalRealThreadsMixin();
 
   void shutdownThreading();
 };
