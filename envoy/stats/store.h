@@ -173,7 +173,7 @@ public:
   }
 
   /**
-   * @returns a scope of the given name.
+   * @return a scope of the given name.
    */
   ScopeSharedPtr createScope(const std::string& name) { return rootScope()->createScope(name); }
 };

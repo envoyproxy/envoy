@@ -1558,7 +1558,7 @@ TEST_P(SslSocketTest, MultiCertPickRSAOnSniMatch) {
 
 // On SNI mismatch, if full scan is disabled, validate that the first cert is used.
 TEST_P(SslSocketTest, MultiCertWithFullScanDisabledOnSniMismatch) {
-  // This test is specific for no full scan case, i.e, below flag is true case.
+  // This test is specific for no full scan case, i.e., below flag is true case.
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.no_full_scan_certs_on_sni_mismatch", "true"}});
