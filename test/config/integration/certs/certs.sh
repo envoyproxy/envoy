@@ -68,6 +68,8 @@ generate_info_header() {
         echo "constexpr char ${prefix}_CERT_1_HASH[] = \"$(openssl x509 -in "${1}cert.pem" -outform DER | openssl dgst -sha1 | cut -d" " -f2)\";"
         echo "constexpr char ${prefix}_CERT_SPKI[] = \"$(openssl x509 -in "${1}cert.pem" -noout -pubkey | openssl pkey -pubin -outform DER | openssl dgst -sha256 -binary | openssl enc -base64)\";"
         echo "constexpr char ${prefix}_CERT_SERIAL[] = \"$(openssl x509 -in "${1}cert.pem" -noout -serial | cut -d"=" -f2 | awk '{print tolower($0)}')\";"
+        echo "constexpr char ${prefix}_CERT_NOT_BEFORE[] = \"$(openssl x509 -in "${1}cert.pem" -noout -startdate | cut -d"=" -f2)\";"
+        echo "constexpr char ${prefix}_CERT_NOT_AFTER[] = \"$(openssl x509 -in "${1}cert.pem" -noout -enddate | cut -d"=" -f2)\";"
     } > "${1}cert_info.h"
 }
 
