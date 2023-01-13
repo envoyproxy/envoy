@@ -82,7 +82,7 @@ minor_behavior_changes:
     added :ref:`idle_timeout <envoy_v3_api_field_extensions.upstreams.tcp.v3.TcpProtocolOptions.idle_timeout>` to support per client idle timeout for tcp connection pool. The timeout is guarded by ``envoy.reloadable_features.tcp_pool_idle_timeout`` and timeout defaults to 10 minutes if runtime flag is enabled.
 
 
-bug_fixes:
+    bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: aws_lambda
   change: |
@@ -326,5 +326,8 @@ new_features:
   change: |
     added an api configuration :ref:`xds_config_tracker_extension <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.xds_config_tracker_extension>` in the bootstrap
     to allow tracking xDS responses in external components, and provided the extension interface.
+- area: tls
+  change: |
+    added support to configure the `enforce_rsa_key_usage` of SSL_CONFIG. This can be used to override its configuration in BoringSSL.
 
 deprecated:
