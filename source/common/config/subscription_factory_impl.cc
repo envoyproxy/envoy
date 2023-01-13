@@ -23,12 +23,10 @@ SubscriptionFactoryImpl::SubscriptionFactoryImpl(
     const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
     Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor,
     Api::Api& api, const Server::Instance& server,
-    XdsResourcesDelegateOptRef xds_resources_delegate,
-    XdsConfigTrackerOptRef xds_config_tracker)
+    XdsResourcesDelegateOptRef xds_resources_delegate, XdsConfigTrackerOptRef xds_config_tracker)
     : local_info_(local_info), dispatcher_(dispatcher), cm_(cm),
       validation_visitor_(validation_visitor), api_(api), server_(server),
-      xds_resources_delegate_(xds_resources_delegate),
-      xds_config_tracker_(xds_config_tracker) {}
+      xds_resources_delegate_(xds_resources_delegate), xds_config_tracker_(xds_config_tracker) {}
 
 SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
@@ -191,7 +189,7 @@ GrpcMuxSharedPtr SubscriptionFactoryImpl::getOrCreateMux(
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
       mux = std::make_shared<Config::XdsMux::GrpcMuxSotw>(
           Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(), api_config_source,
-                                                  scope, true)
+                                                 scope, true)
               ->createUncachedRawAsyncClient(),
           dispatcher_, sotwGrpcMethod(type_url), api_.randomGenerator(), scope,
           Utility::parseRateLimitSettings(api_config_source), local_info_,
@@ -201,7 +199,7 @@ GrpcMuxSharedPtr SubscriptionFactoryImpl::getOrCreateMux(
       mux = std::make_shared<Config::GrpcMuxImpl>(
           local_info_,
           Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(), api_config_source,
-                                                  scope, true)
+                                                 scope, true)
               ->createUncachedRawAsyncClient(),
           dispatcher_, sotwGrpcMethod(type_url), api_.randomGenerator(), scope,
           Utility::parseRateLimitSettings(api_config_source),
@@ -214,7 +212,7 @@ GrpcMuxSharedPtr SubscriptionFactoryImpl::getOrCreateMux(
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
       mux = std::make_shared<Config::XdsMux::GrpcMuxDelta>(
           Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(), api_config_source,
-                                                  scope, true)
+                                                 scope, true)
               ->createUncachedRawAsyncClient(),
           dispatcher_, deltaGrpcMethod(type_url), api_.randomGenerator(), scope,
           Utility::parseRateLimitSettings(api_config_source), local_info_,
@@ -223,7 +221,7 @@ GrpcMuxSharedPtr SubscriptionFactoryImpl::getOrCreateMux(
     } else {
       mux = std::make_shared<Config::NewGrpcMuxImpl>(
           Config::Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
-                                                          api_config_source, scope, true)
+                                                         api_config_source, scope, true)
               ->createUncachedRawAsyncClient(),
           dispatcher_, deltaGrpcMethod(type_url), api_.randomGenerator(), scope,
           Utility::parseRateLimitSettings(api_config_source), local_info_,

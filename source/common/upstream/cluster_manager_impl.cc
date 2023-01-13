@@ -351,7 +351,8 @@ ClusterManagerImpl::ClusterManagerImpl(
 
   multiplexed_subscription_factory_ = std::make_unique<MultiplexedSubscriptionFactory>(
       local_info, main_thread_dispatcher, *this, validation_context.dynamicValidationVisitor(), api,
-      server, makeOptRefFromPtr(xds_resources_delegate_.get()), makeOptRefFromPtr(xds_config_tracker_.get()));
+      server, makeOptRefFromPtr(xds_resources_delegate_.get()),
+      makeOptRefFromPtr(xds_config_tracker_.get()));
 
   const auto& dyn_resources = bootstrap.dynamic_resources();
 
