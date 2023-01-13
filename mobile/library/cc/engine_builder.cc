@@ -191,11 +191,6 @@ EngineBuilder& EngineBuilder::enableH2ExtendKeepaliveTimeout(bool h2_extend_keep
 
 EngineBuilder&
 EngineBuilder::enablePlatformCertificatesValidation(bool platform_certificates_validation_on) {
-#if defined(__APPLE__)
-  if (platform_certificates_validation_on) {
-    PANIC("Certificates validation using platform provided APIs is not supported in IOS.");
-  }
-#endif
   platform_certificates_validation_on_ = platform_certificates_validation_on;
   return *this;
 }
