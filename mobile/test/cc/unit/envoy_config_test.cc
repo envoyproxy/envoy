@@ -338,7 +338,7 @@ TEST(TestConfig, EnablePlatformCertificatesValidation) {
   ASSERT_THAT(bootstrap.DebugString(),
               HasSubstr("envoy_mobile.cert_validator.platform_bridge_cert_validator"));
   ASSERT_THAT(bootstrap.DebugString(), Not(HasSubstr("trusted_ca")));
-#else
+#elif GTEST_HAS_DEATH_TEST
   EXPECT_DEATH(engine_builder.enablePlatformCertificatesValidation(true),
                "Certificates validation using platform provided APIs is not supported in IOS");
 #endif
