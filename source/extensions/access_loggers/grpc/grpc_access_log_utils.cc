@@ -172,7 +172,7 @@ void Utility::extractCommonAccessLogProperties(
         *stream_info.downstreamAddressProvider().localAddress(),
         *common_access_log.mutable_downstream_local_address());
   }
-  if (stream_info.downstreamAddressProvider().requestedServerName() != nullptr) {
+  if (!stream_info.downstreamAddressProvider().requestedServerName().empty()) {
     common_access_log.mutable_tls_properties()->set_tls_sni_hostname(
         std::string(stream_info.downstreamAddressProvider().requestedServerName()));
   }
