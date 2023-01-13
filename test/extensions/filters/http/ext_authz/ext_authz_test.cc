@@ -430,9 +430,9 @@ TEST_F(HttpFilterTest, ImmediateErrorOpen) {
   EXPECT_EQ(1U, config_->stats().failure_mode_allowed_.value());
 }
 
-// Test when allow_debugging_failures is set then the original returned headers are propagated back
-// to the client.
-TEST_F(HttpFilterTest, ResponseHeadersGetPropagatedBackInFailureDebuggingMode) {
+// Test when `propagate_response_on_failure` is set then the original returned headers are
+// propagated back to the client.
+TEST_F(HttpFilterTest, ResponseHeadersGetPropagatedBackOn5XX) {
   InSequence s;
 
   initialize(R"EOF(
@@ -442,7 +442,7 @@ TEST_F(HttpFilterTest, ResponseHeadersGetPropagatedBackInFailureDebuggingMode) {
       uri: "http://localhost:8080"
       cluster: "ext_authz_server"
       timeout: "60s"
-  allow_debugging_failures: true
+    propagate_response_on_failure: true
   )EOF");
   prepareCheck();
   EXPECT_CALL(*client_, check(_, _, _, _))
@@ -480,17 +480,17 @@ TEST_F(HttpFilterTest, ResponseHeadersGetPropagatedBackInFailureDebuggingMode) {
   response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString{"honey"}, "bee"}};
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
 
-  // Verify that both `failure_debugging_allowed` and `error` counters get incremented.
+  // Verify that both `propagate_response_on_failure` and `error` counters get incremented.
   EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
                     ->statsScope()
                     .counterFromString("ext_authz.error")
                     .value());
   EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
                     ->statsScope()
-                    .counterFromString("ext_authz.failure_debugging_allowed")
+                    .counterFromString("ext_authz.propagate_response_on_failure")
                     .value());
   EXPECT_EQ(1U, config_->stats().error_.value());
-  EXPECT_EQ(1U, config_->stats().failure_debugging_allowed_.value());
+  EXPECT_EQ(1U, config_->stats().propagate_response_on_failure_.value());
   EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
                     ->statsScope()
                     .counterFromString("upstream_rq_5xx")
@@ -501,9 +501,9 @@ TEST_F(HttpFilterTest, ResponseHeadersGetPropagatedBackInFailureDebuggingMode) {
                     .value());
 }
 
-// Test when allow_debugging_failures is not set then the headers sent from upstream are not
+// Test when `propagate_response_on_failure` is not set then the headers sent from upstream are not
 // propagated back to the client.
-TEST_F(HttpFilterTest, ResponseHeadersDoNotGetPropagatedWhenNotFailureDebuggingMode) {
+TEST_F(HttpFilterTest, ResponseHeadersDoNotGetPropagatedOn5XX) {
   InSequence s;
 
   initialize(R"EOF(
@@ -513,7 +513,7 @@ TEST_F(HttpFilterTest, ResponseHeadersDoNotGetPropagatedWhenNotFailureDebuggingM
       uri: "http://localhost:8080"
       cluster: "ext_authz_server"
       timeout: "60s"
-  allow_debugging_failures: false
+    propagate_response_on_failure: false
   )EOF");
   prepareCheck();
   EXPECT_CALL(*client_, check(_, _, _, _))
@@ -540,17 +540,17 @@ TEST_F(HttpFilterTest, ResponseHeadersDoNotGetPropagatedWhenNotFailureDebuggingM
   response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString{"honey"}, "bee"}};
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
 
-  // Verify that both `failure_debugging_allowed` and `error` counters get incremented.
+  // Verify that both `propagate_response_on_failure` and `error` counters get incremented.
   EXPECT_EQ(1U, decoder_filter_callbacks_.clusterInfo()
                     ->statsScope()
                     .counterFromString("ext_authz.error")
                     .value());
   EXPECT_EQ(0U, decoder_filter_callbacks_.clusterInfo()
                     ->statsScope()
-                    .counterFromString("ext_authz.failure_debugging_allowed")
+                    .counterFromString("ext_authz.propagate_response_on_failure")
                     .value());
   EXPECT_EQ(1U, config_->stats().error_.value());
-  EXPECT_EQ(0U, config_->stats().failure_debugging_allowed_.value());
+  EXPECT_EQ(0U, config_->stats().propagate_response_on_failure_.value());
   EXPECT_EQ(0U, decoder_filter_callbacks_.clusterInfo()
                     ->statsScope()
                     .counterFromString("upstream_rq_5xx")

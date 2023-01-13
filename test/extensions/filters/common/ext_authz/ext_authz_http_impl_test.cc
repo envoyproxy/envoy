@@ -179,8 +179,8 @@ public:
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 };
 
-// Verify that when a call to authorization server returns a 5xx and `allow_debugging_failures` is
-// set then we preserve the original status code, headers, etc.
+// Verify that when a call to authorization server returns a 5xx and `propagate_response_on_failure`
+// is set then we preserve the original status code, headers, etc.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationRequest5xxNoError) {
   const std::string yaml = R"EOF(
     http_service:
@@ -193,7 +193,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationRequest5xxNoError) {
           patterns:
           - prefix: "X-Metadata-"
             ignore_case: true
-    allow_debugging_failures: true
+      propagate_response_on_failure: true
     )EOF";
 
   initialize(yaml);

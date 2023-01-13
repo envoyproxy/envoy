@@ -26,7 +26,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 19]
+// [#next-free-field: 18]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v2.ExtAuthz";
@@ -62,16 +62,6 @@ message ExtAuthz {
   // Note that errors can be ``always`` tracked in the :ref:`stats
   // <config_http_filters_ext_authz_stats>`.
   bool failure_mode_allow = 2;
-
-  //  This changes the filter's behaviour on errors:
-  //
-  //  1. When set to true, the filter would retain the status code received from the upstream and
-  //  would also propagate the response body and headers back to the client (if available) for
-  //  further debugging.
-  //
-  //  2. When set to false, the filter would return a 403 or `status_on_error` (if set) and would
-  //  not propagate any response body or headers back to the client. This is the default behavior.
-  bool allow_debugging_failures = 18;
 
   // Enables filter to buffer the client request body and send it within the authorization request.
   // A ``x-envoy-auth-partial-body: false|true`` metadata header will be added to the authorization
@@ -242,7 +232,7 @@ message BufferSettings {
 // metadata as well as body may be added to the client's response. See :ref:`allowed_client_headers
 // <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.AuthorizationResponse.allowed_client_headers>`
 // for details.
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message HttpService {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v2.HttpService";
@@ -260,6 +250,16 @@ message HttpService {
 
   // Settings used for controlling authorization response metadata.
   AuthorizationResponse authorization_response = 8;
+
+  //  This changes the filter's behaviour on errors:
+  //
+  //  1. When set to true, the filter would retain the status code received from the upstream and
+  //  would also propagate the response body and headers back to the client (if available) for
+  //  further debugging.
+  //
+  //  2. When set to false, the filter would return a 403 or `status_on_error` (if set) and would
+  //  not propagate any response body or headers back to the client. This is the default behavior.
+  bool propagate_response_on_failure = 9;
 }
 
 message AuthorizationRequest {

@@ -418,15 +418,15 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
           *decoder_callbacks_, enumToInt(config_->statusOnError()));
       decoder_callbacks_->streamInfo().setResponseFlag(
           StreamInfo::ResponseFlag::UnauthorizedExternalService);
-      if (config_->failureDebuggingAllowed()) {
+      if (config_->propagateResponseOnFailure()) {
         ENVOY_STREAM_LOG(trace,
                          "ext_authz filter has failure debugging allowed. Propagating response "
                          "body and headers back to the client.",
                          *decoder_callbacks_);
-        stats_.failure_debugging_allowed_.inc();
+        stats_.propagate_response_on_failure_.inc();
         if (cluster_) {
           config_->incCounter(cluster_->statsScope(),
-                              config_->ext_authz_failure_debugging_allowed_);
+                              config_->ext_authz_propagate_response_on_failure_);
           Http::CodeStats::ResponseStatInfo info{config_->scope(),
                                                  cluster_->statsScope(),
                                                  empty_stat_name,
@@ -455,7 +455,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
               // times, e.g. `Set-Cookie`.
               for (const auto& header : headers) {
                 ENVOY_STREAM_LOG(trace, " '{}':'{}'", callbacks, header.first.get(), header.second);
-                response_headers.addCopy(header.first, header.second);
+                response_headers.setCopy(header.first, header.second);
               }
             },
             absl::nullopt, Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzError);

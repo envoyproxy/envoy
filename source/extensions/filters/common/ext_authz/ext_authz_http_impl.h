@@ -81,7 +81,7 @@ public:
    * the user then we should preserve the headers, body, and status received from upstream and
    * propagate it back to the client for further debugging.
    */
-  bool failureDebuggingAllowed() const { return failure_debugging_allowed_; }
+  bool propagateResponseOnFailure() const { return propagate_response_on_failure_; }
 
   /**
    * Returns the name used for tracing.
@@ -108,7 +108,7 @@ private:
   const MatcherSharedPtr to_dynamic_metadata_matchers_;
   const MatcherSharedPtr upstream_header_matchers_;
   const MatcherSharedPtr upstream_header_to_append_matchers_;
-  const bool failure_debugging_allowed_;
+  const bool propagate_response_on_failure_;
   const std::string cluster_name_;
   const std::chrono::milliseconds timeout_;
   const std::string path_prefix_;

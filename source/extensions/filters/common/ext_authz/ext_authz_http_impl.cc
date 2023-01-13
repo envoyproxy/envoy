@@ -114,7 +114,9 @@ ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3
           config.http_service().authorization_response().allowed_upstream_headers())),
       upstream_header_to_append_matchers_(toUpstreamMatchers(
           config.http_service().authorization_response().allowed_upstream_headers_to_append())),
-      failure_debugging_allowed_(config.allow_debugging_failures()),
+      propagate_response_on_failure_(config.has_http_service()
+                                         ? config.http_service().propagate_response_on_failure()
+                                         : false),
       cluster_name_(config.http_service().server_uri().cluster()), timeout_(timeout),
       path_prefix_(path_prefix),
       tracing_name_(fmt::format("async {} egress", config.http_service().server_uri().cluster())),
@@ -276,7 +278,7 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
   // Set an error status if the call to the authorization server returns any of the 5xx HTTP error
   // codes. A Forbidden response is sent to the client if the filter has not been configured with
   // failure_mode_allow.
-  if (Http::CodeUtility::is5xx(status_code) && !config_->failureDebuggingAllowed()) {
+  if (Http::CodeUtility::is5xx(status_code) && !config_->propagateResponseOnFailure()) {
     return std::make_unique<Response>(errorResponse());
   }
 
