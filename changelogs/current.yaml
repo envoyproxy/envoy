@@ -328,6 +328,6 @@ new_features:
     to allow tracking xDS responses in external components, and provided the extension interface.
 - area: tls
   change: |
-    added support to configure the `enforce_rsa_key_usage` of SSL_CONFIG. This can be used to override its configuration in BoringSSL.
+    added support to configure the ``enforce_rsa_key_usage`` of SSL_CONFIG. This can be used to override its configuration in BoringSSL.
 
 deprecated:
