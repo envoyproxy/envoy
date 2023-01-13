@@ -23,8 +23,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: TLS transport socket]
 // [#extension: envoy.transport_sockets.tls]
-
 // The TLS contexts below provide the transport socket configuration for upstream/downstream TLS.
+
 // [#next-free-field: 6]
 message UpstreamTlsContext {
   option (udpa.annotations.versioning).previous_message_type =
