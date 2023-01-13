@@ -12,6 +12,7 @@
 #include "source/common/network/connection_balancer_impl.h"
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/raw_buffer_socket.h"
+#include "source/common/network/proxy_protocol_filter_state.h"
 #include "source/common/network/tcp_listener_impl.h"
 #include "source/common/network/utility.h"
 #include "source/extensions/filters/listener/proxy_protocol/proxy_protocol.h"
@@ -1554,6 +1555,48 @@ TEST_P(ProxyProtocolTest, V2IncompleteTLV) {
   write(tlv2, sizeof(tlv2));
 
   expectProxyProtoError();
+}
+
+TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterState) {
+  // A well-formed ipv4/tcp with a pair of TLV extensions is accepted
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x1a, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
+  constexpr uint8_t tlv1[] = {0x0, 0x0, 0x1, 0xff};
+  constexpr uint8_t tlv_type_authority[] = {0x02, 0x00, 0x07, 0x66, 0x6f,
+                                            0x6f, 0x2e, 0x63, 0x6f, 0x6d};
+  constexpr uint8_t data[] = {'D', 'A', 'T', 'A'};
+
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  auto rule = proto_config.add_rules();
+  rule->set_tlv_type(0x02);
+  rule->mutable_on_tlv_present()->set_key("PP2 type authority");
+
+  connect(true, &proto_config);
+  write(buffer, sizeof(buffer));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  write(tlv1, sizeof(tlv1));
+  write(tlv_type_authority, sizeof(tlv_type_authority));
+  write(data, sizeof(data));
+  expectData("DATA");
+
+  auto& filter_state = server_connection_->streamInfo().filterState();
+  EXPECT_TRUE(filter_state->hasData<Network::ProxyProtocolFilterState>(
+      Network::ProxyProtocolFilterState::key()));
+
+  const auto& proxy_proto_data = filter_state
+                                     ->getDataReadOnly<Network::ProxyProtocolFilterState>(
+                                         Network::ProxyProtocolFilterState::key())
+                                     ->value();
+
+  EXPECT_EQ(2, proxy_proto_data.tlv_vector_.size());
+  EXPECT_EQ(0x0, proxy_proto_data.tlv_vector_[0].type);
+  EXPECT_EQ("\xff", proxy_proto_data.tlv_vector_[0].value);
+  EXPECT_EQ(0x02, proxy_proto_data.tlv_vector_[1].type);
+  EXPECT_EQ("foo.com", proxy_proto_data.tlv_vector_[1].value);
+
+  disconnect();
 }
 
 TEST_P(ProxyProtocolTest, MalformedProxyLine) {

@@ -71,8 +71,7 @@ void UpstreamProxyProtocolSocket::generateHeaderV2() {
     Common::ProxyProtocol::generateV2LocalHeader(header_buffer_);
   } else {
     const auto options = options_->proxyProtocolOptions().value();
-    Common::ProxyProtocol::generateV2Header(*options.src_addr_->ip(), *options.dst_addr_->ip(),
-                                            header_buffer_);
+    Common::ProxyProtocol::generateV2Header(options, header_buffer_);
   }
 }
 
