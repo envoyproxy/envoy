@@ -8,12 +8,6 @@
 #include "envoy/config/cluster/v3/filter.pb.h"
 #include "envoy/config/cluster/v3/filter.pb.validate.h"
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/config/health_checker/redis/v2/redis.pb.h"
-#include "envoy/config/health_checker/redis/v2/redis.pb.validate.h"
-#include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
-#include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.validate.h"
-#include "envoy/extensions/health_checkers/redis/v3/redis.pb.h"
-#include "envoy/extensions/health_checkers/redis/v3/redis.pb.validate.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "source/common/common/base64.h"
@@ -257,28 +251,28 @@ TEST_F(ProtobufUtilityTest, DowncastAndValidateUnknownFieldsNested) {
 // Validated exception thrown when observed nested unknown field with any.
 TEST_F(ProtobufUtilityTest, ValidateUnknownFieldsNestedAny) {
   // Constructs a nested message with unknown field
-  envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig cluster_config;
-  auto* dns_cache_config = cluster_config.mutable_dns_cache_config();
-  dns_cache_config->set_name("dynamic_forward_proxy_cache_config");
-  dns_cache_config->GetReflection()->MutableUnknownFields(dns_cache_config)->AddVarint(999, 0);
+  utility_test::message_field_wip::Outer outer;
+  auto* inner = outer.mutable_inner();
+  inner->set_name("inner");
+  inner->GetReflection()->MutableUnknownFields(inner)->AddVarint(999, 0);
 
   // Constructs ancestors of the nested any message with unknown field.
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
   auto* cluster_type = cluster->mutable_cluster_type();
-  cluster_type->set_name("envoy.clusters.dynamic_forward_proxy");
-  cluster_type->mutable_typed_config()->PackFrom(cluster_config);
+  cluster_type->set_name("outer");
+  cluster_type->mutable_typed_config()->PackFrom(outer);
 
   EXPECT_THROW_WITH_MESSAGE(
       TestUtility::validate(bootstrap, /*recurse_into_any*/ true), EnvoyException,
-      unknownFieldsMessage("envoy.extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig",
+      unknownFieldsMessage("utility_test.message_field_wip.Inner",
                            {
                                "envoy.config.bootstrap.v3.Bootstrap",
                                "envoy.config.bootstrap.v3.Bootstrap.StaticResources",
                                "envoy.config.cluster.v3.Cluster",
                                "envoy.config.cluster.v3.Cluster.CustomClusterType",
                                "google.protobuf.Any",
-                               "envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig",
+                               "utility_test.message_field_wip.Outer",
                            },
                            {999}));
 }

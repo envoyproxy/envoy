@@ -85,8 +85,8 @@ protected:
     return std::make_unique<Event::SimulatedTimeSystem>();
   }
 
-  void initGuardDog(Stats::Scope& stats_scope, const Server::Configuration::Watchdog& config) {
-    guard_dog_ = std::make_unique<GuardDogImpl>(stats_scope, config, *api_, "server",
+  void initGuardDog(Stats::Store& stats_store, const Server::Configuration::Watchdog& config) {
+    guard_dog_ = std::make_unique<GuardDogImpl>(*stats_store.rootScope(), config, *api_, "server",
                                                 std::make_unique<DebugTestInterlock>());
   }
 

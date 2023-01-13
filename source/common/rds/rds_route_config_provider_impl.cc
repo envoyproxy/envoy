@@ -15,13 +15,13 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
     return std::make_shared<ThreadLocalConfig>(initial_config);
   });
   // It should be 1:1 mapping due to shared rds config.
-  ASSERT(!subscription_->routeConfigProvider().has_value());
-  subscription_->routeConfigProvider().emplace(this);
+  ASSERT(subscription_->routeConfigProvider() == nullptr);
+  subscription_->routeConfigProvider() = this;
 }
 
 RdsRouteConfigProviderImpl::~RdsRouteConfigProviderImpl() {
-  ASSERT(subscription_->routeConfigProvider().has_value());
-  subscription_->routeConfigProvider().reset();
+  ASSERT(subscription_->routeConfigProvider() != nullptr);
+  subscription_->routeConfigProvider() = nullptr;
 }
 
 const absl::optional<RouteConfigProvider::ConfigInfo>&

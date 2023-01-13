@@ -17,3 +17,11 @@ message MultipleFields {
   string bar = 2;
   int32 baz = 3;
 }
+
+message Inner {
+  string name = 1;
+}
+
+message Outer {
+  Inner inner = 1;
+};
