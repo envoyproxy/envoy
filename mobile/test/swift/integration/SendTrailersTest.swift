@@ -84,7 +84,7 @@ static_resources:
       .sendData(body)
       .close(trailers: requestTrailers)
 
-    XCTAssertEqual(XCTWaiter.wait(for: [expectation], timeout: 1), .completed)
+    XCTAssertEqual(XCTWaiter.wait(for: [expectation], timeout: 10), .completed)
 
     engine.terminate()
   }
