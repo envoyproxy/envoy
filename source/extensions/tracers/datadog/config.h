@@ -27,7 +27,8 @@ class DatadogTracerFactory : public Common::FactoryBase<envoy::config::trace::v3
 public:
   DatadogTracerFactory();
 
-  static datadog::tracing::TracerConfig makeConfig();
+  static datadog::tracing::TracerConfig
+  makeConfig(const envoy::config::trace::v3::DatadogConfig& proto_config);
   static std::string
   makeCollectorReferenceHost(const envoy::config::trace::v3::DatadogConfig& proto_config);
 

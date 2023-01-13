@@ -72,7 +72,7 @@ public:
     driver_ = std::make_unique<Tracer>(
         datadog_config.collector_cluster(),
         DatadogTracerFactory::makeCollectorReferenceHost(datadog_config),
-        DatadogTracerFactory::makeConfig(), cm_, *stats_.rootScope(), tls_);
+        DatadogTracerFactory::makeConfig(datadog_config), cm_, *stats_.rootScope(), tls_);
   }
 
   void setupValidDriver() {

@@ -19,11 +19,16 @@ namespace Datadog {
 
 DatadogTracerFactory::DatadogTracerFactory() : FactoryBase("envoy.tracers.datadog") {}
 
-dd::TracerConfig DatadogTracerFactory::makeConfig() {
+dd::TracerConfig
+DatadogTracerFactory::makeConfig(const envoy::config::trace::v3::DatadogConfig& proto_config) {
   dd::TracerConfig config;
   config.defaults.version = "envoy " + Envoy::VersionInfo::version();
   config.defaults.name = "envoy.proxy";
-  config.defaults.service = "envoy";
+  if (proto_config.service_name().empty()) {
+    config.defaults.service = "envoy";
+  } else {
+    config.defaults.service = proto_config.service_name();
+  }
   return config;
 }
 
@@ -40,9 +45,9 @@ Tracing::DriverSharedPtr DatadogTracerFactory::createTracerDriverTyped(
     const envoy::config::trace::v3::DatadogConfig& proto_config,
     Server::Configuration::TracerFactoryContext& context) {
   return std::make_shared<Tracer>(
-      proto_config.collector_cluster(), makeCollectorReferenceHost(proto_config), makeConfig(),
-      context.serverFactoryContext().clusterManager(), context.serverFactoryContext().scope(),
-      context.serverFactoryContext().threadLocal());
+      proto_config.collector_cluster(), makeCollectorReferenceHost(proto_config),
+      makeConfig(proto_config), context.serverFactoryContext().clusterManager(),
+      context.serverFactoryContext().scope(), context.serverFactoryContext().threadLocal());
 }
 
 /**
