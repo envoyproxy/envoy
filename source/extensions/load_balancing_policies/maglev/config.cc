@@ -25,8 +25,8 @@ Upstream::ThreadAwareLoadBalancerPtr Factory::create(const Upstream::ClusterInfo
 
   return std::make_unique<Upstream::MaglevLoadBalancer>(
       priority_set, cluster_info.lbStats(), cluster_info.statsScope(), runtime, random,
-      PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(cluster_info.lbConfig(),
-                                                     healthy_panic_threshold, 100, 50),
+      static_cast<uint32_t>(PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
+          cluster_info.lbConfig(), healthy_panic_threshold, 100, 50)),
       *typed_config);
 }
 
