@@ -6,7 +6,7 @@
 
 #include "source/common/common/hex.h"
 
-#include "nghttp2/nghttp2.h"
+#include "quiche/spdy/core/hpack/hpack_encoder.h"
 
 namespace {
 
@@ -265,35 +265,29 @@ Http2Frame Http2Frame::makeMetadataFrameFromMetadataMap(uint32_t stream_index,
                                                         const MetadataMap& metadata_map,
                                                         MetadataFlags flags) {
   const int numberOfNameValuePairs = metadata_map.size();
-  absl::FixedArray<nghttp2_nv> nameValues(numberOfNameValuePairs);
-  absl::FixedArray<nghttp2_nv>::iterator iterator = nameValues.begin();
+  spdy::HpackEncoder encoder;
+  encoder.DisableCompression();
+  spdy::HpackEncoder::Representations representations;
+  representations.reserve(numberOfNameValuePairs);
   for (const auto& metadata : metadata_map) {
-    *iterator = {const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(metadata.first.data())),
-                 const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(metadata.second.data())),
-                 metadata.first.size(), metadata.second.size(), NGHTTP2_NV_FLAG_NO_INDEX};
-    ++iterator;
+    representations.push_back({metadata.first, metadata.second});
   }
 
-  nghttp2_hd_deflater* deflater;
-  // Note: this has no effect, as metadata frames do not add onto Dynamic table.
-  const int maxDynamicTableSize = 4096;
-  nghttp2_hd_deflate_new(&deflater, maxDynamicTableSize);
-
-  const size_t upperBoundBufferLength =
-      nghttp2_hd_deflate_bound(deflater, nameValues.begin(), numberOfNameValuePairs);
-
-  uint8_t* buffer = new uint8_t[upperBoundBufferLength];
-
-  const size_t numberOfBytesInMetadataPayload = nghttp2_hd_deflate_hd(
-      deflater, buffer, upperBoundBufferLength, nameValues.begin(), numberOfNameValuePairs);
+  auto payload_sequence = encoder.EncodeRepresentations(representations);
+  ASSERT(payload_sequence->HasNext() || numberOfNameValuePairs == 0);
+  const size_t maxPayloadSize = 4 * 1024 * 1024;
+  std::string payload;
+  if (payload_sequence->HasNext()) {
+    payload = payload_sequence->Next(maxPayloadSize);
+  }
+  ASSERT(!payload_sequence->HasNext());
+  ASSERT(payload.size() > 0);
 
   Http2Frame frame;
-  frame.buildHeader(Type::Metadata, numberOfBytesInMetadataPayload, static_cast<uint8_t>(flags),
+  frame.buildHeader(Type::Metadata, payload.size(), static_cast<uint8_t>(flags),
                     makeNetworkOrderStreamId(stream_index));
-  std::vector<uint8_t> bufferVector(buffer, buffer + numberOfBytesInMetadataPayload);
-  frame.appendDataAfterHeaders(bufferVector);
-  delete[] buffer;
-  nghttp2_hd_deflate_del(deflater);
+  frame.appendDataAfterHeaders(payload);
+  ASSERT(frame.size() == payload.size() + 9);
   return frame;
 }
 
