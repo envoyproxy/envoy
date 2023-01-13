@@ -122,6 +122,9 @@ bug_fixes:
 - area: jwt_authn
   change: |
     fix a bug that jwt_cache breaks the :ref:`provider_and_audiences <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtRequirement.provider_and_audiences>` JWT requirement.
+- area: skywalking
+  change: |
+    fixed a crash which could happen when skywalking tracer is enabled and illegal ``sw8`` header is received.
 - area: health_checker
   change: |
     prevent writing pending data for health checkers by introducing ``ConnectionCloseType::Abort`` to avoid cascading handshake overhead from health checker's requests on timeout. This fix is related to `issue \#23718 <https://github.com/envoyproxy/envoy/issues/23718>`_.
@@ -220,6 +223,9 @@ new_features:
 - area: access_log
   change: |
     added support for :ref:`%STREAM_ID% <config_access_log_format_stream_id>` for stream unique identifier.
+- area: access_log
+  change: |
+    enhanced observability into local close for :ref:`%RESPONSE_CODE_DETAILS% <config_http_conn_man_details>`.
 - area: thrift
   change: |
     added payload to metadata filter which matches a given payload field's value would be extracted and attached to the request as dynamic metadata.
@@ -277,6 +283,9 @@ new_features:
 - area: tracing
   change: |
     added support for setting the hostname used when sending spans to a Datadog collector using the :ref:`collector_hostname <envoy_v3_api_field_config.trace.v3.DatadogConfig.collector_hostname>` field.
+- area: stats
+  change: |
+    added ``includeHistogram()`` method to ``Stats::SinkPredicates`` to filter histograms to be flushed to stat sinks. Use ``envoy.reloadable_features.enable_include_histograms`` to enable this feature, which is disabled by default.
 - area: http
   change: |
     added support of :ref:`early header mutation <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.early_header_mutation_extensions>` to the HTTP connection manager.
