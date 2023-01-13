@@ -512,7 +512,7 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, DualCert) {
   }
 }
 
-// A test that multiple(>) sds configs are provided. More than one RSA/ECDSA cert
+// A test that multiple(>2) sds configs are provided. More than one RSA/ECDSA cert
 // is allowed if they has different server name pattern(DNS SAN or subject name),
 // different server name patterns will be used to match SNI in cert selection.
 // Detailed behaviors of cert selection are tested in SslSocketTest with static
