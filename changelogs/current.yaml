@@ -137,6 +137,9 @@ bug_fixes:
 - area: tcp_proxy
   change: |
     When tunneling TCP over HTTP, mark the upstream connection as done reading when upstream trailers are read. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.finish_reading_on_decode_trailers`` to false.
+- area: router
+  change: |
+    fixed the bug that custom tags of the route metadata type are not set for upstream spans.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -328,6 +331,6 @@ new_features:
     to allow tracking xDS responses in external components, and provided the extension interface.
 - area: router
   change: |
-    support route info in upstream access log and custom tags of the route metadata type for upstream spans.
+    support route info in upstream access log.
 
 deprecated:
