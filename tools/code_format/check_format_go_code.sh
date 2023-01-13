@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 tools="$(dirname "$(dirname "$(realpath "$0")")")"
 root=$(realpath "$tools/..")
 
