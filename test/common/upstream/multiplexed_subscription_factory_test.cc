@@ -38,9 +38,9 @@ public:
       const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
       Upstream::ClusterManager& cm, Api::Api& api,
       ProtobufMessage::ValidationVisitor& validation_visitor, const Server::Instance& server,
-      Config::XdsResourcesDelegateOptRef xds_resources_delegate)
+      Config::XdsResourcesDelegateOptRef xds_resources_delegate, Config::XdsConfigTrackerOptRef xds_config_tracker)
       : MultiplexedSubscriptionFactory(local_info, dispatcher, cm, validation_visitor, api, server,
-                                       xds_resources_delegate){};
+                                       xds_resources_delegate, xds_config_tracker){};
 
   Config::GrpcMuxSharedPtr
   testGetOrCreateMux(const envoy::config::core::v3::ApiConfigSource& api_config_source,
@@ -72,6 +72,7 @@ public:
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Config::OpaqueResourceDecoderSharedPtr resource_decoder_;
   NiceMock<Config::XdsResourcesDelegateOptRef> xds_resources_delegate_;
+  NiceMock<Config::XdsConfigTrackerOptRef> xds_config_tracker_;
 };
 
 using MultiplexedSubscriptionFactoryForGrpcTest = MultiplexedSubscriptionFactoryTest;
@@ -87,7 +88,7 @@ TEST_P(MultiplexedSubscriptionFactoryForGrpcTest, ShouldReturnSameMuxForSameConf
   config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("primary_xds_cluster");
   config_source->set_api_type(GetParam());
   auto factory = MultiplexedSubscriptionFactoryForTesting(
-      local_info_, dispatcher_, cm_, api_, validation_visitor_, server_, xds_resources_delegate_);
+      local_info_, dispatcher_, cm_, api_, validation_visitor_, server_, xds_resources_delegate_, xds_config_tracker_);
 
   EXPECT_CALL(dispatcher_, createTimer_(_));
   Config::CustomConfigValidatorsPtr config_validators =
@@ -115,7 +116,7 @@ TEST_P(MultiplexedSubscriptionFactoryForGrpcTest, ShouldReturnSameMuxForSameGrpc
   config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name(
       "fallback_xds_cluster");
   auto factory = MultiplexedSubscriptionFactoryForTesting(
-      local_info_, dispatcher_, cm_, api_, validation_visitor_, server_, xds_resources_delegate_);
+      local_info_, dispatcher_, cm_, api_, validation_visitor_, server_, xds_resources_delegate_, xds_config_tracker_);
 
   EXPECT_CALL(dispatcher_, createTimer_(_));
   Config::CustomConfigValidatorsPtr config_validators =
@@ -132,7 +133,7 @@ TEST_P(MultiplexedSubscriptionFactoryForGrpcTest, ShouldReturnSameMuxForSameGrpc
 // Verify that a new mux instance is created if a different config_source is used.
 TEST_P(MultiplexedSubscriptionFactoryForGrpcTest, ShouldReturnDiffMuxesForDiffXdsServers) {
   auto factory = MultiplexedSubscriptionFactoryForTesting(
-      local_info_, dispatcher_, cm_, api_, validation_visitor_, server_, xds_resources_delegate_);
+      local_info_, dispatcher_, cm_, api_, validation_visitor_, server_, xds_resources_delegate_, xds_config_tracker_);
 
   EXPECT_CALL(dispatcher_, createTimer_(_)).Times(2);
   envoy::config::core::v3::ConfigSource first_config;
@@ -161,7 +162,7 @@ TEST_P(MultiplexedSubscriptionFactoryForGrpcTest, ShouldReturnDiffMuxesForDiffXd
   config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("xds_cluster");
   config_source->set_api_type(GetParam());
   auto factory = MultiplexedSubscriptionFactoryForTesting(
-      local_info_, dispatcher_, cm_, api_, validation_visitor_, server_, xds_resources_delegate_);
+      local_info_, dispatcher_, cm_, api_, validation_visitor_, server_, xds_resources_delegate_, xds_config_tracker_);
   EXPECT_CALL(dispatcher_, createTimer_(_)).Times(3);
   Config::CustomConfigValidatorsPtr config_validators =
       std::make_unique<NiceMock<Config::MockCustomConfigValidators>>();
@@ -186,7 +187,7 @@ TEST_P(MultiplexedSubscriptionFactoryForGrpcTest, ShouldReturnDiffMuxesForDiffXd
 TEST_P(MultiplexedSubscriptionFactoryForGrpcTest,
        ShouldUseGetOrCreateMuxWhenApiConfigSourceIsUsed) {
   auto factory = MultiplexedSubscriptionFactoryForTesting(
-      local_info_, dispatcher_, cm_, api_, validation_visitor_, server_, xds_resources_delegate_);
+      local_info_, dispatcher_, cm_, api_, validation_visitor_, server_, xds_resources_delegate_, xds_config_tracker_);
   envoy::config::core::v3::ConfigSource config;
   auto config_source = config.mutable_api_config_source();
   config_source->set_api_type(GetParam());
@@ -227,7 +228,7 @@ INSTANTIATE_TEST_SUITE_P(NonGrpcApiConfigSource, MultiplexedSubscriptionFactoryF
 TEST_P(MultiplexedSubscriptionFactoryForNonGrpcTest,
        ShouldUseBaseGetOrCreateMuxWhenNonGrpcConfigSourceIsUsed) {
   auto factory = MultiplexedSubscriptionFactoryForTesting(
-      local_info_, dispatcher_, cm_, api_, validation_visitor_, server_, xds_resources_delegate_);
+      local_info_, dispatcher_, cm_, api_, validation_visitor_, server_, xds_resources_delegate_, xds_config_tracker_);
   envoy::config::core::v3::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::REST);

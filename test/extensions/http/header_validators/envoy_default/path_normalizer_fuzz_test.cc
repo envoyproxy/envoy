@@ -2,8 +2,10 @@
 #include "source/extensions/http/header_validators/envoy_default/http1_header_validator.h"
 
 #include "test/extensions/http/header_validators/envoy_default/path_normalizer_fuzz.pb.h"
+#include "test/extensions/http/header_validators/envoy_default/path_normalizer_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
-#include "test/mocks/stream_info/mocks.h"
+#include "test/mocks/http/header_validator.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 
@@ -11,6 +13,14 @@ namespace Envoy {
 DEFINE_PROTO_FUZZER(
     const test::extensions::http::header_validators::envoy_default::PathNormalizerFuzzTestCase&
         input) {
+  // Validate the PGV constraints of the input.
+  try {
+    TestUtility::validate(input);
+  } catch (const EnvoyException& e) {
+    ENVOY_LOG_MISC(debug, "EnvoyException during validation: {}", e.what());
+    return;
+  }
+
   auto header_map = Http::RequestHeaderMapImpl::create();
   Http::HeaderString method;
   Http::HeaderString path;
@@ -19,9 +29,9 @@ DEFINE_PROTO_FUZZER(
 
   ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig config;
   *config.mutable_uri_path_normalization_options() = input.options();
-  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  ::testing::NiceMock<Http::MockHeaderValidatorStats> stats_fake;
   Extensions::Http::HeaderValidators::EnvoyDefault::Http1HeaderValidator validator(
-      config, Http::Protocol::Http11, stream_info);
+      config, Http::Protocol::Http11, stats_fake);
   // The character set of the :path and :method headers is validated before normalization.
   // Here we will just not run the test with invalid values
   if (!validator.validateMethodHeader(method) ||

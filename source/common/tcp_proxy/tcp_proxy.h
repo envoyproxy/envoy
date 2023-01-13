@@ -459,10 +459,7 @@ protected:
     return config_->getRouteFromEntries(read_callbacks_->connection());
   }
 
-  virtual void onInitFailure(UpstreamFailureReason) {
-    read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
-  }
-
+  virtual void onInitFailure(UpstreamFailureReason reason);
   void initialize(Network::ReadFilterCallbacks& callbacks, bool set_connection_stats);
 
   // Create connection to the upstream cluster. This function can be repeatedly called on upstream

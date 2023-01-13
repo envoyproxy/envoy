@@ -161,7 +161,12 @@ private:
   OptRef<quic::ProofVerifyContext> last_verify_context_;
 };
 
-class MockEnvoyQuicClientSession : public EnvoyQuicClientSession {
+class IsolatedStoreProvider {
+protected:
+  Stats::IsolatedStoreImpl stats_store_;
+};
+
+class MockEnvoyQuicClientSession : public IsolatedStoreProvider, public EnvoyQuicClientSession {
 public:
   MockEnvoyQuicClientSession(const quic::QuicConfig& config,
                              const quic::ParsedQuicVersionVector& supported_versions,
@@ -173,7 +178,7 @@ public:
                                std::make_shared<quic::QuicCryptoClientConfig>(
                                    quic::test::crypto_test_utils::ProofVerifierForTesting()),
                                nullptr, dispatcher, send_buffer_limit, crypto_stream_factory,
-                               quic_stat_names_, {}, stats_store_, nullptr) {}
+                               quic_stat_names_, {}, *stats_store_.rootScope(), nullptr) {}
 
   void Initialize() override {
     EnvoyQuicClientSession::Initialize();
@@ -209,7 +214,6 @@ protected:
   }
   quic::QuicConnection* quicConnection() override { return initialized_ ? connection() : nullptr; }
 
-  Stats::IsolatedStoreImpl stats_store_;
   QuicStatNames quic_stat_names_{stats_store_.symbolTable()};
 };
 

@@ -36,6 +36,8 @@ public:
   CancelFunction
   openExistingFile(absl::string_view filename, Mode mode,
                    std::function<void(absl::StatusOr<AsyncFileHandle>)> on_complete) override;
+  CancelFunction stat(absl::string_view filename,
+                      std::function<void(absl::StatusOr<struct stat>)> on_complete) override;
   CancelFunction unlink(absl::string_view filename,
                         std::function<void(absl::Status)> on_complete) override;
   std::string describe() const override;

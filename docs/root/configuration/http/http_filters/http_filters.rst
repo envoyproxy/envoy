@@ -27,6 +27,7 @@ HTTP filters
   fault_filter
   file_system_buffer_filter
   gcp_authn_filter
+  golang_filter
   grpc_http1_bridge_filter
   grpc_http1_reverse_bridge_filter
   grpc_json_transcoder_filter

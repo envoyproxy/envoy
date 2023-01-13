@@ -139,8 +139,8 @@ void ConnectionImpl::close(ConnectionCloseType type) {
                        data_to_write, enumToInt(type));
   const bool delayed_close_timeout_set = delayed_close_timeout_.count() > 0;
   if (data_to_write == 0 || type == ConnectionCloseType::NoFlush ||
-      !transport_socket_->canFlushClose()) {
-    if (data_to_write > 0) {
+      type == ConnectionCloseType::Abort || !transport_socket_->canFlushClose()) {
+    if (data_to_write > 0 && type != ConnectionCloseType::Abort) {
       // We aren't going to wait to flush, but try to write as much as we can if there is pending
       // data.
       transport_socket_->doWrite(*write_buffer_, true);
@@ -861,7 +861,7 @@ bool ServerConnectionImpl::initializeReadFilters() {
 
 void ServerConnectionImpl::onTransportSocketConnectTimeout() {
   stream_info_.setConnectionTerminationDetails(kTransportSocketConnectTimeoutTerminationDetails);
-  closeConnectionImmediately();
+  closeConnectionImmediatelyWithDetails("transport_socket_timeout");
   transport_socket_timeout_stat_->inc();
   setFailureReason("connect timeout");
 }

@@ -33,7 +33,8 @@ public:
                                  Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm,
                                  ProtobufMessage::ValidationVisitor& validation_visitor,
                                  Api::Api& api, const Server::Instance& server,
-                                 Config::XdsResourcesDelegateOptRef xds_resources_delegate);
+                                 Config::XdsResourcesDelegateOptRef xds_resources_delegate,
+                                 Config::XdsConfigTrackerOptRef xds_config_tracker);
 
 protected:
   // Config::SubscriptionFactoryImpl

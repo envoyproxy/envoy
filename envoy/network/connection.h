@@ -68,9 +68,11 @@ public:
  */
 enum class ConnectionCloseType {
   FlushWrite, // Flush pending write data before raising ConnectionEvent::LocalClose
-  NoFlush,    // Do not flush any pending data and immediately raise ConnectionEvent::LocalClose
-  FlushWriteAndDelay // Flush pending write data and delay raising a ConnectionEvent::LocalClose
-                     // until the delayed_close_timeout expires
+  NoFlush, // Do not flush any pending data. Write the pending data to buffer and then immediately
+           // raise ConnectionEvent::LocalClose
+  FlushWriteAndDelay, // Flush pending write data and delay raising a ConnectionEvent::LocalClose
+                      // until the delayed_close_timeout expires
+  Abort // Do not write/flush any pending data and immediately raise ConnectionEvent::LocalClose
 };
 
 /**
@@ -133,8 +135,16 @@ public:
 
   /**
    * Close the connection.
+   * @param type the connection close type.
    */
   virtual void close(ConnectionCloseType type) PURE;
+
+  /**
+   * Close the connection.
+   * @param type the connection close type.
+   * @param details the reason the connection is being closed.
+   */
+  virtual void close(ConnectionCloseType type, absl::string_view details) PURE;
 
   /**
    * @return Event::Dispatcher& the dispatcher backing this connection.
@@ -309,10 +319,16 @@ public:
   virtual void setDelayedCloseTimeout(std::chrono::milliseconds timeout) PURE;
 
   /**
-   * @return std::string the failure reason of the underlying transport socket, if no failure
-   *         occurred an empty string is returned.
+   * @return absl::string_view the failure reason of the underlying transport socket, if no failure
+   *         occurred an empty string view is returned.
    */
   virtual absl::string_view transportFailureReason() const PURE;
+
+  /**
+   * @return absl::string_view the local close reason of the underlying socket, if local close
+   *         did not occur an empty string view is returned.
+   */
+  virtual absl::string_view localCloseReason() const PURE;
 
   /**
    * Instructs the connection to start using secure transport.

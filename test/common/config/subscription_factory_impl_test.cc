@@ -6,6 +6,7 @@
 #include "envoy/config/core/v3/config_source.pb.validate.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
+#include "envoy/config/xds_config_tracker.h"
 #include "envoy/config/xds_resources_delegate.h"
 #include "envoy/stats/scope.h"
 
@@ -47,12 +48,13 @@ public:
         http_request_(&cm_.thread_local_cluster_.async_client_),
         api_(Api::createApiForTest(stats_store_, random_)),
         subscription_factory_(local_info_, dispatcher_, cm_, validation_visitor_, *api_, server_,
-                              /*xds_resources_delegate=*/XdsResourcesDelegateOptRef()) {}
+                              /*xds_resources_delegate=*/XdsResourcesDelegateOptRef(),
+                              /*xds_config_tracker=*/XdsConfigTrackerOptRef()) {}
 
   SubscriptionPtr
   subscriptionFromConfigSource(const envoy::config::core::v3::ConfigSource& config) {
     return subscription_factory_.subscriptionFromConfigSource(
-        config, Config::TypeUrl::get().ClusterLoadAssignment, stats_store_, callbacks_,
+        config, Config::TypeUrl::get().ClusterLoadAssignment, *stats_store_.rootScope(), callbacks_,
         resource_decoder_, {});
   }
 
@@ -61,8 +63,8 @@ public:
                                 const envoy::config::core::v3::ConfigSource& config) {
     const auto resource_locator = XdsResourceIdentifier::decodeUrl(xds_url);
     return subscription_factory_.collectionSubscriptionFromUrl(
-        resource_locator, config, "envoy.config.endpoint.v3.ClusterLoadAssignment", stats_store_,
-        callbacks_, resource_decoder_);
+        resource_locator, config, "envoy.config.endpoint.v3.ClusterLoadAssignment",
+        *stats_store_.rootScope(), callbacks_, resource_decoder_);
   }
 
   Upstream::MockClusterManager cm_;
@@ -435,8 +437,8 @@ TEST_F(SubscriptionFactoryTest, LogWarningOnDeprecatedV2Transport) {
   EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
 
   EXPECT_THROW_WITH_REGEX(subscription_factory_.subscriptionFromConfigSource(
-                              config, Config::TypeUrl::get().ClusterLoadAssignment, stats_store_,
-                              callbacks_, resource_decoder_, {}),
+                              config, Config::TypeUrl::get().ClusterLoadAssignment,
+                              *stats_store_.rootScope(), callbacks_, resource_decoder_, {}),
                           EnvoyException,
                           "V2 .and AUTO. xDS transport protocol versions are deprecated in");
 }
@@ -457,8 +459,8 @@ TEST_F(SubscriptionFactoryTest, LogWarningOnDeprecatedAutoTransport) {
   EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
 
   EXPECT_THROW_WITH_REGEX(subscription_factory_.subscriptionFromConfigSource(
-                              config, Config::TypeUrl::get().ClusterLoadAssignment, stats_store_,
-                              callbacks_, resource_decoder_, {}),
+                              config, Config::TypeUrl::get().ClusterLoadAssignment,
+                              *stats_store_.rootScope(), callbacks_, resource_decoder_, {}),
                           EnvoyException,
                           "V2 .and AUTO. xDS transport protocol versions are deprecated in");
 }

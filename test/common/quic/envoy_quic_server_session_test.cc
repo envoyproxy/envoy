@@ -4,13 +4,13 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/event/libevent_scheduler.h"
-#include "source/common/quic/codec_impl.h"
 #include "source/common/quic/envoy_quic_alarm_factory.h"
 #include "source/common/quic/envoy_quic_connection_helper.h"
 #include "source/common/quic/envoy_quic_server_connection.h"
 #include "source/common/quic/envoy_quic_server_session.h"
 #include "source/common/quic/envoy_quic_server_stream.h"
 #include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/quic/server_codec_impl.h"
 #include "source/server/configuration_impl.h"
 
 #include "test/common/quic/test_proof_source.h"
@@ -365,7 +365,7 @@ TEST_F(EnvoyQuicServerSessionTest, OnResetFrameIetfQuic) {
   stream1->encodeHeaders(response_headers, true);
 
   EXPECT_EQ(1U, TestUtility::findCounter(
-                    static_cast<Stats::IsolatedStoreImpl&>(listener_config_.listenerScope()),
+                    listener_config_.listenerScope().store(),
                     "http3.downstream.rx.quic_reset_stream_error_code_QUIC_ERROR_PROCESSING_STREAM")
                     ->value());
 
@@ -392,7 +392,7 @@ TEST_F(EnvoyQuicServerSessionTest, OnResetFrameIetfQuic) {
   envoy_quic_session_.OnStopSendingFrame(stop_sending2);
   envoy_quic_session_.OnRstStream(rst2);
   EXPECT_EQ(1U, TestUtility::findCounter(
-                    static_cast<Stats::IsolatedStoreImpl&>(listener_config_.listenerScope()),
+                    listener_config_.listenerScope().store(),
                     "http3.downstream.rx.quic_reset_stream_error_code_QUIC_REFUSED_STREAM")
                     ->value());
 
@@ -413,7 +413,7 @@ TEST_F(EnvoyQuicServerSessionTest, OnResetFrameIetfQuic) {
   envoy_quic_session_.OnRstStream(rst3);
   envoy_quic_session_.OnStopSendingFrame(stop_sending3);
   EXPECT_EQ(2U, TestUtility::findCounter(
-                    static_cast<Stats::IsolatedStoreImpl&>(listener_config_.listenerScope()),
+                    listener_config_.listenerScope().store(),
                     "http3.downstream.rx.quic_reset_stream_error_code_QUIC_REFUSED_STREAM")
                     ->value());
 }
@@ -1047,6 +1047,16 @@ TEST_F(EnvoyQuicServerSessionTest, GetRttAndCwnd) {
   envoy_quic_session_.configureInitialCongestionWindow(8000000, std::chrono::microseconds(1000000));
   EXPECT_GT(envoy_quic_session_.congestionWindowInBytes().value(),
             quic::kInitialCongestionWindow * quic::kDefaultTCPMSS);
+}
+
+TEST_F(EnvoyQuicServerSessionTest, SslConnectionInfoDumbImplmention) {
+  installReadFilter();
+  EXPECT_FALSE(envoy_quic_session_.ssl()->peerCertificatePresented());
+  EXPECT_TRUE(envoy_quic_session_.ssl()->urlEncodedPemEncodedPeerCertificateChain().empty());
+  EXPECT_TRUE(envoy_quic_session_.ssl()->dnsSansPeerCertificate().empty());
+  EXPECT_TRUE(envoy_quic_session_.ssl()->dnsSansLocalCertificate().empty());
+  EXPECT_FALSE(envoy_quic_session_.ssl()->validFromPeerCertificate().has_value());
+  EXPECT_FALSE(envoy_quic_session_.ssl()->expirationPeerCertificate().has_value());
 }
 
 } // namespace Quic

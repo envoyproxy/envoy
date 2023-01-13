@@ -10,9 +10,10 @@ MultiplexedSubscriptionFactory::MultiplexedSubscriptionFactory(
     const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
     Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor,
     Api::Api& api, const Server::Instance& server,
-    Config::XdsResourcesDelegateOptRef xds_resources_delegate)
+    Config::XdsResourcesDelegateOptRef xds_resources_delegate,
+    Config::XdsConfigTrackerOptRef xds_config_tracker)
     : Config::SubscriptionFactoryImpl(local_info, dispatcher, cm, validation_visitor, api, server,
-                                      xds_resources_delegate){};
+                                      xds_resources_delegate, xds_config_tracker){};
 
 Config::GrpcMuxSharedPtr MultiplexedSubscriptionFactory::getOrCreateMux(
     const envoy::config::core::v3::ApiConfigSource& config_source, absl::string_view type_url,

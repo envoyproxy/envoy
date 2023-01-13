@@ -21,7 +21,7 @@
 #include "source/common/network/udp_packet_writer_handler_impl.h"
 #include "source/common/network/utility.h"
 #include "source/extensions/listener_managers/listener_manager/active_raw_udp_listener_config.h"
-#include "source/server/connection_handler_impl.h"
+#include "source/extensions/listener_managers/listener_manager/connection_handler_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/api/mocks.h"
@@ -142,7 +142,7 @@ public:
     bool continueOnListenerFiltersTimeout() const override {
       return continue_on_listener_filters_timeout_;
     }
-    Stats::Scope& listenerScope() override { return parent_.stats_store_; }
+    Stats::Scope& listenerScope() override { return *parent_.stats_store_.rootScope(); }
     uint64_t listenerTag() const override { return tag_; }
     const std::string& name() const override { return name_; }
     Network::UdpListenerConfigOptRef udpListenerConfig() override { return *udp_listener_config_; }
@@ -968,7 +968,7 @@ TEST_F(ConnectionHandlerTest, CloseConnectionOnEmptyFilterChain) {
   auto* connection = new NiceMock<Network::MockServerConnection>();
   EXPECT_CALL(dispatcher_, createServerConnection_()).WillOnce(Return(connection));
   EXPECT_CALL(factory_, createNetworkFilterChain(_, _)).WillOnce(Return(false));
-  EXPECT_CALL(*connection, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connection, close(Network::ConnectionCloseType::NoFlush, _));
   EXPECT_CALL(*connection, addConnectionCallbacks(_)).Times(0);
   EXPECT_CALL(*access_log_, log(_, _, _, _));
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();

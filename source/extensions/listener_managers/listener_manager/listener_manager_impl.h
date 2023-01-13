@@ -75,7 +75,7 @@ public:
                          const xds::core::v3::ResourceLocator* lds_resources_locator) override {
     return std::make_unique<LdsApiImpl>(
         lds_config, lds_resources_locator, server_.clusterManager(), server_.initManager(),
-        server_.stats(), server_.listenerManager(),
+        *server_.stats().rootScope(), server_.listenerManager(),
         server_.messageValidationContext().dynamicValidationVisitor());
   }
   std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
@@ -368,6 +368,8 @@ public:
     return Config::ServerExtensionValues::get().DEFAULT_LISTENER;
   }
 };
+
+DECLARE_FACTORY(DefaultListenerManagerFactoryImpl);
 
 } // namespace Server
 } // namespace Envoy

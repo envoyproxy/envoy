@@ -904,6 +904,11 @@ public:
     EXPECT_CALL(os_sys_calls, close(_))
         .WillRepeatedly(Invoke(
             [&](os_fd_t sockfd) -> Api::SysCallIntResult { return real_syscall.close(sockfd); }));
+    EXPECT_CALL(os_sys_calls, getaddrinfo(_, _, _, _))
+        .WillRepeatedly(Invoke([&](const char* node, const char* service,
+                                   const struct addrinfo* hints, struct addrinfo** res) {
+          return real_syscall.getaddrinfo(node, service, hints, res);
+        }));
 
     resolveWithExpectations("some.good.domain", lookup_family, resolution_status,
                             expected_addresses, {}, absl::nullopt);
@@ -1448,7 +1453,7 @@ TEST_P(DnsImplTest, PendingTimerEnable) {
   Event::MockDispatcher dispatcher;
   Event::MockTimer* timer = new NiceMock<Event::MockTimer>();
   EXPECT_CALL(dispatcher, createTimer_(_)).WillOnce(Return(timer));
-  resolver_ = std::make_shared<DnsResolverImpl>(config, dispatcher, vec, stats_store_);
+  resolver_ = std::make_shared<DnsResolverImpl>(config, dispatcher, vec, *stats_store_.rootScope());
   Event::FileEvent* file_event = new NiceMock<Event::MockFileEvent>();
   EXPECT_CALL(dispatcher, createFileEvent_(_, _, _, _)).WillOnce(Return(file_event));
   EXPECT_CALL(*timer, enableTimer(_, _));

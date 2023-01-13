@@ -40,12 +40,14 @@ ar
 btree
 CAS
 CB
+cartid
 cbor
 CDN
 CDS
 CEL
 CWND
 DLE
+DPE
 DSR
 DSS
 EBADF
@@ -165,6 +167,7 @@ dnsresolvers
 endpos
 fo
 ghi
+golang
 guarddog
 GC
 GCC
@@ -278,12 +281,14 @@ Oauth
 OCSP
 OD
 ODCDS
+middlewildcard
 mpd
 oghttp
 OID
 OK
 OOM
 OOMs
+ORCA
 OS
 OSI
 OSS
@@ -802,6 +807,8 @@ initializers
 inlined
 inlining
 inobservability
+inode
+inodes
 inotify
 inserter
 instantiation
@@ -955,6 +962,7 @@ ocagent
 offsetof
 oneof
 oneway
+oob
 opcode
 opencensus
 openssl
@@ -1060,6 +1068,7 @@ qdtext
 qps
 quantile
 quantiles
+querydetails
 quiesce
 quitquitquit
 qvalue
@@ -1384,6 +1393,8 @@ xid
 xmodem
 xxhash
 xxs
+xyz
+xyzwebservices
 zag
 zig
 zipkin

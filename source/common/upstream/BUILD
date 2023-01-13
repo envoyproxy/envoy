@@ -285,6 +285,10 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_protos_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/load_balancing_policies/common/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/load_balancing_policies/least_request/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/load_balancing_policies/random/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/load_balancing_policies/round_robin/v3:pkg_cc_proto",
     ],
 )
 
@@ -535,6 +539,7 @@ envoy_cc_library(
         "//source/common/stats:stats_lib",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/upstreams/http:config",
+        "//source/extensions/upstreams/tcp:config",
         "//source/server:transport_socket_config_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

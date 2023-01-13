@@ -4,6 +4,7 @@ use("github.com/repokitteh/modules/assign.star")
 use("github.com/repokitteh/modules/review.star")
 use("github.com/repokitteh/modules/wait.star")
 use("github.com/envoyproxy/envoy/ci/repokitteh/modules/azure_pipelines.star", secret_token=get_secret('azp_token'))
+use("github.com/envoyproxy/envoy/ci/repokitteh/modules/coverage.star")
 use("github.com/envoyproxy/envoy/ci/repokitteh/modules/docs.star")
 use("github.com/envoyproxy/envoy/ci/repokitteh/modules/newpr.star")
 use(
@@ -22,6 +23,11 @@ use(
        "path": "(test/per_file_coverage.sh)",
        "github_status_label": "changes to Envoy coverage scripts",
        "auto_assign": True,
+    },
+    {
+       "owner": "envoyproxy/runtime-guard-changes",
+       "path": "(source/common/runtime/runtime_features.cc)",
+       "github_status_label": "changes to Envoy runtime guards",
     },
     {
       "owner": "envoyproxy/api-shepherds!",
