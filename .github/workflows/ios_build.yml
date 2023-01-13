@@ -53,6 +53,12 @@ jobs:
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //examples/swift/hello_world:app
+    - uses: nick-fields/retry@943e742917ac94714d2f408a0e8320f2d1fcafcd
+      if: steps.should_run.outputs.run_ci_job == 'true'
+      name: 'Start simulator'
+      with:
+        max_attempts: 3
+        command: ./mobile/ci/start_ios_simulator.sh
     # Run the app in the background and redirect logs.
     - name: 'Run app'
       if: steps.should_run.outputs.run_ci_job == 'true'
@@ -93,6 +99,12 @@ jobs:
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //test/swift/apps/baseline:app
+    - uses: nick-fields/retry@943e742917ac94714d2f408a0e8320f2d1fcafcd
+      if: steps.should_run.outputs.run_ci_job == 'true'
+      name: 'Start simulator'
+      with:
+        max_attempts: 3
+        command: ./mobile/ci/start_ios_simulator.sh
     # Run the app in the background and redirect logs.
     - name: 'Run app'
       if: steps.should_run.outputs.run_ci_job == 'true'
@@ -133,6 +145,12 @@ jobs:
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //test/swift/apps/experimental:app
+    - uses: nick-fields/retry@943e742917ac94714d2f408a0e8320f2d1fcafcd
+      if: steps.should_run.outputs.run_ci_job == 'true'
+      name: 'Start simulator'
+      with:
+        max_attempts: 3
+        command: ./mobile/ci/start_ios_simulator.sh
     # Run the app in the background and redirect logs.
     - name: 'Run app'
       if: steps.should_run.outputs.run_ci_job == 'true'
@@ -173,6 +191,12 @@ jobs:
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //examples/swift/async_await:app
+    - uses: nick-fields/retry@943e742917ac94714d2f408a0e8320f2d1fcafcd
+      if: steps.should_run.outputs.run_ci_job == 'true'
+      name: 'Start simulator'
+      with:
+        max_attempts: 3
+        command: ./mobile/ci/start_ios_simulator.sh
     # Run the app in the background and redirect logs.
     - name: 'Run app'
       if: steps.should_run.outputs.run_ci_job == 'true'
@@ -213,6 +237,12 @@ jobs:
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //examples/objective-c/hello_world:app
+    - uses: nick-fields/retry@943e742917ac94714d2f408a0e8320f2d1fcafcd
+      if: steps.should_run.outputs.run_ci_job == 'true'
+      name: 'Start simulator'
+      with:
+        max_attempts: 3
+        command: ./mobile/ci/start_ios_simulator.sh
     # Run the app in the background and redirect logs.
     - name: 'Run app'
       if: steps.should_run.outputs.run_ci_job == 'true'
