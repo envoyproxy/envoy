@@ -204,8 +204,10 @@ public:
   virtual absl::optional<MonotonicTime> lastHcPassTime() const PURE;
   virtual MonotonicTime lastTrafficPassTime() const PURE;
   virtual MonotonicTime lastTrafficPassTime2xx() const PURE;
+  virtual MonotonicTime lastTrafficPassTimeGrpc() const PURE;
   virtual void setLastTrafficTime(MonotonicTime last_traffic_pass_time) const PURE;
   virtual void setLastTrafficTime2xx(MonotonicTime last_traffic_pass_time) const PURE;
+  virtual void setLastTrafficTimeGrpc(MonotonicTime last_traffic_pass_time) const PURE;
 };
 
 using HostDescriptionConstSharedPtr = std::shared_ptr<const HostDescription>;

@@ -1288,6 +1288,8 @@ void Filter::handleNon5xxResponseHeaders(absl::optional<Grpc::Status::GrpcStatus
     if (end_stream) {
       if (grpc_status && !Http::CodeUtility::is5xx(grpc_to_http_status)) {
         upstream_request.upstreamHost()->stats().rq_success_.inc();
+        upstream_request.upstreamHost()->setLastTrafficTimeGrpc(
+            callbacks_->dispatcher().timeSource().monotonicTime());
       } else {
         upstream_request.upstreamHost()->stats().rq_error_.inc();
       }

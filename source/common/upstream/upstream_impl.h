@@ -212,6 +212,7 @@ public:
   absl::optional<MonotonicTime> lastHcPassTime() const override { return last_hc_pass_time_; }
   MonotonicTime lastTrafficPassTime() const override { return last_traffic_pass_time_; }
   MonotonicTime lastTrafficPassTime2xx() const override { return last_traffic_pass_time_2xx_; }
+  MonotonicTime lastTrafficPassTimeGrpc() const override { return last_traffic_pass_time_grpc_; }
 
   void setLastTrafficTime(MonotonicTime last_traffic_pass_time) const override {
     last_traffic_pass_time_ = last_traffic_pass_time;
@@ -219,6 +220,10 @@ public:
 
   void setLastTrafficTime2xx(MonotonicTime last_traffic_pass_time) const override {
     last_traffic_pass_time_2xx_ = last_traffic_pass_time;
+  }
+
+  void setLastTrafficTimeGrpc(MonotonicTime last_traffic_pass_time) const override {
+    last_traffic_pass_time_grpc_ = last_traffic_pass_time;
   }
 
   void setAddressList(const std::vector<Network::Address::InstanceConstSharedPtr>& address_list) {
@@ -267,6 +272,7 @@ private:
   absl::optional<MonotonicTime> last_hc_pass_time_;
   mutable MonotonicTime last_traffic_pass_time_;
   mutable MonotonicTime last_traffic_pass_time_2xx_;
+  mutable MonotonicTime last_traffic_pass_time_grpc_;
 };
 
 /**
@@ -328,7 +334,6 @@ public:
   void setLastHcPassTime(MonotonicTime last_hc_pass_time) override {
     setLastHcPassTimeImpl(std::move(last_hc_pass_time));
   }
-
 
   Host::HealthStatus healthStatus() const override {
     // Evaluate active health status first.

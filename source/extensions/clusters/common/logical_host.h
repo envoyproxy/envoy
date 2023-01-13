@@ -128,15 +128,22 @@ public:
   MonotonicTime lastTrafficPassTime2xx() const override {
     return logical_host_->lastTrafficPassTime2xx();
   }
+  MonotonicTime lastTrafficPassTimeGrpc() const override {
+    return logical_host_->lastTrafficPassTimeGrpc();
+  }
   uint32_t priority() const override { return logical_host_->priority(); }
   void priority(uint32_t) override {}
 
-  void setLastTrafficTime(MonotonicTime last_traffic_pass_time) const override{
+  void setLastTrafficTime(MonotonicTime last_traffic_pass_time) const override {
     logical_host_->setLastTrafficTime(last_traffic_pass_time);
   }
 
-  void setLastTrafficTime2xx(MonotonicTime last_traffic_pass_time) const override{
+  void setLastTrafficTime2xx(MonotonicTime last_traffic_pass_time) const override {
     logical_host_->setLastTrafficTime2xx(last_traffic_pass_time);
+  }
+
+  void setLastTrafficTimeGrpc(MonotonicTime last_traffic_pass_time) const override {
+    logical_host_->setLastTrafficTimeGrpc(last_traffic_pass_time);
   }
 
 private:

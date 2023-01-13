@@ -18,8 +18,7 @@ HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
                                              Random::RandomGenerator& random,
                                              HealthCheckEventLoggerPtr&& event_logger)
     : always_log_health_check_failures_(config.always_log_health_check_failures()),
-      enable_idle_hc_(config.enable_idle_hc()),
-      cluster_(cluster), dispatcher_(dispatcher),
+      enable_idle_hc_(config.enable_idle_hc()), cluster_(cluster), dispatcher_(dispatcher),
       timeout_(PROTOBUF_GET_MS_REQUIRED(config, timeout)),
       unhealthy_threshold_(PROTOBUF_GET_WRAPPED_REQUIRED(config, unhealthy_threshold)),
       healthy_threshold_(PROTOBUF_GET_WRAPPED_REQUIRED(config, healthy_threshold)),
@@ -423,19 +422,23 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::onIntervalBase() {
   /*Only if host is healthy, check whether need idle hc*/
   if (parent_.enable_idle_hc_ && !host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
     MonotonicTime traffic_pass_time;
-    switch(parent_.healthCheckerType()) {
-      case envoy::data::core::v3::HealthCheckerType::TCP:
-        traffic_pass_time = host_->lastTrafficPassTime();
-        break;
-      case envoy::data::core::v3::HealthCheckerType::HTTP:
-        traffic_pass_time = host_->lastTrafficPassTime2xx();
-        break;
-      default:
-        break;
+    switch (parent_.healthCheckerType()) {
+    case envoy::data::core::v3::HealthCheckerType::TCP:
+      traffic_pass_time = host_->lastTrafficPassTime();
+      break;
+    case envoy::data::core::v3::HealthCheckerType::HTTP:
+      traffic_pass_time = host_->lastTrafficPassTime2xx();
+      break;
+    case envoy::data::core::v3::HealthCheckerType::GRPC:
+      traffic_pass_time = host_->lastTrafficPassTimeGrpc();
+      break;
+    default:
+      break;
     }
     auto duration = time_source_.monotonicTime() - traffic_pass_time;
-    if (duration.count() < std::chrono::milliseconds(parent_.interval_*1000000).count()){
-      /* During the time, there is already business traffic for the host, no need to send HC packet */
+    if (duration.count() < std::chrono::milliseconds(parent_.interval_ * 1000000).count()) {
+      /* During the time, there is already business traffic for the host, no need to send HC packet
+       */
       interval_timer_->enableTimer(parent_.interval_);
       return;
     }
