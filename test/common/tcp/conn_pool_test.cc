@@ -769,7 +769,7 @@ TEST_F(TcpConnPoolImplTest, LocalConnectFailure) {
 
   EXPECT_EQ(ConnectionPool::PoolFailureReason::LocalConnectionFailure, callbacks.reason_);
 
-  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_connect_fail_.value());
+  EXPECT_EQ(1U, cluster_->trafficStats()->upstream_cx_connect_fail_.value());
   EXPECT_EQ(1U, cluster_->trafficStats()->upstream_rq_pending_failure_eject_.value());
 }
 
