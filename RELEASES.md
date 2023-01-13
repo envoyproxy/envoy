@@ -118,13 +118,13 @@ deadline of 3 weeks.
   pass**.
 * Once the tests have passed, and the PR has landed, CI will automatically create the tagged release.
 * From the envoy [landing page](https://github.com/envoyproxy/envoy) use the branch drop-down to create a branch
-  from the tagged release, e.g. "release/v1.6". It will be used for the
+  using the minor version from the tagged release, e.g. `1.6.0` -> `release/v1.6`. It will be used for the
   [stable releases](RELEASES.md#stable-releases).
 * Tagging will kick off another run of [AZP postsubmit](https://dev.azure.com/cncf/envoy/_build?definitionId=11). Monitor that
   tag build to make sure that the final docker images get pushed along with
-  the final docs and release assets. The final documentation will end up in the
+  the final docs and [release assets](https://github.com/envoyproxy/envoy/releases). The final documentation will end up in the
   [envoy-website repository](https://github.com/envoyproxy/envoy-website/tree/main/docs/envoy).
-* Update the website ([example PR](https://github.com/envoyproxy/envoy-website/pull/148)) for the new release.
+* Update the website ([example PR](https://github.com/envoyproxy/envoy-website/pull/148)) with the new release version.
 * Craft a witty/uplifting email and send it to all the email aliases: envoy-announce@ envoy-users@ envoy-dev@ envoy-maintainers
 * Make sure we tweet the new release: either have Matt do it or email social@cncf.io and ask them to do an Envoy account
   post.
