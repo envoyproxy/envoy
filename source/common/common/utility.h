@@ -22,10 +22,10 @@
 namespace Envoy {
 
 /**
- * Converts a timespec structure to a std::chrono::time_point aka. Envoy::SystemTime.
- * @param t the timespec
- * @return Envoy::SystemTime the same time, represented as a std::chrono::time_point,
- *         to microsecond accuracy. (SystemTime does not accept nanosecond accuracy.)
+ * Converts a `timespec` structure to a `std::chrono::time_point` aka. `Envoy::SystemTime`.
+ * @param t the `timespec`
+ * @return Envoy::SystemTime the same time, represented as a `std::chrono::time_point`,
+ *         to microsecond accuracy. (`SystemTime` does not accept nanosecond accuracy.)
  */
 constexpr SystemTime timespecToChrono(const struct timespec& t) {
   return SystemTime{} + std::chrono::duration_cast<std::chrono::microseconds>(
