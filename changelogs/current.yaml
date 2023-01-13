@@ -82,7 +82,7 @@ minor_behavior_changes:
     added :ref:`idle_timeout <envoy_v3_api_field_extensions.upstreams.tcp.v3.TcpProtocolOptions.idle_timeout>` to support per client idle timeout for tcp connection pool. The timeout is guarded by ``envoy.reloadable_features.tcp_pool_idle_timeout`` and timeout defaults to 10 minutes if runtime flag is enabled.
 
 
-    bug_fixes:
+bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: aws_lambda
   change: |
