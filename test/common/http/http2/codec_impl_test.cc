@@ -11,7 +11,6 @@
 #include "source/common/http/exception.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/http2/codec_impl.h"
-#include "source/extensions/http/header_validators/envoy_default/header_validator_factory.h"
 #include "source/extensions/http/header_validators/envoy_default/http2_header_validator.h"
 
 #include "test/common/http/common.h"
@@ -178,11 +177,10 @@ public:
 
     http2OptionsFromTuple(client_http2_options_, client_settings_);
     http2OptionsFromTuple(server_http2_options_, server_settings_);
-    Envoy::Http::HeaderValidatorFactorySharedPtr header_validator_factory;
     client_ = std::make_unique<TestClientConnectionImpl>(
         client_connection_, client_callbacks_, *client_stats_store_.rootScope(),
         client_http2_options_, random_, max_request_headers_kb_, max_response_headers_count_,
-        ProdNghttp2SessionFactory::get(), makeHeaderValidatorFactory());
+        ProdNghttp2SessionFactory::get());
     client_wrapper_ = std::make_unique<ConnectionWrapper>(client_.get());
     server_ = std::make_unique<TestServerConnectionImpl>(
         server_connection_, server_callbacks_, *server_stats_store_.rootScope(),
@@ -348,18 +346,6 @@ public:
     header_validator_ =
         std::make_unique<Extensions::Http::HeaderValidators::EnvoyDefault::Http2HeaderValidator>(
             header_validator_config_, Protocol::Http2, server_->http2CodecStats());
-  }
-
-  Envoy::Http::HeaderValidatorFactorySharedPtr makeHeaderValidatorFactory() {
-#ifdef ENVOY_ENABLE_UHV
-    envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
-        header_validator_config;
-    return std::make_shared<
-        Extensions::Http::HeaderValidators::EnvoyDefault::HeaderValidatorFactory>(
-        header_validator_config);
-#else
-    return nullptr;
-#endif
   }
 
   TestScopedRuntime scoped_runtime_;
@@ -2426,7 +2412,7 @@ TEST_P(Http2CodecImplStreamLimitTest, MaxClientStreams) {
   client_ = std::make_unique<TestClientConnectionImpl>(
       client_connection_, client_callbacks_, *client_stats_store_.rootScope(),
       client_http2_options_, random_, max_request_headers_kb_, max_response_headers_count_,
-      ProdNghttp2SessionFactory::get(), nullptr);
+      ProdNghttp2SessionFactory::get());
   client_wrapper_ = std::make_unique<ConnectionWrapper>(client_.get());
   server_ = std::make_unique<TestServerConnectionImpl>(
       server_connection_, server_callbacks_, *server_stats_store_.rootScope(),
@@ -4434,10 +4420,13 @@ TEST_P(Http2CodecImplTest, CheckHeaderValueValidation) {
 }
 
 TEST_P(Http2CodecImplTest, BadResponseHeader) {
-  // Since the client coded will trigger a protocol error, its buffer
-  // will not be fully drained
-  expect_buffered_data_on_teardown_ = true;
   initialize();
+#ifdef ENVOY_ENABLE_UHV
+  // UHV mode makes no effect on nghttp2
+  if (http2_implementation_ != Http2Impl::Oghttp2) {
+    return;
+  }
+#endif
 
   InSequence s;
   TestRequestHeaderMapImpl request_headers;
@@ -4452,16 +4441,35 @@ TEST_P(Http2CodecImplTest, BadResponseHeader) {
   // { is illegal in header name
   TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"foo{bar", "baz"}};
 
-  // Encode response headers. The decodeHeaders on the client side will not be called
-  // due to protocol error
+  // Encode response headers.
+#ifdef ENVOY_ENABLE_UHV
+  // Header validation is done by the CodecClient after header map is fully parsed.
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, _))
+      .WillOnce(Invoke([this](ResponseHeaderMapPtr& headers, bool) -> void {
+        auto result = header_validator_->validateResponseHeaderMap(*headers);
+        ASSERT_FALSE(result.ok());
+      }));
+#else
+  // The decodeHeaders on the client side will not be called due to protocol error
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, _)).Times(0);
+  // Since the client coded will trigger a protocol error, its buffer
+  // will not be fully drained
+  expect_buffered_data_on_teardown_ = true;
+#endif
   response_encoder_->encodeHeaders(response_headers, true);
 
   driveToCompletion();
 
+#ifdef ENVOY_ENABLE_UHV
+  // In case of UHV dispatching frames will be successful and connection is closed
+  // by the codec client.
+  EXPECT_TRUE(client_wrapper_->status_.ok());
+  EXPECT_EQ(1, server_stats_store_.counter("http2.rx_messaging_error").value());
+#else
   EXPECT_FALSE(client_wrapper_->status_.ok());
   EXPECT_TRUE(isCodecProtocolError(client_wrapper_->status_));
   EXPECT_EQ(1, client_stats_store_.counter("http2.rx_messaging_error").value());
+#endif
   EXPECT_TRUE(server_wrapper_->status_.ok());
 }
 
@@ -4477,7 +4485,7 @@ public:
       uint32_t max_request_headers_count, Http2SessionFactory& http2_session_factory)
       : TestClientConnectionImpl(connection, callbacks, scope, http2_options, random,
                                  max_request_headers_kb, max_request_headers_count,
-                                 http2_session_factory, nullptr) {}
+                                 http2_session_factory) {}
 
   // Overrides TestClientConnectionImpl::submitMetadata().
   bool submitMetadata(const MetadataMapVector& metadata_map_vector, int32_t stream_id) override {

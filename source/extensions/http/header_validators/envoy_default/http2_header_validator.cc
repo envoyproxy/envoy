@@ -111,6 +111,7 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
   //
   // The method pseudo header is always mandatory.
   if (header_map.getMethodValue().empty()) {
+    stats_.incMessagingError();
     return {RequestHeaderMapValidationResult::Action::Reject,
             UhvResponseCodeDetail::get().InvalidMethod};
   }
@@ -229,6 +230,7 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
       });
 
   if (!reject_details.empty()) {
+    stats_.incMessagingError();
     return {RequestHeaderMapValidationResult::Action::Reject, reject_details};
   }
 
@@ -251,6 +253,7 @@ Http2HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap
   // status code field (see Section 15 of [HTTP]). This pseudo-header field MUST be included in all
   // responses, including interim responses; otherwise, the response is malformed (Section 8.1.1).
   if (header_map.getStatusValue().empty()) {
+    stats_.incMessagingError();
     return {ResponseHeaderMapValidationResult::Action::Reject,
             UhvResponseCodeDetail::get().InvalidStatus};
   }
@@ -278,6 +281,7 @@ Http2HeaderValidator::validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap
       });
 
   if (!reject_details.empty()) {
+    stats_.incMessagingError();
     return {ResponseHeaderMapValidationResult::Action::Reject, reject_details};
   }
 
@@ -399,12 +403,20 @@ Http2HeaderValidator::validateGenericHeaderName(const HeaderString& name) {
 
 HeaderValidator::TrailerValidationResult
 Http2HeaderValidator::validateRequestTrailerMap(::Envoy::Http::RequestTrailerMap& trailer_map) {
-  return validateTrailers(trailer_map);
+  TrailerValidationResult result = validateTrailers(trailer_map);
+  if (!result.ok()) {
+    stats_.incMessagingError();
+  }
+  return result;
 }
 
 HeaderValidator::TrailerValidationResult
 Http2HeaderValidator::validateResponseTrailerMap(::Envoy::Http::ResponseTrailerMap& trailer_map) {
-  return validateTrailers(trailer_map);
+  TrailerValidationResult result = validateTrailers(trailer_map);
+  if (!result.ok()) {
+    stats_.incMessagingError();
+  }
+  return result;
 }
 
 } // namespace EnvoyDefault

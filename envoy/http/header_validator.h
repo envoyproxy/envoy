@@ -122,6 +122,7 @@ public:
 
   virtual void incDroppedHeadersWithUnderscores() PURE;
   virtual void incRequestsRejectedWithUnderscoresInHeaders() PURE;
+  virtual void incMessagingError() PURE;
 };
 
 /**
@@ -138,7 +139,6 @@ public:
 };
 
 using HeaderValidatorFactoryPtr = std::unique_ptr<HeaderValidatorFactory>;
-using HeaderValidatorFactorySharedPtr = std::shared_ptr<HeaderValidatorFactory>;
 
 /**
  * Extension configuration for header validators.

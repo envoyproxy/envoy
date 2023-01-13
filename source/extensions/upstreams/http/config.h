@@ -55,7 +55,7 @@ public:
   const FiltersList http_filters_;
   const absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>
       alternate_protocol_cache_options_;
-  const Envoy::Http::HeaderValidatorFactorySharedPtr header_validator_factory_;
+  const Envoy::Http::HeaderValidatorFactoryPtr header_validator_factory_;
   const bool use_downstream_protocol_{};
   const bool use_http2_{};
   const bool use_http3_{};

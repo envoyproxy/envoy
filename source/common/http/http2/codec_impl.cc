@@ -532,25 +532,8 @@ void ConnectionImpl::StreamImpl::decodeData() {
   }
 }
 
-Http::Status ConnectionImpl::ClientStreamImpl::decodeHeaders() {
+void ConnectionImpl::ClientStreamImpl::decodeHeaders() {
   auto& headers = absl::get<ResponseHeaderMapPtr>(headers_or_trailers_);
-#ifdef ENVOY_ENABLE_UHV
-  if (header_validator_) {
-    header_validator_->validateResponseHeaderMap(*headers);
-    ::Envoy::Http::HeaderValidator::ResponseHeaderMapValidationResult result =
-        header_validator_->validateResponseHeaderMap(*headers);
-    if (!result.ok()) {
-      ENVOY_CONN_LOG(debug, "Response header validation failed\n{}", parent_.connection_, *headers);
-      parent_.stats_.rx_messaging_error_.inc();
-      setDetails(result.details());
-      if (parent_.stream_error_on_invalid_http_messaging_) {
-        resetStream(StreamResetReason::ProtocolError);
-        return okStatus();
-      }
-      return codecProtocolError(result.details());
-    }
-  }
-#endif
   const uint64_t status = Http::Utility::getResponseStatus(*headers);
 
   if (!upgrade_type_.empty() && headers->Status()) {
@@ -562,13 +545,12 @@ Http::Status ConnectionImpl::ClientStreamImpl::decodeHeaders() {
   received_noninformational_headers_ =
       !CodeUtility::is1xx(status) || status == enumToInt(Http::Code::SwitchingProtocols);
 
-  if (headers->Status() && HeaderUtility::isSpecial1xx(*headers)) {
+  if (HeaderUtility::isSpecial1xx(*headers)) {
     ASSERT(!remote_end_stream_);
     response_decoder_.decode1xxHeaders(std::move(headers));
   } else {
     response_decoder_.decodeHeaders(std::move(headers), sendEndStream());
   }
-  return okStatus();
 }
 
 bool ConnectionImpl::StreamImpl::maybeDeferDecodeTrailers() {
@@ -600,13 +582,12 @@ void ConnectionImpl::ClientStreamImpl::decodeTrailers() {
       std::move(absl::get<ResponseTrailerMapPtr>(headers_or_trailers_)));
 }
 
-Http::Status ConnectionImpl::ServerStreamImpl::decodeHeaders() {
+void ConnectionImpl::ServerStreamImpl::decodeHeaders() {
   auto& headers = absl::get<RequestHeaderMapPtr>(headers_or_trailers_);
   if (Http::Utility::isH2UpgradeRequest(*headers)) {
     Http::Utility::transformUpgradeRequestFromH2toH1(*headers);
   }
   request_decoder_->decodeHeaders(std::move(headers), sendEndStream());
-  return okStatus();
 }
 
 void ConnectionImpl::ServerStreamImpl::decodeTrailers() {
@@ -1184,7 +1165,7 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
     switch (frame->headers.cat) {
     case NGHTTP2_HCAT_RESPONSE:
     case NGHTTP2_HCAT_REQUEST: {
-      RETURN_IF_ERROR(stream->decodeHeaders());
+      stream->decodeHeaders();
       break;
     }
 
@@ -1197,7 +1178,7 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
           stream->decodeTrailers();
         } else {
           // We're a client session and still waiting for non-informational headers.
-          RETURN_IF_ERROR(stream->decodeHeaders());
+          stream->decodeHeaders();
         }
       }
       break;
@@ -1968,11 +1949,10 @@ ClientConnectionImpl::ClientConnectionImpl(
     Random::RandomGenerator& random_generator,
     const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
     const uint32_t max_response_headers_kb, const uint32_t max_response_headers_count,
-    Http2SessionFactory& http2_session_factory,
-    Http::HeaderValidatorFactorySharedPtr header_validator_factory)
+    Http2SessionFactory& http2_session_factory)
     : ConnectionImpl(connection, stats, random_generator, http2_options, max_response_headers_kb,
                      max_response_headers_count),
-      callbacks_(callbacks), header_validator_factory_(header_validator_factory) {
+      callbacks_(callbacks) {
   ClientHttp2Options client_http2_options(http2_options, max_response_headers_kb);
   if (use_oghttp2_library_) {
     adapter_ = http2_session_factory.create(http2_callbacks_.callbacks(), base(),
@@ -1996,11 +1976,7 @@ RequestEncoder& ClientConnectionImpl::newStream(ResponseDecoder& decoder) {
     sendKeepalive();
   }
 
-  Http::HeaderValidatorPtr header_validator =
-      header_validator_factory_ ? header_validator_factory_->create(Http::Protocol::Http2, stats_)
-                                : nullptr;
-  auto stream = std::make_unique<ClientStreamImpl>(*this, per_stream_buffer_limit_, decoder,
-                                                   std::move(header_validator));
+  ClientStreamImplPtr stream(new ClientStreamImpl(*this, per_stream_buffer_limit_, decoder));
   // If the connection is currently above the high watermark, make sure to inform the new stream.
   // The connection can not pass this on automatically as it has no awareness that a new stream is
   // created.

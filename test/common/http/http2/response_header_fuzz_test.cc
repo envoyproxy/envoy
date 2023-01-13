@@ -19,7 +19,7 @@ void replay(const Frame& frame, ClientCodecFrameInjector& codec) {
   TestClientConnectionImpl connection(
       codec.client_connection_, codec.client_callbacks_, *codec.stats_store_.rootScope(),
       codec.options_, codec.random_, Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
-      Http::DEFAULT_MAX_HEADERS_COUNT, ProdNghttp2SessionFactory::get(), nullptr);
+      Http::DEFAULT_MAX_HEADERS_COUNT, ProdNghttp2SessionFactory::get());
   // Create a new stream.
   Http::Status status = Http::okStatus();
   codec.request_encoder_ = &connection.newStream(codec.response_decoder_);

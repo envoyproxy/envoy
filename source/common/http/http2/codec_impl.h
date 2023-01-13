@@ -14,7 +14,6 @@
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/codec.h"
-#include "envoy/http/header_validator.h"
 #include "envoy/network/connection.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -286,7 +285,7 @@ protected:
 
     // Does any necessary WebSocket/Upgrade conversion, then passes the headers
     // to the decoder_.
-    virtual Http::Status decodeHeaders() PURE;
+    virtual void decodeHeaders() PURE;
     virtual void decodeTrailers() PURE;
     bool maybeDeferDecodeTrailers();
     // Consumes any decoded data, buffering if backed up.
@@ -408,10 +407,9 @@ protected:
    */
   struct ClientStreamImpl : public StreamImpl, public RequestEncoder {
     ClientStreamImpl(ConnectionImpl& parent, uint32_t buffer_limit,
-                     ResponseDecoder& response_decoder, Http::HeaderValidatorPtr header_validator)
+                     ResponseDecoder& response_decoder)
         : StreamImpl(parent, buffer_limit), response_decoder_(response_decoder),
-          headers_or_trailers_(ResponseHeaderMapImpl::create()),
-          header_validator_(std::move(header_validator)) {}
+          headers_or_trailers_(ResponseHeaderMapImpl::create()) {}
 
     // Http::MultiplexedStreamImplBase
     // Client streams do not need a flush timer because we currently assume that any failure
@@ -422,7 +420,7 @@ protected:
     // Do not use deferred reset on upstream connections.
     bool useDeferredReset() const override { return false; }
     StreamDecoder& decoder() override { return response_decoder_; }
-    Http::Status decodeHeaders() override;
+    void decodeHeaders() override;
     void decodeTrailers() override;
     HeaderMap& headers() override {
       if (absl::holds_alternative<ResponseHeaderMapPtr>(headers_or_trailers_)) {
@@ -457,7 +455,6 @@ protected:
     ResponseDecoder& response_decoder_;
     absl::variant<ResponseHeaderMapPtr, ResponseTrailerMapPtr> headers_or_trailers_;
     std::string upgrade_type_;
-    const Http::HeaderValidatorPtr header_validator_;
   };
 
   using ClientStreamImplPtr = std::unique_ptr<ClientStreamImpl>;
@@ -477,7 +474,7 @@ protected:
     // control window is available.
     bool useDeferredReset() const override { return true; }
     StreamDecoder& decoder() override { return *request_decoder_; }
-    Http::Status decodeHeaders() override;
+    void decodeHeaders() override;
     void decodeTrailers() override;
     HeaderMap& headers() override {
       if (absl::holds_alternative<RequestHeaderMapPtr>(headers_or_trailers_)) {
@@ -705,8 +702,7 @@ public:
                        const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                        const uint32_t max_response_headers_kb,
                        const uint32_t max_response_headers_count,
-                       SessionFactory& http2_session_factory,
-                       Http::HeaderValidatorFactorySharedPtr header_validator_factory);
+                       SessionFactory& http2_session_factory);
 
   // Http::ClientConnection
   RequestEncoder& newStream(ResponseDecoder& response_decoder) override;
@@ -722,7 +718,6 @@ private:
   StreamResetReason getMessagingErrorResetReason() const override;
   Http::ConnectionCallbacks& callbacks_;
   std::chrono::milliseconds idle_session_requires_ping_interval_;
-  const Http::HeaderValidatorFactorySharedPtr header_validator_factory_;
 };
 
 /**

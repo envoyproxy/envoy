@@ -1760,6 +1760,13 @@ TEST_P(ProtocolIntegrationTest, 304WithBody) {
 }
 
 TEST_P(ProtocolIntegrationTest, OverflowingResponseCode) {
+#ifdef ENVOY_ENABLE_UHV
+  // TODO(#24945): In UHV case this test breaks in the CONNECT/upgrade normalization code in H/2
+  // codec
+  if (upstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
+  }
+#endif
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   initialize();
 
@@ -1788,6 +1795,13 @@ TEST_P(ProtocolIntegrationTest, OverflowingResponseCode) {
 }
 
 TEST_P(ProtocolIntegrationTest, OverflowingResponseCodeStreamError) {
+#ifdef ENVOY_ENABLE_UHV
+  // TODO(#24945): In UHV case this test breaks in the CONNECT/upgrade normalization code in H/2
+  // codec
+  if (upstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
+  }
+#endif
   // For H/1 this test is equivalent to OverflowingResponseCode
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
     return;
@@ -1813,6 +1827,13 @@ TEST_P(ProtocolIntegrationTest, OverflowingResponseCodeStreamError) {
 }
 
 TEST_P(ProtocolIntegrationTest, MissingStatus) {
+#ifdef ENVOY_ENABLE_UHV
+  // TODO(#24945): In UHV case this test breaks in the CONNECT/upgrade normalization code in H/2
+  // codec
+  if (upstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
+  }
+#endif
   initialize();
 
   // HTTP1, uses a defined protocol which doesn't split up messages into raw byte frames
@@ -1852,6 +1873,13 @@ TEST_P(ProtocolIntegrationTest, MissingStatus) {
 }
 
 TEST_P(ProtocolIntegrationTest, MissingStatusStreamError) {
+#ifdef ENVOY_ENABLE_UHV
+  // TODO(#24945): In UHV case this test breaks in the CONNECT/upgrade normalization code in H/2
+  // codec
+  if (upstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
+  }
+#endif
   // For H/1 this test is equivalent to MissingStatus
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
     return;

@@ -186,7 +186,7 @@ public:
                const Http::FilterChainFactory::UpgradeMap* upgrade_map,
                Http::FilterChainManager& manager),
               (const));
-  MOCK_METHOD(Http::HeaderValidatorFactorySharedPtr, headerValidatorFactory, (), (const));
+  MOCK_METHOD(Http::HeaderValidatorPtr, makeHeaderValidator, (Http::Protocol), (const));
 
   Http::Http1::CodecStats& http1CodecStats() const override;
   Http::Http2::CodecStats& http2CodecStats() const override;
