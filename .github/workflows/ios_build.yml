@@ -57,6 +57,7 @@ jobs:
       if: steps.should_run.outputs.run_ci_job == 'true'
       name: 'Start simulator'
       with:
+        timeout_minutes: 5
         max_attempts: 3
         command: ./mobile/ci/start_ios_simulator.sh
     # Run the app in the background and redirect logs.
@@ -103,6 +104,7 @@ jobs:
       if: steps.should_run.outputs.run_ci_job == 'true'
       name: 'Start simulator'
       with:
+        timeout_minutes: 5
         max_attempts: 3
         command: ./mobile/ci/start_ios_simulator.sh
     # Run the app in the background and redirect logs.
@@ -149,6 +151,7 @@ jobs:
       if: steps.should_run.outputs.run_ci_job == 'true'
       name: 'Start simulator'
       with:
+        timeout_minutes: 5
         max_attempts: 3
         command: ./mobile/ci/start_ios_simulator.sh
     # Run the app in the background and redirect logs.
@@ -195,6 +198,7 @@ jobs:
       if: steps.should_run.outputs.run_ci_job == 'true'
       name: 'Start simulator'
       with:
+        timeout_minutes: 5
         max_attempts: 3
         command: ./mobile/ci/start_ios_simulator.sh
     # Run the app in the background and redirect logs.
@@ -241,6 +245,7 @@ jobs:
       if: steps.should_run.outputs.run_ci_job == 'true'
       name: 'Start simulator'
       with:
+        timeout_minutes: 5
         max_attempts: 3
         command: ./mobile/ci/start_ios_simulator.sh
     # Run the app in the background and redirect logs.
