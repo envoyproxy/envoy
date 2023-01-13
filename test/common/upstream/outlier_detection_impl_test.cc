@@ -394,7 +394,35 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xxViaHttpCodesWithActiveHC) {
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
   interval_timer_->invokeCallback();
 
-  // Trigger the health checker callbacks and validate host is unejected.
+  // Trigger the health checker callbacks with "Changed" status and validate host is unejected.
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_,
+              logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
+  health_checker->runCallbacks(hosts_[0], HealthTransition::Changed);
+  EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
+  EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+
+  // Cause a consecutive 5xx error again on host[0] by reporting HTTP codes.
+  loadRq(hosts_[0], 1, 500);
+  loadRq(hosts_[0], 1, 200);
+  hosts_[0]->outlierDetector().putResponseTime(std::chrono::milliseconds(5));
+  loadRq(hosts_[0], 4, 500);
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(0));
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
+                                       _, envoy::data::cluster::v3::CONSECUTIVE_5XX, true));
+  loadRq(hosts_[0], 1, 500);
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+
+  EXPECT_EQ(1UL, outlier_detection_ejections_active_.value());
+
+  // Interval that doesn't bring the host back in.
+  time_system_.setMonotonicTime(std::chrono::milliseconds(9999));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
+  interval_timer_->invokeCallback();
+
+  // Trigger the health checker callbacks with "UnChanged" status and validate host is unejected.
   EXPECT_CALL(checker_, check(hosts_[0]));
   EXPECT_CALL(*event_logger_,
               logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
@@ -417,9 +445,9 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xxViaHttpCodesWithActiveHC) {
   cluster_.prioritySet().getMockHostSet(0)->runCallbacks({}, hosts_);
 
   EXPECT_EQ(0UL, outlier_detection_ejections_active_.value());
-  EXPECT_EQ(2UL, cluster_.info_->stats_store_.counter("outlier_detection.ejections_total").value());
+  EXPECT_EQ(3UL, cluster_.info_->stats_store_.counter("outlier_detection.ejections_total").value());
   EXPECT_EQ(
-      2UL,
+      3UL,
       cluster_.info_->stats_store_.counter("outlier_detection.ejections_consecutive_5xx").value());
   EXPECT_EQ(0UL, cluster_.info_->stats_store_
                      .counter("outlier_detection.ejections_consecutive_gateway_failure")
