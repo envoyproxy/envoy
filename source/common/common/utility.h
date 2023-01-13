@@ -27,7 +27,7 @@ namespace Envoy {
  * @return Envoy::SystemTime the same time as a std::chrono::time_point.
  */
 constexpr Envoy::SystemTime timespecToChrono(const struct timespec& t) {
-  return Envoy::SystemTime{std::chrono::seconds{t.tv_sec} + std::chrono::nanoseconds{t.tv_nsec}};
+  return Envoy::SystemTime{} + std::chrono::seconds{t.tv_sec} + std::chrono::nanoseconds{t.tv_nsec};
 }
 
 /**

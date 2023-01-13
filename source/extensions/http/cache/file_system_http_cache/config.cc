@@ -59,9 +59,11 @@ public:
       cache = it->second.lock();
     }
     if (!cache) {
-      cache = std::make_shared<FileSystemHttpCache>(
-          singleton, cache_eviction_thread_, std::move(config),
-          async_file_manager_factory_->getAsyncFileManager(config.manager_config()), stats_scope);
+      auto async_file_manager =
+          async_file_manager_factory_->getAsyncFileManager(config.manager_config());
+      cache = std::make_shared<FileSystemHttpCache>(singleton, cache_eviction_thread_,
+                                                    std::move(config),
+                                                    std::move(async_file_manager), stats_scope);
       caches_[key] = cache;
     } else if (!Protobuf::util::MessageDifferencer::Equals(cache->config(), config)) {
       throw EnvoyException(

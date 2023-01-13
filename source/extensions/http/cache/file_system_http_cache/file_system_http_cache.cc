@@ -2,7 +2,6 @@
 
 #include <chrono>
 
-#include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/filesystem/directory.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/extensions/http/cache/file_system_http_cache/cache_eviction_thread.h"
@@ -17,16 +16,14 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 namespace FileSystemHttpCache {
-namespace {
-bool isCacheFile(const Filesystem::DirectoryEntry& entry) {
-  return absl::StartsWith(entry.name_, "cache-") && entry.type_ == Filesystem::FileType::Regular;
-}
-} // namespace
 
 // Copying in 128K chunks is an arbitrary choice for a reasonable balance of performance and
 // memory usage. Since UpdateHeaders is unlikely to be a common operation it is most likely
 // not worthwhile to carefully tune this.
 const size_t FileSystemHttpCache::max_update_headers_copy_chunk_size_ = 128 * 1024;
+
+const CacheStats& FileSystemHttpCache::stats() const { return shared_->stats_; }
+const ConfigProto& FileSystemHttpCache::config() const { return shared_->config_; }
 
 void FileSystemHttpCache::writeVaryNodeToDisk(const Key& key,
                                               const Http::ResponseHeaderMap& response_headers,
@@ -83,13 +80,16 @@ FileSystemHttpCache::FileSystemHttpCache(
     Singleton::InstanceSharedPtr owner, CacheEvictionThread& cache_eviction_thread,
     ConfigProto config, std::shared_ptr<Common::AsyncFiles::AsyncFileManager>&& async_file_manager,
     Stats::Scope& stats_scope)
-    : owner_(owner), config_(config), async_file_manager_(async_file_manager),
-      stats_(generateStats(stats_scope, cachePath())),
+    : owner_(owner), async_file_manager_(async_file_manager),
+      shared_(std::make_shared<CacheShared>(config, stats_scope)),
       cache_eviction_thread_(cache_eviction_thread) {
-  init();
+  cache_eviction_thread_.addCache(shared_);
 }
 
-FileSystemHttpCache::~FileSystemHttpCache() { cache_eviction_thread_.removeCache(*this); }
+CacheShared::CacheShared(ConfigProto config, Stats::Scope& stats_scope)
+    : config_(config), stats_(generateStats(stats_scope, cachePath())) {}
+
+FileSystemHttpCache::~FileSystemHttpCache() { cache_eviction_thread_.removeCache(shared_); }
 
 CacheInfo FileSystemHttpCache::cacheInfo() const {
   CacheInfo info;
@@ -306,7 +306,7 @@ void FileSystemHttpCache::updateHeaders(const LookupContext& lookup_context,
   ctx->begin(ctx);
 }
 
-absl::string_view FileSystemHttpCache::cachePath() const { return config_.cache_path(); }
+absl::string_view FileSystemHttpCache::cachePath() const { return shared_->cachePath(); }
 
 bool FileSystemHttpCache::workInProgress(const Key& key) {
   absl::MutexLock lock(&cache_mu_);
@@ -348,39 +348,23 @@ InsertContextPtr FileSystemHttpCache::makeInsertContext(LookupContextPtr&& looku
   return std::make_unique<FileInsertContext>(shared_from_this(), std::move(file_lookup_context));
 }
 
-void FileSystemHttpCache::init() {
-  size_bytes_ = 0;
-  size_count_ = 0;
-  // TODO(ravenblack): Add support for directory tree structure.
-  for (const Filesystem::DirectoryEntry& entry : Filesystem::Directory(std::string{cachePath()})) {
-    if (!isCacheFile(entry)) {
-      continue;
-    }
-    size_count_++;
-    size_bytes_ += entry.size_bytes_.value_or(0);
-  }
-  stats_.size_count_.set(size_count_);
-  stats_.size_bytes_.set(size_bytes_);
-  if (config().has_max_cache_size_bytes()) {
-    stats_.size_limit_bytes_.set(config().max_cache_size_bytes().value());
-  }
-  if (config().has_max_cache_entry_count()) {
-    stats_.size_limit_count_.set(config().max_cache_entry_count().value());
-  }
-  cache_eviction_thread_.addCache(*this);
-}
-
 void FileSystemHttpCache::trackFileAdded(uint64_t file_size) {
+  shared_->trackFileAdded(file_size);
+  if (shared_->needsEviction()) {
+    cache_eviction_thread_.signal();
+  }
+}
+void CacheShared::trackFileAdded(uint64_t file_size) {
   size_count_++;
   size_bytes_ += file_size;
   stats_.size_count_.inc();
   stats_.size_bytes_.add(file_size);
-  if (needsEviction()) {
-    cache_eviction_thread_.signal();
-  }
 }
 
 void FileSystemHttpCache::trackFileRemoved(uint64_t file_size) {
+  shared_->trackFileRemoved(file_size);
+}
+void CacheShared::trackFileRemoved(uint64_t file_size) {
   // Atomically decrement-but-clamp-at-zero the count of files in the cache.
   //
   // It is an error to try to set a gauge to less than zero, so we must actively
@@ -404,91 +388,15 @@ void FileSystemHttpCache::trackFileRemoved(uint64_t file_size) {
   stats_.size_bytes_.set(size_bytes_);
 }
 
-FileSystemHttpCache::EvictionsRequired FileSystemHttpCache::needsEviction() const {
-  EvictionsRequired required;
-  if (config().has_max_cache_size_bytes()) {
-    // capture a value from the atomic because we're going to use it twice and don't want our
-    // value to change in between.
-    uint64_t seen_size = size_bytes_;
-    required.size_bytes_ = seen_size > config().max_cache_size_bytes().value()
-                               ? seen_size - config().max_cache_size_bytes().value()
-                               : 0;
+bool CacheShared::needsEviction() const {
+  if (config_.has_max_cache_size_bytes() && size_bytes_ > config_.max_cache_size_bytes().value()) {
+    return true;
   }
-  if (config().has_max_cache_entry_count()) {
-    // capture a value from the atomic because we're going to use it twice and don't want our
-    // value to change in between.
-    uint64_t seen_count = size_count_;
-    required.count_ = seen_count > config().max_cache_entry_count().value()
-                          ? seen_count - config().max_cache_entry_count().value()
-                          : 0;
+  if (config_.has_max_cache_entry_count() &&
+      size_count_ > config_.max_cache_entry_count().value()) {
+    return true;
   }
-  return required;
-}
-
-void FileSystemHttpCache::maybeEvict() {
-  EvictionsRequired evictions_required = needsEviction();
-  if (!evictions_required) {
-    return;
-  }
-
-  auto os_sys_calls = Api::OsSysCallsSingleton::get();
-  uint64_t size = 0;
-  uint64_t count = 0;
-  uint64_t proposed_size_evicted = 0;
-  struct ProposedEviction {
-    std::string name_;
-    uint64_t size_;
-    Envoy::SystemTime last_touch_;
-    bool operator<(const ProposedEviction& other) const { return last_touch_ < other.last_touch_; }
-  };
-  std::multiset<ProposedEviction> proposed_evictions;
-
-  // TODO(ravenblack): Add support for directory tree structure.
-  for (const Filesystem::DirectoryEntry& entry : Filesystem::Directory(std::string{cachePath()})) {
-    if (!isCacheFile(entry)) {
-      continue;
-    }
-    count++;
-    size += entry.size_bytes_.value_or(0);
-    struct stat s;
-    if (os_sys_calls.stat(absl::StrCat(cachePath(), entry.name_).c_str(), &s).return_value_ != -1) {
-      Envoy::SystemTime last_touch =
-          std::max(timespecToChrono(s.st_atim), timespecToChrono(s.st_ctim));
-      if (proposed_size_evicted < evictions_required.size_bytes_ ||
-          proposed_evictions.size() < evictions_required.count_ ||
-          last_touch < proposed_evictions.rbegin()->last_touch_) {
-        // We either haven't evicted enough yet, or this eviction candidate is 'older'
-        // than our current 'youngest' eviction candidate. So add this one to candidates.
-        proposed_evictions.insert(
-            ProposedEviction{entry.name_, entry.size_bytes_.value_or(0), last_touch});
-        proposed_size_evicted += entry.size_bytes_.value_or(0);
-        std::multiset<ProposedEviction>::iterator youngest;
-        while (proposed_evictions.size() > evictions_required.count_ &&
-               proposed_size_evicted - (youngest = std::prev(proposed_evictions.end()))->size_ >=
-                   evictions_required.size_bytes_) {
-          // We'd still be evicting enough if we don't evict the 'youngest' proposed eviction,
-          // so we unpropose that one.
-          proposed_size_evicted -= youngest->size_;
-          proposed_evictions.erase(youngest);
-        }
-      }
-    }
-  }
-  size_bytes_ = size;
-  size_count_ = count;
-  for (const ProposedEviction& eviction : proposed_evictions) {
-    // Unlink is expected to fail occasionally, e.g. if another instance of Envoy is performing
-    // cleanup at the same time, or some external operator deleted the file. If it fails we
-    // don't reduce the estimated cache size, so another eviction run will happen sooner.
-    // TODO(ravenblack): might be worth checking the type of the error, or whether the file is gone
-    // - if there's a permissions issue, for example, then the cache might remain oversized and the
-    // eviction thread will be churning, trying and failing to remove a file, which would be worth
-    // logging a warning, versus if the file is already gone then there's no problem.
-    if (os_sys_calls.unlink(absl::StrCat(cachePath(), eviction.name_).c_str()).return_value_ !=
-        -1) {
-      trackFileRemoved(eviction.size_);
-    }
-  }
+  return false;
 }
 
 } // namespace FileSystemHttpCache

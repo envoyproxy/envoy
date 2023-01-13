@@ -22,6 +22,7 @@ using ConfigProto =
     envoy::extensions::http::cache::file_system_http_cache::v3::FileSystemHttpCacheConfig;
 
 class CacheEvictionThread;
+struct CacheShared;
 
 /**
  * An instance of a cache. There may be multiple caches in a single envoy configuration.
@@ -46,7 +47,7 @@ public:
   InsertContextPtr makeInsertContext(LookupContextPtr&& lookup_context,
                                      Http::StreamEncoderFilterCallbacks& callbacks) override;
   CacheInfo cacheInfo() const override;
-  const CacheStats& stats() const { return stats_; }
+  const CacheStats& stats() const;
 
   /**
    * Replaces the headers of a cache entry.
@@ -82,7 +83,7 @@ public:
    * configs using the same path.
    * @return the config of this cache.
    */
-  const ConfigProto& config() const { return config_; }
+  const ConfigProto& config() const;
 
   /**
    * True if the given key currently has a stream writing to it.
@@ -164,11 +165,6 @@ public:
   }
 
   /**
-   * Measures initial state of cache path, to facilitate stats and timely eviction.
-   */
-  void init();
-
-  /**
    * Updates stats to reflect that a file has been added to the cache.
    * @param file_size The size in bytes of the file that was added.
    */
@@ -185,26 +181,7 @@ public:
   // is totally irrelevant to the outward-facing API.
   static const size_t max_update_headers_copy_chunk_size_;
 
-  struct EvictionsRequired {
-    // The number of bytes that must be evicted to be under the threshold.
-    uint64_t size_bytes_ = 0;
-    // The number of files that must be evicted to be under the threshold.
-    uint64_t count_ = 0;
-    operator bool() const { return size_bytes_ > 0 || count_ > 0; }
-  };
-
-  /**
-   * @return EvictionsRequired the amounts that need to be evicted to be under the configured
-   * thresholds.
-   */
-  EvictionsRequired needsEviction() const;
-
-  /**
-   * Called from CacheEvictionThread, this checks if the cache is over any of its
-   * size thresholds, and if so, least recently touched files are erased to bring
-   * it back under those thresholds.
-   */
-  void maybeEvict();
+  using PostEvictionCallback = std::function<void(uint64_t size_bytes, uint64_t count)>;
 
 private:
   /**
@@ -220,7 +197,6 @@ private:
 
   // A shared_ptr to keep the cache singleton alive as long as any of its caches are in use.
   const Singleton::InstanceSharedPtr owner_;
-  const ConfigProto config_;
 
   absl::Mutex cache_mu_;
   // When a new cache entry is being written, its key will be here and the cache file
@@ -237,8 +213,21 @@ private:
       entries_being_written_ ABSL_GUARDED_BY(cache_mu_);
 
   std::shared_ptr<Common::AsyncFiles::AsyncFileManager> async_file_manager_;
-  CacheStats stats_;
 
+  // Stats and config are held in a shared_ptr so that CacheEvictionThread can use
+  // them even if the cache instance has been deleted while it performed work.
+  std::shared_ptr<CacheShared> shared_;
+
+  CacheEvictionThread& cache_eviction_thread_;
+
+  // Allow test access to cache_eviction_thread_ for synchronization.
+  friend class FileSystemCacheTestContext;
+};
+
+struct CacheShared {
+  CacheShared(ConfigProto config, Stats::Scope& stats_scope);
+  const ConfigProto config_;
+  CacheStats stats_;
   // These are part of stats, but we have to track them separately because there is
   // potential to go "less than zero" due to not having sole control of the file cache;
   // gauge values don't have fine enough control to prevent that, and aren't allowed to
@@ -246,13 +235,32 @@ private:
   //
   // See comment on size_bytes and size_count in stats.h for explanation of how stat
   // values can be out of sync with the actionable cache.
-  std::atomic<uint64_t> size_count_;
-  std::atomic<uint64_t> size_bytes_;
+  std::atomic<uint64_t> size_count_ = 0;
+  std::atomic<uint64_t> size_bytes_ = 0;
+  bool needs_init_ = true;
 
-  CacheEvictionThread& cache_eviction_thread_;
+  /**
+   * @return true if the eviction thread should do a pass over this cache.
+   */
+  bool needsEviction() const;
 
-  // Allow test access to cache_eviction_thread_ for synchronization.
-  friend class FileSystemCacheTestContext;
+  /**
+   * Returns the path for this cache instance. Guaranteed to end in a path-separator.
+   * @return the configured path for this cache instance.
+   */
+  absl::string_view cachePath() const { return config_.cache_path(); }
+
+  /**
+   * Updates stats to reflect that a file has been added to the cache.
+   * @param file_size The size in bytes of the file that was added.
+   */
+  void trackFileAdded(uint64_t file_size);
+
+  /**
+   * Updates stats to reflect that a file has been removed from the cache.
+   * @param file_size The size in bytes of the file that was removed.
+   */
+  void trackFileRemoved(uint64_t file_size);
 };
 
 } // namespace FileSystemHttpCache

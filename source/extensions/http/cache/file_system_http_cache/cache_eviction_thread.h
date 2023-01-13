@@ -16,7 +16,7 @@ namespace HttpFilters {
 namespace Cache {
 namespace FileSystemHttpCache {
 
-class FileSystemHttpCache;
+struct CacheShared;
 
 /**
  * A class which controls a thread on which cache evictions for all instances
@@ -35,17 +35,15 @@ public:
 
   /**
    * Adds the given cache to the caches that may be evicted from.
-   * May block for up to one eviction cycle, if one is in progress.
    * @param cache an unowned reference to the cache in question.
    */
-  void addCache(FileSystemHttpCache& cache);
+  void addCache(std::shared_ptr<CacheShared> cache);
 
   /**
    * Removes the given cache from the caches that may be evicted from.
-   * May block for up to one eviction cycle, if one is in progress.
    * @param cache an unowned reference to the cache in question.
    */
-  void removeCache(FileSystemHttpCache& cache);
+  void removeCache(std::shared_ptr<CacheShared>& cache);
 
   /**
    * Signals the cache eviction thread that it's time to test things.
@@ -62,6 +60,19 @@ private:
   void work();
 
   /**
+   * Initialize the cache stats.
+   * @param cache the shared data of the cache to initialize.
+   */
+
+  static void init(CacheShared& cache);
+
+  /**
+   * Evict from the cache, until the configured thresholds are not exceeded.
+   * @param cache the shared data of the cache to evict from.
+   */
+  static void evict(CacheShared& cache);
+
+  /**
    * @return false if terminating.
    */
   bool waitForSignal();
@@ -75,7 +86,7 @@ private:
   // We must store the caches as unowned references so they can be destroyed
   // during config changes - that destruction is the only signal that a cache
   // instance should be removed.
-  absl::flat_hash_set<FileSystemHttpCache*> caches_ ABSL_GUARDED_BY(cache_mu_);
+  absl::flat_hash_set<std::shared_ptr<CacheShared>> caches_ ABSL_GUARDED_BY(cache_mu_);
 
   // Allow test access to waitForIdle for synchronization.
   friend class FileSystemCacheTestContext;

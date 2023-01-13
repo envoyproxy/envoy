@@ -17,6 +17,7 @@
 - [ ] Cache should optionally expose histogram for cache entry sizes.
 - [x] Cache should index by the request route *and* a key generated from headers that may affect the outcome of a request (See [allowed_vary_headers](https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/filters/http/cache/v3/cache.proto.html))
 - [ ] Cache should create a [tree structure](#tree-structure) of folders (may be configured as just one branch), so user may avoid filesystem performance issues with overcrowded directories.
+- [ ] Cache should validate the existence of the file path it is configured to use, at startup. (Maybe optionally try to create it if not present?)
 
 ## Storage design
 
@@ -29,10 +30,6 @@
 * (When implemented) the tree structure of folders is simply one level deep of folders named `cache-0000`, `cache-0001` etc. as four-digit hexadecimal numbers up to the configured number of subdirectories. Cache files are placed in a folder according to a short stable hash of their key. On cache startup, any cache entries found to be in the wrong folder (as would be the case if the number of folders was reconfigured) will simply be removed.
 
 ## Discussions
-
-### Startup
-
-In the current implementation, on startup all cache entries are enumerated synchronously to provide an initially-accurate measure of the cache size. If server startup time is found to be impacted too significantly by this, the operation could be made asynchronous and moved to the start of the eviction thread. It is still useful to do some minimal operations on startup, so as to be able to detect and reject misconfigurations.
 
 <a name="thundering-herd"></a>
 ### Thundering herd

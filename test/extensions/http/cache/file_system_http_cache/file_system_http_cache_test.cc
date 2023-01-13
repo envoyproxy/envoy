@@ -121,6 +121,7 @@ TEST_F(FileSystemHttpCacheTestWithNoDefaultCache, InitialStatsAreSetCorrectly) {
   env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-b"), file_2_contents, true);
   cache_ = std::dynamic_pointer_cast<FileSystemHttpCache>(
       http_cache_factory_->getCache(cacheConfig(cfg), context_));
+  waitForEvictionThreadIdle();
   EXPECT_EQ(cache_->stats().size_limit_bytes_.value(), max_size);
   EXPECT_EQ(cache_->stats().size_limit_count_.value(), max_count);
   EXPECT_EQ(cache_->stats().size_bytes_.value(), file_1_contents.size() + file_2_contents.size());
@@ -143,6 +144,9 @@ TEST_F(FileSystemHttpCacheTestWithNoDefaultCache, EvictsOldestFilesUntilUnderCou
   }
   cache_ = std::dynamic_pointer_cast<FileSystemHttpCache>(
       http_cache_factory_->getCache(cacheConfig(cfg), context_));
+  waitForEvictionThreadIdle();
+  EXPECT_EQ(cache_->stats().size_bytes_.value(), file_contents.size() * 2);
+  EXPECT_EQ(cache_->stats().size_count_.value(), 2);
   env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-c"), file_contents, true);
   env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-d"), file_contents, true);
   cache_->trackFileAdded(file_contents.size());
@@ -173,6 +177,7 @@ TEST_F(FileSystemHttpCacheTestWithNoDefaultCache, EvictsOldestFilesUntilUnderSiz
   }
   cache_ = std::dynamic_pointer_cast<FileSystemHttpCache>(
       http_cache_factory_->getCache(cacheConfig(cfg), context_));
+  waitForEvictionThreadIdle();
   env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-c"), large_file_contents, true);
   EXPECT_EQ(cache_->stats().size_bytes_.value(), file_contents.size() * 2);
   EXPECT_EQ(cache_->stats().size_count_.value(), 2);
