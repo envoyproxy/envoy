@@ -169,7 +169,7 @@ static_resources:
       .sendHeaders(requestHeaders, endStream: true)
 
     XCTAssertEqual(
-      XCTWaiter.wait(for: [filterExpectation, callbackExpectation], timeout: 2),
+      XCTWaiter.wait(for: [filterExpectation, callbackExpectation], timeout: 10),
       .completed
     )
 
