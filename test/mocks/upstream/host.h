@@ -103,6 +103,12 @@ public:
   MOCK_METHOD(uint32_t, priority, (), (const));
   MOCK_METHOD(void, priority, (uint32_t));
   MOCK_METHOD(absl::optional<MonotonicTime>, lastHcPassTime, (), (const));
+  MOCK_METHOD(MonotonicTime, lastTrafficPassTime, (), (const));
+  MOCK_METHOD(MonotonicTime, lastTrafficPassTime2xx, (), (const));
+  MOCK_METHOD(MonotonicTime, lastTrafficPassTimeGrpc, (), (const));
+  MOCK_METHOD(void, setLastTrafficTime, (MonotonicTime last_traffic_pass_time), (const));
+  MOCK_METHOD(void, setLastTrafficTime2xx, (MonotonicTime last_traffic_pass_time), (const));
+  MOCK_METHOD(void, setLastTrafficTimeGrpc, (MonotonicTime last_traffic_pass_time), (const));
   Stats::StatName localityZoneStatName() const override {
     Stats::SymbolTable& symbol_table = *symbol_table_;
     locality_zone_stat_name_ =
@@ -215,6 +221,12 @@ public:
   MOCK_METHOD(void, priority, (uint32_t));
   MOCK_METHOD(bool, warmed, (), (const));
   MOCK_METHOD(absl::optional<MonotonicTime>, lastHcPassTime, (), (const));
+  MOCK_METHOD(MonotonicTime, lastTrafficPassTime, (), (const));
+  MOCK_METHOD(MonotonicTime, lastTrafficPassTime2xx, (), (const));
+  MOCK_METHOD(MonotonicTime, lastTrafficPassTimeGrpc, (), (const));
+  MOCK_METHOD(void, setLastTrafficTime, (MonotonicTime last_traffic_pass_time), (const));
+  MOCK_METHOD(void, setLastTrafficTime2xx, (MonotonicTime last_traffic_pass_time), (const));
+  MOCK_METHOD(void, setLastTrafficTimeGrpc, (MonotonicTime last_traffic_pass_time), (const));
 
   testing::NiceMock<MockClusterInfo> cluster_;
   Network::UpstreamTransportSocketFactoryPtr socket_factory_;

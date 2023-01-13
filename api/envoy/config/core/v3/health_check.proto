@@ -415,8 +415,8 @@ message HealthCheck {
   // will be used for health check socket configuration.
   google.protobuf.Struct transport_socket_match_criteria = 23;
 
-  // If this field is enabled, when envoy wants to send active health check packet to target host, it will first check whether 
-  // there is already business traffic hit the target host during the interval. If yes, no need to send health check packet. 
+  // When the health status of a host is healthy, if this field is enabled, when envoy wants to send active health check packet to target host, it will first check whether
+  // there is already business traffic hit the target host during the interval. If yes, no need to send health check packet.
   // The default value is false.
   bool enable_idle_hc = 25;
 }
