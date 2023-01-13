@@ -11,7 +11,7 @@ namespace Stats {
 
 // See full context https://github.com/envoyproxy/envoy/pull/23921
 // This is a helper class used in thread local store test and the future
-// lazyinit stats speed test, which works as the base for ThreadLocalStore related tests.
+// lazy init stats speed test, which works as the base for ThreadLocalStore related tests.
 class ThreadLocalStoreNoMocksMixin {
 public:
   ThreadLocalStoreNoMocksMixin();
