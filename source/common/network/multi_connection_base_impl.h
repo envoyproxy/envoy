@@ -120,11 +120,13 @@ public:
   StreamInfo::StreamInfo& streamInfo() override;
   const StreamInfo::StreamInfo& streamInfo() const override;
   absl::string_view transportFailureReason() const override;
+  absl::string_view localCloseReason() const override;
 
   // Methods implemented largely by this class itself.
   uint64_t id() const override;
   Event::Dispatcher& dispatcher() override;
-  void close(ConnectionCloseType type) override;
+  void close(ConnectionCloseType type) override { close(type, ""); }
+  void close(ConnectionCloseType type, absl::string_view details) override;
   bool readEnabled() const override;
   bool aboveHighWatermark() const override;
   void hashKey(std::vector<uint8_t>& hash_key) const override;

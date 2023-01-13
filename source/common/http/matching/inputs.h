@@ -86,6 +86,8 @@ public:
   HttpRequestHeadersDataInputFactory() : HttpHeadersDataInputFactoryBase("request_headers") {}
 };
 
+DECLARE_FACTORY(HttpRequestHeadersDataInputFactory);
+
 class HttpResponseHeadersDataInput : public HttpHeadersDataInputBase<ResponseHeaderMap> {
 public:
   explicit HttpResponseHeadersDataInput(const std::string& name) : HttpHeadersDataInputBase(name) {}
@@ -101,6 +103,8 @@ class HttpResponseHeadersDataInputFactory
 public:
   HttpResponseHeadersDataInputFactory() : HttpHeadersDataInputFactoryBase("response_headers") {}
 };
+
+DECLARE_FACTORY(HttpResponseHeadersDataInputFactory);
 
 class HttpRequestTrailersDataInput : public HttpHeadersDataInputBase<RequestTrailerMap> {
 public:
@@ -118,6 +122,8 @@ public:
   HttpRequestTrailersDataInputFactory() : HttpHeadersDataInputFactoryBase("request_trailers") {}
 };
 
+DECLARE_FACTORY(HttpRequestTrailersDataInputFactory);
+
 class HttpResponseTrailersDataInput : public HttpHeadersDataInputBase<ResponseTrailerMap> {
 public:
   explicit HttpResponseTrailersDataInput(const std::string& name)
@@ -134,6 +140,9 @@ class HttpResponseTrailersDataInputFactory
 public:
   HttpResponseTrailersDataInputFactory() : HttpHeadersDataInputFactoryBase("response_trailers") {}
 };
+
+DECLARE_FACTORY(HttpResponseTrailersDataInputFactory);
+
 } // namespace Matching
 } // namespace Http
 } // namespace Envoy

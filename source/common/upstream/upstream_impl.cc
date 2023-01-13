@@ -875,7 +875,7 @@ public:
   // other contexts taken from TransportSocketFactoryContext.
   FactoryContextImpl(Stats::Scope& stats_scope, Envoy::Runtime::Loader& runtime,
                      Server::Configuration::TransportSocketFactoryContext& c)
-      : admin_(c.admin()), server_scope_(c.stats()), stats_scope_(stats_scope),
+      : admin_(c.admin()), server_scope_(*c.stats().rootScope()), stats_scope_(stats_scope),
         cluster_manager_(c.clusterManager()), local_info_(c.localInfo()),
         dispatcher_(c.mainThreadDispatcher()), runtime_(runtime),
         singleton_manager_(c.singletonManager()), tls_(c.threadLocal()), api_(c.api()),
@@ -1001,8 +1001,9 @@ ClusterInfoImpl::ClusterInfoImpl(
       lb_stats_(factory_context.clusterManager().clusterLbStatNames(), *stats_scope_),
       endpoint_stats_(factory_context.clusterManager().clusterEndpointStatNames(), *stats_scope_),
       load_report_stats_store_(stats_scope_->symbolTable()),
-      load_report_stats_(generateLoadReportStats(
-          load_report_stats_store_, factory_context.clusterManager().clusterLoadReportStatNames())),
+      load_report_stats_(
+          generateLoadReportStats(*load_report_stats_store_.rootScope(),
+                                  factory_context.clusterManager().clusterLoadReportStatNames())),
       optional_cluster_stats_((config.has_track_cluster_stats() || config.track_timeout_budgets())
                                   ? std::make_unique<OptionalClusterStats>(
                                         config, *stats_scope_, factory_context.clusterManager())

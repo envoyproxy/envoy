@@ -78,7 +78,7 @@ public:
    * Validate the entire request header map.
    * This method may mutate the header map as well, for example by normalizing URI path.
    * Returning the Reject value form this method causes the HTTP request to be rejected with 400
-   * status, and the gRPC request with the the INTERNAL (13) error code. Returning the Redirect
+   * status, and the gRPC request with the INTERNAL (13) error code. Returning the Redirect
    * value causes the HTTP request to be redirected to the :path presudo header in the request map.
    * The gRPC request will still be rejected with the INTERNAL (13) error code.
    */
@@ -89,7 +89,7 @@ public:
   /**
    * Validate the entire response header map.
    * Returning the Reject value causes the HTTP request to be rejected with the 502 status,
-   * and the gRPC request with the the UNAVAILABLE (14) error code.
+   * and the gRPC request with the UNAVAILABLE (14) error code.
    */
   using ResponseHeaderMapValidationResult = RejectResult;
   virtual ResponseHeaderMapValidationResult
@@ -98,7 +98,7 @@ public:
   /**
    * Validate the entire request trailer map.
    * Returning the Reject value causes the HTTP request to be rejected with the 502 status,
-   * and the gRPC request with the the UNAVAILABLE (14) error code.
+   * and the gRPC request with the UNAVAILABLE (14) error code.
    * If response headers have already been sent the request is reset.
    */
   using TrailerValidationResult = RejectResult;
