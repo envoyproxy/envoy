@@ -219,7 +219,7 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store, TimeSource& time_sou
         gauges_.push_back(gauge);
       });
 
-  store.forEachHistogram(
+  store.forEachSinkedHistogram(
       [this](std::size_t size) {
         snapped_histograms_.reserve(size);
         histograms_.reserve(size);

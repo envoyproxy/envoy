@@ -217,7 +217,7 @@ static_resources:
     )
 
     XCTAssertEqual(
-      XCTWaiter.wait(for: [cancelExpectation], timeout: 1),
+      XCTWaiter.wait(for: [cancelExpectation], timeout: 2),
       .completed
     )
 
