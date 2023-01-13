@@ -11,7 +11,7 @@
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/match.h"
-#include "nghttp2/nghttp2.h"
+#include "quiche/http2/adapter/header_validator.h"
 
 namespace Envoy {
 namespace Http {
@@ -190,8 +190,8 @@ bool HeaderUtility::schemeIsValid(const absl::string_view scheme) {
 }
 
 bool HeaderUtility::headerValueIsValid(const absl::string_view header_value) {
-  return nghttp2_check_header_value(reinterpret_cast<const uint8_t*>(header_value.data()),
-                                    header_value.size()) != 0;
+  return http2::adapter::HeaderValidator::IsValidHeaderValue(header_value,
+                                                             http2::adapter::ObsTextOption::kAllow);
 }
 
 bool HeaderUtility::headerNameContainsUnderscore(const absl::string_view header_name) {
@@ -199,8 +199,7 @@ bool HeaderUtility::headerNameContainsUnderscore(const absl::string_view header_
 }
 
 bool HeaderUtility::authorityIsValid(const absl::string_view header_value) {
-  return nghttp2_check_authority(reinterpret_cast<const uint8_t*>(header_value.data()),
-                                 header_value.size()) != 0;
+  return http2::adapter::HeaderValidator::IsValidAuthority(header_value);
 }
 
 bool HeaderUtility::isSpecial1xx(const ResponseHeaderMap& response_headers) {
