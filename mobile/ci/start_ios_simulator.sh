@@ -13,6 +13,7 @@ attempt=0
 max=5
 delay=5
 while true; do
+  # shellcheck disable=SC2015
   (xcrun simctl list | grep "($simulator_uuid) (Booted)") && break || {
     if [[ $attempt -lt $max ]]; then
       ((attempt++))
