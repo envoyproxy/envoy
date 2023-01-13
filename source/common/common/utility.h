@@ -28,8 +28,8 @@ namespace Envoy {
  *         to microsecond accuracy. (SystemTime does not accept nanosecond accuracy.)
  */
 constexpr SystemTime timespecToChrono(const struct timespec& t) {
-  return SystemTime{} + std::chrono::seconds{t.tv_sec} +
-         std::chrono::microseconds{t.tv_nsec / 1000};
+  return SystemTime{} + std::chrono::duration_cast<std::chrono::microseconds>(
+                            std::chrono::seconds{t.tv_sec} + std::chrono::nanoseconds{t.tv_nsec});
 }
 
 /**

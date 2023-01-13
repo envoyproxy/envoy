@@ -31,10 +31,10 @@ namespace Envoy {
 
 TEST(TimeSpecToChrono, convertsCorrectly) {
   struct timespec t;
-  t.tv_nsec = 456000;
+  t.tv_nsec = 456789;
   t.tv_sec = 1673368198;
   auto expected =
-      SystemTime{std::chrono::seconds{t.tv_sec} + std::chrono::microseconds{t.tv_nsec / 1000}};
+      SystemTime{} + std::chrono::seconds{t.tv_sec} + std::chrono::microseconds{t.tv_nsec / 1000};
   EXPECT_EQ(expected, timespecToChrono(t));
   t.tv_sec++;
   EXPECT_NE(expected, timespecToChrono(t));
