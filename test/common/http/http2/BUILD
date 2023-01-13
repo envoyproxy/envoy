@@ -225,3 +225,27 @@ envoy_cc_fuzz_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_proto_library(
+    name = "http2_connection_proto",
+    srcs = ["http2_connection.proto"],
+    deps = ["//test/fuzz:common_proto"],
+)
+
+envoy_cc_fuzz_test(
+    name = "http2_connection_fuzz_test",
+    srcs = ["http2_connection_fuzz_test.cc"],
+    corpus = "http2_connection_corpus",
+    external_deps = [
+        "nghttp2",
+    ],
+    deps = [
+        ":http2_connection_proto_cc_proto",
+        "//source/common/http/http2:codec_lib",
+        "//test/common/http/http2:http2_frame",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
