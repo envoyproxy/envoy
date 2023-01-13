@@ -39,6 +39,8 @@ constexpr uint32_t PROXY_PROTO_V2_ADDR_LEN_INET = 12;
 constexpr uint32_t PROXY_PROTO_V2_ADDR_LEN_INET6 = 36;
 constexpr uint32_t PROXY_PROTO_V2_ADDR_LEN_UNIX = 216;
 
+constexpr uint32_t PROXY_PROTO_V2_TLV_TYPE_LENGTH_LEN = 3;
+
 // Generates the v1 PROXY protocol header and adds it to the specified buffer
 void generateV1Header(const std::string& src_addr, const std::string& dst_addr, uint32_t src_port,
                       uint32_t dst_port, Network::Address::IpVersion ip_version,
@@ -48,6 +50,9 @@ void generateV1Header(const Network::Address::Ip& source_address,
 
 // Generates the v2 PROXY protocol header and adds it to the specified buffer
 // TCP is assumed as the transport protocol
+void generateV2Header(const std::string& src_addr, const std::string& dst_addr, uint32_t src_port,
+                      uint32_t dst_port, Network::Address::IpVersion ip_version,
+                      uint16_t extension_length, Buffer::Instance& out);
 void generateV2Header(const std::string& src_addr, const std::string& dst_addr, uint32_t src_port,
                       uint32_t dst_port, Network::Address::IpVersion ip_version,
                       Buffer::Instance& out);
@@ -60,6 +65,9 @@ void generateProxyProtoHeader(const envoy::config::core::v3::ProxyProtocolConfig
 
 // Generates the v2 PROXY protocol local command header and adds it to the specified buffer
 void generateV2LocalHeader(Buffer::Instance& out);
+
+// Generates the v2 PROXY protocol header including the TLV vector into the specified buffer.
+void generateV2Header(const Network::ProxyProtocolData& proxy_proto_data, Buffer::Instance& out);
 
 } // namespace ProxyProtocol
 } // namespace Common
