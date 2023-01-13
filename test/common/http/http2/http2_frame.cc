@@ -281,7 +281,6 @@ Http2Frame Http2Frame::makeMetadataFrameFromMetadataMap(uint32_t stream_index,
     payload = payload_sequence->Next(maxPayloadSize);
   }
   ASSERT(!payload_sequence->HasNext());
-  ASSERT(payload.size() > 0);
 
   Http2Frame frame;
   frame.buildHeader(Type::Metadata, payload.size(), static_cast<uint8_t>(flags),
