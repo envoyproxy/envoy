@@ -88,8 +88,6 @@ void deflate_headers(nghttp2_hd_deflater* deflater, const test::fuzz::Headers& f
   auto headers = fragment.headers();
   for (unsigned i = 0; i < n_headers; i++) {
     auto hv = headers.at(i);
-    // Because I didn't manage to discard const from the char pointer,
-    // so that I can assign it to nghttp2_nv fields, copy to stack first.
     size_t keylen = hv.key().size();
     uint8_t* key = reinterpret_cast<uint8_t*>(alloca(keylen));
     std::memcpy(key, hv.key().c_str(), keylen);
