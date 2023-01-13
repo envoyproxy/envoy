@@ -14,19 +14,40 @@ envoy_extension_package()
 envoy_cc_library(
     name = "datadog_tracer_lib",
     srcs = [
-        "datadog_tracer_impl.cc",
+        "agent_http_client.cc",
+        "dict_util.cc",
+        "event_scheduler.cc",
+        "logger.cc",
+        "span.cc",
+        "time_util.cc",
+        "tracer.cc",
     ],
     hdrs = [
-        "datadog_tracer_impl.h",
+        "agent_http_client.h",
+        "dd.h",
+        "dict_util.h",
+        "event_scheduler.h",
+        "logger.h",
+        "span.h",
+        "string_util.h",
+        "time_util.h",
+        "tracer.h",
+        "tracer_stats.h",
     ],
-    external_deps = ["dd_opentracing_cpp"],
+    copts = [
+        # Make sure that headers included from dd_trace_cpp use Abseil
+        # equivalents of std::string_view and std::optional.
+        "-DDD_USE_ABSEIL_FOR_ENVOY",
+    ],
+    external_deps = [
+        "dd_trace_cpp",
+    ],
     deps = [
         "//source/common/config:utility_lib",
         "//source/common/http:async_client_utility_lib",
+        "//source/common/tracing:null_span_lib",
         "//source/common/upstream:cluster_update_tracker_lib",
         "//source/common/version:version_lib",
-        "//source/extensions/tracers/common/ot:opentracing_driver_lib",
-        "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
 )
 

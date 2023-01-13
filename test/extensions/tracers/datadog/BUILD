@@ -12,11 +12,19 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_extension_cc_test(
-    name = "datadog_tracer_impl_test",
+    name = "datadog_tracer_test",
     srcs = [
-        "datadog_tracer_impl_test.cc",
+        "datadog_tracer_test.cc",
+    ],
+    copts = [
+        # Make sure that headers included from dd_trace_cpp use Abseil
+        # equivalents of std::string_view and std::optional.
+        "-DDD_USE_ABSEIL_FOR_ENVOY",
     ],
     extension_names = ["envoy.tracers.datadog"],
+    external_deps = [
+        "dd_trace_cpp",
+    ],
     # TODO(wrowe): envoy_extension_ rules don't currently exclude windows extensions
     tags = ["skip_on_windows"],
     deps = [
@@ -25,6 +33,7 @@ envoy_extension_cc_test(
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
         "//source/common/runtime:runtime_lib",
+        "//source/extensions/tracers/datadog:config",
         "//source/extensions/tracers/datadog:datadog_tracer_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/local_info:local_info_mocks",
