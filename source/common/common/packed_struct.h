@@ -99,8 +99,6 @@ public:
     return *this;
   }
 
-  ~PackedStruct() = default;
-
 private:
   // Accessors.
   T& operator[](size_t idx) {
@@ -131,9 +129,7 @@ private:
     // If we're at capacity and we don't have a slot for element_idx, increase capacity by 1.
     if (!has(element_idx) && current_size == capacity()) {
       std::unique_ptr<T[]> tmp(new T[++indices_[max_size]]);
-      for (size_t idx = 0; idx < current_size; ++idx) {
-        swap(tmp.get()[idx], data_.get()[idx]);
-      }
+      std::move(data_.get(), std::next(data_.get(), current_size), tmp.get());
       swap(data_, tmp);
     }
     if (!has(element_idx)) {

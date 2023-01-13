@@ -11,8 +11,6 @@
 namespace Envoy {
 namespace {
 
-MAKE_PACKED_MS_STRUCT(TimeoutsFromProto, TIMEOUT_ELEMENTS);
-
 TEST(PackedStruct, StringStruct) {
   enum class RedirectStringElement { scheme_redirect, host_redirect, path_redirect };
   using RedirectStringsPackedStruct = PackedStruct<std::string, 3, RedirectStringElement>;
