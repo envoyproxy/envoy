@@ -185,7 +185,6 @@ public:
 };
 
 DECLARE_FACTORY(QuicClientTransportSocketConfigFactory);
-DECLARE_FACTORY(QuicServerTransportSocketConfigFactory);
 
 } // namespace Quic
 } // namespace Envoy

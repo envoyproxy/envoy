@@ -1,9 +1,11 @@
+#include "extension_registry.h"
 #include "gtest/gtest.h"
 #include "library/common/engine_common.h"
 
 namespace Envoy {
 
 TEST(EngineCommonTest, SignalHandlingFalse) {
+  ExtensionRegistry::registerFactories();
   std::vector<const char*> envoy_argv{
       "envoy", "--config-yaml",
       "{\"layered_runtime\":{\"layers\":[{\"name\":\"static_layer_0\",\"static_layer\":{"
