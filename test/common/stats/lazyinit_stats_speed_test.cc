@@ -21,17 +21,17 @@ using Upstream::ClusterTrafficStats;
 
 class LazyInitStatsBenchmarkBase {
 public:
-  LazyInitStatsBenchmarkBase(bool lazy, const uint64_t n_clusters, Stats::Store& s)
+  LazyInitStatsBenchmarkBase(bool lazy, const uint64_t n_clusters, Store& s)
       : lazy_init_(lazy), num_clusters_(n_clusters), stat_store_(s),
         stat_names_(stat_store_.symbolTable()) {}
 
   void createStats(bool defer_init) {
     for (uint64_t i = 0; i < num_clusters_; ++i) {
       std::string new_cluster_name = absl::StrCat("cluster_", i);
-      Stats::ScopeSharedPtr scope = stat_store_.createScope(new_cluster_name);
+      ScopeSharedPtr scope = stat_store_.createScope(new_cluster_name);
       scopes_.push_back(scope);
       if (lazy_init_) {
-        auto lazy_stat = std::make_shared<Stats::LazyInit<ClusterTrafficStats>>(stat_names_, scope);
+        auto lazy_stat = std::make_shared<LazyInit<ClusterTrafficStats>>(stat_names_, scope);
         lazy_stats_.push_back(lazy_stat);
         if (!defer_init) {
           *(*lazy_stat);
@@ -44,16 +44,16 @@ public:
 
   const bool lazy_init_;
   const uint64_t num_clusters_;
-  Stats::Store& stat_store_;
-  std::vector<Stats::ScopeSharedPtr> scopes_;
-  std::vector<std::shared_ptr<Stats::LazyInit<ClusterTrafficStats>>> lazy_stats_;
+  Store& stat_store_;
+  std::vector<ScopeSharedPtr> scopes_;
+  std::vector<std::shared_ptr<LazyInit<ClusterTrafficStats>>> lazy_stats_;
   std::vector<std::shared_ptr<ClusterTrafficStats>> normal_stats_;
   Upstream::ClusterTrafficStatNames stat_names_;
 };
 
 // Benchmark no-lazy-init on stats, the lazy init version is much faster since no allocation.
 void benchmarkLazyInitCreation(::benchmark::State& state) {
-  Stats::IsolatedStoreImpl stats_store;
+  IsolatedStoreImpl stats_store;
   LazyInitStatsBenchmarkBase base(state.range(0) == 1, state.range(1), stats_store);
 
   for (auto _ : state) { // NOLINT: Silences warning about dead store
@@ -67,7 +67,7 @@ BENCHMARK(benchmarkLazyInitCreation)
 
 // Benchmark lazy-init of stats in same thread, mimics main thread creation.
 void benchmarkLazyInitCreationInstantiateSameThread(::benchmark::State& state) {
-  Stats::IsolatedStoreImpl stats_store;
+  IsolatedStoreImpl stats_store;
   LazyInitStatsBenchmarkBase base(state.range(0) == 1, state.range(1), stats_store);
 
   for (auto _ : state) { // NOLINT: Silences warning about dead store
