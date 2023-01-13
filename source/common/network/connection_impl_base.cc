@@ -70,7 +70,7 @@ void ConnectionImplBase::onDelayedCloseTimeout() {
   if (connection_stats_ != nullptr && connection_stats_->delayed_close_timeouts_ != nullptr) {
     connection_stats_->delayed_close_timeouts_->inc();
   }
-  closeConnectionImmediatelyWithDetails("triggered_delayed_close_timeout");
+  closeConnectionImmediately();
 }
 
 } // namespace Network

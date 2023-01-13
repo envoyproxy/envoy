@@ -375,8 +375,8 @@ TEST_F(MultiConnectionBaseImplTest, CloseDuringAttempt) {
   EXPECT_CALL(*failover_timer_, disableTimer());
   EXPECT_CALL(*createdConnections()[0], removeConnectionCallbacks(_));
   EXPECT_CALL(*createdConnections()[1], removeConnectionCallbacks(_));
-  EXPECT_CALL(*createdConnections()[0], close(ConnectionCloseType::FlushWrite, _));
-  EXPECT_CALL(*createdConnections()[1], close(ConnectionCloseType::NoFlush, _));
+  EXPECT_CALL(*createdConnections()[0], close(ConnectionCloseType::FlushWrite));
+  EXPECT_CALL(*createdConnections()[1], close(ConnectionCloseType::NoFlush));
   impl_->close(ConnectionCloseType::FlushWrite);
 }
 
@@ -393,11 +393,11 @@ TEST_F(MultiConnectionBaseImplTest, CloseDuringAttemptWithCallbacks) {
   EXPECT_CALL(*failover_timer_, disableTimer());
   EXPECT_CALL(*createdConnections()[0], removeConnectionCallbacks(_));
   EXPECT_CALL(*createdConnections()[1], removeConnectionCallbacks(_));
-  EXPECT_CALL(*createdConnections()[1], close(ConnectionCloseType::NoFlush, _));
+  EXPECT_CALL(*createdConnections()[1], close(ConnectionCloseType::NoFlush));
   // addConnectionCallbacks() should be applied to the now final connection.
   EXPECT_CALL(*createdConnections()[0], addConnectionCallbacks(_))
       .WillOnce(Invoke([&](ConnectionCallbacks& c) -> void { EXPECT_EQ(&c, &callbacks); }));
-  EXPECT_CALL(*createdConnections()[0], close(ConnectionCloseType::FlushWrite, _));
+  EXPECT_CALL(*createdConnections()[0], close(ConnectionCloseType::FlushWrite));
   impl_->close(ConnectionCloseType::FlushWrite);
 }
 
@@ -406,7 +406,7 @@ TEST_F(MultiConnectionBaseImplTest, CloseAfterAttemptComplete) {
 
   connectFirstAttempt();
 
-  EXPECT_CALL(*createdConnections()[0], close(ConnectionCloseType::FlushWrite, _));
+  EXPECT_CALL(*createdConnections()[0], close(ConnectionCloseType::FlushWrite));
   impl_->close(ConnectionCloseType::FlushWrite);
 }
 

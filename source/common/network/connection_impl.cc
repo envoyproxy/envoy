@@ -861,7 +861,7 @@ bool ServerConnectionImpl::initializeReadFilters() {
 
 void ServerConnectionImpl::onTransportSocketConnectTimeout() {
   stream_info_.setConnectionTerminationDetails(kTransportSocketConnectTimeoutTerminationDetails);
-  closeConnectionImmediatelyWithDetails("transport_socket_timeout");
+  closeConnectionImmediately();
   transport_socket_timeout_stat_->inc();
   setFailureReason("connect timeout");
 }

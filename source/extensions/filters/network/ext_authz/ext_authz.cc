@@ -106,7 +106,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       (response->status == Filters::Common::ExtAuthz::CheckStatus::Error &&
        !config_->failureModeAllow())) {
     config_->stats().cx_closed_.inc();
-    filter_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush, "ext_authz_close");
+    filter_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     filter_callbacks_->connection().streamInfo().setResponseFlag(
         StreamInfo::ResponseFlag::UnauthorizedExternalService);
     filter_callbacks_->connection().streamInfo().setResponseCodeDetails(
