@@ -130,5 +130,6 @@ envoy_cc_fuzz_test(
         "//source/extensions/http/header_validators/envoy_default:http1_header_validator",
         "//source/extensions/http/header_validators/envoy_default:path_normalizer",
         "//test/mocks/http:header_validator_mocks",
+        "//test/test_common:utility_lib",
     ],
 )

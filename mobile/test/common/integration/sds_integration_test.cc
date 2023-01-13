@@ -8,6 +8,7 @@
 #include "test/config/integration/certs/clientcert_hash.h"
 #include "test/integration/ssl_utility.h"
 
+#include "extension_registry.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -19,6 +20,7 @@ const envoy::service::secret::v3::SdsDummy _sds_dummy;
 class SdsIntegrationTest : public XdsIntegrationTest {
 public:
   SdsIntegrationTest() {
+    ExtensionRegistry::registerFactories();
     skip_tag_extraction_rule_check_ = true;
     upstream_tls_ = true;
 

@@ -36,7 +36,7 @@ protected:
     ON_CALL(decoder_callbacks_, streamInfo()).WillByDefault(testing::ReturnRef(stream_info_));
 
     ON_CALL(*decoder_callbacks_.cluster_info_, statsScope())
-        .WillByDefault(testing::ReturnRef(stats_store_));
+        .WillByDefault(testing::ReturnRef(scope_));
 
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
@@ -67,6 +67,7 @@ protected:
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
+  Stats::Scope& scope_{*stats_store_.rootScope()};
 };
 
 TEST_F(GrpcStatsFilterConfigTest, StatsHttp2HeaderOnlyResponse) {

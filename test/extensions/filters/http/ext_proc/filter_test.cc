@@ -85,7 +85,7 @@ protected:
     if (!yaml.empty()) {
       TestUtility::loadFromYaml(yaml, proto_config);
     }
-    config_.reset(new FilterConfig(proto_config, 200ms, stats_store_, ""));
+    config_.reset(new FilterConfig(proto_config, 200ms, *stats_store_.rootScope(), ""));
     filter_ = std::make_unique<Filter>(config_, std::move(client_), grpc_service_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     EXPECT_CALL(encoder_callbacks_, encoderBufferLimit()).WillRepeatedly(Return(BufferSize));
