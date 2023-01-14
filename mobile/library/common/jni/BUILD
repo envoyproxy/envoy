@@ -134,7 +134,7 @@ config_setting(
 cc_binary(
     name = "libenvoy_jni.so",
     linkopts = [
-        # Without this option the app crashes when launched 
+        # Without this option the app crashes when launched
         # on arm64 emulator which is not covered by CI.
         "-ldl",
     ] + select({
