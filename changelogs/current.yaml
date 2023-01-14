@@ -25,6 +25,10 @@ bug_fixes:
     could have resulted in other unforseen errors such as a lack of visibility into requests (eg request not logged). Envoy will now by default sanitize the values sent
     in gRPC service calls to be valid UTF-8, replacing data that is not valid UTF-8 with a '!' character. This behavioral change can be temporarily reverted by
     setting runtime guard ``envoy.reloadable_features.service_sanitize_non_utf8_strings`` to false.
+- area: http
+  change: |
+    stop forwarding ``:method`` value which is not a valid token defined in https://www.rfc-editor.org/rfc/rfc9110#section-5.6.2.
+    Also, reject ``:method`` and ``:scheme`` headers with multiple values.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
