@@ -47,7 +47,7 @@ IoUringImpl::~IoUringImpl() { io_uring_queue_exit(&ring_); }
 
 os_fd_t IoUringImpl::registerEventfd() {
   ASSERT(!isEventfdRegistered());
-  event_fd_ = eventfd(0, 0);
+  event_fd_ = eventfd(0, EFD_NONBLOCK);
   int res = io_uring_register_eventfd(&ring_, event_fd_);
   RELEASE_ASSERT(res == 0, fmt::format("unable to register eventfd: {}", errorDetails(-res)));
   return event_fd_;
@@ -65,8 +65,17 @@ void IoUringImpl::forEveryCompletion(CompletionCb completion_cb) {
   ASSERT(SOCKET_VALID(event_fd_));
 
   eventfd_t v;
-  int ret = eventfd_read(event_fd_, &v);
-  RELEASE_ASSERT(ret == 0, "unable to drain eventfd");
+  while (true) {
+    int ret = eventfd_read(event_fd_, &v);
+    if (ret != 0) {
+      if (errno == EAGAIN) {
+        break;
+      } else {
+        ENVOY_LOG(warn, "unable to drain eventfd");
+        return;
+      }
+    }
+  }
 
   unsigned count = io_uring_peek_batch_cqe(&ring_, cqes_.data(), io_uring_size_);
 
@@ -74,7 +83,45 @@ void IoUringImpl::forEveryCompletion(CompletionCb completion_cb) {
     struct io_uring_cqe* cqe = cqes_[i];
     completion_cb(reinterpret_cast<void*>(cqe->user_data), cqe->res);
   }
+
   io_uring_cq_advance(&ring_, count);
+
+  ENVOY_LOG(trace, "the num of injected completion is {}", injected_completions_.size());
+
+  // TODO(soulxu): We may need to only iterate the injected completions in the current
+  // event loop. Any completions injected nested should be iterated in the next event
+  // loop. This matches the current Envoy behavior. But let's change this when we face
+  // the issue.
+  // Iterate the injected completion.
+  while (!injected_completions_.empty()) {
+    auto& completion = injected_completions_.front();
+    completion_cb(completion.user_data_, completion.result_);
+    // The socket may closed in the completion_cb and all the related completions are
+    // removed.
+    if (injected_completions_.empty()) {
+      break;
+    }
+    injected_completions_.pop_front();
+  }
+}
+
+void IoUringImpl::injectCompletion(os_fd_t fd, void* user_data, int32_t result) {
+  injected_completions_.emplace_back(fd, user_data, result);
+  ENVOY_LOG(trace, "inject completion, fd = {}, req = {}, num injects = {}", fd,
+            fmt::ptr(user_data), injected_completions_.size());
+}
+
+void IoUringImpl::removeInjectedCompletion(os_fd_t fd) {
+  ENVOY_LOG(trace, "remove injected completions for fd = {}, size = {}", fd,
+            injected_completions_.size());
+  for (std::list<InjectedCompletion>::iterator it = injected_completions_.begin();
+       it != injected_completions_.end();) {
+    if (it->fd_ == fd) {
+      it = injected_completions_.erase(it);
+    } else {
+      it++;
+    }
+  }
 }
 
 IoUringResult IoUringImpl::prepareAccept(os_fd_t fd, struct sockaddr* remote_addr,

@@ -112,6 +112,136 @@ TEST_F(IoUringImplTest, Instantiate) {
   EXPECT_EQ(&uring1, &uring2);
 }
 
+TEST_F(IoUringImplTest, InjectCompletion) {
+  auto dispatcher = api_->allocateDispatcher("test_thread");
+  auto& uring = factory_->getOrCreate();
+
+  os_fd_t fd = 11;
+  os_fd_t event_fd = uring.registerEventfd();
+  const Event::FileTriggerType trigger = Event::PlatformDefaultTriggerType;
+  int32_t completions_nr = 0;
+
+  auto file_event = dispatcher->createFileEvent(
+      event_fd,
+      [&uring, &fd, &completions_nr](uint32_t) {
+        uring.forEveryCompletion([&fd, &completions_nr](void* user_data, int32_t res) {
+          EXPECT_EQ(&fd, user_data);
+          EXPECT_EQ(-11, res);
+          completions_nr++;
+        });
+      },
+      trigger, Event::FileReadyType::Read);
+
+  uring.injectCompletion(fd, &fd, -11);
+
+  file_event->activate(Event::FileReadyType::Read);
+
+  dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(completions_nr, 1);
+}
+
+TEST_F(IoUringImplTest, NestInjectCompletion) {
+  auto dispatcher = api_->allocateDispatcher("test_thread");
+  auto& uring = factory_->getOrCreate();
+
+  os_fd_t fd = 11;
+  os_fd_t fd2 = 11;
+  os_fd_t event_fd = uring.registerEventfd();
+  const Event::FileTriggerType trigger = Event::PlatformDefaultTriggerType;
+  int32_t completions_nr = 0;
+
+  auto file_event = dispatcher->createFileEvent(
+      event_fd,
+      [&uring, &fd, &fd2, &completions_nr](uint32_t) {
+        uring.forEveryCompletion(
+            [&uring, &fd, &fd2, &completions_nr](void* user_data, int32_t res) {
+              if (completions_nr == 0) {
+                EXPECT_EQ(&fd, user_data);
+                EXPECT_EQ(-11, res);
+                uring.injectCompletion(fd2, &fd2, -22);
+              } else {
+                EXPECT_EQ(&fd2, user_data);
+                EXPECT_EQ(-22, res);
+              }
+
+              completions_nr++;
+            });
+      },
+      trigger, Event::FileReadyType::Read);
+
+  uring.injectCompletion(fd, &fd, -11);
+
+  file_event->activate(Event::FileReadyType::Read);
+
+  dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(completions_nr, 2);
+}
+
+TEST_F(IoUringImplTest, RemoveInjectCompletion) {
+  auto dispatcher = api_->allocateDispatcher("test_thread");
+  auto& uring = factory_->getOrCreate();
+
+  os_fd_t fd = 11;
+  os_fd_t fd2 = 22;
+  os_fd_t event_fd = uring.registerEventfd();
+  const Event::FileTriggerType trigger = Event::PlatformDefaultTriggerType;
+  int32_t completions_nr = 0;
+
+  auto file_event = dispatcher->createFileEvent(
+      event_fd,
+      [&uring, &fd, &completions_nr](uint32_t) {
+        uring.forEveryCompletion([&fd, &completions_nr](void* user_data, int32_t res) {
+          EXPECT_EQ(&fd, user_data);
+          EXPECT_EQ(-11, res);
+          completions_nr++;
+        });
+      },
+      trigger, Event::FileReadyType::Read);
+
+  uring.injectCompletion(fd, &fd, -11);
+  uring.injectCompletion(fd2, &fd2, -22);
+  uring.removeInjectedCompletion(fd2);
+  file_event->activate(Event::FileReadyType::Read);
+
+  dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(completions_nr, 1);
+}
+
+TEST_F(IoUringImplTest, NestRemoveInjectCompletion) {
+  auto dispatcher = api_->allocateDispatcher("test_thread");
+  auto& uring = factory_->getOrCreate();
+
+  os_fd_t fd = 11;
+  os_fd_t fd2 = 22;
+  os_fd_t event_fd = uring.registerEventfd();
+  const Event::FileTriggerType trigger = Event::PlatformDefaultTriggerType;
+  int32_t completions_nr = 0;
+
+  auto file_event = dispatcher->createFileEvent(
+      event_fd,
+      [&uring, &fd, &fd2, &completions_nr](uint32_t) {
+        uring.forEveryCompletion(
+            [&uring, &fd, &fd2, &completions_nr](void* user_data, int32_t res) {
+              if (completions_nr == 0) {
+                EXPECT_EQ(&fd, user_data);
+                EXPECT_EQ(-11, res);
+              } else {
+                uring.removeInjectedCompletion(fd2);
+              }
+              completions_nr++;
+            });
+      },
+      trigger, Event::FileReadyType::Read);
+
+  uring.injectCompletion(fd, &fd, -11);
+  uring.injectCompletion(fd2, &fd2, -22);
+
+  file_event->activate(Event::FileReadyType::Read);
+
+  dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(completions_nr, 2);
+}
+
 TEST_F(IoUringImplTest, RegisterEventfd) {
   auto& uring = factory_->getOrCreate();
 

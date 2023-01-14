@@ -104,6 +104,16 @@ public:
    * with the forEveryCompletion() method and try again.
    */
   virtual IoUringResult submit() PURE;
+
+  /**
+   * Inject a request completion into the iouring.
+   */
+  virtual void injectCompletion(os_fd_t fd, void* user_data, int32_t result) PURE;
+
+  /**
+   * Remove the injected completion for specific fd.
+   */
+  virtual void removeInjectedCompletion(os_fd_t fd) PURE;
 };
 
 /**
