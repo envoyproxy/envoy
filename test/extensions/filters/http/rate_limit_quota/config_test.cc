@@ -54,11 +54,6 @@ TEST(RateLimitQuotaFilterConfigTest, RateLimitQuotaFilterWithCorrectProto) {
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
-
-  // envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaOverride override_config;
-  // ProtobufMessage::ValidationVisitor visitor = {};
-  // EXPECT_EQ(factory.createRouteSpecificFilterConfigTyped(override_config, context, visitor),
-  // nullptr);
 }
 
 } // namespace

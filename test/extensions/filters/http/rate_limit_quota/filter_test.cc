@@ -410,8 +410,7 @@ TEST_F(FilterTest, RequestMatchingWithOnNoMatch) {
 TEST_F(FilterTest, RequestMatchingWithInvalidOnNoMatch) {
   addMatcherConfig(MatcherConfigType::InvalidOnNoMatchConfig);
   createFilter();
-  // absl::flat_hash_map<std::string, std::string> expected_bucket_ids = {
-  //     {"on_no_match_name", "on_no_match_value"}, {"on_no_match_name_2", "on_no_match_value_2"}};
+
   // Perform request matching.
   auto match_result = filter_->requestMatching(default_headers_);
   // Asserts that the request matching succeeded.

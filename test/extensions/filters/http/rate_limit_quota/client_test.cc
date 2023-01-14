@@ -63,8 +63,6 @@ public:
   Grpc::Status::GrpcStatus grpc_status_ = Grpc::Status::WellKnownGrpcStatus::Ok;
   RateLimitClientPtr client_;
   MockRateLimitQuotaCallbacks callbacks_;
-  // RateLimitQuotaUsageReports reports_;
-
   bool grpc_closed_ = false;
 };
 
@@ -86,9 +84,6 @@ TEST_F(RateLimitStreamTest, SendRequest) {
   EXPECT_CALL(stream_, resetStream());
   client_->closeStream();
 }
-
-// TEST_F(RateLimitStreamTest, SendMultipleUsageReport) {
-// }
 
 TEST_F(RateLimitStreamTest, SendRequestAndReceiveResponse) {
   EXPECT_OK(client_->startStream(stream_info_));

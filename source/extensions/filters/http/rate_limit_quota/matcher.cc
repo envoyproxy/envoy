@@ -25,10 +25,9 @@ RateLimitOnMactchAction::generateBucketId(const Http::Matching::HttpMatchingData
     // Generate the bucket id based on builder method type.
     switch (builder_method.value_specifier_case()) {
     // Retrieve the string value directly from the config (static method).
-    case ValueSpecifierCase::kStringValue: {
+    case ValueSpecifierCase::kStringValue:
       bucket_id.mutable_bucket()->insert({bucket_id_key, builder_method.string_value()});
       break;
-    }
     // Retrieve the value from the `custom_value` typed extension config (dynamic method).
     case ValueSpecifierCase::kCustomValue: {
       // Initialize the pointer to input factory on first use.
