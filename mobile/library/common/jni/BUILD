@@ -107,9 +107,7 @@ cc_library(
 # Library which contains all the JNI related targets.
 cc_library(
     name = "envoy_jni_lib",
-    linkopts = [
-        "-ldl",
-    ] + select({
+    linkopts = select({
         "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
         "//conditions:default": [],
     }),
@@ -136,9 +134,8 @@ config_setting(
 cc_binary(
     name = "libenvoy_jni.so",
     linkopts = [
-        "-lm",
-    ] +
-     select({
+        "-ldl",
+    ] + select({
         "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
         "//conditions:default": [],
     }),
