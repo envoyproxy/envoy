@@ -20,6 +20,9 @@ namespace Http {
 struct SharedResponseCodeDetailsValues {
   const absl::string_view InvalidAuthority = "http.invalid_authority";
   const absl::string_view ConnectUnsupported = "http.connect_not_supported";
+  const absl::string_view InvalidMethod = "http.invalid_method";
+  const absl::string_view InvalidPath = "http.invalid_path";
+  const absl::string_view InvalidScheme = "http.invalid_scheme";
 };
 
 using SharedResponseCodeDetails = ConstSingleton<SharedResponseCodeDetailsValues>;
@@ -356,11 +359,35 @@ absl::string_view::size_type HeaderUtility::getPortStart(absl::string_view host)
   return absl::string_view::npos;
 }
 
+constexpr bool isInvalidToken(unsigned char c) {
+  if (c == '!' || c == '|' || c == '~' || c == '*' || c == '+' || c == '-' || c == '.' ||
+      // #, $, %, &, '
+      (c >= '#' && c <= '\'') ||
+      // [0-9]
+      (c >= '0' && c <= '9') ||
+      // [A-Z]
+      (c >= 'A' && c <= 'Z') ||
+      // ^, _, `, [a-z]
+      (c >= '^' && c <= 'z')) {
+    return false;
+  }
+  return true;
+}
+
 absl::optional<std::reference_wrapper<const absl::string_view>>
 HeaderUtility::requestHeadersValid(const RequestHeaderMap& headers) {
   // Make sure the host is valid.
   if (headers.Host() && !HeaderUtility::authorityIsValid(headers.Host()->value().getStringView())) {
     return SharedResponseCodeDetails::get().InvalidAuthority;
+  }
+  if (headers.Method()) {
+    absl::string_view method = headers.Method()->value().getStringView();
+    if (method.empty() || std::any_of(method.begin(), method.end(), isInvalidToken)) {
+      return SharedResponseCodeDetails::get().InvalidMethod;
+    }
+  }
+  if (headers.Scheme() && absl::StrContains(headers.Scheme()->value().getStringView(), ",")) {
+    return SharedResponseCodeDetails::get().InvalidScheme;
   }
   return absl::nullopt;
 }
