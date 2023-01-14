@@ -22,7 +22,7 @@ public:
   // IoUringSocket
   os_fd_t fd() const override { return fd_; }
 
-  std::unique_ptr<IoUringSocketEntry> unlink();
+  void unlink();
 
 private:
   os_fd_t fd_;

@@ -59,8 +59,8 @@ TEST(IoUringWorkerImplTest, addDeleteSocket) {
   auto& io_uring_socket = worker.addTestSocket(fd, handler);
   EXPECT_EQ(fd, io_uring_socket.fd());
   EXPECT_EQ(1, worker.getSockets().size());
-  std::unique_ptr<IoUringSocket> unlinked_io_uring_socket = worker.getSockets().front()->unlink();
-  EXPECT_EQ(fd, unlinked_io_uring_socket->fd());
+  EXPECT_CALL(dispatcher, deferredDelete_);
+  worker.getSockets().front()->unlink();
   EXPECT_EQ(0, worker.getSockets().size());
   EXPECT_CALL(dispatcher, clearDeferredDeleteList);
 }

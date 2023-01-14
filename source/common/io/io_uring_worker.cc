@@ -10,8 +10,9 @@ namespace Io {
 IoUringSocketEntry::IoUringSocketEntry(os_fd_t fd, IoUringWorkerImpl& parent)
     : fd_(fd), parent_(parent) {}
 
-std::unique_ptr<IoUringSocketEntry> IoUringSocketEntry::unlink() {
-  return parent_.removeSocket(*this);
+void IoUringSocketEntry::unlink() {
+  std::unique_ptr<IoUringSocketEntry> socket = parent_.removeSocket(*this);
+  parent_.dispatcher().deferredDelete(std::move(socket));
 }
 
 IoUringWorkerImpl::IoUringWorkerImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
