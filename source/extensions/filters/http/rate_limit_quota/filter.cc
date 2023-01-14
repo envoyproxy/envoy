@@ -22,17 +22,16 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
   }
   // Second, generate the bucket id for this request based on match action if the request matching
   // succeeded.
-  // TODO(tyxia) dynamic_cast; target type must be a reference or pointer type to a defined class
   const RateLimitOnMactchAction* match_action =
       dynamic_cast<RateLimitOnMactchAction*>(match_result.value().get());
   auto ret = match_action->generateBucketId(*data_ptr_, factory_context_, visitor_);
   if (!ret.ok()) {
-    // When it failed to generate the bucket id for this specific request. the request is ALLOWED by
-    // default (i.e., fail-open) and will not be reported to RLQS server.
+    // When it failed to generate the bucket id for this specific request, the request is ALLOWED by
+    // default (i.e., fail-open).
     ENVOY_LOG(debug, "Unable to generate the bucket id: {}", ret.status().message());
     return Envoy::Http::FilterHeadersStatus::Continue;
   }
-
+  // TODO(tyxia) Implement the quota cache.
   BucketId bucket_id = ret.value();
   return Envoy::Http::FilterHeadersStatus::Continue;
 }
