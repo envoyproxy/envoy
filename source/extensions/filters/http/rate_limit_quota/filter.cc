@@ -13,7 +13,6 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
                                                               bool) {
   // First, perform request matching.
   absl::StatusOr<Matcher::ActionPtr> match_result = requestMatching(headers);
-
   if (!match_result.ok()) {
     // When the request is not matched by any matchers, request is ALLOWED by
     // default (i.e., fail-open) and will not be reported to RLQS server.
@@ -21,7 +20,6 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
               "The request is not matched by any matchers: ", match_result.status().message());
     return Envoy::Http::FilterHeadersStatus::Continue;
   }
-
   // Second, generate the bucket id for this request based on match action if the request matching
   // succeeded.
   // TODO(tyxia) dynamic_cast; target type must be a reference or pointer type to a defined class
@@ -31,7 +29,7 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
   if (!ret.ok()) {
     // When it failed to generate the bucket id for this specific request. the request is ALLOWED by
     // default (i.e., fail-open) and will not be reported to RLQS server.
-    ENVOY_LOG(error, "Unable to generate the bucket id: ", ret.status().message());
+    ENVOY_LOG(debug, "Unable to generate the bucket id: {}", ret.status().message());
     return Envoy::Http::FilterHeadersStatus::Continue;
   }
 
@@ -62,7 +60,7 @@ RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& headers) {
   }
 
   if (matcher_ == nullptr) {
-    return absl::InternalError("Matcher tree has not been initialized yet");
+    return absl::InternalError("Matcher tree has not been initialized yet.");
   } else {
     data_ptr_->onRequestHeaders(headers);
     // TODO(tyxia) This function should trigger the CEL expression matching. Here, we need to
@@ -75,16 +73,15 @@ RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& headers) {
         // return the matched result for `on_match` case.
         return match_result.result_();
       } else {
-        return absl::NotFoundError("The match was completed, no match found");
+        return absl::NotFoundError("The match was completed, no match found.");
       }
     } else {
       // The returned state from `evaluateMatch` function is `MatchState::UnableToMatch` here.
-      return absl::InternalError("Unable to match the request");
+      return absl::InternalError("Unable to match the request.");
     }
   }
 }
 
-// TODO(tyxia) This is how we represent the RATELIMITED and ALLOWED
 void RateLimitQuotaFilter::onComplete(const RateLimitQuotaBucketSettings&, RateLimitStatus) {}
 
 } // namespace RateLimitQuota

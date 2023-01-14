@@ -39,9 +39,9 @@ enum class RateLimitStatus {
   // The request is not over limit.
   OK,
   // The request is over limit.
-  OverLimit
-  // // The rate limit service could not be queried.
-  // Error,
+  OverLimit,
+  // The rate limit service could not be queried.
+  Error,
 };
 
 class RateLimitQuotaFilter : public Http::PassThroughFilter,
@@ -57,8 +57,6 @@ public:
   // Http::PassThroughDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override;
   void onDestroy() override {}
-  // TODO(tyxia) How to close the stream for each quota bucket separately.
-  // rate_limit_client_->closeStream(); };
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     callbacks_ = &callbacks;
   }

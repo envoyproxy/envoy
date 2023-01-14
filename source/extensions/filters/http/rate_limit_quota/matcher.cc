@@ -17,7 +17,6 @@ RateLimitOnMactchAction::generateBucketId(const Http::Matching::HttpMatchingData
                                           RateLimitQuotaValidationVisitor& visitor) const {
   BucketId bucket_id;
   std::unique_ptr<Matcher::MatchInputFactory<Http::HttpMatchingData>> input_factory_ptr = nullptr;
-
   // Generate the `BucketId` based on the bucked id builder from the configuration.
   for (const auto& id_builder : setting_.bucket_id_builder().bucket_id_builder()) {
     std::string bucket_id_key = id_builder.first;
@@ -47,12 +46,11 @@ RateLimitOnMactchAction::generateBucketId(const Http::Matching::HttpMatchingData
           // Build the bucket id from the matched result.
           bucket_id.mutable_bucket()->insert({bucket_id_key, result.data_.value()});
         } else {
-          return absl::InternalError("Empty matched result from custom value config.");
+          // TODO(tyxia) Nothing hit this line at this moment.
+          return absl::InternalError("Empty resulting data from custom value config.");
         }
       } else {
-        // Currently, this line will be hotted if we configure the `custom_value` in
-        // `on_no_match` action.
-        return absl::InternalError("No matched result from custom value config.");
+        return absl::InternalError("Failed to generate the id from custom value config.");
       }
       break;
     }
@@ -63,37 +61,6 @@ RateLimitOnMactchAction::generateBucketId(const Http::Matching::HttpMatchingData
     }
   }
 
-  /* TODO(tyxia) Remove the noAssignment behavior and expiredAssignment behavior from
-     generateBucketId because those two should only be used for when there is no response from RLQS
-     server.
-  */
-  // Add the no assignment behavior if the corresponding config is present.
-  // TODO(tyxia) Include the additional info and refactor the return object along the callstack,
-  // to indicate the it is on_no_match and handle this blanket rule in the caller site.
-  if (setting_.has_no_assignment_behavior()) {
-    // Retrieve the value from the `blanket_rule` in the config to decide if we want to fail-open or
-    // fail-close.
-    auto strategy = setting_.no_assignment_behavior().fallback_rate_limit();
-    if (strategy.blanket_rule() == RateLimitStrategy::ALLOW_ALL) {
-    }
-  }
-
-  // Add the expired assignment behavior if the corresponding config is present.
-  if (setting_.has_expired_assignment_behavior()) {
-    // Retrieve the value from the `blanket_rule` in the config to decide if we want to fail-open or
-    // fail-close.
-    auto strategy = setting_.expired_assignment_behavior().fallback_rate_limit();
-    switch (strategy.blanket_rule()) {
-    case RateLimitStrategy::ALLOW_ALL: {
-    }
-    case RateLimitStrategy::DENY_ALL: {
-    }
-    default: {
-    }
-    }
-    // if (strategy.blanket_rule() == RateLimitStrategy::ALLOW_ALL) {
-    // }
-  }
   return bucket_id;
 }
 
