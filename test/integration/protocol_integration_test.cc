@@ -4010,6 +4010,111 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidReqestHeaderName) {
   }
 }
 
+TEST_P(DownstreamProtocolIntegrationTest, DuplicatedSchemeHeaders) {
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
+    // send_fully_qualified_url_ is not enabled, so :scheme header isn't used.
+    return;
+  }
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Start the request.
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {":scheme", "http"}});
+  ASSERT_TRUE(response->waitForReset());
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("invalid"));
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, DuplicatedMethodHeaders) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Start the request.
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {":method", "POST"}});
+  ASSERT_TRUE(response->waitForReset());
+  EXPECT_THAT(
+      waitForAccessLog(access_log_name_),
+      HasSubstr(downstreamProtocol() == Http::CodecType::HTTP1 ? "codec_error" : "invalid"));
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, MethodHeaderWithWhitespace) {
+  return;
+
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Start the request.
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET /admin"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}});
+  ASSERT_TRUE(response->waitForReset());
+  EXPECT_THAT(
+      waitForAccessLog(access_log_name_),
+      HasSubstr(downstreamProtocol() == Http::CodecType::HTTP1 ? "codec_error" : "invalid"));
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, EmptyMethodHeader) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Start the request.
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", ""}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}});
+  ASSERT_TRUE(response->waitForReset());
+  EXPECT_THAT(
+      waitForAccessLog(access_log_name_),
+      HasSubstr(downstreamProtocol() == Http::CodecType::HTTP1 ? "codec_error" : "invalid"));
+}
+
+// Verify that request with invalid trailers is rejected.
+TEST_P(DownstreamProtocolIntegrationTest, InvalidTrailer) {
+  useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
+  config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
+  config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "sni.lyft.com"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  codec_client_->sendData(*request_encoder_, 1, false);
+  Http::TestRequestTrailerMapImpl trailers{{"trailer1", "value1"}};
+  // DEL (0x7F) is invalid header value
+  Http::HeaderString invalid_value;
+  invalid_value.setCopyUnvalidatedForTestOnly("abc\x7Fxyz");
+  trailers.addViaMove(Http::HeaderString(absl::string_view("trailer2")), std::move(invalid_value));
+
+  codec_client_->sendTrailers(*request_encoder_, trailers);
+
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("400", response->headers().getStatusValue());
+    test_server_->waitForCounterGe("http.config_test.downstream_rq_4xx", 1);
+  } else {
+    ASSERT_TRUE(response->waitForReset());
+    EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->resetReason());
+  }
+}
+
 TEST_P(DownstreamProtocolIntegrationTest, InvalidResponseHeaderName) {
   config_helper_.addRuntimeOverride("envoy.reloadable_features.validate_upstream_headers", "false");
 
