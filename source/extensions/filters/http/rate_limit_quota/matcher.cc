@@ -45,7 +45,7 @@ RateLimitOnMactchAction::generateBucketId(const Http::Matching::HttpMatchingData
           // Build the bucket id from the matched result.
           bucket_id.mutable_bucket()->insert({bucket_id_key, result.data_.value()});
         } else {
-          // TODO(tyxia) Nothing hit this line at this moment.
+          // TODO(tyxia) Nothing hits this line at this moment.
           return absl::InternalError("Empty resulting data from custom value config.");
         }
       } else {

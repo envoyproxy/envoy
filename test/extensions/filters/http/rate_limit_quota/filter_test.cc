@@ -102,7 +102,6 @@ constexpr char OnNoMatchConfig[] = R"EOF(
               header_name: environment
           value_match:
             exact: staging
-      # Here is on_match field that will not be matched by the request header.
       on_match:
         action:
           name: rate_limit_quota
@@ -110,6 +109,7 @@ constexpr char OnNoMatchConfig[] = R"EOF(
             "@type": type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
             bucket_id_builder:
               bucket_id_builder:
+                # The on_match field here will not be matched by the request header.
                 "NO_MATCHED_NAME":
                     string_value: "NO_MATCHED"
             reporting_interval: 60s
@@ -366,7 +366,7 @@ TEST_F(FilterTest, RequestMatchingFailed) {
   // Not_OK status is expected to be returned because the matching failed due to mismatched inputs.
   EXPECT_FALSE(match.ok());
   EXPECT_THAT(match, StatusIs(absl::StatusCode::kNotFound));
-  EXPECT_EQ(match.status().message(), "The match was completed, no match found.");
+  EXPECT_EQ(match.status().message(), "Matching completed but no match result was found.");
 }
 
 TEST_F(FilterTest, RequestMatchingFailedWithNoCallback) {

@@ -20,7 +20,7 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
               "The request is not matched by any matchers: ", match_result.status().message());
     return Envoy::Http::FilterHeadersStatus::Continue;
   }
-  // Second, generate the bucket id for this request based on match action if the request matching
+  // Second, generate the bucket id for this request based on match action when request matching
   // succeeded.
   const RateLimitOnMactchAction* match_action =
       dynamic_cast<RateLimitOnMactchAction*>(match_result.value().get());
@@ -31,7 +31,7 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
     ENVOY_LOG(debug, "Unable to generate the bucket id: {}", ret.status().message());
     return Envoy::Http::FilterHeadersStatus::Continue;
   }
-  // TODO(tyxia) Implement the quota cache.
+  // TODO(tyxia) Implement the quota cache and other actions.
   BucketId bucket_id = ret.value();
   return Envoy::Http::FilterHeadersStatus::Continue;
 }
@@ -69,10 +69,10 @@ RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& headers) {
 
     if (match_result.match_state_ == Matcher::MatchState::MatchComplete) {
       if (match_result.result_) {
-        // return the matched result for `on_match` case.
+        // Return the matched result for `on_match` case.
         return match_result.result_();
       } else {
-        return absl::NotFoundError("The match was completed, no match found.");
+        return absl::NotFoundError("Matching completed but no match result was found.");
       }
     } else {
       // The returned state from `evaluateMatch` function is `MatchState::UnableToMatch` here.
