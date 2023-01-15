@@ -4,7 +4,7 @@ namespace Envoy {
 namespace Platform {
 
 RequestTrailers RequestTrailersBuilder::build() const {
-  return RequestTrailers(this->allHeaders());
+  return RequestTrailers(allHeaders());
 }
 
 } // namespace Platform
