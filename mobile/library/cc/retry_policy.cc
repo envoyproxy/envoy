@@ -34,8 +34,7 @@ RetryRule retryRuleFromString(const std::string& str) {
 RawHeaderMap RetryPolicy::asRawHeaderMap() const {
   RawHeaderMap outbound_headers{
       {"x-envoy-max-retries", {std::to_string(max_retry_count)}},
-      {"x-envoy-upstream-rq-timeout-ms",
-       {std::to_string(total_upstream_timeout_ms.value_or(0))}},
+      {"x-envoy-upstream-rq-timeout-ms", {std::to_string(total_upstream_timeout_ms.value_or(0))}},
   };
 
   if (per_try_timeout_ms.has_value()) {

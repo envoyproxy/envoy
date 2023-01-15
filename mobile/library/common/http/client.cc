@@ -115,8 +115,8 @@ void Client::DirectStreamCallbacks::encodeData(Buffer::Instance& data, bool end_
   // incur an asynchronous callback to sendDataToBridge.
   if (explicit_flow_control_ && !response_data_) {
     response_data_ = std::make_unique<Buffer::WatermarkBuffer>(
-        [this]() -> void { onBufferedDataDrained(); },
-        [this]() -> void { onHasBufferedData(); }, []() -> void {});
+        [this]() -> void { onBufferedDataDrained(); }, [this]() -> void { onHasBufferedData(); },
+        []() -> void {});
     // Default to 1M per stream. This is fairly arbitrary and will result in
     // Envoy buffering up to 1M + flow-control-window for HTTP/2 and HTTP/3,
     // and having local data of 1M + kernel-buffer-limit for HTTP/1.1

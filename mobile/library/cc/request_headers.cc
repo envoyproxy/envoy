@@ -30,8 +30,7 @@ absl::optional<UpstreamHttpProtocol> RequestHeaders::upstreamHttpProtocol() cons
 }
 
 RequestHeadersBuilder RequestHeaders::toRequestHeadersBuilder() const {
-  RequestHeadersBuilder builder(requestMethod(), scheme(), authority(),
-                                path());
+  RequestHeadersBuilder builder(requestMethod(), scheme(), authority(), path());
   for (const auto& pair : allHeaders()) {
     builder.set(pair.first, pair.second);
   }

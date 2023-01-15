@@ -7,9 +7,7 @@ Headers::const_iterator Headers::begin() const {
   return Headers::const_iterator(allHeaders().begin());
 }
 
-Headers::const_iterator Headers::end() const {
-  return Headers::const_iterator(allHeaders().end());
-}
+Headers::const_iterator Headers::end() const { return Headers::const_iterator(allHeaders().end()); }
 
 const std::vector<std::string>& Headers::operator[](const std::string& key) const {
   return headers_.at(key);
