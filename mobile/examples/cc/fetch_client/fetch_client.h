@@ -1,19 +1,19 @@
 #include <string>
 #include <vector>
 
-#include "absl/synchronization/notification.h"
-
 #include "envoy/http/header_map.h"
-#include "source/common/http/header_map_impl.h"
+
 #include "source/common/api/api_impl.h"
 #include "source/common/common/random_generator.h"
 #include "source/common/common/thread.h"
 #include "source/common/event/real_time_system.h"
+#include "source/common/http/header_map_impl.h"
 #include "source/common/stats/allocator_impl.h"
 #include "source/common/stats/thread_local_store.h"
 #include "source/exe/platform_impl.h"
 #include "source/exe/process_wide.h"
 
+#include "absl/synchronization/notification.h"
 #include "library/cc/engine_builder.h"
 #include "library/cc/stream.h"
 #include "library/cc/stream_prototype.h"
@@ -28,7 +28,7 @@ public:
 
   void fetch();
 
- private:
+private:
   void runEngine();
   void sendRequest(const absl::string_view url);
 
@@ -54,4 +54,4 @@ public:
   std::vector<absl::string_view> urls_;
 };
 
-}  // namespace Envoy
+} // namespace Envoy

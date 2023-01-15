@@ -11,10 +11,10 @@ envoy_package()
 envoy_cc_library(
     name = "fetch_client_lib",
     srcs = [
-	"fetch_client.cc",
+        "fetch_client.cc",
     ],
     hdrs = [
-	"fetch_client.h",
+        "fetch_client.h",
     ],
     repository = "@envoy",
     deps = [
@@ -22,16 +22,16 @@ envoy_cc_library(
         "//library/common/http:client_lib",
         "//library/common/http:header_utility_lib",
         "//library/common/types:c_types_lib",
-	"@envoy//envoy/http:header_map_interface",
-	"@envoy//source/common/http:header_map_lib",
+        "@envoy//envoy/http:header_map_interface",
+        "@envoy//source/common/http:header_map_lib",
     ],
 )
 
 cc_binary(
     name = "fetch_client",
-    srcs = [ "fetch_client_main.cc" ],
-    deps = [ ":fetch_client_lib",
-
+    srcs = ["fetch_client_main.cc"],
+    deps = [
+        ":fetch_client_lib",
         "@envoy//source/common/api:api_lib",
         "@envoy//source/common/common:random_generator_lib",
         "@envoy//source/common/common:thread_lib",
