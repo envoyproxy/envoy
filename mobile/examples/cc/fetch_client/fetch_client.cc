@@ -14,8 +14,6 @@
 
 #include "library/common/data/utility.h"
 
-#define HERE __FUNCTION__ << ":" << __LINE__ << " "
-
 namespace Envoy {
 
 Fetch::Fetch(int argc, char** argv)
@@ -26,7 +24,7 @@ Fetch::Fetch(int argc, char** argv)
                                               time_system_, platform_impl_.fileSystem(),
                                               random_generator_, bootstrap_)) {
   Envoy::Event::Libevent::Global::initialize();
-  dispatcher_ = api_->allocateDispatcher("fetch");
+  dispatcher_ = api_->allocateDispatcher("fetch_client");
 
   // Start at 1 to skip the command name.
   for (int i = 1; i < argc; ++i) {
