@@ -27,10 +27,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "io_uring_worker_lib",
     srcs = [
-        "io_uring_worker.cc",
+        "io_uring_worker_impl.cc",
     ],
     hdrs = [
-        "io_uring_worker.h",
+        "io_uring_worker_impl.h",
     ],
     tags = ["nocompdb"],
     deps = [

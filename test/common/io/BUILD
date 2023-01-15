@@ -25,8 +25,8 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "io_uring_worker_test",
-    srcs = ["io_uring_worker_test.cc"],
+    name = "io_uring_worker_impl_test",
+    srcs = ["io_uring_worker_impl_test.cc"],
     tags = [
         "nocompdb",
         "skip_on_windows",
