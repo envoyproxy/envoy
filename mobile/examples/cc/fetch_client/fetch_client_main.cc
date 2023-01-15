@@ -7,7 +7,13 @@ const char build_scm_revision[] = "0";
 const char build_scm_status[] = "test";
 
 int main(int argc, char** argv) {
-  Envoy::Fetch client(argc, argv);
-  client.fetch();
+  Envoy::Fetch client;
+  std::vector<absl::string_view> urls;
+  // Start at 1 to skip the command name.
+  for (int i = 1; i < argc; ++i) {
+    urls.push_back(argv[i]);
+  }
+  client.fetch(urls);
+
   exit(0);
 }

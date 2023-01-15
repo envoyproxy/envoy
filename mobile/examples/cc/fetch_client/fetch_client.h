@@ -24,12 +24,12 @@ namespace Envoy {
 
 class Fetch {
 public:
-  Fetch(int argc, char** argv);
+  Fetch();
 
-  void fetch();
+  void fetch(const std::vector<absl::string_view>& urls);
 
 private:
-  void runEngine();
+  void runEngine(absl::Notification& engine_running);
   void sendRequest(const absl::string_view url);
 
   Envoy::Thread::MutexBasicLockable lock_;
@@ -45,10 +45,6 @@ private:
 
   Event::DispatcherPtr dispatcher_;
   Platform::EngineSharedPtr engine_;
-  absl::Notification engine_running_;
-
-  // URLs to fetch
-  std::vector<absl::string_view> urls_;
 };
 
 } // namespace Envoy

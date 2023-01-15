@@ -16,7 +16,7 @@
 
 namespace Envoy {
 
-Fetch::Fetch(int argc, char** argv)
+Fetch::Fetch()
     : logging_context_(spdlog::level::level_enum::info, Envoy::Logger::Logger::DEFAULT_LOG_FORMAT,
                        lock_, false),
       stats_allocator_(symbol_table_), store_root_(stats_allocator_),
@@ -24,19 +24,15 @@ Fetch::Fetch(int argc, char** argv)
                                               time_system_, platform_impl_.fileSystem(),
                                               random_generator_, bootstrap_)) {
   Envoy::Event::Libevent::Global::initialize();
-
-  // Start at 1 to skip the command name.
-  for (int i = 1; i < argc; ++i) {
-    urls_.push_back(argv[i]);
-  }
 }
 
-void Fetch::fetch() {
+void Fetch::fetch(const std::vector<absl::string_view>& urls) {
+  absl::Notification engine_running;
   dispatcher_ = api_->allocateDispatcher("fetch_client");
-  Thread::ThreadPtr envoy_thread =
-      api_->threadFactory().createThread([this]() -> void { runEngine(); });
-  engine_running_.WaitForNotification();
-  for (const absl::string_view url : urls_) {
+  Thread::ThreadPtr envoy_thread = api_->threadFactory().createThread(
+      [this, &engine_running]() -> void { runEngine(engine_running); });
+  engine_running.WaitForNotification();
+  for (const absl::string_view url : urls) {
     sendRequest(url);
   }
   dispatcher_->exit();
@@ -53,7 +49,8 @@ void Fetch::sendRequest(const absl::string_view url_string) {
   std::cout << "Fetching url: " << url.toString() << "\n";
 
   absl::Notification request_finished;
-  Platform::StreamPrototypeSharedPtr stream_prototype = engine_->streamClient()->newStreamPrototype();
+  Platform::StreamPrototypeSharedPtr stream_prototype =
+      engine_->streamClient()->newStreamPrototype();
   stream_prototype->setOnHeaders(
       [](Platform::ResponseHeadersSharedPtr headers, bool, envoy_stream_intel intel) {
         std::cerr << "Received headers on connection: " << intel.connection_id << "\n";
@@ -79,8 +76,8 @@ void Fetch::sendRequest(const absl::string_view url_string) {
         request_finished.Notify();
       });
   stream_prototype->setOnError([&request_finished](Platform::EnvoyErrorSharedPtr,
-                                                    envoy_stream_intel,
-                                                    envoy_final_stream_intel final_intel) {
+                                                   envoy_stream_intel,
+                                                   envoy_final_stream_intel final_intel) {
     std::cerr << "Request failed after " << final_intel.stream_end_ms - final_intel.stream_start_ms
               << "ms\n";
     request_finished.Notify();
@@ -102,9 +99,9 @@ void Fetch::sendRequest(const absl::string_view url_string) {
   request_finished.WaitForNotification();
 }
 
-void Fetch::runEngine() {
+void Fetch::runEngine(absl::Notification& engine_running) {
   Platform::EngineBuilder engine_builder;
-  engine_builder.setOnEngineRunning([this]() { engine_running_.Notify(); });
+  engine_builder.setOnEngineRunning([&engine_running]() { engine_running.Notify(); });
   engine_ = engine_builder.build();
   dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
 }
