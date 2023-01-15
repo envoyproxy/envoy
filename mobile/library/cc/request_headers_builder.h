@@ -8,6 +8,8 @@
 #include "retry_policy.h"
 #include "upstream_http_protocol.h"
 
+#include "source/common/http/utility.h"
+
 namespace Envoy {
 namespace Platform {
 
@@ -18,6 +20,7 @@ class RequestHeadersBuilder : public HeadersBuilder {
 public:
   RequestHeadersBuilder(RequestMethod request_method, std::string scheme, std::string authority,
                         std::string path);
+  RequestHeadersBuilder(RequestMethod request_method, Envoy::Http::Utility::Url url);
 
   RequestHeadersBuilder& addRetryPolicy(const RetryPolicy& retry_policy);
   RequestHeadersBuilder& addUpstreamHttpProtocol(UpstreamHttpProtocol upstream_http_protocol);

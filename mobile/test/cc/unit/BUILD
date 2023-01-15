@@ -14,3 +14,13 @@ envoy_cc_test(
         "@envoy_build_config//:extension_registry",
     ],
 )
+
+envoy_cc_test(
+    name = "request_headers_builder_test",
+    srcs = ["request_headers_builder_test.cc"],
+    repository = "@envoy",
+    deps = [
+        "//library/cc:envoy_engine_cc_lib_no_stamp",
+        "@envoy_build_config//:extension_registry",
+    ],
+)

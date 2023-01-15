@@ -83,6 +83,7 @@ envoy_cc_library(
         "//library/common/api:c_types",
         "//library/common/data:utility_lib",
         "//library/common/extensions/key_value/platform:config",
+	"@envoy//source/common/http:utility_lib",
     ],
 )
 
