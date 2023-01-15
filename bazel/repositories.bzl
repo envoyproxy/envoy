@@ -1119,6 +1119,8 @@ def _cxx_rs():
     external_http_archive(
         name = "cxx_rs",
         repo_mapping = {"@third-party": "@cxx-third-party"},
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:cxx_rs.path"],
     )
 
 def _com_github_wamr():

@@ -1,0 +1,13 @@
+diff --git a/BUILD b/BUILD
+index c88eb249..23917956 100644
+--- a/BUILD
++++ b/BUILD
+@@ -43,6 +43,7 @@ cc_library(
+     name = "core-lib",
+     srcs = ["src/cxx.cc"],
+     hdrs = ["include/cxx.h"],
++    linkstatic = True,
+ )
+
+ rust_proc_macro(
+
