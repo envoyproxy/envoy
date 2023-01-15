@@ -25,9 +25,8 @@ public:
   void threadRoutine(absl::Notification& engine_running);
   void sendRequest(const absl::string_view url);
 
+  // URLs to fetch
   std::vector<absl::string_view> urls_;
-
-  Event::ProvisionalDispatcherPtr dispatcher_ = std::make_unique<Event::ProvisionalDispatcher>();
 
   Api::ApiPtr api_;
   std::unique_ptr<Http::RequestHeaderMapImpl> default_request_headers_;
