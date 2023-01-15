@@ -15,6 +15,15 @@ void IoUringSocketEntry::unlink() {
   parent_.dispatcher().deferredDelete(std::move(socket));
 }
 
+void IoUringSocketEntry::cleanup() {
+  parent_.removeInjectedCompletion(*this);
+  unlink();
+}
+
+void IoUringSocketEntry::injectCompletion(RequestType type) {
+  parent_.injectCompletion(*this, type, -EAGAIN);
+}
+
 IoUringWorkerImpl::IoUringWorkerImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
                                      Event::Dispatcher& dispatcher)
     : io_uring_instance_(
@@ -200,6 +209,16 @@ void IoUringWorkerImpl::submit() {
 
 std::unique_ptr<IoUringSocketEntry> IoUringWorkerImpl::removeSocket(IoUringSocketEntry& socket) {
   return socket.removeFromList(sockets_);
+}
+
+void IoUringWorkerImpl::injectCompletion(IoUringSocket& socket, RequestType type, int32_t result) {
+  Request* req = new Request{type, socket};
+  io_uring_instance_->injectCompletion(socket.fd(), req, result);
+  file_event_->activate(Event::FileReadyType::Read);
+}
+
+void IoUringWorkerImpl::removeInjectedCompletion(IoUringSocket& socket) {
+  io_uring_instance_->removeInjectedCompletion(socket.fd());
 }
 
 } // namespace Io

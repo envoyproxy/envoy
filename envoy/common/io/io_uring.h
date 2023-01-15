@@ -197,6 +197,8 @@ public:
   virtual void onConnect(int32_t) PURE;
   virtual void onRead(int32_t) PURE;
   virtual void onWrite(int32_t) PURE;
+
+  virtual void injectCompletion(RequestType type) PURE;
 };
 
 /**

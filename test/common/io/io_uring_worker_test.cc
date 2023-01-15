@@ -48,9 +48,10 @@ public:
   void onWrite(WriteParam&) override {}
 };
 
-TEST(IoUringWorkerImplTest, addDeleteSocket) {
+TEST(IoUringWorkerImplTest, cleanupSocket) {
   Event::MockDispatcher dispatcher;
   std::unique_ptr<IoUring> io_uring_instance = std::make_unique<MockIoUring>();
+  MockIoUring& mock_io_uring = *dynamic_cast<MockIoUring*>(io_uring_instance.get());
 
   IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
   os_fd_t fd = 11;
@@ -59,10 +60,11 @@ TEST(IoUringWorkerImplTest, addDeleteSocket) {
   auto& io_uring_socket = worker.addTestSocket(fd, handler);
   EXPECT_EQ(fd, io_uring_socket.fd());
   EXPECT_EQ(1, worker.getSockets().size());
+  EXPECT_CALL(mock_io_uring, removeInjectedCompletion(fd));
   EXPECT_CALL(dispatcher, deferredDelete_);
-  worker.getSockets().front()->unlink();
+  worker.getSockets().front()->cleanup();
   EXPECT_EQ(0, worker.getSockets().size());
-  EXPECT_CALL(dispatcher, clearDeferredDeleteList);
+  EXPECT_CALL(dispatcher, clearDeferredDeleteList());
 }
 
 } // namespace

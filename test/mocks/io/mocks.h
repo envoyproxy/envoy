@@ -26,6 +26,8 @@ public:
   MOCK_METHOD(IoUringResult, prepareClose, (os_fd_t fd, void* user_data));
   MOCK_METHOD(IoUringResult, prepareCancel, (void* cancelling_user_data, void* user_data));
   MOCK_METHOD(IoUringResult, submit, ());
+  MOCK_METHOD(void, injectCompletion, (os_fd_t fd, void* user_data, int32_t result));
+  MOCK_METHOD(void, removeInjectedCompletion, (os_fd_t fd));
 };
 
 } // namespace Io

@@ -21,10 +21,13 @@ public:
 
   // IoUringSocket
   os_fd_t fd() const override { return fd_; }
+  void injectCompletion(RequestType type) override;
 
-  void unlink();
+  void cleanup();
 
 private:
+  void unlink();
+
   os_fd_t fd_;
   IoUringWorkerImpl& parent_;
 };
@@ -56,6 +59,8 @@ public:
                                 const Network::Address::InstanceConstSharedPtr& address) override;
 
   std::unique_ptr<IoUringSocketEntry> removeSocket(IoUringSocketEntry& socket);
+  void injectCompletion(IoUringSocket& socket, RequestType type, int32_t result);
+  void removeInjectedCompletion(IoUringSocket& socket);
 
 protected:
   void onFileEvent();
