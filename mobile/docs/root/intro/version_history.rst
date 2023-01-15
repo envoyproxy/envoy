@@ -20,6 +20,7 @@ Bugfixes:
 
 Features:
 
+- api: Add a constructor which takes a URL to C++ RequestEngineBuilder.
 - api: add option to support platform provided certificates validation interfaces on iOS and Android. (:issue `#2144 <2144>`)
 - api: Add a ``setPerTryIdleTimeoutSeconds()`` method to C++ EngineBuilder.
 - swift/kotlin: add an option to enable DNS cache by calling ``enableDNSCache(_:)`` method.
