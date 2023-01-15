@@ -24,7 +24,6 @@ Fetch::Fetch(int argc, char** argv)
                                               time_system_, platform_impl_.fileSystem(),
                                               random_generator_, bootstrap_)) {
   Envoy::Event::Libevent::Global::initialize();
-  dispatcher_ = api_->allocateDispatcher("fetch_client");
 
   // Start at 1 to skip the command name.
   for (int i = 1; i < argc; ++i) {
@@ -33,6 +32,7 @@ Fetch::Fetch(int argc, char** argv)
 }
 
 void Fetch::fetch() {
+  dispatcher_ = api_->allocateDispatcher("fetch_client");
   Thread::ThreadPtr envoy_thread =
       api_->threadFactory().createThread([this]() -> void { runEngine(); });
   engine_running_.WaitForNotification();
@@ -53,8 +53,8 @@ void Fetch::sendRequest(const absl::string_view url_string) {
   std::cout << "Fetching url: " << url.toString() << "\n";
 
   absl::Notification request_finished;
-  stream_prototype_ = engine_->streamClient()->newStreamPrototype();
-  stream_prototype_->setOnHeaders(
+  Platform::StreamPrototypeSharedPtr stream_prototype = engine_->streamClient()->newStreamPrototype();
+  stream_prototype->setOnHeaders(
       [](Platform::ResponseHeadersSharedPtr headers, bool, envoy_stream_intel intel) {
         std::cerr << "Received headers on connection: " << intel.connection_id << "\n";
 
@@ -65,46 +65,47 @@ void Fetch::sendRequest(const absl::string_view url_string) {
           }
         }
       });
-  stream_prototype_->setOnData([](envoy_data c_data, bool fin) {
+  stream_prototype->setOnData([](envoy_data c_data, bool fin) {
     std::cout << Data::Utility::copyToString(c_data);
     if (fin) {
       std::cout << "Received final data\n";
     }
     release_envoy_data(c_data);
   });
-  stream_prototype_->setOnComplete(
+  stream_prototype->setOnComplete(
       [&request_finished](envoy_stream_intel, envoy_final_stream_intel final_intel) {
         std::cerr << "Request finished after "
                   << final_intel.stream_end_ms - final_intel.stream_start_ms << "ms\n";
         request_finished.Notify();
       });
-  stream_prototype_->setOnError([&request_finished](Platform::EnvoyErrorSharedPtr,
+  stream_prototype->setOnError([&request_finished](Platform::EnvoyErrorSharedPtr,
                                                     envoy_stream_intel,
                                                     envoy_final_stream_intel final_intel) {
     std::cerr << "Request failed after " << final_intel.stream_end_ms - final_intel.stream_start_ms
               << "ms\n";
     request_finished.Notify();
   });
-  stream_prototype_->setOnCancel(
+  stream_prototype->setOnCancel(
       [&request_finished](envoy_stream_intel, envoy_final_stream_intel final_intel) {
         std::cerr << "Request cancelled after "
                   << final_intel.stream_end_ms - final_intel.stream_start_ms << "ms\n";
         request_finished.Notify();
       });
 
-  stream_ = (*stream_prototype_).start(/*explicit_flow_control=*/false);
+  Platform::StreamSharedPtr stream = stream_prototype->start(/*explicit_flow_control=*/false);
 
   Platform::RequestHeadersBuilder builder(Platform::RequestMethod::GET, std::string(url.scheme()),
                                           std::string(url.hostAndPort()),
                                           std::string(url.pathAndQueryParams()));
 
-  stream_->sendHeaders(std::make_shared<Platform::RequestHeaders>(builder.build()), true);
+  stream->sendHeaders(std::make_shared<Platform::RequestHeaders>(builder.build()), true);
   request_finished.WaitForNotification();
 }
 
 void Fetch::runEngine() {
-  builder_.setOnEngineRunning([this]() { engine_running_.Notify(); });
-  engine_ = builder_.build();
+  Platform::EngineBuilder engine_builder;
+  engine_builder.setOnEngineRunning([this]() { engine_running_.Notify(); });
+  engine_ = engine_builder.build();
   dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
 }
 

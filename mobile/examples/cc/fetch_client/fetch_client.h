@@ -44,10 +44,7 @@ private:
   Api::ApiPtr api_;
 
   Event::DispatcherPtr dispatcher_;
-  Platform::StreamPrototypeSharedPtr stream_prototype_;
-  Platform::StreamSharedPtr stream_;
   Platform::EngineSharedPtr engine_;
-  Platform::EngineBuilder builder_;
   absl::Notification engine_running_;
 
   // URLs to fetch
