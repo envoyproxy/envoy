@@ -133,6 +133,10 @@ constexpr char OnNoMatchConfig[] = R"EOF(
         reporting_interval: 5s
 )EOF";
 
+// By design, on_no_match here only supports static bucket_id generation (via string value) and
+// doesn't support dynamic way (via custom_value extension). So the configuration with
+// `custom_value` typed_config is invalid configuration that will cause the failure of generating
+// the bucket id.
 constexpr char InvalidOnNoMatcherConfig[] = R"EOF(
   matcher_list:
     matchers:
@@ -258,12 +262,12 @@ public:
       TestUtility::loadFromYaml(InvalidOnNoMatcherConfig, matcher);
       break;
     }
-    // Invalid bucket_matcher configuration will be just empty matcher config.
     case MatcherConfigType::Empty:
     default:
       break;
     }
 
+    // Empty matcher config will not have the bucket matcher configured.
     if (config_type != MatcherConfigType::Empty) {
       config_.mutable_bucket_matchers()->MergeFrom(matcher);
     }
@@ -332,7 +336,7 @@ TEST_F(FilterTest, RequestMatchingSucceeded) {
 
   // Perform request matching.
   auto match_result = filter_->requestMatching(default_headers_);
-  // Asserts that the request matching succeeded and then retrieve the matched action.
+  // Assert that the request matching succeeded and then retrieve the matched action.
   ASSERT_TRUE(match_result.ok());
   const RateLimitOnMactchAction* match_action =
       dynamic_cast<RateLimitOnMactchAction*>(match_result.value().get());
@@ -340,7 +344,7 @@ TEST_F(FilterTest, RequestMatchingSucceeded) {
   RateLimitQuotaValidationVisitor visitor = {};
   // Generate the bucket ids.
   auto ret = match_action->generateBucketId(filter_->matchingData(), context_, visitor);
-  // Asserts that the bucket id generation succeeded and then retrieve the bucket ids.
+  // Assert that the bucket id generation succeeded and then retrieve the bucket ids.
   ASSERT_TRUE(ret.ok());
   auto bucket_ids = ret.value().bucket();
 

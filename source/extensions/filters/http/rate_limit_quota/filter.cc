@@ -11,17 +11,18 @@ namespace RateLimitQuota {
 
 Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                               bool) {
-  // First, perform request matching.
+  // First, perform the request matching.
   absl::StatusOr<Matcher::ActionPtr> match_result = requestMatching(headers);
   if (!match_result.ok()) {
-    // When the request is not matched by any matchers, request is ALLOWED by
-    // default (i.e., fail-open) and its quota usage will not be reported to RLQS server.
+    // When the request is not matched by any matchers, it is ALLOWED by default (i.e., fail-open)
+    // and its quota usage will not be reported to RLQS server.
     ENVOY_LOG(debug,
               "The request is not matched by any matchers: ", match_result.status().message());
     return Envoy::Http::FilterHeadersStatus::Continue;
   }
-  // Second, generate the bucket id for this request based on match action when request matching
-  // succeeded.
+
+  // Second, generate the bucket id for this request based on match action when the request matching
+  // succeeds.
   const RateLimitOnMactchAction* match_action =
       dynamic_cast<RateLimitOnMactchAction*>(match_result.value().get());
   auto ret = match_action->generateBucketId(*data_ptr_, factory_context_, visitor_);
@@ -31,7 +32,8 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
     ENVOY_LOG(debug, "Unable to generate the bucket id: {}", ret.status().message());
     return Envoy::Http::FilterHeadersStatus::Continue;
   }
-  // TODO(tyxia) Implement the quota cache and other actions.
+
+  // TODO(tyxia) Add impl for quota cache and other actions.
   BucketId bucket_id = ret.value();
   return Envoy::Http::FilterHeadersStatus::Continue;
 }
