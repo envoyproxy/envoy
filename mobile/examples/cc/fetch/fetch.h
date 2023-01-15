@@ -5,6 +5,14 @@
 
 #include "envoy/http/header_map.h"
 #include "source/common/http/header_map_impl.h"
+#include "source/common/api/api_impl.h"
+#include "source/common/common/random_generator.h"
+#include "source/common/common/thread.h"
+#include "source/common/event/real_time_system.h"
+#include "source/common/stats/allocator_impl.h"
+#include "source/common/stats/thread_local_store.h"
+#include "source/exe/platform_impl.h"
+#include "source/exe/process_wide.h"
 
 #include "library/cc/engine_builder.h"
 #include "library/cc/stream.h"
@@ -13,31 +21,38 @@
 #include "library/common/types/c_types.h"
 
 namespace Envoy {
-namespace Platform {
 
 class Fetch {
 public:
   Fetch(int argc, char** argv);
 
-  void Run();
+  void fetch();
 
  private:
-  void threadRoutine(absl::Notification& engine_running);
+  void runEngine();
   void sendRequest(const absl::string_view url);
 
-  // URLs to fetch
-  std::vector<absl::string_view> urls_;
-
+  Envoy::Thread::MutexBasicLockable lock_;
+  Envoy::Logger::Context logging_context_;
+  Envoy::PlatformImpl platform_impl_;
+  Envoy::Stats::SymbolTableImpl symbol_table_;
+  Envoy::Event::RealTimeSystem time_system_;
+  Envoy::Stats::AllocatorImpl stats_allocator_;
+  Envoy::Stats::ThreadLocalStoreImpl store_root_;
+  Envoy::Random::RandomGeneratorImpl random_generator_;
+  envoy::config::bootstrap::v3::Bootstrap bootstrap_;
   Api::ApiPtr api_;
-  std::unique_ptr<Http::RequestHeaderMapImpl> default_request_headers_;
-  //envoy_http_callbacks bridge_callbacks_;
-  Event::DispatcherPtr full_dispatcher_;
+
+  Event::DispatcherPtr dispatcher_;
   Platform::StreamPrototypeSharedPtr stream_prototype_;
   Platform::StreamSharedPtr stream_;
   Platform::EngineSharedPtr engine_;
   Thread::ThreadPtr envoy_thread_;
   Platform::EngineBuilder builder_;
+  absl::Notification engine_running_;
+
+  // URLs to fetch
+  std::vector<absl::string_view> urls_;
 };
 
 }  // namespace Envoy
-}  // namespace Platform

@@ -7,7 +7,7 @@ const char build_scm_revision[] = "0";
 const char build_scm_status[] = "test";
 
 int main(int argc, char** argv) {
-  Envoy::Platform::Fetch fetch(argc, argv);
-  fetch.Run();
+  Envoy::Fetch client(argc, argv);
+  client.fetch();
   exit(0);
 }

@@ -16,22 +16,50 @@
 #define HERE __FUNCTION__ << ":" << __LINE__ << " "
 
 namespace Envoy {
-namespace Platform {
 
 Fetch::Fetch(int argc, char** argv)
-  : default_request_headers_(Envoy::Http::RequestHeaderMapImpl::create()) {
+  : logging_context_(spdlog::level::level_enum::info,
+		     Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock_, false),
+    stats_allocator_(symbol_table_),
+    store_root_(stats_allocator_),
+    api_(std::make_unique<Envoy::Api::Impl>(
+        platform_impl_.threadFactory(), store_root_, time_system_,
+	platform_impl_.fileSystem(), random_generator_, bootstrap_)) {
+  Envoy::Event::Libevent::Global::initialize();
+  dispatcher_ = api_->allocateDispatcher("fetch");
+
+  // Start at 1 to skip the command name.
   for (int i = 1; i < argc; ++i) {
     urls_.push_back(argv[i]);
   }
 }
 
+void Fetch::fetch() {
+  std::cout << "here! 1\n";
+  std::cout << "here! 2\n";
+  envoy_thread_ = api_->threadFactory().createThread([this]() -> void { runEngine(); });
+  std::cout << "here! 3\n";
+  engine_running_.WaitForNotification();
+  std::cout << "here! 4\n";
+  for (const absl::string_view url : urls_) {
+    std::cout << "Sending request to: "<< url << "\n";
+    sendRequest(url);
+  }
+  std::cout << "here! 5\n";
+  dispatcher_->exit();
+  envoy_thread_->join();
+  engine_->terminate();
+  std::cout << "here! 6\n";
+}
+
 void Fetch::sendRequest(const absl::string_view url) {
   stream_prototype_ = engine_->streamClient()->newStreamPrototype();
+  absl::Notification request_finished;
 
   stream_prototype_->setOnHeaders(
       [this](Platform::ResponseHeadersSharedPtr headers, bool, envoy_stream_intel intel) {
 	std::cout << HERE << std::endl;
-	const RawHeaderMap raw_headers = headers->allHeaders();
+	const Platform::RawHeaderMap raw_headers = headers->allHeaders();
 	for (const auto& [key, header] : raw_headers) {
 	  for (const auto& val : header) {
 	    std::cout << key << ": " << val << "\n";
@@ -50,7 +78,7 @@ void Fetch::sendRequest(const absl::string_view url) {
     release_envoy_data(c_data);
   });
   stream_prototype_->setOnComplete(
-      [this](envoy_stream_intel, envoy_final_stream_intel final_intel) {
+				   [this,&request_finished](envoy_stream_intel, envoy_final_stream_intel final_intel) {
 	std::cout << HERE << std::endl;
 	(void)this;
 	(void)final_intel;
@@ -61,7 +89,7 @@ void Fetch::sendRequest(const absl::string_view url) {
 	//        cc_.on_complete_calls++;
 	//        cc_.terminal_callback->setReady();
 	std::cout << HERE << std::endl;
-	full_dispatcher_->exit();
+	request_finished.Notify();
 	std::cout << HERE << std::endl;
       });
   stream_prototype_->setOnError(
@@ -100,56 +128,18 @@ void Fetch::sendRequest(const absl::string_view url) {
   //  Buffer::OwnedImpl request_data2 = Buffer::OwnedImpl("request body");
   //  envoy_data c_data2 = Data::Utility::toBridgeData(request_data);
   //  stream_->close(c_data2);
+
+  request_finished.WaitForNotification();
 }
 
-void Fetch::threadRoutine(absl::Notification& engine_running) {
+void Fetch::runEngine() {
   std::cout << "here! A\n";
-  builder_.setOnEngineRunning([&]() { engine_running.Notify(); });
+  builder_.setOnEngineRunning([this]() { engine_running_.Notify(); });
   std::cout << "here! B\n";
   engine_ = builder_.build();
   std::cout << "here! C\n";
-  full_dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
+  dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
   std::cout << "here! D\n";
 }
 
-void Fetch::Run() {
-  Envoy::Thread::MutexBasicLockable lock;
-  Envoy::Logger::Context logging_context(
-      spdlog::level::level_enum::info,
-      Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
-
-  // Process-wide params for Envoy connection class.
-  Envoy::PlatformImpl platform_impl;
-  Envoy::Stats::SymbolTableImpl symbol_table;
-  Envoy::Event::RealTimeSystem time_system;
-  Envoy::Stats::AllocatorImpl stats_allocator(symbol_table);
-  Envoy::Stats::ThreadLocalStoreImpl store_root(stats_allocator);
-  Envoy::Random::RandomGeneratorImpl random_generator;
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  api_ = std::make_unique<Envoy::Api::Impl>(
-					    platform_impl.threadFactory(), store_root, time_system,
-					    platform_impl.fileSystem(), random_generator, bootstrap);
-
-  Envoy::Event::Libevent::Global::initialize();
-  full_dispatcher_ = api_->allocateDispatcher("fake_envoy_mobile");
-
-  std::cout << "here! 1\n";
-  absl::Notification engine_running;
-  std::cout << "here! 2\n";
-  envoy_thread_ = api_->threadFactory().createThread(
-      [this, &engine_running]() -> void { threadRoutine(engine_running); });
-  std::cout << "here! 3\n";
-  engine_running.WaitForNotification();
-  std::cout << "here! 4\n";
-  for (const absl::string_view url : urls_) {
-    std::cout << "Sending request to: "<< url << "\n";
-    sendRequest(url);
-  }
-  std::cout << "here! 5\n";
-  envoy_thread_->join();
-  engine_->terminate();
-  std::cout << "here! 6\n";
-}
-
 }  // namespace Envoy
-}  // namespace Platform
