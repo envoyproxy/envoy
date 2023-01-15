@@ -9,12 +9,12 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
-    name = "fetch_lib",
+    name = "fetch_client_lib",
     srcs = [
-	"fetch.cc",
+	"fetch_client.cc",
     ],
     hdrs = [
-	"fetch.h",
+	"fetch_client.h",
     ],
     repository = "@envoy",
     deps = [
@@ -28,9 +28,9 @@ envoy_cc_library(
 )
 
 cc_binary(
-    name = "fetch",
-    srcs = [ "fetch_main.cc" ],
-    deps = [ ":fetch_lib",
+    name = "fetch_client",
+    srcs = [ "fetch_client_main.cc" ],
+    deps = [ ":fetch_client_lib",
 
         "@envoy//source/common/api:api_lib",
         "@envoy//source/common/common:random_generator_lib",

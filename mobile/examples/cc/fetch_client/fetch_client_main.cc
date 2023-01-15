@@ -1,4 +1,4 @@
-#include "examples/cc/fetch/fetch.h"
+#include "examples/cc/fetch_client/fetch_client.h"
 
 extern const char build_scm_revision[];
 extern const char build_scm_status[];

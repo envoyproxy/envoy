@@ -47,7 +47,6 @@ public:
   Platform::StreamPrototypeSharedPtr stream_prototype_;
   Platform::StreamSharedPtr stream_;
   Platform::EngineSharedPtr engine_;
-  Thread::ThreadPtr envoy_thread_;
   Platform::EngineBuilder builder_;
   absl::Notification engine_running_;
 
