@@ -26,13 +26,19 @@ void IoUringSocketEntry::injectCompletion(RequestType type) {
 
 IoUringWorkerImpl::IoUringWorkerImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
                                      Event::Dispatcher& dispatcher)
-    : io_uring_instance_(
-          std::make_unique<IoUringImpl>(io_uring_size, use_submission_queue_polling)),
-      dispatcher_(dispatcher) {}
+    : IoUringWorkerImpl(std::make_unique<IoUringImpl>(io_uring_size, use_submission_queue_polling),
+                        dispatcher) {}
 
 IoUringWorkerImpl::IoUringWorkerImpl(std::unique_ptr<IoUring> io_uring_instance,
                                      Event::Dispatcher& dispatcher)
-    : io_uring_instance_(std::move(io_uring_instance)), dispatcher_(dispatcher) {}
+    : io_uring_instance_(std::move(io_uring_instance)), dispatcher_(dispatcher) {
+  const os_fd_t event_fd = io_uring_instance_->registerEventfd();
+  // We only care about the read event of Eventfd, since we only receive the
+  // event here.
+  file_event_ = dispatcher_.createFileEvent(
+      event_fd, [this](uint32_t) { onFileEvent(); }, Event::PlatformDefaultTriggerType,
+      Event::FileReadyType::Read);
+}
 
 IoUringWorkerImpl::~IoUringWorkerImpl() {
   ENVOY_LOG(trace, "destruct io uring worker");
