@@ -181,23 +181,50 @@ public:
 
   /**
    * Connect to an address.
+   * @param address the peer of address which is connected to.
    */
-  virtual void connect(const Network::Address::InstanceConstSharedPtr&) PURE;
+  virtual void connect(const Network::Address::InstanceConstSharedPtr& address) PURE;
 
   /**
    * On accept request completed.
+   * @param result the result of operation in the request.
    */
-  virtual void onAccept(int32_t) PURE;
+  virtual void onAccept(int32_t result) PURE;
 
   /**
    * On close request completed.
+   * @param result the result of operation in the request.
    */
-  virtual void onClose(int32_t) PURE;
-  virtual void onCancel(int32_t) PURE;
-  virtual void onConnect(int32_t) PURE;
-  virtual void onRead(int32_t) PURE;
-  virtual void onWrite(int32_t) PURE;
+  virtual void onClose(int32_t result) PURE;
 
+  /**
+   * On cancel request completed.
+   * @param result the result of operation in the request.
+   */
+  virtual void onCancel(int32_t result) PURE;
+
+  /**
+   * On connect request completed.
+   * @param result the result of operation in the request.
+   */
+  virtual void onConnect(int32_t result) PURE;
+
+  /**
+   * On read request completed.
+   * @param result the result of operation in the request.
+   */
+  virtual void onRead(int32_t result) PURE;
+
+  /**
+   * On write request completed.
+   * @param result the result of operation in the request.
+   */
+  virtual void onWrite(int32_t result) PURE;
+
+  /**
+   * Inject a request completion to the io uring instance.
+   * @param type the request type of injected completion.
+   */
   virtual void injectCompletion(RequestType type) PURE;
 };
 

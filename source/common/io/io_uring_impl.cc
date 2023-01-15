@@ -47,6 +47,9 @@ IoUringImpl::~IoUringImpl() { io_uring_queue_exit(&ring_); }
 
 os_fd_t IoUringImpl::registerEventfd() {
   ASSERT(!isEventfdRegistered());
+  // Mark the eventfd as non-blocking, since we may activate event for the eventfd when injected
+  // completion is added. Then non-blocking can avoid the reading of eventfd blocking for no actual
+  // event.
   event_fd_ = eventfd(0, EFD_NONBLOCK);
   int res = io_uring_register_eventfd(&ring_, event_fd_);
   RELEASE_ASSERT(res == 0, fmt::format("unable to register eventfd: {}", errorDetails(-res)));

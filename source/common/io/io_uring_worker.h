@@ -23,6 +23,8 @@ public:
   os_fd_t fd() const override { return fd_; }
   void injectCompletion(RequestType type) override;
 
+  // This will cleanup all the injected completions for this socket and
+  // unlink itself from the worker.
   void cleanup();
 
 private:
@@ -58,19 +60,27 @@ public:
   Request* submitConnectRequest(IoUringSocket& socket,
                                 const Network::Address::InstanceConstSharedPtr& address) override;
 
+  // From socket from the worker.
   std::unique_ptr<IoUringSocketEntry> removeSocket(IoUringSocketEntry& socket);
+  // Inject a request completion into the io_uring instance.
   void injectCompletion(IoUringSocket& socket, RequestType type, int32_t result);
+  // Remove all the injected completion for the specific socket.
   void removeInjectedCompletion(IoUringSocket& socket);
 
 protected:
   void onFileEvent();
   void submit();
 
+  // The io_uring instance.
   std::unique_ptr<IoUring> io_uring_instance_;
+  // The file event of io_uring's eventfd.
   Event::FileEventPtr file_event_{nullptr};
   Event::Dispatcher& dispatcher_;
-
+  // All the sockets in this worker.
   std::list<std::unique_ptr<IoUringSocketEntry>> sockets_;
+  // This is used to mark whether the delay submit is enabled.
+  // The IoUriingWorks delay the submit the requests which are submitted in request completion
+  // callback.
   bool delay_submit_{false};
 };
 
