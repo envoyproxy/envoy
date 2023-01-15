@@ -970,14 +970,14 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "cxx.rs",
         name_override = "cxx.rs",
         project_desc = "Rust/C++ bridging library",
+        sha256 = "5ff018d6e99e4009450096653d92810e37d83c00e90d9cfbdd234fd7bc70d183",
         project_url = "https://cxx.rs",
-        version = "1.0.83",
-        sha256 = "e30cbd34fc8ec2ae78f4f9e546d29c6c92e6d714f30c3c150f7b8c6ea08ea971",
+        version = "1.0.86",
         strip_prefix = "cxx-{version}",
         urls = [
             "https://github.com/dtolnay/cxx/archive/refs/tags/{version}.tar.gz",
         ],
-        release_date = "2022-12-03",
+        release_date = "2023-01-07",
         use_category = ["build"],
     ),
     com_github_wavm_wavm = dict(
