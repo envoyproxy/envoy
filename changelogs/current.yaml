@@ -55,6 +55,9 @@ minor_behavior_changes:
 - area: oauth2
   change: |
     Requests which match the passthrough header now have their own metric ``oauth_passthrough`` and aren't included in ``oauth_success`` anymore.
+- area: oauth2
+  change: |
+    query parameters in the :ref:`authorization_endpoint <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.authorization_endpoint>` are now preserved.
 - area: upstream
   change: |
     detailed health status is used for override host selection. This behavior can be reverted by setting runtime flag ``envoy.reloadable_features.validate_detailed_override_host_statuses`` to false.
