@@ -11,8 +11,10 @@ RequestHeadersBuilder::RequestHeadersBuilder(RequestMethod request_method, std::
   internalSet(":path", {std::move(path)});
 }
 
-RequestHeadersBuilder::RequestHeadersBuilder(RequestMethod request_method, Envoy::Http::Utility::Url url)
-  : RequestHeadersBuilder(request_method, std::string(url.scheme()), std::string(url.hostAndPort()), std::string(url.pathAndQueryParams())) {
+RequestHeadersBuilder::RequestHeadersBuilder(RequestMethod request_method,
+                                             Envoy::Http::Utility::Url url)
+    : RequestHeadersBuilder(request_method, std::string(url.scheme()),
+                            std::string(url.hostAndPort()), std::string(url.pathAndQueryParams())) {
 }
 
 RequestHeadersBuilder& RequestHeadersBuilder::addRetryPolicy(const RetryPolicy& retry_policy) {
@@ -26,7 +28,7 @@ RequestHeadersBuilder& RequestHeadersBuilder::addRetryPolicy(const RetryPolicy& 
 RequestHeadersBuilder&
 RequestHeadersBuilder::addUpstreamHttpProtocol(UpstreamHttpProtocol upstream_http_protocol) {
   internalSet("x-envoy-mobile-upstream-protocol",
-                    std::vector<std::string>{upstreamHttpProtocolToString(upstream_http_protocol)});
+              std::vector<std::string>{upstreamHttpProtocolToString(upstream_http_protocol)});
   return *this;
 }
 

@@ -2,13 +2,13 @@
 
 #include <string>
 
+#include "source/common/http/utility.h"
+
 #include "headers_builder.h"
 #include "request_headers.h"
 #include "request_method.h"
 #include "retry_policy.h"
 #include "upstream_http_protocol.h"
-
-#include "source/common/http/utility.h"
 
 namespace Envoy {
 namespace Platform {
