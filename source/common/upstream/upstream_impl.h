@@ -841,7 +841,7 @@ public:
     return http_protocol_options_->upstream_http_protocol_options_;
   }
 
-  const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+  const absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>&
   alternateProtocolsCacheOptions() const override {
     return http_protocol_options_->alternate_protocol_cache_options_;
   }

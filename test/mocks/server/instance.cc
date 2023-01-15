@@ -59,14 +59,14 @@ namespace Configuration {
 
 MockServerFactoryContext::MockServerFactoryContext()
     : singleton_manager_(new Singleton::ManagerImpl(Thread::threadFactoryForTest())),
-      grpc_context_(scope_.symbolTable()), router_context_(scope_.symbolTable()) {
+      grpc_context_(store_.symbolTable()), router_context_(store_.symbolTable()) {
   ON_CALL(*this, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
   ON_CALL(*this, mainThreadDispatcher()).WillByDefault(ReturnRef(dispatcher_));
   ON_CALL(*this, drainDecision()).WillByDefault(ReturnRef(drain_manager_));
   ON_CALL(*this, localInfo()).WillByDefault(ReturnRef(local_info_));
   ON_CALL(*this, runtime()).WillByDefault(ReturnRef(runtime_loader_));
-  ON_CALL(*this, scope()).WillByDefault(ReturnRef(scope_));
-  ON_CALL(*this, serverScope()).WillByDefault(ReturnRef(scope_));
+  ON_CALL(*this, scope()).WillByDefault(ReturnRef(*store_.rootScope()));
+  ON_CALL(*this, serverScope()).WillByDefault(ReturnRef(*store_.rootScope()));
   ON_CALL(*this, singletonManager()).WillByDefault(ReturnRef(*singleton_manager_));
   ON_CALL(*this, threadLocal()).WillByDefault(ReturnRef(thread_local_));
   ON_CALL(*this, admin()).WillByDefault(Return(OptRef<Server::Admin>{admin_}));

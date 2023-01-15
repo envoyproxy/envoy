@@ -29,7 +29,6 @@ envoy_mobile_android_test(
         # TODO(lfpino): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
         "sandboxNetwork": "standard",
     },
-    library_path = "test/common/jni",
     native_deps = [
         "//test/common/jni:libquic_test_server_jni.so",
         "//test/common/jni:libquic_test_server_jni.jnilib",
