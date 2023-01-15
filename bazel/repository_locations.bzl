@@ -977,7 +977,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = [
             "https://github.com/dtolnay/cxx/archive/refs/tags/{version}.tar.gz",
         ],
-        release_date = "2023-01-07",
+        release_date = "2023-01-08",
         use_category = ["build"],
     ),
     com_github_wavm_wavm = dict(
