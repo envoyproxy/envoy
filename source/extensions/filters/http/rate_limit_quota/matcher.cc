@@ -56,11 +56,11 @@ RateLimitOnMactchAction::generateBucketId(const Http::Matching::HttpMatchingData
     case ValueSpecifierCase::VALUE_SPECIFIER_NOT_SET: {
       PANIC_DUE_TO_PROTO_UNSET;
     }
-    PANIC_DUE_TO_CORRUPT_ENUM;
+      PANIC_DUE_TO_CORRUPT_ENUM;
+    }
   }
-}
 
-return bucket_id;
+  return bucket_id;
 }
 
 /**
