@@ -1,5 +1,7 @@
 #include "test/server/admin/stats_request_test_base.h"
 
+#include <string>
+
 namespace Envoy {
 namespace Server {
 
@@ -52,6 +54,9 @@ template <class T> std::string StatsRequestTestBase<T>::response(T& request) {
   }
   return data.toString();
 }
+
+TestScope::TestScope(const std::string& prefix, Stats::MockStore& store)
+    : Stats::IsolatedScopeImpl(prefix, store) {}
 
 template class StatsRequestTestBase<GroupedStatsRequest>;
 template class StatsRequestTestBase<UngroupedStatsRequest>;

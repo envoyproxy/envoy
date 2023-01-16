@@ -1,5 +1,8 @@
 #pragma once
 
+#include <string>
+#include <vector>
+
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/stats/thread_local_store.h"
 #include "source/server/admin/grouped_stats_request.h"
@@ -34,6 +37,43 @@ protected:
   testing::NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::ThreadLocalStoreImpl store_;
   Buffer::OwnedImpl response_;
+};
+
+class TestScope : public Stats::IsolatedScopeImpl {
+public:
+  TestScope(const std::string& prefix, Stats::MockStore& store);
+
+  bool iterate(const Stats::IterateFn<Stats::Histogram>& fn) const override {
+    std::for_each(histograms_.begin(), histograms_.end(), fn);
+    return true;
+  }
+
+  bool iterate(const Stats::IterateFn<Stats::Counter>& fn) const override {
+    std::for_each(counters_.begin(), counters_.end(), fn);
+    return true;
+  }
+
+  bool iterate(const Stats::IterateFn<Stats::Gauge>& fn) const override {
+    std::for_each(gauges_.begin(), gauges_.end(), fn);
+    return true;
+  }
+
+  bool iterate(const Stats::IterateFn<Stats::TextReadout>& fn) const override {
+    std::for_each(text_readouts_.begin(), text_readouts_.end(), fn);
+    return true;
+  }
+
+public:
+  std::vector<Stats::ParentHistogramSharedPtr> histograms_;
+  std::vector<Stats::CounterSharedPtr> counters_;
+  std::vector<Stats::GaugeSharedPtr> gauges_;
+  std::vector<Stats::TextReadoutSharedPtr> text_readouts_;
+  ;
+};
+
+class MockStore : public Stats::MockStore {
+public:
+  MOCK_METHOD(Stats::ScopeSharedPtr, rootScope, ());
 };
 
 } // namespace Server
