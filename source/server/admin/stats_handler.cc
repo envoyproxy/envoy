@@ -87,6 +87,7 @@ Admin::RequestPtr StatsHandler::makeRequest(AdminStream& admin_stream) {
   }
 
   if (params.format_ == StatsFormat::Prometheus || path == "/stats/prometheus") {
+    params.format_ = StatsFormat::Prometheus;
     return makePrometheusRequest(
         server_.stats(), params, server_.api().customStatNamespaces(),
         [this]() -> Admin::UrlHandler { return prometheusStatsHandler(); });
