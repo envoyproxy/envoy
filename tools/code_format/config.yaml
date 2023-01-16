@@ -194,8 +194,8 @@ paths:
     - source/common/version/version.cc
     - source/server/admin/grouped_stats_request.cc
     - source/server/admin/ungrouped_stats_request.cc
-    - source/server/admin/prometheus_stats.h
-    - source/server/admin/prometheus_stats.cc
+    - source/server/admin/prometheus_stats_formatter.h
+    - source/server/admin/prometheus_stats_formatter.cc
     - source/server/admin/stats_params.h
     - source/server/admin/utils.h
     - source/server/admin/utils.cc

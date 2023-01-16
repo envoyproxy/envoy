@@ -11,7 +11,7 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/server/admin/grouped_stats_request.h"
-#include "source/server/admin/prometheus_stats.h"
+#include "source/server/admin/prometheus_stats_formatter.h"
 #include "source/server/admin/ungrouped_stats_request.h"
 
 #include "absl/strings/numbers.h"

@@ -4,7 +4,7 @@
 #include "source/common/json/json_sanitizer.h"
 #include "source/common/stats/histogram_impl.h"
 
-#include "prometheus_stats.h"
+#include "source/server/admin/prometheus_stats_formatter.h"
 
 namespace {
 constexpr absl::string_view JsonNameTag = "{\"name\":\"";

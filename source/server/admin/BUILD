@@ -200,8 +200,8 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "prometheus_stats_lib",
-    srcs = ["prometheus_stats.cc"],
-    hdrs = ["prometheus_stats.h"],
+    srcs = ["prometheus_stats_formatter.cc"],
+    hdrs = ["prometheus_stats_formatter.h"],
     deps = [
         ":stats_params_lib",
         ":utils_lib",

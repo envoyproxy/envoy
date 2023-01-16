@@ -1,4 +1,4 @@
-#include "source/server/admin/prometheus_stats.h"
+#include "source/server/admin/prometheus_stats_formatter.h"
 
 #include "source/common/common/empty_string.h"
 #include "source/common/common/macros.h"
