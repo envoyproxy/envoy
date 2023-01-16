@@ -8,9 +8,6 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/utility.h"
 
-using testing::NiceMock;
-using testing::ReturnRef;
-
 namespace Envoy {
 namespace Server {
 
