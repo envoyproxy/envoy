@@ -36,7 +36,7 @@ private:
   Envoy::Logger::Context logging_context_;
   Envoy::PlatformImpl platform_impl_;
   Envoy::Stats::SymbolTableImpl symbol_table_;
-  Envoy::Event::RealTimeSystem time_system_;  // NO_CHECK_FORMAT(real_time)
+  Envoy::Event::RealTimeSystem time_system_; // NO_CHECK_FORMAT(real_time)
   Envoy::Stats::AllocatorImpl stats_allocator_;
   Envoy::Stats::ThreadLocalStoreImpl store_root_;
   Envoy::Random::RandomGeneratorImpl random_generator_;
