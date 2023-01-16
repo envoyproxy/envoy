@@ -41,11 +41,11 @@ protected:
   Stats::CustomStatNamespacesImpl custom_namespaces_;
 };
 
-class PrometheusStatsFormatterTest : public testing::Test {
+class PrometheusStatsRenderingTest : public testing::Test {
 protected:
-  PrometheusStatsFormatterTest() : alloc_(*symbol_table_), pool_(*symbol_table_) {}
+  PrometheusStatsRenderingTest() : alloc_(*symbol_table_), pool_(*symbol_table_) {}
 
-  ~PrometheusStatsFormatterTest() override { clearStorage(); }
+  ~PrometheusStatsRenderingTest() override { clearStorage(); }
 
   Stats::StatName makeStatName(absl::string_view name) { return pool_.add(name); }
 
@@ -283,7 +283,7 @@ envoy_cluster_test_cluster_4_upstream_cx_total{another_tag_name_4="another_tag_4
   EXPECT_EQ(expected_output, response(*makeRequest(false)));
 }
 
-TEST_F(PrometheusStatsFormatterTest, HistogramWithNoValuesAndNoTags) {
+TEST_F(PrometheusStatsRenderingTest, HistogramWithNoValuesAndNoTags) {
   HistogramWrapper h1_cumulative;
   h1_cumulative.setHistogramValues(std::vector<uint64_t>(0));
   Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
@@ -322,7 +322,7 @@ envoy_histogram1_count{} 0
   EXPECT_EQ(expected_output, response(*makeRequest(false)));
 }
 
-TEST_F(PrometheusStatsFormatterTest, HistogramWithNonDefaultBuckets) {
+TEST_F(PrometheusStatsRenderingTest, HistogramWithNonDefaultBuckets) {
   HistogramWrapper h1_cumulative;
   h1_cumulative.setHistogramValues(std::vector<uint64_t>(0));
   Stats::ConstSupportedBuckets buckets{10, 20};
@@ -349,7 +349,7 @@ envoy_histogram1_count{} 0
 
 // Test that scaled percents are emitted in the expected 0.0-1.0 range, and that the buckets
 // apply to the final output range, not the internal scaled range.
-TEST_F(PrometheusStatsFormatterTest, HistogramWithScaledPercent) {
+TEST_F(PrometheusStatsRenderingTest, HistogramWithScaledPercent) {
   HistogramWrapper h1_cumulative;
   h1_cumulative.setHistogramValues(std::vector<uint64_t>(0));
   Stats::ConstSupportedBuckets buckets{0.5, 1.0};
@@ -382,7 +382,7 @@ envoy_histogram1_count{} 3
   EXPECT_EQ(expected_output, response(*makeRequest(false)));
 }
 
-TEST_F(PrometheusStatsFormatterTest, HistogramWithHighCounts) {
+TEST_F(PrometheusStatsRenderingTest, HistogramWithHighCounts) {
   HistogramWrapper h1_cumulative;
 
   // Force large counts to prove that the +Inf bucket doesn't overflow to scientific notation.
@@ -429,7 +429,7 @@ envoy_histogram1_count{} 101100000
   EXPECT_EQ(expected_output, response(*makeRequest(false)));
 }
 
-TEST_F(PrometheusStatsFormatterTest, OutputWithAllMetricTypes) {
+TEST_F(PrometheusStatsRenderingTest, OutputWithAllMetricTypes) {
   custom_namespaces_.registerStatNamespace("promtest");
 
   addCounter("cluster.test_1.upstream_cx_total",
@@ -499,7 +499,7 @@ envoy_cluster_test_1_upstream_rq_time_count{key1="value1",key2="value2"} 7
   EXPECT_EQ(expected_output, response(*makeRequest(false)));
 }
 
-TEST_F(PrometheusStatsFormatterTest, OutputWithTextReadoutsInGaugeFormat) {
+TEST_F(PrometheusStatsRenderingTest, OutputWithTextReadoutsInGaugeFormat) {
   addCounter("cluster.upstream_cx_total_count", {{makeStatName("cluster"), makeStatName("c1")}});
   addGauge("cluster.upstream_cx_total", {{makeStatName("cluster"), makeStatName("c1")}});
   // Text readouts that should be returned in gauge format.
@@ -529,7 +529,7 @@ envoy_invalid_tag_values{tag1="\\",tag2="\n",tag3="\"",text_value="test"} 0
 // as required by the Prometheus exposition format spec. Additionally, groups of metrics
 // should be sorted by their tags; the format specifies that it is preferred that metrics
 // are always grouped in the same order, and sorting is an easy way to ensure this.
-TEST_F(PrometheusStatsFormatterTest, OutputSortedByMetricName) {
+TEST_F(PrometheusStatsRenderingTest, OutputSortedByMetricName) {
   const std::vector<uint64_t> h1_values = {50, 20, 30, 70, 100, 5000, 200};
   HistogramWrapper h1_cumulative;
   h1_cumulative.setHistogramValues(h1_values);
@@ -711,7 +711,7 @@ envoy_cluster_upstream_rq_time_count{cluster="ccc"} 7
   EXPECT_EQ(expected_output, response(*makeRequest(false)));
 }
 
-TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnly) {
+TEST_F(PrometheusStatsRenderingTest, OutputWithUsedOnly) {
   addCounter("cluster.test_1.upstream_cx_total",
              {{makeStatName("a.tag-name"), makeStatName("a.tag-value")}});
   addCounter("cluster.test_2.upstream_cx_total",
@@ -763,7 +763,7 @@ envoy_cluster_test_1_upstream_rq_time_count{key1="value1",key2="value2"} 7
   EXPECT_EQ(expected_output, response(*makeRequest(true)));
 }
 
-TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnlyHistogram) {
+TEST_F(PrometheusStatsRenderingTest, OutputWithUsedOnlyHistogram) {
   const std::vector<uint64_t> h1_values = {};
   HistogramWrapper h1_cumulative;
   h1_cumulative.setHistogramValues(h1_values);
@@ -817,7 +817,7 @@ envoy_cluster_test_1_upstream_rq_time_count{key1="value1",key2="value2"} 0
   }
 }
 
-TEST_F(PrometheusStatsFormatterTest, OutputWithRegexp) {
+TEST_F(PrometheusStatsRenderingTest, OutputWithRegexp) {
   addCounter("cluster.test_1.upstream_cx_total",
              {{makeStatName("a.tag-name"), makeStatName("a.tag-value")}});
   addCounter("cluster.test_2.upstream_cx_total",
