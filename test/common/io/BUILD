@@ -38,3 +38,17 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "io_uring_worker_impl_integration_test",
+    srcs = ["io_uring_worker_impl_integration_test.cc"],
+    tags = [
+        "nocompdb",
+        "skip_on_windows",
+    ],
+    deps = [
+        "//source/common/api:os_sys_calls_lib",
+        "//source/common/io:io_uring_worker_lib",
+        "//envoy/api:os_sys_calls_interface",
+    ],
+)
