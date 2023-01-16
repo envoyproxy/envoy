@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-#include "source/server/admin/prometheus_stats.h"
+#include "source/server/admin/prometheus_stats_formatter.h"
 
 #include "stats_params.h"
 #include "stats_render.h"
