@@ -22,8 +22,8 @@ const uint64_t TEST_TIME_MILLIS = 42000;
 class SubscriptionTestHarness : public Event::TestUsingSimulatedTime {
 public:
   SubscriptionTestHarness()
-      : stats_(Utility::generateStats(stats_store_)),
-        control_plane_stats_(Utility::generateControlPlaneStats(stats_store_)) {
+      : stats_(Utility::generateStats(*stats_store_.rootScope())),
+        control_plane_stats_(Utility::generateControlPlaneStats(*stats_store_.rootScope())) {
     simTime().setSystemTime(SystemTime(std::chrono::milliseconds(TEST_TIME_MILLIS)));
   }
   virtual ~SubscriptionTestHarness() = default;
