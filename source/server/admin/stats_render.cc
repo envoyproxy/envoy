@@ -3,7 +3,6 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/json/json_sanitizer.h"
 #include "source/common/stats/histogram_impl.h"
-
 #include "source/server/admin/prometheus_stats_formatter.h"
 
 namespace {
