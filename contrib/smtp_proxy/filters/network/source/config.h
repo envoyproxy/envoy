@@ -16,14 +16,16 @@ namespace SmtpProxy {
  * Config registration for the smtp proxy filter. @see NamedNetworkFilterConfigFactory.
  */
 
-class SmtpConfigFactory : public Common::FactoryBase<
-                              envoy::extensions::filters::network::smtp_proxy::v3alpha::SmtpProxy> {
+class SmtpConfigFactory
+    : public Common::FactoryBase<
+          envoy::extensions::filters::network::smtp_proxy::v3alpha::SmtpProxy> {
 public:
   SmtpConfigFactory() : FactoryBase{NetworkFilterNames::get().SmtpProxy} {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::network::smtp_proxy::v3alpha::SmtpProxy& proto_config,
+      const envoy::extensions::filters::network::smtp_proxy::v3alpha::SmtpProxy&
+          proto_config,
       Server::Configuration::FactoryContext& context) override;
 };
 

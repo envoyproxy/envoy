@@ -24,11 +24,21 @@ public:
   virtual void incSmtpSessionRequests() PURE;
   virtual void incSmtpConnectionEstablishmentErrors() PURE;
   virtual void incSmtpSessionsCompleted() PURE;
+  virtual void incSmtpSessionsTerminated() PURE;
   virtual void incTlsTerminatedSessions() PURE;
-  virtual void incSmtp4xxErrors() PURE;
-  virtual void incSmtp5xxErrors() PURE;
-  virtual bool onStartTlsCommand(absl::string_view) PURE;
+  virtual void incTlsTerminationErrors() PURE;
+  virtual void incUpstreamTlsSuccess() PURE;
+  virtual void incUpstreamTlsFailed() PURE;
+
+  virtual void incSmtpAuthErrors() PURE;
+  virtual void incMailDataTransferErrors() PURE;
+  virtual void incMailRcptErrors() PURE;
+  
+  virtual bool downstreamStartTls(absl::string_view) PURE;
   virtual bool sendReplyDownstream(absl::string_view) PURE;
+  virtual bool upstreamTlsRequired() const PURE;
+  virtual bool upstreamStartTls() PURE;
+  virtual void closeDownstreamConnection() PURE;
 };
 
 // SMTP message decoder.
@@ -58,29 +68,38 @@ public:
 
   Result onData(Buffer::Instance& data, bool upstream) override;
   SmtpSession& getSession() override { return session_; }
-
-  bool isSessionEncrypted() const { return session_encrypted_; }
-
-protected:
   Decoder::Result parseCommand(Buffer::Instance& data);
   Decoder::Result parseResponse(Buffer::Instance& data);
-  void parseMessage(Buffer::Instance& message, uint8_t seq, uint32_t len);
+  void setSessionEncrypted(bool flag) { session_encrypted_ = flag; }
+  bool isSessionEncrypted() const { return session_encrypted_; }
+  void handleDownstreamTls();
+  void decodeSmtpTransactionCommands(std::string&);
+  void decodeSmtpTransactionResponse(uint16_t&);
 
+  const char* SessionStates[9] = {
+      "CONNECTION_REQUEST",       "CONNECTION_SUCCESS",          "SESSION_INIT_REQUEST",
+      "SESSION_IN_PROGRESS",      "SESSION_TERMINATION_REQUEST", "SESSION_TERMINATED",
+      "UPSTREAM_TLS_NEGOTIATION", "DOWNSTREAM_TLS_NEGOTIATION",  "SESSION_AUTH_REQUEST",
+  };
+
+  const char* TransactionStates[8] = {
+      "NONE",
+      "TRANSACTION_REQUEST",
+      "TRANSACTION_IN_PROGRESS",
+      "TRANSACTION_ABORT_REQUEST",
+      "TRANSACTION_ABORTED",
+      "MAIL_DATA_TRANSFER_REQUEST",
+      "RCPT_COMMAND",
+      "TRANSACTION_COMPLETED",
+  };
+
+protected:
+ 
   DecoderCallbacks* callbacks_{};
-  SmtpSession session_{};
+  SmtpSession session_;
 
   bool session_encrypted_{false}; // tells if exchange is encrypted
-  inline static const char* smtpHeloCommand = "HELO";
-  inline static const char* smtpEhloCommand = "EHLO";
-  inline static const char* smtpMailCommand = "MAIL";
-  inline static const char* smtpDataCommand = "DATA";
-  inline static const char* smtpQuitCommand = "QUIT";
-  inline static const char* smtpRsetCommand = "RSET";
-  inline static const char* startTlsCommand = "STARTTLS";
-  inline static const char* outOfOrderCommandResponse = "503 Bad sequence of commands\r\n";
-  inline static const char* readyToStartTlsResponse = "220 Ready to start TLS\r\n";
-  inline static const char* failedToStartTlsResponse =
-      "454 TLS not available due to temporary reason\r\n";
+
 };
 
 } // namespace SmtpProxy

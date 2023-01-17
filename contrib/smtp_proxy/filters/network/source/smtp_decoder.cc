@@ -1,8 +1,8 @@
 
 #include "contrib/smtp_proxy/filters/network/source/smtp_decoder.h"
-#include "source/common/common/logger.h"
-
 #include "contrib/smtp_proxy/filters/network/source/smtp_utils.h"
+
+#include "source/common/common/logger.h"
 #include "absl/strings/match.h"
 
 namespace Envoy {
@@ -11,100 +11,108 @@ namespace NetworkFilters {
 namespace SmtpProxy {
 
 Decoder::Result DecoderImpl::onData(Buffer::Instance& data, bool upstream) {
+  const std::string message = data.toString();
+  std::cout << "current session state: " << SessionStates[static_cast<int>(session_.getState())]
+            << "\n";
+  std::cout << "current transaction state: "
+            << TransactionStates[static_cast<int>(session_.getTransactionState())] << "\n";
+
   Decoder::Result result = Decoder::Result::ReadyForNext;
+
   if (upstream) {
+    ENVOY_LOG(debug, "received response from upstream: ", StringUtil::trim(message));
     result = parseResponse(data);
-  } else {
-    result = parseCommand(data);
+    data.drain(data.length());
+    return result;
   }
+  std::cout << "received message " << message << "\n";
+  result = parseCommand(data);
   data.drain(data.length());
   return result;
 }
 
 Decoder::Result DecoderImpl::parseCommand(Buffer::Instance& data) {
   ENVOY_LOG(debug, "smtp_proxy: decoding {} bytes", data.length());
-
+  Decoder::Result result = Decoder::Result::ReadyForNext;
   std::string command = data.toString();
+  std::cout << "command string : " << command << " length: " << command.length() << "\n";
 
   if (command.length() < 6) {
-    // Message size is not sufficient to parse. Minimum 6 bytes required (4 byte command verb + CRLF
-    // \r\n character sequence)
-    return Decoder::Result::ReadyForNext;
+    // Message size is not sufficient to parse.
+    return result;
   }
 
   switch (session_.getState()) {
   case SmtpSession::State::CONNECTION_SUCCESS: {
-    if (absl::StartsWithIgnoreCase(command, smtpEhloCommand) ||
-        absl::StartsWithIgnoreCase(command, smtpHeloCommand)) {
+    if (absl::StartsWithIgnoreCase(command, SmtpUtils::smtpEhloCommand) ||
+        absl::StartsWithIgnoreCase(command, SmtpUtils::smtpHeloCommand)) {
       session_.setState(SmtpSession::State::SESSION_INIT_REQUEST);
     }
+    break;
+  }
+  case SmtpSession::State::UPSTREAM_TLS_NEGOTIATION: {
+    // No downstream messages will be processed when upstream TLS negotiation is in progress.
+    callbacks_->sendReplyDownstream(SmtpUtils::mailboxUnavailableResponse);
+    result = Decoder::Result::Stopped;
     break;
   }
   case SmtpSession::State::SESSION_IN_PROGRESS: {
 
-    if (absl::StartsWithIgnoreCase(command, startTlsCommand)) {
+    if (absl::StartsWithIgnoreCase(command, SmtpUtils::startTlsCommand)) {
+      // STARTTLS command processing
+      if (command.length() > 10) {
+        ENVOY_LOG(error, "smtp_proxy: parameters not allowed for startls command");
+        callbacks_->sendReplyDownstream(SmtpUtils::syntaxErrorNoParamsAllowed);
+        result = Decoder::Result::Stopped;
+        break;
+      }
       if (session_encrypted_) {
         ENVOY_LOG(error, "smtp_proxy: received starttls when session is already encrypted.");
-        callbacks_->sendReplyDownstream(outOfOrderCommandResponse);
-        return Decoder::Result::Stopped;
+        callbacks_->sendReplyDownstream(SmtpUtils::outOfOrderCommandResponse);
+        result = Decoder::Result::Stopped;
+        break;
       }
 
-      if (!callbacks_->onStartTlsCommand(readyToStartTlsResponse)) {
-        // callback returns false if connection is switched to tls i.e. tls termination is
-        // successful.
-        session_encrypted_ = true;
+      if (callbacks_->upstreamTlsRequired()) {
+        // Send STARTTLS request to upstream.
+        session_.setState(SmtpSession::State::UPSTREAM_TLS_NEGOTIATION);
+        result = Decoder::Result::ReadyForNext;
+        break;
+
       } else {
-        // error while switching transport socket to tls.
-        callbacks_->sendReplyDownstream(failedToStartTlsResponse);
+        // Perform downstream TLS negotiation.
+        handleDownstreamTls();
+        result = Decoder::Result::Stopped;
       }
-      return Decoder::Result::Stopped;
+      break;
 
-    } else if (absl::StartsWithIgnoreCase(command, smtpQuitCommand)) {
+    } else if (absl::StartsWithIgnoreCase(command, SmtpUtils::smtpQuitCommand)) {
       session_.setState(SmtpSession::State::SESSION_TERMINATION_REQUEST);
       break;
-    } else if (absl::StartsWithIgnoreCase(command, smtpEhloCommand) ||
-               absl::StartsWithIgnoreCase(command, smtpHeloCommand)) {
+    } else if (absl::StartsWithIgnoreCase(command, SmtpUtils::smtpEhloCommand) ||
+               absl::StartsWithIgnoreCase(command, SmtpUtils::smtpHeloCommand)) {
       session_.setState(SmtpSession::State::SESSION_INIT_REQUEST);
       break;
-    }
-
-    switch (session_.getTransactionState()) {
-    case SmtpTransaction::State::NONE:
-    case SmtpTransaction::State::TRANSACTION_COMPLETED: {
-
-      if (absl::StartsWithIgnoreCase(command, smtpMailCommand)) {
-        session_.SetTransactionState(SmtpTransaction::State::TRANSACTION_REQUEST);
-      }
+    } else if (absl::StartsWithIgnoreCase(command, SmtpUtils::smtpAuthCommand)) {
+      session_.setState(SmtpSession::State::SESSION_AUTH_REQUEST);
       break;
     }
-    case SmtpTransaction::State::MAIL_DATA_TRANSFER_REQUEST:
-    case SmtpTransaction::State::TRANSACTION_IN_PROGRESS: {
 
-      if (absl::StartsWithIgnoreCase(command, smtpDataCommand)) {
-        session_.SetTransactionState(SmtpTransaction::State::MAIL_DATA_TRANSFER_REQUEST);
-      } else if (absl::StartsWithIgnoreCase(command, smtpRsetCommand) ||
-                 absl::StartsWithIgnoreCase(command, smtpEhloCommand) ||
-                 absl::StartsWithIgnoreCase(command, smtpHeloCommand)) {
-        session_.SetTransactionState(SmtpTransaction::State::TRANSACTION_ABORT_REQUEST);
-      }
-      break;
-    }
-    default:
-      break;
-    }
+    decodeSmtpTransactionCommands(command);
+   
     break;
   } // End case SESSION_IN_PROGRESS
+
+  case SmtpSession::State::SESSION_TERMINATED: {
+    result = Decoder::Result::Stopped;
+    break;
+  }
   default:
     break;
   }
-  return Decoder::Result::ReadyForNext;
+  return result;
 }
 
-/*
-  Response from upstream server is processed as per Command-Reply Sequence given in
-  rfc https://www.rfc-editor.org/rfc/rfc5321 section: 4.3.2.
-  We set Session and transaction states based on response received.
-*/
 Decoder::Result DecoderImpl::parseResponse(Buffer::Instance& data) {
   ENVOY_LOG(debug, "smtp_proxy: decoding response {} bytes", data.length());
 
@@ -118,6 +126,8 @@ Decoder::Result DecoderImpl::parseResponse(Buffer::Instance& data) {
   response.assign(std::string(static_cast<char*>(data.linearize(3)), 3));
 
   uint16_t response_code = stoi(response);
+  std::cout << "response code 3 bytes: " << response_code << "\n";
+
   switch (session_.getState()) {
 
   case SmtpSession::State::CONNECTION_REQUEST: {
@@ -142,32 +152,41 @@ Decoder::Result DecoderImpl::parseResponse(Buffer::Instance& data) {
     break;
   }
 
-  case SmtpSession::State::SESSION_IN_PROGRESS: {
+  case SmtpSession::State::SESSION_AUTH_REQUEST: {
+    if (response_code == 334)
+      break;
+    if (response_code >= 400 && response_code <= 599) {
+      callbacks_->incSmtpAuthErrors();
+    }
+    session_.setState(SmtpSession::State::SESSION_IN_PROGRESS);
+    break;
+  }
 
-    switch (session_.getTransactionState()) {
-    case SmtpTransaction::State::TRANSACTION_REQUEST: {
-      if (response_code == 250) {
-        session_.SetTransactionState(SmtpTransaction::State::TRANSACTION_IN_PROGRESS);
+  case SmtpSession::State::DOWNSTREAM_TLS_NEGOTIATION: {
+    break;
+  }
+
+  case SmtpSession::State::UPSTREAM_TLS_NEGOTIATION: {
+    if (response_code == 220) {
+      if (callbacks_->upstreamStartTls()) {
+        std::cout << "Upstream encrypted success\n";
+        // Upstream TLS connection established.Now encrypt downstream connection.
+        handleDownstreamTls();
+        result = Decoder::Result::Stopped;
+        break;
       }
-      break;
     }
-    case SmtpTransaction::State::MAIL_DATA_TRANSFER_REQUEST: {
-      if (response_code == 250) {
-        callbacks_->incSmtpTransactions();
-        session_.SetTransactionState(SmtpTransaction::State::TRANSACTION_COMPLETED);
-      }
-      break;
-    }
-    case SmtpTransaction::State::TRANSACTION_ABORT_REQUEST: {
-      if (response_code == 250) {
-        callbacks_->incSmtpTransactionsAborted();
-        session_.SetTransactionState(SmtpTransaction::State::NONE);
-      }
-      break;
-    }
-    default:
-      break;
-    }
+    std::cout << "Upsteam encryption failed\n";
+    // If upstream server does not support TLS i.e. response code != 220
+    callbacks_->incUpstreamTlsFailed();
+    session_.setState(SmtpSession::State::SESSION_TERMINATED);
+    callbacks_->sendReplyDownstream(SmtpUtils::tlsNotSupportedResponse);
+    callbacks_->closeDownstreamConnection();
+    result = Decoder::Result::Stopped;
+    break;
+  }
+  case SmtpSession::State::SESSION_IN_PROGRESS: {
+    decodeSmtpTransactionResponse(response_code);
     break;
   }
   case SmtpSession::State::SESSION_TERMINATION_REQUEST: {
@@ -176,7 +195,7 @@ Decoder::Result DecoderImpl::parseResponse(Buffer::Instance& data) {
       callbacks_->incSmtpSessionsCompleted();
       if (session_.getTransactionState() == SmtpTransaction::State::TRANSACTION_IN_PROGRESS ||
           session_.getTransactionState() == SmtpTransaction::State::MAIL_DATA_TRANSFER_REQUEST) {
-        // Increment stats for icomplete transactions when session is abruptly terminated.
+        // Increment stats for incomplete transactions when session is abruptly terminated.
         callbacks_->incSmtpTransactionsAborted();
       }
     }
@@ -185,12 +204,95 @@ Decoder::Result DecoderImpl::parseResponse(Buffer::Instance& data) {
   default:
     result = Decoder::Result::ReadyForNext;
   }
-  if (response_code >= 400 && response_code <= 499) {
-    callbacks_->incSmtp4xxErrors();
-  } else if (response_code >= 500 && response_code <= 599) {
-    callbacks_->incSmtp5xxErrors();
-  }
   return result;
+}
+
+
+void DecoderImpl::decodeSmtpTransactionCommands(std::string& command) {
+  switch (session_.getTransactionState()) {
+  case SmtpTransaction::State::NONE:
+  case SmtpTransaction::State::TRANSACTION_COMPLETED: {
+
+    if (absl::StartsWithIgnoreCase(command, SmtpUtils::smtpMailCommand)) {
+      session_.SetTransactionState(SmtpTransaction::State::TRANSACTION_REQUEST);
+    }
+    break;
+  }
+  case SmtpTransaction::State::RCPT_COMMAND:
+  case SmtpTransaction::State::MAIL_DATA_TRANSFER_REQUEST:
+  case SmtpTransaction::State::TRANSACTION_IN_PROGRESS: {   
+
+    if(absl::StartsWithIgnoreCase(command, SmtpUtils::smtpRcptCommand)) {
+      session_.SetTransactionState(SmtpTransaction::State::RCPT_COMMAND);
+    } else if (absl::StartsWithIgnoreCase(command, SmtpUtils::smtpDataCommand)) {
+      session_.SetTransactionState(SmtpTransaction::State::MAIL_DATA_TRANSFER_REQUEST);
+    } else if (absl::StartsWithIgnoreCase(command, SmtpUtils::smtpRsetCommand) ||
+               absl::StartsWithIgnoreCase(command, SmtpUtils::smtpEhloCommand) ||
+               absl::StartsWithIgnoreCase(command, SmtpUtils::smtpHeloCommand)) {
+      session_.SetTransactionState(SmtpTransaction::State::TRANSACTION_ABORT_REQUEST);
+    }
+    break;
+  }
+  default:
+    break;
+  }
+}
+
+void DecoderImpl::decodeSmtpTransactionResponse(uint16_t& response_code) {
+  switch (session_.getTransactionState()) {
+  case SmtpTransaction::State::TRANSACTION_REQUEST: {
+    if (response_code == 250) {
+      session_.SetTransactionState(SmtpTransaction::State::TRANSACTION_IN_PROGRESS);
+    }
+    break;
+  }
+  case SmtpTransaction::State::RCPT_COMMAND: {
+    if (response_code == 250 || response_code == 251) {
+      session_.SetTransactionState(SmtpTransaction::State::TRANSACTION_IN_PROGRESS);
+    } else if(response_code >=400 && response_code <= 599) {
+      callbacks_->incMailRcptErrors();
+    }
+    break;
+  }
+  case SmtpTransaction::State::MAIL_DATA_TRANSFER_REQUEST: {
+    if (response_code == 250) {
+      session_.SetTransactionState(SmtpTransaction::State::TRANSACTION_COMPLETED);
+      callbacks_->incSmtpTransactions();
+    } else if(response_code >=400 && response_code <= 599) {
+      callbacks_->incMailDataTransferErrors();
+      callbacks_->incSmtpTransactions();
+      //Reset the transaction state in case of mail data transfer errors.
+      session_.SetTransactionState(SmtpTransaction::State::NONE);
+    }
+    break;
+  }
+  case SmtpTransaction::State::TRANSACTION_ABORT_REQUEST: {
+    if (response_code == 250) {
+      callbacks_->incSmtpTransactionsAborted();
+      session_.SetTransactionState(SmtpTransaction::State::NONE);
+    }
+    break;
+  }
+  default:
+    break;
+  }
+}
+
+
+void DecoderImpl::handleDownstreamTls() {
+  session_.setState(SmtpSession::State::DOWNSTREAM_TLS_NEGOTIATION);
+  if (!callbacks_->downstreamStartTls(SmtpUtils::readyToStartTlsResponse)) {
+    // callback returns false if connection is switched to tls i.e. tls termination is
+    // successful.
+    session_encrypted_ = true;
+    session_.setState(SmtpSession::State::SESSION_IN_PROGRESS);
+  } else {
+    // error while switching transport socket to tls.
+    callbacks_->incTlsTerminationErrors();
+    session_.setState(SmtpSession::State::SESSION_TERMINATED);
+    callbacks_->sendReplyDownstream(SmtpUtils::tlsHandshakeErrorResponse);
+    callbacks_->closeDownstreamConnection();
+  }
 }
 
 } // namespace SmtpProxy
