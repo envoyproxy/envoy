@@ -44,9 +44,10 @@ datadog::tracing::Expected<void> AgentHTTPClient::post(const URL& url, HeadersSe
   ENVOY_LOG(debug, "flushing traces");
 
   auto message = std::make_unique<Http::RequestMessageImpl>();
-  message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
-  message->headers().setReferencePath(url.path);
-  message->headers().setReferenceHost(reference_host_);
+  Http::RequestHeaderMap& headers = message->headers();
+  headers.setReferenceMethod(Http::Headers::get().MethodValues.Post);
+  headers.setReferencePath(url.path);
+  headers.setReferenceHost(reference_host_);
 
   RequestHeaderWriter writer{message->headers()};
   set_headers(writer);
