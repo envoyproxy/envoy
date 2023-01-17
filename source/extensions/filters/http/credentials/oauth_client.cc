@@ -1,0 +1,110 @@
+#include "source/extensions/filters/http/credentials/oauth_client.h"
+
+#include <chrono>
+
+#include "envoy/http/async_client.h"
+#include "envoy/http/message.h"
+#include "envoy/upstream/cluster_manager.h"
+
+#include "source/common/common/empty_string.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/logger.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/credentials/oauth_response.pb.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace Credentials {
+
+namespace {
+constexpr const char* GetAccessTokenBodyFormatString =
+    "grant_type=client_credentials&client_id={0}&client_secret={1}";
+
+} // namespace
+
+void OAuth2ClientImpl::asyncGetAccessToken(const std::string& client_id, const std::string& secret) {
+  const auto encoded_client_id = Http::Utility::PercentEncoding::encode(client_id, ":/=&?");
+  const auto encoded_secret = Http::Utility::PercentEncoding::encode(secret, ":/=&?");
+
+  Http::RequestMessagePtr request = createPostRequest();
+  const std::string body = fmt::format(GetAccessTokenBodyFormatString, encoded_client_id, encoded_secret);
+  request->body().add(body);
+  request->headers().setContentLength(body.length());
+  ENVOY_LOG(debug, "Dispatching OAuth request for access token.");
+  dispatchRequest(std::move(request));
+
+  ASSERT(state_ == OAuthState::Idle);
+  state_ = OAuthState::PendingAccessToken;
+}
+
+void OAuth2ClientImpl::dispatchRequest(Http::RequestMessagePtr&& msg) {
+  const auto thread_local_cluster = cm_.getThreadLocalCluster(uri_.cluster());
+  if (thread_local_cluster != nullptr) {
+    in_flight_request_ = thread_local_cluster->httpAsyncClient().send(
+        std::move(msg), *this,
+        Http::AsyncClient::RequestOptions().setTimeout(
+            std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(uri_, timeout))));
+  } else {
+    parent_->sendUnauthorizedResponse();
+  }
+}
+
+void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
+                                 Http::ResponseMessagePtr&& message) {
+  in_flight_request_ = nullptr;
+
+  ASSERT(state_ == OAuthState::PendingAccessToken);
+  state_ = OAuthState::Idle;
+
+  // Check that the auth cluster returned a happy response.
+  const auto response_code = message->headers().Status()->value().getStringView();
+  if (response_code != "200") {
+    ENVOY_LOG(debug, "Oauth response code: {}", response_code);
+    ENVOY_LOG(debug, "Oauth response body: {}", message->bodyAsString());
+    parent_->sendUnauthorizedResponse();
+    return;
+  }
+
+  const std::string response_body = message->bodyAsString();
+
+  envoy::extensions::http_filters::credentials::OAuthResponse response;
+  try {
+    MessageUtil::loadFromJson(response_body, response, ProtobufMessage::getNullValidationVisitor());
+  } catch (EnvoyException& e) {
+    ENVOY_LOG(debug, "Error parsing response body, received exception: {}", e.what());
+    ENVOY_LOG(debug, "Response body: {}", response_body);
+    parent_->sendUnauthorizedResponse();
+    return;
+  }
+
+  // TODO(snowp): Should this be a pgv validation instead? A more readable log
+  // message might be good enough reason to do this manually?
+  if (!response.has_access_token() || !response.has_expires_in()) {
+    ENVOY_LOG(debug, "No access token or expiration after asyncGetAccessToken");
+    parent_->sendUnauthorizedResponse();
+    return;
+  }
+
+  const std::string access_token{PROTOBUF_GET_WRAPPED_REQUIRED(response, access_token)};
+  const std::string refresh_token{
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(response, refresh_token, EMPTY_STRING)};
+  const std::chrono::seconds expires_in{PROTOBUF_GET_WRAPPED_REQUIRED(response, expires_in)};
+
+  parent_->onGetAccessTokenSuccess(access_token, refresh_token, expires_in);
+}
+
+void OAuth2ClientImpl::onFailure(const Http::AsyncClient::Request&,
+                                 Http::AsyncClient::FailureReason) {
+  ENVOY_LOG(debug, "OAuth request failed.");
+  in_flight_request_ = nullptr;
+  parent_->sendUnauthorizedResponse();
+}
+
+} // namespace Credentials
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

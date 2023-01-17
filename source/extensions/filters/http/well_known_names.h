@@ -26,6 +26,8 @@ public:
   const std::string Cors = "envoy.filters.http.cors";
   // Composite filter
   const std::string Composite = "envoy.filters.http.composite";
+  // Credentials Injector filter
+  const std::string Credentials = "envoy.filters.http.credentials";
   // CSRF filter
   const std::string Csrf = "envoy.filters.http.csrf";
   // Decompressor filter

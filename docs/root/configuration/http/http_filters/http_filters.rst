@@ -17,6 +17,7 @@ HTTP filters
   compressor_filter
   composite_filter
   cors_filter
+  credentials_filter
   csrf_filter
   decompressor_filter
   dynamic_forward_proxy_filter
