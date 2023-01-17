@@ -382,7 +382,7 @@ build:windows --define wasm=disabled
 build:windows --define manual_stamp=manual_stamp
 build:windows --cxxopt="/std:c++17"
 build:windows --output_groups=+pdb_file
-build:windows --dynamic_mode=false
+build:windows --dynamic_mode=off
 
 # TODO(wrowe,sunjayBhatia): Resolve bugs upstream in curl and rules_foreign_cc
 # See issue https://github.com/bazelbuild/rules_foreign_cc/issues/301
