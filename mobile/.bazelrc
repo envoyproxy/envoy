@@ -17,7 +17,6 @@ build --features=swift.debug_prefix_map
 build --host_force_python=PY3
 build --macos_minimum_os=10.14
 build --ios_minimum_os=12.0
-build --ios_simulator_device="iPhone 13"
 build --ios_simulator_version=16.1
 build --verbose_failures
 build --workspace_status_command=../bazel/get_workspace_status

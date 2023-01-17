@@ -2423,7 +2423,7 @@ TEST_F(ClusterManagerImplTest, CloseTcpConnectionsOnHealthFailure) {
     outlier_detector.runCallbacks(test_host);
     health_checker.runCallbacks(test_host, HealthTransition::Unchanged);
 
-    EXPECT_CALL(*connection1, close(Network::ConnectionCloseType::NoFlush, _));
+    EXPECT_CALL(*connection1, close(Network::ConnectionCloseType::NoFlush));
     test_host->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
     outlier_detector.runCallbacks(test_host);
 
@@ -2438,8 +2438,8 @@ TEST_F(ClusterManagerImplTest, CloseTcpConnectionsOnHealthFailure) {
   }
 
   // Order of these calls is implementation dependent, so can't sequence them!
-  EXPECT_CALL(*connection1, close(Network::ConnectionCloseType::NoFlush, _));
-  EXPECT_CALL(*connection2, close(Network::ConnectionCloseType::NoFlush, _));
+  EXPECT_CALL(*connection1, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connection2, close(Network::ConnectionCloseType::NoFlush));
   test_host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   health_checker.runCallbacks(test_host, HealthTransition::Changed);
 
