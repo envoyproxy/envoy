@@ -68,7 +68,7 @@ jobs:
         cd mobile && ./bazelw test \
             --test_output=all \
             --build_tests_only \
-            --config android-test \
+            --config test-android \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             --define=signal_trace=disabled \
@@ -110,7 +110,7 @@ jobs:
         cd mobile && ./bazelw test \
             --test_output=all \
             --build_tests_only \
-            --config android-test \
+            --config test-android \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux-clang") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //test/kotlin/...

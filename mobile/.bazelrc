@@ -70,7 +70,8 @@ build:dbg-ios --config=ios
 
 # Default flags for Android tests
 # TODO(jpsim): Explicitly register test extensions for Android tests
-build:android-test --define=static_extension_registration=enabled
+# https://github.com/envoyproxy/envoy/issues/24977
+build:test-android --define=static_extension_registration=enabled
 
 # Locally-runnable ASAN config for MacOS & Linux with standard dev environment
 # See also:
