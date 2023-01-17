@@ -29,7 +29,7 @@ namespace {
 #endif
 
 void setAlternateGetifaddrs() {
-#if defined(__ANDROID_API__)
+#if defined(__ANDROID_API__) && __ANDROID_API__ < 24
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
   ENVOY_BUG(!os_syscalls.supportsGetifaddrs(),
             "setAlternateGetifaddrs should only be called when supportsGetifaddrs is false");
