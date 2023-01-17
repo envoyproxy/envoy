@@ -174,7 +174,7 @@ private:
       bool is_valid_response = parent_.isValidResponse(*headers);
       parent_.config_.propagateResponseHeaders(std::move(headers),
                                                parent_.downstream_info_.filterState());
-      if (!isValidResponse || end_stream) {
+      if (!is_valid_response || end_stream) {
         parent_.resetEncoder(Network::ConnectionEvent::LocalClose);
       } else if (parent_.conn_pool_callbacks_ != nullptr) {
         parent_.conn_pool_callbacks_->onSuccess(*parent_.request_encoder_);
