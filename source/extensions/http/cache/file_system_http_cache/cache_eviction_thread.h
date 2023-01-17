@@ -65,11 +65,13 @@ private:
   bool waitForSignal();
   void terminate();
 
-  absl::Mutex mu_;
+  // These two mutexes are never held at the same time. We signify this by requiring
+  // that both be 'acquired before' the other, since there is no exclusion annotation.
+  absl::Mutex mu_ ABSL_ACQUIRED_BEFORE(cache_mu_);
   bool signalled_ ABSL_GUARDED_BY(mu_) = false;
   bool terminating_ ABSL_GUARDED_BY(mu_) = false;
 
-  absl::Mutex cache_mu_;
+  absl::Mutex cache_mu_ ABSL_ACQUIRED_BEFORE(mu_);
   // We must store the caches as unowned references so they can be destroyed
   // during config changes - that destruction is the only signal that a cache
   // instance should be removed.
