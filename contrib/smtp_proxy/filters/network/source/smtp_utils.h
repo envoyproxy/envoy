@@ -1,34 +1,31 @@
 #pragma once
 
-#include "envoy/buffer/buffer.h"
-#include "envoy/common/platform.h"
-
-#include "source/common/buffer/buffer_impl.h"
-#include "source/common/common/byte_order.h"
-#include "source/common/common/logger.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace SmtpProxy {
 
-enum DecodeStatus : uint8_t {
-  Success = 0,
-  Failure = 1,
-};
-
-/**
- * IO helpers for reading/writing SMTP data from/to a buffer.
- */
-class BufferHelper : public Logger::Loggable<Logger::Id::filter> {
+class SmtpUtils {
 public:
-  static bool endOfBuffer(Buffer::Instance& buffer);
-  static DecodeStatus skipBytes(Buffer::Instance& buffer, size_t skip_bytes);
-  static DecodeStatus readUint8(Buffer::Instance& buffer, uint8_t& val);
-  static DecodeStatus readUint16(Buffer::Instance& buffer, uint16_t& val);
-  static DecodeStatus readUint24(Buffer::Instance& buffer, uint32_t& val);
-  static DecodeStatus readUint32(Buffer::Instance& buffer, uint32_t& val);
-  static DecodeStatus readStringBySize(Buffer::Instance& buffer, size_t len, std::string& str);
+  inline static const char* smtpHeloCommand = "HELO";
+  inline static const char* smtpEhloCommand = "EHLO";
+  inline static const char* smtpAuthCommand = "AUTH";
+  inline static const char* smtpMailCommand = "MAIL";
+  inline static const char* smtpRcptCommand = "RCPT";
+  inline static const char* smtpDataCommand = "DATA";
+  inline static const char* smtpQuitCommand = "QUIT";
+  inline static const char* smtpRsetCommand = "RSET";
+  inline static const char* startTlsCommand = "STARTTLS";
+  inline static const char* syntaxErrorNoParamsAllowed =
+      "501 Syntax error (no parameters allowed)\r\n";
+  inline static const char* outOfOrderCommandResponse = "503 Bad sequence of commands\r\n";
+  inline static const char* readyToStartTlsResponse = "220 Ready to start TLS\r\n";
+  inline static const char* tlsHandshakeErrorResponse =
+      "550 TLS Handshake Error\r\n";
+  inline static const char* tlsNotSupportedResponse =
+      "502 TLS not supported\r\n";
+  inline static const char* mailboxUnavailableResponse =
+      "450  Requested mail action not taken: mailbox unavailable\r\n";
 };
 
 } // namespace SmtpProxy

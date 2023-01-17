@@ -18,7 +18,20 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.network.smtp_proxy]
 
 message SmtpProxy {
+    // Upstream TLS operational modes.
+  enum UpstreamTLSMode {
+    // Do not encrypt upstream connection to the server.
+    DISABLE = 0;
+
+    // Establish upstream TLS connection to the server. If the server does not
+    // accept the request for TLS connection, the session is terminated.
+    REQUIRE = 1;
+  }
     // The human readable prefix to use when emitting :ref:`statistics
     // <config_network_filters_smtp_proxy_stats>`.
     string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
+
+    // Controls whether to establish upstream TLS connection to the server.
+    // Defaults to DISABLE.
+    UpstreamTLSMode upstream_tls = 2;
 }

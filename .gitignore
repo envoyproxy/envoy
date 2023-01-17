@@ -53,3 +53,5 @@ bazel.output.txt
 **/.DS_Store
 **/*.iml
 tools/dev/src
+smtp-proxy-test/
+contrib/smtp_proxy/filters/network/source/smtp_transaction.cc
