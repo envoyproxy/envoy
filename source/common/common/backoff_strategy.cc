@@ -14,12 +14,8 @@ uint64_t JitteredExponentialBackOffStrategy::nextBackOffMs() {
   const uint64_t backoff = next_interval_;
   ASSERT(backoff > 0);
   // Set next_interval_ to max_interval_ if doubling the interval would exceed the max or overflow.
-  if (next_interval_ < max_interval_ / 2) {
-    next_interval_ *= 2;
-  } else {
-    next_interval_ = max_interval_;
-  }
-  return std::min(random_.random() % backoff, max_interval_);
+  next_interval_ = (next_interval_ < doubling_limit_) ? (next_interval_ * 2u) : max_interval_;
+  return (random_.random() % backoff);
 }
 
 void JitteredExponentialBackOffStrategy::reset() { next_interval_ = base_interval_; }

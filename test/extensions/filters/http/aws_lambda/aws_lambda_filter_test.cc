@@ -55,7 +55,7 @@ public:
   envoy::config::core::v3::Metadata metadata_;
   Arn arn_;
   Stats::IsolatedStoreImpl stats_store_;
-  FilterStats stats_ = generateStats("test", stats_store_);
+  FilterStats stats_ = generateStats("test", *stats_store_.rootScope());
   const std::string metadata_yaml_ = "egress_gateway: true";
 };
 
@@ -158,11 +158,11 @@ TEST_F(AwsLambdaFilterTest, DecodeDataRecordsPayloadSize) {
   FilterSettings settings{arn_, InvocationMode::Synchronous, true /*passthrough*/};
   NiceMock<Stats::MockStore> store;
   NiceMock<Stats::MockHistogram> histogram;
-  EXPECT_CALL(store, histogramFromString(_, _)).WillOnce(ReturnRef(histogram));
+  EXPECT_CALL(store, histogram(_, _)).WillOnce(ReturnRef(histogram));
 
   setupClusterMetadata();
 
-  FilterStats stats(generateStats("test", store));
+  FilterStats stats(generateStats("test", *store.rootScope()));
   signer_ = std::make_shared<NiceMock<MockSigner>>();
   filter_ = std::make_unique<Filter>(settings, stats, signer_);
   filter_->setDecoderFilterCallbacks(decoder_callbacks_);

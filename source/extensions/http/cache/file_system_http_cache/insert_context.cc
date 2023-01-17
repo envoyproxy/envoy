@@ -241,33 +241,50 @@ void InsertOperationQueue::commit(std::shared_ptr<InsertOperationQueue> p,
           return;
         }
         // Unlink any existing cache entry with this filename.
-        cancel_action_in_flight_ = cache_->asyncFileManager()->unlink(
+        cancel_action_in_flight_ = cache_->asyncFileManager()->stat(
             absl::StrCat(cache_->cachePath(), cache_->generateFilename(key_)),
-            [this, p](absl::Status) {
-              // We can ignore the result of unlink - the file may or may not have previously
-              // existed.
+            [this, p](absl::StatusOr<struct stat> stat_result) {
               absl::MutexLock lock(&mu_);
               cancel_action_in_flight_ = nullptr;
-              // Link the file to its filename.
-              auto queued = file_handle_->createHardLink(
+              size_t file_size = 0;
+              if (stat_result.ok()) {
+                file_size = stat_result.value().st_size;
+              }
+              cancel_action_in_flight_ = cache_->asyncFileManager()->unlink(
                   absl::StrCat(cache_->cachePath(), cache_->generateFilename(key_)),
-                  [this, p](absl::Status link_result) {
+                  [this, file_size, p](absl::Status unlink_result) {
+                    if (unlink_result.ok()) {
+                      cache_->trackFileRemoved(file_size);
+                    }
+                    // We can ignore failure of unlink - the file may or may not have previously
+                    // existed.
                     absl::MutexLock lock(&mu_);
                     cancel_action_in_flight_ = nullptr;
-                    if (!link_result.ok()) {
-                      cancelInsert(p, absl::StrCat("failed to link file (", link_result.ToString(),
-                                                   "): ", cache_->cachePath(),
-                                                   cache_->generateFilename(key_)));
-                      return;
-                    }
-                    ENVOY_LOG(debug, "created cache file {}", cache_->generateFilename(key_));
-                    callback_in_flight_(true);
-                    callback_in_flight_ = nullptr;
-                    // By clearing cleanup before destructor, we prevent logging an error.
-                    cleanup_ = nullptr;
+                    // Link the file to its filename.
+                    auto queued = file_handle_->createHardLink(
+                        absl::StrCat(cache_->cachePath(), cache_->generateFilename(key_)),
+                        [this, p](absl::Status link_result) {
+                          absl::MutexLock lock(&mu_);
+                          cancel_action_in_flight_ = nullptr;
+                          if (!link_result.ok()) {
+                            cancelInsert(p, absl::StrCat("failed to link file (",
+                                                         link_result.ToString(),
+                                                         "): ", cache_->cachePath(),
+                                                         cache_->generateFilename(key_)));
+                            return;
+                          }
+                          ENVOY_LOG(debug, "created cache file {}", cache_->generateFilename(key_));
+                          callback_in_flight_(true);
+                          callback_in_flight_ = nullptr;
+                          uint64_t file_size =
+                              header_block_.offsetToTrailers() + header_block_.trailerSize();
+                          cache_->trackFileAdded(file_size);
+                          // By clearing cleanup before destructor, we prevent logging an error.
+                          cleanup_ = nullptr;
+                        });
+                    ASSERT(queued.ok(), queued.status().ToString());
+                    cancel_action_in_flight_ = queued.value();
                   });
-              ASSERT(queued.ok(), queued.status().ToString());
-              cancel_action_in_flight_ = queued.value();
             });
       });
   ASSERT(queued.ok(), queued.status().ToString());

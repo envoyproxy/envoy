@@ -54,6 +54,45 @@ getHttp3Options(const envoy::extensions::upstreams::http::v3::HttpProtocolOption
   return options.explicit_http_config().http3_protocol_options();
 }
 
+bool useHttp2(const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options) {
+  if (options.has_explicit_http_config() &&
+      options.explicit_http_config().has_http2_protocol_options()) {
+    return true;
+  } else if (options.has_use_downstream_protocol_config() &&
+             options.use_downstream_protocol_config().has_http2_protocol_options()) {
+    return true;
+  } else if (options.has_auto_config()) {
+    return true;
+  }
+  return false;
+}
+
+bool useHttp3(const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options) {
+  if (options.has_explicit_http_config() &&
+      options.explicit_http_config().has_http3_protocol_options()) {
+    return true;
+  } else if (options.has_use_downstream_protocol_config() &&
+             options.use_downstream_protocol_config().has_http3_protocol_options()) {
+    return true;
+  } else if (options.has_auto_config() && options.auto_config().has_http3_protocol_options()) {
+    return true;
+  }
+  return false;
+}
+
+absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>
+getAlternateProtocolsCacheOptions(
+    const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options) {
+  if (options.has_auto_config() && options.auto_config().has_http3_protocol_options()) {
+    if (!options.auto_config().has_alternate_protocols_cache_options()) {
+      throw EnvoyException(fmt::format("alternate protocols cache must be configured when HTTP/3 "
+                                       "is enabled with auto_config"));
+    }
+    return options.auto_config().alternate_protocols_cache_options();
+  }
+  return absl::nullopt;
+}
+
 } // namespace
 
 uint64_t ProtocolOptionsConfigImpl::parseFeatures(const envoy::config::cluster::v3::Cluster& config,
@@ -90,37 +129,12 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
           options.has_upstream_http_protocol_options()
               ? absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>(
                     options.upstream_http_protocol_options())
-              : absl::nullopt) {
-  if (options.has_explicit_http_config()) {
-    if (options.explicit_http_config().has_http3_protocol_options()) {
-      use_http3_ = true;
-    } else if (options.explicit_http_config().has_http2_protocol_options()) {
-      use_http2_ = true;
-    }
-  }
-  if (options.has_use_downstream_protocol_config()) {
-    if (options.use_downstream_protocol_config().has_http3_protocol_options()) {
-      use_http3_ = true;
-    }
-    if (options.use_downstream_protocol_config().has_http2_protocol_options()) {
-      use_http2_ = true;
-    }
-    use_downstream_protocol_ = true;
-  }
-  http_filters_ = options.http_filters();
-  if (options.has_auto_config()) {
-    use_http2_ = true;
-    use_alpn_ = true;
-    use_http3_ = options.auto_config().has_http3_protocol_options();
-    if (use_http3_) {
-      if (!options.auto_config().has_alternate_protocols_cache_options()) {
-        throw EnvoyException(fmt::format("alternate protocols cache must be configured when HTTP/3 "
-                                         "is enabled with auto_config"));
-      }
-      alternate_protocol_cache_options_ = options.auto_config().alternate_protocols_cache_options();
-    }
-  }
-}
+              : absl::nullopt),
+      http_filters_(options.http_filters()),
+      alternate_protocol_cache_options_(getAlternateProtocolsCacheOptions(options)),
+      use_downstream_protocol_(options.has_use_downstream_protocol_config()),
+      use_http2_(useHttp2(options)), use_http3_(useHttp3(options)),
+      use_alpn_(options.has_auto_config()) {}
 
 ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
     const envoy::config::core::v3::Http1ProtocolOptions& http1_settings,
@@ -135,8 +149,8 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
       upstream_http_protocol_options_(upstream_options),
       use_downstream_protocol_(use_downstream_protocol), use_http2_(use_http2) {}
 
-REGISTER_FACTORY(ProtocolOptionsConfigFactory, Server::Configuration::ProtocolOptionsFactory){
-    "envoy.upstreams.http.http_protocol_options"};
+LEGACY_REGISTER_FACTORY(ProtocolOptionsConfigFactory, Server::Configuration::ProtocolOptionsFactory,
+                        "envoy.upstreams.http.http_protocol_options");
 } // namespace Http
 } // namespace Upstreams
 } // namespace Extensions

@@ -26,11 +26,13 @@ public:
   bool includeTextReadout(const Stats::TextReadout&) override {
     return (++num_text_readouts_) % 10 == 0;
   }
+  bool includeHistogram(const Stats::Histogram&) override { return (++num_histograms_) % 10 == 0; }
 
 private:
   size_t num_counters_ = 0;
   size_t num_gauges_ = 0;
   size_t num_text_readouts_ = 0;
+  size_t num_histograms_ = 0;
 };
 
 class StatsSinkFlushSpeedTest {
@@ -45,18 +47,21 @@ public:
     // Create counters
     for (uint64_t idx = 0; idx < num_stats; ++idx) {
       auto stat_name = pool_.add(absl::StrCat("counter.", idx));
-      stats_store_.counterFromStatName(stat_name).inc();
+      stats_store_.rootScope()->counterFromStatName(stat_name).inc();
     }
     // Create gauges
     for (uint64_t idx = 0; idx < num_stats; ++idx) {
       auto stat_name = pool_.add(absl::StrCat("gauge.", idx));
-      stats_store_.gaugeFromStatName(stat_name, Stats::Gauge::ImportMode::NeverImport).set(idx);
+      stats_store_.rootScope()
+          ->gaugeFromStatName(stat_name, Stats::Gauge::ImportMode::NeverImport)
+          .set(idx);
     }
 
     // Create text readouts
     for (uint64_t idx = 0; idx < num_stats; ++idx) {
       auto stat_name = pool_.add(absl::StrCat("text_readout.", idx));
-      stats_store_.textReadoutFromStatName(stat_name).set(absl::StrCat("text_readout.", idx));
+      stats_store_.rootScope()->textReadoutFromStatName(stat_name).set(
+          absl::StrCat("text_readout.", idx));
     }
 
     // Create histograms

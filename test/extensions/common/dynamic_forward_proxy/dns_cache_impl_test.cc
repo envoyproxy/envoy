@@ -59,13 +59,13 @@ public:
 
   ~DnsCacheImplTest() override {
     dns_cache_.reset();
-    EXPECT_EQ(0, TestUtility::findGauge(context_.scope_, "dns_cache.foo.num_hosts")->value());
+    EXPECT_EQ(0, TestUtility::findGauge(context_.store_, "dns_cache.foo.num_hosts")->value());
   }
 
   void checkStats(uint64_t query_attempt, uint64_t query_success, uint64_t query_failure,
                   uint64_t address_changed, uint64_t added, uint64_t removed, uint64_t num_hosts) {
     const auto counter_value = [this](const std::string& name) {
-      return TestUtility::findCounter(context_.scope_, "dns_cache.foo." + name)->value();
+      return TestUtility::findCounter(context_.store_, "dns_cache.foo." + name)->value();
     };
 
     EXPECT_EQ(query_attempt, counter_value("dns_query_attempt"));
@@ -75,7 +75,7 @@ public:
     EXPECT_EQ(added, counter_value("host_added"));
     EXPECT_EQ(removed, counter_value("host_removed"));
     EXPECT_EQ(num_hosts,
-              TestUtility::findGauge(context_.scope_, "dns_cache.foo.num_hosts")->value());
+              TestUtility::findGauge(context_.store_, "dns_cache.foo.num_hosts")->value());
   }
 
   NiceMock<Server::Configuration::MockFactoryContext> context_;
@@ -625,7 +625,7 @@ TEST_F(DnsCacheImplTest, ResolveTimeout) {
   checkStats(1 /* attempt */, 0 /* success */, 1 /* failure */, 0 /* address changed */,
              1 /* added */, 0 /* removed */, 1 /* num hosts */);
   EXPECT_EQ(1,
-            TestUtility::findCounter(context_.scope_, "dns_cache.foo.dns_query_timeout")->value());
+            TestUtility::findCounter(context_.store_, "dns_cache.foo.dns_query_timeout")->value());
 }
 
 // Resolve failure that returns no addresses.
@@ -980,7 +980,7 @@ TEST_F(DnsCacheImplTest, MaxHostOverflow) {
   EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Overflow, result.status_);
   EXPECT_EQ(result.handle_, nullptr);
   EXPECT_EQ(absl::nullopt, result.host_info_);
-  EXPECT_EQ(1, TestUtility::findCounter(context_.scope_, "dns_cache.foo.host_overflow")->value());
+  EXPECT_EQ(1, TestUtility::findCounter(context_.store_, "dns_cache.foo.host_overflow")->value());
 }
 
 TEST_F(DnsCacheImplTest, CircuitBreakersNotInvoked) {
@@ -998,7 +998,7 @@ TEST_F(DnsCacheImplTest, DnsCacheCircuitBreakersOverflow) {
   EXPECT_EQ(raii_ptr.get(), nullptr);
   EXPECT_EQ(
       1,
-      TestUtility::findCounter(context_.scope_, "dns_cache.foo.dns_rq_pending_overflow")->value());
+      TestUtility::findCounter(context_.store_, "dns_cache.foo.dns_rq_pending_overflow")->value());
 }
 
 TEST_F(DnsCacheImplTest, UseTcpForDnsLookupsOptionSetDeprecatedField) {
@@ -1441,7 +1441,7 @@ TEST_F(DnsCacheImplTest, CacheLoad) {
 
   initialize();
   ASSERT(store != nullptr);
-  EXPECT_EQ(2, TestUtility::findCounter(context_.scope_, "dns_cache.foo.cache_load")->value());
+  EXPECT_EQ(2, TestUtility::findCounter(context_.store_, "dns_cache.foo.cache_load")->value());
 
   {
     MockLoadDnsCacheEntryCallbacks callbacks;

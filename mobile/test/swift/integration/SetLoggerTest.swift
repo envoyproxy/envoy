@@ -91,7 +91,7 @@ static_resources:
       .start()
       .sendHeaders(requestHeaders, endStream: true)
 
-    XCTAssertEqual(XCTWaiter.wait(for: [logEventExpectation], timeout: 1), .completed)
+    XCTAssertEqual(XCTWaiter.wait(for: [logEventExpectation], timeout: 10), .completed)
 
     engine.terminate()
   }

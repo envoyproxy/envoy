@@ -19,9 +19,10 @@ HttpConnectionManagerImplTest::HttpConnectionManagerImplTest()
           Filesystem::FilePathAndType{Filesystem::DestinationType::File, access_log_path_}, {},
           Formatter::SubstitutionFormatUtils::defaultSubstitutionFormatter(), log_manager_)}},
       codec_(new NiceMock<MockServerConnection>()),
-      stats_({ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(fake_stats_), POOL_GAUGE(fake_stats_),
-                                      POOL_HISTOGRAM(fake_stats_))},
-             "", fake_stats_),
+      stats_({ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(*fake_stats_.rootScope()),
+                                      POOL_GAUGE(*fake_stats_.rootScope()),
+                                      POOL_HISTOGRAM(*fake_stats_.rootScope()))},
+             "", *fake_stats_.rootScope()),
 
       listener_stats_({CONN_MAN_LISTENER_STATS(POOL_COUNTER(fake_listener_stats_))}),
       request_id_extension_(
@@ -307,6 +308,23 @@ void HttpConnectionManagerImplTest::testPathNormalization(
 
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
+}
+
+void HttpConnectionManagerImplTest::expectUhvTrailerCheckFail() {
+  EXPECT_CALL(header_validator_factory_, create(codec_->protocol_, _))
+      .WillOnce(InvokeWithoutArgs([]() {
+        auto header_validator = std::make_unique<testing::StrictMock<MockHeaderValidator>>();
+        EXPECT_CALL(*header_validator, validateRequestHeaderMap(_))
+            .WillOnce(InvokeWithoutArgs(
+                []() { return HeaderValidator::RequestHeaderMapValidationResult::success(); }));
+
+        EXPECT_CALL(*header_validator, validateRequestTrailerMap(_))
+            .WillOnce(InvokeWithoutArgs([]() {
+              return HeaderValidator::TrailerValidationResult(
+                  HeaderValidator::TrailerValidationResult::Action::Reject, "bad_trailer_map");
+            }));
+        return header_validator;
+      }));
 }
 
 } // namespace Http

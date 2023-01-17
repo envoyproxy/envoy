@@ -63,10 +63,10 @@ public:
           return Upstream::UpstreamLocalAddress({nullptr, socket_options});
         }));
     Network::TransportSocketOptionsConstSharedPtr transport_options;
-    pool_ = allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default,
-                             options, transport_options, state_, quic_stat_names_, {}, store_,
-                             makeOptRef<PoolConnectResultCallback>(connect_result_callback_),
-                             quic_info_);
+    pool_ = allocateConnPool(
+        dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options,
+        transport_options, state_, quic_stat_names_, {}, *store_.rootScope(),
+        makeOptRef<PoolConnectResultCallback>(connect_result_callback_), quic_info_);
     EXPECT_EQ(3000, Http3ConnPoolImplPeer::getServerId(*pool_).port());
   }
 
@@ -115,7 +115,7 @@ TEST_F(Http3ConnPoolImplTest, FastFailWithoutSecretsLoaded) {
   Network::TransportSocketOptionsConstSharedPtr transport_options;
   ConnectionPool::InstancePtr pool =
       allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options,
-                       transport_options, state_, quic_stat_names_, {}, store_,
+                       transport_options, state_, quic_stat_names_, {}, *store_.rootScope(),
                        makeOptRef<PoolConnectResultCallback>(connect_result_callback_), quic_info_);
 
   EXPECT_EQ(static_cast<Http3ConnPoolImpl*>(pool.get())->instantiateActiveClient(), nullptr);
@@ -139,7 +139,7 @@ TEST_F(Http3ConnPoolImplTest, FailWithSecretsBecomeEmpty) {
   Network::TransportSocketOptionsConstSharedPtr transport_options;
   ConnectionPool::InstancePtr pool =
       allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options,
-                       transport_options, state_, quic_stat_names_, {}, store_,
+                       transport_options, state_, quic_stat_names_, {}, *store_.rootScope(),
                        makeOptRef<PoolConnectResultCallback>(connect_result_callback_), quic_info_);
 
   MockResponseDecoder decoder;

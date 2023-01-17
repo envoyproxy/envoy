@@ -29,7 +29,7 @@ const AsyncStreamImpl::NullConfig AsyncStreamImpl::NullVirtualHost::route_config
 const std::multimap<std::string, std::string> AsyncStreamImpl::RouteEntryImpl::opaque_config_;
 const AsyncStreamImpl::NullPathMatchCriterion
     AsyncStreamImpl::RouteEntryImpl::path_match_criterion_;
-const absl::optional<envoy::config::route::v3::RouteAction::UpgradeConfig::ConnectConfig>
+const AsyncStreamImpl::RouteEntryImpl::ConnectConfigOptRef
     AsyncStreamImpl::RouteEntryImpl::connect_config_nullopt_;
 const std::list<LowerCaseString> AsyncStreamImpl::NullConfig::internal_only_headers_;
 
@@ -41,8 +41,8 @@ AsyncClientImpl::AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster,
                                  Router::ShadowWriterPtr&& shadow_writer,
                                  Http::Context& http_context, Router::Context& router_context)
     : cluster_(cluster),
-      config_(http_context.asyncClientStatPrefix(), local_info, stats_store, cm, runtime, random,
-              std::move(shadow_writer), true, false, false, false, false, {},
+      config_(http_context.asyncClientStatPrefix(), local_info, *stats_store.rootScope(), cm,
+              runtime, random, std::move(shadow_writer), true, false, false, false, false, {},
               dispatcher.timeSource(), http_context, router_context),
       dispatcher_(dispatcher), singleton_manager_(cm.clusterManagerFactory().singletonManager()) {}
 
@@ -80,7 +80,7 @@ AsyncClient::Stream* AsyncClientImpl::start(AsyncClient::StreamCallbacks& callba
 AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
                                  const AsyncClient::StreamOptions& options)
     : parent_(parent), stream_callbacks_(callbacks), stream_id_(parent.config_.random_.random()),
-      router_(options.filter_config_ ? options.filter_config_.value().get() : parent.config_,
+      router_(options.filter_config_ ? *options.filter_config_ : parent.config_,
               parent.config_.async_stats_),
       stream_info_(Protocol::Http11, parent.dispatcher().timeSource(), nullptr),
       tracing_config_(Tracing::EgressConfig::get()),

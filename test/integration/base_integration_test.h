@@ -150,6 +150,7 @@ public:
   Event::TestTimeSystem& timeSystem() { return time_system_; }
 
   Stats::IsolatedStoreImpl stats_store_;
+  Stats::Scope& stats_scope_{*stats_store_.rootScope()};
   Api::ApiPtr api_;
   Api::ApiPtr api_for_server_stat_store_;
   MockBufferFactory* mock_buffer_factory_; // Will point to the dispatcher's factory.
@@ -416,10 +417,6 @@ protected:
   void setMaxRequestHeadersCount(uint32_t value) {
     upstream_config_.max_request_headers_count_ = value;
   }
-  void setHeadersWithUnderscoreAction(
-      envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction value) {
-    upstream_config_.headers_with_underscores_action_ = value;
-  }
 
   void setServerBufferFactory(Buffer::WatermarkFactorySharedPtr proxy_buffer_factory) {
     ASSERT(!test_server_, "Proxy buffer factory must be set before test server creation");
@@ -435,7 +432,7 @@ protected:
 
   void checkForMissingTagExtractionRules();
 
-  std::unique_ptr<Stats::Scope> upstream_stats_store_;
+  std::unique_ptr<Stats::Store> upstream_stats_store_;
 
   // Make sure the test server will be torn down after any fake client.
   // The test server owns the runtime, which is often accessed by client and

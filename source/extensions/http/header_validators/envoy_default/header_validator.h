@@ -1,10 +1,14 @@
 #pragma once
 
+#include <functional>
+
 #include "envoy/extensions/http/header_validators/envoy_default/v3/header_validator.pb.h"
 #include "envoy/http/header_validator.h"
 
 #include "source/common/http/headers.h"
 #include "source/extensions/http/header_validators/envoy_default/path_normalizer.h"
+
+#include "absl/container/node_hash_map.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -21,20 +25,18 @@ public:
   HeaderValidator(
       const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig&
           config,
-      ::Envoy::Http::Protocol protocol, StreamInfo::StreamInfo& stream_info);
+      ::Envoy::Http::Protocol protocol, ::Envoy::Http::HeaderValidatorStats& stats);
 
   using HeaderValueValidationResult = RejectResult;
   /*
    * Validate the :method pseudo header, honoring the restrict_http_methods configuration option.
    */
-  virtual HeaderValueValidationResult
-  validateMethodHeader(const ::Envoy::Http::HeaderString& value);
+  HeaderValueValidationResult validateMethodHeader(const ::Envoy::Http::HeaderString& value);
 
   /*
    * Validate the :status response pseudo header based on the range of valid response statuses.
    */
-  virtual HeaderValueValidationResult
-  validateStatusHeader(const ::Envoy::Http::HeaderString& value);
+  HeaderValueValidationResult validateStatusHeader(const ::Envoy::Http::HeaderString& value);
 
   /*
    * Validate any request or response header name.
@@ -45,8 +47,7 @@ public:
   /*
    * Validate any request or response header value.
    */
-  virtual HeaderValueValidationResult
-  validateGenericHeaderValue(const ::Envoy::Http::HeaderString& value);
+  HeaderValueValidationResult validateGenericHeaderValue(const ::Envoy::Http::HeaderString& value);
 
   /*
    * Validate the Content-Length request and response header as a whole number integer. The RFC
@@ -55,26 +56,24 @@ public:
    * rejected. We can add an option to allow multiple Content-Length values in the future if
    * needed.
    */
-  virtual HeaderValueValidationResult
-  validateContentLengthHeader(const ::Envoy::Http::HeaderString& value);
+  HeaderValueValidationResult validateContentLengthHeader(const ::Envoy::Http::HeaderString& value);
 
   /*
    * Validate the :scheme pseudo header.
    */
-  virtual HeaderValueValidationResult
-  validateSchemeHeader(const ::Envoy::Http::HeaderString& value);
+  HeaderValueValidationResult validateSchemeHeader(const ::Envoy::Http::HeaderString& value);
 
   /*
    * Validate the Host header or :authority pseudo header. This method does not allow the
    * userinfo component (user:pass@host).
    */
-  virtual HeaderValueValidationResult validateHostHeader(const ::Envoy::Http::HeaderString& value);
+  HeaderValueValidationResult validateHostHeader(const ::Envoy::Http::HeaderString& value);
 
   /*
    * Validate the :path pseudo header. This method only validates that the :path header only
    * contains valid characters and does not validate the syntax or form of the path URI.
    */
-  virtual HeaderValueValidationResult
+  HeaderValueValidationResult
   validatePathHeaderCharacters(const ::Envoy::Http::HeaderString& value);
 
   /*
@@ -131,11 +130,32 @@ protected:
    */
   HostHeaderValidationResult validateHostHeaderRegName(absl::string_view host);
 
+  /*
+   * Validate a header value. The `protocol_specific_header_validators` map contains validation
+   * function for protocol specific header keys. If the header key is not found in the
+   * `protocol_specific_header_validators` the header key is checked by calling the
+   * `validateGenericHeaderName` method (Note that `validateGenericHeaderName` is virtual and has
+   * different behavior for H/1 and H/2, H/3 validators) and the header value is checked by calling
+   * the `validateGenericHeaderValue` method.
+   */
+  using HeaderValidatorFunction = std::function<HeaderValidator::HeaderValueValidationResult(
+      const ::Envoy::Http::HeaderString&)>;
+  using HeaderValidatorMap = absl::node_hash_map<absl::string_view, HeaderValidatorFunction>;
+  ::Envoy::Http::HeaderValidator::HeaderEntryValidationResult
+  validateGenericRequestHeaderEntry(const ::Envoy::Http::HeaderString& key,
+                                    const ::Envoy::Http::HeaderString& value,
+                                    const HeaderValidatorMap& protocol_specific_header_validators);
+
+  /*
+   * Common method for validating request or response trailers.
+   */
+  TrailerValidationResult validateTrailers(::Envoy::Http::HeaderMap& trailers);
+
   const envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       config_;
   ::Envoy::Http::Protocol protocol_;
-  StreamInfo::StreamInfo& stream_info_;
   const ::Envoy::Http::HeaderValues& header_values_;
+  ::Envoy::Http::HeaderValidatorStats& stats_;
   const PathNormalizer path_normalizer_;
 };
 

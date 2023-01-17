@@ -468,6 +468,21 @@ SharedPreferences.
   // Coming soon.
 
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+``forceIPv6``
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Specify whether to remap IPv4 addresses to the IPv6 space and always force connections
+to use IPv6. Note this is an experimental option and should be enabled with caution.
+
+**Example**::
+
+  // Kotlin
+  // No API: always enabled
+  // Swift
+  builder.forceIPv6(true)
+
+
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ``enablePlatformCertificatesValidation``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

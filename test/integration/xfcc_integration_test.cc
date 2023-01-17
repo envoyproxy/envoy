@@ -99,7 +99,7 @@ common_tls_context:
   static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
   return Network::UpstreamTransportSocketFactoryPtr{
       new Extensions::TransportSockets::Tls::ClientSslSocketFactory(
-          std::move(cfg), *context_manager_, *client_stats_store)};
+          std::move(cfg), *context_manager_, *client_stats_store->rootScope())};
 }
 
 Network::DownstreamTransportSocketFactoryPtr XfccIntegrationTest::createUpstreamSslContext() {
@@ -113,9 +113,10 @@ Network::DownstreamTransportSocketFactoryPtr XfccIntegrationTest::createUpstream
 
   auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
       tls_context, factory_context_);
-  static Stats::Scope* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
+  static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
   return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
-      std::move(cfg), *context_manager_, *upstream_stats_store, std::vector<std::string>{});
+      std::move(cfg), *context_manager_, *(upstream_stats_store->rootScope()),
+      std::vector<std::string>{});
 }
 
 Network::ClientConnectionPtr XfccIntegrationTest::makeTcpClientConnection() {

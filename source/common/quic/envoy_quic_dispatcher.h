@@ -4,7 +4,7 @@
 
 #include "envoy/network/listener.h"
 
-#include "source/common/quic/envoy_quic_crypto_stream_factory.h"
+#include "source/common/quic/envoy_quic_server_crypto_stream_factory.h"
 #include "source/common/quic/envoy_quic_server_session.h"
 #include "source/common/quic/quic_stat_names.h"
 #include "source/server/listener_stats.h"

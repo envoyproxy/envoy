@@ -4,6 +4,7 @@
 #include <memory>
 #include <vector>
 
+#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/scope.h"
@@ -27,10 +28,55 @@ class Sink;
 class SinkPredicates;
 
 /**
- * A store for all known counters, gauges, and timers.
+ * Store keeps track of all Scopes created in it, and the Scopes manage
+ * individual stats. Each stat is defined in a scope. There is a single root
+ * scope created in the Store, and more sub-scopes can be created. Scopes do not
+ * own the scopes created underneath; they are managed by the return
+ * SharePtr. However, sub-scopes combine the prefixes from their parental chain.
+ *
+ * Stores enable iteration over all stats in its transitively owned Scopes,
+ *
+ * There is typically one Store instance in a test or binary, though Isolated
+ * Stores can be created in some scenarios. Stores are typically allocated
+ * as part of other objects or via std::unique_ptr.
+ *
+ * In contrast, Scopes are managed via shared_ptr, unique nickname
+ * ScopeSharedPtr, and should not be directly instantiated or allocated via
+ * std::unique_ptr.
+ *
+ * A reference to the root-scope held by the Store until it shuts down. Holding
+ * onto a reference to the root-scope's shared_ptr that outlives the Store is
+ * not allowed.
  */
-class Store : public Scope {
+class Store {
 public:
+  virtual ~Store() = default;
+
+  /**
+   * @return the root scope (creating it if necessary)
+   */
+  virtual ScopeSharedPtr rootScope() PURE;
+
+  /**
+   * @return the root scope (creating it if necessary)
+   */
+  virtual ConstScopeSharedPtr constRootScope() const PURE;
+
+  /**
+   * @return The symbol table.
+   **/
+  virtual const SymbolTable& constSymbolTable() const PURE;
+
+  /**
+   * @return The symbol table.
+   **/
+  virtual SymbolTable& symbolTable() PURE;
+
+  /**
+   * Deliver an individual histogram value to all registered sinks.
+   */
+  virtual void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) PURE;
+
   /**
    * @return a list of all known counters.
    */
@@ -71,6 +117,16 @@ public:
   virtual void forEachScope(SizeFn f_size, StatFn<const Scope> f_stat) const PURE;
 
   /**
+   * @return a null counter that will ignore increments and always return 0.
+   */
+  virtual Counter& nullCounter() PURE;
+
+  /**
+   * @return a null gauge that will ignore set() calls and always return 0.
+   */
+  virtual Gauge& nullGauge() PURE;
+
+  /**
    * Iterate over all stats that need to be flushed to sinks. Note, that implementations can
    * potentially hold on to a mutex that will deadlock if the passed in functors try to create
    * or delete a stat.
@@ -81,6 +137,45 @@ public:
   virtual void forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const PURE;
   virtual void forEachSinkedGauge(SizeFn f_size, StatFn<Gauge> f_stat) const PURE;
   virtual void forEachSinkedTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const PURE;
+  virtual void forEachSinkedHistogram(SizeFn f_size, StatFn<ParentHistogram> f_stat) const PURE;
+
+  /**
+   * Calls 'fn' for every stat. Note that in the case of overlapping scopes, the
+   * implementation may call fn more than one time for each counter. Iteration
+   * stops if `fn` returns false;
+   *
+   * @param fn Function to be run for every counter, or until fn return false.
+   * @return false if fn(counter) return false during iteration, true if every counter was hit.
+   */
+  virtual bool iterate(const IterateFn<Counter>& fn) const PURE;
+  virtual bool iterate(const IterateFn<Gauge>& fn) const PURE;
+  virtual bool iterate(const IterateFn<Histogram>& fn) const PURE;
+  virtual bool iterate(const IterateFn<TextReadout>& fn) const PURE;
+
+  // TODO(#24007): Remove this operator overload: it is not needed anymore. Once
+  // #24567, #24843, and #24861 have landed we can remove this API.
+  operator Scope&() { return *rootScope(); }
+
+  // Delegate some methods to the root scope; these are exposed to make it more
+  // convenient to use stats_macros.h. We may consider dropping them if desired,
+  // when we resolve #24007 or in the next follow-up.
+  Counter& counterFromString(const std::string& name) {
+    return rootScope()->counterFromString(name);
+  }
+  Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) {
+    return rootScope()->gaugeFromString(name, import_mode);
+  }
+  TextReadout& textReadoutFromString(const std::string& name) {
+    return rootScope()->textReadoutFromString(name);
+  }
+  Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) {
+    return rootScope()->histogramFromString(name, unit);
+  }
+
+  /**
+   * @return a scope of the given name.
+   */
+  ScopeSharedPtr createScope(const std::string& name) { return rootScope()->createScope(name); }
 };
 
 using StorePtr = std::unique_ptr<Store>;
@@ -141,12 +236,14 @@ public:
   virtual void mergeHistograms(PostMergeCb merge_complete_cb) PURE;
 
   /**
-   * Set predicates for filtering counters, gauges and text readouts to be flushed to sinks.
+   * Set predicates for filtering stats to be flushed to sinks.
    * Note that if the sink predicates object is set, we do not send non-sink stats over to the
    * child process during hot restart. This will result in the admin stats console being wrong
    * during hot restart.
    */
   virtual void setSinkPredicates(std::unique_ptr<SinkPredicates>&& sink_predicates) PURE;
+
+  virtual OptRef<SinkPredicates> sinkPredicates() PURE;
 };
 
 using StoreRootPtr = std::unique_ptr<StoreRoot>;

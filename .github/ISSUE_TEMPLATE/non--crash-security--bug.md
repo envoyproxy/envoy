@@ -1,6 +1,6 @@
 ---
 name: Non-{crash,security} bug
-about: Bugs which are not crashes, DoS or other security issue
+about: Bugs which are not crashes (including asserts in debug builds), DoS or other security issue
 title: ''
 labels: bug,triage
 assignees: ''

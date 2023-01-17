@@ -1,6 +1,7 @@
 #import <Foundation/Foundation.h>
 
 #import "library/common/types/c_types.h"
+#import "library/objective-c/EnvoyAliases.h"
 
 static inline envoy_data toNativeData(NSData *data) {
   if (data == nil || [data isEqual:[NSNull null]]) {

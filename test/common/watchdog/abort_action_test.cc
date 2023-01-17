@@ -27,7 +27,7 @@ class AbortActionTest : public testing::Test {
 protected:
   AbortActionTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test")),
-        context_({*api_, *dispatcher_, stats_, "test"}) {}
+        context_({*api_, *dispatcher_, *stats_.rootScope(), "test"}) {}
 
   Stats::TestUtil::TestStore stats_;
   Api::ApiPtr api_;

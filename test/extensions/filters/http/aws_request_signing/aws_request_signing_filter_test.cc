@@ -32,7 +32,7 @@ public:
 
   std::shared_ptr<Common::Aws::MockSigner> signer_;
   Stats::IsolatedStoreImpl stats_store_;
-  FilterStats stats_{Filter::generateStats("test", stats_store_)};
+  FilterStats stats_{Filter::generateStats("test", *stats_store_.rootScope())};
   std::string host_rewrite_;
   bool use_unsigned_payload_;
 };
@@ -189,7 +189,7 @@ TEST_F(AwsRequestSigningFilterTest, FilterConfigImplGetters) {
   Stats::IsolatedStoreImpl stats;
   auto signer = std::make_unique<Common::Aws::MockSigner>();
   const auto* signer_ptr = signer.get();
-  FilterConfigImpl config(std::move(signer), "prefix", stats, "foo", true);
+  FilterConfigImpl config(std::move(signer), "prefix", *stats.rootScope(), "foo", true);
 
   EXPECT_EQ(signer_ptr, &config.signer());
   EXPECT_EQ(0UL, config.stats().signing_added_.value());

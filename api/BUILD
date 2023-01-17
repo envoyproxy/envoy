@@ -73,6 +73,7 @@ proto_library(
     visibility = ["//visibility:public"],
     deps = [
         "//contrib/envoy/extensions/filters/http/dynamo/v3:pkg",
+        "//contrib/envoy/extensions/filters/http/golang/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/http/language/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/http/squash/v3:pkg",
         "//contrib/envoy/extensions/filters/http/sxg/v3alpha:pkg",
@@ -234,6 +235,7 @@ proto_library(
         "//envoy/extensions/http/cache/simple_http_cache/v3:pkg",
         "//envoy/extensions/http/custom_response/local_response_policy/v3:pkg",
         "//envoy/extensions/http/custom_response/redirect_policy/v3:pkg",
+        "//envoy/extensions/http/early_header_mutation/header_mutation/v3:pkg",
         "//envoy/extensions/http/header_formatters/preserve_case/v3:pkg",
         "//envoy/extensions/http/header_validators/envoy_default/v3:pkg",
         "//envoy/extensions/http/original_ip_detection/custom_header/v3:pkg",
@@ -295,6 +297,7 @@ proto_library(
         "//envoy/extensions/upstreams/http/tcp/v3:pkg",
         "//envoy/extensions/upstreams/http/v3:pkg",
         "//envoy/extensions/upstreams/tcp/generic/v3:pkg",
+        "//envoy/extensions/upstreams/tcp/v3:pkg",
         "//envoy/extensions/wasm/v3:pkg",
         "//envoy/extensions/watchdog/profile_action/v3:pkg",
         "//envoy/service/accesslog/v3:pkg",

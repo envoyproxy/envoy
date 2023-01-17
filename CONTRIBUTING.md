@@ -404,3 +404,11 @@ re-run all the CI tasks. Consider adding an alias into your `.gitconfig` file:
 
 Once you add this alias you can issue the command `git kick-ci` and the PR
 will be sent back for a retest.
+
+# Repo Etiquette
+
+Contributors with push-access to the Envoy project should prefer pushing changes to a personal fork,
+including when creating branches for pull requests.
+
+This helps keep the Envoy repo as lean as possible, which can speed up cloning and synchronizing
+operations for both developers and CI.

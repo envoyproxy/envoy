@@ -67,7 +67,7 @@ public:
   PrioritySetImpl local_priority_set_;
   Stats::IsolatedStoreImpl stats_store_;
   ClusterLbStatNames stat_names_{stats_store_.symbolTable()};
-  ClusterLbStats stats_{stat_names_, stats_store_};
+  ClusterLbStats stats_{stat_names_, *stats_store_.rootScope()};
   NiceMock<Runtime::MockLoader> runtime_;
   Random::RandomGeneratorImpl random_;
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
@@ -154,8 +154,9 @@ public:
   RingHashTester(uint64_t num_hosts, uint64_t min_ring_size) : BaseTester(num_hosts) {
     config_ = envoy::config::cluster::v3::Cluster::RingHashLbConfig();
     config_.value().mutable_minimum_ring_size()->set_value(min_ring_size);
-    ring_hash_lb_ = std::make_unique<RingHashLoadBalancer>(
-        priority_set_, stats_, stats_store_, runtime_, random_, config_, common_config_);
+    ring_hash_lb_ =
+        std::make_unique<RingHashLoadBalancer>(priority_set_, stats_, *stats_store_.rootScope(),
+                                               runtime_, random_, config_, common_config_);
   }
 
   absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig> config_;
@@ -166,8 +167,9 @@ class MaglevTester : public BaseTester {
 public:
   MaglevTester(uint64_t num_hosts, uint32_t weighted_subset_percent = 0, uint32_t weight = 0)
       : BaseTester(num_hosts, weighted_subset_percent, weight) {
-    maglev_lb_ = std::make_unique<MaglevLoadBalancer>(priority_set_, stats_, stats_store_, runtime_,
-                                                      random_, config_, common_config_);
+    maglev_lb_ =
+        std::make_unique<MaglevLoadBalancer>(priority_set_, stats_, *stats_store_.rootScope(),
+                                             runtime_, random_, config_, common_config_);
   }
 
   absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig> config_;
@@ -544,9 +546,9 @@ public:
 
     subset_info_ = std::make_unique<LoadBalancerSubsetInfoImpl>(subset_config);
     lb_ = std::make_unique<SubsetLoadBalancer>(
-        LoadBalancerType::Random, priority_set_, &local_priority_set_, stats_, stats_store_,
-        runtime_, random_, *subset_info_, absl::nullopt, absl::nullopt, absl::nullopt,
-        absl::nullopt, common_config_, simTime());
+        LoadBalancerType::Random, priority_set_, &local_priority_set_, stats_,
+        *stats_store_.rootScope(), runtime_, random_, *subset_info_, absl::nullopt, absl::nullopt,
+        absl::nullopt, absl::nullopt, common_config_, simTime());
 
     const HostVector& hosts = priority_set_.getOrCreateHostSet(0).hosts();
     ASSERT(hosts.size() == num_hosts);

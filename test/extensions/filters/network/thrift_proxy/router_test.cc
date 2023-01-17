@@ -590,27 +590,28 @@ public:
     router_.reset();
   }
 
-  void expectStatCalls(Stats::MockStore& cluster_scope) {
+  void expectStatCalls(Stats::MockStore& cluster_store) {
+    Stats::MockScope& cluster_scope = cluster_store.mockScope();
     ON_CALL(*context_.cluster_manager_.thread_local_cluster_.cluster_.info_, statsScope())
         .WillByDefault(ReturnRef(cluster_scope));
 
-    EXPECT_CALL(cluster_scope, counter("thrift.upstream_rq_call")).Times(AtLeast(1));
-    EXPECT_CALL(cluster_scope, counter("thrift.upstream_resp_reply")).Times(AtLeast(1));
-    EXPECT_CALL(cluster_scope, counter("thrift.upstream_resp_success")).Times(AtLeast(1));
+    EXPECT_CALL(cluster_store, counter("thrift.upstream_rq_call")).Times(AtLeast(1));
+    EXPECT_CALL(cluster_store, counter("thrift.upstream_resp_reply")).Times(AtLeast(1));
+    EXPECT_CALL(cluster_store, counter("thrift.upstream_resp_success")).Times(AtLeast(1));
 
-    EXPECT_CALL(cluster_scope,
+    EXPECT_CALL(cluster_store,
                 histogram("thrift.upstream_rq_time", Stats::Histogram::Unit::Milliseconds));
-    EXPECT_CALL(cluster_scope,
+    EXPECT_CALL(cluster_store,
                 deliverHistogramToSinks(
                     testing::Property(&Stats::Metric::name, "thrift.upstream_rq_time"), _));
 
-    EXPECT_CALL(cluster_scope, histogram("thrift.upstream_rq_size", Stats::Histogram::Unit::Bytes));
-    EXPECT_CALL(cluster_scope,
+    EXPECT_CALL(cluster_store, histogram("thrift.upstream_rq_size", Stats::Histogram::Unit::Bytes));
+    EXPECT_CALL(cluster_store,
                 deliverHistogramToSinks(
                     testing::Property(&Stats::Metric::name, "thrift.upstream_rq_size"), _));
-    EXPECT_CALL(cluster_scope,
+    EXPECT_CALL(cluster_store,
                 histogram("thrift.upstream_resp_size", Stats::Histogram::Unit::Bytes));
-    EXPECT_CALL(cluster_scope,
+    EXPECT_CALL(cluster_store,
                 deliverHistogramToSinks(
                     testing::Property(&Stats::Metric::name, "thrift.upstream_resp_size"), _));
   }
@@ -1109,13 +1110,14 @@ TEST_F(ThriftRouterTest, UnexpectedRouterDestroy) {
 }
 
 TEST_F(ThriftRouterTest, ProtocolUpgrade) {
-  Stats::MockStore cluster_scope;
+  Stats::MockStore cluster_store;
+  Stats::MockScope& cluster_scope{cluster_store.mockScope()};
   ON_CALL(*context_.cluster_manager_.thread_local_cluster_.cluster_.info_, statsScope())
       .WillByDefault(ReturnRef(cluster_scope));
 
-  EXPECT_CALL(cluster_scope, counter("thrift.upstream_rq_call"));
-  EXPECT_CALL(cluster_scope, counter("thrift.upstream_resp_reply"));
-  EXPECT_CALL(cluster_scope, counter("thrift.upstream_resp_success"));
+  EXPECT_CALL(cluster_store, counter("thrift.upstream_rq_call"));
+  EXPECT_CALL(cluster_store, counter("thrift.upstream_resp_reply"));
+  EXPECT_CALL(cluster_store, counter("thrift.upstream_resp_success"));
 
   initializeRouter();
   startRequest(MessageType::Call);
@@ -1137,18 +1139,18 @@ TEST_F(ThriftRouterTest, ProtocolUpgrade) {
 
   EXPECT_CALL(*protocol_, supportsUpgrade()).WillOnce(Return(true));
 
-  EXPECT_CALL(cluster_scope,
+  EXPECT_CALL(cluster_store,
               histogram("thrift.upstream_rq_time", Stats::Histogram::Unit::Milliseconds));
-  EXPECT_CALL(cluster_scope,
+  EXPECT_CALL(cluster_store,
               deliverHistogramToSinks(
                   testing::Property(&Stats::Metric::name, "thrift.upstream_rq_time"), _));
 
-  EXPECT_CALL(cluster_scope, histogram("thrift.upstream_rq_size", Stats::Histogram::Unit::Bytes));
-  EXPECT_CALL(cluster_scope,
+  EXPECT_CALL(cluster_store, histogram("thrift.upstream_rq_size", Stats::Histogram::Unit::Bytes));
+  EXPECT_CALL(cluster_store,
               deliverHistogramToSinks(
                   testing::Property(&Stats::Metric::name, "thrift.upstream_rq_size"), _));
-  EXPECT_CALL(cluster_scope, histogram("thrift.upstream_resp_size", Stats::Histogram::Unit::Bytes));
-  EXPECT_CALL(cluster_scope,
+  EXPECT_CALL(cluster_store, histogram("thrift.upstream_resp_size", Stats::Histogram::Unit::Bytes));
+  EXPECT_CALL(cluster_store,
               deliverHistogramToSinks(
                   testing::Property(&Stats::Metric::name, "thrift.upstream_resp_size"), _));
 
@@ -1326,20 +1328,21 @@ TEST_F(ThriftRouterTest, ProtocolUpgradeSkippedOnExistingConnection) {
 TEST_F(ThriftRouterTest, PoolTimeoutUpstreamTimeMeasurement) {
   initializeRouter();
 
-  Stats::MockStore cluster_scope;
+  Stats::MockStore cluster_store;
+  Stats::MockScope& cluster_scope{cluster_store.mockScope()};
   ON_CALL(*context_.cluster_manager_.thread_local_cluster_.cluster_.info_, statsScope())
       .WillByDefault(ReturnRef(cluster_scope));
-  EXPECT_CALL(cluster_scope, counter("thrift.upstream_rq_call"));
+  EXPECT_CALL(cluster_store, counter("thrift.upstream_rq_call"));
 
   startRequest(MessageType::Call);
 
   dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(500));
-  EXPECT_CALL(cluster_scope, counter("thrift.upstream_resp_exception"));
-  EXPECT_CALL(cluster_scope, counter("thrift.upstream_resp_exception_local"));
-  EXPECT_CALL(cluster_scope,
+  EXPECT_CALL(cluster_store, counter("thrift.upstream_resp_exception"));
+  EXPECT_CALL(cluster_store, counter("thrift.upstream_resp_exception_local"));
+  EXPECT_CALL(cluster_store,
               histogram("thrift.upstream_rq_time", Stats::Histogram::Unit::Milliseconds))
       .Times(0);
-  EXPECT_CALL(cluster_scope,
+  EXPECT_CALL(cluster_store,
               deliverHistogramToSinks(
                   testing::Property(&Stats::Metric::name, "thrift.upstream_rq_time"), 500))
       .Times(0);
@@ -1412,19 +1415,20 @@ TEST_P(ThriftRouterFieldTypeTest, CallWithUpstreamRqTime) {
 
   initializeRouter();
 
-  Stats::MockStore cluster_scope;
+  Stats::MockStore cluster_store;
+  Stats::MockScope& cluster_scope{cluster_store.mockScope()};
   ON_CALL(*context_.cluster_manager_.thread_local_cluster_.cluster_.info_, statsScope())
       .WillByDefault(ReturnRef(cluster_scope));
-  EXPECT_CALL(cluster_scope, counter("thrift.upstream_rq_call"));
-  EXPECT_CALL(cluster_scope, counter("thrift.upstream_resp_reply"));
-  EXPECT_CALL(cluster_scope, counter("thrift.upstream_resp_success"));
+  EXPECT_CALL(cluster_store, counter("thrift.upstream_rq_call"));
+  EXPECT_CALL(cluster_store, counter("thrift.upstream_resp_reply"));
+  EXPECT_CALL(cluster_store, counter("thrift.upstream_resp_success"));
 
-  EXPECT_CALL(cluster_scope, histogram("thrift.upstream_rq_size", Stats::Histogram::Unit::Bytes));
-  EXPECT_CALL(cluster_scope,
+  EXPECT_CALL(cluster_store, histogram("thrift.upstream_rq_size", Stats::Histogram::Unit::Bytes));
+  EXPECT_CALL(cluster_store,
               deliverHistogramToSinks(
                   testing::Property(&Stats::Metric::name, "thrift.upstream_rq_size"), _));
-  EXPECT_CALL(cluster_scope, histogram("thrift.upstream_resp_size", Stats::Histogram::Unit::Bytes));
-  EXPECT_CALL(cluster_scope,
+  EXPECT_CALL(cluster_store, histogram("thrift.upstream_resp_size", Stats::Histogram::Unit::Bytes));
+  EXPECT_CALL(cluster_store,
               deliverHistogramToSinks(
                   testing::Property(&Stats::Metric::name, "thrift.upstream_resp_size"), _));
 
@@ -1434,9 +1438,9 @@ TEST_P(ThriftRouterFieldTypeTest, CallWithUpstreamRqTime) {
   completeRequest();
 
   dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(500));
-  EXPECT_CALL(cluster_scope,
+  EXPECT_CALL(cluster_store,
               histogram("thrift.upstream_rq_time", Stats::Histogram::Unit::Milliseconds));
-  EXPECT_CALL(cluster_scope,
+  EXPECT_CALL(cluster_store,
               deliverHistogramToSinks(
                   testing::Property(&Stats::Metric::name, "thrift.upstream_rq_time"), 500));
   returnResponse();
@@ -1725,8 +1729,8 @@ TEST_P(ThriftRouterPassthroughTest, PassthroughEnable) {
 TEST_F(ThriftRouterTest, RequestResponseSize) {
   initializeRouter();
 
-  Stats::MockStore cluster_scope;
-  expectStatCalls(cluster_scope);
+  Stats::MockStore cluster_store;
+  expectStatCalls(cluster_store);
 
   startRequestWithExistingConnection(MessageType::Call);
   sendTrivialStruct(FieldType::I32);
@@ -1737,13 +1741,12 @@ TEST_F(ThriftRouterTest, RequestResponseSize) {
 
 TEST_F(ThriftRouterTest, UpstreamDraining) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.thrift_connection_draining", "true"}});
 
   initializeRouter();
 
-  Stats::MockStore cluster_scope;
-  expectStatCalls(cluster_scope);
-  EXPECT_CALL(cluster_scope, counter("thrift.upstream_cx_drain_close")).Times(AtLeast(1));
+  Stats::MockStore cluster_store;
+  expectStatCalls(cluster_store);
+  EXPECT_CALL(cluster_store, counter("thrift.upstream_cx_drain_close")).Times(AtLeast(1));
   // Keep the downstream connection.
   EXPECT_CALL(callbacks_, resetDownstreamConnection()).Times(0);
   startRequestWithExistingConnection(MessageType::Call);
@@ -1900,7 +1903,8 @@ TEST_F(ThriftRouterTest, UpstreamZoneCallException) {
 }
 
 TEST_F(ThriftRouterTest, UpstreamZoneCallWithRqTime) {
-  NiceMock<Stats::MockStore> cluster_scope;
+  NiceMock<Stats::MockStore> cluster_store;
+  Stats::MockScope& cluster_scope{cluster_store.mockScope()};
   ON_CALL(*context_.cluster_manager_.thread_local_cluster_.cluster_.info_, statsScope())
       .WillByDefault(ReturnRef(cluster_scope));
 
@@ -1912,20 +1916,20 @@ TEST_F(ThriftRouterTest, UpstreamZoneCallWithRqTime) {
   completeRequest();
 
   dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(500));
-  EXPECT_CALL(cluster_scope, histogram("thrift.upstream_resp_size", Stats::Histogram::Unit::Bytes));
-  EXPECT_CALL(cluster_scope,
+  EXPECT_CALL(cluster_store, histogram("thrift.upstream_resp_size", Stats::Histogram::Unit::Bytes));
+  EXPECT_CALL(cluster_store,
               deliverHistogramToSinks(
                   testing::Property(&Stats::Metric::name, "thrift.upstream_resp_size"), _));
 
-  EXPECT_CALL(cluster_scope,
+  EXPECT_CALL(cluster_store,
               histogram("thrift.upstream_rq_time", Stats::Histogram::Unit::Milliseconds));
-  EXPECT_CALL(cluster_scope,
+  EXPECT_CALL(cluster_store,
               deliverHistogramToSinks(
                   testing::Property(&Stats::Metric::name, "thrift.upstream_rq_time"), _));
 
-  EXPECT_CALL(cluster_scope, histogram("zone.zone_name.other_zone_name.thrift.upstream_rq_time",
+  EXPECT_CALL(cluster_store, histogram("zone.zone_name.other_zone_name.thrift.upstream_rq_time",
                                        Stats::Histogram::Unit::Milliseconds));
-  EXPECT_CALL(cluster_scope,
+  EXPECT_CALL(cluster_store,
               deliverHistogramToSinks(
                   testing::Property(&Stats::Metric::name,
                                     "zone.zone_name.other_zone_name.thrift.upstream_rq_time"),

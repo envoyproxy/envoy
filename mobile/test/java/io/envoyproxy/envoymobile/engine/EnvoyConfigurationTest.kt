@@ -50,6 +50,11 @@ private const val CERT_VALIDATION_TEMPLATE =
     name: "dumb_validator"
 """
 
+private const val PERSISTENT_DNS_CACHE_INSERT =
+"""
+  config: persistent_dns_cache
+"""
+
 class EnvoyConfigurationTest {
 
   fun buildTestEnvoyConfiguration(
@@ -62,6 +67,7 @@ class EnvoyConfigurationTest {
     dnsQueryTimeoutSeconds: Int = 321,
     dnsMinRefreshSeconds: Int = 12,
     dnsPreresolveHostnames: String = "[hostname]",
+    enableDNSCache: Boolean = false,
     enableDrainPostDnsRefresh: Boolean = false,
     enableHttp3: Boolean = false,
     enableGzip: Boolean = true,
@@ -93,6 +99,7 @@ class EnvoyConfigurationTest {
       dnsQueryTimeoutSeconds,
       dnsMinRefreshSeconds,
       dnsPreresolveHostnames,
+      enableDNSCache,
       enableDrainPostDnsRefresh,
       enableHttp3,
       enableGzip,
@@ -126,7 +133,7 @@ class EnvoyConfigurationTest {
     val envoyConfiguration = buildTestEnvoyConfiguration()
 
     val resolvedTemplate = envoyConfiguration.resolveTemplate(
-      TEST_CONFIG, PLATFORM_FILTER_CONFIG, NATIVE_FILTER_CONFIG, APCF_INSERT, GZIP_INSERT, BROTLI_INSERT, SOCKET_TAG_INSERT,
+      TEST_CONFIG, PLATFORM_FILTER_CONFIG, NATIVE_FILTER_CONFIG, APCF_INSERT, GZIP_INSERT, BROTLI_INSERT, SOCKET_TAG_INSERT, PERSISTENT_DNS_CACHE_INSERT,
       CERT_VALIDATION_TEMPLATE
     )
     assertThat(resolvedTemplate).contains("&connect_timeout 123s")
@@ -143,6 +150,7 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("&dns_min_refresh_rate 12s")
     assertThat(resolvedTemplate).contains("&dns_preresolve_hostnames [hostname]")
     assertThat(resolvedTemplate).contains("&enable_drain_post_dns_refresh false")
+    assertThat(resolvedTemplate).doesNotContain(PERSISTENT_DNS_CACHE_INSERT);
 
     // Interface Binding
     assertThat(resolvedTemplate).contains("&enable_interface_binding false")
@@ -199,6 +207,7 @@ class EnvoyConfigurationTest {
   fun `configuration resolves with alternate values`() {
     val envoyConfiguration = buildTestEnvoyConfiguration(
       enableDrainPostDnsRefresh = true,
+      enableDNSCache = true,
       enableHappyEyeballs = true,
       enableHttp3 = true,
       enableGzip = false,
@@ -210,7 +219,7 @@ class EnvoyConfigurationTest {
     )
 
     val resolvedTemplate = envoyConfiguration.resolveTemplate(
-      TEST_CONFIG, PLATFORM_FILTER_CONFIG, NATIVE_FILTER_CONFIG, APCF_INSERT, GZIP_INSERT, BROTLI_INSERT, SOCKET_TAG_INSERT,
+      TEST_CONFIG, PLATFORM_FILTER_CONFIG, NATIVE_FILTER_CONFIG, APCF_INSERT, GZIP_INSERT, BROTLI_INSERT, SOCKET_TAG_INSERT, PERSISTENT_DNS_CACHE_INSERT,
 CERT_VALIDATION_TEMPLATE
     )
 
@@ -218,6 +227,7 @@ CERT_VALIDATION_TEMPLATE
     assertThat(resolvedTemplate).contains("&dns_lookup_family ALL")
     assertThat(resolvedTemplate).contains("&dns_multiple_addresses true")
     assertThat(resolvedTemplate).contains("&enable_drain_post_dns_refresh true")
+    assertThat(resolvedTemplate).contains("config: persistent_dns_cache")
 
     // H2
     assertThat(resolvedTemplate).contains("&h2_delay_keepalive_timeout true")
@@ -246,7 +256,7 @@ CERT_VALIDATION_TEMPLATE
     val envoyConfiguration = buildTestEnvoyConfiguration()
 
     try {
-      envoyConfiguration.resolveTemplate("{{ missing }}", "", "", "", "", "", "", "")
+      envoyConfiguration.resolveTemplate("{{ missing }}", "", "", "", "", "", "", "", "")
       fail("Unresolved configuration keys should trigger exception.")
     } catch (e: EnvoyConfiguration.ConfigurationException) {
       assertThat(e.message).contains("missing")
