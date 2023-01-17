@@ -76,23 +76,6 @@ public:
   void decodeSmtpTransactionCommands(std::string&);
   void decodeSmtpTransactionResponse(uint16_t&);
 
-  const char* SessionStates[9] = {
-      "CONNECTION_REQUEST",       "CONNECTION_SUCCESS",          "SESSION_INIT_REQUEST",
-      "SESSION_IN_PROGRESS",      "SESSION_TERMINATION_REQUEST", "SESSION_TERMINATED",
-      "UPSTREAM_TLS_NEGOTIATION", "DOWNSTREAM_TLS_NEGOTIATION",  "SESSION_AUTH_REQUEST",
-  };
-
-  const char* TransactionStates[8] = {
-      "NONE",
-      "TRANSACTION_REQUEST",
-      "TRANSACTION_IN_PROGRESS",
-      "TRANSACTION_ABORT_REQUEST",
-      "TRANSACTION_ABORTED",
-      "MAIL_DATA_TRANSFER_REQUEST",
-      "RCPT_COMMAND",
-      "TRANSACTION_COMPLETED",
-  };
-
 protected:
  
   DecoderCallbacks* callbacks_{};
