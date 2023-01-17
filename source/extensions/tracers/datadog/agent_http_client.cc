@@ -120,8 +120,7 @@ void AgentHTTPClient::onFailure(const Http::AsyncClient::Request& request,
   stats_->reports_failed_.inc();
 
   Handlers& handlers = found->second;
-  std::string message;
-  message += "Failed to send request to Datadog Agent: ";
+  std::string message = "Failed to send request to Datadog Agent: ";
   switch (reason) {
   case Http::AsyncClient::FailureReason::Reset:
     message += "The stream has been reset.";
