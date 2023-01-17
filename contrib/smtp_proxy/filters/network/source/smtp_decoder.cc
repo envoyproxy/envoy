@@ -11,21 +11,13 @@ namespace NetworkFilters {
 namespace SmtpProxy {
 
 Decoder::Result DecoderImpl::onData(Buffer::Instance& data, bool upstream) {
-  const std::string message = data.toString();
-  std::cout << "current session state: " << SessionStates[static_cast<int>(session_.getState())]
-            << "\n";
-  std::cout << "current transaction state: "
-            << TransactionStates[static_cast<int>(session_.getTransactionState())] << "\n";
-
   Decoder::Result result = Decoder::Result::ReadyForNext;
 
   if (upstream) {
-    ENVOY_LOG(debug, "received response from upstream: ", StringUtil::trim(message));
     result = parseResponse(data);
     data.drain(data.length());
     return result;
   }
-  std::cout << "received message " << message << "\n";
   result = parseCommand(data);
   data.drain(data.length());
   return result;
@@ -35,7 +27,6 @@ Decoder::Result DecoderImpl::parseCommand(Buffer::Instance& data) {
   ENVOY_LOG(debug, "smtp_proxy: decoding {} bytes", data.length());
   Decoder::Result result = Decoder::Result::ReadyForNext;
   std::string command = data.toString();
-  std::cout << "command string : " << command << " length: " << command.length() << "\n";
 
   if (command.length() < 6) {
     // Message size is not sufficient to parse.
@@ -126,7 +117,6 @@ Decoder::Result DecoderImpl::parseResponse(Buffer::Instance& data) {
   response.assign(std::string(static_cast<char*>(data.linearize(3)), 3));
 
   uint16_t response_code = stoi(response);
-  std::cout << "response code 3 bytes: " << response_code << "\n";
 
   switch (session_.getState()) {
 
@@ -169,14 +159,12 @@ Decoder::Result DecoderImpl::parseResponse(Buffer::Instance& data) {
   case SmtpSession::State::UPSTREAM_TLS_NEGOTIATION: {
     if (response_code == 220) {
       if (callbacks_->upstreamStartTls()) {
-        std::cout << "Upstream encrypted success\n";
         // Upstream TLS connection established.Now encrypt downstream connection.
         handleDownstreamTls();
         result = Decoder::Result::Stopped;
         break;
       }
     }
-    std::cout << "Upsteam encryption failed\n";
     // If upstream server does not support TLS i.e. response code != 220
     callbacks_->incUpstreamTlsFailed();
     session_.setState(SmtpSession::State::SESSION_TERMINATED);

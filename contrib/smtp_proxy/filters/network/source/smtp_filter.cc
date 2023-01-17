@@ -16,7 +16,6 @@ SmtpFilterConfig::SmtpFilterConfig(const SmtpFilterConfigOptions& config_options
                                    Stats::Scope& scope)
     : scope_{scope}, stats_(generateStats(config_options.stats_prefix_, scope)),
       upstream_tls_(config_options.upstream_tls_) {
-  std::cout << config_options.stats_prefix_ << "\n";
 }
 SmtpFilter::SmtpFilter(SmtpFilterConfigSharedPtr config) : config_{config} {
   if (!decoder_) {
@@ -38,12 +37,12 @@ bool SmtpFilter::downstreamStartTls(absl::string_view response) {
     // Wait until response has been sent.
     if (bytes >= response.length()) {
       if (!read_callbacks_->connection().startSecureTransport()) {
-        ENVOY_CONN_LOG(debug, "smtp_proxy filter: cannot switch to tls",
+        ENVOY_CONN_LOG(trace, "smtp_proxy filter: cannot switch to tls",
                        read_callbacks_->connection(), bytes);
       } else {
         // Switch to TLS has been completed.
         incTlsTerminatedSessions();
-        ENVOY_CONN_LOG(debug, "smtp_proxy filter: switched to tls", read_callbacks_->connection(),
+        ENVOY_CONN_LOG(trace, "smtp_proxy filter: switched to tls", read_callbacks_->connection(),
                        bytes);
         return false;
       }
@@ -134,7 +133,6 @@ void SmtpFilter::closeDownstreamConnection() {
 Network::FilterStatus SmtpFilter::onData(Buffer::Instance& data, bool end_stream) {
   ENVOY_CONN_LOG(trace, "smtp_proxy: got {} bytes", read_callbacks_->connection(), data.length(),
                  "end_stream ", end_stream);
-  ENVOY_LOG(debug, "smtp_proxy onRead received data: ", StringUtil::trim(data.toString()));
   read_buffer_.add(data);
   Network::FilterStatus result = doDecode(read_buffer_, false);
   if (result == Network::FilterStatus::StopIteration) {
@@ -148,7 +146,6 @@ Network::FilterStatus SmtpFilter::onData(Buffer::Instance& data, bool end_stream
 Network::FilterStatus SmtpFilter::onWrite(Buffer::Instance& data, bool end_stream) {
   ENVOY_CONN_LOG(trace, "smtp_proxy: got {} bytes", write_callbacks_->connection(), data.length(),
                  "end_stream ", end_stream);
-  ENVOY_LOG(debug, "smtp_proxy onWrite received data: ", StringUtil::trim(data.toString()));
   write_buffer_.add(data);
   Network::FilterStatus result = doDecode(write_buffer_, true);
   if (result == Network::FilterStatus::StopIteration) {
