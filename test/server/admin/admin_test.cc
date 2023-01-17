@@ -255,7 +255,8 @@ TEST_P(AdminInstanceTest, StatsWithMultipleChunks) {
   uint32_t expected_size = 0;
 
   // Declare enough counters so that we are sure to exceed the chunk size.
-  const uint32_t n = (UngroupedStatsRequest::DefaultChunkSize + prefix.size() / 2) / prefix.size() + 1;
+  const uint32_t n =
+      (UngroupedStatsRequest::DefaultChunkSize + prefix.size() / 2) / prefix.size() + 1;
   for (uint32_t i = 0; i <= n; ++i) {
     const std::string name = absl::StrCat(prefix, i);
     store.counterFromString(name);
