@@ -55,7 +55,7 @@ public:
       EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(900), _));
     }
 
-    driver_ = std::make_unique<Driver>(datadog_config, cm_, stats_, tls_, runtime_);
+    driver_ = std::make_unique<Driver>(datadog_config, cm_, *stats_.rootScope(), tls_, runtime_);
   }
 
   void setupValidDriver() {

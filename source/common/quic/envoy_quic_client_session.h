@@ -70,7 +70,7 @@ public:
   void OnProofVerifyDetailsAvailable(const quic::ProofVerifyDetails& verify_details) override;
 
   // PacketsToReadDelegate
-  size_t numPacketsExpectedPerEventLoop() override {
+  size_t numPacketsExpectedPerEventLoop() const override {
     // Do one round of reading per active stream, or to see if there's a new
     // active stream.
     return std::max<size_t>(1, GetNumActiveStreams()) * Network::NUM_DATAGRAMS_PER_RECEIVE;

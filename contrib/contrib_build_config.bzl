@@ -5,7 +5,8 @@ CONTRIB_EXTENSIONS = {
     #
 
     "envoy.filters.http.dynamo":                                "//contrib/dynamo/filters/http/source:config",
-    #"envoy.filters.http.language":                              "//contrib/language/filters/http/source:config_lib",
+    "envoy.filters.http.golang":                                "//contrib/golang/filters/http/source:config",
+    "envoy.filters.http.language":                              "//contrib/language/filters/http/source:config_lib",
     "envoy.filters.http.squash":                                "//contrib/squash/filters/http/source:config",
     "envoy.filters.http.sxg":                                   "//contrib/sxg/filters/http/source:config",
 

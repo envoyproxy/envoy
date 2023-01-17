@@ -16,7 +16,6 @@ build --features=swift.debug_prefix_map
 build --host_force_python=PY3
 build --macos_minimum_os=10.14
 build --ios_minimum_os=12.0
-build --ios_simulator_device="iPhone 13"
 build --ios_simulator_version=16.1
 build --verbose_failures
 build --workspace_status_command=../bazel/get_workspace_status
@@ -34,9 +33,6 @@ build --define cxxopts=-std=c++17
 build --features=-per_object_debug_info
 # Suppress deprecated declaration warnings due to extensive transitive noise from protobuf.
 build --copt -Wno-deprecated-declarations
-# Abseil Flag literals are compiled out by default on mobile platforms. These flags are needed for
-# Envoy's runtime system. This option prevents them from being compiled out.
-build --copt -DABSL_FLAGS_STRIP_NAMES=0
 
 build:rules_xcodeproj --config=ios
 build:rules_xcodeproj --define=apple.experimental.tree_artifact_outputs=0
