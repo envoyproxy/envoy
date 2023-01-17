@@ -26,7 +26,7 @@ AgentHTTPClient::AgentHTTPClient(Upstream::ClusterManager& cluster_manager,
                                  const std::string& cluster, const std::string& reference_host,
                                  TracerStats& stats)
     : collector_cluster_(cluster_manager, cluster), cluster_(cluster),
-      reference_host_(reference_host), stats_(&stats) {}
+      reference_host_(reference_host), stats_(stats) {}
 
 AgentHTTPClient::~AgentHTTPClient() {
   for (const auto& [request_ptr, _] : handlers_) {
@@ -57,7 +57,7 @@ datadog::tracing::Expected<void> AgentHTTPClient::post(const URL& url, HeadersSe
 
   if (!collector_cluster_.threadLocalCluster().has_value()) {
     ENVOY_LOG(debug, "collector cluster '{}' does not exist", cluster_);
-    stats_->reports_skipped_no_cluster_.inc();
+    stats_.reports_skipped_no_cluster_.inc();
     return datadog::tracing::nullopt;
   }
 
@@ -66,7 +66,7 @@ datadog::tracing::Expected<void> AgentHTTPClient::post(const URL& url, HeadersSe
           std::move(message), *this,
           Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(1000)));
   if (!request) {
-    stats_->reports_failed_.inc();
+    stats_.reports_failed_.inc();
     return datadog::tracing::Error{datadog::tracing::Error::ENVOY_HTTP_CLIENT_FAILURE,
                                    "Failed to create request."};
   }
@@ -89,10 +89,10 @@ void AgentHTTPClient::onSuccess(const Http::AsyncClient::Request& request,
                                 Http::ResponseMessagePtr&& response) {
   const std::uint64_t status = Http::Utility::getResponseStatus(response->headers());
   if (status != std::uint64_t(Http::Code::OK)) {
-    stats_->reports_dropped_.inc();
+    stats_.reports_dropped_.inc();
   } else {
     ENVOY_LOG(debug, "traces successfully submitted to datadog agent");
-    stats_->reports_sent_.inc();
+    stats_.reports_sent_.inc();
   }
 
   auto found = handlers_.find(const_cast<Http::AsyncClient::Request*>(&request));
@@ -117,7 +117,7 @@ void AgentHTTPClient::onFailure(const Http::AsyncClient::Request& request,
     return;
   }
 
-  stats_->reports_failed_.inc();
+  stats_.reports_failed_.inc();
 
   Handlers& handlers = found->second;
   std::string message = "Failed to send request to Datadog Agent: ";

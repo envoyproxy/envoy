@@ -59,7 +59,7 @@ private:
   Upstream::ClusterUpdateTracker collector_cluster_;
   std::string cluster_;
   std::string reference_host_;
-  TracerStats* stats_;
+  TracerStats& stats_;
 };
 
 } // namespace Datadog
