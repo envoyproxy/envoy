@@ -53,6 +53,7 @@ objc_library(
         "//library/common:envoy_main_interface_lib",
         "//library/common/api:c_types",
         "//library/common/network:apple_platform_cert_verifier",
+        "//library/objective-c/proxy:envoy_proxy_lib",
     ],
 )
 

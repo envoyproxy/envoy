@@ -9,6 +9,7 @@
 #import "library/common/network/apple_platform_cert_verifier.h"
 #import "library/common/types/c_types.h"
 #import "library/common/extensions/key_value/platform/c_types.h"
+#import "library/objective-c/proxy/EnvoyProxyResolver.h"
 
 #if TARGET_OS_IPHONE
 #import <UIKit/UIKit.h>
@@ -392,9 +393,35 @@ static void ios_track_event(envoy_map map, const void *context) {
   }
 }
 
+static void ios_resolve_proxy(envoy_data c_host, const uint16_t port, envoy_proxy_resolver_proxy_resolution_result_handler *result_handler, const void *context) {
+  @autoreleasepool {
+    EnvoyProxyResolver *resolver = (__bridge EnvoyProxyResolver *)context;
+    NSString *host = to_ios_string(c_host);
+
+    [resolver
+     resolveProxyForTargetURL:[NSURL URLWithString:host]
+     port:port
+     withCompletionBlock:^(NSArray<EnvoyProxySettings *> * _Nullable settings, NSError * _Nullable error) {
+      envoy_proxy_settings_list list;
+      list.length = (uint64_t)settings.count;
+      list.proxy_settings = safe_malloc(list.length);
+
+      for (NSUInteger i = 0; i < settings.count; i++) {
+        envoy_proxy_settings proxy_settings = {
+          .host_data = toManagedNativeString(settings[i].host),
+          .port = settings[i].port
+        };
+        list.proxy_settings[i] = proxy_settings;
+      }
+      result_handler->proxy_resolution_completed(list, context);
+    }];
+  }
+}
+
 @implementation EnvoyEngineImpl {
   envoy_engine_t _engineHandle;
   EnvoyNetworkMonitor *_networkMonitor;
+  EnvoyProxyResolver *_proxyResolver;
 }
 
 - (instancetype)initWithRunningCallback:(nullable void (^)())onEngineRunning
@@ -429,7 +456,11 @@ static void ios_track_event(envoy_map map, const void *context) {
   }
 
   _engineHandle = init_engine(native_callbacks, native_logger, native_event_tracker);
+
   _networkMonitor = [[EnvoyNetworkMonitor alloc] initWithEngine:_engineHandle];
+  _proxyResolver = [EnvoyProxyResolver new];
+  [self registerProxyResolver:_proxyResolver];
+  [_proxyResolver start];
 
   if (networkMonitoringMode == 1) {
     [_networkMonitor startReachability];
@@ -442,6 +473,12 @@ static void ios_track_event(envoy_map map, const void *context) {
 
 - (void)dealloc {
   [[NSNotificationCenter defaultCenter] removeObserver:self];
+}
+
+- (void)registerProxyResolver:(EnvoyProxyResolver *)proxyResolver {
+  envoy_proxy_resolver *resolver = safe_malloc(sizeof(envoy_proxy_resolver));
+  resolver->context = CFBridgingRetain(proxyResolver);
+  resolver->resolve = ios_resolve_proxy;
 }
 
 - (int)registerFilterFactory:(EnvoyHTTPFilterFactory *)filterFactory {

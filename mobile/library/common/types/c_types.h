@@ -529,3 +529,34 @@ typedef enum {
   // its value is not correct for a web server.
   CERT_VERIFY_STATUS_INCORRECT_KEY_USAGE = -6,
 } envoy_cert_verify_status_t;
+
+typedef struct {
+  envoy_data host_data;
+  uint16_t port;
+} envoy_proxy_settings;
+
+typedef struct {
+  envoy_proxy_settings *proxy_settings;
+  uint64_t length;
+} envoy_proxy_settings_list;
+
+typedef void (*envoy_proxy_resolver_proxy_resolution_completed_f)
+  (envoy_proxy_settings_list proxy_settings_list,
+   const void *context);
+
+typedef struct {
+  const void *context;
+  envoy_proxy_resolver_proxy_resolution_completed_f proxy_resolution_completed;
+} envoy_proxy_resolver_proxy_resolution_result_handler;
+
+typedef void (*envoy_proxy_resolver_resolve_f)
+  (envoy_data host,
+   const uint16_t port,
+   envoy_proxy_resolver_proxy_resolution_result_handler result_handler,
+   const void *context);
+
+typedef struct {
+  envoy_proxy_resolver_resolve_f resolve;
+  envoy_proxy_resolver_proxy_resolution_result_handler proxy_resolution_result_handler;
+  const void *context;
+} envoy_proxy_resolver;

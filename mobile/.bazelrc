@@ -116,6 +116,10 @@ build:release-android --define=include_ifaddrs=true
 build:release-android --config=release-common
 build:release-android --compilation_mode=opt
 
+build:profile-android --config=release-android
+build:profile-android --define=admin_functionality=enabled
+build:profile-android --copt='-g' --
+
 # Instrument Envoy Mobile's C++ code for coverage
 build:coverage --instrumentation_filter="//library/common[/:]"
 

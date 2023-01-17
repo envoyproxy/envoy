@@ -4,4 +4,4 @@ import examples/java/hello_world/.bazelproject
 import test/kotlin/apps/baseline/.bazelproject
 import test/kotlin/apps/experimental/.bazelproject
 
-android_sdk_platform: android-31
+android_sdk_platform: android-32

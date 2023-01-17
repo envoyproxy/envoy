@@ -141,7 +141,6 @@ def _create_aar(name, archive_name, classes_jar, jni_archive, proguard_rules, vi
             classes_jar,
             jni_archive,
             _manifest_name,
-            proguard_rules,
         ],
         cmd = """
         # Set source variables
@@ -149,7 +148,6 @@ def _create_aar(name, archive_name, classes_jar, jni_archive, proguard_rules, vi
         src_classes_jar=$$1
         src_jni_archive_apk=$$2
         src_manifest_xml=$$3
-        src_proguard_txt=$$4
 
         original_directory=$$PWD
 
@@ -163,7 +161,6 @@ def _create_aar(name, archive_name, classes_jar, jni_archive, proguard_rules, vi
         else
             echo "No jni directory found"
         fi
-        cp $$original_directory/$$src_proguard_txt ./proguard.txt
         cp $$original_directory/$$src_manifest_xml AndroidManifest.xml
         zip -r tmp.aar * > /dev/null
         cp tmp.aar $$original_directory/$@
