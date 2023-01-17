@@ -99,7 +99,7 @@ public:
                 path: {}
                 log_format:
                   text_format_source:
-                    inline_string: "%DYNAMIC_METADATA(host_metadata:value)%,%DYNAMIC_METADATA(cluster_metadata:value)%,%FILTER_STATE(internal_state:PLAIN)%\n"
+                    inline_string: "%DYNAMIC_METADATA(host_metadata:value)%,%DYNAMIC_METADATA(cluster_metadata:value)%,%FILTER_STATE(internal_state:PLAIN)%,%FILTER_STATE(internal_state_once:PLAIN)%\n"
       )EOF",
                                             access_log_name_),
                                 *listener);
@@ -118,7 +118,15 @@ public:
       "@type": type.googleapis.com/test.integration.filters.HeaderToFilterStateFilterConfig
       header_name: internal-header
       state_name: internal_state
-      shared: true
+      shared: TRANSITIVE
+    )EOF");
+    config_helper_.prependFilter(R"EOF(
+    name: header-to-filter-state
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.HeaderToFilterStateFilterConfig
+      header_name: internal-header-once
+      state_name: internal_state_once
+      shared: ONCE
     )EOF");
     HttpIntegrationTest::initialize();
   }
@@ -147,6 +155,7 @@ public:
       {":scheme", "http"},
       {":authority", "host.com"},
       {"internal-header", "FOO"},
+      {"internal-header-once", "BAZ"},
   }};
   bool add_metadata_{true};
   bool use_transport_socket_{true};
@@ -165,7 +174,7 @@ TEST_F(InternalUpstreamIntegrationTest, BasicFlow) {
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   cleanupUpstreamAndDownstream();
-  EXPECT_THAT(waitForAccessLog(access_log_name_), ::testing::HasSubstr("HOST,CLUSTER,FOO"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_), ::testing::HasSubstr("HOST,CLUSTER,FOO,BAZ"));
 }
 
 TEST_F(InternalUpstreamIntegrationTest, BasicFlowMissing) {
