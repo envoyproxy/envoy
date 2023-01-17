@@ -35,11 +35,12 @@ AgentHTTPClient::~AgentHTTPClient() {
   }
 }
 
-// dd::HTTPClient
+// datadog::tracing::HTTPClient
 
-dd::Expected<void> AgentHTTPClient::post(const URL& url, HeadersSetter set_headers,
-                                         std::string body, ResponseHandler on_response,
-                                         ErrorHandler on_error) {
+datadog::tracing::Expected<void> AgentHTTPClient::post(const URL& url, HeadersSetter set_headers,
+                                                       std::string body,
+                                                       ResponseHandler on_response,
+                                                       ErrorHandler on_error) {
   ENVOY_LOG(debug, "flushing traces");
 
   auto message = std::make_unique<Http::RequestMessageImpl>();
@@ -56,7 +57,7 @@ dd::Expected<void> AgentHTTPClient::post(const URL& url, HeadersSetter set_heade
   if (!collector_cluster_.threadLocalCluster().has_value()) {
     ENVOY_LOG(debug, "collector cluster '{}' does not exist", cluster_);
     stats_->reports_skipped_no_cluster_.inc();
-    return dd::nullopt;
+    return datadog::tracing::nullopt;
   }
 
   Http::AsyncClient::Request* request =
@@ -65,11 +66,12 @@ dd::Expected<void> AgentHTTPClient::post(const URL& url, HeadersSetter set_heade
           Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(1000)));
   if (!request) {
     stats_->reports_failed_.inc();
-    return dd::Error{dd::Error::ENVOY_HTTP_CLIENT_FAILURE, "Failed to create request."};
+    return datadog::tracing::Error{datadog::tracing::Error::ENVOY_HTTP_CLIENT_FAILURE,
+                                   "Failed to create request."};
   }
 
   handlers_.emplace(request, Handlers{std::move(on_response), std::move(on_error)});
-  return dd::nullopt;
+  return datadog::tracing::nullopt;
 }
 
 void AgentHTTPClient::drain(std::chrono::steady_clock::time_point) {}
@@ -126,7 +128,8 @@ void AgentHTTPClient::onFailure(const Http::AsyncClient::Request& request,
   default:
     message += "Unknown error.";
   }
-  handlers.on_error(dd::Error{dd::Error::ENVOY_HTTP_CLIENT_FAILURE, std::move(message)});
+  handlers.on_error(datadog::tracing::Error{datadog::tracing::Error::ENVOY_HTTP_CLIENT_FAILURE,
+                                            std::move(message)});
 
   handlers_.erase(found);
 }

@@ -13,7 +13,7 @@ this library.
 Each node denotes one of the following:
 
 - Hexagonal nodes are interfaces defined by Envoy.
-- Nodes that mention the 🐶namespace (`::datadog::tracing`, aliased as `dd`) are
+- Nodes that mention the 🐶 namespace (`::datadog::tracing`) are
   defined within the Datadog core C++ tracing library, [dd-trace-cpp][2].
 - Rectangular nodes are classes defined in this library.
 
@@ -63,11 +63,6 @@ The Datadog core tracing library uses two interfaces, `DictReader` and
 context (e.g. HTTP headers).
 
 These files contain implementations of those interfaces used by this library.
-
-#### `dd.h`
-Contains a namespace alias `namespace dd = ::datadog::tracing`. The Datadog
-core C++ tracing library is defined in this namespace. By including `dd.h`,
-code here can instead refer to the `dd` alias, for brevity.
 
 #### `event_scheduler.{h,cc}`
 Contains `class EventScheduler`, which is an implementation of

@@ -9,14 +9,12 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 
-#include "source/extensions/tracers/datadog/dd.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace Datadog {
 
-class EventScheduler : public dd::EventScheduler {
+class EventScheduler : public datadog::tracing::EventScheduler {
   Event::Dispatcher* dispatcher_;
   std::vector<Event::TimerPtr> timers_;
 
@@ -24,7 +22,7 @@ public:
   explicit EventScheduler(Event::Dispatcher& dispatcher);
   ~EventScheduler() override;
 
-  // dd::EventScheduler
+  // datadog::tracing::EventScheduler
 
   // Repeatedly execute the specified `callback` with approximately `interval` between each
   // invocation, starting after an initial `interval`. Return a function that cancels future

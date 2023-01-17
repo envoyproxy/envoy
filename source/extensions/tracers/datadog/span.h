@@ -7,22 +7,20 @@
 #include "envoy/common/time.h"
 #include "envoy/tracing/trace_driver.h"
 
-#include "source/extensions/tracers/datadog/dd.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace Datadog {
 
 class Span : public Tracing::Span {
-  dd::Optional<dd::Span> span_;
+  datadog::tracing::Optional<datadog::tracing::Span> span_;
   std::string trace_id_hex_;
 
 public:
-  explicit Span(dd::Span&& span);
+  explicit Span(datadog::tracing::Span&& span);
 
   // `impl` is used by the unit tests.
-  const dd::Optional<dd::Span>& impl() const;
+  const datadog::tracing::Optional<datadog::tracing::Span>& impl() const;
 
   void setOperation(absl::string_view operation) override;
 

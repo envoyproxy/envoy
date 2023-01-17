@@ -5,8 +5,6 @@
 
 #include <string>
 
-#include "source/extensions/tracers/datadog/dd.h"
-
 namespace Envoy {
 namespace Tracing {
 class TraceContext;
@@ -19,38 +17,40 @@ namespace Extensions {
 namespace Tracers {
 namespace Datadog {
 
-class RequestHeaderWriter : public dd::DictWriter {
+class RequestHeaderWriter : public datadog::tracing::DictWriter {
   Http::RequestHeaderMap* headers_;
 
 public:
   explicit RequestHeaderWriter(Http::RequestHeaderMap& headers);
 
-  void set(dd::StringView key, dd::StringView value) override;
+  void set(datadog::tracing::StringView key, datadog::tracing::StringView value) override;
 };
 
-class ResponseHeaderReader : public dd::DictReader {
+class ResponseHeaderReader : public datadog::tracing::DictReader {
   const Http::ResponseHeaderMap* headers_;
   mutable std::string buffer_;
 
 public:
   explicit ResponseHeaderReader(const Http::ResponseHeaderMap& headers);
 
-  dd::Optional<dd::StringView> lookup(dd::StringView key) const override;
+  datadog::tracing::Optional<datadog::tracing::StringView>
+  lookup(datadog::tracing::StringView key) const override;
 
-  void visit(
-      const std::function<void(dd::StringView key, dd::StringView value)>& visitor) const override;
+  void visit(const std::function<void(datadog::tracing::StringView key,
+                                      datadog::tracing::StringView value)>& visitor) const override;
 };
 
-class TraceContextReader : public dd::DictReader {
+class TraceContextReader : public datadog::tracing::DictReader {
   const Tracing::TraceContext* context_;
 
 public:
   explicit TraceContextReader(const Tracing::TraceContext& context);
 
-  dd::Optional<dd::StringView> lookup(dd::StringView key) const override;
+  datadog::tracing::Optional<datadog::tracing::StringView>
+  lookup(datadog::tracing::StringView key) const override;
 
-  void visit(
-      const std::function<void(dd::StringView key, dd::StringView value)>& visitor) const override;
+  void visit(const std::function<void(datadog::tracing::StringView key,
+                                      datadog::tracing::StringView value)>& visitor) const override;
 };
 
 } // namespace Datadog

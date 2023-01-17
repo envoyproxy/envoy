@@ -7,8 +7,8 @@ namespace Extensions {
 namespace Tracers {
 namespace Datadog {
 
-dd::TimePoint estimateTime(SystemTime wall) {
-  auto point = dd::default_clock();
+datadog::tracing::TimePoint estimateTime(SystemTime wall) {
+  auto point = datadog::tracing::default_clock();
   auto elapsed = point.wall - wall;
   // We could be off by a second or so if the system clock has been adjusted
   // since `wall` was taken. It's fine.

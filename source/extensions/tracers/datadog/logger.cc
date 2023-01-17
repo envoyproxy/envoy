@@ -11,7 +11,7 @@ namespace Datadog {
 
 Logger::Logger(spdlog::logger& logger) : logger_(&logger) {}
 
-// dd::Logger
+// datadog::tracing::Logger
 
 void Logger::log_error(const LogFunc& write) {
   if (!ENVOY_LOG_COMP_LEVEL((*logger_), error)) {
@@ -33,11 +33,11 @@ void Logger::log_startup(const LogFunc& write) {
   ENVOY_LOG_TO_LOGGER((*logger_), info, "{}", stream.str());
 }
 
-void Logger::log_error(const dd::Error& error) {
+void Logger::log_error(const datadog::tracing::Error& error) {
   ENVOY_LOG_TO_LOGGER((*logger_), error, "Datadog [error {}]: {}", int(error.code), error.message);
 }
 
-void Logger::log_error(dd::StringView message) {
+void Logger::log_error(datadog::tracing::StringView message) {
   ENVOY_LOG_TO_LOGGER((*logger_), error, "{}", message);
 }
 

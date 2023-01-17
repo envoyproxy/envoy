@@ -18,20 +18,23 @@ namespace Tracers {
 namespace Datadog {
 namespace {
 
-class TraceContextWriter : public dd::DictWriter {
+class TraceContextWriter : public datadog::tracing::DictWriter {
   Tracing::TraceContext* context_;
 
 public:
   explicit TraceContextWriter(Tracing::TraceContext& context) : context_(&context) {}
 
-  void set(dd::StringView key, dd::StringView value) override { context_->setByKey(key, value); }
+  void set(datadog::tracing::StringView key, datadog::tracing::StringView value) override {
+    context_->setByKey(key, value);
+  }
 };
 
 } // namespace
 
-Span::Span(dd::Span&& span) : span_(std::move(span)), trace_id_hex_(hex(span_->trace_id())) {}
+Span::Span(datadog::tracing::Span&& span)
+    : span_(std::move(span)), trace_id_hex_(hex(span_->trace_id())) {}
 
-const dd::Optional<dd::Span>& Span::impl() const { return span_; }
+const datadog::tracing::Optional<datadog::tracing::Span>& Span::impl() const { return span_; }
 
 void Span::setOperation(absl::string_view operation) {
   if (!span_) {
@@ -75,7 +78,7 @@ Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string& nam
 
   // The OpenTracing implementation ignored the `Tracing::Config` argument,
   // so we will as well.
-  dd::SpanConfig config;
+  datadog::tracing::SpanConfig config;
   config.name = name;
   config.start = estimateTime(start_time);
 
@@ -87,7 +90,8 @@ void Span::setSampled(bool sampled) {
     return;
   }
 
-  auto priority = int(sampled ? dd::SamplingPriority::USER_KEEP : dd::SamplingPriority::USER_DROP);
+  auto priority = int(sampled ? datadog::tracing::SamplingPriority::USER_KEEP
+                              : datadog::tracing::SamplingPriority::USER_DROP);
   span_->trace_segment().override_sampling_priority(priority);
 }
 

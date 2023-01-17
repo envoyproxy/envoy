@@ -24,7 +24,6 @@ envoy_cc_library(
     ],
     hdrs = [
         "agent_http_client.h",
-        "dd.h",
         "dict_util.h",
         "event_scheduler.h",
         "logger.h",

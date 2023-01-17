@@ -8,7 +8,6 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/upstream/cluster_update_tracker.h"
-#include "source/extensions/tracers/datadog/dd.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -19,7 +18,7 @@ namespace Datadog {
 
 struct TracerStats;
 
-class AgentHTTPClient : public dd::HTTPClient,
+class AgentHTTPClient : public datadog::tracing::HTTPClient,
                         public Http::AsyncClient::Callbacks,
                         private Logger::Loggable<Logger::Id::tracing> {
 public:
@@ -45,10 +44,11 @@ public:
 
   ~AgentHTTPClient() override;
 
-  // dd::HTTPClient
+  // datadog::tracing::HTTPClient
 
-  dd::Expected<void> post(const URL& url, HeadersSetter set_headers, std::string body,
-                          ResponseHandler on_response, ErrorHandler on_error) override;
+  datadog::tracing::Expected<void> post(const URL& url, HeadersSetter set_headers, std::string body,
+                                        ResponseHandler on_response,
+                                        ErrorHandler on_error) override;
 
   // `drain` has no effect.
   void drain(std::chrono::steady_clock::time_point) override;

@@ -18,7 +18,6 @@
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/common/tracing/null_span_impl.h"
 #include "source/extensions/tracers/datadog/config.h"
-#include "source/extensions/tracers/datadog/dd.h"
 #include "source/extensions/tracers/datadog/dict_util.h"
 #include "source/extensions/tracers/datadog/span.h"
 #include "source/extensions/tracers/datadog/tracer.h"
@@ -481,7 +480,7 @@ TEST_F(DatadogDriverTest, ResponseHeaderReader) {
   EXPECT_EQ("case", result);
 
   result = reader.lookup("missing");
-  EXPECT_EQ(dd::nullopt, result);
+  EXPECT_EQ(datadog::tracing::nullopt, result);
 
   std::vector<std::pair<std::string, std::string>> expected_visitation{
       // These entries are in reverse. We'll `pop_back` as we go.
@@ -577,10 +576,10 @@ TEST_F(DatadogDriverTest, Span) {
   const auto span_impl = dynamic_cast<Span*>(span.get());
   ASSERT_NE(nullptr, span_impl);
 
-  const dd::Optional<dd::Span>& dd_span = span_impl->impl();
+  const datadog::tracing::Optional<datadog::tracing::Span>& dd_span = span_impl->impl();
   ASSERT_TRUE(dd_span);
 
-  // Neither `Tracing::Span` nor `dd::Span` exposes a "get span" method.
+  // Neither `Tracing::Span` nor `datadog::tracing::Span` exposes a "get span" method.
   span->setOperation("pig.bristle");
 
   span->setTag("foo", "bar");
@@ -606,13 +605,13 @@ TEST_F(DatadogDriverTest, Span) {
   EXPECT_EQ(std::to_string(dd_span->id()), found->second);
   found = context.context_map_.find("x-datadog-sampling-priority");
   ASSERT_NE(context.context_map_.end(), found);
-  EXPECT_EQ(std::to_string(int(dd::SamplingPriority::USER_DROP)), found->second);
+  EXPECT_EQ(std::to_string(int(datadog::tracing::SamplingPriority::USER_DROP)), found->second);
 
   auto child = span->spawnChild(config_, "do.foo", now);
   ASSERT_NE(nullptr, child);
   const auto child_impl = dynamic_cast<Span*>(child.get());
   ASSERT_NE(nullptr, child_impl);
-  const dd::Optional<dd::Span>& dd_child = child_impl->impl();
+  const datadog::tracing::Optional<datadog::tracing::Span>& dd_child = child_impl->impl();
   ASSERT_TRUE(dd_child);
 
   EXPECT_EQ(dd_child->trace_id(), dd_span->trace_id());
@@ -622,7 +621,7 @@ TEST_F(DatadogDriverTest, Span) {
   auto decision = dd_span->trace_segment().sampling_decision();
   ASSERT_TRUE(decision);
   // The sampling priority is "user drop," i.e. -1.
-  EXPECT_EQ(int(dd::SamplingPriority::USER_DROP), decision->priority);
+  EXPECT_EQ(int(datadog::tracing::SamplingPriority::USER_DROP), decision->priority);
 
   // `setBaggage` does nothing (there's no way to check, really).
   span->setBaggage("foo", "bar");
@@ -633,7 +632,7 @@ TEST_F(DatadogDriverTest, Span) {
   span->finishSpan();
 
   // After the span is finished, its methods become no-ops, because its
-  // implementation (the dd::Span inside) has been destroyed.
+  // implementation (the datadog::tracing::Span inside) has been destroyed.
   EXPECT_FALSE(dd_span);
 
   span->finishSpan();

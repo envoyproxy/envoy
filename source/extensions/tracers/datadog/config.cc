@@ -9,7 +9,6 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/version/version.h"
-#include "source/extensions/tracers/datadog/dd.h"
 #include "source/extensions/tracers/datadog/tracer.h"
 
 namespace Envoy {
@@ -19,9 +18,9 @@ namespace Datadog {
 
 DatadogTracerFactory::DatadogTracerFactory() : FactoryBase("envoy.tracers.datadog") {}
 
-dd::TracerConfig
+datadog::tracing::TracerConfig
 DatadogTracerFactory::makeConfig(const envoy::config::trace::v3::DatadogConfig& proto_config) {
-  dd::TracerConfig config;
+  datadog::tracing::TracerConfig config;
   config.defaults.version = "envoy " + Envoy::VersionInfo::version();
   config.defaults.name = "envoy.proxy";
   if (proto_config.service_name().empty()) {
