@@ -140,8 +140,8 @@ TEST_F(FileSystemHttpCacheTestWithNoDefaultCache, EvictsOldestFilesUntilUnderCou
     // TODO(ravenblack): replace this with backdating the files when that's possible.
     absl::Mutex mu;
     absl::MutexLock lock(&mu);
-    auto cond = []() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu) { return false; };
-    mu.AwaitWithTimeout(absl::Condition(&cond), absl::Seconds(1));
+    const bool alwaysFalse = false;
+    mu.AwaitWithTimeout(absl::Condition(&alwaysFalse), absl::Seconds(1));
   }
   cache_ = std::dynamic_pointer_cast<FileSystemHttpCache>(
       http_cache_factory_->getCache(cacheConfig(cfg), context_));
@@ -178,8 +178,8 @@ TEST_F(FileSystemHttpCacheTestWithNoDefaultCache, EvictsOldestFilesUntilUnderSiz
     // TODO(ravenblack): replace this with backdating the files when that's possible.
     absl::Mutex mu;
     absl::MutexLock lock(&mu);
-    auto cond = []() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu) { return false; };
-    mu.AwaitWithTimeout(absl::Condition(&cond), absl::Seconds(1));
+    const bool alwaysFalse = false;
+    mu.AwaitWithTimeout(absl::Condition(&alwaysFalse), absl::Seconds(1));
   }
   cache_ = std::dynamic_pointer_cast<FileSystemHttpCache>(
       http_cache_factory_->getCache(cacheConfig(cfg), context_));
