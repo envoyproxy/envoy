@@ -8,18 +8,18 @@ RequestHeadersBuilder::RequestHeadersBuilder(RequestMethod request_method, std::
   initialize(request_method, std::move(scheme), std::move(authority), std::move(path));
 }
 
-RequestHeadersBuilder::RequestHeadersBuilder(RequestMethod request_method,
-                                             absl::string_view url) {
+RequestHeadersBuilder::RequestHeadersBuilder(RequestMethod request_method, absl::string_view url) {
   Envoy::Http::Utility::Url parsed_url;
-  if (!parsed_url.initialize(url, /*is_connect_request=*/ false)) {
+  if (!parsed_url.initialize(url, /*is_connect_request=*/false)) {
     initialize(request_method, "", "", "");
     return;
   }
-  initialize(request_method, std::string(parsed_url.scheme()), std::string(parsed_url.hostAndPort()), std::string(parsed_url.pathAndQueryParams()));
+  initialize(request_method, std::string(parsed_url.scheme()),
+             std::string(parsed_url.hostAndPort()), std::string(parsed_url.pathAndQueryParams()));
 }
 
-void RequestHeadersBuilder::initialize(RequestMethod request_method, std::string scheme, std::string authority,
-				       std::string path) {
+void RequestHeadersBuilder::initialize(RequestMethod request_method, std::string scheme,
+                                       std::string authority, std::string path) {
   internalSet(":method", {requestMethodToString(request_method)});
   internalSet(":scheme", {std::move(scheme)});
   internalSet(":authority", {std::move(authority)});

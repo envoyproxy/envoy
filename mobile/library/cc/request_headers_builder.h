@@ -27,7 +27,7 @@ public:
 
 private:
   void initialize(RequestMethod request_method, std::string scheme, std::string authority,
-		  std::string path);
+                  std::string path);
 };
 
 using RequestHeadersBuilderSharedPtr = std::shared_ptr<RequestHeadersBuilder>;
