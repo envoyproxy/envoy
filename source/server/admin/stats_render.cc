@@ -78,8 +78,8 @@ void StatsTextRender::addDisjointBuckets(const std::string& name,
       bucket_summary.push_back(" ");
     }
     bucket_strings.push_back(fmt::format("B{:g}({},{})", supported_buckets[i],
-                                          disjoint_interval_buckets[i],
-                                          disjoint_cumulative_buckets[i]));
+                                         disjoint_interval_buckets[i],
+                                         disjoint_cumulative_buckets[i]));
     bucket_summary.push_back(bucket_strings.back());
   }
   bucket_summary.push_back("\n");
