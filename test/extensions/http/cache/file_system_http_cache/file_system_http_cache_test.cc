@@ -126,6 +126,7 @@ TEST_F(FileSystemHttpCacheTestWithNoDefaultCache, InitialStatsAreSetCorrectly) {
   EXPECT_EQ(cache_->stats().size_limit_count_.value(), max_count);
   EXPECT_EQ(cache_->stats().size_bytes_.value(), file_1_contents.size() + file_2_contents.size());
   EXPECT_EQ(cache_->stats().size_count_.value(), 2);
+  EXPECT_EQ(cache_->stats().eviction_runs_.value(), 0);
 }
 
 TEST_F(FileSystemHttpCacheTestWithNoDefaultCache, EvictsOldestFilesUntilUnderCountLimit) {
@@ -145,6 +146,7 @@ TEST_F(FileSystemHttpCacheTestWithNoDefaultCache, EvictsOldestFilesUntilUnderCou
   cache_ = std::dynamic_pointer_cast<FileSystemHttpCache>(
       http_cache_factory_->getCache(cacheConfig(cfg), context_));
   waitForEvictionThreadIdle();
+  EXPECT_EQ(cache_->stats().eviction_runs_.value(), 0);
   EXPECT_EQ(cache_->stats().size_bytes_.value(), file_contents.size() * 2);
   EXPECT_EQ(cache_->stats().size_count_.value(), 2);
   env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-c"), file_contents, true);
@@ -158,6 +160,10 @@ TEST_F(FileSystemHttpCacheTestWithNoDefaultCache, EvictsOldestFilesUntilUnderCou
   EXPECT_FALSE(Filesystem::fileSystemForTest().fileExists(absl::StrCat(cache_path_, "cache-b")));
   EXPECT_TRUE(Filesystem::fileSystemForTest().fileExists(absl::StrCat(cache_path_, "cache-c")));
   EXPECT_TRUE(Filesystem::fileSystemForTest().fileExists(absl::StrCat(cache_path_, "cache-d")));
+  // There may have been one or two eviction runs here, because there's a race
+  // between the eviction and the second file being added. Either amount of runs
+  // is valid, as the eventual consistency is achieved either way.
+  EXPECT_THAT(cache_->stats().eviction_runs_.value(), testing::AnyOf(1, 2));
 }
 
 TEST_F(FileSystemHttpCacheTestWithNoDefaultCache, EvictsOldestFilesUntilUnderSizeLimit) {
@@ -178,6 +184,7 @@ TEST_F(FileSystemHttpCacheTestWithNoDefaultCache, EvictsOldestFilesUntilUnderSiz
   cache_ = std::dynamic_pointer_cast<FileSystemHttpCache>(
       http_cache_factory_->getCache(cacheConfig(cfg), context_));
   waitForEvictionThreadIdle();
+  EXPECT_EQ(cache_->stats().eviction_runs_.value(), 0);
   env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-c"), large_file_contents, true);
   EXPECT_EQ(cache_->stats().size_bytes_.value(), file_contents.size() * 2);
   EXPECT_EQ(cache_->stats().size_count_.value(), 2);
@@ -188,6 +195,7 @@ TEST_F(FileSystemHttpCacheTestWithNoDefaultCache, EvictsOldestFilesUntilUnderSiz
   EXPECT_FALSE(Filesystem::fileSystemForTest().fileExists(absl::StrCat(cache_path_, "cache-a")));
   EXPECT_FALSE(Filesystem::fileSystemForTest().fileExists(absl::StrCat(cache_path_, "cache-b")));
   EXPECT_TRUE(Filesystem::fileSystemForTest().fileExists(absl::StrCat(cache_path_, "cache-c")));
+  EXPECT_EQ(cache_->stats().eviction_runs_.value(), 1);
 }
 
 class FileSystemHttpCacheTest : public FileSystemCacheTestContext, public ::testing::Test {

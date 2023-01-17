@@ -19,7 +19,8 @@ namespace FileSystemHttpCache {
  *
  * Drift will eventually be reconciled at the next pre-cache-purge measurement.
  **/
-#define ALL_CACHE_STATS(GAUGE)                                                                     \
+#define ALL_CACHE_STATS(COUNTER, GAUGE)                                                            \
+  COUNTER(eviction_runs)                                                                           \
   GAUGE(size_bytes, NeverImport)                                                                   \
   GAUGE(size_count, NeverImport)                                                                   \
   GAUGE(size_limit_bytes, NeverImport)                                                             \
@@ -27,7 +28,7 @@ namespace FileSystemHttpCache {
 // TODO(ravenblack): Add other stats from DESIGN.md
 
 struct CacheStats {
-  ALL_CACHE_STATS(GENERATE_GAUGE_STRUCT)
+  ALL_CACHE_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
 CacheStats generateStats(Stats::Scope& scope, absl::string_view cache_path);

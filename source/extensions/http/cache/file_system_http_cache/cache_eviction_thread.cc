@@ -89,6 +89,7 @@ void CacheShared::initStats() {
 }
 
 void CacheShared::evict() {
+  stats_.eviction_runs_.add(1);
   auto os_sys_calls = Api::OsSysCallsSingleton::get();
   uint64_t size = 0;
   uint64_t count = 0;
@@ -152,6 +153,7 @@ void CacheShared::evict() {
 }
 
 void CacheEvictionThread::work() {
+  ENVOY_LOG(info, "Starting cache eviction thread.");
   while (waitForSignal()) {
     absl::flat_hash_set<std::shared_ptr<CacheShared>> caches;
     {
@@ -170,6 +172,7 @@ void CacheEvictionThread::work() {
       }
     }
   }
+  ENVOY_LOG(info, "Ending cache eviction thread.");
 }
 
 void CacheEvictionThread::waitForIdle() {

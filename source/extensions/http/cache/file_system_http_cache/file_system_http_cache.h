@@ -4,6 +4,7 @@
 
 #include "envoy/extensions/http/cache/file_system_http_cache/v3/file_system_http_cache.pb.h"
 
+#include "source/common/common/logger.h"
 #include "source/extensions/common/async_files/async_file_manager.h"
 #include "source/extensions/filters/http/cache/http_cache.h"
 #include "source/extensions/http/cache/file_system_http_cache/stats.h"

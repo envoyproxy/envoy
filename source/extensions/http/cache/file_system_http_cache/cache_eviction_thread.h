@@ -6,6 +6,8 @@
 
 #include "envoy/thread/thread.h"
 
+#include "source/common/common/logger.h"
+
 #include "absl/base/thread_annotations.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/synchronization/mutex.h"
@@ -28,7 +30,7 @@ struct CacheShared;
  *
  * See DESIGN.md for more details of the eviction process.
  **/
-class CacheEvictionThread {
+class CacheEvictionThread : public Logger::Loggable<Logger::Id::cache_filter> {
 public:
   CacheEvictionThread(Thread::ThreadFactory& thread_factory);
   ~CacheEvictionThread();
