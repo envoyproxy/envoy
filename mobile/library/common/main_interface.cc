@@ -171,3 +171,12 @@ envoy_status_t reset_connectivity_state(envoy_engine_t e) {
   return Envoy::EngineHandle::runOnEngineDispatcher(
       e, [](auto& engine) { engine.networkConnectivityManager().resetConnectivityState(); });
 }
+
+envoy_status_t complete_proxy_resolution
+ (envoy_engine_t engine, envoy_proxy_settings_list proxy_settings_list,
+  const envoy_proxy_resolver_proxy_resolution_result_handler *result_handler) {
+  return Envoy::EngineHandle::runOnEngineDispatcher(
+      engine, [proxy_settings_list, result_handler](auto&) {
+        result_handler->proxy_resolution_completed(proxy_settings_list, result_handler->context);
+      });
+}

@@ -552,7 +552,7 @@ typedef struct {
 typedef void (*envoy_proxy_resolver_resolve_f)
   (envoy_data host,
    const uint16_t port,
-   envoy_proxy_resolver_proxy_resolution_result_handler result_handler,
+   const envoy_proxy_resolver_proxy_resolution_result_handler *result_handler,
    const void *context);
 
 typedef struct {

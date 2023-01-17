@@ -73,14 +73,12 @@ NSTimeInterval kProxySettingsRefreshRateSeconds = 7;
   if (NO && isHTTPProxyEnabled) {
     NSString *host = settings[(NSString *)kCFNetworkProxiesHTTPProxy];
     NSUInteger port = [settings[(NSString *)kCFNetworkProxiesHTTPPort] unsignedIntValue];
-      self.proxySettings = [[EnvoyProxySettings alloc] initWithHostname:host port:port];
+    self.proxySettings = [[EnvoyProxySettings alloc] initWithHost:host port:port];
   } else if (isAutoConfigProxyEnabled) {
     NSString *urlString = settings[(NSString *)kCFNetworkProxiesProxyAutoConfigURLString];
-      // TODO: what to do with an incorrect string in here
-      NSURL *url = [NSURL URLWithString:urlString];
-      self.proxySettings = [[EnvoyProxySettings alloc] initWithPACFileURL:@"https://s3.magneticbear.com/uploads/rafal.pac"];
-
-
+    // TODO: what to do with an incorrect string in here
+    NSURL *url = [NSURL URLWithString:urlString];
+    self.proxySettings = [[EnvoyProxySettings alloc] initWithPACFileURL:@"https://s3.magneticbear.com/uploads/rafal.pac"];
   } else {
     self.proxySettings = nil;
   }

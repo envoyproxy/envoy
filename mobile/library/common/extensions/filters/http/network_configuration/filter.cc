@@ -4,6 +4,7 @@
 
 #include "source/common/network/filter_state_proxy_info.h"
 
+#include "library/common/api/external.h"
 #include "library/common/http/header_utility.h"
 
 namespace Envoy {
@@ -63,6 +64,10 @@ NetworkConfigurationFilter::decodeHeaders(Http::RequestHeaderMap& request_header
   if (authority.empty()) {
     return Http::FilterHeadersStatus::Continue;
   }
+
+  const auto authorityHeader = request_headers.get(AuthorityHeaderName);
+  const auto proxy_resolver = static_cast<envoy_proxy_resolver *>(Api::External::retrieveApi("envoy_proxy_resolver"));
+  proxy_resolver->resolve(request_headers.get);
 
   // If there is no proxy configured, continue.
   const auto proxy_settings = connectivity_manager_->getProxySettings();

@@ -393,12 +393,24 @@ static void ios_track_event(envoy_map map, const void *context) {
   }
 }
 
-static void ios_resolve_proxy(envoy_data c_host, const uint16_t port, envoy_proxy_resolver_proxy_resolution_result_handler *result_handler, const void *context) {
+@interface EnvoyProxyResolutionContext: NSObject
+
+@property (nonatomic, assign) envoy_engine_t engineHandle;
+@property (nonatomic, strong) EnvoyProxyResolver *proxyResolver;
+
+@end
+
+@implementation EnvoyProxyResolutionContext
+@end
+
+static void ios_resolve_proxy(envoy_data c_host, const uint16_t port,
+                              const envoy_proxy_resolver_proxy_resolution_result_handler *result_handler,
+                              const void *context) {
   @autoreleasepool {
-    EnvoyProxyResolver *resolver = (__bridge EnvoyProxyResolver *)context;
+    EnvoyProxyResolutionContext *resolutionContext = (__bridge EnvoyProxyResolutionContext *)context;
     NSString *host = to_ios_string(c_host);
 
-    [resolver
+    [resolutionContext.proxyResolver
      resolveProxyForTargetURL:[NSURL URLWithString:host]
      port:port
      withCompletionBlock:^(NSArray<EnvoyProxySettings *> * _Nullable settings, NSError * _Nullable error) {
@@ -413,7 +425,8 @@ static void ios_resolve_proxy(envoy_data c_host, const uint16_t port, envoy_prox
         };
         list.proxy_settings[i] = proxy_settings;
       }
-      result_handler->proxy_resolution_completed(list, context);
+
+      complete_proxy_resolution(resolutionContext.engineHandle, list, result_handler);
     }];
   }
 }
@@ -476,9 +489,15 @@ static void ios_resolve_proxy(envoy_data c_host, const uint16_t port, envoy_prox
 }
 
 - (void)registerProxyResolver:(EnvoyProxyResolver *)proxyResolver {
+  EnvoyProxyResolutionContext *context = [EnvoyProxyResolutionContext new];
+  context.engineHandle = self->_engineHandle;
+  context.proxyResolver = proxyResolver;
+
   envoy_proxy_resolver *resolver = safe_malloc(sizeof(envoy_proxy_resolver));
-  resolver->context = CFBridgingRetain(proxyResolver);
+  resolver->context = CFBridgingRetain(context);
   resolver->resolve = ios_resolve_proxy;
+
+  register_platform_api("envoy_proxy_resolver", resolver);
 }
 
 - (int)registerFilterFactory:(EnvoyHTTPFilterFactory *)filterFactory {

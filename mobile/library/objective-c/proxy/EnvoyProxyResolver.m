@@ -34,14 +34,14 @@ NS_ASSUME_NONNULL_BEGIN
 }
 
 - (void)resolveProxyForTargetURL:(NSURL *)targetURL
-       proxyAutoConfigurationURL:(NSURL *)proxyAutoConfigurationURL
+                            port:(uint16_t)port
              withCompletionBlock:(void(^)(NSArray<EnvoyProxySettings *> * _Nullable, NSError * _Nullable))completion
 {
     @synchronized (self) {
         if (self.proxySettings.pacFileURL) {
             [self.pacProxyResolver
              resolveProxiesForTargetURL:targetURL
-             proxyAutoConfigurationURL:proxyAutoConfigurationURL
+             proxyAutoConfigurationURL:self.proxySettings.pacFileURL
              withCompletionBlock:^void(NSArray<EnvoyProxySettings *> * _Nullable proxySettings, NSError * _Nullable error) {
                 completion(proxySettings, error);
             }];
