@@ -502,9 +502,9 @@ stats_config:
         - prefix: cluster.base.upstream_cx_
         - prefix: cluster.base_h2.upstream_cx_
         - prefix: cluster.stats.upstream_cx_
-        - exact:  cluster.base.http2.keepalive_timeout
-        - exact:  cluster.base_h2.http2.keepalive_timeout
-        - exact:  cluster.stats.http2.keepalive_timeout
+        - exact: cluster.base.http2.keepalive_timeout
+        - exact: cluster.base_h2.http2.keepalive_timeout
+        - exact: cluster.stats.http2.keepalive_timeout
         - prefix: http.hcm.downstream_rq_
         - prefix: http.hcm.decompressor.
         - prefix: pulse.
