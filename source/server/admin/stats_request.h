@@ -30,7 +30,7 @@ protected:
   // over all scopes for each type. This enables the complex chunking
   // implementation to pass the tests that capture the buffered behavior. There
   // is not a significant cost to this, but in a future PR we may choose to
-  // co-mingle the types. Note that histograms are groups together in the data
+  // co-mingle the types. Note that histograms are grouped together in the data
   // JSON data model, so we won't be able to fully co-mingle.
   enum class PhaseName {
     TextReadouts,

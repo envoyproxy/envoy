@@ -35,7 +35,7 @@ Http::Code StatsRequest<TextReadoutTyoe, CounterType, GaugeType, HistogramType>:
     html_render->urlHandler(response_, url_handler_fn_(), params_.query_);
     html_render->tableEnd(response_);
     html_render->startPre(response_);
-    render_.reset(html_render.release());
+    render_ = std::move(html_render);
     break;
   }
 #endif
