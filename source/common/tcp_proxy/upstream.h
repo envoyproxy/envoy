@@ -171,7 +171,7 @@ private:
     // Http::ResponseDecoder
     void decode1xxHeaders(Http::ResponseHeaderMapPtr&&) override {}
     void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override {
-      bool isValidResponse = parent_.isValidResponse(*headers);
+      bool is_valid_response = parent_.isValidResponse(*headers);
       parent_.config_.propagateResponseHeaders(std::move(headers),
                                                parent_.downstream_info_.filterState());
       if (!isValidResponse || end_stream) {
