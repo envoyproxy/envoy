@@ -8,6 +8,7 @@
 - [x] Cache should evict the least recently used (LRU) entry when full
 - [ ] Eviction should be configurable as a "window", like watermarks, or with an optional frequency constraint, so the eviction thread can be kept from churning.
 - [x] Cache should be limited to a specified amount of storage
+- [ ] Cache should be configurable to periodically update the internal size from the filesystem, to account for external alterations.
 - [ ] Cache should mitigate thundering herd problem (i.e. if two or more workers request the same cacheable uncached result at the same time, only one worker should hit upstream). See [discussion](#thundering-herd).
 - [ ] There should be an ability to remove objects from the cache with some kind of API call.
 - [ ] Cache should expose counters for eviction stats (files evicted, bytes evicted).
