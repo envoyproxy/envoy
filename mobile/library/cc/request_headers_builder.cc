@@ -1,5 +1,7 @@
 #include "request_headers_builder.h"
 
+#include "source/common/http/utility.h"
+
 namespace Envoy {
 namespace Platform {
 
