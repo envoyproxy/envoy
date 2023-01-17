@@ -254,13 +254,13 @@ struct CacheShared {
   absl::string_view cachePath() const { return config_.cache_path(); }
 
   /**
-   * Updates stats to reflect that a file has been added to the cache.
+   * Updates stats (size and count) to reflect that a file has been added to the cache.
    * @param file_size The size in bytes of the file that was added.
    */
   void trackFileAdded(uint64_t file_size);
 
   /**
-   * Updates stats to reflect that a file has been removed from the cache.
+   * Updates stats (size and count) to reflect that a file has been removed from the cache.
    * @param file_size The size in bytes of the file that was removed.
    */
   void trackFileRemoved(uint64_t file_size);
