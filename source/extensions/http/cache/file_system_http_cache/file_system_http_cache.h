@@ -224,6 +224,9 @@ private:
   friend class FileSystemCacheTestContext;
 };
 
+// This part of the cache implementation is shared between CacheEvictionThread and
+// FileSystemHttpCache. The implementation of CacheShared is also split between the
+// two implementation files, accordingly.
 struct CacheShared {
   CacheShared(ConfigProto config, Stats::Scope& stats_scope);
   const ConfigProto config_;
@@ -261,6 +264,16 @@ struct CacheShared {
    * @param file_size The size in bytes of the file that was removed.
    */
   void trackFileRemoved(uint64_t file_size);
+
+  /**
+   * Performs an eviction pass over this cache. Runs in the CacheEvictionThread.
+   */
+  void evict();
+
+  /**
+   * Initializes the stats for this cache. Runs in the CacheEvictionThread.
+   */
+  void initStats();
 };
 
 } // namespace FileSystemHttpCache

@@ -60,19 +60,6 @@ private:
   void work();
 
   /**
-   * Initialize the cache stats.
-   * @param cache the shared data of the cache to initialize.
-   */
-
-  static void init(CacheShared& cache);
-
-  /**
-   * Evict from the cache, until the configured thresholds are not exceeded.
-   * @param cache the shared data of the cache to evict from.
-   */
-  static void evict(CacheShared& cache);
-
-  /**
    * @return false if terminating.
    */
   bool waitForSignal();
