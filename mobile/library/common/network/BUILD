@@ -8,17 +8,8 @@ envoy_cc_library(
     name = "connectivity_manager_lib",
     srcs = [
         "connectivity_manager.cc",
-        "android.cc",
-    ] + select({
-        "@envoy//bazel:android": [
-            "//third_party:android/ifaddrs-android.h",
-            "//third_party:android/LocalArray.h",
-            "//third_party:android/ScopedFd.h",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     hdrs = [
-        "android.h",
         "connectivity_manager.h",
         "proxy_settings.h",
     ],

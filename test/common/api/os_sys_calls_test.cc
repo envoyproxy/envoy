@@ -72,7 +72,7 @@ TEST(OsSyscallsTest, SetAlternateGetifaddrs) {
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
   const bool pre_alternate_support = os_syscalls.supportsGetifaddrs();
   Api::InterfaceAddressVector interfaces{};
-#if defined(WIN32) || (defined(__ANDROID_API__) && __ANDROID_API__ < 24)
+#if defined(WIN32)
   EXPECT_FALSE(pre_alternate_support);
   EXPECT_DEATH(os_syscalls.getifaddrs(interfaces), "not implemented");
 #else
