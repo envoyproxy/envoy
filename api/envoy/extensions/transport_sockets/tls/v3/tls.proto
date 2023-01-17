@@ -254,8 +254,7 @@ message CommonTlsContext {
   // [#next-major-version: These mutually exclusive fields should ideally be in a oneof, but it's
   // not legal to put a repeated field in a oneof. In the next major version, we should rework
   // this to avoid this problem.]
-  repeated SdsSecretConfig tls_certificate_sds_secret_configs = 6
-      [(validate.rules).repeated = {max_items: 2}];
+  repeated SdsSecretConfig tls_certificate_sds_secret_configs = 6;
 
   // Certificate provider instance for fetching TLS certs.
   //
