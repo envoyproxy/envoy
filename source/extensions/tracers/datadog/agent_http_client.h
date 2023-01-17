@@ -27,13 +27,6 @@ public:
     ErrorHandler on_error;
   };
 
-private:
-  absl::flat_hash_map<Http::AsyncClient::Request*, Handlers> handlers_;
-  Upstream::ClusterUpdateTracker collector_cluster_;
-  std::string cluster_;
-  std::string reference_host_;
-  TracerStats* stats_;
-
 public:
   // Create an `AgentHTTPClient` that uses the specified `ClusterManager` to
   // make requests to the specified `cluster`, where requests include the
@@ -60,6 +53,13 @@ public:
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&&) override;
   void onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason) override;
   void onBeforeFinalizeUpstreamSpan(Tracing::Span&, const Http::ResponseHeaderMap*) override;
+
+private:
+  absl::flat_hash_map<Http::AsyncClient::Request*, Handlers> handlers_;
+  Upstream::ClusterUpdateTracker collector_cluster_;
+  std::string cluster_;
+  std::string reference_host_;
+  TracerStats* stats_;
 };
 
 } // namespace Datadog
