@@ -102,7 +102,7 @@ void AgentHTTPClient::onSuccess(const Http::AsyncClient::Request& request,
     return;
   }
 
-  auto& handlers = found->second;
+  Handlers& handlers = found->second;
   ResponseHeaderReader reader{response->headers()};
   handlers.on_response(status, reader, response->bodyAsString());
 
@@ -119,7 +119,7 @@ void AgentHTTPClient::onFailure(const Http::AsyncClient::Request& request,
 
   stats_->reports_failed_.inc();
 
-  auto& handlers = found->second;
+  Handlers& handlers = found->second;
   std::string message;
   message += "Failed to send request to Datadog Agent: ";
   switch (reason) {
