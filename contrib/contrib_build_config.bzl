@@ -40,7 +40,7 @@ CONTRIB_EXTENSIONS = {
     # Socket interface extensions
     #
 
-    #"envoy.bootstrap.vcl":                                      "//contrib/vcl/source:config",
+    "envoy.bootstrap.vcl":                                      "//contrib/vcl/source:config",
 
     #
     # Input matchers
@@ -52,7 +52,7 @@ CONTRIB_EXTENSIONS = {
     # Connection Balance extensions
     #
 
-    #"envoy.network.connection_balance.dlb":                     "//contrib/network/connection_balance/dlb/source:connection_balancer",
+    "envoy.network.connection_balance.dlb":                     "//contrib/network/connection_balance/dlb/source:connection_balancer",
 
     #
     # Regex engines
