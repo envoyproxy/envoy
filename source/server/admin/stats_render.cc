@@ -77,9 +77,9 @@ void StatsTextRender::addDisjointBuckets(const std::string& name,
     if (i != 0) {
       bucket_summary.push_back(" ");
     }
-    bucket_strings.push_back(fmt::format("B{:g}({},{})", supported_buckets[i],
-                                         disjoint_interval_buckets[i],
-                                         disjoint_cumulative_buckets[i]));
+    bucket_strings.push_back(absl::StrCat("B{:g}({},{})", supported_buckets[i],
+                                          disjoint_interval_buckets[i],
+                                          disjoint_cumulative_buckets[i]));
     bucket_summary.push_back(bucket_strings.back());
   }
   bucket_summary.push_back("\n");
@@ -268,7 +268,7 @@ void PrometheusStatsRender::generate(Buffer::Instance& response,
                                      const std::string& prefixed_tag_extracted_name,
                                      const Stats::Gauge& gauge) {
   const std::string tags = PrometheusStatsFormatter::formattedTags(gauge.tags());
-  response.add(fmt::format("{0}{{{1}}} {2}\n", prefixed_tag_extracted_name, tags, gauge.value()));
+  response.add(absl::StrCat(prefixed_tag_extracted_name, "{", tags, "} ", gauge.value(), "\n"));
 }
 
 // Writes a counter value.
@@ -276,7 +276,7 @@ void PrometheusStatsRender::generate(Buffer::Instance& response,
                                      const std::string& prefixed_tag_extracted_name,
                                      const Stats::Counter& counter) {
   const std::string tags = PrometheusStatsFormatter::formattedTags(counter.tags());
-  response.add(fmt::format("{0}{{{1}}} {2}\n", prefixed_tag_extracted_name, tags, counter.value()));
+  response.add(absl::StrCat(prefixed_tag_extracted_name, "{", tags, "} ", counter.value(), "\n"));
 }
 
 // Writes a text readout value.
@@ -286,13 +286,16 @@ void PrometheusStatsRender::generate(Buffer::Instance& response,
   auto tags = text_readout.tags();
   tags.push_back(Stats::Tag{"text_value", text_readout.value()});
   const std::string formattedTags = PrometheusStatsFormatter::formattedTags(tags);
-  response.add(fmt::format("{0}{{{1}}} 0\n", prefixed_tag_extracted_name, formattedTags));
+  response.add(absl::StrCat(prefixed_tag_extracted_name, "{", formattedTags, "} 0\n"));
 }
 
 // Writes a histogram value.
 void PrometheusStatsRender::generate(Buffer::Instance& response,
                                      const std::string& prefixed_tag_extracted_name,
                                      const Stats::ParentHistogram& histogram) {
+  // TODO(rulex123): support for the 3 histogram "bucket modes" offered in other
+  // stats formats hasn't been ported to Prometheus yet (see Utility::HistogramBucketsMode in
+  // source/server/admin/utils.h).
   const std::string tags = PrometheusStatsFormatter::formattedTags(histogram.tags());
   const std::string hist_tags = histogram.tags().empty() ? EMPTY_STRING : (tags + ",");
 
@@ -307,16 +310,16 @@ void PrometheusStatsRender::generate(Buffer::Instance& response,
     // 'g' operator which prints the number in general fixed point format or scientific format
     // with precision 50 to round the number up to 32 significant digits in fixed point format
     // which should cover pretty much all cases
-    response.add(fmt::format("{0}_bucket{{{1}le=\"{2:.32g}\"}} {3}\n", prefixed_tag_extracted_name,
-                             hist_tags, bucket, value));
+    response.add(absl::StrCat(prefixed_tag_extracted_name, "_bucket{", hist_tags, "le=\"",
+                              fmt::format("{0:.32g}", bucket), "\"} ", value, "\n"));
   }
 
-  response.add(fmt::format("{0}_bucket{{{1}le=\"+Inf\"}} {2}\n", prefixed_tag_extracted_name,
-                           hist_tags, stats.sampleCount()));
-  response.add(fmt::format("{0}_sum{{{1}}} {2:.32g}\n", prefixed_tag_extracted_name, tags,
-                           stats.sampleSum()));
-  response.add(fmt::format("{0}_count{{{1}}} {2}\n", prefixed_tag_extracted_name, tags,
-                           stats.sampleCount()));
+  response.add(absl::StrCat(prefixed_tag_extracted_name, "_bucket{", hist_tags, "le=\"+Inf\"} ",
+                            stats.sampleCount(), "\n"));
+  response.add(absl::StrCat(prefixed_tag_extracted_name, "_sum{", tags, "} ",
+                            fmt::format("{0:.32g}", stats.sampleSum()), "\n"));
+  response.add(
+      absl::StrCat(prefixed_tag_extracted_name, "_count{", tags, "} ", stats.sampleCount(), "\n"));
 }
 
 void PrometheusStatsRender::finalize(Buffer::Instance&) {}
