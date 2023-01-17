@@ -507,7 +507,6 @@ stats_config:
         - exact:  cluster.stats.http2.keepalive_timeout
         - prefix: http.hcm.downstream_rq_
         - prefix: http.hcm.decompressor.
-        - prefix: pbf_filter.
         - prefix: pulse.
         - safe_regex:
             regex: '^vhost\.[\w]+\.vcluster\.[\w]+?\.upstream_rq_(?:[12345]xx|[3-5][0-9][0-9]|retry|total)'
