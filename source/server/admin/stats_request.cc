@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-#include "stats_params.h"
+#include "source/server/admin/stats_params.h"
 
 #ifdef ENVOY_ADMIN_HTML
 #include "source/server/admin/stats_html_render.h"
