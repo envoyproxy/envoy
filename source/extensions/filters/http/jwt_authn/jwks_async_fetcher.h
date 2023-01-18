@@ -66,9 +66,9 @@ private:
   Common::JwksFetcherPtr fetcher_;
 
   // The next refetch duration after a good fetch.
-  std::chrono::seconds good_refetch_duration_;
+  std::chrono::milliseconds good_refetch_duration_;
   // The next refetch duration after a failed fetch.
-  std::chrono::seconds failed_refetch_duration_;
+  std::chrono::milliseconds failed_refetch_duration_;
   // The timer to trigger a refetch.
   Envoy::Event::TimerPtr refetch_timer_;
 

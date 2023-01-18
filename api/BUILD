@@ -73,6 +73,7 @@ proto_library(
     visibility = ["//visibility:public"],
     deps = [
         "//contrib/envoy/extensions/filters/http/dynamo/v3:pkg",
+        "//contrib/envoy/extensions/filters/http/golang/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/http/language/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/http/squash/v3:pkg",
         "//contrib/envoy/extensions/filters/http/sxg/v3alpha:pkg",
@@ -296,6 +297,7 @@ proto_library(
         "//envoy/extensions/upstreams/http/tcp/v3:pkg",
         "//envoy/extensions/upstreams/http/v3:pkg",
         "//envoy/extensions/upstreams/tcp/generic/v3:pkg",
+        "//envoy/extensions/upstreams/tcp/v3:pkg",
         "//envoy/extensions/wasm/v3:pkg",
         "//envoy/extensions/watchdog/profile_action/v3:pkg",
         "//envoy/service/accesslog/v3:pkg",

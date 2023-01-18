@@ -103,6 +103,12 @@ private:
       const std::string&, Server::Configuration::FactoryContext& context) override;
 };
 
+DECLARE_FACTORY(MatchDelegateConfig);
+
+namespace Factory {
+DECLARE_FACTORY(SkipActionFactory);
+} // namespace Factory
+
 } // namespace MatchDelegate
 } // namespace Http
 } // namespace Common

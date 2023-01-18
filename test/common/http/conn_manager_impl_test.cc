@@ -1197,8 +1197,8 @@ TEST_F(HttpConnectionManagerImplTest, DelegatingRouteEntryAllCalls) {
         EXPECT_EQ(default_route->routeEntry()->connectConfig().has_value(),
                   delegating_route_foo->routeEntry()->connectConfig().has_value());
         if (default_route->routeEntry()->connectConfig().has_value()) {
-          EXPECT_EQ(default_route->routeEntry()->connectConfig().value().allow_post(),
-                    delegating_route_foo->routeEntry()->connectConfig().value().allow_post());
+          EXPECT_EQ(default_route->routeEntry()->connectConfig()->allow_post(),
+                    delegating_route_foo->routeEntry()->connectConfig()->allow_post());
         }
 
         EXPECT_EQ(default_route->routeEntry()->routeName(),

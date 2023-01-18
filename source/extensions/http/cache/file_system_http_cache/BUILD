@@ -23,11 +23,13 @@ envoy_cc_extension(
         "file_system_http_cache.cc",
         "insert_context.cc",
         "lookup_context.cc",
+        "stats.cc",
     ],
     hdrs = [
         "file_system_http_cache.h",
         "insert_context.h",
         "lookup_context.h",
+        "stats.h",
     ],
     deps = [
         ":cache_file_fixed_block",
@@ -39,6 +41,7 @@ envoy_cc_extension(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:macros",
         "//source/common/common:safe_memcpy_lib",
+        "//source/common/filesystem:directory_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/protobuf",

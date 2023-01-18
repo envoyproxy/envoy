@@ -150,6 +150,7 @@ public:
   Event::TestTimeSystem& timeSystem() { return time_system_; }
 
   Stats::IsolatedStoreImpl stats_store_;
+  Stats::Scope& stats_scope_{*stats_store_.rootScope()};
   Api::ApiPtr api_;
   Api::ApiPtr api_for_server_stat_store_;
   MockBufferFactory* mock_buffer_factory_; // Will point to the dispatcher's factory.
@@ -415,10 +416,6 @@ protected:
   void setMaxRequestHeadersKb(uint32_t value) { upstream_config_.max_request_headers_kb_ = value; }
   void setMaxRequestHeadersCount(uint32_t value) {
     upstream_config_.max_request_headers_count_ = value;
-  }
-  void setHeadersWithUnderscoreAction(
-      envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction value) {
-    upstream_config_.headers_with_underscores_action_ = value;
   }
 
   void setServerBufferFactory(Buffer::WatermarkFactorySharedPtr proxy_buffer_factory) {

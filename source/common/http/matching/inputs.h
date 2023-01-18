@@ -20,17 +20,16 @@ class HttpHeadersDataInputBase : public Matcher::DataInput<HttpMatchingData> {
 public:
   explicit HttpHeadersDataInputBase(const std::string& name) : name_(name) {}
 
-  virtual absl::optional<std::reference_wrapper<const HeaderType>>
-  headerMap(const HttpMatchingData& data) const PURE;
+  virtual OptRef<const HeaderType> headerMap(const HttpMatchingData& data) const PURE;
 
   Matcher::DataInputGetResult get(const HttpMatchingData& data) const override {
-    const auto maybe_headers = headerMap(data);
+    const OptRef<const HeaderType> maybe_headers = headerMap(data);
 
     if (!maybe_headers) {
       return {Matcher::DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt};
     }
 
-    auto header_string = HeaderUtility::getAllOfHeaderAsString(maybe_headers->get(), name_, ",");
+    auto header_string = HeaderUtility::getAllOfHeaderAsString(*maybe_headers, name_, ",");
 
     if (header_string.result()) {
       return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
@@ -76,8 +75,7 @@ class HttpRequestHeadersDataInput : public HttpHeadersDataInputBase<RequestHeade
 public:
   explicit HttpRequestHeadersDataInput(const std::string& name) : HttpHeadersDataInputBase(name) {}
 
-  absl::optional<std::reference_wrapper<const RequestHeaderMap>>
-  headerMap(const HttpMatchingData& data) const override {
+  OptRef<const RequestHeaderMap> headerMap(const HttpMatchingData& data) const override {
     return data.requestHeaders();
   }
 };
@@ -89,12 +87,13 @@ public:
   HttpRequestHeadersDataInputFactory() : HttpHeadersDataInputFactoryBase("request_headers") {}
 };
 
+DECLARE_FACTORY(HttpRequestHeadersDataInputFactory);
+
 class HttpResponseHeadersDataInput : public HttpHeadersDataInputBase<ResponseHeaderMap> {
 public:
   explicit HttpResponseHeadersDataInput(const std::string& name) : HttpHeadersDataInputBase(name) {}
 
-  absl::optional<std::reference_wrapper<const ResponseHeaderMap>>
-  headerMap(const HttpMatchingData& data) const override {
+  OptRef<const ResponseHeaderMap> headerMap(const HttpMatchingData& data) const override {
     return data.responseHeaders();
   }
 };
@@ -106,12 +105,13 @@ public:
   HttpResponseHeadersDataInputFactory() : HttpHeadersDataInputFactoryBase("response_headers") {}
 };
 
+DECLARE_FACTORY(HttpResponseHeadersDataInputFactory);
+
 class HttpRequestTrailersDataInput : public HttpHeadersDataInputBase<RequestTrailerMap> {
 public:
   explicit HttpRequestTrailersDataInput(const std::string& name) : HttpHeadersDataInputBase(name) {}
 
-  absl::optional<std::reference_wrapper<const RequestTrailerMap>>
-  headerMap(const HttpMatchingData& data) const override {
+  OptRef<const RequestTrailerMap> headerMap(const HttpMatchingData& data) const override {
     return data.requestTrailers();
   }
 };
@@ -123,13 +123,14 @@ public:
   HttpRequestTrailersDataInputFactory() : HttpHeadersDataInputFactoryBase("request_trailers") {}
 };
 
+DECLARE_FACTORY(HttpRequestTrailersDataInputFactory);
+
 class HttpResponseTrailersDataInput : public HttpHeadersDataInputBase<ResponseTrailerMap> {
 public:
   explicit HttpResponseTrailersDataInput(const std::string& name)
       : HttpHeadersDataInputBase(name) {}
 
-  absl::optional<std::reference_wrapper<const ResponseTrailerMap>>
-  headerMap(const HttpMatchingData& data) const override {
+  OptRef<const ResponseTrailerMap> headerMap(const HttpMatchingData& data) const override {
     return data.responseTrailers();
   }
 };
@@ -140,6 +141,8 @@ class HttpResponseTrailersDataInputFactory
 public:
   HttpResponseTrailersDataInputFactory() : HttpHeadersDataInputFactoryBase("response_trailers") {}
 };
+
+DECLARE_FACTORY(HttpResponseTrailersDataInputFactory);
 
 class HttpRequestQueryParamsDataInput : public Matcher::DataInput<HttpMatchingData> {
 public:
@@ -192,6 +195,8 @@ public:
     return std::make_unique<envoy::type::matcher::v3::HttpRequestQueryParamMatchInput>();
   }
 };
+
+DECLARE_FACTORY(HttpRequestQueryParamsDataInputFactory);
 
 } // namespace Matching
 } // namespace Http

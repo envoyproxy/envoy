@@ -5,7 +5,7 @@ namespace Platform {
 
 RequestTrailersBuilder RequestTrailers::toRequestTrailersBuilder() const {
   RequestTrailersBuilder builder;
-  for (const auto& pair : this->allHeaders()) {
+  for (const auto& pair : allHeaders()) {
     builder.set(pair.first, pair.second);
   }
   return builder;

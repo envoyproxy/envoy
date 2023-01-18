@@ -5,6 +5,8 @@
 #include "source/common/http/headers.h"
 #include "source/extensions/http/header_validators/envoy_default/character_tables.h"
 
+#include "absl/strings/match.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Http {

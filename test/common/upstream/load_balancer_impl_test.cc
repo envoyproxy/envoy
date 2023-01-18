@@ -57,8 +57,11 @@ public:
       const PrioritySet& priority_set, ClusterLbStats& lb_stats, Runtime::Loader& runtime,
       Random::RandomGenerator& random,
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
-      : ZoneAwareLoadBalancerBase(priority_set, nullptr, lb_stats, runtime, random, common_config) {
-  }
+      : ZoneAwareLoadBalancerBase(
+            priority_set, nullptr, lb_stats, runtime, random,
+            PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(common_config, healthy_panic_threshold,
+                                                           100, 50),
+            LoadBalancerConfigHelper::localityLbConfigFromCommonLbConfig(common_config)) {}
   void runInvalidLocalitySourceType() {
     localitySourceType(static_cast<LoadBalancerBase::HostAvailability>(123));
   }
@@ -77,7 +80,7 @@ protected:
   MockHostSet& hostSet() { return GetParam() ? host_set_ : failover_host_set_; }
 
   LoadBalancerTestBase()
-      : stat_names_(stats_store_.symbolTable()), stats_(stat_names_, stats_store_) {
+      : stat_names_(stats_store_.symbolTable()), stats_(stat_names_, *stats_store_.rootScope()) {
     least_request_lb_config_.mutable_choice_count()->set_value(2);
   }
 
@@ -100,7 +103,9 @@ public:
   TestLb(const PrioritySet& priority_set, ClusterLbStats& lb_stats, Runtime::Loader& runtime,
          Random::RandomGenerator& random,
          const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
-      : LoadBalancerBase(priority_set, lb_stats, runtime, random, common_config) {}
+      : LoadBalancerBase(priority_set, lb_stats, runtime, random,
+                         PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
+                             common_config, healthy_panic_threshold, 100, 50)) {}
   using LoadBalancerBase::chooseHostSet;
   using LoadBalancerBase::isInPanic;
   using LoadBalancerBase::percentageDegradedLoad;
@@ -584,8 +589,11 @@ public:
   TestZoneAwareLb(const PrioritySet& priority_set, ClusterLbStats& lb_stats,
                   Runtime::Loader& runtime, Random::RandomGenerator& random,
                   const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
-      : ZoneAwareLoadBalancerBase(priority_set, nullptr, lb_stats, runtime, random, common_config) {
-  }
+      : ZoneAwareLoadBalancerBase(
+            priority_set, nullptr, lb_stats, runtime, random,
+            PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(common_config, healthy_panic_threshold,
+                                                           100, 50),
+            LoadBalancerConfigHelper::localityLbConfigFromCommonLbConfig(common_config)) {}
 
   HostConstSharedPtr chooseHostOnce(LoadBalancerContext*) override {
     return choose_host_once_host_;

@@ -69,7 +69,8 @@ TEST_F(RedisProxyFilterConfigTest, Normal) {
 
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
-  ProxyFilterConfig config(proto_config, store_, drain_decision_, runtime_, api_, *this);
+  ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
+                           *this);
   EXPECT_EQ("redis.foo.", config.stat_prefix_);
   EXPECT_TRUE(config.downstream_auth_username_.empty());
   EXPECT_TRUE(config.downstream_auth_passwords_.empty());
@@ -98,7 +99,8 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamAuthPasswordSet) {
 
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
-  ProxyFilterConfig config(proto_config, store_, drain_decision_, runtime_, api_, *this);
+  ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
+                           *this);
   EXPECT_EQ(config.downstream_auth_passwords_.size(), 1);
   EXPECT_EQ(config.downstream_auth_passwords_[0], "somepassword");
 }
@@ -120,7 +122,8 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamMultipleAuthPasswordsSet) {
 
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
-  ProxyFilterConfig config(proto_config, store_, drain_decision_, runtime_, api_, *this);
+  ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
+                           *this);
   EXPECT_EQ(config.downstream_auth_passwords_.size(), 3);
   EXPECT_EQ(config.downstream_auth_passwords_[0], "somepassword");
   EXPECT_EQ(config.downstream_auth_passwords_[1], "newpassword1");
@@ -142,7 +145,8 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamOnlyExraAuthPasswordsSet) {
 
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
-  ProxyFilterConfig config(proto_config, store_, drain_decision_, runtime_, api_, *this);
+  ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
+                           *this);
   EXPECT_EQ(config.downstream_auth_passwords_.size(), 2);
   EXPECT_EQ(config.downstream_auth_passwords_[0], "newpassword1");
   EXPECT_EQ(config.downstream_auth_passwords_[1], "newpassword2");
@@ -164,7 +168,8 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamAuthAclSet) {
 
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
-  ProxyFilterConfig config(proto_config, store_, drain_decision_, runtime_, api_, *this);
+  ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
+                           *this);
   EXPECT_EQ(config.downstream_auth_username_, "someusername");
   EXPECT_EQ(config.downstream_auth_passwords_.size(), 1);
   EXPECT_EQ(config.downstream_auth_passwords_[0], "somepassword");
@@ -189,7 +194,8 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamAuthAclSetWithMultiplePasswords) {
 
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
-  ProxyFilterConfig config(proto_config, store_, drain_decision_, runtime_, api_, *this);
+  ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
+                           *this);
   EXPECT_EQ(config.downstream_auth_username_, "someusername");
   EXPECT_EQ(config.downstream_auth_passwords_.size(), 3);
   EXPECT_EQ(config.downstream_auth_passwords_[0], "somepassword");
@@ -214,7 +220,8 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamAuthAclSetWithOnlyExtraPasswords) {
 
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
-  ProxyFilterConfig config(proto_config, store_, drain_decision_, runtime_, api_, *this);
+  ProxyFilterConfig config(proto_config, *store_.rootScope(), drain_decision_, runtime_, api_,
+                           *this);
   EXPECT_EQ(config.downstream_auth_username_, "someusername");
   EXPECT_EQ(config.downstream_auth_passwords_.size(), 2);
   EXPECT_EQ(config.downstream_auth_passwords_[0], "newpassword1");
@@ -245,8 +252,8 @@ public:
   RedisProxyFilterTest(const std::string& yaml_string) {
     envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
         parseProtoFromYaml(yaml_string);
-    config_ = std::make_shared<ProxyFilterConfig>(proto_config, store_, drain_decision_, runtime_,
-                                                  api_, *this);
+    config_ = std::make_shared<ProxyFilterConfig>(proto_config, *store_.rootScope(),
+                                                  drain_decision_, runtime_, api_, *this);
     filter_ = std::make_unique<ProxyFilter>(*this, Common::Redis::EncoderPtr{encoder_}, splitter_,
                                             config_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);

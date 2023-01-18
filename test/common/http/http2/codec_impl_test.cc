@@ -178,12 +178,14 @@ public:
     http2OptionsFromTuple(client_http2_options_, client_settings_);
     http2OptionsFromTuple(server_http2_options_, server_settings_);
     client_ = std::make_unique<TestClientConnectionImpl>(
-        client_connection_, client_callbacks_, client_stats_store_, client_http2_options_, random_,
-        max_request_headers_kb_, max_response_headers_count_, ProdNghttp2SessionFactory::get());
+        client_connection_, client_callbacks_, *client_stats_store_.rootScope(),
+        client_http2_options_, random_, max_request_headers_kb_, max_response_headers_count_,
+        ProdNghttp2SessionFactory::get());
     client_wrapper_ = std::make_unique<ConnectionWrapper>(client_.get());
     server_ = std::make_unique<TestServerConnectionImpl>(
-        server_connection_, server_callbacks_, server_stats_store_, server_http2_options_, random_,
-        max_request_headers_kb_, max_request_headers_count_, headers_with_underscores_action_);
+        server_connection_, server_callbacks_, *server_stats_store_.rootScope(),
+        server_http2_options_, random_, max_request_headers_kb_, max_request_headers_count_,
+        headers_with_underscores_action_);
     server_wrapper_ = std::make_unique<ConnectionWrapper>(server_.get());
     createHeaderValidator();
     request_encoder_ = &client_->newStream(response_decoder_);
@@ -343,7 +345,7 @@ public:
             headers_with_underscores_action_));
     header_validator_ =
         std::make_unique<Extensions::Http::HeaderValidators::EnvoyDefault::Http2HeaderValidator>(
-            header_validator_config_, Protocol::Http2, stream_info_, server_->http2CodecStats());
+            header_validator_config_, Protocol::Http2, server_->http2CodecStats());
   }
 
   TestScopedRuntime scoped_runtime_;
@@ -391,7 +393,6 @@ public:
       headers_with_underscores_action_{envoy::config::core::v3::HttpProtocolOptions::ALLOW};
   envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       header_validator_config_;
-  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
   HeaderValidatorPtr header_validator_;
 };
 
@@ -2409,12 +2410,14 @@ TEST_P(Http2CodecImplStreamLimitTest, MaxClientStreams) {
   http2OptionsFromTuple(client_http2_options_, ::testing::get<0>(GetParam()));
   http2OptionsFromTuple(server_http2_options_, ::testing::get<1>(GetParam()));
   client_ = std::make_unique<TestClientConnectionImpl>(
-      client_connection_, client_callbacks_, client_stats_store_, client_http2_options_, random_,
-      max_request_headers_kb_, max_response_headers_count_, ProdNghttp2SessionFactory::get());
+      client_connection_, client_callbacks_, *client_stats_store_.rootScope(),
+      client_http2_options_, random_, max_request_headers_kb_, max_response_headers_count_,
+      ProdNghttp2SessionFactory::get());
   client_wrapper_ = std::make_unique<ConnectionWrapper>(client_.get());
   server_ = std::make_unique<TestServerConnectionImpl>(
-      server_connection_, server_callbacks_, server_stats_store_, server_http2_options_, random_,
-      max_request_headers_kb_, max_request_headers_count_, headers_with_underscores_action_);
+      server_connection_, server_callbacks_, *server_stats_store_.rootScope(),
+      server_http2_options_, random_, max_request_headers_kb_, max_request_headers_count_,
+      headers_with_underscores_action_);
   server_wrapper_ = std::make_unique<ConnectionWrapper>(server_.get());
   setupDefaultConnectionMocks();
   driveToCompletion();
@@ -4519,14 +4522,16 @@ protected:
     http2OptionsFromTuple(client_http2_options_, client_settings_);
     http2OptionsFromTuple(server_http2_options_, server_settings_);
     client_ = std::make_unique<MetadataTestClientConnectionImpl>(
-        client_connection_, client_callbacks_, client_stats_store_, client_http2_options_, random_,
-        max_request_headers_kb_, max_response_headers_count_, http2_session_factory_);
+        client_connection_, client_callbacks_, *client_stats_store_.rootScope(),
+        client_http2_options_, random_, max_request_headers_kb_, max_response_headers_count_,
+        http2_session_factory_);
     client_wrapper_ = std::make_unique<ConnectionWrapper>(client_.get());
     // SETTINGS are required as part of the preface.
     submitSettings(client_, {});
     server_ = std::make_unique<TestServerConnectionImpl>(
-        server_connection_, server_callbacks_, server_stats_store_, server_http2_options_, random_,
-        max_request_headers_kb_, max_request_headers_count_, headers_with_underscores_action_);
+        server_connection_, server_callbacks_, *server_stats_store_.rootScope(),
+        server_http2_options_, random_, max_request_headers_kb_, max_request_headers_count_,
+        headers_with_underscores_action_);
     server_wrapper_ = std::make_unique<ConnectionWrapper>(server_.get());
     setupDefaultConnectionMocks();
     driveToCompletion();
