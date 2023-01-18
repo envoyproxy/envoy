@@ -14,9 +14,9 @@ datadog::tracing::TimePoint estimateTime(SystemTime wall) {
 datadog::tracing::TimePoint estimateTime(SystemTime wall, const datadog::tracing::Clock& clock) {
   auto point = clock();
   auto elapsed = point.wall - wall;
-  // We could be off by a second or so if the system clock has been adjusted
-  // since `wall` was taken. It's fine.
-  point.tick -= elapsed;
+  if (elapsed > std::chrono::system_clock::duration::zero()) {
+    point.tick -= elapsed;
+  }
   point.wall = wall;
   return point;
 }
