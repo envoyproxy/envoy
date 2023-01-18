@@ -66,13 +66,6 @@ TEST(PackedStruct, StringStructMove) {
   EXPECT_EQ(redirect_strings2.get(RedirectStringElement::path_redirect), "def");
   EXPECT_FALSE(redirect_strings2.has(RedirectStringElement::host_redirect));
 
-  // Verify that redirect_strings is now empty.
-  EXPECT_EQ(redirect_strings.size(), 0);
-  EXPECT_EQ(redirect_strings.capacity(), 0);
-  EXPECT_FALSE(redirect_strings.has(RedirectStringElement::scheme_redirect));
-  EXPECT_FALSE(redirect_strings.has(RedirectStringElement::path_redirect));
-  EXPECT_FALSE(redirect_strings.has(RedirectStringElement::host_redirect));
-
   // Invoke move assignment.
   RedirectStringsPackedStruct redirect_strings3(0);
   redirect_strings3 = move(redirect_strings2);
@@ -84,13 +77,6 @@ TEST(PackedStruct, StringStructMove) {
   EXPECT_EQ(redirect_strings3.get(RedirectStringElement::scheme_redirect), "abc");
   EXPECT_EQ(redirect_strings3.get(RedirectStringElement::path_redirect), "def");
   EXPECT_FALSE(redirect_strings3.has(RedirectStringElement::host_redirect));
-
-  // Verify that redirect_strings2 is now empty.
-  EXPECT_EQ(redirect_strings2.size(), 0);
-  EXPECT_EQ(redirect_strings2.capacity(), 0);
-  EXPECT_FALSE(redirect_strings2.has(RedirectStringElement::scheme_redirect));
-  EXPECT_FALSE(redirect_strings2.has(RedirectStringElement::path_redirect));
-  EXPECT_FALSE(redirect_strings2.has(RedirectStringElement::host_redirect));
 }
 
 } // namespace

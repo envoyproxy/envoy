@@ -86,18 +86,9 @@ public:
   // Disable copying
   PackedStruct(const PackedStruct&) = delete;
 
-  friend void swap(PackedStruct& first, PackedStruct& second) {
-    using std::swap;
-    swap(first.data_, second.data_);
-    swap(first.indices_, second.indices_);
-  }
-
   // Move constructor and assignment operator.
-  PackedStruct(PackedStruct&& other) noexcept : PackedStruct(0) { swap(*this, other); }
-  PackedStruct& operator=(PackedStruct&& other) {
-    swap(*this, other);
-    return *this;
-  }
+  PackedStruct(PackedStruct&& other) noexcept = default;
+  PackedStruct& operator=(PackedStruct&& other) = default;
 
 private:
   // Accessors.
