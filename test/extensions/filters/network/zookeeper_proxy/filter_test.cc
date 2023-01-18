@@ -274,6 +274,30 @@ public:
     return buffer;
   }
 
+  Buffer::OwnedImpl
+  encodeCreateRequestWithNegativeDataLen(const std::string& path, const CreateFlags flags,
+                      const bool txn = false,
+                      const int32_t opcode = enumToSignedInt(OpCodes::Create)) const {
+    Buffer::OwnedImpl buffer;
+
+    if (!txn) {
+      buffer.writeBEInt<int32_t>(24 + path.length());
+      buffer.writeBEInt<int32_t>(1000);
+      buffer.writeBEInt<int32_t>(opcode);
+    }
+
+    // Path.
+    addString(buffer, path);
+    // Data.
+    addNegativeStringLen(buffer, 0xffffffff);
+    // Acls.
+    buffer.writeBEInt<int32_t>(0);
+    // Flags.
+    buffer.writeBEInt<int32_t>(static_cast<int32_t>(flags));
+
+    return buffer;
+  }
+
   Buffer::OwnedImpl encodeSetRequest(const std::string& path, const std::string& data,
                                      const int32_t version, const bool txn = false) const {
     Buffer::OwnedImpl buffer;
@@ -406,6 +430,10 @@ public:
     buffer.add(str);
   }
 
+  void addNegativeStringLen(Buffer::OwnedImpl& buffer, const int32_t slen) const {
+    buffer.writeBEInt<int32_t>(slen);
+  }
+
   void addStrings(Buffer::OwnedImpl& buffer, const std::vector<std::string>& watches) const {
     buffer.writeBEInt<uint32_t>(watches.size());
 
@@ -468,6 +496,47 @@ public:
     }
 
     EXPECT_EQ(35UL, config_->stats().request_bytes_.value());
+    EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+  }
+
+  void testCreateWithNegativeDataLen(CreateFlags flags, const OpCodes opcode = OpCodes::Create) {
+    initialize();
+    Buffer::OwnedImpl data =
+        encodeCreateRequestWithNegativeDataLen("/foo", flags, false, enumToSignedInt(opcode));
+    std::string opname = "create";
+
+    switch (opcode) {
+    case OpCodes::CreateContainer:
+      opname = "createcontainer";
+      break;
+    case OpCodes::CreateTtl:
+      opname = "createttl";
+      break;
+    default:
+      break;
+    }
+
+    expectSetDynamicMetadata(
+        {{{"opname", opname}, {"path", "/foo"}, {"create_type", createFlagsToString(flags)}},
+         {{"bytes", "32"}}});
+
+    EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
+
+    switch (opcode) {
+    case OpCodes::Create:
+      EXPECT_EQ(1UL, config_->stats().create_rq_.value());
+      break;
+    case OpCodes::CreateContainer:
+      EXPECT_EQ(1UL, config_->stats().createcontainer_rq_.value());
+      break;
+    case OpCodes::CreateTtl:
+      EXPECT_EQ(1UL, config_->stats().createttl_rq_.value());
+      break;
+    default:
+      break;
+    }
+
+    EXPECT_EQ(32UL, config_->stats().request_bytes_.value());
     EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
   }
 
@@ -643,6 +712,8 @@ TEST_F(ZooKeeperFilterTest, GetDataRequestEmptyPath) {
 }
 
 TEST_F(ZooKeeperFilterTest, CreateRequestPersistent) { testCreate(CreateFlags::Persistent); }
+
+TEST_F(ZooKeeperFilterTest, CreateRequestPersistentWithNegativeDataLen) { testCreateWithNegativeDataLen(CreateFlags::Persistent); }
 
 TEST_F(ZooKeeperFilterTest, CreateRequestPersistentSequential) {
   testCreate(CreateFlags::PersistentSequential);
@@ -833,12 +904,14 @@ TEST_F(ZooKeeperFilterTest, MultiRequest) {
 
   Buffer::OwnedImpl create1 = encodeCreateRequest("/foo", "1", CreateFlags::Persistent, true);
   Buffer::OwnedImpl create2 = encodeCreateRequest("/bar", "1", CreateFlags::Persistent, true);
+  Buffer::OwnedImpl create3 = encodeCreateRequestWithNegativeDataLen("/baz", CreateFlags::Persistent, true);
   Buffer::OwnedImpl check1 = encodePathVersion("/foo", 100, enumToSignedInt(OpCodes::Check), true);
   Buffer::OwnedImpl set1 = encodeSetRequest("/bar", "2", -1, true);
 
   std::vector<std::pair<int32_t, Buffer::OwnedImpl>> ops;
   ops.push_back(std::make_pair(enumToSignedInt(OpCodes::Create), std::move(create1)));
   ops.push_back(std::make_pair(enumToSignedInt(OpCodes::Create), std::move(create2)));
+  ops.push_back(std::make_pair(enumToSignedInt(OpCodes::Create), std::move(create3)));
   ops.push_back(std::make_pair(enumToSignedInt(OpCodes::Check), std::move(check1)));
   ops.push_back(std::make_pair(enumToSignedInt(OpCodes::SetData), std::move(set1)));
 
@@ -846,8 +919,8 @@ TEST_F(ZooKeeperFilterTest, MultiRequest) {
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(1UL, config_->stats().multi_rq_.value());
-  EXPECT_EQ(128UL, config_->stats().request_bytes_.value());
-  EXPECT_EQ(2UL, config_->stats().create_rq_.value());
+  EXPECT_EQ(157UL, config_->stats().request_bytes_.value());
+  EXPECT_EQ(3UL, config_->stats().create_rq_.value());
   EXPECT_EQ(1UL, config_->stats().setdata_rq_.value());
   EXPECT_EQ(1UL, config_->stats().check_rq_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());

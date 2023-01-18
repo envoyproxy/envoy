@@ -448,6 +448,11 @@ void DecoderImpl::parseXWatchesRequest(Buffer::Instance& data, uint64_t& offset,
 
 void DecoderImpl::skipString(Buffer::Instance& data, uint64_t& offset) {
   const int32_t slen = helper_.peekInt32(data, offset);
+  if (slen < 0) {
+    ENVOY_LOG(trace, "zookeeper_proxy: decoding response with negative string length {} at offset {}", slen,
+              offset);
+    return;
+  }
   helper_.skip(slen, offset);
 }
 
