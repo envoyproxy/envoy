@@ -231,17 +231,17 @@ RingHashLoadBalancer::Ring::Ring(const NormalizedHostWeightVector& normalized_ho
 
   // Right shift each hash and create shards of the hosts.
   uint64_t ring_index = 0;
-  uint64_t curr_shard, prev_shard = 0;
+  uint64_t current_shard, prev_shard = 0;
 
   // push the first index if the ring_ isn't empty
   if (!ring_.empty())
     ring_shard_.push_back(ring_index);
 
   for (const auto& entry : ring_) {
-    curr_shard = entry.hash_ >> rightShift;
-    // If new shard found, push the index to ring_shard_ and update curr_shard.
-    if (curr_shard != prev_shard) {
-      prev_shard = curr_shard;
+    current_shard = entry.hash_ >> rightShift;
+    // If new shard found, push the index to ring_shard_ and update current_shard.
+    if (current_shard != prev_shard) {
+      prev_shard = current_shard;
       ring_shard_.push_back(ring_index);
     }
     ring_index++;
