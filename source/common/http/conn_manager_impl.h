@@ -206,6 +206,11 @@ private:
     }
     // Hand off headers/trailers and stream info to the codec's response encoder, for logging later
     // (i.e. possibly after this stream has been destroyed).
+    //
+    // TODO(paulsohn): Investigate whether we can move the headers/trailers and stream info required
+    // for logging instead of copying them (as is currently done in the HTTP/3 implementation) or
+    // using a shared pointer. See
+    // https://github.com/envoyproxy/envoy/pull/23648#discussion_r1066095564 for more details.
     void deferHeadersAndTrailers() {
       response_encoder_->setDeferredLoggingHeadersAndTrailers(request_headers_, response_headers_,
                                                               response_trailers_, streamInfo());
