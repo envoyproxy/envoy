@@ -1,6 +1,6 @@
 #pragma once
 
-#include "absl/types/optional.h"
+#include "absl/types/optional.h" // required for absl::nullopt
 
 namespace Envoy {
 
@@ -13,76 +13,104 @@ namespace Envoy {
 //
 // Using absl::optional directly you must write optref.value().method() which is
 // a bit more awkward.
-template <class T> struct OptRef : public absl::optional<std::reference_wrapper<T>> {
-  OptRef(T& t) : absl::optional<std::reference_wrapper<T>>(t) {}
-  OptRef() = default;
-  OptRef(absl::nullopt_t) : OptRef() {}
+//
+// This class also consumes less memory -- e.g. 8 bytes for a pointer rather
+// than 16 bytes for a pointer plus a bool with alignment padding.
+template <class T> struct OptRef {
+  OptRef(T& t) : ptr_(&t) {}
+  OptRef() : ptr_(nullptr) {}
+  OptRef(absl::nullopt_t) : ptr_(nullptr) {}
 
   /**
    * Copy constructor that allows conversion.
    */
-  template <class From> explicit OptRef(OptRef<From> rhs) {
-    if (rhs.has_value()) {
-      *this = rhs.ref();
-    }
-  }
+  template <class From> explicit OptRef(OptRef<From> rhs) : ptr_(rhs.ptr()) {}
 
   /**
    * Assignment that allows conversion.
    */
   template <class From> OptRef<T>& operator=(OptRef<From> rhs) {
-    this->reset();
-    if (rhs.has_value()) {
-      *this = rhs.ref();
-    }
+    ptr_ = rhs.ptr();
     return *this;
-  }
-
-  /**
-   * Helper to call a method on T. The caller is responsible for ensuring
-   * has_value() is true.
-   */
-  T* operator->() {
-    T& ref = **this;
-    return &ref;
   }
 
   /**
    * Helper to call a const method on T. The caller is responsible for ensuring
    * has_value() is true.
    */
-  const T* operator->() const {
-    const T& ref = **this;
-    return &ref;
-  }
+  T* operator->() const { return ptr_; }
 
   /**
    * Helper to convert a OptRef into a pointer. If the optional is not set, returns a nullptr.
    */
-  T* ptr() {
-    if (this->has_value()) {
-      T& ref = **this;
-      return &ref;
-    }
+  T* ptr() const { return ptr_; }
 
-    return nullptr;
+  /**
+   * Helper to convert a OptRef into a ref. Behavior if !has_value() is undefined.
+   */
+  T& ref() const { return *ptr_; }
+
+  /**
+   * Helper to dereference an OptRef. Behavior if !has_value() is undefined.
+   */
+  T& operator*() const { return *ptr_; }
+
+  /**
+   * @return true if the object has a value.
+   */
+  bool has_value() const { return ptr_ != nullptr; }
+
+  /**
+   * @return true if the object has a value.
+   */
+  bool operator!() const { return ptr_ == nullptr; }
+  operator bool() const { return ptr_ != nullptr; }
+
+  /**
+   * Copies the OptRef into an optional<T>. To use this, T must supply
+   * an assignment operator.
+   *
+   * It is OK to copy an unset object -- it will result in an optional where
+   * has_value() is false.
+   *
+   * @return an optional copy of the referenced object (or nullopt).
+   */
+  absl::optional<T> copy() const {
+    absl::optional<T> ret;
+    if (has_value()) {
+      ret = *ptr_;
+    }
+    return ret;
   }
 
   /**
-   * Helper to convert a OptRef into a pointer. If the optional is not set, returns a nullptr.
+   * Places a reference to the an object into the OptRef.
+   *
+   * @param ref the object to be referenced.
    */
-  const T* ptr() const {
-    if (this->has_value()) {
-      const T& ref = **this;
-      return &ref;
-    }
+  void emplace(T& ref) { ptr_ = &ref; }
 
-    return nullptr;
-  }
+  /**
+   * The value method has no intrinsic value to OptRef, but is left here for
+   * compatibility reasons. This is used in call-sites which would be needed if
+   * they were using optional<reference_wrapper<T>> directly without
+   * OptRef. Having this function makes it easier upgrade to using OptRef
+   * without having to change all call-sites.
+   *
+   * This must be called with has_value() true.
+   *
+   * @return a reference_wrapper around the value.
+   */
+  std::reference_wrapper<const T> value() const { return std::reference_wrapper<T>(*ptr_); }
+  std::reference_wrapper<T> value() { return std::reference_wrapper<T>(*ptr_); }
 
-  T& ref() { return **this; }
+  /**
+   * Clears any current reference.
+   */
+  void reset() { ptr_ = nullptr; }
 
-  const T& ref() const { return **this; }
+private:
+  T* ptr_;
 };
 
 /**
@@ -103,6 +131,20 @@ template <class T> OptRef<T> makeOptRefFromPtr(T* ptr) {
   }
 
   return {*ptr};
+}
+
+// Overloads for comparing OptRef against absl::nullopt.
+template <class T> bool operator!=(const OptRef<T>& optref, absl::nullopt_t) {
+  return optref.has_value();
+}
+template <class T> bool operator!=(absl::nullopt_t, const OptRef<T>& optref) {
+  return optref.has_value();
+}
+template <class T> bool operator==(const OptRef<T>& optref, absl::nullopt_t) {
+  return !optref.has_value();
+}
+template <class T> bool operator==(absl::nullopt_t, const OptRef<T>& optref) {
+  return !optref.has_value();
 }
 
 } // namespace Envoy

@@ -118,7 +118,7 @@ public:
 class ConnectionManagerTest : public testing::Test {
 public:
   ConnectionManagerTest()
-      : stats_(DubboFilterStats::generateStats("test.", store_)),
+      : stats_(DubboFilterStats::generateStats("test.", *store_.rootScope())),
         engine_(std::make_unique<Regex::GoogleReEngine>()) {
 
     route_config_provider_manager_ =
