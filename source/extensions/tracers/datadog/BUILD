@@ -19,7 +19,15 @@ envoy_cc_library(
     hdrs = [
         "datadog_tracer_impl.h",
     ],
-    external_deps = ["dd_opentracing_cpp"],
+    copts = [
+        # Make sure that headers included from dd_trace_cpp use Abseil
+        # equivalents of std::string_view and std::optional.
+        "-DDD_USE_ABSEIL_FOR_ENVOY",
+    ],
+    external_deps = [
+        "dd_opentracing_cpp",
+        "dd_trace_cpp",
+    ],
     deps = [
         "//source/common/config:utility_lib",
         "//source/common/http:async_client_utility_lib",
