@@ -124,7 +124,8 @@ bug_fixes:
     fix a bug that jwt_cache breaks the :ref:`provider_and_audiences <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtRequirement.provider_and_audiences>` JWT requirement.
 - area: eds
   change: |
-    added ``envoy.reloadable_features.multiplex_eds`` to enable eds multiplexing by default.
+    added ``envoy.reloadable_features.multiplex_eds`` to disable eds multiplexing. Eds multiplexing is enabled by default, so that all subscriptions for the same resource type and management server reuse a single channel/mux.
+    When eds multiplexing is disabled each subscription uses a dedicated channel/mux.
 - area: skywalking
   change: |
     fixed a crash which could happen when skywalking tracer is enabled and illegal ``sw8`` header is received.
