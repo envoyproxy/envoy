@@ -122,6 +122,9 @@ bug_fixes:
 - area: jwt_authn
   change: |
     fix a bug that jwt_cache breaks the :ref:`provider_and_audiences <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtRequirement.provider_and_audiences>` JWT requirement.
+- area: skywalking
+  change: |
+    fixed a crash which could happen when skywalking tracer is enabled and illegal ``sw8`` header is received.
 - area: health_checker
   change: |
     prevent writing pending data for health checkers by introducing ``ConnectionCloseType::Abort`` to avoid cascading handshake overhead from health checker's requests on timeout. This fix is related to `issue \#23718 <https://github.com/envoyproxy/envoy/issues/23718>`_.
@@ -320,5 +323,8 @@ new_features:
   change: |
     added an api configuration :ref:`xds_config_tracker_extension <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.xds_config_tracker_extension>` in the bootstrap
     to allow tracking xDS responses in external components, and provided the extension interface.
+- area: build
+  change: |
+    added compile-time option ``--define=static_extension_registration=disabled`` to disable the automatic static registration of extension factories.
 
 deprecated:
