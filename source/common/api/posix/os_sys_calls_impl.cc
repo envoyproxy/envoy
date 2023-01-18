@@ -362,6 +362,7 @@ bool OsSysCallsImpl::supportsGetifaddrs() const {
 SysCallIntResult OsSysCallsImpl::getifaddrs([[maybe_unused]] InterfaceAddressVector& interfaces) {
   if (alternate_getifaddrs_.has_value()) {
     return alternate_getifaddrs_.value()(interfaces);
+  }
 
 #if defined(__ANDROID_API__) && __ANDROID_API__ < 24
   struct android::ifaddrs* ifaddr;
