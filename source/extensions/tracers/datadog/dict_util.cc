@@ -9,19 +9,19 @@ namespace Extensions {
 namespace Tracers {
 namespace Datadog {
 
-RequestHeaderWriter::RequestHeaderWriter(Http::RequestHeaderMap& headers) : headers_(&headers) {}
+RequestHeaderWriter::RequestHeaderWriter(Http::RequestHeaderMap& headers) : headers_(headers) {}
 
 void RequestHeaderWriter::set(datadog::tracing::StringView key,
                               datadog::tracing::StringView value) {
-  headers_->setCopy(Http::LowerCaseString{key}, value);
+  headers_.setCopy(Http::LowerCaseString{key}, value);
 }
 
 ResponseHeaderReader::ResponseHeaderReader(const Http::ResponseHeaderMap& headers)
-    : headers_(&headers) {}
+    : headers_(headers) {}
 
 datadog::tracing::Optional<datadog::tracing::StringView>
 ResponseHeaderReader::lookup(datadog::tracing::StringView key) const {
-  auto result = headers_->get(Http::LowerCaseString{key});
+  auto result = headers_.get(Http::LowerCaseString{key});
   if (result.empty()) {
     // `headers_.get` can return multiple header entries. It conveys
     // "not found" by returning zero header entries.
@@ -49,23 +49,23 @@ ResponseHeaderReader::lookup(datadog::tracing::StringView key) const {
 void ResponseHeaderReader::visit(
     const std::function<void(datadog::tracing::StringView key, datadog::tracing::StringView value)>&
         visitor) const {
-  headers_->iterate([&](const Http::HeaderEntry& entry) {
+  headers_.iterate([&](const Http::HeaderEntry& entry) {
     visitor(entry.key().getStringView(), entry.value().getStringView());
     return Http::ResponseHeaderMap::Iterate::Continue;
   });
 }
 
-TraceContextReader::TraceContextReader(const Tracing::TraceContext& context) : context_(&context) {}
+TraceContextReader::TraceContextReader(const Tracing::TraceContext& context) : context_(context) {}
 
 datadog::tracing::Optional<datadog::tracing::StringView>
 TraceContextReader::lookup(datadog::tracing::StringView key) const {
-  return context_->getByKey(key);
+  return context_.getByKey(key);
 }
 
 void TraceContextReader::visit(
     const std::function<void(datadog::tracing::StringView key, datadog::tracing::StringView value)>&
         visitor) const {
-  context_->forEach([&](absl::string_view key, absl::string_view value) {
+  context_.forEach([&](absl::string_view key, absl::string_view value) {
     visitor(key, value);
     const bool continue_iterating = true;
     return continue_iterating;

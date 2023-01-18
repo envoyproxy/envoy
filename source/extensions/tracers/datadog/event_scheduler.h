@@ -31,7 +31,7 @@ public:
   nlohmann::json config_json() const override;
 
 private:
-  Event::Dispatcher* dispatcher_;
+  Event::Dispatcher& dispatcher_;
   std::vector<Event::TimerPtr> timers_;
 };
 

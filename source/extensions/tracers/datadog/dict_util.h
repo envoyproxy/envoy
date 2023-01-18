@@ -18,7 +18,7 @@ namespace Tracers {
 namespace Datadog {
 
 class RequestHeaderWriter : public datadog::tracing::DictWriter {
-  Http::RequestHeaderMap* headers_;
+  Http::RequestHeaderMap& headers_;
 
 public:
   explicit RequestHeaderWriter(Http::RequestHeaderMap& headers);
@@ -27,7 +27,7 @@ public:
 };
 
 class ResponseHeaderReader : public datadog::tracing::DictReader {
-  const Http::ResponseHeaderMap* headers_;
+  const Http::ResponseHeaderMap& headers_;
   mutable std::string buffer_;
 
 public:
@@ -41,7 +41,7 @@ public:
 };
 
 class TraceContextReader : public datadog::tracing::DictReader {
-  const Tracing::TraceContext* context_;
+  const Tracing::TraceContext& context_;
 
 public:
   explicit TraceContextReader(const Tracing::TraceContext& context);

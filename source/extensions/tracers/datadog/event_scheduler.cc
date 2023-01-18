@@ -10,7 +10,7 @@ namespace Extensions {
 namespace Tracers {
 namespace Datadog {
 
-EventScheduler::EventScheduler(Event::Dispatcher& dispatcher) : dispatcher_(&dispatcher) {}
+EventScheduler::EventScheduler(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
 
 EventScheduler::~EventScheduler() {
   for (const auto& timer : timers_) {
@@ -24,11 +24,10 @@ EventScheduler::schedule_recurring_event(std::chrono::steady_clock::duration int
   // Yes, a shared pointer to a pointer.
   auto self = std::make_shared<Event::Timer*>();
 
-  Event::TimerPtr timer =
-      dispatcher_->createTimer([self, interval, callback = std::move(callback)] {
-        (**self).enableTimer(std::chrono::duration_cast<std::chrono::milliseconds>(interval));
-        callback();
-      });
+  Event::TimerPtr timer = dispatcher_.createTimer([self, interval, callback = std::move(callback)] {
+    (**self).enableTimer(std::chrono::duration_cast<std::chrono::milliseconds>(interval));
+    callback();
+  });
 
   Event::Timer* timer_raw = timer.get();
   *self = timer_raw;
