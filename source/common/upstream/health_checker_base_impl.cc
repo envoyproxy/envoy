@@ -18,7 +18,8 @@ HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
                                              Random::RandomGenerator& random,
                                              HealthCheckEventLoggerPtr&& event_logger)
     : always_log_health_check_failures_(config.always_log_health_check_failures()),
-      enable_idle_hc_(config.enable_idle_hc()), cluster_(cluster), dispatcher_(dispatcher),
+      disable_health_check_if_active_traffic(config.disable_health_check_if_active_traffic()),
+      cluster_(cluster), dispatcher_(dispatcher),
       timeout_(PROTOBUF_GET_MS_REQUIRED(config, timeout)),
       unhealthy_threshold_(PROTOBUF_GET_WRAPPED_REQUIRED(config, unhealthy_threshold)),
       healthy_threshold_(PROTOBUF_GET_WRAPPED_REQUIRED(config, healthy_threshold)),
@@ -279,7 +280,6 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::onDeferredDeleteBase() {
 void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess(bool degraded) {
   // If we are healthy, reset the # of unhealthy to zero.
   num_unhealthy_ = 0;
-
   HealthTransition changed_state = HealthTransition::Unchanged;
 
   if (host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
@@ -419,8 +419,9 @@ HealthCheckerImplBase::ActiveHealthCheckSession::clearPendingFlag(HealthTransiti
 }
 
 void HealthCheckerImplBase::ActiveHealthCheckSession::onIntervalBase() {
-  /*Only if host is healthy, check whether need idle hc*/
-  if (parent_.enable_idle_hc_ && !host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
+  // Only if host is healthy, check whether need disable HC if there is already business traffic
+  if (parent_.disable_health_check_if_active_traffic &&
+      !host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
     MonotonicTime traffic_pass_time;
     switch (parent_.healthCheckerType()) {
     case envoy::data::core::v3::HealthCheckerType::TCP:

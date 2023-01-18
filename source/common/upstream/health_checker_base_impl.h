@@ -14,6 +14,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/matchers.h"
 #include "source/common/network/transport_socket_options_impl.h"
+#include "source/server/backtrace.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -122,7 +123,7 @@ protected:
   virtual ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) PURE;
 
   const bool always_log_health_check_failures_;
-  const bool enable_idle_hc_;
+  const bool disable_health_check_if_active_traffic;
   const Cluster& cluster_;
   Event::Dispatcher& dispatcher_;
   const std::chrono::milliseconds timeout_;

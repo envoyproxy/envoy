@@ -360,7 +360,8 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
       upstream_host->stats().rq_error_.inc();
     }
     if (upstream_host && Http::CodeUtility::is2xx(response_status_code)) {
-      upstream_host->setLastTrafficTime2xx(callbacks_->dispatcher().timeSource().monotonicTime());
+      upstream_host->setLastTrafficTimeHttp2xx(
+          callbacks_->dispatcher().timeSource().monotonicTime());
     }
   }
 }
@@ -1288,7 +1289,7 @@ void Filter::handleNon5xxResponseHeaders(absl::optional<Grpc::Status::GrpcStatus
     if (end_stream) {
       if (grpc_status && !Http::CodeUtility::is5xx(grpc_to_http_status)) {
         upstream_request.upstreamHost()->stats().rq_success_.inc();
-        upstream_request.upstreamHost()->setLastTrafficTimeGrpc(
+        upstream_request.upstreamHost()->setLastTrafficTimeGrpcSuccess(
             callbacks_->dispatcher().timeSource().monotonicTime());
       } else {
         upstream_request.upstreamHost()->stats().rq_error_.inc();

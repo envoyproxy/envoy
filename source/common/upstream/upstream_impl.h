@@ -214,15 +214,15 @@ public:
   MonotonicTime lastTrafficPassTime2xx() const override { return last_traffic_pass_time_2xx_; }
   MonotonicTime lastTrafficPassTimeGrpc() const override { return last_traffic_pass_time_grpc_; }
 
-  void setLastTrafficTime(MonotonicTime last_traffic_pass_time) const override {
+  void setLastTrafficTimeTcpSuccess(MonotonicTime last_traffic_pass_time) const override {
     last_traffic_pass_time_ = last_traffic_pass_time;
   }
 
-  void setLastTrafficTime2xx(MonotonicTime last_traffic_pass_time) const override {
+  void setLastTrafficTimeHttp2xx(MonotonicTime last_traffic_pass_time) const override {
     last_traffic_pass_time_2xx_ = last_traffic_pass_time;
   }
 
-  void setLastTrafficTimeGrpc(MonotonicTime last_traffic_pass_time) const override {
+  void setLastTrafficTimeGrpcSuccess(MonotonicTime last_traffic_pass_time) const override {
     last_traffic_pass_time_grpc_ = last_traffic_pass_time;
   }
 

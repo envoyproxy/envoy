@@ -552,6 +552,21 @@ public:
     addCompletionCallback();
   }
 
+  void setupEnableIdleHC() {
+    std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    http_health_check:
+      path: /l7-healthcheck 
+    disable_health_check_if_active_traffic: true
+    )EOF";
+
+    allocHealthChecker(yaml);
+    addCompletionCallback();
+  }
+
   const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig
   makeHealthCheckConfig(const uint32_t port_value) {
     envoy::config::endpoint::v3::Endpoint::HealthCheckConfig config;
@@ -873,6 +888,15 @@ TEST_F(HttpHealthCheckerImplTest, Success) {
   respond(0, "200", false, false, true);
   EXPECT_EQ(Host::Health::Healthy,
             cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
+}
+
+TEST_F(HttpHealthCheckerImplTest, EnableIdleHC) {
+  setupEnableIdleHC();
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
+  health_checker_->start();
+  EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.attempt").value());
 }
 
 TEST_F(HttpHealthCheckerImplTest, Degraded) {
@@ -4181,6 +4205,19 @@ public:
     allocHealthChecker(yaml);
   }
 
+  void setupEnableIdleHC() {
+    std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    tcp_health_check: {}
+    disable_health_check_if_active_traffic: true 
+    )EOF";
+
+    allocHealthChecker(yaml);
+  }
+
   void expectSessionCreate() {
     interval_timer_ = new Event::MockTimer(&dispatcher_);
     timeout_timer_ = new Event::MockTimer(&dispatcher_);
@@ -4676,6 +4713,17 @@ TEST_F(TcpHealthCheckerImplTest, ConnectionLocalFailure) {
   EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.passive_failure").value());
 }
 
+TEST_F(TcpHealthCheckerImplTest, EnableIdleHC) {
+  InSequence s;
+
+  setupEnableIdleHC();
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
+  health_checker_->start();
+  EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.attempt").value());
+}
+
 class TestGrpcHealthCheckerImpl : public GrpcHealthCheckerImpl {
 public:
   using GrpcHealthCheckerImpl::GrpcHealthCheckerImpl;
@@ -4858,6 +4906,13 @@ public:
     config.mutable_interval_jitter()->set_seconds(0);
     config.mutable_unhealthy_threshold()->set_value(3);
     config.mutable_healthy_threshold()->set_value(3);
+    allocHealthChecker(config);
+    addCompletionCallback();
+  }
+
+  void setupEnableIdleHC() {
+    auto config = createGrpcHealthCheckConfig();
+    config.set_disable_health_check_if_active_traffic(true);
     allocHealthChecker(config);
     addCompletionCallback();
   }
@@ -5314,6 +5369,14 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessWithMultipleHostSets) {
             cluster_->prioritySet().getMockHostSet(1)->hosts_[0]->coarseHealth());
 }
 
+TEST_F(GrpcHealthCheckerImplTest, EnableIdleHC) {
+  setupEnableIdleHC();
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
+  health_checker_->start();
+  EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.attempt").value());
+}
 // Test stream-level watermarks does not interfere with health check.
 TEST_F(GrpcHealthCheckerImplTest, StreamReachesWatermarkDuringCheck) {
   setupHC();
