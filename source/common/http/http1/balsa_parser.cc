@@ -106,7 +106,7 @@ bool isUrlValid(absl::string_view url, bool is_connect) {
 
 bool isVersionValid(absl::string_view version_input) {
   // HTTP-version is defined at
-  // https://www.rfc-editor.org/rfc/rfc7230.html#section-2.6. HTTP/0.9 requests
+  // https://www.rfc-editor.org/rfc/rfc9112.html#section-2.3. HTTP/0.9 requests
   // have no http-version, so empty `version_input` is also accepted.
   envoy::type::matcher::v3::RegexMatcher matcher;
   *matcher.mutable_google_re2() = envoy::type::matcher::v3::RegexMatcher::GoogleRE2();
