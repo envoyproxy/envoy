@@ -92,7 +92,8 @@ deadline of 3 weeks.
 | 1.22.0  | 2022/04/15 | 2022/04/15 |    0 days  | 2023/04/15  |
 | 1.23.0  | 2022/07/15 | 2022/07/15 |    0 days  | 2023/07/15  |
 | 1.24.0  | 2022/10/15 | 2022/10/19 |   +4 days  | 2023/10/19  |
-| 1.25.0  | 2023/01/15 |            |            |             |
+| 1.25.0  | 2023/01/15 | 2022/01/18 |   +3 days  | 2024/01/18  |
+| 1.26.0  | 2023/04/15 |            |            |             |
 
 ### Cutting a major release
 
@@ -114,19 +115,17 @@ deadline of 3 weeks.
     release, please also make sure there's a stable maintainer signed up for next quarter,
     and the deadline for the next release is documented in the release schedule.
   * Get a review and merge.
-* Create a pull request with the commit created by the project tool and wait for tests to
-  pass on [main](https://dev.azure.com/cncf/envoy/_build).
-* Create a [tagged release](https://github.com/envoyproxy/envoy/releases). The release should
-  start with "v" and be followed by the version number. E.g., "v1.6.0". **This must match the
-  [VERSION](VERSION).**
+* Create a pull request with the commit created by the project tool and **wait for tests to
+  pass**.
+* Once the tests have passed, and the PR has landed, CI will automatically create the tagged release.
 * From the envoy [landing page](https://github.com/envoyproxy/envoy) use the branch drop-down to create a branch
-  from the tagged release, e.g. "release/v1.6". It will be used for the
+  using the minor version from the tagged release, e.g. `1.6.0` -> `release/v1.6`. It will be used for the
   [stable releases](RELEASES.md#stable-releases).
 * Tagging will kick off another run of [AZP postsubmit](https://dev.azure.com/cncf/envoy/_build?definitionId=11). Monitor that
   tag build to make sure that the final docker images get pushed along with
-  the final docs. The final documentation will end up in the
+  the final docs and [release assets](https://github.com/envoyproxy/envoy/releases). The final documentation will end up in the
   [envoy-website repository](https://github.com/envoyproxy/envoy-website/tree/main/docs/envoy).
-* Update the website ([example PR](https://github.com/envoyproxy/envoy-website/pull/148)) for the new release.
+* Update the website ([example PR](https://github.com/envoyproxy/envoy-website/pull/148)) with the new release version.
 * Craft a witty/uplifting email and send it to all the email aliases: envoy-announce@ envoy-users@ envoy-dev@ envoy-maintainers
 * Make sure we tweet the new release: either have Matt do it or email social@cncf.io and ask them to do an Envoy account
   post.

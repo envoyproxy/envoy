@@ -1498,8 +1498,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
         break;
       }
       TcpConnectionsMap& container = it->second;
-      container.connections_.begin()->first->close(Network::ConnectionCloseType::NoFlush,
-                                                   "non-pooled_tcp_connection_host_health_failure");
+      container.connections_.begin()->first->close(Network::ConnectionCloseType::NoFlush);
     }
   } else {
     drainOrCloseConnPools(host, ConnectionPool::DrainBehavior::DrainExistingConnections);

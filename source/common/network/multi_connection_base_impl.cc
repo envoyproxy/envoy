@@ -261,11 +261,6 @@ absl::string_view MultiConnectionBaseImpl::transportFailureReason() const {
   return connections_[0]->transportFailureReason();
 }
 
-absl::string_view MultiConnectionBaseImpl::localCloseReason() const {
-  // Note, this might change before connect finishes.
-  return connections_[0]->localCloseReason();
-}
-
 bool MultiConnectionBaseImpl::startSecureTransport() {
   if (!connect_finished_) {
     per_connection_state_.start_secure_transport_ = true;
@@ -316,9 +311,9 @@ void MultiConnectionBaseImpl::removeConnectionCallbacks(ConnectionCallbacks& cb)
   IS_ENVOY_BUG("Failed to remove connection callbacks");
 }
 
-void MultiConnectionBaseImpl::close(ConnectionCloseType type, absl::string_view details) {
+void MultiConnectionBaseImpl::close(ConnectionCloseType type) {
   if (connect_finished_) {
-    connections_[0]->close(type, details);
+    connections_[0]->close(type);
     return;
   }
 
@@ -330,7 +325,7 @@ void MultiConnectionBaseImpl::close(ConnectionCloseType type, absl::string_view 
     if (i != 0) {
       // Wait to close the final connection until the post-connection callbacks
       // have been added.
-      connections_[i]->close(ConnectionCloseType::NoFlush, details);
+      connections_[i]->close(ConnectionCloseType::NoFlush);
     }
   }
   connections_.resize(1);
@@ -341,7 +336,7 @@ void MultiConnectionBaseImpl::close(ConnectionCloseType type, absl::string_view 
       connections_[0]->addConnectionCallbacks(*cb);
     }
   }
-  connections_[0]->close(type, details);
+  connections_[0]->close(type);
 }
 
 Event::Dispatcher& MultiConnectionBaseImpl::dispatcher() {
