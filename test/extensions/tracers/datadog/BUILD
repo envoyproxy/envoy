@@ -16,7 +16,15 @@ envoy_extension_cc_test(
     srcs = [
         "datadog_tracer_impl_test.cc",
     ],
+    copts = [
+        # Make sure that headers included from dd_trace_cpp use Abseil
+        # equivalents of std::string_view and std::optional.
+        "-DDD_USE_ABSEIL_FOR_ENVOY",
+    ],
     extension_names = ["envoy.tracers.datadog"],
+    external_deps = [
+        "dd_trace_cpp",
+    ],
     # TODO(wrowe): envoy_extension_ rules don't currently exclude windows extensions
     tags = ["skip_on_windows"],
     deps = [
