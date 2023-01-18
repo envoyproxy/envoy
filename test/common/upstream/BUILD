@@ -138,6 +138,23 @@ envoy_cc_test(
     deps = ["//source/common/upstream:scheduler_lib"],
 )
 
+envoy_cc_test(
+    name = "multiplexed_subscription_factory_test",
+    srcs = ["multiplexed_subscription_factory_test.cc"],
+    deps = [
+        "//source/common/upstream:multiplexed_subscription_factory_lib",
+        "//test/mocks/api:api_mocks",
+        "//test/mocks/config:config_mocks",
+        "//test/mocks/config:custom_config_validators_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/protobuf:protobuf_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+    ],
+)
+
 envoy_cc_test_library(
     name = "health_check_fuzz_utils_lib",
     srcs = [
