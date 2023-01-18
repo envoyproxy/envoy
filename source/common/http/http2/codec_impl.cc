@@ -2042,10 +2042,9 @@ Status ClientConnectionImpl::trackInboundFrames(int32_t stream_id, size_t length
       ConnectionImpl::StreamImpl* stream = getStreamUnchecked(stream_id);
       if (stream) {
         stream->setDetails(Http2ResponseCodeDetails::get().inbound_empty_frame_flood);
-      } else {
-        ENVOY_CONN_LOG(debug, "no stream for stream_id {} while tracking inbound frames",
-                       connection_, hd->stream_id);
       }
+      // Above if is defensive, because the stream has just been created and therefore always
+      // exists.
     }
   }
   return result;
@@ -2138,11 +2137,9 @@ Status ServerConnectionImpl::trackInboundFrames(int32_t stream_id, size_t length
       ConnectionImpl::StreamImpl* stream = getStreamUnchecked(stream_id);
       if (stream) {
         stream->setDetails(Http2ResponseCodeDetails::get().inbound_empty_frame_flood);
-      } else {
-        ENVOY_CONN_LOG(
-            debug, "no stream for stream_id {} while tracking inbound frames on server connection",
-            connection_, hd->stream_id);
       }
+      // Above if is defensive, because the stream has just been created and therefore always
+      // exists.
     }
   }
   return result;
