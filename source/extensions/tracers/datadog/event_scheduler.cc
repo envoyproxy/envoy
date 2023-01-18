@@ -24,12 +24,13 @@ EventScheduler::schedule_recurring_event(std::chrono::steady_clock::duration int
   // Yes, a shared pointer to a pointer.
   auto self = std::make_shared<Event::Timer*>();
 
-  auto timer = dispatcher_->createTimer([self, interval, callback = std::move(callback)] {
-    (**self).enableTimer(std::chrono::duration_cast<std::chrono::milliseconds>(interval));
-    callback();
-  });
+  Event::TimerPtr timer =
+      dispatcher_->createTimer([self, interval, callback = std::move(callback)] {
+        (**self).enableTimer(std::chrono::duration_cast<std::chrono::milliseconds>(interval));
+        callback();
+      });
 
-  auto timer_raw = timer.get();
+  Event::Timer* timer_raw = timer.get();
   *self = timer_raw;
 
   timers_.emplace_back(std::move(timer));

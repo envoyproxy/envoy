@@ -13,9 +13,6 @@ namespace Tracers {
 namespace Datadog {
 
 class Span : public Tracing::Span {
-  datadog::tracing::Optional<datadog::tracing::Span> span_;
-  std::string trace_id_hex_;
-
 public:
   explicit Span(datadog::tracing::Span&& span);
 
@@ -44,6 +41,10 @@ public:
 
   // Note that `getTraceIdAsHex` is nowhere used.
   std::string getTraceIdAsHex() const override;
+
+private:
+  datadog::tracing::Optional<datadog::tracing::Span> span_;
+  std::string trace_id_hex_;
 };
 
 } // namespace Datadog

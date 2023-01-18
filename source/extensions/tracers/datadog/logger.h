@@ -10,8 +10,6 @@ namespace Tracers {
 namespace Datadog {
 
 class Logger : public datadog::tracing::Logger {
-  spdlog::logger* logger_;
-
 public:
   explicit Logger(spdlog::logger& logger);
 
@@ -22,6 +20,9 @@ public:
 
   void log_error(const datadog::tracing::Error&) override;
   void log_error(datadog::tracing::StringView) override;
+
+private:
+  spdlog::logger& logger_;
 };
 
 } // namespace Datadog

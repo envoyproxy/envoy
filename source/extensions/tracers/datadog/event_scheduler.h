@@ -15,9 +15,6 @@ namespace Tracers {
 namespace Datadog {
 
 class EventScheduler : public datadog::tracing::EventScheduler {
-  Event::Dispatcher* dispatcher_;
-  std::vector<Event::TimerPtr> timers_;
-
 public:
   explicit EventScheduler(Event::Dispatcher& dispatcher);
   ~EventScheduler() override;
@@ -32,6 +29,10 @@ public:
                                   std::function<void()> callback) override;
 
   nlohmann::json config_json() const override;
+
+private:
+  Event::Dispatcher* dispatcher_;
+  std::vector<Event::TimerPtr> timers_;
 };
 
 } // namespace Datadog
