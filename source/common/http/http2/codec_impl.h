@@ -574,10 +574,10 @@ protected:
   }
 
   /**
-   * Save `status` into nghttp2_callback_status_.
-   * Return nghttp2 callback return code corresponding to `status`.
+   * Save `status` into codec_callback_status_.
+   * Return codec callback return code corresponding to `status`.
    */
-  int setAndCheckNghttp2CallbackStatus(Status&& status);
+  int setAndCheckCodecCallbackStatus(Status&& status);
 
   /**
    * Callback for terminating connection when protocol constrain has been violated
@@ -612,9 +612,9 @@ protected:
 
   // Status for any errors encountered by the nghttp2 callbacks.
   // nghttp2 library uses single return code to indicate callback failure and
-  // `nghttp2_callback_status_` is used to save right error information returned by a callback. The
-  // `nghttp2_callback_status_` is valid iff nghttp call returned NGHTTP2_ERR_CALLBACK_FAILURE.
-  Status nghttp2_callback_status_;
+  // `codec_callback_status_` is used to save right error information returned by a callback. The
+  // `codec_callback_status_` is valid iff nghttp call returned NGHTTP2_ERR_CALLBACK_FAILURE.
+  Status codec_callback_status_;
 
   // Set if the type of frame that is about to be sent is PING or SETTINGS with the ACK flag set, or
   // RST_STREAM.
@@ -650,10 +650,11 @@ private:
   virtual ConnectionCallbacks& callbacks() PURE;
   virtual Status onBeginHeaders(const nghttp2_frame* frame) PURE;
   int onData(int32_t stream_id, const uint8_t* data, size_t len);
-  Status onBeforeFrameReceived(const nghttp2_frame_hd* hd);
+  Status onBeforeFrameReceived(int32_t stream_id, size_t length, uint8_t type, uint8_t flags);
   Status onFrameReceived(const nghttp2_frame* frame);
-  int onBeforeFrameSend(const nghttp2_frame* frame);
-  int onFrameSend(const nghttp2_frame* frame);
+  int onBeforeFrameSend(int32_t stream_id, size_t length, uint8_t type, uint8_t flags);
+  int onFrameSend(int32_t stream_id, size_t length, uint8_t type, uint8_t flags,
+                  uint32_t error_code);
   int onError(absl::string_view error);
   virtual int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) PURE;
   int onInvalidFrame(int32_t stream_id, int error_code);
@@ -667,7 +668,8 @@ private:
 
   // Adds buffer fragment for a new outbound frame to the supplied Buffer::OwnedImpl.
   void addOutboundFrameFragment(Buffer::OwnedImpl& output, const uint8_t* data, size_t length);
-  virtual Status trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) PURE;
+  virtual Status trackInboundFrames(int32_t stream_id, size_t length, uint8_t type, uint8_t flags,
+                                    uint32_t padding_length) PURE;
   void onKeepaliveResponse();
   void onKeepaliveResponseTimeout();
   bool slowContainsStreamId(int32_t stream_id) const;
@@ -714,7 +716,8 @@ private:
   ConnectionCallbacks& callbacks() override { return callbacks_; }
   Status onBeginHeaders(const nghttp2_frame* frame) override;
   int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) override;
-  Status trackInboundFrames(const nghttp2_frame_hd*, uint32_t) override;
+  Status trackInboundFrames(int32_t stream_id, size_t length, uint8_t type, uint8_t flags,
+                            uint32_t) override;
   void dumpStreams(std::ostream& os, int indent_level) const override;
   StreamResetReason getMessagingErrorResetReason() const override;
   Http::ConnectionCallbacks& callbacks_;
@@ -739,7 +742,8 @@ private:
   ConnectionCallbacks& callbacks() override { return callbacks_; }
   Status onBeginHeaders(const nghttp2_frame* frame) override;
   int onHeader(const nghttp2_frame* frame, HeaderString&& name, HeaderString&& value) override;
-  Status trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) override;
+  Status trackInboundFrames(int32_t stream_id, size_t length, uint8_t type, uint8_t flags,
+                            uint32_t padding_length) override;
   absl::optional<int> checkHeaderNameForUnderscores(absl::string_view header_name) override;
   StreamResetReason getMessagingErrorResetReason() const override {
     return StreamResetReason::LocalReset;
