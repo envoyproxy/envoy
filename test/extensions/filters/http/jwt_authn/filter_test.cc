@@ -32,7 +32,7 @@ JwtAuthnFilterStats generateMockStats(Stats::Scope& scope) {
 
 class MockFilterConfig : public FilterConfig {
 public:
-  MockFilterConfig() : stats_(generateMockStats(stats_store_)) {
+  MockFilterConfig() : stats_(generateMockStats(*stats_store_.rootScope())) {
     ON_CALL(*this, bypassCorsPreflightRequest()).WillByDefault(Return(true));
     ON_CALL(*this, findVerifier(_, _)).WillByDefault(Return(nullptr));
     ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_));

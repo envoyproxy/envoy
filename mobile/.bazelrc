@@ -7,6 +7,7 @@ build --define=google_grpc=disabled
 build --define=hot_restart=disabled
 build --define=tcmalloc=disabled
 build --define=admin_html=disabled
+build --define=static_extension_registration=disabled
 build --define=library_autolink=disabled
 build --experimental_inmemory_dotd_files
 build --experimental_inmemory_jdeps_files
@@ -16,7 +17,6 @@ build --features=swift.debug_prefix_map
 build --host_force_python=PY3
 build --macos_minimum_os=10.14
 build --ios_minimum_os=12.0
-build --ios_simulator_device="iPhone 13"
 build --ios_simulator_version=16.1
 build --verbose_failures
 build --workspace_status_command=../bazel/get_workspace_status
@@ -34,9 +34,6 @@ build --define cxxopts=-std=c++17
 build --features=-per_object_debug_info
 # Suppress deprecated declaration warnings due to extensive transitive noise from protobuf.
 build --copt -Wno-deprecated-declarations
-# Abseil Flag literals are compiled out by default on mobile platforms. These flags are needed for
-# Envoy's runtime system. This option prevents them from being compiled out.
-build --copt -DABSL_FLAGS_STRIP_NAMES=0
 
 build:rules_xcodeproj --config=ios
 build:rules_xcodeproj --define=apple.experimental.tree_artifact_outputs=0
@@ -69,6 +66,11 @@ build:dbg-android --config=android
 # Default flags for iOS debug builds
 build:dbg-ios --config=dbg-common
 build:dbg-ios --config=ios
+
+# Default flags for Android tests
+# TODO(jpsim): Explicitly register test extensions for Android tests
+# https://github.com/envoyproxy/envoy/issues/24977
+build:test-android --define=static_extension_registration=enabled
 
 # Locally-runnable ASAN config for MacOS & Linux with standard dev environment
 # See also:
@@ -108,6 +110,9 @@ build:release-common --config=sizeopt --define=admin_functionality=disabled
 
 # Set default symbols visibility to hidden to reduce .dynstr and the symbol table size
 build:release-common --copt=-fvisibility=hidden
+
+# Enable automatic extension factory registration for release builds
+build:release-common --define=static_extension_registration=enabled
 
 # Flags for release builds targeting iOS
 build:release-ios --config=ios

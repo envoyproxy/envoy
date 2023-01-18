@@ -89,7 +89,7 @@ protected:
   }
 
   Http::Http1::CodecStats& http1CodecStats() {
-    return Http::Http1::CodecStats::atomicGet(http1_codec_stats_, store_);
+    return Http::Http1::CodecStats::atomicGet(http1_codec_stats_, *store_.rootScope());
   }
 
   TestScopedRuntime scoped_runtime_;
@@ -243,8 +243,7 @@ void Http1ServerConnectionImplTest::expectTrailersTest(bool enable_trailers) {
 
   InSequence sequence;
   StrictMock<MockRequestDecoder> decoder;
-  EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder&, bool) -> RequestDecoder& { return decoder; }));
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   EXPECT_CALL(decoder, decodeHeaders_(_, false));
 
@@ -278,8 +277,7 @@ void Http1ServerConnectionImplTest::testTrailersExceedLimit(std::string trailer_
       max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
   std::string exception_reason;
   NiceMock<MockRequestDecoder> decoder;
-  EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder&, bool) -> RequestDecoder& { return decoder; }));
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   if (enable_trailers) {
     EXPECT_CALL(decoder, decodeHeaders_(_, false));
@@ -339,12 +337,7 @@ void Http1ServerConnectionImplTest::testRequestHeadersAccepted(std::string heade
   initialize();
 
   NiceMock<MockRequestDecoder> decoder;
-  Http::ResponseEncoder* response_encoder = nullptr;
-  EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
-        response_encoder = &encoder;
-        return decoder;
-      }));
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n");
   auto status = codec_->dispatch(buffer);
@@ -907,12 +900,7 @@ TEST_P(Http1ServerConnectionImplTest, Http10MultipleResponses) {
   {
     Buffer::OwnedImpl buffer("GET /foobar HTTP/1.1\r\nHost: www.somewhere.com\r\n\r\n");
 
-    Http::ResponseEncoder* response_encoder = nullptr;
-    EXPECT_CALL(callbacks_, newStream(_, _))
-        .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
-          response_encoder = &encoder;
-          return decoder;
-        }));
+    EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
     EXPECT_CALL(decoder, decodeHeaders_(_, true));
     auto status = codec_->dispatch(buffer);
     EXPECT_TRUE(status.ok());
@@ -1043,8 +1031,7 @@ TEST_P(Http1ServerConnectionImplTest, Http11InvalidTrailerPost) {
   initialize();
 
   MockRequestDecoder decoder;
-  EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder&, bool) -> RequestDecoder& { return decoder; }));
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   EXPECT_CALL(decoder, decodeHeaders_(_, false));
   // Verify that body is delivered as soon as the final chunk marker is found, even if an error is
@@ -1201,12 +1188,7 @@ TEST_P(Http1ServerConnectionImplTest, BadRequestNoStream) {
   initialize();
 
   MockRequestDecoder decoder;
-  Http::ResponseEncoder* response_encoder = nullptr;
-  EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
-        response_encoder = &encoder;
-        return decoder;
-      }));
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
   // Check that before any headers are parsed, requests do not look like HEAD or gRPC requests.
   EXPECT_CALL(decoder, sendLocalReply(_, _, _, _, _));
 
@@ -1282,12 +1264,7 @@ TEST_P(Http1ServerConnectionImplTest, FloodProtection) {
   // Trying to accept a third request with two buffered responses in the queue should trigger flood
   // protection.
   {
-    Http::ResponseEncoder* response_encoder = nullptr;
-    EXPECT_CALL(callbacks_, newStream(_, _))
-        .WillOnce(Invoke([&](Http::ResponseEncoder& encoder, bool) -> Http::RequestDecoder& {
-          response_encoder = &encoder;
-          return decoder;
-        }));
+    EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
     Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
     auto status = codec_->dispatch(buffer);
@@ -2336,8 +2313,7 @@ TEST_P(Http1ServerConnectionImplTest,
   initialize();
 
   MockRequestDecoder decoder;
-  EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder&, bool) -> RequestDecoder& { return decoder; }));
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   std::array<char, 1024> buffer;
   OutputBufferStream ostream{buffer.data(), buffer.size()};
@@ -2375,8 +2351,7 @@ TEST_P(Http1ServerConnectionImplTest, ShouldDumpDispatchBufferWithoutAllocatingM
   initialize();
 
   NiceMock<MockRequestDecoder> decoder;
-  EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder&, bool) -> RequestDecoder& { return decoder; }));
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   std::array<char, 1024> buffer;
   OutputBufferStream ostream{buffer.data(), buffer.size()};
@@ -3281,12 +3256,8 @@ TEST_P(Http1ServerConnectionImplTest, ManyRequestHeadersSplitRejected) {
 
   std::string exception_reason;
   NiceMock<MockRequestDecoder> decoder;
-  Http::ResponseEncoder* response_encoder = nullptr;
-  EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
-        response_encoder = &encoder;
-        return decoder;
-      }));
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n");
   auto status = codec_->dispatch(buffer);
 
@@ -3996,9 +3967,7 @@ TEST_P(Http1ServerConnectionImplTest, FirstReadEOF) {
   ASSERT_TRUE(status.ok());
 
   StrictMock<MockRequestDecoder> decoder;
-  EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(
-          Invoke([&](ResponseEncoder& /*encoder*/, bool) -> RequestDecoder& { return decoder; }));
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
   EXPECT_CALL(decoder, decodeHeaders_(_, true));

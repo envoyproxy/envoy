@@ -667,7 +667,7 @@ void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
   }
 
   ENVOY_CONN_LOG(trace, "on downstream event {}, has upstream = {}", read_callbacks_->connection(),
-                 static_cast<int>(event), upstream_ == nullptr);
+                 static_cast<int>(event), upstream_ != nullptr);
 
   if (upstream_) {
     Tcp::ConnectionPool::ConnectionDataPtr conn_data(upstream_->onDownstreamEvent(event));
