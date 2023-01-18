@@ -349,6 +349,11 @@ ClusterManagerImpl::ClusterManagerImpl(
       server, makeOptRefFromPtr(xds_resources_delegate_.get()),
       makeOptRefFromPtr(xds_config_tracker_.get()));
 
+  multiplexed_subscription_factory_ = std::make_unique<MultiplexedSubscriptionFactory>(
+      local_info, main_thread_dispatcher, *this, validation_context.dynamicValidationVisitor(), api,
+      server, makeOptRefFromPtr(xds_resources_delegate_.get()),
+      makeOptRefFromPtr(xds_config_tracker_.get()));
+
   const auto& dyn_resources = bootstrap.dynamic_resources();
 
   // Cluster loading happens in two phases: first all the primary clusters are loaded, and then all
@@ -1493,8 +1498,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
         break;
       }
       TcpConnectionsMap& container = it->second;
-      container.connections_.begin()->first->close(Network::ConnectionCloseType::NoFlush,
-                                                   "non-pooled_tcp_connection_host_health_failure");
+      container.connections_.begin()->first->close(Network::ConnectionCloseType::NoFlush);
     }
   } else {
     drainOrCloseConnPools(host, ConnectionPool::DrainBehavior::DrainExistingConnections);
