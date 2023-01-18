@@ -8,63 +8,10 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
-- area: aws_lambda
-  change: |
-    fix a bug when :ref:`PerRouteConfig <envoy_v3_api_msg_extensions.filters.http.aws_lambda.v3.PerRouteConfig>` is defined and was routing to a target cluster's AWS Lambda endpoint
-    in a region that is different from the region obtained in :ref:`arn <envoy_v3_api_field_extensions.filters.http.aws_lambda.v3.Config.arn>` of aws_lambda http_filter configuration
-    then the authorization header included in the request towards AWS Lambda was not signed with the region specified in PerRouteConfig.
-- area: grpc_json_transcoder
-  change: |
-    fix a bug when using http2, request body has google.api.HttpBody and the size is < 16KB, it will cause EOF from the backend grpc server.
-- area: router
-  change: |
-    fixed a bug that incorrectly rewrote the path when using ``regex_rewrite`` for redirects matched on prefix.
-- area: oauth2
-  change: |
-    fixed a bug when passthrough header was matched, envoy would always remove the authorization header. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.oauth_header_passthrough_fix`` to false.
-- area: generic_proxy
-  change: |
-    fixed a bug that encoder filters and decoder filters of generic proxy will be executed in the same order. The encoder filters' execuate order should be the reverse of decoder filters' in the generic proxy.
-- area: quic
-  change: |
-    reject configs that specify require_client_certificate with QUIC since clients certificates are currently unsupported in QUIC. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.reject_require_client_certificate_with_quic`` to false.
-- area: http
-  change: |
-    fixed a bug where Utility::PercentEncoding::encode() encodes some characters incorrectly because it was treating the value as negative.
-- area: upstream
-  change: |
-    fixed a bug that only coarse health status is used for override host selection.
-- area: validation
-  change: |
-    fixed a crash which could happen when optional ``engine_type`` is not provided in regex.
-- area: upstream
-  change: |
-    fixed a bug when specify both a single address in bootstrap and cluster upstream binding config but with a different IP version. It should be allowed but it is rejected.
-- area: upstream
-  change: |
-    fixed a bug for tcp upstream where we did not count use the count the header and data to/from the upstream.
-- area: jwt_authn
-  change: |
-    fix a bug that jwt_cache breaks the :ref:`provider_and_audiences <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtRequirement.provider_and_audiences>` JWT requirement.
 - area: eds
   change: |
     added ``envoy.reloadable_features.multiplex_eds`` to disable eds multiplexing. Eds multiplexing is enabled by default, so that all subscriptions for the same resource type and management server reuse a single channel/mux.
     When eds multiplexing is disabled each subscription uses a dedicated channel/mux.
-- area: skywalking
-  change: |
-    fixed a crash which could happen when skywalking tracer is enabled and illegal ``sw8`` header is received.
-- area: health_checker
-  change: |
-    prevent writing pending data for health checkers by introducing ``ConnectionCloseType::Abort`` to avoid cascading handshake overhead from health checker's requests on timeout. This fix is related to `issue \#23718 <https://github.com/envoyproxy/envoy/issues/23718>`_.
-- area: router
-  change: |
-    fixed a bug that truncated query parameters from paths rewritten with a path_rewrite_policy, query parameters are now appended. ``envoy_reloadable_features_append_query_parameters_path_rewriter`` can be used to revert to truncation.
-- area: grpc_http_bridge
-  change: |
-    fixed a bug where response data could be lost for requests that were upgraded from Protobuf.
-- area: tcp_proxy
-  change: |
-    When tunneling TCP over HTTP, mark the upstream connection as done reading when upstream trailers are read. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.finish_reading_on_decode_trailers`` to false.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
