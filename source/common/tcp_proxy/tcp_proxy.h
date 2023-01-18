@@ -114,18 +114,40 @@ using TunnelingConfig =
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig;
 
 /**
+ * Base class for both tunnel response headers and trailers.
+ */
+class TunnelResponseHeadersOrTrailers : public StreamInfo::FilterState::Object {
+public:
+  ProtobufTypes::MessagePtr serializeAsProto() const override;
+  virtual const Http::HeaderMap& value() const PURE;
+};
+
+/**
  * Response headers for the tunneling connections.
  */
-class TunnelResponseHeaders : public StreamInfo::FilterState::Object {
+class TunnelResponseHeaders : public TunnelResponseHeadersOrTrailers {
 public:
   TunnelResponseHeaders(Http::ResponseHeaderMapPtr&& response_headers)
       : response_headers_(std::move(response_headers)) {}
-  const Http::ResponseHeaderMap& value() const { return *response_headers_; }
-  ProtobufTypes::MessagePtr serializeAsProto() const override;
+  const Http::ResponseHeaderMap& value() const override { return *response_headers_; }
   static const std::string& key();
 
 private:
   const Http::ResponseHeaderMapPtr response_headers_;
+};
+
+/**
+ * Response trailers for the tunneling connections.
+ */
+class TunnelResponseTrailers : public TunnelResponseHeadersOrTrailers {
+public:
+  TunnelResponseTrailers(Http::ResponseTrailerMapPtr&& response_trailers)
+      : response_trailers_(std::move(response_trailers)) {}
+  const Http::ResponseTrailerMap& value() const override { return *response_trailers_; }
+  static const std::string& key();
+
+private:
+  const Http::ResponseTrailerMapPtr response_trailers_;
 };
 
 class TunnelingConfigHelperImpl : public TunnelingConfigHelper,
@@ -142,12 +164,16 @@ public:
   void
   propagateResponseHeaders(Http::ResponseHeaderMapPtr&& headers,
                            const StreamInfo::FilterStateSharedPtr& filter_state) const override;
+  void
+  propagateResponseTrailers(Http::ResponseTrailerMapPtr&& trailers,
+                            const StreamInfo::FilterStateSharedPtr& filter_state) const override;
 
 private:
   const bool use_post_;
   std::unique_ptr<Envoy::Router::HeaderParser> header_parser_;
   Formatter::FormatterPtr hostname_fmt_;
   const bool propagate_response_headers_;
+  const bool propagate_response_trailers_;
   std::string post_path_;
 };
 
