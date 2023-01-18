@@ -18,7 +18,7 @@ TEST(DatadogTracerTimeUtilTest, EstimateTime) {
   // - If the current system time is after the specified time (likely case),
   //   then the resulting steady time point is set back accordingly.
   // - If the current system time is before the specified time (rare case),
-  //   the the resulting steady time point is whatever the clock returns.
+  //   then the resulting steady time point is whatever the clock returns.
 
   // Modify `now` to change the value returned by `clock`.
   datadog::tracing::TimePoint now;
