@@ -2218,7 +2218,7 @@ TEST_F(HttpConnectionManagerImplTest, TestFilterCanEnrichAccessLogs) {
   conn_manager_->onData(fake_input, false);
 }
 
-TEST_F(HttpConnectionManagerImplTest, TestRemoteDownstreamDisconnectAccessLog) {
+TEST_F(HttpConnectionManagerImplTest, TestDownstreamDisconnectAccessLog) {
   setup(false, "");
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
@@ -2260,48 +2260,6 @@ TEST_F(HttpConnectionManagerImplTest, TestRemoteDownstreamDisconnectAccessLog) {
   conn_manager_->onData(fake_input, false);
 
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
-}
-
-TEST_F(HttpConnectionManagerImplTest, TestLocalDownstreamDisconnectAccessLog) {
-  setup(false, "");
-
-  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
-  std::shared_ptr<AccessLog::MockInstance> handler(new NiceMock<AccessLog::MockInstance>());
-
-  EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillOnce(Invoke([&](FilterChainManager& manager) -> bool {
-        FilterFactoryCb filter_factory = createDecoderFilterFactoryCb(filter);
-        FilterFactoryCb handler_factory = createLogHandlerFactoryCb(handler);
-
-        manager.applyFilterFactoryCb({}, filter_factory);
-        manager.applyFilterFactoryCb({}, handler_factory);
-        return true;
-      }));
-
-  EXPECT_CALL(*handler, log(_, _, _, _))
-      .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
-                          const StreamInfo::StreamInfo& stream_info) {
-        EXPECT_EQ("downstream_local_disconnect(reason_for_local_close)",
-                  stream_info.responseCodeDetails().value());
-      }));
-
-  EXPECT_CALL(*codec_, dispatch(_))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
-        decoder_ = &conn_manager_->newStream(response_encoder_);
-
-        RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
-            {":method", "GET"}, {":authority", "host"}, {":path", "/"}}};
-        decoder_->decodeHeaders(std::move(headers), true);
-
-        data.drain(4);
-        return Http::okStatus();
-      }));
-
-  Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input, false);
-
-  filter_callbacks_.connection_.close(Network::ConnectionCloseType::NoFlush,
-                                      "reason for local close");
 }
 
 TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithTrailers) {
@@ -3927,7 +3885,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainCloseRaceWithClose) {
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Return(codecProtocolError("protocol error")));
   EXPECT_CALL(*drain_timer, disableTimer());
   EXPECT_CALL(filter_callbacks_.connection_,
-              close(Network::ConnectionCloseType::FlushWriteAndDelay, _))
+              close(Network::ConnectionCloseType::FlushWriteAndDelay))
       .WillOnce(Return());
   conn_manager_->onData(fake_input, false);
 
@@ -4025,7 +3983,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainClose) {
 
   EXPECT_CALL(*codec_, goAway());
   EXPECT_CALL(filter_callbacks_.connection_,
-              close(Network::ConnectionCloseType::FlushWriteAndDelay, _));
+              close(Network::ConnectionCloseType::FlushWriteAndDelay));
   EXPECT_CALL(*drain_timer, disableTimer());
   drain_timer->invokeCallback();
 
