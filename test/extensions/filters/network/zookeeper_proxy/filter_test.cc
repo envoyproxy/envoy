@@ -711,9 +711,17 @@ TEST_F(ZooKeeperFilterTest, GetDataRequestEmptyPath) {
                config_->stats().getdata_resp_);
 }
 
-TEST_F(ZooKeeperFilterTest, CreateRequestPersistent) { testCreate(CreateFlags::Persistent); }
+TEST_F(ZooKeeperFilterTest, CreateRequestPersistent) {
+  testCreate(CreateFlags::Persistent);
+  testResponse({{{"opname", "create_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
+               config_->stats().create_resp_);
+}
 
-TEST_F(ZooKeeperFilterTest, CreateRequestPersistentWithNegativeDataLen) { testCreateWithNegativeDataLen(CreateFlags::Persistent); }
+TEST_F(ZooKeeperFilterTest, CreateRequestPersistentWithNegativeDataLen) {
+  testCreateWithNegativeDataLen(CreateFlags::Persistent);
+  testResponse({{{"opname", "create_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
+               config_->stats().create_resp_);
+}
 
 TEST_F(ZooKeeperFilterTest, CreateRequestPersistentSequential) {
   testCreate(CreateFlags::PersistentSequential);
