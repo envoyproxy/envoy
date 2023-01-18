@@ -47,7 +47,7 @@ public:
     // Check if cluster is configured, fail the request if not.
     const auto thread_local_cluster = cm_.getThreadLocalCluster(remote_jwks_.http_uri().cluster());
     if (thread_local_cluster == nullptr) {
-      ENVOY_LOG(error, "{}: fetch pubkey [uri = {}] failed: [cluster = {}] is not configured",
+      ENVOY_LOG(debug, "{}: fetch pubkey [uri = {}] failed: [cluster = {}] is not configured",
                 __func__, remote_jwks_.http_uri().uri(), remote_jwks_.http_uri().cluster());
       complete_ = true;
       receiver_->onJwksError(JwksFetcher::JwksReceiver::Failure::Network);
