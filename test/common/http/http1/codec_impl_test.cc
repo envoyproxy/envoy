@@ -915,7 +915,9 @@ struct {
 } kRequestHTTPStringTestCases[] = {{"", {}, {}}, // HTTP/0.9 has no HTTP-version.
                                    {"HTTP/9.1", {}, {}},
                                    {"aHTTP/1.1", "HPE_INVALID_VERSION", "HPE_INVALID_CONSTANT"},
+                                   // SPELLCHECKER(off)
                                    {"HHTTP/1.1", "HPE_INVALID_VERSION", "HPE_STRICT"},
+                                   // SPELLCHECKER(on)
                                    {"HTTPS/1.1", "HPE_INVALID_VERSION", "HPE_STRICT"},
                                    {"FTP/1.1", "HPE_INVALID_VERSION", "HPE_INVALID_CONSTANT"},
                                    {"HTTP/1.01", "HPE_INVALID_VERSION", "HPE_INVALID_VERSION"},
@@ -3840,12 +3842,14 @@ struct {
   const absl::optional<absl::string_view> balsa_parser_expected_error;
   const absl::optional<absl::string_view> http_parser_expected_error;
 } kResponseHTTPStringTestCases[] = {{"HTTP/9.1", {}, {}},
-                                    {"aHTTP/1.1", "HPE_INVALID_CONSTANT", "HPE_INVALID_CONSTANT"},
-                                    {"HHTTP/1.1", "HPE_INVALID_VERSION", "HPE_STRICT"},
-                                    {"HTTPS/1.1", "HPE_INVALID_VERSION", "HPE_STRICT"},
-                                    {"FTP/1.1", "HPE_INVALID_CONSTANT", "HPE_INVALID_CONSTANT"},
-                                    {"HTTP/1.01", "HPE_INVALID_VERSION", "HPE_INVALID_VERSION"},
-                                    {"HTTP/A.0", "HPE_INVALID_VERSION", "HPE_INVALID_VERSION"}};
+     {"aHTTP/1.1", "HPE_INVALID_CONSTANT", "HPE_INVALID_CONSTANT"},
+    // SPELLCHECKER(off)
+     {"HHTTP/1.1", "HPE_INVALID_VERSION", "HPE_STRICT"},
+// SPELLCHECKER(on)
+     {"HTTPS/1.1", "HPE_INVALID_VERSION", "HPE_STRICT"},
+     {"FTP/1.1", "HPE_INVALID_CONSTANT", "HPE_INVALID_CONSTANT"},
+     {"HTTP/1.01", "HPE_INVALID_VERSION", "HPE_INVALID_VERSION"},
+     {"HTTP/A.0", "HPE_INVALID_VERSION", "HPE_INVALID_VERSION"}};
 
 TEST_P(Http1ClientConnectionImplTest, HttpVersion) {
   for (const auto& test_case : kResponseHTTPStringTestCases) {
