@@ -11,20 +11,20 @@ behavior_changes:
     The runtime flag ``envoy.reloadable_features.enable_update_listener_socket_options`` can be used to revert this behavior.
 - area: build
   change: |
-    removed the c-ares and apple resolvers as required extensions. Envoy now only creates DNS resolvers when necessary (e.g. for logical DNS cluster); as such, it does not require these resolvers to always be included. If your Envoys do DNS resolution and override extensions_build_config.bzl you will need to include c-ares / apple resolver explicitly.
+    removed the c-ares and apple resolvers as required extensions. Envoy now only creates DNS resolvers when necessary (e.g. for logical DNS cluster); as such, it does not require these resolvers to always be included. If your Envoys do DNS resolution and override ``extensions_build_config.bzl`` you will need to include c-ares / apple resolver explicitly.
 - area: build
   change: |
-    moved the strict_dns, original_dst, logical_dns, static, and eds clusters to extensions. If you use these clusters and override extensions_build_config.bzl you will now need to include it explicitly.
+    moved the ``strict_dns``, ``original_dst``, ``logical_dns``, ``static``, and ``eds`` clusters to extensions. If you use these clusters and override ``extensions_build_config.bzl`` you will now need to include it explicitly.
 - area: stats http ext_authz
   change: |
-    Fixed ext_authz metric tag extraction so that :ref:`stat_prefix <envoy_v3_api_msg_extensions.filters.http.ext_authz.v3.ExtAuthz>`
+    Fixed ``ext_authz`` metric tag extraction so that :ref:`stat_prefix <envoy_v3_api_msg_extensions.filters.http.ext_authz.v3.ExtAuthz>`
     is properly extracted. This changes the Prometheus name from
     ``envoy_http_ext_authz_prefixval_denied{}`` to ``envoy_http_ext_authz_denied{envoy_ext_authz_prefix="prefixval"}``.
     ``envoy_cluster_X_ext_authz_Y_denied`` follows the same pattern.
 - area: loadbalancing
   change: |
     When active health checking is enabled per cluster, slow start calculations will now start after first passing health check. The cluster membership duration condition is dropped from the slow start calculation.
-    Endpoints can now re-enter slow start if active health checking is configured per cluster, on each "unhealthy -> healthy" state transition.
+    Endpoints can now re-enter slow start if active health checking is configured per cluster, on each ``unhealthy`` -> ``healthy`` state transition.
 
 minor_behavior_changes:
 - area: tls
@@ -36,7 +36,7 @@ minor_behavior_changes:
     This change can be reverted via the runtime flag ``envoy.reloadable_features.enable_intermediate_ca``.
 - area: cache_filter
   change: |
-    add a completion callback to ``updateHeaders`` interface. Any external cache implementations should be updated to match this new interface. See changes to simple_http_cache in PR#23666 for example.
+    add a completion callback to ``updateHeaders`` interface. Any external cache implementations should be updated to match this new interface. See changes to simple_http_cache in `PR \#23666 <https://github.com/envoyproxy/envoy/pull/23666>`_ for example.
 - area: cache_filter
   change: |
     api path of work-in-progress extension changed from ``api/extensions/cache/simple_http_cache`` to ``api/extensions/http/cache/simple_http_cache``, and source code moved to match extension category.
@@ -63,7 +63,7 @@ minor_behavior_changes:
     Virtual cluster statistics are no longer created for routes without any ``virtual_clusters``. Previously statistics for a ``catch all`` virtual cluster were created, but never updated.
 - area: jwt_authn
   change: |
-    adjust the refetch time for remote_jwks async_fetch feature. For a good fetch, refetch 5 seconds before jwks cache duration. For a failed fetch, refetch time can be specified by :ref:`failed_refetch_duration <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwksAsyncFetch.failed_refetch_duration>` with default 1 second.
+    adjust the refetch time for ``remote_jwks`` ``async_fetch`` feature. For a good fetch, refetch 5 seconds before jwks cache duration. For a failed fetch, refetch time can be specified by :ref:`failed_refetch_duration <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwksAsyncFetch.failed_refetch_duration>` with default 1 second.
 - area: config
   change: |
     add support for thrift connection draining. This can be disabled by setting the runtime guard ``envoy.reloadable_features.thrift_connection_draining`` to false.
@@ -79,7 +79,7 @@ bug_fixes:
 - area: aws_lambda
   change: |
     fix a bug when :ref:`PerRouteConfig <envoy_v3_api_msg_extensions.filters.http.aws_lambda.v3.PerRouteConfig>` is defined and was routing to a target cluster's AWS Lambda endpoint
-    in a region that is different from the region obtained in :ref:`arn <envoy_v3_api_field_extensions.filters.http.aws_lambda.v3.Config.arn>` of aws_lambda http_filter configuration
+    in a region that is different from the region obtained in :ref:`arn <envoy_v3_api_field_extensions.filters.http.aws_lambda.v3.Config.arn>` of ``aws_lambda`` ``http_filter`` configuration
     then the authorization header included in the request towards AWS Lambda was not signed with the region specified in ``PerRouteConfig``.
 - area: grpc_json_transcoder
   change: |
@@ -113,7 +113,7 @@ bug_fixes:
     fixed a bug for tcp upstream where we did not count the header and data to/from the upstream.
 - area: jwt_authn
   change: |
-    fix a bug that jwt_cache breaks the :ref:`provider_and_audiences <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtRequirement.provider_and_audiences>` JWT requirement.
+    fix a bug that ``jwt_cache`` breaks the :ref:`provider_and_audiences <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtRequirement.provider_and_audiences>` JWT requirement.
 - area: skywalking
   change: |
     fixed a crash that could happen when skywalking tracer is enabled and illegal ``sw8`` header is received.
@@ -122,7 +122,7 @@ bug_fixes:
     prevent writing pending data for health checkers by introducing ``ConnectionCloseType::Abort`` to avoid cascading handshake overhead from health checker's requests on timeout. This fix is related to `issue \#23718 <https://github.com/envoyproxy/envoy/issues/23718>`_.
 - area: router
   change: |
-    fixed a bug that truncated query parameters from paths rewritten with a path_rewrite_policy, query parameters are now appended. ``envoy_reloadable_features_append_query_parameters_path_rewriter`` can be used to revert to truncation.
+    fixed a bug that truncated query parameters from paths rewritten with a ``path_rewrite_policy``, query parameters are now appended. ``envoy_reloadable_features_append_query_parameters_path_rewriter`` can be used to revert to truncation.
 - area: grpc_http_bridge
   change: |
     fixed a bug where response data could be lost for requests that were upgraded from Protobuf.
@@ -261,7 +261,7 @@ new_features:
     added support for upstream SSL.
 - area: redis
   change: |
-    extended :ref:`cluster support <arch_overview_redis_cluster_support>` by adding a :ref:`dns_cache_config <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.dns_cache_config>` option that can be used to resolve hostnames returned by MOVED/ASK responses.
+    extended :ref:`cluster support <arch_overview_redis_cluster_support>` by adding a :ref:`dns_cache_config <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.dns_cache_config>` option that can be used to resolve hostnames returned by ``MOVED``/``ASK`` responses.
 - area: gcp_authn
   change: |
     added support for configuring header that holds token fetched from GCE metadata server in new field :ref:`token_header <envoy_v3_api_field_extensions.filters.http.gcp_authn.v3.GcpAuthnFilterConfig.token_header>`.
@@ -285,7 +285,7 @@ new_features:
     added :ref:`append_x_forwarded_port <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.append_x_forwarded_port>` to append the ``x-forwarded-port`` header to HTTP upstream requests.
 - area: tcp
   change: |
-    added :ref:`idle_timeout <envoy_v3_api_field_extensions.upstreams.tcp.v3.TcpProtocolOptions.idle_timeout>` to support per client idle timeout for tcp connection pool. See also minor_behavior_changes.
+    added :ref:`idle_timeout <envoy_v3_api_field_extensions.upstreams.tcp.v3.TcpProtocolOptions.idle_timeout>` to support per client idle timeout for tcp connection pool. See also `minor behaviour changes <#minor-behavior-changes>`__.
 - area: ext_authz
   change: |
     added support to allowlist headers included in the check request to gRPC authorization server (previously only available for HTTP authorization server).
