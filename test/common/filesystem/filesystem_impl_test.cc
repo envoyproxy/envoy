@@ -349,6 +349,62 @@ TEST_F(FileSystemImplTest, PwriteWritesTheSpecifiedRange) {
   EXPECT_EQ(contents, "01BOOPS789");
 }
 
+TEST_F(FileSystemImplTest, StatOnFileOpenOrClosedMeasuresTheExpectedValues) {
+  const std::string file_path =
+      TestEnvironment::writeStringToFileForTest("test_envoy", "0123456789");
+  {
+    const char buf[6] = "BOOPS";
+    absl::string_view view{buf};
+    FilePathAndType file_info{Filesystem::DestinationType::File, file_path};
+    FilePtr file = file_system_.createFile(file_info);
+    const Api::IoCallBoolResult open_result = file->open(FlagSet{
+        (1 << Filesystem::File::Operation::Write) | (1 << Filesystem::File::Operation::Read) |
+        (1 << Filesystem::File::Operation::KeepExistingData)});
+    EXPECT_TRUE(open_result.return_value_) << open_result.err_->getErrorDetails();
+    const Api::IoCallSizeResult write_result = file->pwrite(buf, view.size(), 8);
+    EXPECT_EQ(write_result.return_value_, view.size()) << write_result.err_->getErrorDetails();
+    EXPECT_THAT(write_result.err_, ::testing::IsNull());
+    {
+      // Verify info() on an open file.
+      const Api::IoCallResult<FileInfo> info_result = file->info();
+      EXPECT_THAT(info_result.err_, ::testing::IsNull()) << info_result.err_->getErrorDetails();
+      EXPECT_EQ(info_result.return_value_.size_, 13U);
+      EXPECT_EQ(info_result.return_value_.name_, "test_envoy");
+      EXPECT_EQ(info_result.return_value_.file_type_, FileType::Regular);
+      // File system uses real system clock, so to validate that the value retrieved by info() is
+      // reasonable, we must also use the real system clock here.
+      SystemTime now = std::chrono::system_clock::now(); // NO_CHECK_FORMAT(real_time)
+      // Verify that the file times on the created file are within the last 5 seconds.
+      EXPECT_THAT(info_result.return_value_.time_created_,
+                  testing::AllOf(testing::Gt(now - std::chrono::seconds(5)), testing::Le(now)));
+      EXPECT_THAT(info_result.return_value_.time_last_accessed_,
+                  testing::AllOf(testing::Gt(now - std::chrono::seconds(5)), testing::Le(now)));
+      EXPECT_THAT(info_result.return_value_.time_last_modified_,
+                  testing::AllOf(testing::Gt(now - std::chrono::seconds(5)), testing::Le(now)));
+    }
+  }
+  auto contents = TestEnvironment::readFileToStringForTest(file_path);
+  EXPECT_EQ(contents, "01234567BOOPS");
+  {
+    // Verify stat() on a non-open file.
+    const Api::IoCallResult<FileInfo> info_result = file_system_.stat(file_path);
+    EXPECT_THAT(info_result.err_, ::testing::IsNull()) << info_result.err_->getErrorDetails();
+    EXPECT_EQ(info_result.return_value_.size_, 13U);
+    EXPECT_EQ(info_result.return_value_.name_, "test_envoy");
+    EXPECT_EQ(info_result.return_value_.file_type_, FileType::Regular);
+    // File system uses real system clock, so to validate that the value retrieved by stat() is
+    // reasonable, we must also use the real system clock here.
+    SystemTime now = std::chrono::system_clock::now(); // NO_CHECK_FORMAT(real_time)
+    // Verify that the file times on the created file are within the last 5 seconds.
+    EXPECT_THAT(info_result.return_value_.time_created_,
+                testing::AllOf(testing::Gt(now - std::chrono::seconds(5)), testing::Le(now)));
+    EXPECT_THAT(info_result.return_value_.time_last_accessed_,
+                testing::AllOf(testing::Gt(now - std::chrono::seconds(5)), testing::Le(now)));
+    EXPECT_THAT(info_result.return_value_.time_last_modified_,
+                testing::AllOf(testing::Gt(now - std::chrono::seconds(5)), testing::Le(now)));
+  }
+}
+
 TEST_F(FileSystemImplTest, PwriteFailureReturnsError) {
   const std::string file_path =
       TestEnvironment::writeStringToFileForTest("test_envoy", "0123456789");

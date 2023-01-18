@@ -14,7 +14,7 @@ struct MemFileInfo;
 
 class MemfileInstanceImpl : public Instance {
 public:
-  MemfileInstanceImpl();
+  MemfileInstanceImpl(TimeSource& time_source);
 
   FilePtr createFile(const FilePathAndType& file_info) override;
 
@@ -40,6 +40,8 @@ public:
 
   void renameFile(const std::string& old_name, const std::string& new_name);
 
+  Api::IoCallResult<FileInfo> stat(absl::string_view path) override;
+
 private:
   friend class ScopedUseMemfiles;
 
@@ -57,6 +59,7 @@ private:
   absl::Mutex lock_;
   bool use_memfiles_ ABSL_GUARDED_BY(lock_);
   absl::flat_hash_map<std::string, std::shared_ptr<MemFileInfo>> files_ ABSL_GUARDED_BY(lock_);
+  TimeSource& time_source_;
 };
 
 MemfileInstanceImpl& fileSystemForTest();

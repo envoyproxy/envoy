@@ -8,6 +8,7 @@
 #include "envoy/api/io_error.h"
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
+#include "envoy/common/time.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
@@ -18,6 +19,19 @@ namespace Filesystem {
 using FlagSet = std::bitset<5>;
 
 enum class DestinationType { File, Stderr, Stdout, TmpFile };
+
+enum class FileType { Regular, Directory, Other };
+
+struct FileInfo {
+  const std::string name_;
+  // the size of the file in bytes, or `nullopt` if the size could not be determined
+  //         (e.g. for directories, or windows symlinks.)
+  const absl::optional<uint64_t> size_;
+  const FileType file_type_;
+  const absl::optional<SystemTime> time_created_;
+  const absl::optional<SystemTime> time_last_accessed_;
+  const absl::optional<SystemTime> time_last_modified_;
+};
 
 /**
  * Abstraction for a basic file on disk.
@@ -58,6 +72,13 @@ public:
    * @return ssize_t number of bytes written, or -1 for failure
    */
   virtual Api::IoCallSizeResult write(absl::string_view buffer) PURE;
+
+  /**
+   * Get additional details about the file. May or may not require a file system operation.
+   *
+   * @return FileInfo the file info.
+   */
+  virtual Api::IoCallResult<FileInfo> info() PURE;
 
   /**
    * Close the file.
@@ -146,6 +167,11 @@ public:
   virtual bool fileExists(const std::string& path) PURE;
 
   /**
+   * @return FileInfo containing information about the file, or an error status.
+   */
+  virtual Api::IoCallResult<FileInfo> stat(absl::string_view path) PURE;
+
+  /**
    * @return bool whether a directory exists on disk and can be opened for read.
    */
   virtual bool directoryExists(const std::string& path) PURE;
@@ -184,8 +210,6 @@ public:
 };
 
 using InstancePtr = std::unique_ptr<Instance>;
-
-enum class FileType { Regular, Directory, Other };
 
 struct DirectoryEntry {
   // name_ is the name of the file in the directory, not including the directory path itself

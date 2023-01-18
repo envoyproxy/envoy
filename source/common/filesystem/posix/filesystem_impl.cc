@@ -119,6 +119,70 @@ Api::IoCallSizeResult FileImplPosix::pwrite(const void* buf, uint64_t count, uin
   return (rc == -1) ? resultFailure(rc, errno) : resultSuccess(rc);
 }
 
+static FileType typeFromStat(struct stat s) {
+  if (S_ISDIR(s.st_mode)) {
+    return FileType::Directory;
+  }
+  if (S_ISREG(s.st_mode)) {
+    return FileType::Regular;
+  }
+  return FileType::Other;
+}
+
+static absl::optional<SystemTime> systemTimeFromTimespec(struct timespec t) {
+  if (t.tv_sec == 0) {
+    return absl::nullopt;
+  }
+  // TODO(once #24642 is landed): return timespecToChrono(t);
+  return SystemTime{} + std::chrono::duration_cast<std::chrono::microseconds>(
+                            std::chrono::seconds{t.tv_sec} + std::chrono::nanoseconds{t.tv_nsec});
+}
+
+static FileInfo infoFromStat(absl::string_view path, struct stat s) {
+  return {
+      std::string{InstanceImplPosix().splitPathFromFilename(path).file_},
+      s.st_size,
+      typeFromStat(s),
+      systemTimeFromTimespec(s.st_ctim),
+      systemTimeFromTimespec(s.st_atim),
+      systemTimeFromTimespec(s.st_mtim),
+  };
+}
+
+Api::IoCallResult<FileInfo> FileImplPosix::info() {
+  ASSERT(isOpen());
+  struct stat s;
+  if (::fstat(fd_, &s) != 0) {
+    return resultFailure<FileInfo>({}, errno);
+  }
+  return resultSuccess(infoFromStat(path(), s));
+}
+
+Api::IoCallResult<FileInfo> InstanceImplPosix::stat(absl::string_view path) {
+  struct stat s;
+  std::string full_path{path};
+  if (::stat(full_path.c_str(), &s) != 0) {
+    if (errno == ENOENT) {
+      if (::lstat(full_path.c_str(), &s) == 0 && S_ISLNK(s.st_mode)) {
+        // Special case. This directory entity is a symlink,
+        // but the reference is broken as the target could not be stat()'ed.
+        // After confirming this with an lstat, treat this file entity as
+        // a regular file, which may be unlink()'ed.
+        return resultSuccess<FileInfo>({
+            std::string{InstanceImplPosix().splitPathFromFilename(path).file_},
+            s.st_size,
+            FileType::Regular,
+            systemTimeFromTimespec(s.st_ctim),
+            systemTimeFromTimespec(s.st_atim),
+            systemTimeFromTimespec(s.st_mtim),
+        });
+      }
+    }
+    return resultFailure<FileInfo>({}, errno);
+  }
+  return resultSuccess(infoFromStat(path, s));
+}
+
 FileImplPosix::FlagsAndMode FileImplPosix::translateFlag(FlagSet in) {
   int out = 0;
   mode_t mode = 0;
