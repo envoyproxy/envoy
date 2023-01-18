@@ -545,6 +545,7 @@ enum class HttpVersion { Http1, Http2Nghttp2, Http2Oghttp2 };
 
 void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersion http_version) {
   Stats::IsolatedStoreImpl stats_store;
+  Stats::Scope& scope = *stats_store.rootScope();
   NiceMock<Network::MockConnection> client_connection;
   const envoy::config::core::v3::Http2ProtocolOptions client_http2_options{
       fromHttp2Settings(input.h2_settings().client())};
@@ -585,12 +586,12 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
 
   if (http2) {
     client = std::make_unique<Http2::ClientConnectionImpl>(
-        client_connection, client_callbacks, Http2::CodecStats::atomicGet(http2_stats, stats_store),
+        client_connection, client_callbacks, Http2::CodecStats::atomicGet(http2_stats, scope),
         random, client_http2_options, max_request_headers_kb, max_response_headers_count,
         Http2::ProdNghttp2SessionFactory::get());
   } else {
     client = std::make_unique<Http1::ClientConnectionImpl>(
-        client_connection, Http1::CodecStats::atomicGet(http1_stats, stats_store), client_callbacks,
+        client_connection, Http1::CodecStats::atomicGet(http1_stats, scope), client_callbacks,
         client_http1settings, max_response_headers_count);
   }
 
@@ -598,13 +599,13 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
     const envoy::config::core::v3::Http2ProtocolOptions server_http2_options{
         fromHttp2Settings(input.h2_settings().server())};
     server = std::make_unique<Http2::ServerConnectionImpl>(
-        server_connection, server_callbacks, Http2::CodecStats::atomicGet(http2_stats, stats_store),
+        server_connection, server_callbacks, Http2::CodecStats::atomicGet(http2_stats, scope),
         random, server_http2_options, max_request_headers_kb, max_request_headers_count,
         headers_with_underscores_action);
   } else {
     const Http1Settings server_http1settings{fromHttp1Settings(input.h1_settings().server())};
     server = std::make_unique<Http1::ServerConnectionImpl>(
-        server_connection, Http1::CodecStats::atomicGet(http1_stats, stats_store), server_callbacks,
+        server_connection, Http1::CodecStats::atomicGet(http1_stats, scope), server_callbacks,
         server_http1settings, max_request_headers_kb, max_request_headers_count,
         headers_with_underscores_action);
   }

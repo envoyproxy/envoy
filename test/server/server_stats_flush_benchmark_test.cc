@@ -26,11 +26,13 @@ public:
   bool includeTextReadout(const Stats::TextReadout&) override {
     return (++num_text_readouts_) % 10 == 0;
   }
+  bool includeHistogram(const Stats::Histogram&) override { return (++num_histograms_) % 10 == 0; }
 
 private:
   size_t num_counters_ = 0;
   size_t num_gauges_ = 0;
   size_t num_text_readouts_ = 0;
+  size_t num_histograms_ = 0;
 };
 
 class StatsSinkFlushSpeedTest {

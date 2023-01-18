@@ -141,7 +141,7 @@ public:
         dispatcher_, random_,
         Upstream::makeTestHost(cluster_, "hostname", "tcp://127.0.0.1:9000", simTime()),
         Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_, state_,
-        simTime(), alternate_protocols_, options_, quic_stat_names_, store_,
+        simTime(), alternate_protocols_, options_, quic_stat_names_, *store_.rootScope(),
         *quic_connection_persistent_info_);
     host_ = grid_->host();
     grid_->info_ = &info_;
@@ -937,11 +937,11 @@ TEST_F(ConnectivityGridTest, RealGrid) {
       .WillRepeatedly(
           Return(Upstream::TransportSocketMatcher::MatchData(*factory, matcher.stats_, "test")));
 
-  ConnectivityGrid grid(dispatcher_, random_,
-                        Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
-                        Upstream::ResourcePriority::Default, socket_options_,
-                        transport_socket_options_, state_, simTime(), alternate_protocols_,
-                        options_, quic_stat_names_, store_, *quic_connection_persistent_info_);
+  ConnectivityGrid grid(
+      dispatcher_, random_, Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
+      Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_, state_,
+      simTime(), alternate_protocols_, options_, quic_stat_names_, *store_.rootScope(),
+      *quic_connection_persistent_info_);
   EXPECT_EQ("connection grid", grid.protocolDescription());
   EXPECT_FALSE(grid.hasActiveConnections());
 
@@ -985,11 +985,11 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringCreation) {
       .WillRepeatedly(
           Return(Upstream::TransportSocketMatcher::MatchData(*factory, matcher.stats_, "test")));
 
-  ConnectivityGrid grid(dispatcher_, random_,
-                        Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
-                        Upstream::ResourcePriority::Default, socket_options_,
-                        transport_socket_options_, state_, simTime(), alternate_protocols_,
-                        options_, quic_stat_names_, store_, *quic_connection_persistent_info_);
+  ConnectivityGrid grid(
+      dispatcher_, random_, Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
+      Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_, state_,
+      simTime(), alternate_protocols_, options_, quic_stat_names_, *store_.rootScope(),
+      *quic_connection_persistent_info_);
 
   // Create the HTTP/3 pool.
   auto optional_it1 = ConnectivityGridForTest::forceCreateNextPool(grid);
@@ -1057,11 +1057,11 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringAysnConnect) {
       .WillRepeatedly(
           Return(Upstream::TransportSocketMatcher::MatchData(*factory, matcher.stats_, "test")));
 
-  ConnectivityGrid grid(dispatcher_, random_,
-                        Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
-                        Upstream::ResourcePriority::Default, socket_options_,
-                        transport_socket_options_, state_, simTime(), alternate_protocols_,
-                        options_, quic_stat_names_, store_, *quic_connection_persistent_info_);
+  ConnectivityGrid grid(
+      dispatcher_, random_, Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
+      Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_, state_,
+      simTime(), alternate_protocols_, options_, quic_stat_names_, *store_.rootScope(),
+      *quic_connection_persistent_info_);
 
   // Create the HTTP/3 pool.
   auto optional_it1 = ConnectivityGridForTest::forceCreateNextPool(grid);

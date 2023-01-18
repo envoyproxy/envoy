@@ -75,7 +75,8 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type 
 #if defined(__APPLE__) || defined(WIN32)
   // Cannot set SOCK_NONBLOCK as a ::socket flag.
   const int rc = io_handle->setBlocking(false).return_value_;
-  RELEASE_ASSERT(!SOCKET_FAILURE(rc), "");
+  RELEASE_ASSERT(!SOCKET_FAILURE(rc),
+                 fmt::format("Unable to set socket non-blocking: got error: {}", rc));
 #endif
 
   return io_handle;
@@ -97,7 +98,9 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type,
     // Setting IPV6_V6ONLY restricts the IPv6 socket to IPv6 connections only.
     const Api::SysCallIntResult result = io_handle->setOption(
         IPPROTO_IPV6, IPV6_V6ONLY, reinterpret_cast<const char*>(&v6only), sizeof(v6only));
-    RELEASE_ASSERT(!SOCKET_FAILURE(result.return_value_), "");
+    RELEASE_ASSERT(
+        !SOCKET_FAILURE(result.return_value_),
+        fmt::format("Unable to set socket non-blocking: got error: {}", result.return_value_));
   }
   return io_handle;
 }
