@@ -908,6 +908,7 @@ TEST_P(Http1ServerConnectionImplTest, Http10MultipleResponses) {
   }
 }
 
+// SPELLCHECKER(off)
 struct {
   const absl::string_view http_version;
   const absl::optional<absl::string_view> balsa_parser_expected_error;
@@ -915,13 +916,17 @@ struct {
 } kRequestHTTPStringTestCases[] = {{"", {}, {}}, // HTTP/0.9 has no HTTP-version.
                                    {"HTTP/9.1", {}, {}},
                                    {"aHTTP/1.1", "HPE_INVALID_VERSION", "HPE_INVALID_CONSTANT"},
-                                   // SPELLCHECKER(off)
+#ifdef ENVOY_ENABLE_UHV
+                                   {"HHTTP/1.1", "HPE_INVALID_VERSION", "HPE_INVALID_VERSION"},
+                                   {"HTTPS/1.1", "HPE_INVALID_VERSION", "HPE_INVALID_VERSION"},
+#else
                                    {"HHTTP/1.1", "HPE_INVALID_VERSION", "HPE_STRICT"},
-                                   // SPELLCHECKER(on)
                                    {"HTTPS/1.1", "HPE_INVALID_VERSION", "HPE_STRICT"},
+#endif
                                    {"FTP/1.1", "HPE_INVALID_VERSION", "HPE_INVALID_CONSTANT"},
                                    {"HTTP/1.01", "HPE_INVALID_VERSION", "HPE_INVALID_VERSION"},
                                    {"HTTP/A.0", "HPE_INVALID_VERSION", "HPE_INVALID_VERSION"}};
+// SPELLCHECKER(on)
 
 TEST_P(Http1ServerConnectionImplTest, HttpVersion) {
   for (const auto& test_case : kRequestHTTPStringTestCases) {
@@ -3837,19 +3842,24 @@ TEST_P(Http1ClientConnectionImplTest, ResponseHttpVersion) {
   }
 }
 
+// SPELLCHECKER(off)
 struct {
   const absl::string_view http_version;
   const absl::optional<absl::string_view> balsa_parser_expected_error;
   const absl::optional<absl::string_view> http_parser_expected_error;
 } kResponseHTTPStringTestCases[] = {{"HTTP/9.1", {}, {}},
                                     {"aHTTP/1.1", "HPE_INVALID_CONSTANT", "HPE_INVALID_CONSTANT"},
-                                    // SPELLCHECKER(off)
+#ifdef ENVOY_ENABLE_UHV
+                                    {"HHTTP/1.1", "HPE_INVALID_VERSION", "HPE_INVALID_VERSION"},
+                                    {"HTTPS/1.1", "HPE_INVALID_VERSION", "HPE_INVALID_VERSION"},
+#else
                                     {"HHTTP/1.1", "HPE_INVALID_VERSION", "HPE_STRICT"},
-                                    // SPELLCHECKER(on)
                                     {"HTTPS/1.1", "HPE_INVALID_VERSION", "HPE_STRICT"},
+#endif
                                     {"FTP/1.1", "HPE_INVALID_CONSTANT", "HPE_INVALID_CONSTANT"},
                                     {"HTTP/1.01", "HPE_INVALID_VERSION", "HPE_INVALID_VERSION"},
                                     {"HTTP/A.0", "HPE_INVALID_VERSION", "HPE_INVALID_VERSION"}};
+// SPELLCHECKER(on)
 
 TEST_P(Http1ClientConnectionImplTest, HttpVersion) {
   for (const auto& test_case : kResponseHTTPStringTestCases) {
