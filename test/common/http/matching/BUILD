@@ -9,16 +9,6 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_test(
-    name = "config_test",
-    srcs = ["config_test.cc"],
-    deps = [
-        "//source/common/http/matching:data_impl_lib",
-        "//source/common/http/matching:inputs_lib",
-        "//test/mocks/protobuf:protobuf_mocks"
-    ],
-)
-
-envoy_cc_test(
     name = "inputs_test",
     srcs = ["inputs_test.cc"],
     deps = [
