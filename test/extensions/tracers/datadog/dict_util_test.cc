@@ -1,4 +1,22 @@
-// TODO
+#include <datadog/optional.h>
+
+#include <utility>
+#include <vector>
+
+#include "envoy/http/header_map.h"
+
+#include "source/extensions/tracers/datadog/dict_util.h"
+
+#include "test/mocks/http/mocks.h"
+#include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace Tracers {
+namespace Datadog {
+namespace {
 
 TEST(DatadogTracerDictUtilTest, RequestHeaderWriter) {
   Http::TestRequestHeaderMapImpl headers;
@@ -54,14 +72,27 @@ TEST(DatadogTracerDictUtilTest, ResponseHeaderReader) {
 }
 
 TEST(DatadogTracerDictUtilTest, TraceContextReader) {
-  // `dd-trace-cpp` doesn't call `visit` when it's extracting trace context, but
-  // the method is nonetheless required by the `DictReader` interface.
-  // TODO: test the rest, too.
   const Tracing::TestTraceContextImpl context{{"foo", "bar"}, {"boo", "yah"}};
   const TraceContextReader reader{context};
+
+  auto result = reader.lookup("foo");
+  EXPECT_EQ(result, "bar");
+  result = reader.lookup("boo");
+  EXPECT_EQ(result, "yah");
+  result = reader.lookup("snark");
+  EXPECT_EQ(result, datadog::tracing::nullopt);
+
+  // `dd-trace-cpp` doesn't call `visit` when it's extracting trace context, but
+  // the method is nonetheless required by the `DictReader` interface.
   reader.visit([&](const auto& key, const auto& value) {
     const auto found = context.context_map_.find(key);
     ASSERT_NE(context.context_map_.end(), found);
     EXPECT_EQ(found->second, value);
   });
 }
+
+} // namespace
+} // namespace Datadog
+} // namespace Tracers
+} // namespace Extensions
+} // namespace Envoy
