@@ -326,5 +326,8 @@ new_features:
 - area: build
   change: |
     added compile-time option ``--define=static_extension_registration=disabled`` to disable the automatic static registration of extension factories.
+- area: oauth2
+  change: |
+    added :ref:`use_refresh_token <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.use_refresh_token>` to support updating an access token using by a refresh token if that is provided by authorization server.
 
 deprecated:
