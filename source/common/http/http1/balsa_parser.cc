@@ -108,10 +108,14 @@ bool isVersionValid(absl::string_view version_input) {
   // HTTP-version is defined at
   // https://www.rfc-editor.org/rfc/rfc9112.html#section-2.3. HTTP/0.9 requests
   // have no http-version, so empty `version_input` is also accepted.
-  envoy::type::matcher::v3::RegexMatcher matcher;
-  *matcher.mutable_google_re2() = envoy::type::matcher::v3::RegexMatcher::GoogleRE2();
-  matcher.set_regex("|HTTP/[0-9]\\.[0-9]");
-  const auto regex = Regex::Utility::parseRegex(matcher);
+
+  static const auto regex = [] {
+    envoy::type::matcher::v3::RegexMatcher matcher;
+    *matcher.mutable_google_re2() = envoy::type::matcher::v3::RegexMatcher::GoogleRE2();
+    matcher.set_regex("|HTTP/[0-9]\\.[0-9]");
+    return Regex::Utility::parseRegex(matcher);
+  }();
+
   return regex->match(version_input);
 }
 
