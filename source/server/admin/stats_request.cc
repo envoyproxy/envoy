@@ -135,6 +135,8 @@ void StatsRequest<TextReadoutTyoe, CounterType, GaugeType, HistogramType>::start
   // through the map we'll erase the scopes and replace them with the stats held
   // in the scopes.
   for (const Stats::ConstScopeSharedPtr& scope : scopes_) {
+    // The operator[] of btree_map runs a try_emplace behind the scenes,
+    // inserting the variant into the map when the lookup key does not exist.
     StatOrScopes& variant = stat_map_[stats_.symbolTable().toString(scope->prefix())];
     absl::get<ScopeVec>(variant).emplace_back(scope);
   }
