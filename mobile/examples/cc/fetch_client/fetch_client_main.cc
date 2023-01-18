@@ -7,7 +7,7 @@ const char build_scm_revision[] = "0";
 const char build_scm_status[] = "test";
 
 // Fetches each URL specified on the command line in series,
-// and prints the countents to standard out.
+// and prints the contents to standard out.
 int main(int argc, char** argv) {
   Envoy::Fetch client;
   std::vector<absl::string_view> urls;
