@@ -55,7 +55,7 @@ public:
               const std::string& service_zone, spdlog::level::level_enum log_level);
 
   // Constructor for mobile
-  OptionsImpl() {}
+  OptionsImpl() = default;
 
   // Setters for option fields. These are not part of the Options interface.
   void setBaseId(uint64_t base_id) { base_id_ = base_id; };
