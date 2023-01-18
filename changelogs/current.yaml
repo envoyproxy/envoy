@@ -223,9 +223,6 @@ new_features:
 - area: access_log
   change: |
     added support for :ref:`%STREAM_ID% <config_access_log_format_stream_id>` for stream unique identifier.
-- area: access_log
-  change: |
-    enhanced observability into local close for :ref:`%RESPONSE_CODE_DETAILS% <config_http_conn_man_details>`.
 - area: thrift
   change: |
     added payload to metadata filter which matches a given payload field's value would be extracted and attached to the request as dynamic metadata.
@@ -332,5 +329,8 @@ new_features:
 - area: router
   change: |
     support route info in upstream access log.
+- area: build
+  change: |
+    added compile-time option ``--define=static_extension_registration=disabled`` to disable the automatic static registration of extension factories.
 
 deprecated:
