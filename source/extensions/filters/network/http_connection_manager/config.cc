@@ -292,9 +292,9 @@ MobileHttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoType
 /**
  * Static registration for the HTTP connection manager filter.
  */
-REGISTER_FACTORY(HttpConnectionManagerFilterConfigFactory,
-                 Server::Configuration::NamedNetworkFilterConfigFactory){
-    "envoy.http_connection_manager"};
+LEGACY_REGISTER_FACTORY(HttpConnectionManagerFilterConfigFactory,
+                        Server::Configuration::NamedNetworkFilterConfigFactory,
+                        "envoy.http_connection_manager");
 
 InternalAddressConfig::InternalAddressConfig(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::

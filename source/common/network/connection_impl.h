@@ -67,12 +67,6 @@ public:
   void enableHalfClose(bool enabled) override;
   bool isHalfCloseEnabled() override { return enable_half_close_; }
   void close(ConnectionCloseType type) final;
-  void close(ConnectionCloseType type, absl::string_view details) override {
-    if (!details.empty()) {
-      setLocalCloseReason(details);
-    }
-    close(type);
-  }
   std::string nextProtocol() const override { return transport_socket_->protocol(); }
   void noDelay(bool enable) override;
   void readDisable(bool disable) override;

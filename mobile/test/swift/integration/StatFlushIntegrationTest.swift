@@ -1,8 +1,14 @@
 import Envoy
 import Foundation
+import TestExtensions
 import XCTest
 
 final class StatFlushIntegrationTest: XCTestCase {
+  override static func setUp() {
+    super.setUp()
+    register_test_extensions()
+  }
+
   func testLotsOfFlushesWithHistograms() throws {
     let engineExpectation = self.expectation(description: "Engine Running")
 
