@@ -136,13 +136,8 @@ TEST_F(FileSystemHttpCacheTestWithNoDefaultCache, EvictsOldestFilesUntilUnderCou
   cfg.mutable_max_cache_entry_count()->set_value(max_count);
   env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-a"), file_contents, true);
   env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-b"), file_contents, true);
-  {
-    // TODO(ravenblack): replace this with backdating the files when that's possible.
-    absl::Mutex mu;
-    absl::MutexLock lock(&mu);
-    const bool alwaysFalse = false;
-    mu.AwaitWithTimeout(absl::Condition(&alwaysFalse), absl::Seconds(1));
-  }
+  // TODO(#24994): replace this with backdating the files when that's possible.
+  sleep(1); // NO_CHECK_FORMAT(real_time)
   cache_ = std::dynamic_pointer_cast<FileSystemHttpCache>(
       http_cache_factory_->getCache(cacheConfig(cfg), context_));
   waitForEvictionThreadIdle();
@@ -174,13 +169,8 @@ TEST_F(FileSystemHttpCacheTestWithNoDefaultCache, EvictsOldestFilesUntilUnderSiz
   cfg.mutable_max_cache_size_bytes()->set_value(max_size);
   env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-a"), file_contents, true);
   env_.writeStringToFileForTest(absl::StrCat(cache_path_, "cache-b"), file_contents, true);
-  {
-    // TODO(ravenblack): replace this with backdating the files when that's possible.
-    absl::Mutex mu;
-    absl::MutexLock lock(&mu);
-    const bool alwaysFalse = false;
-    mu.AwaitWithTimeout(absl::Condition(&alwaysFalse), absl::Seconds(1));
-  }
+  // TODO(#24994): replace this with backdating the files when that's possible.
+  sleep(1); // NO_CHECK_FORMAT(real_time)
   cache_ = std::dynamic_pointer_cast<FileSystemHttpCache>(
       http_cache_factory_->getCache(cacheConfig(cfg), context_));
   waitForEvictionThreadIdle();
