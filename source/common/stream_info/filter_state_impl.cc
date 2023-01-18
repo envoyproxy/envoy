@@ -98,8 +98,10 @@ FilterState::ObjectsPtr FilterStateImpl::objectsSharedWithUpstreamConnection() c
   for (const auto& [name, object] : data_storage_) {
     switch (object->stream_sharing_) {
     case StreamSharing::SharedWithUpstreamConnection:
-    case StreamSharing::SharedWithUpstreamConnectionOnce:
       objects->push_back({object->data_, object->state_type_, object->stream_sharing_, name});
+      break;
+    case StreamSharing::SharedWithUpstreamConnectionOnce:
+      objects->push_back({object->data_, object->state_type_, StreamSharing::None, name});
       break;
     default:
       break;

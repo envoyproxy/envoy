@@ -374,13 +374,20 @@ TEST_F(FilterStateImplTest, SharedWithUpstream) {
             [](const auto& lhs, const auto& rhs) -> bool { return lhs.name_ < rhs.name_; });
   EXPECT_EQ(objects->at(0).name_, "shared_1");
   EXPECT_EQ(objects->at(0).state_type_, FilterState::StateType::ReadOnly);
+  EXPECT_EQ(objects->at(0).stream_sharing_,
+            FilterState::StreamSharing::SharedWithUpstreamConnection);
   EXPECT_EQ(objects->at(0).data_.get(), shared.get());
   EXPECT_EQ(objects->at(1).name_, "shared_4");
   EXPECT_EQ(objects->at(1).state_type_, FilterState::StateType::Mutable);
+  EXPECT_EQ(objects->at(1).stream_sharing_,
+            FilterState::StreamSharing::SharedWithUpstreamConnection);
   EXPECT_EQ(objects->at(2).name_, "shared_5");
   EXPECT_EQ(objects->at(2).state_type_, FilterState::StateType::ReadOnly);
+  EXPECT_EQ(objects->at(2).stream_sharing_,
+            FilterState::StreamSharing::SharedWithUpstreamConnection);
   EXPECT_EQ(objects->at(3).name_, "shared_7");
   EXPECT_EQ(objects->at(3).state_type_, FilterState::StateType::ReadOnly);
+  EXPECT_EQ(objects->at(3).stream_sharing_, FilterState::StreamSharing::None);
 }
 
 TEST_F(FilterStateImplTest, HasDataAtOrAboveLifeSpan) {

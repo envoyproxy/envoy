@@ -35,83 +35,6 @@ public:
     boostrap_extension->set_name("envoy.bootstrap.internal_listener");
   }
   void initialize() override {
-    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      setupBootstrapExtension(bootstrap);
-      auto* static_resources = bootstrap.mutable_static_resources();
-      auto* cluster = static_resources->mutable_clusters()->Add();
-      cluster->set_name("internal_upstream");
-      // Insert internal upstream transport.
-      if (use_transport_socket_) {
-        TestUtility::loadFromYaml(R"EOF(
-        name: envoy.transport_sockets.internal_upstream
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.transport_sockets.internal_upstream.v3.InternalUpstreamTransport
-          passthrough_metadata:
-          - name: host_metadata
-            kind: { host: {}}
-          - name: cluster_metadata
-            kind: { cluster: {}}
-          transport_socket:
-            name: envoy.transport_sockets.raw_buffer
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
-        )EOF",
-                                  *cluster->mutable_transport_socket());
-      }
-      // Insert internal address endpoint.
-      cluster->clear_load_assignment();
-      auto* load_assignment = cluster->mutable_load_assignment();
-      load_assignment->set_cluster_name(cluster->name());
-      auto* endpoints = load_assignment->add_endpoints();
-      auto* lb_endpoint = endpoints->add_lb_endpoints();
-      auto* endpoint = lb_endpoint->mutable_endpoint();
-      auto* addr = endpoint->mutable_address()->mutable_envoy_internal_address();
-      addr->set_server_listener_name("internal_address");
-      addr->set_endpoint_id("lorem_ipsum");
-      if (add_metadata_) {
-        auto* metadata = lb_endpoint->mutable_metadata();
-        Config::Metadata::mutableMetadataValue(*metadata, "host_metadata", "value")
-            .set_string_value("HOST");
-        // Insert cluster metadata.
-        Config::Metadata::mutableMetadataValue(*(cluster->mutable_metadata()), "cluster_metadata",
-                                               "value")
-            .set_string_value("CLUSTER");
-      }
-      // Emit metadata to access log.
-      access_log_name_ = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
-
-      // Insert internal listener.
-      auto* listener = static_resources->mutable_listeners()->Add();
-      TestUtility::loadFromYaml(fmt::format(R"EOF(
-      name: internal_address
-      internal_listener: {{}}
-      filter_chains:
-      - filters:
-        - name: tcp_proxy
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
-            cluster: cluster_0
-            stat_prefix: internal_address
-            access_log:
-            - name: envoy.file_access_log
-              typed_config:
-                "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
-                path: {}
-                log_format:
-                  text_format_source:
-                    inline_string: "%DYNAMIC_METADATA(host_metadata:value)%,%DYNAMIC_METADATA(cluster_metadata:value)%,%FILTER_STATE(internal_state:PLAIN)%,%FILTER_STATE(internal_state_once:PLAIN)%\n"
-      )EOF",
-                                            access_log_name_),
-                                *listener);
-    });
-    config_helper_.addConfigModifier(
-        [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-                hcm) -> void {
-          auto* route_config = hcm.mutable_route_config();
-          auto* virtual_host = route_config->mutable_virtual_hosts(0);
-          auto* route = virtual_host->mutable_routes(0);
-          route->mutable_route()->set_cluster("internal_upstream");
-        });
     config_helper_.prependFilter(R"EOF(
     name: header-to-filter-state
     typed_config:
@@ -128,7 +51,101 @@ public:
       state_name: internal_state_once
       shared: ONCE
     )EOF");
+    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      setupBootstrapExtension(bootstrap);
+      auto* static_resources = bootstrap.mutable_static_resources();
+      makeInternalListenerUpstream("internal_listener",
+                                   static_resources->mutable_clusters()->Add());
+      makeInternalListenerUpstream("internal_listener2",
+                                   static_resources->mutable_clusters()->Add());
+
+      // Emit metadata to access logs.
+      access_log_name_ = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+      access_log2_name_ = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+
+      // Insert internal listeners.
+      TestUtility::loadFromYaml(
+          makeInternalListener("internal_listener", "internal_listener2", access_log_name_),
+          *static_resources->mutable_listeners()->Add());
+      TestUtility::loadFromYaml(
+          makeInternalListener("internal_listener2", "cluster_0", access_log2_name_),
+          *static_resources->mutable_listeners()->Add());
+    });
+    config_helper_.addConfigModifier(
+        [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) -> void {
+          auto* route_config = hcm.mutable_route_config();
+          auto* virtual_host = route_config->mutable_virtual_hosts(0);
+          auto* route = virtual_host->mutable_routes(0);
+          route->mutable_route()->set_cluster("internal_listener");
+        });
     HttpIntegrationTest::initialize();
+  }
+
+  void makeInternalListenerUpstream(const std::string& listener_name,
+                                    envoy::config::cluster::v3::Cluster* cluster) {
+    cluster->set_name(listener_name);
+    cluster->clear_load_assignment();
+    auto* load_assignment = cluster->mutable_load_assignment();
+    load_assignment->set_cluster_name(cluster->name());
+    auto* endpoints = load_assignment->add_endpoints();
+    auto* lb_endpoint = endpoints->add_lb_endpoints();
+    auto* endpoint = lb_endpoint->mutable_endpoint();
+    auto* addr = endpoint->mutable_address()->mutable_envoy_internal_address();
+    addr->set_server_listener_name(listener_name);
+    addr->set_endpoint_id("lorem_ipsum");
+    // Insert internal upstream transport.
+    if (use_transport_socket_) {
+      TestUtility::loadFromYaml(R"EOF(
+      name: envoy.transport_sockets.internal_upstream
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.internal_upstream.v3.InternalUpstreamTransport
+        passthrough_metadata:
+        - name: host_metadata
+          kind: { host: {}}
+        - name: cluster_metadata
+          kind: { cluster: {}}
+        transport_socket:
+          name: envoy.transport_sockets.raw_buffer
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
+      )EOF",
+                                *cluster->mutable_transport_socket());
+    }
+    // Insert internal address endpoint.
+    if (add_metadata_) {
+      auto* metadata = lb_endpoint->mutable_metadata();
+      Config::Metadata::mutableMetadataValue(*metadata, "host_metadata", "value")
+          .set_string_value(listener_name);
+      // Insert cluster metadata.
+      Config::Metadata::mutableMetadataValue(*(cluster->mutable_metadata()), "cluster_metadata",
+                                             "value")
+          .set_string_value(listener_name);
+    }
+  }
+
+  std::string makeInternalListener(const std::string& name, const std::string& cluster,
+                                   const std::string& access_log_name) {
+    return fmt::format(R"EOF(
+      name: {}
+      internal_listener: {{}}
+      filter_chains:
+      - filters:
+        - name: tcp_proxy
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+            cluster: {}
+            stat_prefix: internal_address
+            access_log:
+            - name: envoy.file_access_log
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+                path: {}
+                log_format:
+                  text_format_source:
+                    inline_string: "%DYNAMIC_METADATA(host_metadata:value)%,%DYNAMIC_METADATA(cluster_metadata:value)%,%FILTER_STATE(internal_state:PLAIN)%,%FILTER_STATE(internal_state_once:PLAIN)%\n"
+      )EOF",
+                       name, cluster, access_log_name);
   }
 
   // Send bidirectional data through the internal connection.
@@ -161,6 +178,7 @@ public:
   bool use_transport_socket_{true};
   bool buffer_size_specified_{false};
   uint32_t buffer_size_{0};
+  std::string access_log2_name_;
 };
 
 TEST_F(InternalUpstreamIntegrationTest, BasicFlow) {
@@ -174,7 +192,10 @@ TEST_F(InternalUpstreamIntegrationTest, BasicFlow) {
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   cleanupUpstreamAndDownstream();
-  EXPECT_THAT(waitForAccessLog(access_log_name_), ::testing::HasSubstr("HOST,CLUSTER,FOO,BAZ"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_),
+              ::testing::HasSubstr("internal_listener,internal_listener,FOO,BAZ"));
+  EXPECT_THAT(waitForAccessLog(access_log2_name_),
+              ::testing::HasSubstr("internal_listener2,internal_listener2,FOO,-"));
 }
 
 TEST_F(InternalUpstreamIntegrationTest, BasicFlowMissing) {

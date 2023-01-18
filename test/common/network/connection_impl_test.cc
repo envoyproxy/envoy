@@ -3113,27 +3113,16 @@ class TestObject : public StreamInfo::FilterState::Object {};
 
 TEST_P(ClientConnectionWithCustomRawBufferSocketTest, TransportSocketCallbacks) {
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
-  auto filter_state_object1 = std::make_shared<TestObject>();
-  filter_state.setData("test-filter-state1", filter_state_object1,
+  auto filter_state_object = std::make_shared<TestObject>();
+  filter_state.setData("test-filter-state", filter_state_object,
                        StreamInfo::FilterState::StateType::ReadOnly,
                        StreamInfo::FilterState::LifeSpan::Connection,
                        StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection);
-  auto filter_state_object2 = std::make_shared<TestObject>();
-  filter_state.setData("test-filter-state2", filter_state_object2,
-                       StreamInfo::FilterState::StateType::ReadOnly,
-                       StreamInfo::FilterState::LifeSpan::Connection,
-                       StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnectionOnce);
   transport_socket_options_ = TransportSocketOptionsUtility::fromFilterState(filter_state);
   setUpBasicConnection();
 
   EXPECT_TRUE(getTransportSocket()->compareCallbacks(testClientConnection()));
-  const StreamInfo::FilterStateSharedPtr& dest_filter_state =
-      client_connection_->streamInfo().filterState();
-  EXPECT_TRUE(dest_filter_state->hasDataWithName("test-filter-state1"));
-  EXPECT_TRUE(dest_filter_state->hasDataWithName("test-filter-state2"));
-  const auto shared_objects = dest_filter_state->objectsSharedWithUpstreamConnection();
-  ASSERT_EQ(1, shared_objects->size());
-  ASSERT_EQ("test-filter-state1", shared_objects->at(0).name_);
+  EXPECT_TRUE(client_connection_->streamInfo().filterState()->hasDataWithName("test-filter-state"));
 
   disconnect(false);
 }
