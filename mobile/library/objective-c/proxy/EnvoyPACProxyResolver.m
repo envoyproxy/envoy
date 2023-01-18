@@ -28,18 +28,17 @@
 
 - (void)resolveProxiesForTargetURL:(NSURL *)targetURL
          proxyAutoConfigurationURL:(NSURL *)proxyAutoConfigurationURL
-               withCompletionBlock:(void(^)(NSArray * _Nullable, NSError * _Nullable))completion
+               withCompletionBlock:(void(^)(NSArray<EnvoyProxySettings *> * _Nullable, NSError * _Nullable))completion
 {
+  CFURLRef cfTargetURL =
+  CFURLCreateWithString(kCFAllocatorDefault,
+                        (__bridge_retained CFStringRef)[targetURL absoluteString],
+                        NULL);
   CFURLRef cfProxyAutoConfigurationURL =
   CFURLCreateWithString(
                         kCFAllocatorDefault,
                         (__bridge_retained CFStringRef)[proxyAutoConfigurationURL absoluteString],
                         NULL);
-  CFURLRef cfTargetURL =
-  CFURLCreateWithString(kCFAllocatorDefault,
-                        (__bridge_retained CFStringRef)[targetURL absoluteString],
-                        NULL);
-
   Wrapper *wrapper = [Wrapper new];
   wrapper.block = completion;
 //  CFStreamClientContext context = {0, (__bridge void*)wrapper, retainWrapper, releaseWrapper, NULL};
@@ -58,22 +57,26 @@ void proxyAutoConfigurationResultCallback(void *ptr, CFArrayRef cfProxies, CFErr
   Wrapper *wrapper = CFBridgingRelease(ptr);
 
   if (cfError != NULL) {
-    wrapper.block(nil, [NSError new]);
+    NSError *error = (__bridge NSError *)cfError;
+    NSLog(@"RAF: ERROR: %@", error.localizedDescription);
+    wrapper.block(nil, (__bridge NSError *)cfError);
   } else if (cfProxies != NULL) {
+    NSLog(@"RAF: PROXIES ");
+    NSMutableArray<EnvoyProxySettings *> *proxies = [NSMutableArray new];
+    NSUInteger count = CFArrayGetCount(cfProxies);
+    for (NSUInteger i = 0; i < count; i++) {
+      NSDictionary *current = (__bridge NSDictionary *)((CFDictionaryRef)CFArrayGetValueAtIndex(cfProxies, i));
+      NSString *proxyType = current[(NSString *)kCFProxyTypeKey];
+      NSLog(@"RAF: %@", current);
 
+//      if (!CFEqual(proxyType, kCFProxyTypeAutoConfigurationURL)) {
+//        [proxies addObject:[[EnvoyProxySettings alloc] initWithHost:<#(NSString *)#> port:<#(NSUInteger)#>]];
+//      }
+    }
   } else {
+    NSLog(@"RAF: NO PROXIES ");
     wrapper.block(@[], nil);
   }
-
-
-  NSUInteger count = CFArrayGetCount(cfProxies);
-  for (NSUInteger i = 0; i < count; i++) {
-
-  }
-
-  NSError *error = (__bridge NSError *)cfError;
-  NSLog(@"RAF: test %@", error);
-  wrapper.block(@[], nil);
 }
 
 @end

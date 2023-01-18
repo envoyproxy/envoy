@@ -81,7 +81,7 @@ NetworkConfigurationFilter::decodeHeaders(Http::RequestHeaderMap& request_header
 
   envoy_proxy_settings_list *proxy_settings_list = static_cast<envoy_proxy_settings_list*>(safe_malloc(sizeof(envoy_proxy_settings_list)));
 
-  const auto host_data = Data::Utility::copyToBridgeData("api.lyft.com");
+  const auto host_data = Data::Utility::copyToBridgeData("https://api.lyft.com");
   const auto proxy_resolution_result = proxy_resolver->resolve(host_data, proxy_settings_list, result_handler, proxy_resolver->context);
   if (proxy_resolution_result == ENVOY_PROXY_RESOLUTION_RESULT_NONE) {
     return Http::FilterHeadersStatus::Continue;
