@@ -274,10 +274,9 @@ public:
     return buffer;
   }
 
-  Buffer::OwnedImpl
-  encodeCreateRequestWithNegativeDataLen(const std::string& path, const CreateFlags flags,
-                      const bool txn = false,
-                      const int32_t opcode = enumToSignedInt(OpCodes::Create)) const {
+  Buffer::OwnedImpl encodeCreateRequestWithNegativeDataLen(
+      const std::string& path, const CreateFlags flags, const bool txn = false,
+      const int32_t opcode = enumToSignedInt(OpCodes::Create)) const {
     Buffer::OwnedImpl buffer;
 
     if (!txn) {
@@ -912,7 +911,8 @@ TEST_F(ZooKeeperFilterTest, MultiRequest) {
 
   Buffer::OwnedImpl create1 = encodeCreateRequest("/foo", "1", CreateFlags::Persistent, true);
   Buffer::OwnedImpl create2 = encodeCreateRequest("/bar", "1", CreateFlags::Persistent, true);
-  Buffer::OwnedImpl create3 = encodeCreateRequestWithNegativeDataLen("/baz", CreateFlags::Persistent, true);
+  Buffer::OwnedImpl create3 =
+      encodeCreateRequestWithNegativeDataLen("/baz", CreateFlags::Persistent, true);
   Buffer::OwnedImpl check1 = encodePathVersion("/foo", 100, enumToSignedInt(OpCodes::Check), true);
   Buffer::OwnedImpl set1 = encodeSetRequest("/bar", "2", -1, true);
 
