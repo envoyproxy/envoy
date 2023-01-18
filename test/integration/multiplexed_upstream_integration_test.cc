@@ -666,10 +666,6 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamGoaway) {
 }
 
 TEST_P(MultiplexedUpstreamIntegrationTest, AutoRetrySafeRequestUponTooEarlyResponse) {
-  if (!Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3)) {
-    return;
-  }
-
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -799,8 +795,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamEarlyDataRejected) {
   GTEST_SKIP() << "Skipping on Windows";
 #endif
   if (upstreamProtocol() != Http::CodecType::HTTP3 ||
-      !(Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3) &&
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_sends_early_data"))) {
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_sends_early_data")) {
     return;
   }
   initialize();
@@ -891,8 +886,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamDisconnectDuringEarlyData) {
   GTEST_SKIP() << "Skipping on Windows";
 #endif
   if (upstreamProtocol() != Http::CodecType::HTTP3 ||
-      !(Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3) &&
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_sends_early_data"))) {
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_sends_early_data")) {
     return;
   }
   Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.no_extension_lookup_by_name", false);
@@ -950,8 +944,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, DownstreamDisconnectDuringEarlyData) 
   GTEST_SKIP() << "Skipping on Windows";
 #endif
   if (upstreamProtocol() != Http::CodecType::HTTP3 ||
-      !(Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3) &&
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_sends_early_data"))) {
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_sends_early_data")) {
     return;
   }
   initialize();
@@ -1002,8 +995,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, ConnPoolQueuingNonSafeRequest) {
   GTEST_SKIP() << "Skipping on Windows";
 #endif
   if (upstreamProtocol() != Http::CodecType::HTTP3 ||
-      !(Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3) &&
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_sends_early_data"))) {
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_sends_early_data")) {
     return;
   }
   initialize();
