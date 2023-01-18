@@ -323,5 +323,8 @@ new_features:
   change: |
     added an api configuration :ref:`xds_config_tracker_extension <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.xds_config_tracker_extension>` in the bootstrap
     to allow tracking xDS responses in external components, and provided the extension interface.
+- area: build
+  change: |
+    added compile-time option ``--define=static_extension_registration=disabled`` to disable the automatic static registration of extension factories.
 
 deprecated:
