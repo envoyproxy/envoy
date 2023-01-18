@@ -1,6 +1,7 @@
 #import <Foundation/Foundation.h>
 
 #import "library/objective-c/proxy/EnvoyProxySettings.h"
+#import "library/common/types/c_types.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -8,9 +9,9 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (void)start;
 
-- (void)resolveProxyForTargetURL:(NSURL *)targetURL
-                            port:(uint16_t)port
-             withCompletionBlock:(void(^)(NSArray<EnvoyProxySettings *> * _Nullable, NSError * _Nullable))completion;
+- (envoy_proxy_resolution_result)resolveProxyForTargetURL:(NSURL *)targetURL
+                                            proxySettings:(NSArray<EnvoyProxySettings *> *_Nullable*_Nullable)proxySettings
+                                      withCompletionBlock:(void(^)(NSArray<EnvoyProxySettings *> * _Nullable, NSError * _Nullable))completion;
 
 @end
 

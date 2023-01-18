@@ -4,6 +4,8 @@
 
 #include "source/common/network/filter_state_proxy_info.h"
 
+#include "library/common/data/utility.h"
+#include "library/common/types/c_types.h"
 #include "library/common/api/external.h"
 #include "library/common/http/header_utility.h"
 
@@ -56,6 +58,10 @@ bool NetworkConfigurationFilter::onAddressResolved(
   return false;
 }
 
+void proxy_resolution_completed(envoy_proxy_settings_list, const void *) {
+
+}
+
 Http::FilterHeadersStatus
 NetworkConfigurationFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, bool) {
   ENVOY_LOG(trace, "NetworkConfigurationFilter::decodeHeaders", request_headers);
@@ -67,7 +73,19 @@ NetworkConfigurationFilter::decodeHeaders(Http::RequestHeaderMap& request_header
 
   const auto authorityHeader = request_headers.get(AuthorityHeaderName);
   const auto proxy_resolver = static_cast<envoy_proxy_resolver *>(Api::External::retrieveApi("envoy_proxy_resolver"));
-  proxy_resolver->resolve(request_headers.get);
+
+  envoy_proxy_resolver_proxy_resolution_result_handler *result_handler = static_cast<envoy_proxy_resolver_proxy_resolution_result_handler*>(safe_malloc(sizeof(envoy_proxy_resolver_proxy_resolution_result_handler)));
+  result_handler->context = this;
+  result_handler->proxy_resolution_completed = proxy_resolution_completed;
+
+
+  envoy_proxy_settings_list *proxy_settings_list = static_cast<envoy_proxy_settings_list*>(safe_malloc(sizeof(envoy_proxy_settings_list)));
+
+  const auto host_data = Data::Utility::copyToBridgeData("api.lyft.com");
+  const auto proxy_resolution_result = proxy_resolver->resolve(host_data, proxy_settings_list, result_handler, proxy_resolver->context);
+  if (proxy_resolution_result == ENVOY_PROXY_RESOLUTION_RESULT_NONE) {
+    return Http::FilterHeadersStatus::Continue;
+  }
 
   // If there is no proxy configured, continue.
   const auto proxy_settings = connectivity_manager_->getProxySettings();

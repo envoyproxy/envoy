@@ -403,16 +403,18 @@ static void ios_track_event(envoy_map map, const void *context) {
 @implementation EnvoyProxyResolutionContext
 @end
 
-static void ios_resolve_proxy(envoy_data c_host, const uint16_t port,
-                              const envoy_proxy_resolver_proxy_resolution_result_handler *result_handler,
-                              const void *context) {
+static envoy_proxy_resolution_result ios_resolve_proxy
+ (envoy_data c_host, envoy_proxy_settings_list *proxy_settings_list,
+  const envoy_proxy_resolver_proxy_resolution_result_handler *result_handler, const void *context) {
   @autoreleasepool {
     EnvoyProxyResolutionContext *resolutionContext = (__bridge EnvoyProxyResolutionContext *)context;
     NSString *host = to_ios_string(c_host);
+    NSArray<EnvoyProxySettings *> *proxySettings;
 
+    envoy_proxy_resolution_result result =
     [resolutionContext.proxyResolver
      resolveProxyForTargetURL:[NSURL URLWithString:host]
-     port:port
+     proxySettings:&proxySettings
      withCompletionBlock:^(NSArray<EnvoyProxySettings *> * _Nullable settings, NSError * _Nullable error) {
       envoy_proxy_settings_list list;
       list.length = (uint64_t)settings.count;
@@ -428,6 +430,21 @@ static void ios_resolve_proxy(envoy_data c_host, const uint16_t port,
 
       complete_proxy_resolution(resolutionContext.engineHandle, list, result_handler);
     }];
+
+    if (result == ENVOY_PROXY_RESOLUTION_RESULT_COMPLETED) {
+      envoy_proxy_settings_list list;
+      list.length = (uint64_t)proxySettings.count;
+      list.proxy_settings = safe_malloc(list.length);
+      for (NSUInteger i = 0; i < proxySettings.count; i++) {
+        envoy_proxy_settings proxy_settings = {
+          .host_data = toManagedNativeString(proxySettings[i].host),
+          .port = proxySettings[i].port
+        };
+        list.proxy_settings[i] = proxy_settings;
+      }
+    }
+
+    return result;
   }
 }
 

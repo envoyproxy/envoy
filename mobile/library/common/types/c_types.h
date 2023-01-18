@@ -545,13 +545,19 @@ typedef void (*envoy_proxy_resolver_proxy_resolution_completed_f)
    const void *context);
 
 typedef struct {
-  const void *context;
   envoy_proxy_resolver_proxy_resolution_completed_f proxy_resolution_completed;
+  const void *context;
 } envoy_proxy_resolver_proxy_resolution_result_handler;
 
-typedef void (*envoy_proxy_resolver_resolve_f)
+typedef enum {
+  ENVOY_PROXY_RESOLUTION_RESULT_NONE = 0,
+  ENVOY_PROXY_RESOLUTION_RESULT_COMPLETED = 1,
+  ENVOY_PROXY_RESOLUTION_RESULT_IN_PROGRESS = 2,
+} envoy_proxy_resolution_result;
+
+typedef envoy_proxy_resolution_result (*envoy_proxy_resolver_resolve_f)
   (envoy_data host,
-   const uint16_t port,
+   envoy_proxy_settings_list *proxy_settings_list,
    const envoy_proxy_resolver_proxy_resolution_result_handler *result_handler,
    const void *context);
 

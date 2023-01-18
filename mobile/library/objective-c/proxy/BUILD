@@ -30,5 +30,7 @@ objc_library(
         ],
     }),
     visibility = ["//visibility:public"],
-    deps = [],
+    deps = [
+        "//library/common/api:c_types",
+    ],
 )

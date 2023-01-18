@@ -21,6 +21,7 @@ envoy_cc_extension(
     repository = "@envoy",
     deps = [
         ":filter_cc_proto",
+        "//library/common/api:external_api_lib",
         "//library/common/http:header_utility_lib",
         "//library/common/http:internal_headers_lib",
         "//library/common/network:connectivity_manager_lib",
