@@ -31,10 +31,9 @@ namespace {
 void setAlternateGetifaddrs() {
 #if defined(INCLUDE_IFADDRS)
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  if (!os_syscalls.supportsGetifaddrs()) {
-    ENVOY_LOG_MISC(warn, "supportsGetifaddrs unsupported");
-    return;
-  }
+  ENVOY_BUG(!os_syscalls.supportsGetifaddrs(),
+            "setAlternateGetifaddrs should only be called when supportsGetifaddrs is false");
+
   Api::AlternateGetifaddrs android_getifaddrs =
       [](Api::InterfaceAddressVector& interfaces) -> Api::SysCallIntResult {
     struct ifaddrs* ifaddr;
