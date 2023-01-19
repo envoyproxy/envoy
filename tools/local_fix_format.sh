@@ -11,20 +11,31 @@
 # call to 'git commit'.  If you forget to do that then you can run with "-main"
 # and it will run on all changes you've made since branching from main, which
 # will still be relatively fast.
+#
+# To run this script, you must provide several environment variables:
+#
+# CLANG_FORMAT     -- points to the clang formatter binary, perhaps found in
+#                     $CLANG_TOOLCHAIN/bin/clang-format
+# BUILDIFIER_BIN   -- buildifier location, perhaps found in $HOME/go/bin/buildifier
+# BUILDOZER_BIN    -- buildozer location, perhaps found in $HOME/go/bin/buildozer
 
 # If DISPLAY is set, then tkdiff pops up for some BUILD changes.
 unset DISPLAY
 
-if [ "$1" = "-all" ]; then
+# Trigger an error if the required env vars are not set.
+set -u
+ignore="$CLANG_FORMAT $BUILDIFIER_BIN $BUILDOZER_BIN"
+
+if [[ $# > 0 && "$1" == "-all" ]]; then
   all=1
   echo ALL.
   shift
   args="$@"
 else
-  if [ "$1" = "-main" ]; then
+  if [[ $# > 0 && "$1" = "-main" ]]; then
     shift
     args=$(git diff main | grep ^diff | awk '{print $3}' | cut -c 3-)
-  elif [ -z "$1" ]; then
+  elif [[ $# == 0 ]]; then
     args=$(git status|egrep '(modified:|added:)'|awk '{print $2}')
     args+=$(git status|egrep 'new file:'|awk '{print $3}')
   else
