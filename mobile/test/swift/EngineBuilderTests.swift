@@ -467,6 +467,7 @@ final class EngineBuilderTests: XCTestCase {
       dnsPreresolveHostnames: "[test]",
       enableDNSCache: false,
       enableHappyEyeballs: true,
+      enableHttp3: true,
       enableGzip: true,
       enableBrotli: false,
       enableInterfaceBinding: true,
