@@ -71,7 +71,7 @@ public:
     auto object_range = object_pool_.equal_range(hashed_value);
     for (auto it = object_range.first; it != object_range.second; ++it) {
       auto lock_object = it->second.lock();
-      if (lock_object&& EqualFunc{}(obj, *lock_object)) {
+      if (lock_object && EqualFunc{}(obj, *lock_object)) {
         return lock_object;
       }
     }
