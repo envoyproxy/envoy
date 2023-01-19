@@ -1015,11 +1015,30 @@ ClusterInfoImpl::ClusterInfoImpl(
       maintenance_mode_runtime_key_(absl::StrCat("upstream.maintenance_mode.", name_)),
       upstream_local_address_selector_(
           std::make_shared<UpstreamLocalAddressSelectorImpl>(config, bind_config)),
-      lb_round_robin_config_(config.round_robin_lb_config()),
-      lb_least_request_config_(config.least_request_lb_config()),
-      lb_ring_hash_config_(config.ring_hash_lb_config()),
-      lb_maglev_config_(config.maglev_lb_config()),
-      lb_original_dst_config_(config.original_dst_lb_config()),
+      lb_round_robin_config_(
+          config.has_round_robin_lb_config()
+              ? std::make_unique<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>(
+                    config.round_robin_lb_config())
+              : nullptr),
+      lb_least_request_config_(
+          config.has_least_request_lb_config()
+              ? std::make_unique<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>(
+                    config.least_request_lb_config())
+              : nullptr),
+      lb_ring_hash_config_(
+          config.has_ring_hash_lb_config()
+              ? std::make_unique<envoy::config::cluster::v3::Cluster::RingHashLbConfig>(
+                    config.ring_hash_lb_config())
+              : nullptr),
+      lb_maglev_config_(config.has_maglev_lb_config()
+                            ? std::make_unique<envoy::config::cluster::v3::Cluster::MaglevLbConfig>(
+                                  config.maglev_lb_config())
+                            : nullptr),
+      lb_original_dst_config_(
+          config.has_original_dst_lb_config()
+              ? std::make_unique<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>(
+                    config.original_dst_lb_config())
+              : nullptr),
       upstream_config_(config.has_upstream_config()
                            ? absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>(
                                  config.upstream_config())

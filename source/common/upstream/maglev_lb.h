@@ -71,11 +71,10 @@ private:
 class MaglevLoadBalancer : public ThreadAwareLoadBalancerBase,
                            Logger::Loggable<Logger::Id::upstream> {
 public:
-  MaglevLoadBalancer(
-      const PrioritySet& priority_set, ClusterLbStats& stats, Stats::Scope& scope,
-      Runtime::Loader& runtime, Random::RandomGenerator& random,
-      const absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig>& config,
-      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
+  MaglevLoadBalancer(const PrioritySet& priority_set, ClusterLbStats& stats, Stats::Scope& scope,
+                     Runtime::Loader& runtime, Random::RandomGenerator& random,
+                     OptRef<const envoy::config::cluster::v3::Cluster::MaglevLbConfig> config,
+                     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
 
   const MaglevLoadBalancerStats& stats() const { return stats_; }
   uint64_t tableSize() const { return table_size_; }
