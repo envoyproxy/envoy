@@ -7,13 +7,13 @@ root=$(realpath "$tools/..")
 
 cd "$root" || exit 1
 
-gofmt=bazel-bin/tools/code_format/gofmt
+gofmt="@go_sdk//:bin/gofmt"
 
 # only get the filenames which not satisfy gofmt
-files=$(find . -name "*.go" -exec $gofmt -l {} \;)
+files=$(find . -name "*.go" -exec bazel run $gofmt -- -l {} \;)
 if [[ $files != "" ]]; then
   # write changes to original files, so that we can get the changes by git diff.
-  find . -name "*.go" -exec $gofmt -w {} \;
+  find . -name "*.go" -exec bazel run $gofmt -- -w {} \;
   echo "ERROR: files not satisfy gofmt:"
   echo "$files"
   exit 1
