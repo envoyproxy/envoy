@@ -86,8 +86,8 @@ public class EnvoyConfiguration {
    * @param enableDNSCache                                whether to enable DNS cache.
    * @param enableDrainPostDnsRefresh                     whether to drain connections after soft
    *     DNS refresh.
-   * @param disableHttp3                                   whether to disable experimental support for
-   *     HTTP/3 (QUIC).
+   * @param disableHttp3                                   whether to disable experimental support
+   *     for HTTP/3 (QUIC).
    * @param enableGzip                                    whether to enable response gzip
    *     decompression.
    * @param enableBrotli                                  whether to enable response brotli
