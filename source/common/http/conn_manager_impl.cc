@@ -188,9 +188,8 @@ void ConnectionManagerImpl::checkForDeferredClose(bool skip_delay_close) {
     close = Network::ConnectionCloseType::FlushWrite;
   }
   if (drain_state_ == DrainState::Closing && streams_.empty() && !codec_->wantsToWrite()) {
-    // We are closing a draining connection with no active streams and the codec has
-    // nothing to write.
-    doConnectionClose(close, absl::nullopt, "deferred_close_on_drained_connection");
+    doConnectionClose(close, absl::nullopt,
+                      StreamInfo::ResponseCodeDetails::get().DownstreamLocalDisconnect);
   }
 }
 
@@ -472,19 +471,14 @@ void ConnectionManagerImpl::onEvent(Network::ConnectionEvent event) {
 
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
-
-    std::string details;
     if (event == Network::ConnectionEvent::RemoteClose) {
       remote_close_ = true;
       stats_.named_.downstream_cx_destroy_remote_.inc();
-      details = StreamInfo::ResponseCodeDetails::get().DownstreamRemoteDisconnect;
-    } else {
-      absl::string_view local_close_reason = read_callbacks_->connection().localCloseReason();
-      ENVOY_BUG(!local_close_reason.empty(), "Local Close Reason was not set!");
-      details = fmt::format(StreamInfo::ResponseCodeDetails::get().DownstreamLocalDisconnect,
-                            StringUtil::replaceAllEmptySpace(local_close_reason));
     }
-
+    absl::string_view details =
+        event == Network::ConnectionEvent::RemoteClose
+            ? StreamInfo::ResponseCodeDetails::get().DownstreamRemoteDisconnect
+            : StreamInfo::ResponseCodeDetails::get().DownstreamLocalDisconnect;
     // TODO(mattklein123): It is technically possible that something outside of the filter causes
     // a local connection close, so we still guard against that here. A better solution would be to
     // have some type of "pre-close" callback that we could hook for cleanup that would get called
@@ -536,7 +530,7 @@ void ConnectionManagerImpl::doConnectionClose(
   }
 
   if (close_type.has_value()) {
-    read_callbacks_->connection().close(close_type.value(), details);
+    read_callbacks_->connection().close(close_type.value());
   }
 }
 
@@ -551,7 +545,7 @@ void ConnectionManagerImpl::onIdleTimeout() {
   if (!codec_) {
     // No need to delay close after flushing since an idle timeout has already fired. Attempt to
     // write out buffered data one last time and issue a local close if successful.
-    doConnectionClose(Network::ConnectionCloseType::FlushWrite, absl::nullopt, "on_idle_timeout");
+    doConnectionClose(Network::ConnectionCloseType::FlushWrite, absl::nullopt, "");
   } else if (drain_state_ == DrainState::NotDraining) {
     startDrainSequence();
   }
@@ -1192,7 +1186,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
 
 void ConnectionManagerImpl::ActiveStream::traceRequest() {
   const Tracing::Decision tracing_decision =
-      Tracing::HttpTracerUtility::shouldTraceRequest(filter_manager_.streamInfo());
+      Tracing::TracerUtility::shouldTraceRequest(filter_manager_.streamInfo());
   ConnectionManagerImpl::chargeTracingStats(tracing_decision.reason,
                                             connection_manager_.config_.tracingStats());
 

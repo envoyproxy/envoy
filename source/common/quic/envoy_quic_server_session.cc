@@ -97,9 +97,6 @@ void EnvoyQuicServerSession::setUpRequestDecoder(EnvoyQuicServerStream& stream) 
 void EnvoyQuicServerSession::OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
                                                 quic::ConnectionCloseSource source) {
   quic::QuicServerSessionBase::OnConnectionClosed(frame, source);
-  if (source == quic::ConnectionCloseSource::FROM_SELF) {
-    setLocalCloseReason(frame.error_details);
-  }
   onConnectionCloseEvent(frame, source, version());
   if (position_.has_value()) {
     // Remove this connection from the map.

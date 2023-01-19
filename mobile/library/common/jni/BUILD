@@ -133,7 +133,11 @@ config_setting(
 # Main dynamic library for the Envoy Mobile aar
 cc_binary(
     name = "libenvoy_jni.so",
-    linkopts = select({
+    linkopts = [
+        # Without this option the app crashes when launched
+        # on arm64 emulator which is not covered by CI.
+        "-ldl",
+    ] + select({
         "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
         "//conditions:default": [],
     }),
