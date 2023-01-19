@@ -34,6 +34,7 @@ envoy_cc_extension(
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/upstream:cluster_factory_lib",
+        "//source/common/upstream:multiplexed_subscription_factory_lib",
         "//source/common/upstream:upstream_includes",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
