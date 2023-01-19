@@ -9,12 +9,16 @@ namespace Extensions {
 namespace Tracers {
 namespace Datadog {
 
-// Return the `datadog::tracing::TimePoint` that most closely matches the
-// specified `SystemTime`. Use the optionally specified
-// `datadog::tracing::Clock` to read the current time. If a clock is not
-// specified, then the default clock is used.
-datadog::tracing::TimePoint estimateTime(SystemTime);
-datadog::tracing::TimePoint estimateTime(SystemTime, const datadog::tracing::Clock&);
+/**
+ * Convert a specified system \p time to a datadog time point, estimating the
+    steady portion of the result by examining the current time as measured by
+    the optionally specified \p clock and comparing it with the given \p time.
+ * @param time system time to convert from
+ * @param clock datadog clock used to measure the current time (default clock if omitted)
+ * @return datadog time point whose steady portion is estimated from the given \p time.
+ */
+datadog::tracing::TimePoint estimateTime(SystemTime time);
+datadog::tracing::TimePoint estimateTime(SystemTime time, const datadog::tracing::Clock& clock);
 
 } // namespace Datadog
 } // namespace Tracers
