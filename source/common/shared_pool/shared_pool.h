@@ -4,6 +4,7 @@
 #include <memory>
 #include <thread>
 #include <type_traits>
+#include <unordered_map>
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/singleton/instance.h"
@@ -30,22 +31,28 @@ namespace SharedPool {
  * There is also a need to ensure that the thread where ObjectSharedPool's destructor is also in the
  * main thread, or that ObjectSharedPool destruct before the program exit
  */
-template <typename T, typename HashFunc = std::hash<T>,
+template <typename T, typename HashFunc = std::hash<T>, typename EqualFunc = std::equal_to<T>,
           class = typename std::enable_if<std::is_copy_constructible<T>::value>::type>
-class ObjectSharedPool : public Singleton::Instance,
-                         public std::enable_shared_from_this<ObjectSharedPool<T, HashFunc>>,
-                         NonCopyable {
+class ObjectSharedPool
+    : public Singleton::Instance,
+      public std::enable_shared_from_this<ObjectSharedPool<T, HashFunc, EqualFunc>>,
+      NonCopyable {
 public:
   ObjectSharedPool(Event::Dispatcher& dispatcher)
       : thread_id_(std::this_thread::get_id()), dispatcher_(dispatcher) {}
 
   void deleteObject(const size_t hash_key) {
     if (std::this_thread::get_id() == thread_id_) {
-      // There may be new inserts with the same hash value before deleting the old element,
-      // so there is no need to delete it at this time.
-      if (object_pool_.find(hash_key) != object_pool_.end() &&
-          object_pool_[hash_key].use_count() == 0) {
-        object_pool_.erase(hash_key);
+      // Erase all elements with hash_key as the hash value that have use_count
+      // as 0
+      auto object_range = object_pool_.equal_range(hash_key);
+      auto it = object_range.first;
+      while (it != object_range.second) {
+        if (it->second.use_count() == 0) {
+          it = object_pool_.erase(it);
+        } else {
+          ++it;
+        }
       }
     } else {
       // Most of the time, the object's destructor occurs in the main thread, but with some
@@ -61,10 +68,10 @@ public:
   std::shared_ptr<T> getObject(const T& obj) {
     ASSERT(std::this_thread::get_id() == thread_id_);
     auto hashed_value = HashFunc{}(obj);
-    auto object_it = object_pool_.find(hashed_value);
-    if (object_it != object_pool_.end()) {
-      auto lock_object = object_it->second.lock();
-      if (lock_object) {
+    auto object_range = object_pool_.equal_range(hashed_value);
+    for (auto it = object_range.first; it != object_range.second; ++it) {
+      auto lock_object = it->second.lock();
+      if (lock_object&& EqualFunc{}(obj, *lock_object)) {
         return lock_object;
       }
     }
@@ -77,13 +84,7 @@ public:
       this_shared_ptr->deleteObject(hashed_value);
     });
 
-    // When inserted, it is possible that the old elements still exist before they can be deleted,
-    // and the insertion will fail and therefore need to be overwritten.
-    auto ret = object_pool_.try_emplace(hashed_value, obj_shared);
-    if (!ret.second) {
-      ASSERT(ret.first->second.use_count() == 0);
-      ret.first->second = obj_shared;
-    }
+    object_pool_.emplace(hashed_value, obj_shared);
     return obj_shared;
   }
 
@@ -101,16 +102,17 @@ public:
 
 private:
   const std::thread::id thread_id_;
-  absl::flat_hash_map<size_t, std::weak_ptr<T>> object_pool_;
+  std::unordered_multimap<size_t, std::weak_ptr<T>> object_pool_;
   Event::Dispatcher& dispatcher_;
   Thread::ThreadSynchronizer sync_;
 };
 
-template <typename T, typename HashFunc, class V>
-const char ObjectSharedPool<T, HashFunc, V>::DeleteObjectOnMainThread[] = "delete-object-on-main";
+template <typename T, typename HashFunc, typename EqualFunc, class V>
+const char ObjectSharedPool<T, HashFunc, EqualFunc, V>::DeleteObjectOnMainThread[] =
+    "delete-object-on-main";
 
-template <typename T, typename HashFunc, class V>
-const char ObjectSharedPool<T, HashFunc, V>::ObjectDeleterEntry[] = "deleter-entry";
+template <typename T, typename HashFunc, typename EqualFunc, class V>
+const char ObjectSharedPool<T, HashFunc, EqualFunc, V>::ObjectDeleterEntry[] = "deleter-entry";
 
 } // namespace SharedPool
 } // namespace Envoy
