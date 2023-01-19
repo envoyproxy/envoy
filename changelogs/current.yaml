@@ -16,6 +16,10 @@ bug_fixes:
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
+- area: http
+  change: |
+    removed ``envoy.reloadable_features.use_rfc_connect`` and legacy code path.
+
 new_features:
 
 deprecated:

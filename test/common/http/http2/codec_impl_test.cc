@@ -3638,34 +3638,6 @@ TEST_P(Http2CodecImplTest, ResetStreamCausesOutboundFlood) {
   EXPECT_EQ(1, server_stats_store_.counter("http2.outbound_flood").value());
 }
 
-// CONNECT without upgrade type gets tagged with "bytestream"
-TEST_P(Http2CodecImplTest, ConnectTestOld) {
-  scoped_runtime_.mergeValues({{"envoy.reloadable_features.use_rfc_connect", "false"}});
-  client_http2_options_.set_allow_connect(true);
-  server_http2_options_.set_allow_connect(true);
-  initialize();
-  MockStreamCallbacks callbacks;
-  request_encoder_->getStream().addCallbacks(callbacks);
-
-  TestRequestHeaderMapImpl request_headers;
-  HttpTestUtility::addDefaultHeaders(request_headers);
-  request_headers.setReferenceKey(Headers::get().Method, Http::Headers::get().MethodValues.Connect);
-  request_headers.setReferenceKey(Headers::get().Protocol, "bytestream");
-  TestRequestHeaderMapImpl expected_headers;
-  HttpTestUtility::addDefaultHeaders(expected_headers);
-  expected_headers.setReferenceKey(Headers::get().Method,
-                                   Http::Headers::get().MethodValues.Connect);
-  expected_headers.setReferenceKey(Headers::get().Protocol, "bytestream");
-  EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
-  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
-  driveToCompletion();
-
-  EXPECT_CALL(callbacks, onResetStream(StreamResetReason::ConnectError, _));
-  EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::ConnectError, _));
-  response_encoder_->getStream().resetStream(StreamResetReason::ConnectError);
-  driveToCompletion();
-}
-
 TEST_P(Http2CodecImplTest, ConnectTest) {
   client_http2_options_.set_allow_connect(true);
   server_http2_options_.set_allow_connect(true);
