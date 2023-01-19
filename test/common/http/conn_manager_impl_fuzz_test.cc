@@ -262,7 +262,7 @@ public:
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
   Network::Address::Ipv4Instance local_address_{"127.0.0.1"};
   absl::optional<std::string> user_agent_;
-  Tracing::HttpTracerSharedPtr http_tracer_{std::make_shared<NiceMock<Tracing::MockHttpTracer>>()};
+  Tracing::HttpTracerSharedPtr http_tracer_{std::make_shared<NiceMock<Tracing::MockTracer>>()};
   TracingConnectionManagerConfigPtr tracing_config_;
   bool proxy_100_continue_{true};
   bool stream_error_on_invalid_http_messaging_ = false;
@@ -598,8 +598,6 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
   ON_CALL(filter_callbacks.connection_, ssl()).WillByDefault(Return(ssl_connection));
   ON_CALL(Const(filter_callbacks.connection_), ssl()).WillByDefault(Return(ssl_connection));
   ON_CALL(filter_callbacks.connection_, close(_))
-      .WillByDefault(InvokeWithoutArgs([&connection_alive] { connection_alive = false; }));
-  ON_CALL(filter_callbacks.connection_, close(_, _))
       .WillByDefault(InvokeWithoutArgs([&connection_alive] { connection_alive = false; }));
   filter_callbacks.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"));

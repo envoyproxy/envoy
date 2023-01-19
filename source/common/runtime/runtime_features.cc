@@ -57,6 +57,7 @@ RUNTIME_GUARD(envoy_reloadable_features_http_skip_adding_content_length_to_upgra
 RUNTIME_GUARD(envoy_reloadable_features_http_strip_fragment_from_path_unsafe_if_disabled);
 RUNTIME_GUARD(envoy_reloadable_features_local_ratelimit_match_all_descriptors);
 RUNTIME_GUARD(envoy_reloadable_features_lua_respond_with_send_local_reply);
+RUNTIME_GUARD(envoy_reloadable_features_multiplex_eds);
 RUNTIME_GUARD(envoy_reloadable_features_no_extension_lookup_by_name);
 RUNTIME_GUARD(envoy_reloadable_features_no_full_scan_certs_on_sni_mismatch);
 RUNTIME_GUARD(envoy_reloadable_features_oauth_header_passthrough_fix);
@@ -101,6 +102,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_runtime_initialized);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_always_use_v6);
 // TODO(alyssawilk) remove in Q2.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_no_delay_close_for_upgrades);
+// TODO(alyssawilk) flip once Lyft has tested.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_api_listener);
 // TODO(pradeepcrao) reset this to true after 2 releases (1.27)
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_include_histograms);
 

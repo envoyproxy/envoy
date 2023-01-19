@@ -295,7 +295,7 @@ TEST_F(TsiSocketTest, HandshakeValidationFail) {
   EXPECT_EQ(0L, client_.read_buffer_.length());
 
   EXPECT_CALL(*server_.raw_socket_, doRead(_));
-  EXPECT_CALL(server_.callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
+  EXPECT_CALL(server_.callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   // doRead won't immediately fail, but it will result connection close.
   expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
                  server_.tsi_socket_->doRead(server_.read_buffer_));
@@ -312,7 +312,7 @@ TEST_F(TsiSocketTest, HandshakerCreationFail) {
   InSequence s;
 
   EXPECT_CALL(*client_.raw_socket_, doWrite(_, _)).Times(0);
-  EXPECT_CALL(client_.callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
+  EXPECT_CALL(client_.callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   client_.tsi_socket_->onConnected();
   expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
                  client_.tsi_socket_->doWrite(client_.write_buffer_, false));
@@ -422,7 +422,7 @@ TEST_F(TsiSocketTest, HandshakeWithReadError) {
     return result;
   }));
   EXPECT_CALL(*client_.raw_socket_, doWrite(_, false)).Times(0);
-  EXPECT_CALL(client_.callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
+  EXPECT_CALL(client_.callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
                  client_.tsi_socket_->doRead(client_.read_buffer_));
   EXPECT_EQ("", client_to_server_.toString());
@@ -450,7 +450,7 @@ TEST_F(TsiSocketTest, HandshakeWithInternalError) {
 
   InSequence s;
 
-  EXPECT_CALL(client_.callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
+  EXPECT_CALL(client_.callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   // doWrite won't immediately fail, but it will result connection close.
   client_.tsi_socket_->onConnected();
 

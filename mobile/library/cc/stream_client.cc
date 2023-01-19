@@ -6,7 +6,7 @@ namespace Platform {
 StreamClient::StreamClient(EngineSharedPtr engine) : engine_(engine) {}
 
 StreamPrototypeSharedPtr StreamClient::newStreamPrototype() {
-  return std::make_shared<StreamPrototype>(this->engine_);
+  return std::make_shared<StreamPrototype>(engine_);
 }
 
 } // namespace Platform
