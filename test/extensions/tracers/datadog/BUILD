@@ -15,6 +15,7 @@ envoy_extension_cc_test(
     name = "datadog_tracer_impl_test",
     srcs = [
         "datadog_tracer_impl_test.cc",
+        "span_test.cc",
         "time_util_test.cc",
     ],
     copts = [
