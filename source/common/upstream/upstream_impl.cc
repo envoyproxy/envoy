@@ -875,7 +875,7 @@ public:
   // other contexts taken from TransportSocketFactoryContext.
   FactoryContextImpl(Stats::Scope& stats_scope, Envoy::Runtime::Loader& runtime,
                      Server::Configuration::TransportSocketFactoryContext& c)
-      : admin_(c.admin()), server_scope_(c.stats()), stats_scope_(stats_scope),
+      : admin_(c.admin()), server_scope_(*c.stats().rootScope()), stats_scope_(stats_scope),
         cluster_manager_(c.clusterManager()), local_info_(c.localInfo()),
         dispatcher_(c.mainThreadDispatcher()), runtime_(runtime),
         singleton_manager_(c.singletonManager()), tls_(c.threadLocal()), api_(c.api()),
@@ -1001,8 +1001,9 @@ ClusterInfoImpl::ClusterInfoImpl(
       lb_stats_(factory_context.clusterManager().clusterLbStatNames(), *stats_scope_),
       endpoint_stats_(factory_context.clusterManager().clusterEndpointStatNames(), *stats_scope_),
       load_report_stats_store_(stats_scope_->symbolTable()),
-      load_report_stats_(generateLoadReportStats(
-          load_report_stats_store_, factory_context.clusterManager().clusterLoadReportStatNames())),
+      load_report_stats_(
+          generateLoadReportStats(*load_report_stats_store_.rootScope(),
+                                  factory_context.clusterManager().clusterLoadReportStatNames())),
       optional_cluster_stats_((config.has_track_cluster_stats() || config.track_timeout_budgets())
                                   ? std::make_unique<OptionalClusterStats>(
                                         config, *stats_scope_, factory_context.clusterManager())
@@ -1014,11 +1015,30 @@ ClusterInfoImpl::ClusterInfoImpl(
       maintenance_mode_runtime_key_(absl::StrCat("upstream.maintenance_mode.", name_)),
       upstream_local_address_selector_(
           std::make_shared<UpstreamLocalAddressSelectorImpl>(config, bind_config)),
-      lb_round_robin_config_(config.round_robin_lb_config()),
-      lb_least_request_config_(config.least_request_lb_config()),
-      lb_ring_hash_config_(config.ring_hash_lb_config()),
-      lb_maglev_config_(config.maglev_lb_config()),
-      lb_original_dst_config_(config.original_dst_lb_config()),
+      lb_round_robin_config_(
+          config.has_round_robin_lb_config()
+              ? std::make_unique<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>(
+                    config.round_robin_lb_config())
+              : nullptr),
+      lb_least_request_config_(
+          config.has_least_request_lb_config()
+              ? std::make_unique<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>(
+                    config.least_request_lb_config())
+              : nullptr),
+      lb_ring_hash_config_(
+          config.has_ring_hash_lb_config()
+              ? std::make_unique<envoy::config::cluster::v3::Cluster::RingHashLbConfig>(
+                    config.ring_hash_lb_config())
+              : nullptr),
+      lb_maglev_config_(config.has_maglev_lb_config()
+                            ? std::make_unique<envoy::config::cluster::v3::Cluster::MaglevLbConfig>(
+                                  config.maglev_lb_config())
+                            : nullptr),
+      lb_original_dst_config_(
+          config.has_original_dst_lb_config()
+              ? std::make_unique<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>(
+                    config.original_dst_lb_config())
+              : nullptr),
       upstream_config_(config.has_upstream_config()
                            ? absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>(
                                  config.upstream_config())

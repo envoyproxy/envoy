@@ -14,6 +14,7 @@
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/config/route/v3/route_components.pb.validate.h"
+#include "envoy/registry/registry.h"
 #include "envoy/router/cluster_specifier_plugin.h"
 #include "envoy/router/router.h"
 #include "envoy/runtime/runtime.h"
@@ -258,6 +259,7 @@ public:
   const RouteSpecificFilterConfig* mostSpecificPerFilterConfig(const std::string&) const override;
   bool includeAttemptCountInRequest() const override { return include_attempt_count_in_request_; }
   bool includeAttemptCountInResponse() const override { return include_attempt_count_in_response_; }
+  bool includeIsTimeoutRetryHeader() const override { return include_is_timeout_retry_header_; }
   const std::vector<ShadowPolicyPtr>& shadowPolicies() const { return shadow_policies_; }
   RetryPolicyConstOptRef retryPolicy() const {
     if (retry_policy_ != nullptr) {
@@ -342,6 +344,7 @@ private:
   SslRequirements ssl_requirements_;
   const bool include_attempt_count_in_request_ : 1;
   const bool include_attempt_count_in_response_ : 1;
+  const bool include_is_timeout_retry_header_ : 1;
 };
 
 using VirtualHostSharedPtr = std::shared_ptr<VirtualHostImpl>;
@@ -602,6 +605,27 @@ private:
 };
 
 /**
+ * Container for route config elements that pertain to a redirect.
+ *
+ * We keep them in a separate data structure to avoid memory overhead for the routes that do not use
+ * redirect.
+ */
+struct RedirectConfig {
+  RedirectConfig(const envoy::config::route::v3::Route& route);
+  const std::string scheme_redirect_;
+  const std::string host_redirect_;
+  const std::string port_redirect_;
+  const std::string path_redirect_;
+  const std::string prefix_rewrite_redirect_;
+  std::string regex_rewrite_redirect_substitution_;
+  Regex::CompiledMatcherPtr regex_rewrite_redirect_;
+  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
+  const bool path_redirect_has_query_;
+  const bool https_redirect_;
+  const bool strip_query_;
+};
+
+/**
  * Base implementation for all route entries.q
  */
 class RouteEntryImplBase : public RouteEntryAndRoute,
@@ -625,8 +649,12 @@ public:
     if (!isDirectResponse()) {
       return false;
     }
-    return !host_redirect_.empty() || !path_redirect_.empty() ||
-           !prefix_rewrite_redirect_.empty() || regex_rewrite_redirect_ != nullptr;
+    if (redirect_config_ == nullptr) {
+      return false;
+    }
+    return !redirect_config_->host_redirect_.empty() || !redirect_config_->path_redirect_.empty() ||
+           !redirect_config_->prefix_rewrite_redirect_.empty() ||
+           redirect_config_->regex_rewrite_redirect_ != nullptr;
   }
 
   bool matchRoute(const Http::RequestHeaderMap& headers, const StreamInfo::StreamInfo& stream_info,
@@ -1017,15 +1045,26 @@ public:
   };
 
   using WeightedClusterEntrySharedPtr = std::shared_ptr<WeightedClusterEntry>;
+  // Container for route config elements that pertain to weighted clusters.
+  // We keep them in a separate data structure to avoid memory overhead for the routes that do not
+  // use weighted clusters.
+  struct WeightedClustersConfig {
+    WeightedClustersConfig(const std::vector<WeightedClusterEntrySharedPtr>& weighted_clusters,
+                           uint64_t total_cluster_weight,
+                           const std::string& random_value_header_name)
+        : weighted_clusters_(weighted_clusters), total_cluster_weight_(total_cluster_weight),
+          random_value_header_name_(random_value_header_name) {}
+    const std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
+    const uint64_t total_cluster_weight_;
+    const std::string random_value_header_name_;
+  };
 
 protected:
   const std::string prefix_rewrite_;
   Regex::CompiledMatcherPtr regex_rewrite_;
-  Regex::CompiledMatcherPtr regex_rewrite_redirect_;
   const PathMatcherSharedPtr path_matcher_;
   const PathRewriterSharedPtr path_rewriter_;
   std::string regex_rewrite_substitution_;
-  std::string regex_rewrite_redirect_substitution_;
   const std::string host_rewrite_;
   std::unique_ptr<ConnectConfig> connect_config_;
 
@@ -1140,11 +1179,7 @@ private:
   std::unique_ptr<const OptionalTimeouts> optional_timeouts_;
   Runtime::Loader& loader_;
   std::unique_ptr<const RuntimeData> runtime_;
-  const std::string scheme_redirect_;
-  const std::string host_redirect_;
-  const std::string port_redirect_;
-  const std::string path_redirect_;
-  const std::string prefix_rewrite_redirect_;
+  std::unique_ptr<const RedirectConfig> redirect_config_;
   std::unique_ptr<const HedgePolicyImpl> hedge_policy_;
   std::unique_ptr<const RetryPolicyImpl> retry_policy_;
   std::unique_ptr<const InternalRedirectPolicyImpl> internal_redirect_policy_;
@@ -1152,10 +1187,9 @@ private:
   std::vector<ShadowPolicyPtr> shadow_policies_;
   std::vector<Http::HeaderUtility::HeaderDataPtr> config_headers_;
   std::vector<ConfigUtility::QueryParameterMatcherPtr> config_query_parameters_;
-  std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
+  std::unique_ptr<const WeightedClustersConfig> weighted_clusters_config_;
 
   UpgradeMap upgrade_map_;
-  uint64_t total_cluster_weight_;
   std::unique_ptr<const Http::HashPolicyImpl> hash_policy_;
   MetadataMatchCriteriaConstPtr metadata_match_criteria_;
   TlsContextMatchCriteriaConstPtr tls_context_match_criteria_;
@@ -1174,7 +1208,6 @@ private:
   PerFilterConfigs per_filter_configs_;
   const std::string route_name_;
   TimeSource& time_source_;
-  const std::string random_value_header_name_;
   EarlyDataPolicyPtr early_data_policy_;
 
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
@@ -1184,10 +1217,7 @@ private:
   const Upstream::ResourcePriority priority_;
   const bool auto_host_rewrite_ : 1;
   const bool append_xfh_ : 1;
-  const bool path_redirect_has_query_ : 1;
-  const bool https_redirect_ : 1;
   const bool using_new_timeouts_ : 1;
-  const bool strip_query_ : 1;
   const bool match_grpc_ : 1;
   const bool case_sensitive_ : 1;
   bool include_vh_rate_limits_ : 1;
@@ -1418,6 +1448,8 @@ public:
   }
 };
 
+DECLARE_FACTORY(RouteMatchActionFactory);
+
 // Similar to RouteMatchAction, but accepts v3::RouteList instead of v3::Route.
 class RouteListMatchAction : public Matcher::ActionBase<envoy::config::route::v3::RouteList> {
 public:
@@ -1441,6 +1473,8 @@ public:
     return std::make_unique<envoy::config::route::v3::RouteList>();
   }
 };
+
+DECLARE_FACTORY(RouteListMatchActionFactory);
 
 /**
  * Wraps the route configuration which matches an incoming request headers to a backend cluster.

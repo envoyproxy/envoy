@@ -152,6 +152,25 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "eds_grpc_integration_test",
+    srcs = ["eds_grpc_integration_test.cc"],
+    deps = [
+        ":http_integration_lib",
+        "//source/common/runtime:runtime_features_lib",
+        "//source/common/upstream:load_balancer_lib",
+        "//test/config:utility_lib",
+        "//test/integration/filters:eds_ready_filter_config_lib",
+        "//test/test_common:network_utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "leds_integration_test",
     srcs = ["leds_integration_test.cc"],
     deps = [
@@ -586,6 +605,7 @@ envoy_cc_test(
         "//source/extensions/filters/http/buffer:config",
         "//test/integration/filters:add_body_filter_config_lib",
         "//test/integration/filters:add_invalid_data_filter_lib",
+        "//test/integration/filters:assert_non_reentrant_filter_lib",
         "//test/integration/filters:buffer_continue_filter_lib",
         "//test/integration/filters:continue_after_local_reply_filter_lib",
         "//test/integration/filters:continue_headers_only_inject_body",
@@ -874,7 +894,7 @@ envoy_cc_test_library(
         "//source/common/network:utility_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/listener_managers/listener_manager:active_raw_udp_listener_config",
-        "//source/server:connection_handler_lib",
+        "//source/extensions/listener_managers/listener_manager:connection_handler_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:test_time_system_interface",
         "//test/test_common:utility_lib",
@@ -1064,8 +1084,8 @@ envoy_cc_test_library(
         "//source/common/upstream:upstream_lib",
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/access_loggers/stream:config",
+        "//source/extensions/listener_managers/listener_manager:connection_handler_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
-        "//source/server:connection_handler_lib",
         "//source/server:drain_manager_lib",
         "//source/server:hot_restart_nop_lib",
         "//source/server:listener_hooks_lib",
@@ -1404,6 +1424,7 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "//source/extensions/transport_sockets/tls:context_lib",
         "//test/common/grpc:grpc_client_integration_lib",
+        "//test/config/integration/certs:certs_info",
         "//test/extensions/transport_sockets/tls:test_private_key_method_provider_test_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",

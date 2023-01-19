@@ -127,6 +127,12 @@ public:
    * return an appropriate status code depending on what the filter needs to do.
    */
   virtual void continueDecoding() PURE;
+
+  /**
+   * Clears the route cache for the current request. This must be called when a filter has modified
+   * the headers in a way that would affect routing.
+   */
+  virtual void clearRouteCache() PURE;
 };
 
 /**

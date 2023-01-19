@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "envoy/common/callback.h"
+#include "envoy/common/optref.h"
 #include "envoy/common/time.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
@@ -764,25 +765,40 @@ public:
   clusterType() const override {
     return cluster_type_;
   }
-  const absl::optional<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>&
+  OptRef<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>
   lbRoundRobinConfig() const override {
-    return lb_round_robin_config_;
+    if (lb_round_robin_config_ == nullptr) {
+      return absl::nullopt;
+    }
+    return *lb_round_robin_config_;
   }
-  const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>&
+  OptRef<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
   lbLeastRequestConfig() const override {
-    return lb_least_request_config_;
+    if (lb_least_request_config_ == nullptr) {
+      return absl::nullopt;
+    }
+    return *lb_least_request_config_;
   }
-  const absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig>&
+  OptRef<const envoy::config::cluster::v3::Cluster::RingHashLbConfig>
   lbRingHashConfig() const override {
-    return lb_ring_hash_config_;
+    if (lb_ring_hash_config_ == nullptr) {
+      return absl::nullopt;
+    }
+    return *lb_ring_hash_config_;
   }
-  const absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig>&
+  OptRef<const envoy::config::cluster::v3::Cluster::MaglevLbConfig>
   lbMaglevConfig() const override {
-    return lb_maglev_config_;
+    if (lb_maglev_config_ == nullptr) {
+      return absl::nullopt;
+    }
+    return *lb_maglev_config_;
   }
-  const absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>&
+  OptRef<const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>
   lbOriginalDstConfig() const override {
-    return lb_original_dst_config_;
+    if (lb_original_dst_config_ == nullptr) {
+      return absl::nullopt;
+    }
+    return *lb_original_dst_config_;
   }
   const absl::optional<envoy::config::core::v3::TypedExtensionConfig>&
   upstreamConfig() const override {
@@ -841,7 +857,7 @@ public:
     return http_protocol_options_->upstream_http_protocol_options_;
   }
 
-  const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+  const absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>&
   alternateProtocolsCacheOptions() const override {
     return http_protocol_options_->alternate_protocol_cache_options_;
   }
@@ -931,12 +947,16 @@ private:
   const std::string maintenance_mode_runtime_key_;
   std::shared_ptr<UpstreamLocalAddressSelector> upstream_local_address_selector_;
   LoadBalancerType lb_type_;
-  absl::optional<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> lb_round_robin_config_;
-  absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
+  const std::unique_ptr<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>
+      lb_round_robin_config_;
+  const std::unique_ptr<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
       lb_least_request_config_;
-  absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig> lb_ring_hash_config_;
-  absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig> lb_maglev_config_;
-  absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig> lb_original_dst_config_;
+  const std::unique_ptr<const envoy::config::cluster::v3::Cluster::RingHashLbConfig>
+      lb_ring_hash_config_;
+  const std::unique_ptr<const envoy::config::cluster::v3::Cluster::MaglevLbConfig>
+      lb_maglev_config_;
+  const std::unique_ptr<const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>
+      lb_original_dst_config_;
   absl::optional<envoy::config::core::v3::TypedExtensionConfig> upstream_config_;
   const bool added_via_api_;
   LoadBalancerSubsetInfoImpl lb_subset_;

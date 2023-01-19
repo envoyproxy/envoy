@@ -13,6 +13,8 @@
 #include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/simulated_time_system.h"
 
+#include "absl/types/optional.h"
+
 namespace Envoy {
 namespace Upstream {
 namespace {
@@ -45,11 +47,15 @@ public:
 class MaglevLoadBalancerTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
   MaglevLoadBalancerTest()
-      : stat_names_(stats_store_.symbolTable()), stats_(stat_names_, stats_store_) {}
+      : stat_names_(stats_store_.symbolTable()), stats_(stat_names_, *stats_store_.rootScope()) {}
 
   void createLb() {
-    lb_ = std::make_unique<MaglevLoadBalancer>(priority_set_, stats_, stats_store_, runtime_,
-                                               random_, config_, common_config_);
+    lb_ = std::make_unique<MaglevLoadBalancer>(
+        priority_set_, stats_, *stats_store_.rootScope(), runtime_, random_,
+        config_.has_value()
+            ? makeOptRef<const envoy::config::cluster::v3::Cluster::MaglevLbConfig>(config_.value())
+            : absl::nullopt,
+        common_config_);
   }
 
   void init(uint64_t table_size) {

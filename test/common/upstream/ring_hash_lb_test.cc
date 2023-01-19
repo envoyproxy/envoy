@@ -21,6 +21,7 @@
 #include "test/test_common/simulated_time_system.h"
 
 #include "absl/container/node_hash_map.h"
+#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -58,11 +59,16 @@ class RingHashLoadBalancerTest : public Event::TestUsingSimulatedTime,
                                  public testing::TestWithParam<bool> {
 public:
   RingHashLoadBalancerTest()
-      : stat_names_(stats_store_.symbolTable()), stats_(stat_names_, stats_store_) {}
+      : stat_names_(stats_store_.symbolTable()), stats_(stat_names_, *stats_store_.rootScope()) {}
 
   void init() {
-    lb_ = std::make_unique<RingHashLoadBalancer>(priority_set_, stats_, stats_store_, runtime_,
-                                                 random_, config_, common_config_);
+    lb_ = std::make_unique<RingHashLoadBalancer>(
+        priority_set_, stats_, *stats_store_.rootScope(), runtime_, random_,
+        config_.has_value()
+            ? makeOptRef<const envoy::config::cluster::v3::Cluster::RingHashLbConfig>(
+                  config_.value())
+            : absl::nullopt,
+        common_config_);
     lb_->initialize();
   }
 

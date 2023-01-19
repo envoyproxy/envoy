@@ -898,12 +898,20 @@ def _com_github_google_quiche():
         actual = "@com_github_google_quiche//:http2_adapter",
     )
     native.bind(
+        name = "quiche_http2_protocol",
+        actual = "@com_github_google_quiche//:http2_adapter_http2_protocol",
+    )
+    native.bind(
         name = "quiche_quic_platform",
         actual = "@com_github_google_quiche//:quic_platform",
     )
     native.bind(
         name = "quiche_quic_platform_base",
         actual = "@com_github_google_quiche//:quic_platform_base",
+    )
+    native.bind(
+        name = "quiche_spdy_hpack",
+        actual = "@com_github_google_quiche//:spdy_core_hpack_hpack_lib",
     )
 
 def _com_googlesource_googleurl():

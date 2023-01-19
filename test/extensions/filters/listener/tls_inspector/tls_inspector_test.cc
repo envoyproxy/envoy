@@ -36,7 +36,8 @@ class TlsInspectorTest : public testing::TestWithParam<std::tuple<uint16_t, uint
 public:
   TlsInspectorTest()
       : cfg_(std::make_shared<Config>(
-            store_, envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector())),
+            *store_.rootScope(),
+            envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector())),
         io_handle_(
             Network::SocketInterfaceImpl::makePlatformSpecificSocket(42, false, absl::nullopt)) {}
 
@@ -104,9 +105,9 @@ INSTANTIATE_TEST_SUITE_P(TlsProtocolVersions, TlsInspectorTest,
 // Test that an exception is thrown for an invalid value for max_client_hello_size
 TEST_P(TlsInspectorTest, MaxClientHelloSize) {
   envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
-  EXPECT_THROW_WITH_MESSAGE(Config(store_, proto_config, Config::TLS_MAX_CLIENT_HELLO + 1),
-                            EnvoyException,
-                            "max_client_hello_size of 65537 is greater than maximum of 65536.");
+  EXPECT_THROW_WITH_MESSAGE(
+      Config(*store_.rootScope(), proto_config, Config::TLS_MAX_CLIENT_HELLO + 1), EnvoyException,
+      "max_client_hello_size of 65537 is greater than maximum of 65536.");
 }
 
 // Test that a ClientHello with an SNI value causes the correct name notification.
@@ -233,7 +234,8 @@ TEST_P(TlsInspectorTest, NoExtensions) {
 TEST_P(TlsInspectorTest, ClientHelloTooBig) {
   envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
   const size_t max_size = 50;
-  cfg_ = std::make_shared<Config>(store_, proto_config, static_cast<uint32_t>(max_size));
+  cfg_ =
+      std::make_shared<Config>(*store_.rootScope(), proto_config, static_cast<uint32_t>(max_size));
   std::vector<uint8_t> client_hello = Tls::Test::generateClientHello(
       std::get<0>(GetParam()), std::get<1>(GetParam()), "example.com", "");
   ASSERT(client_hello.size() > max_size);
@@ -280,7 +282,7 @@ TEST_P(TlsInspectorTest, ClientHelloTooBig) {
 TEST_P(TlsInspectorTest, ConnectionFingerprint) {
   envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
   proto_config.mutable_enable_ja3_fingerprinting()->set_value(true);
-  cfg_ = std::make_shared<Config>(store_, proto_config);
+  cfg_ = std::make_shared<Config>(*store_.rootScope(), proto_config);
   std::vector<uint8_t> client_hello =
       Tls::Test::generateClientHello(std::get<0>(GetParam()), std::get<1>(GetParam()), "", "");
   init();
@@ -300,7 +302,7 @@ void TlsInspectorTest::testJA3(const std::string& fingerprint, bool expect_serve
                                const std::string& hash) {
   envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
   proto_config.mutable_enable_ja3_fingerprinting()->set_value(true);
-  cfg_ = std::make_shared<Config>(store_, proto_config);
+  cfg_ = std::make_shared<Config>(*store_.rootScope(), proto_config);
   std::vector<uint8_t> client_hello = Tls::Test::generateClientHelloFromJA3Fingerprint(fingerprint);
   init();
   mockSysCallForPeek(client_hello);

@@ -11,3 +11,11 @@ message Foo {
 message Bar {
   bool test_field = 1 [(xds.annotations.v3.field_status).work_in_progress = true];
 }
+
+message Inner {
+  string name = 1;
+}
+
+message Outer {
+  Inner inner = 1;
+};
