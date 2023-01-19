@@ -2011,6 +2011,7 @@ message RateLimit {
     // .. code-block:: cpp
     //
     //   ("<descriptor_key>", "<value_queried_from_metadata>")
+    // [#next-free-field: 6]
     message MetaData {
       enum Source {
         // Query :ref:`dynamic metadata <well_known_dynamic_metadata>`
@@ -2028,11 +2029,17 @@ message RateLimit {
       type.metadata.v3.MetadataKey metadata_key = 2 [(validate.rules).message = {required: true}];
 
       // An optional value to use if ``metadata_key`` is empty. If not set and
-      // no value is present under the metadata_key then no descriptor is generated.
+      // no value is present under the metadata_key then ``skip_if_absent`` is followed to
+      // skip calling the rate limiting service or skip the descriptor.
       string default_value = 3;
 
       // Source of metadata
       Source source = 4 [(validate.rules).enum = {defined_only: true}];
+
+      // If set to true, Envoy skips the descriptor while calling rate limiting service
+      // when ``metadata_key`` is empty and ``default_value`` is not set. By default it skips calling the
+      // rate limiting service in that case.
+      bool skip_if_absent = 5;
     }
 
     // The following descriptor entry is appended to the descriptor:
