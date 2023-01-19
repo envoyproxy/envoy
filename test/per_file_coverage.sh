@@ -78,6 +78,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/server/admin:profiler-lib:83"
 "source/extensions/load_balancing_policies:96"
 "source/extensions/load_balancing_policies/common:94" # Death tests don't report LCOV
+"source/server/config_validation:80.8"
 "source/extensions/http/early_header_mutation:95.2" # Death tests don't report LCOV
 "source/extensions/http/early_header_mutation/header_mutation:95.2" # Death tests don't report LCOV
 )
