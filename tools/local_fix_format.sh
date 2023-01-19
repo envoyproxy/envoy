@@ -47,14 +47,6 @@ else
     echo No files selected. Bailing out.
     exit 0
   fi
-
-#  for arg in $args; do
-#    echo ./tools/code_format/check_format.py fix $arg
-#    ./tools/code_format/check_format.py fix $arg |& grep -v "no longer checks API"
-#    echo ./tools/spelling/check_spelling_pedantic.py fix $arg
-#    ./tools/spelling/check_spelling_pedantic.py fix $arg
-#  done
-#  exit $?
 fi
 
 echo ./tools/code_format/check_format.py fix $args '|& grep -v "no longer checks API"'
