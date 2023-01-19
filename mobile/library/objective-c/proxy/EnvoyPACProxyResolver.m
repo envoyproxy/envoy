@@ -2,33 +2,18 @@
 
 #import "library/objective-c/proxy/EnvoyPACProxyResolver.h"
 
-@interface Wrapper : NSObject
-
-@property (nonatomic, copy) void(^block)(NSArray * _Nullable, NSError * _Nullable);
-
+@interface EnvoyPACProxyResolverResolutionCompletionCallbackWrapper : NSObject
+@property (nonatomic, copy) void(^completion)(NSArray * _Nullable, NSError * _Nullable);
 @end
 
-@implementation Wrapper
-
+@implementation EnvoyPACProxyResolverResolutionCompletionCallbackWrapper
 @end
-
-//static void* retainWrapper(void *ptr) {
-//    return NULL;
-//}
-//
-//static void releaseWrapper(void *ptr) {
-////    return NULL;
-//}
-//
-////static void copyWrapper(void *ptr) {
-//////    return NULL;
-////}
 
 @implementation EnvoyPACProxyResolver
 
 - (void)resolveProxiesForTargetURL:(NSURL *)targetURL
          proxyAutoConfigurationURL:(NSURL *)proxyAutoConfigurationURL
-               withCompletionBlock:(void(^)(NSArray<EnvoyProxySettings *> * _Nullable, NSError * _Nullable))completion
+               withCompletionBlock:(EnvoyPacProxyResolverCompletionBlock)completion
 {
   CFURLRef cfTargetURL =
   CFURLCreateWithString(kCFAllocatorDefault,
@@ -39,10 +24,11 @@
                         kCFAllocatorDefault,
                         (__bridge_retained CFStringRef)[proxyAutoConfigurationURL absoluteString],
                         NULL);
-  Wrapper *wrapper = [Wrapper new];
-  wrapper.block = completion;
-//  CFStreamClientContext context = {0, (__bridge void*)wrapper, retainWrapper, releaseWrapper, NULL};
-  CFStreamClientContext context = {0, (void *)CFBridgingRetain(wrapper), NULL, NULL, NULL};
+  EnvoyPACProxyResolverResolutionCompletionCallbackWrapper *completionWrapper =
+    [EnvoyPACProxyResolverResolutionCompletionCallbackWrapper new];
+  completionWrapper.completion = completion;
+
+  CFStreamClientContext context = {0, (void *)CFBridgingRetain(completionWrapper), NULL, NULL, NULL};
   CFRunLoopSourceRef runLoopSource =
   CFNetworkExecuteProxyAutoConfigurationURL(
                                             cfProxyAutoConfigurationURL,
@@ -54,28 +40,36 @@
 }
 
 void proxyAutoConfigurationResultCallback(void *ptr, CFArrayRef cfProxies, CFErrorRef cfError) {
-  Wrapper *wrapper = CFBridgingRelease(ptr);
+  EnvoyPACProxyResolverResolutionCompletionCallbackWrapper *completionWrapper = CFBridgingRelease(ptr);
 
   if (cfError != NULL) {
     NSError *error = (__bridge NSError *)cfError;
     NSLog(@"RAF: ERROR: %@", error.localizedDescription);
-    wrapper.block(nil, (__bridge NSError *)cfError);
+    completionWrapper.completion(nil, (__bridge NSError *)cfError);
   } else if (cfProxies != NULL) {
     NSLog(@"RAF: PROXIES ");
-    NSMutableArray<EnvoyProxySettings *> *proxies = [NSMutableArray new];
+    NSMutableArray<EnvoyProxySystemSettings *> *proxies = [NSMutableArray new];
     NSUInteger count = CFArrayGetCount(cfProxies);
+
     for (NSUInteger i = 0; i < count; i++) {
       NSDictionary *current = (__bridge NSDictionary *)((CFDictionaryRef)CFArrayGetValueAtIndex(cfProxies, i));
       NSString *proxyType = current[(NSString *)kCFProxyTypeKey];
       NSLog(@"RAF: %@", current);
 
-//      if (!CFEqual(proxyType, kCFProxyTypeAutoConfigurationURL)) {
+      if ([proxyType isEqualToString:(NSString *)kCFProxyTypeHTTP]) {
 //        [proxies addObject:[[EnvoyProxySettings alloc] initWithHost:<#(NSString *)#> port:<#(NSUInteger)#>]];
-//      }
+      } else if ([proxyType isEqualToString:(NSString *)kCFProxyTypeHTTPS]) {
+
+      } else if ([proxyType isEqualToString:(NSString *)kCFProxyTypeNone]) {
+
+      } else {
+        // Ignore kCFProxyTypeAutoConfigurationURL, kCFProxyTypeFTP and kCFProxyTypeSOCKS proxies
+        completionWrapper.completion(@[], nil);
+      }
     }
   } else {
     NSLog(@"RAF: NO PROXIES ");
-    wrapper.block(@[], nil);
+    completionWrapper.completion(@[], nil);
   }
 }
 

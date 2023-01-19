@@ -2,6 +2,13 @@
 
 #import "library/objective-c/proxy/EnvoyProxySettings.h"
 
+@interface EnvoyProxySettings ()
+
+@property (nonatomic, strong) NSString *host;
+@property (nonatomic, assign) NSUInteger port;
+
+@end
+
 @implementation EnvoyProxySettings
 
 - (instancetype)initWithHost:(NSString *)host port:(NSUInteger)port {
@@ -14,23 +21,12 @@
   return self;
 }
 
-- (instancetype)initWithPACFileURL:(id)pacFileURL {
-  self = [super init];
-  if (self) {
-    self.pacFileURL = pacFileURL;
-  }
-
-  return self;
++ (instancetype)directProxy {
+  return [[EnvoyProxySettings alloc] initWithHost:@"" port:0];
 }
 
-- (BOOL)isEqual:(id)object {
-  if (![object isKindOfClass:[EnvoyProxySettings class]]) {
-    return false;
-  }
-
-  EnvoyProxySettings *rhs = (EnvoyProxySettings *)object;
-  return [self.host isEqual:rhs.host]
-    && self.port == rhs.port;
+- (BOOL)isDirect {
+  return [self.host isEqualToString:@""] && self.port == 0;
 }
 
 @end

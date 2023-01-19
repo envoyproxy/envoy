@@ -11,7 +11,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 @property (nonatomic, strong, nullable) EnvoyProxyMonitor *proxyMonitor;
 @property (nonatomic, strong, nullable) EnvoyPACProxyResolver *pacProxyResolver;
-@property (nonatomic, strong, nullable) EnvoyProxySettings *proxySettings;
+@property (nonatomic, strong, nullable) EnvoyProxySystemSettings *proxySettings;
 
 @end
 
@@ -25,7 +25,7 @@ NS_ASSUME_NONNULL_BEGIN
   self.pacProxyResolver = [EnvoyPACProxyResolver new];
 
   __weak typeof(self) weakSelf = self;
-  self.proxyMonitor = [[EnvoyProxyMonitor alloc] initWithProxySettingsDidChange:^void (EnvoyProxySettings *proxySettings){
+  self.proxyMonitor = [[EnvoyProxyMonitor alloc] initWithProxySettingsDidChange:^void (EnvoyProxySystemSettings *proxySettings){
     @synchronized (self) {
       weakSelf.proxySettings = proxySettings;
     }
@@ -34,17 +34,17 @@ NS_ASSUME_NONNULL_BEGIN
 }
 
 - (envoy_proxy_resolution_result)resolveProxyForTargetURL:(NSURL *)targetURL
-                                            proxySettings:(NSArray<EnvoyProxySettings *> **)proxySettings
-                                      withCompletionBlock:(void(^)(NSArray<EnvoyProxySettings *> * _Nullable, NSError * _Nullable))completion
+                                            proxySettings:(NSArray<EnvoyProxySystemSettings *> **)proxySettings
+                                      withCompletionBlock:(void(^)(NSArray<EnvoyProxySystemSettings *> * _Nullable, NSError * _Nullable))completion
 {
-  self.proxySettings = [[EnvoyProxySettings alloc] initWithPACFileURL:[NSURL URLWithString:@"https://s3.magneticbear.com/uploads/rafal.pac"]];
+  self.proxySettings = [[EnvoyProxySystemSettings alloc] initWithPACFileURL:[NSURL URLWithString:@"https://s3.magneticbear.com/uploads/rafal.pac"]];
   @synchronized (self) {
     if (self.proxySettings.pacFileURL) {
       [self.pacProxyResolver
        resolveProxiesForTargetURL:targetURL
        proxyAutoConfigurationURL:self.proxySettings.pacFileURL
-       withCompletionBlock:^void(NSArray<EnvoyProxySettings *> * _Nullable proxySettings, NSError * _Nullable error) {
-        NSLog(@"RAF: RESOLVER");
+       withCompletionBlock:^void(NSArray<EnvoyProxySystemSettings *> * _Nullable proxySettings,
+                                 NSError * _Nullable error) {
         completion(proxySettings, error);
       }];
       return ENVOY_PROXY_RESOLUTION_RESULT_IN_PROGRESS;

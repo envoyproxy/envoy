@@ -15,6 +15,8 @@ objc_library(
         "EnvoyProxyResolver.m",
         "EnvoyProxySettings.h",
         "EnvoyProxySettings.m",
+        "EnvoyProxySystemSettings.h",
+        "EnvoyProxySystemSettings.m",
     ],
     hdrs = [
         "EnvoyProxyResolver.h",

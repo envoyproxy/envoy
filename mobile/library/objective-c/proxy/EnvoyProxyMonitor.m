@@ -2,21 +2,21 @@
 
 #import "library/objective-c/proxy/EnvoyProxyMonitor.h"
 
+// The interval at which system proxy settings should be polled at.
 NSTimeInterval kProxySettingsRefreshRateSeconds = 7;
-
 
 @interface EnvoyProxyMonitor ()
 
 @property (nonatomic, strong) dispatch_source_t dispatchSource;
-@property (nonatomic, strong) EnvoyProxySettings *proxySettings;
-@property (nonatomic, copy) void (^proxySettingsDidChange)(EnvoyProxySettings *);
-
+@property (nonatomic, strong) EnvoyProxySystemSettings *proxySettings;
+@property (nonatomic, copy) EnvoyProxyMonitorUpdate proxySettingsDidChange;
+@property (nonatomic, assign) BOOL isStarted;
 
 @end
 
 @implementation EnvoyProxyMonitor
 
-- (instancetype)initWithProxySettingsDidChange:(void (^)(EnvoyProxySettings *))proxySettingsDidChange {
+- (instancetype)initWithProxySettingsDidChange:(EnvoyProxyMonitorUpdate)proxySettingsDidChange {
   self = [super init];
   if (self) {
     self.proxySettingsDidChange = proxySettingsDidChange;
@@ -27,6 +27,11 @@ NSTimeInterval kProxySettingsRefreshRateSeconds = 7;
 
 
 - (void)start {
+  if (self.isStarted) {
+    return;
+  }
+
+  self.isStarted = true;
   [self stop];
 
   self.dispatchSource = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0,
@@ -35,9 +40,11 @@ NSTimeInterval kProxySettingsRefreshRateSeconds = 7;
                             dispatch_time(DISPATCH_TIME_NOW, 0),
                             (int64_t)(kProxySettingsRefreshRateSeconds * NSEC_PER_SEC), 0);
 
+  __block BOOL isInitialUpdate = YES;
   __weak typeof(self) weakSelf = self;
   dispatch_source_set_event_handler(self.dispatchSource, ^{
-    [weakSelf pollProxySettings];
+    [weakSelf pollProxySettings:isInitialUpdate];
+    isInitialUpdate = NO;
   });
 
   dispatch_resume(self.dispatchSource);
@@ -54,9 +61,15 @@ NSTimeInterval kProxySettingsRefreshRateSeconds = 7;
   [self stop];
 }
 
-- (void)setProxySettings:(EnvoyProxySettings *)proxySettings {
-  if ([self.proxySettings isEqual:proxySettings]) {
-    return;
+- (void)updateProxySettings:(EnvoyProxySystemSettings *)proxySettings force:(BOOL)force {
+  if (!force) {
+    if (self.proxySettings == nil && proxySettings == nil) {
+      return;
+    }
+
+    if ([self.proxySettings isEqual:proxySettings]) {
+      return;
+    }
   }
 
   _proxySettings = proxySettings;
@@ -65,22 +78,28 @@ NSTimeInterval kProxySettingsRefreshRateSeconds = 7;
 
 #pragma mark - Private
 
-- (void)pollProxySettings {
+- (void)pollProxySettings:(BOOL)force {
   NSDictionary *settings = (NSDictionary *) CFBridgingRelease(CFNetworkCopySystemProxySettings());
   BOOL isHTTPProxyEnabled = [settings[(NSString *)kCFNetworkProxiesHTTPEnable] intValue] > 0;
   BOOL isAutoConfigProxyEnabled = [settings[(NSString *)kCFNetworkProxiesProxyAutoConfigEnable] intValue] > 0;
 
-  if (NO && isHTTPProxyEnabled) {
+  if (isHTTPProxyEnabled) {
     NSString *host = settings[(NSString *)kCFNetworkProxiesHTTPProxy];
     NSUInteger port = [settings[(NSString *)kCFNetworkProxiesHTTPPort] unsignedIntValue];
-    self.proxySettings = [[EnvoyProxySettings alloc] initWithHost:host port:port];
+    EnvoyProxySystemSettings *settings = [[EnvoyProxySystemSettings alloc] initWithHost:host port:port];
+    [self updateProxySettings:settings force:force];
   } else if (isAutoConfigProxyEnabled) {
     NSString *urlString = settings[(NSString *)kCFNetworkProxiesProxyAutoConfigURLString];
-    // TODO: what to do with an incorrect string in here
     NSURL *url = [NSURL URLWithString:urlString];
-    self.proxySettings = [[EnvoyProxySettings alloc] initWithPACFileURL:@"https://s3.magneticbear.com/uploads/rafal.pac"];
+    if (url) {
+      // TODO: is ignoring the string which are invalid URLs a right thing to do in here?
+      [self updateProxySettings:nil force:force];
+    } else {
+      EnvoyProxySystemSettings *settings = [[EnvoyProxySystemSettings alloc] initWithPACFileURL:url];
+      [self updateProxySettings:settings force:force];
+    }
   } else {
-    self.proxySettings = nil;
+    [self updateProxySettings:nil force:force];
   }
 }
 

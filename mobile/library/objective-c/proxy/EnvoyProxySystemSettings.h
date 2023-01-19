@@ -1,13 +1,12 @@
 #import <Foundation/Foundation.h>
 
-@interface EnvoyProxySettings : NSObject
+@interface EnvoyProxySystemSettings : NSObject
 
+@property (nonatomic, strong, readonly) NSURL *pacFileURL;
 @property (nonatomic, strong, readonly) NSString *host;
 @property (nonatomic, assign, readonly) NSUInteger port;
-@property (nonatomic, assign, readonly) BOOL isDirect;
 
 - (instancetype)initWithHost:(NSString *)host port:(NSUInteger)port;
-
-+ (instancetype)directProxy;
+- (instancetype)initWithPACFileURL:(NSURL *)pacFileURL;
 
 @end
