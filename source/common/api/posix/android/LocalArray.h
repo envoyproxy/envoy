@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+// NOLINT(namespace-envoy)
+
 #ifndef LOCAL_ARRAY_H_included
 #define LOCAL_ARRAY_H_included
 

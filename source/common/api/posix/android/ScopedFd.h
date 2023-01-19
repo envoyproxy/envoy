@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+// NOLINT(namespace-envoy)
+
 #ifndef SCOPED_FD_H_included
 #define SCOPED_FD_H_included
 

@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+// NOLINT(namespace-envoy)
+
 #ifndef IFADDRS_ANDROID_H_included
 #define IFADDRS_ANDROID_H_included
 
@@ -105,7 +107,7 @@ struct ifaddrs {
     ifa_addr = reinterpret_cast<sockaddr*>(ss);
     ss->ss_family = family;
     uint8_t* dst = sockaddrBytes(family, ss);
-    memcpy(dst, data, byteCount);
+    memcpy(dst, data, byteCount); // NOLINT(safe-memcpy)
   }
 
   // Netlink gives us the prefix length as a bit count. We need to turn
