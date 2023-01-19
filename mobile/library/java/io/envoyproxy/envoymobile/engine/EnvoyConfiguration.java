@@ -36,7 +36,7 @@ public class EnvoyConfiguration {
   public final String dnsPreresolveHostnames;
   public final Boolean enableDNSCache;
   public final Boolean enableDrainPostDnsRefresh;
-  public final Boolean enableHttp3;
+  public final Boolean disableHttp3;
   public final Boolean enableGzip;
   public final Boolean enableBrotli;
   public final Boolean enableSocketTagging;
@@ -86,7 +86,7 @@ public class EnvoyConfiguration {
    * @param enableDNSCache                                whether to enable DNS cache.
    * @param enableDrainPostDnsRefresh                     whether to drain connections after soft
    *     DNS refresh.
-   * @param enableHttp3                                   whether to enable experimental support for
+   * @param disableHttp3                                   whether to disable experimental support for
    *     HTTP/3 (QUIC).
    * @param enableGzip                                    whether to enable response gzip
    *     decompression.
@@ -125,7 +125,7 @@ public class EnvoyConfiguration {
       boolean adminInterfaceEnabled, String grpcStatsDomain, int connectTimeoutSeconds,
       int dnsRefreshSeconds, int dnsFailureRefreshSecondsBase, int dnsFailureRefreshSecondsMax,
       int dnsQueryTimeoutSeconds, int dnsMinRefreshSeconds, String dnsPreresolveHostnames,
-      boolean enableDNSCache, boolean enableDrainPostDnsRefresh, boolean enableHttp3,
+      boolean enableDNSCache, boolean enableDrainPostDnsRefresh, boolean disableHttp3,
       boolean enableGzip, boolean enableBrotli, boolean enableSocketTagging,
       boolean enableHappyEyeballs, boolean enableInterfaceBinding,
       int h2ConnectionKeepaliveIdleIntervalMilliseconds, int h2ConnectionKeepaliveTimeoutSeconds,
@@ -148,7 +148,7 @@ public class EnvoyConfiguration {
     this.dnsPreresolveHostnames = dnsPreresolveHostnames;
     this.enableDNSCache = enableDNSCache;
     this.enableDrainPostDnsRefresh = enableDrainPostDnsRefresh;
-    this.enableHttp3 = enableHttp3;
+    this.disableHttp3 = disableHttp3;
     this.enableGzip = enableGzip;
     this.enableBrotli = enableBrotli;
     this.enableSocketTagging = enableSocketTagging;
@@ -212,7 +212,7 @@ public class EnvoyConfiguration {
       customFiltersBuilder.append(filterConfig);
     }
 
-    if (enableHttp3) {
+    if (!disableHttp3) {
       customFiltersBuilder.append(altProtocolCacheFilterInsert);
     }
 

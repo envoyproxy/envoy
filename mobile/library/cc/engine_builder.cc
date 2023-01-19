@@ -164,8 +164,8 @@ EngineBuilder& EngineBuilder::enableHappyEyeballs(bool happy_eyeballs_on) {
   return *this;
 }
 
-EngineBuilder& EngineBuilder::enableHttp3(bool http3_on) {
-  enable_http3_ = http3_on;
+EngineBuilder& EngineBuilder::disableHttp3(bool http3_off) {
+  disable_http3_ = http3_off;
   return *this;
 }
 
@@ -281,7 +281,7 @@ std::string EngineBuilder::generateConfigStr() const {
   if (socket_tagging_filter_) {
     insertCustomFilter(socket_tag_config_insert, config_template);
   }
-  if (enable_http3_) {
+  if (!disable_http3_) {
     insertCustomFilter(alternate_protocols_cache_filter_insert, config_template);
   }
 

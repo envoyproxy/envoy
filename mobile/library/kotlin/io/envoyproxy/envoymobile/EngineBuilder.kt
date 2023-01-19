@@ -53,7 +53,7 @@ open class EngineBuilder(
   private var dnsPreresolveHostnames = "[]"
   private var enableDNSCache = false
   private var enableDrainPostDnsRefresh = false
-  private var enableHttp3 = false
+  private var disableHttp3 = false
   private var enableHappyEyeballs = true
   private var enableGzip = true
   private var enableBrotli = false
@@ -225,16 +225,16 @@ open class EngineBuilder(
   }
 
   /**
-   * Specify whether to enable experimental HTTP/3 (QUIC) support. Note the actual protocol will
+   * Specify whether to disable experimental HTTP/3 (QUIC) support. Note the actual protocol will
    * be negotiated with the upstream endpoint and so upstream support is still required for HTTP/3
    * to be utilized.
    *
-   * @param enableHttp3 whether to enable HTTP/3.
+   * @param disableHttp3 whether to disable HTTP/3.
    *
    * @return This builder.
    */
-  fun enableHttp3(enableHttp3: Boolean): EngineBuilder {
-    this.enableHttp3 = enableHttp3
+  fun disableHttp3(disableHttp3: Boolean): EngineBuilder {
+    this.disableHttp3 = disableHttp3
     return this
   }
 
@@ -605,7 +605,7 @@ open class EngineBuilder(
       dnsPreresolveHostnames,
       enableDNSCache,
       enableDrainPostDnsRefresh,
-      enableHttp3,
+      disableHttp3,
       enableGzip,
       enableBrotli,
       enableSocketTagging,
