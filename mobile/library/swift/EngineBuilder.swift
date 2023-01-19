@@ -27,6 +27,7 @@ open class EngineBuilder: NSObject {
   private var enableHappyEyeballs: Bool = true
   private var enableGzip: Bool = true
   private var enableBrotli: Bool = false
+  private var disableHttp3: Bool = false
   private var enableInterfaceBinding: Bool = false
   private var enforceTrustChainVerification: Bool = true
   private var enablePlatformCertificateValidation: Bool = false
@@ -219,6 +220,17 @@ open class EngineBuilder: NSObject {
   @discardableResult
   public func enableBrotli(_ enableBrotli: Bool) -> Self {
     self.enableBrotli = enableBrotli
+    return self
+  }
+
+  /// Specify whether to disable support for HTTP/3 or not.  Defaults to false.
+  ///
+  /// - parameter disableHttp3: whether or not to disable HTTP/3.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func disableHttp3(_ disableHttp3: Bool) -> Self {
+    self.disableHttp3 = disableHttp3
     return self
   }
 
@@ -549,6 +561,7 @@ open class EngineBuilder: NSObject {
       enableHappyEyeballs: self.enableHappyEyeballs,
       enableGzip: self.enableGzip,
       enableBrotli: self.enableBrotli,
+      disableHttp3: self.disableHttp3,
       enableInterfaceBinding: self.enableInterfaceBinding,
       enableDrainPostDnsRefresh: self.enableDrainPostDnsRefresh,
       enforceTrustChainVerification: self.enforceTrustChainVerification,

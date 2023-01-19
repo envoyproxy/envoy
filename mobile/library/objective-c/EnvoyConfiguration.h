@@ -21,6 +21,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) UInt32 dnsRefreshSeconds;
 @property (nonatomic, assign) BOOL enableDNSCache;
 @property (nonatomic, assign) BOOL enableHappyEyeballs;
+@property (nonatomic, assign) BOOL disableHttp3;
 @property (nonatomic, assign) BOOL enableGzip;
 @property (nonatomic, assign) BOOL enableBrotli;
 @property (nonatomic, assign) BOOL enableInterfaceBinding;
@@ -60,6 +61,7 @@ NS_ASSUME_NONNULL_BEGIN
                            dnsPreresolveHostnames:(NSString *)dnsPreresolveHostnames
                                    enableDNSCache:(BOOL)enableDNSCache
                               enableHappyEyeballs:(BOOL)enableHappyEyeballs
+                                     disableHttp3:(BOOL)disableHttp3
                                        enableGzip:(BOOL)enableGzip
                                      enableBrotli:(BOOL)enableBrotli
                            enableInterfaceBinding:(BOOL)enableInterfaceBinding
