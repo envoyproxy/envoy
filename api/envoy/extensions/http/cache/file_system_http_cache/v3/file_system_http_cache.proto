@@ -121,6 +121,7 @@ message FileSystemHttpCacheConfig {
   // any missing directories leading up to it. On failure, the config is rejected.
   //
   // If false, and the cache path does not exist, the config is rejected.
+  //
   // [#not-implemented-hide:]
   bool create_cache_path = 10;
 }
