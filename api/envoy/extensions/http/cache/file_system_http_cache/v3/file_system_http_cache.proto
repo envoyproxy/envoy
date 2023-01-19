@@ -95,7 +95,7 @@ message FileSystemHttpCacheConfig {
   // cache in parallel.
   //
   // If an eviction pass has not happened within this duration, the eviction thread will
-  // be awoken and perform an eviction.
+  // be awoken and perform an eviction pass.
   //
   // If unset, there will be no eviction passes except those triggered by cache limits.
   //
