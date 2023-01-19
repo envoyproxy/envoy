@@ -123,7 +123,7 @@ private:
     if (!has(element_idx) && current_size == capacity()) {
       std::unique_ptr<T[]> tmp(new T[++indices_[max_size]]);
       std::move(data_.get(), std::next(data_.get(), current_size), tmp.get());
-      swap(data_, tmp);
+      data_ = std::move(tmp);
     }
     if (!has(element_idx)) {
       indices_[element_idx] = current_size;
