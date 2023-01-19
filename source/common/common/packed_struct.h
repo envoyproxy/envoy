@@ -40,12 +40,12 @@ namespace Envoy {
  *
  *    MyPackedStringStruct packed_struct(2); // For this instantiation, only 2
  *                                           // elements are non-empty
- *    packed_struct.set(MyElementNames::element1, "abc");
- *    packed_struct.set(MyElementNames::element2, "def");
+ *    packed_struct.set<MyElementNames::element1>("abc");
+ *    packed_struct.set<MyElementNames::element2>("def");
  *
  *    // Code that accesses the elements of the struct needs to check for existence first.
- *    if (packed_struct.has(MyElementNames::element0) {
- *      auto& element0 = packed_struct.get(MyElements::element0);
+ *    if (packed_struct.has<MyElementNames::element0>() {
+ *      auto& element0 = packed_struct.get<MyElements::element0>();
  *    }
  * ```
  */
