@@ -541,6 +541,49 @@ TEST_P(ShadowPolicyIntegrationTest, ShadowRequestOverBufferLimit) {
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_rq_completed")->value(), 0);
 }
 
+TEST_P(ShadowPolicyIntegrationTest, ShadowRequestOverRouteBufferLimit) {
+  if (!streaming_shadow_) {
+    GTEST_SKIP() << "Not applicable for non-streaming shadows.";
+  }
+  autonomous_upstream_ = true;
+  cluster_with_custom_filter_ = 1;
+  filter_name_ = "encoder-decoder-buffer-filter";
+  initialConfigSetup("cluster_1", "");
+  config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& hcm) {
+    hcm.mutable_route_config()
+        ->mutable_virtual_hosts(0)
+        ->mutable_per_request_buffer_limit_bytes()
+        ->set_value(0);
+  });
+  config_helper_.disableDelayClose();
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl request_headers = default_request_headers_;
+  request_headers.addCopy("potato", "salad");
+  // Send whole (large) request.
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/dynamo/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"x-forwarded-for", "10.0.0.1"},
+                                     {"x-envoy-retry-on", "5xx"}},
+      1024 * 65);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ(response->headers().getStatusValue(), "200");
+
+  cleanupUpstreamAndDownstream();
+
+  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 1);
+  EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
+  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_completed")->value(), 1);
+  // The request to the shadow upstream never completed due to buffer overflow.
+  EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_rq_completed")->value(), 0);
+}
+
 TEST_P(ShadowPolicyIntegrationTest, BackedUpConnectionBeforeShadowBegins) {
   if (!streaming_shadow_) {
     GTEST_SKIP() << "Not applicable for non-streaming shadows.";

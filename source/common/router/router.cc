@@ -1,5 +1,6 @@
 #include "source/common/router/router.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <functional>
@@ -715,14 +716,17 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
         continue;
       }
       auto shadow_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>(*shadow_headers_);
-      auto options = Http::AsyncClient::RequestOptions()
-                         .setTimeout(timeout_.global_timeout_)
-                         .setParentSpan(callbacks_->activeSpan())
-                         .setChildSpanName("mirror")
-                         .setSampled(shadow_policy.traceSampled())
-                         .setIsShadow(true)
-                         .setBufferAccount(callbacks_->account())
-                         .setBufferLimit(callbacks_->decoderBufferLimit());
+      auto options =
+          Http::AsyncClient::RequestOptions()
+              .setTimeout(timeout_.global_timeout_)
+              .setParentSpan(callbacks_->activeSpan())
+              .setChildSpanName("mirror")
+              .setSampled(shadow_policy.traceSampled())
+              .setIsShadow(true)
+              .setBufferAccount(callbacks_->account())
+              // A buffer limit of 1 is set in the case that retry_shadow_buffer_limit_ == 0,
+              // because a buffer limit of zero on async clients is interpreted as no buffer limit.
+              .setBufferLimit(1 > retry_shadow_buffer_limit_ ? 1 : retry_shadow_buffer_limit_);
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.closer_shadow_behavior")) {
         options.setFilterConfig(config_);
       }
