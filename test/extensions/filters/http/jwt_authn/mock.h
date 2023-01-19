@@ -91,7 +91,7 @@ public:
 
 class MockJwksCache : public JwksCache {
 public:
-  MockJwksCache() : stats_(generateMockStats(stats_store_)) {
+  MockJwksCache() : stats_(generateMockStats(*stats_store_.rootScope())) {
     ON_CALL(*this, findByIssuer(_)).WillByDefault(::testing::Return(&jwks_data_));
     ON_CALL(*this, findByProvider(_)).WillByDefault(::testing::Return(&jwks_data_));
     ON_CALL(*this, stats()).WillByDefault(::testing::ReturnRef(stats_));

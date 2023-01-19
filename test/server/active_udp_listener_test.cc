@@ -103,7 +103,8 @@ public:
   Network::Address::InstanceConstSharedPtr local_address_;
   Network::SocketSharedPtr listen_socket_;
   NiceMock<Network::MockListenSocketFactory> socket_factory_;
-  Stats::IsolatedStoreImpl scope_;
+  Stats::IsolatedStoreImpl store_;
+  Stats::Scope& scope_{*store_.rootScope()};
   std::unique_ptr<NiceMock<Network::MockUdpListenerConfig>> udp_listener_config_;
   NiceMock<Network::MockUdpPacketWriterFactory> udp_packet_writer_factory_;
   Network::MockListenerConfig listener_config_;

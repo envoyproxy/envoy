@@ -288,6 +288,7 @@ OID
 OK
 OOM
 OOMs
+ORCA
 OS
 OSI
 OSS
@@ -923,6 +924,7 @@ mutator
 mutex
 mutexes
 mux
+muxes
 muxed
 mysql
 namelen
@@ -960,6 +962,7 @@ ocagent
 offsetof
 oneof
 oneway
+oob
 opcode
 opencensus
 openssl

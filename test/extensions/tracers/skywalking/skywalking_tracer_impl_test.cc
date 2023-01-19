@@ -104,7 +104,7 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
     EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _));
     span->finishSpan();
 
-    EXPECT_EQ(1U, factory_context.scope_.counter("tracing.skywalking.segments_sent").value());
+    EXPECT_EQ(1U, factory_context.store_.counter("tracing.skywalking.segments_sent").value());
   }
 
   {
@@ -126,7 +126,7 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
     EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _));
     span->finishSpan();
 
-    EXPECT_EQ(2U, factory_context.scope_.counter("tracing.skywalking.segments_sent").value());
+    EXPECT_EQ(2U, factory_context.store_.counter("tracing.skywalking.segments_sent").value());
   }
 
   {
@@ -136,6 +136,23 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
         {":method", "GET"},
         {":authority", "test.com"},
         {"sw8", "xxxxxx-error-propagation-header"}};
+    Tracing::SpanPtr org_null_span =
+        driver_->startSpan(mock_tracing_config_, error_request_headers, "TEST_OP",
+                           time_system_.systemTime(), decision);
+
+    EXPECT_EQ(nullptr, dynamic_cast<Span*>(org_null_span.get()));
+
+    auto& null_span = *org_null_span;
+    EXPECT_EQ(typeid(null_span).name(), typeid(Tracing::NullSpan).name());
+  }
+
+  {
+    // Create new span segment with error propagation header.
+    Http::TestRequestHeaderMapImpl error_request_headers{
+        {":path", "/path"},
+        {":method", "GET"},
+        {":authority", "test.com"},
+        {"sw8", "1-x-x-x-x-x-x-x"}}; // The first field is legal and fourth field is illegal.
     Tracing::SpanPtr org_null_span =
         driver_->startSpan(mock_tracing_config_, error_request_headers, "TEST_OP",
                            time_system_.systemTime(), decision);
