@@ -114,6 +114,8 @@ public:
 
   void setStatsTags(const Stats::TagVector& stats_tags) { stats_tags_ = stats_tags; }
 
+  void setListenerManager(absl::string_view manager) { listener_manager_ = std::string(manager); }
+
   // Server::Options
   uint64_t baseId() const override { return base_id_; }
   bool useDynamicBaseId() const override { return use_dynamic_base_id_; }

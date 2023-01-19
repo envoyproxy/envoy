@@ -367,6 +367,9 @@ public:
   std::string name() const override {
     return Config::ServerExtensionValues::get().DEFAULT_LISTENER;
   }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<envoy::config::listener::v3::ListenerManager>();
+  }
 };
 
 DECLARE_FACTORY(DefaultListenerManagerFactoryImpl);
