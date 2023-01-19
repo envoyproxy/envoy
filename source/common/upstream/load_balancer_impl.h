@@ -707,11 +707,19 @@ private:
 
     double host_weight = static_cast<double>(host.weight());
 
+    // If the value of active requests is the max value, adding +1 will overflow
+    // it and cause a divide by zero. This won't happen in normal cases but stops
+    // failing fuzz tests
+    auto active_request_value =
+        host.stats().rq_active_.value() != std::numeric_limits<uint64_t>::max()
+            ? host.stats().rq_active_.value() + 1
+            : host.stats().rq_active_.value();
+
     if (active_request_bias_ == 1.0) {
-      host_weight = static_cast<double>(host.weight()) / (host.stats().rq_active_.value() + 1);
+      host_weight = static_cast<double>(host.weight()) / active_request_value;
     } else if (active_request_bias_ != 0.0) {
-      host_weight = static_cast<double>(host.weight()) /
-                    std::pow(host.stats().rq_active_.value() + 1, active_request_bias_);
+      host_weight =
+          static_cast<double>(host.weight()) / std::pow(active_request_value, active_request_bias_);
     }
 
     if (!noHostsAreInSlowStart()) {
