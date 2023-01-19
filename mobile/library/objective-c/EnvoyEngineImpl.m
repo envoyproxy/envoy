@@ -409,13 +409,13 @@ static envoy_proxy_resolution_result ios_resolve_proxy
   @autoreleasepool {
     EnvoyProxyResolutionContext *resolutionContext = (__bridge EnvoyProxyResolutionContext *)context;
     NSString *host = to_ios_string(c_host);
-    NSArray<EnvoyProxySystemSettings *> *proxySettings;
+    NSArray<EnvoyProxySettings *> *proxySettings;
 
     envoy_proxy_resolution_result result =
     [resolutionContext.proxyResolver
      resolveProxyForTargetURL:[NSURL URLWithString:host]
      proxySettings:&proxySettings
-     withCompletionBlock:^(NSArray<EnvoyProxySystemSettings *> * _Nullable settings, NSError * _Nullable error) {
+     withCompletionBlock:^(NSArray<EnvoyProxySettings *> * _Nullable settings, NSError * _Nullable error) {
       envoy_proxy_settings_list list;
       list.length = (uint64_t)settings.count;
       list.proxy_settings = safe_malloc(list.length);

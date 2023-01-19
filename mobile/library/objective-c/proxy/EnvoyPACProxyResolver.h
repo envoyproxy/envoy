@@ -1,8 +1,8 @@
-#include "library/objective-c/proxy/EnvoyProxySystemSettings.h"
+#include "library/objective-c/proxy/EnvoyProxySettings.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
-typedef void (^EnvoyPacProxyResolverCompletionBlock)(NSArray<EnvoyProxySystemSettings *> * _Nullable,
+typedef void (^EnvoyPacProxyResolverCompletionBlock)(NSArray<EnvoyProxySettings *> * _Nullable,
                                                      NSError * _Nullable);
 
 @interface EnvoyPACProxyResolver : NSObject

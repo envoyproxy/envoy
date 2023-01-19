@@ -48,7 +48,7 @@ void proxyAutoConfigurationResultCallback(void *ptr, CFArrayRef cfProxies, CFErr
     completionWrapper.completion(nil, (__bridge NSError *)cfError);
   } else if (cfProxies != NULL) {
     NSLog(@"RAF: PROXIES ");
-    NSMutableArray<EnvoyProxySystemSettings *> *proxies = [NSMutableArray new];
+    NSMutableArray<EnvoyProxySettings *> *proxies = [NSMutableArray new];
     NSUInteger count = CFArrayGetCount(cfProxies);
 
     for (NSUInteger i = 0; i < count; i++) {
@@ -56,16 +56,18 @@ void proxyAutoConfigurationResultCallback(void *ptr, CFArrayRef cfProxies, CFErr
       NSString *proxyType = current[(NSString *)kCFProxyTypeKey];
       NSLog(@"RAF: %@", current);
 
-      if ([proxyType isEqualToString:(NSString *)kCFProxyTypeHTTP]) {
-//        [proxies addObject:[[EnvoyProxySettings alloc] initWithHost:<#(NSString *)#> port:<#(NSUInteger)#>]];
-      } else if ([proxyType isEqualToString:(NSString *)kCFProxyTypeHTTPS]) {
-
+      // Ignore kCFProxyTypeAutoConfigurationURL, kCFProxyTypeFTP and kCFProxyTypeSOCKS proxies
+      if ([proxyType isEqualToString:(NSString *)kCFProxyTypeHTTP]
+          || [proxyType isEqualToString:(NSString *)kCFProxyTypeHTTPS])
+      {
+        NSString *host = current[(NSString *)kCFProxyHostNameKey];
+        NSUInteger port = [current[(NSString *)kCFProxyPortNumberKey] unsignedIntegerValue];
+        [proxies addObject:[[EnvoyProxySettings alloc] initWithHost:host port:port]];
       } else if ([proxyType isEqualToString:(NSString *)kCFProxyTypeNone]) {
-
-      } else {
-        // Ignore kCFProxyTypeAutoConfigurationURL, kCFProxyTypeFTP and kCFProxyTypeSOCKS proxies
-        completionWrapper.completion(@[], nil);
+        [proxies addObject:[EnvoyProxySettings directProxy]];
       }
+
+      completionWrapper.completion(proxies, nil);
     }
   } else {
     NSLog(@"RAF: NO PROXIES ");
