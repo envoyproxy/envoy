@@ -221,7 +221,7 @@ private:
   void appendData(std::vector<uint8_t> data) {
     data_.insert(data_.end(), data.begin(), data.end());
   }
-  void appendDataAfterHeaders(std::vector<uint8_t> data) {
+  void appendDataAfterHeaders(absl::string_view data) {
     std::copy(data.begin(), data.end(), data_.begin() + 9);
   }
 

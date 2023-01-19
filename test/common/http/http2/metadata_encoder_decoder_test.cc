@@ -123,6 +123,7 @@ public:
   }
 
   void verifyMetadataMapVector(MetadataMapVector& expect, MetadataMapPtr&& metadata_map_ptr) {
+    ASSERT_EQ(expect.front()->size(), metadata_map_ptr->size());
     for (const auto& metadata : *metadata_map_ptr) {
       EXPECT_EQ(expect.front()->find(metadata.first)->second, metadata.second);
     }
