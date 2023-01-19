@@ -13,7 +13,7 @@ namespace Router {
 
 namespace {
 
-std::string newHost(absl::string_view host) {
+std::string shadowAppendedHost(absl::string_view host) {
   ASSERT(!host.empty());
   // Switch authority to add a shadow postfix. This allows upstream logging to
   // make more sense.
@@ -58,7 +58,7 @@ Upstream::ThreadLocalCluster* ShadowWriterImpl::getClusterAndPreprocessHeadersAn
     return nullptr;
   }
 
-  headers.setHost(newHost(headers.getHostValue()));
+  headers.setHost(shadowAppendedHost(headers.getHostValue()));
 
   const_cast<Http::AsyncClient::RequestOptions&>(options).setIsShadow(true);
   return thread_local_cluster;
