@@ -13,7 +13,7 @@
 #pragma clang diagnostic ignored "-Wold-style-cast"
 namespace android {
 #include "source/common/api/posix/android/ifaddrs-android.h"
-}  // namespace tmp
+} // namespace android
 #pragma clang diagnostic pop
 #endif
 
@@ -355,9 +355,7 @@ SysCallBoolResult OsSysCallsImpl::socketTcpInfo([[maybe_unused]] os_fd_t sockfd,
   return {false, EOPNOTSUPP};
 }
 
-bool OsSysCallsImpl::supportsGetifaddrs() const {
-  return true;
-}
+bool OsSysCallsImpl::supportsGetifaddrs() const { return true; }
 
 SysCallIntResult OsSysCallsImpl::getifaddrs([[maybe_unused]] InterfaceAddressVector& interfaces) {
   if (alternate_getifaddrs_.has_value()) {
