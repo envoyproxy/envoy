@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <limits>
 #include <type_traits>
 
@@ -101,8 +102,8 @@ public:
   // Number of non-empty elements in the struct. Note that this can be less than
   // capacity.
   size_t size() const {
-    return std::accumulate(indices_.begin(), indices_.end() - 1, 0,
-                           [](uint8_t a, uint8_t b) { return b < max_size ? ++a : a; });
+    return std::count_if(indices_.begin(), indices_.end() - 1,
+                         [](uint8_t a) { return a < max_size; });
   }
 
   // Disable copying
