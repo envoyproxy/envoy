@@ -27,6 +27,8 @@ import (
 	hcm "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/http_connection_manager/v3"
 
 	"github.com/envoyproxy/go-control-plane/pkg/cache/types"
+	_ "github.com/envoyproxy/go-control-plane/pkg/cache/v3"
+	_ "github.com/envoyproxy/go-control-plane/pkg/resource/v3"
 	"github.com/envoyproxy/go-control-plane/pkg/wellknown"
 )
 
