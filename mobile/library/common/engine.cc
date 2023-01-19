@@ -66,8 +66,10 @@ envoy_status_t Engine::main(const std::string config, const std::string log_leve
 
       auto options = std::make_unique<Envoy::OptionsImpl>();
       options->setConfigYaml(absl::StrCat(config_header, config));
-      options->parseAndValidateLogLevel(log_level.c_str());
-      options->setConcurrency(0);
+      if (!log_level.empty()) {
+        options->setLogLevel(options->parseAndValidateLogLevel(log_level.c_str()));
+      }
+      options->setConcurrency(1);
       if (!admin_address_path.empty()) {
         options->setAdminAddressPath(admin_address_path);
       }

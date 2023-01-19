@@ -81,6 +81,15 @@ TEST_F(OptionsImplTest, V1Disallowed) {
   EXPECT_EQ(Server::Mode::Validate, options->mode());
 }
 
+TEST_F(OptionsImplTest, ConcurrencyZeroIsOne) {
+  std::unique_ptr<OptionsImpl> options =
+      createOptionsImpl("envoy --mode validate --concurrency 0 ");
+  EXPECT_EQ(1U, options->concurrency());
+
+  options = createOptionsImpl("envoy --mode init_only");
+  EXPECT_EQ(Server::Mode::InitOnly, options->mode());
+}
+
 TEST_F(OptionsImplTest, All) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl(
       "envoy --mode validate --concurrency 2 -c hello --admin-address-path path --restart-epoch 0 "
