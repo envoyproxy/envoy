@@ -60,6 +60,9 @@ fi
 CURRENT=check_format
 "${ENVOY_SRCDIR}"/tools/code_format/check_format.py fix --fail_on_diff
 
+# generate the gofmt command
+bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/code_format:gofmt
+
 CURRENT=check_format_go_code
 "${ENVOY_SRCDIR}"/tools/code_format/check_format_go_code.sh
 
