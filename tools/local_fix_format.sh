@@ -28,12 +28,13 @@ ignore="$CLANG_FORMAT $BUILDIFIER_BIN $BUILDOZER_BIN"
 
 if [[ $# > 0 && "$1" == "-all" ]]; then
   all=1
-  echo ALL.
+  echo "Checking all files in the repo...this may take a while."
   shift
   args="$@"
 else
-  if [[ $# > 0 && "$1" = "-main" ]]; then
+  if [[ $# > 0 && "$1" == "-main" ]]; then
     shift
+    echo "Checking all files that have changed since the main branch."
     args=$(git diff main | grep ^diff | awk '{print $3}' | cut -c 3-)
   elif [[ $# == 0 ]]; then
     args=$(git status|egrep '(modified:|added:)'|awk '{print $2}')
@@ -41,14 +42,22 @@ else
   else
     args="$@"
   fi
-  for arg in $args; do
-    echo ./tools/code_format/check_format.py fix $arg
-    ./tools/code_format/check_format.py fix $arg |& grep -v "no longer checks API"
-    echo ./tools/spelling/check_spelling_pedantic.py fix $arg
-    ./tools/spelling/check_spelling_pedantic.py fix $arg
-  done
-  exit $?
+
+  if [[ "$args" == "" ]]; then
+    echo No files selected. Bailing out.
+    exit 0
+  fi
+
+#  for arg in $args; do
+#    echo ./tools/code_format/check_format.py fix $arg
+#    ./tools/code_format/check_format.py fix $arg |& grep -v "no longer checks API"
+#    echo ./tools/spelling/check_spelling_pedantic.py fix $arg
+#    ./tools/spelling/check_spelling_pedantic.py fix $arg
+#  done
+#  exit $?
 fi
 
-./tools/code_format/check_format.py fix $args  |& grep -v "no longer checks API"
+echo ./tools/code_format/check_format.py fix $args '|& grep -v "no longer checks API"'
+./tools/code_format/check_format.py fix $args |& grep -v "no longer checks API"
+echo ./tools/spelling/check_spelling_pedantic.py fix $args
 ./tools/spelling/check_spelling_pedantic.py fix $args
