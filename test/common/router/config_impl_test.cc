@@ -6341,6 +6341,28 @@ virtual_hosts:
       EnvoyException, "Sum of weights in the weighted_cluster must be greater than 0.");
 }
 
+TEST_F(RouteMatcherTest, WeightedClustersSumOfWeightsTooLarge) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: www2
+    domains: ["www.lyft.com"]
+    routes:
+      - match: { prefix: "/" }
+        name: lyft_route
+        route:
+          weighted_clusters:
+            clusters:
+              - name: cluster1
+                weight: 2394967295
+              - name: cluster2
+                weight: 2394967295
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
+      "The sum of weights of all weighted clusters of route lyft_route exceeds 4294967295");
+}
+
 TEST_F(RouteMatcherTest, TestWeightedClusterWithMissingWeights) {
   const std::string yaml = R"EOF(
 virtual_hosts:
