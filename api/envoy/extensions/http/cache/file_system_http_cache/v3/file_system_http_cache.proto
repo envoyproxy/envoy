@@ -57,7 +57,7 @@ message FileSystemHttpCacheConfig {
   // If unset there is no limit.
   //
   // [#not-implemented-hide:]
-  google.protobuf.UInt64Value max_cache_entry_size_bytes = 4;
+  google.protobuf.UInt64Value max_individual_cache_entry_size_bytes = 4;
 
   // The maximum number of cache entries - when reached, cache eviction is triggered.
   //
