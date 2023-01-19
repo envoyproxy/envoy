@@ -25,7 +25,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // Configuration for a cache implementation that caches in the local file system.
 //
 // By default this cache uses a least-recently-used eviction strategy.
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message FileSystemHttpCacheConfig {
   // Configuration of a manager for how the file system is used asynchronously.
   common.async_files.v3.AsyncFileManagerConfig manager_config = 1
@@ -116,4 +116,11 @@ message FileSystemHttpCacheConfig {
   //
   // [#not-implemented-hide:]
   google.protobuf.Duration min_eviction_period = 9;
+
+  // If true, and the cache path does not exist, attempt to create the cache path (on failure,
+  // the config is rejected). Will attempt to create the entire missing directory tree.
+  //
+  // If false, and the cache path does not exist, the config is rejected.
+  // [#not-implemented-hide:]
+  bool create_cache_path = 10;
 }
