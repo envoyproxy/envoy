@@ -69,7 +69,7 @@ class EnvoyConfigurationTest {
     dnsPreresolveHostnames: String = "[hostname]",
     enableDNSCache: Boolean = false,
     enableDrainPostDnsRefresh: Boolean = false,
-    enableHttp3: Boolean = false,
+    disableHttp3: Boolean = false,
     enableGzip: Boolean = true,
     enableBrotli: Boolean = false,
     enableSocketTagging: Boolean = false,
@@ -101,7 +101,7 @@ class EnvoyConfigurationTest {
       dnsPreresolveHostnames,
       enableDNSCache,
       enableDrainPostDnsRefresh,
-      enableHttp3,
+      disableHttp3,
       enableGzip,
       enableBrotli,
       enableSocketTagging,
@@ -209,7 +209,7 @@ class EnvoyConfigurationTest {
       enableDrainPostDnsRefresh = true,
       enableDNSCache = true,
       enableHappyEyeballs = true,
-      enableHttp3 = true,
+      disableHttp3 = true,
       enableGzip = false,
       enableBrotli = true,
       enableInterfaceBinding = true,
@@ -233,7 +233,7 @@ CERT_VALIDATION_TEMPLATE
     assertThat(resolvedTemplate).contains("&h2_delay_keepalive_timeout true")
 
     // H3
-    assertThat(resolvedTemplate).contains(APCF_INSERT);
+    assertThat(resolvedTemplate).doesNotContain(APCF_INSERT);
 
     // Gzip
     assertThat(resolvedTemplate).doesNotContain(GZIP_INSERT);
