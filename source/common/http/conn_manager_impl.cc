@@ -1186,7 +1186,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
 
 void ConnectionManagerImpl::ActiveStream::traceRequest() {
   const Tracing::Decision tracing_decision =
-      Tracing::HttpTracerUtility::shouldTraceRequest(filter_manager_.streamInfo());
+      Tracing::TracerUtility::shouldTraceRequest(filter_manager_.streamInfo());
   ConnectionManagerImpl::chargeTracingStats(tracing_decision.reason,
                                             connection_manager_.config_.tracingStats());
 

@@ -18,7 +18,7 @@
 #include "envoy/http/original_ip_detection.h"
 #include "envoy/http/request_id_extension.h"
 #include "envoy/router/route_config_provider_manager.h"
-#include "envoy/tracing/http_tracer_manager.h"
+#include "envoy/tracing/tracer_manager.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/filter/config_discovery_impl.h"
@@ -131,7 +131,7 @@ public:
       Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
       Router::RouteConfigProviderManager& route_config_provider_manager,
       Config::ConfigProviderManager& scoped_routes_config_provider_manager,
-      Tracing::HttpTracerManager& http_tracer_manager,
+      Tracing::TracerManager& tracer_manager,
       FilterConfigProviderManager& filter_config_provider_manager);
 
   // Http::FilterChainFactory
@@ -300,7 +300,7 @@ private:
       HttpConnectionManagerProto::OVERWRITE};
   std::string server_name_;
   absl::optional<std::string> scheme_to_set_;
-  Tracing::HttpTracerSharedPtr http_tracer_{std::make_shared<Tracing::HttpNullTracer>()};
+  Tracing::HttpTracerSharedPtr http_tracer_{std::make_shared<Tracing::NullTracer>()};
   Http::TracingConnectionManagerConfigPtr tracing_config_;
   absl::optional<std::string> user_agent_;
   const uint32_t max_request_headers_kb_;
@@ -367,7 +367,7 @@ public:
     std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider_;
     Router::RouteConfigProviderManagerSharedPtr route_config_provider_manager_;
     Router::ScopedRoutesConfigProviderManagerSharedPtr scoped_routes_config_provider_manager_;
-    Tracing::HttpTracerManagerSharedPtr http_tracer_manager_;
+    Tracing::TracerManagerSharedPtr tracer_manager_;
     std::shared_ptr<FilterConfigProviderManager> filter_config_provider_manager_;
   };
 
@@ -395,7 +395,7 @@ public:
       Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
       Router::RouteConfigProviderManager& route_config_provider_manager,
       Config::ConfigProviderManager& scoped_routes_config_provider_manager,
-      Tracing::HttpTracerManager& http_tracer_manager,
+      Tracing::TracerManager& tracer_manager,
       FilterConfigProviderManager& filter_config_provider_manager);
 };
 

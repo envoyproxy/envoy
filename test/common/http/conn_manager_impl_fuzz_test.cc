@@ -262,7 +262,7 @@ public:
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
   Network::Address::Ipv4Instance local_address_{"127.0.0.1"};
   absl::optional<std::string> user_agent_;
-  Tracing::HttpTracerSharedPtr http_tracer_{std::make_shared<NiceMock<Tracing::MockHttpTracer>>()};
+  Tracing::HttpTracerSharedPtr http_tracer_{std::make_shared<NiceMock<Tracing::MockTracer>>()};
   TracingConnectionManagerConfigPtr tracing_config_;
   bool proxy_100_continue_{true};
   bool stream_error_on_invalid_http_messaging_ = false;
