@@ -55,7 +55,7 @@ public:
   EngineBuilder& enableSocketTagging(bool socket_tagging_on);
   EngineBuilder& enableAdminInterface(bool admin_interface_on);
   EngineBuilder& enableHappyEyeballs(bool happy_eyeballs_on);
-  EngineBuilder& disableHttp3(bool http3_off);
+  EngineBuilder& enableHttp3(bool http3_on);
   EngineBuilder& enableInterfaceBinding(bool interface_binding_on);
   EngineBuilder& enableDrainPostDnsRefresh(bool drain_post_dns_refresh_on);
   EngineBuilder& enableH2ExtendKeepaliveTimeout(bool h2_extend_keepalive_timeout_on);
@@ -117,7 +117,7 @@ private:
   bool enable_drain_post_dns_refresh_ = false;
   bool enforce_trust_chain_verification_ = true;
   bool h2_extend_keepalive_timeout_ = false;
-  bool disable_http3_ = false;
+  bool enable_http3_ = true;
   int dns_min_refresh_seconds_ = 60;
   int max_connections_per_host_ = 7;
   std::vector<std::string> stat_sinks_;

@@ -15,7 +15,7 @@
                            dnsPreresolveHostnames:(NSString *)dnsPreresolveHostnames
                                    enableDNSCache:(BOOL)enableDNSCache
                               enableHappyEyeballs:(BOOL)enableHappyEyeballs
-                                     disableHttp3:(BOOL)disableHttp3
+                                     enableHttp3:(BOOL)enableHttp3
                                        enableGzip:(BOOL)enableGzip
                                      enableBrotli:(BOOL)enableBrotli
                            enableInterfaceBinding:(BOOL)enableInterfaceBinding
@@ -63,7 +63,7 @@
   self.dnsPreresolveHostnames = dnsPreresolveHostnames;
   self.enableDNSCache = enableDNSCache;
   self.enableHappyEyeballs = enableHappyEyeballs;
-  self.disableHttp3 = disableHttp3;
+  self.enableHttp3 = enableHttp3;
   self.enableGzip = enableGzip;
   self.enableBrotli = enableBrotli;
   self.enableInterfaceBinding = enableInterfaceBinding;
@@ -126,7 +126,7 @@
     [customFilters appendString:brotliFilterInsert];
   }
 
-  if (!self.disableHttp3) {
+  if (self.enableHttp3) {
     NSString *http3Insert =
         [[NSString alloc] initWithUTF8String:alternate_protocols_cache_filter_insert];
     [customFilters appendString:http3Insert];
