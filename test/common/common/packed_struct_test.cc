@@ -9,9 +9,18 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+
+class PackedStructTest : public testing::Test {
+public:
+  template <class T, uint8_t max_size, class ElementName>
+  size_t capacity(const PackedStruct<T, max_size, ElementName>& packed_struct) const {
+    return packed_struct.capacity();
+  }
+};
+
 namespace {
 
-TEST(PackedStruct, StringStruct) {
+TEST_F(PackedStructTest, StringStruct) {
   enum class RedirectStringElement { scheme_redirect, host_redirect, path_redirect };
   using RedirectStringsPackedStruct = PackedStruct<std::string, 3, RedirectStringElement>;
 
@@ -23,7 +32,7 @@ TEST(PackedStruct, StringStruct) {
   EXPECT_MEMORY_LE(memory_test.consumedBytes(), 2 * sizeof(std::string) + 16);
 
   EXPECT_EQ(redirect_strings.size(), 2);
-  EXPECT_EQ(redirect_strings.capacity(), 2);
+  EXPECT_EQ(capacity(redirect_strings), 2);
   EXPECT_EQ(redirect_strings.get(RedirectStringElement::scheme_redirect), "abc");
   EXPECT_EQ(redirect_strings.get(RedirectStringElement::path_redirect), "def");
   EXPECT_FALSE(redirect_strings.has(RedirectStringElement::host_redirect));
@@ -33,12 +42,12 @@ TEST(PackedStruct, StringStruct) {
   EXPECT_EQ(redirect_strings.get(RedirectStringElement::host_redirect), "abcd");
   EXPECT_MEMORY_LE(memory_test.consumedBytes(), 3 * sizeof(std::string) + 16);
   EXPECT_EQ(redirect_strings.size(), 3);
-  EXPECT_EQ(redirect_strings.capacity(), 3);
+  EXPECT_EQ(capacity(redirect_strings), 3);
 }
 
 // Test the move constructor and move assignment operators. Verify that no
 // memory is allocated on the heap because of these operations.
-TEST(PackedStruct, StringStructMove) {
+TEST_F(PackedStructTest, StringStructMove) {
   enum class RedirectStringElement { scheme_redirect, host_redirect, path_redirect };
   using RedirectStringsPackedStruct = PackedStruct<std::string, 3, RedirectStringElement>;
 
@@ -50,7 +59,7 @@ TEST(PackedStruct, StringStructMove) {
   EXPECT_MEMORY_LE(memory_test.consumedBytes(), 2 * sizeof(std::string) + 16);
 
   EXPECT_EQ(redirect_strings.size(), 2);
-  EXPECT_EQ(redirect_strings.capacity(), 2);
+  EXPECT_EQ(capacity(redirect_strings), 2);
   EXPECT_EQ(redirect_strings.get(RedirectStringElement::scheme_redirect), "abc");
   EXPECT_EQ(redirect_strings.get(RedirectStringElement::path_redirect), "def");
   EXPECT_FALSE(redirect_strings.has(RedirectStringElement::host_redirect));
@@ -61,7 +70,7 @@ TEST(PackedStruct, StringStructMove) {
   EXPECT_MEMORY_LE(memory_test.consumedBytes(), 2 * sizeof(std::string) + 16);
 
   EXPECT_EQ(redirect_strings2.size(), 2);
-  EXPECT_EQ(redirect_strings2.capacity(), 2);
+  EXPECT_EQ(capacity(redirect_strings2), 2);
   EXPECT_EQ(redirect_strings2.get(RedirectStringElement::scheme_redirect), "abc");
   EXPECT_EQ(redirect_strings2.get(RedirectStringElement::path_redirect), "def");
   EXPECT_FALSE(redirect_strings2.has(RedirectStringElement::host_redirect));
@@ -73,7 +82,7 @@ TEST(PackedStruct, StringStructMove) {
   EXPECT_MEMORY_LE(memory_test.consumedBytes(), 2 * sizeof(std::string) + 16);
 
   EXPECT_EQ(redirect_strings3.size(), 2);
-  EXPECT_EQ(redirect_strings3.capacity(), 2);
+  EXPECT_EQ(capacity(redirect_strings3), 2);
   EXPECT_EQ(redirect_strings3.get(RedirectStringElement::scheme_redirect), "abc");
   EXPECT_EQ(redirect_strings3.get(RedirectStringElement::path_redirect), "def");
   EXPECT_FALSE(redirect_strings3.has(RedirectStringElement::host_redirect));

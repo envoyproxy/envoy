@@ -81,14 +81,14 @@ public:
                            [](uint8_t a, uint8_t b) { return b < max_size ? ++a : a; });
   }
 
-  size_t capacity() const { return indices_[max_size]; }
-
   // Disable copying
   PackedStruct(const PackedStruct&) = delete;
 
   // Move constructor and assignment operator.
   PackedStruct(PackedStruct&& other) noexcept = default;
   PackedStruct& operator=(PackedStruct&& other) = default;
+
+  friend class PackedStructTest;
 
 private:
   // Accessors.
@@ -112,6 +112,8 @@ private:
                    absl::StrCat("idx (", idx, ") should be less than ", max_size));
     return indices_[idx] < max_size;
   }
+
+  size_t capacity() const { return indices_[max_size]; }
 
   void assign(size_t element_idx, T t) {
     RELEASE_ASSERT(element_idx < static_cast<size_t>(max_size),
