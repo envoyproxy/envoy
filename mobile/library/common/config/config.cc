@@ -137,7 +137,6 @@ R"(- &enable_drain_post_dns_refresh false
 - &enable_interface_binding false
 - &h2_connection_keepalive_idle_interval 100000s
 - &h2_connection_keepalive_timeout 10s
-- &h2_delay_keepalive_timeout false
 - &max_connections_per_host 7
 - &metadata {}
 - &stats_domain 127.0.0.1
