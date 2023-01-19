@@ -15,28 +15,6 @@ def _gen_gofmt_impl(ctx):
         inputs = sdk.tools,
     )
 
-    # cmd = "pwd > {out} && echo {gopath} >> {out}".format(
-    #     out = out.path,
-    #     gopath = gopath,
-    # )
-    # ctx.actions.run_shell(
-    #     inputs = sdk.libs + sdk.headers + sdk.tools + ctx.files.srcs + [sdk.go],
-    #     command = cmd,
-    #     outputs = [out],
-    # )
-
-    # cmd = "{go} tool compile -o {cout} -trimpath=$PWD {srcs}".format(
-    #     go = sdk.go.path,
-    #     cout = cout.path,
-    #     srcs = " ".join([f.path for f in ctx.files.srcs]),
-    # )
-    # ctx.actions.run_shell(
-    #     command = cmd,
-    #     inputs = sdk.libs + sdk.headers + sdk.tools + ctx.files.srcs + [sdk.go],
-    #     outputs = [cout],
-    #     env = {"GOROOT": sdk.root_file.dirname},  # NOTE(#2005): avoid realpath in sandbox
-    #     mnemonic = "GoToolchainBinaryCompile",
-    # )
     return [DefaultInfo(
         files = depset([out]),
     )]
