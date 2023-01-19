@@ -27,7 +27,6 @@ set -u
 ignore="$CLANG_FORMAT $BUILDIFIER_BIN $BUILDOZER_BIN"
 
 if [[ $# > 0 && "$1" == "-all" ]]; then
-  all=1
   echo "Checking all files in the repo...this may take a while."
   shift
   args="$@"
