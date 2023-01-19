@@ -222,9 +222,9 @@ void terminate_engine(envoy_engine_t engine, bool release);
  */
 envoy_status_t reset_connectivity_state(envoy_engine_t engine);
 
-envoy_status_t complete_proxy_resolution
- (envoy_engine_t engine, envoy_proxy_settings_list proxy_settings_list,
-  const envoy_proxy_resolver_proxy_resolution_result_handler *result_handler);
+envoy_status_t complete_proxy_resolution(
+    envoy_engine_t engine, envoy_proxy_settings_list proxy_settings_list,
+    const envoy_proxy_resolver_proxy_resolution_result_handler* result_handler);
 
 #ifdef __cplusplus
 } // functions

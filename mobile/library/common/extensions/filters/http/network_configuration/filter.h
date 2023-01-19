@@ -48,6 +48,8 @@ private:
   void setInfo(absl::string_view authority, Network::Address::InstanceConstSharedPtr address);
   bool
   onAddressResolved(const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info);
+  Http::FilterHeadersStatus resolveProxy(Http::RequestHeaderMap& request_headers,
+                                         envoy_proxy_resolver* resolver);
 
   // This is only present if there is an active proxy DNS lookup in progress.
   std::unique_ptr<Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryHandle>

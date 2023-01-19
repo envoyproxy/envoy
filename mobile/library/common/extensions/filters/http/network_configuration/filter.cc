@@ -4,10 +4,10 @@
 
 #include "source/common/network/filter_state_proxy_info.h"
 
-#include "library/common/data/utility.h"
-#include "library/common/types/c_types.h"
 #include "library/common/api/external.h"
+#include "library/common/data/utility.h"
 #include "library/common/http/header_utility.h"
+#include "library/common/types/c_types.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -58,9 +58,7 @@ bool NetworkConfigurationFilter::onAddressResolved(
   return false;
 }
 
-void proxy_resolution_completed(envoy_proxy_settings_list, const void *) {
-
-}
+void proxyResolutionCompleted(envoy_proxy_settings_list, const void*) {}
 
 Http::FilterHeadersStatus
 NetworkConfigurationFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, bool) {
@@ -71,20 +69,10 @@ NetworkConfigurationFilter::decodeHeaders(Http::RequestHeaderMap& request_header
     return Http::FilterHeadersStatus::Continue;
   }
 
-  const auto authorityHeader = request_headers.get(AuthorityHeaderName);
-  const auto proxy_resolver = static_cast<envoy_proxy_resolver *>(Api::External::retrieveApi("envoy_proxy_resolver"));
-
-  envoy_proxy_resolver_proxy_resolution_result_handler *result_handler = static_cast<envoy_proxy_resolver_proxy_resolution_result_handler*>(safe_malloc(sizeof(envoy_proxy_resolver_proxy_resolution_result_handler)));
-  result_handler->context = this;
-  result_handler->proxy_resolution_completed = proxy_resolution_completed;
-
-
-  envoy_proxy_settings_list *proxy_settings_list = static_cast<envoy_proxy_settings_list*>(safe_malloc(sizeof(envoy_proxy_settings_list)));
-
-  const auto host_data = Data::Utility::copyToBridgeData("https://api.lyft.com");
-  const auto proxy_resolution_result = proxy_resolver->resolve(host_data, proxy_settings_list, result_handler, proxy_resolver->context);
-  if (proxy_resolution_result == ENVOY_PROXY_RESOLUTION_RESULT_NONE) {
-    return Http::FilterHeadersStatus::Continue;
+  const auto proxy_resolver =
+      static_cast<envoy_proxy_resolver*>(Api::External::retrieveApi("envoy_proxy_resolver"));
+  if (proxy_resolver != nullptr) {
+    return resolveProxy(request_headers, proxy_resolver);
   }
 
   // If there is no proxy configured, continue.
@@ -142,6 +130,32 @@ NetworkConfigurationFilter::decodeHeaders(Http::RequestHeaderMap& request_header
                                      "Proxy configured but DNS resolution failed", nullptr,
                                      absl::nullopt, "no_dns_address_for_proxy");
   return Http::FilterHeadersStatus::StopIteration;
+}
+
+Http::FilterHeadersStatus
+NetworkConfigurationFilter::resolveProxy(Http::RequestHeaderMap& request_headers,
+                                         envoy_proxy_resolver* proxy_resolver) {
+  const auto authorityHeader = request_headers.get(AuthorityHeaderName);
+
+  envoy_proxy_resolver_proxy_resolution_result_handler* result_handler =
+      static_cast<envoy_proxy_resolver_proxy_resolution_result_handler*>(
+          safe_malloc(sizeof(envoy_proxy_resolver_proxy_resolution_result_handler)));
+  result_handler->context = this;
+  result_handler->proxy_resolution_completed = proxyResolutionCompleted;
+
+  envoy_proxy_settings_list proxy_settings_list;
+
+  const auto host_data = Data::Utility::copyToBridgeData("https://api.lyft.com");
+  const auto proxy_resolution_result = proxy_resolver->resolve(
+      host_data, &proxy_settings_list, result_handler, proxy_resolver->context);
+  switch (proxy_resolution_result) {
+  case ENVOY_PROXY_RESOLUTION_RESULT_NO_PROXY_CONFIGURED:
+    return Http::FilterHeadersStatus::Continue;
+  case ENVOY_PROXY_RESOLUTION_RESULT_COMPLETED:
+    return Http::FilterHeadersStatus::Continue;
+  case ENVOY_PROXY_RESOLUTION_RESULT_IN_PROGRESS:
+    return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
+  }
 }
 
 void NetworkConfigurationFilter::setInfo(absl::string_view authority,

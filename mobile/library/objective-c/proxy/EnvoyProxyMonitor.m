@@ -25,7 +25,6 @@ NSTimeInterval kProxySettingsRefreshRateSeconds = 7;
   return self;
 }
 
-
 - (void)start {
   if (self.isStarted) {
     return;
@@ -34,10 +33,10 @@ NSTimeInterval kProxySettingsRefreshRateSeconds = 7;
   self.isStarted = true;
   [self stop];
 
-  self.dispatchSource = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0,
-                                       dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0));
-  dispatch_source_set_timer(self.dispatchSource,
-                            dispatch_time(DISPATCH_TIME_NOW, 0),
+  self.dispatchSource =
+      dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0,
+                             dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0));
+  dispatch_source_set_timer(self.dispatchSource, dispatch_time(DISPATCH_TIME_NOW, 0),
                             (int64_t)(kProxySettingsRefreshRateSeconds * NSEC_PER_SEC), 0);
 
   __block BOOL isInitialUpdate = YES;
@@ -78,28 +77,33 @@ NSTimeInterval kProxySettingsRefreshRateSeconds = 7;
 
 #pragma mark - Private
 
-- (void)pollProxySettings:(BOOL)force {
-  NSDictionary *settings = (NSDictionary *) CFBridgingRelease(CFNetworkCopySystemProxySettings());
+- (void)pollProxySettings:(BOOL)forceUpdate {
+  NSDictionary *settings = (NSDictionary *)CFBridgingRelease(CFNetworkCopySystemProxySettings());
   BOOL isHTTPProxyEnabled = [settings[(NSString *)kCFNetworkProxiesHTTPEnable] intValue] > 0;
-  BOOL isAutoConfigProxyEnabled = [settings[(NSString *)kCFNetworkProxiesProxyAutoConfigEnable] intValue] > 0;
+  BOOL isAutoConfigProxyEnabled =
+      [settings[(NSString *)kCFNetworkProxiesProxyAutoConfigEnable] intValue] > 0;
 
   if (isHTTPProxyEnabled) {
     NSString *host = settings[(NSString *)kCFNetworkProxiesHTTPProxy];
     NSUInteger port = [settings[(NSString *)kCFNetworkProxiesHTTPPort] unsignedIntValue];
-    EnvoyProxySystemSettings *settings = [[EnvoyProxySystemSettings alloc] initWithHost:host port:port];
-    [self updateProxySettings:settings force:force];
+    EnvoyProxySystemSettings *settings = [[EnvoyProxySystemSettings alloc] initWithHost:host
+                                                                                   port:port];
+    [self updateProxySettings:settings force:forceUpdate];
+
   } else if (isAutoConfigProxyEnabled) {
     NSString *urlString = settings[(NSString *)kCFNetworkProxiesProxyAutoConfigURLString];
     NSURL *url = [NSURL URLWithString:urlString];
     if (url) {
       // TODO: is ignoring the string which are invalid URLs a right thing to do in here?
-      [self updateProxySettings:nil force:force];
+      [self updateProxySettings:nil force:forceUpdate];
     } else {
-      EnvoyProxySystemSettings *settings = [[EnvoyProxySystemSettings alloc] initWithPACFileURL:url];
-      [self updateProxySettings:settings force:force];
+      EnvoyProxySystemSettings *settings =
+          [[EnvoyProxySystemSettings alloc] initWithPACFileURL:url];
+      [self updateProxySettings:settings force:forceUpdate];
     }
+
   } else {
-    [self updateProxySettings:nil force:force];
+    [self updateProxySettings:nil force:forceUpdate];
   }
 }
 

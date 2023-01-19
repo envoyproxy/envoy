@@ -2,6 +2,7 @@
 
 #import "library/common/types/c_types.h"
 #import "library/objective-c/EnvoyAliases.h"
+#import "library/objective-c/proxy/EnvoyProxySettings.h"
 
 static inline envoy_data toNativeData(NSData *data) {
   if (data == nil || [data isEqual:[NSNull null]]) {
@@ -158,4 +159,25 @@ static inline EnvoyHeaders *to_ios_headers(envoy_headers headers) {
   // The C envoy_headers struct can be released now because the headers have been copied.
   release_envoy_headers(headers);
   return headerDict;
+}
+
+static inline envoy_proxy_settings_list
+toNativeEnvoyProxySettingsList(NSArray<EnvoyProxySettings *> *proxySettingsList) {
+  envoy_proxy_settings_list list;
+  list.length = (uint64_t)proxySettingsList.count;
+  list.proxy_settings = safe_malloc(list.length);
+
+  for (NSUInteger i = 0; i < proxySettingsList.count; i++) {
+    EnvoyProxySettings *current = proxySettingsList[i];
+    envoy_proxy_type type =
+        current.isDirect ? ENVOY_PROXY_TYPE_DIRECT : ENVOY_PROXY_TYPE_HTTPS_OR_HTTP;
+
+    envoy_proxy_settings proxy_settings = {
+        .host_data = toManagedNativeString(proxySettingsList[i].host),
+        .port = proxySettingsList[i].port,
+        .type = type,
+    };
+  }
+
+  return list;
 }

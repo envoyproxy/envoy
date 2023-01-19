@@ -37,8 +37,7 @@
   }
 
   EnvoyProxySystemSettings *rhs = (EnvoyProxySystemSettings *)object;
-  return [self.host isEqual:rhs.host]
-    && self.port == rhs.port;
+  return [self.host isEqual:rhs.host] && self.port == rhs.port;
 }
 
 @end

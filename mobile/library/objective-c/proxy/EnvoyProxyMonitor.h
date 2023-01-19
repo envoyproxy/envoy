@@ -9,10 +9,12 @@ typedef void (^EnvoyProxyMonitorUpdate)(EnvoyProxySystemSettings *_Nullable);
 // Monitors system proxy settings changes.
 @interface EnvoyProxyMonitor : NSObject
 
-// Initializes a new instance of the receiver. Calls a provided closure every time it detects a change of
-// system proxy settings.
+// Initializes a new instance of the receiver. Calls a provided closure every time it detects a
+// change of system proxy settings.
 //
-// @param proxySettingsDidChange The closure to call every time system proxy settings change.
+// @param proxySettingsDidChange The closure to call every time system proxy settings change. The
+// closure is
+//                               called on a non-main thread.
 - (instancetype)initWithProxySettingsDidChange:(EnvoyProxyMonitorUpdate)proxySettingsDidChange;
 
 // Starts the monitoring of system proxy settings.

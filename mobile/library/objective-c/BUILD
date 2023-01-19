@@ -64,6 +64,7 @@ objc_library(
     deps = [
         ":envoy_aliases_lib",
         "//library/common/types:c_types_lib",
+        "//library/objective-c/proxy:envoy_proxy_lib",
     ],
 )
 
