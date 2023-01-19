@@ -100,20 +100,20 @@ message FileSystemHttpCacheConfig {
   // If unset, there will be no eviction passes except those triggered by cache limits.
   //
   // [#not-implemented-hide:]
-  google.protobuf.Duration max_eviction_frequency = 8;
+  google.protobuf.Duration max_eviction_period = 8;
 
   // The shortest amount of time between cache eviction passes. This can be used to reduce
   // eviction churn, if your cache max size can be flexible. If a cache eviction pass already
-  // occurred more recently than this frequency when another would be triggered, that new
+  // occurred more recently than this period when another would be triggered, that new
   // pass is cancelled.
   //
   // This means the cache can potentially grow beyond ``max_cache_size_bytes`` by as much as
   // can be written within the duration specified.
   //
-  // Generally you would use *either* ``min_eviction_frequency`` *or* ``evict_fraction`` to
-  // reduce churn. Both together will work but since they're both aiming for the same thing,
+  // Generally you would use *either* ``min_eviction_period`` *or* ``evict_fraction`` to
+  // reduce churn. Both together will work but since they're both aiming for the same goal,
   // it's simpler not to.
   //
   // [#not-implemented-hide:]
-  google.protobuf.Duration min_eviction_frequency = 9;
+  google.protobuf.Duration min_eviction_period = 9;
 }
