@@ -857,6 +857,7 @@ TEST_P(TcpTunnelingIntegrationTest, BasicHeaderEvaluationTunnelingConfig) {
   // Verify response header value object is not present
   EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr("RESPONSE_HEADERS=-"));
   EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr("RESPONSE_TRAILERS=-"));
+}
 
 // Verify that the header evaluator is updated without lifetime issue.
 TEST_P(TcpTunnelingIntegrationTest, HeaderEvaluatorConfigUpdate) {
