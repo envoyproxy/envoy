@@ -52,7 +52,8 @@ namespace Envoy {
  */
 template <class T, uint8_t max_size, class ElementName> class PackedStruct {
 public:
-  PackedStruct(size_t a_capacity = 0) : data_(a_capacity > 0 ? new T[a_capacity] : nullptr) {
+  PackedStruct(size_t a_capacity = 0)
+      : data_(a_capacity > 0 ? std::make_unique<T[]>(a_capacity) : nullptr) {
     static_assert(std::is_enum_v<ElementName>);
     static_assert(max_size > 0);
 
@@ -69,9 +70,7 @@ public:
     return (data_.get())[indices_[static_cast<std::underlying_type_t<ElementName>>(element_name)]];
   }
   template <ElementName element_name> const T& get() const {
-    sizeCheck<element_name>();
-    hasCheck<element_name>();
-    return (data_.get())[indices_[static_cast<std::underlying_type_t<ElementName>>(element_name)]];
+    return const_cast<const T&>(get<element_name>());
   }
 
   // Check to see if element is populated.
@@ -89,7 +88,7 @@ public:
     auto const current_size = size();
     // If we're at capacity and we don't have a slot for element_idx, increase capacity by 1.
     if (!has<element_name>() && current_size == capacity()) {
-      std::unique_ptr<T[]> tmp(new T[++indices_[max_size]]);
+      auto tmp = std::make_unique<T[]>(++indices_[max_size]);
       std::move(data_.get(), std::next(data_.get(), current_size), tmp.get());
       data_ = std::move(tmp);
     }
