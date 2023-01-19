@@ -90,8 +90,8 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::ext_authz::ExtAuthzT
   FilterConfigSharedPtr config;
 
   try {
-    config = std::make_shared<FilterConfig>(proto_config, stats_store, mocks.runtime_, http_context,
-                                            "ext_authz_prefix", bootstrap);
+    config = std::make_shared<FilterConfig>(proto_config, *stats_store.rootScope(), mocks.runtime_,
+                                            http_context, "ext_authz_prefix", bootstrap);
   } catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException during filter config validation: {}", e.what());
     return;

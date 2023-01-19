@@ -56,8 +56,8 @@ public:
       EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5000), _));
     }
 
-    driver_ = std::make_unique<Driver>(zipkin_config, cm_, stats_, tls_, runtime_, local_info_,
-                                       random_, time_source_);
+    driver_ = std::make_unique<Driver>(zipkin_config, cm_, *stats_.rootScope(), tls_, runtime_,
+                                       local_info_, random_, time_source_);
   }
 
   void setupValidDriverWithHostname(const std::string& version, const std::string& hostname) {

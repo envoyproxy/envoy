@@ -1216,6 +1216,7 @@ message LoadBalancingPolicy {
 
     reserved "config", "name", "typed_config";
 
+    // [#extension-category: envoy.load_balancing_policies]
     core.v3.TypedExtensionConfig typed_extension_config = 4;
   }
 

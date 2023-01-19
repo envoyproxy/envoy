@@ -142,7 +142,7 @@ public:
   Init::Manager& initManager() override;
   const LocalInfo::LocalInfo& localInfo() const override;
   Envoy::Runtime::Loader& runtime() override;
-  Stats::Scope& serverScope() override { return server_.stats(); }
+  Stats::Scope& serverScope() override { return *server_.stats().rootScope(); }
   Stats::Scope& scope() override;
   Singleton::Manager& singletonManager() override;
   OverloadManager& overloadManager() override;

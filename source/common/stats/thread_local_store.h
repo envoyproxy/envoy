@@ -192,8 +192,10 @@ public:
   void forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const override;
   void forEachSinkedGauge(SizeFn f_size, StatFn<Gauge> f_stat) const override;
   void forEachSinkedTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const override;
+  void forEachSinkedHistogram(SizeFn f_size, StatFn<ParentHistogram> f_stat) const override;
 
   void setSinkPredicates(std::unique_ptr<SinkPredicates>&& sink_predicates) override;
+  OptRef<SinkPredicates> sinkPredicates() override { return sink_predicates_; }
 
   /**
    * @return a thread synchronizer object used for controlling thread behavior in tests.
@@ -519,6 +521,7 @@ private:
 
   mutable Thread::MutexBasicLockable hist_mutex_;
   StatSet<ParentHistogramImpl> histogram_set_ ABSL_GUARDED_BY(hist_mutex_);
+  StatSet<ParentHistogramImpl> sinked_histograms_ ABSL_GUARDED_BY(hist_mutex_);
 
   // Retain storage for deleted stats; these are no longer in maps because the
   // matcher-pattern was established after they were created. Since the stats

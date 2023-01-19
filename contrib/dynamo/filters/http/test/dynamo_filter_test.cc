@@ -32,7 +32,7 @@ public:
         .WillByDefault(Return(enabled));
     EXPECT_CALL(loader_.snapshot_, featureEnabled("dynamodb.filter_enabled", 100));
 
-    auto stats = std::make_shared<DynamoStats>(stats_, "prefix.");
+    auto stats = std::make_shared<DynamoStats>(*stats_.rootScope(), "prefix.");
     filter_ = std::make_unique<DynamoFilter>(loader_, stats,
                                              decoder_callbacks_.dispatcher().timeSource());
 

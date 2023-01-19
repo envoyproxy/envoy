@@ -36,7 +36,7 @@ public:
   Thread::ThreadFactory& threadFactory() override { return thread_factory_; }
   Filesystem::Instance& fileSystem() override { return file_system_; }
   TimeSource& timeSource() override { return time_system_; }
-  Stats::Scope& rootScope() override { return store_; }
+  Stats::Scope& rootScope() override { return *store_.rootScope(); }
   Random::RandomGenerator& randomGenerator() override { return random_generator_; }
   Stats::CustomStatNamespaces& customStatNamespaces() override { return custom_stat_namespaces_; }
   const envoy::config::bootstrap::v3::Bootstrap& bootstrap() const override { return bootstrap_; }
