@@ -152,16 +152,8 @@ public:
   virtual bool iterate(const IterateFn<Histogram>& fn) const PURE;
   virtual bool iterate(const IterateFn<TextReadout>& fn) const PURE;
 
-  // TODO(#24007): The cast operator is available temporarily to bound the size
-  // of https://github.com/envoyproxy/envoy/pull/23851, which detaches the
-  // inheritance of Scope as a parent of Store. There is semantic complexity to
-  // that PR, so it's going to be easier review if it's as small as possible.
-  //
-  // A series of follow-up PRs is required to remove the functions below, which
-  // will require a large number of files to be trivially changed, by explicitly
-  // accessing the rootScope() to call these methods. The first in the series is
-  // https://github.com/envoyproxy/envoy/pull/24567 which just takes care of
-  // test/common/...
+  // TODO(#24007): Remove this operator overload: it is not needed anymore. Once
+  // #24567, #24843, and #24861 have landed we can remove this API.
   operator Scope&() { return *rootScope(); }
 
   // Delegate some methods to the root scope; these are exposed to make it more
@@ -181,7 +173,7 @@ public:
   }
 
   /**
-   * @returns a scope of the given name.
+   * @return a scope of the given name.
    */
   ScopeSharedPtr createScope(const std::string& name) { return rootScope()->createScope(name); }
 };

@@ -68,6 +68,8 @@ generate_info_header() {
         echo "constexpr char ${prefix}_CERT_1_HASH[] = \"$(openssl x509 -in "${1}cert.pem" -outform DER | openssl dgst -sha1 | cut -d" " -f2)\";"
         echo "constexpr char ${prefix}_CERT_SPKI[] = \"$(openssl x509 -in "${1}cert.pem" -noout -pubkey | openssl pkey -pubin -outform DER | openssl dgst -sha256 -binary | openssl enc -base64)\";"
         echo "constexpr char ${prefix}_CERT_SERIAL[] = \"$(openssl x509 -in "${1}cert.pem" -noout -serial | cut -d"=" -f2 | awk '{print tolower($0)}')\";"
+        echo "constexpr char ${prefix}_CERT_NOT_BEFORE[] = \"$(openssl x509 -in "${1}cert.pem" -noout -startdate | cut -d"=" -f2)\";"
+        echo "constexpr char ${prefix}_CERT_NOT_AFTER[] = \"$(openssl x509 -in "${1}cert.pem" -noout -enddate | cut -d"=" -f2)\";"
     } > "${1}cert_info.h"
 }
 
@@ -85,6 +87,11 @@ cat intermediate_cacert.pem intermediate_ca_2cert.pem > intermediate_partial_ca_
 generate_rsa_key server ca
 generate_x509_cert server ca
 generate_ocsp_response server ca
+generate_info_header server
+# Generate RSA cert for the server with different SAN
+generate_rsa_key server2 ca
+generate_x509_cert server2 ca
+generate_info_header server2
 # Generate ECDSA cert for the server.
 cp -f servercert.cfg server_ecdsacert.cfg
 generate_ecdsa_key server_ecdsa ca

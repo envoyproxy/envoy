@@ -4,6 +4,7 @@
 #include "envoy/network/address.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/resolver.h"
+#include "envoy/registry/registry.h"
 
 #include "source/common/network/address_impl.h"
 
@@ -25,6 +26,9 @@ resolveProtoAddress(const envoy::config::core::v3::Address& address);
  */
 Address::InstanceConstSharedPtr
 resolveProtoSocketAddress(const envoy::config::core::v3::SocketAddress& address);
+
+DECLARE_FACTORY(IpResolver);
+
 } // namespace Address
 } // namespace Network
 } // namespace Envoy

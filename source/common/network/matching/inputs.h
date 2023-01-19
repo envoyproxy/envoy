@@ -4,6 +4,7 @@
 #include "envoy/extensions/matching/common_inputs/network/v3/network_inputs.pb.validate.h"
 #include "envoy/matcher/matcher.h"
 #include "envoy/network/filter.h"
+#include "envoy/registry/registry.h"
 
 #include "source/common/network/utility.h"
 
@@ -58,6 +59,10 @@ public:
                     MatchingDataType>("destination_ip") {}
 };
 
+DECLARE_FACTORY(DestinationIPInputFactory);
+DECLARE_FACTORY(UdpDestinationIPInputFactory);
+DECLARE_FACTORY(HttpDestinationIPInputFactory);
+
 template <class MatchingDataType>
 class DestinationPortInput : public Matcher::DataInput<MatchingDataType> {
 public:
@@ -84,6 +89,10 @@ public:
                     MatchingDataType>("destination_port") {}
 };
 
+DECLARE_FACTORY(DestinationPortInputFactory);
+DECLARE_FACTORY(UdpDestinationPortInputFactory);
+DECLARE_FACTORY(HttpDestinationPortInputFactory);
+
 template <class MatchingDataType>
 class SourceIPInput : public Matcher::DataInput<MatchingDataType> {
 public:
@@ -109,6 +118,10 @@ public:
                     MatchingDataType>("source_ip") {}
 };
 
+DECLARE_FACTORY(SourceIPInputFactory);
+DECLARE_FACTORY(UdpSourceIPInputFactory);
+DECLARE_FACTORY(HttpSourceIPInputFactory);
+
 template <class MatchingDataType>
 class SourcePortInput : public Matcher::DataInput<MatchingDataType> {
 public:
@@ -133,6 +146,10 @@ public:
                     envoy::extensions::matching::common_inputs::network::v3::SourcePortInput,
                     MatchingDataType>("source_port") {}
 };
+
+DECLARE_FACTORY(SourcePortInputFactory);
+DECLARE_FACTORY(UdpSourcePortInputFactory);
+DECLARE_FACTORY(HttpSourcePortInputFactory);
 
 template <class MatchingDataType>
 class DirectSourceIPInput : public Matcher::DataInput<MatchingDataType> {
@@ -160,6 +177,9 @@ public:
                     MatchingDataType>("direct_source_ip") {}
 };
 
+DECLARE_FACTORY(DirectSourceIPInputFactory);
+DECLARE_FACTORY(HttpDirectSourceIPInputFactory);
+
 template <class MatchingDataType>
 class SourceTypeInput : public Matcher::DataInput<MatchingDataType> {
 public:
@@ -184,6 +204,9 @@ public:
                     envoy::extensions::matching::common_inputs::network::v3::SourceTypeInput,
                     MatchingDataType>("source_type") {}
 };
+
+DECLARE_FACTORY(SourceTypeInputFactory);
+DECLARE_FACTORY(HttpSourceTypeInputFactory);
 
 template <class MatchingDataType>
 class ServerNameInput : public Matcher::DataInput<MatchingDataType> {
@@ -210,6 +233,9 @@ public:
                     MatchingDataType>("server_name") {}
 };
 
+DECLARE_FACTORY(ServerNameInputFactory);
+DECLARE_FACTORY(HttpServerNameInputFactory);
+
 class TransportProtocolInput : public Matcher::DataInput<MatchingData> {
 public:
   Matcher::DataInputGetResult get(const MatchingData& data) const override;
@@ -224,6 +250,8 @@ public:
   TransportProtocolInputFactory() : BaseFactory("transport_protocol") {}
 };
 
+DECLARE_FACTORY(TransportProtocolInputFactory);
+
 class ApplicationProtocolInput : public Matcher::DataInput<MatchingData> {
 public:
   Matcher::DataInputGetResult get(const MatchingData& data) const override;
@@ -237,6 +265,8 @@ class ApplicationProtocolInputFactory
 public:
   ApplicationProtocolInputFactory() : BaseFactory("application_protocol") {}
 };
+
+DECLARE_FACTORY(ApplicationProtocolInputFactory);
 
 } // namespace Matching
 } // namespace Network

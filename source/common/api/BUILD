@@ -23,10 +23,15 @@ envoy_cc_library(
     ],
 )
 
+# TODO(abeyad): remove kick start ci
 envoy_cc_library(
     name = "os_sys_calls_lib",
     srcs = select({
         "//bazel:linux": [
+            "posix/os_sys_calls_impl.cc",
+            "posix/os_sys_calls_impl_linux.cc",
+        ],
+        "//bazel:android": [
             "posix/os_sys_calls_impl.cc",
             "posix/os_sys_calls_impl_linux.cc",
         ],
@@ -42,6 +47,10 @@ envoy_cc_library(
     }) + envoy_select_hot_restart(["posix/os_sys_calls_impl_hot_restart.cc"]),
     hdrs = select({
         "//bazel:linux": [
+            "posix/os_sys_calls_impl.h",
+            "posix/os_sys_calls_impl_linux.h",
+        ],
+        "//bazel:android": [
             "posix/os_sys_calls_impl.h",
             "posix/os_sys_calls_impl_linux.h",
         ],

@@ -1,5 +1,6 @@
 #include "library/common/engine.h"
 
+#include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/lock_guard.h"
 
 #include "library/common/bridge/utility.h"
