@@ -34,5 +34,8 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: attributes
+  change: |
+    added :ref:`attributes <arch_overview_attributes>` for looking up xDS configuration information.
 
 deprecated:
