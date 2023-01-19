@@ -175,10 +175,10 @@ void EnvoyQuicClientConnection::onPathValidationSuccess(
 }
 
 void EnvoyQuicClientConnection::onPathValidationFailure(
-    std::unique_ptr<quic::QuicPathValidationContext> /*context*/) {
+    std::unique_ptr<quic::QuicPathValidationContext> context) {
   // Note that the probing socket and probing writer will be deleted once context goes out of
   // scope.
-  OnPathValidationFailureAtClient(/*is_multi_port=*/false);
+  OnPathValidationFailureAtClient(/*is_multi_port=*/false, *context);
 }
 
 void EnvoyQuicClientConnection::onFileEvent(uint32_t events,

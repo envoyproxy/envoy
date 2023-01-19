@@ -19,5 +19,6 @@ envoy_extension_cc_test(
         "@envoy//source/common/upstream:retry_factory_lib",
         "@envoy//test/mocks/server:factory_context_mocks",
         "@envoy//test/mocks/stream_info:stream_info_mocks",
+        "@envoy_build_config//:extension_registry",
     ],
 )
