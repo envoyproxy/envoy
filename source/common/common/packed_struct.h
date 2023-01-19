@@ -61,17 +61,41 @@ public:
     indices_[max_size] = a_capacity;
   }
 
-  T& get(ElementName element_name) {
-    return (*this)[static_cast<std::underlying_type_t<ElementName>>(element_name)];
+  // Accessors.
+  template <ElementName element_name> T& get() {
+    sizeCheck<element_name>();
+    hasCheck<element_name>();
+    return (data_.get())[indices_[static_cast<std::underlying_type_t<ElementName>>(element_name)]];
   }
-  const T& get(ElementName element_name) const {
-    return (*this)[static_cast<std::underlying_type_t<ElementName>>(element_name)];
+  template <ElementName element_name> const T& get() const {
+    sizeCheck<element_name>();
+    hasCheck<element_name>();
+    return (data_.get())[indices_[static_cast<std::underlying_type_t<ElementName>>(element_name)]];
   }
-  bool has(ElementName element_name) const {
-    return has(static_cast<std::underlying_type_t<ElementName>>(element_name));
+
+  // Check to see if element is populated.
+  template <ElementName element_name> bool has() const {
+    sizeCheck<element_name>();
+    return indices_[static_cast<std::underlying_type_t<ElementName>>(element_name)] < max_size;
   }
-  void set(ElementName element_name, T t) {
-    return assign(static_cast<std::underlying_type_t<ElementName>>(element_name), t);
+
+  // Set element.
+  template <ElementName element_name> void set(T t) {
+    sizeCheck<element_name>();
+
+    static constexpr auto element_idx =
+        static_cast<std::underlying_type_t<ElementName>>(element_name);
+    auto const current_size = size();
+    // If we're at capacity and we don't have a slot for element_idx, increase capacity by 1.
+    if (!has<element_name>() && current_size == capacity()) {
+      std::unique_ptr<T[]> tmp(new T[++indices_[max_size]]);
+      std::move(data_.get(), std::next(data_.get(), current_size), tmp.get());
+      data_ = std::move(tmp);
+    }
+    if (!has<element_name>()) {
+      indices_[element_idx] = current_size;
+    }
+    data_.get()[indices_[element_idx]] = t;
   }
 
   // Number of non-empty elements in the struct. Note that this can be less than
@@ -91,44 +115,16 @@ public:
   friend class PackedStructTest;
 
 private:
-  // Accessors.
-  T& operator[](size_t idx) {
-    RELEASE_ASSERT(idx < static_cast<size_t>(max_size),
-                   absl::StrCat("idx (", idx, ") should be less than ", max_size));
-    RELEASE_ASSERT(indices_[idx] < max_size,
-                   absl::StrCat("Element corresponding to index ", idx, " is not assigned"));
-    return (data_.get())[indices_[idx]];
-  }
-  const T& operator[](size_t idx) const {
-    RELEASE_ASSERT(idx < static_cast<size_t>(max_size),
-                   absl::StrCat("idx (", idx, ") should be less than ", max_size));
-    RELEASE_ASSERT(indices_[idx] < max_size,
-                   absl::StrCat("Element corresponding to index ", idx, " is not assigned"));
-    return (data_.get())[indices_[idx]];
-  }
-
-  bool has(size_t idx) const {
-    RELEASE_ASSERT(idx < static_cast<size_t>(max_size),
-                   absl::StrCat("idx (", idx, ") should be less than ", max_size));
-    return indices_[idx] < max_size;
-  }
-
   size_t capacity() const { return indices_[max_size]; }
 
-  void assign(size_t element_idx, T t) {
-    RELEASE_ASSERT(element_idx < static_cast<size_t>(max_size),
-                   absl::StrCat("element_idx (", element_idx, ") should be less than ", max_size));
-    auto const current_size = size();
-    // If we're at capacity and we don't have a slot for element_idx, increase capacity by 1.
-    if (!has(element_idx) && current_size == capacity()) {
-      std::unique_ptr<T[]> tmp(new T[++indices_[max_size]]);
-      std::move(data_.get(), std::next(data_.get(), current_size), tmp.get());
-      data_ = std::move(tmp);
-    }
-    if (!has(element_idx)) {
-      indices_[element_idx] = current_size;
-    }
-    data_.get()[indices_[element_idx]] = t;
+  template <ElementName element_name> static constexpr void sizeCheck() {
+    static_assert(static_cast<size_t>(element_name) < static_cast<size_t>(max_size));
+  }
+  template <ElementName element_name> void hasCheck() const {
+    ENVOY_BUG(has<element_name>(),
+              absl::StrCat("Element corresponding to index ",
+                           static_cast<std::underlying_type_t<ElementName>>(element_name),
+                           " is not assigned"));
   }
 
   // Storage for elements.

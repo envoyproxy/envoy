@@ -27,19 +27,19 @@ TEST_F(PackedStructTest, StringStruct) {
   Stats::TestUtil::MemoryTest memory_test;
   // Initialize capacity to 2.
   RedirectStringsPackedStruct redirect_strings(2);
-  redirect_strings.set(RedirectStringElement::scheme_redirect, "abc");
-  redirect_strings.set(RedirectStringElement::path_redirect, "def");
+  redirect_strings.set<RedirectStringElement::scheme_redirect>("abc");
+  redirect_strings.set<RedirectStringElement::path_redirect>("def");
   EXPECT_MEMORY_LE(memory_test.consumedBytes(), 2 * sizeof(std::string) + 16);
 
   EXPECT_EQ(redirect_strings.size(), 2);
   EXPECT_EQ(capacity(redirect_strings), 2);
-  EXPECT_EQ(redirect_strings.get(RedirectStringElement::scheme_redirect), "abc");
-  EXPECT_EQ(redirect_strings.get(RedirectStringElement::path_redirect), "def");
-  EXPECT_FALSE(redirect_strings.has(RedirectStringElement::host_redirect));
+  EXPECT_EQ(redirect_strings.get<RedirectStringElement::scheme_redirect>(), "abc");
+  EXPECT_EQ(redirect_strings.get<RedirectStringElement::path_redirect>(), "def");
+  EXPECT_FALSE(redirect_strings.has<RedirectStringElement::host_redirect>());
 
   // Add a third element.
-  redirect_strings.set(RedirectStringElement::host_redirect, "abcd");
-  EXPECT_EQ(redirect_strings.get(RedirectStringElement::host_redirect), "abcd");
+  redirect_strings.set<RedirectStringElement::host_redirect>("abcd");
+  EXPECT_EQ(redirect_strings.get<RedirectStringElement::host_redirect>(), "abcd");
   EXPECT_MEMORY_LE(memory_test.consumedBytes(), 3 * sizeof(std::string) + 16);
   EXPECT_EQ(redirect_strings.size(), 3);
   EXPECT_EQ(capacity(redirect_strings), 3);
@@ -54,15 +54,15 @@ TEST_F(PackedStructTest, StringStructMove) {
   Stats::TestUtil::MemoryTest memory_test;
   // Initialize capacity to 2.
   RedirectStringsPackedStruct redirect_strings(2);
-  redirect_strings.set(RedirectStringElement::scheme_redirect, "abc");
-  redirect_strings.set(RedirectStringElement::path_redirect, "def");
+  redirect_strings.set<RedirectStringElement::scheme_redirect>("abc");
+  redirect_strings.set<RedirectStringElement::path_redirect>("def");
   EXPECT_MEMORY_LE(memory_test.consumedBytes(), 2 * sizeof(std::string) + 16);
 
   EXPECT_EQ(redirect_strings.size(), 2);
   EXPECT_EQ(capacity(redirect_strings), 2);
-  EXPECT_EQ(redirect_strings.get(RedirectStringElement::scheme_redirect), "abc");
-  EXPECT_EQ(redirect_strings.get(RedirectStringElement::path_redirect), "def");
-  EXPECT_FALSE(redirect_strings.has(RedirectStringElement::host_redirect));
+  EXPECT_EQ(redirect_strings.get<RedirectStringElement::scheme_redirect>(), "abc");
+  EXPECT_EQ(redirect_strings.get<RedirectStringElement::path_redirect>(), "def");
+  EXPECT_FALSE(redirect_strings.has<RedirectStringElement::host_redirect>());
 
   // Invoke move constructor.
   RedirectStringsPackedStruct redirect_strings2(move(redirect_strings));
@@ -71,9 +71,9 @@ TEST_F(PackedStructTest, StringStructMove) {
 
   EXPECT_EQ(redirect_strings2.size(), 2);
   EXPECT_EQ(capacity(redirect_strings2), 2);
-  EXPECT_EQ(redirect_strings2.get(RedirectStringElement::scheme_redirect), "abc");
-  EXPECT_EQ(redirect_strings2.get(RedirectStringElement::path_redirect), "def");
-  EXPECT_FALSE(redirect_strings2.has(RedirectStringElement::host_redirect));
+  EXPECT_EQ(redirect_strings2.get<RedirectStringElement::scheme_redirect>(), "abc");
+  EXPECT_EQ(redirect_strings2.get<RedirectStringElement::path_redirect>(), "def");
+  EXPECT_FALSE(redirect_strings2.has<RedirectStringElement::host_redirect>());
 
   // Invoke move assignment.
   RedirectStringsPackedStruct redirect_strings3(0);
@@ -83,9 +83,9 @@ TEST_F(PackedStructTest, StringStructMove) {
 
   EXPECT_EQ(redirect_strings3.size(), 2);
   EXPECT_EQ(capacity(redirect_strings3), 2);
-  EXPECT_EQ(redirect_strings3.get(RedirectStringElement::scheme_redirect), "abc");
-  EXPECT_EQ(redirect_strings3.get(RedirectStringElement::path_redirect), "def");
-  EXPECT_FALSE(redirect_strings3.has(RedirectStringElement::host_redirect));
+  EXPECT_EQ(redirect_strings3.get<RedirectStringElement::scheme_redirect>(), "abc");
+  EXPECT_EQ(redirect_strings3.get<RedirectStringElement::path_redirect>(), "def");
+  EXPECT_FALSE(redirect_strings3.has<RedirectStringElement::host_redirect>());
 }
 
 } // namespace
