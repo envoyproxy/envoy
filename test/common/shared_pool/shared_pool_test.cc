@@ -174,5 +174,47 @@ TEST_F(SharedPoolTest, RaceCondtionForGetObjectWithObjectDeleter) {
   deferredDeleteSharedPoolOnMainThread(pool);
 }
 
+TEST_F(SharedPoolTest, HashCollision) {
+  Event::MockDispatcher dispatcher;
+  struct MyHash {
+    constexpr size_t operator()(int x) const { return x < 10 ? 0 : 1; }
+  };
+
+  auto pool = std::make_shared<ObjectSharedPool<int, MyHash>>(dispatcher);
+  {
+    // Verify that the hash function works as intended.
+    static_assert(MyHash{}(4) == 0);
+    static_assert(MyHash{}(3) == 0);
+    static_assert(MyHash{}(15) == 1);
+    static_assert(MyHash{}(12) == 1);
+
+    // Instantiate objects that hash to the same value.
+    auto o = pool->getObject(4);
+    auto o1 = pool->getObject(3);
+
+    // Verify that there are separate entries in the pool for objects with the
+    // same hash value.
+    ASSERT_EQ(2, pool->poolSize());
+
+    ASSERT_EQ(*o, 4);
+    ASSERT_EQ(*o1, 3);
+
+    auto o2 = pool->getObject(15);
+    auto o3 = pool->getObject(12);
+    auto o4 = pool->getObject(3);
+    auto o5 = pool->getObject(1);
+
+    ASSERT_EQ(o4.get(), o1.get());
+    ASSERT_EQ(*o2, 15);
+    ASSERT_EQ(*o3, 12);
+    ASSERT_EQ(*o4, 3);
+    ASSERT_EQ(*o5, 1);
+
+    ASSERT_EQ(5, pool->poolSize());
+  }
+
+  ASSERT_EQ(0, pool->poolSize());
+}
+
 } // namespace SharedPool
 } // namespace Envoy

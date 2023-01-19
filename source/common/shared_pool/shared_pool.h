@@ -43,8 +43,8 @@ public:
 
   void deleteObject(const size_t hash_key) {
     if (std::this_thread::get_id() == thread_id_) {
-      // Erase all elements with hash_key as the hash value that have use_count
-      // as 0
+      // Erase all elements with the input hash key that have use count
+      // as 0.
       auto object_range = object_pool_.equal_range(hash_key);
       auto it = object_range.first;
       while (it != object_range.second) {
@@ -71,7 +71,7 @@ public:
     auto object_range = object_pool_.equal_range(hashed_value);
     for (auto it = object_range.first; it != object_range.second; ++it) {
       auto lock_object = it->second.lock();
-      if (lock_object && EqualFunc{}(obj, *lock_object)) {
+      if (static_cast<bool>(lock_object) && EqualFunc{}(obj, *lock_object)) {
         return lock_object;
       }
     }
@@ -84,6 +84,9 @@ public:
       this_shared_ptr->deleteObject(hashed_value);
     });
 
+    // Add the object to the object pool with the computed hash value as the
+    // key. Note that the object pool can have multiple objects corresponding to
+    // the same key.
     object_pool_.emplace(hashed_value, obj_shared);
     return obj_shared;
   }
@@ -102,6 +105,7 @@ public:
 
 private:
   const std::thread::id thread_id_;
+  // Use a multimap to allow for multiple objects with the same hash key.
   std::unordered_multimap<size_t, std::weak_ptr<T>> object_pool_;
   Event::Dispatcher& dispatcher_;
   Thread::ThreadSynchronizer sync_;
