@@ -1,6 +1,7 @@
 #include "source/extensions/filters/http/connect_grpc_bridge/end_stream_response.h"
 
-#include "source/common/json/json_sanitizer.h"
+#include "source/common/common/base64.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -9,24 +10,14 @@ namespace ConnectGrpcBridge {
 
 namespace {
 
-using WellKnownGrpcStatus = Grpc::Status::WellKnownGrpcStatus;
-
-constexpr absl::string_view JsonCloseQuoteBrace = "\"}";
-constexpr absl::string_view JsonErrorTag = "\"error\":";
-constexpr absl::string_view JsonErrorCodeTag = "{\"code\":\"";
-constexpr absl::string_view JsonErrorMessageTag = "\",\"message\":\"";
-constexpr absl::string_view JsonErrorDetailsTypeTag = "\",\"details\":[{\"type\":\"";
-constexpr absl::string_view JsonErrorDetailNextTypeTag = "\"},{\"type\":\"";
-constexpr absl::string_view JsonErrorDetailValueTag = "\",\"value\":\"";
-constexpr absl::string_view JsonErrorDetailsClose = "\"}]}";
-constexpr absl::string_view JsonMetadataTag = "\"metadata\":{";
-
 /**
  * Returns the appropriate error status code for a given gRPC status.
  *
  * https://connect.build/docs/protocol#error-codes
  */
-absl::string_view statusCodeToString(std::string& buffer, const Grpc::Status::GrpcStatus status) {
+std::string statusCodeToString(const Grpc::Status::GrpcStatus status) {
+  using WellKnownGrpcStatus = Grpc::Status::WellKnownGrpcStatus;
+
   switch (status) {
   case WellKnownGrpcStatus::Canceled:
     return "canceled";
@@ -61,97 +52,71 @@ absl::string_view statusCodeToString(std::string& buffer, const Grpc::Status::Gr
   case WellKnownGrpcStatus::Unauthenticated:
     return "unauthenticated";
   default:
-    buffer = fmt::format("code_{}", status);
-    return buffer;
+    return fmt::format("code_{}", status);
   }
+}
+
+ProtobufWkt::Struct convertToStruct(const Error& error) {
+  ProtobufWkt::Struct obj;
+  (*obj.mutable_fields())["code"] = ValueUtil::stringValue(statusCodeToString(error.code));
+
+  if (!error.message.empty()) {
+    (*obj.mutable_fields())["message"] = ValueUtil::stringValue(error.message);
+  }
+
+  if (!error.details.empty()) {
+    auto details_list = std::make_unique<ProtobufWkt::ListValue>();
+    for (const auto& detail : error.details) {
+      const auto& value = detail.value();
+      *details_list->add_values() = ValueUtil::structValue(MessageUtil::keyValueStruct({
+          {"type", detail.type_url()},
+          {"value", Base64::encode(value.c_str(), value.size())},
+      }));
+    }
+
+    ProtobufWkt::Value details_value;
+    details_value.set_allocated_list_value(details_list.release());
+    (*obj.mutable_fields())["details"] = details_value;
+  }
+  return obj;
+}
+
+ProtobufWkt::Struct convertToStruct(const EndStreamResponse& response) {
+  ProtobufWkt::Struct obj;
+
+  if (response.error.has_value()) {
+    (*obj.mutable_fields())["error"] = ValueUtil::structValue(convertToStruct(*response.error));
+  }
+
+  if (!response.metadata.empty()) {
+    ProtobufWkt::Struct metadata_obj;
+    for (const auto& [name, values] : response.metadata) {
+      auto values_list = std::make_unique<ProtobufWkt::ListValue>();
+
+      for (const auto& value : values) {
+        *values_list->add_values() = ValueUtil::stringValue(value);
+      }
+
+      ProtobufWkt::Value values_value;
+      values_value.set_allocated_list_value(values_list.release());
+      (*metadata_obj.mutable_fields())[name] = values_value;
+    }
+    (*obj.mutable_fields())["metadata"] = ValueUtil::structValue(metadata_obj);
+  }
+
+  return obj;
 }
 
 } // namespace
 
-/**
- * Serializes a Buf Connect Error object to JSON.
- *
- * https://connect.build/docs/protocol#error-end-stream
- */
-void serializeJson(const Error& error, Buffer::Instance& buffer) {
-  std::string tmp_1;
-
-  buffer.addFragments({JsonErrorCodeTag, statusCodeToString(tmp_1, error.code)});
-
-  if (!error.message.empty()) {
-    buffer.addFragments({JsonErrorMessageTag, Json::sanitize(tmp_1, error.message)});
-  }
-
-  if (!error.details.empty()) {
-    const auto& details = error.details;
-
-    auto serializeDetail = [&buffer](absl::string_view prefix, const ErrorDetail& detail) {
-      std::string tmp_1, tmp_2;
-      buffer.addFragments({
-          prefix,
-          Json::sanitize(tmp_1, detail.type),
-          JsonErrorDetailValueTag,
-          Json::sanitize(tmp_2, detail.value),
-      });
-    };
-
-    auto it = details.begin();
-    serializeDetail(JsonErrorDetailsTypeTag, *it);
-    for (; it != details.end(); it++) {
-      serializeDetail(JsonErrorDetailNextTypeTag, *it);
-    }
-    buffer.add(JsonErrorDetailsClose);
-  } else {
-    buffer.add(JsonCloseQuoteBrace);
-  }
+bool serializeJson(const Error& error, std::string& out) {
+  ProtobufWkt::Struct message = convertToStruct(error);
+  return Protobuf::util::MessageToJsonString(message, &out).ok();
 }
 
-/**
- * Serializes a Buf Connect EndStreamResponse object to JSON.
- *
- * https://connect.build/docs/protocol#error-end-stream
- */
-void serializeJson(const EndStreamResponse& response, Buffer::Instance& buffer) {
-  buffer.add("{");
-
-  if (response.error) {
-    buffer.add(JsonErrorTag);
-
-    serializeJson(*response.error, buffer);
-
-    if (!response.metadata.empty()) {
-      buffer.add(",");
-    }
-  }
-
-  if (!response.metadata.empty()) {
-    const auto& metadata = response.metadata;
-    buffer.add(JsonMetadataTag);
-
-    auto serializeMeta = [&buffer](absl::string_view prefix, absl::string_view key,
-                                   const std::vector<std::string>& values) {
-      std::string tmp_1;
-      buffer.addFragments({prefix, Json::sanitize(tmp_1, key), "\":["});
-
-      if (!values.empty()) {
-        auto it = values.begin();
-        buffer.addFragments({"\"", Json::sanitize(tmp_1, *it), "\""});
-        for (; it != values.end(); it++) {
-          buffer.addFragments({",\"", Json::sanitize(tmp_1, *it), "\""});
-        }
-      }
-
-      buffer.add("]");
-    };
-
-    auto it = metadata.begin();
-    serializeMeta("\"", it->first, it->second);
-    for (; it != metadata.end(); it++) {
-      serializeMeta(",\"", it->first, it->second);
-    }
-  }
-
-  buffer.add("}");
+bool serializeJson(const EndStreamResponse& response, std::string& out) {
+  ProtobufWkt::Struct message = convertToStruct(response);
+  return Protobuf::util::MessageToJsonString(message, &out).ok();
 }
 
 /**
@@ -160,6 +125,8 @@ void serializeJson(const EndStreamResponse& response, Buffer::Instance& buffer) 
  * https://connect.build/docs/protocol#error-codes
  */
 uint64_t statusCodeToConnectUnaryStatus(const Grpc::Status::GrpcStatus status) {
+  using WellKnownGrpcStatus = Grpc::Status::WellKnownGrpcStatus;
+
   switch (status) {
   case WellKnownGrpcStatus::Canceled:
   case WellKnownGrpcStatus::DeadlineExceeded:

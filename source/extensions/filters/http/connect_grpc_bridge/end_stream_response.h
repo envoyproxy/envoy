@@ -6,6 +6,7 @@
 #include "envoy/grpc/status.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/types/optional.h"
@@ -15,14 +16,10 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ConnectGrpcBridge {
 
-struct ErrorDetail {
-  std::string type, value;
-};
-
 struct Error {
   Grpc::Status::GrpcStatus code;
   std::string message;
-  std::vector<ErrorDetail> details;
+  std::vector<ProtobufWkt::Any> details;
 };
 
 struct EndStreamResponse {
@@ -30,9 +27,27 @@ struct EndStreamResponse {
   absl::flat_hash_map<std::string, std::vector<std::string>> metadata;
 };
 
-void serializeJson(const Error& error, Buffer::Instance& buffer);
+/**
+ * Serializes a Buf Connect Error object to JSON.
+ *
+ * https://connect.build/docs/protocol#error-end-stream
+ *
+ * @param error Error object to serialize.
+ * @param out String to store result in.
+ * @returns True on success, false on failure.
+ */
+bool serializeJson(const Error& error, std::string& out);
 
-void serializeJson(const EndStreamResponse& response, Buffer::Instance& buffer);
+/**
+ * Serializes a Buf Connect EndStreamResponse object to JSON.
+ *
+ * https://connect.build/docs/protocol#error-end-stream
+ *
+ * @param response EndStreamResponse object to serialize.
+ * @param out String to store result in.
+ * @returns True on success, false on failure.
+ */
+bool serializeJson(const EndStreamResponse& response, std::string& out);
 
 uint64_t statusCodeToConnectUnaryStatus(const Grpc::Status::GrpcStatus status);
 

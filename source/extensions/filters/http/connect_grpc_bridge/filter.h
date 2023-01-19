@@ -15,10 +15,10 @@ namespace ConnectGrpcBridge {
 
 using HeaderPair = std::pair<Http::LowerCaseString, std::string>;
 
-class ConnectUnaryToGrpcFilter : public Http::PassThroughFilter,
-                                 public Logger::Loggable<Logger::Id::filter> {
+class ConnectGrpcBridgeFilter : public Http::PassThroughFilter,
+                                public Logger::Loggable<Logger::Id::filter> {
 public:
-  ConnectUnaryToGrpcFilter();
+  ConnectGrpcBridgeFilter();
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
@@ -50,33 +50,12 @@ private:
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{nullptr};
 
   bool is_connect_unary_{false};
+  bool is_connect_streaming_{false};
   bool is_grpc_response_{false};
-  bool drained_frame_header_{false};
+  uint64_t drained_frame_header_bytes_{false};
   Buffer::OwnedImpl request_buffer_;
   Buffer::OwnedImpl response_buffer_;
   Http::ResponseHeaderMap* response_headers_;
-};
-
-class ConnectStreamingToGrpcFilter : public Http::PassThroughFilter {
-public:
-  ConnectStreamingToGrpcFilter();
-
-  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;
-
-  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
-                                          bool end_stream) override;
-
-  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
-
-  void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override {
-    encoder_callbacks_ = &callbacks;
-  }
-
-private:
-  Http::StreamEncoderFilterCallbacks* encoder_callbacks_{nullptr};
-
-  bool is_connect_streaming_{false};
-  bool is_grpc_response_{false};
 };
 
 } // namespace ConnectGrpcBridge

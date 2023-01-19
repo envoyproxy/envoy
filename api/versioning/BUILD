@@ -102,7 +102,6 @@ proto_library(
         "//envoy/extensions/filters/http/composite/v3:pkg",
         "//envoy/extensions/filters/http/compressor/v3:pkg",
         "//envoy/extensions/filters/http/connect_grpc_bridge/v3:pkg",
-        "//envoy/extensions/filters/http/connect_stats/v3:pkg",
         "//envoy/extensions/filters/http/cors/v3:pkg",
         "//envoy/extensions/filters/http/csrf/v3:pkg",
         "//envoy/extensions/filters/http/custom_response/v3:pkg",

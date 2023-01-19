@@ -21,6 +21,24 @@ public:
   }
 };
 
+TEST_P(ConnectIntegrationTest, ConnectFilterRequestBufferLimit) {
+  config_helper_.setBufferLimits(1024, 1024);
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/Service/Method"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/proto"},
+                                     {"connect-protocol-version", "1"}},
+      1024 * 65, false);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), Http::HttpStatusIs("413"));
+}
+
 TEST_P(ConnectIntegrationTest, ConnectFilterResponseBufferLimit) {
   config_helper_.setBufferLimits(1024, 1024);
   initialize();

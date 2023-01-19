@@ -260,13 +260,6 @@ envoy.filters.http.compressor:
   type_urls:
   - envoy.extensions.filters.http.compressor.v3.Compressor
   - envoy.extensions.filters.http.compressor.v3.CompressorPerRoute
-envoy.filters.http.connect_stats:
-  categories:
-  - envoy.filters.http
-  security_posture: unknown
-  status: alpha
-  type_urls:
-  - envoy.extensions.filters.http.connect_stats.v3.FilterConfig
 envoy.filters.http.connect_grpc_bridge:
   categories:
   - envoy.filters.http

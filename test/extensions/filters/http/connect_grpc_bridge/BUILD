@@ -12,23 +12,8 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_extension_cc_test(
-    name = "connect_grpc_streaming_filter_test",
-    srcs = ["connect_grpc_streaming_filter_test.cc"],
-    extension_names = ["envoy.filters.http.connect_grpc_bridge"],
-    deps = [
-        "//source/common/buffer:buffer_lib",
-        "//source/common/http:header_map_lib",
-        "//source/extensions/filters/http/connect_grpc_bridge:filter_lib",
-        "//test/mocks/server:factory_context_mocks",
-        "//test/test_common:global_lib",
-        "//test/test_common:test_runtime_lib",
-        "//test/test_common:utility_lib",
-    ],
-)
-
-envoy_extension_cc_test(
-    name = "connect_grpc_unary_filter_test",
-    srcs = ["connect_grpc_unary_filter_test.cc"],
+    name = "connect_grpc_bridge_filter_test",
+    srcs = ["connect_grpc_bridge_filter_test.cc"],
     extension_names = ["envoy.filters.http.connect_grpc_bridge"],
     deps = [
         "//source/common/buffer:buffer_lib",

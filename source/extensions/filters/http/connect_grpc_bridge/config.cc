@@ -15,8 +15,7 @@ Http::FilterFactoryCb ConnectGrpcFilterConfigFactory::createFilterFactoryFromPro
     const envoy::extensions::filters::http::connect_grpc_bridge::v3::FilterConfig&,
     const std::string&, Server::Configuration::FactoryContext&) {
   return [](Http::FilterChainFactoryCallbacks& callbacks) {
-    callbacks.addStreamFilter(std::make_shared<ConnectUnaryToGrpcFilter>());
-    callbacks.addStreamFilter(std::make_shared<ConnectStreamingToGrpcFilter>());
+    callbacks.addStreamFilter(std::make_shared<ConnectGrpcBridgeFilter>());
   };
 }
 
