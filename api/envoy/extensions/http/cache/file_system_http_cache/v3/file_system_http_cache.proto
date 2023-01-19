@@ -117,8 +117,8 @@ message FileSystemHttpCacheConfig {
   // [#not-implemented-hide:]
   google.protobuf.Duration min_eviction_period = 9;
 
-  // If true, and the cache path does not exist, attempt to create the cache path (on failure,
-  // the config is rejected). Will attempt to create the entire missing directory tree.
+  // If true, and the cache path does not exist, attempt to create the cache path, including
+  // any missing directories leading up to it. On failure, the config is rejected.
   //
   // If false, and the cache path does not exist, the config is rejected.
   // [#not-implemented-hide:]
