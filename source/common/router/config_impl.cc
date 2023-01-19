@@ -616,6 +616,11 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
           optional_http_filters);
       weighted_clusters.emplace_back(std::move(cluster_entry));
       total_weight += weighted_clusters.back()->clusterWeight();
+      if (total_weight > std::numeric_limits<uint32_t>::max()) {
+        throw EnvoyException(
+            fmt::format("The sum of weights of all weighted clusters of route {} exceeds {}",
+                        route_name_, std::numeric_limits<uint32_t>::max()));
+      }
     }
 
     // Reject the config if the total_weight of all clusters is 0.
