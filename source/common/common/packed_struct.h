@@ -4,6 +4,8 @@
 #include <limits>
 #include <type_traits>
 
+#include "envoy/common/optref.h"
+
 #include "source/common/common/assert.h"
 #include "source/common/common/utility.h"
 #include "source/common/protobuf/utility.h"
@@ -18,12 +20,12 @@ namespace Envoy {
  *
  * The overhead of using this class as opposed to declaring the elements
  * individually in another class or struct is 8 + (n+1) unaligned bytes, where n is
- * the maximum number of elements in the struct.
+ * the maximum number of elements (max_size) in the struct.
  *
  * The way to use this class is to first define an enum class with the element
  * names, and providing the enum class as the third template argument to
  * PackedStruct, the first two being the type of element and number of element
- * names. Instantiate the object with the number of elements that have values.
+ * names respectively. Instantiate the object with the number of elements that have values.
  * Note that this can be increased after the fact but can (potentially) lead to
  * memory fragmentation.
  *
@@ -31,7 +33,7 @@ namespace Envoy {
  *
  * ```
  *    enum class MyElementNames {
- *      element0,
+ *      element0 = 0,
  *      element1,
  *      element2,
  *      element3
@@ -45,10 +47,36 @@ namespace Envoy {
  *    packed_struct.set<MyElementNames::element2>("def");
  *
  *    // Code that accesses the elements of the struct needs to check for existence first.
- *    if (packed_struct.has<MyElementNames::element0>() {
- *      auto& element0 = packed_struct.get<MyElements::element0>();
+ *    auto element0 = packed_struct.get<MyElements::element0>();
+ *    if (element0.has_value()) {
+ *      // use element0.ref()
  *    }
+ *
  * ```
+ *
+ * Implementation details:
+ *
+ * This class stores all elements in the member data_ which is a
+ * unique_ptr<T[]>. Using a unique_ptr<T[]> instead of vector<T> saves us 16
+ * bytes.
+ *
+ * The class can store 0 or 1 value corresponding to each element of the enum
+ * ElementName.
+ *
+ * If an element has a value, then its corresponding index in
+ * data_ is given by indices_[static_cast<unsigned>(element_name)], where
+ * element_name is the corresponding enum value. If an element does not have a
+ * value, then indices_[static_cast<unsigned>(element_name)] = max_size.
+ *
+ * We calculate the size of the class (i.e. number of elements stored) by
+ * counting all but the last entry in indices_ that are less than max_size. The
+ * last entry in indices_ is reserved to store the size of data_.
+ * We grow data_ (always by 1) only when adding an element when
+ * number of elements == size of data_.
+ *
+ * Note that it is only possible to add or modify an element, but not to remove
+ * an element.
+ *
  */
 template <class T, uint8_t max_size, class ElementName> class PackedStruct {
 public:
@@ -57,20 +85,27 @@ public:
     static_assert(std::is_enum_v<ElementName>);
     static_assert(max_size > 0);
 
-    RELEASE_ASSERT(a_capacity < std::numeric_limits<uint8_t>::max(),
-                   "capacity should fit in uint8_t.");
+    RELEASE_ASSERT(a_capacity <= max_size,
+                   absl::StrCat("capacity should be less than or equal to ", max_size, "."));
+
+    // Initialize indices with max_size as we start with 0 elements.
     indices_.fill(max_size);
+    // Set the current capacity.
     indices_[max_size] = a_capacity;
   }
 
   // Accessors.
-  template <ElementName element_name> T& get() {
+  template <ElementName element_name> Envoy::OptRef<T> get() {
     sizeCheck<element_name>();
-    hasCheck<element_name>();
-    return (data_.get())[indices_[static_cast<std::underlying_type_t<ElementName>>(element_name)]];
+    if (!has<element_name>()) {
+      return Envoy::OptRef<T>{};
+    }
+    return Envoy::makeOptRef<T>(
+        data_.get()[indices_[static_cast<std::underlying_type_t<ElementName>>(element_name)]]);
   }
-  template <ElementName element_name> const T& get() const {
-    return const_cast<const T&>(get<element_name>());
+
+  template <ElementName element_name> const Envoy::OptRef<const T&> get() const {
+    return const_cast<Envoy::OptRef<const T&>>(get<element_name>());
   }
 
   // Check to see if element is populated.
@@ -83,18 +118,27 @@ public:
   template <ElementName element_name> void set(T t) {
     sizeCheck<element_name>();
 
+    // Cast the enum to an integer for looking up the corresponding index in
+    // data_;
     static constexpr auto element_idx =
         static_cast<std::underlying_type_t<ElementName>>(element_name);
+
+    // Get the current size. Note that this can be less than capacity.
     auto const current_size = size();
-    // If we're at capacity and we don't have a slot for element_idx, increase capacity by 1.
+
+    // If we're at capacity and we don't have a slot for element_name, increase capacity by 1.
     if (!has<element_name>() && current_size == capacity()) {
       auto tmp = std::make_unique<T[]>(++indices_[max_size]);
       std::move(data_.get(), std::next(data_.get(), current_size), tmp.get());
       data_ = std::move(tmp);
     }
+    // If we don't have a slot for element_name in data_, allot the slot
+    // corresponding to the value of current_size.
     if (!has<element_name>()) {
       indices_[element_idx] = current_size;
     }
+    // Set the value for element_name in the corresponding slot, which is
+    // indices_[element_idx]
     data_.get()[indices_[element_idx]] = t;
   }
 
@@ -118,13 +162,8 @@ private:
   size_t capacity() const { return indices_[max_size]; }
 
   template <ElementName element_name> static constexpr void sizeCheck() {
+    // Elements of ElementName cast to size_t should be less than max_size.
     static_assert(static_cast<size_t>(element_name) < static_cast<size_t>(max_size));
-  }
-  template <ElementName element_name> void hasCheck() const {
-    ENVOY_BUG(has<element_name>(),
-              absl::StrCat("Element corresponding to index ",
-                           static_cast<std::underlying_type_t<ElementName>>(element_name),
-                           " is not assigned"));
   }
 
   // Storage for elements.
