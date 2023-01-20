@@ -925,6 +925,7 @@ mutator
 mutex
 mutexes
 mux
+muxes
 muxed
 mysql
 namelen

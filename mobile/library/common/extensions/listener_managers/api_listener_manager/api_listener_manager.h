@@ -52,6 +52,9 @@ public:
     return std::make_unique<ApiListenerManagerImpl>(server);
   }
   std::string name() const override { return "envoy.listener_manager_impl.api"; }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<envoy::config::listener::v3::ApiListenerManager>();
+  }
 };
 
 DECLARE_FACTORY(ApiListenerManagerFactoryImpl);
