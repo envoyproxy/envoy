@@ -1,3 +1,4 @@
+
 date: Pending
 
 behavior_changes:
@@ -5,57 +6,9 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
-- area: tls
-  change: |
-    added support for intermediate CA as trusted ca. The peer certificate issued by an intermediate CA will be trusted by
-    building valid partial chain. In old days, it can not be verified without trusting its ancestor root CA and building
-    a full chain.
-    :ref:`trust_ca<envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.trusted_ca>`.
-    This change can be reverted via the ``envoy.reloadable_features.enable_intermediate_ca``.
-- area: cache_filter
-  change: |
-    add a completion callback to updateHeaders interface. Any external cache implementations will need to update to match this new interface. See changes to simple_http_cache in PR#23666 for example.
-- area: cache_filter
-  change: |
-    api path of work-in-progress extension changed from ``api/extensions/cache/simple_http_cache`` to ``api/extensions/http/cache/simple_http_cache``, and source code moved, to match extension category.
-- area: http filter
-  change: |
-    Avoid re-entrant filter invocations if we do a local reply via the filter chain when executing decoder filters. This behavioral change can be temporarily reverted by setting runtime guard ``envoy_reloadable_features_http_filter_avoid_reentrant_local_reply`` to false.
-- area: http filters
-  change: |
-    change ``StreamEncoderFilter::encode1xxHeaders`` to use its own enum class ``Http::Filter1xxHeadersStatus``. Previously we shared the same enum class for general headers, but the implementation did not support most of them. We also fixed ``StreamEncoderFilter::encode1xxHeaders`` to send local replies without trailing 1xx headers afterward.
-- area: oauth2
-  change: |
-    Requests which match the passthrough header now have their own metric ``oauth_passthrough`` and aren't included in ``oauth_success`` anymore.
-- area: oauth2
-  change: |
-    query parameters in the :ref:`authorization_endpoint <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.authorization_endpoint>` are now preserved.
-- area: upstream
-  change: |
-    detailed health status is used for override host selection. This behavior can be reverted by setting runtime flag ``envoy.reloadable_features.validate_detailed_override_host_statuses`` to false.
-- area: rate_limit
-  change: |
-    add ``MONTH`` and ``YEAR`` to the unit of time for rate limit.
-- area: router
-  change: |
-    Virtual cluster statistics are no longer created for routes without any ``virtual_clusters``. Previously statistics for a ``catch all`` virtual cluster were created, but never updated.
-- area: jwt_authn
-  change: |
-    adjust the refetch time for remote_jwks async_fetch feature. For a good fetch, refetch 5 seconds before jwks cache duration. For a failed fetch, refetch time can be specified by :ref:`failed_refetch_duration <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwksAsyncFetch.failed_refetch_duration>` with default 1 second.
 - area: healthcheck
   change: |
     If active HC is enabled and a host is ejected by outlier detection, a successful active health check unejects the host and consider it healthy. This also clears all the outlier detection counters. This behavior change can be reverted by setting ``envoy.reloadable_features_successful_active_health_check_uneject_host`` to ``false``.
-- area: config
-  change: |
-    add support for thrift connection draining. This can be disabled by setting the runtime guard ``envoy.reloadable_features.thrift_connection_draining`` to false.
-- area: http
-  change: |
-    reverting the behavioral change to have ``CONNECT`` and upgrade requests over HTTP/1.1 not delay close.  One can reinstate
-    delay close for upgrades by setting ``envoy.reloadable_features.no_delay_close_for_upgrades`` to ``true``.
-- area: tcp
-  change: |
-    added :ref:`idle_timeout <envoy_v3_api_field_extensions.upstreams.tcp.v3.TcpProtocolOptions.idle_timeout>` to support per client idle timeout for tcp connection pool. The timeout is guarded by ``envoy.reloadable_features.tcp_pool_idle_timeout`` and timeout defaults to 10 minutes if runtime flag is enabled.
-
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
