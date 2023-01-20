@@ -144,12 +144,12 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
                 Utility::parseRateLimitSettings(api_config_source), local_info_,
                 std::move(custom_config_validators), xds_config_tracker_),
             callbacks, resource_decoder, stats, dispatcher_,
-            Utility::configSourceInitialFetchTimeout(config), false, options);
+            Utility::configSourceInitialFetchTimeout(config), /*is_aggregated=*/false, options);
       }
       case envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC: {
         return std::make_unique<GrpcCollectionSubscriptionImpl>(
             collection_locator, cm_.adsMux(), callbacks, resource_decoder, stats, dispatcher_,
-            Utility::configSourceInitialFetchTimeout(config), false, options);
+            Utility::configSourceInitialFetchTimeout(config), /*is_aggregated=*/true, options);
       }
       default:
         throw EnvoyException(fmt::format("Unknown xdstp:// transport API type in {}",
