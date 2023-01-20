@@ -6,9 +6,9 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
-#include "source/common/runtime/runtime_features.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/upstream/thread_aware_lb_impl.h"
 
 namespace Envoy {

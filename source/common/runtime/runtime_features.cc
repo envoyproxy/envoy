@@ -65,6 +65,7 @@ RUNTIME_GUARD(envoy_reloadable_features_original_dst_rely_on_idle_timeout);
 RUNTIME_GUARD(envoy_reloadable_features_postpone_h3_client_connect_to_next_loop);
 RUNTIME_GUARD(envoy_reloadable_features_quic_defer_send_in_response_to_packet);
 RUNTIME_GUARD(envoy_reloadable_features_reject_require_client_certificate_with_quic);
+RUNTIME_GUARD(envoy_reloadable_features_shard_ringhash);
 RUNTIME_GUARD(envoy_reloadable_features_skip_dns_lookup_for_proxied_requests);
 RUNTIME_GUARD(envoy_reloadable_features_tcp_pool_idle_timeout);
 RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
@@ -79,7 +80,6 @@ RUNTIME_GUARD(envoy_reloadable_features_validate_detailed_override_host_statuses
 RUNTIME_GUARD(envoy_restart_features_explicit_wildcard_resource);
 RUNTIME_GUARD(envoy_restart_features_remove_runtime_singleton);
 RUNTIME_GUARD(envoy_restart_features_use_apple_api_for_dns_lookups);
-RUNTIME_GUARD(envoy_reloadable_features_shard_ringhash);
 
 // Begin false flags. These should come with a TODO to flip true.
 // Sentinel and test flag.

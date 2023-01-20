@@ -71,12 +71,11 @@ HostConstSharedPtr RingHashLoadBalancer::Ring::chooseHost(uint64_t h, uint32_t a
     // Right shift of a 64-bit unsigned int doesn't work if MSB (bit 63) is set.
     // Below code is needed to compute a right shift of such a number.
     uint64_t h_msb = h & 0x8000000000000000;
-    if (h_msb != 0UL)
-    {
+    if (h_msb != 0UL) {
       uint64_t h_msb0 = h & 0x7FFFFFFFFFFFFFFF;
       uint64_t h_r1 = h_msb0 >> 1;
       uint64_t h_r1_msb1 = h_r1 | 0x4000000000000000;
-      shard_index = h_r1_msb1 >> (rightShift -1);
+      shard_index = h_r1_msb1 >> (rightShift - 1);
     }
 
     // 'lowp' and 'highp' are the lower and upper indices of the shard.
@@ -87,7 +86,6 @@ HostConstSharedPtr RingHashLoadBalancer::Ring::chooseHost(uint64_t h, uint32_t a
 
     lowp = 0;
     highp = ring_.size();
-
   }
 
   int64_t midp = 0;
@@ -237,7 +235,7 @@ RingHashLoadBalancer::Ring::Ring(const NormalizedHostWeightVector& normalized_ho
     // shift to right, the fewer the shards. Experiment with values 9, 10, ... 30, the SHARD_SHIFT
     // parameter.
     rightShift += msb;
-    rightShift = (rightShift > 64)? 64 : rightShift;
+    rightShift = (rightShift > 64) ? 64 : rightShift;
 
     // Reserve memory for shard indices. Worst-case, every hash belongs to a different shard!
     // The ring_shard_ container stores the start indices of the shards.
@@ -248,8 +246,7 @@ RingHashLoadBalancer::Ring::Ring(const NormalizedHostWeightVector& normalized_ho
     uint64_t current_shard, prev_shard = 0;
 
     // push the first index if the ring_ isn't empty
-    if (!ring_.empty())
-    {
+    if (!ring_.empty()) {
       ring_shard_.push_back(ring_index);
       ring_index++;
     }
