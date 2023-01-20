@@ -17,6 +17,9 @@
 #include "envoy/network/dns.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
+#include "envoy/tcp/async_tcp_client.h"
+#include "envoy/upstream/load_balancer.h"
+#include "envoy/upstream/upstream.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/enum_to_int.h"
@@ -1188,6 +1191,13 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpAsyncClient
         parent_.parent_.http_context_, parent_.parent_.router_context_);
   }
   return *lazy_http_async_client_;
+}
+
+Tcp::AsyncTcpClientPtr
+ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpAsyncClient(
+    LoadBalancerContext* context, bool enable_half_close) {
+  return std::make_unique<Tcp::AsyncTcpClientImpl>(parent_.thread_local_dispatcher_, *this, context,
+                                                   enable_half_close);
 }
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::updateHosts(
