@@ -968,8 +968,7 @@ public:
   /**
    * @return the type of cluster, only used for custom discovery types.
    */
-  virtual OptRef<envoy::config::cluster::v3::Cluster::CustomClusterType>
-  clusterType() const PURE;
+  virtual OptRef<envoy::config::cluster::v3::Cluster::CustomClusterType> clusterType() const PURE;
 
   /**
    * @return configuration for round robin load balancing, only used if LB type is round robin.

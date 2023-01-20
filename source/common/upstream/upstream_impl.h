@@ -762,10 +762,8 @@ public:
   LoadBalancerType lbType() const override { return lb_type_; }
   envoy::config::cluster::v3::Cluster::DiscoveryType type() const override { return type_; }
 
-  OptRef<envoy::config::cluster::v3::Cluster::CustomClusterType>
-  clusterType() const override {
-    if(cluster_type_ == nullptr)
-    {
+  OptRef<envoy::config::cluster::v3::Cluster::CustomClusterType> clusterType() const override {
+    if (cluster_type_ == nullptr) {
       return absl::nullopt;
     }
     return *cluster_type_;

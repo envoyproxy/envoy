@@ -131,8 +131,8 @@ public:
   MOCK_METHOD(const envoy::config::cluster::v3::Cluster::CommonLbConfig&, lbConfig, (), (const));
   MOCK_METHOD(LoadBalancerType, lbType, (), (const));
   MOCK_METHOD(envoy::config::cluster::v3::Cluster::DiscoveryType, type, (), (const));
-  MOCK_METHOD(OptRef<envoy::config::cluster::v3::Cluster::CustomClusterType>,
-              clusterType, (), (const));
+  MOCK_METHOD(OptRef<envoy::config::cluster::v3::Cluster::CustomClusterType>, clusterType, (),
+              (const));
   MOCK_METHOD(OptRef<const envoy::config::cluster::v3::Cluster::RingHashLbConfig>, lbRingHashConfig,
               (), (const));
   MOCK_METHOD(OptRef<const envoy::config::cluster::v3::Cluster::MaglevLbConfig>, lbMaglevConfig, (),
