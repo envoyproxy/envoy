@@ -41,18 +41,15 @@ public:
   ObjectSharedPool(Event::Dispatcher& dispatcher)
       : thread_id_(std::this_thread::get_id()), dispatcher_(dispatcher) {}
 
-  void deleteObject(const size_t hash_key) {
+  void deleteObject(T* ptr) {
     if (std::this_thread::get_id() == thread_id_) {
-      // Erase all elements with the input hash key that have use count
-      // as 0.
-      auto object_range = object_pool_.equal_range(hash_key);
-      auto it = object_range.first;
-      while (it != object_range.second) {
-        if (it->second.use_count() == 0) {
-          it = object_pool_.erase(it);
-        } else {
-          ++it;
-        }
+      if (auto iter = object_pool_.find(ptr);
+          iter != object_pool_.end() && iter->use_count() == 0) {
+        object_pool_.erase(iter);
+        // Wait till here to delete the pointer because we don't want the OS to
+        // reallocate the memory location before this method completes to prevent
+        // "hash collisions".
+        delete ptr;
       }
     } else {
       // Most of the time, the object's destructor occurs in the main thread, but with some
@@ -61,33 +58,30 @@ public:
       auto this_shared_ptr = this->shared_from_this();
       // Used for testing to simulate some race condition scenarios
       sync_.syncPoint(DeleteObjectOnMainThread);
-      dispatcher_.post([hash_key, this_shared_ptr] { this_shared_ptr->deleteObject(hash_key); });
+      dispatcher_.post([ptr, this_shared_ptr] { this_shared_ptr->deleteObject(ptr); });
     }
   }
 
   std::shared_ptr<T> getObject(const T& obj) {
     ASSERT(std::this_thread::get_id() == thread_id_);
-    auto hashed_value = HashFunc{}(obj);
-    auto object_range = object_pool_.equal_range(hashed_value);
-    for (auto it = object_range.first; it != object_range.second; ++it) {
-      auto lock_object = it->second.lock();
-      if (static_cast<bool>(lock_object) && EqualFunc{}(obj, *lock_object)) {
+
+    auto iter = object_pool_.find(&obj);
+    if (iter != object_pool_.end()) {
+      auto lock_object = iter->lock();
+      if (lock_object) {
         return lock_object;
       }
     }
 
     auto this_shared_ptr = this->shared_from_this();
-    std::shared_ptr<T> obj_shared(new T(obj), [hashed_value, this_shared_ptr](T* ptr) {
+    std::shared_ptr<T> obj_shared(new T(obj), [this_shared_ptr](T* ptr) {
       this_shared_ptr->sync().syncPoint(ObjectSharedPool<T>::ObjectDeleterEntry);
-      // release ptr as early as possible to avoid exposure of ptr, resulting in undefined behavior.
-      delete ptr;
-      this_shared_ptr->deleteObject(hashed_value);
+      this_shared_ptr->deleteObject(ptr);
     });
 
-    // Add the object to the object pool with the computed hash value as the
-    // key. Note that the object pool can have multiple objects corresponding to
-    // the same key.
-    object_pool_.emplace(hashed_value, obj_shared);
+    // Add the object to the object pool. Note that we store a weak_ptr in the
+    // pool.
+    object_pool_.emplace(obj_shared);
     return obj_shared;
   }
 
@@ -104,9 +98,52 @@ public:
   static const char ObjectDeleterEntry[];
 
 private:
+  class Element {
+  public:
+    Element(const std::shared_ptr<T>& ptr) : ptr_{ptr.get()}, weak_ptr_{ptr} {}
+
+    Element() = delete;
+    Element(const Element&) = delete;
+
+    Element(Element&&) = default;
+
+    auto lock() const { return weak_ptr_.lock(); }
+    auto use_count() const { return weak_ptr_.use_count(); }
+
+    friend struct Hash;
+    friend struct Compare;
+
+    struct Hash {
+      using is_transparent = void; // NOLINT(readability-identifier-naming)
+      constexpr size_t operator()(const T* ptr) const { return HashFunc{}(*ptr); }
+      constexpr size_t operator()(const Element& element) const {
+        return HashFunc{}(*element.ptr_);
+      }
+    };
+    struct Compare {
+      using is_transparent = void; // NOLINT(readability-identifier-naming)
+      bool operator()(const Element& a, const Element& b) const {
+        ASSERT(a.ptr_ != nullptr && b.ptr_ != nullptr);
+        return a.ptr_ == b.ptr_ ||
+               (a.ptr_ != nullptr && b.ptr_ != nullptr && EqualFunc{}(*a.ptr_, *b.ptr_));
+      }
+      bool operator()(const Element& a, const T* ptr) const {
+        ASSERT(a.ptr_ != nullptr && ptr != nullptr);
+        return a.ptr_ == ptr || (a.ptr_ != nullptr && ptr != nullptr && EqualFunc{}(*a.ptr_, *ptr));
+      }
+    };
+
+  private:
+    const T* const ptr_ = nullptr; ///< This is only used to speed up
+                                   ///< comparisons and should never be
+                                   ///< made available outside this class.
+    std::weak_ptr<T> weak_ptr_;
+  };
+
   const std::thread::id thread_id_;
+  absl::flat_hash_set<Element, typename Element::Hash, typename Element::Compare> object_pool_;
   // Use a multimap to allow for multiple objects with the same hash key.
-  std::unordered_multimap<size_t, std::weak_ptr<T>> object_pool_;
+  // std::unordered_multimap<size_t, std::weak_ptr<T>> object_pool_;
   Event::Dispatcher& dispatcher_;
   Thread::ThreadSynchronizer sync_;
 };
