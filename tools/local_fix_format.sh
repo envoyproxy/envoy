@@ -1,10 +1,10 @@
 #!/bin/sh
 #
-# Runs the Enovy format fixers on the current changes. By default, this runs on
+# Runs the Envoy format fixers on the current changes. By default, this runs on
 # changes that are not yet committed. You can also specify:
 #
 #   -all: runs on the entire repository (very slow)
-#   -main: runs on the changes amde from the main branch
+#   -main: runs on the changes made from the main branch
 #   file1 file2 file3...: runs on the specified files.
 #
 # To effectively use this script, it's best to run the format fixer before each
@@ -21,10 +21,6 @@
 
 # If DISPLAY is set, then tkdiff pops up for some BUILD changes.
 unset DISPLAY
-
-# Trigger an error if the required env vars are not set.
-set -u
-ignore="$CLANG_FORMAT $BUILDIFIER_BIN $BUILDOZER_BIN"
 
 if [[ $# > 0 && "$1" == "-all" ]]; then
   echo "Checking all files in the repo...this may take a while."
@@ -48,7 +44,6 @@ else
   fi
 fi
 
-echo ./tools/code_format/check_format.py fix $args '|& grep -v "no longer checks API"'
+set -x
 ./tools/code_format/check_format.py fix $args |& grep -v "no longer checks API"
-echo ./tools/spelling/check_spelling_pedantic.py fix $args
 ./tools/spelling/check_spelling_pedantic.py fix $args
