@@ -74,6 +74,8 @@ public:
 private:
   absl::flat_hash_map<uint8_t, KeyValuePair> tlv_types_;
   const bool allow_requests_without_proxy_protocol_;
+  bool pass_all_tlvs_ = false;
+  absl::flat_hash_set<uint8_t> pass_through_tlvs_{};
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;

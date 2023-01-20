@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.filters.listener.proxy_protocol.v3;
 
+import "envoy/config/core/v3/proxy_protocol.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -58,4 +60,8 @@ message ProxyProtocol {
   //   signature will timeout (Envoy is unable to differentiate these requests
   //   from incomplete proxy protocol requests).
   bool allow_requests_without_proxy_protocol = 2;
+
+  // This config controls which TLVs can be passed to filter state if it is Proxy Protocol
+  // V2 header. If there is no setting for this field, no TLVs will be passed through.
+  config.core.v3.ProxyProtocolPassThroughTLVs pass_through_tlvs = 3;
 }

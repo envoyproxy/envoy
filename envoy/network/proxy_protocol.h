@@ -1,9 +1,10 @@
 #pragma once
 
-#include "envoy/network/address.h"
 #include <cstdint>
 #include <string>
 #include <vector>
+
+#include "envoy/network/address.h"
 
 namespace Envoy {
 namespace Network {

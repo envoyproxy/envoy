@@ -6,6 +6,7 @@
 #include "envoy/network/transport_socket.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/hex.h"
 #include "source/common/common/scalar_to_byte_vector.h"
 #include "source/common/common/utility.h"
 #include "source/common/network/address_impl.h"
@@ -13,6 +14,7 @@
 
 using envoy::config::core::v3::ProxyProtocolConfig;
 using envoy::config::core::v3::ProxyProtocolConfig_Version;
+using envoy::config::core::v3::ProxyProtocolPassThroughTLVs;
 
 namespace Envoy {
 namespace Extensions {
@@ -21,8 +23,20 @@ namespace ProxyProtocol {
 
 UpstreamProxyProtocolSocket::UpstreamProxyProtocolSocket(
     Network::TransportSocketPtr&& transport_socket,
-    Network::TransportSocketOptionsConstSharedPtr options, ProxyProtocolConfig_Version version)
-    : PassthroughSocket(std::move(transport_socket)), options_(options), version_(version) {}
+    Network::TransportSocketOptionsConstSharedPtr options, ProxyProtocolConfig config)
+    : PassthroughSocket(std::move(transport_socket)), options_(options),
+      version_(config.version()) {
+  if (config.has_pass_through_tlvs()) {
+    if (config.pass_through_tlvs().match_type() == ProxyProtocolPassThroughTLVs::INCLUDE_ALL) {
+      pass_all_tlvs_ = true;
+    } else if (config.pass_through_tlvs().match_type() == ProxyProtocolPassThroughTLVs::INCLUDE) {
+      pass_all_tlvs_ = false;
+      for (const auto& tlv_type : config.pass_through_tlvs().tlv_type()) {
+        pass_through_tlvs_.insert(0xFF & tlv_type);
+      }
+    }
+  }
+}
 
 void UpstreamProxyProtocolSocket::setTransportSocketCallbacks(
     Network::TransportSocketCallbacks& callbacks) {
@@ -66,12 +80,22 @@ void UpstreamProxyProtocolSocket::generateHeaderV1() {
   Common::ProxyProtocol::generateV1Header(*src_addr->ip(), *dst_addr->ip(), header_buffer_);
 }
 
+namespace {
+std::string toHex(const Buffer::Instance& buffer) {
+  std::string bufferStr = buffer.toString();
+  return Hex::encode(reinterpret_cast<uint8_t*>(bufferStr.data()), bufferStr.length());
+}
+} // namespace
+
 void UpstreamProxyProtocolSocket::generateHeaderV2() {
   if (!options_ || !options_->proxyProtocolOptions().has_value()) {
     Common::ProxyProtocol::generateV2LocalHeader(header_buffer_);
   } else {
     const auto options = options_->proxyProtocolOptions().value();
-    Common::ProxyProtocol::generateV2Header(options, header_buffer_);
+    Common::ProxyProtocol::generateV2Header(options, header_buffer_, pass_all_tlvs_,
+                                            pass_through_tlvs_);
+    ENVOY_LOG(trace, fmt::format("generated proxy protocol v2 header, length: {}, buffer: {}",
+                                 header_buffer_.length(), toHex(header_buffer_)));
   }
 }
 
@@ -117,8 +141,7 @@ Network::TransportSocketPtr UpstreamProxyProtocolSocketFactory::createTransportS
   if (inner_socket == nullptr) {
     return nullptr;
   }
-  return std::make_unique<UpstreamProxyProtocolSocket>(std::move(inner_socket), options,
-                                                       config_.version());
+  return std::make_unique<UpstreamProxyProtocolSocket>(std::move(inner_socket), options, config_);
 }
 
 void UpstreamProxyProtocolSocketFactory::hashKey(

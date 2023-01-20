@@ -110,9 +110,13 @@ void generateV2Header(const Network::Address::Ip& source_address,
                    source_address.port(), dest_address.port(), source_address.version(), 0, out);
 }
 
-void generateV2Header(const Network::ProxyProtocolData& proxy_proto_data, Buffer::Instance& out) {
+void generateV2Header(const Network::ProxyProtocolData& proxy_proto_data, Buffer::Instance& out,
+                      bool pass_all_tlvs, const absl::flat_hash_set<uint8_t>& pass_through_tlvs) {
   uint64_t extension_length = 0;
   for (auto&& tlv : proxy_proto_data.tlv_vector_) {
+    if (!pass_all_tlvs && !pass_through_tlvs.contains(tlv.type)) {
+      continue;
+    }
     extension_length += PROXY_PROTO_V2_TLV_TYPE_LENGTH_LEN + tlv.value.size();
     if (extension_length > std::numeric_limits<uint16_t>::max()) {
       ExceptionUtil::throwEnvoyException(
@@ -128,6 +132,9 @@ void generateV2Header(const Network::ProxyProtocolData& proxy_proto_data, Buffer
 
   // Generate the TLV vector.
   for (auto&& tlv : proxy_proto_data.tlv_vector_) {
+    if (!pass_all_tlvs && !pass_through_tlvs.contains(tlv.type)) {
+      continue;
+    }
     out.add(&tlv.type, 1);
     uint16_t size = htons(static_cast<uint16_t>(tlv.value.size()));
     out.add(&size, sizeof(uint16_t));

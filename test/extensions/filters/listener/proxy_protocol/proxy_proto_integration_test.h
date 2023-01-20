@@ -24,6 +24,12 @@ public:
   ProxyProtoTcpIntegrationTest();
 };
 
+class ProxyProtocolTLVsIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                                         public BaseIntegrationTest {
+public:
+  ProxyProtocolTLVsIntegrationTest();
+};
+
 class ProxyProtoFilterChainMatchIntegrationTest : public ProxyProtoTcpIntegrationTest {
 public:
   ProxyProtoFilterChainMatchIntegrationTest();
