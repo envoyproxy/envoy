@@ -3,8 +3,7 @@ version: "3.8"
 services:
   wasm_compile_update:
     build:
-      context: .
-      dockerfile: Dockerfile-envoy-build
+      context: ../shared/build
     command: >
       bash -c "
       bazel build //examples/wasm-cc:envoy_filter_http_wasm_updated_example.wasm
@@ -21,8 +20,7 @@ services:
 
   wasm_compile:
     build:
-      context: .
-      dockerfile: Dockerfile-envoy-build
+      context: ../shared/build
     command: >
       bash -c "
       bazel build //examples/wasm-cc:envoy_filter_http_wasm_example.wasm
