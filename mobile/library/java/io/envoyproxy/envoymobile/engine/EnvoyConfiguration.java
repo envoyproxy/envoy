@@ -241,8 +241,6 @@ public class EnvoyConfiguration {
                               enableHappyEyeballs ? "ALL" : "V4_PREFERRED"))
         .append(
             String.format("- &dns_multiple_addresses %s\n", enableHappyEyeballs ? "true" : "false"))
-        .append(String.format("- &h2_delay_keepalive_timeout %s\n",
-                              h2ExtendKeepaliveTimeout ? "true" : "false"))
         .append(String.format("- &dns_refresh_rate %ss\n", dnsRefreshSeconds))
         .append(String.format("- &enable_drain_post_dns_refresh %s\n",
                               enableDrainPostDnsRefresh ? "true" : "false"))

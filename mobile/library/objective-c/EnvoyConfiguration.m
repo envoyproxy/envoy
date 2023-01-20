@@ -163,8 +163,6 @@
                             self.enableHappyEyeballs ? @"ALL" : @"V4_PREFERRED"];
   [definitions appendFormat:@"- &dns_multiple_addresses %@\n",
                             self.enableHappyEyeballs ? @"true" : @"false"];
-  [definitions appendFormat:@"- &h2_delay_keepalive_timeout %@\n",
-                            self.h2ExtendKeepaliveTimeout ? @"true" : @"false"];
   [definitions appendFormat:@"- &dns_refresh_rate %lus\n", (unsigned long)self.dnsRefreshSeconds];
   [definitions appendFormat:@"- &enable_drain_post_dns_refresh %@\n",
                             self.enableDrainPostDnsRefresh ? @"true" : @"false"];
