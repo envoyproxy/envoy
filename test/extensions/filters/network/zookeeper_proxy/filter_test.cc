@@ -365,6 +365,7 @@ public:
     buffer.writeBEInt<int32_t>(8 + watches_buffer.length());
     buffer.writeBEInt<int32_t>(xid);
     buffer.writeBEInt<int32_t>(enumToSignedInt(OpCodes::SetWatches));
+    buffer.writeBEInt<int64_t>(3000);
     buffer.add(watches_buffer);
 
     return buffer;
@@ -877,8 +878,8 @@ TEST_F(ZooKeeperFilterTest, SetWatchesRequestControlXid) {
   Buffer::OwnedImpl data =
       encodeSetWatchesRequest(dataw, existw, childw, enumToSignedInt(XidCodes::SetWatchesXid));
 
-  testRequest(data, {{{"opname", "setwatches"}}, {{"bytes", "76"}}},
-              config_->stats().setwatches_rq_, 76);
+  testRequest(data, {{{"opname", "setwatches"}}, {{"bytes", "84"}}},
+              config_->stats().setwatches_rq_, 84);
   testResponse(
       {{{"opname", "setwatches_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
       config_->stats().setwatches_resp_, enumToSignedInt(XidCodes::SetWatchesXid));
@@ -893,8 +894,8 @@ TEST_F(ZooKeeperFilterTest, SetWatchesRequest) {
 
   Buffer::OwnedImpl data = encodeSetWatchesRequest(dataw, existw, childw);
 
-  testRequest(data, {{{"opname", "setwatches"}}, {{"bytes", "76"}}},
-              config_->stats().setwatches_rq_, 76);
+  testRequest(data, {{{"opname", "setwatches"}}, {{"bytes", "84"}}},
+              config_->stats().setwatches_rq_, 84);
   testResponse(
       {{{"opname", "setwatches_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
       config_->stats().setwatches_resp_);

@@ -422,6 +422,8 @@ void DecoderImpl::parseReconfigRequest(Buffer::Instance& data, uint64_t& offset,
 void DecoderImpl::parseSetWatchesRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
   ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + (3 * INT_LENGTH));
 
+  // Ignore relative Zxid.
+  helper_.peekInt64(data, offset);
   // Data watches.
   skipStrings(data, offset);
   // Exist watches.
