@@ -1369,6 +1369,20 @@ envoy.load_balancing_policies.round_robin:
   status: stable
   type_urls:
   - envoy.extensions.load_balancing_policies.round_robin.v3.RoundRobin
+envoy.load_balancing_policies.ring_hash:
+  categories:
+  - envoy.load_balancing_policies
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+  type_urls:
+  - envoy.extensions.load_balancing_policies.ring_hash.v3.RingHash
+envoy.load_balancing_policies.maglev:
+  categories:
+  - envoy.load_balancing_policies
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+  type_urls:
+  - envoy.extensions.load_balancing_policies.maglev.v3.Maglev
 envoy.http.early_header_mutation.header_mutation:
   categories:
   - envoy.http.early_header_mutation
