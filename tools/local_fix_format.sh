@@ -32,7 +32,7 @@ fi
 if [[ $# -gt 0 && "$1" == "-all" ]]; then
   echo "Checking all files in the repo...this may take a while."
   shift
-  args="$*"
+  args="$@"
 else
   if [[ $# -gt 0 && "$1" == "-main" ]]; then
     shift
@@ -42,7 +42,7 @@ else
     args=$(git status|grep -E '(modified:|added:)'|awk '{print $2}')
     args+=$(git status|grep -E 'new file:'|awk '{print $3}')
   else
-    args="$*"
+    args="$@"
   fi
 
   if [[ "$args" == "" ]]; then
@@ -55,5 +55,5 @@ if [[ "$verbose" == "1" ]]; then
   set -x
 fi
 
-./tools/code_format/check_format.py fix $args
-./tools/spelling/check_spelling_pedantic.py fix $args
+./tools/code_format/check_format.py fix ${args}
+./tools/spelling/check_spelling_pedantic.py fix ${args}
