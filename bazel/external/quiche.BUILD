@@ -1470,6 +1470,7 @@ envoy_cc_library(
     ],
     copts = quiche_copts,
     repository = "@envoy",
+    visibility = ["//visibility:public"],
     deps = [
         ":http2_hpack_huffman_hpack_huffman_encoder_lib",
         ":quiche_common_circular_deque_lib",
