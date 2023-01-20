@@ -3,7 +3,6 @@ version: "3.8"
 services:
   go_plugin_compile:
     image: envoyproxy/envoy-build-ubuntu:5c8e6ab946230d0232d6875344f28457a3c68dd7
-    network_mode: host
     command: >
       bash -c "
       bazel build  //examples/golang/simple:filter.so

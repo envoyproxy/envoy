@@ -2,9 +2,12 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
 )
+
+var LOCALREPLYFORBIDDENBODY = "localreply forbidden by encodedata"
 
 type filter struct {
 	callbacks api.FilterCallbackHandler
@@ -22,12 +25,13 @@ func (f *filter) DecodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 	f.path, _ = header.Get(":path")
 	header.Set("rsp-header-from-go", "foo-test")
 	if f.path == "/forbidden" {
-		return f.sendLocalReply()
+		return f.sendLocalReplyForbidden()
 	}
 	return api.Continue
 }
 
 func (f *filter) DecodeData(buffer api.BufferInstance, endStream bool) api.StatusType {
+	println("enter decodedata")
 	return api.Continue
 }
 
@@ -36,11 +40,22 @@ func (f *filter) DecodeTrailers(trailers api.RequestTrailerMap) api.StatusType {
 }
 
 func (f *filter) EncodeHeaders(header api.ResponseHeaderMap, endStream bool) api.StatusType {
+	if f.path == "/localreply/forbidden" {
+		header.Set("Content-Length", strconv.Itoa(len(LOCALREPLYFORBIDDENBODY)))
+	}
 	header.Set("Rsp-Header-From-Go", "bar-test")
 	return api.Continue
 }
 
 func (f *filter) EncodeData(buffer api.BufferInstance, endStream bool) api.StatusType {
+	if f.path == "/localreply/forbidden" {
+		if endStream {
+			buffer.SetString(LOCALREPLYFORBIDDENBODY)
+		} else {
+			// TODO implement buffer->Drain, buffer.SetString means buffer->Drain(buffer.Len())
+			buffer.SetString("")
+		}
+	}
 	return api.Continue
 }
 
