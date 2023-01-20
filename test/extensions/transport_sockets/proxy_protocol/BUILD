@@ -42,18 +42,3 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/extensions/transport_sockets/proxy_protocol/v3:pkg_cc_proto",
     ],
 )
-
-# envoy_extension_cc_test(
-#     name = "proxy_protocol_tlvs_integration_test",
-#     srcs = ["proxy_protocol_tlvs_integration_test.cc"],
-#     extension_names = ["envoy.transport_sockets.upstream_proxy_protocol"],
-#     deps = [
-#         "//test/integration:integration_lib",
-#         "//source/extensions/filters/network/tcp_proxy:config",
-#         "//source/extensions/transport_sockets/proxy_protocol:upstream_config",
-#         "//source/extensions/filters/listener/proxy_protocol:config",
-#         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-#         "@envoy_api//envoy/extensions/transport_sockets/proxy_protocol/v3:pkg_cc_proto",
-#         "@envoy_api//envoy/extensions/filters/listener/proxy_protocol/v3:pkg_cc_proto",
-#     ],
-# )
