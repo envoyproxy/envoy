@@ -11,7 +11,7 @@ type filter struct {
 	path      string
 }
 
-func (f *filter) sendLocalReply() api.StatusType {
+func (f *filter) sendLocalReplyForbidden() api.StatusType {
 	headers := make(map[string]string)
 	body := fmt.Sprintf("forbidden from go, path: %s\r\n", f.path)
 	f.callbacks.SendLocalReply(403, body, headers, -1, "test-from-go")
