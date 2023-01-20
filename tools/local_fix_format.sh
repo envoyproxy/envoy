@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #
 # Runs the Envoy format fixers on the current changes. By default, this runs on
 # changes that are not yet committed. You can also specify:
@@ -22,27 +22,27 @@
 # If DISPLAY is set, then tkdiff pops up for some BUILD changes.
 unset DISPLAY
 
-if [[ $# > 0 && "$1" == "-verbose" ]]; then
+if [[ $# -gt 0 && "$1" == "-verbose" ]]; then
   verbose=1
   shift
 else
   verbose=0
 fi
 
-if [[ $# > 0 && "$1" == "-all" ]]; then
+if [[ $# -gt 0 && "$1" == "-all" ]]; then
   echo "Checking all files in the repo...this may take a while."
   shift
-  args="$@"
+  args="$*"
 else
-  if [[ $# > 0 && "$1" == "-main" ]]; then
+  if [[ $# -gt 0 && "$1" == "-main" ]]; then
     shift
     echo "Checking all files that have changed since the main branch."
     args=$(git diff main | grep ^diff | awk '{print $3}' | cut -c 3-)
   elif [[ $# == 0 ]]; then
-    args=$(git status|egrep '(modified:|added:)'|awk '{print $2}')
-    args+=$(git status|egrep 'new file:'|awk '{print $3}')
+    args=$(git status|grep -E '(modified:|added:)'|awk '{print $2}')
+    args+=$(git status|grep -E 'new file:'|awk '{print $3}')
   else
-    args="$@"
+    args="$*"
   fi
 
   if [[ "$args" == "" ]]; then
@@ -50,8 +50,6 @@ else
     exit 0
   fi
 fi
-
-echo "args=$args"
 
 if [[ "$verbose" == "1" ]]; then
   set -x
