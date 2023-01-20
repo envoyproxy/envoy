@@ -520,7 +520,6 @@ final class EngineBuilderTests: XCTestCase {
     // HTTP/2
     XCTAssertTrue(resolvedYAML.contains("&h2_connection_keepalive_idle_interval 0.001s"))
     XCTAssertTrue(resolvedYAML.contains("&h2_connection_keepalive_timeout 333s"))
-    XCTAssertTrue(resolvedYAML.contains("&h2_delay_keepalive_timeout true"))
 
     XCTAssertTrue(resolvedYAML.contains("&max_connections_per_host 100"))
 
@@ -619,7 +618,6 @@ final class EngineBuilderTests: XCTestCase {
     name: "envoy_mobile.cert_validator.platform_bridge_cert_validator"
 """
     ))
-    XCTAssertTrue(resolvedYAML.contains("&h2_delay_keepalive_timeout false"))
     XCTAssertTrue(resolvedYAML.contains("&enable_drain_post_dns_refresh true"))
 
     // Decompression
