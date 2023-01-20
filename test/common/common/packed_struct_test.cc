@@ -35,7 +35,7 @@ TEST_F(PackedStructTest, StringStruct) {
   EXPECT_EQ(capacity(redirect_strings), 2);
   EXPECT_EQ(redirect_strings.get<RedirectStringElement::scheme_redirect>().ref(), "abc");
   EXPECT_EQ(redirect_strings.get<RedirectStringElement::path_redirect>().ref(), "def");
-  EXPECT_FALSE(redirect_strings.has<RedirectStringElement::host_redirect>());
+  EXPECT_FALSE(redirect_strings.get<RedirectStringElement::host_redirect>().has_value());
 
   // Add a third element.
   redirect_strings.set<RedirectStringElement::host_redirect>("abcd");
@@ -62,7 +62,7 @@ TEST_F(PackedStructTest, StringStructMove) {
   EXPECT_EQ(capacity(redirect_strings), 2);
   EXPECT_EQ(redirect_strings.get<RedirectStringElement::scheme_redirect>().ref(), "abc");
   EXPECT_EQ(redirect_strings.get<RedirectStringElement::path_redirect>().ref(), "def");
-  EXPECT_FALSE(redirect_strings.has<RedirectStringElement::host_redirect>());
+  EXPECT_FALSE(redirect_strings.get<RedirectStringElement::host_redirect>().has_value());
 
   // Invoke move constructor.
   RedirectStringsPackedStruct redirect_strings2(move(redirect_strings));
@@ -73,7 +73,7 @@ TEST_F(PackedStructTest, StringStructMove) {
   EXPECT_EQ(capacity(redirect_strings2), 2);
   EXPECT_EQ(redirect_strings2.get<RedirectStringElement::scheme_redirect>().ref(), "abc");
   EXPECT_EQ(redirect_strings2.get<RedirectStringElement::path_redirect>().ref(), "def");
-  EXPECT_FALSE(redirect_strings2.has<RedirectStringElement::host_redirect>());
+  EXPECT_FALSE(redirect_strings2.get<RedirectStringElement::host_redirect>().has_value());
 
   // Invoke move assignment.
   RedirectStringsPackedStruct redirect_strings3(0);
@@ -85,7 +85,7 @@ TEST_F(PackedStructTest, StringStructMove) {
   EXPECT_EQ(capacity(redirect_strings3), 2);
   EXPECT_EQ(redirect_strings3.get<RedirectStringElement::scheme_redirect>().ref(), "abc");
   EXPECT_EQ(redirect_strings3.get<RedirectStringElement::path_redirect>().ref(), "def");
-  EXPECT_FALSE(redirect_strings3.has<RedirectStringElement::host_redirect>());
+  EXPECT_FALSE(redirect_strings3.get<RedirectStringElement::host_redirect>().has_value());
 }
 
 } // namespace
