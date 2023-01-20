@@ -143,7 +143,7 @@ public:
               lbLeastRequestConfig, (), (const));
   MOCK_METHOD(OptRef<const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>,
               lbOriginalDstConfig, (), (const));
-  MOCK_METHOD(const absl::optional<envoy::config::core::v3::TypedExtensionConfig>&, upstreamConfig,
+  MOCK_METHOD(OptRef<envoy::config::core::v3::TypedExtensionConfig>, upstreamConfig,
               (), (const));
   MOCK_METHOD(bool, maintenanceMode, (), (const));
   MOCK_METHOD(uint32_t, maxResponseHeadersCount, (), (const));
@@ -241,7 +241,7 @@ public:
   std::unique_ptr<const envoy::config::cluster::v3::Cluster::MaglevLbConfig> lb_maglev_config_;
   std::unique_ptr<const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>
       lb_original_dst_config_;
-  absl::optional<envoy::config::core::v3::TypedExtensionConfig> upstream_config_;
+  std::unique_ptr<envoy::config::core::v3::TypedExtensionConfig> upstream_config_;
   Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
   envoy::config::cluster::v3::Cluster::CommonLbConfig lb_config_;
   envoy::config::core::v3::Metadata metadata_;

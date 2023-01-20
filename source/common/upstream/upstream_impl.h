@@ -800,9 +800,12 @@ public:
     }
     return *lb_original_dst_config_;
   }
-  const absl::optional<envoy::config::core::v3::TypedExtensionConfig>&
+  OptRef<envoy::config::core::v3::TypedExtensionConfig>
   upstreamConfig() const override {
-    return upstream_config_;
+    if(upstream_config_ == nullptr) {
+      return absl::nullopt;
+    }
+    return *upstream_config_;
   }
   bool maintenanceMode() const override;
   uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
@@ -957,7 +960,7 @@ private:
       lb_maglev_config_;
   const std::unique_ptr<const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>
       lb_original_dst_config_;
-  absl::optional<envoy::config::core::v3::TypedExtensionConfig> upstream_config_;
+  std::unique_ptr<envoy::config::core::v3::TypedExtensionConfig> upstream_config_;
   const bool added_via_api_;
   LoadBalancerSubsetInfoImpl lb_subset_;
   const envoy::config::core::v3::Metadata metadata_;

@@ -710,10 +710,10 @@ Filter::createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster) {
   GenericConnPoolFactory* factory = nullptr;
   if (cluster_->upstreamConfig().has_value()) {
     factory = Envoy::Config::Utility::getFactory<GenericConnPoolFactory>(
-        cluster_->upstreamConfig().value());
+        cluster_->upstreamConfig().ref());
     ENVOY_BUG(factory != nullptr,
               fmt::format("invalid factory type '{}', failing over to default upstream",
-                          cluster_->upstreamConfig().value().DebugString()));
+                          cluster_->upstreamConfig().ref().DebugString()));
   }
   if (!factory) {
     factory = &config_.router_context_.genericConnPoolFactory();

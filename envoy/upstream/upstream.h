@@ -1007,7 +1007,7 @@ public:
    * @return const absl::optional<envoy::config::core::v3::TypedExtensionConfig>& the configuration
    *         for the upstream, if a custom upstream is configured.
    */
-  virtual const absl::optional<envoy::config::core::v3::TypedExtensionConfig>&
+  virtual OptRef<envoy::config::core::v3::TypedExtensionConfig>
   upstreamConfig() const PURE;
 
   /**

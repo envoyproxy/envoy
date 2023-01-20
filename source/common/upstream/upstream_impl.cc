@@ -1040,9 +1040,9 @@ ClusterInfoImpl::ClusterInfoImpl(
                     config.original_dst_lb_config())
               : nullptr),
       upstream_config_(config.has_upstream_config()
-                           ? absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>(
+                           ? std::make_unique<envoy::config::core::v3::TypedExtensionConfig>(
                                  config.upstream_config())
-                           : absl::nullopt),
+                           : nullptr),
       added_via_api_(added_via_api),
       lb_subset_(LoadBalancerSubsetInfoImpl(config.lb_subset_config())),
       metadata_(config.metadata()), typed_metadata_(config.metadata()),

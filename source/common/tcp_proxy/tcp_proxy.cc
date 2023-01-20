@@ -471,7 +471,7 @@ bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster) {
   GenericConnPoolFactory* factory = nullptr;
   if (cluster.info()->upstreamConfig().has_value()) {
     factory = Envoy::Config::Utility::getFactory<GenericConnPoolFactory>(
-        cluster.info()->upstreamConfig().value());
+        cluster.info()->upstreamConfig().ref());
   } else {
     factory = Envoy::Config::Utility::getFactoryByName<GenericConnPoolFactory>(
         "envoy.filters.connection_pools.tcp.generic");
