@@ -77,7 +77,6 @@ class EnvoyConfigurationTest {
     enableInterfaceBinding: Boolean = false,
     h2ConnectionKeepaliveIdleIntervalMilliseconds: Int = 222,
     h2ConnectionKeepaliveTimeoutSeconds: Int = 333,
-    h2ExtendKeepaliveTimeout: Boolean = false,
     maxConnectionsPerHost: Int = 543,
     statsFlushSeconds: Int = 567,
     streamIdleTimeoutSeconds: Int = 678,
@@ -109,7 +108,6 @@ class EnvoyConfigurationTest {
       enableInterfaceBinding,
       h2ConnectionKeepaliveIdleIntervalMilliseconds,
       h2ConnectionKeepaliveTimeoutSeconds,
-      h2ExtendKeepaliveTimeout,
       maxConnectionsPerHost,
       statsFlushSeconds,
       streamIdleTimeoutSeconds,
@@ -213,7 +211,6 @@ class EnvoyConfigurationTest {
       enableGzip = false,
       enableBrotli = true,
       enableInterfaceBinding = true,
-      h2ExtendKeepaliveTimeout = true,
       enableSkipDNSLookupForProxiedRequests = true,
       enablePlatformCertificatesValidation = true
     )

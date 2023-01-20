@@ -44,7 +44,6 @@ public class EnvoyConfiguration {
   public final Boolean enableInterfaceBinding;
   public final Integer h2ConnectionKeepaliveIdleIntervalMilliseconds;
   public final Integer h2ConnectionKeepaliveTimeoutSeconds;
-  public final Boolean h2ExtendKeepaliveTimeout;
   public final Integer maxConnectionsPerHost;
   public final List<EnvoyHTTPFilterFactory> httpPlatformFilterFactories;
   public final Integer statsFlushSeconds;
@@ -99,9 +98,6 @@ public class EnvoyConfiguration {
    * @param h2ConnectionKeepaliveIdleIntervalMilliseconds rate in milliseconds seconds to send h2
    *                                                      pings on stream creation.
    * @param h2ConnectionKeepaliveTimeoutSeconds           rate in seconds to timeout h2 pings.
-   * @param h2ExtendKeepaliveTimeout                      Extend the keepalive timeout when *any*
-   *                                                      frame is received
-   *                                                      on the owning HTTP/2 connection.
    * @param maxConnectionsPerHost                         maximum number of connections to open to a
    *                                                      single host.
    * @param statsFlushSeconds                             interval at which to flush Envoy stats.
@@ -129,7 +125,7 @@ public class EnvoyConfiguration {
       boolean enableGzip, boolean enableBrotli, boolean enableSocketTagging,
       boolean enableHappyEyeballs, boolean enableInterfaceBinding,
       int h2ConnectionKeepaliveIdleIntervalMilliseconds, int h2ConnectionKeepaliveTimeoutSeconds,
-      boolean h2ExtendKeepaliveTimeout, int maxConnectionsPerHost, int statsFlushSeconds,
+      int maxConnectionsPerHost, int statsFlushSeconds,
       int streamIdleTimeoutSeconds, int perTryIdleTimeoutSeconds, String appVersion, String appId,
       TrustChainVerification trustChainVerification, String virtualClusters,
       List<EnvoyNativeFilterConfig> nativeFilterChain,
@@ -157,7 +153,6 @@ public class EnvoyConfiguration {
     this.h2ConnectionKeepaliveIdleIntervalMilliseconds =
         h2ConnectionKeepaliveIdleIntervalMilliseconds;
     this.h2ConnectionKeepaliveTimeoutSeconds = h2ConnectionKeepaliveTimeoutSeconds;
-    this.h2ExtendKeepaliveTimeout = h2ExtendKeepaliveTimeout;
     this.maxConnectionsPerHost = maxConnectionsPerHost;
     this.statsFlushSeconds = statsFlushSeconds;
     this.streamIdleTimeoutSeconds = streamIdleTimeoutSeconds;

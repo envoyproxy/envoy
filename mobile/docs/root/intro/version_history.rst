@@ -7,6 +7,7 @@ Pending Release
 Breaking changes:
 
 - ios/android: remove ``addH2RawDomains`` method. (:issue: `#2590 <2590>`)
+- ios/android: remove ``h2ExtendKeepaliveTimeout`` method. (:issue: `#25042 <25042>`)
 - build: building on macOS now requires Xcode 14.1. (:issue:`#2664 <2664>`)
 - kotlin: always use ``getaddrinfo`` DNS resolver. Remove ``addDNSFallbackNameservers``, ``enableDNSFilterUnroutableFamilies``, and ``enableDNSUseSystemResolver`` methods from the Kotlin engine builder. (:issue:`#2618 <2618>`)
 - Envoy Mobile's release builds compile without admin support by default. (``--define=admin_functionality=disabled``) (:issue`#2693 <2693>`)
