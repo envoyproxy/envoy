@@ -422,6 +422,8 @@ void DecoderImpl::parseReconfigRequest(Buffer::Instance& data, uint64_t& offset,
 void DecoderImpl::parseSetWatchesRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
   ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + (3 * INT_LENGTH));
 
+  // Ignore relative Zxid.
+  helper_.peekInt64(data, offset);
   // Data watches.
   skipStrings(data, offset);
   // Exist watches.
@@ -448,6 +450,12 @@ void DecoderImpl::parseXWatchesRequest(Buffer::Instance& data, uint64_t& offset,
 
 void DecoderImpl::skipString(Buffer::Instance& data, uint64_t& offset) {
   const int32_t slen = helper_.peekInt32(data, offset);
+  if (slen < 0) {
+    ENVOY_LOG(trace,
+              "zookeeper_proxy: decoding response with negative string length {} at offset {}",
+              slen, offset);
+    return;
+  }
   helper_.skip(slen, offset);
 }
 
