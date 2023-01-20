@@ -5,6 +5,9 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: healthcheck
+  change: |
+    If active HC is enabled and a host is ejected by outlier detection, a successful active health check unejects the host and consider it healthy. This also clears all the outlier detection counters. This behavior change can be reverted by setting ``envoy.reloadable_features_successful_active_health_check_uneject_host`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
