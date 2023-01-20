@@ -19,21 +19,22 @@ namespace Upstream {
 RingHashLoadBalancer::RingHashLoadBalancer(
     const PrioritySet& priority_set, ClusterLbStats& stats, Stats::Scope& scope,
     Runtime::Loader& runtime, Random::RandomGenerator& random,
-    const absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig>& config,
+    OptRef<const envoy::config::cluster::v3::Cluster::RingHashLbConfig> config,
     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
     : ThreadAwareLoadBalancerBase(priority_set, stats, runtime, random,
                                   PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
                                       common_config, healthy_panic_threshold, 100, 50),
                                   common_config.has_locality_weighted_lb_config()),
       scope_(scope.createScope("ring_hash_lb.")), stats_(generateStats(*scope_)),
-      min_ring_size_(config ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.value(), minimum_ring_size,
-                                                              DefaultMinRingSize)
-                            : DefaultMinRingSize),
-      max_ring_size_(config ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.value(), maximum_ring_size,
-                                                              DefaultMaxRingSize)
-                            : DefaultMaxRingSize),
-      hash_function_(config ? config.value().hash_function()
-                            : HashFunction::Cluster_RingHashLbConfig_HashFunction_XX_HASH),
+      min_ring_size_(config.has_value() ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+                                              config.ref(), minimum_ring_size, DefaultMinRingSize)
+                                        : DefaultMinRingSize),
+      max_ring_size_(config.has_value() ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+                                              config.ref(), maximum_ring_size, DefaultMaxRingSize)
+                                        : DefaultMaxRingSize),
+      hash_function_(config.has_value()
+                         ? config->hash_function()
+                         : HashFunction::Cluster_RingHashLbConfig_HashFunction_XX_HASH),
       use_hostname_for_hashing_(
           common_config.has_consistent_hashing_lb_config()
               ? common_config.consistent_hashing_lb_config().use_hostname_for_hashing()
