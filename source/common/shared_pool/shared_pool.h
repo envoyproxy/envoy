@@ -43,8 +43,8 @@ public:
 
   void deleteObject(T* ptr) {
     if (std::this_thread::get_id() == thread_id_) {
-      if (auto iter = object_pool_.find(ptr);
-          iter != object_pool_.end() && iter->use_count() == 0) {
+      if (auto iter = object_pool_.find(ptr); iter != object_pool_.end()) {
+        ASSERT(iter->use_count() == 0);
         object_pool_.erase(iter);
         // Wait till here to delete the pointer because we don't want the OS to
         // reallocate the memory location before this method completes to prevent
@@ -65,22 +65,20 @@ public:
   std::shared_ptr<T> getObject(const T& obj) {
     ASSERT(std::this_thread::get_id() == thread_id_);
 
-    auto iter = object_pool_.find(&obj);
-    if (iter != object_pool_.end()) {
+    // Return from the object pool if we find the object there.
+    if (auto iter = object_pool_.find(&obj); iter != object_pool_.end()) {
       auto lock_object = iter->lock();
       if (lock_object) {
         return lock_object;
       }
     }
 
+    // Create a shared_ptr and add the object to the object_pool.
     auto this_shared_ptr = this->shared_from_this();
     std::shared_ptr<T> obj_shared(new T(obj), [this_shared_ptr](T* ptr) {
       this_shared_ptr->sync().syncPoint(ObjectSharedPool<T>::ObjectDeleterEntry);
       this_shared_ptr->deleteObject(ptr);
     });
-
-    // Add the object to the object pool. Note that we store a weak_ptr in the
-    // pool.
     object_pool_.emplace(obj_shared);
     return obj_shared;
   }
