@@ -77,7 +77,6 @@ class EnvoyConfigurationTest {
     enableInterfaceBinding: Boolean = false,
     h2ConnectionKeepaliveIdleIntervalMilliseconds: Int = 222,
     h2ConnectionKeepaliveTimeoutSeconds: Int = 333,
-    h2ExtendKeepaliveTimeout: Boolean = false,
     maxConnectionsPerHost: Int = 543,
     statsFlushSeconds: Int = 567,
     streamIdleTimeoutSeconds: Int = 678,
@@ -109,7 +108,6 @@ class EnvoyConfigurationTest {
       enableInterfaceBinding,
       h2ConnectionKeepaliveIdleIntervalMilliseconds,
       h2ConnectionKeepaliveTimeoutSeconds,
-      h2ExtendKeepaliveTimeout,
       maxConnectionsPerHost,
       statsFlushSeconds,
       streamIdleTimeoutSeconds,
@@ -213,7 +211,6 @@ class EnvoyConfigurationTest {
       enableGzip = false,
       enableBrotli = true,
       enableInterfaceBinding = true,
-      h2ExtendKeepaliveTimeout = true,
       enableSkipDNSLookupForProxiedRequests = true,
       enablePlatformCertificatesValidation = true
     )
@@ -228,9 +225,6 @@ CERT_VALIDATION_TEMPLATE
     assertThat(resolvedTemplate).contains("&dns_multiple_addresses true")
     assertThat(resolvedTemplate).contains("&enable_drain_post_dns_refresh true")
     assertThat(resolvedTemplate).contains("config: persistent_dns_cache")
-
-    // H2
-    assertThat(resolvedTemplate).contains("&h2_delay_keepalive_timeout true")
 
     // H3
     assertThat(resolvedTemplate).doesNotContain(APCF_INSERT);

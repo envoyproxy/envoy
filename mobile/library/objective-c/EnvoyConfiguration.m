@@ -26,7 +26,6 @@
     h2ConnectionKeepaliveIdleIntervalMilliseconds:
         (UInt32)h2ConnectionKeepaliveIdleIntervalMilliseconds
               h2ConnectionKeepaliveTimeoutSeconds:(UInt32)h2ConnectionKeepaliveTimeoutSeconds
-                         h2ExtendKeepaliveTimeout:(BOOL)h2ExtendKeepaliveTimeout
                             maxConnectionsPerHost:(UInt32)maxConnectionsPerHost
                                 statsFlushSeconds:(UInt32)statsFlushSeconds
                          streamIdleTimeoutSeconds:(UInt32)streamIdleTimeoutSeconds
@@ -74,7 +73,6 @@
   self.h2ConnectionKeepaliveIdleIntervalMilliseconds =
       h2ConnectionKeepaliveIdleIntervalMilliseconds;
   self.h2ConnectionKeepaliveTimeoutSeconds = h2ConnectionKeepaliveTimeoutSeconds;
-  self.h2ExtendKeepaliveTimeout = h2ExtendKeepaliveTimeout;
   self.maxConnectionsPerHost = maxConnectionsPerHost;
   self.statsFlushSeconds = statsFlushSeconds;
   self.streamIdleTimeoutSeconds = streamIdleTimeoutSeconds;
@@ -171,8 +169,6 @@
                             self.enableHappyEyeballs ? @"ALL" : @"V4_PREFERRED"];
   [definitions appendFormat:@"- &dns_multiple_addresses %@\n",
                             self.enableHappyEyeballs ? @"true" : @"false"];
-  [definitions appendFormat:@"- &h2_delay_keepalive_timeout %@\n",
-                            self.h2ExtendKeepaliveTimeout ? @"true" : @"false"];
   [definitions appendFormat:@"- &dns_refresh_rate %lus\n", (unsigned long)self.dnsRefreshSeconds];
   [definitions appendFormat:@"- &enable_drain_post_dns_refresh %@\n",
                             self.enableDrainPostDnsRefresh ? @"true" : @"false"];

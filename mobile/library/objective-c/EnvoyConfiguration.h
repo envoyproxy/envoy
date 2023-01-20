@@ -31,7 +31,6 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) BOOL enablePlatformCertificateValidation;
 @property (nonatomic, assign) UInt32 h2ConnectionKeepaliveIdleIntervalMilliseconds;
 @property (nonatomic, assign) UInt32 h2ConnectionKeepaliveTimeoutSeconds;
-@property (nonatomic, assign) BOOL h2ExtendKeepaliveTimeout;
 @property (nonatomic, assign) UInt32 maxConnectionsPerHost;
 @property (nonatomic, assign) UInt32 statsFlushSeconds;
 @property (nonatomic, assign) UInt32 streamIdleTimeoutSeconds;
@@ -72,7 +71,6 @@ NS_ASSUME_NONNULL_BEGIN
     h2ConnectionKeepaliveIdleIntervalMilliseconds:
         (UInt32)h2ConnectionKeepaliveIdleIntervalMilliseconds
               h2ConnectionKeepaliveTimeoutSeconds:(UInt32)h2ConnectionKeepaliveTimeoutSeconds
-                         h2ExtendKeepaliveTimeout:(BOOL)h2ExtendKeepaliveTimeout
                             maxConnectionsPerHost:(UInt32)maxConnectionsPerHost
                                 statsFlushSeconds:(UInt32)statsFlushSeconds
                          streamIdleTimeoutSeconds:(UInt32)streamIdleTimeoutSeconds

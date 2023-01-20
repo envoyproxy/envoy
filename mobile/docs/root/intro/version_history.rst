@@ -13,6 +13,7 @@ Breaking changes:
 - swift/kotlin: remove `gauge`, `timer`, and `distribution` methods from the PulseClient.
 - swift/kotlin: add `cancel` method to `GRPCStream`` type (:issue:`#24780 <24780>`).
 - all: enable HTTP/3 by default in Engine builders.
+- api: remove ``extendKeepaliveTimeout`` method from engine builders.
 
 Bugfixes:
 
