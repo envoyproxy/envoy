@@ -163,7 +163,7 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("&h2_connection_keepalive_timeout 333s")
 
     // H3
-    assertThat(resolvedTemplate).doesNotContain(APCF_INSERT);
+    assertThat(resolvedTemplate).contains(APCF_INSERT);
 
     // Gzip
     assertThat(resolvedTemplate).contains(GZIP_INSERT);
