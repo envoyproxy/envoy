@@ -184,11 +184,6 @@ EngineBuilder& EngineBuilder::enforceTrustChainVerification(bool trust_chain_ver
   return *this;
 }
 
-EngineBuilder& EngineBuilder::enableH2ExtendKeepaliveTimeout(bool h2_extend_keepalive_timeout_on) {
-  h2_extend_keepalive_timeout_ = h2_extend_keepalive_timeout_on;
-  return *this;
-}
-
 EngineBuilder&
 EngineBuilder::enablePlatformCertificatesValidation(bool platform_certificates_validation_on) {
   platform_certificates_validation_on_ = platform_certificates_validation_on;
