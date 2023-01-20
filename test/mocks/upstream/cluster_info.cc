@@ -171,8 +171,8 @@ MockClusterInfo::MockClusterInfo()
       }));
   ON_CALL(*this, clusterType())
       .WillByDefault(
-          Invoke([this]() -> OptRef<envoy::config::cluster::v3::Cluster::CustomClusterType> {
-            return makeOptRefFromPtr<envoy::config::cluster::v3::Cluster::CustomClusterType>(
+          Invoke([this]() -> OptRef<const envoy::config::cluster::v3::Cluster::CustomClusterType> {
+            return makeOptRefFromPtr<const envoy::config::cluster::v3::Cluster::CustomClusterType>(
                 cluster_type_.get());
           }));
   ON_CALL(*this, upstreamHttpProtocol(_))

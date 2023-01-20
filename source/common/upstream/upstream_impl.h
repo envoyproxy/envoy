@@ -762,7 +762,8 @@ public:
   LoadBalancerType lbType() const override { return lb_type_; }
   envoy::config::cluster::v3::Cluster::DiscoveryType type() const override { return type_; }
 
-  OptRef<envoy::config::cluster::v3::Cluster::CustomClusterType> clusterType() const override {
+  OptRef<const envoy::config::cluster::v3::Cluster::CustomClusterType>
+  clusterType() const override {
     if (cluster_type_ == nullptr) {
       return absl::nullopt;
     }
@@ -975,7 +976,7 @@ private:
   const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>
       upstream_http_protocol_options_;
   absl::optional<std::string> eds_service_name_;
-  const std::unique_ptr<envoy::config::cluster::v3::Cluster::CustomClusterType> cluster_type_;
+  const std::unique_ptr<const envoy::config::cluster::v3::Cluster::CustomClusterType> cluster_type_;
   const std::unique_ptr<Server::Configuration::CommonFactoryContext> factory_context_;
   std::vector<Network::FilterFactoryCb> filter_factories_;
   Http::FilterChainUtility::FilterFactoriesList http_filter_factories_;

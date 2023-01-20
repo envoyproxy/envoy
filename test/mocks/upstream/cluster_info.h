@@ -131,7 +131,7 @@ public:
   MOCK_METHOD(const envoy::config::cluster::v3::Cluster::CommonLbConfig&, lbConfig, (), (const));
   MOCK_METHOD(LoadBalancerType, lbType, (), (const));
   MOCK_METHOD(envoy::config::cluster::v3::Cluster::DiscoveryType, type, (), (const));
-  MOCK_METHOD(OptRef<envoy::config::cluster::v3::Cluster::CustomClusterType>, clusterType, (),
+  MOCK_METHOD(OptRef<const envoy::config::cluster::v3::Cluster::CustomClusterType>, clusterType, (),
               (const));
   MOCK_METHOD(OptRef<const envoy::config::cluster::v3::Cluster::RingHashLbConfig>, lbRingHashConfig,
               (), (const));
@@ -229,7 +229,7 @@ public:
   LoadBalancerType lb_type_{LoadBalancerType::RoundRobin};
   envoy::config::cluster::v3::Cluster::DiscoveryType type_{
       envoy::config::cluster::v3::Cluster::STRICT_DNS};
-  std::unique_ptr<envoy::config::cluster::v3::Cluster::CustomClusterType> cluster_type_;
+  const std::unique_ptr<const envoy::config::cluster::v3::Cluster::CustomClusterType> cluster_type_;
   NiceMock<MockLoadBalancerSubsetInfo> lb_subset_;
   absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>
       upstream_http_protocol_options_;
