@@ -229,9 +229,6 @@ CERT_VALIDATION_TEMPLATE
     assertThat(resolvedTemplate).contains("&enable_drain_post_dns_refresh true")
     assertThat(resolvedTemplate).contains("config: persistent_dns_cache")
 
-    // H2
-    assertThat(resolvedTemplate).contains("&h2_delay_keepalive_timeout true")
-
     // H3
     assertThat(resolvedTemplate).contains(APCF_INSERT);
 

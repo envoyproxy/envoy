@@ -1222,47 +1222,6 @@ TEST_P(Http2CodecImplTest, KeepaliveTimeoutDelay) {
   driveToCompletion();
 }
 
-// Verify that extending the timeout is not performed when a frame is received and the feature
-// flag is disabled.
-TEST_P(Http2CodecImplTest, KeepaliveTimeoutDelayRuntimeFalse) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.http2_delay_keepalive_timeout", "false"}});
-
-  constexpr uint32_t interval_ms = 100;
-  constexpr uint32_t timeout_ms = 200;
-  client_http2_options_.mutable_connection_keepalive()->mutable_interval()->set_nanos(interval_ms *
-                                                                                      1000 * 1000);
-  client_http2_options_.mutable_connection_keepalive()->mutable_timeout()->set_nanos(timeout_ms *
-                                                                                     1000 * 1000);
-  client_http2_options_.mutable_connection_keepalive()->mutable_interval_jitter()->set_value(0);
-  auto timeout_timer = new NiceMock<Event::MockTimer>(&client_connection_.dispatcher_);
-  auto send_timer = new NiceMock<Event::MockTimer>(&client_connection_.dispatcher_);
-  EXPECT_CALL(*timeout_timer, disableTimer());
-  EXPECT_CALL(*send_timer, enableTimer(std::chrono::milliseconds(interval_ms), _));
-  initialize();
-  InSequence s;
-
-  // Initiate a request.
-  TestRequestHeaderMapImpl request_headers;
-  HttpTestUtility::addDefaultHeaders(request_headers);
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
-  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
-  driveToCompletion();
-
-  // Now send a ping.
-  EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(timeout_ms), _));
-  send_timer->invokeCallback();
-
-  // Send the response and make sure the keepalive timeout is not extended. After the response is
-  // received the ACK will come in and reset.
-  EXPECT_CALL(response_decoder_, decodeHeaders_(_, true));
-  EXPECT_CALL(*timeout_timer, disableTimer()); // This indicates that an ACK was received.
-  EXPECT_CALL(*send_timer, enableTimer(std::chrono::milliseconds(interval_ms), _));
-  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-  response_encoder_->encodeHeaders(response_headers, true);
-  driveToCompletion();
-}
-
 // Validate that jitter is added as expected based on configuration.
 TEST_P(Http2CodecImplTest, ConnectionKeepaliveJitter) {
   client_http2_options_.mutable_connection_keepalive()->mutable_interval()->set_seconds(1);

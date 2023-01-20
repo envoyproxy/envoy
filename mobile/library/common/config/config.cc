@@ -137,7 +137,6 @@ R"(- &enable_drain_post_dns_refresh false
 - &enable_interface_binding false
 - &h2_connection_keepalive_idle_interval 100000s
 - &h2_connection_keepalive_timeout 10s
-- &h2_delay_keepalive_timeout false
 - &max_connections_per_host 7
 - &metadata {}
 - &stats_domain 127.0.0.1
@@ -534,7 +533,6 @@ layered_runtime:
           reloadable_features:
             allow_multiple_dns_addresses: *dns_multiple_addresses
             always_use_v6: *force_ipv6
-            http2_delay_keepalive_timeout: *h2_delay_keepalive_timeout
             skip_dns_lookup_for_proxied_requests: *skip_dns_lookup_for_proxied_requests
 )"
 // Needed due to warning in
