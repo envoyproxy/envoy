@@ -108,12 +108,6 @@ public:
     return const_cast<Envoy::OptRef<const T&>>(get<element_name>());
   }
 
-  // Check to see if element is populated.
-  template <ElementName element_name> bool has() const {
-    sizeCheck<element_name>();
-    return indices_[static_cast<std::underlying_type_t<ElementName>>(element_name)] < max_size;
-  }
-
   // Set element.
   template <ElementName element_name> void set(T t) {
     sizeCheck<element_name>();
@@ -160,6 +154,12 @@ public:
 
 private:
   size_t capacity() const { return indices_[max_size]; }
+
+  // Check to see if element is populated.
+  template <ElementName element_name> bool has() const {
+    sizeCheck<element_name>();
+    return indices_[static_cast<std::underlying_type_t<ElementName>>(element_name)] < max_size;
+  }
 
   template <ElementName element_name> static constexpr void sizeCheck() {
     // Elements of ElementName cast to size_t should be less than max_size.
