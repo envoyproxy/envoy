@@ -909,6 +909,10 @@ def _com_github_google_quiche():
         name = "quiche_quic_platform_base",
         actual = "@com_github_google_quiche//:quic_platform_base",
     )
+    native.bind(
+        name = "quiche_spdy_hpack",
+        actual = "@com_github_google_quiche//:spdy_core_hpack_hpack_lib",
+    )
 
 def _com_googlesource_googleurl():
     external_http_archive(

@@ -121,7 +121,7 @@ CompressorFilterConfigSharedPtr makeGzipConfig(Stats::IsolatedStoreImpl& stats,
   Envoy::Compression::Compressor::CompressorFactoryPtr compressor_factory =
       std::make_unique<MockGzipCompressorFactory>(level, strategy, window_bits, memory_level);
   CompressorFilterConfigSharedPtr config = std::make_shared<CompressorFilterConfig>(
-      compressor, "test.", stats, runtime, std::move(compressor_factory));
+      compressor, "test.", *stats.rootScope(), runtime, std::move(compressor_factory));
 
   return config;
 }
@@ -137,7 +137,7 @@ CompressorFilterConfigSharedPtr makeZstdConfig(Stats::IsolatedStoreImpl& stats,
   Envoy::Compression::Compressor::CompressorFactoryPtr compressor_factory =
       std::make_unique<MockZstdCompressorFactory>(level, strategy);
   CompressorFilterConfigSharedPtr config = std::make_shared<CompressorFilterConfig>(
-      compressor, "test.", stats, runtime, std::move(compressor_factory));
+      compressor, "test.", *stats.rootScope(), runtime, std::move(compressor_factory));
 
   return config;
 }
@@ -152,7 +152,7 @@ CompressorFilterConfigSharedPtr makeBrotliConfig(Stats::IsolatedStoreImpl& stats
   Envoy::Compression::Compressor::CompressorFactoryPtr compressor_factory =
       std::make_unique<MockBrotliCompressorFactory>(quality);
   CompressorFilterConfigSharedPtr config = std::make_shared<CompressorFilterConfig>(
-      compressor, "test.", stats, runtime, std::move(compressor_factory));
+      compressor, "test.", *stats.rootScope(), runtime, std::move(compressor_factory));
 
   return config;
 }
