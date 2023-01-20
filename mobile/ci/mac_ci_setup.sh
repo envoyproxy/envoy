@@ -10,6 +10,23 @@ set -e
 # a list of pre-installed tools in the macOS image.
 
 export HOMEBREW_NO_AUTO_UPDATE=1
+HOMEBREW_RETRY_ATTEMPTS=10
+HOMEBREW_RETRY_INTERVAL=3
+
+
+function retry () {
+    local returns=1 i=1
+    while ((i<=HOMEBREW_RETRY_ATTEMPTS)); do
+        if "$@"; then
+            returns=0
+            break
+        else
+            sleep "$HOMEBREW_RETRY_INTERVAL";
+            ((i++))
+        fi
+    done
+    return "$returns"
+}
 
 function is_installed {
     brew ls --versions "$1" >/dev/null
@@ -17,17 +34,16 @@ function is_installed {
 
 function install {
     echo "Installing $1"
-    if ! brew install "$1"; then
+    if ! retry brew install "$1"; then
         echo "Failed to install $1"
         exit 1
     fi
 }
 
-# Disabled due to frequent CI failures for now.
-#if ! brew update; then
-#    echo "Failed to update homebrew"
-#    exit 1
-#fi
+if ! retry brew update; then
+  # Do not exit early if update fails.
+  echo "Failed to update homebrew"
+fi
 
 DEPS="automake cmake coreutils libtool wget ninja"
 for DEP in ${DEPS}
