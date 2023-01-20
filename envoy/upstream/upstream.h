@@ -1007,8 +1007,7 @@ public:
    * @return const absl::optional<envoy::config::core::v3::TypedExtensionConfig>& the configuration
    *         for the upstream, if a custom upstream is configured.
    */
-  virtual OptRef<envoy::config::core::v3::TypedExtensionConfig>
-  upstreamConfig() const PURE;
+  virtual OptRef<envoy::config::core::v3::TypedExtensionConfig> upstreamConfig() const PURE;
 
   /**
    * @return Whether the cluster is currently in maintenance mode and should not be routed to.

@@ -154,13 +154,10 @@ MockClusterInfo::MockClusterInfo()
                 lb_original_dst_config_.get());
           }));
   ON_CALL(*this, upstreamConfig())
-      .WillByDefault(Invoke(
-          [this]() -> OptRef<envoy::config::core::v3::TypedExtensionConfig> {
-            return makeOptRefFromPtr<
-            envoy::config::core::v3::TypedExtensionConfig>(
-              upstream_config_.get());
-          }));
-
+      .WillByDefault(Invoke([this]() -> OptRef<envoy::config::core::v3::TypedExtensionConfig> {
+        return makeOptRefFromPtr<envoy::config::core::v3::TypedExtensionConfig>(
+            upstream_config_.get());
+      }));
 
   ON_CALL(*this, lbConfig()).WillByDefault(ReturnRef(lb_config_));
   ON_CALL(*this, metadata()).WillByDefault(ReturnRef(metadata_));
