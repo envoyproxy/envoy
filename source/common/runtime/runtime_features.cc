@@ -101,6 +101,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_runtime_initialized);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_always_use_v6);
 // TODO(alyssawilk) remove in Q2.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_no_delay_close_for_upgrades);
+// TODO(alyssawilk) flip once Lyft has tested.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_api_listener);
 // TODO(pradeepcrao) reset this to true after 2 releases (1.27)
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_include_histograms);
 
