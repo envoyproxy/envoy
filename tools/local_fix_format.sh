@@ -22,6 +22,13 @@
 # If DISPLAY is set, then tkdiff pops up for some BUILD changes.
 unset DISPLAY
 
+if [[ $# > 0 && "$1" == "-verbose" ]]; then
+  verbose=1
+  shift
+else
+  verbose=0
+fi
+
 if [[ $# > 0 && "$1" == "-all" ]]; then
   echo "Checking all files in the repo...this may take a while."
   shift
@@ -44,6 +51,11 @@ else
   fi
 fi
 
-set -x
-./tools/code_format/check_format.py fix $args |& grep -v "no longer checks API"
+echo "args=$args"
+
+if [[ "$verbose" == "1" ]]; then
+  set -x
+fi
+
+./tools/code_format/check_format.py fix $args
 ./tools/spelling/check_spelling_pedantic.py fix $args
