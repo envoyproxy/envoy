@@ -25,6 +25,7 @@ using testing::ReturnRef;
 
 using envoy::config::core::v3::ProxyProtocolConfig;
 using envoy::config::core::v3::ProxyProtocolConfig_Version;
+using envoy::config::core::v3::ProxyProtocolPassThroughTLVs;
 
 namespace Envoy {
 namespace Extensions {
@@ -34,13 +35,13 @@ namespace {
 
 class ProxyProtocolTest : public testing::Test {
 public:
-  void initialize(ProxyProtocolConfig_Version version,
+  void initialize(ProxyProtocolConfig& config,
                   Network::TransportSocketOptionsConstSharedPtr socket_options) {
     auto inner_socket = std::make_unique<NiceMock<Network::MockTransportSocket>>();
     inner_socket_ = inner_socket.get();
     ON_CALL(transport_callbacks_, ioHandle()).WillByDefault(ReturnRef(io_handle_));
     proxy_protocol_socket_ = std::make_unique<UpstreamProxyProtocolSocket>(std::move(inner_socket),
-                                                                           socket_options, version);
+                                                                           socket_options, config);
     proxy_protocol_socket_->setTransportSocketCallbacks(transport_callbacks_);
     proxy_protocol_socket_->onConnected();
   }
@@ -60,7 +61,9 @@ TEST_F(ProxyProtocolTest, InjectesHeaderOnlyOnce) {
   Buffer::OwnedImpl expected_buff{};
   Common::ProxyProtocol::generateV1Header("174.2.2.222", "172.0.0.1", 50000, 80,
                                           Network::Address::IpVersion::v4, expected_buff);
-  initialize(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1, nullptr);
+  ProxyProtocolConfig config;
+  config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1);
+  initialize(config, nullptr);
 
   EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
@@ -90,7 +93,9 @@ TEST_F(ProxyProtocolTest, BytesProcessedIncludesProxyProtocolHeader) {
   Buffer::OwnedImpl expected_buff{};
   Common::ProxyProtocol::generateV1Header("174.2.2.222", "172.0.0.1", 50000, 80,
                                           Network::Address::IpVersion::v4, expected_buff);
-  initialize(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1, nullptr);
+  ProxyProtocolConfig config;
+  config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1);
+  initialize(config, nullptr);
 
   EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
@@ -123,7 +128,9 @@ TEST_F(ProxyProtocolTest, ReturnsKeepOpenWhenWriteErrorIsAgain) {
   Buffer::OwnedImpl expected_buff{};
   Common::ProxyProtocol::generateV1Header("174.2.2.222", "172.0.0.1", 50000, 80,
                                           Network::Address::IpVersion::v4, expected_buff);
-  initialize(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1, nullptr);
+  ProxyProtocolConfig config;
+  config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1);
+  initialize(config, nullptr);
 
   auto msg = Buffer::OwnedImpl("some data");
   {
@@ -159,7 +166,9 @@ TEST_F(ProxyProtocolTest, ReturnsCloseWhenWriteErrorIsNotAgain) {
   Buffer::OwnedImpl expected_buff{};
   Common::ProxyProtocol::generateV1Header("174.2.2.222", "172.0.0.1", 50000, 80,
                                           Network::Address::IpVersion::v4, expected_buff);
-  initialize(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1, nullptr);
+  ProxyProtocolConfig config;
+  config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1);
+  initialize(config, nullptr);
 
   auto msg = Buffer::OwnedImpl("some data");
   {
@@ -185,7 +194,9 @@ TEST_F(ProxyProtocolTest, V1IPV4LocalAddressWhenTransportOptionsAreNull) {
   Buffer::OwnedImpl expected_buff{};
   Common::ProxyProtocol::generateV1Header("174.2.2.222", "172.0.0.1", 50000, 80,
                                           Network::Address::IpVersion::v4, expected_buff);
-  initialize(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1, nullptr);
+  ProxyProtocolConfig config;
+  config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1);
+  initialize(config, nullptr);
 
   EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
@@ -208,8 +219,9 @@ TEST_F(ProxyProtocolTest, V1IPV4LocalAddressesWhenHeaderOptionsAreNull) {
   Buffer::OwnedImpl expected_buff{};
   Common::ProxyProtocol::generateV1Header("174.2.2.222", "172.0.0.1", 50000, 80,
                                           Network::Address::IpVersion::v4, expected_buff);
-  initialize(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1,
-             std::make_shared<Network::TransportSocketOptionsImpl>());
+  ProxyProtocolConfig config;
+  config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1);
+  initialize(config, std::make_shared<Network::TransportSocketOptionsImpl>());
 
   EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
@@ -232,8 +244,9 @@ TEST_F(ProxyProtocolTest, V1IPV6LocalAddressesWhenHeaderOptionsAreNull) {
   Buffer::OwnedImpl expected_buff{};
   Common::ProxyProtocol::generateV1Header("a:b:c:d::", "e:b:c:f::", 50000, 8080,
                                           Network::Address::IpVersion::v6, expected_buff);
-  initialize(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1,
-             std::make_shared<Network::TransportSocketOptionsImpl>());
+  ProxyProtocolConfig config;
+  config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1);
+  initialize(config, std::make_shared<Network::TransportSocketOptionsImpl>());
 
   EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
@@ -265,7 +278,9 @@ TEST_F(ProxyProtocolTest, V1IPV4DownstreamAddresses) {
   Buffer::OwnedImpl expected_buff{};
   Common::ProxyProtocol::generateV1Header("202.168.0.13", "174.2.2.222", 52000, 80,
                                           Network::Address::IpVersion::v4, expected_buff);
-  initialize(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1, socket_options);
+  ProxyProtocolConfig config;
+  config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1);
+  initialize(config, socket_options);
 
   EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
@@ -297,7 +312,9 @@ TEST_F(ProxyProtocolTest, V1IPV6DownstreamAddresses) {
   Buffer::OwnedImpl expected_buff{};
   Common::ProxyProtocol::generateV1Header("1::2:3", "a:b:c:d::", 52000, 80,
                                           Network::Address::IpVersion::v6, expected_buff);
-  initialize(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1, socket_options);
+  ProxyProtocolConfig config;
+  config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1);
+  initialize(config, socket_options);
 
   EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
@@ -319,7 +336,10 @@ TEST_F(ProxyProtocolTest, V2IPV4LocalCommandWhenTransportOptionsAreNull) {
       ->setRemoteAddress(Network::Utility::resolveUrl("tcp://0.1.1.2:513"));
   Buffer::OwnedImpl expected_buff{};
   Common::ProxyProtocol::generateV2LocalHeader(expected_buff);
-  initialize(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2, nullptr);
+
+  ProxyProtocolConfig config;
+  config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2);
+  initialize(config, nullptr);
 
   EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
@@ -341,8 +361,10 @@ TEST_F(ProxyProtocolTest, V2IPV4LocalCommandWhenHeaderOptionsAreNull) {
       ->setRemoteAddress(Network::Utility::resolveUrl("tcp://0.1.1.2:513"));
   Buffer::OwnedImpl expected_buff{};
   Common::ProxyProtocol::generateV2LocalHeader(expected_buff);
-  initialize(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2,
-             std::make_shared<Network::TransportSocketOptionsImpl>());
+
+  ProxyProtocolConfig config;
+  config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2);
+  initialize(config, std::make_shared<Network::TransportSocketOptionsImpl>());
 
   EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
@@ -374,7 +396,9 @@ TEST_F(ProxyProtocolTest, V2IPV4DownstreamAddresses) {
   Buffer::OwnedImpl expected_buff{};
   Common::ProxyProtocol::generateV2Header("1.2.3.4", "0.1.1.2", 773, 513,
                                           Network::Address::IpVersion::v4, expected_buff);
-  initialize(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2, socket_options);
+  ProxyProtocolConfig config;
+  config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2);
+  initialize(config, socket_options);
 
   EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
@@ -406,7 +430,10 @@ TEST_F(ProxyProtocolTest, V2IPV6DownstreamAddresses) {
   Buffer::OwnedImpl expected_buff{};
   Common::ProxyProtocol::generateV2Header("1:2:3::4", "1:100:200:3::", 8, 2,
                                           Network::Address::IpVersion::v6, expected_buff);
-  initialize(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2, socket_options);
+
+  ProxyProtocolConfig config;
+  config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2);
+  initialize(config, socket_options);
 
   EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
@@ -435,7 +462,10 @@ TEST_F(ProxyProtocolTest, OnConnectedCallsInnerOnConnected) {
       ->setLocalAddress(Network::Utility::resolveUrl("tcp://[1:100:200:3::]:50000"));
   transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
       ->setRemoteAddress(Network::Utility::resolveUrl("tcp://[e:b:c:f::]:8080"));
-  initialize(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2, socket_options);
+
+  ProxyProtocolConfig config;
+  config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2);
+  initialize(config, socket_options);
 
   EXPECT_CALL(*inner_socket_, onConnected());
   proxy_protocol_socket_->onConnected();
@@ -459,8 +489,92 @@ TEST_F(ProxyProtocolTest, V2IPV4DownstreamAddressesAndTLVs) {
   transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
       ->setRemoteAddress(Network::Utility::resolveUrl("tcp://3.3.3.3:80"));
   Buffer::OwnedImpl expected_buff{};
-  Common::ProxyProtocol::generateV2Header(proxy_proto_data, expected_buff);
-  initialize(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2, socket_options);
+  absl::flat_hash_set<uint8_t> pass_tlvs_set{};
+  Common::ProxyProtocol::generateV2Header(proxy_proto_data, expected_buff, true, pass_tlvs_set);
+
+  ProxyProtocolConfig config;
+  config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2);
+  auto pass_through_tlvs = config.mutable_pass_through_tlvs();
+  pass_through_tlvs->set_match_type(ProxyProtocolPassThroughTLVs::INCLUDE_ALL);
+  initialize(config, socket_options);
+
+  EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+        auto length = buffer.length();
+        buffer.drain(length);
+        return Api::IoCallUint64Result(length, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
+      }));
+  auto msg = Buffer::OwnedImpl("some data");
+  EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false));
+
+  proxy_protocol_socket_->doWrite(msg, false);
+}
+
+// Test injects V2 PROXY protocol for downstream IPV4 addresses and TLVs with passing specific TLV.
+TEST_F(ProxyProtocolTest, V2IPV4PassSpecificTLVs) {
+  auto src_addr =
+      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("1.2.3.4", 773));
+  auto dst_addr =
+      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("0.1.1.2", 513));
+  // TLV type 0x5 is PP2_TYPE_UNIQUE_ID
+  Network::ProxyProtocolTLVVector tlv_vector{Network::ProxyProtocolTLV{0x5, std::string(16, 'a')}};
+  Network::ProxyProtocolData proxy_proto_data{src_addr, dst_addr, tlv_vector};
+  Network::TransportSocketOptionsConstSharedPtr socket_options =
+      std::make_shared<Network::TransportSocketOptionsImpl>(
+          "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
+          absl::optional<Network::ProxyProtocolData>(proxy_proto_data));
+  transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
+      ->setLocalAddress(Network::Utility::resolveUrl("tcp://0.1.1.2:50000"));
+  transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
+      ->setRemoteAddress(Network::Utility::resolveUrl("tcp://3.3.3.3:80"));
+  Buffer::OwnedImpl expected_buff{};
+  absl::flat_hash_set<uint8_t> pass_tlvs_set{0x05};
+  Common::ProxyProtocol::generateV2Header(proxy_proto_data, expected_buff, false, pass_tlvs_set);
+
+  ProxyProtocolConfig config;
+  config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2);
+  auto pass_through_tlvs = config.mutable_pass_through_tlvs();
+  pass_through_tlvs->set_match_type(ProxyProtocolPassThroughTLVs::INCLUDE);
+  pass_through_tlvs->add_tlv_type(0x05);
+  initialize(config, socket_options);
+
+  EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+        auto length = buffer.length();
+        buffer.drain(length);
+        return Api::IoCallUint64Result(length, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
+      }));
+  auto msg = Buffer::OwnedImpl("some data");
+  EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false));
+
+  proxy_protocol_socket_->doWrite(msg, false);
+}
+
+// Test injects V2 PROXY protocol for downstream IPV4 addresses and TLVs with empty passing TLV set.
+TEST_F(ProxyProtocolTest, V2IPV4PassEmptyTLVs) {
+  auto src_addr =
+      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("1.2.3.4", 773));
+  auto dst_addr =
+      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("0.1.1.2", 513));
+  // TLV type 0x5 is PP2_TYPE_UNIQUE_ID
+  Network::ProxyProtocolTLVVector tlv_vector{Network::ProxyProtocolTLV{0x5, std::string(16, 'a')}};
+  Network::ProxyProtocolData proxy_proto_data{src_addr, dst_addr, tlv_vector};
+  Network::TransportSocketOptionsConstSharedPtr socket_options =
+      std::make_shared<Network::TransportSocketOptionsImpl>(
+          "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
+          absl::optional<Network::ProxyProtocolData>(proxy_proto_data));
+  transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
+      ->setLocalAddress(Network::Utility::resolveUrl("tcp://0.1.1.2:50000"));
+  transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
+      ->setRemoteAddress(Network::Utility::resolveUrl("tcp://3.3.3.3:80"));
+  Buffer::OwnedImpl expected_buff{};
+  absl::flat_hash_set<uint8_t> pass_tlvs_set{};
+  Common::ProxyProtocol::generateV2Header(proxy_proto_data, expected_buff, false, pass_tlvs_set);
+
+  ProxyProtocolConfig config;
+  config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2);
+  config.mutable_pass_through_tlvs()->set_match_type(ProxyProtocolPassThroughTLVs::INCLUDE);
+  initialize(config, socket_options);
 
   EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
@@ -492,8 +606,51 @@ TEST_F(ProxyProtocolTest, V2IPV6DownstreamAddressesAndTLVs) {
   transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
       ->setRemoteAddress(Network::Utility::resolveUrl("tcp://[e:b:c:f::]:8080"));
   Buffer::OwnedImpl expected_buff{};
-  Common::ProxyProtocol::generateV2Header(proxy_proto_data, expected_buff);
-  initialize(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2, socket_options);
+  absl::flat_hash_set<uint8_t> pass_through_tlvs{};
+  Common::ProxyProtocol::generateV2Header(proxy_proto_data, expected_buff, true, pass_through_tlvs);
+
+  ProxyProtocolConfig config;
+  config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2);
+  config.mutable_pass_through_tlvs()->set_match_type(ProxyProtocolPassThroughTLVs::INCLUDE_ALL);
+  initialize(config, socket_options);
+
+  EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+        auto length = buffer.length();
+        buffer.drain(length);
+        return Api::IoCallUint64Result(length, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
+      }));
+  auto msg = Buffer::OwnedImpl("some data");
+  EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false));
+
+  proxy_protocol_socket_->doWrite(msg, false);
+}
+
+// Test injects V2 PROXY protocol for downstream IPV6 addresses and TLVs without pass TLV config.
+TEST_F(ProxyProtocolTest, V2IPV6DownstreamAddressesAndTLVsWithoutPassConfig) {
+  auto src_addr =
+      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv6Instance("1:2:3::4", 8));
+  auto dst_addr = Network::Address::InstanceConstSharedPtr(
+      new Network::Address::Ipv6Instance("1:100:200:3::", 2));
+  // TLV type 0x5 is PP2_TYPE_UNIQUE_ID
+  Network::ProxyProtocolTLVVector tlv_vector{Network::ProxyProtocolTLV{0x5, std::string(16, 'a')}};
+  Network::ProxyProtocolData proxy_proto_data{src_addr, dst_addr, tlv_vector};
+  Network::TransportSocketOptionsConstSharedPtr socket_options =
+      std::make_shared<Network::TransportSocketOptionsImpl>(
+          "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
+          absl::optional<Network::ProxyProtocolData>(proxy_proto_data));
+  transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
+      ->setLocalAddress(Network::Utility::resolveUrl("tcp://[1:100:200:3::]:50000"));
+  transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
+      ->setRemoteAddress(Network::Utility::resolveUrl("tcp://[e:b:c:f::]:8080"));
+  Buffer::OwnedImpl expected_buff{};
+  absl::flat_hash_set<uint8_t> pass_through_tlvs{};
+  Common::ProxyProtocol::generateV2Header(proxy_proto_data, expected_buff, false,
+                                          pass_through_tlvs);
+
+  ProxyProtocolConfig config;
+  config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2);
+  initialize(config, socket_options);
 
   EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {

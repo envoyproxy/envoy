@@ -9,6 +9,7 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
+#include "envoy/config/core/v3/proxy_protocol.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/stats/scope.h"
@@ -17,12 +18,15 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/fmt.h"
+#include "source/common/common/hex.h"
 #include "source/common/common/safe_memcpy.h"
 #include "source/common/common/utility.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/network/proxy_protocol_filter_state.h"
 #include "source/common/network/utility.h"
 #include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 
+using envoy::config::core::v3::ProxyProtocolPassThroughTLVs;
 using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V1_SIGNATURE;
 using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V1_SIGNATURE_LEN;
 using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_ADDR_LEN_INET;
@@ -51,6 +55,19 @@ Config::Config(
   for (const auto& rule : proto_config.rules()) {
     tlv_types_[0xFF & rule.tlv_type()] = rule.on_tlv_present();
   }
+
+  if (proto_config.has_pass_through_tlvs()) {
+    if (proto_config.pass_through_tlvs().match_type() ==
+        ProxyProtocolPassThroughTLVs::INCLUDE_ALL) {
+      pass_all_tlvs_ = true;
+    } else if (proto_config.pass_through_tlvs().match_type() ==
+               ProxyProtocolPassThroughTLVs::INCLUDE) {
+      pass_all_tlvs_ = false;
+      for (const auto& tlv_type : proto_config.pass_through_tlvs().tlv_type()) {
+        pass_through_tlvs_.insert(0xFF & tlv_type);
+      }
+    }
+  }
 }
 
 const KeyValuePair* Config::isTlvTypeNeeded(uint8_t type) const {
@@ -62,9 +79,11 @@ const KeyValuePair* Config::isTlvTypeNeeded(uint8_t type) const {
   return nullptr;
 }
 
-bool Config::isPassThroughTlvTypeNeeded(uint8_t) const {
-  // TODO: read config.
-  return true;
+bool Config::isPassThroughTlvTypeNeeded(uint8_t tlv_type) const {
+  if (pass_all_tlvs_) {
+    return true;
+  }
+  return pass_through_tlvs_.contains(tlv_type);
 }
 
 size_t Config::numberOfNeededTlvTypes() const { return tlv_types_.size(); }
@@ -127,6 +146,18 @@ ReadOrParseState Filter::parseBuffer(Network::ListenerFilterBuffer& buffer) {
   if (proxy_protocol_header_.has_value() &&
       !cb_->filterState().hasData<Network::ProxyProtocolFilterState>(
           Network::ProxyProtocolFilterState::key())) {
+    if (!proxy_protocol_header_.value().local_command_) {
+      auto buf = reinterpret_cast<const uint8_t*>(buffer.rawSlice().mem_);
+      ENVOY_LOG(
+          trace,
+          "Parsed proxy protocol header, length: {}, buffer: {}, TLV length: {}, TLV buffer: {}",
+          proxy_protocol_header_.value().wholeHeaderLength(),
+          Envoy::Hex::encode(buf, proxy_protocol_header_.value().wholeHeaderLength()),
+          proxy_protocol_header_.value().extensions_length_,
+          Envoy::Hex::encode(buf + proxy_protocol_header_.value().headerLengthWithoutExtension(),
+                             proxy_protocol_header_.value().extensions_length_));
+    }
+
     cb_->filterState().setData(
         Network::ProxyProtocolFilterState::key(),
         std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
@@ -391,12 +422,14 @@ bool Filter::parseTlvs(const uint8_t* buf, size_t len) {
       metadata.mutable_fields()->insert({key_value_pair->key(), metadata_value});
       cb_->setDynamicMetadata(metadata_key, metadata);
     } else {
-      ENVOY_LOG(trace, "proxy_protocol: Skip TLV of type {} since it's not needed", tlv_type);
+      ENVOY_LOG(trace,
+                "proxy_protocol: Skip TLV of type {} since it's not needed for dynamic metadata",
+                tlv_type);
     }
 
-    // Save TLV to the filter state.
+    // Save TLVs to the filter state.
     if (config_->isPassThroughTlvTypeNeeded(tlv_type)) {
-      ENVOY_LOG(trace, "proxy_protocol: Storing parsed TLV of type {}", tlv_type);
+      ENVOY_LOG(trace, "proxy_protocol: Storing parsed TLV of type {} to filter state.", tlv_type);
       parsed_tlvs_.push_back({tlv_type, std::string(tlv_value)});
     }
 

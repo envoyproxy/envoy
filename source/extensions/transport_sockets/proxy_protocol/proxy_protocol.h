@@ -21,7 +21,7 @@ class UpstreamProxyProtocolSocket : public TransportSockets::PassthroughSocket,
 public:
   UpstreamProxyProtocolSocket(Network::TransportSocketPtr&& transport_socket,
                               Network::TransportSocketOptionsConstSharedPtr options,
-                              ProxyProtocolConfig_Version version);
+                              ProxyProtocolConfig config);
 
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
   Network::IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
@@ -37,6 +37,8 @@ private:
   Network::TransportSocketCallbacks* callbacks_{};
   Buffer::OwnedImpl header_buffer_{};
   ProxyProtocolConfig_Version version_{ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1};
+  bool pass_all_tlvs_ = false;
+  absl::flat_hash_set<uint8_t> pass_through_tlvs_{};
 };
 
 class UpstreamProxyProtocolSocketFactory : public PassthroughFactory {
