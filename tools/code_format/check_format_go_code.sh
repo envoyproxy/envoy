@@ -10,7 +10,7 @@ root=$(realpath "$tools/..")
 cd "$root" || exit 1
 
 # all go files
-go_files=$(find . -name "*.go")
+go_files=($(find . -name "*.go"))
 
 # only get the filenames which not satisfy gofmt
 files=$($GOFMT_BIN -l ${go_files[@]})
