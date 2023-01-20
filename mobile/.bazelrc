@@ -19,7 +19,7 @@ build --ios_minimum_os=12.0
 build --ios_simulator_version=16.1
 build --verbose_failures
 build --workspace_status_command=../bazel/get_workspace_status
-build --xcode_version=14.1
+build --xcode_version=14.2
 build --use_top_level_targets_for_symlinks
 build --experimental_repository_downloader_retries=2
 # We don't have a ton of Swift in Envoy Mobile, so always build with WMO

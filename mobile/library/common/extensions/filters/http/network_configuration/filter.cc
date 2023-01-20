@@ -2,6 +2,8 @@
 
 #include "envoy/server/filter_config.h"
 
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
 #include "source/common/network/filter_state_proxy_info.h"
 
 #include "library/common/api/external.h"
@@ -58,7 +60,17 @@ bool NetworkConfigurationFilter::onAddressResolved(
   return false;
 }
 
-void proxyResolutionCompleted(envoy_proxy_settings_list, const void*) {}
+void
+NetworkConfigurationFilter::onProxyResolutionComplete() {
+  continue_decoding_callback_ = decoder_callbacks_->dispatcher().createSchedulableCallback(
+      [this]() { decoder_callbacks_->continueDecoding(); });
+  continue_decoding_callback_->scheduleCallbackNextIteration();
+}
+
+void proxyResolutionCompleted(envoy_proxy_settings_list, const void* context) {
+  const auto filter = const_cast<NetworkConfigurationFilter *>(static_cast<NetworkConfigurationFilter const *>(context));
+  filter->onProxyResolutionComplete();
+}
 
 Http::FilterHeadersStatus
 NetworkConfigurationFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, bool) {
@@ -85,7 +97,7 @@ NetworkConfigurationFilter::decodeHeaders(Http::RequestHeaderMap& request_header
   // If there is a proxy with a raw address, set the information, and continue.
   const auto proxy_address = proxy_settings->address();
   if (proxy_address != nullptr) {
-    const auto authorityHeader = request_headers.get(AuthorityHeaderName);
+    const auto authorityHeader = request_headers.get(Http::Headers::get().Host);
 
     setInfo(request_headers.getHostValue(), proxy_address);
     return Http::FilterHeadersStatus::Continue;
@@ -135,17 +147,19 @@ NetworkConfigurationFilter::decodeHeaders(Http::RequestHeaderMap& request_header
 Http::FilterHeadersStatus
 NetworkConfigurationFilter::resolveProxy(Http::RequestHeaderMap& request_headers,
                                          envoy_proxy_resolver* proxy_resolver) {
-  const auto authorityHeader = request_headers.get(AuthorityHeaderName);
+
+  const auto url_string = Http::Utility::buildOriginalUri(request_headers, absl::nullopt);
+  const auto host_data = Data::Utility::copyToBridgeData(url_string);
 
   envoy_proxy_resolver_proxy_resolution_result_handler* result_handler =
       static_cast<envoy_proxy_resolver_proxy_resolution_result_handler*>(
           safe_malloc(sizeof(envoy_proxy_resolver_proxy_resolution_result_handler)));
-  result_handler->context = this;
+
+  result_handler->context = static_cast<void *>(&weak_from_this());
   result_handler->proxy_resolution_completed = proxyResolutionCompleted;
 
   envoy_proxy_settings_list proxy_settings_list;
 
-  const auto host_data = Data::Utility::copyToBridgeData("https://api.lyft.com");
   const auto proxy_resolution_result = proxy_resolver->resolve(
       host_data, &proxy_settings_list, result_handler, proxy_resolver->context);
   switch (proxy_resolution_result) {

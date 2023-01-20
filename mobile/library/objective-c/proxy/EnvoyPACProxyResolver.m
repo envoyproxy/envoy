@@ -39,6 +39,7 @@ void proxyAutoConfigurationResultCallback(void *ptr, CFArrayRef cfProxies, CFErr
     NSError *error = (__bridge NSError *)cfError;
     NSLog(@"RAF: ERROR: %@", error.localizedDescription);
     completionWrapper.completion(nil, (__bridge NSError *)cfError);
+
   } else if (cfProxies != NULL) {
     NSLog(@"RAF: PROXIES ");
     NSMutableArray<EnvoyProxySettings *> *proxies = [NSMutableArray new];
@@ -59,9 +60,9 @@ void proxyAutoConfigurationResultCallback(void *ptr, CFArrayRef cfProxies, CFErr
       } else if ([proxyType isEqualToString:(NSString *)kCFProxyTypeNone]) {
         [proxies addObject:[EnvoyProxySettings directProxy]];
       }
-
-      completionWrapper.completion(proxies, nil);
     }
+
+    completionWrapper.completion(proxies, nil);
   } else {
     NSLog(@"RAF: NO PROXIES ");
     completionWrapper.completion(@[], nil);

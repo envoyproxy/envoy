@@ -21,7 +21,9 @@ namespace NetworkConfiguration {
 class NetworkConfigurationFilter final
     : public Http::PassThroughFilter,
       public Logger::Loggable<Logger::Id::filter>,
-      public Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryCallbacks {
+      public Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryCallbacks,
+      public std::enable_shared_from_this<NetworkConfigurationFilter>
+{
 public:
   NetworkConfigurationFilter(Network::ConnectivityManagerSharedPtr connectivity_manager,
                              bool enable_drain_post_dns_refresh, bool enable_interface_binding)
@@ -43,6 +45,7 @@ public:
       const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) override;
 
   void onDestroy() override;
+  void onProxyResolutionComplete();
 
 private:
   void setInfo(absl::string_view authority, Network::Address::InstanceConstSharedPtr address);
