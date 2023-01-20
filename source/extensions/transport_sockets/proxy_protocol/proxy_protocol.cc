@@ -94,8 +94,8 @@ void UpstreamProxyProtocolSocket::generateHeaderV2() {
     const auto options = options_->proxyProtocolOptions().value();
     Common::ProxyProtocol::generateV2Header(options, header_buffer_, pass_all_tlvs_,
                                             pass_through_tlvs_);
-    ENVOY_LOG(trace, fmt::format("generated proxy protocol v2 header, length: {}, buffer: {}",
-                                 header_buffer_.length(), toHex(header_buffer_)));
+    ENVOY_LOG(trace, "generated proxy protocol v2 header, length: {}, buffer: {}",
+              header_buffer_.length(), toHex(header_buffer_));
   }
 }
 
