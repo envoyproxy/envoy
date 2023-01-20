@@ -90,8 +90,8 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
 
   // We only need to do DNS lookups for hosts in dynamic forward proxy clusters,
   // since the other cluster types do their own DNS management.
-  const absl::optional<CustomClusterType>& cluster_type = cluster_info_->clusterType();
-  if (!cluster_type) {
+  OptRef<CustomClusterType> cluster_type = cluster_info_->clusterType();
+  if (!cluster_type.has_value()) {
     return Http::FilterHeadersStatus::Continue;
   }
 

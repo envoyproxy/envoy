@@ -1056,9 +1056,9 @@ ClusterInfoImpl::ClusterInfoImpl(
           config.upstream_connection_options().set_local_interface_name_on_upstream_connections()),
       cluster_type_(
           config.has_cluster_type()
-              ? absl::make_optional<envoy::config::cluster::v3::Cluster::CustomClusterType>(
+              ? std::make_unique<envoy::config::cluster::v3::Cluster::CustomClusterType>(
                     config.cluster_type())
-              : absl::nullopt),
+              : nullptr),
       factory_context_(
           std::make_unique<FactoryContextImpl>(*stats_scope_, runtime, factory_context)),
       upstream_context_(server_context, init_manager, *stats_scope_) {

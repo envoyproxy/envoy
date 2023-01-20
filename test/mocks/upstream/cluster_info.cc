@@ -169,7 +169,12 @@ MockClusterInfo::MockClusterInfo()
         }
         return *typed_metadata_;
       }));
-  ON_CALL(*this, clusterType()).WillByDefault(ReturnRef(cluster_type_));
+  ON_CALL(*this, clusterType())
+      .WillByDefault(
+        Invoke([this]() -> OptRef<envoy::config::cluster::v3::Cluster::CustomClusterType> {
+          return makeOptRefFromPtr<envoy::config::cluster::v3::Cluster::CustomClusterType>(
+              cluster_type_.get());
+        }));
   ON_CALL(*this, upstreamHttpProtocol(_))
       .WillByDefault(Return(std::vector<Http::Protocol>{Http::Protocol::Http11}));
   ON_CALL(*this, createFilterChain(_, _))

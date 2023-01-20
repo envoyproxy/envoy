@@ -156,7 +156,7 @@ void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
   // its members. This is done once to minimize overhead in the data path, makeRequest() in
   // particular.
   Upstream::ClusterInfoConstSharedPtr info = cluster_->info();
-  const auto& cluster_type = info->clusterType();
+  OptRef<envoy::config::cluster::v3::Cluster::CustomClusterType> cluster_type = info->clusterType();
   is_redis_cluster_ = info->lbType() == Upstream::LoadBalancerType::ClusterProvided &&
                       cluster_type.has_value() && cluster_type->name() == "envoy.clusters.redis";
 }

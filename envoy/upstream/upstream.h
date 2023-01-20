@@ -968,7 +968,7 @@ public:
   /**
    * @return the type of cluster, only used for custom discovery types.
    */
-  virtual const absl::optional<envoy::config::cluster::v3::Cluster::CustomClusterType>&
+  virtual OptRef<envoy::config::cluster::v3::Cluster::CustomClusterType>
   clusterType() const PURE;
 
   /**
