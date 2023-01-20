@@ -55,8 +55,7 @@ def _py_proto_mapping(dep):
 # https://github.com/bazelbuild/bazel/issues/2626 are resolved.
 def _api_py_proto_library(name, srcs = [], deps = []):
     mapped_deps = [_py_proto_mapping(dep) for dep in deps]
-    mapped_unique_deps = []
-    [mapped_unique_deps.append(d) for d in mapped_deps if d not in mapped_unique_deps]
+    mapped_unique_deps = {k: True for k in mapped_deps}.keys()
     _py_proto_library(
         name = name + _PY_PROTO_SUFFIX,
         srcs = srcs,
