@@ -61,7 +61,6 @@ open class EngineBuilder(
   private var enableInterfaceBinding = false
   private var h2ConnectionKeepaliveIdleIntervalMilliseconds = 1
   private var h2ConnectionKeepaliveTimeoutSeconds = 10
-  private var h2ExtendKeepaliveTimeout = false
   private var maxConnectionsPerHost = 7
   private var statsFlushSeconds = 60
   private var streamIdleTimeoutSeconds = 15
@@ -362,18 +361,6 @@ open class EngineBuilder(
   }
 
   /**
-   * Extend the keepalive timeout when *any* frame is received on the owning HTTP/2 connection.
-   *
-   * @param h2ExtendKeepaliveTimeout whether to extend the keepalive timeout.
-   *
-   * @return This builder.
-   */
-  fun h2ExtendKeepaliveTimeout(h2ExtendKeepaliveTimeout: Boolean): EngineBuilder {
-    this.h2ExtendKeepaliveTimeout = h2ExtendKeepaliveTimeout
-    return this
-  }
-
-  /**
    * Set the maximum number of connections to open to a single host. Default is 7.
    *
    * @param maxConnectionsPerHost the maximum number of connections per host.
@@ -613,7 +600,6 @@ open class EngineBuilder(
       enableInterfaceBinding,
       h2ConnectionKeepaliveIdleIntervalMilliseconds,
       h2ConnectionKeepaliveTimeoutSeconds,
-      h2ExtendKeepaliveTimeout,
       maxConnectionsPerHost,
       statsFlushSeconds,
       streamIdleTimeoutSeconds,

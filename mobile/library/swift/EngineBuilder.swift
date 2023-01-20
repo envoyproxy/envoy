@@ -34,7 +34,6 @@ open class EngineBuilder: NSObject {
   private var forceIPv6: Bool = false
   private var h2ConnectionKeepaliveIdleIntervalMilliseconds: UInt32 = 1
   private var h2ConnectionKeepaliveTimeoutSeconds: UInt32 = 10
-  private var h2ExtendKeepaliveTimeout: Bool = false
   private var maxConnectionsPerHost: UInt32 = 7
   private var statsFlushSeconds: UInt32 = 60
   private var streamIdleTimeoutSeconds: UInt32 = 15
@@ -311,17 +310,6 @@ open class EngineBuilder: NSObject {
     return self
   }
 
-  /// Extend the keepalive timeout when *any* frame is received on the owning HTTP/2 connection.
-  ///
-  /// - parameter h2ExtendKeepaliveTimeout: whether to extend the keepalive timeout.
-  ///
-  /// - returns: This builder.
-  @discardableResult
-  public func h2ExtendKeepaliveTimeout(_ h2ExtendKeepaliveTimeout: Bool) -> Self {
-    self.h2ExtendKeepaliveTimeout = h2ExtendKeepaliveTimeout
-    return self
-  }
-
   /// Set the maximum number of connections to open to a single host. Default is 7.
   ///
   /// - parameter maxConnectionsPerHost: the maximum number of connections per host.
@@ -557,7 +545,6 @@ open class EngineBuilder: NSObject {
       h2ConnectionKeepaliveIdleIntervalMilliseconds:
         self.h2ConnectionKeepaliveIdleIntervalMilliseconds,
       h2ConnectionKeepaliveTimeoutSeconds: self.h2ConnectionKeepaliveTimeoutSeconds,
-      h2ExtendKeepaliveTimeout: self.h2ExtendKeepaliveTimeout,
       maxConnectionsPerHost: self.maxConnectionsPerHost,
       statsFlushSeconds: self.statsFlushSeconds,
       streamIdleTimeoutSeconds: self.streamIdleTimeoutSeconds,

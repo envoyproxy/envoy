@@ -25,7 +25,6 @@
     h2ConnectionKeepaliveIdleIntervalMilliseconds:
         (UInt32)h2ConnectionKeepaliveIdleIntervalMilliseconds
               h2ConnectionKeepaliveTimeoutSeconds:(UInt32)h2ConnectionKeepaliveTimeoutSeconds
-                         h2ExtendKeepaliveTimeout:(BOOL)h2ExtendKeepaliveTimeout
                             maxConnectionsPerHost:(UInt32)maxConnectionsPerHost
                                 statsFlushSeconds:(UInt32)statsFlushSeconds
                          streamIdleTimeoutSeconds:(UInt32)streamIdleTimeoutSeconds
@@ -72,7 +71,6 @@
   self.h2ConnectionKeepaliveIdleIntervalMilliseconds =
       h2ConnectionKeepaliveIdleIntervalMilliseconds;
   self.h2ConnectionKeepaliveTimeoutSeconds = h2ConnectionKeepaliveTimeoutSeconds;
-  self.h2ExtendKeepaliveTimeout = h2ExtendKeepaliveTimeout;
   self.maxConnectionsPerHost = maxConnectionsPerHost;
   self.statsFlushSeconds = statsFlushSeconds;
   self.streamIdleTimeoutSeconds = streamIdleTimeoutSeconds;

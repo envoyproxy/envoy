@@ -58,7 +58,6 @@ public:
   EngineBuilder& enableHttp3(bool http3_on);
   EngineBuilder& enableInterfaceBinding(bool interface_binding_on);
   EngineBuilder& enableDrainPostDnsRefresh(bool drain_post_dns_refresh_on);
-  EngineBuilder& enableH2ExtendKeepaliveTimeout(bool h2_extend_keepalive_timeout_on);
   EngineBuilder& enforceTrustChainVerification(bool trust_chain_verification_on);
   EngineBuilder& enablePlatformCertificatesValidation(bool platform_certificates_validation_on);
 
