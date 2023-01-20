@@ -48,6 +48,7 @@
 #include "source/common/router/config_utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/runtime/runtime_impl.h"
+#include "source/common/stats/lazy_init.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/health_checker_impl.h"
 #include "source/extensions/filters/network/http_connection_manager/config.h"
@@ -849,11 +850,7 @@ void MainPrioritySetImpl::updateCrossPriorityHostMap(const HostVector& hosts_add
 std::unique_ptr<LazyCompatibleClusterTrafficStats>
 ClusterInfoImpl::generateStats(Stats::ScopeSharedPtr scope,
                                const ClusterTrafficStatNames& stat_names, bool lazyinit) {
-  if (lazyinit) {
-    return std::make_unique<LazyInitClusterTrafficStats>(stat_names, scope);
-  } else {
-    return std::make_unique<DirectInitClusterTrafficStats>(stat_names, *scope);
-  }
+  return Stats::LazyCompatibleInterface<ClusterTrafficStats>::create(scope, stat_names, lazyinit);
 }
 
 ClusterRequestResponseSizeStats ClusterInfoImpl::generateRequestResponseSizeStats(

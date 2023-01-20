@@ -5,6 +5,9 @@
 namespace Envoy {
 namespace Stats {
 
+template <typename StatsStructType> class DirectStats;
+template <typename StatsStructType> class LazyInit;
+
 /**
  * Interface for stats lazy initialization.
  * To reduce memory and CPU consumption, Envoy can enable the bootstrap config
@@ -15,6 +18,16 @@ namespace Stats {
  */
 template <typename StatsStructType> class LazyCompatibleInterface {
 public:
+  static std::unique_ptr<LazyCompatibleInterface>
+  create(Stats::ScopeSharedPtr scope, const typename StatsStructType::StatNameType& stat_names,
+         bool lazyinit) {
+    if (lazyinit) {
+      return std::make_unique<LazyInit<StatsStructType>>(stat_names, scope);
+    } else {
+      return std::make_unique<DirectStats<StatsStructType>>(stat_names, *scope);
+    }
+  }
+
   // Helper operators to get-or-create and return the StatsStructType object.
   virtual StatsStructType* operator->() PURE;
   virtual StatsStructType& operator*() PURE;
@@ -73,7 +86,7 @@ private:
   // To do that we keep an "inited" stat in the cluster's scope, which will be associated by name to
   // the previous generation's cluster's lazy-init block. We use the value in this shared gauge to
   // determine whether to instantiate the lazy block on construction.
-    Gauge& inited_;
+  Gauge& inited_;
   // TODO(stevenzzzz, jmarantz): Clean up this ctor_ by moving ownership to AtomicPtr, and drop it
   // when the nested object is created.
   std::function<StatsStructType*()> ctor_;
