@@ -838,8 +838,6 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       stream_error_on_invalid_http_messaging_(
           http2_options.override_stream_error_on_invalid_http_message().value()),
       protocol_constraints_(stats, http2_options), dispatching_(false), raised_goaway_(false),
-      delay_keepalive_timeout_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.http2_delay_keepalive_timeout")),
       random_(random_generator),
       last_received_data_time_(connection_.dispatcher().timeSource().monotonicTime()) {
   if (http2_options.has_connection_keepalive()) {
@@ -1076,8 +1074,7 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
   // timeout for another timeout period. This will still timeout the connection if there is no
   // activity, but if there is frame activity we assume the connection is still healthy and the
   // PING ACK may be delayed behind other frames.
-  if (delay_keepalive_timeout_ && keepalive_timeout_timer_ != nullptr &&
-      keepalive_timeout_timer_->enabled()) {
+  if (keepalive_timeout_timer_ != nullptr && keepalive_timeout_timer_->enabled()) {
     keepalive_timeout_timer_->enableTimer(keepalive_timeout_);
   }
 
