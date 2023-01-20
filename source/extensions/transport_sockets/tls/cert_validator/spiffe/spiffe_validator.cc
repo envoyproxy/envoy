@@ -104,8 +104,10 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
 }
 
 void SPIFFEValidator::addClientValidationContext(SSL_CTX* ctx, bool) {
-  bssl::UniquePtr<STACK_OF(X509_NAME)> list(sk_X509_NAME_new(
-      [](const X509_NAME** a, const X509_NAME** b) -> int { return X509_NAME_cmp(*a, *b); }));
+  // Use a generic lambda to be compatible with BoringSSL before and after
+  // https://boringssl-review.googlesource.com/c/boringssl/+/56190
+  bssl::UniquePtr<STACK_OF(X509_NAME)> list(
+      sk_X509_NAME_new([](auto* a, auto* b) -> int { return X509_NAME_cmp(*a, *b); }));
 
   for (auto& ca : ca_certs_) {
     X509_NAME* name = X509_get_subject_name(ca.get());

@@ -1,5 +1,6 @@
 #include "library/common/engine.h"
 
+#include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/lock_guard.h"
 
 #include "library/common/bridge/utility.h"
@@ -100,7 +101,9 @@ envoy_status_t Engine::main(const std::string config, const std::string log_leve
 
           connectivity_manager_ =
               Network::ConnectivityManagerFactory{server_->serverFactoryContext()}.get();
-          Envoy::Network::Android::Utility::setAlternateGetifaddrs();
+          if (Api::OsSysCallsSingleton::get().supportsGetifaddrs()) {
+            Envoy::Network::Android::Utility::setAlternateGetifaddrs();
+          }
           auto v4_interfaces = connectivity_manager_->enumerateV4Interfaces();
           auto v6_interfaces = connectivity_manager_->enumerateV6Interfaces();
           logInterfaces("netconf_get_v4_interfaces", v4_interfaces);
