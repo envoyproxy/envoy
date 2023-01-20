@@ -21,7 +21,7 @@ func (f *filter) sendLocalReply() api.StatusType {
 func (f *filter) DecodeHeaders(header api.RequestHeaderMap, endStream bool) api.StatusType {
 	f.path, _ = header.Get(":path")
 	header.Set("rsp-header-from-go", "foo-test")
-	if f.path == "/localreply" {
+	if f.path == "/forbidden" {
 		return f.sendLocalReply()
 	}
 	return api.Continue
