@@ -912,3 +912,25 @@ envoy_cc_test_library(
         "//source/extensions/filters/network/common:factory_base_lib",
     ],
 )
+
+envoy_proto_library(
+    name = "test_network_async_tcp_proto",
+    srcs = [":test_network_async_tcp_filter.proto"],
+)
+
+envoy_cc_test_library(
+    name = "test_network_async_tcp_filter_lib",
+    srcs = [
+        "test_network_async_tcp_filter.cc",
+    ],
+    deps = [
+        ":test_network_async_tcp_proto_cc_proto",
+        "//envoy/network:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//envoy/upstream:cluster_manager_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/tcp:async_tcp_client_lib",
+        "//source/extensions/filters/network/common:factory_base_lib",
+    ],
+)

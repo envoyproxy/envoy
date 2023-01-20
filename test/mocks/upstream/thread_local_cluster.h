@@ -37,6 +37,8 @@ public:
               (ResourcePriority priority, LoadBalancerContext* context));
   MOCK_METHOD(MockHost::MockCreateConnectionData, tcpConn_, (LoadBalancerContext * context));
   MOCK_METHOD(Http::AsyncClient&, httpAsyncClient, ());
+  MOCK_METHOD(Tcp::AsyncTcpClientPtr, tcpAsyncClient,
+              (LoadBalancerContext * context, bool enable_half_close));
 
   NiceMock<MockClusterMockPrioritySet> cluster_;
   NiceMock<MockLoadBalancer> lb_;

@@ -131,6 +131,7 @@ envoy_cc_library(
         ":load_balancer_interface",
         ":upstream_interface",
         "//envoy/http:async_client_interface",
+        "//envoy/tcp:async_tcp_client_interface",
     ],
 )
 

@@ -1536,6 +1536,17 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "tcp_async_client_integration_test",
+    srcs = [
+        "tcp_async_client_integration_test.cc",
+    ],
+    deps = [
+        ":integration_lib",
+        "//test/integration/filters:test_network_async_tcp_filter_lib",
+    ],
+)
+
 envoy_cc_test_library(
     name = "tcp_dump",
     srcs = ["tcp_dump.cc"],
