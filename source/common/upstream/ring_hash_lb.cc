@@ -62,20 +62,32 @@ HostConstSharedPtr RingHashLoadBalancer::Ring::chooseHost(uint64_t h, uint32_t a
 
   // Algorithm is to shard the indices and lookup the host for a given hash from a shard
   // (instead of a lookup of all hosts). Hence fewer lookups/ accesses and faster execution.
-#ifdef SHARD_ALGORITHM
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.shard_ringhash")) {
 
-  // Given a hash 'h', find the shard index by shifting it to right (by rightShift).
-  uint64_t shard_index = h >> rightShift;
-  // 'lowp' and 'highp' are the lower and upper indices of the shard.
-  lowp = ring_shard_[shard_index];
-  highp = ring_shard_[shard_index + 1] - 1;
+    // Given a hash 'h', find the shard index by shifting it to right (by rightShift).
+    uint64_t shard_index = (h >> (rightShift - 1)) >> 1;
 
-#else
+    // Right shift of a 64-bit unsigned int doesn't work if MSB (bit 63) is set.
+    // Below code is needed to compute a right shift of such a number.
+    uint64_t h_msb = h & 0x8000000000000000;
+    if (h_msb != 0UL)
+    {
+      uint64_t h_msb0 = h & 0x7FFFFFFFFFFFFFFF;
+      uint64_t h_r1 = h_msb0 >> 1;
+      uint64_t h_r1_msb1 = h_r1 | 0x4000000000000000;
+      shard_index = h_r1_msb1 >> (rightShift -1);
+    }
 
-  lowp = 0;
-  highp = ring_.size();
+    // 'lowp' and 'highp' are the lower and upper indices of the shard.
+    lowp = ring_shard_[shard_index];
+    highp = ring_shard_[shard_index + 1] - 1;
 
-#endif
+  } else {
+
+    lowp = 0;
+    highp = ring_.size();
+
+  }
 
   int64_t midp = 0;
   while (true) {
@@ -209,48 +221,54 @@ RingHashLoadBalancer::Ring::Ring(const NormalizedHostWeightVector& normalized_ho
     }
   }
 
-#ifdef SHARD_ALGORITHM
-  /******* BEGIN: code for sharding algorithm *******/
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.shard_ringhash")) {
+    /******* BEGIN: code for sharding algorithm *******/
 
-  // Find MSB bit of the first hash so we can right shift all the other hashes to create shards.
-  int msb = 0;
-  uint64_t n = ring_[0].hash_;
-  n = n / 2;
-  while (n != 0) {
+    // Find MSB bit of the first hash so we can right shift all the other hashes to create shards.
+    int msb = 0;
+    uint64_t n = ring_[0].hash_;
     n = n / 2;
-    msb++;
-  }
-  // Arbitrarily choosing MSB + 10 bits to shift hash to right for creating shards. The larger the
-  // shift to right, the fewer the shards. Experiment with values 9, 10, ... 30, the SHARD_SHIFT
-  // parameter.
-  rightShift += msb;
-
-  // Reserve memory for shard indices. Worst-case, every hash belongs to a different shard!
-  // The ring_shard_ container stores the start indices of the shards.
-  ring_shard_.reserve(ring_size);
-
-  // Right shift each hash and create shards of the hosts.
-  uint64_t ring_index = 0;
-  uint64_t current_shard, prev_shard = 0;
-
-  // push the first index if the ring_ isn't empty
-  if (!ring_.empty())
-    ring_shard_.push_back(ring_index);
-
-  for (const auto& entry : ring_) {
-    current_shard = entry.hash_ >> rightShift;
-    // If new shard found, push the index to ring_shard_ and update current_shard.
-    if (current_shard != prev_shard) {
-      prev_shard = current_shard;
-      ring_shard_.push_back(ring_index);
+    while (n != 0) {
+      n = n / 2;
+      msb++;
     }
-    ring_index++;
-  }
-  // For the last shard, we need end and hence storing ring_size value.
-  ring_shard_.push_back(ring_size);
+    // Arbitrarily choosing MSB + 10 bits to shift hash to right for creating shards. The larger the
+    // shift to right, the fewer the shards. Experiment with values 9, 10, ... 30, the SHARD_SHIFT
+    // parameter.
+    rightShift += msb;
+    rightShift = (rightShift > 64)? 64 : rightShift;
 
-  /******* END: code for sharding algorithm *******/
-#endif
+    // Reserve memory for shard indices. Worst-case, every hash belongs to a different shard!
+    // The ring_shard_ container stores the start indices of the shards.
+    ring_shard_.reserve(ring_size);
+
+    // Right shift each hash and create shards of the hosts.
+    uint64_t ring_index = 0;
+    uint64_t current_shard, prev_shard = 0;
+
+    // push the first index if the ring_ isn't empty
+    if (!ring_.empty())
+    {
+      ring_shard_.push_back(ring_index);
+      ring_index++;
+    }
+
+    for (const auto& entry : ring_) {
+      // shifting right by 64 as 64-bit unsigned int doesn't seem to work! So, I split it.
+      current_shard = (entry.hash_ >> (rightShift - 1)) >> 1;
+
+      // If new shard found, push the index to ring_shard_ and update current_shard.
+      if (current_shard != prev_shard) {
+        prev_shard = current_shard;
+        ring_shard_.push_back(ring_index);
+      }
+      ring_index++;
+    }
+    // For the last shard, we need end and hence storing ring_size value.
+    ring_shard_.push_back(ring_size);
+
+    /******* END: code for sharding algorithm *******/
+  }
 
   stats_.size_.set(ring_size);
   stats_.min_hashes_per_host_.set(min_hashes_per_host);

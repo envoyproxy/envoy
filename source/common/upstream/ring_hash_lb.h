@@ -6,18 +6,13 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/upstream/thread_aware_lb_impl.h"
 
 namespace Envoy {
 namespace Upstream {
-
-#ifdef SHARD_ALGORITHM
-#ifndef SHARD_SHIFT
-#define SHARD_SHIFT 9
-#endif
-#endif
 
 /**
  * All ring hash load balancer stats. @see stats_macros.h
@@ -72,10 +67,8 @@ private:
 
     std::vector<RingEntry> ring_;
 
-#ifdef SHARD_ALGORITHM
     std::vector<uint64_t> ring_shard_;
-    uint64_t rightShift = SHARD_SHIFT;
-#endif
+    uint64_t rightShift = 9; // SHARD_SHIFT parameter
 
     RingHashLoadBalancerStats& stats_;
   };
