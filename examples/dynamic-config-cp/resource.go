@@ -52,6 +52,26 @@ func makeCluster(clusterName string) *cluster.Cluster {
 	}
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 func makeEndpoint(clusterName string) *endpoint.ClusterLoadAssignment {
 	return &endpoint.ClusterLoadAssignment{
 		ClusterName: clusterName,
