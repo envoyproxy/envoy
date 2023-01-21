@@ -21,6 +21,6 @@ removed_config_or_runtime:
 new_features:
 - area: tracing
   change: |
-    allow :ref:`grpc_service <envoy_v3_api_field_config.trace.v3.OpenTelemetryConfig.grpc_service>` to be optional. This enables a means to disable collection of traces. 
+    allow :ref:`grpc_service <envoy_v3_api_field_config.trace.v3.OpenTelemetryConfig.grpc_service>` to be optional. This enables a means to disable collection of traces.
 
 deprecated:
