@@ -2,7 +2,8 @@ version: "3.8"
 
 services:
   go_plugin_compile:
-    context: ../shared/build
+    build:
+      context: ../shared/build
     command: >
       bash -c "
       bazel build  //examples/golang/simple:filter.so
