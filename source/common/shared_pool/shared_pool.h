@@ -44,13 +44,18 @@ public:
   void deleteObject(T* ptr) {
     if (std::this_thread::get_id() == thread_id_) {
       if (auto iter = object_pool_.find(ptr); iter != object_pool_.end()) {
-        ASSERT(iter->use_count() == 0);
-        object_pool_.erase(iter);
-        // Wait till here to delete the pointer because we don't want the OS to
-        // reallocate the memory location before this method completes to prevent
-        // "hash collisions".
-        delete ptr;
+        // It is possible that the entry in object_pool_ corresponds to a
+        // different weak_ptr, due to a race condition in a shared_ptr being
+        // destroyed on another thread, and getObject() being called on the main
+        // thread.
+        if (iter->use_count() == 0) {
+          object_pool_.erase(iter);
+        }
       }
+      // Wait till here to delete the pointer because we don't want the OS to
+      // reallocate the memory location before this method completes to prevent
+      // "hash collisions".
+      delete ptr;
     } else {
       // Most of the time, the object's destructor occurs in the main thread, but with some
       // exceptions, it is destructed in the worker thread. In order to keep the object_pool_ thread
@@ -67,9 +72,12 @@ public:
 
     // Return from the object pool if we find the object there.
     if (auto iter = object_pool_.find(&obj); iter != object_pool_.end()) {
-      auto lock_object = iter->lock();
-      if (lock_object) {
+      if (auto lock_object = iter->lock(); static_cast<bool>(lock_object) == true) {
         return lock_object;
+      } else {
+        // Remove the weak_ptr since all associated shared_ptrs have been
+        // destroyed.
+        object_pool_.erase(iter);
       }
     }
 
@@ -105,8 +113,8 @@ private:
 
     Element(Element&&) = default;
 
-    auto lock() const { return weak_ptr_.lock(); }
-    auto use_count() const { return weak_ptr_.use_count(); }
+    std::shared_ptr<T> lock() const { return weak_ptr_.lock(); }
+    long use_count() const { return weak_ptr_.use_count(); }
 
     friend struct Hash;
     friend struct Compare;

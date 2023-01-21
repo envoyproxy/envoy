@@ -90,27 +90,28 @@ TEST_F(SharedPoolTest, NonThreadSafeForGetObjectDeathTest) {
   EXPECT_DEBUG_DEATH(pool->getObject(4), ".*");
 }
 
-// TEST_F(SharedPoolTest, ThreadSafeForDeleteObject) {
-// std::shared_ptr<ObjectSharedPool<int>> pool;
-//{
-//// same thread
-// createObjectSharedPool(pool);
-// dispatcher_->post([&pool, this]() {
-// pool->deleteObject(std::hash<int>{}(4));
-// go_.Notify();
-//});
-// go_.WaitForNotification();
-//}
+TEST_F(SharedPoolTest, ThreadSafeForDeleteObject) {
+  std::shared_ptr<ObjectSharedPool<int>> pool;
+  {
+    // same thread
+    int* an_int = new int(4);
+    createObjectSharedPool(pool);
+    dispatcher_->post([&pool, this, &an_int]() {
+      pool->deleteObject(an_int);
+      go_.Notify();
+    });
+    go_.WaitForNotification();
+  }
 
-//{
-//// different threads
-// createObjectSharedPool(pool);
-// Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
-// auto thread =
-// thread_factory.createThread([&pool]() { pool->deleteObject(std::hash<int>{}(4)); });
-// thread->join();
-//}
-//}
+  {
+    // different threads
+    int* an_int = new int(4);
+    createObjectSharedPool(pool);
+    Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
+    auto thread = thread_factory.createThread([&pool, &an_int]() { pool->deleteObject(an_int); });
+    thread->join();
+  }
+}
 
 TEST_F(SharedPoolTest, NonThreadSafeForPoolSizeDeathTest) {
   std::shared_ptr<ObjectSharedPool<int>> pool;
@@ -142,7 +143,7 @@ TEST_F(SharedPoolTest, GetObjectAndDeleteObjectRaceForSameHashValue) {
   // Because the storage is actually a new weak_ptr and the reference count is not zero, it is not
   // deleted
   dispatcher_->post([&pool, this]() {
-    EXPECT_EQ(0, pool->poolSize());
+    EXPECT_EQ(1, pool->poolSize());
     go_.Notify();
   });
   go_.WaitForNotification();
