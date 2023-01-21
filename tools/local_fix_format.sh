@@ -29,10 +29,21 @@ else
   verbose=0
 fi
 
+# Runs the formatting functions on the specified args, echoing commands
+# if -vergbose was supplied to the script.
+function format() {
+  (
+    if [[ "$verbose" == "1" ]]; then
+      set -x
+    fi
+    ./tools/code_format/check_format.py fix "$1"
+    ./tools/spelling/check_spelling_pedantic.py fix "$1"
+  )
+}
+
 if [[ $# -gt 0 && "$1" == "-all" ]]; then
   echo "Checking all files in the repo...this may take a while."
-  shift
-  args="$@"
+  format
 else
   if [[ $# -gt 0 && "$1" == "-main" ]]; then
     shift
@@ -42,18 +53,14 @@ else
     args=$(git status|grep -E '(modified:|added:)'|awk '{print $2}')
     args+=$(git status|grep -E 'new file:'|awk '{print $3}')
   else
-    args="$@"
+    args="$*"
   fi
 
   if [[ "$args" == "" ]]; then
     echo No files selected. Bailing out.
     exit 0
   fi
+  for arg in $args; do
+    format "$arg"
+  done
 fi
-
-if [[ "$verbose" == "1" ]]; then
-  set -x
-fi
-
-./tools/code_format/check_format.py fix ${args}
-./tools/spelling/check_spelling_pedantic.py fix ${args}
