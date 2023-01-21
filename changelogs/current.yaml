@@ -17,6 +17,9 @@ removed_config_or_runtime:
 - area: http
   change: |
     removed ``envoy.reloadable_features.http2_delay_keepalive_timeout`` and legacy code paths.
+- area: http
+  change: |
+    removed ``envoy.reloadable_features.local_ratelimit_match_all_descriptors`` and legacy code paths.
 
 new_features:
 
