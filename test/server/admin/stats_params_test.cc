@@ -56,19 +56,14 @@ TEST(StatsParamsTest, ParseParamsFilter) {
   Buffer::OwnedImpl response;
 
   {
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues({{"envoy.reloadable_features.admin_stats_filter_use_re2", "false"}});
-
     StatsParams params;
     ASSERT_EQ(Http::Code::OK, params.parse("?filter=foo", response));
-    EXPECT_NE(nullptr, params.filter_);
-    EXPECT_EQ(nullptr, params.re2_filter_);
+    EXPECT_NE(nullptr, params.re2_filter_);
   }
 
   {
     StatsParams params;
     ASSERT_EQ(Http::Code::OK, params.parse("?filter=foo", response));
-    EXPECT_EQ(nullptr, params.filter_);
     EXPECT_NE(nullptr, params.re2_filter_);
   }
 }

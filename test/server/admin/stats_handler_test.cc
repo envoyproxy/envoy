@@ -117,11 +117,6 @@ public:
     }
   }
 
-  void setRegexType(Regex::Type type) {
-    scoped_runtime_.mergeValues({{"envoy.reloadable_features.admin_stats_filter_use_re2",
-                                  type == Regex::Type::Re2 ? "true" : "false"}});
-  }
-
   Stats::StatName makeStat(absl::string_view name) { return pool_.add(name); }
 
   Stats::SymbolTableImpl symbol_table_;
@@ -243,7 +238,6 @@ TEST_F(AdminStatsTest, HandlerStatsPlainTextHistogramBucketsCumulative) {
 
 class AdminStatsFilterTest : public StatsHandlerTest, public testing::TestWithParam<Regex::Type> {
 protected:
-  AdminStatsFilterTest() { setRegexType(GetParam()); }
 };
 
 INSTANTIATE_TEST_SUITE_P(RegexTypes, AdminStatsFilterTest,
@@ -1232,19 +1226,8 @@ TEST_P(AdminStatsFilterTest, StatsInvalidRegex) {
   for (absl::string_view path :
        {"/stats?filter=*.test", "/stats?format=prometheus&filter=*.test"}) {
     CodeResponse code_response;
-    if (GetParam() == Regex::Type::Re2) {
-      code_response = handlerStats(path);
-      EXPECT_EQ("Invalid re2 regex", code_response.second) << path;
-    } else {
-      EXPECT_LOG_CONTAINS("error", "Invalid regex: ", code_response = handlerStats(path));
-
-      // Note: depending on the library, the detailed error message might be one of:
-      //   "One of *?+{ was not preceded by a valid regular expression."
-      //   "regex_error"
-      // but we always precede by 'Invalid regex: "'.
-      EXPECT_THAT(code_response.second, StartsWith("Invalid regex: \"")) << path;
-      EXPECT_THAT(code_response.second, EndsWith("\"\n")) << path;
-    }
+    code_response = handlerStats(path);
+    EXPECT_EQ("Invalid re2 regex", code_response.second) << path;
     EXPECT_EQ(Http::Code::BadRequest, code_response.first) << path;
   }
 }
@@ -1318,7 +1301,6 @@ public:
 class StatsHandlerPrometheusDefaultTest : public StatsHandlerPrometheusTest,
                                           public testing::TestWithParam<Regex::Type> {
 public:
-  StatsHandlerPrometheusDefaultTest() { setRegexType(GetParam()); }
 };
 
 INSTANTIATE_TEST_SUITE_P(RegexTypes, StatsHandlerPrometheusDefaultTest,
@@ -1349,11 +1331,7 @@ TEST_P(StatsHandlerPrometheusDefaultTest, StatsHandlerPrometheusInvalidRegex) {
 
   const CodeResponse code_response = handlerStats(url);
   EXPECT_EQ(Http::Code::BadRequest, code_response.first);
-  if (GetParam() == Regex::Type::Re2) {
-    EXPECT_THAT(code_response.second, HasSubstr("Invalid re2 regex"));
-  } else {
-    EXPECT_THAT(code_response.second, HasSubstr("Invalid regex"));
-  }
+  EXPECT_THAT(code_response.second, HasSubstr("Invalid re2 regex"));
 }
 
 class StatsHandlerPrometheusWithTextReadoutsTest

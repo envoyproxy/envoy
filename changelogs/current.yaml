@@ -7,15 +7,16 @@ minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
 
 bug_fixes:
-# *Changes expected to improve the state of the world and are unlikely to have negative effects*
-- area: eds
-  change: |
-    added ``envoy.reloadable_features.multiplex_eds`` to disable eds multiplexing. Eds multiplexing is enabled by default, so that all subscriptions for the same resource type and management server reuse a single channel/mux.
-    When eds multiplexing is disabled each subscription uses a dedicated channel/mux.
+  # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+  - area: eds
+    change: |
+      added ``envoy.reloadable_features.multiplex_eds`` to disable eds multiplexing. Eds multiplexing is enabled by default, so that all subscriptions for the same resource type and management server reuse a single channel/mux.
+      When eds multiplexing is disabled each subscription uses a dedicated channel/mux.
 
 removed_config_or_runtime:
-# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
-
+  # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+  - area: config
+    change: |
+      removed ``envoy.reloadable_features.admin_stats_filter_use_re2`` and legacy code paths.
 new_features:
-
 deprecated:
