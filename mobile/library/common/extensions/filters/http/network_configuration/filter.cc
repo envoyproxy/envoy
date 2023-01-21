@@ -68,8 +68,14 @@ NetworkConfigurationFilter::onProxyResolutionComplete() {
 }
 
 void proxyResolutionCompleted(envoy_proxy_settings_list, const void* context) {
-  const auto filter = const_cast<NetworkConfigurationFilter *>(static_cast<NetworkConfigurationFilter const *>(context));
-  filter->onProxyResolutionComplete();
+  const auto wrapped_filter = const_cast<std::unique_ptr<std::weak_ptr<NetworkConfigurationFilter>> *>(static_cast<const std::unique_ptr<std::weak_ptr<NetworkConfigurationFilter>> *>(context));
+  const auto filter = wrapped_filter->get()->lock();
+  if (filter) {
+    filter->onProxyResolutionComplete();
+  }
+
+  wrapped_filter->get()->reset();
+  delete wrapped_filter;
 }
 
 Http::FilterHeadersStatus
@@ -155,7 +161,9 @@ NetworkConfigurationFilter::resolveProxy(Http::RequestHeaderMap& request_headers
       static_cast<envoy_proxy_resolver_proxy_resolution_result_handler*>(
           safe_malloc(sizeof(envoy_proxy_resolver_proxy_resolution_result_handler)));
 
-  result_handler->context = static_cast<void *>(&weak_from_this());
+  auto weak_self = weak_from_this();
+  auto wrapper = new std::unique_ptr<std::weak_ptr<NetworkConfigurationFilter>>(new std::weak_ptr(weak_self));
+  result_handler->context = static_cast<const void *>(wrapper);
   result_handler->proxy_resolution_completed = proxyResolutionCompleted;
 
   envoy_proxy_settings_list proxy_settings_list;
