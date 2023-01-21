@@ -2,6 +2,8 @@
 
 #include "envoy/common/random_generator.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/extensions/load_balancing_policies/maglev/v3/maglev.pb.h"
+#include "envoy/extensions/load_balancing_policies/maglev/v3/maglev.pb.validate.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
@@ -75,6 +77,11 @@ public:
                      Runtime::Loader& runtime, Random::RandomGenerator& random,
                      OptRef<const envoy::config::cluster::v3::Cluster::MaglevLbConfig> config,
                      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
+
+  MaglevLoadBalancer(const PrioritySet& priority_set, ClusterLbStats& stats, Stats::Scope& scope,
+                     Runtime::Loader& runtime, Random::RandomGenerator& random,
+                     uint32_t healthy_panic_threshold,
+                     const envoy::extensions::load_balancing_policies::maglev::v3::Maglev& config);
 
   const MaglevLoadBalancerStats& stats() const { return stats_; }
   uint64_t tableSize() const { return table_size_; }
