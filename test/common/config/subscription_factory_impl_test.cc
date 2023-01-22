@@ -108,6 +108,28 @@ TEST_F(SubscriptionFactoryTest, NoConfigSpecifier) {
       "Missing config source specifier in envoy::config::core::v3::ConfigSource");
 }
 
+TEST_F(SubscriptionFactoryTest, UnsupportedConfigSourceAggregatedGrpc) {
+  envoy::config::core::v3::ConfigSource config;
+  Upstream::ClusterManager::ClusterSet primary_clusters;
+  config.mutable_api_config_source()->set_api_type(
+      envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC);
+  config.mutable_api_config_source()->set_transport_api_version(envoy::config::core::v3::V3);
+  EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
+  EXPECT_THROW_WITH_MESSAGE(subscriptionFromConfigSource(config), EnvoyException,
+                            "Unsupported config source AGGREGATED_GRPC");
+}
+
+TEST_F(SubscriptionFactoryTest, UnsupportedConfigSourceAggregatedDeltaGrpc) {
+  envoy::config::core::v3::ConfigSource config;
+  Upstream::ClusterManager::ClusterSet primary_clusters;
+  config.mutable_api_config_source()->set_api_type(
+      envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC);
+  config.mutable_api_config_source()->set_transport_api_version(envoy::config::core::v3::V3);
+  EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
+  EXPECT_THROW_WITH_MESSAGE(subscriptionFromConfigSource(config), EnvoyException,
+                            "Unsupported config source AGGREGATED_DELTA_GRPC");
+}
+
 TEST_F(SubscriptionFactoryTest, RestClusterEmpty) {
   envoy::config::core::v3::ConfigSource config;
   Upstream::ClusterManager::ClusterSet primary_clusters;

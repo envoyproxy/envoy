@@ -85,7 +85,7 @@ struct ProxySettings {
 
   bool operator==(ProxySettings const& rhs) const {
     // Even if the hostnames are IP addresses, they'll be stored in hostname_
-    return this->hostname() == rhs.hostname() && this->port() == rhs.port();
+    return hostname() == rhs.hostname() && port() == rhs.port();
   }
 
   bool operator!=(ProxySettings const& rhs) const { return !(*this == rhs); }
