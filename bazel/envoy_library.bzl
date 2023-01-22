@@ -7,6 +7,7 @@ load(
     "envoy_linkstatic",
 )
 load(":envoy_pch.bzl", "envoy_pch_copts")
+load("@bazel_skylib//rules:run_binary.bzl", "run_binary")
 load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
 load(
     "@envoy_build_config//:extensions_build_config.bzl",
@@ -236,4 +237,29 @@ def envoy_rust_library(name, **kwargs):
         name = name,
         edition = "2021",
         **kwargs
+    )
+
+# Invokes the cxx.rs codegen tool against the provided src file and defines an envoy_cc_library containing the generated code.
+def envoy_rust_cxx_bridge(name, src, deps = [], **kwargs):
+    run_binary(
+        name = "_%s_gen" % name,
+        srcs = [src],
+        outs = [
+            src + ".h",
+            src + ".cc",
+        ],
+        args = [
+            "$(location %s)" % src,
+            "-o",
+            "$(location %s.h)" % src,
+            "-o",
+            "$(location %s.cc)" % src,
+        ],
+        tool = "@cxx.rs//:codegen",
+    )
+
+    envoy_cc_library(
+        name = name,
+        deps = deps,
+        **kwargs,
     )

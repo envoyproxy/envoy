@@ -4,8 +4,8 @@ load(
     "envoy_cc_library",
     "envoy_extension_package",
     "envoy_rust_library",
+    "envoy_rust_cxx_bridge",
 )
-load("@cxx.rs//tools/bazel:rust_cxx_bridge.bzl", "rust_cxx_bridge")
 
 licenses(["notice"])  # Apache 2
 
@@ -41,22 +41,15 @@ envoy_rust_library(
     name = "matcher_rs",
     srcs = ["matcher.rs"],
     deps = [
-        "bridge",
+        ":bridge",
         "@cxx.rs//:cxx",
     ],
 )
 
-rust_cxx_bridge(
-    name = "gen",
+envoy_rust_cxx_bridge(
+    name = "bridge",
     src = "matcher.rs",
     deps = ["hash_lib"],
-)
-
-envoy_cc_library(
-    name = "bridge",
-    hdrs = [":gen/include"],
-    srcs = [":gen/source"],
-    deps = ["hash_lib", ":gen/include"],
 )
 
 envoy_cc_library(
