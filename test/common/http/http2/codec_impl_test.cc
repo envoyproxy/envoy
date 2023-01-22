@@ -1180,7 +1180,7 @@ TEST_P(Http2CodecImplTest, ConnectionKeepalive) {
   EXPECT_CALL(*timeout_timer, disableTimer()).Times(0); // This indicates that no ACK was received.
   send_timer->invokeCallback();
   driveClient();
-  EXPECT_CALL(client_connection_, close(Network::ConnectionCloseType::NoFlush, _));
+  EXPECT_CALL(client_connection_, close(Network::ConnectionCloseType::NoFlush));
   timeout_timer->invokeCallback();
 }
 
@@ -1214,47 +1214,6 @@ TEST_P(Http2CodecImplTest, KeepaliveTimeoutDelay) {
   // Send the response and make sure the keepalive timeout is extended. After the response is
   // received the ACK will come in and reset.
   EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(timeout_ms), _));
-  EXPECT_CALL(response_decoder_, decodeHeaders_(_, true));
-  EXPECT_CALL(*timeout_timer, disableTimer()); // This indicates that an ACK was received.
-  EXPECT_CALL(*send_timer, enableTimer(std::chrono::milliseconds(interval_ms), _));
-  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-  response_encoder_->encodeHeaders(response_headers, true);
-  driveToCompletion();
-}
-
-// Verify that extending the timeout is not performed when a frame is received and the feature
-// flag is disabled.
-TEST_P(Http2CodecImplTest, KeepaliveTimeoutDelayRuntimeFalse) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.http2_delay_keepalive_timeout", "false"}});
-
-  constexpr uint32_t interval_ms = 100;
-  constexpr uint32_t timeout_ms = 200;
-  client_http2_options_.mutable_connection_keepalive()->mutable_interval()->set_nanos(interval_ms *
-                                                                                      1000 * 1000);
-  client_http2_options_.mutable_connection_keepalive()->mutable_timeout()->set_nanos(timeout_ms *
-                                                                                     1000 * 1000);
-  client_http2_options_.mutable_connection_keepalive()->mutable_interval_jitter()->set_value(0);
-  auto timeout_timer = new NiceMock<Event::MockTimer>(&client_connection_.dispatcher_);
-  auto send_timer = new NiceMock<Event::MockTimer>(&client_connection_.dispatcher_);
-  EXPECT_CALL(*timeout_timer, disableTimer());
-  EXPECT_CALL(*send_timer, enableTimer(std::chrono::milliseconds(interval_ms), _));
-  initialize();
-  InSequence s;
-
-  // Initiate a request.
-  TestRequestHeaderMapImpl request_headers;
-  HttpTestUtility::addDefaultHeaders(request_headers);
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
-  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
-  driveToCompletion();
-
-  // Now send a ping.
-  EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(timeout_ms), _));
-  send_timer->invokeCallback();
-
-  // Send the response and make sure the keepalive timeout is not extended. After the response is
-  // received the ACK will come in and reset.
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, true));
   EXPECT_CALL(*timeout_timer, disableTimer()); // This indicates that an ACK was received.
   EXPECT_CALL(*send_timer, enableTimer(std::chrono::milliseconds(interval_ms), _));
@@ -2288,7 +2247,7 @@ TEST_P(Http2CodecImplFlowControlTest, WindowUpdateOnReadResumingFlood) {
   if (defer_processing_backedup_streams_) {
     EXPECT_TRUE(process_buffered_data_callback->enabled_);
   }
-  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush, _));
+  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush));
   violation_callback->invokeCallback();
 
   EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
@@ -2345,7 +2304,7 @@ TEST_P(Http2CodecImplFlowControlTest, RstStreamOnPendingFlushTimeoutFlood) {
   driveToCompletion();
 
   EXPECT_TRUE(violation_callback->enabled_);
-  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush, _));
+  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush));
   violation_callback->invokeCallback();
 
   EXPECT_EQ(1, server_stats_store_.counter("http2.tx_flush_timeout").value());
@@ -3139,7 +3098,7 @@ TEST_P(Http2CodecImplTest, ResponseHeadersFlood) {
   EXPECT_NO_THROW(driveToCompletion());
 
   EXPECT_TRUE(violation_callback->enabled_);
-  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush, _));
+  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush));
   violation_callback->invokeCallback();
 
   EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
@@ -3177,7 +3136,7 @@ TEST_P(Http2CodecImplTest, ResponseDataFlood) {
   EXPECT_NO_THROW(driveToCompletion());
 
   EXPECT_TRUE(violation_callback->enabled_);
-  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush, _));
+  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush));
   violation_callback->invokeCallback();
 
   EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
@@ -3258,7 +3217,7 @@ TEST_P(Http2CodecImplTest, ResponseDataFloodCounterReset) {
   EXPECT_NO_THROW(driveToCompletion());
 
   EXPECT_TRUE(violation_callback->enabled_);
-  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush, _));
+  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush));
   violation_callback->invokeCallback();
 }
 
@@ -3334,7 +3293,7 @@ TEST_P(Http2CodecImplTest, ResponseTrailersFlood) {
   EXPECT_NO_THROW(driveToCompletion());
 
   EXPECT_TRUE(violation_callback->enabled_);
-  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush, _));
+  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush));
   violation_callback->invokeCallback();
 
   EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
@@ -3386,7 +3345,7 @@ TEST_P(Http2CodecImplTest, MetadataFlood) {
   driveToCompletion();
 
   EXPECT_TRUE(violation_callback->enabled_);
-  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush, _));
+  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush));
   violation_callback->invokeCallback();
 
   EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
@@ -3488,7 +3447,7 @@ TEST_P(Http2CodecImplTest, GoAwayCausesOutboundFlood) {
   driveToCompletion();
 
   EXPECT_TRUE(violation_callback->enabled_);
-  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush, _));
+  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush));
   violation_callback->invokeCallback();
 
   EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
@@ -3496,7 +3455,7 @@ TEST_P(Http2CodecImplTest, GoAwayCausesOutboundFlood) {
 }
 
 // Verify that codec detects flood of outbound frames caused by shutdownNotice() method
-TEST_P(Http2CodecImplTest, ShutdownNoticeCausesOutboundFlood) {
+TEST_P(Http2CodecImplTest, ShudowNoticeCausesOutboundFlood) {
   initialize();
 
   TestRequestHeaderMapImpl request_headers;
@@ -3531,7 +3490,7 @@ TEST_P(Http2CodecImplTest, ShutdownNoticeCausesOutboundFlood) {
   driveToCompletion();
 
   EXPECT_TRUE(violation_callback->enabled_);
-  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush, _));
+  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush));
   violation_callback->invokeCallback();
 
   EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
@@ -3588,7 +3547,7 @@ TEST_P(Http2CodecImplTest, KeepAliveCausesOutboundFlood) {
   send_timer->invokeCallback();
 
   EXPECT_TRUE(violation_callback->enabled_);
-  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush, _));
+  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush));
   violation_callback->invokeCallback();
 
   EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
@@ -3631,7 +3590,7 @@ TEST_P(Http2CodecImplTest, ResetStreamCausesOutboundFlood) {
   server_->getStream(1)->resetStream(StreamResetReason::RemoteReset);
 
   EXPECT_TRUE(violation_callback->enabled_);
-  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush, _));
+  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush));
   violation_callback->invokeCallback();
 
   EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1);

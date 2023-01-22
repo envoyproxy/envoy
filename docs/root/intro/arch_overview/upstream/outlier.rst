@@ -202,6 +202,11 @@ gRPC
 For gRPC requests, the outlier detection will use the HTTP status mapped from the `grpc-status <https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#responses>`_ response header.
 
 
+.. note::
+
+  If :ref: `active health <arch_overview_health_checking>` is also configured, a successful active health check unejects the host and
+  clears all outlier detection counters.
+
 .. _arch_overview_outlier_detection_logging:
 
 Ejection event logging

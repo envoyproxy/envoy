@@ -137,7 +137,6 @@ R"(- &enable_drain_post_dns_refresh false
 - &enable_interface_binding false
 - &h2_connection_keepalive_idle_interval 100000s
 - &h2_connection_keepalive_timeout 10s
-- &h2_delay_keepalive_timeout false
 - &max_connections_per_host 7
 - &metadata {}
 - &stats_domain 127.0.0.1
@@ -496,13 +495,17 @@ stats_config:
   stats_matcher:
     inclusion_list:
       patterns:
-        - prefix: cluster.base.
-        - prefix: cluster.base_h2.
-        - prefix: cluster.stats.
-        - prefix: http.client.
-        - prefix: http.dispatcher.
-        - prefix: http.hcm.
-        - prefix: pbf_filter.
+        - prefix: cluster.base.upstream_rq_
+        - prefix: cluster.base_h2.upstream_rq_
+        - prefix: cluster.stats.upstream_rq_
+        - prefix: cluster.base.upstream_cx_
+        - prefix: cluster.base_h2.upstream_cx_
+        - prefix: cluster.stats.upstream_cx_
+        - exact: cluster.base.http2.keepalive_timeout
+        - exact: cluster.base_h2.http2.keepalive_timeout
+        - exact: cluster.stats.http2.keepalive_timeout
+        - prefix: http.hcm.downstream_rq_
+        - prefix: http.hcm.decompressor.
         - prefix: pulse.
         - safe_regex:
             regex: '^vhost\.[\w]+\.vcluster\.[\w]+?\.upstream_rq_(?:[12345]xx|[3-5][0-9][0-9]|retry|total)'
@@ -530,7 +533,6 @@ layered_runtime:
           reloadable_features:
             allow_multiple_dns_addresses: *dns_multiple_addresses
             always_use_v6: *force_ipv6
-            http2_delay_keepalive_timeout: *h2_delay_keepalive_timeout
             skip_dns_lookup_for_proxied_requests: *skip_dns_lookup_for_proxied_requests
 )"
 // Needed due to warning in
