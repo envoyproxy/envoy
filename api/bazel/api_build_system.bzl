@@ -54,12 +54,14 @@ def _py_proto_mapping(dep):
 # https://github.com/bazelbuild/bazel/issues/3935 and/or
 # https://github.com/bazelbuild/bazel/issues/2626 are resolved.
 def _api_py_proto_library(name, srcs = [], deps = []):
+    mapped_deps = [_py_proto_mapping(dep) for dep in deps]
+    mapped_unique_deps = {k: True for k in mapped_deps}.keys()
     _py_proto_library(
         name = name + _PY_PROTO_SUFFIX,
         srcs = srcs,
         default_runtime = "@com_google_protobuf//:protobuf_python",
         protoc = "@com_google_protobuf//:protoc",
-        deps = [_py_proto_mapping(dep) for dep in deps] + [
+        deps = mapped_unique_deps + [
             "@com_envoyproxy_protoc_gen_validate//validate:validate_py",
             "@com_google_googleapis//google/rpc:status_py_proto",
             "@com_google_googleapis//google/api:annotations_py_proto",
@@ -84,6 +86,11 @@ def py_proto_library(name, deps = [], plugin = None):
     # checked.proto depends on syntax.proto, we have to add this dependency manually as well.
     if name == "checked_py_proto":
         proto_deps = proto_deps + [":syntax_py_proto"]
+
+    # Special handling for expr_proto target
+    if srcs[0] == ":expr_moved.proto":
+        srcs = ["checked.proto", "eval.proto", "explain.proto", "syntax.proto", "value.proto"]
+        proto_deps = proto_deps + ["@com_google_googleapis//google/rpc:status_py_proto"]
 
     # py_proto_library does not support plugin as an argument yet at gRPC v1.25.0:
     # https://github.com/grpc/grpc/blob/v1.25.0/bazel/python_rules.bzl#L72.

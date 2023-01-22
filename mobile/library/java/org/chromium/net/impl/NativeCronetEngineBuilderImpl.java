@@ -55,7 +55,6 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
   private boolean mEnableSkipDNSLookupForProxiedRequests = false;
   private int mH2ConnectionKeepaliveIdleIntervalMilliseconds = 1;
   private int mH2ConnectionKeepaliveTimeoutSeconds = 10;
-  private boolean mH2ExtendKeepaliveTimeout = false;
   private int mMaxConnectionsPerHost = 7;
   private int mStatsFlushSeconds = 60;
   private int mStreamIdleTimeoutSeconds = 15;
@@ -126,9 +125,9 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
         mDnsMinRefreshSeconds, mDnsPreresolveHostnames, mEnableDNSCache, mEnableDrainPostDnsRefresh,
         quicEnabled(), mEnableGzip, brotliEnabled(), mEnableSocketTag, mEnableHappyEyeballs,
         mEnableInterfaceBinding, mH2ConnectionKeepaliveIdleIntervalMilliseconds,
-        mH2ConnectionKeepaliveTimeoutSeconds, mH2ExtendKeepaliveTimeout, mMaxConnectionsPerHost,
-        mStatsFlushSeconds, mStreamIdleTimeoutSeconds, mPerTryIdleTimeoutSeconds, mAppVersion,
-        mAppId, mTrustChainVerification, mVirtualClusters, nativeFilterChain, platformFilterChain,
+        mH2ConnectionKeepaliveTimeoutSeconds, mMaxConnectionsPerHost, mStatsFlushSeconds,
+        mStreamIdleTimeoutSeconds, mPerTryIdleTimeoutSeconds, mAppVersion, mAppId,
+        mTrustChainVerification, mVirtualClusters, nativeFilterChain, platformFilterChain,
         stringAccessors, keyValueStores, statSinks, mEnableSkipDNSLookupForProxiedRequests,
         mEnablePlatformCertificatesValidation);
   }

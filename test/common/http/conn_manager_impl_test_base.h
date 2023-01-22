@@ -220,8 +220,8 @@ public:
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   RequestDecoder* decoder_{};
   std::shared_ptr<Ssl::MockConnectionInfo> ssl_connection_;
-  std::shared_ptr<NiceMock<Tracing::MockHttpTracer>> tracer_{
-      std::make_shared<NiceMock<Tracing::MockHttpTracer>>()};
+  std::shared_ptr<NiceMock<Tracing::MockTracer>> tracer_{
+      std::make_shared<NiceMock<Tracing::MockTracer>>()};
   TracingConnectionManagerConfigPtr tracing_config_;
   SlowDateProviderImpl date_provider_{test_time_.timeSystem()};
   NiceMock<MockStream> stream_;
