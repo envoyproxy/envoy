@@ -47,9 +47,16 @@ envoy_rust_library(
 )
 
 rust_cxx_bridge(
-    name = "bridge",
+    name = "gen",
     src = "matcher.rs",
     deps = ["hash_lib"],
+)
+
+envoy_cc_library(
+    name = "bridge",
+    hdrs = [":gen/include"],
+    srcs = [":gen/source"],
+    deps = ["hash_lib", ":gen/include"],
 )
 
 envoy_cc_library(

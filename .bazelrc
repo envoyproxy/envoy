@@ -394,7 +394,6 @@ build:windows --copt="-DCURL_STATICLIB"
 build:msvc-cl --action_env=USE_CLANG_CL=""
 build:msvc-cl --define clang_cl=0
 build:msvc-cl --features=-determinism
-build:msvc-cl --dynamic_mode=off
 
 # Windows build behaviors when using clang-cl
 build:clang-cl --action_env=USE_CLANG_CL=1
