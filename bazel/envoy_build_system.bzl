@@ -14,8 +14,8 @@ load(
     _envoy_cc_posix_without_linux_library = "envoy_cc_posix_without_linux_library",
     _envoy_cc_win32_library = "envoy_cc_win32_library",
     _envoy_proto_library = "envoy_proto_library",
-    _envoy_rust_library = "envoy_rust_library",
     _envoy_rust_cxx_bridge = "envoy_rust_cxx_bridge",
+    _envoy_rust_library = "envoy_rust_library",
 )
 load(":envoy_pch.bzl", _envoy_pch_library = "envoy_pch_library")
 load(

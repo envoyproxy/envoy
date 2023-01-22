@@ -3,8 +3,8 @@ load(
     "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_extension_package",
-    "envoy_rust_library",
     "envoy_rust_cxx_bridge",
+    "envoy_rust_library",
 )
 
 licenses(["notice"])  # Apache 2
@@ -16,7 +16,6 @@ envoy_cc_library(
     hdrs = ["matcher.h"],
     deps = [
         "bridge",
-        "bridge/include",
         ":matcher_rs",
         "//envoy/matcher:matcher_interface",
         "//envoy/upstream:retry_interface",

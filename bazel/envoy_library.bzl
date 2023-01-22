@@ -261,5 +261,7 @@ def envoy_rust_cxx_bridge(name, src, deps = [], **kwargs):
     envoy_cc_library(
         name = name,
         deps = deps,
-        **kwargs,
+        srcs = ["%s.cc" % src],
+        hdrs = ["%s.h" % src],
+        **kwargs
     )
