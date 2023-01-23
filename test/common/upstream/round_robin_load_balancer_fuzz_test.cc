@@ -1,5 +1,7 @@
 #include <memory>
 
+#include "envoy/common/optref.h"
+
 #include "test/common/upstream/round_robin_load_balancer_fuzz.pb.validate.h"
 #include "test/common/upstream/zone_aware_load_balancer_fuzz_base.h"
 #include "test/fuzz/fuzz_runner.h"
@@ -32,7 +34,9 @@ DEFINE_PROTO_FUZZER(const test::common::upstream::RoundRobinLoadBalancerTestCase
         zone_aware_load_balancer_fuzz.stats_, zone_aware_load_balancer_fuzz.runtime_,
         zone_aware_load_balancer_fuzz.random_,
         zone_aware_load_balancer_test_case.load_balancer_test_case().common_lb_config(),
-        input.round_robin_lb_config(), zone_aware_load_balancer_fuzz.simTime());
+        makeOptRef<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>(
+            input.round_robin_lb_config()),
+        zone_aware_load_balancer_fuzz.simTime());
   } catch (EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException; {}", e.what());
     return;

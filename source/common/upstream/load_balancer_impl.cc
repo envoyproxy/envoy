@@ -695,7 +695,7 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context, uint64_
     }
   }
 
-  // If we've latched that we can't do priority-based routing, return healthy or degraded hosts
+  // If we've latched that we can't do locality-based routing, return healthy or degraded hosts
   // for the selected host set.
   if (per_priority_state_[host_set.priority()]->locality_routing_state_ ==
       LocalityRoutingState::NoLocalityRouting) {
