@@ -15,6 +15,15 @@ namespace Http {
 namespace HeaderValidators {
 namespace EnvoyDefault {
 
+namespace {
+
+template <typename IntType>
+std::from_chars_result fromChars(const absl::string_view string_value, IntType& value) {
+  return std::from_chars(string_value.data(), string_value.data() + string_value.size(), value);
+}
+
+} // namespace
+
 using ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig;
 using ::Envoy::Http::HeaderString;
 using ::Envoy::Http::Protocol;
@@ -140,7 +149,7 @@ HeaderValidator::validateStatusHeader(const HeaderString& value) {
 
   // Convert the status to an integer.
   std::uint32_t status_value{};
-  auto result = std::from_chars(value_string_view.begin(), value_string_view.end(), status_value);
+  auto result = fromChars(value_string_view, status_value);
   if (result.ec != std::errc() || result.ptr != value_string_view.end()) {
     return {HeaderValueValidationResult::Action::Reject,
             UhvResponseCodeDetail::get().InvalidStatus};
@@ -246,7 +255,7 @@ HeaderValidator::validateContentLengthHeader(const HeaderString& value) {
   //
   // Content-Length = 1*DIGIT
   // TODO(#23315) - Validate multiple Content-Length values
-  const auto& value_string_view = value.getStringView();
+  const auto value_string_view = value.getStringView();
 
   if (value_string_view.empty()) {
     return {HeaderValueValidationResult::Action::Reject,
@@ -254,7 +263,7 @@ HeaderValidator::validateContentLengthHeader(const HeaderString& value) {
   }
 
   std::uint64_t int_value{};
-  auto result = std::from_chars(value_string_view.begin(), value_string_view.end(), int_value);
+  auto result = fromChars(value_string_view, int_value);
   if (result.ec != std::errc() || result.ptr != value_string_view.end()) {
     return {HeaderValueValidationResult::Action::Reject,
             UhvResponseCodeDetail::get().InvalidContentLength};
@@ -306,7 +315,7 @@ HeaderValidator::validateHostHeader(const HeaderString& value) {
     } else {
       // parse the port number
       std::uint16_t port_int{};
-      auto result = std::from_chars(std::next(port_string.begin()), port_string.end(), port_int);
+      auto result = fromChars(port_string.substr(1), port_int);
 
       if (result.ec != std::errc() || result.ptr != port_string.end() || port_int == 0) {
         is_valid = false;
