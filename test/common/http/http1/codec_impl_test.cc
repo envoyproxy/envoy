@@ -74,6 +74,13 @@ Buffer::OwnedImpl createBufferWithNByteSlices(absl::string_view input, size_t ma
   ASSERT(buffer.getRawSlices().size() == (input.size() + max_slice_size - 1) / max_slice_size);
   return buffer;
 }
+
+struct HTTPStringTestCase {
+  const absl::string_view http_version_;
+  const absl::optional<absl::string_view> balsa_parser_expected_error_;
+  const absl::optional<absl::string_view> http_parser_expected_error_;
+};
+
 } // namespace
 
 class Http1CodecTestBase : public testing::TestWithParam<Http1ParserImpl> {
@@ -908,29 +915,26 @@ TEST_P(Http1ServerConnectionImplTest, Http10MultipleResponses) {
   }
 }
 
-// SPELLCHECKER(off)
-struct {
-  const absl::string_view http_version_;
-  const absl::optional<absl::string_view> balsa_parser_expected_error_;
-  const absl::optional<absl::string_view> http_parser_expected_error_;
-} kRequestHTTPStringTestCases[] = {{"", {}, {}}, // HTTP/0.9 has no HTTP-version.
-                                   {"HTTP/1.0", {}, {}},
-                                   {"HTTP/1.1", {}, {}},
-                                   {"HTTP/9.1", {}, {}},
-                                   {"aHTTP/1.1", "HPE_INVALID_VERSION", "HPE_INVALID_CONSTANT"},
-#ifdef ENVOY_ENABLE_UHV
-                                   {"HHTTP/1.1", "HPE_INVALID_VERSION", "HPE_INVALID_VERSION"},
-                                   {"HTTPS/1.1", "HPE_INVALID_VERSION", "HPE_INVALID_VERSION"},
-#else
-                                   {"HHTTP/1.1", "HPE_INVALID_VERSION", "HPE_STRICT"},
-                                   {"HTTPS/1.1", "HPE_INVALID_VERSION", "HPE_STRICT"},
-#endif
-                                   {"FTP/1.1", "HPE_INVALID_VERSION", "HPE_INVALID_CONSTANT"},
-                                   {"HTTP/1.01", "HPE_INVALID_VERSION", "HPE_INVALID_VERSION"},
-                                   {"HTTP/A.0", "HPE_INVALID_VERSION", "HPE_INVALID_VERSION"}};
-// SPELLCHECKER(on)
-
 TEST_P(Http1ServerConnectionImplTest, HttpVersion) {
+  // SPELLCHECKER(off)
+  HTTPStringTestCase kRequestHTTPStringTestCases[] = {
+      {"", {}, {}}, // HTTP/0.9 has no HTTP-version.
+      {"HTTP/1.0", {}, {}},
+      {"HTTP/1.1", {}, {}},
+      {"HTTP/9.1", {}, {}},
+      {"aHTTP/1.1", "HPE_INVALID_VERSION", "HPE_INVALID_CONSTANT"},
+#ifdef ENVOY_ENABLE_UHV
+      {"HHTTP/1.1", "HPE_INVALID_VERSION", "HPE_INVALID_VERSION"},
+      {"HTTPS/1.1", "HPE_INVALID_VERSION", "HPE_INVALID_VERSION"},
+#else
+      {"HHTTP/1.1", "HPE_INVALID_VERSION", "HPE_STRICT"},
+      {"HTTPS/1.1", "HPE_INVALID_VERSION", "HPE_STRICT"},
+#endif
+      {"FTP/1.1", "HPE_INVALID_VERSION", "HPE_INVALID_CONSTANT"},
+      {"HTTP/1.01", "HPE_INVALID_VERSION", "HPE_INVALID_VERSION"},
+      {"HTTP/A.0", "HPE_INVALID_VERSION", "HPE_INVALID_VERSION"}};
+  // SPELLCHECKER(on)
+
   for (const auto& test_case : kRequestHTTPStringTestCases) {
     // BalsaParser signals an error if and only if http-parser signals an error,
     // even though they may give different error codes.
@@ -3844,28 +3848,24 @@ TEST_P(Http1ClientConnectionImplTest, ResponseHttpVersion) {
   }
 }
 
-// SPELLCHECKER(off)
-struct {
-  const absl::string_view http_version_;
-  const absl::optional<absl::string_view> balsa_parser_expected_error_;
-  const absl::optional<absl::string_view> http_parser_expected_error_;
-} kResponseHTTPStringTestCases[] = {{"HTTP/1.0", {}, {}},
-                                    {"HTTP/1.1", {}, {}},
-                                    {"HTTP/9.1", {}, {}},
-                                    {"aHTTP/1.1", "HPE_INVALID_CONSTANT", "HPE_INVALID_CONSTANT"},
-#ifdef ENVOY_ENABLE_UHV
-                                    {"HHTTP/1.1", "HPE_INVALID_VERSION", "HPE_INVALID_VERSION"},
-                                    {"HTTPS/1.1", "HPE_INVALID_VERSION", "HPE_INVALID_VERSION"},
-#else
-                                    {"HHTTP/1.1", "HPE_INVALID_VERSION", "HPE_STRICT"},
-                                    {"HTTPS/1.1", "HPE_INVALID_VERSION", "HPE_STRICT"},
-#endif
-                                    {"FTP/1.1", "HPE_INVALID_CONSTANT", "HPE_INVALID_CONSTANT"},
-                                    {"HTTP/1.01", "HPE_INVALID_VERSION", "HPE_INVALID_VERSION"},
-                                    {"HTTP/A.0", "HPE_INVALID_VERSION", "HPE_INVALID_VERSION"}};
-// SPELLCHECKER(on)
-
 TEST_P(Http1ClientConnectionImplTest, HttpVersion) {
+  HTTPStringTestCase kResponseHTTPStringTestCases[] = {
+      {"HTTP/1.0", {}, {}},
+      {"HTTP/1.1", {}, {}},
+      {"HTTP/9.1", {}, {}},
+      {"aHTTP/1.1", "HPE_INVALID_CONSTANT", "HPE_INVALID_CONSTANT"},
+#ifdef ENVOY_ENABLE_UHV
+      {"HHTTP/1.1", "HPE_INVALID_VERSION", "HPE_INVALID_VERSION"},
+      {"HTTPS/1.1", "HPE_INVALID_VERSION", "HPE_INVALID_VERSION"},
+#else
+      {"HHTTP/1.1", "HPE_INVALID_VERSION", "HPE_STRICT"},
+      {"HTTPS/1.1", "HPE_INVALID_VERSION", "HPE_STRICT"},
+#endif
+      {"FTP/1.1", "HPE_INVALID_CONSTANT", "HPE_INVALID_CONSTANT"},
+      {"HTTP/1.01", "HPE_INVALID_VERSION", "HPE_INVALID_VERSION"},
+      {"HTTP/A.0", "HPE_INVALID_VERSION", "HPE_INVALID_VERSION"}};
+  // SPELLCHECKER(on)
+
   for (const auto& test_case : kResponseHTTPStringTestCases) {
     // BalsaParser signals an error if and only if http-parser signals an error,
     // even though they may give different error codes.
