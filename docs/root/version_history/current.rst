@@ -16,6 +16,8 @@ Bug Fixes
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
 * grpc: when Envoy was configured to use ext_authz, ext_proc, tap, ratelimit filters, and grpc access log service and an http header with non-UTF-8 data was received, Envoy would generate an invalid protobuf message and send it to the configured service. The receiving service would typically generate an error when decoding the protobuf message. For ext_authz that was configured with ``failure_mode_allow: true``, the request would have been allowed in this case. For the other services, this could have resulted in other unforseen errors such as a lack of visibility into requests (eg request not logged). Envoy will now by default sanitize the values sent in gRPC service calls to be valid UTF-8, replacing data that is not valid UTF-8 with a '!' character. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.service_sanitize_non_utf8_strings`` to false.
+* http: stop forwarding ``:method`` value which is not a valid token defined in https://www.rfc-editor.org/rfc/rfc9110#section-5.6.2.
+  Also, reject ``:method`` and ``:scheme`` headers with multiple values.
 * lua: lua coroutine should not execute after local reply is sent.
 * oauth: fixed a bug where the oauth2 filter would crash if it received a redirect URL without a state query param set.
 
