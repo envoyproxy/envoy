@@ -27,6 +27,10 @@ protected:
     });
   }
 
+  template <typename T> void deleteObject(std::shared_ptr<ObjectSharedPool<T>> pool, T* ptr) {
+    pool->deleteObject(ptr);
+  }
+
   ~SharedPoolTest() override {
     dispatcher_->exit();
     dispatcher_thread_->join();
@@ -97,7 +101,7 @@ TEST_F(SharedPoolTest, ThreadSafeForDeleteObject) {
     int* an_int = new int(4);
     createObjectSharedPool(pool);
     dispatcher_->post([&pool, this, &an_int]() {
-      pool->deleteObject(an_int);
+      deleteObject(pool, an_int);
       go_.Notify();
     });
     go_.WaitForNotification();
@@ -108,7 +112,8 @@ TEST_F(SharedPoolTest, ThreadSafeForDeleteObject) {
     int* an_int = new int(4);
     createObjectSharedPool(pool);
     Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
-    auto thread = thread_factory.createThread([&pool, &an_int]() { pool->deleteObject(an_int); });
+    auto thread =
+        thread_factory.createThread([this, &pool, &an_int]() { deleteObject(pool, an_int); });
     thread->join();
   }
 }
@@ -195,26 +200,26 @@ TEST_F(SharedPoolTest, HashCollision) {
 
     // Verify that there are separate entries in the pool for objects with the
     // same hash value.
-    ASSERT_EQ(2, pool->poolSize());
+    EXPECT_EQ(2, pool->poolSize());
 
-    ASSERT_EQ(*o, 4);
-    ASSERT_EQ(*o1, 3);
+    EXPECT_EQ(*o, 4);
+    EXPECT_EQ(*o1, 3);
 
     auto o2 = pool->getObject(15);
     auto o3 = pool->getObject(12);
     auto o4 = pool->getObject(3);
     auto o5 = pool->getObject(1);
 
-    ASSERT_EQ(o4.get(), o1.get());
-    ASSERT_EQ(*o2, 15);
-    ASSERT_EQ(*o3, 12);
-    ASSERT_EQ(*o4, 3);
-    ASSERT_EQ(*o5, 1);
+    EXPECT_EQ(o4.get(), o1.get());
+    EXPECT_EQ(*o2, 15);
+    EXPECT_EQ(*o3, 12);
+    EXPECT_EQ(*o4, 3);
+    EXPECT_EQ(*o5, 1);
 
-    ASSERT_EQ(5, pool->poolSize());
+    EXPECT_EQ(5, pool->poolSize());
   }
 
-  ASSERT_EQ(0, pool->poolSize());
+  EXPECT_EQ(0, pool->poolSize());
 }
 
 } // namespace SharedPool

@@ -4,7 +4,6 @@
 #include <memory>
 #include <thread>
 #include <type_traits>
-#include <unordered_map>
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/singleton/instance.h"
@@ -13,7 +12,7 @@
 #include "source/common/common/non_copyable.h"
 #include "source/common/common/thread_synchronizer.h"
 
-#include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
 
 namespace Envoy {
 namespace SharedPool {
@@ -40,32 +39,6 @@ class ObjectSharedPool
 public:
   ObjectSharedPool(Event::Dispatcher& dispatcher)
       : thread_id_(std::this_thread::get_id()), dispatcher_(dispatcher) {}
-
-  void deleteObject(T* ptr) {
-    if (std::this_thread::get_id() == thread_id_) {
-      if (auto iter = object_pool_.find(ptr); iter != object_pool_.end()) {
-        // It is possible that the entry in object_pool_ corresponds to a
-        // different weak_ptr, due to a race condition in a shared_ptr being
-        // destroyed on another thread, and getObject() being called on the main
-        // thread.
-        if (iter->use_count() == 0) {
-          object_pool_.erase(iter);
-        }
-      }
-      // Wait till here to delete the pointer because we don't want the OS to
-      // reallocate the memory location before this method completes to prevent
-      // "hash collisions".
-      delete ptr;
-    } else {
-      // Most of the time, the object's destructor occurs in the main thread, but with some
-      // exceptions, it is destructed in the worker thread. In order to keep the object_pool_ thread
-      // safe, the deleteObject needs to be delivered to the main thread.
-      auto this_shared_ptr = this->shared_from_this();
-      // Used for testing to simulate some race condition scenarios
-      sync_.syncPoint(DeleteObjectOnMainThread);
-      dispatcher_.post([ptr, this_shared_ptr] { this_shared_ptr->deleteObject(ptr); });
-    }
-  }
 
   std::shared_ptr<T> getObject(const T& obj) {
     ASSERT(std::this_thread::get_id() == thread_id_);
@@ -103,7 +76,40 @@ public:
   static const char DeleteObjectOnMainThread[];
   static const char ObjectDeleterEntry[];
 
+  friend class SharedPoolTest;
+
 private:
+  void deleteObject(T* ptr) {
+    if (std::this_thread::get_id() == thread_id_) {
+      deleteObjectOnMainThread(ptr);
+    } else {
+      // Most of the time, the object's destructor occurs in the main thread, but with some
+      // exceptions, it is destructed in the worker thread. In order to keep the object_pool_ thread
+      // safe, the deleteObject needs to be delivered to the main thread.
+      auto this_shared_ptr = this->shared_from_this();
+      // Used for testing to simulate some race condition scenarios
+      sync_.syncPoint(DeleteObjectOnMainThread);
+      dispatcher_.post([ptr, this_shared_ptr] { this_shared_ptr->deleteObjectOnMainThread(ptr); });
+    }
+  }
+
+  void deleteObjectOnMainThread(T* ptr) {
+    ASSERT(std::this_thread::get_id() == thread_id_);
+    if (auto iter = object_pool_.find(ptr); iter != object_pool_.end()) {
+      // It is possible that the entry in object_pool_ corresponds to a
+      // different weak_ptr, due to a race condition in a shared_ptr being
+      // destroyed on another thread, and getObject() being called on the main
+      // thread.
+      if (iter->use_count() == 0) {
+        object_pool_.erase(iter);
+      }
+    }
+    // Wait till here to delete the pointer because we don't want the OS to
+    // reallocate the memory location before this method completes to prevent
+    // "hash collisions".
+    delete ptr;
+  }
+
   class Element {
   public:
     Element(const std::shared_ptr<T>& ptr) : ptr_{ptr.get()}, weak_ptr_{ptr} {}
