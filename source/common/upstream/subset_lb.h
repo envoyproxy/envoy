@@ -365,7 +365,7 @@ private:
 
   OptRef<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
   lbLeastRequestConfig() const {
-    if (round_robin_config_ != nullptr) {
+    if (least_request_config_ != nullptr) {
       return *least_request_config_;
     }
     return absl::nullopt;
