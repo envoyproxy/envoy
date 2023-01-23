@@ -28,18 +28,16 @@ namespace Tracers {
 namespace Datadog {
 
 class RequestHeaderWriter : public datadog::tracing::DictWriter {
-  Http::RequestHeaderMap& headers_;
-
 public:
   explicit RequestHeaderWriter(Http::RequestHeaderMap& headers);
 
   void set(datadog::tracing::StringView key, datadog::tracing::StringView value) override;
+
+private:
+  Http::RequestHeaderMap& headers_;
 };
 
 class ResponseHeaderReader : public datadog::tracing::DictReader {
-  const Http::ResponseHeaderMap& headers_;
-  mutable std::string buffer_;
-
 public:
   explicit ResponseHeaderReader(const Http::ResponseHeaderMap& headers);
 
@@ -48,11 +46,13 @@ public:
 
   void visit(const std::function<void(datadog::tracing::StringView key,
                                       datadog::tracing::StringView value)>& visitor) const override;
+
+private:
+  const Http::ResponseHeaderMap& headers_;
+  mutable std::string buffer_;
 };
 
 class TraceContextReader : public datadog::tracing::DictReader {
-  const Tracing::TraceContext& context_;
-
 public:
   explicit TraceContextReader(const Tracing::TraceContext& context);
 
@@ -61,6 +61,9 @@ public:
 
   void visit(const std::function<void(datadog::tracing::StringView key,
                                       datadog::tracing::StringView value)>& visitor) const override;
+
+private:
+  const Tracing::TraceContext& context_;
 };
 
 } // namespace Datadog
