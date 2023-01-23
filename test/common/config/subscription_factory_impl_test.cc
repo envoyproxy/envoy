@@ -425,6 +425,31 @@ TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcCollectionAggregatedSubscr
       ->start({});
 }
 
+TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcCollectionAggregatedSotwSubscription) {
+  envoy::config::core::v3::ConfigSource config;
+  auto* api_config_source = config.mutable_api_config_source();
+  api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC);
+  api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
+  api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("static_cluster");
+
+  Upstream::ClusterManager::ClusterSet primary_clusters;
+  primary_clusters.insert("static_cluster");
+  EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
+  const std::string xds_url = "xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/bar";
+
+  if (GetParam() == LegacyOrUnified::Legacy) {
+    // AGGREGATED_GRPC not supported for legacy State-of-the-World, .
+    EXPECT_THROW_WITH_MESSAGE(collectionSubscriptionFromUrl(xds_url, config), EnvoyException,
+                              "AGGREGATED_GRPC only supported for unified_mux");
+    return;
+  }
+
+  GrpcMuxSharedPtr ads_mux = std::make_shared<NiceMock<MockGrpcMux>>();
+  EXPECT_CALL(cm_, adsMux()).WillOnce(Return(ads_mux));
+  EXPECT_CALL(dispatcher_, createTimer_(_));
+  collectionSubscriptionFromUrl(xds_url, config)->start({});
+}
+
 TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcCollectionDeltaSubscription) {
   envoy::config::core::v3::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();

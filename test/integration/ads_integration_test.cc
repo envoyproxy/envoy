@@ -1749,15 +1749,17 @@ TEST_P(AdsIntegrationTest, ContextParameterUpdate) {
 class XdsTpAdsIntegrationTest : public AdsIntegrationTest {
 public:
   void initialize() override {
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       bootstrap.add_node_context_params("id");
       bootstrap.add_node_context_params("cluster");
       bootstrap.mutable_dynamic_resources()->set_cds_resources_locator(
           "xdstp://test/envoy.config.cluster.v3.Cluster/foo-cluster/*");
       auto* cds_config = bootstrap.mutable_dynamic_resources()->mutable_cds_config();
       cds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+      const bool is_sotw = sotwOrDelta() == Grpc::SotwOrDelta::Sotw;
       cds_config->mutable_api_config_source()->set_api_type(
-          envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC);
+          is_sotw ? envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC
+                  : envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC);
       cds_config->mutable_api_config_source()->set_transport_api_version(
           envoy::config::core::v3::V3);
       bootstrap.mutable_dynamic_resources()->set_lds_resources_locator(
@@ -1765,7 +1767,8 @@ public:
       auto* lds_config = bootstrap.mutable_dynamic_resources()->mutable_lds_config();
       lds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
       lds_config->mutable_api_config_source()->set_api_type(
-          envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC);
+          is_sotw ? envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC
+                  : envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC);
       lds_config->mutable_api_config_source()->set_transport_api_version(
           envoy::config::core::v3::V3);
       auto* ads_config = bootstrap.mutable_dynamic_resources()->mutable_ads_config();
@@ -2371,6 +2374,108 @@ TEST_P(XdsTpAdsIntegrationTest, EdsAlternatingLedsUsage) {
 
   // Make sure that traffic can still be sent to the endpoint (now using the
   // EDS without LEDS).
+  makeSingleRequest();
+}
+
+// A separate test fixture for running xdstp tests on the UnifiedSotw protocol.
+// Most of the XdsTpAdsIntegrationTest tests use LEDS, which is not supported
+// for State-of-the-World yet.
+class UnifiedSotwXdsTpAdsIntegrationTest : public XdsTpAdsIntegrationTest {};
+
+INSTANTIATE_TEST_SUITE_P(
+    UnifiedSotw, UnifiedSotwXdsTpAdsIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     // There should be no variation across clients.
+                     testing::Values(Grpc::ClientType::EnvoyGrpc),
+                     testing::Values(Grpc::SotwOrDelta::UnifiedSotw),
+                     testing::Values(OldDssOrNewDss::Old, OldDssOrNewDss::New)));
+
+TEST_P(UnifiedSotwXdsTpAdsIntegrationTest, Basic) {
+  initialize();
+  // Basic CDS/EDS xDS initialization (CDS via xdstp:// glob collection).
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {},
+                                      {"xdstp://test/envoy.config.cluster.v3.Cluster/foo-cluster/"
+                                       "*?xds.node.cluster=cluster_name&xds.node.id=node_name"},
+                                      {}, /*expect_node=*/true));
+  const std::string cluster_name = "xdstp://test/envoy.config.cluster.v3.Cluster/foo-cluster/"
+                                   "baz?xds.node.cluster=cluster_name&xds.node.id=node_name";
+  auto cluster_resource = buildCluster(cluster_name);
+  const std::string endpoints_name =
+      "xdstp://test/envoy.config.endpoint.v3.ClusterLoadAssignment/foo-cluster/baz";
+  cluster_resource.mutable_eds_cluster_config()->set_service_name(endpoints_name);
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
+                                                             {cluster_resource}, {}, {}, "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",
+                                      {endpoints_name}, {}, {}, /*expect_node=*/true));
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment(endpoints_name)},
+      {}, {}, "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}, {}, {},
+                                      /*expect_node=*/true));
+
+  // LDS/RDS xDS initialization (LDS via xdstp:// glob collection)
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {},
+                              {"xdstp://test/envoy.config.listener.v3.Listener/foo-listener/"
+                               "*?xds.node.cluster=cluster_name&xds.node.id=node_name"},
+                              {}, /*expect_node=*/true));
+  const std::string route_name_0 =
+      "xdstp://test/envoy.config.route.v3.RouteConfiguration/route_config_0";
+  const std::string route_name_1 =
+      "xdstp://test/envoy.config.route.v3.RouteConfiguration/route_config_1";
+  sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
+      Config::TypeUrl::get().Listener,
+      {
+          buildListener("xdstp://test/envoy.config.listener.v3.Listener/foo-listener/"
+                        "bar?xds.node.cluster=cluster_name&xds.node.id=node_name",
+                        route_name_0),
+          // Ignore resource in impostor namespace.
+          buildListener("xdstp://test/envoy.config.listener.v3.Listener/impostor/"
+                        "bar?xds.node.cluster=cluster_name&xds.node.id=node_name",
+                        route_name_0),
+          // Ignore non-matching context params.
+          buildListener("xdstp://test/envoy.config.listener.v3.Listener/foo-listener/"
+                        "baz?xds.node.cluster=cluster_name&xds.node.id=other_name",
+                        route_name_0),
+      },
+      {}, {}, "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1", {}, {}, {},
+                                      /*expect_node=*/true));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "", {},
+                                      {route_name_0}, {}, /*expect_node=*/true));
+  sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
+      Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig(route_name_0, cluster_name)}, {},
+      {}, "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "1", {}, {}, {},
+                                      /*expect_node=*/true));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "1", {}, {}, {},
+                                      /*expect_node=*/true));
+
+  test_server_->waitForCounterEq("listener_manager.listener_create_success", 1);
+  makeSingleRequest();
+
+  // Add a second listener in the foo namespace.
+  sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
+      Config::TypeUrl::get().Listener,
+      {buildListener("xdstp://test/envoy.config.listener.v3.Listener/foo-listener/"
+                     "baz?xds.node.cluster=cluster_name&xds.node.id=node_name",
+                     route_name_1)},
+      {}, {}, "2");
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "1", {},
+                                      {route_name_1}, {}, /*expect_node=*/true));
+  sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
+      Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig(route_name_1, cluster_name)}, {},
+      {}, "2");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "2", {}, {}, {},
+                                      /*expect_node=*/true));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "2", {}, {}, {},
+                                      /*expect_node=*/true));
+  test_server_->waitForCounterEq("listener_manager.listener_create_success", 2);
   makeSingleRequest();
 }
 
