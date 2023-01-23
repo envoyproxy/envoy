@@ -1,5 +1,24 @@
 #pragma once
 
+/**
+ * This file contains functions related to time points and durations.
+ *
+ * Envoy has a time type that contains both a system time point and a steady
+ * ("monotonic") time point. However, only the system time is exposed to the
+ * tracing subsystem. This may be remedied in the future, but for now we work
+ * with the system time.
+ *
+ * This is problematic for the Datadog core tracing library (dd-trace-cpp),
+ * because it uses the steady time to calculate the duration of a span
+ * (end.tick - begin.tick). So, we need to get a steady clock time from a given system
+ * clock time. The scheme is to measure the current system/steady time,
+ * compare the system part with the given system time, and then adjust the
+ * measured steady time accordingly. This is correct if the system clock has not
+ * been adjusted since the given system time was measured. It's incorrect
+ * otherwise, hence only an estimate. This conversion is performed by the
+ * estimateTime function.
+ */
+
 #include <datadog/clock.h>
 
 #include "envoy/common/time.h"
