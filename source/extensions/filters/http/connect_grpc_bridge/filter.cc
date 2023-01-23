@@ -228,6 +228,7 @@ Http::FilterHeadersStatus ConnectGrpcBridgeFilter::decodeHeaders(Http::RequestHe
     // Remove connect protocol header.
     headers.remove(Http::CustomHeaders::get().ConnectProtocolVersion);
 
+    headers.setTE(Http::Headers::get().TEValues.Trailers);
     renameHeader(headers, Http::CustomHeaders::get().ConnectContentEncoding,
                  Http::CustomHeaders::get().GrpcEncoding);
     renameHeader(headers, Http::CustomHeaders::get().ConnectAcceptEncoding,
