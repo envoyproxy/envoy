@@ -1066,13 +1066,6 @@ if __name__ == "__main__":
     if format_checker.check_error_messages(ct_error_messages):
         sys.exit(1)
 
-    if not os.environ.get("CI"):
-        # TODO(phlax): Remove this after a month or so
-        logger.warning(
-            "Please note: `tools/code_format/check_format.py` no longer checks API `.proto` files, "
-            "please use `tools/proto_format/proto_format.sh` if you are making changes to the API files"
-        )
-
     def check_visibility(error_messages):
         command = (
             "git diff $(tools/git/last_github_commit.sh) -- source/extensions/* %s |grep '+.*visibility ='"
