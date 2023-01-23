@@ -909,6 +909,44 @@ bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
   return true;
 }
 
+bool ConnectionManagerImpl::ActiveStream::validateTrailers() {
+  if (!header_validator_) {
+    return true;
+  }
+
+  auto validation_result = header_validator_->validateRequestTrailerMap(*request_trailers_);
+  if (validation_result.ok()) {
+    return true;
+  }
+
+  Code response_code = Code::BadRequest;
+  absl::optional<Grpc::Status::GrpcStatus> grpc_status;
+  if (Grpc::Common::hasGrpcContentType(*request_headers_)) {
+    grpc_status = Grpc::Status::WellKnownGrpcStatus::Internal;
+  }
+
+  // H/2 codec was resetting requests that were rejected due to headers with underscores,
+  // instead of sending 400. Preserving this behavior for now.
+  // TODO(#24466): Make H/2 behavior consistent with H/1 and H/3.
+  if (validation_result.details() == UhvResponseCodeDetail::get().InvalidUnderscore &&
+      connection_manager_.codec_->protocol() == Protocol::Http2) {
+    filter_manager_.streamInfo().setResponseCodeDetails(validation_result.details());
+    resetStream();
+  } else {
+    // TODO(#24735): Harmonize H/2 and H/3 behavior with H/1
+    if (connection_manager_.codec_->protocol() < Protocol::Http2) {
+      sendLocalReply(response_code, "", nullptr, grpc_status, validation_result.details());
+    } else {
+      filter_manager_.streamInfo().setResponseCodeDetails(validation_result.details());
+      resetStream();
+    }
+    if (!response_encoder_->streamErrorOnInvalidHttpMessage()) {
+      connection_manager_.handleCodecError(validation_result.details());
+    }
+  }
+  return false;
+}
+
 void ConnectionManagerImpl::ActiveStream::maybeEndDecode(bool end_stream) {
   // If recreateStream is called, the HCM rewinds state and may send more encodeData calls.
   if (end_stream && !filter_manager_.remoteDecodeComplete()) {
@@ -1148,7 +1186,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
 
 void ConnectionManagerImpl::ActiveStream::traceRequest() {
   const Tracing::Decision tracing_decision =
-      Tracing::HttpTracerUtility::shouldTraceRequest(filter_manager_.streamInfo());
+      Tracing::TracerUtility::shouldTraceRequest(filter_manager_.streamInfo());
   ConnectionManagerImpl::chargeTracingStats(tracing_decision.reason,
                                             connection_manager_.config_.tracingStats());
 
@@ -1212,12 +1250,17 @@ void ConnectionManagerImpl::ActiveStream::decodeData(Buffer::Instance& data, boo
 }
 
 void ConnectionManagerImpl::ActiveStream::decodeTrailers(RequestTrailerMapPtr&& trailers) {
+  ENVOY_STREAM_LOG(debug, "request trailers complete:\n{}", *this, *trailers);
   ScopeTrackerScopeState scope(this,
                                connection_manager_.read_callbacks_->connection().dispatcher());
   resetIdleTimer();
 
   ASSERT(!request_trailers_);
   request_trailers_ = std::move(trailers);
+  if (!validateTrailers()) {
+    ENVOY_STREAM_LOG(debug, "request trailers validation failed:\n{}", *this, *request_trailers_);
+    return;
+  }
   maybeEndDecode(true);
   filter_manager_.decodeTrailers(*request_trailers_);
 }

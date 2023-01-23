@@ -41,7 +41,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // host header. This allows a single listener to service multiple top level domain path trees. Once
 // a virtual host is selected based on the domain, the routes are processed in order to see which
 // upstream cluster to route to or whether to perform a redirect.
-// [#next-free-field: 23]
+// [#next-free-field: 24]
 message VirtualHost {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.VirtualHost";
 
@@ -205,6 +205,10 @@ message VirtualHost {
   // route level entry will take precedence over this config and it'll be treated
   // independently (e.g.: values are not inherited).
   HedgePolicy hedge_policy = 17;
+
+  // Decides whether to include the :ref:`x-envoy-is-timeout-retry <config_http_filters_router_x-envoy-is-timeout-retry>`
+  // request header in retries initiated by per try timeouts.
+  bool include_is_timeout_retry_header = 23;
 
   // The maximum bytes which will be buffered for retries and shadowing.
   // If set and a route-specific limit is not set, the bytes actually buffered will be the minimum
@@ -404,7 +408,8 @@ message WeightedCluster {
     // The weight of the cluster. This value is relative to the other clusters'
     // weights. When a request matches the route, the choice of an upstream cluster
     // is determined by its weight. The sum of weights across all
-    // entries in the clusters array must be greater than 0.
+    // entries in the clusters array must be greater than 0, and must not exceed
+    // uint32_t maximal value (4294967295).
     google.protobuf.UInt32Value weight = 2;
 
     // Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints in
@@ -2007,6 +2012,7 @@ message RateLimit {
     // .. code-block:: cpp
     //
     //   ("<descriptor_key>", "<value_queried_from_metadata>")
+    // [#next-free-field: 6]
     message MetaData {
       enum Source {
         // Query :ref:`dynamic metadata <well_known_dynamic_metadata>`
@@ -2024,11 +2030,17 @@ message RateLimit {
       type.metadata.v3.MetadataKey metadata_key = 2 [(validate.rules).message = {required: true}];
 
       // An optional value to use if ``metadata_key`` is empty. If not set and
-      // no value is present under the metadata_key then no descriptor is generated.
+      // no value is present under the metadata_key then ``skip_if_absent`` is followed to
+      // skip calling the rate limiting service or skip the descriptor.
       string default_value = 3;
 
       // Source of metadata
       Source source = 4 [(validate.rules).enum = {defined_only: true}];
+
+      // If set to true, Envoy skips the descriptor while calling rate limiting service
+      // when ``metadata_key`` is empty and ``default_value`` is not set. By default it skips calling the
+      // rate limiting service in that case.
+      bool skip_if_absent = 5;
     }
 
     // The following descriptor entry is appended to the descriptor:

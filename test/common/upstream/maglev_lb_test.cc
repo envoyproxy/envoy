@@ -13,6 +13,8 @@
 #include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/simulated_time_system.h"
 
+#include "absl/types/optional.h"
+
 namespace Envoy {
 namespace Upstream {
 namespace {
@@ -45,16 +47,24 @@ public:
 class MaglevLoadBalancerTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
   MaglevLoadBalancerTest()
-      : stat_names_(stats_store_.symbolTable()), stats_(stat_names_, stats_store_) {}
+      : stat_names_(stats_store_.symbolTable()), stats_(stat_names_, *stats_store_.rootScope()) {}
 
   void createLb() {
-    lb_ = std::make_unique<MaglevLoadBalancer>(priority_set_, stats_, stats_store_, runtime_,
-                                               random_, config_, common_config_);
+    lb_ = std::make_unique<MaglevLoadBalancer>(
+        priority_set_, stats_, *stats_store_.rootScope(), runtime_, random_,
+        config_.has_value()
+            ? makeOptRef<const envoy::config::cluster::v3::Cluster::MaglevLbConfig>(config_.value())
+            : absl::nullopt,
+        common_config_);
   }
 
-  void init(uint64_t table_size) {
+  void init(uint64_t table_size, bool locality_weighted_balancing = false) {
     config_ = envoy::config::cluster::v3::Cluster::MaglevLbConfig();
     config_.value().mutable_table_size()->set_value(table_size);
+
+    if (locality_weighted_balancing) {
+      common_config_.mutable_locality_weighted_lb_config();
+    }
 
     createLb();
     lb_->initialize();
@@ -311,7 +321,7 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedSameLocalityWeights) {
   LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 1}};
   host_set_.locality_weights_ = locality_weights;
   host_set_.runCallbacks({}, {});
-  init(17);
+  init(17, true);
   EXPECT_EQ(8, lb_->stats().min_entries_per_host_.value());
   EXPECT_EQ(9, lb_->stats().max_entries_per_host_.value());
 
@@ -355,7 +365,7 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedDifferentLocalityWeights) {
   LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{8, 0, 2}};
   host_set_.locality_weights_ = locality_weights;
   host_set_.runCallbacks({}, {});
-  init(17);
+  init(17, true);
   EXPECT_EQ(4, lb_->stats().min_entries_per_host_.value());
   EXPECT_EQ(13, lb_->stats().max_entries_per_host_.value());
 
@@ -395,7 +405,7 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedAllZeroLocalityWeights) {
   LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{0}};
   host_set_.locality_weights_ = locality_weights;
   host_set_.runCallbacks({}, {});
-  init(17);
+  init(17, true);
   LoadBalancerPtr lb = lb_->factory()->create();
   TestLoadBalancerContext context(0);
   EXPECT_EQ(nullptr, lb->chooseHost(&context));
@@ -413,7 +423,7 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedGlobalPanic) {
   LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 1}};
   host_set_.locality_weights_ = locality_weights;
   host_set_.runCallbacks({}, {});
-  init(17);
+  init(17, true);
   EXPECT_EQ(8, lb_->stats().min_entries_per_host_.value());
   EXPECT_EQ(9, lb_->stats().max_entries_per_host_.value());
 
@@ -459,7 +469,7 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedLopsided) {
   host_set_.healthy_hosts_per_locality_ = host_set_.hosts_per_locality_;
   host_set_.locality_weights_ = makeLocalityWeights({127, 1});
   host_set_.runCallbacks({}, {});
-  init(MaglevTable::DefaultTableSize);
+  init(MaglevTable::DefaultTableSize, true);
   EXPECT_EQ(1, lb_->stats().min_entries_per_host_.value());
   EXPECT_EQ(MaglevTable::DefaultTableSize - 1023, lb_->stats().max_entries_per_host_.value());
 

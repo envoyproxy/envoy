@@ -247,7 +247,7 @@ public:
 
 // Verify descriptor rate limit time interval is multiple of token bucket fill interval.
 TEST_F(LocalRateLimiterDescriptorImplTest, DescriptorRateLimitDivisibleByTokenFillInterval) {
-  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 10, 10, "60s"),
+  TestUtility::loadFromYaml(fmt::format(fmt::runtime(single_descriptor_config_yaml), 10, 10, "60s"),
                             *descriptors_.Add());
 
   EXPECT_THROW_WITH_MESSAGE(
@@ -256,9 +256,9 @@ TEST_F(LocalRateLimiterDescriptorImplTest, DescriptorRateLimitDivisibleByTokenFi
 }
 
 TEST_F(LocalRateLimiterDescriptorImplTest, DuplicateDescriptor) {
-  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 1, 1, "0.1s"),
+  TestUtility::loadFromYaml(fmt::format(fmt::runtime(single_descriptor_config_yaml), 1, 1, "0.1s"),
                             *descriptors_.Add());
-  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 1, 1, "0.1s"),
+  TestUtility::loadFromYaml(fmt::format(fmt::runtime(single_descriptor_config_yaml), 1, 1, "0.1s"),
                             *descriptors_.Add());
 
   EXPECT_THROW_WITH_MESSAGE(
@@ -276,8 +276,9 @@ TEST_F(LocalRateLimiterDescriptorImplTest, DescriptorRateLimitNoExceptionWithout
 TEST_F(LocalRateLimiterDescriptorImplTest, CasEdgeCasesDescriptor) {
   // This tests the case in which an allowed check races with the fill timer.
   {
-    TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 1, 1, "0.1s"),
-                              *descriptors_.Add());
+    TestUtility::loadFromYaml(
+        fmt::format(fmt::runtime(single_descriptor_config_yaml), 1, 1, "0.1s"),
+        *descriptors_.Add());
     initializeWithDescriptor(std::chrono::milliseconds(50), 1, 1);
 
     synchronizer().enable();
@@ -325,7 +326,7 @@ TEST_F(LocalRateLimiterDescriptorImplTest, CasEdgeCasesDescriptor) {
 }
 
 TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDescriptor2) {
-  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 1, 1, "0.1s"),
+  TestUtility::loadFromYaml(fmt::format(fmt::runtime(single_descriptor_config_yaml), 1, 1, "0.1s"),
                             *descriptors_.Add());
   initializeWithDescriptor(std::chrono::milliseconds(50), 1, 1);
 
@@ -338,7 +339,7 @@ TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDescriptor2) {
 
 // Verify token bucket functionality with a single token.
 TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDescriptor) {
-  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 1, 1, "0.1s"),
+  TestUtility::loadFromYaml(fmt::format(fmt::runtime(single_descriptor_config_yaml), 1, 1, "0.1s"),
                             *descriptors_.Add());
   initializeWithDescriptor(std::chrono::milliseconds(50), 1, 1);
 
@@ -375,7 +376,7 @@ TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDescriptor) {
 
 // Verify token bucket functionality with request per unit > 1.
 TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketMultipleTokensPerFillDescriptor) {
-  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 2, 2, "0.1s"),
+  TestUtility::loadFromYaml(fmt::format(fmt::runtime(single_descriptor_config_yaml), 2, 2, "0.1s"),
                             *descriptors_.Add());
   initializeWithDescriptor(std::chrono::milliseconds(50), 2, 2);
 
@@ -416,7 +417,7 @@ TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketMultipleTokensPerFillDescr
 // Verify token bucket functionality with multiple descriptors.
 TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDifferentDescriptorDifferentRateLimits) {
   TestUtility::loadFromYaml(multiple_descriptor_config_yaml, *descriptors_.Add());
-  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 1, 1, "1000s"),
+  TestUtility::loadFromYaml(fmt::format(fmt::runtime(single_descriptor_config_yaml), 1, 1, "1000s"),
                             *descriptors_.Add());
   initializeWithDescriptor(std::chrono::milliseconds(50), 3, 1);
 
@@ -442,7 +443,7 @@ TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDifferentDescriptorDiffere
 TEST_F(LocalRateLimiterDescriptorImplTest,
        TokenBucketDifferentDescriptorDifferentRateLimitsSorted) {
   TestUtility::loadFromYaml(multiple_descriptor_config_yaml, *descriptors_.Add());
-  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 2, 2, "1s"),
+  TestUtility::loadFromYaml(fmt::format(fmt::runtime(single_descriptor_config_yaml), 2, 2, "1s"),
                             *descriptors_.Add());
   initializeWithDescriptor(std::chrono::milliseconds(50), 3, 3);
   std::vector<RateLimit::LocalDescriptor> descriptors{{{{"hello", "world"}, {"foo", "bar"}}},
@@ -457,7 +458,7 @@ TEST_F(LocalRateLimiterDescriptorImplTest,
 
 // Verify token bucket status of max tokens, remaining tokens and remaining fill interval.
 TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDescriptorStatus) {
-  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 2, 2, "3s"),
+  TestUtility::loadFromYaml(fmt::format(fmt::runtime(single_descriptor_config_yaml), 2, 2, "3s"),
                             *descriptors_.Add());
   initializeWithDescriptor(std::chrono::milliseconds(3000), 2, 2);
 
@@ -497,7 +498,7 @@ TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDescriptorStatus) {
 // multiple descriptors.
 TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDifferentDescriptorStatus) {
   TestUtility::loadFromYaml(multiple_descriptor_config_yaml, *descriptors_.Add());
-  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 2, 2, "3s"),
+  TestUtility::loadFromYaml(fmt::format(fmt::runtime(single_descriptor_config_yaml), 2, 2, "3s"),
                             *descriptors_.Add());
   initializeWithDescriptor(std::chrono::milliseconds(50), 2, 1);
 

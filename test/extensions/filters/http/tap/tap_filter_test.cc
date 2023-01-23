@@ -25,7 +25,7 @@ public:
   FilterStats& stats() override { return stats_; }
 
   Stats::IsolatedStoreImpl stats_store_;
-  FilterStats stats_{Filter::generateStats("foo", stats_store_)};
+  FilterStats stats_{Filter::generateStats("foo", *stats_store_.rootScope())};
 };
 
 class MockHttpPerRequestTapper : public HttpPerRequestTapper {

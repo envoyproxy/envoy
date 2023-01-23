@@ -77,6 +77,36 @@ bool hostWeightsAreEqual(const HostVector& hosts) {
 
 } // namespace
 
+absl::optional<envoy::extensions::load_balancing_policies::common::v3::LocalityLbConfig>
+LoadBalancerConfigHelper::localityLbConfigFromCommonLbConfig(
+    const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config) {
+
+  if (common_config.has_locality_weighted_lb_config()) {
+    envoy::extensions::load_balancing_policies::common::v3::LocalityLbConfig locality_lb_config;
+    locality_lb_config.mutable_locality_weighted_lb_config();
+    return locality_lb_config;
+  } else if (common_config.has_zone_aware_lb_config()) {
+    envoy::extensions::load_balancing_policies::common::v3::LocalityLbConfig locality_lb_config;
+    auto& zone_aware_lb_config = *locality_lb_config.mutable_zone_aware_lb_config();
+
+    const auto& legacy_zone_aware_lb_config = common_config.zone_aware_lb_config();
+    if (legacy_zone_aware_lb_config.has_routing_enabled()) {
+      *zone_aware_lb_config.mutable_routing_enabled() =
+          legacy_zone_aware_lb_config.routing_enabled();
+    }
+    if (legacy_zone_aware_lb_config.has_min_cluster_size()) {
+      *zone_aware_lb_config.mutable_min_cluster_size() =
+          legacy_zone_aware_lb_config.min_cluster_size();
+    }
+    zone_aware_lb_config.set_fail_traffic_on_panic(
+        legacy_zone_aware_lb_config.fail_traffic_on_panic());
+
+    return locality_lb_config;
+  }
+
+  return {};
+}
+
 std::pair<uint32_t, LoadBalancerBase::HostAvailability>
 LoadBalancerBase::choosePriority(uint64_t hash, const HealthyLoad& healthy_per_priority_load,
                                  const DegradedLoad& degraded_per_priority_load) {
@@ -108,14 +138,11 @@ LoadBalancerBase::choosePriority(uint64_t hash, const HealthyLoad& healthy_per_p
   return {0, HostAvailability::Healthy};
 }
 
-LoadBalancerBase::LoadBalancerBase(
-    const PrioritySet& priority_set, ClusterLbStats& stats, Runtime::Loader& runtime,
-    Random::RandomGenerator& random,
-    const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
+LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set, ClusterLbStats& stats,
+                                   Runtime::Loader& runtime, Random::RandomGenerator& random,
+                                   uint32_t healthy_panic_threshold)
     : stats_(stats), runtime_(runtime), random_(random),
-      default_healthy_panic_percent_(PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
-          common_config, healthy_panic_threshold, 100, 50)),
-      priority_set_(priority_set) {
+      default_healthy_panic_percent_(healthy_panic_threshold), priority_set_(priority_set) {
   for (auto& host_set : priority_set_.hostSetsPerPriority()) {
     recalculatePerPriorityState(host_set->priority(), priority_set_, per_priority_load_,
                                 per_priority_health_, per_priority_degraded_, total_healthy_hosts_);
@@ -352,16 +379,23 @@ LoadBalancerBase::chooseHostSet(LoadBalancerContext* context, uint64_t hash) con
 
 ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
     const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& stats,
-    Runtime::Loader& runtime, Random::RandomGenerator& random,
-    const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
-    : LoadBalancerBase(priority_set, stats, runtime, random, common_config),
+    Runtime::Loader& runtime, Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
+    const absl::optional<LocalityLbConfig> locality_config)
+    : LoadBalancerBase(priority_set, stats, runtime, random, healthy_panic_threshold),
       local_priority_set_(local_priority_set),
-      locality_weighted_balancing_(common_config.has_locality_weighted_lb_config()),
-      routing_enabled_(PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
-          common_config.zone_aware_lb_config(), routing_enabled, 100, 100)),
-      min_cluster_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(common_config.zone_aware_lb_config(),
-                                                        min_cluster_size, 6U)),
-      fail_traffic_on_panic_(common_config.zone_aware_lb_config().fail_traffic_on_panic()) {
+      locality_weighted_balancing_(locality_config.has_value() &&
+                                   locality_config->has_locality_weighted_lb_config()),
+      routing_enabled_(locality_config.has_value()
+                           ? PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
+                                 locality_config->zone_aware_lb_config(), routing_enabled, 100, 100)
+                           : 100),
+      min_cluster_size_(locality_config.has_value()
+                            ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+                                  locality_config->zone_aware_lb_config(), min_cluster_size, 6U)
+                            : 6U),
+      fail_traffic_on_panic_(locality_config.has_value()
+                                 ? locality_config->zone_aware_lb_config().fail_traffic_on_panic()
+                                 : false) {
   ASSERT(!priority_set.hostSetsPerPriority().empty());
   resizePerPriorityState();
   priority_update_cb_ = priority_set_.addPriorityUpdateCb(
@@ -661,7 +695,7 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context, uint64_
     }
   }
 
-  // If we've latched that we can't do priority-based routing, return healthy or degraded hosts
+  // If we've latched that we can't do locality-based routing, return healthy or degraded hosts
   // for the selected host set.
   if (per_priority_state_[host_set.priority()]->locality_routing_state_ ==
       LocalityRoutingState::NoLocalityRouting) {
@@ -727,12 +761,11 @@ const HostVector& ZoneAwareLoadBalancerBase::hostSourceToHosts(HostsSource hosts
 
 EdfLoadBalancerBase::EdfLoadBalancerBase(
     const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& stats,
-    Runtime::Loader& runtime, Random::RandomGenerator& random,
-    const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
-    const absl::optional<envoy::config::cluster::v3::Cluster::SlowStartConfig> slow_start_config,
-    TimeSource& time_source)
+    Runtime::Loader& runtime, Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
+    const absl::optional<LocalityLbConfig> locality_config,
+    const absl::optional<SlowStartConfig> slow_start_config, TimeSource& time_source)
     : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
-                                common_config),
+                                healthy_panic_threshold, locality_config),
       seed_(random_.random()),
       slow_start_window_(slow_start_config.has_value()
                              ? std::chrono::milliseconds(DurationUtil::durationToMilliseconds(

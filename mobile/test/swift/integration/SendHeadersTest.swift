@@ -1,9 +1,15 @@
 import Envoy
 import EnvoyEngine
 import Foundation
+import TestExtensions
 import XCTest
 
 final class SendHeadersTests: XCTestCase {
+  override static func setUp() {
+    super.setUp()
+    register_test_extensions()
+  }
+
   func testSendHeaders() {
     // swiftlint:disable:next line_length
     let emhcmType = "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.EnvoyMobileHttpConnectionManager"
@@ -72,7 +78,7 @@ static_resources:
       .start()
       .sendHeaders(requestHeaders, endStream: true)
 
-    XCTAssertEqual(XCTWaiter.wait(for: [expectation], timeout: 1), .completed)
+    XCTAssertEqual(XCTWaiter.wait(for: [expectation], timeout: 10), .completed)
 
     engine.terminate()
   }
