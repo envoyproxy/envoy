@@ -910,9 +910,9 @@ TEST_P(Http1ServerConnectionImplTest, Http10MultipleResponses) {
 
 // SPELLCHECKER(off)
 struct {
-  const absl::string_view http_version;
-  const absl::optional<absl::string_view> balsa_parser_expected_error;
-  const absl::optional<absl::string_view> http_parser_expected_error;
+  const absl::string_view http_version_;
+  const absl::optional<absl::string_view> balsa_parser_expected_error_;
+  const absl::optional<absl::string_view> http_parser_expected_error_;
 } kRequestHTTPStringTestCases[] = {{"", {}, {}}, // HTTP/0.9 has no HTTP-version.
                                    {"HTTP/1.0", {}, {}},
                                    {"HTTP/1.1", {}, {}},
@@ -934,14 +934,14 @@ TEST_P(Http1ServerConnectionImplTest, HttpVersion) {
   for (const auto& test_case : kRequestHTTPStringTestCases) {
     // BalsaParser signals an error if and only if http-parser signals an error,
     // even though they may give different error codes.
-    ASSERT_EQ(test_case.balsa_parser_expected_error.has_value(),
-              test_case.http_parser_expected_error.has_value());
+    ASSERT_EQ(test_case.balsa_parser_expected_error_.has_value(),
+              test_case.http_parser_expected_error_.has_value());
 
     absl::optional<absl::string_view> expected_error;
     if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-      expected_error = test_case.balsa_parser_expected_error;
+      expected_error = test_case.balsa_parser_expected_error_;
     } else {
-      expected_error = test_case.http_parser_expected_error;
+      expected_error = test_case.http_parser_expected_error_;
     }
 
     initialize();
@@ -957,16 +957,16 @@ TEST_P(Http1ServerConnectionImplTest, HttpVersion) {
       EXPECT_CALL(decoder, decodeHeaders_(_, true));
     }
 
-    Buffer::OwnedImpl buffer(absl::StrCat("GET /", test_case.http_version.empty() ? "" : " ",
-                                          test_case.http_version, "\r\n\r\n"));
+    Buffer::OwnedImpl buffer(absl::StrCat("GET /", test_case.http_version_.empty() ? "" : " ",
+                                          test_case.http_version_, "\r\n\r\n"));
     auto status = codec_->dispatch(buffer);
 
     if (expected_error.has_value()) {
-      EXPECT_TRUE(isCodecProtocolError(status)) << test_case.http_version;
+      EXPECT_TRUE(isCodecProtocolError(status)) << test_case.http_version_;
       EXPECT_EQ(status.message(), absl::StrCat("http/1.1 protocol error: ", expected_error.value()))
-          << test_case.http_version;
+          << test_case.http_version_;
     } else {
-      EXPECT_TRUE(status.ok()) << test_case.http_version;
+      EXPECT_TRUE(status.ok()) << test_case.http_version_;
     }
   }
 }
@@ -3846,9 +3846,9 @@ TEST_P(Http1ClientConnectionImplTest, ResponseHttpVersion) {
 
 // SPELLCHECKER(off)
 struct {
-  const absl::string_view http_version;
-  const absl::optional<absl::string_view> balsa_parser_expected_error;
-  const absl::optional<absl::string_view> http_parser_expected_error;
+  const absl::string_view http_version_;
+  const absl::optional<absl::string_view> balsa_parser_expected_error_;
+  const absl::optional<absl::string_view> http_parser_expected_error_;
 } kResponseHTTPStringTestCases[] = {{"HTTP/1.0", {}, {}},
                                     {"HTTP/1.1", {}, {}},
                                     {"HTTP/9.1", {}, {}},
@@ -3869,14 +3869,14 @@ TEST_P(Http1ClientConnectionImplTest, HttpVersion) {
   for (const auto& test_case : kResponseHTTPStringTestCases) {
     // BalsaParser signals an error if and only if http-parser signals an error,
     // even though they may give different error codes.
-    ASSERT_EQ(test_case.balsa_parser_expected_error.has_value(),
-              test_case.http_parser_expected_error.has_value());
+    ASSERT_EQ(test_case.balsa_parser_expected_error_.has_value(),
+              test_case.http_parser_expected_error_.has_value());
 
     absl::optional<absl::string_view> expected_error;
     if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-      expected_error = test_case.balsa_parser_expected_error;
+      expected_error = test_case.balsa_parser_expected_error_;
     } else {
-      expected_error = test_case.http_parser_expected_error;
+      expected_error = test_case.http_parser_expected_error_;
     }
 
     initialize();
@@ -3890,14 +3890,14 @@ TEST_P(Http1ClientConnectionImplTest, HttpVersion) {
       EXPECT_CALL(response_decoder, decodeHeaders_(_, true));
     }
     Buffer::OwnedImpl response(
-        absl::StrCat(test_case.http_version, " 200 OK\r\nContent-Length: 0\r\n\r\n"));
+        absl::StrCat(test_case.http_version_, " 200 OK\r\nContent-Length: 0\r\n\r\n"));
     auto status = codec_->dispatch(response);
     if (expected_error.has_value()) {
-      EXPECT_TRUE(isCodecProtocolError(status)) << test_case.http_version;
+      EXPECT_TRUE(isCodecProtocolError(status)) << test_case.http_version_;
       EXPECT_EQ(status.message(), absl::StrCat("http/1.1 protocol error: ", expected_error.value()))
-          << test_case.http_version;
+          << test_case.http_version_;
     } else {
-      EXPECT_TRUE(status.ok()) << test_case.http_version;
+      EXPECT_TRUE(status.ok()) << test_case.http_version_;
     }
   }
 }
