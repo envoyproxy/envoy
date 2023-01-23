@@ -12,6 +12,23 @@ namespace Extensions {
 namespace Tracers {
 namespace Datadog {
 
+/**
+  * Tracing::Span implementation for use in Datadog tracing. This class contains
+  * an optional<datadog::tracing::Span> and forwards its member functions to the
+  * corresponding member functions of datadog::tracing::Span.
+  *
+  * datadog::tracing::Span is the span type used in Datadog's core tracing
+  * library, dd-trace-cpp. It's wrapped in an optional<> because the lifetime
+  * of a datadog::tracing::Span is tied to the scope of the object itself,
+  * whereas the Tracing::Span implemented here has a finishSpan() member
+  * function that allows the span's lifetime to end without destroying the
+  * object.
+  *
+  * For the same reason, this class has two states: one when the
+  * optional<datadog::tracing::Span> is not empty and member functions are
+  * forwarded to it, and another state when the optional<datadog::tracing::Span>
+  * is empty and member functions have no effect.
+  */
 class Span : public Tracing::Span {
 public:
   explicit Span(datadog::tracing::Span&& span);
