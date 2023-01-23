@@ -29,8 +29,8 @@ envoy_cc_library(
         "-DDD_USE_ABSEIL_FOR_ENVOY",
     ],
     external_deps = [
-        "dd_opentracing_cpp",
         "dd_trace_cpp",
+        "dd_opentracing_cpp",
     ],
     deps = [
         "//source/common/config:utility_lib",
