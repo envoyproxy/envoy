@@ -20,14 +20,15 @@ namespace Datadog {
 namespace {
 
 class TraceContextWriter : public datadog::tracing::DictWriter {
-  Tracing::TraceContext* context_;
-
 public:
   explicit TraceContextWriter(Tracing::TraceContext& context) : context_(&context) {}
 
   void set(datadog::tracing::StringView key, datadog::tracing::StringView value) override {
     context_->setByKey(key, value);
   }
+
+private:
+  Tracing::TraceContext* context_;
 };
 
 } // namespace
