@@ -373,6 +373,11 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
                                        const Options& options,
                                        ProtobufMessage::ValidationVisitor& validation_visitor,
                                        Api::Api& api) {
+  if (options.bootstrap().has_value()) {
+    bootstrap.MergeFrom(*options.bootstrap());
+    MessageUtil::validate(bootstrap, validation_visitor);
+    return;
+  }
   const std::string& config_path = options.configPath();
   const std::string& config_yaml = options.configYaml();
   const envoy::config::bootstrap::v3::Bootstrap& config_proto = options.configProto();
