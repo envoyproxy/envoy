@@ -158,7 +158,7 @@ from ``service1`` to ``service2``:
 .. literalinclude:: _include/dynamic-config-cp/resource.go
    :language: go
    :lines: 34-43
-   :lineno-start: 34
+   :lineno-start: 35
    :emphasize-lines: 6
    :linenos:
 
@@ -167,7 +167,7 @@ Further down in this file you must also change the configuration snapshot versio
 
 .. literalinclude:: _include/dynamic-config-cp/resource.go
    :language: go
-   :lineno-start: 164
+   :lineno-start: 175
    :lines: 174-186
    :emphasize-lines: 3
    :linenos:

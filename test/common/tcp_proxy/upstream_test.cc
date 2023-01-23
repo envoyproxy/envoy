@@ -255,29 +255,6 @@ public:
 
 TYPED_TEST_SUITE(HttpUpstreamRequestEncoderTest, Implementations);
 
-TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderOld) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.use_rfc_connect", "false"}});
-
-  this->setupUpstream();
-  std::unique_ptr<Http::RequestHeaderMapImpl> expected_headers;
-  expected_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
-      {Http::Headers::get().Method, "CONNECT"},
-      {Http::Headers::get().Host, this->config_->host(this->downstream_stream_info_)},
-  });
-
-  if (this->is_http2_) {
-    expected_headers->setReferenceKey(Http::Headers::get().Path, "/");
-    expected_headers->setReferenceKey(Http::Headers::get().Scheme,
-                                      Http::Headers::get().SchemeValues.Http);
-    expected_headers->setReferenceKey(Http::Headers::get().Protocol,
-                                      Http::Headers::get().ProtocolValues.Bytestream);
-  }
-
-  EXPECT_CALL(this->encoder_, encodeHeaders(HeaderMapEqualRef(expected_headers.get()), false));
-  this->upstream_->setRequestEncoder(this->encoder_, false);
-}
-
 TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoder) {
   this->setupUpstream();
   std::unique_ptr<Http::RequestHeaderMapImpl> expected_headers;
