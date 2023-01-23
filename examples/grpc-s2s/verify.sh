@@ -8,7 +8,9 @@ export PORT_ADMIN_WORLD="${GRPC_S2S_WORLD_PORT_ADMIN:-12801}"
 # shellcheck source=examples/verify-common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
 
-# TODO network=host
+# TODO using network=host ok? It simplifies the setup for using
+# grpccurl. Also used later on in the script.
+
 run_log "Make an example request to Hello which will call World as well"
 docker run --network=host fullstorydev/grpcurl -plaintext "localhost:${PORT_PROXY}" Hello/Greet
 
@@ -20,12 +22,19 @@ curl -s "http://localhost:${PORT_ADMIN_WORLD}/stats" | grep -q "cluster.world.he
 
 run_log "Render an instance of Hello unhealthy"
 docker-compose exec -ti --index 1 hello kill -SIGUSR1 1
+# TODO remove this if possible
+sleep 1
+
 docker-compose logs hello | grep hello-1 |  grep -q "Marking service Hello as unhealthy"
 
 run_log "Render an instance of World unhealthy"
 docker-compose exec -ti --index 1 world kill -SIGUSR1 1
+# TODO remove this if possible
+sleep 1
+
 docker-compose logs world | grep world-1 | grep -q "Marking service World as unhealthy"
 
+# TODO remove this if possible
 sleep 1
 
 run_log "Ensure that we now only have one healthy instance of Hello"
