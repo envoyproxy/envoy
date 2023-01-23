@@ -181,6 +181,8 @@ class ServerBuiltInExtensionValues {
 public:
   // Extension point for the default listener.
   const std::string DEFAULT_LISTENER = "envoy.listener_manager_impl.default";
+  // Extension point for the validation listener
+  const std::string VALIDATION_LISTENER = "envoy.listener_manager_impl.validation";
 };
 
 using ServerExtensionValues = ConstSingleton<ServerBuiltInExtensionValues>;
