@@ -1,5 +1,15 @@
 #pragma once
 
+/*
+ * This file contains implementations of the datadog::tracing::DictReader and
+ * datadog::tracing::DictWriter interfaces.
+ *
+ * The Datadog core tracing library, dd-trace-cpp, uses these interfaces
+ * anywhere it needs to read from or write to mappings of string, such as when
+ * extracting trace context, injecting trace context, reading HTTP response
+ * headers, or writing HTTP request headers.
+ */
+
 #include <datadog/dict_reader.h>
 #include <datadog/dict_writer.h>
 
