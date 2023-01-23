@@ -53,6 +53,7 @@ genrule(
     name = "example_configs",
     srcs = [
         ":configs",
+        "//configs/golang:testing_shared_objects",
         "//examples:configs",
         "//examples:certs",
         "//examples:lua",
@@ -65,6 +66,7 @@ genrule(
     cmd = (
         "$(location configgen.sh) $(location configgen) $(@D) " +
         "$(locations :configs) " +
+        "$(locations //configs/golang:testing_shared_objects) " +
         "$(locations //examples:configs) " +
         "$(locations //examples:certs) " +
         "$(locations //examples:lua) " +

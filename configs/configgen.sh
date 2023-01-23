@@ -20,7 +20,8 @@ for FILE in "$@"; do
   *.pem|*.der)
     cp "$FILE" "$OUT_DIR/certs"
     ;;
-  *.lua|*.wasm)
+  *.lua|*.wasm|*.so)
+      echo $FILE
     cp "$FILE" "$OUT_DIR/lib"
     ;;
   *.pb)
@@ -29,6 +30,7 @@ for FILE in "$@"; do
   *)
 
     FILENAME="$(echo "$FILE" | sed -e 's/.*examples\///g')"
+
     # Configuration filenames may conflict. To avoid this we use the full path.
     cp "$FILE" "$OUT_DIR/${FILENAME//\//_}"
     ;;
@@ -41,4 +43,4 @@ done
 # shellcheck disable=SC2035
 # TODO(mattklein123): I can't make this work when using the shellcheck suggestions. Try
 # to fix this.
-(cd "$OUT_DIR"; tar -hcf example_configs.tar -- $(ls *.yaml certs/*.pem certs/*.der protos/*.pb lib/*.wasm lib/*.lua 2>/dev/null))
+(cd "$OUT_DIR"; tar -hcf example_configs.tar -- $(ls *.yaml certs/*.pem certs/*.der protos/*.pb lib/*.so lib/*.wasm lib/*.lua 2>/dev/null))
