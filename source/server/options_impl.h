@@ -54,6 +54,9 @@ public:
   OptionsImpl(const std::string& service_cluster, const std::string& service_node,
               const std::string& service_zone, spdlog::level::level_enum log_level);
 
+  // Constructor for mobile
+  OptionsImpl() = default;
+
   // Setters for option fields. These are not part of the Options interface.
   void setBaseId(uint64_t base_id) { base_id_ = base_id; };
   void setUseDynamicBaseId(bool use_dynamic_base_id) { use_dynamic_base_id_ = use_dynamic_base_id; }
@@ -225,7 +228,7 @@ private:
   // enable_fine_grain_logging_.
   bool enable_fine_grain_logging_ = false;
   std::string socket_path_{"@envoy_domain_socket"};
-  std::string listener_manager_;
+  std::string listener_manager_ = Config::ServerExtensionValues::get().DEFAULT_LISTENER;
   mode_t socket_mode_{0};
 };
 
