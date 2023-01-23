@@ -33,7 +33,7 @@ jobs:
     - run: unzip mobile/bazel-bin/library/swift/Envoy.xcframework.zip -d mobile/examples/swift/swiftpm/Packages || true
       if: steps.should_run.outputs.run_ci_job == 'true'
       name: 'Unzip xcframework'
-    - run: xcodebuild -project mobile/examples/swift/swiftpm/EnvoySwiftPMExample.xcodeproj -scheme EnvoySwiftPMExample -destination platform="iOS Simulator,name=iPhone 13 Pro Max,OS=16.1"
+    - run: xcodebuild -project mobile/examples/swift/swiftpm/EnvoySwiftPMExample.xcodeproj -scheme EnvoySwiftPMExample -destination platform="iOS Simulator,name=iPhone 14 Pro Max,OS=16.1"
       if: steps.should_run.outputs.run_ci_job == 'true'
       name: 'Build app'
     # TODO(jpsim): Run app and inspect logs to validate

@@ -1,4 +1,4 @@
-FROM envoyproxy/envoy-build-ubuntu:b0ff77ae3f25b0bf595f9b8bba46b489723ab446
+FROM envoyproxy/envoy-build-ubuntu:7304f974de2724617b7492ccb4c9c58cd420353a
 
 ENV DEBIAN_FRONTEND=noninteractive
 

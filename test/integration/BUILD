@@ -152,6 +152,25 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "eds_grpc_integration_test",
+    srcs = ["eds_grpc_integration_test.cc"],
+    deps = [
+        ":http_integration_lib",
+        "//source/common/runtime:runtime_features_lib",
+        "//source/common/upstream:load_balancer_lib",
+        "//test/config:utility_lib",
+        "//test/integration/filters:eds_ready_filter_config_lib",
+        "//test/test_common:network_utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "leds_integration_test",
     srcs = ["leds_integration_test.cc"],
     deps = [
@@ -1405,6 +1424,7 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "//source/extensions/transport_sockets/tls:context_lib",
         "//test/common/grpc:grpc_client_integration_lib",
+        "//test/config/integration/certs:certs_info",
         "//test/extensions/transport_sockets/tls:test_private_key_method_provider_test_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",

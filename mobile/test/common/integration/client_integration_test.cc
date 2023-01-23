@@ -28,13 +28,15 @@ public:
     cleanup();
     BaseClientIntegrationTest::TearDown();
   }
+
+  void basicTest();
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ClientIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(ClientIntegrationTest, Basic) {
+void ClientIntegrationTest::basicTest() {
   initialize();
 
   Buffer::OwnedImpl request_data = Buffer::OwnedImpl("request body");
@@ -69,6 +71,11 @@ TEST_P(ClientIntegrationTest, Basic) {
   ASSERT_EQ(cc_.on_complete_calls, 1);
   ASSERT_EQ(cc_.on_header_consumed_bytes_from_response, 27);
   ASSERT_EQ(cc_.on_complete_received_byte_count, 67);
+}
+
+TEST_P(ClientIntegrationTest, Basic) {
+  basicTest();
+  TearDown();
 }
 
 TEST_P(ClientIntegrationTest, BasicNon2xx) {
@@ -338,6 +345,26 @@ TEST_P(ClientIntegrationTest, DirectResponse) {
   ASSERT_EQ(cc_.status, "404");
   ASSERT_EQ(cc_.on_headers_calls, 1);
   stream_.reset();
+}
+
+TEST_P(ClientIntegrationTest, ForceAdmin) {
+  override_builder_config_ = true;
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.use_api_listener", "true");
+  basicTest();
+  TearDown();
+}
+
+TEST_P(ClientIntegrationTest, ForceAdminViaBootstrap) {
+  override_builder_config_ = true;
+
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    envoy::config::listener::v3::ApiListenerManager api;
+    auto* listener_manager = bootstrap.mutable_listener_manager();
+    listener_manager->mutable_typed_config()->PackFrom(api);
+    listener_manager->set_name("envoy.listener_manager_impl.api");
+  });
+
+  basicTest();
 }
 
 } // namespace

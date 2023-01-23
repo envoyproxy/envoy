@@ -845,13 +845,15 @@ TEST_P(ClusterManagerSubsetInitializationTest, SubsetLoadBalancerInitialization)
   }
   const std::string yaml = fmt::format(yamlPattern, cluster_type, policy_name);
 
-  if (GetParam() == envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED ||
-      GetParam() == envoy::config::cluster::v3::Cluster::LOAD_BALANCING_POLICY_CONFIG) {
+  if (GetParam() == envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
     EXPECT_THROW_WITH_MESSAGE(
         create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
         fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
                     envoy::config::cluster::v3::Cluster::LbPolicy_Name(GetParam())));
 
+  } else if (GetParam() == envoy::config::cluster::v3::Cluster::LOAD_BALANCING_POLICY_CONFIG) {
+    EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
+                              "cluster: field load_balancing_policy need to be set");
   } else {
     create(parseBootstrapFromV3Yaml(yaml));
     checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
@@ -1024,74 +1026,6 @@ TEST_F(ClusterManagerImplTest, ClusterProvidedLbNotConfigured) {
                             "'cluster_0' provided one. Check cluster documentation.");
 }
 
-// Verify that specifying LOAD_BALANCING_POLICY_CONFIG with CommonLbConfig is an error.
-TEST_F(ClusterManagerImplTest, LbPolicyConfigCannotSpecifyCommonLbConfig) {
-  // envoy.load_balancers.custom_lb is registered by linking in
-  // //test/integration/load_balancers:custom_lb_policy.
-  const std::string yaml = fmt::format(R"EOF(
- static_resources:
-  clusters:
-  - name: cluster_1
-    connect_timeout: 0.250s
-    type: STATIC
-    lb_policy: LOAD_BALANCING_POLICY_CONFIG
-    load_balancing_policy:
-      policies:
-      - typed_extension_config:
-          name: envoy.load_balancers.custom_lb
-    common_lb_config:
-      update_merge_window: 3s
-    load_assignment:
-      cluster_name: cluster_1
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: 127.0.0.1
-                port_value: 8000
-        - endpoint:
-            address:
-              socket_address:
-                address: 127.0.0.1
-                port_value: 8001
-  )EOF");
-
-  EXPECT_THROW_WITH_MESSAGE(
-      create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
-      "cluster: LB policy LOAD_BALANCING_POLICY_CONFIG cannot be combined with common_lb_config");
-}
-
-// Verify that LOAD_BALANCING_POLICY_CONFIG without specifying load balancing policy is an error.
-TEST_F(ClusterManagerImplTest, LbPolicyConfigMustSpecifyLbPolicy) {
-  const std::string yaml = fmt::format(R"EOF(
- static_resources:
-  clusters:
-  - name: cluster_1
-    connect_timeout: 0.250s
-    type: STATIC
-    lb_policy: LOAD_BALANCING_POLICY_CONFIG
-    load_assignment:
-      cluster_name: cluster_1
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: 127.0.0.1
-                port_value: 8000
-        - endpoint:
-            address:
-              socket_address:
-                address: 127.0.0.1
-                port_value: 8001
-  )EOF");
-
-  EXPECT_THROW_WITH_MESSAGE(
-      create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
-      "cluster: LB policy LOAD_BALANCING_POLICY_CONFIG requires load_balancing_policy to be set");
-}
-
 // Verify that multiple load balancing policies can be specified, and Envoy selects the first
 // policy that it has a factory for.
 TEST_F(ClusterManagerImplTest, LbPolicyConfig) {
@@ -1133,43 +1067,6 @@ TEST_F(ClusterManagerImplTest, LbPolicyConfig) {
   const auto& cluster = cluster_manager_->clusters().getCluster("cluster_1");
   EXPECT_NE(cluster, absl::nullopt);
   EXPECT_NE(cluster->get().info()->loadBalancingPolicy(), nullptr);
-}
-
-// Verify that if Envoy does not have a factory for any of the load balancing policies specified in
-// the load balancing policy config, it is an error.
-TEST_F(ClusterManagerImplTest, LbPolicyConfigThrowsExceptionIfNoLbPoliciesFound) {
-  const std::string yaml = fmt::format(R"EOF(
- static_resources:
-  clusters:
-  - name: cluster_1
-    connect_timeout: 0.250s
-    type: STATIC
-    lb_policy: LOAD_BALANCING_POLICY_CONFIG
-    load_balancing_policy:
-      policies:
-      - typed_extension_config:
-          name: envoy.load_balancers.unknown_lb_1
-      - typed_extension_config:
-          name: envoy.load_balancers.unknown_lb_2
-    load_assignment:
-      cluster_name: cluster_1
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: 127.0.0.1
-                port_value: 8000
-        - endpoint:
-            address:
-              socket_address:
-                address: 127.0.0.1
-                port_value: 8001
-  )EOF");
-
-  EXPECT_THROW_WITH_MESSAGE(
-      create(parseBootstrapFromV3Yaml(yaml)), EnvoyException,
-      "Didn't find a registered load balancer factory implementation for cluster: 'cluster_1'");
 }
 
 class ClusterManagerImplThreadAwareLbTest : public ClusterManagerImplTest {
@@ -2423,7 +2320,7 @@ TEST_F(ClusterManagerImplTest, CloseTcpConnectionsOnHealthFailure) {
     outlier_detector.runCallbacks(test_host);
     health_checker.runCallbacks(test_host, HealthTransition::Unchanged);
 
-    EXPECT_CALL(*connection1, close(Network::ConnectionCloseType::NoFlush, _));
+    EXPECT_CALL(*connection1, close(Network::ConnectionCloseType::NoFlush));
     test_host->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
     outlier_detector.runCallbacks(test_host);
 
@@ -2438,8 +2335,8 @@ TEST_F(ClusterManagerImplTest, CloseTcpConnectionsOnHealthFailure) {
   }
 
   // Order of these calls is implementation dependent, so can't sequence them!
-  EXPECT_CALL(*connection1, close(Network::ConnectionCloseType::NoFlush, _));
-  EXPECT_CALL(*connection2, close(Network::ConnectionCloseType::NoFlush, _));
+  EXPECT_CALL(*connection1, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connection2, close(Network::ConnectionCloseType::NoFlush));
   test_host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   health_checker.runCallbacks(test_host, HealthTransition::Changed);
 

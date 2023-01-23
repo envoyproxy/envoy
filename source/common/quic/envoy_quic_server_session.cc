@@ -72,14 +72,12 @@ quic::QuicSpdyStream* EnvoyQuicServerSession::CreateIncomingStream(quic::QuicStr
 
 quic::QuicSpdyStream*
 EnvoyQuicServerSession::CreateIncomingStream(quic::PendingStream* /*pending*/) {
-  // Only client side server push stream should trigger this call.
-  IS_ENVOY_BUG("Unexpected function call");
+  IS_ENVOY_BUG("Unexpected disallowed server push call");
   return nullptr;
 }
 
 quic::QuicSpdyStream* EnvoyQuicServerSession::CreateOutgoingBidirectionalStream() {
-  // Disallow server initiated stream.
-  IS_ENVOY_BUG("Unexpected function call");
+  IS_ENVOY_BUG("Unexpected disallowed server initiated stream");
   return nullptr;
 }
 
@@ -97,9 +95,6 @@ void EnvoyQuicServerSession::setUpRequestDecoder(EnvoyQuicServerStream& stream) 
 void EnvoyQuicServerSession::OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
                                                 quic::ConnectionCloseSource source) {
   quic::QuicServerSessionBase::OnConnectionClosed(frame, source);
-  if (source == quic::ConnectionCloseSource::FROM_SELF) {
-    setLocalCloseReason(frame.error_details);
-  }
   onConnectionCloseEvent(frame, source, version());
   if (position_.has_value()) {
     // Remove this connection from the map.
