@@ -29,5 +29,11 @@ removed_config_or_runtime:
     removed ``envoy.reloadable_features.allow_concurrency_for_alpn_pool`` and legacy code path.
 
 new_features:
+- area: upstream
+  change: |
+    added :ref:`ring hash extension <envoy_v3_api_msg_extensions.load_balancing_policies.ring_hash.v3.RingHash>` to suppport the :ref:`load balancer policy <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>`.
+- area: upstream
+  change: |
+    added :ref:`maglev extension <envoy_v3_api_msg_extensions.load_balancing_policies.maglev.v3.Maglev>` to suppport the :ref:`load balancer policy <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>`.
 
 deprecated:

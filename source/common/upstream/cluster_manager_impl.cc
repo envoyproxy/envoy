@@ -1875,77 +1875,77 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
         alternate_protocol_options.value(), dispatcher);
   } else if (!alternate_protocol_options.has_value() &&
              (protocols.size() == 2 ||
-              (protocols.size() == 1 && protocols[0] == Http::Protocol::Http2)))
+              (protocols.size() == 1 && protocols[0] == Http::Protocol::Http2))) {
     // If there is no configuration for an alternate protocols cache, still
     // create one if there's an HTTP/2 upstream (either explicitly, or for mixed
     // HTTP/1.1 and HTTP/2 pools) to track the max concurrent streams across
     // connections.
-    envoy::config::core::v3::AlternateProtocolsCacheOptions default_options;
-  default_options.set_name(host->cluster().name());
-  alternate_protocols_cache =
-      alternate_protocols_cache_manager_->getCache(default_options, dispatcher);
-}
-
-absl::optional<Http::HttpServerPropertiesCache::Origin> origin =
-    getOrigin(transport_socket_options, host);
-if (protocols.size() == 3 &&
-    context_.runtime().snapshot().featureEnabled("upstream.use_http3", 100)) {
-  ASSERT(
-      contains(protocols, {Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}));
-  ASSERT(alternate_protocol_options.has_value());
-  ASSERT(alternate_protocols_cache);
-#ifdef ENVOY_ENABLE_QUIC
-  Envoy::Http::ConnectivityGrid::ConnectivityOptions coptions{protocols};
-  if (quic_info == nullptr) {
-    quic_info = Quic::createPersistentQuicInfoForCluster(dispatcher, host->cluster());
-  }
-  return std::make_unique<Http::ConnectivityGrid>(
-      dispatcher, context_.api().randomGenerator(), host, priority, options,
-      transport_socket_options, state, source, alternate_protocols_cache, coptions,
-      quic_stat_names_, *stats_.rootScope(), *quic_info);
-#else
-  (void)quic_info;
-  // Should be blocked by configuration checking at an earlier point.
-  PANIC("unexpected");
-#endif
-}
-if (protocols.size() >= 2) {
-  if (origin.has_value()) {
     envoy::config::core::v3::AlternateProtocolsCacheOptions default_options;
     default_options.set_name(host->cluster().name());
     alternate_protocols_cache =
         alternate_protocols_cache_manager_->getCache(default_options, dispatcher);
   }
 
-  ASSERT(contains(protocols, {Http::Protocol::Http11, Http::Protocol::Http2}));
-  return std::make_unique<Http::HttpConnPoolImplMixed>(
-      dispatcher, context_.api().randomGenerator(), host, priority, options,
-      transport_socket_options, state, origin, alternate_protocols_cache);
-}
-if (protocols.size() == 1 && protocols[0] == Http::Protocol::Http2 &&
-    context_.runtime().snapshot().featureEnabled("upstream.use_http2", 100)) {
-  return Http::Http2::allocateConnPool(dispatcher, context_.api().randomGenerator(), host, priority,
-                                       options, transport_socket_options, state, origin,
-                                       alternate_protocols_cache);
-}
-if (protocols.size() == 1 && protocols[0] == Http::Protocol::Http3 &&
-    context_.runtime().snapshot().featureEnabled("upstream.use_http3", 100)) {
+  absl::optional<Http::HttpServerPropertiesCache::Origin> origin =
+      getOrigin(transport_socket_options, host);
+  if (protocols.size() == 3 &&
+      context_.runtime().snapshot().featureEnabled("upstream.use_http3", 100)) {
+    ASSERT(contains(protocols,
+                    {Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}));
+    ASSERT(alternate_protocol_options.has_value());
+    ASSERT(alternate_protocols_cache);
 #ifdef ENVOY_ENABLE_QUIC
-  if (quic_info == nullptr) {
-    quic_info = Quic::createPersistentQuicInfoForCluster(dispatcher, host->cluster());
-  }
-  return Http::Http3::allocateConnPool(dispatcher, context_.api().randomGenerator(), host, priority,
-                                       options, transport_socket_options, state, quic_stat_names_,
-                                       {}, *stats_.rootScope(), {}, *quic_info);
+    Envoy::Http::ConnectivityGrid::ConnectivityOptions coptions{protocols};
+    if (quic_info == nullptr) {
+      quic_info = Quic::createPersistentQuicInfoForCluster(dispatcher, host->cluster());
+    }
+    return std::make_unique<Http::ConnectivityGrid>(
+        dispatcher, context_.api().randomGenerator(), host, priority, options,
+        transport_socket_options, state, source, alternate_protocols_cache, coptions,
+        quic_stat_names_, *stats_.rootScope(), *quic_info);
 #else
-  UNREFERENCED_PARAMETER(source);
-  // Should be blocked by configuration checking at an earlier point.
-  PANIC("unexpected");
+    (void)quic_info;
+    // Should be blocked by configuration checking at an earlier point.
+    PANIC("unexpected");
 #endif
-}
-ASSERT(protocols.size() == 1 && protocols[0] == Http::Protocol::Http11);
-return Http::Http1::allocateConnPool(dispatcher, context_.api().randomGenerator(), host, priority,
-                                     options, transport_socket_options, state);
+  }
+  if (protocols.size() >= 2) {
+    if (origin.has_value()) {
+      envoy::config::core::v3::AlternateProtocolsCacheOptions default_options;
+      default_options.set_name(host->cluster().name());
+      alternate_protocols_cache =
+          alternate_protocols_cache_manager_->getCache(default_options, dispatcher);
+    }
+
+    ASSERT(contains(protocols, {Http::Protocol::Http11, Http::Protocol::Http2}));
+    return std::make_unique<Http::HttpConnPoolImplMixed>(
+        dispatcher, context_.api().randomGenerator(), host, priority, options,
+        transport_socket_options, state, origin, alternate_protocols_cache);
+  }
+  if (protocols.size() == 1 && protocols[0] == Http::Protocol::Http2 &&
+      context_.runtime().snapshot().featureEnabled("upstream.use_http2", 100)) {
+    return Http::Http2::allocateConnPool(dispatcher, context_.api().randomGenerator(), host,
+                                         priority, options, transport_socket_options, state, origin,
+                                         alternate_protocols_cache);
+  }
+  if (protocols.size() == 1 && protocols[0] == Http::Protocol::Http3 &&
+      context_.runtime().snapshot().featureEnabled("upstream.use_http3", 100)) {
+#ifdef ENVOY_ENABLE_QUIC
+    if (quic_info == nullptr) {
+      quic_info = Quic::createPersistentQuicInfoForCluster(dispatcher, host->cluster());
+    }
+    return Http::Http3::allocateConnPool(dispatcher, context_.api().randomGenerator(), host,
+                                         priority, options, transport_socket_options, state,
+                                         quic_stat_names_, {}, *stats_.rootScope(), {}, *quic_info);
+#else
+    UNREFERENCED_PARAMETER(source);
+    // Should be blocked by configuration checking at an earlier point.
+    PANIC("unexpected");
+#endif
+  }
+  ASSERT(protocols.size() == 1 && protocols[0] == Http::Protocol::Http11);
+  return Http::Http1::allocateConnPool(dispatcher, context_.api().randomGenerator(), host, priority,
+                                       options, transport_socket_options, state);
 }
 
 Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
