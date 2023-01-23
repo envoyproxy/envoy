@@ -7,6 +7,8 @@
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
 #include "fmt/core.h"
+#include "library/common/config/internal.h"
+#include "library/common/engine.h"
 #include "library/common/main_interface.h"
 
 namespace Envoy {
@@ -336,8 +338,16 @@ EngineSharedPtr EngineBuilder::build() {
     register_platform_api(name.c_str(), api);
   }
 
-  run_engine(envoy_engine, config_str.c_str(), logLevelToString(log_level_).c_str(),
-             admin_address_path_for_tests_.c_str());
+  if (auto cast_engine = reinterpret_cast<Envoy::Engine*>(envoy_engine)) {
+    auto options = std::make_unique<Envoy::OptionsImpl>();
+    options->setConfigYaml(absl::StrCat(config_header, config_str));
+    options->setLogLevel(options->parseAndValidateLogLevel(logLevelToString(log_level_).c_str()));
+    options->setConcurrency(1);
+    if (!admin_address_path_for_tests_.empty()) {
+      options->setAdminAddressPath(admin_address_path_for_tests_);
+    }
+    cast_engine->run(std::move(options));
+  }
 
   // we can't construct via std::make_shared
   // because Engine is only constructible as a friend
