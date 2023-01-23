@@ -24,6 +24,10 @@ removed_config_or_runtime:
   change: |
     removed ``envoy.reloadable_features.http2_delay_keepalive_timeout`` and legacy code paths.
 
+- area: http
+  change: |
+    removed ``envoy.reloadable_features.use_rfc_connect`` and legacy code path.
+
 new_features:
 - area: upstream
   change: |
