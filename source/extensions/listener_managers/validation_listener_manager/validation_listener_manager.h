@@ -73,6 +73,9 @@ public:
   std::string name() const override {
     return Config::ServerExtensionValues::get().VALIDATION_LISTENER;
   }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<envoy::config::listener::v3::ValidationListenerManager>();
+  }
 };
 
 DECLARE_FACTORY(ValidationListenerManagerFactoryImpl);
