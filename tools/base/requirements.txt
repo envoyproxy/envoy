@@ -867,9 +867,9 @@ requests==2.26.0 \
     # via
     #   pygithub
     #   sphinx
-setuptools==65.7.0 \
-    --hash=sha256:4d3c92fac8f1118bb77a22181355e29c239cabfe2b9effdaa665c66b711136d7 \
-    --hash=sha256:8ab4f1dbf2b4a65f7eec5ad0c620e84c34111a68d3349833494b9088212214dd
+setuptools==66.1.0 \
+    --hash=sha256:78a02bdea8a5cb66dec1c507598c443bcc75562817d2556c1a17f7a344615bb4 \
+    --hash=sha256:fc19f9f62120a763300fd78e234b3cbd3417be098f08c156eaaf36420627e57b
     # via
     #   -r requirements.in
     #   yamllint
