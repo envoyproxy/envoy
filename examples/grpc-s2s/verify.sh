@@ -23,19 +23,20 @@ curl -s "http://localhost:${PORT_ADMIN_WORLD}/stats" | grep -q "cluster.world.he
 run_log "Render an instance of Hello unhealthy"
 docker-compose exec -ti --index 1 hello kill -SIGUSR1 1
 # TODO remove this if possible
-sleep 1
+sleep 2
 
+docker-compose logs hello
 docker-compose logs hello | grep hello-1 |  grep -q "Marking service Hello as unhealthy"
 
 run_log "Render an instance of World unhealthy"
 docker-compose exec -ti --index 1 world kill -SIGUSR1 1
 # TODO remove this if possible
-sleep 1
+sleep 2
 
 docker-compose logs world | grep world-1 | grep -q "Marking service World as unhealthy"
 
 # TODO remove this if possible
-sleep 1
+sleep 2
 
 run_log "Ensure that we now only have one healthy instance of Hello"
 curl -s "http://localhost:${PORT_ADMIN_HELLO}/stats" | grep -q "cluster.hello.health_check.healthy: 1"
