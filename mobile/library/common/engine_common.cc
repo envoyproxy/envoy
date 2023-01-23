@@ -5,17 +5,15 @@
 
 namespace Envoy {
 
-std::string hotRestartVersion(bool) { return "disabled"; }
-
-EngineCommon::EngineCommon(int argc, const char* const* argv)
-    : options_(argc, argv, &hotRestartVersion, spdlog::level::info) {
+EngineCommon::EngineCommon(std::unique_ptr<Envoy::OptionsImpl>&& options)
+    : options_(std::move(options)) {
   // TODO(alyssar) when this defaults true, move E-M default config over to boostrap config.
-  if (absl::StrContains(options_.configYaml(), "use_api_listener: true")) {
-    options_.setListenerManager("envoy.listener_manager_impl.api");
+  if (absl::StrContains(options_->configYaml(), "use_api_listener: true")) {
+    options_->setListenerManager("envoy.listener_manager_impl.api");
   }
 
   base_ = std::make_unique<StrippedMainBase>(
-      options_, real_time_system_, default_listener_hooks_, prod_component_factory_,
+      *options_, real_time_system_, default_listener_hooks_, prod_component_factory_,
       std::make_unique<PlatformImpl>(), std::make_unique<Random::RandomGeneratorImpl>(), nullptr);
 
   // Disabling signal handling in the options makes it so that the server's event dispatcher _does
@@ -25,7 +23,7 @@ EngineCommon::EngineCommon(int argc, const char* const* argv)
   // https://github.com/envoyproxy/envoy-mobile/issues/831. Ignoring termination signals makes it
   // more likely that the event loop will only exit due to Engine destruction
   // https://github.com/envoyproxy/envoy-mobile/blob/a72a51e64543882ea05fba3c76178b5784d39cdc/library/common/engine.cc#L105.
-  options_.setSignalHandling(false);
+  options_->setSignalHandling(false);
 }
 
 } // namespace Envoy
