@@ -914,6 +914,8 @@ struct {
   const absl::optional<absl::string_view> balsa_parser_expected_error;
   const absl::optional<absl::string_view> http_parser_expected_error;
 } kRequestHTTPStringTestCases[] = {{"", {}, {}}, // HTTP/0.9 has no HTTP-version.
+                                   {"HTTP/1.0", {}, {}},
+                                   {"HTTP/1.1", {}, {}},
                                    {"HTTP/9.1", {}, {}},
                                    {"aHTTP/1.1", "HPE_INVALID_VERSION", "HPE_INVALID_CONSTANT"},
 #ifdef ENVOY_ENABLE_UHV
@@ -3847,7 +3849,9 @@ struct {
   const absl::string_view http_version;
   const absl::optional<absl::string_view> balsa_parser_expected_error;
   const absl::optional<absl::string_view> http_parser_expected_error;
-} kResponseHTTPStringTestCases[] = {{"HTTP/9.1", {}, {}},
+} kResponseHTTPStringTestCases[] = {{"HTTP/1.0", {}, {}},
+                                    {"HTTP/1.1", {}, {}},
+                                    {"HTTP/9.1", {}, {}},
                                     {"aHTTP/1.1", "HPE_INVALID_CONSTANT", "HPE_INVALID_CONSTANT"},
 #ifdef ENVOY_ENABLE_UHV
                                     {"HHTTP/1.1", "HPE_INVALID_VERSION", "HPE_INVALID_VERSION"},
