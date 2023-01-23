@@ -271,23 +271,10 @@ Status ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& h
     Http::Utility::transformUpgradeRequestFromH1toH2(*modified_headers);
     encodeHeadersBase(*modified_headers, end_stream);
   } else if (headers.Method() && headers.Method()->value() == "CONNECT") {
-    // If this is not an upgrade style connect (above branch) it is a bytestream
-    // connect and should have :path and :protocol set accordingly
-    // As HTTP/1.1 does not require a path for CONNECT, we may have to add one
-    // if shifting codecs. For now, default to "/" - this can be made
-    // configurable if necessary.
-    // https://tools.ietf.org/html/draft-kinnear-httpbis-http2-transport-02
     modified_headers = createHeaderMap<RequestHeaderMapImpl>(headers);
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_rfc_connect")) {
-      modified_headers->removeScheme();
-      modified_headers->removePath();
-      modified_headers->removeProtocol();
-    } else {
-      modified_headers->setProtocol(Headers::get().ProtocolValues.Bytestream);
-      if (!headers.Path()) {
-        modified_headers->setPath("/");
-      }
-    }
+    modified_headers->removeScheme();
+    modified_headers->removePath();
+    modified_headers->removeProtocol();
     encodeHeadersBase(*modified_headers, end_stream);
   } else {
     encodeHeadersBase(headers, end_stream);
@@ -845,8 +832,6 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       stream_error_on_invalid_http_messaging_(
           http2_options.override_stream_error_on_invalid_http_message().value()),
       protocol_constraints_(stats, http2_options), dispatching_(false), raised_goaway_(false),
-      delay_keepalive_timeout_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.http2_delay_keepalive_timeout")),
       random_(random_generator),
       last_received_data_time_(connection_.dispatcher().timeSource().monotonicTime()) {
   if (http2_options.has_connection_keepalive()) {
@@ -1083,8 +1068,7 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
   // timeout for another timeout period. This will still timeout the connection if there is no
   // activity, but if there is frame activity we assume the connection is still healthy and the
   // PING ACK may be delayed behind other frames.
-  if (delay_keepalive_timeout_ && keepalive_timeout_timer_ != nullptr &&
-      keepalive_timeout_timer_->enabled()) {
+  if (keepalive_timeout_timer_ != nullptr && keepalive_timeout_timer_->enabled()) {
     keepalive_timeout_timer_->enableTimer(keepalive_timeout_);
   }
 

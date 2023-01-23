@@ -139,6 +139,25 @@ TEST(EnvoyQuicUtilsTest, HeadersSizeBounds) {
   EXPECT_EQ(rst, quic::QUIC_STREAM_EXCESSIVE_LOAD);
 }
 
+TEST(EnvoyQuicUtilsTest, TrailersSizeBounds) {
+  spdy::Http2HeaderBlock headers_block;
+  headers_block[":authority"] = "www.google.com";
+  headers_block[":path"] = "/index.hml";
+  headers_block[":scheme"] = "https";
+  headers_block["foo"] = std::string("bar\0eep\0baz", 11);
+  absl::string_view details;
+  NiceMock<MockHeaderValidator> validator;
+  quic::QuicRstStreamErrorCode rst = quic::QUIC_REFUSED_STREAM;
+  EXPECT_NE(nullptr, http2HeaderBlockToEnvoyTrailers<Http::RequestHeaderMapImpl>(
+                         headers_block, 6, validator, details, rst));
+  EXPECT_EQ(nullptr, http2HeaderBlockToEnvoyTrailers<Http::RequestHeaderMapImpl>(
+                         headers_block, 2, validator, details, rst));
+  EXPECT_EQ("http3.too_many_trailers", details);
+  EXPECT_EQ(nullptr, http2HeaderBlockToEnvoyTrailers<Http::RequestHeaderMapImpl>(
+                         headers_block, 2, validator, details, rst));
+  EXPECT_EQ(rst, quic::QUIC_STREAM_EXCESSIVE_LOAD);
+}
+
 TEST(EnvoyQuicUtilsTest, TrailerCharacters) {
   spdy::Http2HeaderBlock headers_block;
   headers_block[":authority"] = "www.google.com";

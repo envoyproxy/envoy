@@ -1222,47 +1222,6 @@ TEST_P(Http2CodecImplTest, KeepaliveTimeoutDelay) {
   driveToCompletion();
 }
 
-// Verify that extending the timeout is not performed when a frame is received and the feature
-// flag is disabled.
-TEST_P(Http2CodecImplTest, KeepaliveTimeoutDelayRuntimeFalse) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.http2_delay_keepalive_timeout", "false"}});
-
-  constexpr uint32_t interval_ms = 100;
-  constexpr uint32_t timeout_ms = 200;
-  client_http2_options_.mutable_connection_keepalive()->mutable_interval()->set_nanos(interval_ms *
-                                                                                      1000 * 1000);
-  client_http2_options_.mutable_connection_keepalive()->mutable_timeout()->set_nanos(timeout_ms *
-                                                                                     1000 * 1000);
-  client_http2_options_.mutable_connection_keepalive()->mutable_interval_jitter()->set_value(0);
-  auto timeout_timer = new NiceMock<Event::MockTimer>(&client_connection_.dispatcher_);
-  auto send_timer = new NiceMock<Event::MockTimer>(&client_connection_.dispatcher_);
-  EXPECT_CALL(*timeout_timer, disableTimer());
-  EXPECT_CALL(*send_timer, enableTimer(std::chrono::milliseconds(interval_ms), _));
-  initialize();
-  InSequence s;
-
-  // Initiate a request.
-  TestRequestHeaderMapImpl request_headers;
-  HttpTestUtility::addDefaultHeaders(request_headers);
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
-  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
-  driveToCompletion();
-
-  // Now send a ping.
-  EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(timeout_ms), _));
-  send_timer->invokeCallback();
-
-  // Send the response and make sure the keepalive timeout is not extended. After the response is
-  // received the ACK will come in and reset.
-  EXPECT_CALL(response_decoder_, decodeHeaders_(_, true));
-  EXPECT_CALL(*timeout_timer, disableTimer()); // This indicates that an ACK was received.
-  EXPECT_CALL(*send_timer, enableTimer(std::chrono::milliseconds(interval_ms), _));
-  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-  response_encoder_->encodeHeaders(response_headers, true);
-  driveToCompletion();
-}
-
 // Validate that jitter is added as expected based on configuration.
 TEST_P(Http2CodecImplTest, ConnectionKeepaliveJitter) {
   client_http2_options_.mutable_connection_keepalive()->mutable_interval()->set_seconds(1);
@@ -3636,34 +3595,6 @@ TEST_P(Http2CodecImplTest, ResetStreamCausesOutboundFlood) {
 
   EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
   EXPECT_EQ(1, server_stats_store_.counter("http2.outbound_flood").value());
-}
-
-// CONNECT without upgrade type gets tagged with "bytestream"
-TEST_P(Http2CodecImplTest, ConnectTestOld) {
-  scoped_runtime_.mergeValues({{"envoy.reloadable_features.use_rfc_connect", "false"}});
-  client_http2_options_.set_allow_connect(true);
-  server_http2_options_.set_allow_connect(true);
-  initialize();
-  MockStreamCallbacks callbacks;
-  request_encoder_->getStream().addCallbacks(callbacks);
-
-  TestRequestHeaderMapImpl request_headers;
-  HttpTestUtility::addDefaultHeaders(request_headers);
-  request_headers.setReferenceKey(Headers::get().Method, Http::Headers::get().MethodValues.Connect);
-  request_headers.setReferenceKey(Headers::get().Protocol, "bytestream");
-  TestRequestHeaderMapImpl expected_headers;
-  HttpTestUtility::addDefaultHeaders(expected_headers);
-  expected_headers.setReferenceKey(Headers::get().Method,
-                                   Http::Headers::get().MethodValues.Connect);
-  expected_headers.setReferenceKey(Headers::get().Protocol, "bytestream");
-  EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
-  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
-  driveToCompletion();
-
-  EXPECT_CALL(callbacks, onResetStream(StreamResetReason::ConnectError, _));
-  EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::ConnectError, _));
-  response_encoder_->getStream().resetStream(StreamResetReason::ConnectError);
-  driveToCompletion();
 }
 
 TEST_P(Http2CodecImplTest, ConnectTest) {
