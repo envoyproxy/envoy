@@ -67,7 +67,7 @@ The following extension maintainers have final say over the extensions mentioned
 approve an extension PR, it will be merged by the maintainer on-call (or any other maintainer)
 without further review.
 
-* Piotr Sikora ([PiotrSikora](https://github.com/PiotrSikora)) (piotrsikora@google.com)
+* Piotr Sikora ([PiotrSikora](https://github.com/PiotrSikora)) (psikora@aviatrix.com)
   * Wasm
 * Raúl Gutiérrez Segalés ([rgs1](https://github.com/rgs1)) (rgs@pinterest.com)
   * Thrift
