@@ -33,7 +33,7 @@ public:
   public:
     virtual ~HashingLoadBalancer() = default;
     virtual HostConstSharedPtr chooseHost(uint64_t hash, uint32_t attempt) const PURE;
-    const absl::string_view hashKey(HostConstSharedPtr host, bool use_hostname) {
+    const absl::string_view hashKey(HostConstSharedPtr host, bool use_hostname) const {
       const ProtobufWkt::Value& val = Config::Metadata::metadataValue(
           host->metadata().get(), Config::MetadataFilters::get().ENVOY_LB,
           Config::MetadataEnvoyLbKeys::get().HASH_KEY);
