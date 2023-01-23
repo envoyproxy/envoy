@@ -37,6 +37,7 @@
 #include "source/common/upstream/cluster_discovery_manager.h"
 #include "source/common/upstream/host_utility.h"
 #include "source/common/upstream/load_stats_reporter.h"
+#include "source/common/upstream/multiplexed_subscription_factory.h"
 #include "source/common/upstream/od_cds_api_impl.h"
 #include "source/common/upstream/priority_conn_pool_map.h"
 #include "source/common/upstream/upstream_impl.h"
@@ -327,6 +328,10 @@ public:
   ClusterManagerFactory& clusterManagerFactory() override { return factory_; }
 
   Config::SubscriptionFactory& subscriptionFactory() override { return *subscription_factory_; }
+
+  Config::SubscriptionFactory& multiplexedSubscriptionFactory() override {
+    return *multiplexed_subscription_factory_;
+  }
 
   void
   initializeSecondaryClusters(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override;
@@ -812,6 +817,7 @@ private:
   ClusterTimeoutBudgetStatNames cluster_timeout_budget_stat_names_;
 
   std::unique_ptr<Config::SubscriptionFactoryImpl> subscription_factory_;
+  std::unique_ptr<MultiplexedSubscriptionFactory> multiplexed_subscription_factory_;
   ClusterSet primary_clusters_;
 
   std::unique_ptr<Config::XdsResourcesDelegate> xds_resources_delegate_;

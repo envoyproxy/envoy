@@ -106,14 +106,12 @@ public:
   }
 
 protected:
-  ThreadAwareLoadBalancerBase(
-      const PrioritySet& priority_set, ClusterLbStats& stats, Runtime::Loader& runtime,
-      Random::RandomGenerator& random,
-      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
-      : LoadBalancerBase(priority_set, stats, runtime, random,
-                         PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
-                             common_config, healthy_panic_threshold, 100, 50)),
-        factory_(new LoadBalancerFactoryImpl(stats, random)) {}
+  ThreadAwareLoadBalancerBase(const PrioritySet& priority_set, ClusterLbStats& stats,
+                              Runtime::Loader& runtime, Random::RandomGenerator& random,
+                              uint32_t healthy_panic_threshold, bool locality_weighted_balancing)
+      : LoadBalancerBase(priority_set, stats, runtime, random, healthy_panic_threshold),
+        factory_(new LoadBalancerFactoryImpl(stats, random)),
+        locality_weighted_balancing_(locality_weighted_balancing) {}
 
 private:
   struct PerPriorityState {
@@ -171,6 +169,7 @@ private:
   void refresh();
 
   std::shared_ptr<LoadBalancerFactoryImpl> factory_;
+  const bool locality_weighted_balancing_{};
   Common::CallbackHandlePtr priority_update_cb_;
 };
 

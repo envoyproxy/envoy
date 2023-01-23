@@ -189,6 +189,16 @@ public:
       const std::vector<std::string>& expected_resource_names_removed, bool expect_node = false,
       const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
       const std::string& expected_error_message = "");
+
+  AssertionResult compareDiscoveryRequest(
+      const std::string& expected_type_url, const std::string& expected_version,
+      const std::vector<std::string>& expected_resource_names,
+      const std::vector<std::string>& expected_resource_names_added,
+      const std::vector<std::string>& expected_resource_names_removed, FakeStreamPtr& stream,
+      bool expect_node = false,
+      const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
+      const std::string& expected_error_message = "");
+
   template <class T>
   void sendDiscoveryResponse(const std::string& type_url, const std::vector<T>& state_of_the_world,
                              const std::vector<T>& added_or_updated,
@@ -198,6 +208,19 @@ public:
       sendSotwDiscoveryResponse(type_url, state_of_the_world, version);
     } else {
       sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version);
+    }
+  }
+
+  template <class T>
+  void sendDiscoveryResponse(const std::string& type_url, const std::vector<T>& state_of_the_world,
+                             const std::vector<T>& added_or_updated,
+                             const std::vector<std::string>& removed, const std::string& version,
+                             FakeStreamPtr& stream) {
+    if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw ||
+        sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedSotw) {
+      sendSotwDiscoveryResponse(type_url, state_of_the_world, version, stream.get());
+    } else {
+      sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, stream);
     }
   }
 
@@ -224,6 +247,43 @@ public:
       const std::vector<std::string>& expected_resource_names, bool expect_node = false,
       const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
       const std::string& expected_error_message = "", FakeStream* stream = nullptr);
+
+  struct DiscoveryRequestExpectedContents {
+    DiscoveryRequestExpectedContents(
+        const std::string& type_url, const std::vector<std::string>& subscriptions,
+        const std::vector<std::string>& unsubscriptions,
+        const Protobuf::int32 error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
+        const std::string& error_substring = "")
+        : type_url_(type_url),
+          // Convert subscribed/unsubscribed names into sets to ignore ordering.
+          subscriptions_(subscriptions.begin(), subscriptions.end()),
+          unsubscriptions_(unsubscriptions.begin(), unsubscriptions.end()), error_code_(error_code),
+          error_substring_(error_substring) {}
+
+    const std::string& type_url_;
+    const std::set<std::string> subscriptions_;
+    const std::set<std::string> unsubscriptions_;
+    const Protobuf::int32 error_code_;
+    const std::string& error_substring_;
+  };
+
+  AssertionResult internalCompareDeltaDiscoveryRequest(
+      const DiscoveryRequestExpectedContents& expected_request,
+      const envoy::service::discovery::v3::DeltaDiscoveryRequest& actual_request,
+      const std::set<std::string>& actual_sub, const std::set<std::string>& actual_unsub);
+
+  AssertionResult internalCompareDiscoveryRequest(
+      const DiscoveryRequestExpectedContents& expected_request,
+      const envoy::service::discovery::v3::DiscoveryRequest& actual_request,
+      const std::set<std::string>& actual_sub);
+
+  AssertionResult assertExpectedDeltaDiscoveryRequest(
+      const envoy::service::discovery::v3::DeltaDiscoveryRequest& request,
+      const DiscoveryRequestExpectedContents& expected_request);
+
+  AssertionResult
+  assertExpectedDiscoveryRequest(const envoy::service::discovery::v3::DiscoveryRequest& request,
+                                 const DiscoveryRequestExpectedContents& expected_request);
 
   template <class T>
   void sendSotwDiscoveryResponse(const std::string& type_url, const std::vector<T>& messages,
