@@ -10496,37 +10496,6 @@ virtual_hosts:
   checkEach(yaml, 123, expected_traveled_config, "filter.unknown");
 }
 
-TEST_F(PerFilterConfigsTest, RouteTypedConfigWithErrorFilterNameButDisableGetByType) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.get_route_config_factory_by_type", "false"}});
-
-  const std::string yaml = R"EOF(
-virtual_hosts:
-  - name: bar
-    domains: ["*"]
-    routes:
-      - match: { prefix: "/" }
-        route: { cluster: baz }
-        typed_per_filter_config:
-          filter.unknown:
-            "@type": type.googleapis.com/google.protobuf.Timestamp
-            value:
-              seconds: 123
-    typed_per_filter_config:
-      filter.unknown:
-        "@type": type.googleapis.com/google.protobuf.Timestamp
-        value:
-          seconds: 456
-)EOF";
-
-  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
-  OptionalHttpFilters optional_http_filters;
-  optional_http_filters.insert("filter.unknown");
-  // No route config factory can be obtained by the filter name 'filter.unknown'.
-  checkNoPerFilterConfig(yaml, "filter.unknown", optional_http_filters);
-}
-
 class RouteMatchOverrideTest : public testing::Test, public ConfigImplTestBase {};
 
 TEST_F(RouteMatchOverrideTest, VerifyAllMatchableRoutes) {
