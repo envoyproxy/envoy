@@ -90,9 +90,9 @@ LocalRateLimiterImpl::~LocalRateLimiterImpl() {
 }
 
 void LocalRateLimiterImpl::onFillTimer() {
+  refill_counter_++;
   onFillTimerHelper(tokens_, token_bucket_);
   onFillTimerDescriptorHelper();
-  refill_counter_++;
   fill_timer_->enableTimer(absl::ToChronoMilliseconds(token_bucket_.fill_interval_));
 }
 
@@ -170,28 +170,21 @@ bool LocalRateLimiterImpl::requestAllowed(
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.local_ratelimit_match_all_descriptors")) {
 
-    bool allow = requestAllowedHelper(tokens_);
-    // Global token is not enough. Since global token is not sorted, so we suggest it should be
-    // larger than other descriptors.
-    if (!allow) {
-      return allow;
-    }
-
     if (!descriptors_.empty() && !request_descriptors.empty()) {
       for (const auto& descriptor : sorted_descriptors_) {
         for (const auto& request_descriptor : request_descriptors) {
           if (descriptor == request_descriptor) {
-            allow &= requestAllowedHelper(*descriptor.token_state_);
             // Descriptor token is not enough.
-            if (!allow) {
-              return allow;
+            if (!requestAllowedHelper(*descriptor.token_state_)) {
+              return false;
             }
             break;
           }
         }
       }
     }
-    return allow;
+    // Since global token is not sorted, so we suggest it should be larger than other descriptors.
+    return requestAllowedHelper(tokens_);
   }
   auto descriptor = descriptorHelper(request_descriptors);
 
