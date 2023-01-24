@@ -16,6 +16,7 @@
 #include "source/common/local_reply/local_reply.h"
 #include "source/common/network/utility.h"
 #include "source/common/stats/symbol_table.h"
+#include "source/common/tracing/tracing_config_impl.h"
 
 namespace Envoy {
 namespace Http {
@@ -122,21 +123,7 @@ struct ConnectionManagerTracingStats {
   CONN_MAN_TRACING_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-/**
- * Configuration for tracing which is set on the connection manager level.
- * Http Tracing can be enabled/disabled on a per connection manager basis.
- * Here we specify some specific for connection manager settings.
- */
-struct TracingConnectionManagerConfig {
-  Tracing::OperationName operation_name_;
-  Tracing::CustomTagMap custom_tags_;
-  envoy::type::v3::FractionalPercent client_sampling_;
-  envoy::type::v3::FractionalPercent random_sampling_;
-  envoy::type::v3::FractionalPercent overall_sampling_;
-  bool verbose_;
-  uint32_t max_path_tag_length_;
-};
-
+using TracingConnectionManagerConfig = Tracing::ConnectionManagerTracingConfigImpl;
 using TracingConnectionManagerConfigPtr = std::unique_ptr<TracingConnectionManagerConfig>;
 
 /**

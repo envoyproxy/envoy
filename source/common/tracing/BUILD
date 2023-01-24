@@ -75,7 +75,9 @@ envoy_cc_library(
         "tracer_config_impl.h",
     ],
     deps = [
+        ":custom_tag_lib",
         "//envoy/server:tracer_config_interface",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
 

@@ -3,8 +3,16 @@
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/server/tracer_config.h"
 
+#include "source/common/tracing/custom_tag_impl.h"
+
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
+
 namespace Envoy {
 namespace Tracing {
+
+using ConnectionManagerTracingConfigProto =
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager_Tracing;
 
 class TracerFactoryContextImpl : public Server::Configuration::TracerFactoryContext {
 public:
@@ -21,6 +29,77 @@ public:
 private:
   Server::Configuration::ServerFactoryContext& server_factory_context_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
+};
+
+class ConnectionManagerTracingConfigImpl : public ConnectionManagerTracingConfig {
+public:
+  explicit ConnectionManagerTracingConfigImpl(
+      envoy::config::core::v3::TrafficDirection traffic_direction,
+      const ConnectionManagerTracingConfigProto& tracing_config) {
+
+    // Listener level traffic direction overrides the operation name
+    switch (traffic_direction) {
+      PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+    case envoy::config::core::v3::UNSPECIFIED:
+      // Continuing legacy behavior; if unspecified, we treat this as ingress.
+      operation_name_ = Tracing::OperationName::Ingress;
+      break;
+    case envoy::config::core::v3::INBOUND:
+      operation_name_ = Tracing::OperationName::Ingress;
+      break;
+    case envoy::config::core::v3::OUTBOUND:
+      operation_name_ = Tracing::OperationName::Egress;
+      break;
+    }
+
+    for (const auto& tag : tracing_config.custom_tags()) {
+      custom_tags_.emplace(tag.tag(), Tracing::CustomTagUtility::createCustomTag(tag));
+    }
+
+    client_sampling_.set_numerator(
+        tracing_config.has_client_sampling() ? tracing_config.client_sampling().value() : 100);
+    envoy::type::v3::FractionalPercent random_sampling;
+    // TODO: Random sampling historically was an integer and default to out of 10,000. We should
+    // deprecate that and move to a straight fractional percent config.
+    uint64_t random_sampling_numerator{PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
+        tracing_config, random_sampling, 10000, 10000)};
+    random_sampling.set_numerator(random_sampling_numerator);
+    random_sampling.set_denominator(envoy::type::v3::FractionalPercent::TEN_THOUSAND);
+    envoy::type::v3::FractionalPercent overall_sampling;
+    uint64_t overall_sampling_numerator{PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
+        tracing_config, overall_sampling, 10000, 10000)};
+    overall_sampling.set_numerator(overall_sampling_numerator);
+    overall_sampling.set_denominator(envoy::type::v3::FractionalPercent::TEN_THOUSAND);
+
+    verbose_ = tracing_config.verbose();
+    max_path_tag_length_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(tracing_config, max_path_tag_length,
+                                                           Tracing::DefaultMaxPathTagLength);
+  }
+
+  const envoy::type::v3::FractionalPercent& getClientSampling() const override {
+    return client_sampling_;
+  }
+  const envoy::type::v3::FractionalPercent& getRandomSampling() const override {
+    return random_sampling_;
+  }
+  const envoy::type::v3::FractionalPercent& getOverallSampling() const override {
+    return overall_sampling_;
+  }
+  const Tracing::CustomTagMap& getCustomTags() const override { return custom_tags_; }
+
+  Tracing::OperationName operationName() const override { return operation_name_; }
+  bool verbose() const override { return verbose_; }
+  uint32_t maxPathTagLength() const override { return max_path_tag_length_; }
+
+  // TODO(wbpcode): keep this field be public for compatibility. Then the HCM needn't change much
+  // code to use this config.
+  Tracing::OperationName operation_name_;
+  Tracing::CustomTagMap custom_tags_;
+  envoy::type::v3::FractionalPercent client_sampling_;
+  envoy::type::v3::FractionalPercent random_sampling_;
+  envoy::type::v3::FractionalPercent overall_sampling_;
+  bool verbose_;
+  uint32_t max_path_tag_length_;
 };
 
 } // namespace Tracing
