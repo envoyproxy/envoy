@@ -18,28 +18,37 @@ namespace Envoy {
 class HeaderToFilterStateFilter : public Http::PassThroughDecoderFilter {
 public:
   HeaderToFilterStateFilter(const std::string& header, const std::string& state, bool read_only,
-                            bool shared)
+                            test::integration::filters::SharingConfig shared)
       : header_(header), state_(state), read_only_(read_only), shared_(shared) {}
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override {
     const auto entry = headers.get(header_);
     if (!entry.empty()) {
+      auto shared = StreamInfo::FilterState::StreamSharing::None;
+      switch (shared_) {
+      case test::integration::filters::SharingConfig::ONCE:
+        shared = StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnectionOnce;
+        break;
+      case test::integration::filters::SharingConfig::TRANSITIVE:
+        shared = StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection;
+        break;
+      default:
+        break;
+      }
       decoder_callbacks_->streamInfo().filterState()->setData(
           state_, std::make_unique<Router::StringAccessorImpl>(entry[0]->value().getStringView()),
           read_only_ ? StreamInfo::FilterState::StateType::ReadOnly
                      : StreamInfo::FilterState::StateType::Mutable,
-          StreamInfo::FilterState::LifeSpan::FilterChain,
-          shared_ ? StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection
-                  : StreamInfo::FilterState::StreamSharing::None);
+          StreamInfo::FilterState::LifeSpan::FilterChain, shared);
     }
     return Http::FilterHeadersStatus::Continue;
   }
 
 private:
-  Http::LowerCaseString header_;
-  std::string state_;
-  bool read_only_;
-  bool shared_;
+  const Http::LowerCaseString header_;
+  const std::string state_;
+  const bool read_only_;
+  const test::integration::filters::SharingConfig shared_;
 };
 
 class HeaderToFilterStateFilterFactory
