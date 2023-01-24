@@ -102,8 +102,7 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_api_listener);
 // TODO(pradeepcrao) reset this to true after 2 releases (1.27)
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_include_histograms);
 
-// Block of non-boolean flags. These are deprecated. Do not add more.
-ABSL_FLAG(uint64_t, envoy_headermap_lazy_map_min_size, 3, "");  // NOLINT
+// Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT
 ABSL_FLAG(uint64_t, re2_max_program_size_warn_level,            // NOLINT
           std::numeric_limits<uint32_t>::max(), "");            // NOLINT
@@ -176,12 +175,7 @@ bool runtimeFeatureEnabled(absl::string_view feature) {
 }
 
 uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
-  if (absl::StartsWith(feature, "envoy.")) {
-    // DO NOT ADD MORE FLAGS HERE. This function deprecated.
-    if (feature == "envoy.http.headermap.lazy_map_min_size") {
-      return absl::GetFlag(FLAGS_envoy_headermap_lazy_map_min_size);
-    }
-  }
+  // DO NOT ADD MORE FLAGS HERE. This function deprecated.
   if (absl::StartsWith(feature, "re2.")) {
     if (feature == "re2.max_program_size.error_level") {
       return absl::GetFlag(FLAGS_re2_max_program_size_error_level);
