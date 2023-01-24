@@ -11,6 +11,9 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: stats
+  change: |
+    now updating upstream total connection stats as happy eyeballs connections are created.
 - area: eds
   change: |
     added ``envoy.reloadable_features.multiplex_eds`` to disable eds multiplexing. Eds multiplexing is enabled by default, so that all subscriptions for the same resource type and management server reuse a single channel/mux.
