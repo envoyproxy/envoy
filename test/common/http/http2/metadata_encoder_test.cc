@@ -94,7 +94,6 @@ public:
     session_ = http2::adapter::NgHttp2Adapter::CreateClientAdapter(*visitor_, option);
     nghttp2_enable_strict_preface = 1;
     nghttp2_option_del(option);
-    // nghttp2_session_callbacks_del(callbacks);
   }
 
   void verifyMetadataMapVector(MetadataMapVector& expect, MetadataMapPtr&& metadata_map_ptr) {
