@@ -3849,6 +3849,7 @@ TEST_P(Http1ClientConnectionImplTest, ResponseHttpVersion) {
 }
 
 TEST_P(Http1ClientConnectionImplTest, HttpVersion) {
+  // SPELLCHECKER(off)
   HTTPStringTestCase kResponseHTTPStringTestCases[] = {
       {"HTTP/1.0", {}, {}},
       {"HTTP/1.1", {}, {}},
