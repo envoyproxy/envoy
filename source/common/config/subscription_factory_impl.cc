@@ -112,15 +112,11 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
         validation_visitor_, api_);
   }
   case xds::core::v3::ResourceLocator::XDSTP: {
-    std::cerr << "==> AAB Xdstp" << std::endl;
     if (resource_type != collection_locator.resource_type()) {
-      std::cerr << "==> AAB Xdstp Exception" << std::endl;
       throw EnvoyException(
           fmt::format("xdstp:// type does not match {} in {}", resource_type,
                       Config::XdsResourceIdentifier::encodeUrl(collection_locator)));
     }
-    std::cerr << "==> AAB Xdstp case: " << static_cast<int>(config.config_source_specifier_case())
-              << std::endl;
     switch (config.config_source_specifier_case()) {
     case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kApiConfigSource: {
       const envoy::config::core::v3::ApiConfigSource& api_config_source =
@@ -151,7 +147,6 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
             Utility::configSourceInitialFetchTimeout(config), false, options);
       }
       case envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC: {
-        std::cerr << "==> AAB AGGREGATED_GRPC" << std::endl;
         if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
           throw EnvoyException("AGGREGATED_GRPC only supported for unified_mux");
         }
