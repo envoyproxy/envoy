@@ -6,7 +6,6 @@
 #include "library/common/bridge/utility.h"
 #include "library/common/config/internal.h"
 #include "library/common/data/utility.h"
-#include "library/common/network/android.h"
 #include "library/common/stats/utility.h"
 
 namespace Envoy {
@@ -101,9 +100,6 @@ envoy_status_t Engine::main(const std::string config, const std::string log_leve
 
           connectivity_manager_ =
               Network::ConnectivityManagerFactory{server_->serverFactoryContext()}.get();
-          if (Api::OsSysCallsSingleton::get().supportsGetifaddrs()) {
-            Envoy::Network::Android::Utility::setAlternateGetifaddrs();
-          }
           auto v4_interfaces = connectivity_manager_->enumerateV4Interfaces();
           auto v6_interfaces = connectivity_manager_->enumerateV6Interfaces();
           logInterfaces("netconf_get_v4_interfaces", v4_interfaces);

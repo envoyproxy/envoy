@@ -57,7 +57,7 @@ build:dbg-common --copt="-fdebug-compilation-dir" --copt="/proc/self/cwd"
 build:ios --define=manual_stamp=manual_stamp
 
 # Default flags for builds targeting Android
-build:android --define=logger=android --define=include_ifaddrs=true
+build:android --define=logger=android
 
 # Default flags for Android debug builds
 build:dbg-android --config=dbg-common
@@ -121,7 +121,6 @@ build:release-ios --compilation_mode=opt
 
 # Flags for release builds targeting Android or the JVM
 # Release does not use the option --define=logger=android
-build:release-android --define=include_ifaddrs=true
 build:release-android --config=release-common
 build:release-android --compilation_mode=opt
 
