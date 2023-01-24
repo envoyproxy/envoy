@@ -68,6 +68,8 @@ void ResponseFrameCounter::frameDataEnd() {
     return;
   }
 
+  connect_error_code_ = "";
+
   const auto& error_struct = error_field->second.struct_value();
   const auto& code_field = error_struct.fields().find("code");
   if (code_field == error_struct.fields().end()) {
