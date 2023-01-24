@@ -25,7 +25,7 @@ docker-compose exec -ti --index 1 hello kill -SIGUSR1 1
 # TODO remove this if possible
 sleep 2
 
-docker-compose logs hello
+docker-compose logs | grep hello-1
 docker-compose logs hello | grep hello-1 |  grep -q "Marking service Hello as unhealthy"
 
 run_log "Render an instance of World unhealthy"
