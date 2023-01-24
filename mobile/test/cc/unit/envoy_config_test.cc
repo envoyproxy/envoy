@@ -207,20 +207,6 @@ TEST(TestConfig, EnableDrainPostDnsRefresh) {
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
 }
 
-TEST(TestConfig, EnableH2ExtendKeepaliveTimeout) {
-  EngineBuilder engine_builder;
-
-  std::string config_str = engine_builder.generateConfigStr();
-  ASSERT_THAT(config_str, HasSubstr("&h2_delay_keepalive_timeout false"));
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
-
-  engine_builder.enableH2ExtendKeepaliveTimeout(true);
-  config_str = engine_builder.generateConfigStr();
-  ASSERT_THAT(config_str, HasSubstr("&h2_delay_keepalive_timeout true"));
-  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
-}
-
 TEST(TestConfig, EnableHappyEyeballs) {
   EngineBuilder engine_builder;
 
@@ -294,20 +280,20 @@ TEST(TestConfig, AddStatsSinks) {
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
 }
 
-TEST(TestConfig, EnableHttp3) {
+TEST(TestConfig, DisableHttp3) {
   EngineBuilder engine_builder;
 
   std::string config_str = engine_builder.generateConfigStr();
-  ASSERT_THAT(
-      config_str,
-      Not(HasSubstr("envoy.extensions.filters.http.alternate_protocols_cache.v3.FilterConfig")));
+  ASSERT_THAT(config_str,
+              HasSubstr("envoy.extensions.filters.http.alternate_protocols_cache.v3.FilterConfig"));
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
 
-  engine_builder.enableHttp3(true);
+  engine_builder.enableHttp3(false);
   config_str = engine_builder.generateConfigStr();
-  ASSERT_THAT(config_str,
-              HasSubstr("envoy.extensions.filters.http.alternate_protocols_cache.v3.FilterConfig"));
+  ASSERT_THAT(
+      config_str,
+      Not(HasSubstr("envoy.extensions.filters.http.alternate_protocols_cache.v3.FilterConfig")));
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
 }
 
