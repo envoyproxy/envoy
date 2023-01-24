@@ -432,7 +432,7 @@ private:
 
   TimeSource& time_source_;
 
-  friend class SubsetLoadBalancerDescribeMetadataTester;
+  friend class SubsetLoadBalancerInternalStateTester;
 };
 
 } // namespace Upstream
