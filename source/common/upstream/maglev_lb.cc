@@ -46,6 +46,9 @@ void MaglevTable::constructMaglevTableInternal(
 // TODO(kbaichoo): make const
 void OriginalMaglevTable::constructImplementationInternals(
     std::vector<TableBuildEntry>& table_build_entries, double max_normalized_weight) {
+  // Size internal representation for maglev table correctly.
+  table_.resize(table_size_);
+
   // Iterate through the table build entries as many times as it takes to fill up the table.
   uint64_t table_index = 0;
   for (uint32_t iteration = 1; table_index < table_size_; ++iteration) {
@@ -82,8 +85,8 @@ MaglevTableSharedPtr
 MaglevTable::createMaglevTable(const NormalizedHostWeightVector& normalized_host_weights,
                                double max_normalized_weight, uint64_t table_size,
                                bool use_hostname_for_hashing, MaglevLoadBalancerStats& stats) {
-  // TODO(kbaichoo): possibly release guard this as well e.g >= || flag
-  // TODO(kbaichoo): remove this sort circuiting.
+  // TODO(kbaichoo): possibly release guard this as well e.g >= || flag, check
+  // of windows for endianess?
   MaglevTableSharedPtr maglev_table;
   if (normalized_host_weights.size() >= MaglevTable::NumberOfHostsAtWhichToNotUseMemoryOptimized ||
       true) {
@@ -111,73 +114,8 @@ void CompactMaglevTable::logMaglevTable(bool /*use_hostname_for_hashing*/) const
   ASSERT(false, "Unimplemented compact maglev table");
 }
 
-MaglevTable::MaglevTable(const NormalizedHostWeightVector& normalized_host_weights,
-                         double max_normalized_weight, uint64_t table_size,
-                         bool use_hostname_for_hashing, MaglevLoadBalancerStats& stats)
-    : table_size_(table_size), stats_(stats) {
-  // We can't do anything sensible with no hosts.
-  if (normalized_host_weights.empty()) {
-    ENVOY_LOG(debug, "maglev: normalized hosts weights is empty, skipping building table");
-    return;
-  }
-
-  // Implementation of pseudocode listing 1 in the paper (see header file for more info).
-  std::vector<TableBuildEntry> table_build_entries;
-  table_build_entries.reserve(normalized_host_weights.size());
-  for (const auto& host_weight : normalized_host_weights) {
-    const auto& host = host_weight.first;
-    const absl::string_view key_to_hash = hashKey(host, use_hostname_for_hashing);
-    ASSERT(!key_to_hash.empty());
-    table_build_entries.emplace_back(host, HashUtil::xxHash64(key_to_hash) % table_size_,
-                                     (HashUtil::xxHash64(key_to_hash, 1) % (table_size_ - 1)) + 1,
-                                     host_weight.second);
-  }
-
-  table_.resize(table_size_);
-
-  // Iterate through the table build entries as many times as it takes to fill up the table.
-  uint64_t table_index = 0;
-  for (uint32_t iteration = 1; table_index < table_size_; ++iteration) {
-    for (uint64_t i = 0; i < table_build_entries.size() && table_index < table_size; i++) {
-      TableBuildEntry& entry = table_build_entries[i];
-      // To understand how target_weight_ and weight_ are used below, consider a host with weight
-      // equal to max_normalized_weight. This would be picked on every single iteration. If it had
-      // weight equal to max_normalized_weight / 3, then it would only be picked every 3 iterations,
-      // etc.
-      if (iteration * entry.weight_ < entry.target_weight_) {
-        continue;
-      }
-      entry.target_weight_ += max_normalized_weight;
-      uint64_t c = permutation(entry);
-      while (table_[c] != nullptr) {
-        entry.next_++;
-        c = permutation(entry);
-      }
-
-      table_[c] = entry.host_;
-      entry.next_++;
-      entry.count_++;
-      table_index++;
-    }
-  }
-
-  uint64_t min_entries_per_host = table_size_;
-  uint64_t max_entries_per_host = 0;
-  for (const auto& entry : table_build_entries) {
-    min_entries_per_host = std::min(entry.count_, min_entries_per_host);
-    max_entries_per_host = std::max(entry.count_, max_entries_per_host);
-  }
-  stats_.min_entries_per_host_.set(min_entries_per_host);
-  stats_.max_entries_per_host_.set(max_entries_per_host);
-
-  if (ENVOY_LOG_CHECK_LEVEL(trace)) {
-    for (uint64_t i = 0; i < table_.size(); i++) {
-      const absl::string_view key_to_hash = hashKey(table_[i], use_hostname_for_hashing);
-      ENVOY_LOG(trace, "maglev: i={} address={} host={}", i, table_[i]->address()->asString(),
-                key_to_hash);
-    }
-  }
-}
+MaglevTable::MaglevTable(uint64_t table_size, MaglevLoadBalancerStats& stats)
+    : table_size_(table_size), stats_(stats) {}
 
 HostConstSharedPtr OriginalMaglevTable::chooseHost(uint64_t hash, uint32_t attempt) const {
   if (table_.empty()) {
