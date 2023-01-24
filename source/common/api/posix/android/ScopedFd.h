@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+// NOLINT(namespace-envoy)
+
 #ifndef SCOPED_FD_H_included
 #define SCOPED_FD_H_included
 
@@ -24,23 +26,18 @@
 // but needs to be cleaned up on exit.
 class ScopedFd {
 public:
-    explicit ScopedFd(int fd) : fd(fd) {
-    }
+  explicit ScopedFd(int fd) : fd(fd) {}
 
-    ~ScopedFd() {
-        close(fd);
-    }
+  ~ScopedFd() { close(fd); }
 
-    int get() const {
-        return fd;
-    }
+  int get() const { return fd; }
 
 private:
-    int fd;
+  int fd;
 
-    // Disallow copy and assignment.
-    ScopedFd(const ScopedFd&);
-    void operator=(const ScopedFd&);
+  // Disallow copy and assignment.
+  ScopedFd(const ScopedFd&);
+  void operator=(const ScopedFd&);
 };
 
-#endif  // SCOPED_FD_H_included
+#endif // SCOPED_FD_H_included
