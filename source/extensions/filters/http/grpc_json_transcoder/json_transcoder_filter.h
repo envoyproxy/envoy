@@ -112,6 +112,7 @@ public:
   absl::optional<uint32_t> max_response_body_size_;
 
   void addBuiltinSymbolDescriptor(const std::string& symbol_name);
+  bool use_route_naming_conventions() const { return use_route_naming_conventions_; }
 
 private:
   /**
@@ -138,6 +139,7 @@ private:
   bool ignore_unknown_query_parameters_{false};
   bool convert_grpc_status_{false};
   bool case_insensitive_enum_parsing_{false};
+  bool use_route_naming_conventions_{false};
 
   bool disabled_;
 };
@@ -207,6 +209,9 @@ private:
    */
   void maybeExpandBufferLimits();
 
+  void checkRouteNameIfDisabled();
+  bool isDisabledForTheRoute();
+
   const JsonTranscoderConfig& config_;
   const JsonTranscoderConfig* per_route_config_{};
   std::unique_ptr<google::grpc::transcoding::Transcoder> transcoder_;
@@ -230,6 +235,8 @@ private:
 
   // Don't buffer unary response data in the `FilterManager` buffer.
   Buffer::OwnedImpl response_out_;
+
+  bool disabled_for_the_route_{false};
 };
 
 } // namespace GrpcJsonTranscoder

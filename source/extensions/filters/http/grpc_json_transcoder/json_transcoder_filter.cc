@@ -62,6 +62,8 @@ using RcDetails = ConstSingleton<RcDetailsValues>;
 
 namespace {
 
+constexpr absl::string_view SkipTranscodingSuffix = "_skip_transcoding";
+
 const Http::LowerCaseString& trailerHeader() {
   CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "trailer");
 }
@@ -116,6 +118,8 @@ JsonTranscoderConfig::JsonTranscoderConfig(
   if (disabled_) {
     return;
   }
+
+  use_route_naming_conventions_ = proto_config.use_route_naming_conventions();
 
   FileDescriptorSet descriptor_set;
 
@@ -447,10 +451,26 @@ void JsonTranscoderFilter::maybeExpandBufferLimits() {
   }
 }
 
+void JsonTranscoderFilter::checkRouteNameIfDisabled() {
+  auto route = decoder_callbacks_->route();
+  if (route == nullptr) {
+    ENVOY_STREAM_LOG(debug, "No route entry", *decoder_callbacks_);
+    return;
+  }
+  disabled_for_the_route_ = config_.use_route_naming_conventions() &&
+      absl::EndsWith(route->routeEntry()->routeName(), SkipTranscodingSuffix);
+}
+
+bool JsonTranscoderFilter::isDisabledForTheRoute() {
+  return !per_route_config_ || per_route_config_->disabled() || disabled_for_the_route_;
+}
+
+
 Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                               bool end_stream) {
   initPerRouteConfig();
-  if (per_route_config_->disabled()) {
+  checkRouteNameIfDisabled();
+  if (isDisabledForTheRoute()) {
     ENVOY_STREAM_LOG(debug,
                      "Transcoding is disabled for the route. Request headers is passed through.",
                      *decoder_callbacks_);
@@ -737,7 +757,7 @@ JsonTranscoderFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
 }
 
 void JsonTranscoderFilter::doTrailers(Http::ResponseHeaderOrTrailerMap& headers_or_trailers) {
-  if (error_ || !transcoder_ || !per_route_config_ || per_route_config_->disabled()) {
+  if (error_ || !transcoder_ || isDisabledForTheRoute()) {
     ENVOY_STREAM_LOG(debug, "Response headers/trailers is passed through", *encoder_callbacks_);
     return;
   }
@@ -924,7 +944,7 @@ bool JsonTranscoderFilter::buildResponseFromHttpBodyOutput(
 
 bool JsonTranscoderFilter::maybeConvertGrpcStatus(Grpc::Status::GrpcStatus grpc_status,
                                                   Http::ResponseHeaderOrTrailerMap& trailers) {
-  ASSERT(per_route_config_ && !per_route_config_->disabled());
+  ASSERT(!isDisabledForTheRoute());
   if (!per_route_config_->convertGrpcStatus()) {
     return false;
   }

@@ -288,4 +288,15 @@ message GrpcJsonTranscoder {
   //
   // If unset, the current stream buffer size is used.
   google.protobuf.UInt32Value max_response_body_size = 16 [(validate.rules).uint32 = {gt: 0}];
+
+  // If true, the transcoder will honor route naming conventions for the below
+  // suffix applied to the route.
+  //
+  // "_skip_transcoding": the transcoder will skip transcoding for the route.
+  //
+  // This is a workaround when per_filter_config isn't available for the route
+  // config. For example, istio control plane.
+  // TODO: remove this feature after istio supports per filter config in their
+  // first-class route APIs.
+  bool use_route_naming_conventions = 17;
 }
