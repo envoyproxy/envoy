@@ -24,6 +24,9 @@ removed_config_or_runtime:
 - area: http
   change: |
     removed ``envoy.reloadable_features.use_rfc_connect`` and legacy code path.
+- area: http
+  change: |
+    removed ``envoy.reloadable_features.allow_concurrency_for_alpn_pool`` and legacy code path.
 
 new_features:
 - area: upstream
