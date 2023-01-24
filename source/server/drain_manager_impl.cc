@@ -165,7 +165,8 @@ void DrainManagerImpl::startDrainSequence(std::function<void()> drain_complete_c
 }
 
 void DrainManagerImpl::startParentShutdownSequence() {
-  if (!server_.options().hotRestartDisabled()) {
+  // Do not initiate parent shutdown sequence when hot restart is disabled.
+  if (server_.options().hotRestartDisabled()) {
     return;
   }
   ASSERT(!parent_shutdown_timer_);
