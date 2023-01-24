@@ -175,6 +175,7 @@ envoy_cc_library(
         "//source/common/common:compiler_requirements_lib",
         "//source/common/common:perf_annotation_lib",
         "//source/common/grpc:google_grpc_context_lib",
+        "//source/extensions/listener_managers/validation_listener_manager:validation_listener_manager_lib",
         "//source/server:hot_restart_lib",
         "//source/server:hot_restart_nop_lib",
         "//source/server/config_validation:server_lib",
