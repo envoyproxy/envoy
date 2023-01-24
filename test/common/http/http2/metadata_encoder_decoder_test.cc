@@ -12,6 +12,8 @@
 #include "gtest/gtest.h"
 #include "http2_frame.h"
 #include "nghttp2/nghttp2.h"
+#include "quiche/http2/adapter/callback_visitor.h"
+#include "quiche/http2/adapter/nghttp2_adapter.h"
 
 // A global variable in nghttp2 to disable preface and initial settings for tests.
 // TODO(soya3129): Remove after issue https://github.com/nghttp2/nghttp2/issues/1246 is fixed.
@@ -24,6 +26,10 @@ namespace Http {
 namespace Http2 {
 namespace {
 
+absl::string_view toStringView(uint8_t* data, size_t length) {
+  return absl::string_view(reinterpret_cast<char*>(data), length);
+}
+
 static const uint64_t STREAM_ID = 1;
 
 // The buffer stores data sent by encoder and received by decoder.
@@ -34,27 +40,14 @@ struct TestBuffer {
 
 // The application data structure passes to nghttp2 session.
 struct UserData {
-  MetadataEncoder* encoder;
   MetadataDecoder* decoder;
   // Stores data sent by encoder and received by the decoder.
   TestBuffer* output_buffer;
 };
 
-// Nghttp2 callback function for sending extension frame.
-static ssize_t pack_extension_callback(nghttp2_session* session, uint8_t* buf, size_t len,
-                                       const nghttp2_frame*, void* user_data) {
-  EXPECT_NE(nullptr, session);
-
-  MetadataEncoder* encoder = reinterpret_cast<UserData*>(user_data)->encoder;
-  const uint64_t size_copied = encoder->packNextFramePayload(buf, len);
-
-  return static_cast<ssize_t>(size_copied);
-}
-
 // Nghttp2 callback function for receiving extension frame.
-static int on_extension_chunk_recv_callback(nghttp2_session* session, const nghttp2_frame_hd* hd,
+static int on_extension_chunk_recv_callback(nghttp2_session* /*session*/, const nghttp2_frame_hd* hd,
                                             const uint8_t* data, size_t len, void* user_data) {
-  EXPECT_NE(nullptr, session);
   EXPECT_GE(hd->length, len);
 
   MetadataDecoder* decoder = reinterpret_cast<UserData*>(user_data)->decoder;
@@ -63,9 +56,8 @@ static int on_extension_chunk_recv_callback(nghttp2_session* session, const nght
 }
 
 // Nghttp2 callback function for unpack extension frames.
-static int unpack_extension_callback(nghttp2_session* session, void** payload,
+static int unpack_extension_callback(nghttp2_session* /*session*/, void** payload,
                                      const nghttp2_frame_hd* hd, void* user_data) {
-  EXPECT_NE(nullptr, session);
   EXPECT_NE(nullptr, hd);
   EXPECT_NE(nullptr, payload);
 
@@ -75,9 +67,8 @@ static int unpack_extension_callback(nghttp2_session* session, void** payload,
 }
 
 // Nghttp2 callback function for sending data to peer.
-static ssize_t send_callback(nghttp2_session* session, const uint8_t* buf, size_t len, int flags,
+static ssize_t send_callback(nghttp2_session* /*session*/, const uint8_t* buf, size_t len, int flags,
                              void* user_data) {
-  EXPECT_NE(nullptr, session);
   EXPECT_LE(0, flags);
 
   TestBuffer* buffer = (reinterpret_cast<UserData*>(user_data))->output_buffer;
@@ -99,25 +90,24 @@ public:
 
     // Sets callback functions.
     nghttp2_session_callbacks_new(&callbacks_);
-    nghttp2_session_callbacks_set_pack_extension_callback(callbacks_, pack_extension_callback);
     nghttp2_session_callbacks_set_send_callback(callbacks_, send_callback);
     nghttp2_session_callbacks_set_on_extension_chunk_recv_callback(
         callbacks_, on_extension_chunk_recv_callback);
     nghttp2_session_callbacks_set_unpack_extension_callback(callbacks_, unpack_extension_callback);
 
     // Sets application data to pass to nghttp2 session.
-    user_data_.encoder = &encoder_;
     user_data_.decoder = decoder_.get();
     user_data_.output_buffer = &output_buffer_;
 
     // Creates new nghttp2 session.
     nghttp2_enable_strict_preface = 0;
-    nghttp2_session_client_new2(&session_, callbacks_, &user_data_, option_);
+    visitor_ = std::make_unique<http2::adapter::CallbackVisitor>(
+        http2::adapter::Perspective::kClient, *callbacks_, &user_data_);
+    session_ = http2::adapter::NgHttp2Adapter::CreateClientAdapter(*visitor_, option_);
     nghttp2_enable_strict_preface = 1;
   }
 
   void cleanUp() {
-    nghttp2_session_del(session_);
     nghttp2_session_callbacks_del(callbacks_);
     nghttp2_option_del(option_);
   }
@@ -132,20 +122,19 @@ public:
 
   void submitMetadata(const MetadataMapVector& metadata_map_vector) {
     // Creates metadata payload.
-    encoder_.createPayload(metadata_map_vector);
-    for (uint8_t flags : encoder_.payloadFrameFlagBytes()) {
-      int result =
-          nghttp2_submit_extension(session_, METADATA_FRAME_TYPE, flags, STREAM_ID, nullptr);
-      EXPECT_EQ(0, result);
+    NewMetadataEncoder::MetadataSourceVector sources = encoder_.createSources(metadata_map_vector);
+    for (auto& source : sources) {
+      session_->SubmitMetadata(STREAM_ID, 16 * 1024, std::move(source));
     }
     // Triggers nghttp2 to populate the payloads of the METADATA frames.
-    int result = nghttp2_session_send(session_);
+    int result = session_->Send();
     EXPECT_EQ(0, result);
   }
 
-  nghttp2_session* session_ = nullptr;
+  std::unique_ptr<http2::adapter::NgHttp2Adapter> session_;
+  std::unique_ptr<http2::adapter::CallbackVisitor> visitor_;
   nghttp2_session_callbacks* callbacks_;
-  MetadataEncoder encoder_;
+  NewMetadataEncoder encoder_;
   std::unique_ptr<MetadataDecoder> decoder_;
   nghttp2_option* option_;
   int count_ = 0;
@@ -158,30 +147,6 @@ public:
 
   Random::RandomGeneratorImpl random_generator_;
 };
-
-TEST_F(MetadataEncoderDecoderTest, TestMetadataSizeLimit) {
-  MetadataMap metadata_map = {
-      {"header_key1", std::string(1024 * 1024 + 1, 'a')},
-  };
-  MetadataMapPtr metadata_map_ptr = std::make_unique<MetadataMap>(metadata_map);
-  MetadataMapVector metadata_map_vector;
-  metadata_map_vector.push_back(std::move(metadata_map_ptr));
-
-  // Verifies the encoding/decoding result in decoder's callback functions.
-  initialize([this, &metadata_map_vector](MetadataMapPtr&& metadata_map_ptr) -> void {
-    this->verifyMetadataMapVector(metadata_map_vector, std::move(metadata_map_ptr));
-  });
-
-  // metadata_map exceeds size limit.
-  EXPECT_LOG_CONTAINS("error", "exceeds the max bound.",
-                      EXPECT_FALSE(encoder_.createPayload(metadata_map_vector)));
-
-  std::string payload = std::string(1024 * 1024 + 1, 'a');
-  EXPECT_FALSE(
-      decoder_->receiveMetadata(reinterpret_cast<const uint8_t*>(payload.data()), payload.size()));
-
-  cleanUp();
-}
 
 TEST_F(MetadataEncoderDecoderTest, TestTotalPayloadSize) {
   initialize([](MetadataMapPtr&&) {});
@@ -246,7 +211,7 @@ TEST_F(MetadataEncoderDecoderTest, VerifyEncoderDecoderMultipleMetadataReachSize
     };
     submitMetadata(metadata_map_vector);
 
-    result = nghttp2_session_mem_recv(session_, output_buffer_.buf, output_buffer_.length);
+    result = session_->ProcessBytes(toStringView(output_buffer_.buf, output_buffer_.length));
     if (result < 0) {
       break;
     }
@@ -289,9 +254,9 @@ TEST_F(MetadataEncoderDecoderTest, EncodeMetadataMapVectorSmall) {
 
   // Verifies flag and payload are encoded correctly.
   const uint64_t consume_size = random_generator_.random() % output_buffer_.length;
-  nghttp2_session_mem_recv(session_, output_buffer_.buf, consume_size);
-  nghttp2_session_mem_recv(session_, output_buffer_.buf + consume_size,
-                           output_buffer_.length - consume_size);
+  session_->ProcessBytes(toStringView(output_buffer_.buf, consume_size));
+  session_->ProcessBytes(toStringView(output_buffer_.buf + consume_size,
+                                      output_buffer_.length - consume_size));
 
   cleanUp();
 }
@@ -314,9 +279,9 @@ TEST_F(MetadataEncoderDecoderTest, EncodeMetadataMapVectorLarge) {
   submitMetadata(metadata_map_vector);
   // Verifies flag and payload are encoded correctly.
   const uint64_t consume_size = random_generator_.random() % output_buffer_.length;
-  nghttp2_session_mem_recv(session_, output_buffer_.buf, consume_size);
-  nghttp2_session_mem_recv(session_, output_buffer_.buf + consume_size,
-                           output_buffer_.length - consume_size);
+  session_->ProcessBytes(toStringView(output_buffer_.buf, consume_size));
+  session_->ProcessBytes(toStringView(output_buffer_.buf + consume_size,
+                                      output_buffer_.length - consume_size));
   cleanUp();
 }
 
@@ -342,7 +307,7 @@ TEST_F(MetadataEncoderDecoderTest, EncodeFuzzedMetadata) {
   submitMetadata(metadata_map_vector);
 
   // Verifies flag and payload are encoded correctly.
-  nghttp2_session_mem_recv(session_, output_buffer_.buf, output_buffer_.length);
+  session_->ProcessBytes(toStringView(output_buffer_.buf, output_buffer_.length));
 
   cleanUp();
 }
@@ -362,35 +327,6 @@ TEST_F(MetadataEncoderDecoderTest, EncodeDecodeFrameTest) {
   });
   decoder.receiveMetadata(http2FrameFromUltility.data() + 9, http2FrameFromUltility.size() - 9);
   decoder.onMetadataFrameComplete(true);
-}
-
-using MetadataEncoderDecoderDeathTest = MetadataEncoderDecoderTest;
-
-// Crash if a caller tries to pack more frames than the encoder has data for.
-TEST_F(MetadataEncoderDecoderDeathTest, PackTooManyFrames) {
-  MetadataMap metadata_map = {
-      {"header_key1", std::string(5, 'a')},
-      {"header_key2", std::string(5, 'b')},
-  };
-  MetadataMapPtr metadata_map_ptr = std::make_unique<MetadataMap>(metadata_map);
-  MetadataMapVector metadata_map_vector;
-  metadata_map_vector.push_back(std::move(metadata_map_ptr));
-
-  initialize([this, &metadata_map_vector](MetadataMapPtr&& metadata_map_ptr) -> void {
-    this->verifyMetadataMapVector(metadata_map_vector, std::move(metadata_map_ptr));
-  });
-  submitMetadata(metadata_map_vector);
-
-  // Try to send an extra METADATA frame. Submitting the frame to nghttp2 should succeed, but
-  // pack_extension_callback should fail, and that failure will propagate through
-  // nghttp2_session_send. How to handle the failure is up to the HTTP/2 codec (in practice, it will
-  // throw a CodecProtocolException).
-  int result = nghttp2_submit_extension(session_, METADATA_FRAME_TYPE, 0, STREAM_ID, nullptr);
-  EXPECT_EQ(0, result);
-  EXPECT_DEATH(nghttp2_session_send(session_),
-               "No payload remaining to pack into a METADATA frame.");
-
-  cleanUp();
 }
 
 } // namespace Http2
