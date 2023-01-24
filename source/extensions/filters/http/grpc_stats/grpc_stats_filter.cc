@@ -151,8 +151,7 @@ class GrpcStatsFilter : public Http::PassThroughFilter {
 public:
   GrpcStatsFilter(ConfigConstSharedPtr config) : config_(config) {}
 
-  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
-                                          bool end_stream) override {
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override {
     grpc_request_ = Grpc::Common::isGrpcRequestHeaders(headers);
     if (config_->enable_buf_connect_support_) {
       connect_unary_ = Grpc::Common::isConnectRequestHeaders(headers);
@@ -201,10 +200,6 @@ public:
       }
     }
 
-    if (do_stat_tracking_ && connect_unary_ && end_stream) {
-      config_->context_.chargeRequestMessageStat(*cluster_, request_names_, 1);
-    }
-
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -224,6 +219,8 @@ public:
         config_->context_.chargeRequestMessageStat(*cluster_, request_names_, delta);
       }
     } else if (connect_unary_ && end_stream) {
+      connect_unary_request_body_ = true;
+      maybeWriteFilterState();
       config_->context_.chargeRequestMessageStat(*cluster_, request_names_, 1);
     }
     return Http::FilterDataStatus::Continue;
@@ -271,6 +268,8 @@ public:
         maybeChargeUpstreamStat();
       }
     } else if (connect_unary_ && end_stream) {
+      connect_unary_response_body_ = true;
+      maybeWriteFilterState();
       config_->context_.chargeResponseMessageStat(*cluster_, request_names_, 1);
       maybeChargeUpstreamStat();
     }
@@ -301,8 +300,8 @@ public:
           StreamInfo::FilterState::LifeSpan::FilterChain);
     }
     if (connect_unary_) {
-      filter_object_->request_message_count = 1;
-      filter_object_->response_message_count = 1;
+      filter_object_->request_message_count = connect_unary_request_body_;
+      filter_object_->response_message_count = connect_unary_response_body_;
     } else {
       filter_object_->request_message_count = request_counter_.frameCount();
       filter_object_->response_message_count = response_counter_.frameCount();
@@ -333,6 +332,8 @@ private:
   bool connect_unary_{false};
   bool connect_streaming_request_{false};
   bool connect_streaming_response_{false};
+  bool connect_unary_request_body_{false};
+  bool connect_unary_response_body_{false};
   Grpc::FrameInspector request_counter_;
   ResponseFrameCounter response_counter_;
   Upstream::ClusterInfoConstSharedPtr cluster_;
