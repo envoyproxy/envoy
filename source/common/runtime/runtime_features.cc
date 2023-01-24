@@ -30,7 +30,6 @@
 // ASAP by filing a bug on github. Overriding non-buggy code is strongly discouraged to avoid the
 // problem of the bugs being found after the old code path has been removed.
 RUNTIME_GUARD(envoy_reloadable_features_admin_stats_filter_use_re2);
-RUNTIME_GUARD(envoy_reloadable_features_allow_concurrency_for_alpn_pool);
 RUNTIME_GUARD(envoy_reloadable_features_allow_multiple_dns_addresses);
 RUNTIME_GUARD(envoy_reloadable_features_allow_upstream_filters);
 RUNTIME_GUARD(envoy_reloadable_features_append_query_parameters_path_rewriter);
