@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+
 #include "absl/container/flat_hash_map.h"
 #include "engine.h"
 #include "engine_callbacks.h"
@@ -17,20 +19,19 @@ namespace Platform {
 
 class EngineBuilder {
 public:
+  // This constructor is not compatible with bootstrap mode.
   EngineBuilder(std::string config_template);
   EngineBuilder();
 
   EngineBuilder& addLogLevel(LogLevel log_level);
   EngineBuilder& setOnEngineRunning(std::function<void()> closure);
 
-  EngineBuilder& addStatsSinks(const std::vector<std::string>& stat_sinks);
   EngineBuilder& addGrpcStatsDomain(std::string stats_domain);
   EngineBuilder& addConnectTimeoutSeconds(int connect_timeout_seconds);
   EngineBuilder& addDnsRefreshSeconds(int dns_refresh_seconds);
   EngineBuilder& addDnsFailureRefreshSeconds(int base, int max);
   EngineBuilder& addDnsQueryTimeoutSeconds(int dns_query_timeout_seconds);
   EngineBuilder& addDnsMinRefreshSeconds(int dns_min_refresh_seconds);
-  EngineBuilder& addDnsPreresolveHostnames(std::string dns_preresolve_hostnames);
   EngineBuilder& addMaxConnectionsPerHost(int max_connections_per_host);
   EngineBuilder& useDnsSystemResolver(bool use_system_resolver);
   EngineBuilder& addH2ConnectionKeepaliveIdleIntervalMilliseconds(
@@ -38,13 +39,8 @@ public:
   EngineBuilder&
   addH2ConnectionKeepaliveTimeoutSeconds(int h2_connection_keepalive_timeout_seconds);
   EngineBuilder& addStatsFlushSeconds(int stats_flush_seconds);
-  EngineBuilder& addVirtualClusters(std::string virtual_clusters);
-  EngineBuilder& addKeyValueStore(std::string name, KeyValueStoreSharedPtr key_value_store);
-  EngineBuilder& addStringAccessor(std::string name, StringAccessorSharedPtr accessor);
-  EngineBuilder& addNativeFilter(std::string name, std::string typed_config);
   // Configures Envoy to use the PlatformBridge filter named `name`. An instance of
   // envoy_http_filter must be registered as a platform API with the same name.
-  EngineBuilder& addPlatformFilter(std::string name);
   EngineBuilder& setAppVersion(std::string app_version);
   EngineBuilder& setAppId(std::string app_id);
   EngineBuilder& setDeviceOs(std::string app_id);
@@ -53,13 +49,25 @@ public:
   EngineBuilder& enableGzip(bool gzip_on);
   EngineBuilder& enableBrotli(bool brotli_on);
   EngineBuilder& enableSocketTagging(bool socket_tagging_on);
-  EngineBuilder& enableAdminInterface(bool admin_interface_on);
   EngineBuilder& enableHappyEyeballs(bool happy_eyeballs_on);
   EngineBuilder& enableHttp3(bool http3_on);
   EngineBuilder& enableInterfaceBinding(bool interface_binding_on);
   EngineBuilder& enableDrainPostDnsRefresh(bool drain_post_dns_refresh_on);
   EngineBuilder& enforceTrustChainVerification(bool trust_chain_verification_on);
   EngineBuilder& enablePlatformCertificatesValidation(bool platform_certificates_validation_on);
+
+  // These functions are not compatible with boostrap mode.
+  EngineBuilder& addStatsSinks(const std::vector<std::string>& stat_sinks);
+  EngineBuilder& addDnsPreresolveHostnames(std::string dns_preresolve_hostnames);
+  EngineBuilder& addVirtualClusters(std::string virtual_clusters);
+  EngineBuilder& addKeyValueStore(std::string name, KeyValueStoreSharedPtr key_value_store);
+  EngineBuilder& addStringAccessor(std::string name, StringAccessorSharedPtr accessor);
+  EngineBuilder& addNativeFilter(std::string name, std::string typed_config);
+  EngineBuilder& addPlatformFilter(std::string name);
+  EngineBuilder& enableAdminInterface(bool admin_interface_on);
+
+  // Use the experimental non-YAML config mode which uses the bootstrap proto directly.
+  EngineBuilder& setUseBootstrap();
 
   // this is separated from build() for the sake of testability
   std::string generateConfigStr() const;
@@ -83,6 +91,8 @@ private:
   LogLevel log_level_ = LogLevel::info;
   EngineCallbacksSharedPtr callbacks_;
 
+  bool config_bootstrap_incompatible_ = false;
+  bool use_bootstrap_ = false;
   std::string config_template_;
   std::string stats_domain_;
   int connect_timeout_seconds_ = 30;

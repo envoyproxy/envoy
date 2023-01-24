@@ -2,13 +2,31 @@
 
 #include <sstream>
 
+#include "envoy/config/metrics/v3/metrics_service.pb.h"
+#include "envoy/extensions/compression/brotli/decompressor/v3/brotli.pb.h"
+#include "envoy/extensions/compression/gzip/decompressor/v3/gzip.pb.h"
+#include "envoy/extensions/filters/http/alternate_protocols_cache/v3/alternate_protocols_cache.pb.h"
+#include "envoy/extensions/filters/http/decompressor/v3/decompressor.pb.h"
+#include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
+#include "envoy/extensions/http/header_formatters/preserve_case/v3/preserve_case.pb.h"
+#include "envoy/extensions/network/dns_resolver/apple/v3/apple_dns_resolver.pb.h"
+#include "envoy/extensions/network/dns_resolver/getaddrinfo/v3/getaddrinfo_dns_resolver.pb.h"
+#include "envoy/extensions/transport_sockets/http_11_proxy/v3/upstream_http_11_connect.pb.h"
+#include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
+#include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
+
 #include "source/common/common/assert.h"
+#include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
 #include "fmt/core.h"
 #include "library/common/config/internal.h"
 #include "library/common/engine.h"
+#include "library/common/extensions/cert_validator/platform_bridge/platform_bridge.pb.h"
+#include "library/common/extensions/filters/http/local_error/filter.pb.h"
+#include "library/common/extensions/filters/http/network_configuration/filter.pb.h"
+#include "library/common/extensions/filters/http/socket_tag/filter.pb.h"
 #include "library/common/main_interface.h"
 
 namespace Envoy {
@@ -23,8 +41,14 @@ void insertCustomFilter(const std::string& filter_config, std::string& config_te
 } // namespace
 
 EngineBuilder::EngineBuilder(std::string config_template)
-    : callbacks_(std::make_shared<EngineCallbacks>()), config_template_(config_template) {}
-EngineBuilder::EngineBuilder() : EngineBuilder(std::string(config_template)) {}
+    : callbacks_(std::make_shared<EngineCallbacks>()), config_template_(config_template) {
+  config_bootstrap_incompatible_ = true;
+}
+
+EngineBuilder::EngineBuilder() : EngineBuilder(std::string(config_template)) {
+  // Using the default config template is bootstrap compatible.
+  config_bootstrap_incompatible_ = false;
+}
 
 EngineBuilder& EngineBuilder::addLogLevel(LogLevel log_level) {
   log_level_ = log_level;
@@ -37,6 +61,8 @@ EngineBuilder& EngineBuilder::setOnEngineRunning(std::function<void()> closure) 
 }
 
 EngineBuilder& EngineBuilder::addStatsSinks(const std::vector<std::string>& stat_sinks) {
+  ENVOY_BUG(!use_bootstrap_, "Function not compatible with bootstrap builder");
+  config_bootstrap_incompatible_ = true;
   stat_sinks_ = stat_sinks;
   return *this;
 }
@@ -73,6 +99,8 @@ EngineBuilder& EngineBuilder::addDnsQueryTimeoutSeconds(int dns_query_timeout_se
 }
 
 EngineBuilder& EngineBuilder::addDnsPreresolveHostnames(std::string dns_preresolve_hostnames) {
+  ENVOY_BUG(!use_bootstrap_, "Function not compatible with bootstrap builder");
+  config_bootstrap_incompatible_ = true;
   dns_preresolve_hostnames_ = std::move(dns_preresolve_hostnames);
   return *this;
 }
@@ -106,12 +134,16 @@ EngineBuilder& EngineBuilder::addStatsFlushSeconds(int stats_flush_seconds) {
 }
 
 EngineBuilder& EngineBuilder::addVirtualClusters(std::string virtual_clusters) {
+  ENVOY_BUG(!use_bootstrap_, "Function not compatible with bootstrap builder");
+  config_bootstrap_incompatible_ = true;
   virtual_clusters_ = std::move(virtual_clusters);
   return *this;
 }
 
 EngineBuilder& EngineBuilder::addKeyValueStore(std::string name,
                                                KeyValueStoreSharedPtr key_value_store) {
+  ENVOY_BUG(!use_bootstrap_, "Function not compatible with bootstrap builder");
+  config_bootstrap_incompatible_ = true;
   key_value_stores_[std::move(name)] = std::move(key_value_store);
   return *this;
 }
@@ -157,6 +189,8 @@ EngineBuilder& EngineBuilder::enableSocketTagging(bool socket_tagging_on) {
 }
 
 EngineBuilder& EngineBuilder::enableAdminInterface(bool admin_interface_on) {
+  ENVOY_BUG(!use_bootstrap_, "Function not currently compatible with bootstrap builder");
+  config_bootstrap_incompatible_ = true;
   admin_interface_enabled_ = admin_interface_on;
   return *this;
 }
@@ -194,17 +228,29 @@ EngineBuilder::enablePlatformCertificatesValidation(bool platform_certificates_v
 
 EngineBuilder& EngineBuilder::addStringAccessor(std::string name,
                                                 StringAccessorSharedPtr accessor) {
+  ENVOY_BUG(!use_bootstrap_, "Function not compatible with bootstrap builder");
+  config_bootstrap_incompatible_ = true;
   string_accessors_[std::move(name)] = std::move(accessor);
   return *this;
 }
 
 EngineBuilder& EngineBuilder::addNativeFilter(std::string name, std::string typed_config) {
+  ENVOY_BUG(!use_bootstrap_, "Function not compatible with bootstrap builder");
+  config_bootstrap_incompatible_ = true;
   native_filter_chain_.emplace_back(std::move(name), std::move(typed_config));
   return *this;
 }
 
 EngineBuilder& EngineBuilder::addPlatformFilter(std::string name) {
+  ENVOY_BUG(!use_bootstrap_, "Function not compatible with bootstrap builder");
+  config_bootstrap_incompatible_ = true;
   platform_filters_.push_back(std::move(name));
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::setUseBootstrap() {
+  ENVOY_BUG(!config_bootstrap_incompatible_, "Config not compatible with bootstrap builder");
+  use_bootstrap_ = true;
   return *this;
 }
 
@@ -304,6 +350,7 @@ std::string EngineBuilder::generateConfigStr() const {
   if (config_str.find("{{") != std::string::npos) {
     throw std::runtime_error("could not resolve all template keys in config");
   }
+
   return config_str;
 }
 
@@ -316,10 +363,15 @@ EngineSharedPtr EngineBuilder::build() {
   envoy_event_tracker null_tracker{};
 
   std::string config_str;
-  if (config_override_for_tests_.empty()) {
+  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap;
+  if (use_bootstrap_) {
     config_str = generateConfigStr();
   } else {
-    config_str = config_override_for_tests_;
+    if (config_override_for_tests_.empty()) {
+      config_str = generateConfigStr();
+    } else {
+      config_str = config_override_for_tests_;
+    }
   }
   envoy_engine_t envoy_engine =
       init_engine(callbacks_->asEnvoyEngineCallbacks(), null_logger, null_tracker);
@@ -338,9 +390,15 @@ EngineSharedPtr EngineBuilder::build() {
     register_platform_api(name.c_str(), api);
   }
 
+  Engine* engine = new Engine(envoy_engine);
+
   if (auto cast_engine = reinterpret_cast<Envoy::Engine*>(envoy_engine)) {
     auto options = std::make_unique<Envoy::OptionsImpl>();
-    options->setConfigYaml(absl::StrCat(config_header, config_str));
+    if (bootstrap) {
+      options->setBootstrap(std::move(bootstrap));
+    } else {
+      options->setConfigYaml(absl::StrCat(config_header, config_str));
+    }
     options->setLogLevel(options->parseAndValidateLogLevel(logLevelToString(log_level_).c_str()));
     options->setConcurrency(1);
     if (!admin_address_path_for_tests_.empty()) {
@@ -351,7 +409,6 @@ EngineSharedPtr EngineBuilder::build() {
 
   // we can't construct via std::make_shared
   // because Engine is only constructible as a friend
-  Engine* engine = new Engine(envoy_engine);
   auto engine_ptr = EngineSharedPtr(engine);
   return engine_ptr;
 }
