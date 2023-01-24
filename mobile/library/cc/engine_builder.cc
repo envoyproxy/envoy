@@ -250,19 +250,19 @@ EngineBuilder::enablePlatformCertificatesValidation(bool platform_certificates_v
 
 EngineBuilder& EngineBuilder::addStringAccessor(std::string name,
                                                 StringAccessorSharedPtr accessor) {
-  ENVOY_BUG(!use_bootstrap_, "Function not compatible with bootstrap builder");
+  bootstrapIncompatible();
   string_accessors_[std::move(name)] = std::move(accessor);
   return *this;
 }
 
 EngineBuilder& EngineBuilder::addNativeFilter(std::string name, std::string typed_config) {
-  ENVOY_BUG(!use_bootstrap_, "Function not compatible with bootstrap builder");
+  bootstrapIncompatible();
   native_filter_chain_.emplace_back(std::move(name), std::move(typed_config));
   return *this;
 }
 
 EngineBuilder& EngineBuilder::addPlatformFilter(std::string name) {
-  ENVOY_BUG(!use_bootstrap_, "Function not compatible with bootstrap builder");
+  bootstrapIncompatible();
   platform_filters_.push_back(std::move(name));
   return *this;
 }
