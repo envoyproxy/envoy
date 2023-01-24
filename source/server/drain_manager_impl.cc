@@ -165,6 +165,9 @@ void DrainManagerImpl::startDrainSequence(std::function<void()> drain_complete_c
 }
 
 void DrainManagerImpl::startParentShutdownSequence() {
+  if (!server_.options().hotRestartDisabled()) {
+    return;
+  }
   ASSERT(!parent_shutdown_timer_);
   parent_shutdown_timer_ = server_.dispatcher().createTimer([this]() -> void {
     // Shut down the parent now. It should have already been draining.

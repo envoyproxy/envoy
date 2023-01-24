@@ -815,12 +815,10 @@ void InstanceImpl::startWorkers() {
     updateServerStats();
     workers_started_ = true;
     hooks_.onWorkersStarted();
-    if (!options_.hotRestartDisabled()) {
-      // At this point we are ready to take traffic and all listening ports are up. Notify our
-      // parent if applicable that they can stop listening and drain.
-      restarter_.drainParentListeners();
-      drain_manager_->startParentShutdownSequence();
-    }
+    // At this point we are ready to take traffic and all listening ports are up. Notify our
+    // parent if applicable that they can stop listening and drain.
+    restarter_.drainParentListeners();
+    drain_manager_->startParentShutdownSequence();
   });
 }
 
