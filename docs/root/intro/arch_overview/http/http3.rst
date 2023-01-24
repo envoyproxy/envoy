@@ -5,10 +5,10 @@ HTTP3 overview
 
 .. warning::
 
-  While HTTP/3 downstream support is deemed ready for production use, improvements are ongoing,
+  While HTTP/3 **downstream support is deemed ready for production use**, improvements are ongoing,
   tracked in the `area-quic <https://github.com/envoyproxy/envoy/labels/area%2Fquic>`_ tag.
 
-  HTTP/3 upstream support is fine for locally controlled networks, but is not ready for
+  HTTP/3 **upstream support is fine for locally controlled networks**, but is not ready for
   general internet use, and is missing some key latency features. See details below.
 
 
@@ -68,6 +68,8 @@ with :ref:`http3_protocol_options <envoy_v3_api_field_extensions.upstreams.http.
 will result in Envoy attempting to use HTTP/3 for endpoints which have explicitly advertised HTTP/3 support
 via an ``alt-svc`` header.
 
+When using :ref:`auto_config <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.auto_config>`
+with :ref:`http3_protocol_options <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.ExplicitHttpConfig.http3_protocol_options>`,
 Envoy will attempt to create a QUIC connection, then if the QUIC handshake is not complete after a short delay,
 will kick off a TCP connection, and will use whichever is established first.
 
