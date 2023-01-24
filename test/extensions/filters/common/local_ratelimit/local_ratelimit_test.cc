@@ -287,7 +287,7 @@ TEST_F(LocalRateLimiterDescriptorImplTest, CasEdgeCasesDescriptor) {
     fill_timer_->invokeCallback();
 
     synchronizer().enable();
-    
+
     // Start a thread and start the fill callback. This will wait pre-CAS.
     dispatcher_.globalTimeSystem().advanceTimeAndRun(std::chrono::milliseconds(50), dispatcher_,
                                                      Envoy::Event::Dispatcher::RunType::NonBlock);
@@ -479,7 +479,7 @@ TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDescriptorStatus) {
                                                    Envoy::Event::Dispatcher::RunType::NonBlock);
   EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(1000), nullptr));
   fill_timer_->invokeCallback();
-  
+
   // 1 -> 0 tokens
   EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_));
   EXPECT_EQ(rate_limiter_->maxTokens(descriptor_), 2);
@@ -496,7 +496,7 @@ TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDescriptorStatus) {
   EXPECT_EQ(rate_limiter_->maxTokens(descriptor_), 2);
   EXPECT_EQ(rate_limiter_->remainingTokens(descriptor_), 0);
   EXPECT_EQ(rate_limiter_->remainingFillInterval(descriptor_), 1);
-  
+
   dispatcher_.globalTimeSystem().advanceTimeAndRun(std::chrono::milliseconds(1000), dispatcher_,
                                                    Envoy::Event::Dispatcher::RunType::NonBlock);
   EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(1000), nullptr));
