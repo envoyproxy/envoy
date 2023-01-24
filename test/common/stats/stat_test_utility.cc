@@ -186,7 +186,7 @@ Histogram& TestScope::histogramFromString(const std::string& leaf_name, Histogra
 std::string TestScope::statNameWithTags(const StatName& stat_name,
                                         StatNameTagVectorOptConstRef tags) {
   TagUtility::TagStatNameJoiner joiner(prefix(), stat_name, tags, symbolTable());
-  return prefix_str_ + symbolTable().toString(joiner.nameWithTags());
+  return symbolTable().toString(joiner.nameWithTags());
 }
 
 void TestScope::verifyConsistency(StatName ref_stat_name, StatName stat_name,
