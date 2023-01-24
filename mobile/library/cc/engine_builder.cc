@@ -38,6 +38,28 @@ void insertCustomFilter(const std::string& filter_config, std::string& config_te
   absl::StrReplaceAll({{"#{custom_filters}", absl::StrCat("#{custom_filters}\n", filter_config)}},
                       &config_template);
 }
+
+bool generatedStringMatchesGeneratedBoostrap(
+    std::string& config_str, std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap) {
+  Thread::SkipAsserts skip;
+  ProtobufMessage::StrictValidationVisitorImpl visitor;
+  envoy::config::bootstrap::v3::Bootstrap config_bootstrap;
+  MessageUtil::loadFromYaml(absl::StrCat(config_header, config_str), config_bootstrap, visitor);
+
+  Protobuf::util::MessageDifferencer differencer;
+  differencer.set_message_field_comparison(Protobuf::util::MessageDifferencer::EQUIVALENT);
+  differencer.set_repeated_field_comparison(Protobuf::util::MessageDifferencer::AS_SET);
+
+  bool same = differencer.Compare(config_bootstrap, *bootstrap);
+
+  if (!same) {
+    std::cerr << config_bootstrap.DebugString();
+    std::cerr << "============================================";
+    std::cerr << bootstrap->DebugString();
+  }
+  return same;
+}
+
 } // namespace
 
 EngineBuilder::EngineBuilder(std::string config_template)
@@ -60,9 +82,13 @@ EngineBuilder& EngineBuilder::setOnEngineRunning(std::function<void()> closure) 
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addStatsSinks(const std::vector<std::string>& stat_sinks) {
+void EngineBuilder::bootstrapIncompatible() {
   ENVOY_BUG(!use_bootstrap_, "Function not compatible with bootstrap builder");
   config_bootstrap_incompatible_ = true;
+}
+
+EngineBuilder& EngineBuilder::addStatsSinks(const std::vector<std::string>& stat_sinks) {
+  bootstrapIncompatible();
   stat_sinks_ = stat_sinks;
   return *this;
 }
@@ -99,8 +125,7 @@ EngineBuilder& EngineBuilder::addDnsQueryTimeoutSeconds(int dns_query_timeout_se
 }
 
 EngineBuilder& EngineBuilder::addDnsPreresolveHostnames(std::string dns_preresolve_hostnames) {
-  ENVOY_BUG(!use_bootstrap_, "Function not compatible with bootstrap builder");
-  config_bootstrap_incompatible_ = true;
+  bootstrapIncompatible();
   dns_preresolve_hostnames_ = std::move(dns_preresolve_hostnames);
   return *this;
 }
@@ -134,16 +159,14 @@ EngineBuilder& EngineBuilder::addStatsFlushSeconds(int stats_flush_seconds) {
 }
 
 EngineBuilder& EngineBuilder::addVirtualClusters(std::string virtual_clusters) {
-  ENVOY_BUG(!use_bootstrap_, "Function not compatible with bootstrap builder");
-  config_bootstrap_incompatible_ = true;
+  bootstrapIncompatible();
   virtual_clusters_ = std::move(virtual_clusters);
   return *this;
 }
 
 EngineBuilder& EngineBuilder::addKeyValueStore(std::string name,
                                                KeyValueStoreSharedPtr key_value_store) {
-  ENVOY_BUG(!use_bootstrap_, "Function not compatible with bootstrap builder");
-  config_bootstrap_incompatible_ = true;
+  bootstrapIncompatible();
   key_value_stores_[std::move(name)] = std::move(key_value_store);
   return *this;
 }
@@ -189,8 +212,7 @@ EngineBuilder& EngineBuilder::enableSocketTagging(bool socket_tagging_on) {
 }
 
 EngineBuilder& EngineBuilder::enableAdminInterface(bool admin_interface_on) {
-  ENVOY_BUG(!use_bootstrap_, "Function not currently compatible with bootstrap builder");
-  config_bootstrap_incompatible_ = true;
+  bootstrapIncompatible();
   admin_interface_enabled_ = admin_interface_on;
   return *this;
 }
@@ -229,21 +251,18 @@ EngineBuilder::enablePlatformCertificatesValidation(bool platform_certificates_v
 EngineBuilder& EngineBuilder::addStringAccessor(std::string name,
                                                 StringAccessorSharedPtr accessor) {
   ENVOY_BUG(!use_bootstrap_, "Function not compatible with bootstrap builder");
-  config_bootstrap_incompatible_ = true;
   string_accessors_[std::move(name)] = std::move(accessor);
   return *this;
 }
 
 EngineBuilder& EngineBuilder::addNativeFilter(std::string name, std::string typed_config) {
   ENVOY_BUG(!use_bootstrap_, "Function not compatible with bootstrap builder");
-  config_bootstrap_incompatible_ = true;
   native_filter_chain_.emplace_back(std::move(name), std::move(typed_config));
   return *this;
 }
 
 EngineBuilder& EngineBuilder::addPlatformFilter(std::string name) {
   ENVOY_BUG(!use_bootstrap_, "Function not compatible with bootstrap builder");
-  config_bootstrap_incompatible_ = true;
   platform_filters_.push_back(std::move(name));
   return *this;
 }
@@ -252,27 +271,6 @@ EngineBuilder& EngineBuilder::setUseBootstrap() {
   ENVOY_BUG(!config_bootstrap_incompatible_, "Config not compatible with bootstrap builder");
   use_bootstrap_ = true;
   return *this;
-}
-
-bool generatedStringMatchesGeneratedBoostrap(
-    std::string config_str, std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap) {
-  Thread::SkipAsserts skip;
-  ProtobufMessage::StrictValidationVisitorImpl visitor;
-  envoy::config::bootstrap::v3::Bootstrap config_bootstrap;
-  MessageUtil::loadFromYaml(absl::StrCat(config_header, config_str), config_bootstrap, visitor);
-
-  Protobuf::util::MessageDifferencer differencer;
-  differencer.set_message_field_comparison(Protobuf::util::MessageDifferencer::EQUIVALENT);
-  differencer.set_repeated_field_comparison(Protobuf::util::MessageDifferencer::AS_SET);
-
-  bool same = differencer.Compare(config_bootstrap, *bootstrap);
-
-  if (!same) {
-    std::cerr << config_bootstrap.DebugString();
-    std::cerr << "============================================";
-    std::cerr << bootstrap->DebugString();
-  }
-  return same;
 }
 
 std::string EngineBuilder::generateConfigStr() const {
@@ -851,7 +849,7 @@ EngineSharedPtr EngineBuilder::build() {
   if (auto cast_engine = reinterpret_cast<Envoy::Engine*>(envoy_engine)) {
     auto options = std::make_unique<Envoy::OptionsImpl>();
     if (bootstrap) {
-      options->setBootstrap(std::move(bootstrap));
+      options->setConfigProto(std::move(bootstrap));
     } else {
       options->setConfigYaml(absl::StrCat(config_header, config_str));
     }

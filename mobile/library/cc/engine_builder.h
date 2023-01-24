@@ -17,6 +17,15 @@
 namespace Envoy {
 namespace Platform {
 
+// The C++ Engine builder supports 2 ways of building Envoy Mobile config, the 'legacy mode'
+// which uses a yaml config header, blocks of well known yaml configs, and uses string manipulation
+// to glue them together, and the 'bootstrap mode' which creates a structured bootstrap proto and
+// modifies it to produce the same config. We need to retain the legacy mode even if all functions
+// become bootstrap compatible to be able to regression test that changes to the config yaml are
+// reflected in generateBootstrap, until all languages use the C++ bootstrap builder.
+//
+// Currently the default is legacy mode but worth noting bootstrap mode is 2 orders of magnitude
+// faster.
 class EngineBuilder {
 public:
   // This constructor is not compatible with bootstrap mode.
@@ -56,7 +65,7 @@ public:
   EngineBuilder& enforceTrustChainVerification(bool trust_chain_verification_on);
   EngineBuilder& enablePlatformCertificatesValidation(bool platform_certificates_validation_on);
 
-  // These functions are not compatible with boostrap mode.
+  // These functions are not compatible with boostrap mode, see |bootstrap_mode_| for details.
   EngineBuilder& addStatsSinks(const std::vector<std::string>& stat_sinks);
   EngineBuilder& addDnsPreresolveHostnames(std::string dns_preresolve_hostnames);
   EngineBuilder& addVirtualClusters(std::string virtual_clusters);
@@ -88,6 +97,9 @@ private:
     std::string name_;
     std::string typed_config_;
   };
+
+  // Verifies use_bootstrap_ is not true and sets config_bootstrap_incompatible_ true.
+  void bootstrapIncompatible();
 
   LogLevel log_level_ = LogLevel::info;
   EngineCallbacksSharedPtr callbacks_;

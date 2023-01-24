@@ -373,16 +373,11 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
                                        const Options& options,
                                        ProtobufMessage::ValidationVisitor& validation_visitor,
                                        Api::Api& api) {
-  if (options.bootstrap().has_value()) {
-    bootstrap.MergeFrom(*options.bootstrap());
-    MessageUtil::validate(bootstrap, validation_visitor);
-    return;
-  }
   const std::string& config_path = options.configPath();
   const std::string& config_yaml = options.configYaml();
   const envoy::config::bootstrap::v3::Bootstrap& config_proto = options.configProto();
 
-  // Exactly one of config_path and config_yaml should be specified.
+  // One of config_path and config_yaml or bootstrap should be specified.
   if (config_path.empty() && config_yaml.empty() && config_proto.ByteSizeLong() == 0) {
     throw EnvoyException("At least one of --config-path or --config-yaml or Options::configProto() "
                          "should be non-empty");
