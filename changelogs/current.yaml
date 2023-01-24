@@ -20,6 +20,10 @@ bug_fixes:
     When eds multiplexing is disabled each subscription uses a dedicated channel/mux.
 
 removed_config_or_runtime:
+# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: router
+  change: |
+    removed ``envoy.reloadable_features.get_route_config_factory_by_type`` runtime flag. The flag is no longer needed as the behavior is now the default.
 - area: http
   change: |
     removed ``envoy.reloadable_features.http2_delay_keepalive_timeout`` and legacy code paths.
