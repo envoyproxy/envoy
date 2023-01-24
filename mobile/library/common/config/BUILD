@@ -12,7 +12,6 @@ envoy_cc_library(
         "//bazel:exclude_certificates": [],
         "//conditions:default": [
             "certificates.inc",
-            "no_whitespace_certificates.inc",
         ],
     }),
     hdrs = [

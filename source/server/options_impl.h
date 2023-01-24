@@ -66,9 +66,6 @@ public:
   void setConfigProto(const envoy::config::bootstrap::v3::Bootstrap& config_proto) {
     config_proto_ = config_proto;
   }
-  void setBootstrap(std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>&& bootstrap) {
-    bootstrap_ = std::move(bootstrap);
-  }
   void setConfigYaml(const std::string& config_yaml) { config_yaml_ = config_yaml; }
   void setAdminAddressPath(const std::string& admin_address_path) {
     admin_address_path_ = admin_address_path;
@@ -127,9 +124,6 @@ public:
   const std::string& configPath() const override { return config_path_; }
   const envoy::config::bootstrap::v3::Bootstrap& configProto() const override {
     return config_proto_;
-  }
-  const OptRef<envoy::config::bootstrap::v3::Bootstrap> bootstrap() const override {
-    return makeOptRefFromPtr(bootstrap_.get());
   }
   const std::string& configYaml() const override { return config_yaml_; }
   bool allowUnknownStaticFields() const override { return allow_unknown_static_fields_; }
@@ -200,7 +194,6 @@ private:
   uint32_t concurrency_{1};
   std::string config_path_;
   envoy::config::bootstrap::v3::Bootstrap config_proto_;
-  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap_;
   std::string config_yaml_;
   bool allow_unknown_static_fields_{false};
   bool reject_unknown_dynamic_fields_{false};

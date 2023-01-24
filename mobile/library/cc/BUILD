@@ -12,33 +12,11 @@ envoy_cc_library(
     hdrs = [
         "engine_builder.h",
     ],
-    copts = select({
-        "//bazel:exclude_certificates": ["-DEXCLUDE_CERTIFICATES"],
-        "//conditions:default": [],
-    }),
     repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [
         ":envoy_engine_cc_lib_no_stamp",
         "@envoy//source/common/common:assert_lib",
-        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/compression/brotli/decompressor/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/compression/gzip/decompressor/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/http/alternate_protocols_cache/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/http/decompressor/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/http/dynamic_forward_proxy/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/http/header_formatters/preserve_case/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/network/dns_resolver/apple/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/network/dns_resolver/getaddrinfo/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/transport_sockets/http_11_proxy/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/transport_sockets/raw_buffer/v3:pkg_cc_proto",
-        "@envoy_mobile//library/common/config:config_lib",
-        "@envoy_mobile//library/common/extensions/cert_validator/platform_bridge:platform_bridge_cc_proto",
-        "@envoy_mobile//library/common/extensions/filters/http/local_error:filter_cc_proto",
-        "@envoy_mobile//library/common/extensions/filters/http/network_configuration:filter_cc_proto",
-        "@envoy_mobile//library/common/extensions/filters/http/socket_tag:filter_cc_proto",
     ],
 )
 

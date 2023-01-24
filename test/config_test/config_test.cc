@@ -56,7 +56,8 @@ static std::vector<absl::string_view> unsuported_win32_configs = {
 
 class ConfigTest {
 public:
-  ConfigTest(OptionsImpl& options) : api_(Api::createApiForTest(time_system_)), options_(options) {
+  ConfigTest(const OptionsImpl& options)
+      : api_(Api::createApiForTest(time_system_)), options_(options) {
     ON_CALL(*server_.server_factory_context_, api()).WillByDefault(ReturnRef(server_.api_));
     ON_CALL(server_, options()).WillByDefault(ReturnRef(options_));
     ON_CALL(server_, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
@@ -167,7 +168,7 @@ public:
   NiceMock<Server::MockInstance> server_;
   Server::ServerFactoryContextImpl server_factory_context_{server_};
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;
-  OptionsImpl& options_;
+  OptionsImpl options_;
   std::unique_ptr<Upstream::ProdClusterManagerFactory> cluster_manager_factory_;
   std::unique_ptr<NiceMock<Server::MockListenerComponentFactory>> component_factory_ptr_{
       std::make_unique<NiceMock<Server::MockListenerComponentFactory>>()};
@@ -240,8 +241,7 @@ uint32_t run(const std::string& directory) {
       Server::InstanceUtil::loadBootstrapConfig(
           bootstrap, options, ProtobufMessage::getStrictValidationVisitor(), *api);
       ENVOY_LOG_MISC(info, "testing {} as yaml.", filename);
-      OptionsImpl config = asConfigYaml(options, *api);
-      ConfigTest test2(config);
+      ConfigTest test2(asConfigYaml(options, *api));
     }
     num_tested++;
   }

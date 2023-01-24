@@ -5,7 +5,6 @@
 #include <string>
 
 #include "envoy/admin/v3/server_info.pb.h"
-#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/network/address.h"
@@ -123,15 +122,10 @@ public:
   virtual const std::string& configYaml() const PURE;
 
   /**
-   * @return const envoy::config::bootstrap::v3::Bootstrap& a bootstrap proto object
+   * @return const envoy::config::bootstrap::v2::Bootstrap& a bootstrap proto object
    * that merges into the config last, after configYaml and configPath.
    */
   virtual const envoy::config::bootstrap::v3::Bootstrap& configProto() const PURE;
-
-  /**
-   * @return a bootstrap proto object that replaces configProto, configYaml and configPath.
-   */
-  virtual const OptRef<envoy::config::bootstrap::v3::Bootstrap> bootstrap() const PURE;
 
   /**
    * @return bool allow unknown fields in the static configuration?
