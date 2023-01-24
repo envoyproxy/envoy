@@ -46,8 +46,9 @@ struct UserData {
 };
 
 // Nghttp2 callback function for receiving extension frame.
-static int on_extension_chunk_recv_callback(nghttp2_session* /*session*/, const nghttp2_frame_hd* hd,
-                                            const uint8_t* data, size_t len, void* user_data) {
+static int on_extension_chunk_recv_callback(nghttp2_session* /*session*/,
+                                            const nghttp2_frame_hd* hd, const uint8_t* data,
+                                            size_t len, void* user_data) {
   EXPECT_GE(hd->length, len);
 
   MetadataDecoder* decoder = reinterpret_cast<UserData*>(user_data)->decoder;
@@ -67,8 +68,8 @@ static int unpack_extension_callback(nghttp2_session* /*session*/, void** payloa
 }
 
 // Nghttp2 callback function for sending data to peer.
-static ssize_t send_callback(nghttp2_session* /*session*/, const uint8_t* buf, size_t len, int flags,
-                             void* user_data) {
+static ssize_t send_callback(nghttp2_session* /*session*/, const uint8_t* buf, size_t len,
+                             int flags, void* user_data) {
   EXPECT_LE(0, flags);
 
   TestBuffer* buffer = (reinterpret_cast<UserData*>(user_data))->output_buffer;
@@ -255,8 +256,8 @@ TEST_F(MetadataEncoderDecoderTest, EncodeMetadataMapVectorSmall) {
   // Verifies flag and payload are encoded correctly.
   const uint64_t consume_size = random_generator_.random() % output_buffer_.length;
   session_->ProcessBytes(toStringView(output_buffer_.buf, consume_size));
-  session_->ProcessBytes(toStringView(output_buffer_.buf + consume_size,
-                                      output_buffer_.length - consume_size));
+  session_->ProcessBytes(
+      toStringView(output_buffer_.buf + consume_size, output_buffer_.length - consume_size));
 
   cleanUp();
 }
@@ -280,8 +281,8 @@ TEST_F(MetadataEncoderDecoderTest, EncodeMetadataMapVectorLarge) {
   // Verifies flag and payload are encoded correctly.
   const uint64_t consume_size = random_generator_.random() % output_buffer_.length;
   session_->ProcessBytes(toStringView(output_buffer_.buf, consume_size));
-  session_->ProcessBytes(toStringView(output_buffer_.buf + consume_size,
-                                      output_buffer_.length - consume_size));
+  session_->ProcessBytes(
+      toStringView(output_buffer_.buf + consume_size, output_buffer_.length - consume_size));
   cleanUp();
 }
 
