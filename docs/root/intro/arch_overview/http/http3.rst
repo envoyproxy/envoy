@@ -1,7 +1,7 @@
 .. _arch_overview_http3:
 
-HTTP3 overview
-==============
+HTTP/3 overview
+===============
 
 .. warning::
 
@@ -11,38 +11,54 @@ HTTP3 overview
   HTTP/3 **upstream support is fine for locally controlled networks**, but is not ready for
   general internet use, and is missing some key latency features. See details below.
 
+.. _arch_overview_http3_downstream:
 
-HTTP3 downstream
-----------------
+HTTP/3 downstream
+-----------------
 
 Downstream Envoy HTTP/3 support can be turned up via adding
 :ref:`quic_options <envoy_v3_api_field_config.listener.v3.UdpListenerConfig.quic_options>`,
-ensuring the downstream transport socket is a QuicDownstreamTransport, and setting the codec
-to HTTP/3.
+ensuring the downstream transport socket is a
+:ref:`QuicDownstreamTransport <envoy_v3_api_msg_extensions.transport_sockets.quic.v3.QuicDownstreamTransport>`,
+and setting the codec to HTTP/3.
 
 .. note::
    Hot restart is not gracefully handled for HTTP/3 yet.
 
 .. tip::
-
    See :repo:`downstream HTTP/3 configuration </configs/envoyproxy_io_proxy_http3_downstream.yaml>`
    for example configuration.
 
    This example configuration includes both a TCP and a UDP listener, and the TCP
    listener is advertising HTTP/3 support via an ``alt-svc`` header.
 
-   By default the example configuration uses kernel UDP support, but for production performance use of
-   BPF is strongly advised if Envoy is running with multiple worker threads.
+   By default the example configuration uses kernel UDP support, but **for production performance use of**
+   :ref:`BPF <arch_overview_http3_downstream_bpf>` **is strongly advised if Envoy is running with multiple worker threads**.
+
+.. _arch_overview_http3_downstream_advertisement:
+
+HTTP/3 advertisement
+~~~~~~~~~~~~~~~~~~~~
 
 Advertising HTTP/3 is not necessary for in-house deployments where HTTP/3 is explicitly configured,
 but is needed for internet facing deployments where TCP is the default, and clients such as Chrome
 will only attempt HTTP/3 if it is explicitly advertised.
+
+.. _arch_overview_http3_downstream_bpf:
+
+BPF usage
+~~~~~~~~~
 
 Envoy will attempt to use BPF on Linux by default if multiple worker threads are configured,
 but may require root, or at least ``sudo``-with-permissions (e.g. ``sudo setcap cap_bpf+ep``).
 
 If multiple worker threads are configured and BPF is unsupported on the platform, or is attempted and fails,
 Envoy will log a warning on start-up.
+
+.. _arch_overview_http3_downstream_stats:
+
+Downstream stats
+~~~~~~~~~~~~~~~~
 
 It is recommanded to monitor some UDP listener and QUIC connection stats:
 
@@ -54,8 +70,10 @@ It is recommanded to monitor some UDP listener and QUIC connection stats:
     Refer to `quic_error_codes.h <https://github.com/google/quiche/blob/main/quiche/quic/core/quic_error_codes.h>`_
     for the meaning of each error code.
 
-HTTP3 upstream
---------------
+.. _arch_overview_http3_upstream:
+
+HTTP/3 upstream
+---------------
 
 HTTP/3 upstream support is implemented, with support both for explicit HTTP/3 (for data center use) and
 automatic HTTP/3 (for internet use).

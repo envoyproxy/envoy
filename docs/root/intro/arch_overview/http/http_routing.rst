@@ -215,8 +215,6 @@ and :ref:`circuit breaking <config_cluster_manager_cluster_circuit_breakers>` se
 priority level, which means that even for HTTP/2 requests, two physical connections will be used to
 an upstream host.
 
-In the future Envoy will likely support true HTTP/2 priority over a single connection.
-
 The currently supported priorities are ``default`` and ``high``.
 
 .. _arch_overview_http_routing_direct_response:
