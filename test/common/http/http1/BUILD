@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_fuzz_test",
     "envoy_cc_test",
     "envoy_package",
 )
@@ -40,7 +41,6 @@ envoy_cc_test(
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:test_runtime_lib",
-        "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto",
     ],
 )
@@ -68,5 +68,20 @@ envoy_cc_test(
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "http1_codec_impl_fuzz_test",
+    srcs = ["http1_codec_impl_fuzz_test.cc"],
+    corpus = "http1_codec_impl_corpus",
+    deps = [
+        "//source/common/http:conn_manager_lib",
+        "//source/common/http:header_map_lib",
+        "//source/common/http/http1:codec_lib",
+        "//test/fuzz:utility_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/test_common:test_runtime_lib",
     ],
 )
