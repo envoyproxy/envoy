@@ -113,7 +113,7 @@ Tracing::SpanPtr Span::spawnChild(const Tracing::Config& config, const std::stri
   auto child_span = std::make_unique<XRay::Span>(time_source_, random_, broker_);
   child_span->setName(operation_name);
   child_span->setOperation(operation_name);
-  child_span->setDirection(Tracing::HttpTracerUtility::toString(config.operationName()));
+  child_span->setDirection(Tracing::TracerUtility::toString(config.operationName()));
   child_span->setStartTime(start_time);
   child_span->setParentId(id());
   child_span->setTraceId(traceId());
@@ -130,7 +130,7 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::str
   auto span_ptr = std::make_unique<XRay::Span>(time_source_, random_, *daemon_broker_);
   span_ptr->setName(segment_name_);
   span_ptr->setOperation(operation_name);
-  span_ptr->setDirection(Tracing::HttpTracerUtility::toString(config.operationName()));
+  span_ptr->setDirection(Tracing::TracerUtility::toString(config.operationName()));
   // Even though we have a TimeSource member in the tracer, we assume the start_time argument has a
   // more precise value than calling the systemTime() at this point in time.
   span_ptr->setStartTime(start_time);

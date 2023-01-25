@@ -6341,6 +6341,28 @@ virtual_hosts:
       EnvoyException, "Sum of weights in the weighted_cluster must be greater than 0.");
 }
 
+TEST_F(RouteMatcherTest, WeightedClustersSumOfWeightsTooLarge) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: www2
+    domains: ["www.lyft.com"]
+    routes:
+      - match: { prefix: "/" }
+        name: lyft_route
+        route:
+          weighted_clusters:
+            clusters:
+              - name: cluster1
+                weight: 2394967295
+              - name: cluster2
+                weight: 2394967295
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
+      "The sum of weights of all weighted clusters of route lyft_route exceeds 4294967295");
+}
+
 TEST_F(RouteMatcherTest, TestWeightedClusterWithMissingWeights) {
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -10472,37 +10494,6 @@ virtual_hosts:
   absl::InlinedVector<uint32_t, 3> expected_traveled_config({456, 123});
   // Factories is obtained by type here by default, so route config can be loaded correctly.
   checkEach(yaml, 123, expected_traveled_config, "filter.unknown");
-}
-
-TEST_F(PerFilterConfigsTest, RouteTypedConfigWithErrorFilterNameButDisableGetByType) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.get_route_config_factory_by_type", "false"}});
-
-  const std::string yaml = R"EOF(
-virtual_hosts:
-  - name: bar
-    domains: ["*"]
-    routes:
-      - match: { prefix: "/" }
-        route: { cluster: baz }
-        typed_per_filter_config:
-          filter.unknown:
-            "@type": type.googleapis.com/google.protobuf.Timestamp
-            value:
-              seconds: 123
-    typed_per_filter_config:
-      filter.unknown:
-        "@type": type.googleapis.com/google.protobuf.Timestamp
-        value:
-          seconds: 456
-)EOF";
-
-  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
-  OptionalHttpFilters optional_http_filters;
-  optional_http_filters.insert("filter.unknown");
-  // No route config factory can be obtained by the filter name 'filter.unknown'.
-  checkNoPerFilterConfig(yaml, "filter.unknown", optional_http_filters);
 }
 
 class RouteMatchOverrideTest : public testing::Test, public ConfigImplTestBase {};
