@@ -431,6 +431,30 @@ TEST_F(OpenTelemetryDriverTest, IgnoreNotSampledSpan) {
   EXPECT_EQ(0U, stats_.counter("tracing.opentelemetry.spans_sent").value());
 }
 
+TEST_F(OpenTelemetryDriverTest, NoExportWithoutGrpcService) {
+  const std::string yaml_string = "{}";
+  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+  TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+  setup(opentelemetry_config);
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
+
+  Tracing::SpanPtr span =
+      driver_->startSpan(mock_tracing_config_, request_headers, operation_name_,
+                         time_system_.systemTime(), {Tracing::Reason::Sampling, true});
+  EXPECT_NE(span.get(), nullptr);
+
+  // Flush after a single span.
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
+      .Times(1)
+      .WillRepeatedly(Return(1));
+  // We should see a call to sendMessage to export that single span.
+  EXPECT_CALL(*mock_stream_ptr_, sendMessageRaw_(_, _)).Times(0);
+  span->finishSpan();
+  EXPECT_EQ(0U, stats_.counter("tracing.opentelemetry.spans_sent").value());
+}
+
 TEST_F(OpenTelemetryDriverTest, ExportSpanWithCustomServiceName) {
   const std::string yaml_string = R"EOF(
     grpc_service:

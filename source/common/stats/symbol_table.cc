@@ -141,7 +141,17 @@ public:
   // The type of token reached.
   enum class TokenType { StringView, Symbol, End };
 
-  TokenIter(StatName stat_name) : array_(stat_name.data()), size_(stat_name.dataSize()) {}
+  TokenIter(StatName stat_name) {
+    const uint8_t* raw_data = stat_name.dataIncludingSize();
+    if (raw_data == nullptr) {
+      size_ = 0;
+      array_ = nullptr;
+    } else {
+      std::pair<uint64_t, size_t> size_consumed = decodeNumber(raw_data);
+      size_ = size_consumed.first;
+      array_ = raw_data + size_consumed.second;
+    }
+  }
 
   /**
    * Parses the next token. The token can then be retrieved by calling

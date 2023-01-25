@@ -531,7 +531,7 @@ HeaderMapImplUtility::getAllHeaderMapImplInfo() {
 
 absl::string_view RequestHeaderMapImpl::protocol() const { return getProtocolValue(); }
 
-absl::string_view RequestHeaderMapImpl::authority() const { return getHostValue(); }
+absl::string_view RequestHeaderMapImpl::host() const { return getHostValue(); }
 
 absl::string_view RequestHeaderMapImpl::path() const { return getPathValue(); }
 

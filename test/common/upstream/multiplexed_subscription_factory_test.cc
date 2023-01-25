@@ -64,6 +64,7 @@ public:
   NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Config::MockSubscriptionCallbacks> callbacks_;
   Stats::MockIsolatedStatsStore stats_store_;
+  Stats::Scope& stats_scope_{*stats_store_.rootScope()};
   NiceMock<Api::MockApi> api_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Grpc::MockAsyncClient* async_client_;
@@ -95,10 +96,10 @@ TEST_P(MultiplexedSubscriptionFactoryForGrpcTest, ShouldReturnSameMuxForSameConf
   EXPECT_CALL(dispatcher_, createTimer_(_));
   Config::CustomConfigValidatorsPtr config_validators =
       std::make_unique<NiceMock<Config::MockCustomConfigValidators>>();
-  auto first_mux = factory.testGetOrCreateMux(config1.api_config_source(), type_url_, stats_store_,
+  auto first_mux = factory.testGetOrCreateMux(config1.api_config_source(), type_url_, stats_scope_,
                                               config_validators);
   config_validators = std::make_unique<NiceMock<Config::MockCustomConfigValidators>>();
-  auto second_mux = factory.testGetOrCreateMux(config1.api_config_source(), type_url_, stats_store_,
+  auto second_mux = factory.testGetOrCreateMux(config1.api_config_source(), type_url_, stats_scope_,
                                                config_validators);
   EXPECT_EQ(first_mux.get(), second_mux.get());
   EXPECT_EQ(1, MultiplexedSubscriptionFactoryPeer::optimizedMuxesSize(factory));
@@ -124,10 +125,10 @@ TEST_P(MultiplexedSubscriptionFactoryForGrpcTest, ShouldReturnSameMuxForSameGrpc
   EXPECT_CALL(dispatcher_, createTimer_(_));
   Config::CustomConfigValidatorsPtr config_validators =
       std::make_unique<NiceMock<Config::MockCustomConfigValidators>>();
-  auto first_mux = factory.testGetOrCreateMux(config1.api_config_source(), type_url_, stats_store_,
+  auto first_mux = factory.testGetOrCreateMux(config1.api_config_source(), type_url_, stats_scope_,
                                               config_validators);
   config_validators = std::make_unique<NiceMock<Config::MockCustomConfigValidators>>();
-  auto second_mux = factory.testGetOrCreateMux(config1.api_config_source(), type_url_, stats_store_,
+  auto second_mux = factory.testGetOrCreateMux(config1.api_config_source(), type_url_, stats_scope_,
                                                config_validators);
   EXPECT_EQ(first_mux.get(), second_mux.get());
   EXPECT_EQ(1, MultiplexedSubscriptionFactoryPeer::optimizedMuxesSize(factory));
@@ -147,14 +148,14 @@ TEST_P(MultiplexedSubscriptionFactoryForGrpcTest, ShouldReturnDiffMuxesForDiffXd
   Config::CustomConfigValidatorsPtr config_validators =
       std::make_unique<NiceMock<Config::MockCustomConfigValidators>>();
   auto first_mux = factory.testGetOrCreateMux(first_config.api_config_source(), type_url_,
-                                              stats_store_, config_validators);
+                                              stats_scope_, config_validators);
   envoy::config::core::v3::ConfigSource second_config;
   config_source = second_config.mutable_api_config_source();
   config_source->set_api_type(GetParam());
   config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("second_cluster");
   config_validators = std::make_unique<NiceMock<Config::MockCustomConfigValidators>>();
   auto second_mux = factory.testGetOrCreateMux(second_config.api_config_source(), type_url_,
-                                               stats_store_, config_validators);
+                                               stats_scope_, config_validators);
   EXPECT_NE(first_mux.get(), second_mux.get());
   EXPECT_EQ(2, MultiplexedSubscriptionFactoryPeer::optimizedMuxesSize(factory));
 }
@@ -171,17 +172,17 @@ TEST_P(MultiplexedSubscriptionFactoryForGrpcTest, ShouldReturnDiffMuxesForDiffXd
   EXPECT_CALL(dispatcher_, createTimer_(_)).Times(3);
   Config::CustomConfigValidatorsPtr config_validators =
       std::make_unique<NiceMock<Config::MockCustomConfigValidators>>();
-  auto first_mux = factory.testGetOrCreateMux(config.api_config_source(), type_url_, stats_store_,
+  auto first_mux = factory.testGetOrCreateMux(config.api_config_source(), type_url_, stats_scope_,
                                               config_validators);
   config_validators = std::make_unique<NiceMock<Config::MockCustomConfigValidators>>();
   auto second_mux = factory.testGetOrCreateMux(
       config.api_config_source(), "type.googleapis.com/envoy.config.cluster.v3.Cluster",
-      stats_store_, config_validators);
+      stats_scope_, config_validators);
   EXPECT_NE(first_mux.get(), second_mux.get());
   config_validators = std::make_unique<NiceMock<Config::MockCustomConfigValidators>>();
   auto third_mux = factory.testGetOrCreateMux(
       config.api_config_source(), "type.googleapis.com/envoy.config.listener.v3.Listener",
-      stats_store_, config_validators);
+      stats_scope_, config_validators);
   EXPECT_NE(first_mux.get(), third_mux.get());
   EXPECT_NE(second_mux.get(), third_mux.get());
   EXPECT_EQ(3, MultiplexedSubscriptionFactoryPeer::optimizedMuxesSize(factory));
@@ -217,11 +218,11 @@ TEST_P(MultiplexedSubscriptionFactoryForGrpcTest,
   EXPECT_CALL(dispatcher_, createTimer_(_));
   auto subscription =
       factory.subscriptionFromConfigSource(config, Config::TypeUrl::get().ClusterLoadAssignment,
-                                           stats_store_, callbacks_, resource_decoder_, {});
+                                           stats_scope_, callbacks_, resource_decoder_, {});
   Config::CustomConfigValidatorsPtr config_validators =
       std::make_unique<NiceMock<Config::MockCustomConfigValidators>>();
   auto expected_mux = factory.testGetOrCreateMux(config.api_config_source(), type_url_,
-                                                 stats_store_, config_validators);
+                                                 stats_scope_, config_validators);
   EXPECT_EQ(expected_mux.get(),
             (dynamic_cast<Config::GrpcSubscriptionImpl&>(*subscription).grpcMux()).get());
 }
@@ -248,7 +249,7 @@ TEST_P(MultiplexedSubscriptionFactoryForNonGrpcTest,
   EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
   EXPECT_CALL(dispatcher_, createTimer_(_));
   factory.subscriptionFromConfigSource(config, Config::TypeUrl::get().ClusterLoadAssignment,
-                                       stats_store_, callbacks_, resource_decoder_, {});
+                                       stats_scope_, callbacks_, resource_decoder_, {});
   EXPECT_EQ(0, MultiplexedSubscriptionFactoryPeer::optimizedMuxesSize(factory));
 }
 

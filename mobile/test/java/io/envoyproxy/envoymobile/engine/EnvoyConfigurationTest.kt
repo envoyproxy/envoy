@@ -144,7 +144,6 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("&dns_fail_max_interval 456s")
     assertThat(resolvedTemplate).contains("&dns_query_timeout 321s")
     assertThat(resolvedTemplate).contains("&dns_lookup_family V4_PREFERRED")
-    assertThat(resolvedTemplate).contains("&dns_multiple_addresses false")
     assertThat(resolvedTemplate).contains("&dns_min_refresh_rate 12s")
     assertThat(resolvedTemplate).contains("&dns_preresolve_hostnames [hostname]")
     assertThat(resolvedTemplate).contains("&enable_drain_post_dns_refresh false")
@@ -222,7 +221,6 @@ CERT_VALIDATION_TEMPLATE
 
     // DNS
     assertThat(resolvedTemplate).contains("&dns_lookup_family ALL")
-    assertThat(resolvedTemplate).contains("&dns_multiple_addresses true")
     assertThat(resolvedTemplate).contains("&enable_drain_post_dns_refresh true")
     assertThat(resolvedTemplate).contains("config: persistent_dns_cache")
 
