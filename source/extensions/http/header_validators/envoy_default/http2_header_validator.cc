@@ -146,7 +146,7 @@ Http2HeaderValidator::validateRequestHeaderMap(::Envoy::Http::RequestHeaderMap& 
       details = UhvResponseCodeDetail::get().InvalidUrl;
     } else if (!header_map.getSchemeValue().empty()) {
       details = UhvResponseCodeDetail::get().InvalidScheme;
-    } else if (header_map.authority().empty()) {
+    } else if (header_map.getHostValue().empty()) {
       details = UhvResponseCodeDetail::get().InvalidHost;
     }
 

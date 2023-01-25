@@ -140,7 +140,7 @@ private:
   bool enable_drain_post_dns_refresh_ = false;
   bool enforce_trust_chain_verification_ = true;
   bool h2_extend_keepalive_timeout_ = false;
-  bool enable_http3_ = false;
+  bool enable_http3_ = true;
   int dns_min_refresh_seconds_ = 60;
   int max_connections_per_host_ = 7;
   std::vector<std::string> stat_sinks_;

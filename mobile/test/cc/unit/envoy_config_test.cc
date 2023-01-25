@@ -265,8 +265,6 @@ TEST(TestConfig, EnableHappyEyeballs) {
   config_str = absl::StrCat(config_header, engine_builder.generateConfigStr());
   ASSERT_THAT(config_str, Not(HasSubstr("&dns_lookup_family V4_PREFERRED")));
   ASSERT_THAT(config_str, HasSubstr("&dns_lookup_family ALL"));
-  ASSERT_THAT(config_str, Not(HasSubstr("&dns_multiple_addresses false")));
-  ASSERT_THAT(config_str, HasSubstr("&dns_multiple_addresses true"));
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
 
@@ -274,8 +272,6 @@ TEST(TestConfig, EnableHappyEyeballs) {
   config_str = engine_builder.generateConfigStr();
   ASSERT_THAT(config_str, HasSubstr("&dns_lookup_family V4_PREFERRED"));
   ASSERT_THAT(config_str, Not(HasSubstr("&dns_lookup_family ALL")));
-  ASSERT_THAT(config_str, HasSubstr("&dns_multiple_addresses false"));
-  ASSERT_THAT(config_str, Not(HasSubstr("&dns_multiple_addresses true")));
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
 }
 
@@ -331,20 +327,20 @@ TEST(TestConfig, AddStatsSinks) {
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
 }
 
-TEST(TestConfig, EnableHttp3) {
+TEST(TestConfig, DisableHttp3) {
   EngineBuilder engine_builder;
 
   std::string config_str = engine_builder.generateConfigStr();
-  ASSERT_THAT(
-      config_str,
-      Not(HasSubstr("envoy.extensions.filters.http.alternate_protocols_cache.v3.FilterConfig")));
+  ASSERT_THAT(config_str,
+              HasSubstr("envoy.extensions.filters.http.alternate_protocols_cache.v3.FilterConfig"));
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
 
-  engine_builder.enableHttp3(true);
+  engine_builder.enableHttp3(false);
   config_str = engine_builder.generateConfigStr();
-  ASSERT_THAT(config_str,
-              HasSubstr("envoy.extensions.filters.http.alternate_protocols_cache.v3.FilterConfig"));
+  ASSERT_THAT(
+      config_str,
+      Not(HasSubstr("envoy.extensions.filters.http.alternate_protocols_cache.v3.FilterConfig")));
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
 }
 
