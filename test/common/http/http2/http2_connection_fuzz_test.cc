@@ -26,6 +26,7 @@ class Http2Frame {
 public:
   static constexpr char Preamble[25] = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
   static constexpr size_t HeaderSize = 9;
+  static const uint8_t PADDED = 0x8;
   Http2Frame(uint32_t stream_id, uint8_t type, uint8_t flags) : stream_id_(stream_id) {
     data_.assign(HeaderSize, 0);
     setType(type);
@@ -119,6 +120,7 @@ Http2Frame pb_to_h2_frame(nghttp2_hd_deflater* deflater,
     auto h2frame = pb_frame.h2frame();
     uint32_t streamid = h2frame.streamid();
     uint8_t flags = static_cast<uint8_t>(h2frame.flags() & 0xff);
+    bool use_padding = flags & Http2Frame::PADDED;
     uint8_t type;
     std::string payload;
     if (h2frame.has_data()) {
@@ -129,7 +131,9 @@ Http2Frame pb_to_h2_frame(nghttp2_hd_deflater* deflater,
       type = 1;
       auto f = h2frame.headers();
       uint8_t padding_len = static_cast<uint8_t>(f.padding().size() & 0xff);
-      payload.push_back(static_cast<char>(padding_len));
+      if (use_padding) {
+        payload.push_back(static_cast<char>(padding_len));
+      }
 
       uint32_t stream_dependency = f.stream_dependency();
       payload.append(reinterpret_cast<char*>(&stream_dependency), sizeof(stream_dependency));
@@ -140,7 +144,9 @@ Http2Frame pb_to_h2_frame(nghttp2_hd_deflater* deflater,
       }
 
       deflate_headers(deflater, f.headers(), payload);
-      payload.append(f.padding().data(), padding_len);
+      if (use_padding) {
+        payload.append(f.padding().data(), padding_len);
+      }
     } else if (h2frame.has_priority()) {
       type = 2;
       auto f = h2frame.priority();
@@ -165,11 +171,15 @@ Http2Frame pb_to_h2_frame(nghttp2_hd_deflater* deflater,
       type = 5;
       auto f = h2frame.push_promise();
       uint8_t padding_len = static_cast<uint8_t>(f.padding().size() & 0xff);
-      payload.push_back(static_cast<char>(padding_len));
+      if (use_padding) {
+        payload.push_back(static_cast<char>(padding_len));
+      }
       uint32_t stream_id = f.stream_id();
       payload.append(reinterpret_cast<char*>(&stream_id), sizeof(stream_id));
       deflate_headers(deflater, f.headers(), payload);
-      payload.append(f.padding().data(), padding_len);
+      if (use_padding) {
+        payload.append(f.padding().data(), padding_len);
+      }
     } else if (h2frame.has_ping()) {
       type = 6;
       auto f = h2frame.ping();
