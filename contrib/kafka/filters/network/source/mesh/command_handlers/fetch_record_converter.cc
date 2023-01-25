@@ -8,9 +8,10 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
 
-std::vector<FetchableTopicResponse> FetchResponsePayloadProcessor::transform(
+std::vector<FetchableTopicResponse> FetchRecordConverter::convert(
     const std::map<KafkaPartition, std::vector<InboundRecordSharedPtr>>&) const {
 
+  // TODO (adam.kotwasinski) This needs to be implemented.
   return {};
 }
 

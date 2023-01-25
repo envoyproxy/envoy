@@ -2,6 +2,8 @@
 
 #include <thread>
 
+#include "source/common/common/fmt.h"
+
 #include "absl/synchronization/mutex.h"
 #include "contrib/kafka/filters/network/source/external/responses.h"
 
@@ -17,13 +19,12 @@ FetchRequestHolder::FetchRequestHolder(AbstractRequestListener& filter,
     : BaseInFlightRequest{filter}, consumer_manager_{consumer_manager}, request_{request},
       dispatcher_{filter.dispatcher()} {}
 
-FetchRequestHolder::~FetchRequestHolder() { ENVOY_LOG(info, "Fetch {} DTOR", toString()); }
-
 // XXX (adam.kotwasinski) This should be made configurable in future.
 constexpr uint32_t FETCH_TIMEOUT_MS = 5000;
 
 static Event::TimerPtr registerTimeoutCallback(Event::Dispatcher& dispatcher,
-                                               Event::TimerCb callback, int32_t timeout) {
+                                               const Event::TimerCb callback,
+                                               const int32_t timeout) {
   auto event = dispatcher.createTimer(callback);
   event->enableTimer(std::chrono::milliseconds(timeout));
   return event;
@@ -47,10 +48,9 @@ void FetchRequestHolder::startProcessing() {
   const auto self_reference = shared_from_this();
   consumer_manager_.processCallback(self_reference);
 
-  // Event::TimerCb callback = [self_reference]() -> void {
   Event::TimerCb callback = [this]() -> void {
-    // Fun fact: if the request is degenerate (no partitions requested), this will make it be
-    // processed. self_reference->markFinishedByTimer();
+    // Fun fact: if the request is degenerate (no partitions requested),
+    // this will ensure it gets processed.
     markFinishedByTimer();
   };
   timer_ = registerTimeoutCallback(dispatcher_, callback, FETCH_TIMEOUT_MS);
@@ -71,7 +71,7 @@ TopicToPartitionsMap FetchRequestHolder::interest() const {
 
 // This method is called by a Envoy-worker thread.
 void FetchRequestHolder::markFinishedByTimer() {
-  ENVOY_LOG(info, "Fetch request {} timed out", toString());
+  ENVOY_LOG(trace, "Request {} timed out", toString());
   bool doCleanup = false;
   {
     absl::MutexLock lock(&state_mutex_);
@@ -86,7 +86,8 @@ void FetchRequestHolder::markFinishedByTimer() {
   }
 }
 
-// XXX temporary solution only
+// XXX (adam.kotwasinski) This should be made configurable in future.
+// Right now the Fetch request is going to send up to 3 records.
 constexpr int32_t MINIMAL_MSG_CNT = 3;
 
 // This method is called by:
@@ -95,42 +96,37 @@ constexpr int32_t MINIMAL_MSG_CNT = 3;
 CallbackReply FetchRequestHolder::receive(InboundRecordSharedPtr message) {
   absl::MutexLock lock(&state_mutex_);
   if (!finished_) {
+    // Store a new record.
     const KafkaPartition kp = {message->topic_, message->partition_};
     messages_[kp].push_back(message);
 
+    // Count all the records currently stored within this request.
     uint32_t current_messages = 0;
     for (const auto& e : messages_) {
       current_messages += e.second.size();
     }
 
     if (current_messages < MINIMAL_MSG_CNT) {
-      ENVOY_LOG(info, "Fetch request {} processed message (and wants more {}): {}", toString(),
-                current_messages, message->toString());
+      // We can consume more in future.
       return CallbackReply::AcceptedAndWantMore;
     } else {
-      ENVOY_LOG(info, "Fetch request {} processed message (and is finished with {}): {}",
-                toString(), current_messages, message->toString());
       // We have all we needed, we can finish processing.
       finished_ = true;
       cleanup(false);
       return CallbackReply::AcceptedAndFinished;
     }
   } else {
-    ENVOY_LOG(info, "Fetch request {} rejected message: {}", toString(), message->toString());
+    // This fetch request has finished processing, so it will not accept a record.
     return CallbackReply::Rejected;
   }
 }
 
 std::string FetchRequestHolder::toString() const {
-  std::ostringstream oss;
-  oss << "["
-      << "?"
-      << "/" << request_->request_header_.correlation_id_ << "]";
-  return oss.str();
+  return fmt::format("[Fetch id={}]", request_->request_header_.correlation_id_);
 }
 
 void FetchRequestHolder::cleanup(bool unregister) {
-  ENVOY_LOG(info, "Cleanup starting for {}", toString());
+  ENVOY_LOG(trace, "Cleanup starting for {}", toString());
   if (unregister) {
     const auto self_reference = shared_from_this();
     consumer_manager_.removeCallback(self_reference);
@@ -146,7 +142,7 @@ void FetchRequestHolder::cleanup(bool unregister) {
   // Impl note: usually this will be invoked by non-Envoy thread,
   // so let's not optimize that this might be invoked by dispatcher callback.
   dispatcher_.post(notifyCallback);
-  ENVOY_LOG(info, "Cleanup finished for {}", toString());
+  ENVOY_LOG(trace, "Cleanup finished for {}", toString());
 }
 
 bool FetchRequestHolder::finished() const {
@@ -155,14 +151,12 @@ bool FetchRequestHolder::finished() const {
 }
 
 void FetchRequestHolder::abandon() {
+  ENVOY_LOG(trace, "Abandoning {}", toString());
   // We remove the timeout-callback and unregister this request so no deliveries happen to it.
   timer_ = nullptr;
   const auto self_reference = shared_from_this();
   consumer_manager_.removeCallback(self_reference);
   BaseInFlightRequest::abandon();
-  // XXX (adam.kotwasinski) Might want to "push-back" records that are already in this request.
-  // Replication path: make a Fetch that wants 10 records, provide 8, kill connection.
-  // Part 2: might escalate even higher, what if we finish okay, but cannot send serialized form?
 }
 
 AbstractResponseSharedPtr FetchRequestHolder::computeAnswer() const {
@@ -173,7 +167,7 @@ AbstractResponseSharedPtr FetchRequestHolder::computeAnswer() const {
   std::vector<FetchableTopicResponse> responses;
   {
     absl::MutexLock lock(&state_mutex_);
-    responses = processor_.transform(messages_);
+    responses = converter_.convert(messages_);
   }
   const FetchResponse data = {throttle_time_ms, responses};
   return std::make_shared<Response<FetchResponse>>(metadata, data);

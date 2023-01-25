@@ -24,8 +24,6 @@ public:
   FetchRequestHolder(AbstractRequestListener& filter, RecordCallbackProcessor& consumer_manager,
                      const std::shared_ptr<Request<FetchRequest>> request);
 
-  ~FetchRequestHolder();
-
   void startProcessing() override;
 
   bool finished() const override;
@@ -46,7 +44,6 @@ public:
   TopicToPartitionsMap interest() const override;
 
   // RecordCb
-  // InFlightRequest
   std::string toString() const override;
 
 private:
@@ -73,7 +70,7 @@ private:
   Event::TimerPtr timer_;
 
   // Translates librdkafka objects into bytes to be sent downstream.
-  const FetchResponsePayloadProcessor processor_;
+  const FetchRecordConverter converter_;
 };
 
 } // namespace Mesh

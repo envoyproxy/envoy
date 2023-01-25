@@ -13,10 +13,14 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
 
-class FetchResponsePayloadProcessor {
+/**
+ * Dependency injection class responsible for converting received records into serializable form
+ * that we can put into Fetch responses.
+ */
+class FetchRecordConverter {
 public:
   std::vector<FetchableTopicResponse>
-  transform(const std::map<KafkaPartition, std::vector<InboundRecordSharedPtr>>& arg) const;
+  convert(const std::map<KafkaPartition, std::vector<InboundRecordSharedPtr>>& arg) const;
 };
 
 } // namespace Mesh
