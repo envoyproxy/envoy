@@ -65,7 +65,9 @@ public:
     // kind we need to do DNS entries for.
     CustomClusterType cluster_type;
     cluster_type.set_name("envoy.clusters.dynamic_forward_proxy");
-    cm_.thread_local_cluster_.cluster_.info_->cluster_type_ = cluster_type;
+    cm_.thread_local_cluster_.cluster_.info_->cluster_type_ =
+        std::make_unique<const envoy::config::cluster::v3::Cluster::CustomClusterType>(
+            cluster_type);
 
     // Configure max pending to 1 so we can test circuit breaking.
     cm_.thread_local_cluster_.cluster_.info_->resetResourceManager(0, 1, 0, 0, 0, 100);
@@ -284,7 +286,7 @@ TEST_F(ProxyFilterTest, NoCluster) {
 
 // No cluster type leads to skipping DNS lookups.
 TEST_F(ProxyFilterTest, NoClusterType) {
-  cm_.thread_local_cluster_.cluster_.info_->cluster_type_ = absl::nullopt;
+  cm_.thread_local_cluster_.cluster_.info_->cluster_type_ = nullptr;
 
   InSequence s;
 
@@ -297,7 +299,8 @@ TEST_F(ProxyFilterTest, NoClusterType) {
 TEST_F(ProxyFilterTest, NonDynamicForwardProxy) {
   CustomClusterType cluster_type;
   cluster_type.set_name("envoy.cluster.static");
-  cm_.thread_local_cluster_.cluster_.info_->cluster_type_ = cluster_type;
+  cm_.thread_local_cluster_.cluster_.info_->cluster_type_ =
+      std::make_unique<const envoy::config::cluster::v3::Cluster::CustomClusterType>(cluster_type);
 
   InSequence s;
 
