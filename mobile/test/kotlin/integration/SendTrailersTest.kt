@@ -1,6 +1,6 @@
 package test.kotlin.integration
 
-import io.envoyproxy.envoymobile.Custom
+import io.envoyproxy.envoymobile.Standard
 import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
 import io.envoyproxy.envoymobile.RequestMethod
@@ -14,53 +14,9 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.fail
 import org.junit.Test
 
-private const val apiListenerType = "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.EnvoyMobileHttpConnectionManager"
 private const val assertionFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion"
 private const val matcherTrailerName = "test-trailer"
 private const val matcherTrailerValue = "test.code"
-private const val config =
-"""
-static_resources:
-  listeners:
-  - name: base_api_listener
-    address:
-      socket_address:
-        protocol: TCP
-        address: 0.0.0.0
-        port_value: 10000
-    api_listener:
-      api_listener:
-        "@type": $apiListenerType
-        config:
-          stat_prefix: hcm
-          route_config:
-            name: api_router
-            virtual_hosts:
-              - name: api
-                domains:
-                  - "*"
-                routes:
-                  - match:
-                      prefix: "/"
-                    direct_response:
-                      status: 200
-          http_filters:
-            - name: envoy.filters.http.assertion
-              typed_config:
-                "@type": $assertionFilterType
-                match_config:
-                  http_request_trailers_match:
-                    headers:
-                      - name: $matcherTrailerName
-                        exact_match: $matcherTrailerValue
-            - name: envoy.filters.http.buffer
-              typed_config:
-                "@type": type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer
-                max_request_bytes: 65000
-            - name: envoy.router
-              typed_config:
-                "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-"""
 
 class SendTrailersTest {
 
@@ -72,7 +28,9 @@ class SendTrailersTest {
   fun `successful sending of trailers`() {
 
     val expectation = CountDownLatch(1)
-    val engine = EngineBuilder(Custom(config))
+    val engine = EngineBuilder(Standard())
+      .addNativeFilter("envoy.filters.http.assertion", "{'@type': $assertionFilterType, match_config: {http_request_trailers_match: {headers: [{name: 'test-trailer', exact_match: 'test.code'}]}}}")
+      .addNativeFilter("envoy.filters.http.buffer", "{\"@type\":\"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer\",\"max_request_bytes\":65000}")
       .setOnEngineRunning { }
       .build()
 
@@ -81,8 +39,8 @@ class SendTrailersTest {
     val requestHeaders = RequestHeadersBuilder(
       method = RequestMethod.GET,
       scheme = "https",
-      authority = "example.com",
-      path = "/test"
+      authority = "api.lyft.com",
+      path = "/ping"
     )
       .addUpstreamHttpProtocol(UpstreamHttpProtocol.HTTP2)
       .build()

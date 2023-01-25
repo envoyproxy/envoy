@@ -1,6 +1,6 @@
 package test.kotlin.integration
 
-import io.envoyproxy.envoymobile.Custom
+import io.envoyproxy.envoymobile.Standard
 import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.EnvoyError
 import io.envoyproxy.envoymobile.FilterDataStatus
@@ -22,80 +22,6 @@ import java.util.concurrent.TimeUnit
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.fail
 import org.junit.Test
-
-private const val idleTimeout = "0.5s"
-private const val ehcmType =
-  "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.EnvoyMobileHttpConnectionManager"
-private const val lefType =
-  "type.googleapis.com/envoymobile.extensions.filters.http.local_error.LocalError"
-private const val pbfType = "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge"
-private const val filterName = "idle_timeout_validation_filter"
-private val remotePort = (10001..11000).random()
-private val config =
-"""
-static_resources:
-  listeners:
-  - name: fake_remote_listener
-    address:
-      socket_address: { protocol: TCP, address: 127.0.0.1, port_value: $remotePort }
-    filter_chains:
-    - filters:
-      - name: envoy.filters.network.http_connection_manager
-        typed_config:
-          "@type": $ehcmType
-          stat_prefix: remote_hcm
-          route_config:
-            name: remote_route
-            virtual_hosts:
-            - name: remote_service
-              domains: ["*"]
-              routes:
-              - match: { prefix: "/" }
-                direct_response: { status: 200 }
-          http_filters:
-          - name: envoy.router
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-  - name: base_api_listener
-    address:
-      socket_address: { protocol: TCP, address: 0.0.0.0, port_value: 10000 }
-    api_listener:
-      api_listener:
-        "@type": $hcmType
-        stat_prefix: api_hcm
-        stream_idle_timeout: $idleTimeout
-        route_config:
-          name: api_router
-          virtual_hosts:
-          - name: api
-            domains: ["*"]
-            routes:
-            - match: { prefix: "/" }
-              route: { cluster: fake_remote }
-        http_filters:
-        - name: envoy.filters.http.local_error
-          typed_config:
-            "@type": $lefType
-        - name: envoy.filters.http.platform_bridge
-          typed_config:
-            "@type": $pbfType
-            platform_filter_name: $filterName
-        - name: envoy.router
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-  clusters:
-  - name: fake_remote
-    connect_timeout: 0.25s
-    type: STATIC
-    lb_policy: ROUND_ROBIN
-    load_assignment:
-      cluster_name: fake_remote
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address: { address: 127.0.0.1, port_value: $remotePort }
-"""
 
 class CancelStreamTest {
 
@@ -145,11 +71,12 @@ class CancelStreamTest {
 
   @Test
   fun `stream idle timeout triggers onError callbacks`() {
-    val engine = EngineBuilder(Custom(config))
+    val engine = EngineBuilder(Standard()).build()
       .addPlatformFilter(
         name = "idle_timeout_validation_filter",
         factory = { IdleTimeoutValidationFilter(filterExpectation) }
       )
+      .addStreamIdleTimeoutSeconds(1)
       .setOnEngineRunning {}
       .build()
 
