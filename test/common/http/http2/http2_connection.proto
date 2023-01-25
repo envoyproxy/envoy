@@ -5,8 +5,6 @@ import "test/fuzz/common.proto";
 
 message Http2DataFrame {
   bytes data = 1;
-  // Use only 255 bytes maximum
-  bytes padding = 2;
 }
 
 message Http2HeaderFrame {

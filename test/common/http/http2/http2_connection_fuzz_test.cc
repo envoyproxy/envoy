@@ -124,10 +124,7 @@ Http2Frame pb_to_h2_frame(nghttp2_hd_deflater* deflater,
     if (h2frame.has_data()) {
       type = 0;
       auto f = h2frame.data();
-      uint8_t padding_len = static_cast<uint8_t>(f.padding().size() & 0xff);
-      payload.push_back(static_cast<char>(padding_len));
       payload.append(f.data());
-      payload.append(f.padding().c_str(), padding_len);
     } else if (h2frame.has_headers()) {
       type = 1;
       auto f = h2frame.headers();
