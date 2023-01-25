@@ -10,6 +10,7 @@
 
 #include "source/common/upstream/thread_aware_lb_impl.h"
 #include "source/common/upstream/upstream_impl.h"
+#include "source/common/common/bit_array.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -130,11 +131,7 @@ class CompactMaglevTable : public MaglevTable {
 public:
   CompactMaglevTable(const NormalizedHostWeightVector& normalized_host_weights,
                      double max_normalized_weight, uint64_t table_size,
-                     bool use_hostname_for_hashing, MaglevLoadBalancerStats& stats)
-      : MaglevTable(table_size, stats) {
-    constructMaglevTableInternal(normalized_host_weights, max_normalized_weight,
-                                 use_hostname_for_hashing);
-  }
+                     bool use_hostname_for_hashing, MaglevLoadBalancerStats& stats);
   virtual ~CompactMaglevTable() = default;
 
   // ThreadAwareLoadBalancerBase::HashingLoadBalancer
@@ -144,6 +141,12 @@ private:
   void constructImplementationInternals(std::vector<TableBuildEntry>& table_build_entries,
                                         double max_normalized_weight) override;
   void logMaglevTable(bool use_hostname_for_hashing) const override;
+
+  // Leverage a BitArray to more compactly fit represent the MaglevTable.
+  // The BitArray will index into the host_table_ which will provide the given
+  // host to load balance to.
+  BitArray table_;
+  std::vector<HostConstSharedPtr> host_table_;
 };
 
 /**

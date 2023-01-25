@@ -75,10 +75,60 @@ void OriginalMaglevTable::constructImplementationInternals(
     }
   }
 }
+CompactMaglevTable::CompactMaglevTable(const NormalizedHostWeightVector& normalized_host_weights,
+                                       double max_normalized_weight, uint64_t table_size,
+                                       bool use_hostname_for_hashing,
+                                       MaglevLoadBalancerStats& stats)
+    : MaglevTable(table_size, stats),
+      table_(absl::bit_width(normalized_host_weights.size()), table_size) {
+  constructMaglevTableInternal(normalized_host_weights, max_normalized_weight,
+                               use_hostname_for_hashing);
+}
 
 void CompactMaglevTable::constructImplementationInternals(
-    std::vector<TableBuildEntry>& /*table_build_entries*/, double /*max_normalized_weight*/) {
-  ASSERT(false, "Unimplemented compact maglev table");
+    std::vector<TableBuildEntry>& table_build_entries, double max_normalized_weight) {
+  // Populate the host table. Index into table_build_entries[i] will align with
+  // the host here.
+  host_table_.reserve(table_build_entries.size());
+  for (const auto& entry : table_build_entries) {
+    host_table_.emplace_back(entry.host_);
+  }
+  host_table_.shrink_to_fit();
+
+  // Vector to track whether or not a given fixed width bit is set in the
+  // BitArray used as the maglev table.
+  std::vector<bool> occupied(table_size_, false);
+
+  // Iterate through the table build entries as many times as it takes to fill up the table.
+  uint64_t table_index = 0;
+  for (uint32_t iteration = 1; table_index < table_size_; ++iteration) {
+    for (uint32_t i = 0; i < table_build_entries.size() && table_index < table_size_; i++) {
+      TableBuildEntry& entry = table_build_entries[i];
+      // To understand how target_weight_ and weight_ are used below, consider a host with weight
+      // equal to max_normalized_weight. This would be picked on every single iteration. If it had
+      // weight equal to max_normalized_weight / 3, then it would only be picked every 3 iterations,
+      // etc.
+      if (iteration * entry.weight_ < entry.target_weight_) {
+        continue;
+      }
+      entry.target_weight_ += max_normalized_weight;
+      // As we're using the compact implementation, our table size is limited to
+      // 32-bit, hence static_cast here should be safe.
+      uint32_t c = static_cast<uint32_t>(permutation(entry));
+      while (occupied[c]) {
+        entry.next_++;
+        c = static_cast<uint32_t>(permutation(entry));
+      }
+
+      // Record the index of the given host.
+      table_.set(c, i);
+      occupied[c] = true;
+
+      entry.next_++;
+      entry.count_++;
+      table_index++;
+    }
+  }
 }
 
 MaglevTableSharedPtr
@@ -88,8 +138,8 @@ MaglevTable::createMaglevTable(const NormalizedHostWeightVector& normalized_host
   // TODO(kbaichoo): possibly release guard this as well e.g >= || flag, check
   // of windows for endianess?
   MaglevTableSharedPtr maglev_table;
-  if (normalized_host_weights.size() >= MaglevTable::NumberOfHostsAtWhichToNotUseMemoryOptimized ||
-      true) {
+  if (normalized_host_weights.size() >= MaglevTable::NumberOfHostsAtWhichToNotUseMemoryOptimized &&
+      false) {
     maglev_table =
         std::make_shared<OriginalMaglevTable>(normalized_host_weights, max_normalized_weight,
                                               table_size, use_hostname_for_hashing, stats);
@@ -103,15 +153,24 @@ MaglevTable::createMaglevTable(const NormalizedHostWeightVector& normalized_host
 }
 
 void OriginalMaglevTable::logMaglevTable(bool use_hostname_for_hashing) const {
-  for (uint64_t i = 0; i < table_.size(); i++) {
+  for (uint64_t i = 0; i < table_.size(); ++i) {
     const absl::string_view key_to_hash = hashKey(table_[i], use_hostname_for_hashing);
     ENVOY_LOG(trace, "maglev: i={} address={} host={}", i, table_[i]->address()->asString(),
               key_to_hash);
   }
 }
 
-void CompactMaglevTable::logMaglevTable(bool /*use_hostname_for_hashing*/) const {
-  ASSERT(false, "Unimplemented compact maglev table");
+void CompactMaglevTable::logMaglevTable(bool use_hostname_for_hashing) const {
+  for (uint64_t i = 0; i < table_size_; ++i) {
+
+    const uint32_t index = table_.get(i);
+    ASSERT(index < host_table_.size(), "Compact MaglevTable index into host table out of range");
+    const auto& host = host_table_[index];
+
+    const absl::string_view key_to_hash = hashKey(host, use_hostname_for_hashing);
+    ENVOY_LOG(trace, "maglev: i={} address={} host={}", i, host->address()->asString(),
+              key_to_hash);
+  }
 }
 
 MaglevTable::MaglevTable(uint64_t table_size, MaglevLoadBalancerStats& stats)
@@ -132,9 +191,21 @@ HostConstSharedPtr OriginalMaglevTable::chooseHost(uint64_t hash, uint32_t attem
   return table_[hash % table_size_];
 }
 
-HostConstSharedPtr CompactMaglevTable::chooseHost(uint64_t /*hash*/, uint32_t /*attempt*/) const {
-  // TODO(kbaichoo): impl compact maglev table host selection
-  return nullptr;
+HostConstSharedPtr CompactMaglevTable::chooseHost(uint64_t hash, uint32_t attempt) const {
+  if (host_table_.empty()) {
+    return nullptr;
+  }
+
+  if (attempt > 0) {
+    // If a retry host predicate is being applied, mutate the hash to choose an alternate host.
+    // By using value with most bits set for the retry attempts, we achieve a larger change in
+    // the hash, thereby reducing the likelihood that all retries are directed to a single host.
+    hash ^= ~0ULL - attempt + 1;
+  }
+
+  const uint32_t index = table_.get(hash % table_size_);
+  ASSERT(index < host_table_.size(), "Compact MaglevTable index into host table out of range");
+  return host_table_[index];
 }
 
 uint64_t MaglevTable::permutation(const TableBuildEntry& entry) {
