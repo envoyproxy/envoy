@@ -10,18 +10,18 @@ set -e
 # a list of pre-installed tools in the macOS image.
 
 export HOMEBREW_NO_AUTO_UPDATE=1
-HOMEBREW_RETRY_ATTEMPTS=10
-HOMEBREW_RETRY_INTERVAL=3
+RETRY_ATTEMPTS=10
+RETRY_INTERVAL=3
 
 
 function retry () {
     local returns=1 i=1
-    while ((i<=HOMEBREW_RETRY_ATTEMPTS)); do
+    while ((i<=RETRY_ATTEMPTS)); do
         if "$@"; then
             returns=0
             break
         else
-            sleep "$HOMEBREW_RETRY_INTERVAL";
+            sleep "$RETRY_INTERVAL";
             ((i++))
         fi
     done
@@ -51,11 +51,11 @@ do
     is_installed "${DEP}" || install "${DEP}"
 done
 
-./bazelw version
-
 pip3 install slackclient
 # https://github.com/actions/runner-images/blob/main/images/macos/macos-12-Readme.md#xcode
 sudo xcode-select --switch /Applications/Xcode_14.1.app
+
+retry ./bazelw version
 
 if [[ "${1:-}" == "--android" ]]; then
   # Download and set up ndk 21 after GitHub update
