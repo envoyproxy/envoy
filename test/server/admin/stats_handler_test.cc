@@ -131,7 +131,6 @@ public:
   Http::TestRequestHeaderMapImpl request_headers_;
   MockAdminStream admin_stream_;
   Configuration::MockStatsConfig stats_config_;
-  TestScopedRuntime scoped_runtime_;
 };
 
 class AdminStatsTest : public StatsHandlerTest, public testing::Test {};
@@ -236,14 +235,11 @@ TEST_F(AdminStatsTest, HandlerStatsPlainTextHistogramBucketsCumulative) {
             code_response.second);
 }
 
-class AdminStatsFilterTest : public StatsHandlerTest, public testing::TestWithParam<Regex::Type> {
+class AdminStatsFilterTest : public StatsHandlerTest, public testing::Test {
 protected:
 };
 
-INSTANTIATE_TEST_SUITE_P(RegexTypes, AdminStatsFilterTest,
-                         Values(Regex::Type::Re2, Regex::Type::StdRegex));
-
-TEST_P(AdminStatsFilterTest, HandlerStatsPlainTextHistogramBucketsDisjoint) {
+TEST_F(AdminStatsFilterTest, HandlerStatsPlainTextHistogramBucketsDisjoint) {
   const std::string url = "/stats?histogram_buckets=disjoint";
 
   Stats::Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
@@ -322,7 +318,7 @@ TEST_F(AdminStatsTest, HandlerStatsJsonNoHistograms) {
   EXPECT_THAT(expected_json, JsonStringEq(code_response.second));
 }
 
-TEST_P(AdminStatsFilterTest, HandlerStatsJsonHistogramBucketsCumulative) {
+TEST_F(AdminStatsFilterTest, HandlerStatsJsonHistogramBucketsCumulative) {
   const std::string url = "/stats?histogram_buckets=cumulative&format=json";
   // Set h as prefix to match both histograms.
   setHistogramBucketSettings("h", {1, 2, 3, 4});
@@ -422,7 +418,7 @@ TEST_P(AdminStatsFilterTest, HandlerStatsJsonHistogramBucketsCumulative) {
   EXPECT_THAT(expected_json_used_and_filter, JsonStringEq(code_response.second));
 }
 
-TEST_P(AdminStatsFilterTest, HandlerStatsJsonHistogramBucketsDisjoint) {
+TEST_F(AdminStatsFilterTest, HandlerStatsJsonHistogramBucketsDisjoint) {
   const std::string url = "/stats?histogram_buckets=disjoint&format=json";
   // Set h as prefix to match both histograms.
   setHistogramBucketSettings("h", {1, 2, 3, 4});
@@ -859,7 +855,7 @@ TEST_F(AdminStatsTest, UsedOnlyStatsAsJson) {
   EXPECT_THAT(expected_json, JsonStringEq(actual_json));
 }
 
-TEST_P(AdminStatsFilterTest, StatsAsJsonFilterString) {
+TEST_F(AdminStatsFilterTest, StatsAsJsonFilterString) {
   InSequence s;
 
   Stats::Histogram& h1 = store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
@@ -954,7 +950,7 @@ TEST_P(AdminStatsFilterTest, StatsAsJsonFilterString) {
   EXPECT_THAT(expected_json, JsonStringEq(actual_json));
 }
 
-TEST_P(AdminStatsFilterTest, UsedOnlyStatsAsJsonFilterString) {
+TEST_F(AdminStatsFilterTest, UsedOnlyStatsAsJsonFilterString) {
   InSequence s;
 
   Stats::Histogram& h1 = store_->histogramFromString(
@@ -1222,7 +1218,7 @@ TEST_F(ThreadedTest, Threaded) {
   EXPECT_LE(expected / 2, total_lines_);
 }
 
-TEST_P(AdminStatsFilterTest, StatsInvalidRegex) {
+TEST_F(AdminStatsFilterTest, StatsInvalidRegex) {
   for (absl::string_view path :
        {"/stats?filter=*.test", "/stats?format=prometheus&filter=*.test"}) {
     CodeResponse code_response;
@@ -1298,15 +1294,11 @@ public:
   }
 };
 
-class StatsHandlerPrometheusDefaultTest : public StatsHandlerPrometheusTest,
-                                          public testing::TestWithParam<Regex::Type> {
+class StatsHandlerPrometheusDefaultTest : public StatsHandlerPrometheusTest, public testing::Test {
 public:
 };
 
-INSTANTIATE_TEST_SUITE_P(RegexTypes, StatsHandlerPrometheusDefaultTest,
-                         Values(Regex::Type::Re2, Regex::Type::StdRegex));
-
-TEST_P(StatsHandlerPrometheusDefaultTest, StatsHandlerPrometheusDefaultTest) {
+TEST_F(StatsHandlerPrometheusDefaultTest, StatsHandlerPrometheusDefaultTest) {
   const std::string url = "/stats?format=prometheus";
 
   createTestStats();
@@ -1324,7 +1316,7 @@ envoy_cluster_upstream_cx_active{cluster="c2"} 12
   EXPECT_EQ(expected_response, code_response.second);
 }
 
-TEST_P(StatsHandlerPrometheusDefaultTest, StatsHandlerPrometheusInvalidRegex) {
+TEST_F(StatsHandlerPrometheusDefaultTest, StatsHandlerPrometheusInvalidRegex) {
   const std::string url = "/stats?format=prometheus&filter=(+invalid)";
 
   createTestStats();

@@ -61,11 +61,6 @@ TEST(StatsParamsTest, ParseParamsFilter) {
     EXPECT_NE(nullptr, params.re2_filter_);
   }
 
-  {
-    StatsParams params;
-    ASSERT_EQ(Http::Code::OK, params.parse("?filter=foo", response));
-    EXPECT_NE(nullptr, params.re2_filter_);
-  }
 }
 
 } // namespace Server

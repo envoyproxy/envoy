@@ -458,6 +458,9 @@ modify different aspects of the server:
   containing the word ``server``.  Full-string matching can be specified
   with begin- and end-line anchors. (i.e.  ``/stats?filter=^server.concurrency$``)
 
+  By default, the regular expression is evaluated using the
+  `Google RE2 <https://github.com/google/re2>`_ engine.
+
   .. http:get:: /stats?histogram_buckets=cumulative
 
   Changes histogram output to display cumulative buckets with upper bounds (e.g. B0.5, B1, B5, ...).

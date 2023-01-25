@@ -111,20 +111,6 @@ static void BM_FilteredCountersText(benchmark::State& state) {
 BENCHMARK(BM_FilteredCountersText)->Unit(benchmark::kMillisecond);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
-static void BM_Re2FilteredCountersText(benchmark::State& state) {
-  Envoy::Server::StatsHandlerTest& test_context = testContext();
-  Envoy::Server::StatsParams params;
-  Envoy::Buffer::OwnedImpl response;
-  params.parse("?filter=no-match", response);
-
-  for (auto _ : state) { // NOLINT
-    uint64_t count = test_context.handlerStats(params);
-    RELEASE_ASSERT(count == 0, "expected count == 0");
-  }
-}
-BENCHMARK(BM_Re2FilteredCountersText)->Unit(benchmark::kMillisecond);
-
-// NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_AllCountersJson(benchmark::State& state) {
   Envoy::Server::StatsHandlerTest& test_context = testContext();
   Envoy::Server::StatsParams params;
@@ -168,20 +154,6 @@ static void BM_FilteredCountersJson(benchmark::State& state) {
 BENCHMARK(BM_FilteredCountersJson)->Unit(benchmark::kMillisecond);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
-static void BM_Re2FilteredCountersJson(benchmark::State& state) {
-  Envoy::Server::StatsHandlerTest& test_context = testContext();
-  Envoy::Server::StatsParams params;
-  Envoy::Buffer::OwnedImpl response;
-  params.parse("?format=json&filter=no-match", response);
-
-  for (auto _ : state) { // NOLINT
-    uint64_t count = test_context.handlerStats(params);
-    RELEASE_ASSERT(count < 100, "expected count < 100"); // actual = 12
-  }
-}
-BENCHMARK(BM_Re2FilteredCountersJson)->Unit(benchmark::kMillisecond);
-
-// NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_AllCountersPrometheus(benchmark::State& state) {
   Envoy::Server::StatsHandlerTest& test_context = testContext();
   Envoy::Server::StatsParams params;
@@ -223,17 +195,3 @@ static void BM_FilteredCountersPrometheus(benchmark::State& state) {
   }
 }
 BENCHMARK(BM_FilteredCountersPrometheus)->Unit(benchmark::kMillisecond);
-
-// NOLINTNEXTLINE(readability-identifier-naming)
-static void BM_Re2FilteredCountersPrometheus(benchmark::State& state) {
-  Envoy::Server::StatsHandlerTest& test_context = testContext();
-  Envoy::Server::StatsParams params;
-  Envoy::Buffer::OwnedImpl response;
-  params.parse("?format=prometheus&filter=no-match", response);
-
-  for (auto _ : state) { // NOLINT
-    uint64_t count = test_context.handlerStats(params);
-    RELEASE_ASSERT(count == 0, "expected count == 0");
-  }
-}
-BENCHMARK(BM_Re2FilteredCountersPrometheus)->Unit(benchmark::kMillisecond);
