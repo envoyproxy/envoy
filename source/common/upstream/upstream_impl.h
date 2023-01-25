@@ -901,7 +901,9 @@ private:
     const ClusterRequestResponseSizeStatsPtr request_response_size_stats_;
   };
 
+#ifdef ENVOY_ENABLE_UHV
   ::Envoy::Http::HeaderValidatorStats& getHeaderValidatorStats(Http::Protocol protocol) const;
+#endif
 
   Runtime::Loader& runtime_;
   const std::string name_;
