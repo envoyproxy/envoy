@@ -16,8 +16,15 @@ namespace Mesh {
 FetchRequestHolder::FetchRequestHolder(AbstractRequestListener& filter,
                                        RecordCallbackProcessor& consumer_manager,
                                        const std::shared_ptr<Request<FetchRequest>> request)
+    : FetchRequestHolder{filter, consumer_manager, request,
+                         FetchRecordConverterImpl::getDefaultInstance()} {}
+
+FetchRequestHolder::FetchRequestHolder(AbstractRequestListener& filter,
+                                       RecordCallbackProcessor& consumer_manager,
+                                       const std::shared_ptr<Request<FetchRequest>> request,
+                                       const FetchRecordConverter& converter)
     : BaseInFlightRequest{filter}, consumer_manager_{consumer_manager}, request_{request},
-      dispatcher_{filter.dispatcher()} {}
+      dispatcher_{filter.dispatcher()}, converter_{converter} {}
 
 // XXX (adam.kotwasinski) This should be made configurable in future.
 constexpr uint32_t FETCH_TIMEOUT_MS = 5000;

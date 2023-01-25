@@ -54,7 +54,6 @@ protected:
 // (as ProduceRequests with no topics/records make no sense).
 TEST_F(ProduceUnitTest, ShouldHandleProduceRequestWithNoRecords) {
   // given
-  MockRecordExtractor extractor;
   const std::vector<OutboundRecord> records = {};
   EXPECT_CALL(extractor_, extractRecords(_)).WillOnce(Return(records));
 

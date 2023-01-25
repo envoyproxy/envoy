@@ -8,11 +8,14 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
 
-std::vector<FetchableTopicResponse> FetchRecordConverter::convert(
-    const std::map<KafkaPartition, std::vector<InboundRecordSharedPtr>>&) const {
+std::vector<FetchableTopicResponse> FetchRecordConverterImpl::convert(const INPUT&) const {
 
-  // TODO (adam.kotwasinski) This needs to be implemented.
+  // TODO (adam.kotwasinski) This needs to be actually implemented.
   return {};
+}
+
+const FetchRecordConverter& FetchRecordConverterImpl::getDefaultInstance() {
+  CONSTRUCT_ON_FIRST_USE(FetchRecordConverterImpl);
 }
 
 } // namespace Mesh

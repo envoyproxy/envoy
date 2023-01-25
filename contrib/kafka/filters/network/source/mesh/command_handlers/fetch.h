@@ -24,6 +24,11 @@ public:
   FetchRequestHolder(AbstractRequestListener& filter, RecordCallbackProcessor& consumer_manager,
                      const std::shared_ptr<Request<FetchRequest>> request);
 
+  // Visible for testing.
+  FetchRequestHolder(AbstractRequestListener& filter, RecordCallbackProcessor& consumer_manager,
+                     const std::shared_ptr<Request<FetchRequest>>,
+                     const FetchRecordConverter& converter);
+
   void startProcessing() override;
 
   bool finished() const override;
@@ -70,7 +75,7 @@ private:
   Event::TimerPtr timer_;
 
   // Translates librdkafka objects into bytes to be sent downstream.
-  const FetchRecordConverter converter_;
+  const FetchRecordConverter& converter_;
 };
 
 } // namespace Mesh

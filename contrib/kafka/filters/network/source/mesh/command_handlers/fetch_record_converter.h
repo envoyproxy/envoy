@@ -1,5 +1,6 @@
 #pragma once
 
+#include <map>
 #include <memory>
 #include <vector>
 
@@ -13,14 +14,30 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
 
+using INPUT = std::map<KafkaPartition, std::vector<InboundRecordSharedPtr>>;
+
 /**
  * Dependency injection class responsible for converting received records into serializable form
  * that we can put into Fetch responses.
  */
 class FetchRecordConverter {
 public:
-  std::vector<FetchableTopicResponse>
-  convert(const std::map<KafkaPartition, std::vector<InboundRecordSharedPtr>>& arg) const;
+  virtual ~FetchRecordConverter() = default;
+
+  // Converts received records into the serialized form.
+  virtual std::vector<FetchableTopicResponse> convert(const INPUT& arg) const PURE;
+};
+
+/**
+ * Proper implementation.
+ */
+class FetchRecordConverterImpl : public FetchRecordConverter {
+public:
+  // FetchRecordConverter
+  std::vector<FetchableTopicResponse> convert(const INPUT& arg) const override;
+
+  // Default singleton accessor.
+  static const FetchRecordConverter& getDefaultInstance();
 };
 
 } // namespace Mesh
