@@ -373,13 +373,14 @@ std::string EngineBuilder::generateConfigStr() const {
   if (!config_bootstrap_incompatible_) {
     // In debug mode, unless the config is known to be bootstrap incompatible,
     // check equivalence.
-    ASSERT(generatedStringMatchesGeneratedBoostrap(config_str, generateBootstrap()));
+    ASSERT(generatedStringMatchesGeneratedBoostrap(config_str, generateBootstrap(true)));
   }
 
   return config_str;
 }
 
-std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generateBootstrap() const {
+std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>
+EngineBuilder::generateBootstrap(bool trim_whitespace_for_tests) const {
   auto bootstrap = std::make_unique<envoy::config::bootstrap::v3::Bootstrap>();
 
   // Set up the HCM
@@ -558,10 +559,19 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   } else {
     const char* inline_certs = ""
 #ifndef EXCLUDE_CERTIFICATES
-#include "library/common/config/no_whitespace_certificates.inc"
+#include "library/common/config/certificates.inc"
 #endif
                                "";
-    validation->mutable_trusted_ca()->set_inline_string(inline_certs);
+    if (trim_whitespace_for_tests) {
+      // The certificates in certificates.inc are prefixed with 2 spaces per
+      // line to be ingressed into YAML. This loads fine but fails proto diff checks,
+      // so for comparison testing (done in tests and debug builds) we strip the whitepsace.
+      std::string certs = inline_certs;
+      absl::StrReplaceAll({{"\n  ", "\n"}}, &certs);
+      validation->mutable_trusted_ca()->set_inline_string(certs);
+    } else {
+      validation->mutable_trusted_ca()->set_inline_string(inline_certs);
+    }
   }
   envoy::extensions::transport_sockets::http_11_proxy::v3::Http11ProxyUpstreamTransport
       ssl_proxy_socket;

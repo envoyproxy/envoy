@@ -80,7 +80,8 @@ public:
 
   // this is separated from build() for the sake of testability
   std::string generateConfigStr() const;
-  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> generateBootstrap() const;
+  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>
+  generateBootstrap(bool trim_whitespace_for_tests = false) const;
 
   EngineSharedPtr build();
 
