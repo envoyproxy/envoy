@@ -1652,7 +1652,8 @@ ClusterInfoImpl::getHeaderValidatorStats(Http::Protocol protocol) const {
 }
 #endif
 
-Http::HeaderValidatorPtr ClusterInfoImpl::makeHeaderValidator(Http::Protocol protocol) const {
+Http::HeaderValidatorPtr
+ClusterInfoImpl::makeHeaderValidator([[maybe_unused]] Http::Protocol protocol) const {
 #ifdef ENVOY_ENABLE_UHV
   return http_protocol_options_->header_validator_factory_
              ? http_protocol_options_->header_validator_factory_->create(
