@@ -112,6 +112,7 @@ public:
   absl::optional<uint32_t> max_response_body_size_;
 
   void addBuiltinSymbolDescriptor(const std::string& symbol_name);
+  bool use_route_naming_conventions() const {return use_route_naming_conventions_;}
 
 private:
   /**
@@ -138,6 +139,7 @@ private:
   bool ignore_unknown_query_parameters_{false};
   bool convert_grpc_status_{false};
   bool case_insensitive_enum_parsing_{false};
+  bool use_route_naming_conventions_{false};
 
   bool disabled_;
 };
@@ -180,6 +182,8 @@ public:
     return !error_ && transcoder_ && per_route_config_ && !per_route_config_->disabled();
   }
 
+  bool isHeaderOnlyDecoding();
+
 private:
   bool checkAndRejectIfRequestTranscoderFailed(const std::string& details);
   bool checkAndRejectIfResponseTranscoderFailed();
@@ -207,6 +211,9 @@ private:
    */
   void maybeExpandBufferLimits();
 
+  void translateToBuffer(Buffer::Instance& buffer);
+  void checkRouteNameHeaderOnlyDecoding();
+
   const JsonTranscoderConfig& config_;
   const JsonTranscoderConfig* per_route_config_{};
   std::unique_ptr<google::grpc::transcoding::Transcoder> transcoder_;
@@ -227,6 +234,7 @@ private:
   bool error_{false};
   bool has_body_{false};
   bool http_body_response_headers_set_{false};
+  bool is_header_only_decoding_{false};
 
   // Don't buffer unary response data in the `FilterManager` buffer.
   Buffer::OwnedImpl response_out_;

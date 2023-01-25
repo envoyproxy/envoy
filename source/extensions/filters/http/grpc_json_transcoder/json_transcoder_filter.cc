@@ -16,6 +16,7 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/extensions/filters/http/grpc_json_transcoder/decode_data_filter_state.h"
 #include "source/extensions/filters/http/grpc_json_transcoder/http_body_utils.h"
 
 #include "google/api/annotations.pb.h"
@@ -61,6 +62,8 @@ struct RcDetailsValues {
 using RcDetails = ConstSingleton<RcDetailsValues>;
 
 namespace {
+
+constexpr absl::string_view HeaderOnlyDecoding = "_header_only_decoding";
 
 const Http::LowerCaseString& trailerHeader() {
   CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "trailer");
@@ -116,6 +119,8 @@ JsonTranscoderConfig::JsonTranscoderConfig(
   if (disabled_) {
     return;
   }
+
+  use_route_naming_conventions_ = proto_config.use_route_naming_conventions();
 
   FileDescriptorSet descriptor_set;
 
@@ -447,6 +452,20 @@ void JsonTranscoderFilter::maybeExpandBufferLimits() {
   }
 }
 
+bool JsonTranscoderFilter::isHeaderOnlyDecoding() {
+  return is_header_only_decoding_;
+}
+
+void JsonTranscoderFilter::checkRouteNameHeaderOnlyDecoding() {
+  auto route = decoder_callbacks_->route();
+  if (route == nullptr) {
+    ENVOY_STREAM_LOG(debug, "No route entry", *decoder_callbacks_);
+    return;
+  }
+  is_header_only_decoding_ = config_.use_route_naming_conventions() &&
+      absl::EndsWith(route->routeEntry()->routeName(), HeaderOnlyDecoding);
+};
+
 Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                               bool end_stream) {
   initPerRouteConfig();
@@ -530,14 +549,30 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
     }
   }
 
-  headers.removeContentLength();
-  headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Grpc);
-  headers.setEnvoyOriginalPath(headers.getPathValue());
-  headers.addReferenceKey(Http::Headers::get().EnvoyOriginalMethod, headers.getMethodValue());
-  headers.setPath("/" + method_->descriptor_->service()->full_name() + "/" +
-                  method_->descriptor_->name());
-  headers.setReferenceMethod(Http::Headers::get().MethodValues.Post);
-  headers.setReferenceTE(Http::Headers::get().TEValues.Trailers);
+  if (!isHeaderOnlyDecoding()) {
+    headers.removeContentLength();
+    headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Grpc);
+    headers.setEnvoyOriginalPath(headers.getPathValue());
+    headers.addReferenceKey(Http::Headers::get().EnvoyOriginalMethod,
+                            headers.getMethodValue());
+    headers.setPath("/" + method_->descriptor_->service()->full_name() + "/" +
+        method_->descriptor_->name());
+    headers.setReferenceMethod(Http::Headers::get().MethodValues.Post);
+    headers.setReferenceTE(Http::Headers::get().TEValues.Trailers);
+  }
+
+  Buffer::OwnedImpl filterstatebuffer;
+  if (!isHeaderOnlyDecoding()) {
+    translateToBuffer(filterstatebuffer);
+    std::shared_ptr<HttpBackendDataFilterState>
+        filterstatedata = std::make_shared<HttpBackendDataFilterState>(
+            filterstatebuffer);
+    decoder_callbacks_->streamInfo().filterState()->setData(kHeaderOnlyDecodeDataKey,
+        std::move(filterstatedata),
+        StreamInfo::FilterState::StateType::ReadOnly,
+        StreamInfo::FilterState::LifeSpan::Request);
+    return Http::FilterHeadersStatus::Continue;
+  }
 
   if (!per_route_config_->matchIncomingRequestInfo()) {
     decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
@@ -566,7 +601,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
 Http::FilterDataStatus JsonTranscoderFilter::decodeData(Buffer::Instance& data, bool end_stream) {
   ASSERT(!error_);
 
-  if (!transcoder_) {
+  if (!transcoder_ || isHeaderOnlyDecoding()) {
     ENVOY_STREAM_LOG(debug, "Request data is passed through", *decoder_callbacks_);
     return Http::FilterDataStatus::Continue;
   }
@@ -610,7 +645,7 @@ Http::FilterDataStatus JsonTranscoderFilter::decodeData(Buffer::Instance& data, 
 Http::FilterTrailersStatus JsonTranscoderFilter::decodeTrailers(Http::RequestTrailerMap&) {
   ASSERT(!error_);
 
-  if (!transcoder_) {
+  if (!transcoder_ || isHeaderOnlyDecoding()) {
     ENVOY_STREAM_LOG(debug, "Request trailers is passed through", *decoder_callbacks_);
     return Http::FilterTrailersStatus::Continue;
   }
@@ -649,7 +684,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::ResponseHead
     error_ = true;
   }
 
-  if (error_ || !transcoder_) {
+  if (error_ || !transcoder_ || isHeaderOnlyDecoding()) {
     ENVOY_STREAM_LOG(debug, "Response headers is passed through", *encoder_callbacks_);
     return Http::FilterHeadersStatus::Continue;
   }
@@ -682,7 +717,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::ResponseHead
 }
 
 Http::FilterDataStatus JsonTranscoderFilter::encodeData(Buffer::Instance& data, bool end_stream) {
-  if (error_ || !transcoder_) {
+  if (error_ || !transcoder_ || isHeaderOnlyDecoding()) {
     ENVOY_STREAM_LOG(debug, "Response data is passed through", *encoder_callbacks_);
     return Http::FilterDataStatus::Continue;
   }
@@ -737,7 +772,7 @@ JsonTranscoderFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
 }
 
 void JsonTranscoderFilter::doTrailers(Http::ResponseHeaderOrTrailerMap& headers_or_trailers) {
-  if (error_ || !transcoder_ || !per_route_config_ || per_route_config_->disabled()) {
+  if (error_ || !transcoder_ || !per_route_config_ || per_route_config_->disabled() || isHeaderOnlyDecoding()) {
     ENVOY_STREAM_LOG(debug, "Response headers/trailers is passed through", *encoder_callbacks_);
     return;
   }

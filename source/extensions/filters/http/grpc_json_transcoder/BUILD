@@ -23,6 +23,7 @@ envoy_cc_library(
         "api_httpbody_protos",
     ],
     deps = [
+        ":decode_data_filter_state_lib",
         ":http_body_utils_lib",
         ":transcoder_input_stream_lib",
         "//envoy/http:filter_interface",
@@ -33,6 +34,16 @@ envoy_cc_library(
         "//source/common/runtime:runtime_features_lib",
         "@com_google_googleapis//google/api:http_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/grpc_json_transcoder/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "decode_data_filter_state_lib",
+    srcs = ["decode_data_filter_state.cc"],
+    hdrs = ["decode_data_filter_state.h"],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/stream_info:filter_state_lib",
     ],
 )
 
