@@ -90,11 +90,11 @@ void deflate_headers(nghttp2_hd_deflater* deflater, const test::fuzz::Headers& f
     auto hv = headers.at(i);
     size_t keylen = hv.key().size();
     uint8_t* key = reinterpret_cast<uint8_t*>(alloca(keylen));
-    std::memcpy(key, hv.key().c_str(), keylen);
+    std::memcpy(key, hv.key().data(), keylen);
 
     size_t valuelen = hv.value().size();
     uint8_t* value = reinterpret_cast<uint8_t*>(alloca(valuelen));
-    std::memcpy(value, hv.value().c_str(), valuelen);
+    std::memcpy(value, hv.value().data(), valuelen);
 
     h2hdrs[i].name = key;
     h2hdrs[i].namelen = keylen;
@@ -140,7 +140,7 @@ Http2Frame pb_to_h2_frame(nghttp2_hd_deflater* deflater,
       }
 
       deflate_headers(deflater, f.headers(), payload);
-      payload.append(f.padding().c_str(), padding_len);
+      payload.append(f.padding().data(), padding_len);
     } else if (h2frame.has_priority()) {
       type = 2;
       auto f = h2frame.priority();
@@ -169,7 +169,7 @@ Http2Frame pb_to_h2_frame(nghttp2_hd_deflater* deflater,
       uint32_t stream_id = f.stream_id();
       payload.append(reinterpret_cast<char*>(&stream_id), sizeof(stream_id));
       deflate_headers(deflater, f.headers(), payload);
-      payload.append(f.padding().c_str(), padding_len);
+      payload.append(f.padding().data(), padding_len);
     } else if (h2frame.has_ping()) {
       type = 6;
       auto f = h2frame.ping();
