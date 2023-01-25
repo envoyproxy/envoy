@@ -108,7 +108,8 @@ void convertConnectTimeoutToGrpcTimeout(Http::HeaderMap& headers) {
 // We're using a template because we need both HeaderMap and
 // HeaderOrTrailerResponseMap, but they're not related types.
 template <typename T>
-Buffer::OwnedImpl convertGrpcResponseToConnectStreamingResponse(const T& headers) {
+Buffer::OwnedImpl convertGrpcResponseToConnectStreamingResponse(const T& headers,
+                                                                bool use_metadata) {
   EndStreamResponse connect_response;
   const auto grpc_status = Grpc::Common::getGrpcStatus(headers);
 
@@ -128,20 +129,22 @@ Buffer::OwnedImpl convertGrpcResponseToConnectStreamingResponse(const T& headers
   }
 
   // Convert trailers to metadata.
-  auto& metadata = connect_response.metadata;
-  headers.iterate([&metadata](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-    if (!absl::StartsWith(header.key().getStringView(),
-                          ConnectHeaderParts::get().GrpcHeaderPrefix)) {
-      if (auto it = metadata.find(header.key().getStringView()); it != metadata.end()) {
-        it->second.emplace_back(header.value().getStringView());
-      } else {
-        metadata.insert(std::make_pair<std::string, std::vector<std::string>>(
-            std::string{header.key().getStringView()},
-            std::vector{std::string{header.value().getStringView()}}));
+  if (use_metadata) {
+    auto& metadata = connect_response.metadata;
+    headers.iterate([&metadata](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+      if (!absl::StartsWith(header.key().getStringView(),
+                            ConnectHeaderParts::get().GrpcHeaderPrefix)) {
+        if (auto it = metadata.find(header.key().getStringView()); it != metadata.end()) {
+          it->second.emplace_back(header.value().getStringView());
+        } else {
+          metadata.insert(std::make_pair<std::string, std::vector<std::string>>(
+              std::string{header.key().getStringView()},
+              std::vector{std::string{header.value().getStringView()}}));
+        }
       }
-    }
-    return Http::HeaderMap::Iterate::Continue;
-  });
+      return Http::HeaderMap::Iterate::Continue;
+    });
+  }
 
   // Send converted metadata encapsulated in a Connect frame.
   Buffer::OwnedImpl buffer;
@@ -333,7 +336,7 @@ Http::FilterHeadersStatus ConnectGrpcBridgeFilter::encodeHeaders(Http::ResponseH
 
     if (end_stream) {
       // Handle trailers-only responses.
-      auto response = convertGrpcResponseToConnectStreamingResponse(headers);
+      auto response = convertGrpcResponseToConnectStreamingResponse(headers, false);
       encoder_callbacks_->addEncodedData(response, true);
       headers.removePrefix(Http::LowerCaseString{ConnectHeaderParts::get().GrpcHeaderPrefix});
     }
@@ -387,7 +390,7 @@ ConnectGrpcBridgeFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
   }
 
   if (is_connect_streaming_) {
-    auto response = convertGrpcResponseToConnectStreamingResponse(trailers);
+    auto response = convertGrpcResponseToConnectStreamingResponse(trailers, true);
     encoder_callbacks_->addEncodedData(response, true);
     trailers.clear();
   } else if (is_connect_unary_) {
