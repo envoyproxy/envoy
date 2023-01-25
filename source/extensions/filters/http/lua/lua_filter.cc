@@ -936,27 +936,18 @@ void Filter::scriptLog(spdlog::level::level_enum level, absl::string_view messag
 
 void Filter::DecoderCallbacks::respond(Http::ResponseHeaderMapPtr&& headers, Buffer::Instance* body,
                                        lua_State*) {
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.lua_respond_with_send_local_reply")) {
-    uint64_t status = Http::Utility::getResponseStatus(*headers);
-    auto modify_headers = [&headers](Http::ResponseHeaderMap& response_headers) {
-      headers->iterate(
-          [&response_headers](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-            response_headers.addCopy(Http::LowerCaseString(header.key().getStringView()),
-                                     header.value().getStringView());
-            return Http::HeaderMap::Iterate::Continue;
-          });
-    };
-    callbacks_->sendLocalReply(static_cast<Envoy::Http::Code>(status), body ? body->toString() : "",
-                               modify_headers, absl::nullopt,
-                               HttpResponseCodeDetails::get().LuaResponse);
-  } else {
-    callbacks_->encodeHeaders(std::move(headers), body == nullptr,
-                              HttpResponseCodeDetails::get().LuaResponse);
-    if (body && !parent_.destroyed_) {
-      callbacks_->encodeData(*body, true);
-    }
-  }
+  uint64_t status = Http::Utility::getResponseStatus(*headers);
+  auto modify_headers = [&headers](Http::ResponseHeaderMap& response_headers) {
+    headers->iterate(
+        [&response_headers](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+          response_headers.addCopy(Http::LowerCaseString(header.key().getStringView()),
+                                   header.value().getStringView());
+          return Http::HeaderMap::Iterate::Continue;
+        });
+  };
+  callbacks_->sendLocalReply(static_cast<Envoy::Http::Code>(status), body ? body->toString() : "",
+                             modify_headers, absl::nullopt,
+                             HttpResponseCodeDetails::get().LuaResponse);
 }
 
 const ProtobufWkt::Struct& Filter::DecoderCallbacks::metadata() const {

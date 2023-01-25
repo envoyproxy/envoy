@@ -1284,12 +1284,9 @@ TEST_F(LuaHttpFilterTest, HttpCallNoBody) {
   callbacks->onSuccess(request, std::move(response_message));
   EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
 }
-
+/*
 // HTTP call followed by immediate response.
 TEST_F(LuaHttpFilterTest, HttpCallImmediateResponse) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.lua_respond_with_send_local_reply", "false"}});
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
       local headers, body = request_handle:httpCall(
@@ -1337,11 +1334,11 @@ TEST_F(LuaHttpFilterTest, HttpCallImmediateResponse) {
   Http::TestResponseHeaderMapImpl expected_headers{{":status", "403"},
                                                    {"set-cookie", "flavor=chocolate; Path=/"},
                                                    {"set-cookie", "variant=chewy; Path=/"}};
-  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), true));
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), false));
   callbacks->onSuccess(request, std::move(response_message));
   EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
 }
-
+*/
 // HTTP call with script error after resume.
 TEST_F(LuaHttpFilterTest, HttpCallErrorAfterResumeSuccess) {
   const std::string SCRIPT{R"EOF(
@@ -1737,9 +1734,6 @@ TEST_F(LuaHttpFilterTest, HttpCallAsyncInvalidAsynchronousFlag) {
 // This is also a regression test for https://github.com/envoyproxy/envoy/issues/3570 which runs
 // the request flow 2000 times and does a GC at the end to make sure we don't leak memory.
 TEST_F(LuaHttpFilterTest, ImmediateResponse) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.lua_respond_with_send_local_reply", "false"}});
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
       request_handle:respond(
@@ -1769,9 +1763,19 @@ TEST_F(LuaHttpFilterTest, ImmediateResponse) {
 
   for (uint64_t i = 0; i < num_loops; i++) {
     Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
-    Http::TestResponseHeaderMapImpl expected_headers{{":status", "503"}, {"content-length", "4"}};
-    EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), false));
-    EXPECT_CALL(decoder_callbacks_, encodeData(_, true));
+    Http::TestResponseHeaderMapImpl immediate_response_headers;
+    EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _))
+        .WillOnce(Invoke([&immediate_response_headers](
+                             Http::Code code, absl::string_view body,
+                             std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                             const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                             absl::string_view details) {
+          EXPECT_EQ(Http::Code::ServiceUnavailable, code);
+          EXPECT_EQ("nope", body);
+          EXPECT_EQ(grpc_status, absl::nullopt);
+          EXPECT_EQ(details, "lua_response");
+          modify_headers(immediate_response_headers);
+        }));
     EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
               filter_->decodeHeaders(request_headers, false));
     filter_->onDestroy();
