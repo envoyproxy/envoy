@@ -16,6 +16,7 @@ envoy_mobile_swift_test(
         "RetryPolicyMapperTests.swift",
         "RetryPolicyTests.swift",
     ],
+    flaky = True,  # TODO(jpsim): Fix timeouts when running these tests on CI
     visibility = ["//visibility:public"],
     deps = [
         "//library/objective-c:envoy_engine_objc_lib",
