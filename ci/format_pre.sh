@@ -5,6 +5,9 @@
 # These checks do not provide a fix and are quicker to run,
 # allowing CI to fail quickly on basic linting or validation errors
 
+# DEBUG FAIL
+exit 1
+
 FAILED=()
 CURRENT=""
 # AZP appears to make lines with this prefix red
