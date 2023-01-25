@@ -35,6 +35,10 @@ constexpr std::chrono::hours REFRESH_INTERVAL{1};
 constexpr std::chrono::seconds REFRESH_GRACE_PERIOD{5};
 constexpr char EC2_METADATA_HOST[] = "169.254.169.254:80";
 constexpr char CONTAINER_METADATA_HOST[] = "169.254.170.2:80";
+constexpr char EC2_IMDS_TOKEN_RESOURCE[] = "/latest/api/token";
+constexpr char EC2_IMDS_TOKEN_HEADER[] = "X-aws-ec2-metadata-token";
+constexpr char EC2_IMDS_TOKEN_TTL_HEADER[] = "X-aws-ec2-metadata-token-ttl-seconds";
+constexpr char EC2_IMDS_TOKEN_TTL_DEFAULT_VALUE[] = "21600";
 constexpr char SECURITY_CREDENTIALS_PATH[] = "/latest/meta-data/iam/security-credentials";
 
 } // namespace
@@ -70,29 +74,52 @@ bool InstanceProfileCredentialsProvider::needsRefresh() {
 }
 
 void InstanceProfileCredentialsProvider::refresh() {
-  ENVOY_LOG(debug, "Getting AWS credentials from the instance metadata");
+  ENVOY_LOG(debug, "Getting AWS credentials from the EC2MetadataService");
 
-  // First discover the Role of this instance
+  // First request for a session TOKEN so that we can call EC2MetadataService securely.
+  // https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-service.html
+  Http::RequestMessageImpl token_req_message;
+  token_req_message.headers().setMethod(Http::Headers::get().MethodValues.Put);
+  token_req_message.headers().setHost(EC2_METADATA_HOST);
+  token_req_message.headers().setPath(EC2_IMDS_TOKEN_RESOURCE);
+  token_req_message.headers().setCopy(Http::LowerCaseString(EC2_IMDS_TOKEN_TTL_HEADER),
+                                      EC2_IMDS_TOKEN_TTL_DEFAULT_VALUE);
+  const auto token_string = metadata_fetcher_(token_req_message);
+  if (token_string) {
+    ENVOY_LOG(debug, "Obtained token to make secure call to EC2MetadataService");
+    fetchInstanceRole(token_string.value());
+  } else {
+    ENVOY_LOG(warn, "Failed to get token from EC2MetadataService, falling back to less secure way");
+    fetchInstanceRole("");
+  }
+}
+
+void InstanceProfileCredentialsProvider::fetchInstanceRole(const std::string& token_string) {
+  // Discover the Role of this instance.
   Http::RequestMessageImpl message;
   message.headers().setMethod(Http::Headers::get().MethodValues.Get);
   message.headers().setHost(EC2_METADATA_HOST);
   message.headers().setPath(SECURITY_CREDENTIALS_PATH);
+  if (!token_string.empty()) {
+    message.headers().setCopy(Http::LowerCaseString(EC2_IMDS_TOKEN_HEADER),
+                              StringUtil::trim(token_string));
+  }
   const auto instance_role_string = metadata_fetcher_(message);
   if (!instance_role_string) {
-    ENVOY_LOG(error, "Could not retrieve credentials listing from the instance metadata");
+    ENVOY_LOG(error, "Could not retrieve credentials listing from the EC2MetadataService");
     return;
   }
-  fetchCredentialFromInstanceRole(instance_role_string.value());
+  fetchCredentialFromInstanceRole(instance_role_string.value(), token_string);
 }
 
 void InstanceProfileCredentialsProvider::fetchCredentialFromInstanceRole(
-    const std::string& instance_role) {
+    const std::string& instance_role, const std::string& token_string) {
   if (instance_role.empty()) {
     return;
   }
   const auto instance_role_list = StringUtil::splitToken(StringUtil::trim(instance_role), "\n");
   if (instance_role_list.empty()) {
-    ENVOY_LOG(error, "No AWS credentials were found in the instance metadata");
+    ENVOY_LOG(error, "No AWS credentials were found in the EC2MetadataService");
     return;
   }
   ENVOY_LOG(debug, "AWS credentials list:\n{}", instance_role);
@@ -109,10 +136,13 @@ void InstanceProfileCredentialsProvider::fetchCredentialFromInstanceRole(
   message.headers().setMethod(Http::Headers::get().MethodValues.Get);
   message.headers().setHost(EC2_METADATA_HOST);
   message.headers().setPath(credential_path);
-
+  if (!token_string.empty()) {
+    message.headers().setCopy(Http::LowerCaseString(EC2_IMDS_TOKEN_HEADER),
+                              StringUtil::trim(token_string));
+  }
   const auto credential_document = metadata_fetcher_(message);
   if (!credential_document) {
-    ENVOY_LOG(error, "Could not load AWS credentials document from the instance metadata");
+    ENVOY_LOG(error, "Could not load AWS credentials document from the EC2MetadataService");
     return;
   }
   extractCredentials(credential_document.value());
@@ -135,7 +165,8 @@ void InstanceProfileCredentialsProvider::extractCredentials(
   const auto secret_access_key = document_json->getString(SECRET_ACCESS_KEY, "");
   const auto session_token = document_json->getString(TOKEN, "");
 
-  ENVOY_LOG(debug, "Found following AWS credentials in the instance metadata: {}={}, {}={}, {}={}",
+  ENVOY_LOG(debug,
+            "Obtained following AWS credentials from the EC2MetadataService: {}={}, {}={}, {}={}",
             AWS_ACCESS_KEY_ID, access_key_id, AWS_SECRET_ACCESS_KEY,
             secret_access_key.empty() ? "" : "*****", AWS_SESSION_TOKEN,
             session_token.empty() ? "" : "*****");

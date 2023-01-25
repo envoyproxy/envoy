@@ -69,7 +69,7 @@ class EnvoyConfigurationTest {
     dnsPreresolveHostnames: String = "[hostname]",
     enableDNSCache: Boolean = false,
     enableDrainPostDnsRefresh: Boolean = false,
-    enableHttp3: Boolean = false,
+    enableHttp3: Boolean = true,
     enableGzip: Boolean = true,
     enableBrotli: Boolean = false,
     enableSocketTagging: Boolean = false,
@@ -77,7 +77,6 @@ class EnvoyConfigurationTest {
     enableInterfaceBinding: Boolean = false,
     h2ConnectionKeepaliveIdleIntervalMilliseconds: Int = 222,
     h2ConnectionKeepaliveTimeoutSeconds: Int = 333,
-    h2ExtendKeepaliveTimeout: Boolean = false,
     maxConnectionsPerHost: Int = 543,
     statsFlushSeconds: Int = 567,
     streamIdleTimeoutSeconds: Int = 678,
@@ -109,7 +108,6 @@ class EnvoyConfigurationTest {
       enableInterfaceBinding,
       h2ConnectionKeepaliveIdleIntervalMilliseconds,
       h2ConnectionKeepaliveTimeoutSeconds,
-      h2ExtendKeepaliveTimeout,
       maxConnectionsPerHost,
       statsFlushSeconds,
       streamIdleTimeoutSeconds,
@@ -163,7 +161,7 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("&h2_connection_keepalive_timeout 333s")
 
     // H3
-    assertThat(resolvedTemplate).doesNotContain(APCF_INSERT);
+    assertThat(resolvedTemplate).contains(APCF_INSERT);
 
     // Gzip
     assertThat(resolvedTemplate).contains(GZIP_INSERT);
@@ -209,11 +207,10 @@ class EnvoyConfigurationTest {
       enableDrainPostDnsRefresh = true,
       enableDNSCache = true,
       enableHappyEyeballs = true,
-      enableHttp3 = true,
+      enableHttp3 = false,
       enableGzip = false,
       enableBrotli = true,
       enableInterfaceBinding = true,
-      h2ExtendKeepaliveTimeout = true,
       enableSkipDNSLookupForProxiedRequests = true,
       enablePlatformCertificatesValidation = true
     )
@@ -229,11 +226,8 @@ CERT_VALIDATION_TEMPLATE
     assertThat(resolvedTemplate).contains("&enable_drain_post_dns_refresh true")
     assertThat(resolvedTemplate).contains("config: persistent_dns_cache")
 
-    // H2
-    assertThat(resolvedTemplate).contains("&h2_delay_keepalive_timeout true")
-
     // H3
-    assertThat(resolvedTemplate).contains(APCF_INSERT);
+    assertThat(resolvedTemplate).doesNotContain(APCF_INSERT);
 
     // Gzip
     assertThat(resolvedTemplate).doesNotContain(GZIP_INSERT);

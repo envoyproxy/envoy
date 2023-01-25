@@ -62,7 +62,7 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
         return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
       }));
   ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
-  ON_CALL(factory_context_, scope()).WillByDefault(ReturnRef(stats_store_));
+  ON_CALL(factory_context_, scope()).WillByDefault(ReturnRef(*stats_store_.rootScope()));
   // Allow extension lookup by name in the integration tests.
   config_helper_.addRuntimeOverride("envoy.reloadable_features.no_extension_lookup_by_name",
                                     "false");
@@ -140,7 +140,8 @@ common_tls_context:
         tls_context, factory_context_);
     static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
     return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
-        std::move(cfg), context_manager_, *upstream_stats_store, std::vector<std::string>{});
+        std::move(cfg), context_manager_, *upstream_stats_store->rootScope(),
+        std::vector<std::string>{});
   } else {
     envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport quic_config;
     quic_config.mutable_downstream_tls_context()->MergeFrom(tls_context);
@@ -550,7 +551,8 @@ void BaseIntegrationTest::createXdsUpstream() {
 
     upstream_stats_store_ = std::make_unique<Stats::TestIsolatedStoreImpl>();
     auto context = std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
-        std::move(cfg), context_manager_, *upstream_stats_store_, std::vector<std::string>{});
+        std::move(cfg), context_manager_, *upstream_stats_store_->rootScope(),
+        std::vector<std::string>{});
     addFakeUpstream(std::move(context), Http::CodecType::HTTP2, /*autonomous_upstream=*/false);
   }
   xds_upstream_ = fake_upstreams_.back().get();
@@ -583,6 +585,25 @@ AssertionResult BaseIntegrationTest::compareDiscoveryRequest(
     return compareDeltaDiscoveryRequest(expected_type_url, expected_resource_names_added,
                                         expected_resource_names_removed, expected_error_code,
                                         expected_error_substring, expect_node);
+  }
+}
+
+AssertionResult BaseIntegrationTest::compareDiscoveryRequest(
+    const std::string& expected_type_url, const std::string& expected_version,
+    const std::vector<std::string>& expected_resource_names,
+    const std::vector<std::string>& expected_resource_names_added,
+    const std::vector<std::string>& expected_resource_names_removed, FakeStreamPtr& stream,
+    bool expect_node, const Protobuf::int32 expected_error_code,
+    const std::string& expected_error_message) {
+  if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw ||
+      sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedSotw) {
+    return compareSotwDiscoveryRequest(expected_type_url, expected_version, expected_resource_names,
+                                       expect_node, expected_error_code, expected_error_message,
+                                       stream.get());
+  } else {
+    return compareDeltaDiscoveryRequest(expected_type_url, expected_resource_names_added,
+                                        expected_resource_names_removed, stream,
+                                        expected_error_code, expected_error_message, expect_node);
   }
 }
 
@@ -799,4 +820,98 @@ void BaseIntegrationTest::checkForMissingTagExtractionRules() {
   test_server_->statStore().forEachGauge(nullptr, check_metric);
   test_server_->statStore().forEachHistogram(nullptr, check_metric);
 }
+
+AssertionResult BaseIntegrationTest::internalCompareDiscoveryRequest(
+    const DiscoveryRequestExpectedContents& expected_request,
+    const envoy::service::discovery::v3::DiscoveryRequest& actual_request,
+    const std::set<std::string>& actual_sub) {
+
+  if (actual_request.type_url() != expected_request.type_url_) {
+    return AssertionFailure() << fmt::format("type_url {} does not match expected {}.",
+                                             actual_request.type_url(), expected_request.type_url_);
+  }
+  auto sub_result =
+      compareSets(expected_request.subscriptions_, actual_sub, "expected_resource_subscriptions");
+  if (!sub_result) {
+    return sub_result;
+  }
+
+  if (actual_request.error_detail().code() != expected_request.error_code_) {
+    return AssertionFailure() << fmt::format(
+               "error code {} does not match expected {}. (Error message is {}).",
+               actual_request.error_detail().code(), expected_request.error_code_,
+               actual_request.error_detail().message());
+  }
+  if (expected_request.error_code_ != Grpc::Status::WellKnownGrpcStatus::Ok &&
+      actual_request.error_detail().message().find(expected_request.error_substring_) ==
+          std::string::npos) {
+    return AssertionFailure() << "\"" << expected_request.error_substring_
+                              << "\" is not a substring of actual error message \""
+                              << actual_request.error_detail().message() << "\"";
+  }
+  return AssertionSuccess();
+}
+
+AssertionResult BaseIntegrationTest::internalCompareDeltaDiscoveryRequest(
+    const DiscoveryRequestExpectedContents& expected_request,
+    const envoy::service::discovery::v3::DeltaDiscoveryRequest& actual_request,
+    const std::set<std::string>& actual_sub, const std::set<std::string>& actual_unsub) {
+
+  if (actual_request.type_url() != expected_request.type_url_) {
+    return AssertionFailure() << fmt::format("type_url {} does not match expected {}.",
+                                             actual_request.type_url(), expected_request.type_url_);
+  }
+  auto sub_result =
+      compareSets(expected_request.subscriptions_, actual_sub, "expected_resource_subscriptions");
+  if (!sub_result) {
+    return sub_result;
+  }
+  auto unsub_result = compareSets(expected_request.unsubscriptions_, actual_unsub,
+                                  "expected_resource_unsubscriptions");
+  if (!unsub_result) {
+    return unsub_result;
+  }
+
+  if (actual_request.error_detail().code() != expected_request.error_code_) {
+    return AssertionFailure() << fmt::format(
+               "error code {} does not match expected {}. (Error message is {}).",
+               actual_request.error_detail().code(), expected_request.error_code_,
+               actual_request.error_detail().message());
+  }
+  if (expected_request.error_code_ != Grpc::Status::WellKnownGrpcStatus::Ok &&
+      actual_request.error_detail().message().find(expected_request.error_substring_) ==
+          std::string::npos) {
+    return AssertionFailure() << "\"" << expected_request.error_substring_
+                              << "\" is not a substring of actual error message \""
+                              << actual_request.error_detail().message() << "\"";
+  }
+  return AssertionSuccess();
+}
+
+AssertionResult BaseIntegrationTest::assertExpectedDiscoveryRequest(
+    const envoy::service::discovery::v3::DiscoveryRequest& request,
+    const BaseIntegrationTest::DiscoveryRequestExpectedContents& expected_request) {
+  if (!request.has_node() || request.node().id().empty() || request.node().cluster().empty()) {
+    return AssertionFailure() << "Weird node field";
+  }
+
+  // Convert subscribed/unsubscribed names into sets to ignore ordering.
+  const std::set<std::string> actual_sub{request.resource_names().begin(),
+                                         request.resource_names().end()};
+  return internalCompareDiscoveryRequest(expected_request, request, actual_sub);
+}
+
+AssertionResult BaseIntegrationTest::assertExpectedDeltaDiscoveryRequest(
+    const envoy::service::discovery::v3::DeltaDiscoveryRequest& request,
+    const BaseIntegrationTest::DiscoveryRequestExpectedContents& expected_request) {
+  if (!request.has_node() || request.node().id().empty() || request.node().cluster().empty()) {
+    return AssertionFailure() << "Weird node field";
+  }
+  const std::set<std::string> actual_sub{request.resource_names_subscribe().begin(),
+                                         request.resource_names_subscribe().end()};
+  const std::set<std::string> actual_unsub{request.resource_names_unsubscribe().begin(),
+                                           request.resource_names_unsubscribe().end()};
+  return internalCompareDeltaDiscoveryRequest(expected_request, request, actual_sub, actual_unsub);
+}
+
 } // namespace Envoy

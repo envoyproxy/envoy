@@ -455,59 +455,6 @@ INSTANTIATE_TEST_SUITE_P(
         {Http::CodecType::HTTP1, Http::CodecType::HTTP2, Http::CodecType::HTTP3})),
     HttpProtocolIntegrationTest::protocolTestParamsToString);
 
-TEST_P(ProxyingConnectIntegrationTest, ProxyConnectLegacy) {
-#ifdef ENVOY_ENABLE_UHV
-  // TODO(#23286) - add web socket support for H2 UHV
-  return;
-#endif
-
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.use_rfc_connect", "false");
-
-  initialize();
-
-  Http::TestRequestHeaderMapImpl legacy_connect_headers{{":method", "CONNECT"},
-                                                        {":path", "/"},
-                                                        {":protocol", "bytestream"},
-                                                        {":scheme", "https"},
-                                                        {":authority", "foo.lyft.com:80"}};
-  // Send request headers.
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto encoder_decoder = codec_client_->startRequest(legacy_connect_headers);
-  request_encoder_ = &encoder_decoder.first;
-  response_ = std::move(encoder_decoder.second);
-
-  // Wait for them to arrive upstream.
-  AssertionResult result =
-      fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
-  RELEASE_ASSERT(result, result.message());
-  result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
-  RELEASE_ASSERT(result, result.message());
-  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Method)[0]->value(), "CONNECT");
-  if (upstreamProtocol() == Http::CodecType::HTTP1) {
-    EXPECT_TRUE(upstream_request_->headers().get(Http::Headers::get().Protocol).empty());
-  } else {
-    EXPECT_EQ(upstream_request_->headers().getProtocolValue(), "bytestream");
-  }
-
-  // Send response headers
-  upstream_request_->encodeHeaders(default_response_headers_, false);
-
-  // Wait for them to arrive downstream.
-  response_->waitForHeaders();
-  EXPECT_EQ("200", response_->headers().getStatusValue());
-
-  // Make sure that even once the response has started, that data can continue to go upstream.
-  codec_client_->sendData(*request_encoder_, "hello", false);
-  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
-
-  // Also test upstream to downstream data.
-  upstream_request_->encodeData(12, false);
-  response_->waitForBodyData(12);
-
-  cleanupUpstreamAndDownstream();
-}
-
 TEST_P(ProxyingConnectIntegrationTest, ProxyConnect) {
   initialize();
 
@@ -1006,7 +953,7 @@ TEST_P(TcpTunnelingIntegrationTest, InvalidResponseHeaders) {
   tcp_client_->close();
 }
 
-TEST_P(TcpTunnelingIntegrationTest, CopyResponseHeaders) {
+TEST_P(TcpTunnelingIntegrationTest, CopyValidResponseHeaders) {
   const std::string access_log_filename =
       TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
@@ -1048,6 +995,63 @@ TEST_P(TcpTunnelingIntegrationTest, CopyResponseHeaders) {
 
   sendBidiData(fake_upstream_connection_);
   closeConnection(fake_upstream_connection_);
+
+  // Verify response header value is in the access log.
+  EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr(header_value));
+}
+
+TEST_P(TcpTunnelingIntegrationTest, CopyInvalidResponseHeaders) {
+  const std::string access_log_filename =
+      TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy proxy_config;
+    proxy_config.set_stat_prefix("tcp_stats");
+    proxy_config.set_cluster("cluster_0");
+    proxy_config.mutable_tunneling_config()->set_hostname("foo.lyft.com:80");
+    proxy_config.mutable_tunneling_config()->set_propagate_response_headers(true);
+
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        "%FILTER_STATE(envoy.tcp_proxy.propagate_response_headers:TYPED)%\n");
+    access_log_config.set_path(access_log_filename);
+    proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config);
+
+    auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
+    for (auto& listener : *listeners) {
+      if (listener.name() != "tcp_proxy") {
+        continue;
+      }
+      auto* filter_chain = listener.mutable_filter_chains(0);
+      auto* filter = filter_chain->mutable_filters(0);
+      filter->mutable_typed_config()->PackFrom(proxy_config);
+      break;
+    }
+  });
+  initialize();
+
+  // Start a connection, and verify the upgrade headers are received upstream.
+  tcp_client_ = makeTcpConnection(lookupPort("tcp_proxy"));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  // Send invalid response headers.
+  default_response_headers_.setStatus(enumToInt(Http::Code::ServiceUnavailable));
+  const std::string header_value = "secret-value";
+  default_response_headers_.addCopy("test-header-name", header_value);
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+
+  // verify that the client disconnects and upstream gets a stream reset.
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  } else {
+    ASSERT_TRUE(upstream_request_->waitForReset());
+  }
+
+  // The connection should be fully closed, but the client has no way of knowing
+  // that. Ensure the FIN is read and clean up state.
+  tcp_client_->waitForHalfClose();
+  tcp_client_->close();
 
   // Verify response header value is in the access log.
   EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr(header_value));

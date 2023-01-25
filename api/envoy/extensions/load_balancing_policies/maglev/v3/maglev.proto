@@ -16,7 +16,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/loa
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Maglev Load Balancing Policy]
-// [#not-implemented-hide:]
+// [#extension: envoy.load_balancing_policies.maglev]
 
 // This configuration allows the built-in Maglev LB policy to be configured via the LB policy
 // extension point. See the :ref:`load balancing architecture overview
@@ -30,4 +30,7 @@ message Maglev {
 
   // Common configuration for hashing-based load balancing policies.
   common.v3.ConsistentHashingLbConfig consistent_hashing_lb_config = 2;
+
+  // Enable locality weighted load balancing for maglev lb explicitly.
+  common.v3.LocalityLbConfig.LocalityWeightedLbConfig locality_weighted_lb_config = 3;
 }

@@ -2,8 +2,10 @@
 #include "source/extensions/http/header_validators/envoy_default/http1_header_validator.h"
 
 #include "test/extensions/http/header_validators/envoy_default/path_normalizer_fuzz.pb.h"
+#include "test/extensions/http/header_validators/envoy_default/path_normalizer_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/mocks/http/header_validator.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 
@@ -11,6 +13,14 @@ namespace Envoy {
 DEFINE_PROTO_FUZZER(
     const test::extensions::http::header_validators::envoy_default::PathNormalizerFuzzTestCase&
         input) {
+  // Validate the PGV constraints of the input.
+  try {
+    TestUtility::validate(input);
+  } catch (const EnvoyException& e) {
+    ENVOY_LOG_MISC(debug, "EnvoyException during validation: {}", e.what());
+    return;
+  }
+
   auto header_map = Http::RequestHeaderMapImpl::create();
   Http::HeaderString method;
   Http::HeaderString path;

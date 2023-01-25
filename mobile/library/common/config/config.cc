@@ -137,7 +137,6 @@ R"(- &enable_drain_post_dns_refresh false
 - &enable_interface_binding false
 - &h2_connection_keepalive_idle_interval 100000s
 - &h2_connection_keepalive_timeout 10s
-- &h2_delay_keepalive_timeout false
 - &max_connections_per_host 7
 - &metadata {}
 - &stats_domain 127.0.0.1
@@ -496,28 +495,18 @@ stats_config:
   stats_matcher:
     inclusion_list:
       patterns:
-        - safe_regex:
-            regex: '^cluster\.[\w]+?\.upstream_cx_[\w]+'
-        - safe_regex:
-            regex: '^cluster\.[\w]+?\.upstream_rq_[\w]+'
-        - safe_regex:
-            regex: '^cluster\.[\w]+?\.update_(attempt|success|failure)'
-        - safe_regex:
-            regex: '^cluster\.[\w]+?\.http2.keepalive_timeout'
-        - safe_regex:
-            regex: '^dns.apple.*'
-        - safe_regex:
-            regex: '^http.client.*'
-        - safe_regex:
-            regex: '^http.dispatcher.*'
-        - safe_regex:
-            regex: '^http.hcm.decompressor.*'
-        - safe_regex:
-            regex: '^http.hcm.downstream_rq_[\w]+'
-        - safe_regex:
-            regex: '^pbf_filter.*'
-        - safe_regex:
-            regex: '^pulse.*'
+        - prefix: cluster.base.upstream_rq_
+        - prefix: cluster.base_h2.upstream_rq_
+        - prefix: cluster.stats.upstream_rq_
+        - prefix: cluster.base.upstream_cx_
+        - prefix: cluster.base_h2.upstream_cx_
+        - prefix: cluster.stats.upstream_cx_
+        - exact: cluster.base.http2.keepalive_timeout
+        - exact: cluster.base_h2.http2.keepalive_timeout
+        - exact: cluster.stats.http2.keepalive_timeout
+        - prefix: http.hcm.downstream_rq_
+        - prefix: http.hcm.decompressor.
+        - prefix: pulse.
         - safe_regex:
             regex: '^vhost\.[\w]+\.vcluster\.[\w]+?\.upstream_rq_(?:[12345]xx|[3-5][0-9][0-9]|retry|total)'
   use_all_default_tags:
@@ -544,7 +533,6 @@ layered_runtime:
           reloadable_features:
             allow_multiple_dns_addresses: *dns_multiple_addresses
             always_use_v6: *force_ipv6
-            http2_delay_keepalive_timeout: *h2_delay_keepalive_timeout
             skip_dns_lookup_for_proxied_requests: *skip_dns_lookup_for_proxied_requests
 )"
 // Needed due to warning in

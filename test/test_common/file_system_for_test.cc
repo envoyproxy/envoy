@@ -6,6 +6,53 @@ namespace Envoy {
 
 namespace Filesystem {
 
+struct MemFileInfo {
+  absl::Mutex lock_;
+  std::string data_ ABSL_GUARDED_BY(lock_);
+};
+
+class MemfileImpl : public FileSharedImpl {
+public:
+  MemfileImpl(const FilePathAndType& file_info, std::shared_ptr<MemFileInfo> info)
+      : FileSharedImpl(file_info), info_(std::move(info)) {}
+
+  bool isOpen() const override { return open_; }
+
+protected:
+  Api::IoCallBoolResult open(FlagSet flag) override {
+    ASSERT(!isOpen());
+    flags_ = flag;
+    open_ = true;
+    if (flags_.test(File::Operation::Write) && !flags_.test(File::Operation::Append) &&
+        !flags_.test(File::Operation::KeepExistingData)) {
+      absl::MutexLock l(&info_->lock_);
+      info_->data_.clear();
+    }
+    return resultSuccess(true);
+  }
+
+  Api::IoCallSizeResult write(absl::string_view buffer) override {
+    absl::MutexLock l(&info_->lock_);
+    info_->data_.append(std::string(buffer));
+    const ssize_t size = info_->data_.size();
+    return resultSuccess(size);
+  }
+
+  Api::IoCallBoolResult close() override {
+    ASSERT(isOpen());
+    open_ = false;
+    return resultSuccess(true);
+  }
+
+  Api::IoCallSizeResult pread(void* buf, uint64_t count, uint64_t offset) override;
+  Api::IoCallSizeResult pwrite(const void* buf, uint64_t count, uint64_t offset) override;
+
+private:
+  FlagSet flags_;
+  std::shared_ptr<MemFileInfo> info_;
+  bool open_{false};
+};
+
 Api::IoCallSizeResult MemfileImpl::pread(void* buf, uint64_t count, uint64_t offset) {
   absl::MutexLock l(&info_->lock_);
   if (!flags_.test(File::Operation::Read)) {
@@ -36,7 +83,8 @@ Api::IoCallSizeResult MemfileImpl::pwrite(const void* buf, uint64_t count, uint6
   std::string after = (offset + count > info_->data_.size())
                           ? ""
                           : info_->data_.substr(info_->data_.size() - offset - count);
-  info_->data_ = before + std::string{static_cast<const char*>(buf), count} + after;
+  info_->data_ =
+      before + std::string{static_cast<const char*>(buf), static_cast<size_t>(count)} + after;
   return resultSuccess<ssize_t>(count);
 }
 
@@ -46,6 +94,53 @@ MemfileInstanceImpl::MemfileInstanceImpl()
 MemfileInstanceImpl& fileSystemForTest() {
   static MemfileInstanceImpl* file_system = new MemfileInstanceImpl();
   return *file_system;
+}
+
+FilePtr MemfileInstanceImpl::createFile(const FilePathAndType& file_info) {
+  const std::string& path = file_info.path_;
+  absl::MutexLock m(&lock_);
+  if (!use_memfiles_) {
+    return file_system_->createFile(file_info);
+  }
+  if (file_info.file_type_ == DestinationType::TmpFile) {
+    // tmp files ideally should have no filename, so we create an info
+    // without adding it to files_.
+    return std::make_unique<MemfileImpl>(file_info, std::make_shared<MemFileInfo>());
+  }
+  if (file_system_->fileExists(path)) {
+    return file_system_->createFile(file_info);
+  }
+  std::shared_ptr<MemFileInfo>& info = files_[path];
+  if (info == nullptr) {
+    info = std::make_shared<MemFileInfo>();
+  }
+  return std::make_unique<MemfileImpl>(file_info, info);
+}
+
+ssize_t MemfileInstanceImpl::fileSize(const std::string& path) {
+  {
+    absl::MutexLock m(&lock_);
+    auto it = files_.find(path);
+    if (it != files_.end()) {
+      ASSERT(use_memfiles_);
+      absl::MutexLock n(&it->second->lock_);
+      return it->second->data_.size();
+    }
+  }
+  return file_system_->fileSize(path);
+}
+
+std::string MemfileInstanceImpl::fileReadToEnd(const std::string& path) {
+  {
+    absl::MutexLock m(&lock_);
+    auto it = files_.find(path);
+    if (it != files_.end()) {
+      absl::MutexLock n(&it->second->lock_);
+      ASSERT(use_memfiles_);
+      return it->second->data_;
+    }
+  }
+  return file_system_->fileReadToEnd(path);
 }
 
 void MemfileInstanceImpl::renameFile(const std::string& old_name, const std::string& new_name) {

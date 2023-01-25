@@ -184,18 +184,8 @@ EngineBuilder& EngineBuilder::enforceTrustChainVerification(bool trust_chain_ver
   return *this;
 }
 
-EngineBuilder& EngineBuilder::enableH2ExtendKeepaliveTimeout(bool h2_extend_keepalive_timeout_on) {
-  h2_extend_keepalive_timeout_ = h2_extend_keepalive_timeout_on;
-  return *this;
-}
-
 EngineBuilder&
 EngineBuilder::enablePlatformCertificatesValidation(bool platform_certificates_validation_on) {
-#if defined(__APPLE__)
-  if (platform_certificates_validation_on) {
-    PANIC("Certificates validation using platform provided APIs is not supported in IOS.");
-  }
-#endif
   platform_certificates_validation_on_ = platform_certificates_validation_on;
   return *this;
 }
@@ -233,7 +223,6 @@ std::string EngineBuilder::generateConfigStr() const {
          fmt::format("{}s", h2_connection_keepalive_idle_interval_milliseconds_ / 1000.0)},
         {"h2_connection_keepalive_timeout",
          fmt::format("{}s", h2_connection_keepalive_timeout_seconds_)},
-        {"h2_delay_keepalive_timeout", h2_extend_keepalive_timeout_ ? "true" : "false"},
         {
             "metadata",
             fmt::format("{{ device_os: {}, app_version: {}, app_id: {} }}", device_os_,

@@ -1811,8 +1811,6 @@ protected:
         .Times(AnyNumber())
         .WillRepeatedly(Return(4000));
     EXPECT_CALL(mock_host_->cluster_, maxRequestsPerConnection()).WillRepeatedly(Return(8000));
-    scoped_runtime_.mergeValues(
-        {{"envoy.reloadable_features.allow_concurrency_for_alpn_pool", "true"}});
   }
 
   TestScopedRuntime scoped_runtime_;
@@ -1852,16 +1850,6 @@ TEST_F(InitialStreamsLimitTest, InitialStreamsLimitRespectMaxRequests) {
       .Times(AnyNumber())
       .WillRepeatedly(Return(100));
   EXPECT_EQ(100, ActiveClient::calculateInitialStreamsLimit(cache_, origin_, mock_host_));
-}
-TEST_F(InitialStreamsLimitTest, InitialStreamsLimitOld) {
-  // All these bounds are ignored with the reloadable feature off.
-  EXPECT_CALL(*cache_, getConcurrentStreams(_)).Times(0);
-  EXPECT_CALL(mock_host_->cluster_, maxRequestsPerConnection)
-      .Times(AnyNumber())
-      .WillRepeatedly(Return(100));
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.allow_concurrency_for_alpn_pool", "false"}});
-  EXPECT_EQ(2000, ActiveClient::calculateInitialStreamsLimit(nullptr, origin_, mock_host_));
 }
 
 } // namespace Http2

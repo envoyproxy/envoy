@@ -153,7 +153,8 @@ void EnvoyQuicClientConnection::maybeMigratePort() {
 
   auto context = std::make_unique<EnvoyQuicPathValidationContext>(
       self_address, peer_address, std::move(writer), std::move(probing_socket));
-  ValidatePath(std::move(context), std::make_unique<EnvoyPathValidationResultDelegate>(*this));
+  ValidatePath(std::move(context), std::make_unique<EnvoyPathValidationResultDelegate>(*this),
+               quic::PathValidationReason::kPortMigration);
 }
 
 void EnvoyQuicClientConnection::onPathValidationSuccess(
@@ -175,10 +176,10 @@ void EnvoyQuicClientConnection::onPathValidationSuccess(
 }
 
 void EnvoyQuicClientConnection::onPathValidationFailure(
-    std::unique_ptr<quic::QuicPathValidationContext> /*context*/) {
+    std::unique_ptr<quic::QuicPathValidationContext> context) {
   // Note that the probing socket and probing writer will be deleted once context goes out of
   // scope.
-  OnPathValidationFailureAtClient(/*is_multi_port=*/false);
+  OnPathValidationFailureAtClient(/*is_multi_port=*/false, *context);
 }
 
 void EnvoyQuicClientConnection::onFileEvent(uint32_t events,
