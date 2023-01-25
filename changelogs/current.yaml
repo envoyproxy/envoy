@@ -24,6 +24,9 @@ bug_fixes:
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: dns
+  change: |
+    removed ``envoy.reloadable_features.dns_multiple_addresses`` runtime flag and legacy code paths.
 - area: router
   change: |
     removed ``envoy.reloadable_features.get_route_config_factory_by_type`` runtime flag. The flag is no longer needed as the behavior is now the default.
