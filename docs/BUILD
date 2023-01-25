@@ -40,6 +40,12 @@ filegroup(
     }),
 )
 
+# TODO(phlax): add go config examples
+filegroup(
+    name = "contrib_configs",
+    srcs = [],
+)
+
 filegroup(
     name = "contrib_configs",
     srcs = glob(

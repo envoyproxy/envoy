@@ -2187,30 +2187,19 @@ RouteSpecificFilterConfigConstSharedPtr PerFilterConfigs::createRouteSpecificFil
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator) {
   bool is_optional = (optional_http_filters.find(name) != optional_http_filters.end());
-  Server::Configuration::NamedHttpFilterConfigFactory* factory = nullptr;
-
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.get_route_config_factory_by_type")) {
-    factory = Envoy::Config::Utility::getFactoryByType<
-        Server::Configuration::NamedHttpFilterConfigFactory>(typed_config);
-    if (factory == nullptr) {
-      if (is_optional) {
-        ENVOY_LOG(warn,
-                  "Can't find a registered implementation for http filter '{}' with type URL: '{}'",
-                  name, Envoy::Config::Utility::getFactoryType(typed_config));
-        return nullptr;
-      } else {
-        throw EnvoyException(
-            fmt::format("Didn't find a registered implementation for '{}' with type URL: '{}'",
-                        name, Envoy::Config::Utility::getFactoryType(typed_config)));
-      }
-    }
-  } else {
-    factory = Envoy::Config::Utility::getAndCheckFactoryByName<
-        Server::Configuration::NamedHttpFilterConfigFactory>(name, is_optional);
-    if (factory == nullptr) {
-      ENVOY_LOG(warn, "Can't find a registered implementation for http filter '{}'", name);
+  Server::Configuration::NamedHttpFilterConfigFactory* factory =
+      Envoy::Config::Utility::getFactoryByType<Server::Configuration::NamedHttpFilterConfigFactory>(
+          typed_config);
+  if (factory == nullptr) {
+    if (is_optional) {
+      ENVOY_LOG(warn,
+                "Can't find a registered implementation for http filter '{}' with type URL: '{}'",
+                name, Envoy::Config::Utility::getFactoryType(typed_config));
       return nullptr;
+    } else {
+      throw EnvoyException(
+          fmt::format("Didn't find a registered implementation for '{}' with type URL: '{}'", name,
+                      Envoy::Config::Utility::getFactoryType(typed_config)));
     }
   }
 

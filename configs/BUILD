@@ -84,7 +84,6 @@ genrule(
 genrule(
     name = "example_contrib_configs",
     srcs = [
-        "//contrib/golang/filters/http/test/test_data/dummy:testing_shared_objects",
         "//docs:contrib_configs",
         "//examples:contrib_configs",
         "//examples:certs",

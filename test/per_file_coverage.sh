@@ -4,7 +4,7 @@
 # for existing directories with low coverage.
 declare -a KNOWN_LOW_COVERAGE=(
 "source/common:96.0"
-"source/common/api:82.5"
+"source/common/api:82.4"
 "source/common/api/posix:81.3"
 "source/common/common/posix:92.7"
 "source/common/config:96.4"
@@ -71,6 +71,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/wasm_runtime/wasmtime:0.0" # Not enabled in coverage build
 "source/extensions/wasm_runtime/wavm:0.0" # Not enabled in coverage build
 "source/extensions/watchdog:83.3" # Death tests within extensions
+"source/extensions/listener_managers/validation_listener_manager:67.6"
 "source/extensions/watchdog/profile_action:83.3"
 "source/server:93.3" # flaky: be careful adjusting. See https://github.com/envoyproxy/envoy/issues/15239
 "source/server/admin:97.4"

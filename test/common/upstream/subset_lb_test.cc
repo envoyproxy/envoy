@@ -37,15 +37,27 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Upstream {
 
-class SubsetLoadBalancerDescribeMetadataTester {
+class SubsetLoadBalancerInternalStateTester {
 public:
-  SubsetLoadBalancerDescribeMetadataTester(std::shared_ptr<SubsetLoadBalancer> lb) : lb_(lb) {}
+  SubsetLoadBalancerInternalStateTester(std::shared_ptr<SubsetLoadBalancer> lb) : lb_(lb) {}
 
   using MetadataVector = std::vector<std::pair<std::string, ProtobufWkt::Value>>;
 
-  void test(std::string expected, const MetadataVector& metadata) {
+  void testDescribeMetadata(std::string expected, const MetadataVector& metadata) {
     const SubsetLoadBalancer::SubsetMetadata& subset_metadata(metadata);
     EXPECT_EQ(expected, lb_.get()->describeMetadata(subset_metadata));
+  }
+
+  void validateLbTypeConfigs(LoadBalancerType lb_type) const {
+    // Each of these expects that an lb_type is set to that type iff the
+    // returned config for that type exists.
+    EXPECT_EQ(lb_type == LoadBalancerType::RingHash,
+              lb_.get()->lbRingHashConfig() != absl::nullopt);
+    EXPECT_EQ(lb_type == LoadBalancerType::Maglev, lb_.get()->lbMaglevConfig() != absl::nullopt);
+    EXPECT_EQ(lb_type == LoadBalancerType::RoundRobin,
+              lb_.get()->lbRoundRobinConfig() != absl::nullopt);
+    EXPECT_EQ(lb_type == LoadBalancerType::LeastRequest,
+              lb_.get()->lbLeastRequestConfig() != absl::nullopt);
   }
 
 private:
@@ -240,7 +252,22 @@ public:
 
     lb_ = std::make_shared<SubsetLoadBalancer>(
         lb_type_, priority_set_, nullptr, stats_, *scope_, runtime_, random_, subset_info_,
-        ring_hash_lb_config_, maglev_lb_config_, round_robin_lb_config_, least_request_lb_config_,
+        lb_type_ == LoadBalancerType::RingHash
+            ? makeOptRef<const envoy::config::cluster::v3::Cluster::RingHashLbConfig>(
+                  ring_hash_lb_config_)
+            : absl::nullopt,
+        lb_type_ == LoadBalancerType::Maglev
+            ? makeOptRef<const envoy::config::cluster::v3::Cluster::MaglevLbConfig>(
+                  maglev_lb_config_)
+            : absl::nullopt,
+        lb_type_ == LoadBalancerType::RoundRobin
+            ? makeOptRef<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>(
+                  round_robin_lb_config_)
+            : absl::nullopt,
+        lb_type_ == LoadBalancerType::LeastRequest
+            ? makeOptRef<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>(
+                  least_request_lb_config_)
+            : absl::nullopt,
         common_config_, simTime());
   }
 
@@ -1505,19 +1532,33 @@ TEST_F(SubsetLoadBalancerTest, IgnoresHostsWithoutMetadata) {
 // modifyHosts() also needs params. Clean this up.
 TEST_P(SubsetLoadBalancerTest, LoadBalancerTypesRoundRobin) {
   doLbTypeTest(LoadBalancerType::RoundRobin);
+  auto tester = SubsetLoadBalancerInternalStateTester(lb_);
+  tester.validateLbTypeConfigs(LoadBalancerType::RoundRobin);
 }
 
 TEST_P(SubsetLoadBalancerTest, LoadBalancerTypesLeastRequest) {
   doLbTypeTest(LoadBalancerType::LeastRequest);
+  auto tester = SubsetLoadBalancerInternalStateTester(lb_);
+  tester.validateLbTypeConfigs(LoadBalancerType::LeastRequest);
 }
 
-TEST_P(SubsetLoadBalancerTest, LoadBalancerTypesRandom) { doLbTypeTest(LoadBalancerType::Random); }
+TEST_P(SubsetLoadBalancerTest, LoadBalancerTypesRandom) {
+  doLbTypeTest(LoadBalancerType::Random);
+  auto tester = SubsetLoadBalancerInternalStateTester(lb_);
+  tester.validateLbTypeConfigs(LoadBalancerType::Random);
+}
 
 TEST_P(SubsetLoadBalancerTest, LoadBalancerTypesRingHash) {
   doLbTypeTest(LoadBalancerType::RingHash);
+  auto tester = SubsetLoadBalancerInternalStateTester(lb_);
+  tester.validateLbTypeConfigs(LoadBalancerType::RingHash);
 }
 
-TEST_P(SubsetLoadBalancerTest, LoadBalancerTypesMaglev) { doLbTypeTest(LoadBalancerType::Maglev); }
+TEST_P(SubsetLoadBalancerTest, LoadBalancerTypesMaglev) {
+  doLbTypeTest(LoadBalancerType::Maglev);
+  auto tester = SubsetLoadBalancerInternalStateTester(lb_);
+  tester.validateLbTypeConfigs(LoadBalancerType::Maglev);
+}
 
 TEST_F(SubsetLoadBalancerTest, ZoneAwareFallback) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
@@ -1884,12 +1925,12 @@ TEST_F(SubsetLoadBalancerTest, DescribeMetadata) {
   ProtobufWkt::Value num_value;
   num_value.set_number_value(100);
 
-  auto tester = SubsetLoadBalancerDescribeMetadataTester(lb_);
-  tester.test("version=\"abc\"", {{"version", str_value}});
-  tester.test("number=100", {{"number", num_value}});
-  tester.test("x=\"abc\", y=100", {{"x", str_value}, {"y", num_value}});
-  tester.test("y=100, x=\"abc\"", {{"y", num_value}, {"x", str_value}});
-  tester.test("<no metadata>", {});
+  auto tester = SubsetLoadBalancerInternalStateTester(lb_);
+  tester.testDescribeMetadata("version=\"abc\"", {{"version", str_value}});
+  tester.testDescribeMetadata("number=100", {{"number", num_value}});
+  tester.testDescribeMetadata("x=\"abc\", y=100", {{"x", str_value}, {"y", num_value}});
+  tester.testDescribeMetadata("y=100, x=\"abc\"", {{"y", num_value}, {"x", str_value}});
+  tester.testDescribeMetadata("<no metadata>", {});
 }
 
 TEST_F(SubsetLoadBalancerTest, DisabledLocalityWeightAwareness) {
