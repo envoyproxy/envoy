@@ -297,6 +297,26 @@ public:
     return buffer;
   }
 
+  Buffer::OwnedImpl
+  encodeCreateRequestPartially(const std::string& path, const std::string& data,
+                               const bool txn = false,
+                               const int32_t opcode = enumToSignedInt(OpCodes::Create)) const {
+    Buffer::OwnedImpl buffer;
+
+    if (!txn) {
+      buffer.writeBEInt<int32_t>(24 + path.length() + data.length());
+      buffer.writeBEInt<int32_t>(1000);
+      buffer.writeBEInt<int32_t>(opcode);
+    }
+
+    // Path.
+    addString(buffer, path);
+    // Data.
+    addString(buffer, data);
+
+    return buffer;
+  }
+
   Buffer::OwnedImpl encodeSetRequest(const std::string& path, const std::string& data,
                                      const int32_t version, const bool txn = false) const {
     Buffer::OwnedImpl buffer;
@@ -537,6 +557,71 @@ public:
     }
 
     EXPECT_EQ(32UL, config_->stats().request_bytes_.value());
+    EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+  }
+
+  void testCreateWithMultipleBufferReads(CreateFlags flags,
+                                         const OpCodes opcode = OpCodes::Create) {
+    initialize();
+    Buffer::OwnedImpl data =
+        encodeCreateRequestPartially("/foo", "bar", false, enumToSignedInt(opcode));
+    std::string opname = "create";
+
+    switch (opcode) {
+    case OpCodes::CreateContainer:
+      opname = "createcontainer";
+      break;
+    case OpCodes::CreateTtl:
+      opname = "createttl";
+      break;
+    default:
+      break;
+    }
+
+    switch (opcode) {
+    case OpCodes::Create:
+      EXPECT_EQ(0UL, config_->stats().create_rq_.value());
+      break;
+    case OpCodes::CreateContainer:
+      EXPECT_EQ(0UL, config_->stats().createcontainer_rq_.value());
+      break;
+    case OpCodes::CreateTtl:
+      EXPECT_EQ(0UL, config_->stats().createttl_rq_.value());
+      break;
+    default:
+      break;
+    }
+
+    EXPECT_EQ(0UL, config_->stats().request_bytes_.value());
+    EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+
+    // Add the remaining data to buffer
+    // Acls.
+    data.writeBEInt<int32_t>(0);
+    // Flags.
+    data.writeBEInt<int32_t>(static_cast<int32_t>(flags));
+
+    expectSetDynamicMetadata(
+        {{{"opname", opname}, {"path", "/foo"}, {"create_type", createFlagsToString(flags)}},
+         {{"bytes", "35"}}});
+
+    EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
+
+    switch (opcode) {
+    case OpCodes::Create:
+      EXPECT_EQ(1UL, config_->stats().create_rq_.value());
+      break;
+    case OpCodes::CreateContainer:
+      EXPECT_EQ(1UL, config_->stats().createcontainer_rq_.value());
+      break;
+    case OpCodes::CreateTtl:
+      EXPECT_EQ(1UL, config_->stats().createttl_rq_.value());
+      break;
+    default:
+      break;
+    }
+
+    EXPECT_EQ(35UL, config_->stats().request_bytes_.value());
     EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
   }
 
@@ -1044,6 +1129,14 @@ TEST_F(ZooKeeperFilterTest, MissingXid) {
   EXPECT_EQ(0UL, stat.value());
   EXPECT_EQ(0UL, config_->stats().response_bytes_.value());
   EXPECT_EQ(1UL, config_->stats().decoder_error_.value());
+}
+
+TEST_F(ZooKeeperFilterTest, OneRequestWithMultipleBufferReads) {
+  initialize();
+
+  testCreateWithMultipleBufferReads(CreateFlags::Persistent);
+  testResponse({{{"opname", "create_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
+               config_->stats().create_resp_);
 }
 
 } // namespace ZooKeeperProxy

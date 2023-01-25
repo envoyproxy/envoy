@@ -467,9 +467,57 @@ void DecoderImpl::skipStrings(Buffer::Instance& data, uint64_t& offset) {
   }
 }
 
-void DecoderImpl::onData(Buffer::Instance& data) { decode(data, DecodeType::READ); }
+bool DecoderImpl::onData(Buffer::Instance& data) {
+  int32_t len = 0;
+  try {
+    // Check message length.
+    uint64_t offset = 0;
+    int32_t len = helper_.peekInt32(data, offset);
+    ensureMinLength(len, INT_LENGTH + XID_LENGTH);
+    ensureMaxLength(len);
+  } catch (const EnvoyException& e) {
+    ENVOY_LOG(debug, "zookeeper_proxy: decoding exception {}", e.what());
+    callbacks_.onDecodeError();
+    return true;
+  }
 
-void DecoderImpl::onWrite(Buffer::Instance& data) { decode(data, DecodeType::WRITE); }
+  if (data.length() >= INT_LENGTH + len) {
+    decode(data, DecodeType::READ);
+    return true;
+  } else {
+    ENVOY_LOG(trace,
+              "zookeeper_proxy: waiting for the full packet ({} bytes) in buffer, current buffer "
+              "is {} bytes",
+              INT_LENGTH + len, data.length());
+    return false;
+  }
+}
+
+bool DecoderImpl::onWrite(Buffer::Instance& data) {
+  int32_t len = 0;
+  try {
+    // Check message length.
+    uint64_t offset = 0;
+    int32_t len = helper_.peekInt32(data, offset);
+    ensureMinLength(len, INT_LENGTH + XID_LENGTH);
+    ensureMaxLength(len);
+  } catch (const EnvoyException& e) {
+    ENVOY_LOG(debug, "zookeeper_proxy: decoding exception {}", e.what());
+    callbacks_.onDecodeError();
+    return true;
+  }
+
+  if (data.length() >= INT_LENGTH + len) {
+    decode(data, DecodeType::WRITE);
+    return true;
+  } else {
+    ENVOY_LOG(trace,
+              "zookeeper_proxy: waiting for the full packet ({} bytes) in buffer, current buffer "
+              "is {} bytes",
+              INT_LENGTH + len, data.length());
+    return false;
+  }
+}
 
 void DecoderImpl::decode(Buffer::Instance& data, DecodeType dtype) {
   uint64_t offset = 0;

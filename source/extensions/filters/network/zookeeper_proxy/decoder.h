@@ -112,8 +112,8 @@ class Decoder {
 public:
   virtual ~Decoder() = default;
 
-  virtual void onData(Buffer::Instance& data) PURE;
-  virtual void onWrite(Buffer::Instance& data) PURE;
+  virtual bool onData(Buffer::Instance& data) PURE;
+  virtual bool onWrite(Buffer::Instance& data) PURE;
 };
 
 using DecoderPtr = std::unique_ptr<Decoder>;
@@ -126,8 +126,8 @@ public:
         time_source_(time_source) {}
 
   // ZooKeeperProxy::Decoder
-  void onData(Buffer::Instance& data) override;
-  void onWrite(Buffer::Instance& data) override;
+  bool onData(Buffer::Instance& data) override;
+  bool onWrite(Buffer::Instance& data) override;
 
 private:
   enum class DecodeType { READ, WRITE };
