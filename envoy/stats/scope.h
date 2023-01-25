@@ -28,6 +28,14 @@ using TextReadoutOptConstRef = absl::optional<std::reference_wrapper<const TextR
 using ConstScopeSharedPtr = std::shared_ptr<const Scope>;
 using ScopeSharedPtr = std::shared_ptr<Scope>;
 
+// TODO(#20911): Until 2022, scopes were generally captured by the creator as
+// unique_ptr<Scope>. This has changed to std::shared_ptr<Scope>, and to make
+// this transition work we made ScopePtr an alias for ScopeSharedPtr. All
+// references in the Envoy repo are now removed, but there remain references in
+// external repositories, so we'll leave this alias until we have some
+// confidence that external repositories are cleaned up.
+using ScopePtr ABSL_DEPRECATED("Use ScopeSharedPtr() instead.") = ScopeSharedPtr;
+
 template <class StatType> using IterateFn = std::function<bool(const RefcountPtr<StatType>&)>;
 
 /**
