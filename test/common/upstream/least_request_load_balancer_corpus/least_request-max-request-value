@@ -1,0 +1,24 @@
+zone_aware_load_balancer_test_case {
+  load_balancer_test_case {
+    common_lb_config {
+    }
+    setup_priority_levels {
+      num_hosts_in_priority_level: 96
+      random_bytestring: 5
+    }
+    seed_for_prng: 7
+  }
+  random_bytestring_for_weights: "K"
+}
+least_request_lb_config {
+  slow_start_config {
+    slow_start_window {
+      nanos: 1048576
+    }
+    aggression {
+      default_value: 2
+      runtime_key: "("
+    }
+  }
+}
+random_bytestring_for_requests: "\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201\201h"
