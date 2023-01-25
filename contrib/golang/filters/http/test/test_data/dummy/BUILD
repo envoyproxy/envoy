@@ -7,59 +7,35 @@ envoy_package()
 
 go_binary(
     name = "my_plugin.so",
-    srcs = [
-        "plugin.go",
-    ],
+    srcs = ["plugin.go"],
     out = "my_plugin.so",
     cgo = True,
     importpath = "github.com/envoyproxy/envoy/contrib/golang/filters/http/test/test_data/echo",
     linkmode = "c-shared",
     visibility = ["//visibility:public"],
-    deps = [
-        "//contrib/golang/filters/http/source/go/pkg/api",
-        "//contrib/golang/filters/http/source/go/pkg/http",
-        "//contrib/golang/filters/http/source/go/pkg/utils",
-        "@com_github_cncf_xds_go//udpa/type/v1:type",
-        "@org_golang_google_protobuf//types/known/anypb",
-    ],
+    deps = ["//contrib/golang/filters/http/source/go/pkg/http"],
 )
 
 go_binary(
     name = "my_other_plugin.so",
-    srcs = [
-        "plugin.go",
-    ],
+    srcs = ["plugin.go"],
     out = "my_other_plugin.so",
     cgo = True,
     importpath = "github.com/envoyproxy/envoy/contrib/golang/filters/http/test/test_data/echo",
     linkmode = "c-shared",
     visibility = ["//visibility:public"],
-    deps = [
-        "//contrib/golang/filters/http/source/go/pkg/api",
-        "//contrib/golang/filters/http/source/go/pkg/http",
-        "//contrib/golang/filters/http/source/go/pkg/utils",
-        "@com_github_cncf_xds_go//udpa/type/v1:type",
-        "@org_golang_google_protobuf//types/known/anypb",
-    ],
+    deps = ["//contrib/golang/filters/http/source/go/pkg/http"],
 )
 
 go_binary(
     name = "my_configurable_plugin.so",
-    srcs = [
-        "plugin.go",
-    ],
+    srcs = ["plugin.go"],
     out = "my_configurable_plugin.so",
     cgo = True,
     importpath = "github.com/envoyproxy/envoy/contrib/golang/filters/http/test/test_data/echo",
     linkmode = "c-shared",
     visibility = ["//visibility:public"],
-    deps = [
-        "//contrib/golang/filters/http/source/go/pkg/api",
-        "//contrib/golang/filters/http/source/go/pkg/http",
-        "//contrib/golang/filters/http/source/go/pkg/utils",
-        "@com_github_cncf_xds_go//udpa/type/v1:type",
-        "@org_golang_google_protobuf//types/known/anypb",
-    ],
+    deps = ["//contrib/golang/filters/http/source/go/pkg/http"],
 )
 
 filegroup(
