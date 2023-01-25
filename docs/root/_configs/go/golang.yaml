@@ -21,6 +21,8 @@ static_resources:
               library_path: "lib/my_plugin.so"
               plugin_name: my_plugin
           - name: envoy.filters.http.header_to_metadata
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.header_to_metadata.v3.Config
           - name: envoy.filters.http.golang
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.golang.v3alpha.Config

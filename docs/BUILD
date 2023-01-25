@@ -21,6 +21,7 @@ filegroup(
     srcs = glob(
         ["root/**/*.yaml"],
         exclude = [
+            "root/_configs/go/*",
             "root/**/envoy-dynamic-cds-demo.yaml",
             "root/**/envoy-dynamic-lds-demo.yaml",
             "root/**/envoy-dynamic-filesystem-demo.yaml",
@@ -37,6 +38,13 @@ filegroup(
             "root/intro/arch_overview/security/_include/ssl.yaml",
         ],
     }),
+)
+
+filegroup(
+    name = "contrib_configs",
+    srcs = glob(
+        ["root/_configs/go/*.yaml"],
+    )
 )
 
 filegroup(

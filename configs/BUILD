@@ -64,7 +64,7 @@ genrule(
     ],
     outs = ["example_configs.tar"],
     cmd = (
-        "$(location configgen.sh) $(location configgen) $(@D) " +
+        "$(location configgen.sh) $(location configgen) example_configs.tar $(@D) " +
         "$(locations :configs) " +
         "$(locations //contrib/golang/filters/http/test/test_data/dummy:testing_shared_objects) " +
         "$(locations //examples:configs) " +
@@ -73,6 +73,30 @@ genrule(
         "$(locations //examples/wasm-cc:configs) " +
         "$(locations //docs:configs) " +
         "$(locations //docs:proto_examples) " +
+        "$(locations //test/config/integration/certs)"
+    ),
+    tools = [
+        "configgen.sh",
+        ":configgen",
+    ],
+)
+
+genrule(
+    name = "example_contrib_configs",
+    srcs = [
+        "//contrib/golang/filters/http/test/test_data/dummy:testing_shared_objects",
+        "//docs:contrib_configs",
+        "//examples:contrib_configs",
+        "//examples:certs",
+        "//test/config/integration/certs",
+    ],
+    outs = ["example_contrib_configs.tar"],
+    cmd = (
+        "$(location configgen.sh) NO_CONFIGGEN example_contrib_configs.tar $(@D) " +
+        "$(locations //contrib/golang/filters/http/test/test_data/dummy:testing_shared_objects) " +
+        "$(locations //docs:contrib_configs) " +
+        "$(locations //examples:contrib_configs) " +
+        "$(locations //examples:certs) " +
         "$(locations //test/config/integration/certs)"
     ),
     tools = [
