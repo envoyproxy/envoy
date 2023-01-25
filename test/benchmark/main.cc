@@ -32,10 +32,12 @@ int main(int argc, char** argv) {
     }
   }
 
-  // if the `--help` flag isn't considered separately, it runs "benchmark --help"
-  // (Google Benchmark Help) and the help output doesn't contains details about
-  // custom defined flags like `--skip_expensive_benchmarks`, `--runtime_feature`, etc
-  if (!contains_help_flag) {
+  if (contains_help_flag) {
+    // if the `--help` flag isn't considered separately, it runs "benchmark --help"
+    // (Google Benchmark Help) and the help output doesn't contains details about
+    // custom defined flags like `--skip_expensive_benchmarks`, `--runtime_feature`, etc
+    ::benchmark::PrintDefaultHelp();
+  } else {
     // Passing the arguments of the program to Google Benchmark.
     // That way Google benchmark options would also be supported, along with the
     // custom defined custom flags
@@ -64,14 +66,7 @@ int main(int argc, char** argv) {
     cmd.parse(argc, argv);
   } catch (const TCLAP::ExitException& e) {
     // parse() throws an ExitException with status 0 after printing the output
-    // for --help and --version. But first pass the args to
-    // benchmark::Initialize to give it a chance to print the benchmark library
-    // help.
-
-    if (contains_help_flag) {
-      ::benchmark::Initialize(&argc, argv);
-    }
-
+    // for --help and --version.
     return 0;
   }
 

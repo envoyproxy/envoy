@@ -29,7 +29,6 @@
 // If issues are found that require a runtime feature to be disabled, it should be reported
 // ASAP by filing a bug on github. Overriding non-buggy code is strongly discouraged to avoid the
 // problem of the bugs being found after the old code path has been removed.
-RUNTIME_GUARD(envoy_reloadable_features_allow_concurrency_for_alpn_pool);
 RUNTIME_GUARD(envoy_reloadable_features_allow_multiple_dns_addresses);
 RUNTIME_GUARD(envoy_reloadable_features_allow_upstream_filters);
 RUNTIME_GUARD(envoy_reloadable_features_append_query_parameters_path_rewriter);
@@ -46,7 +45,6 @@ RUNTIME_GUARD(envoy_reloadable_features_enable_intermediate_ca);
 RUNTIME_GUARD(envoy_reloadable_features_enable_update_listener_socket_options);
 RUNTIME_GUARD(envoy_reloadable_features_finish_reading_on_decode_trailers);
 RUNTIME_GUARD(envoy_reloadable_features_fix_hash_key);
-RUNTIME_GUARD(envoy_reloadable_features_get_route_config_factory_by_type);
 RUNTIME_GUARD(envoy_reloadable_features_http3_sends_early_data);
 RUNTIME_GUARD(envoy_reloadable_features_http_filter_avoid_reentrant_local_reply);
 RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
@@ -72,7 +70,6 @@ RUNTIME_GUARD(envoy_reloadable_features_thrift_connection_draining);
 RUNTIME_GUARD(envoy_reloadable_features_tls_async_cert_validation);
 RUNTIME_GUARD(envoy_reloadable_features_udp_proxy_connect);
 RUNTIME_GUARD(envoy_reloadable_features_unified_header_formatter);
-RUNTIME_GUARD(envoy_reloadable_features_use_rfc_connect);
 RUNTIME_GUARD(envoy_reloadable_features_validate_connect);
 RUNTIME_GUARD(envoy_reloadable_features_validate_detailed_override_host_statuses);
 RUNTIME_GUARD(envoy_restart_features_explicit_wildcard_resource);

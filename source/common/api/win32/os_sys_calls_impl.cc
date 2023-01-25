@@ -455,17 +455,9 @@ SysCallBoolResult OsSysCallsImpl::socketTcpInfo([[maybe_unused]] os_fd_t sockfd,
   return {false, WSAEOPNOTSUPP};
 }
 
-bool OsSysCallsImpl::supportsGetifaddrs() const {
-  if (alternate_getifaddrs_.has_value()) {
-    return true;
-  }
-  return false;
-}
+bool OsSysCallsImpl::supportsGetifaddrs() const { return false; }
 
 SysCallIntResult OsSysCallsImpl::getifaddrs([[maybe_unused]] InterfaceAddressVector& interfaces) {
-  if (alternate_getifaddrs_.has_value()) {
-    return alternate_getifaddrs_.value()(interfaces);
-  }
   PANIC("not implemented");
 }
 
