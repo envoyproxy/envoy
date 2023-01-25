@@ -45,7 +45,7 @@ if ! retry brew update; then
   echo "Failed to update homebrew"
 fi
 
-DEPS="automake cmake coreutils libtool wget ninja"
+DEPS="automake cmake coreutils libtool ninja"
 for DEP in ${DEPS}
 do
     is_installed "${DEP}" || install "${DEP}"
@@ -53,7 +53,6 @@ done
 
 ./bazelw version
 
-pip3 install slackclient
 # https://github.com/actions/runner-images/blob/main/images/macos/macos-12-Readme.md#xcode
 sudo xcode-select --switch /Applications/Xcode_14.1.app
 
