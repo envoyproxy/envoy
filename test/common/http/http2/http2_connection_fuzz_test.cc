@@ -109,7 +109,12 @@ void deflate_headers(nghttp2_hd_deflater* deflater, const test::fuzz::Headers& f
 
 Http2Frame pb_to_h2_frame(nghttp2_hd_deflater* deflater,
                           const test::common::http::http2::Http2FrameOrJunk& pb_frame) {
-  if (pb_frame.has_h2frame()) {
+  if (pb_frame.has_junk()) {
+    // Junk frame
+    auto junk = pb_frame.junk();
+    absl::string_view contents = junk.data();
+    return Http2Frame(contents);
+  } else if (pb_frame.has_h2frame()) {
     // Need to encode headers
     auto h2frame = pb_frame.h2frame();
     uint32_t streamid = h2frame.streamid();
@@ -199,11 +204,6 @@ Http2Frame pb_to_h2_frame(nghttp2_hd_deflater* deflater,
     result.appendData(payload);
     result.adjustPayloadSize();
     return result;
-  } else if (pb_frame.has_junk()) {
-    // Junk frame
-    auto junk = pb_frame.junk();
-    absl::string_view contents = junk.data();
-    return Http2Frame(contents);
   } else {
     // Empty frame
     return Http2Frame("");
