@@ -1,9 +1,29 @@
 #include "source/common/upstream/maglev_lb.h"
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "maglev_lb.h"
 
 namespace Envoy {
 namespace Upstream {
+namespace {
+bool shouldUseCompactTable(size_t num_hosts, uint64_t table_size) {
+#if defined(WIN32)
+  // BitArray does not support Windows.
+  return false;
+#else
+  if (num_hosts > MaglevTable::MaxNumberOfHostsForCompactMaglev) {
+    return false;
+  }
+
+  const uint64_t original_maglev_cost = 8 * table_size;
+  // We might be off by a byte e.g. due to rounding down when going from bits to
+  // bytes.
+  const uint64_t compact_maglev_cost =
+      8 * num_hosts + ((absl::bit_width(num_hosts) * table_size) / 8);
+  return compact_maglev_cost < original_maglev_cost;
+#endif
+}
+} // namespace
 
 void MaglevTable::constructMaglevTableInternal(
     const NormalizedHostWeightVector& normalized_host_weights, double max_normalized_weight,
@@ -135,18 +155,20 @@ MaglevTableSharedPtr
 MaglevTable::createMaglevTable(const NormalizedHostWeightVector& normalized_host_weights,
                                double max_normalized_weight, uint64_t table_size,
                                bool use_hostname_for_hashing, MaglevLoadBalancerStats& stats) {
-  // TODO(kbaichoo): possibly release guard this as well e.g >= || flag, check
-  // of windows for endianess?
+  // TODO(kbaichoo): Use release guard flag?
   MaglevTableSharedPtr maglev_table;
-  if (normalized_host_weights.size() >= MaglevTable::NumberOfHostsAtWhichToNotUseMemoryOptimized &&
-      false) {
-    maglev_table =
-        std::make_shared<OriginalMaglevTable>(normalized_host_weights, max_normalized_weight,
-                                              table_size, use_hostname_for_hashing, stats);
-  } else {
+  if (shouldUseCompactTable(normalized_host_weights.size(), table_size)) {
     maglev_table =
         std::make_shared<CompactMaglevTable>(normalized_host_weights, max_normalized_weight,
                                              table_size, use_hostname_for_hashing, stats);
+    ENVOY_LOG(debug, "creating compact maglev table given table size {} and number of hosts {}",
+              table_size, normalized_host_weights.size());
+  } else {
+    maglev_table =
+        std::make_shared<OriginalMaglevTable>(normalized_host_weights, max_normalized_weight,
+                                              table_size, use_hostname_for_hashing, stats);
+    ENVOY_LOG(debug, "creating original maglev table given table size {} and number of hosts {}",
+              table_size, normalized_host_weights.size());
   }
 
   return maglev_table;

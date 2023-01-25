@@ -46,10 +46,7 @@ public:
 
   // Recommended table size in section 5.3 of the paper.
   static const uint64_t DefaultTableSize = 65537;
-  // At this point the benefits from the memory optimized version is diminished.
-  // due to storing an additional table.
-  // TODO(kbaichoo): validate this.
-  static const uint64_t NumberOfHostsAtWhichToNotUseMemoryOptimized = 1UL << 31;
+  static const uint64_t MaxNumberOfHostsForCompactMaglev = (1UL << 32) - 1;
 
   static MaglevTableSharedPtr
   createMaglevTable(const NormalizedHostWeightVector& normalized_host_weights,

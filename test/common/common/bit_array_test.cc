@@ -8,6 +8,9 @@
 namespace Envoy {
 namespace {
 
+// BitArray does not support windows.
+#ifndef(WIN32)
+
 TEST(BitArray, ShouldAssertIfInvalidBitWidth) {
   {
     const int bit_width = 32;
@@ -68,6 +71,8 @@ INSTANTIATE_TEST_SUITE_P(GetAndSetTests, BitArrayTest,
                                             testing::Values(1, 10, 10000)));
 
 TEST_P(BitArrayTest, CanSetAndGetAllBits) { populateBitArrayAndCheckValuesStoredCorrectly(); }
+
+#endif
 
 } // namespace
 } // namespace Envoy
