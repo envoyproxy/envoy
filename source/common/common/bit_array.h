@@ -9,7 +9,10 @@
 namespace Envoy {
 
 /**
- * BitArray is an array of fixed width bits.
+ * BitArray is an fixed sized array of fixed width bits. As such once
+ * constructed it will not grow in the number of elements it can hold, or change
+ * the number of bits an element is considered.
+ *
  * At a minimum this will allocate a word_size worth of bytes.
  * Methods are deliberately implemented in the header to hint to the compiler to
  * inline.
@@ -21,10 +24,19 @@ namespace Envoy {
  */
 class BitArray {
 public:
+  /**
+   * Constructs a BitArray.
+   * @param width the fixed width of the array elements. For example, if we need
+   *  to represent 10 distinct values we need at least 4 bits as the width.
+   * @param num_items the number of elements the bit array must hold.
+   */
   BitArray(int width, size_t num_items)
       : array_start_(std::make_unique<uint8_t[]>(bytesNeeded(width, num_items))),
         end_(array_start_.get() + bytesNeeded(width, num_items)), bit_width_(width),
-        mask_((static_cast<uint32_t>(1) << width) - 1), num_items_(num_items) {
+        // This will fit in a uint32_t as with the maximum shift of 32, we'd
+        // subtract one to fit in 32 bits.
+        mask_(static_cast<uint32_t>((static_cast<uint64_t>(1) << width) - 1)),
+        num_items_(num_items) {
     RELEASE_ASSERT(width <= MaxBitWidth, "Using BitArray with invalid parameters.");
     static_assert(
         sizeof(uint8_t*) == 8,
@@ -115,7 +127,7 @@ private:
   // Pointer to the end of the array. In cases where we allocate a word size of
   // bytes it's possible that the logical "end" of the e.g. based on num_items
   // is before this address.
-  const uint8_t* end_;
+  const uint8_t* const end_;
   // The fixed bit width of the elements in the array.
   const int bit_width_;
   const uint32_t mask_;

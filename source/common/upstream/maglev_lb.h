@@ -46,7 +46,7 @@ public:
 
   // Recommended table size in section 5.3 of the paper.
   static const uint64_t DefaultTableSize = 65537;
-  static const uint64_t MaxNumberOfHostsForCompactMaglev = (1UL << 32) - 1;
+  static const uint64_t MaxNumberOfHostsForCompactMaglev = (static_cast<uint64_t>(1) << 32) - 1;
 
   static MaglevTableSharedPtr
   createMaglevTable(const NormalizedHostWeightVector& normalized_host_weights,
