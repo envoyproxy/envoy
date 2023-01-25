@@ -24,8 +24,25 @@ public:
                          bool was_any_or_top_level) PURE;
 };
 
+class ProtoVisitor {
+public:
+  virtual ~ProtoVisitor() = default;
+
+  // Invoked when a field is visited, with the message, and field descriptor.
+  virtual void onField(Protobuf::Message&, const Protobuf::FieldDescriptor&) PURE;
+
+  // Invoked when a message is visited, with the message and visited parents.
+  // @param was_any_or_top_level supplies whether the message was either the top level message or an
+  //                             Any before being unpacked for further recursion. The latter can
+  //                             only be achieved by using recurse_into_any.
+  virtual void onMessage(Protobuf::Message&, absl::Span<const Protobuf::Message* const>,
+                         bool was_any_or_top_level) PURE;
+};
+
 void traverseMessage(ConstProtoVisitor& visitor, const Protobuf::Message& message,
                      bool recurse_into_any);
+
+void traverseMessage(ProtoVisitor& visitor, Protobuf::Message& message, bool recurse_into_any);
 
 } // namespace ProtobufMessage
 } // namespace Envoy

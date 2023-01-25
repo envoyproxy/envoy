@@ -71,6 +71,7 @@ envoy_cc_fuzz_test(
         "//source/common/config:utility_lib",
         "//test/config:utility_lib",
         "//test/test_common:test_runtime_lib",
+        "@com_github_google_libprotobuf_mutator//:libprotobuf_mutator",
     ] + envoy_all_network_filters(),
 )
 
