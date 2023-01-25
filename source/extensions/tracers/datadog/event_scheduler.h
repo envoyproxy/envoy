@@ -2,8 +2,6 @@
 
 #include <datadog/event_scheduler.h>
 
-#include <chrono>
-#include <functional>
 #include <vector>
 
 #include "envoy/event/dispatcher.h"
