@@ -21,7 +21,6 @@ for FILE in "$@"; do
     cp "$FILE" "$OUT_DIR/certs"
     ;;
   *.lua|*.wasm|*.so)
-      echo $FILE
     cp "$FILE" "$OUT_DIR/lib"
     ;;
   *.pb)
@@ -30,7 +29,6 @@ for FILE in "$@"; do
   *)
 
     FILENAME="$(echo "$FILE" | sed -e 's/.*examples\///g')"
-
     # Configuration filenames may conflict. To avoid this we use the full path.
     cp "$FILE" "$OUT_DIR/${FILENAME//\//_}"
     ;;
