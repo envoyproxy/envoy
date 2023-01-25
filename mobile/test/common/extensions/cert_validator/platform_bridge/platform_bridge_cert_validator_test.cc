@@ -61,7 +61,7 @@ class PlatformBridgeCertValidatorTest
 protected:
   PlatformBridgeCertValidatorTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")),
-        stats_(generateSslStats(test_store_)), ssl_ctx_(SSL_CTX_new(TLS_method())),
+        stats_(generateSslStats(test_store_.rootScope())), ssl_ctx_(SSL_CTX_new(TLS_method())),
         callback_(std::make_unique<MockValidateResultCallback>()), is_server_(false) {
     mock_validator_ = std::make_unique<MockValidator>();
     main_thread_id_ = std::this_thread::get_id();
