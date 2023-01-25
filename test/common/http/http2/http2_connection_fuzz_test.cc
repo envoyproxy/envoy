@@ -134,7 +134,7 @@ Http2Frame pb_to_h2_frame(nghttp2_hd_deflater* deflater,
       uint32_t stream_dependency = f.stream_dependency();
       payload.append(reinterpret_cast<char*>(&stream_dependency), sizeof(stream_dependency));
 
-      if(f.weight() > 0 && f.weight() <= 256) {
+      if (f.weight() > 0 && f.weight() <= 256) {
         uint8_t weight = static_cast<uint8_t>((f.weight() - 1) & 0xff);
         payload.append(reinterpret_cast<char*>(&weight), sizeof(weight));
       }
@@ -219,29 +219,12 @@ envoy::config::core::v3::Http2ProtocolOptions http2Settings() {
 
 class Http2Harness {
 public:
-  Http2Harness() : server_settings(http2Settings()), client_settings(http2Settings()) {
+  Http2Harness() : server_settings(http2Settings()) {
     ON_CALL(mock_server_callbacks, newStream(_, _))
         .WillByDefault(Invoke(
             [&](ResponseEncoder&, bool) -> RequestDecoder& { return orphan_request_decoder; }));
   }
 
-  void fuzz_response(std::vector<Http2Frame>& frames) {
-    client_ = std::make_unique<Http2::ClientConnectionImpl>(
-        mock_client_connection, mock_client_callbacks,
-        Http2::CodecStats::atomicGet(http2_stats, stats_store), random, client_settings,
-        Http::DEFAULT_MAX_REQUEST_HEADERS_KB, Http::DEFAULT_MAX_HEADERS_COUNT,
-        Http2::ProdNghttp2SessionFactory::get());
-
-    Buffer::OwnedImpl init;
-    Http2Frame emptySettingsFrame(0, 4, 0);
-    init.add(emptySettingsFrame.serialize());
-    Status status = client_->dispatch(init);
-    for (auto frame : frames) {
-      Buffer::OwnedImpl framebuf;
-      framebuf.add(frame.serialize());
-      Status status = client_->dispatch(framebuf);
-    }
-  }
   void fuzz_request(std::vector<Http2Frame>& frames, bool use_oghttp2) {
     TestScopedRuntime scoped_runtime;
     if (use_oghttp2) {
@@ -265,13 +248,9 @@ public:
   }
 
 private:
-  const envoy::config::core::v3::Http2ProtocolOptions server_settings, client_settings;
+  const envoy::config::core::v3::Http2ProtocolOptions server_settings;
   Stats::IsolatedStoreImpl stats_store;
   Http2::CodecStats::AtomicPtr http2_stats;
-
-  NiceMock<MockConnectionCallbacks> mock_client_callbacks;
-  NiceMock<Network::MockConnection> mock_client_connection;
-  ClientConnectionPtr client_;
 
   NiceMock<MockRequestDecoder> orphan_request_decoder;
   NiceMock<Network::MockConnection> mock_server_connection;
