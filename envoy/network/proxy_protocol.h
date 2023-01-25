@@ -11,7 +11,7 @@ namespace Network {
 
 struct ProxyProtocolTLV {
   const uint8_t type;
-  const std::string value;
+  const std::vector<unsigned char> value;
 };
 
 using ProxyProtocolTLVVector = std::vector<ProxyProtocolTLV>;

@@ -1,6 +1,7 @@
 #include "envoy/network/address.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/logger.h"
 #include "source/common/network/address_impl.h"
 #include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 
@@ -119,7 +120,7 @@ TEST(ProxyProtocolHeaderTest, GeneratesV2LocalHeader) {
   EXPECT_TRUE(TestUtility::buffersEqual(expectedBuff, buff));
 }
 
-TEST(ProxyProtocolHeaderTest, GeneratesV2IPv4HeaderWithTLV_PassAll) {
+TEST(ProxyProtocolHeaderTest, GeneratesV2IPv4HeaderWithTLVPassAll) {
   const uint8_t v2_protocol[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54,
                                  0x0a, 0x21, 0x11, 0x00, 0x11, 0x01, 0x02, 0x03, 0x04, 0x00, 0x01,
                                  0x01, 0x02, 0x03, 0x05, 0x02, 0x01, 0x05, 0x00, 0x02, 0x06, 0x07};
@@ -129,16 +130,16 @@ TEST(ProxyProtocolHeaderTest, GeneratesV2IPv4HeaderWithTLV_PassAll) {
       Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("1.2.3.4", 773));
   auto dst_addr =
       Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("0.1.1.2", 513));
-  Network::ProxyProtocolTLV tlv{0x5, "\6\7"s};
+  Network::ProxyProtocolTLV tlv{0x5, {0x06, 0x07}};
   Network::ProxyProtocolData proxy_proto_data{src_addr, dst_addr, {tlv}};
   Buffer::OwnedImpl buff{};
 
-  generateV2Header(proxy_proto_data, buff, true, {});
+  ASSERT_TRUE(generateV2Header(proxy_proto_data, buff, true, {}));
 
   EXPECT_TRUE(TestUtility::buffersEqual(expectedBuff, buff));
 }
 
-TEST(ProxyProtocolHeaderTest, GeneratesV2IPv4HeaderWithTLV_PassEmpty) {
+TEST(ProxyProtocolHeaderTest, GeneratesV2IPv4HeaderWithTLVPassEmpty) {
   const uint8_t v2_protocol[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                  0x54, 0x0a, 0x21, 0x11, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
                                  0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x02, 0x01};
@@ -148,16 +149,16 @@ TEST(ProxyProtocolHeaderTest, GeneratesV2IPv4HeaderWithTLV_PassEmpty) {
       Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("1.2.3.4", 773));
   auto dst_addr =
       Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("0.1.1.2", 513));
-  Network::ProxyProtocolTLV tlv{0x5, "\6\7"s};
+  Network::ProxyProtocolTLV tlv{0x5, {0x06, 0x07}};
   Network::ProxyProtocolData proxy_proto_data{src_addr, dst_addr, {tlv}};
   Buffer::OwnedImpl buff{};
 
-  generateV2Header(proxy_proto_data, buff, false, {});
+  ASSERT_TRUE(generateV2Header(proxy_proto_data, buff, false, {}));
 
   EXPECT_TRUE(TestUtility::buffersEqual(expectedBuff, buff));
 }
 
-TEST(ProxyProtocolHeaderTest, GeneratesV2IPv4HeaderWithTLV_PassSpecific) {
+TEST(ProxyProtocolHeaderTest, GeneratesV2IPv4HeaderWithTLVPassSpecific) {
   const uint8_t v2_protocol[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54,
                                  0x0a, 0x21, 0x11, 0x00, 0x11, 0x01, 0x02, 0x03, 0x04, 0x00, 0x01,
                                  0x01, 0x02, 0x03, 0x05, 0x02, 0x01, 0x05, 0x00, 0x02, 0x06, 0x07};
@@ -167,11 +168,11 @@ TEST(ProxyProtocolHeaderTest, GeneratesV2IPv4HeaderWithTLV_PassSpecific) {
       Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("1.2.3.4", 773));
   auto dst_addr =
       Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("0.1.1.2", 513));
-  Network::ProxyProtocolTLV tlv{0x5, "\6\7"s};
+  Network::ProxyProtocolTLV tlv{0x5, {0x06, 0x07}};
   Network::ProxyProtocolData proxy_proto_data{src_addr, dst_addr, {tlv}};
   Buffer::OwnedImpl buff{};
 
-  generateV2Header(proxy_proto_data, buff, false, {0x5});
+  ASSERT_TRUE(generateV2Header(proxy_proto_data, buff, false, {0x5}));
 
   EXPECT_TRUE(TestUtility::buffersEqual(expectedBuff, buff));
 }
@@ -187,11 +188,11 @@ TEST(ProxyProtocolHeaderTest, GeneratesV2IPv6HeaderWithTLV) {
       Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv6Instance("1:2:3::4", 8));
   auto dst_addr = Network::Address::InstanceConstSharedPtr(
       new Network::Address::Ipv6Instance("1:100:200:3::", 2));
-  Network::ProxyProtocolTLV tlv{0x5, "\6\7"s};
+  Network::ProxyProtocolTLV tlv{0x5, {0x06, 0x07}};
   Network::ProxyProtocolData proxy_proto_data{src_addr, dst_addr, {tlv}};
 
   Buffer::OwnedImpl buff{};
-  generateV2Header(proxy_proto_data, buff, true, {});
+  ASSERT_TRUE(generateV2Header(proxy_proto_data, buff, true, {}));
 
   EXPECT_TRUE(TestUtility::buffersEqual(expectedBuff, buff));
 }
@@ -202,12 +203,12 @@ TEST(ProxyProtocolHeaderTest, GeneratesV2WithTLVExceedingLengthLimit) {
   auto dst_addr =
       Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("0.1.1.2", 513));
   const std::string long_tlv(65536, 'a');
-  Network::ProxyProtocolTLV tlv{0x5, long_tlv};
+  Network::ProxyProtocolTLV tlv{0x5, std::vector<unsigned char>(long_tlv.begin(), long_tlv.end())};
   Network::ProxyProtocolData proxy_proto_data{src_addr, dst_addr, {tlv}};
   Buffer::OwnedImpl buff{};
 
-  EXPECT_THROW_WITH_MESSAGE(generateV2Header(proxy_proto_data, buff, true, {}), EnvoyException,
-                            "proxy protocol TLVs exceed length limit 65535, already got 65539");
+  EXPECT_LOG_CONTAINS("warn", "Generating Proxy Protocol V2 header: TLVs exceed length limit 65535",
+                      generateV2Header(proxy_proto_data, buff, true, {}));
 }
 
 } // namespace

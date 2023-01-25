@@ -69,7 +69,7 @@ void generateProxyProtoHeader(const envoy::config::core::v3::ProxyProtocolConfig
 void generateV2LocalHeader(Buffer::Instance& out);
 
 // Generates the v2 PROXY protocol header including the TLV vector into the specified buffer.
-void generateV2Header(const Network::ProxyProtocolData& proxy_proto_data, Buffer::Instance& out,
+bool generateV2Header(const Network::ProxyProtocolData& proxy_proto_data, Buffer::Instance& out,
                       bool pass_all_tlvs, const absl::flat_hash_set<uint8_t>& pass_through_tlvs);
 
 } // namespace ProxyProtocol

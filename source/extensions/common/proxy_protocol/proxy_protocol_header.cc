@@ -110,7 +110,7 @@ void generateV2Header(const Network::Address::Ip& source_address,
                    source_address.port(), dest_address.port(), source_address.version(), 0, out);
 }
 
-void generateV2Header(const Network::ProxyProtocolData& proxy_proto_data, Buffer::Instance& out,
+bool generateV2Header(const Network::ProxyProtocolData& proxy_proto_data, Buffer::Instance& out,
                       bool pass_all_tlvs, const absl::flat_hash_set<uint8_t>& pass_through_tlvs) {
   uint64_t extension_length = 0;
   for (auto&& tlv : proxy_proto_data.tlv_vector_) {
@@ -119,12 +119,14 @@ void generateV2Header(const Network::ProxyProtocolData& proxy_proto_data, Buffer
     }
     extension_length += PROXY_PROTO_V2_TLV_TYPE_LENGTH_LEN + tlv.value.size();
     if (extension_length > std::numeric_limits<uint16_t>::max()) {
-      ExceptionUtil::throwEnvoyException(
-          fmt::format("proxy protocol TLVs exceed length limit {}, already got {}",
-                      std::numeric_limits<uint16_t>::max(), extension_length));
+      ENVOY_LOG_MISC(
+          warn, "Generating Proxy Protocol V2 header: TLVs exceed length limit {}, already got {}",
+          std::numeric_limits<uint16_t>::max(), extension_length);
+      return false;
     }
   }
-  assert(extension_length <= std::numeric_limits<uint16_t>::max());
+
+  ASSERT(extension_length <= std::numeric_limits<uint16_t>::max());
   const auto& src = *proxy_proto_data.src_addr_->ip();
   const auto& dst = *proxy_proto_data.dst_addr_->ip();
   generateV2Header(src.addressAsString(), dst.addressAsString(), src.port(), dst.port(),
@@ -138,8 +140,9 @@ void generateV2Header(const Network::ProxyProtocolData& proxy_proto_data, Buffer
     out.add(&tlv.type, 1);
     uint16_t size = htons(static_cast<uint16_t>(tlv.value.size()));
     out.add(&size, sizeof(uint16_t));
-    out.add(tlv.value.c_str(), tlv.value.size());
+    out.add(&tlv.value.front(), tlv.value.size());
   }
+  return true;
 }
 
 void generateProxyProtoHeader(const envoy::config::core::v3::ProxyProtocolConfig& config,

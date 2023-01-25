@@ -482,12 +482,11 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtocolTLVsIntegrationTest,
 
 // This test adding the listener proxy protocol filter and upstream proxy filter, the TLVs
 // are passed by listener and re-generated in transport socket based on API config.
-TEST_P(ProxyProtocolTLVsIntegrationTest, TestV2TLVProxyProtocol_PassSepcificTLVs) {
+TEST_P(ProxyProtocolTLVsIntegrationTest, TestV2TLVProxyProtocolPassSepcificTLVs) {
   setup(false, {0x05, 0x06}, {0x06});
   initialize();
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  ;
   std::string observed_data;
   if (GetParam() == Envoy::Network::Address::IpVersion::v4) {
     // 2 TLVs are included:
@@ -553,7 +552,7 @@ TEST_P(ProxyProtocolTLVsIntegrationTest, TestV2TLVProxyProtocol_PassSepcificTLVs
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 }
 
-TEST_P(ProxyProtocolTLVsIntegrationTest, TestV2TLVProxyProtocol_PassAll) {
+TEST_P(ProxyProtocolTLVsIntegrationTest, TestV2TLVProxyProtocolPassAll) {
   setup(true, {}, {});
   initialize();
 

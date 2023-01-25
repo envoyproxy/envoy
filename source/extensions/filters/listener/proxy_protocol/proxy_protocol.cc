@@ -430,7 +430,7 @@ bool Filter::parseTlvs(const uint8_t* buf, size_t len) {
     // Save TLVs to the filter state.
     if (config_->isPassThroughTlvTypeNeeded(tlv_type)) {
       ENVOY_LOG(trace, "proxy_protocol: Storing parsed TLV of type {} to filter state.", tlv_type);
-      parsed_tlvs_.push_back({tlv_type, std::string(tlv_value)});
+      parsed_tlvs_.push_back({tlv_type, {tlv_value.begin(), tlv_value.end()}});
     }
 
     idx += tlv_value_length;

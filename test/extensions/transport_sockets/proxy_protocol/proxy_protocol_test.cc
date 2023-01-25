@@ -40,8 +40,8 @@ public:
     auto inner_socket = std::make_unique<NiceMock<Network::MockTransportSocket>>();
     inner_socket_ = inner_socket.get();
     ON_CALL(transport_callbacks_, ioHandle()).WillByDefault(ReturnRef(io_handle_));
-    proxy_protocol_socket_ = std::make_unique<UpstreamProxyProtocolSocket>(std::move(inner_socket),
-                                                                           socket_options, config);
+    proxy_protocol_socket_ = std::make_unique<UpstreamProxyProtocolSocket>(
+        std::move(inner_socket), socket_options, config, stats_store_);
     proxy_protocol_socket_->setTransportSocketCallbacks(transport_callbacks_);
     proxy_protocol_socket_->onConnected();
   }
@@ -50,6 +50,7 @@ public:
   NiceMock<Network::MockIoHandle> io_handle_;
   std::unique_ptr<UpstreamProxyProtocolSocket> proxy_protocol_socket_;
   NiceMock<Network::MockTransportSocketCallbacks> transport_callbacks_;
+  Stats::TestUtil::TestStore stats_store_;
 };
 
 // Test injects PROXY protocol header only once
@@ -478,7 +479,7 @@ TEST_F(ProxyProtocolTest, V2IPV4DownstreamAddressesAndTLVs) {
   auto dst_addr =
       Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("0.1.1.2", 513));
   // TLV type 0x5 is PP2_TYPE_UNIQUE_ID
-  Network::ProxyProtocolTLVVector tlv_vector{Network::ProxyProtocolTLV{0x5, std::string(16, 'a')}};
+  Network::ProxyProtocolTLVVector tlv_vector{Network::ProxyProtocolTLV{0x5, {'a', 'b', 'c'}}};
   Network::ProxyProtocolData proxy_proto_data{src_addr, dst_addr, tlv_vector};
   Network::TransportSocketOptionsConstSharedPtr socket_options =
       std::make_shared<Network::TransportSocketOptionsImpl>(
@@ -517,7 +518,7 @@ TEST_F(ProxyProtocolTest, V2IPV4PassSpecificTLVs) {
   auto dst_addr =
       Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("0.1.1.2", 513));
   // TLV type 0x5 is PP2_TYPE_UNIQUE_ID
-  Network::ProxyProtocolTLVVector tlv_vector{Network::ProxyProtocolTLV{0x5, std::string(16, 'a')}};
+  Network::ProxyProtocolTLVVector tlv_vector{Network::ProxyProtocolTLV{0x5, {'a', 'b', 'c'}}};
   Network::ProxyProtocolData proxy_proto_data{src_addr, dst_addr, tlv_vector};
   Network::TransportSocketOptionsConstSharedPtr socket_options =
       std::make_shared<Network::TransportSocketOptionsImpl>(
@@ -557,7 +558,7 @@ TEST_F(ProxyProtocolTest, V2IPV4PassEmptyTLVs) {
   auto dst_addr =
       Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("0.1.1.2", 513));
   // TLV type 0x5 is PP2_TYPE_UNIQUE_ID
-  Network::ProxyProtocolTLVVector tlv_vector{Network::ProxyProtocolTLV{0x5, std::string(16, 'a')}};
+  Network::ProxyProtocolTLVVector tlv_vector{Network::ProxyProtocolTLV{0x5, {'a', 'b', 'c'}}};
   Network::ProxyProtocolData proxy_proto_data{src_addr, dst_addr, tlv_vector};
   Network::TransportSocketOptionsConstSharedPtr socket_options =
       std::make_shared<Network::TransportSocketOptionsImpl>(
@@ -588,6 +589,36 @@ TEST_F(ProxyProtocolTest, V2IPV4PassEmptyTLVs) {
   proxy_protocol_socket_->doWrite(msg, false);
 }
 
+// Test injects V2 PROXY protocol for downstream IPV4 addresses with exceeding TLV max length.
+TEST_F(ProxyProtocolTest, V2IPV4TLVsExceedLengthLimit) {
+  auto src_addr =
+      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("1.2.3.4", 773));
+  auto dst_addr =
+      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("0.1.1.2", 513));
+
+  const std::string long_tlv(65536, 'a');
+  Network::ProxyProtocolTLV tlv{0x5, std::vector<unsigned char>(long_tlv.begin(), long_tlv.end())};
+
+  Network::ProxyProtocolData proxy_proto_data{src_addr, dst_addr, {tlv}};
+  Network::TransportSocketOptionsConstSharedPtr socket_options =
+      std::make_shared<Network::TransportSocketOptionsImpl>(
+          "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
+          absl::optional<Network::ProxyProtocolData>(proxy_proto_data));
+  transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
+      ->setLocalAddress(Network::Utility::resolveUrl("tcp://0.1.1.2:50000"));
+  transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
+      ->setRemoteAddress(Network::Utility::resolveUrl("tcp://3.3.3.3:80"));
+
+  ProxyProtocolConfig config;
+  config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2);
+  config.mutable_pass_through_tlvs()->set_match_type(ProxyProtocolPassThroughTLVs::INCLUDE_ALL);
+  initialize(config, socket_options);
+
+  auto msg = Buffer::OwnedImpl("some data");
+  proxy_protocol_socket_->doWrite(msg, false);
+  EXPECT_EQ(stats_store_.counter("upstream.proxyprotocol.v2_tlvs_exceed_max_length").value(), 1);
+}
+
 // Test injects V2 PROXY protocol for downstream IPV6 addresses and TLVs
 TEST_F(ProxyProtocolTest, V2IPV6DownstreamAddressesAndTLVs) {
   auto src_addr =
@@ -595,7 +626,7 @@ TEST_F(ProxyProtocolTest, V2IPV6DownstreamAddressesAndTLVs) {
   auto dst_addr = Network::Address::InstanceConstSharedPtr(
       new Network::Address::Ipv6Instance("1:100:200:3::", 2));
   // TLV type 0x5 is PP2_TYPE_UNIQUE_ID
-  Network::ProxyProtocolTLVVector tlv_vector{Network::ProxyProtocolTLV{0x5, std::string(16, 'a')}};
+  Network::ProxyProtocolTLVVector tlv_vector{Network::ProxyProtocolTLV{0x5, {'a', 'b', 'c'}}};
   Network::ProxyProtocolData proxy_proto_data{src_addr, dst_addr, tlv_vector};
   Network::TransportSocketOptionsConstSharedPtr socket_options =
       std::make_shared<Network::TransportSocketOptionsImpl>(
@@ -633,7 +664,7 @@ TEST_F(ProxyProtocolTest, V2IPV6DownstreamAddressesAndTLVsWithoutPassConfig) {
   auto dst_addr = Network::Address::InstanceConstSharedPtr(
       new Network::Address::Ipv6Instance("1:100:200:3::", 2));
   // TLV type 0x5 is PP2_TYPE_UNIQUE_ID
-  Network::ProxyProtocolTLVVector tlv_vector{Network::ProxyProtocolTLV{0x5, std::string(16, 'a')}};
+  Network::ProxyProtocolTLVVector tlv_vector{Network::ProxyProtocolTLV{0x5, {'a', 'b', 'c'}}};
   Network::ProxyProtocolData proxy_proto_data{src_addr, dst_addr, tlv_vector};
   Network::TransportSocketOptionsConstSharedPtr socket_options =
       std::make_shared<Network::TransportSocketOptionsImpl>(
@@ -669,12 +700,13 @@ public:
   void initialize() {
     auto inner_factory = std::make_unique<NiceMock<Network::MockTransportSocketFactory>>();
     inner_factory_ = inner_factory.get();
-    factory_ = std::make_unique<UpstreamProxyProtocolSocketFactory>(std::move(inner_factory),
-                                                                    ProxyProtocolConfig());
+    factory_ = std::make_unique<UpstreamProxyProtocolSocketFactory>(
+        std::move(inner_factory), ProxyProtocolConfig(), stats_store_);
   }
 
   NiceMock<Network::MockTransportSocketFactory>* inner_factory_;
   std::unique_ptr<UpstreamProxyProtocolSocketFactory> factory_;
+  Stats::TestUtil::TestStore stats_store_;
 };
 
 // Test createTransportSocket returns nullptr if inner call returns nullptr
