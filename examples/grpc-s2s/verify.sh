@@ -22,16 +22,18 @@ curl -s "http://localhost:${PORT_ADMIN_WORLD}/stats" | grep -q "cluster.world.he
 
 run_log "Render an instance of Hello unhealthy"
 docker-compose exec -ti --index 1 hello kill -SIGUSR1 1
+run_log "Sleeping for 10"
 # TODO remove this if possible
-sleep 2
+sleep 10
 
 docker-compose logs | grep hello-1
 docker-compose logs hello | grep hello-1 |  grep -q "Marking service Hello as unhealthy"
 
 run_log "Render an instance of World unhealthy"
 docker-compose exec -ti --index 1 world kill -SIGUSR1 1
+run_log "Sleeping for 10"
 # TODO remove this if possible
-sleep 2
+sleep 10
 
 docker-compose logs world | grep world-1 | grep -q "Marking service World as unhealthy"
 
