@@ -44,7 +44,7 @@ filegroup(
     name = "contrib_configs",
     srcs = glob(
         ["root/_configs/go/*.yaml"],
-    )
+    ),
 )
 
 filegroup(
