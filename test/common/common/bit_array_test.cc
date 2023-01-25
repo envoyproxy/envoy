@@ -1,15 +1,16 @@
-#include "source/common/common/bit_array.h"
-
-#include "gtest/gtest.h"
 #include <cstdlib>
 #include <memory>
+
+#include "source/common/common/bit_array.h"
 #include "source/common/common/random_generator.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace {
 
 // BitArray does not support windows.
-#ifndef(WIN32)
+#ifndef WIN32
 
 TEST(BitArray, ShouldAssertIfInvalidBitWidth) {
   {

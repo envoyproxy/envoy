@@ -1,20 +1,22 @@
 #pragma once
 
-#include "assert.h"
 #include <cstdint>
 #include <cstring>
+
+#include "source/common/common/assert.h"
+#include "source/common/common/safe_memcpy.h"
 
 namespace Envoy {
 
 /**
  * BitArray is an array of fixed width bits.
  * At a minimum this will allocate a word_size worth of bytes.
- * Methods are delibrately implemented in the header to hint to the compiler to
+ * Methods are deliberately implemented in the header to hint to the compiler to
  * inline.
  *
  * Limitations to this class are:
  *  1) It is not thread-safe
- *  2) It assumes little-endianess and a 64-bit architecture.
+ *  2) It assumes little-endianness and a 64-bit architecture.
  *  3) It works with a maximum width of 32-bits
  */
 class BitArray {
@@ -99,12 +101,12 @@ private:
   }
 
   static inline void StoreUnsignedWord(void* destination, uint64_t value) {
-    memcpy(destination, &value, sizeof(value));
+    safeMemcpyUnsafeDst(destination, &value);
   }
 
   static inline uint64_t LoadUnsignedWord(const void* source) {
     uint64_t destination;
-    memcpy(&destination, source, sizeof(destination));
+    safeMemcpyUnsafeSrc(&destination, source);
     return destination;
   }
 

@@ -1,7 +1,6 @@
 #include "source/common/upstream/maglev_lb.h"
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
-#include "maglev_lb.h"
 
 namespace Envoy {
 namespace Upstream {

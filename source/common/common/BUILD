@@ -510,6 +510,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "bit_array_lib",
     hdrs = ["bit_array.h"],
+    deps = [
+        ":safe_memcpy_lib",
+    ],
 )
 
 envoy_cc_library(

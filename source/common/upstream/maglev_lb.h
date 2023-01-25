@@ -8,9 +8,9 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
+#include "source/common/common/bit_array.h"
 #include "source/common/upstream/thread_aware_lb_impl.h"
 #include "source/common/upstream/upstream_impl.h"
-#include "source/common/common/bit_array.h"
 
 namespace Envoy {
 namespace Upstream {
