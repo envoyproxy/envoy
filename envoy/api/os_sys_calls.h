@@ -39,6 +39,8 @@ struct InterfaceAddress {
 
 using InterfaceAddressVector = std::vector<InterfaceAddress>;
 
+using AlternateGetifaddrs = std::function<SysCallIntResult(InterfaceAddressVector& interfaces)>;
+
 class OsSysCalls {
 public:
   virtual ~OsSysCalls() = default;
@@ -276,6 +278,16 @@ public:
   virtual SysCallIntResult getifaddrs(InterfaceAddressVector& interfaces) PURE;
 
   /**
+   * allows a platform to override getifaddrs or provide an implementation if one does not exist
+   * natively.
+   *
+   * @arg alternate_getifaddrs function pointer to implementation.
+   */
+  virtual void setAlternateGetifaddrs(AlternateGetifaddrs alternate_getifaddrs) {
+    alternate_getifaddrs_ = alternate_getifaddrs;
+  }
+
+  /**
    * @see man getaddrinfo
    */
   virtual SysCallIntResult getaddrinfo(const char* node, const char* service, const addrinfo* hints,
@@ -285,6 +297,9 @@ public:
    * @see man freeaddrinfo
    */
   virtual void freeaddrinfo(addrinfo* res) PURE;
+
+protected:
+  absl::optional<AlternateGetifaddrs> alternate_getifaddrs_{};
 };
 
 using OsSysCallsPtr = std::unique_ptr<OsSysCalls>;

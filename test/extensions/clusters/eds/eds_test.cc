@@ -200,7 +200,8 @@ protected:
     doOnConfigUpdateVerifyNoThrow(cluster_load_assignment_);
 
     // Make sure the cluster is rebuilt.
-    EXPECT_EQ(0UL, stats_.counter("cluster.name.update_no_rebuild").value());
+    EXPECT_EQ(0UL,
+              stats_.findCounterByString("cluster.name.update_no_rebuild").value().get().value());
     {
       auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
       EXPECT_EQ(hosts.size(), 2);
@@ -258,7 +259,8 @@ protected:
     doOnConfigUpdateVerifyNoThrow(cluster_load_assignment_);
 
     // Always rebuild if health check config is changed.
-    EXPECT_EQ(0UL, stats_.counter("cluster.name.update_no_rebuild").value());
+    EXPECT_EQ(0UL,
+              stats_.findCounterByString("cluster.name.update_no_rebuild").value().get().value());
   }
 
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment_;
@@ -286,7 +288,7 @@ TEST_F(EdsTest, OnConfigUpdateEmpty) {
   eds_callbacks_->onConfigUpdate({}, "");
   Protobuf::RepeatedPtrField<std::string> removed_resources;
   eds_callbacks_->onConfigUpdate({}, removed_resources, "");
-  EXPECT_EQ(2UL, stats_.counter("cluster.name.update_empty").value());
+  EXPECT_EQ(2UL, stats_.findCounterByString("cluster.name.update_empty").value().get().value());
   EXPECT_TRUE(initialized_);
 }
 
@@ -313,7 +315,8 @@ TEST_F(EdsTest, OnConfigUpdateSuccess) {
   initialize();
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
   EXPECT_TRUE(initialized_);
-  EXPECT_EQ(1UL, stats_.counter("cluster.name.update_no_rebuild").value());
+  EXPECT_EQ(1UL,
+            stats_.findCounterByString("cluster.name.update_no_rebuild").value().get().value());
 }
 
 // Validate that delta-style onConfigUpdate() with the expected cluster accepts config.
@@ -332,7 +335,8 @@ TEST_F(EdsTest, DeltaOnConfigUpdateSuccess) {
   VERBOSE_EXPECT_NO_THROW(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "v1"));
 
   EXPECT_TRUE(initialized_);
-  EXPECT_EQ(1UL, stats_.counter("cluster.name.update_no_rebuild").value());
+  EXPECT_EQ(1UL,
+            stats_.findCounterByString("cluster.name.update_no_rebuild").value().get().value());
 }
 
 // Validate that onConfigUpdate() with no service name accepts config.
@@ -381,20 +385,18 @@ TEST_F(EdsTest, EndpointWeightChangeCausesRebuild) {
   initialize();
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
   EXPECT_TRUE(initialized_);
-  EXPECT_EQ(0UL, stats_.counter("cluster.name.update_no_rebuild").value());
-  EXPECT_EQ(
-      30UL,
-      stats_.gauge("cluster.name.max_host_weight", Stats::Gauge::ImportMode::Accumulate).value());
+  EXPECT_EQ(0UL,
+            stats_.findCounterByString("cluster.name.update_no_rebuild").value().get().value());
+  EXPECT_EQ(30UL, stats_.findGaugeByString("cluster.name.max_host_weight").value().get().value());
   auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
   EXPECT_EQ(hosts.size(), 1);
   EXPECT_EQ(hosts[0]->weight(), 30);
 
   endpoint->mutable_load_balancing_weight()->set_value(31);
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
-  EXPECT_EQ(0UL, stats_.counter("cluster.name.update_no_rebuild").value());
-  EXPECT_EQ(
-      31UL,
-      stats_.gauge("cluster.name.max_host_weight", Stats::Gauge::ImportMode::Accumulate).value());
+  EXPECT_EQ(0UL,
+            stats_.findCounterByString("cluster.name.update_no_rebuild").value().get().value());
+  EXPECT_EQ(31UL, stats_.findGaugeByString("cluster.name.max_host_weight").value().get().value());
   auto& new_hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
   EXPECT_EQ(new_hosts.size(), 1);
   EXPECT_EQ(new_hosts[0]->weight(), 31);
@@ -430,7 +432,8 @@ TEST_F(EdsTest, EndpointMetadata) {
   initialize();
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
   EXPECT_TRUE(initialized_);
-  EXPECT_EQ(0UL, stats_.counter("cluster.name.update_no_rebuild").value());
+  EXPECT_EQ(0UL,
+            stats_.findCounterByString("cluster.name.update_no_rebuild").value().get().value());
 
   auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
   EXPECT_EQ(hosts.size(), 2);
@@ -462,7 +465,8 @@ TEST_F(EdsTest, EndpointMetadata) {
 
   // We don't rebuild with the exact same config.
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
-  EXPECT_EQ(1UL, stats_.counter("cluster.name.update_no_rebuild").value());
+  EXPECT_EQ(1UL,
+            stats_.findCounterByString("cluster.name.update_no_rebuild").value().get().value());
 
   // New resources with Metadata updated.
   Config::Metadata::mutableMetadataValue(*canary->mutable_metadata(),
@@ -620,7 +624,8 @@ TEST_F(EdsTest, EndpointHealthStatus) {
     EXPECT_EQ(Host::Health::Healthy, hosts[0]->coarseHealth());
   }
 
-  const auto rebuild_container = stats_.counter("cluster.name.update_no_rebuild").value();
+  const auto rebuild_container =
+      stats_.findCounterByString("cluster.name.update_no_rebuild").value().get().value();
   // Now mark host 0 degraded via EDS, it should be degraded.
   endpoints->mutable_lb_endpoints(0)->set_health_status(envoy::config::core::v3::DEGRADED);
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
@@ -630,7 +635,8 @@ TEST_F(EdsTest, EndpointHealthStatus) {
   }
 
   // We should rebuild the cluster since we went from healthy -> degraded.
-  EXPECT_EQ(rebuild_container, stats_.counter("cluster.name.update_no_rebuild").value());
+  EXPECT_EQ(rebuild_container,
+            stats_.findCounterByString("cluster.name.update_no_rebuild").value().get().value());
 
   // Now mark the host as having been degraded through active hc.
   cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagSet(
@@ -645,7 +651,8 @@ TEST_F(EdsTest, EndpointHealthStatus) {
   }
 
   // Since the host health didn't change, expect no rebuild.
-  EXPECT_EQ(rebuild_container + 1, stats_.counter("cluster.name.update_no_rebuild").value());
+  EXPECT_EQ(rebuild_container + 1,
+            stats_.findCounterByString("cluster.name.update_no_rebuild").value().get().value());
 }
 
 // Validate that onConfigUpdate() updates the hostname.
@@ -2271,7 +2278,8 @@ TEST_F(EdsTest, PriorityAndLocalityWeighted) {
   initialize();
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
   EXPECT_TRUE(initialized_);
-  EXPECT_EQ(0UL, stats_.counter("cluster.name.update_no_rebuild").value());
+  EXPECT_EQ(0UL,
+            stats_.findCounterByString("cluster.name.update_no_rebuild").value().get().value());
 
   {
     auto& first_hosts_per_locality =
@@ -2304,13 +2312,15 @@ TEST_F(EdsTest, PriorityAndLocalityWeighted) {
   // This should noop (regression test for earlier bug where we would still
   // rebuild).
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
-  EXPECT_EQ(1UL, stats_.counter("cluster.name.update_no_rebuild").value());
+  EXPECT_EQ(1UL,
+            stats_.findCounterByString("cluster.name.update_no_rebuild").value().get().value());
 
   // Adjust locality weights, validate that we observe an update.
   cluster_load_assignment.mutable_endpoints(0)->mutable_load_balancing_weight()->set_value(60);
   cluster_load_assignment.mutable_endpoints(1)->mutable_load_balancing_weight()->set_value(40);
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
-  EXPECT_EQ(1UL, stats_.counter("cluster.name.update_no_rebuild").value());
+  EXPECT_EQ(1UL,
+            stats_.findCounterByString("cluster.name.update_no_rebuild").value().get().value());
 }
 
 TEST_F(EdsWithHealthCheckUpdateTest, EndpointUpdateHealthCheckConfig) {
