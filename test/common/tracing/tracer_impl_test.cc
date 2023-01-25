@@ -123,7 +123,7 @@ TEST_F(FinalizerImplTest, TestAll) {
   TestEnvironment::setEnvVar("E_CC", "c", 1);
 
   Tracing::TestTraceContextImpl trace_context{{"x-request-id", "id"}, {"x-bb", "b"}};
-  trace_context.context_authority_ = "test.com";
+  trace_context.context_host_ = "test.com";
   trace_context.context_method_ = "method";
   trace_context.context_path_ = "TestService";
   trace_context.context_protocol_ = "test";
