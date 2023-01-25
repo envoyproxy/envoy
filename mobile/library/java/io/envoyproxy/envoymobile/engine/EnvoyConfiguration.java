@@ -234,8 +234,6 @@ public class EnvoyConfiguration {
         .append(String.format("- &dns_preresolve_hostnames %s\n", dnsPreresolveHostnames))
         .append(String.format("- &dns_lookup_family %s\n",
                               enableHappyEyeballs ? "ALL" : "V4_PREFERRED"))
-        .append(
-            String.format("- &dns_multiple_addresses %s\n", enableHappyEyeballs ? "true" : "false"))
         .append(String.format("- &dns_refresh_rate %ss\n", dnsRefreshSeconds))
         .append(String.format("- &enable_drain_post_dns_refresh %s\n",
                               enableDrainPostDnsRefresh ? "true" : "false"))

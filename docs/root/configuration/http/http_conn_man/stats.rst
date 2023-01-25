@@ -68,6 +68,8 @@ statistics:
    ``downstream_rq_redirected_with_normalized_path``, Counter, Total requests redirected due to different original and normalized URL paths. This action is configured by setting the :ref:`path_with_escaped_slashes_action <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.path_with_escaped_slashes_action>` config option.
    ``rs_too_large``, Counter, Total response errors due to buffering an overly large body
 
+.. _config_http_conn_man_stats_per_ua:
+
 Per user agent statistics
 -------------------------
 
@@ -90,6 +92,8 @@ Per listener statistics
 
 Per listener statistics are rooted at ``listener.<address>.``.
 
+.. _config_http_conn_man_stats_per_listener_http:
+
 HTTP per listener statistics
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -106,6 +110,8 @@ following statistics:
    ``downstream_rq_3xx``, Counter, Total 3xx responses
    ``downstream_rq_4xx``, Counter, Total 4xx responses
    ``downstream_rq_5xx``, Counter, Total 5xx responses
+
+.. _config_http_conn_man_stats_per_listener_http3:
 
 HTTP/3 per listener statistics
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
