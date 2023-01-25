@@ -66,8 +66,8 @@ public:
   void setConfigProto(const envoy::config::bootstrap::v3::Bootstrap& config_proto) {
     *config_proto_ = config_proto;
   }
-  void setConfigProto(std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>&& bootstrap) {
-    config_proto_ = std::move(bootstrap);
+  void setConfigProto(std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>&& config_proto) {
+    config_proto_ = std::move(config_proto);
   }
   void setConfigYaml(const std::string& config_yaml) { config_yaml_ = config_yaml; }
   void setAdminAddressPath(const std::string& admin_address_path) {
