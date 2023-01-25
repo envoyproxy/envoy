@@ -32,6 +32,9 @@ public:
   EngineBuilder(std::string config_template);
   EngineBuilder();
 
+  // Use the experimental non-YAML config mode which uses the bootstrap proto directly.
+  EngineBuilder& setUseBootstrap();
+
   EngineBuilder& addLogLevel(LogLevel log_level);
   EngineBuilder& setOnEngineRunning(std::function<void()> closure);
 
@@ -65,7 +68,7 @@ public:
   EngineBuilder& enforceTrustChainVerification(bool trust_chain_verification_on);
   EngineBuilder& enablePlatformCertificatesValidation(bool platform_certificates_validation_on);
 
-  // These functions are not compatible with boostrap mode, see |bootstrap_mode_| for details.
+  // These functions are not compatible with boostrap mode, see class definition for details.
   EngineBuilder& addStatsSinks(const std::vector<std::string>& stat_sinks);
   EngineBuilder& addDnsPreresolveHostnames(std::string dns_preresolve_hostnames);
   EngineBuilder& addVirtualClusters(std::string virtual_clusters);
@@ -75,11 +78,12 @@ public:
   EngineBuilder& addPlatformFilter(std::string name);
   EngineBuilder& enableAdminInterface(bool admin_interface_on);
 
-  // Use the experimental non-YAML config mode which uses the bootstrap proto directly.
-  EngineBuilder& setUseBootstrap();
-
   // this is separated from build() for the sake of testability
   std::string generateConfigStr() const;
+  // If trim_whitespace_for_tests is set true, it will prunt whitespace from the
+  // certificates file to allow for proto equivalence testing. This is expensive
+  // and should only be done for testing purposes (in explicit unit tests or
+  // debug mode)
   std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>
   generateBootstrap(bool trim_whitespace_for_tests = false) const;
 
@@ -105,8 +109,6 @@ private:
   LogLevel log_level_ = LogLevel::info;
   EngineCallbacksSharedPtr callbacks_;
 
-  bool config_bootstrap_incompatible_ = false;
-  bool use_bootstrap_ = false;
   std::string config_template_;
   std::string stats_domain_;
   int connect_timeout_seconds_ = 30;
@@ -148,6 +150,8 @@ private:
   std::vector<NativeFilterConfig> native_filter_chain_;
   std::vector<std::string> platform_filters_;
   absl::flat_hash_map<std::string, StringAccessorSharedPtr> string_accessors_;
+  bool config_bootstrap_incompatible_ = false;
+  bool use_bootstrap_ = false;
 };
 
 using EngineBuilderSharedPtr = std::shared_ptr<EngineBuilder>;

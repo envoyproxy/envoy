@@ -63,9 +63,8 @@ bool generatedStringMatchesGeneratedBoostrap(
 } // namespace
 
 EngineBuilder::EngineBuilder(std::string config_template)
-    : callbacks_(std::make_shared<EngineCallbacks>()), config_template_(config_template) {
-  config_bootstrap_incompatible_ = true;
-}
+    : callbacks_(std::make_shared<EngineCallbacks>()), config_template_(config_template),
+      config_bootstrap_incompatible_(true) {}
 
 EngineBuilder::EngineBuilder() : EngineBuilder(std::string(config_template)) {
   // Using the default config template is bootstrap compatible.
@@ -790,7 +789,6 @@ EngineBuilder::generateBootstrap(bool trim_whitespace_for_tests) const {
       *(*envoy_layer.mutable_fields())["envoy"].mutable_struct_value();
   ProtobufWkt::Struct& flags =
       *(*runtime_values.mutable_fields())["reloadable_features"].mutable_struct_value();
-  (*flags.mutable_fields())["allow_multiple_dns_addresses"].set_bool_value(enable_happy_eyeballs_);
   (*flags.mutable_fields())["always_use_v6"].set_bool_value(false);
   (*flags.mutable_fields())["skip_dns_lookup_for_proxied_requests"].set_bool_value(false);
   (*runtime_values.mutable_fields())["disallow_global_stats"].set_bool_value("true");
