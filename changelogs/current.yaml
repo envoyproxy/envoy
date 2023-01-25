@@ -48,5 +48,8 @@ new_features:
 - area: upstream
   change: |
     added :ref:`maglev extension <envoy_v3_api_msg_extensions.load_balancing_policies.maglev.v3.Maglev>` to suppport the :ref:`load balancer policy <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>`.
+- area: maglev
+  change: |
+    added ``envoy.reloadable_features.allow_compact_maglev`` to allow the use of a more compact maglev load balancer representation. This can be reverted by setting ``envoy.reloadable_features.allow_compact_maglev`` to false.
 
 deprecated:

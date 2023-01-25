@@ -155,9 +155,9 @@ MaglevTableSharedPtr
 MaglevTable::createMaglevTable(const NormalizedHostWeightVector& normalized_host_weights,
                                double max_normalized_weight, uint64_t table_size,
                                bool use_hostname_for_hashing, MaglevLoadBalancerStats& stats) {
-  // TODO(kbaichoo): Use release guard flag?
   MaglevTableSharedPtr maglev_table;
-  if (shouldUseCompactTable(normalized_host_weights.size(), table_size)) {
+  if (shouldUseCompactTable(normalized_host_weights.size(), table_size) &&
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_compact_maglev")) {
     maglev_table =
         std::make_shared<CompactMaglevTable>(normalized_host_weights, max_normalized_weight,
                                              table_size, use_hostname_for_hashing, stats);
