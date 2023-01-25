@@ -800,7 +800,7 @@ public:
     }
     return *lb_original_dst_config_;
   }
-  OptRef<envoy::config::core::v3::TypedExtensionConfig> upstreamConfig() const override {
+  OptRef<const envoy::config::core::v3::TypedExtensionConfig> upstreamConfig() const override {
     if (upstream_config_ == nullptr) {
       return absl::nullopt;
     }

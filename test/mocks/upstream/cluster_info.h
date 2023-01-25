@@ -143,7 +143,8 @@ public:
               lbLeastRequestConfig, (), (const));
   MOCK_METHOD(OptRef<const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>,
               lbOriginalDstConfig, (), (const));
-  MOCK_METHOD(OptRef<envoy::config::core::v3::TypedExtensionConfig>, upstreamConfig, (), (const));
+  MOCK_METHOD(OptRef<const envoy::config::core::v3::TypedExtensionConfig>, upstreamConfig, (),
+              (const));
   MOCK_METHOD(bool, maintenanceMode, (), (const));
   MOCK_METHOD(uint32_t, maxResponseHeadersCount, (), (const));
   MOCK_METHOD(uint64_t, maxRequestsPerConnection, (), (const));
