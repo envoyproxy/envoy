@@ -2,6 +2,10 @@ on:
   schedule:
   - cron: '0 12 * * 4'
 
+concurrency:
+  group: ${{ github.head_ref-github.workflow || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   CodeQL-Build:
 
