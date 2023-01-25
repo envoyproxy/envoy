@@ -66,6 +66,9 @@ if [[ "${BAZEL_BUILD_EXTRA_OPTIONS[*]}" =~ "clang-cl" ]]; then
   FAIL_GROUP=clang_cl
 fi
 
+# DEBUG!
+bazel "${BAZEL_STARTUP_OPTIONS[@]}" test "${BAZEL_BUILD_OPTIONS[@]}" @envoy//test/server:server_test --test_tag_filters=-skip_on_windows,-fails_on_${FAIL_GROUP} --build_tests_only
+
 # Optional arguments include //source/exe:envoy-static to build,
 # //test/... to test all with flake handling and test tag filters
 # (these are the default), either one or the other, or a list of

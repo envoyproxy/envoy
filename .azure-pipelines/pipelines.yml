@@ -841,7 +841,7 @@ stages:
         echo "macos tested"
 
 - stage: windows
-  dependsOn: ["env", "precheck"]
+  dependsOn: ["env"] # , "precheck"]
   jobs:
   - job: release
     condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
