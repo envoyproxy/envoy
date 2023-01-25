@@ -11,7 +11,7 @@ message Http2DataFrame {
 
 message Http2HeaderFrame {
   uint32 stream_dependency = 1;
-  uint32 weigth = 2;
+  uint32 weight = 2;
   test.fuzz.Headers headers = 3;
   bytes padding = 4;
 }

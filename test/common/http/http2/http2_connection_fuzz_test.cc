@@ -128,8 +128,15 @@ Http2Frame pb_to_h2_frame(nghttp2_hd_deflater* deflater,
       auto f = h2frame.headers();
       uint8_t padding_len = static_cast<uint8_t>(f.padding().size() & 0xff);
       payload.push_back(static_cast<char>(padding_len));
+
       uint32_t stream_dependency = f.stream_dependency();
       payload.append(reinterpret_cast<char*>(&stream_dependency), sizeof(stream_dependency));
+
+      if(f.weight() > 0 && f.weight() <= 256) {
+        uint8_t weight = static_cast<uint8_t>((f.weight() - 1) & 0xff);
+        payload.append(reinterpret_cast<char*>(&weight), sizeof(weight));
+      }
+
       deflate_headers(deflater, f.headers(), payload);
       payload.append(f.padding().c_str(), padding_len);
     } else if (h2frame.has_priority()) {
