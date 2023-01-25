@@ -66,7 +66,7 @@ public:
 
   void appendData(absl::string_view data) { data_.insert(data_.end(), data.begin(), data.end()); }
 
-  const absl::string_view payload() const {
+  const absl::string_view serialize() const {
     const char* d = reinterpret_cast<const char*>(data_.data());
     return absl::string_view(d, data_.size());
   }
@@ -237,11 +237,11 @@ public:
 
     Buffer::OwnedImpl init;
     Http2Frame emptySettingsFrame(0, 4, 0);
-    init.add(emptySettingsFrame.payload());
+    init.add(emptySettingsFrame.serialize());
     Status status = client_->dispatch(init);
     for (auto frame : frames) {
       Buffer::OwnedImpl framebuf;
-      framebuf.add(frame.payload());
+      framebuf.add(frame.serialize());
       Status status = client_->dispatch(framebuf);
     }
   }
@@ -261,9 +261,9 @@ public:
     Buffer::OwnedImpl payload;
     payload.add(Http2Frame::Preamble, 24);
     static Http2Frame emptySettingsFrame(0, 4, 0);
-    payload.add(emptySettingsFrame.payload());
+    payload.add(emptySettingsFrame.serialize());
     for (auto frame : frames)
-      payload.add(frame.payload());
+      payload.add(frame.serialize());
     Status status = server_->dispatch(payload);
   }
 
