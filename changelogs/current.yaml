@@ -76,5 +76,8 @@ new_features:
 - area: lua
   change: |
     added an new option to the options of lua ``httpCall``. This allows to skip adding ``x-forwarded-for`` by setting ``{["send_xff"] = false}`` as the ``options``.
+- area: ratelimit
+  change: |
+    added local rate limit listener filter to enable rate limit before handshake.
 
 deprecated:

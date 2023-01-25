@@ -231,6 +231,7 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /*/extensions/transport_sockets/tap @mattklein123 @daixiang0
 # local rate limit
 /*/extensions/filters/network/local_ratelimit @mattklein123 @wbpcode
+/*/extensions/filters/listener/local_ratelimit @mattklein123 @JuniorHsu
 # proxy protocol
 /*/extensions/filters/listener/proxy_protocol @ggreenway @soulxu
 # access loggers
