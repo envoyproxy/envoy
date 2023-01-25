@@ -8,7 +8,6 @@ envoy_package()
 go_binary(
     name = "my_plugin.so",
     srcs = [
-        "config.go",
         "plugin.go",
     ],
     out = "my_plugin.so",
@@ -28,7 +27,6 @@ go_binary(
 go_binary(
     name = "my_other_plugin.so",
     srcs = [
-        "other_config.go",
         "plugin.go",
     ],
     out = "my_other_plugin.so",
@@ -48,7 +46,6 @@ go_binary(
 go_binary(
     name = "my_configurable_plugin.so",
     srcs = [
-        "configurable_config.go",
         "plugin.go",
     ],
     out = "my_configurable_plugin.so",
@@ -68,8 +65,8 @@ go_binary(
 filegroup(
     name = "testing_shared_objects",
     srcs = [
-        ":my_plugin.so",
-        ":my_other_plugin.so",
         ":my_configurable_plugin.so",
-    ]
+        ":my_other_plugin.so",
+        ":my_plugin.so",
+    ],
 )
