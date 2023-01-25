@@ -1,3 +1,5 @@
+#include "source/common/common/base64.h"
+#include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/connect_grpc_bridge/filter.h"
 
 #include "test/mocks/http/mocks.h"
@@ -24,11 +26,24 @@ protected:
     filter_.setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
-  void compareJson(const std::string& expected, const std::string& actual) {
+  bool jsonEqual(const std::string& expected, const std::string& actual) {
     ProtobufWkt::Value expected_value, actual_value;
     TestUtility::loadFromJson(expected, expected_value);
     TestUtility::loadFromJson(actual, actual_value);
-    EXPECT_TRUE(TestUtility::protoEqual(expected_value, actual_value));
+    return TestUtility::protoEqual(expected_value, actual_value);
+  }
+
+  void setStatusDetails(Http::HeaderMap& headers, const google::rpc::Status& status) {
+    std::string message;
+    EXPECT_TRUE(status.SerializeToString(&message));
+    auto encoded_value = Base64::encode(message.c_str(), message.size());
+    headers.addCopy(Http::Headers::get().GrpcStatusDetailsBin, encoded_value);
+  }
+
+  void addStatusDetails(google::rpc::Status& status, const Protobuf::Message& message) {
+    google::protobuf::Any any;
+    any.PackFrom(message);
+    *status.add_details() = any;
   }
 
 public:
@@ -87,7 +102,15 @@ TEST_F(ConnectGrpcBridgeFilterTest, UnarySupportedContentType) {
   EXPECT_EQ(false, request_headers_.has(Http::CustomHeaders::get().ConnectProtocolVersion));
 }
 
-TEST_F(ConnectGrpcBridgeFilterTest, UnaryTimeoutTranslation) {
+TEST_F(ConnectGrpcBridgeFilterTest, UnaryTimeoutInvalid) {
+  request_headers_.setCopy(Http::CustomHeaders::get().ConnectProtocolVersion, "1");
+  request_headers_.setContentType("application/proto");
+  request_headers_.addCopy(Http::CustomHeaders::get().ConnectTimeoutMs, "invalid!");
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, false));
+  EXPECT_EQ(false, request_headers_.has(Http::CustomHeaders::get().GrpcTimeout));
+}
+
+TEST_F(ConnectGrpcBridgeFilterTest, UnaryTimeoutTranslationMilliseconds) {
   request_headers_.setCopy(Http::CustomHeaders::get().ConnectProtocolVersion, "1");
   request_headers_.setContentType("application/proto");
   request_headers_.addCopy(Http::CustomHeaders::get().ConnectTimeoutMs, "10000");
@@ -96,12 +119,31 @@ TEST_F(ConnectGrpcBridgeFilterTest, UnaryTimeoutTranslation) {
   EXPECT_EQ(false, request_headers_.has(Http::CustomHeaders::get().ConnectTimeoutMs));
 }
 
-TEST_F(ConnectGrpcBridgeFilterTest, UnaryTimeoutInvalid) {
+TEST_F(ConnectGrpcBridgeFilterTest, UnaryTimeoutTranslationSeconds) {
   request_headers_.setCopy(Http::CustomHeaders::get().ConnectProtocolVersion, "1");
   request_headers_.setContentType("application/proto");
-  request_headers_.addCopy(Http::CustomHeaders::get().ConnectTimeoutMs, "invalid!");
+  request_headers_.addCopy(Http::CustomHeaders::get().ConnectTimeoutMs, "32403600000");
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, false));
-  EXPECT_EQ(false, request_headers_.has(Http::CustomHeaders::get().GrpcTimeout));
+  EXPECT_EQ("32403600S", request_headers_.get_(Http::CustomHeaders::get().GrpcTimeout));
+  EXPECT_EQ(false, request_headers_.has(Http::CustomHeaders::get().ConnectTimeoutMs));
+}
+
+TEST_F(ConnectGrpcBridgeFilterTest, UnaryTimeoutTranslationMinutes) {
+  request_headers_.setCopy(Http::CustomHeaders::get().ConnectProtocolVersion, "1");
+  request_headers_.setContentType("application/proto");
+  request_headers_.setCopy(Http::CustomHeaders::get().ConnectTimeoutMs, "1000000000000");
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, false));
+  EXPECT_EQ("16666666M", request_headers_.get_(Http::CustomHeaders::get().GrpcTimeout));
+  EXPECT_EQ(false, request_headers_.has(Http::CustomHeaders::get().ConnectTimeoutMs));
+}
+
+TEST_F(ConnectGrpcBridgeFilterTest, UnaryTimeoutTranslationHours) {
+  request_headers_.setCopy(Http::CustomHeaders::get().ConnectProtocolVersion, "1");
+  request_headers_.setContentType("application/proto");
+  request_headers_.setCopy(Http::CustomHeaders::get().ConnectTimeoutMs, "10000000000000");
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, false));
+  EXPECT_EQ("2777777H", request_headers_.get_(Http::CustomHeaders::get().GrpcTimeout));
+  EXPECT_EQ(false, request_headers_.has(Http::CustomHeaders::get().ConnectTimeoutMs));
 }
 
 TEST_F(ConnectGrpcBridgeFilterTest, UnaryTimeoutOutOfRange) {
@@ -115,12 +157,10 @@ TEST_F(ConnectGrpcBridgeFilterTest, UnaryTimeoutOutOfRange) {
 TEST_F(ConnectGrpcBridgeFilterTest, UnaryRequestTranslation) {
   request_headers_.setCopy(Http::CustomHeaders::get().ConnectProtocolVersion, "1");
   request_headers_.setContentType(Http::Headers::get().ContentTypeValues.Json);
-  request_headers_.setCopy(Http::CustomHeaders::get().ConnectTimeoutMs, "1000000000000");
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, false));
   EXPECT_EQ(
       Http::Headers::get().TEValues.Trailers,
       request_headers_.get_(Http::Headers::get().TE)); // C++ gRPC refuses connections without this.
-  EXPECT_EQ("16666666M", request_headers_.get_(Http::CustomHeaders::get().GrpcTimeout));
 
   Buffer::OwnedImpl data{R"EOF({"request":1})EOF"};
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, true));
@@ -145,14 +185,32 @@ TEST_F(ConnectGrpcBridgeFilterTest, UnaryRequestTranslation) {
   EXPECT_EQ("test", response_headers_.get_("trailer-custom-metadata"));
 }
 
-TEST_F(ConnectGrpcBridgeFilterTest, UnaryDisjointResponseFrameDrain) {
+TEST_F(ConnectGrpcBridgeFilterTest, UnaryRequestWithTrailers) {
   request_headers_.setCopy(Http::CustomHeaders::get().ConnectProtocolVersion, "1");
   request_headers_.setContentType(Http::Headers::get().ContentTypeValues.Json);
-  request_headers_.setCopy(Http::CustomHeaders::get().ConnectTimeoutMs, "10000000000000");
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, false));
-  EXPECT_EQ("2777777H", request_headers_.get_(Http::CustomHeaders::get().GrpcTimeout));
 
   Buffer::OwnedImpl data{R"EOF({"request":1})EOF"};
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_.decodeData(data, false));
+
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true))
+      .WillOnce(Invoke(([&](Buffer::Instance& d, bool) {
+        EXPECT_EQ('\0', d.drainInt<uint8_t>());
+        EXPECT_EQ(13U, d.drainBEInt<uint32_t>());
+        EXPECT_EQ(R"EOF({"request":1})EOF", d.toString());
+      })));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers_));
+}
+
+TEST_F(ConnectGrpcBridgeFilterTest, UnaryDisjointFrameHandling) {
+  request_headers_.setCopy(Http::CustomHeaders::get().ConnectProtocolVersion, "1");
+  request_headers_.setContentType(Http::Headers::get().ContentTypeValues.Json);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, false));
+
+  Buffer::OwnedImpl data{R"EOF({"request":1})EOF"};
+  Buffer::OwnedImpl part;
+  part.move(data, 5);
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_.decodeData(part, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, true));
   EXPECT_EQ('\0', data.drainInt<uint8_t>());
   EXPECT_EQ(13U, data.drainBEInt<uint32_t>());
@@ -168,7 +226,7 @@ TEST_F(ConnectGrpcBridgeFilterTest, UnaryDisjointResponseFrameDrain) {
 
   // Split the gRPC frame unevenly across buffers to ensure that we always drain only exactly one
   // frame header.
-  Buffer::OwnedImpl part;
+  part = {};
   part.move(data, 3);
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_.encodeData(part, false));
   part.move(data, 3);
@@ -186,7 +244,40 @@ TEST_F(ConnectGrpcBridgeFilterTest, UnaryDisjointResponseFrameDrain) {
   EXPECT_EQ("test", response_headers_.get_("trailer-custom-metadata"));
 }
 
-TEST_F(ConnectGrpcBridgeFilterTest, UnaryErrorTranslation) {
+TEST_F(ConnectGrpcBridgeFilterTest, UnaryTrailerErrorTranslation) {
+  request_headers_.setCopy(Http::CustomHeaders::get().ConnectProtocolVersion, "1");
+  request_headers_.setContentType(Http::Headers::get().ContentTypeValues.Json);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, false));
+
+  Buffer::OwnedImpl data{};
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, true));
+
+  response_headers_.setStatus(200);
+  response_headers_.setContentType(Http::Headers::get().ContentTypeValues.Grpc);
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_.encodeHeaders(response_headers_, false));
+
+  google::rpc::Status status;
+  status.set_code(Grpc::Status::WellKnownGrpcStatus::Internal);
+  addStatusDetails(status, ValueUtil::stringValue("Test Status"));
+  setStatusDetails(response_trailers_, status);
+  response_trailers_.setGrpcStatus(status.code());
+  response_trailers_.addCopy("custom-metadata", "test");
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, true))
+      .WillOnce(Invoke(([&](Buffer::Instance& d, bool) {
+        EXPECT_TRUE(jsonEqual(R"EOF({
+          "code": "internal",
+          "details": [{
+            "type": "type.googleapis.com/google.protobuf.Value",
+            "value": "GgtUZXN0IFN0YXR1cw=="
+          }]
+        })EOF",
+                              d.toString()));
+      })));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers_));
+}
+
+TEST_F(ConnectGrpcBridgeFilterTest, UnaryHeaderOnlyErrorTranslation) {
   request_headers_.setCopy(Http::CustomHeaders::get().ConnectProtocolVersion, "1");
   request_headers_.setContentType(Http::Headers::get().ContentTypeValues.Json);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, false));
@@ -230,9 +321,9 @@ TEST_F(ConnectGrpcBridgeFilterTest, StreamingSupportedContentType) {
 
 TEST_F(ConnectGrpcBridgeFilterTest, StreamingTimeoutTranslation) {
   request_headers_.setContentType("application/connect+proto");
-  request_headers_.addCopy(Http::CustomHeaders::get().ConnectTimeoutMs, "32403600000");
+  request_headers_.addCopy(Http::CustomHeaders::get().ConnectTimeoutMs, "1000");
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, false));
-  EXPECT_EQ("32403600S", request_headers_.get_(Http::CustomHeaders::get().GrpcTimeout));
+  EXPECT_EQ("1000m", request_headers_.get_(Http::CustomHeaders::get().GrpcTimeout));
   EXPECT_EQ(false, request_headers_.has(Http::CustomHeaders::get().ConnectTimeoutMs));
 }
 
@@ -254,8 +345,9 @@ TEST_F(ConnectGrpcBridgeFilterTest, StreamingRequestTranslation) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, true));
 
   response_headers_.setStatus(200);
-  response_headers_.setContentType(Http::Headers::get().ContentTypeValues.Grpc);
+  response_headers_.setContentType("application/grpc+json");
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers_, false));
+  EXPECT_EQ("application/connect+json", response_headers_.get_(Http::Headers::get().ContentType));
 
   data = {R"EOF({"response":1})EOF"};
   Grpc::Common::prependGrpcFrameHeader(data);
@@ -267,12 +359,12 @@ TEST_F(ConnectGrpcBridgeFilterTest, StreamingRequestTranslation) {
       .WillOnce(Invoke(([&](Buffer::Instance& d, bool) {
         EXPECT_EQ('\2', d.drainInt<uint8_t>());
         EXPECT_EQ(41U, d.drainBEInt<uint32_t>());
-        compareJson(R"EOF({
+        EXPECT_TRUE(jsonEqual(R"EOF({
           "metadata": {
             "custom-metadata": ["test"]
           }
         })EOF",
-                    d.toString());
+                              d.toString()));
       })));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers_));
 }
@@ -292,23 +384,53 @@ TEST_F(ConnectGrpcBridgeFilterTest, StreamingErrorTranslation) {
   data = {R"EOF({"response":1})EOF"};
   Grpc::Common::prependGrpcFrameHeader(data);
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data, false));
-  response_trailers_.setGrpcStatus(Grpc::Status::WellKnownGrpcStatus::Internal);
+
+  google::rpc::Status status;
+  status.set_code(Grpc::Status::WellKnownGrpcStatus::Internal);
+  addStatusDetails(status, ValueUtil::stringValue("Test Status"));
+  setStatusDetails(response_trailers_, status);
+  response_trailers_.setGrpcStatus(status.code());
   response_trailers_.addCopy("custom-metadata", "test");
   EXPECT_CALL(encoder_callbacks_, addEncodedData(_, true))
       .WillOnce(Invoke(([&](Buffer::Instance& d, bool) {
         EXPECT_EQ('\2', d.drainInt<uint8_t>());
-        EXPECT_EQ(69U, d.drainBEInt<uint32_t>());
-        compareJson(R"EOF({
-          "error": {
-            "code": "internal"
-          },
+        d.drainBEInt<uint32_t>();
+        EXPECT_TRUE(jsonEqual(R"EOF({
           "metadata": {
             "custom-metadata": ["test"]
+          },
+          "error": {
+            "code": "internal",
+            "details": [{
+              "type": "type.googleapis.com/google.protobuf.Value",
+              "value": "GgtUZXN0IFN0YXR1cw=="
+            }]
           }
         })EOF",
-                    d.toString());
+                              d.toString()));
       })));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers_));
+}
+
+TEST_F(ConnectGrpcBridgeFilterTest, StreamingHeaderOnlyErrorTranslation) {
+  request_headers_.setContentType("application/connect+json");
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, false));
+
+  Buffer::OwnedImpl data{R"EOF({"request":1})EOF"};
+  Grpc::Common::prependGrpcFrameHeader(data);
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, true));
+
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, true))
+      .WillOnce(Invoke(([&](Buffer::Instance& d, bool) {
+        EXPECT_EQ('\2', d.drainInt<uint8_t>());
+        EXPECT_EQ(29U, d.drainBEInt<uint32_t>());
+        EXPECT_EQ(R"EOF({"error":{"code":"internal"}})EOF", d.toString());
+      })));
+
+  response_headers_.setStatus(200);
+  response_headers_.setContentType(Http::Headers::get().ContentTypeValues.Grpc);
+  response_headers_.setGrpcStatus(Grpc::Status::WellKnownGrpcStatus::Internal);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers_, true));
 }
 
 TEST_F(ConnectGrpcBridgeFilterTest, StreamingIgnoreBrokenGrpcResponse) {
