@@ -1,9 +1,6 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_binary")
-load("//bazel:envoy_build_system.bzl", "envoy_package")
 
 licenses(["notice"])  # Apache 2
-
-envoy_package()
 
 go_binary(
     name = "my_plugin.so",
@@ -45,4 +42,5 @@ filegroup(
         ":my_other_plugin.so",
         ":my_plugin.so",
     ],
+    visibility = ["//visibility:public"],
 )
