@@ -41,7 +41,7 @@ protected:
   }
 
   void addStatusDetails(google::rpc::Status& status, const Protobuf::Message& message) {
-    google::protobuf::Any any;
+    ProtobufWkt::Any any;
     any.PackFrom(message);
     *status.add_details() = any;
   }
