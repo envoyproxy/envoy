@@ -19,6 +19,7 @@ envoy_mobile_objc_test(
     srcs = [
         "EnvoyKeyValueStoreBridgeImplTest.m",
     ],
+    flaky = True,  # TODO(jpsim): Fix timeouts when running these tests on CI
     visibility = ["//visibility:public"],
     deps = [
         "//library/objective-c:envoy_key_value_store_bridge_impl_lib",
