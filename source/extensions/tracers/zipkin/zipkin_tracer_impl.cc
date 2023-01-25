@@ -122,11 +122,10 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
     auto ret_span_context = extractor.extractSpanContext(sampled);
     if (!ret_span_context.second) {
       // Create a root Zipkin span. No context was found in the headers.
-      new_zipkin_span =
-          tracer.startSpan(config, std::string(trace_context.authority()), start_time);
+      new_zipkin_span = tracer.startSpan(config, std::string(trace_context.host()), start_time);
       new_zipkin_span->setSampled(sampled);
     } else {
-      new_zipkin_span = tracer.startSpan(config, std::string(trace_context.authority()), start_time,
+      new_zipkin_span = tracer.startSpan(config, std::string(trace_context.host()), start_time,
                                          ret_span_context.first);
     }
 

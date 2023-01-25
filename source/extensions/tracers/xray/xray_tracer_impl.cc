@@ -97,7 +97,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
   }
 
   if (!should_trace.has_value()) {
-    const SamplingRequest request{trace_context.authority(), trace_context.method(),
+    const SamplingRequest request{trace_context.host(), trace_context.method(),
                                   trace_context.path()};
 
     should_trace = sampling_strategy_->shouldTrace(request);

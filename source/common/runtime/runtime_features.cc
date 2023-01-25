@@ -30,8 +30,6 @@
 // ASAP by filing a bug on github. Overriding non-buggy code is strongly discouraged to avoid the
 // problem of the bugs being found after the old code path has been removed.
 RUNTIME_GUARD(envoy_reloadable_features_admin_stats_filter_use_re2);
-RUNTIME_GUARD(envoy_reloadable_features_allow_concurrency_for_alpn_pool);
-RUNTIME_GUARD(envoy_reloadable_features_allow_multiple_dns_addresses);
 RUNTIME_GUARD(envoy_reloadable_features_allow_upstream_filters);
 RUNTIME_GUARD(envoy_reloadable_features_append_query_parameters_path_rewriter);
 RUNTIME_GUARD(envoy_reloadable_features_cares_accept_nodata);
@@ -47,8 +45,6 @@ RUNTIME_GUARD(envoy_reloadable_features_enable_intermediate_ca);
 RUNTIME_GUARD(envoy_reloadable_features_enable_update_listener_socket_options);
 RUNTIME_GUARD(envoy_reloadable_features_finish_reading_on_decode_trailers);
 RUNTIME_GUARD(envoy_reloadable_features_fix_hash_key);
-RUNTIME_GUARD(envoy_reloadable_features_get_route_config_factory_by_type);
-RUNTIME_GUARD(envoy_reloadable_features_http2_delay_keepalive_timeout);
 RUNTIME_GUARD(envoy_reloadable_features_http3_sends_early_data);
 RUNTIME_GUARD(envoy_reloadable_features_http_filter_avoid_reentrant_local_reply);
 RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
@@ -66,6 +62,7 @@ RUNTIME_GUARD(envoy_reloadable_features_postpone_h3_client_connect_to_next_loop)
 RUNTIME_GUARD(envoy_reloadable_features_quic_defer_send_in_response_to_packet);
 RUNTIME_GUARD(envoy_reloadable_features_reject_require_client_certificate_with_quic);
 RUNTIME_GUARD(envoy_reloadable_features_skip_dns_lookup_for_proxied_requests);
+RUNTIME_GUARD(envoy_reloadable_features_successful_active_health_check_uneject_host);
 RUNTIME_GUARD(envoy_reloadable_features_tcp_pool_idle_timeout);
 RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
 RUNTIME_GUARD(envoy_reloadable_features_thrift_allow_negative_field_ids);
@@ -73,7 +70,6 @@ RUNTIME_GUARD(envoy_reloadable_features_thrift_connection_draining);
 RUNTIME_GUARD(envoy_reloadable_features_tls_async_cert_validation);
 RUNTIME_GUARD(envoy_reloadable_features_udp_proxy_connect);
 RUNTIME_GUARD(envoy_reloadable_features_unified_header_formatter);
-RUNTIME_GUARD(envoy_reloadable_features_use_rfc_connect);
 RUNTIME_GUARD(envoy_reloadable_features_validate_connect);
 RUNTIME_GUARD(envoy_reloadable_features_validate_detailed_override_host_statuses);
 RUNTIME_GUARD(envoy_restart_features_explicit_wildcard_resource);
@@ -107,8 +103,7 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_api_listener);
 // TODO(pradeepcrao) reset this to true after 2 releases (1.27)
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_include_histograms);
 
-// Block of non-boolean flags. These are deprecated. Do not add more.
-ABSL_FLAG(uint64_t, envoy_headermap_lazy_map_min_size, 3, "");  // NOLINT
+// Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT
 ABSL_FLAG(uint64_t, re2_max_program_size_warn_level,            // NOLINT
           std::numeric_limits<uint32_t>::max(), "");            // NOLINT
@@ -181,12 +176,7 @@ bool runtimeFeatureEnabled(absl::string_view feature) {
 }
 
 uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
-  if (absl::StartsWith(feature, "envoy.")) {
-    // DO NOT ADD MORE FLAGS HERE. This function deprecated.
-    if (feature == "envoy.http.headermap.lazy_map_min_size") {
-      return absl::GetFlag(FLAGS_envoy_headermap_lazy_map_min_size);
-    }
-  }
+  // DO NOT ADD MORE FLAGS HERE. This function deprecated.
   if (absl::StartsWith(feature, "re2.")) {
     if (feature == "re2.max_program_size.error_level") {
       return absl::GetFlag(FLAGS_re2_max_program_size_error_level);

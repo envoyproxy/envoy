@@ -5,9 +5,15 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: healthcheck
+  change: |
+    If active HC is enabled and a host is ejected by outlier detection, a successful active health check unejects the host and consider it healthy. This also clears all the outlier detection counters. This behavior change can be reverted by setting ``envoy.reloadable_features_successful_active_health_check_uneject_host`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: stats
+  change: |
+    now updating upstream total connection stats as happy eyeballs connections are created.
 - area: eds
   change: |
     added ``envoy.reloadable_features.multiplex_eds`` to disable eds multiplexing. Eds multiplexing is enabled by default, so that all subscriptions for the same resource type and management server reuse a single channel/mux.
@@ -15,7 +21,32 @@ bug_fixes:
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: dns
+  change: |
+    removed ``envoy.reloadable_features.dns_multiple_addresses`` runtime flag and legacy code paths.
+- area: router
+  change: |
+    removed ``envoy.reloadable_features.get_route_config_factory_by_type`` runtime flag. The flag is no longer needed as the behavior is now the default.
+- area: http
+  change: |
+    removed ``envoy.reloadable_features.http2_delay_keepalive_timeout`` and legacy code paths.
+
+- area: http
+  change: |
+    removed ``envoy.reloadable_features.use_rfc_connect`` and legacy code path.
+- area: http
+  change: |
+    removed ``envoy.reloadable_features.allow_concurrency_for_alpn_pool`` and legacy code path.
 
 new_features:
+- area: tracing
+  change: |
+    allow :ref:`grpc_service <envoy_v3_api_field_config.trace.v3.OpenTelemetryConfig.grpc_service>` to be optional. This enables a means to disable collection of traces.
+- area: upstream
+  change: |
+    added :ref:`ring hash extension <envoy_v3_api_msg_extensions.load_balancing_policies.ring_hash.v3.RingHash>` to suppport the :ref:`load balancer policy <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>`.
+- area: upstream
+  change: |
+    added :ref:`maglev extension <envoy_v3_api_msg_extensions.load_balancing_policies.maglev.v3.Maglev>` to suppport the :ref:`load balancer policy <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>`.
 
 deprecated:
