@@ -18,16 +18,16 @@
 package http
 
 import (
-    "fmt"
-    "sync"
+	"fmt"
+	"sync"
 
-    "github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
+	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
 )
 
 var httpFilterConfigFactory = sync.Map{}
 
 func RegisterHttpFilterConfigFactory(name string, f api.StreamFilterConfigFactory) {
-    httpFilterConfigFactory.Store(name, f)
+	httpFilterConfigFactory.Store(name, f)
 }
 
 // no parser by default
@@ -35,24 +35,24 @@ var httpFilterConfigParser api.StreamFilterConfigParser = nil
 
 // TODO merge it to api.HttpFilterConfigFactory
 func RegisterHttpFilterConfigParser(parser api.StreamFilterConfigParser) {
-    httpFilterConfigParser = parser
+	httpFilterConfigParser = parser
 }
 
 func getOrCreateHttpFilterFactory(name string, configId uint64) api.StreamFilterFactory {
-    config, ok := configCache.Load(configId)
-    if !ok {
-        panic(fmt.Sprintf("get config failed, plugin: %s, configId: %d", name, configId))
-    }
+	config, ok := configCache.Load(configId)
+	if !ok {
+		panic(fmt.Sprintf("get config failed, plugin: %s, configId: %d", name, configId))
+	}
 
-    if v, ok := httpFilterConfigFactory.Load(name); ok {
-        return (v.(api.StreamFilterConfigFactory))(config)
-    }
+	if v, ok := httpFilterConfigFactory.Load(name); ok {
+		return (v.(api.StreamFilterConfigFactory))(config)
+	}
 
-    // pass through by default
-    return PassThroughFactory(config)
+	// pass through by default
+	return PassThroughFactory(config)
 }
 
 // streaming and async supported by default
 func RegisterStreamingHttpFilterConfigFactory(name string, f api.StreamFilterConfigFactory) {
-    httpFilterConfigFactory.Store(name, f)
+	httpFilterConfigFactory.Store(name, f)
 }

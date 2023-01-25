@@ -20,22 +20,22 @@ package api
 import "unsafe"
 
 type HttpCAPI interface {
-    HttpContinue(r unsafe.Pointer, status uint64)
-    HttpSendLocalReply(r unsafe.Pointer, responseCode int, bodyText string, headers map[string]string, grpcStatus int64, details string)
+	HttpContinue(r unsafe.Pointer, status uint64)
+	HttpSendLocalReply(r unsafe.Pointer, responseCode int, bodyText string, headers map[string]string, grpcStatus int64, details string)
 
-    // experience api, memory unsafe
-    HttpGetHeader(r unsafe.Pointer, key *string, value *string)
-    HttpCopyHeaders(r unsafe.Pointer, num uint64, bytes uint64) map[string]string
-    HttpSetHeader(r unsafe.Pointer, key *string, value *string)
-    HttpRemoveHeader(r unsafe.Pointer, key *string)
+	// experience api, memory unsafe
+	HttpGetHeader(r unsafe.Pointer, key *string, value *string)
+	HttpCopyHeaders(r unsafe.Pointer, num uint64, bytes uint64) map[string]string
+	HttpSetHeader(r unsafe.Pointer, key *string, value *string)
+	HttpRemoveHeader(r unsafe.Pointer, key *string)
 
-    HttpGetBuffer(r unsafe.Pointer, bufferPtr uint64, value *string, length uint64)
-    HttpSetBufferHelper(r unsafe.Pointer, bufferPtr uint64, value string, action BufferAction)
+	HttpGetBuffer(r unsafe.Pointer, bufferPtr uint64, value *string, length uint64)
+	HttpSetBufferHelper(r unsafe.Pointer, bufferPtr uint64, value string, action BufferAction)
 
-    HttpCopyTrailers(r unsafe.Pointer, num uint64, bytes uint64) map[string]string
-    HttpSetTrailer(r unsafe.Pointer, key *string, value *string)
+	HttpCopyTrailers(r unsafe.Pointer, num uint64, bytes uint64) map[string]string
+	HttpSetTrailer(r unsafe.Pointer, key *string, value *string)
 
-    HttpGetRouteName(r unsafe.Pointer) string
+	HttpGetRouteName(r unsafe.Pointer) string
 
-    HttpFinalize(r unsafe.Pointer, reason int)
+	HttpFinalize(r unsafe.Pointer, reason int)
 }

@@ -184,11 +184,6 @@ EngineBuilder& EngineBuilder::enforceTrustChainVerification(bool trust_chain_ver
   return *this;
 }
 
-EngineBuilder& EngineBuilder::enableH2ExtendKeepaliveTimeout(bool h2_extend_keepalive_timeout_on) {
-  h2_extend_keepalive_timeout_ = h2_extend_keepalive_timeout_on;
-  return *this;
-}
-
 EngineBuilder&
 EngineBuilder::enablePlatformCertificatesValidation(bool platform_certificates_validation_on) {
   platform_certificates_validation_on_ = platform_certificates_validation_on;
@@ -218,7 +213,6 @@ std::string EngineBuilder::generateConfigStr() const {
         {"dns_fail_max_interval", fmt::format("{}s", dns_failure_refresh_seconds_max_)},
         {"dns_lookup_family", enable_happy_eyeballs_ ? "ALL" : "V4_PREFERRED"},
         {"dns_min_refresh_rate", fmt::format("{}s", dns_min_refresh_seconds_)},
-        {"dns_multiple_addresses", enable_happy_eyeballs_ ? "true" : "false"},
         {"dns_preresolve_hostnames", dns_preresolve_hostnames_},
         {"dns_refresh_rate", fmt::format("{}s", dns_refresh_seconds_)},
         {"dns_query_timeout", fmt::format("{}s", dns_query_timeout_seconds_)},
@@ -228,7 +222,6 @@ std::string EngineBuilder::generateConfigStr() const {
          fmt::format("{}s", h2_connection_keepalive_idle_interval_milliseconds_ / 1000.0)},
         {"h2_connection_keepalive_timeout",
          fmt::format("{}s", h2_connection_keepalive_timeout_seconds_)},
-        {"h2_delay_keepalive_timeout", h2_extend_keepalive_timeout_ ? "true" : "false"},
         {
             "metadata",
             fmt::format("{{ device_os: {}, app_version: {}, app_id: {} }}", device_os_,

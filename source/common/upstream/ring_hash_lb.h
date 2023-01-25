@@ -3,6 +3,8 @@
 #include <vector>
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/extensions/load_balancing_policies/ring_hash/v3/ring_hash.pb.h"
+#include "envoy/extensions/load_balancing_policies/ring_hash/v3/ring_hash.pb.validate.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
@@ -44,6 +46,11 @@ public:
                        Runtime::Loader& runtime, Random::RandomGenerator& random,
                        OptRef<const envoy::config::cluster::v3::Cluster::RingHashLbConfig> config,
                        const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
+
+  RingHashLoadBalancer(
+      const PrioritySet& priority_set, ClusterLbStats& stats, Stats::Scope& scope,
+      Runtime::Loader& runtime, Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
+      const envoy::extensions::load_balancing_policies::ring_hash::v3::RingHash& config);
 
   const RingHashLoadBalancerStats& stats() const { return stats_; }
 

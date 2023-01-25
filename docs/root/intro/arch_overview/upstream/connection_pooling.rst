@@ -87,8 +87,7 @@ Happy Eyeballs Support
 ----------------------
 
 Envoy supports Happy Eyeballs, `RFC6555 <https://tools.ietf.org/html/rfc6555>`_,
-for upstream TCP connections. This behavior is now on by default but can be disabled by the runtime flag
-``envoy.reloadable_features.allow_multiple_dns_addresses``. For clusters which use
+for upstream TCP connections.  For clusters which use
 :ref:`LOGICAL_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.LOGICAL_DNS>`,
 this behavior is configured by setting the DNS IP address resolution policy in
 :ref:`config.cluster.v3.Cluster.DnsLookupFamily <envoy_v3_api_enum_config.cluster.v3.Cluster.DnsLookupFamily>`
