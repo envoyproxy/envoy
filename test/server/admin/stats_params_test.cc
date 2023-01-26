@@ -1,8 +1,6 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/server/admin/stats_params.h"
 
-#include "test/test_common/test_runtime.h"
-
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -60,7 +58,6 @@ TEST(StatsParamsTest, ParseParamsFilter) {
     ASSERT_EQ(Http::Code::OK, params.parse("?filter=foo", response));
     EXPECT_NE(nullptr, params.re2_filter_);
   }
-
 }
 
 } // namespace Server

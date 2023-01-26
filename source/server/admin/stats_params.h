@@ -1,7 +1,6 @@
 #pragma once
 
 #include <memory>
-#include <regex>
 #include <string>
 
 #include "envoy/buffer/buffer.h"

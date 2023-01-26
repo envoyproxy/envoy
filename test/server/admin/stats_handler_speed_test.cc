@@ -7,8 +7,6 @@
 #include "source/common/stats/thread_local_store.h"
 #include "source/server/admin/stats_handler.h"
 
-#include "test/test_common/test_runtime.h"
-
 #include "benchmark/benchmark.h"
 
 namespace Envoy {

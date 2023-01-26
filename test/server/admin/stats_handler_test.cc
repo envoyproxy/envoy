@@ -12,7 +12,6 @@
 #include "test/server/admin/admin_instance.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/real_threads_test_helper.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 using testing::Combine;
