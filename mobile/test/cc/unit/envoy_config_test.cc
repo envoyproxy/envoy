@@ -214,8 +214,6 @@ TEST(TestConfig, EnableHappyEyeballs) {
   config_str = absl::StrCat(config_header, engine_builder.generateConfigStr());
   ASSERT_THAT(config_str, Not(HasSubstr("&dns_lookup_family V4_PREFERRED")));
   ASSERT_THAT(config_str, HasSubstr("&dns_lookup_family ALL"));
-  ASSERT_THAT(config_str, Not(HasSubstr("&dns_multiple_addresses false")));
-  ASSERT_THAT(config_str, HasSubstr("&dns_multiple_addresses true"));
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
 
@@ -223,8 +221,6 @@ TEST(TestConfig, EnableHappyEyeballs) {
   config_str = engine_builder.generateConfigStr();
   ASSERT_THAT(config_str, HasSubstr("&dns_lookup_family V4_PREFERRED"));
   ASSERT_THAT(config_str, Not(HasSubstr("&dns_lookup_family ALL")));
-  ASSERT_THAT(config_str, HasSubstr("&dns_multiple_addresses false"));
-  ASSERT_THAT(config_str, Not(HasSubstr("&dns_multiple_addresses true")));
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
 }
 

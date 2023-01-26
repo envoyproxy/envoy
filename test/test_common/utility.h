@@ -849,7 +849,7 @@ public:
     }
   }
   absl::string_view protocol() const override { return context_protocol_; }
-  absl::string_view authority() const override { return context_authority_; }
+  absl::string_view host() const override { return context_host_; }
   absl::string_view path() const override { return context_path_; }
   absl::string_view method() const override { return context_method_; }
   void forEach(IterateCallback callback) const override {
@@ -875,7 +875,7 @@ public:
   void setByReference(absl::string_view key, absl::string_view val) override { setByKey(key, val); }
 
   std::string context_protocol_;
-  std::string context_authority_;
+  std::string context_host_;
   std::string context_path_;
   std::string context_method_;
   absl::flat_hash_map<std::string, std::string> context_map_;
@@ -1099,7 +1099,7 @@ public:
 
   // Tracing::TraceContext
   absl::string_view protocol() const override { return header_map_->getProtocolValue(); }
-  absl::string_view authority() const override { return header_map_->getHostValue(); }
+  absl::string_view host() const override { return header_map_->getHostValue(); }
   absl::string_view path() const override { return header_map_->getPathValue(); }
   absl::string_view method() const override { return header_map_->getMethodValue(); }
   void forEach(IterateCallback callback) const override {

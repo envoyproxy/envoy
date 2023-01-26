@@ -126,6 +126,7 @@ public:
   MOCK_METHOD(bool, supportsIpTransparent, (), (const));
   MOCK_METHOD(bool, supportsMptcp, (), (const));
   MOCK_METHOD(bool, supportsGetifaddrs, (), (const));
+  MOCK_METHOD(void, setAlternateGetifaddrs, (AlternateGetifaddrs alternate_getifaddrs));
   MOCK_METHOD(SysCallIntResult, getifaddrs, (InterfaceAddressVector & interfaces));
   MOCK_METHOD(SysCallIntResult, getaddrinfo,
               (const char* node, const char* service, const addrinfo* hints, addrinfo** res));

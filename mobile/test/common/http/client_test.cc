@@ -153,7 +153,7 @@ public:
   NiceMock<Random::MockRandomGenerator> random_;
   Stats::IsolatedStoreImpl stats_store_;
   bool explicit_flow_control_{GetParam()};
-  Client http_client_{api_listener_, dispatcher_, stats_store_, random_};
+  Client http_client_{api_listener_, dispatcher_, *stats_store_.rootScope(), random_};
   envoy_stream_t stream_ = 1;
 };
 

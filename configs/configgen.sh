@@ -4,6 +4,8 @@ set -e
 
 CONFIGGEN="$1"
 shift
+TARGETFILE="$1"
+shift
 OUT_DIR="$1"
 shift
 
@@ -41,4 +43,4 @@ done
 # shellcheck disable=SC2035
 # TODO(mattklein123): I can't make this work when using the shellcheck suggestions. Try
 # to fix this.
-(cd "$OUT_DIR"; tar -hcf example_configs.tar -- $(ls *.yaml certs/*.pem certs/*.der protos/*.pb lib/*.wasm lib/*.lua 2>/dev/null))
+(cd "$OUT_DIR"; tar -hcf "$TARGETFILE" -- $(ls *.yaml certs/*.pem certs/*.der protos/*.pb lib/*.so lib/*.wasm lib/*.lua 2>/dev/null))

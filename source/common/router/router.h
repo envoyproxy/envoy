@@ -366,7 +366,8 @@ public:
   Filter(FilterConfig& config, FilterStats& stats)
       : config_(config), stats_(stats), downstream_1xx_headers_encoded_(false),
         downstream_response_started_(false), downstream_end_stream_(false), is_retry_(false),
-        request_buffer_overflowed_(false) {}
+        request_buffer_overflowed_(false), streaming_shadows_(Runtime::runtimeFeatureEnabled(
+                                               "envoy.reloadable_features.streaming_shadow")) {}
 
   ~Filter() override;
 
@@ -660,6 +661,9 @@ private:
 
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   Network::Socket::OptionsSharedPtr upstream_options_;
+  // Set of ongoing shadow streams which have not yet received end stream.
+  absl::flat_hash_set<Http::AsyncClient::OngoingRequest*> shadow_streams_;
+  const bool streaming_shadows_;
 };
 
 class ProdFilter : public Filter {

@@ -29,7 +29,6 @@
 // If issues are found that require a runtime feature to be disabled, it should be reported
 // ASAP by filing a bug on github. Overriding non-buggy code is strongly discouraged to avoid the
 // problem of the bugs being found after the old code path has been removed.
-RUNTIME_GUARD(envoy_reloadable_features_allow_multiple_dns_addresses);
 RUNTIME_GUARD(envoy_reloadable_features_allow_upstream_filters);
 RUNTIME_GUARD(envoy_reloadable_features_append_query_parameters_path_rewriter);
 RUNTIME_GUARD(envoy_reloadable_features_cares_accept_nodata);
@@ -51,7 +50,6 @@ RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
 RUNTIME_GUARD(envoy_reloadable_features_http_response_half_close);
 RUNTIME_GUARD(envoy_reloadable_features_http_skip_adding_content_length_to_upgrade);
 RUNTIME_GUARD(envoy_reloadable_features_http_strip_fragment_from_path_unsafe_if_disabled);
-RUNTIME_GUARD(envoy_reloadable_features_local_ratelimit_match_all_descriptors);
 RUNTIME_GUARD(envoy_reloadable_features_lua_respond_with_send_local_reply);
 RUNTIME_GUARD(envoy_reloadable_features_multiplex_eds);
 RUNTIME_GUARD(envoy_reloadable_features_no_extension_lookup_by_name);
@@ -79,6 +77,8 @@ RUNTIME_GUARD(envoy_restart_features_use_apple_api_for_dns_lookups);
 // Begin false flags. These should come with a TODO to flip true.
 // Sentinel and test flag.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_test_feature_false);
+// TODO(paul-r-gall) Make this enabled by default after additional soak time.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_streaming_shadow);
 // TODO(adisuissa) reset to true to enable unified mux by default
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_unified_mux);
 // TODO(kbaichoo): Make this enabled by default when fairness and chunking
@@ -101,8 +101,7 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_api_listener);
 // TODO(pradeepcrao) reset this to true after 2 releases (1.27)
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_include_histograms);
 
-// Block of non-boolean flags. These are deprecated. Do not add more.
-ABSL_FLAG(uint64_t, envoy_headermap_lazy_map_min_size, 3, "");  // NOLINT
+// Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT
 ABSL_FLAG(uint64_t, re2_max_program_size_warn_level,            // NOLINT
           std::numeric_limits<uint32_t>::max(), "");            // NOLINT
@@ -175,12 +174,7 @@ bool runtimeFeatureEnabled(absl::string_view feature) {
 }
 
 uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
-  if (absl::StartsWith(feature, "envoy.")) {
-    // DO NOT ADD MORE FLAGS HERE. This function deprecated.
-    if (feature == "envoy.http.headermap.lazy_map_min_size") {
-      return absl::GetFlag(FLAGS_envoy_headermap_lazy_map_min_size);
-    }
-  }
+  // DO NOT ADD MORE FLAGS HERE. This function deprecated.
   if (absl::StartsWith(feature, "re2.")) {
     if (feature == "re2.max_program_size.error_level") {
       return absl::GetFlag(FLAGS_re2_max_program_size_error_level);
