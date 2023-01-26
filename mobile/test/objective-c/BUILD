@@ -8,11 +8,11 @@ envoy_mobile_objc_test(
         "EnvoyBridgeUtilityTest.m",
     ],
     flaky = True,  # TODO(jpsim): Fix timeouts when running these tests on CI
+    tags = ["no-remote-exec"],  # TODO(jpsim): Re-enable remote exec
     visibility = ["//visibility:public"],
     deps = [
         "//library/objective-c:envoy_objc_bridge_lib",
     ],
-    tags = ["no-remote-exec"],  # TODO(jpsim): Re-enable remote exec
 )
 
 envoy_mobile_objc_test(
@@ -21,10 +21,10 @@ envoy_mobile_objc_test(
         "EnvoyKeyValueStoreBridgeImplTest.m",
     ],
     flaky = True,  # TODO(jpsim): Fix timeouts when running these tests on CI
+    tags = ["no-remote-exec"],  # TODO(jpsim): Re-enable remote exec
     visibility = ["//visibility:public"],
     deps = [
         "//library/objective-c:envoy_key_value_store_bridge_impl_lib",
         "//library/objective-c:envoy_objc_bridge_lib",
     ],
-    tags = ["no-remote-exec"],  # TODO(jpsim): Re-enable remote exec
 )
