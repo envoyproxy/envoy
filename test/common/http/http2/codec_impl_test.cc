@@ -1364,7 +1364,7 @@ TEST_P(Http2CodecImplTest, ShouldDumpActiveStreamsWithoutAllocatingMemory) {
     EXPECT_THAT(ostream.contents(), HasSubstr("local_end_stream_: 1"));
     EXPECT_THAT(ostream.contents(),
                 HasSubstr("pending_trailers_to_encode_:     null\n"
-                          "    absl::get<RequestHeaderMapPtr>(headers_or_trailers_): \n"
+                          "    absl::get<RequestHeaderMapSharedPtr>(headers_or_trailers_): \n"
                           "      ':scheme', 'http'\n"
                           "      ':method', 'GET'\n"
                           "      ':authority', 'host'\n"
@@ -2685,7 +2685,7 @@ TEST_P(Http2CodecImplTest, HeaderNameWithUnderscoreAreDropped) {
 #ifdef ENVOY_ENABLE_UHV
   // Header validation is done by the HCM when header map is fully parsed.
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, _))
-      .WillOnce(Invoke([this, &expected_headers](RequestHeaderMapPtr& headers, bool) -> void {
+      .WillOnce(Invoke([this, &expected_headers](RequestHeaderMapSharedPtr& headers, bool) -> void {
         auto result = header_validator_->validateRequestHeaderMap(*headers);
         EXPECT_THAT(headers, HeaderMapEqualIgnoreOrder(&expected_headers));
         ASSERT_TRUE(result.ok());
@@ -2714,7 +2714,7 @@ TEST_P(Http2CodecImplTest, HeaderNameWithUnderscoreAreRejected) {
   // sendLocalReply and closes network connection (based on the
   // stream_error_on_invalid_http_message flag, which in this test is assumed to equal false).
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, _))
-      .WillOnce(Invoke([this](RequestHeaderMapPtr& headers, bool) -> void {
+      .WillOnce(Invoke([this](RequestHeaderMapSharedPtr& headers, bool) -> void {
         auto result = header_validator_->validateRequestHeaderMap(*headers);
         ASSERT_FALSE(result.ok());
         response_encoder_->encodeHeaders(TestResponseHeaderMapImpl{{":status", "400"},
@@ -2748,7 +2748,7 @@ TEST_P(Http2CodecImplTest, HeaderNameWithUnderscoreAllowed) {
 #ifdef ENVOY_ENABLE_UHV
   // Header validation is done by the HCM when header map is fully parsed.
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, _))
-      .WillOnce(Invoke([this, &expected_headers](RequestHeaderMapPtr& headers, bool) -> void {
+      .WillOnce(Invoke([this, &expected_headers](RequestHeaderMapSharedPtr& headers, bool) -> void {
         auto result = header_validator_->validateRequestHeaderMap(*headers);
         EXPECT_THAT(headers, HeaderMapEqualIgnoreOrder(&expected_headers));
         ASSERT_TRUE(result.ok());

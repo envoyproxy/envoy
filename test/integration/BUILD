@@ -1130,9 +1130,11 @@ envoy_cc_test(
         "redirect_integration_test.cc",
     ],
     shard_count = 4,
+    tags = ["nofips"],
     deps = [
         ":http_protocol_integration_lib",
         "//source/common/http:header_map_lib",
+        "//test/integration/filters:pause_filter_for_quic_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",

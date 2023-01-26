@@ -1135,6 +1135,7 @@ responder
 restarter
 resync
 ret
+retransmitted
 retransmitting
 retriable
 retriggers
