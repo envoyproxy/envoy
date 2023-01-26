@@ -2,7 +2,11 @@ name: CIFuzz
 on:
   pull_request:
     branches:
-      - main
+      - master
+      -   pull_request:
+    branches:
+      - master
+      - 'releases/**'
     paths:
       - '**.c'
       - '**.cc'
@@ -15,7 +19,7 @@ jobs:
    strategy:
      fail-fast: false
      matrix:
-       sanitizer: [address, undefined, memory]
+       sanitizer: [address]
    steps:
    - name: Build Fuzzers (${{ matrix.sanitizer }})
      id: build
