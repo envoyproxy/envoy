@@ -16,7 +16,7 @@ for more details on the filter's implementation.
 Developing a Go plugin
 ----------------------
 
-Envoy's Go plugins must implement the :repo:`StreamFilter API <contrib/golang/filters/http/source/go/pkg/api.StreamFilter>`.
+Envoy's Go plugins must implement the :repo:`StreamFilter API <contrib/golang/filters/http/source/go/pkg/api/filter.go>`.
 
 Building a Go plugin
 ~~~~~~~~~~~~~~~~~~~~
@@ -87,6 +87,9 @@ Below is a very simple example of how such a plugin might be configured in Envoy
    :emphasize-lines: 7-10
    :caption: :download:`golang-with-config.yaml </_configs/go/golang-with-config.yaml>`
 
+See the :repo:`StreamFilter API <contrib/golang/filters/http/source/go/pkg/api/filter.go>`
+for more information about how the plugin's configuration data can be accessed.
+
 Per-route plugin configuration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -101,7 +104,6 @@ Go plugins can be configured on a
    :emphasize-lines: 2-7, 21-29
    :caption: :download:`golang-with-per-route-config.yaml </_configs/go/golang-with-per-route-config.yaml>`
 
-
 Per-virtualhost plugin configuration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -114,16 +116,3 @@ Go plugins can also be configured on a
    :lines: 16-44
    :emphasize-lines: 2-7, 21-29
    :caption: :download:`golang-with-per-virtualhost-config.yaml </_configs/go/golang-with-per-virtualhost-config.yaml>`
-
-Plugin configuration merge policy
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Where multiple configurations are set for a plugin, the configuration is merged according
-to the :ref:`merge_policy <envoy_v3_api_field_extensions.filters.http.golang.v3alpha.Config.merge_policy>`:
-
-.. literalinclude:: /_configs/go/golang-with-merged-config.yaml
-   :language: yaml
-   :linenos:
-   :lines: 16-58
-   :emphasize-lines: 8-12, 27-34, 36-43
-   :caption: :download:`golang-with-merged-config.yaml </_configs/go/golang-with-merged-config.yaml>`
