@@ -1,3 +1,5 @@
+#include <chrono>
+
 #include "source/extensions/tracers/datadog/event_scheduler.h"
 
 #include "test/mocks/event/mocks.h"
@@ -5,8 +7,6 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-
-#include <chrono>
 
 namespace Envoy {
 namespace Extensions {
