@@ -2,6 +2,8 @@ load("@build_bazel_rules_apple//apple:ios.bzl", "ios_unit_test")
 load("@build_bazel_rules_swift//swift:swift.bzl", "swift_library")
 load("//bazel:config.bzl", "MINIMUM_IOS_VERSION")
 
+TEST_RUNNER = "@build_bazel_rules_apple//apple/testing/default_runner:ios_xctestrun_random_runner"
+
 # Macro providing a way to easily/consistently define Swift unit test targets.
 #
 # - Prevents consumers from having to define both swift_library and ios_unit_test targets
@@ -35,6 +37,7 @@ def envoy_mobile_swift_test(name, srcs, data = [], deps = [], tags = [], reposit
     ios_unit_test(
         name = name,
         data = data,
+        runner = TEST_RUNNER,
         deps = [test_lib_name],
         minimum_os_version = MINIMUM_IOS_VERSION,
         tags = tags,
@@ -55,6 +58,7 @@ def envoy_mobile_objc_test(name, srcs, data = [], deps = [], tags = [], visibili
     ios_unit_test(
         name = name,
         data = data,
+        runner = TEST_RUNNER,
         deps = [test_lib_name],
         minimum_os_version = MINIMUM_IOS_VERSION,
         tags = tags,
