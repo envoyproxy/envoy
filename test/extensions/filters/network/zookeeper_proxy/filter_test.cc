@@ -91,6 +91,19 @@ public:
     return buffer;
   }
 
+  Buffer::OwnedImpl encodeResponsePartially(const int32_t xid, const int64_t zxid,
+                                            const int32_t error) const {
+    Buffer::OwnedImpl buffer;
+    const uint32_t message_size = 20;
+
+    buffer.writeBEInt<uint32_t>(message_size);
+    buffer.writeBEInt<uint32_t>(xid);
+    buffer.writeBEInt<uint64_t>(zxid);
+    buffer.writeBEInt<uint32_t>(error);
+    // Deliberately skip adding data to the buffer.
+    return buffer;
+  }
+
   Buffer::OwnedImpl encodeWatchEvent(const std::string& path, const int32_t event_type,
                                      const int32_t client_state) const {
     Buffer::OwnedImpl buffer;
@@ -313,7 +326,7 @@ public:
     addString(buffer, path);
     // Data.
     addString(buffer, data);
-
+    // Deliberately skip adding acls and flags to the buffer.
     return buffer;
   }
 
@@ -595,7 +608,7 @@ public:
     EXPECT_EQ(0UL, config_->stats().request_bytes_.value());
     EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 
-    // Add the remaining data to buffer
+    // Add the remaining data to buffer.
     // Acls.
     data.writeBEInt<int32_t>(0);
     // Flags.
@@ -1131,7 +1144,7 @@ TEST_F(ZooKeeperFilterTest, MissingXid) {
   EXPECT_EQ(1UL, config_->stats().decoder_error_.value());
 }
 
-TEST_F(ZooKeeperFilterTest, OneRequestWithMultipleBufferReads) {
+TEST_F(ZooKeeperFilterTest, RequestWithMultipleBufferReads) {
   initialize();
 
   testCreateWithMultipleBufferReads(CreateFlags::Persistent);
@@ -1139,6 +1152,33 @@ TEST_F(ZooKeeperFilterTest, OneRequestWithMultipleBufferReads) {
                config_->stats().create_resp_);
 }
 
+TEST_F(ZooKeeperFilterTest, ResponseWithMultipleBufferReads) {
+  initialize();
+
+  const auto& stat = config_->stats().getdata_resp_;
+  Buffer::OwnedImpl rq_data = encodePathWatch("/foo", true);
+
+  testRequest(rq_data,
+              {{{"opname", "getdata"}, {"path", "/foo"}, {"watch", "true"}}, {{"bytes", "21"}}},
+              config_->stats().getdata_rq_, 21);
+
+  Buffer::OwnedImpl resp_data = encodeResponsePartially(1000, 2000, 0);
+
+  EXPECT_EQ(0UL, stat.value());
+  EXPECT_EQ(0UL, config_->stats().response_bytes_.value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+
+  // Add the data of the path to buffer.
+  resp_data.add("data");
+
+  expectSetDynamicMetadata(
+      {{{"opname", "getdata_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "24"}}});
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(resp_data, false));
+  EXPECT_EQ(1UL, stat.value());
+  EXPECT_EQ(24UL, config_->stats().response_bytes_.value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+  EXPECT_NE(absl::nullopt, findHistogram("test.zookeeper.getdata_resp_latency"));
+}
 } // namespace ZooKeeperProxy
 } // namespace NetworkFilters
 } // namespace Extensions
