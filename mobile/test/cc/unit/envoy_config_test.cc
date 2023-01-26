@@ -52,6 +52,7 @@ TEST(TestConfig, BootstrapCompatibleConfigIsApplied) {
                                            "- &h2_connection_keepalive_idle_interval 0.222s",
                                            "- &h2_connection_keepalive_timeout 333s",
                                            "- &stats_flush_interval 654s",
+                                           "  key: dns_persistent_cache",
                                            ("- &metadata { device_os: probably-ubuntu-on-CI, "
                                             "app_version: 1.2.3, app_id: 1234-1234-1234 }"),
                                            R"(- &validation_context
