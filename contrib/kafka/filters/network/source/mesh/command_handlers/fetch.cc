@@ -172,13 +172,12 @@ AbstractResponseSharedPtr FetchRequestHolder::computeAnswer() const {
   const auto& header = request_->request_header_;
   const ResponseMetadata metadata = {header.api_key_, header.api_version_, header.correlation_id_};
 
-  const int32_t throttle_time_ms = 0;
   std::vector<FetchableTopicResponse> responses;
   {
     absl::MutexLock lock(&state_mutex_);
     responses = converter_.convert(messages_);
   }
-  const FetchResponse data = {throttle_time_ms, responses};
+  const FetchResponse data = {responses};
   return std::make_shared<Response<FetchResponse>>(metadata, data);
 }
 

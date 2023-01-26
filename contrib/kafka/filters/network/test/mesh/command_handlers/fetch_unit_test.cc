@@ -13,6 +13,7 @@ namespace Mesh {
 namespace {
 
 using testing::NiceMock;
+using testing::Return;
 using testing::ReturnRef;
 
 class MockAbstractRequestListener : public AbstractRequestListener {
@@ -30,11 +31,13 @@ public:
 
 class MockFetchRecordConverter : public FetchRecordConverter {
 public:
-  MOCK_METHOD(std::vector<FetchableTopicResponse>, convert, (const INPUT&), (const));
+  MOCK_METHOD(std::vector<FetchableTopicResponse>, convert, (const InboundRecordsMap&), (const));
 };
 
 class FetchUnitTest : public testing::Test {
 protected:
+  constexpr static int64_t TEST_CORRELATION_ID = 123456;
+
   NiceMock<MockAbstractRequestListener> filter_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<MockRecordCallbackProcessor> callback_processor_;
@@ -43,7 +46,7 @@ protected:
   FetchUnitTest() { ON_CALL(filter_, dispatcher).WillByDefault(ReturnRef(dispatcher_)); }
 
   std::shared_ptr<FetchRequestHolder> makeTestee() {
-    const RequestHeader header = {1, 0, 0, absl::nullopt};
+    const RequestHeader header = {FETCH_REQUEST_API_KEY, 0, TEST_CORRELATION_ID, absl::nullopt};
     // Our request refers to aaa-0, aaa-1, bbb-10, bbb-20.
     const FetchTopic t1 = {"aaa", {{0, 0, 0}, {1, 0, 0}}};
     const FetchTopic t2 = {"bbb", {{10, 0, 0}, {20, 0, 0}}};
@@ -156,7 +159,24 @@ TEST_F(FetchUnitTest, ShouldUnregisterItselfWhenAbandoned) {
   // then - expectations are met.
 }
 
-// computeAnswer
+TEST_F(FetchUnitTest, ShouldComputeAnswer) {
+  // given
+  const auto testee = makeTestee();
+  testee->startProcessing();
+
+  std::vector<FetchableTopicResponse> ftr = {{"aaa", {}}, {"bbb", {}}};
+  EXPECT_CALL(converter_, convert(_)).WillOnce(Return(ftr));
+
+  // when
+  const AbstractResponseSharedPtr answer = testee->computeAnswer();
+
+  // then
+  ASSERT_EQ(answer->metadata_.correlation_id_, TEST_CORRELATION_ID);
+  const auto response = std::dynamic_pointer_cast<Response<FetchResponse>>(answer);
+  ASSERT_TRUE(response);
+  const std::vector<FetchableTopicResponse> responses = response->data_.responses_;
+  ASSERT_EQ(responses, ftr);
+}
 
 } // namespace
 } // namespace Mesh

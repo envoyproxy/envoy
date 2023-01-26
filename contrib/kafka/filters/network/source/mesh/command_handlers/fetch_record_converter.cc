@@ -8,7 +8,8 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
 
-std::vector<FetchableTopicResponse> FetchRecordConverterImpl::convert(const INPUT&) const {
+std::vector<FetchableTopicResponse>
+FetchRecordConverterImpl::convert(const InboundRecordsMap&) const {
 
   // TODO (adam.kotwasinski) This needs to be actually implemented.
   return {};

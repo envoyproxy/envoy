@@ -14,7 +14,7 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
 
-using INPUT = std::map<KafkaPartition, std::vector<InboundRecordSharedPtr>>;
+using InboundRecordsMap = std::map<KafkaPartition, std::vector<InboundRecordSharedPtr>>;
 
 /**
  * Dependency injection class responsible for converting received records into serializable form
@@ -25,7 +25,7 @@ public:
   virtual ~FetchRecordConverter() = default;
 
   // Converts received records into the serialized form.
-  virtual std::vector<FetchableTopicResponse> convert(const INPUT& arg) const PURE;
+  virtual std::vector<FetchableTopicResponse> convert(const InboundRecordsMap& arg) const PURE;
 };
 
 /**
@@ -34,7 +34,7 @@ public:
 class FetchRecordConverterImpl : public FetchRecordConverter {
 public:
   // FetchRecordConverter
-  std::vector<FetchableTopicResponse> convert(const INPUT& arg) const override;
+  std::vector<FetchableTopicResponse> convert(const InboundRecordsMap& arg) const override;
 
   // Default singleton accessor.
   static const FetchRecordConverter& getDefaultInstance();
