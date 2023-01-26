@@ -213,7 +213,6 @@ std::string EngineBuilder::generateConfigStr() const {
         {"dns_fail_max_interval", fmt::format("{}s", dns_failure_refresh_seconds_max_)},
         {"dns_lookup_family", enable_happy_eyeballs_ ? "ALL" : "V4_PREFERRED"},
         {"dns_min_refresh_rate", fmt::format("{}s", dns_min_refresh_seconds_)},
-        {"dns_multiple_addresses", enable_happy_eyeballs_ ? "true" : "false"},
         {"dns_preresolve_hostnames", dns_preresolve_hostnames_},
         {"dns_refresh_rate", fmt::format("{}s", dns_refresh_seconds_)},
         {"dns_query_timeout", fmt::format("{}s", dns_query_timeout_seconds_)},

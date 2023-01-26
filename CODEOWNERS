@@ -93,17 +93,17 @@ extensions/filters/common/original_src @snowp @klarose
 # attribute context
 /*/extensions/filters/common/expr @kyessenov @yangminzhu @lizan
 # webassembly access logger extensions
-/*/extensions/access_loggers/wasm @PiotrSikora @mathetake @lizan
+/*/extensions/access_loggers/wasm @mpwarres @mathetake @lizan
 # webassembly bootstrap extensions
-/*/extensions/bootstrap/wasm @PiotrSikora @mathetake @lizan
+/*/extensions/bootstrap/wasm @mpwarres @mathetake @lizan
 # webassembly http extensions
-/*/extensions/filters/http/wasm @PiotrSikora @mathetake @lizan
+/*/extensions/filters/http/wasm @mpwarres @mathetake @lizan
 # webassembly network extensions
-/*/extensions/filters/network/wasm @PiotrSikora @mathetake @lizan
+/*/extensions/filters/network/wasm @mpwarres @mathetake @lizan
 # webassembly common extension
-/*/extensions/common/wasm @PiotrSikora @mathetake @lizan
+/*/extensions/common/wasm @mpwarres @mathetake @lizan
 # webassembly runtimes
-/*/extensions/wasm_runtime/ @PiotrSikora @mathetake @lizan
+/*/extensions/wasm_runtime/ @mpwarres @mathetake @lizan
 # common matcher
 /*/extensions/common/matcher @mattklein123 @yangminzhu
 /*/extensions/common/proxy_protocol @alyssawilk @wez470
@@ -125,7 +125,7 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/stat_sinks/hystrix @trabetti @jmarantz
 /*/extensions/stat_sinks/metrics_service @ramaraochavali @jmarantz
 # webassembly stat-sink extensions
-/*/extensions/stat_sinks/wasm @PiotrSikora @mathetake @lizan
+/*/extensions/stat_sinks/wasm @mpwarres @mathetake @lizan
 /*/extensions/resource_monitors/injected_resource @eziskind @htuch
 /*/extensions/resource_monitors/common @eziskind @htuch
 /*/extensions/resource_monitors/fixed_heap @eziskind @htuch
