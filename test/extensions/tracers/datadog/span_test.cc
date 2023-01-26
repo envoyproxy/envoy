@@ -100,6 +100,22 @@ private:
   }
 };
 
+std::chrono::system_clock::time_point now() {
+  // We are frozen in time.
+  std::tm datetime = {};
+  // May 6th, 2010
+  datetime.tm_year = 2010 - 1900;
+  datetime.tm_mon = 5 - 1;
+  datetime.tm_mday = 6;
+  // 14:45
+  datetime.tm_hour = 14;
+  datetime.tm_min = 45;
+
+  const std::time_t time = std::mktime(&datetime);
+  EXPECT_NE(std::time_t(-1), time);
+  return std::chrono::system_clock::from_time_t(time);
+}
+
 TEST(DatadogTracerSpanTest, SetOperation) {
   TestSetup test;
   Span span{std::move(test.span)};
@@ -170,7 +186,7 @@ TEST(DatadogTracerSpanTest, InjectContext) {
 
 TEST(DatadogTracerSpanTest, SpawnChild) {
   TestSetup test;
-  const auto child_start = std::chrono::system_clock::now();
+  const auto child_start = now();
   {
     Span parent{std::move(test.span)};
     auto child = parent.spawnChild(Tracing::MockConfig{}, "child", child_start);
@@ -201,8 +217,7 @@ TEST(DatadogTracerSpanTest, SetSampled) {
     TestSetup test;
     {
       Span local_root{std::move(test.span)};
-      auto child =
-          local_root.spawnChild(Tracing::MockConfig{}, "child", std::chrono::system_clock::now());
+      auto child = local_root.spawnChild(Tracing::MockConfig{}, "child", now());
       child->setSampled(sampled);
       child->finishSpan();
       local_root.finishSpan();
@@ -262,7 +277,7 @@ TEST(DatadogTracerSpanTest, NoOpMode) {
   span.setOperation("foo");
   span.setTag("foo", "bar");
   // `Span::log` doesn't do anything in any case.
-  span.log(std::chrono::system_clock::now(), "ignored");
+  span.log(now(), "ignored");
   Tracing::TestTraceContextImpl context{};
   span.injectContext(context, nullptr);
   EXPECT_EQ("", context.context_protocol_);
@@ -270,8 +285,7 @@ TEST(DatadogTracerSpanTest, NoOpMode) {
   EXPECT_EQ("", context.context_path_);
   EXPECT_EQ("", context.context_method_);
   EXPECT_EQ(0, context.context_map_.size());
-  const Tracing::SpanPtr child =
-      span.spawnChild(Tracing::MockConfig{}, "child", std::chrono::system_clock::now());
+  const Tracing::SpanPtr child = span.spawnChild(Tracing::MockConfig{}, "child", now());
   EXPECT_NE(nullptr, child);
   EXPECT_EQ(typeid(Tracing::NullSpan), typeid(*child));
   span.setSampled(true);
