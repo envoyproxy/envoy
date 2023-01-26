@@ -325,7 +325,7 @@ public:
 
     // Path.
     addString(buffer, path);
-    // Deliberately adding partial data the buffer.
+    // Deliberately adding partial data to the buffer.
     addString(buffer, data.substr(0, data.length() - 1));
 
     return buffer;
