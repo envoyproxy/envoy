@@ -36,40 +36,125 @@ public:
 class FetchUnitTest : public testing::Test {
 protected:
   NiceMock<MockAbstractRequestListener> filter_;
-  Event::MockDispatcher dispatcher_;
-  MockRecordCallbackProcessor callback_processor_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
+  NiceMock<MockRecordCallbackProcessor> callback_processor_;
   MockFetchRecordConverter converter_;
 
   FetchUnitTest() { ON_CALL(filter_, dispatcher).WillByDefault(ReturnRef(dispatcher_)); }
 
   std::shared_ptr<FetchRequestHolder> makeTestee() {
-    const RequestHeader header = {0, 0, 0, absl::nullopt};
-    const FetchRequest data = {0, 0, 0, {}};
+    const RequestHeader header = {1, 0, 0, absl::nullopt};
+    // Our request refers to aaa-0, aaa-1, bbb-10, bbb-20.
+    const FetchTopic t1 = {"aaa", {{0, 0, 0}, {1, 0, 0}}};
+    const FetchTopic t2 = {"bbb", {{10, 0, 0}, {20, 0, 0}}};
+    const FetchRequest data = {0, 0, 0, {t1, t2}};
     const auto message = std::make_shared<Request<FetchRequest>>(header, data);
     return std::make_shared<FetchRequestHolder>(filter_, callback_processor_, message, converter_);
   }
 };
 
-TEST_F(FetchUnitTest, shouldRegisterCallbackAndTimer) {
-  auto testee = makeTestee();
+TEST_F(FetchUnitTest, ShouldRegisterCallbackAndTimer) {
+  // given
+  const auto testee = makeTestee();
   EXPECT_CALL(callback_processor_, processCallback(_));
   EXPECT_CALL(dispatcher_, createTimer_(_));
+
+  // when
   testee->startProcessing();
+
+  // then
+  ASSERT_FALSE(testee->finished());
 }
 
-// interest
+TEST_F(FetchUnitTest, ShouldReturnProperInterest) {
+  // given
+  const auto testee = makeTestee();
 
-// markFinishedByTimer
+  // when
+  const TopicToPartitionsMap result = testee->interest();
 
-// markFinishedByTimer x2
+  // then
+  const TopicToPartitionsMap expected = {{"aaa", {0, 1}}, {"bbb", {10, 20}}};
+  ASSERT_EQ(result, expected);
+}
 
-// receive (more)
+TEST_F(FetchUnitTest, ShouldCleanupAfterTimer) {
+  // given
+  const auto testee = makeTestee();
+  testee->startProcessing();
 
-// receive (finish)
+  EXPECT_CALL(callback_processor_, removeCallback(_));
+  EXPECT_CALL(dispatcher_, post(_));
 
-// receive (reject)
+  // when
+  testee->markFinishedByTimer();
 
-// abandon
+  // then
+  ASSERT_TRUE(testee->finished());
+}
+
+// Helper method to generate records.
+InboundRecordSharedPtr makeRecord() { return std::make_shared<InboundRecord>("aaa", 0, 0); }
+
+TEST_F(FetchUnitTest, ShouldReceiveRecords) {
+  // given
+  const auto testee = makeTestee();
+  testee->startProcessing();
+
+  // Will be invoked by the third record (delivery was finished).
+  EXPECT_CALL(dispatcher_, post(_));
+  // It is invoker that removes the callback - not us.
+  EXPECT_CALL(callback_processor_, removeCallback(_)).Times(0);
+
+  // when - 1
+  const auto res1 = testee->receive(makeRecord());
+  // then - first record got stored.
+  ASSERT_EQ(res1, CallbackReply::AcceptedAndWantMore);
+  ASSERT_FALSE(testee->finished());
+
+  // when - 2
+  const auto res2 = testee->receive(makeRecord());
+  // then - second record got stored.
+  ASSERT_EQ(res2, CallbackReply::AcceptedAndWantMore);
+  ASSERT_FALSE(testee->finished());
+
+  // when - 3
+  const auto res3 = testee->receive(makeRecord());
+  // then - third record got stored and no more will be accepted.
+  ASSERT_EQ(res3, CallbackReply::AcceptedAndFinished);
+  ASSERT_TRUE(testee->finished());
+
+  // when - 4
+  const auto res4 = testee->receive(makeRecord());
+  // then - fourth record was rejected.
+  ASSERT_EQ(res4, CallbackReply::Rejected);
+}
+
+TEST_F(FetchUnitTest, ShouldRejectRecordsAfterTimer) {
+  // given
+  const auto testee = makeTestee();
+  testee->startProcessing();
+  testee->markFinishedByTimer();
+
+  // when
+  const auto res = testee->receive(makeRecord());
+
+  // then
+  ASSERT_EQ(res, CallbackReply::Rejected);
+}
+
+TEST_F(FetchUnitTest, ShouldUnregisterItselfWhenAbandoned) {
+  // given
+  const auto testee = makeTestee();
+  testee->startProcessing();
+
+  EXPECT_CALL(callback_processor_, removeCallback(_));
+
+  // when
+  testee->abandon();
+
+  // then - expectations are met.
+}
 
 // computeAnswer
 

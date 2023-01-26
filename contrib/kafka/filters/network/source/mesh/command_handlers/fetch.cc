@@ -95,6 +95,8 @@ void FetchRequestHolder::markFinishedByTimer() {
 
 // XXX (adam.kotwasinski) This should be made configurable in future.
 // Right now the Fetch request is going to send up to 3 records.
+// In future this should tranform into some kind of method that's invoked inside 'receive' calls,
+// as Kafka can have limits on records per partition.
 constexpr int32_t MINIMAL_MSG_CNT = 3;
 
 // This method is called by:

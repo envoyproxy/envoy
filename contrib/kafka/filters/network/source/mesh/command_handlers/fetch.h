@@ -29,12 +29,16 @@ public:
                      const std::shared_ptr<Request<FetchRequest>>,
                      const FetchRecordConverter& converter);
 
+  // AbstractInFlightRequest
   void startProcessing() override;
 
+  // AbstractInFlightRequest
   bool finished() const override;
 
+  // AbstractInFlightRequest
   void abandon() override;
 
+  // AbstractInFlightRequest
   AbstractResponseSharedPtr computeAnswer() const override;
 
   // Invoked by timer as this requests's time runs out.
