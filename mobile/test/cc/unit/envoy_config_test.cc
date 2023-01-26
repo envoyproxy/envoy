@@ -38,6 +38,7 @@ TEST(TestConfig, BootstrapCompatibleConfigIsApplied) {
       .addStatsFlushSeconds(654)
       .setAppVersion("1.2.3")
       .setAppId("1234-1234-1234")
+      .enableDnsCache(true)
       .setDeviceOs("probably-ubuntu-on-CI");
   std::string config_str = engine_builder.generateConfigStr();
 

@@ -27,6 +27,7 @@
 #include "library/common/extensions/filters/http/local_error/filter.pb.h"
 #include "library/common/extensions/filters/http/network_configuration/filter.pb.h"
 #include "library/common/extensions/filters/http/socket_tag/filter.pb.h"
+#include "library/common/extensions/key_value/platform/platform.pb.h"
 #include "library/common/main_interface.h"
 
 namespace Envoy {
@@ -247,6 +248,11 @@ EngineBuilder::enablePlatformCertificatesValidation(bool platform_certificates_v
   return *this;
 }
 
+EngineBuilder& EngineBuilder::enableDnsCache(bool dns_cache_on) {
+  dns_cache_on_ = dns_cache_on;
+  return *this;
+}
+
 EngineBuilder& EngineBuilder::addStringAccessor(std::string name,
                                                 StringAccessorSharedPtr accessor) {
   bootstrapIncompatible();
@@ -306,6 +312,9 @@ std::string EngineBuilder::generateConfigStr() const {
   };
   if (!stats_domain_.empty()) {
     replacements.push_back({"stats_domain", stats_domain_});
+  }
+  if (dns_cache_on_) {
+    replacements.push_back({"persistent_dns_cache_config", persistent_dns_cache_config_insert});
   }
 
   // NOTE: this does not include support for custom filters
@@ -500,6 +509,18 @@ EngineBuilder::generateBootstrap(bool trim_whitespace_for_tests) const {
   dns_cache_config->mutable_dns_failure_refresh_rate()->mutable_max_interval()->set_seconds(
       dns_failure_refresh_seconds_max_);
   dns_cache_config->mutable_dns_query_timeout()->set_seconds(dns_query_timeout_seconds_);
+  if (dns_cache_on_) {
+    envoymobile::extensions::key_value::platform::PlatformKeyValueStoreConfig kv_config;
+    kv_config.set_key("dns_persistent_cache");
+    kv_config.mutable_save_interval()->set_seconds(0);
+    kv_config.set_max_entries(100);
+    dns_cache_config->mutable_key_value_config()->mutable_config()->set_name(
+        "envoy.key_value.platform");
+    dns_cache_config->mutable_key_value_config()
+        ->mutable_config()
+        ->mutable_typed_config()
+        ->PackFrom(kv_config);
+  }
 
 #if defined(__APPLE__)
   envoy::extensions::network::dns_resolver::apple::v3::AppleDnsResolverConfig resolver_config;
