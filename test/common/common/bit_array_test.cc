@@ -38,7 +38,7 @@ public:
     vec.reserve(num_items_);
 
     Random::RandomGeneratorImpl gen;
-    uint64_t max_given_bit_width = static_cast<uint64_t>(1) << width;
+    uint64_t max_given_bit_width = static_cast<uint64_t>(1) << bit_width_;
 
     // Populate both with the same value
     for (size_t i = 0; i < num_items_; ++i) {
