@@ -902,6 +902,10 @@ def _com_github_google_quiche():
         actual = "@com_github_google_quiche//:http2_adapter_http2_protocol",
     )
     native.bind(
+        name = "quiche_http2_test_tools",
+        actual = "@com_github_google_quiche//:http2_adapter_mock_http2_visitor",
+    )
+    native.bind(
         name = "quiche_quic_platform",
         actual = "@com_github_google_quiche//:quic_platform",
     )

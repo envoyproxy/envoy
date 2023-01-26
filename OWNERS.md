@@ -69,8 +69,6 @@ without further review.
 
 * Michael Warres ([mpwarres] (https://github.com/mpwarres)) (mpw@google.com)
   * Wasm
-* Raúl Gutiérrez Segalés ([rgs1](https://github.com/rgs1)) (rgs@pinterest.com)
-  * Thrift
 
 # Envoy security team
 

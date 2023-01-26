@@ -18,8 +18,6 @@ enum class SotwOrDelta { Sotw, Delta, UnifiedSotw, UnifiedDelta };
 // Unified or Legacy grpc mux implementation
 enum class LegacyOrUnified { Legacy, Unified };
 
-enum class EdsUpdateMode { Multiplexed, StreamPerCluster };
-
 class BaseGrpcClientIntegrationParamTest {
 public:
   virtual ~BaseGrpcClientIntegrationParamTest() = default;
@@ -123,27 +121,6 @@ public:
   SotwOrDelta sotwOrDelta() const { return std::get<2>(GetParam()); }
 };
 
-class MultiplexedDeltaSotwIntegrationParamTest
-    : public BaseGrpcClientIntegrationParamTest,
-      public testing::TestWithParam<
-          std::tuple<Network::Address::IpVersion, ClientType, SotwOrDelta, EdsUpdateMode>> {
-public:
-  ~MultiplexedDeltaSotwIntegrationParamTest() override = default;
-  static std::string protocolTestParamsToString(
-      const ::testing::TestParamInfo<
-          std::tuple<Network::Address::IpVersion, ClientType, SotwOrDelta, EdsUpdateMode>>& p) {
-    return fmt::format(
-        "{}_{}_{}_{}", std::get<0>(p.param) == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
-        std::get<1>(p.param) == ClientType::GoogleGrpc ? "GoogleGrpc" : "EnvoyGrpc",
-        std::get<2>(p.param) == SotwOrDelta::Delta ? "Delta" : "StateOfTheWorld",
-        std::get<3>(p.param) == EdsUpdateMode::Multiplexed ? "Multiplexed" : "StreamPerCluster");
-  }
-  Network::Address::IpVersion ipVersion() const override { return std::get<0>(GetParam()); }
-  ClientType clientType() const override { return std::get<1>(GetParam()); }
-  SotwOrDelta sotwOrDelta() const { return std::get<2>(GetParam()); }
-  EdsUpdateMode edsUpdateMode() const { return std::get<3>(GetParam()); }
-};
-
 // Skip tests based on gRPC client type.
 #define SKIP_IF_GRPC_CLIENT(client_type)                                                           \
   if (clientType() == (client_type)) {                                                             \
@@ -169,12 +146,6 @@ public:
   testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
                    testing::ValuesIn(TestEnvironment::getsGrpcVersionsForTest()),                  \
                    testing::Values(Grpc::LegacyOrUnified::Legacy, Grpc::LegacyOrUnified::Unified))
-#define EDS_MODE_DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS                                         \
-  testing::Combine(                                                                                \
-      testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                                  \
-      testing::ValuesIn(TestEnvironment::getsGrpcVersionsForTest()),                               \
-      testing::Values(Grpc::SotwOrDelta::Sotw, Grpc::SotwOrDelta::Delta),                          \
-      testing::Values(Grpc::EdsUpdateMode::Multiplexed, Grpc::EdsUpdateMode::StreamPerCluster))
 #define DELTA_SOTW_UNIFIED_GRPC_CLIENT_INTEGRATION_PARAMS                                          \
   testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
                    testing::ValuesIn(TestEnvironment::getsGrpcVersionsForTest()),                  \

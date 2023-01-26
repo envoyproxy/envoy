@@ -167,29 +167,21 @@ OptRef<const LocalRateLimiterImpl::LocalDescriptorImpl> LocalRateLimiterImpl::de
 
 bool LocalRateLimiterImpl::requestAllowed(
     absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const {
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.local_ratelimit_match_all_descriptors")) {
-
-    if (!descriptors_.empty() && !request_descriptors.empty()) {
-      for (const auto& descriptor : sorted_descriptors_) {
-        for (const auto& request_descriptor : request_descriptors) {
-          if (descriptor == request_descriptor) {
-            // Descriptor token is not enough.
-            if (!requestAllowedHelper(*descriptor.token_state_)) {
-              return false;
-            }
-            break;
+  if (!descriptors_.empty() && !request_descriptors.empty()) {
+    for (const auto& descriptor : sorted_descriptors_) {
+      for (const auto& request_descriptor : request_descriptors) {
+        if (descriptor == request_descriptor) {
+          // Descriptor token is not enough.
+          if (!requestAllowedHelper(*descriptor.token_state_)) {
+            return false;
           }
+          break;
         }
       }
     }
-    // Since global token is not sorted, so we suggest it should be larger than other descriptors.
-    return requestAllowedHelper(tokens_);
   }
-  auto descriptor = descriptorHelper(request_descriptors);
-
-  return descriptor.has_value() ? requestAllowedHelper(*descriptor.value().get().token_state_)
-                                : requestAllowedHelper(tokens_);
+  // Since global token is not sorted, so we suggest it should be larger than other descriptors.
+  return requestAllowedHelper(tokens_);
 }
 
 int LocalRateLimiterImpl::tokensFillPerSecond(LocalDescriptorImpl& descriptor) {

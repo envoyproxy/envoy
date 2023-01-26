@@ -25,12 +25,18 @@ bug_fixes:
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: dns
+  change: |
+    removed ``envoy.reloadable_features.dns_multiple_addresses`` runtime flag and legacy code paths.
 - area: router
   change: |
     removed ``envoy.reloadable_features.get_route_config_factory_by_type`` runtime flag. The flag is no longer needed as the behavior is now the default.
 - area: http
   change: |
     removed ``envoy.reloadable_features.http2_delay_keepalive_timeout`` and legacy code paths.
+- area: http
+  change: |
+    removed ``envoy.reloadable_features.local_ratelimit_match_all_descriptors`` and legacy code paths.
 
 - area: http
   change: |
