@@ -22,6 +22,10 @@ static_resources:
               library_id: simple
               library_path: "/usr/local/go-plugins/filter.so"
               plugin_name: simple
+              plugin_config:
+                "@type": type.googleapis.com/udpa.type.v1.TypedStruct
+                value:
+                  prefix_forbidden_body: "forbidden from go"
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router

@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 var LOCALREPLYFORBIDDENBODY = "localreply forbidden by encodedata"
@@ -12,11 +13,18 @@ var LOCALREPLYFORBIDDENBODY = "localreply forbidden by encodedata"
 type filter struct {
 	callbacks api.FilterCallbackHandler
 	path      string
+	config    *structpb.Struct
 }
 
 func (f *filter) sendLocalReplyForbidden() api.StatusType {
 	headers := make(map[string]string)
-	body := fmt.Sprintf("forbidden from go, path: %s\r\n", f.path)
+	configBody := ""
+	v, ok := f.config.AsMap()["prefix_forbidden_body"]
+	if ok {
+		configBody = v.(string)
+	}
+
+	body := fmt.Sprintf("%s, path: %s\r\n", configBody, f.path)
 	f.callbacks.SendLocalReply(403, body, headers, -1, "test-from-go")
 	return api.LocalReply
 }

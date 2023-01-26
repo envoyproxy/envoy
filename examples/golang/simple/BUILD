@@ -16,5 +16,8 @@ go_binary(
     deps = [
         "//contrib/golang/filters/http/source/go/pkg/api",
         "//contrib/golang/filters/http/source/go/pkg/http",
+        "@com_github_cncf_xds_go//udpa/type/v1:type",
+        "@org_golang_google_protobuf//types/known/anypb",
+        "@org_golang_google_protobuf//types/known/structpb",
     ],
 )
