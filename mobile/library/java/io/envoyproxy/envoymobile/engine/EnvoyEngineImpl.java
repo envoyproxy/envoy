@@ -65,18 +65,14 @@ public class EnvoyEngineImpl implements EnvoyEngine {
   }
 
   /**
-   * Run the Envoy engine with the provided yaml string and log level.
-   *
-   * The envoyConfiguration is used to resolve the configurationYAML.
+   * Performs various JNI registration prior to engine running.
    *
    * @param configurationYAML The configuration yaml with which to start Envoy.
    * @param envoyConfiguration The EnvoyConfiguration used to start Envoy.
    * @param logLevel          The log level to use when starting Envoy.
-   * @return A status indicating if the action was successful.
    */
   @Override
-  public int runWithTemplate(String configurationYAML, EnvoyConfiguration envoyConfiguration,
-                             String logLevel) {
+  public void performRegistration(EnvoyConfiguration envoyConfiguration) {
     for (EnvoyHTTPFilterFactory filterFactory : envoyConfiguration.httpPlatformFilterFactories) {
       JniLibrary.registerFilterFactory(filterFactory.getFilterName(),
                                        new JvmFilterFactoryContext(filterFactory));
@@ -93,16 +89,20 @@ public class EnvoyEngineImpl implements EnvoyEngine {
       JniLibrary.registerKeyValueStore(entry.getKey(),
                                        new JvmKeyValueStoreContext(entry.getValue()));
     }
+  }
 
-    return runWithResolvedYAML(
-        envoyConfiguration.resolveTemplate(
-            configurationYAML, JniLibrary.platformFilterTemplate(),
-            JniLibrary.nativeFilterTemplate(), JniLibrary.altProtocolCacheFilterInsert(),
-            JniLibrary.gzipConfigInsert(), JniLibrary.brotliConfigInsert(),
-            JniLibrary.socketTagConfigInsert(), JniLibrary.persistentDNSCacheConfigInsert(),
-            JniLibrary.certValidationTemplate(
-                envoyConfiguration.enablePlatformCertificatesValidation)),
-        logLevel);
+  /**
+   * Run the Envoy engine with the provided yaml string and log level.
+   *
+   * This does not perform registration, and performRegistration may need to be called first.
+   *
+   * @param configurationYAML The configuration yaml with which to start Envoy.
+   * @param logLevel          The log level to use when starting Envoy.
+   * @return A status indicating if the action was successful.
+   */
+  @Override
+  public int runWithYaml(String configurationYAML, String logLevel) {
+    return runWithResolvedYAML(configurationYAML, logLevel);
   }
 
   /**
@@ -114,7 +114,9 @@ public class EnvoyEngineImpl implements EnvoyEngine {
    */
   @Override
   public int runWithConfig(EnvoyConfiguration envoyConfiguration, String logLevel) {
-    return runWithTemplate(JniLibrary.configTemplate(), envoyConfiguration, logLevel);
+    performRegistration(envoyConfiguration);
+
+    return runWithResolvedYAML(envoyConfiguration.createYaml(), logLevel);
   }
 
   private int runWithResolvedYAML(String configurationYAML, String logLevel) {
