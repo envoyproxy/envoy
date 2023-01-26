@@ -52,7 +52,6 @@ RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
 RUNTIME_GUARD(envoy_reloadable_features_http_response_half_close);
 RUNTIME_GUARD(envoy_reloadable_features_http_skip_adding_content_length_to_upgrade);
 RUNTIME_GUARD(envoy_reloadable_features_http_strip_fragment_from_path_unsafe_if_disabled);
-RUNTIME_GUARD(envoy_reloadable_features_local_ratelimit_match_all_descriptors);
 RUNTIME_GUARD(envoy_reloadable_features_lua_respond_with_send_local_reply);
 RUNTIME_GUARD(envoy_reloadable_features_multiplex_eds);
 RUNTIME_GUARD(envoy_reloadable_features_no_extension_lookup_by_name);
@@ -80,6 +79,8 @@ RUNTIME_GUARD(envoy_restart_features_use_apple_api_for_dns_lookups);
 // Begin false flags. These should come with a TODO to flip true.
 // Sentinel and test flag.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_test_feature_false);
+// TODO(paul-r-gall) Make this enabled by default after additional soak time.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_streaming_shadow);
 // TODO(adisuissa) reset to true to enable unified mux by default
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_unified_mux);
 // TODO(kbaichoo): Make this enabled by default when fairness and chunking
