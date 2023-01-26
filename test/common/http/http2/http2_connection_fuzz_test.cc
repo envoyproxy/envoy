@@ -31,14 +31,10 @@ public:
     data_.assign(HeaderSize, 0);
     setType(type);
     setFlags(flags);
+    set_stream_id(stream_id_);
   }
 
-  Http2Frame(absl::string_view contents) : stream_id_(1) {
-    appendData(contents);
-    if (data_.size() >= HeaderSize) {
-      std::memcpy(&stream_id_, &data_[5], sizeof(stream_id_));
-    }
-  }
+  Http2Frame(absl::string_view contents) : stream_id_(1) { appendData(contents); }
 
   void setPayloadSize(uint32_t size) {
     data_[0] = (size >> 16) & 0xff;
@@ -53,16 +49,12 @@ public:
 
   void makeClientStreamId() {
     uint32_t id = (stream_id_ << 1) + 1;
-    if (data_.size() >= HeaderSize) {
-      std::memcpy(&data_[5], &id, sizeof(id));
-    }
+    set_stream_id(id);
   }
 
   void makeServerStreamId() {
     uint32_t id = stream_id_ << 1;
-    if (data_.size() >= HeaderSize) {
-      std::memcpy(&data_[5], &id, sizeof(id));
-    }
+    set_stream_id(id);
   }
 
   void appendData(absl::string_view data) { data_.insert(data_.end(), data.begin(), data.end()); }
@@ -73,6 +65,13 @@ public:
   }
 
 private:
+  void set_stream_id(uint32_t id) {
+    uint32_t id_nbo = htonl(id);
+    if (data_.size() >= HeaderSize) {
+      std::memcpy(&data_[5], &id_nbo, sizeof(id));
+    }
+  }
+
   uint32_t stream_id_;
   std::vector<uint8_t> data_;
 };
@@ -135,7 +134,7 @@ Http2Frame pb_to_h2_frame(nghttp2_hd_deflater* deflater,
         payload.push_back(static_cast<char>(padding_len));
       }
 
-      uint32_t stream_dependency = f.stream_dependency();
+      uint32_t stream_dependency = htonl(f.stream_dependency());
       payload.append(reinterpret_cast<char*>(&stream_dependency), sizeof(stream_dependency));
 
       if (f.weight() > 0 && f.weight() <= 256) {
@@ -150,20 +149,20 @@ Http2Frame pb_to_h2_frame(nghttp2_hd_deflater* deflater,
     } else if (h2frame.has_priority()) {
       type = 2;
       auto f = h2frame.priority();
-      uint32_t stream_dependency = f.stream_dependency();
+      uint32_t stream_dependency = htonl(f.stream_dependency());
       payload.append(reinterpret_cast<char*>(&stream_dependency), sizeof(stream_dependency));
       payload.push_back(static_cast<char>(f.weight() & 0xff));
     } else if (h2frame.has_rst()) {
       type = 3;
       auto f = h2frame.rst();
-      uint32_t error_code = f.error_code();
+      uint32_t error_code = htonl(f.error_code());
       payload.append(reinterpret_cast<char*>(&error_code), sizeof(error_code));
     } else if (h2frame.has_settings()) {
       type = 4;
       auto f = h2frame.settings();
       for (auto& setting : f.settings()) {
         uint16_t id = static_cast<uint16_t>(setting.identifier() & 0xffff);
-        uint32_t value = setting.value();
+        uint32_t value = htonl(setting.value());
         payload.append(reinterpret_cast<char*>(&id), sizeof(id));
         payload.append(reinterpret_cast<char*>(&value), sizeof(value));
       }
@@ -174,7 +173,7 @@ Http2Frame pb_to_h2_frame(nghttp2_hd_deflater* deflater,
       if (use_padding) {
         payload.push_back(static_cast<char>(padding_len));
       }
-      uint32_t stream_id = f.stream_id();
+      uint32_t stream_id = htonl(f.stream_id());
       payload.append(reinterpret_cast<char*>(&stream_id), sizeof(stream_id));
       deflate_headers(deflater, f.headers(), payload);
       if (use_padding) {
@@ -188,15 +187,15 @@ Http2Frame pb_to_h2_frame(nghttp2_hd_deflater* deflater,
     } else if (h2frame.has_go_away()) {
       type = 7;
       auto f = h2frame.go_away();
-      uint32_t last_stream_id = f.last_stream_id();
+      uint32_t last_stream_id = htonl(f.last_stream_id());
       payload.append(reinterpret_cast<char*>(&last_stream_id), sizeof(last_stream_id));
-      uint32_t error_code = f.error_code();
+      uint32_t error_code = htonl(f.error_code());
       payload.append(reinterpret_cast<char*>(&error_code), sizeof(error_code));
       payload.append(f.debug_data());
     } else if (h2frame.has_window_update()) {
       type = 8;
       auto f = h2frame.window_update();
-      uint32_t wsi = f.window_size_increment();
+      uint32_t wsi = htonl(f.window_size_increment());
       payload.append(reinterpret_cast<char*>(&wsi), sizeof(wsi));
     } else if (h2frame.has_continuation()) {
       type = 9;
@@ -252,8 +251,10 @@ public:
     payload.add(Http2Frame::Preamble, 24);
     static Http2Frame emptySettingsFrame(0, 4, 0);
     payload.add(emptySettingsFrame.serialize());
-    for (auto frame : frames)
+    for (auto frame : frames) {
+      frame.makeClientStreamId();
       payload.add(frame.serialize());
+    }
     Status status = server_->dispatch(payload);
   }
 
