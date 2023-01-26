@@ -159,9 +159,6 @@ public:
 private:
   ProcessorState& getProcessorState();
 
-  // check the filter state when invoking C API from Go.
-  int checkApiState();
-
   bool doHeaders(ProcessorState& state, Http::RequestOrResponseHeaderMap& headers, bool end_stream);
   GolangStatus doHeadersGo(ProcessorState& state, Http::RequestOrResponseHeaderMap& headers,
                            bool end_stream);
