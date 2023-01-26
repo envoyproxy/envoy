@@ -29,7 +29,6 @@ envoy_cc_library(
     hdrs = ["async_client.h"],
     external_deps = ["abseil_optional"],
     deps = [
-        ":filter_interface",
         ":message_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/tracing:http_tracer_interface",
