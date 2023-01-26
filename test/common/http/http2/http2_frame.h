@@ -63,6 +63,7 @@ public:
     None = 0,
     EndStream = 1,
     EndHeaders = 4,
+    Padded = 8,
   };
 
   enum class DataFlags : uint8_t {
@@ -127,6 +128,8 @@ public:
   static uint32_t makeClientStreamId(uint32_t stream_id) { return (stream_id << 1) | 1; }
 
   // Methods for creating HTTP2 frames
+  static Http2Frame makeRawFrame(Type type, uint8_t flags, uint32_t stream_id,
+                                 absl::string_view payload);
   static Http2Frame makePingFrame(absl::string_view data = {});
   static Http2Frame makeEmptySettingsFrame(SettingsFlags flags = SettingsFlags::None);
   static Http2Frame makeSettingsFrame(SettingsFlags flags,
