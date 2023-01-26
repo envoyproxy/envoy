@@ -1,6 +1,6 @@
 package test.kotlin.integration
 
-import io.envoyproxy.envoymobile.Standard
+import io.envoyproxy.envoymobile.Custom
 import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
 import io.envoyproxy.envoymobile.RequestMethod
@@ -13,6 +13,48 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.fail
 import org.junit.Test
 
+private val apiListenerType = "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.EnvoyMobileHttpConnectionManager"
+private val assertionFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion"
+private val config =
+"""
+static_resources:
+  listeners:
+  - name: base_api_listener
+    address:
+      socket_address:
+        protocol: TCP
+        address: 0.0.0.0
+        port_value: 10000
+    api_listener:
+      api_listener:
+        "@type": $apiListenerType
+        config:
+          stat_prefix: hcm
+          route_config:
+            name: api_router
+            virtual_hosts:
+              - name: api
+                domains:
+                  - "*"
+                routes:
+                  - match:
+                      prefix: "/"
+                    direct_response:
+                      status: 200
+          http_filters:
+            - name: envoy.filters.http.assertion
+              typed_config:
+                "@type": $assertionFilterType
+                match_config:
+                  http_request_headers_match:
+                    headers:
+                      - name: ":authority"
+                        exact_match: example.com
+            - name: envoy.router
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+"""
+
 class ResetConnectivityStateTest {
 
   init {
@@ -23,14 +65,14 @@ class ResetConnectivityStateTest {
   fun `successful request after connection drain`() {
     val headersExpectation = CountDownLatch(2)
 
-    val engine = EngineBuilder(Standard()).build()
+    val engine = EngineBuilder(Custom(config)).build()
     val client = engine.streamClient()
 
     val requestHeaders = RequestHeadersBuilder(
       method = RequestMethod.GET,
       scheme = "https",
-      authority = "api.lyft.com",
-      path = "/ping"
+      authority = "example.com",
+      path = "/test"
     )
       .addUpstreamHttpProtocol(UpstreamHttpProtocol.HTTP2)
       .build()
@@ -42,9 +84,6 @@ class ResetConnectivityStateTest {
         resultHeaders1 = responseHeaders
         resultEndStream1 = endStream
         headersExpectation.countDown()
-      }
-      .setOnResponseData { _, endStream, _ ->
-        resultEndStream1 = endStream
       }
       .setOnError { _, _ -> fail("Unexpected error") }
       .start()
@@ -61,9 +100,6 @@ class ResetConnectivityStateTest {
         resultHeaders2 = responseHeaders
         resultEndStream2 = endStream
         headersExpectation.countDown()
-      }
-      .setOnResponseData { _, endStream, _ ->
-        resultEndStream2 = endStream
       }
       .setOnError { _, _ -> fail("Unexpected error") }
       .start()

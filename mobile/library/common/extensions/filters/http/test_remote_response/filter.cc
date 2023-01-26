@@ -1,7 +1,9 @@
 #include "library/common/extensions/filters/http/test_remote_response/filter.h"
 
-#include "envoy/server/filter_config.h"
 #include "envoy/http/header_map.h"
+#include "envoy/server/filter_config.h"
+
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/http/header_map_impl.h"
 
 #include "library/common/http/header_utility.h"
@@ -30,10 +32,12 @@ Http::FilterTrailersStatus TestRemoteResponseFilter::decodeTrailers(Http::Reques
 }
 
 void TestRemoteResponseFilter::sendResponse() {
-  Http::ResponseHeaderMapPtr headers{Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
-      {{Http::Headers::get().Status, "200"}})};
-  decoder_callbacks_->encodeHeaders(std::move(headers), true,
-                            StreamInfo::ResponseCodeDetails::get().ViaUpstream);
+  Http::ResponseHeaderMapPtr headers{
+      Http::createHeaderMap<Http::ResponseHeaderMapImpl>({{Http::Headers::get().Status, "200"}})};
+  decoder_callbacks_->encodeHeaders(std::move(headers), false,
+                                    StreamInfo::ResponseCodeDetails::get().ViaUpstream);
+  Buffer::OwnedImpl body("data");
+  decoder_callbacks_->encodeData(body, true);
 }
 
 } // namespace TestRemoteResponse

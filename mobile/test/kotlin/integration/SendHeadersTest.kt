@@ -13,6 +13,8 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.fail
 import org.junit.Test
 
+private const val testResponseFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.test_remote_response.TestRemoteResponse"
+
 class SendHeadersTest {
 
   init {
@@ -23,14 +25,16 @@ class SendHeadersTest {
   fun `successful sending of request headers`() {
     val headersExpectation = CountDownLatch(1)
 
-    val engine = EngineBuilder(Standard()).build()
+    val engine = EngineBuilder(Standard())
+    .addNativeFilter("test_remote_response", "{'@type': $testResponseFilterType}")
+    .build()
     val client = engine.streamClient()
 
     val requestHeaders = RequestHeadersBuilder(
       method = RequestMethod.GET,
       scheme = "https",
-      authority = "api.lyft.com",
-      path = "/ping"
+      authority = "example.com",
+      path = "/test"
     )
       .addUpstreamHttpProtocol(UpstreamHttpProtocol.HTTP2)
       .build()

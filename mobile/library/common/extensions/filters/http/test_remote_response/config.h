@@ -14,13 +14,15 @@ namespace TestRemoteResponse {
  * Config registration for the test_remote_response filter. @see NamedHttpFilterConfigFactory.
  */
 class TestRemoteResponseFilterFactory
-    : public Common::FactoryBase<envoymobile::extensions::filters::http::test_remote_response::TestRemoteResponse> {
+    : public Common::FactoryBase<
+          envoymobile::extensions::filters::http::test_remote_response::TestRemoteResponse> {
 public:
   TestRemoteResponseFilterFactory() : FactoryBase("test_remote_response") {}
 
 private:
   ::Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoymobile::extensions::filters::http::test_remote_response::TestRemoteResponse& config,
+      const envoymobile::extensions::filters::http::test_remote_response::TestRemoteResponse&
+          config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };
 

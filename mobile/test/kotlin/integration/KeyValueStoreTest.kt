@@ -15,6 +15,7 @@ import org.assertj.core.api.Assertions.fail
 import org.junit.Test
 
 private const val assertionFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion"
+private const val testResponseFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.test_remote_response.TestRemoteResponse"
 private const val testKey = "foo"
 private const val testValue = "bar"
 
@@ -38,6 +39,7 @@ class KeyValueStoreTest {
     val engine = EngineBuilder(Standard())
         .addKeyValueStore("envoy.key_value.platform_test", testKeyValueStore)
         .addNativeFilter("envoy.filters.http.test_kv_store", "{'@type': type.googleapis.com/envoymobile.extensions.filters.http.test_kv_store.TestKeyValueStore, kv_store_name: envoy.key_value.platform_test, test_key: $testKey, test_value: $testValue}")
+        .addNativeFilter("test_remote_response", "{'@type': $testResponseFilterType}")
         .build()
     val client = engine.streamClient()
 
