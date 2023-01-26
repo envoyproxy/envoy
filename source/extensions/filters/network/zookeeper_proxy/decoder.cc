@@ -467,55 +467,37 @@ void DecoderImpl::skipStrings(Buffer::Instance& data, uint64_t& offset) {
   }
 }
 
-bool DecoderImpl::onData(Buffer::Instance& data) {
-  int32_t len = 0;
-  try {
-    // Check message length.
-    uint64_t offset = 0;
-    int32_t len = helper_.peekInt32(data, offset);
-    ensureMinLength(len, INT_LENGTH + XID_LENGTH);
-    ensureMaxLength(len);
-  } catch (const EnvoyException& e) {
-    ENVOY_LOG(debug, "zookeeper_proxy: decoding exception {}", e.what());
-    callbacks_.onDecodeError();
-    return true;
-  }
-
-  if (data.length() >= INT_LENGTH + len) {
-    decode(data, DecodeType::READ);
-    return true;
-  } else {
-    ENVOY_LOG(trace,
-              "zookeeper_proxy: waiting for the full packet ({} bytes) in buffer, current buffer "
-              "is {} bytes",
-              INT_LENGTH + len, data.length());
-    return false;
-  }
+Network::FilterStatus DecoderImpl::onData(Buffer::Instance& data) {
+  return decodeAfterBuffer(data, DecodeType::READ);
 }
 
-bool DecoderImpl::onWrite(Buffer::Instance& data) {
+Network::FilterStatus DecoderImpl::onWrite(Buffer::Instance& data) {
+  return decodeAfterBuffer(data, DecodeType::WRITE);
+}
+
+Network::FilterStatus DecoderImpl::decodeAfterBuffer(Buffer::Instance& data, DecodeType dtype) {
   int32_t len = 0;
   try {
-    // Check message length.
+    // Peek packet length.
     uint64_t offset = 0;
-    int32_t len = helper_.peekInt32(data, offset);
+    len = helper_.peekInt32(data, offset);
     ensureMinLength(len, INT_LENGTH + XID_LENGTH);
     ensureMaxLength(len);
   } catch (const EnvoyException& e) {
     ENVOY_LOG(debug, "zookeeper_proxy: decoding exception {}", e.what());
     callbacks_.onDecodeError();
-    return true;
+    return Network::FilterStatus::Continue;
   }
 
   if (data.length() >= INT_LENGTH + len) {
-    decode(data, DecodeType::WRITE);
-    return true;
+    decode(data, dtype);
+    return Network::FilterStatus::Continue;
   } else {
     ENVOY_LOG(trace,
               "zookeeper_proxy: waiting for the full packet ({} bytes) in buffer, current buffer "
               "is {} bytes",
               INT_LENGTH + len, data.length());
-    return false;
+    return Network::FilterStatus::PauseAndBuffer;
   }
 }
 

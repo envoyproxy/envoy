@@ -76,20 +76,20 @@ void ZooKeeperFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks
 
 Network::FilterStatus ZooKeeperFilter::onData(Buffer::Instance& data, bool) {
   clearDynamicMetadata();
-  bool full_msg = decoder_->onData(data);
-  while (!full_msg) {
-    full_msg = decoder_->onData(data);
+  Network::FilterStatus status = decoder_->onData(data);
+  while (status == Network::FilterStatus::PauseAndBuffer) {
+    status = decoder_->onData(data);
   }
-  return Network::FilterStatus::Continue;
+  return status;
 }
 
 Network::FilterStatus ZooKeeperFilter::onWrite(Buffer::Instance& data, bool) {
   clearDynamicMetadata();
-  bool full_msg = decoder_->onWrite(data);
-  while (!full_msg) {
-    full_msg = decoder_->onWrite(data);
+  Network::FilterStatus status = decoder_->onWrite(data);
+  while (status == Network::FilterStatus::PauseAndBuffer) {
+    status = decoder_->onWrite(data);
   }
-  return Network::FilterStatus::Continue;
+  return status;
 }
 
 Network::FilterStatus ZooKeeperFilter::onNewConnection() { return Network::FilterStatus::Continue; }

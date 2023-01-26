@@ -4,6 +4,7 @@
 #include <string>
 
 #include "envoy/common/platform.h"
+#include "envoy/network/filter.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
@@ -112,8 +113,8 @@ class Decoder {
 public:
   virtual ~Decoder() = default;
 
-  virtual bool onData(Buffer::Instance& data) PURE;
-  virtual bool onWrite(Buffer::Instance& data) PURE;
+  virtual Network::FilterStatus onData(Buffer::Instance& data) PURE;
+  virtual Network::FilterStatus onWrite(Buffer::Instance& data) PURE;
 };
 
 using DecoderPtr = std::unique_ptr<Decoder>;
@@ -126,8 +127,8 @@ public:
         time_source_(time_source) {}
 
   // ZooKeeperProxy::Decoder
-  bool onData(Buffer::Instance& data) override;
-  bool onWrite(Buffer::Instance& data) override;
+  Network::FilterStatus onData(Buffer::Instance& data) override;
+  Network::FilterStatus onWrite(Buffer::Instance& data) override;
 
 private:
   enum class DecodeType { READ, WRITE };
@@ -136,6 +137,7 @@ private:
     MonotonicTime start_time;
   };
 
+  Network::FilterStatus decodeAfterBuffer(Buffer::Instance& data, DecodeType dtype);
   void decode(Buffer::Instance& data, DecodeType dtype);
   void decodeOnData(Buffer::Instance& data, uint64_t& offset);
   void decodeOnWrite(Buffer::Instance& data, uint64_t& offset);

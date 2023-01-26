@@ -2,6 +2,7 @@
 #include "source/extensions/filters/network/zookeeper_proxy/decoder.h"
 #include "source/extensions/filters/network/zookeeper_proxy/filter.h"
 
+#include "test/extensions/filters/network/zookeeper_proxy/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 
@@ -31,6 +32,7 @@ public:
 
   void initialize() {
     config_ = std::make_shared<ZooKeeperFilterConfig>(stat_prefix_, 1048576, scope_);
+    decoder_ = std::make_unique<DecoderImpl>(callbacks_, 1048576, time_system_);
     filter_ = std::make_unique<ZooKeeperFilter>(config_, time_system_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
   }
@@ -91,10 +93,10 @@ public:
     return buffer;
   }
 
-  Buffer::OwnedImpl encodeResponsePartially(const int32_t xid, const int64_t zxid,
-                                            const int32_t error) const {
+  Buffer::OwnedImpl encodeResponseWithPartialData(const int32_t xid, const int64_t zxid,
+                                                  const int32_t error) const {
     Buffer::OwnedImpl buffer;
-    const uint32_t message_size = 20;
+    const uint32_t message_size = 666;
 
     buffer.writeBEInt<uint32_t>(message_size);
     buffer.writeBEInt<uint32_t>(xid);
@@ -189,7 +191,7 @@ public:
     const std::string credential = "p@sswd";
     Buffer::OwnedImpl buffer;
 
-    buffer.writeBEInt<uint32_t>(28 + scheme.length() + credential.length());
+    buffer.writeBEInt<uint32_t>(20 + scheme.length() + credential.length());
     buffer.writeBEInt<int32_t>(enumToSignedInt(XidCodes::AuthXid));
     buffer.writeBEInt<int32_t>(enumToSignedInt(OpCodes::SetAuth));
     // Type.
@@ -310,23 +312,22 @@ public:
     return buffer;
   }
 
-  Buffer::OwnedImpl
-  encodeCreateRequestPartially(const std::string& path, const std::string& data,
-                               const bool txn = false,
-                               const int32_t opcode = enumToSignedInt(OpCodes::Create)) const {
+  Buffer::OwnedImpl encodeCreateRequestWithPartialData(
+      const std::string& path, const std::string& data, const bool txn = false,
+      const int32_t opcode = enumToSignedInt(OpCodes::Create)) const {
     Buffer::OwnedImpl buffer;
 
     if (!txn) {
-      buffer.writeBEInt<int32_t>(24 + path.length() + data.length());
+      buffer.writeBEInt<int32_t>(16 + path.length() + data.length());
       buffer.writeBEInt<int32_t>(1000);
       buffer.writeBEInt<int32_t>(opcode);
     }
 
     // Path.
     addString(buffer, path);
-    // Data.
-    addString(buffer, data);
-    // Deliberately skip adding acls and flags to the buffer.
+    // Deliberately adding partial data the buffer.
+    addString(buffer, data.substr(0, data.length() - 1));
+
     return buffer;
   }
 
@@ -573,71 +574,6 @@ public:
     EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
   }
 
-  void testCreateWithMultipleBufferReads(CreateFlags flags,
-                                         const OpCodes opcode = OpCodes::Create) {
-    initialize();
-    Buffer::OwnedImpl data =
-        encodeCreateRequestPartially("/foo", "bar", false, enumToSignedInt(opcode));
-    std::string opname = "create";
-
-    switch (opcode) {
-    case OpCodes::CreateContainer:
-      opname = "createcontainer";
-      break;
-    case OpCodes::CreateTtl:
-      opname = "createttl";
-      break;
-    default:
-      break;
-    }
-
-    switch (opcode) {
-    case OpCodes::Create:
-      EXPECT_EQ(0UL, config_->stats().create_rq_.value());
-      break;
-    case OpCodes::CreateContainer:
-      EXPECT_EQ(0UL, config_->stats().createcontainer_rq_.value());
-      break;
-    case OpCodes::CreateTtl:
-      EXPECT_EQ(0UL, config_->stats().createttl_rq_.value());
-      break;
-    default:
-      break;
-    }
-
-    EXPECT_EQ(0UL, config_->stats().request_bytes_.value());
-    EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
-
-    // Add the remaining data to buffer.
-    // Acls.
-    data.writeBEInt<int32_t>(0);
-    // Flags.
-    data.writeBEInt<int32_t>(static_cast<int32_t>(flags));
-
-    expectSetDynamicMetadata(
-        {{{"opname", opname}, {"path", "/foo"}, {"create_type", createFlagsToString(flags)}},
-         {{"bytes", "35"}}});
-
-    EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
-
-    switch (opcode) {
-    case OpCodes::Create:
-      EXPECT_EQ(1UL, config_->stats().create_rq_.value());
-      break;
-    case OpCodes::CreateContainer:
-      EXPECT_EQ(1UL, config_->stats().createcontainer_rq_.value());
-      break;
-    case OpCodes::CreateTtl:
-      EXPECT_EQ(1UL, config_->stats().createttl_rq_.value());
-      break;
-    default:
-      break;
-    }
-
-    EXPECT_EQ(35UL, config_->stats().request_bytes_.value());
-    EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
-  }
-
   void testRequest(Buffer::OwnedImpl& data, const std::vector<StrStrMap>& metadata_values,
                    const Stats::Counter& stat, const uint64_t request_bytes) {
     expectSetDynamicMetadata(metadata_values);
@@ -668,6 +604,8 @@ public:
   Stats::TestUtil::TestStore store_;
   Stats::Scope& scope_{*store_.rootScope()};
   ZooKeeperFilterConfigSharedPtr config_;
+  NiceMock<MockDecoderCallbacks> callbacks_;
+  std::unique_ptr<DecoderImpl> decoder_;
   std::unique_ptr<ZooKeeperFilter> filter_;
   std::string stat_prefix_{"test.zookeeper"};
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
@@ -1144,41 +1082,29 @@ TEST_F(ZooKeeperFilterTest, MissingXid) {
   EXPECT_EQ(1UL, config_->stats().decoder_error_.value());
 }
 
-TEST_F(ZooKeeperFilterTest, RequestWithMultipleBufferReads) {
+TEST_F(ZooKeeperFilterTest, RequestWithPartialData) {
   initialize();
 
-  testCreateWithMultipleBufferReads(CreateFlags::Persistent);
-  testResponse({{{"opname", "create_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "20"}}},
-               config_->stats().create_resp_);
+  Buffer::OwnedImpl data =
+      encodeCreateRequestWithPartialData("/foo", "bar", false, enumToSignedInt(OpCodes::Create));
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::PauseAndBuffer, decoder_->onData(data));
 }
 
-TEST_F(ZooKeeperFilterTest, ResponseWithMultipleBufferReads) {
+TEST_F(ZooKeeperFilterTest, ResponseWithPartialData) {
   initialize();
 
-  const auto& stat = config_->stats().getdata_resp_;
   Buffer::OwnedImpl rq_data = encodePathWatch("/foo", true);
 
   testRequest(rq_data,
               {{{"opname", "getdata"}, {"path", "/foo"}, {"watch", "true"}}, {{"bytes", "21"}}},
               config_->stats().getdata_rq_, 21);
 
-  Buffer::OwnedImpl resp_data = encodeResponsePartially(1000, 2000, 0);
+  Buffer::OwnedImpl resp_data = encodeResponseWithPartialData(1000, 2000, 0);
 
-  EXPECT_EQ(0UL, stat.value());
-  EXPECT_EQ(0UL, config_->stats().response_bytes_.value());
-  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
-
-  // Add the data of the path to buffer.
-  resp_data.add("data");
-
-  expectSetDynamicMetadata(
-      {{{"opname", "getdata_resp"}, {"zxid", "2000"}, {"error", "0"}}, {{"bytes", "24"}}});
-  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onWrite(resp_data, false));
-  EXPECT_EQ(1UL, stat.value());
-  EXPECT_EQ(24UL, config_->stats().response_bytes_.value());
-  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
-  EXPECT_NE(absl::nullopt, findHistogram("test.zookeeper.getdata_resp_latency"));
+  EXPECT_EQ(Envoy::Network::FilterStatus::PauseAndBuffer, decoder_->onWrite(resp_data));
 }
+
 } // namespace ZooKeeperProxy
 } // namespace NetworkFilters
 } // namespace Extensions
