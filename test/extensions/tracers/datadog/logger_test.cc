@@ -86,6 +86,20 @@ TEST(DatadogTracerLoggerTest, Logger) {
   EXPECT_EQ(absl::nullopt, sink->pattern_);
   EXPECT_EQ(nullptr, sink->formatter_);
   EXPECT_FALSE(sink->flush_);
+
+  sink->reset();
+  // Errors are logged at "error" level, and so if the logger's level threshold
+  // is more severe than that, errors will not be logged.
+  // TODO: callback style
+  sink->reset();
+  // TODO: Error style
+  sink->reset();
+  // TODO: string style
+
+  sink->reset();
+  // The startup banner is printed at "info" level, and so if the logger's level
+  // threshold is more severe than that, the startup banner will not be logged.
+  // TODO
 }
 
 } // namespace
