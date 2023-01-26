@@ -74,6 +74,13 @@ Buffer::OwnedImpl createBufferWithNByteSlices(absl::string_view input, size_t ma
   ASSERT(buffer.getRawSlices().size() == (input.size() + max_slice_size - 1) / max_slice_size);
   return buffer;
 }
+
+struct HTTPStringTestCase {
+  const absl::string_view http_version_;
+  const absl::optional<absl::string_view> balsa_parser_expected_error_;
+  const absl::optional<absl::string_view> http_parser_expected_error_;
+};
+
 } // namespace
 
 class Http1CodecTestBase : public testing::TestWithParam<Http1ParserImpl> {
@@ -905,6 +912,66 @@ TEST_P(Http1ServerConnectionImplTest, Http10MultipleResponses) {
     auto status = codec_->dispatch(buffer);
     EXPECT_TRUE(status.ok());
     EXPECT_EQ(Protocol::Http11, codec_->protocol());
+  }
+}
+
+TEST_P(Http1ServerConnectionImplTest, HttpVersion) {
+  // SPELLCHECKER(off)
+  HTTPStringTestCase kRequestHTTPStringTestCases[] = {
+      {"", {}, {}}, // HTTP/0.9 has no HTTP-version.
+      {"HTTP/1.0", {}, {}},
+      {"HTTP/1.1", {}, {}},
+      {"HTTP/9.1", {}, {}},
+      {"aHTTP/1.1", "HPE_INVALID_VERSION", "HPE_INVALID_CONSTANT"},
+#ifdef ENVOY_ENABLE_UHV
+      {"HHTTP/1.1", "HPE_INVALID_VERSION", "HPE_INVALID_VERSION"},
+      {"HTTPS/1.1", "HPE_INVALID_VERSION", "HPE_INVALID_VERSION"},
+#else
+      {"HHTTP/1.1", "HPE_INVALID_VERSION", "HPE_STRICT"},
+      {"HTTPS/1.1", "HPE_INVALID_VERSION", "HPE_STRICT"},
+#endif
+      {"FTP/1.1", "HPE_INVALID_VERSION", "HPE_INVALID_CONSTANT"},
+      {"HTTP/1.01", "HPE_INVALID_VERSION", "HPE_INVALID_VERSION"},
+      {"HTTP/A.0", "HPE_INVALID_VERSION", "HPE_INVALID_VERSION"}};
+  // SPELLCHECKER(on)
+
+  for (const auto& test_case : kRequestHTTPStringTestCases) {
+    // BalsaParser signals an error if and only if http-parser signals an error,
+    // even though they may give different error codes.
+    ASSERT_EQ(test_case.balsa_parser_expected_error_.has_value(),
+              test_case.http_parser_expected_error_.has_value());
+
+    absl::optional<absl::string_view> expected_error;
+    if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+      expected_error = test_case.balsa_parser_expected_error_;
+    } else {
+      expected_error = test_case.http_parser_expected_error_;
+    }
+
+    initialize();
+
+    InSequence sequence;
+
+    MockRequestDecoder decoder;
+    EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+    if (expected_error.has_value()) {
+      EXPECT_CALL(decoder,
+                  sendLocalReply(Http::Code::BadRequest, "Bad Request", _, _, "http1.codec_error"));
+    } else {
+      EXPECT_CALL(decoder, decodeHeaders_(_, true));
+    }
+
+    Buffer::OwnedImpl buffer(absl::StrCat("GET /", test_case.http_version_.empty() ? "" : " ",
+                                          test_case.http_version_, "\r\n\r\n"));
+    auto status = codec_->dispatch(buffer);
+
+    if (expected_error.has_value()) {
+      EXPECT_TRUE(isCodecProtocolError(status)) << test_case.http_version_;
+      EXPECT_EQ(status.message(), absl::StrCat("http/1.1 protocol error: ", expected_error.value()))
+          << test_case.http_version_;
+    } else {
+      EXPECT_TRUE(status.ok()) << test_case.http_version_;
+    }
   }
 }
 
@@ -3778,6 +3845,61 @@ TEST_P(Http1ClientConnectionImplTest, ResponseHttpVersion) {
     auto status = codec_->dispatch(response);
     EXPECT_TRUE(status.ok());
     EXPECT_EQ(http_version, codec_->protocol());
+  }
+}
+
+TEST_P(Http1ClientConnectionImplTest, HttpVersion) {
+  // SPELLCHECKER(off)
+  HTTPStringTestCase kResponseHTTPStringTestCases[] = {
+      {"HTTP/1.0", {}, {}},
+      {"HTTP/1.1", {}, {}},
+      {"HTTP/9.1", {}, {}},
+      {"aHTTP/1.1", "HPE_INVALID_CONSTANT", "HPE_INVALID_CONSTANT"},
+#ifdef ENVOY_ENABLE_UHV
+      {"HHTTP/1.1", "HPE_INVALID_VERSION", "HPE_INVALID_VERSION"},
+      {"HTTPS/1.1", "HPE_INVALID_VERSION", "HPE_INVALID_VERSION"},
+#else
+      {"HHTTP/1.1", "HPE_INVALID_VERSION", "HPE_STRICT"},
+      {"HTTPS/1.1", "HPE_INVALID_VERSION", "HPE_STRICT"},
+#endif
+      {"FTP/1.1", "HPE_INVALID_CONSTANT", "HPE_INVALID_CONSTANT"},
+      {"HTTP/1.01", "HPE_INVALID_VERSION", "HPE_INVALID_VERSION"},
+      {"HTTP/A.0", "HPE_INVALID_VERSION", "HPE_INVALID_VERSION"}};
+  // SPELLCHECKER(on)
+
+  for (const auto& test_case : kResponseHTTPStringTestCases) {
+    // BalsaParser signals an error if and only if http-parser signals an error,
+    // even though they may give different error codes.
+    ASSERT_EQ(test_case.balsa_parser_expected_error_.has_value(),
+              test_case.http_parser_expected_error_.has_value());
+
+    absl::optional<absl::string_view> expected_error;
+    if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+      expected_error = test_case.balsa_parser_expected_error_;
+    } else {
+      expected_error = test_case.http_parser_expected_error_;
+    }
+
+    initialize();
+
+    StrictMock<MockResponseDecoder> response_decoder;
+    Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+    TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+    EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
+
+    if (!expected_error.has_value()) {
+      EXPECT_CALL(response_decoder, decodeHeaders_(_, true));
+    }
+    Buffer::OwnedImpl response(
+        absl::StrCat(test_case.http_version_, " 200 OK\r\nContent-Length: 0\r\n\r\n"));
+    auto status = codec_->dispatch(response);
+    if (expected_error.has_value()) {
+      EXPECT_TRUE(isCodecProtocolError(status)) << test_case.http_version_;
+      EXPECT_EQ(status.message(), absl::StrCat("http/1.1 protocol error: ", expected_error.value()))
+          << test_case.http_version_;
+    } else {
+      EXPECT_TRUE(status.ok()) << test_case.http_version_;
+    }
   }
 }
 
