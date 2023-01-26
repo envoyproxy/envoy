@@ -50,7 +50,7 @@ open class EngineBuilder(
   private var dnsFailureRefreshSecondsMax = 10
   private var dnsQueryTimeoutSeconds = 25
   private var dnsMinRefreshSeconds = 60
-  private var dnsPreresolveHostnames = "[]"
+  private var dnsPreresolveHostnames = listOf<String>()
   private var enableDNSCache = false
   private var enableDrainPostDnsRefresh = false
   private var enableHttp3 = true
@@ -68,7 +68,7 @@ open class EngineBuilder(
   private var appVersion = "unspecified"
   private var appId = "unspecified"
   private var trustChainVerification = TrustChainVerification.VERIFY_TRUST_CHAIN
-  private var virtualClusters = "[]"
+  private var virtualClusters = mutableListOf<String>()
   private var platformFilterChain = mutableListOf<EnvoyHTTPFilterFactory>()
   private var nativeFilterChain = mutableListOf<EnvoyNativeFilterConfig>()
   private var stringAccessors = mutableMapOf<String, EnvoyStringAccessor>()
@@ -188,7 +188,7 @@ open class EngineBuilder(
    *
    * @return this builder.
    */
-  fun addDNSPreresolveHostnames(dnsPreresolveHostnames: String): EngineBuilder {
+  fun addDNSPreresolveHostnames(dnsPreresolveHostnames: List<String>): EngineBuilder {
     this.dnsPreresolveHostnames = dnsPreresolveHostnames
     return this
   }
@@ -549,12 +549,12 @@ open class EngineBuilder(
   /**
    * Add virtual cluster configuration.
    *
-   * @param virtualClusters the JSON configuration string for virtual clusters.
+   * @param virtualCluster the JSON configuration string for a virtual cluster.
    *
    * @return this builder.
    */
-  fun addVirtualClusters(virtualClusters: String): EngineBuilder {
-    this.virtualClusters = virtualClusters
+  fun addVirtualCluster(cluster: String): EngineBuilder {
+    this.virtualClusters.add(cluster)
     return this
   }
 

@@ -344,4 +344,18 @@ public class JniLibrary {
    *
    */
   public static native void callClearTestRootCertificateFromNative();
+
+  public static native String compareYaml(
+      String yaml, String grpcStatsDomain, boolean adminInterfaceEnabled,
+      long connectTimeoutSeconds, long dnsRefreshSeconds, long dnsFailureRefreshSecondsBase,
+      long dnsFailureRefreshSecondsMax, long dnsQueryTimeoutSeconds, long dnsMinRefreshSeconds,
+      byte[][] dnsPreresolveHostnames, boolean enableDNSCache, boolean enableDrainPostDnsRefresh,
+      boolean enableHttp3, boolean enableGzip, boolean enableBrotli, boolean enableSocketTagging,
+      boolean enableHappyEyeballs, boolean enableInterfaceBinding,
+      long h2ConnectionKeepaliveIdleIntervalMilliseconds, long h2ConnectionKeepaliveTimeoutSeconds,
+      long maxConnectionsPerHost, long statsFlushSeconds, long streamIdleTimeoutSeconds,
+      long perTryIdleTimeoutSeconds, String appVersion, String appId,
+      boolean trustChainVerification, byte[][] virtualClusters, byte[][] filterChain,
+      byte[][] statSinks, boolean enablePlatformCertificatesValidation,
+      boolean enableSkipDNSLookupForProxiedRequests);
 }

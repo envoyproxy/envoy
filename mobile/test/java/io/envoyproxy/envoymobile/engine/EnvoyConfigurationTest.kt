@@ -14,6 +14,7 @@ import org.junit.Test
 import java.util.regex.Pattern
 
 class TestFilter : EnvoyHTTPFilter {
+
 override fun onRequestHeaders(headers: MutableMap<String, MutableList<String>>, endStream: Boolean, streamIntel: EnvoyStreamIntel): Array<Any> {
   return emptyArray()
 }
@@ -72,7 +73,7 @@ class EnvoyConfigurationTest {
     dnsFailureRefreshSecondsMax: Int = 456,
     dnsQueryTimeoutSeconds: Int = 321,
     dnsMinRefreshSeconds: Int = 12,
-    dnsPreresolveHostnames: String = "[{address: hostname, port_value: 443}]",
+    dnsPreresolveHostnames: MutableList<String> = mutableListOf("hostname"),
     enableDNSCache: Boolean = false,
     enableDrainPostDnsRefresh: Boolean = false,
     enableHttp3: Boolean = true,
@@ -90,11 +91,11 @@ class EnvoyConfigurationTest {
     appVersion: String = "v1.2.3",
     appId: String = "com.example.myapp",
     trustChainVerification: TrustChainVerification = TrustChainVerification.VERIFY_TRUST_CHAIN,
-    virtualClusters: String = "[{name: test}]",
+    virtualClusters: MutableList<String> = mutableListOf("{name: test}"),
     filterChain: MutableList<EnvoyNativeFilterConfig> = mutableListOf(EnvoyNativeFilterConfig("buffer_filter_1", "{'@type': 'type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer'}"), EnvoyNativeFilterConfig("buffer_filter_2", "{'@type': 'type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer'}")),
     platformFilterFactories: MutableList<EnvoyHTTPFilterFactory> = mutableListOf(TestEnvoyHTTPFilterFactory("name1"), TestEnvoyHTTPFilterFactory("name2")),
     enableSkipDNSLookupForProxiedRequests: Boolean = false,
-    statSinks: List<String> = emptyList(),
+    statSinks: MutableList<String> = mutableListOf(),
     enablePlatformCertificatesValidation: Boolean = false
   ): EnvoyConfiguration {
     return EnvoyConfiguration(
@@ -227,9 +228,10 @@ class EnvoyConfigurationTest {
       enableInterfaceBinding = true,
       enableSkipDNSLookupForProxiedRequests = true,
       enablePlatformCertificatesValidation = true,
-      dnsPreresolveHostnames = "",
-      virtualClusters = "",
+      dnsPreresolveHostnames = mutableListOf(),
+      virtualClusters = mutableListOf(),
       filterChain = mutableListOf(),
+      statSinks = mutableListOf("{ name: envoy.stat_sinks.statsd, typed_config: { '@type': type.googleapis.com/envoy.config.metrics.v3.StatsdSink, address: { socket_address: { address: 127.0.0.1, port_value: 123 } } } }"),
       trustChainVerification = TrustChainVerification.ACCEPT_UNTRUSTED
     )
 
@@ -264,5 +266,24 @@ class EnvoyConfigurationTest {
 
     // enablePlatformCertificatesValidation = true
     assertThat(resolvedTemplate).doesNotContain("trusted_ca:")
+
+    // statsSinks
+    assertThat(resolvedTemplate).contains("envoy.stat_sinks.statsd");
+  }
+
+  @Test
+  fun `test YAML loads with stats sinks and stats domain`() {
+    JniLibrary.loadTestLibrary()
+    val envoyConfiguration = buildTestEnvoyConfiguration(
+      grpcStatsDomain = "stats.example.com",
+      statSinks = mutableListOf("{ name: envoy.stat_sinks.statsd, typed_config: { '@type': type.googleapis.com/envoy.config.metrics.v3.StatsdSink, address: { socket_address: { address: 127.0.0.1, port_value: 123 } } } }"),
+      trustChainVerification = TrustChainVerification.ACCEPT_UNTRUSTED
+    )
+
+    val resolvedTemplate = envoyConfiguration.createYaml()
+
+    // statsSinks
+    assertThat(resolvedTemplate).contains("envoy.stat_sinks.statsd");
+    assertThat(resolvedTemplate).contains("stats.example.com");
   }
 }

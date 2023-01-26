@@ -1,3 +1,4 @@
+#include "library/cc/engine_builder.h"
 #include "library/common/api/c_types.h"
 #include "library/common/data/utility.h"
 #include "library/common/extensions/filters/http/platform_bridge/c_types.h"
@@ -9,6 +10,8 @@
 #include "library/common/jni/jni_version.h"
 #include "library/common/main_interface.h"
 #include "library/common/types/managed_envoy_headers.h"
+
+using Envoy::Platform::EngineBuilder;
 
 // NOLINT(namespace-envoy)
 
@@ -1106,6 +1109,143 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_registerStringAccessor(JNIEnv* 
 
   envoy_status_t result =
       register_platform_api(env->GetStringUTFChars(accessor_name, nullptr), string_accessor);
+  return result;
+}
+
+void setString(JNIEnv* env, jstring java_string, EngineBuilder* builder,
+               EngineBuilder& (EngineBuilder::*setter)(std::string)) {
+  if (java_string) {
+    const char* native_java_string = env->GetStringUTFChars(java_string, nullptr);
+    std::string java_string_str = std::string(native_java_string);
+    if (!java_string_str.empty()) {
+      (builder->*setter)(java_string_str);
+      env->ReleaseStringUTFChars(java_string, native_java_string);
+    }
+  }
+}
+
+std::string to_string(JNIEnv* env, jbyteArray j_data) {
+  size_t data_length = static_cast<size_t>(env->GetArrayLength(j_data));
+  char* critical_data = static_cast<char*>(env->GetPrimitiveArrayCritical(j_data, 0));
+  std::string ret(critical_data, data_length);
+  env->ReleasePrimitiveArrayCritical(j_data, critical_data, 0);
+  return ret;
+}
+
+std::vector<std::string> to_vector(JNIEnv* env, jobjectArray entries) {
+  std::vector<std::string> ret;
+  // Note that headers is a flattened array of key/value pairs.
+  // Therefore, the length of the native header array is n envoy_data or n/2 envoy_map_entry.
+  envoy_map_size_t length = env->GetArrayLength(entries);
+  if (length == 0) {
+    return ret;
+  }
+
+  for (envoy_map_size_t i = 0; i < length; ++i) {
+    // Copy native byte array for header key
+    jbyteArray j_str = static_cast<jbyteArray>(env->GetObjectArrayElement(entries, i));
+    std::string str = to_string(env, j_str);
+    ret.push_back(to_string(env, j_str));
+    env->DeleteLocalRef(j_str);
+  }
+
+  return ret;
+}
+
+std::vector<std::pair<std::string, std::string>> to_vector_pair(JNIEnv* env, jobjectArray entries) {
+  std::vector<std::pair<std::string, std::string>> ret;
+  // Note that headers is a flattened array of key/value pairs.
+  // Therefore, the length of the native header array is n envoy_data or n/2 envoy_map_entry.
+  envoy_map_size_t length = env->GetArrayLength(entries);
+  if (length == 0) {
+    return ret;
+  }
+
+  for (envoy_map_size_t i = 0; i < length; i += 2) {
+    // Copy native byte array for header key
+    jbyteArray j_key = static_cast<jbyteArray>(env->GetObjectArrayElement(entries, i));
+    jbyteArray j_value = static_cast<jbyteArray>(env->GetObjectArrayElement(entries, i + 1));
+    std::string first = to_string(env, j_key);
+    std::string second = to_string(env, j_value);
+    ret.push_back(std::make_pair(first, second));
+
+    env->DeleteLocalRef(j_key);
+    env->DeleteLocalRef(j_value);
+  }
+
+  return ret;
+}
+
+extern "C" JNIEXPORT jstring JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_compareYaml(
+    JNIEnv* env, jclass, jstring yaml, jstring grpc_stats_domain, jboolean admin_interface_enabled,
+    jint connect_timeout_seconds, jint dns_refresh_seconds, jint dns_failure_refresh_seconds_base,
+    jint dns_failure_refresh_seconds_max, jint dns_query_timeout_seconds,
+    jint dns_min_refresh_seconds, jobjectArray dns_preresolve_hostnames, jboolean enable_dns_cache,
+    jboolean drain_post_dns_refresh_on, jboolean http3_on, jboolean gzip_on, jboolean brotli_on,
+    jboolean socket_tagging_on, jboolean happy_eyeballs_on, jboolean interface_binding_on,
+    jint h2_connection_keepalive_idle_interval_milliseconds,
+    jint h2_connection_keepalive_timeout_seconds, jint max_connections_per_host,
+    jint stats_flush_seconds, jint stream_idle_timeout_seconds, jint per_try_idle_timeout_seconds,
+    jstring app_version, jstring app_id, jboolean enforce_trust_chain_verification,
+    jobjectArray native_clusters, jobjectArray native_filters, jobjectArray native_stats_sinks,
+    jboolean platform_certificates_validation_on,
+    jboolean skip_dns_lLookup_for_proxied_requests_on) {
+  Envoy::Platform::EngineBuilder builder;
+
+  setString(env, grpc_stats_domain, &builder, &EngineBuilder::addGrpcStatsDomain);
+  builder.addConnectTimeoutSeconds((connect_timeout_seconds));
+  builder.addDnsRefreshSeconds((dns_refresh_seconds));
+  builder.addDnsFailureRefreshSeconds((dns_failure_refresh_seconds_base),
+                                      (dns_failure_refresh_seconds_max));
+  builder.addDnsQueryTimeoutSeconds((dns_query_timeout_seconds));
+  builder.addDnsMinRefreshSeconds((dns_min_refresh_seconds));
+  builder.enableDnsCache(enable_dns_cache == JNI_TRUE);
+  builder.addMaxConnectionsPerHost((max_connections_per_host));
+  builder.addH2ConnectionKeepaliveIdleIntervalMilliseconds(
+      (h2_connection_keepalive_idle_interval_milliseconds));
+  builder.addH2ConnectionKeepaliveTimeoutSeconds((h2_connection_keepalive_timeout_seconds));
+  builder.addStatsFlushSeconds((stats_flush_seconds));
+
+  setString(env, app_version, &builder, &EngineBuilder::setAppVersion);
+  setString(env, app_id, &builder, &EngineBuilder::setAppId);
+  setString(env, app_id, &builder, &EngineBuilder::setAppId);
+  builder.setDeviceOs("Android");
+
+  builder.setStreamIdleTimeoutSeconds((stream_idle_timeout_seconds));
+  builder.setPerTryIdleTimeoutSeconds((per_try_idle_timeout_seconds));
+  builder.enableAdminInterface(admin_interface_enabled == JNI_TRUE);
+  builder.enableGzip(gzip_on == JNI_TRUE);
+  builder.enableBrotli(brotli_on == JNI_TRUE);
+  builder.enableSocketTagging(socket_tagging_on == JNI_TRUE);
+  builder.enableHappyEyeballs(happy_eyeballs_on == JNI_TRUE);
+  builder.enableHttp3(http3_on == JNI_TRUE);
+  builder.enableInterfaceBinding(interface_binding_on == JNI_TRUE);
+  builder.enableDrainPostDnsRefresh(drain_post_dns_refresh_on == JNI_TRUE);
+  builder.enforceTrustChainVerification(enforce_trust_chain_verification == JNI_TRUE);
+  builder.enablePlatformCertificatesValidation(platform_certificates_validation_on == JNI_TRUE);
+  builder.setForceAlwaysUsev6(true);
+  builder.setSkipDnsLookupForProxiedRequests(skip_dns_lLookup_for_proxied_requests_on == JNI_TRUE);
+
+  const char* native_yaml = env->GetStringUTFChars(yaml, nullptr);
+
+  auto filters = to_vector_pair(env, native_filters);
+  for (auto& filter : filters) {
+    builder.addNativeFilter(filter.first, filter.second);
+  }
+  auto clusters = to_vector(env, native_clusters);
+  for (auto& cluster : clusters) {
+    builder.addVirtualCluster(cluster);
+  }
+  auto sinks = to_vector(env, native_stats_sinks);
+  builder.addStatsSinks(sinks);
+
+  auto hostnames = to_vector(env, dns_preresolve_hostnames);
+  builder.addDnsPreresolveHostnames(hostnames);
+
+  builder.generateBootstrapAndCompareForTests(native_yaml);
+  env->ReleaseStringUTFChars(yaml, native_yaml);
+
+  jstring result = env->NewStringUTF(config_template);
   return result;
 }
 
