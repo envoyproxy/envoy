@@ -152,8 +152,8 @@ envoy_cc_test(
     name = "metadata_encoder_test",
     srcs = ["metadata_encoder_test.cc"],
     external_deps = [
-        "nghttp2",
         "quiche_http2_adapter",
+        "quiche_http2_test_tools",
     ],
     deps = [
         "//source/common/buffer:buffer_lib",

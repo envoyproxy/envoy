@@ -271,23 +271,10 @@ Status ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& h
     Http::Utility::transformUpgradeRequestFromH1toH2(*modified_headers);
     encodeHeadersBase(*modified_headers, end_stream);
   } else if (headers.Method() && headers.Method()->value() == "CONNECT") {
-    // If this is not an upgrade style connect (above branch) it is a bytestream
-    // connect and should have :path and :protocol set accordingly
-    // As HTTP/1.1 does not require a path for CONNECT, we may have to add one
-    // if shifting codecs. For now, default to "/" - this can be made
-    // configurable if necessary.
-    // https://tools.ietf.org/html/draft-kinnear-httpbis-http2-transport-02
     modified_headers = createHeaderMap<RequestHeaderMapImpl>(headers);
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_rfc_connect")) {
-      modified_headers->removeScheme();
-      modified_headers->removePath();
-      modified_headers->removeProtocol();
-    } else {
-      modified_headers->setProtocol(Headers::get().ProtocolValues.Bytestream);
-      if (!headers.Path()) {
-        modified_headers->setPath("/");
-      }
-    }
+    modified_headers->removeScheme();
+    modified_headers->removePath();
+    modified_headers->removeProtocol();
     encodeHeadersBase(*modified_headers, end_stream);
   } else {
     encodeHeadersBase(headers, end_stream);
@@ -573,7 +560,7 @@ void ConnectionImpl::ClientStreamImpl::decodeTrailers() {
 }
 
 void ConnectionImpl::ServerStreamImpl::decodeHeaders() {
-  auto& headers = absl::get<RequestHeaderMapPtr>(headers_or_trailers_);
+  auto& headers = absl::get<RequestHeaderMapSharedPtr>(headers_or_trailers_);
   if (Http::Utility::isH2UpgradeRequest(*headers)) {
     Http::Utility::transformUpgradeRequestFromH2toH1(*headers);
   }
@@ -1890,8 +1877,8 @@ void ConnectionImpl::ServerStreamImpl::dumpState(std::ostream& os, int indent_le
   StreamImpl::dumpState(os, indent_level);
 
   // Dump header map
-  if (absl::holds_alternative<RequestHeaderMapPtr>(headers_or_trailers_)) {
-    DUMP_DETAILS(absl::get<RequestHeaderMapPtr>(headers_or_trailers_));
+  if (absl::holds_alternative<RequestHeaderMapSharedPtr>(headers_or_trailers_)) {
+    DUMP_DETAILS(absl::get<RequestHeaderMapSharedPtr>(headers_or_trailers_));
   } else {
     DUMP_DETAILS(absl::get<RequestTrailerMapPtr>(headers_or_trailers_));
   }

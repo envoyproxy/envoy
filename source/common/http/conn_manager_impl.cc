@@ -55,7 +55,7 @@
 namespace Envoy {
 namespace Http {
 
-bool requestWasConnect(const RequestHeaderMapPtr& headers, Protocol protocol) {
+bool requestWasConnect(const RequestHeaderMapSharedPtr& headers, Protocol protocol) {
   if (!headers) {
     return false;
   }
@@ -278,7 +278,21 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
 
   stream.completeRequest();
   stream.filter_manager_.onStreamComplete();
-  stream.filter_manager_.log();
+
+  // For HTTP/3, skip access logging here and add deferred logging info
+  // to stream info for QuicStatsGatherer to use later.
+  if (codec_ && codec_->protocol() == Protocol::Http3 &&
+      // There was a downstream reset, log immediately.
+      !stream.filter_manager_.sawDownstreamReset() &&
+      // On recreate stream, log immediately.
+      stream.response_encoder_ != nullptr &&
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.quic_defer_logging_to_ack_listener")) {
+    stream.deferHeadersAndTrailers();
+  } else {
+    // For HTTP/1 and HTTP/2, log here as usual.
+    stream.filter_manager_.log();
+  }
 
   stream.filter_manager_.destroyFilters();
 
@@ -966,7 +980,7 @@ void ConnectionManagerImpl::ActiveStream::maybeEndDecode(bool end_stream) {
 // can't route select properly without full headers), checking state required to
 // serve error responses (connection close, head requests, etc), and
 // modifications which may themselves affect route selection.
-void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& headers,
+void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPtr&& headers,
                                                         bool end_stream) {
   ENVOY_STREAM_LOG(debug, "request headers complete (end_stream={}):\n{}", *this, end_stream,
                    *headers);
