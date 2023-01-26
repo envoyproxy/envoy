@@ -16,6 +16,8 @@
 #include <utility>
 #include <vector>
 
+#include "absl/time/time.h"
+
 #include "source/common/tracing/null_span_impl.h"
 #include "source/extensions/tracers/datadog/span.h"
 #include "source/extensions/tracers/datadog/time_util.h"
@@ -101,19 +103,9 @@ private:
 };
 
 std::chrono::system_clock::time_point now() {
-  // We are frozen in time.
-  std::tm datetime = {};
-  // May 6th, 2010
-  datetime.tm_year = 2010 - 1900;
-  datetime.tm_mon = 5 - 1;
-  datetime.tm_mday = 6;
-  // 14:45
-  datetime.tm_hour = 14;
-  datetime.tm_min = 45;
-
-  const std::time_t time = std::mktime(&datetime);
-  EXPECT_NE(std::time_t(-1), time);
-  return std::chrono::system_clock::from_time_t(time);
+  // 14:45 May 6th, 2010 in New York
+  absl::CivilSecond datetime{2010, 5, 3, 14, 45};
+  return absl::ToChronoTime(absl::FromCivil(datetime, absl::FixedTimeZone(-4 * 60 * 60)));
 }
 
 TEST(DatadogTracerSpanTest, SetOperation) {
