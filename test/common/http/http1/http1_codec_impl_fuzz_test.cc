@@ -42,13 +42,13 @@ public:
 
   void fuzz_response(Buffer::Instance& payload) {
     client_ = std::make_unique<Http1::ClientConnectionImpl>(
-        mock_client_connection, Http1::CodecStats::atomicGet(http1_stats, stats_store),
+        mock_client_connection, Http1::CodecStats::atomicGet(http1_stats, *stats_store.rootScope()),
         mock_client_callbacks, client_settings, Http::DEFAULT_MAX_HEADERS_COUNT);
     Status status = client_->dispatch(payload);
   }
   void fuzz_request(Buffer::Instance& payload) {
     server_ = std::make_unique<Http1::ServerConnectionImpl>(
-        mock_server_connection, Http1::CodecStats::atomicGet(http1_stats, stats_store),
+        mock_server_connection, Http1::CodecStats::atomicGet(http1_stats, *stats_store.rootScope()),
         mock_server_callbacks, server_settings, Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
         Http::DEFAULT_MAX_HEADERS_COUNT, envoy::config::core::v3::HttpProtocolOptions::ALLOW);
 

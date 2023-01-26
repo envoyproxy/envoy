@@ -213,7 +213,11 @@ MockAsyncClientRequest::MockAsyncClientRequest(MockAsyncClient* client) : client
 MockAsyncClientRequest::~MockAsyncClientRequest() { client_->onRequestDestroy(); }
 
 MockAsyncClientStream::MockAsyncClientStream() = default;
-MockAsyncClientStream::~MockAsyncClientStream() = default;
+MockAsyncClientStream::~MockAsyncClientStream() {
+  if (destructor_callback_) {
+    (*destructor_callback_)();
+  }
+};
 
 MockFilterChainFactoryCallbacks::MockFilterChainFactoryCallbacks() = default;
 MockFilterChainFactoryCallbacks::~MockFilterChainFactoryCallbacks() = default;
