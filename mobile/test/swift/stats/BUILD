@@ -14,4 +14,5 @@ envoy_mobile_swift_test(
     deps = [
         "//library/objective-c:envoy_engine_objc_lib",
     ],
+    tags = ["no-remote-exec"],  # TODO(jpsim): Re-enable remote exec
 )

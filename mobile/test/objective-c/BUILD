@@ -12,6 +12,7 @@ envoy_mobile_objc_test(
     deps = [
         "//library/objective-c:envoy_objc_bridge_lib",
     ],
+    tags = ["no-remote-exec"],  # TODO(jpsim): Re-enable remote exec
 )
 
 envoy_mobile_objc_test(
@@ -25,4 +26,5 @@ envoy_mobile_objc_test(
         "//library/objective-c:envoy_key_value_store_bridge_impl_lib",
         "//library/objective-c:envoy_objc_bridge_lib",
     ],
+    tags = ["no-remote-exec"],  # TODO(jpsim): Re-enable remote exec
 )
