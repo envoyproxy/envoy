@@ -383,11 +383,12 @@ void Http1ServerConnectionImplTest::testServerAllowChunkedContentLength(uint32_t
 #ifdef ENVOY_ENABLE_UHV
     // Header validation is done by the HCM when header map is fully parsed.
     EXPECT_CALL(decoder, decodeHeaders_(_, _))
-        .WillOnce(Invoke([this, &expected_headers](RequestHeaderMapPtr& headers, bool) -> void {
-          auto result = header_validator_->validateRequestHeaderMap(*headers);
-          EXPECT_THAT(headers, HeaderMapEqualIgnoreOrder(&expected_headers));
-          ASSERT_TRUE(result.ok());
-        }));
+        .WillOnce(
+            Invoke([this, &expected_headers](RequestHeaderMapSharedPtr& headers, bool) -> void {
+              auto result = header_validator_->validateRequestHeaderMap(*headers);
+              EXPECT_THAT(headers, HeaderMapEqualIgnoreOrder(&expected_headers));
+              ASSERT_TRUE(result.ok());
+            }));
 #else
     EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
 #endif
@@ -400,16 +401,17 @@ void Http1ServerConnectionImplTest::testServerAllowChunkedContentLength(uint32_t
     // sendLocalReply and closes network connection (based on the
     // stream_error_on_invalid_http_message flag, which in this test is assumed to equal false).
     EXPECT_CALL(decoder, decodeHeaders_(_, _))
-        .WillOnce(Invoke([this, &response_encoder](RequestHeaderMapPtr& headers, bool) -> void {
-          auto result = header_validator_->validateRequestHeaderMap(*headers);
-          ASSERT_FALSE(result.ok());
-          response_encoder->encodeHeaders(TestResponseHeaderMapImpl{{":status", "400"},
-                                                                    {"connection", "close"},
-                                                                    {"content-length", "0"}},
-                                          true);
-          response_encoder->getStream().resetStream(StreamResetReason::LocalReset);
-          connection_.state_ = Network::Connection::State::Closing;
-        }));
+        .WillOnce(
+            Invoke([this, &response_encoder](RequestHeaderMapSharedPtr& headers, bool) -> void {
+              auto result = header_validator_->validateRequestHeaderMap(*headers);
+              ASSERT_FALSE(result.ok());
+              response_encoder->encodeHeaders(TestResponseHeaderMapImpl{{":status", "400"},
+                                                                        {"connection", "close"},
+                                                                        {"content-length", "0"}},
+                                              true);
+              response_encoder->getStream().resetStream(StreamResetReason::LocalReset);
+              connection_.state_ = Network::Connection::State::Closing;
+            }));
     ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&response));
 #else
     EXPECT_CALL(decoder, decodeHeaders_(_, _)).Times(0);
@@ -551,7 +553,7 @@ TEST_P(Http1ServerConnectionImplTest, ContentLengthAllBitsSet) {
   TestRequestHeaderMapImpl expected_headers{
       {"content-length", "3"}, {":path", "/"}, {":method", "POST"}};
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false))
-      .WillOnce(Invoke([&](Http::RequestHeaderMapPtr&, bool) -> void {
+      .WillOnce(Invoke([&](Http::RequestHeaderMapSharedPtr&, bool) -> void {
         connection_.state_ = Network::Connection::State::Closing;
       }));
   EXPECT_CALL(decoder, decodeData(_, _)).Times(0);
@@ -1347,7 +1349,7 @@ TEST_P(Http1ServerConnectionImplTest, HeaderNameWithUnderscoreAllowed) {
 #ifdef ENVOY_ENABLE_UHV
   // Header validation is done by the HCM when header map is fully parsed.
   EXPECT_CALL(decoder, decodeHeaders_(_, _))
-      .WillOnce(Invoke([this, &expected_headers](RequestHeaderMapPtr& headers, bool) -> void {
+      .WillOnce(Invoke([this, &expected_headers](RequestHeaderMapSharedPtr& headers, bool) -> void {
         auto result = header_validator_->validateRequestHeaderMap(*headers);
         EXPECT_THAT(headers, HeaderMapEqualIgnoreOrder(&expected_headers));
         ASSERT_TRUE(result.ok());
@@ -1380,7 +1382,7 @@ TEST_P(Http1ServerConnectionImplTest, HeaderNameWithUnderscoreAreDropped) {
 #ifdef ENVOY_ENABLE_UHV
   // Header validation is done by the HCM when header map is fully parsed.
   EXPECT_CALL(decoder, decodeHeaders_(_, _))
-      .WillOnce(Invoke([this, &expected_headers](RequestHeaderMapPtr& headers, bool) -> void {
+      .WillOnce(Invoke([this, &expected_headers](RequestHeaderMapSharedPtr& headers, bool) -> void {
         auto result = header_validator_->validateRequestHeaderMap(*headers);
         EXPECT_THAT(headers, HeaderMapEqualIgnoreOrder(&expected_headers));
         ASSERT_TRUE(result.ok());
@@ -1417,7 +1419,7 @@ TEST_P(Http1ServerConnectionImplTest, HeaderNameWithUnderscoreCauseRequestReject
   // sendLocalReply and closes network connection (based on the
   // stream_error_on_invalid_http_message flag, which in this test is assumed to equal false).
   EXPECT_CALL(decoder, decodeHeaders_(_, _))
-      .WillOnce(Invoke([this, &response_encoder](RequestHeaderMapPtr& headers, bool) -> void {
+      .WillOnce(Invoke([this, &response_encoder](RequestHeaderMapSharedPtr& headers, bool) -> void {
         auto result = header_validator_->validateRequestHeaderMap(*headers);
         ASSERT_FALSE(result.ok());
         response_encoder->encodeHeaders(TestResponseHeaderMapImpl{{":status", "400"},
@@ -1556,7 +1558,7 @@ TEST_P(Http1ServerConnectionImplTest, CloseDuringHeadersComplete) {
   TestRequestHeaderMapImpl expected_headers{
       {"content-length", "5"}, {":path", "/"}, {":method", "POST"}};
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false))
-      .WillOnce(Invoke([&](Http::RequestHeaderMapPtr&, bool) -> void {
+      .WillOnce(Invoke([&](Http::RequestHeaderMapSharedPtr&, bool) -> void {
         connection_.state_ = Network::Connection::State::Closing;
       }));
   EXPECT_CALL(decoder, decodeData(_, _)).Times(0);
