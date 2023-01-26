@@ -4021,7 +4021,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidRequestHeaderName) {
     EXPECT_EQ("400", response->headers().getStatusValue());
     test_server_->waitForCounterGe("http.config_test.downstream_rq_4xx", 1);
   } else {
-    // H/2 codec doers not send 400 on protocol errors
+    // H/2 codec does not send 400 on protocol errors
     EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->resetReason());
   }
 }
@@ -4050,7 +4050,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidRequestHeaderNameStreamError) {
     EXPECT_EQ("400", response->headers().getStatusValue());
     test_server_->waitForCounterGe("http.config_test.downstream_rq_4xx", 1);
   } else {
-    // H/2 codec doers not send 400 on protocol errors
+    // H/2 codec does not send 400 on protocol errors
     EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
   }
 }
