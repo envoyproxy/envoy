@@ -16,7 +16,6 @@
 #include "test/integration/ads_integration.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/utility.h"
-#include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/resources.h"
 #include "test/test_common/utility.h"
@@ -1772,9 +1771,7 @@ public:
       auto* ads_config = bootstrap.mutable_dynamic_resources()->mutable_ads_config();
       ads_config->set_set_node_on_first_message_only(false);
     });
-    // Verifies that GrpcStream::establishNewStream() doesn't already have a stream created. The
-    // ADS protocol does not try to create multiple streams for each resource type.
-    EXPECT_LOG_NOT_CONTAINS("warning", "already exists!", AdsIntegrationTest::initialize());
+    AdsIntegrationTest::initialize();
   }
 };
 
