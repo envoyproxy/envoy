@@ -9749,11 +9749,11 @@ virtual_hosts:
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
 
   Http::TestRequestHeaderMapImpl headers =
-      genHeaders("path.prefix.com", "/rest/one/prevideo/videos/three/end", "GET");
+      genHeaders("path.prefix.com", "/rest/one/previous/videos/three/end", "GET");
   const RouteEntry* route = config.route(headers, 0)->routeEntry();
-  EXPECT_EQ("/prevideo/videos/three", route->currentUrlPathAfterRewrite(headers));
+  EXPECT_EQ("/previous/videos/three", route->currentUrlPathAfterRewrite(headers));
   route->finalizeRequestHeaders(headers, stream_info, true);
-  EXPECT_EQ("/prevideo/videos/three", headers.get_(Http::Headers::get().Path));
+  EXPECT_EQ("/previous/videos/three", headers.get_(Http::Headers::get().Path));
   EXPECT_EQ("path.prefix.com", headers.get_(Http::Headers::get().Host));
 }
 
