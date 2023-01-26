@@ -717,7 +717,8 @@ uint64_t FilterConfig::getConfigId() {
   ASSERT(dlib != nullptr, "load at the config parse phase, so it should not be null");
 
   std::string str;
-  ASSERT(plugin_config_.SerializeToString(&str));
+  auto res = plugin_config_.SerializeToString(&str);
+  ASSERT(res, "SerializeToString is always successful");
   auto ptr = reinterpret_cast<unsigned long long>(str.data());
   auto len = str.length();
   config_id_ = dlib->envoyGoFilterNewHttpPluginConfig(ptr, len);
@@ -763,7 +764,8 @@ uint64_t RoutePluginConfig::getMergedConfigId(uint64_t parent_id, std::string so
 
   if (config_id_ == 0) {
     std::string str;
-    ASSERT(plugin_config_.SerializeToString(&str));
+    auto res = plugin_config_.SerializeToString(&str);
+    ASSERT(res, "SerializeToString is always successful");
     auto ptr = reinterpret_cast<unsigned long long>(str.data());
     auto len = str.length();
     config_id_ = dlib->envoyGoFilterNewHttpPluginConfig(ptr, len);
