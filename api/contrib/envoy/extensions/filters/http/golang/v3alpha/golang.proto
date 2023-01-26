@@ -23,13 +23,13 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#next-free-field: 6]
 message Config {
+
   // The meanings are as follows:
   //
   // :``MERGE_VIRTUALHOST_ROUTER_FILTER``: Pass all configuration into Go plugin.
   // :``MERGE_VIRTUALHOST_ROUTER``: Pass merged Virtual host and Router configuration into Go plugin.
   // :``OVERRIDE``: Pass merged Virtual host, Router, and plugin configuration into Go plugin.
   //
-  // [#not-implemented-hide:]
   enum MergePolicy {
     MERGE_VIRTUALHOST_ROUTER_FILTER = 0;
     MERGE_VIRTUALHOST_ROUTER = 1;
@@ -59,9 +59,6 @@ message Config {
   //     This configuration is only parsed in the go plugin, and is therefore not validated
   //     by Envoy.
   //
-  //     See the :repo:`StreamFilter API <contrib/golang/filters/http/source/go/pkg/api/filter.go>`
-  //     for more information about how the plugin's configuration data can be accessed.
-  //
   google.protobuf.Any plugin_config = 4;
 
   // Merge policy for plugin configuration.
@@ -72,7 +69,6 @@ message Config {
   // * Route’s :ref:`typed_per_filter_config <envoy_v3_api_field_config.route.v3.Route.typed_per_filter_config>`
   // * The filter's :ref:`plugin_config <envoy_v3_api_field_extensions.filters.http.golang.v3alpha.Config.plugin_config>`
   //
-  // [#not-implemented-hide:]
   MergePolicy merge_policy = 5 [(validate.rules).enum = {defined_only: true}];
 }
 
