@@ -83,6 +83,7 @@ genrule(
     name = "example_contrib_configs",
     srcs = [
         "//docs:contrib_configs",
+        "//contrib:configs",
         "//examples:contrib_configs",
         "//examples:certs",
         "//test/config/integration/certs",
@@ -90,7 +91,8 @@ genrule(
     outs = ["example_contrib_configs.tar"],
     cmd = (
         "$(location configgen.sh) NO_CONFIGGEN example_contrib_configs.tar $(@D) " +
-        # "$(locations //docs:contrib_configs) " +
+        "$(locations //contrib:configs) " +
+        "$(locations //docs:contrib_configs) " +
         "$(locations //examples:contrib_configs) " +
         "$(locations //examples:certs) " +
         "$(locations //test/config/integration/certs)"
