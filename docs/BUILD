@@ -42,9 +42,10 @@ filegroup(
 
 filegroup(
     name = "contrib_configs",
-    srcs = glob(
-        ["root/_configs/go/*.yaml"],
-    ),
+    srcs = select({
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": glob(["root/_configs/go/*.yaml"]),
+    }),
 )
 
 filegroup(
