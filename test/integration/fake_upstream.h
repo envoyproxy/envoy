@@ -219,11 +219,14 @@ public:
   void decodeMetadata(Http::MetadataMapPtr&& metadata_map_ptr) override;
 
   // Http::RequestDecoder
-  void decodeHeaders(Http::RequestHeaderMapPtr&& headers, bool end_stream) override;
+  void decodeHeaders(Http::RequestHeaderMapSharedPtr&& headers, bool end_stream) override;
   void decodeTrailers(Http::RequestTrailerMapPtr&& trailers) override;
   StreamInfo::StreamInfo& streamInfo() override {
     RELEASE_ASSERT(false, "initialize if this is needed");
     return *stream_info_;
+  }
+  std::list<AccessLog::InstanceSharedPtr> accessLogHandlers() override {
+    return access_log_handlers_;
   }
 
   // Http::StreamCallbacks
@@ -243,7 +246,7 @@ public:
 
 protected:
   absl::Mutex lock_;
-  Http::RequestHeaderMapPtr headers_ ABSL_GUARDED_BY(lock_);
+  Http::RequestHeaderMapSharedPtr headers_ ABSL_GUARDED_BY(lock_);
   Buffer::OwnedImpl body_ ABSL_GUARDED_BY(lock_);
   FakeHttpConnection& parent_;
 
@@ -258,7 +261,8 @@ private:
   Event::TestTimeSystem& time_system_;
   Http::MetadataMap metadata_map_;
   absl::node_hash_map<std::string, uint64_t> duplicated_metadata_key_count_;
-  std::unique_ptr<StreamInfo::StreamInfo> stream_info_;
+  std::shared_ptr<StreamInfo::StreamInfo> stream_info_;
+  std::list<AccessLog::InstanceSharedPtr> access_log_handlers_;
   bool received_data_{false};
   bool grpc_stream_started_{false};
 };
@@ -836,7 +840,7 @@ private:
     uint32_t perConnectionBufferLimitBytes() const override { return 0; }
     std::chrono::milliseconds listenerFiltersTimeout() const override { return {}; }
     bool continueOnListenerFiltersTimeout() const override { return false; }
-    Stats::Scope& listenerScope() override { return parent_.stats_store_; }
+    Stats::Scope& listenerScope() override { return *parent_.stats_store_.rootScope(); }
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
     Network::UdpListenerConfigOptRef udpListenerConfig() override { return udp_listener_config_; }

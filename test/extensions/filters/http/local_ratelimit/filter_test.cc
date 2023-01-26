@@ -73,8 +73,8 @@ public:
 
     envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit config;
     TestUtility::loadFromYaml(yaml, config);
-    config_ = std::make_shared<FilterConfig>(config, local_info_, dispatcher_, stats_, runtime_,
-                                             per_route);
+    config_ = std::make_shared<FilterConfig>(config, local_info_, dispatcher_, *stats_.rootScope(),
+                                             runtime_, per_route);
     filter_ = std::make_shared<Filter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
 
@@ -460,26 +460,6 @@ TEST_F(DescriptorFilterTest, RouteDescriptorNotFound) {
 
   EXPECT_CALL(route_rate_limit_, populateLocalDescriptors(_, _, _, _))
       .WillOnce(testing::SetArgReferee<0>(descriptor_not_found_));
-
-  auto headers = Http::TestRequestHeaderMapImpl();
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
-  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enabled"));
-  EXPECT_EQ(0U, findCounter("test.http_local_rate_limit.enforced"));
-  EXPECT_EQ(0U, findCounter("test.http_local_rate_limit.rate_limited"));
-}
-
-TEST_F(DescriptorFilterTest, RouteDescriptorFirstMatch) {
-  // Request  should not be rate  limited as it should match first descriptor with 10 req/min
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.local_ratelimit_match_all_descriptors", "false"}});
-  setUpTest(fmt::format(fmt::runtime(descriptor_config_yaml), "0", "\"OFF\"", "0", "0"));
-
-  EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_,
-              getApplicableRateLimit(0));
-
-  EXPECT_CALL(route_rate_limit_, populateLocalDescriptors(_, _, _, _))
-      .WillOnce(testing::SetArgReferee<0>(descriptor_first_match_));
 
   auto headers = Http::TestRequestHeaderMapImpl();
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));

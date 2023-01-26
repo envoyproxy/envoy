@@ -10,6 +10,23 @@ set -e
 # a list of pre-installed tools in the macOS image.
 
 export HOMEBREW_NO_AUTO_UPDATE=1
+RETRY_ATTEMPTS=10
+RETRY_INTERVAL=3
+
+
+function retry () {
+    local returns=1 i=1
+    while ((i<=RETRY_ATTEMPTS)); do
+        if "$@"; then
+            returns=0
+            break
+        else
+            sleep "$RETRY_INTERVAL";
+            ((i++))
+        fi
+    done
+    return "$returns"
+}
 
 function is_installed {
     brew ls --versions "$1" >/dev/null
@@ -17,29 +34,27 @@ function is_installed {
 
 function install {
     echo "Installing $1"
-    if ! brew install "$1"; then
+    if ! retry brew install "$1"; then
         echo "Failed to install $1"
         exit 1
     fi
 }
 
-# Disabled due to frequent CI failures for now.
-#if ! brew update; then
-#    echo "Failed to update homebrew"
-#    exit 1
-#fi
+if ! retry brew update; then
+  # Do not exit early if update fails.
+  echo "Failed to update homebrew"
+fi
 
-DEPS="automake cmake coreutils libtool wget ninja"
+DEPS="automake cmake coreutils libtool ninja"
 for DEP in ${DEPS}
 do
     is_installed "${DEP}" || install "${DEP}"
 done
 
-./bazelw version
-
-pip3 install slackclient
 # https://github.com/actions/runner-images/blob/main/images/macos/macos-12-Readme.md#xcode
 sudo xcode-select --switch /Applications/Xcode_14.1.app
+
+retry ./bazelw version
 
 if [[ "${1:-}" == "--android" ]]; then
   # Download and set up ndk 21 after GitHub update

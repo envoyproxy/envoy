@@ -192,7 +192,7 @@ private:
     void maybeEndDecode(bool end_stream);
 
     // Http::RequestDecoder
-    void decodeHeaders(RequestHeaderMapPtr&& headers, bool end_stream) override;
+    void decodeHeaders(RequestHeaderMapSharedPtr&& headers, bool end_stream) override;
     void decodeTrailers(RequestTrailerMapPtr&& trailers) override;
     StreamInfo::StreamInfo& streamInfo() override { return filter_manager_.streamInfo(); }
     void sendLocalReply(Code code, absl::string_view body,
@@ -200,6 +200,20 @@ private:
                         const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                         absl::string_view details) override {
       return filter_manager_.sendLocalReply(code, body, modify_headers, grpc_status, details);
+    }
+    std::list<AccessLog::InstanceSharedPtr> accessLogHandlers() override {
+      return filter_manager_.accessLogHandlers();
+    }
+    // Hand off headers/trailers and stream info to the codec's response encoder, for logging later
+    // (i.e. possibly after this stream has been destroyed).
+    //
+    // TODO(paulsohn): Investigate whether we can move the headers/trailers and stream info required
+    // for logging instead of copying them (as is currently done in the HTTP/3 implementation) or
+    // using a shared pointer. See
+    // https://github.com/envoyproxy/envoy/pull/23648#discussion_r1066095564 for more details.
+    void deferHeadersAndTrailers() {
+      response_encoder_->setDeferredLoggingHeadersAndTrailers(request_headers_, response_headers_,
+                                                              response_trailers_, streamInfo());
     }
 
     // ScopeTrackedObject
@@ -355,18 +369,28 @@ private:
     // If header map failed validation, it sends an error response and returns false.
     bool validateHeaders();
 
+    // Note: this method is a noop unless ENVOY_ENABLE_UHV is defined
+    // Call header validator extension to validate the request trailer map after it was
+    // deserialized. If the trailer map failed validation, this method does the following:
+    // 1. For H/1 it sends 400 response and returns false.
+    // 2. For H/2 and H/3 it resets the stream (without error response). Issue #24735 is filed to
+    //    harmonize this behavior with H/1.
+    // 3. If the `stream_error_on_invalid_http_message` is set to `false` (it is by default) in the
+    // HTTP connection manager configuration, then the entire connection is closed.
+    bool validateTrailers();
+
     ConnectionManagerImpl& connection_manager_;
     OptRef<const TracingConnectionManagerConfig> connection_manager_tracing_config_;
     // TODO(snowp): It might make sense to move this to the FilterManager to avoid storing it in
     // both locations, then refer to the FM when doing stream logs.
     const uint64_t stream_id_;
 
-    RequestHeaderMapPtr request_headers_;
+    RequestHeaderMapSharedPtr request_headers_;
     RequestTrailerMapPtr request_trailers_;
 
     ResponseHeaderMapPtr informational_headers_;
-    ResponseHeaderMapPtr response_headers_;
-    ResponseTrailerMapPtr response_trailers_;
+    ResponseHeaderMapSharedPtr response_headers_;
+    ResponseTrailerMapSharedPtr response_trailers_;
 
     // Note: The FM must outlive the above headers, as they are possibly accessed during filter
     // destruction.

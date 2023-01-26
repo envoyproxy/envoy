@@ -22,13 +22,12 @@ function failure() {
   echo "run_ci_job=false" >> "$GITHUB_OUTPUT"
 }
 
-# TODO(jpsim): Consider enabling this if the load on EngFlow is ok
-# if [[ $branch_name == "main" ]]; then
-#   # Run all mobile CI jobs on `main`
-#   echo "Running $job because current branch is main"
-#   echo "run_ci_job=true" >> "$GITHUB_OUTPUT"
-#   exit 0
-# fi
+if [[ $branch_name == "main" ]]; then
+  # Run all mobile CI jobs on `main`
+  echo "Running $job because current branch is main"
+  echo "run_ci_job=true" >> "$GITHUB_OUTPUT"
+  exit 0
+fi
 
 base_commit="$(git merge-base origin/main HEAD)"
 changed_files="$(git diff "$base_commit" --name-only)"

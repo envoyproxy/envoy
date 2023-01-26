@@ -15,7 +15,7 @@ load("@aspect_bazel_lib//lib:repositories.bzl", "register_jq_toolchains", "regis
 load("@com_google_cel_cpp//bazel:deps.bzl", "parser_deps")
 
 # go version for rules_go
-GO_VERSION = "1.17.5"
+GO_VERSION = "1.18"
 
 JQ_VERSION = "1.6"
 YQ_VERSION = "4.24.4"
@@ -86,6 +86,20 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
         # last_update = "2021-06-16"
         # use_category = ["api"],
         # source = "https://github.com/bufbuild/protoc-gen-validate/blob/v0.6.1/dependencies.bzl#L148-L153"
+    )
+    go_repository(
+        name = "org_golang_google_protobuf",
+        importpath = "google.golang.org/protobuf",
+        sum = "h1:d0NfwRgPtno5B1Wa6L2DAG+KivqkdutMf1UhdNx175w=",
+        version = "v1.28.1",
+        build_external = "external",
+    )
+    go_repository(
+        name = "com_github_cncf_xds_go",
+        importpath = "github.com/cncf/xds/go",
+        sum = "h1:B/lvg4tQ5hfFZd4V2hcSfFVfUvAK6GSFKxIIzwnkv8g=",
+        version = "v0.0.0-20220520190051-1e77728a1eaa",
+        build_external = "external",
     )
     go_repository(
         name = "com_github_spf13_afero",

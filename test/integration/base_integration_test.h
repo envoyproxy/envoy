@@ -150,6 +150,7 @@ public:
   Event::TestTimeSystem& timeSystem() { return time_system_; }
 
   Stats::IsolatedStoreImpl stats_store_;
+  Stats::Scope& stats_scope_{*stats_store_.rootScope()};
   Api::ApiPtr api_;
   Api::ApiPtr api_for_server_stat_store_;
   MockBufferFactory* mock_buffer_factory_; // Will point to the dispatcher's factory.
@@ -158,8 +159,10 @@ public:
   void useListenerAccessLog(absl::string_view format = "");
   // Returns all log entries after the nth access log entry, defaulting to log entry 0.
   // By default will trigger an expect failure if more than one entry is returned.
+  // If client_connection is provided, flush pending acks to enable deferred logging.
   std::string waitForAccessLog(const std::string& filename, uint32_t entry = 0,
-                               bool allow_excess_entries = false);
+                               bool allow_excess_entries = false,
+                               Network::ClientConnection* client_connection = nullptr);
 
   std::string listener_access_log_name_;
 

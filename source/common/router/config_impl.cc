@@ -616,6 +616,11 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
           optional_http_filters);
       weighted_clusters.emplace_back(std::move(cluster_entry));
       total_weight += weighted_clusters.back()->clusterWeight();
+      if (total_weight > std::numeric_limits<uint32_t>::max()) {
+        throw EnvoyException(
+            fmt::format("The sum of weights of all weighted clusters of route {} exceeds {}",
+                        route_name_, std::numeric_limits<uint32_t>::max()));
+      }
     }
 
     // Reject the config if the total_weight of all clusters is 0.
@@ -1036,7 +1041,12 @@ absl::optional<std::string> RouteEntryImplBase::currentUrlPathAfterRewriteWithMa
       return std::string(headers.getPathValue());
     }
 
-    return *std::move(new_path);
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.append_query_parameters_path_rewriter")) {
+      return path.replace(0, just_path.size(), new_path.value());
+    } else {
+      return *std::move(new_path);
+    }
   }
 
   // There are no rewrites configured.
@@ -1732,9 +1742,6 @@ VirtualHostImpl::VirtualHostImpl(
     ProtobufMessage::ValidationVisitor& validator,
     const absl::optional<Upstream::ClusterManager::ClusterInfoMaps>& validation_clusters)
     : stat_name_storage_(virtual_host.name(), factory_context.scope().symbolTable()),
-      vcluster_scope_(Stats::Utility::scopeFromStatNames(
-          scope, {stat_name_storage_.statName(),
-                  factory_context.routerContext().virtualClusterStatNames().vcluster_})),
       global_route_config_(global_route_config),
       per_filter_configs_(virtual_host.typed_per_filter_config(), optional_http_filters,
                           factory_context, validator),
@@ -1816,6 +1823,9 @@ VirtualHostImpl::VirtualHostImpl(
   }
 
   if (!virtual_host.virtual_clusters().empty()) {
+    vcluster_scope_ = Stats::Utility::scopeFromStatNames(
+        scope, {stat_name_storage_.statName(),
+                factory_context.routerContext().virtualClusterStatNames().vcluster_});
     virtual_cluster_catch_all_ = std::make_unique<CatchAllVirtualCluster>(
         *vcluster_scope_, factory_context.routerContext().virtualClusterStatNames());
     for (const auto& virtual_cluster : virtual_host.virtual_clusters()) {
@@ -2177,30 +2187,19 @@ RouteSpecificFilterConfigConstSharedPtr PerFilterConfigs::createRouteSpecificFil
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator) {
   bool is_optional = (optional_http_filters.find(name) != optional_http_filters.end());
-  Server::Configuration::NamedHttpFilterConfigFactory* factory = nullptr;
-
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.get_route_config_factory_by_type")) {
-    factory = Envoy::Config::Utility::getFactoryByType<
-        Server::Configuration::NamedHttpFilterConfigFactory>(typed_config);
-    if (factory == nullptr) {
-      if (is_optional) {
-        ENVOY_LOG(warn,
-                  "Can't find a registered implementation for http filter '{}' with type URL: '{}'",
-                  name, Envoy::Config::Utility::getFactoryType(typed_config));
-        return nullptr;
-      } else {
-        throw EnvoyException(
-            fmt::format("Didn't find a registered implementation for '{}' with type URL: '{}'",
-                        name, Envoy::Config::Utility::getFactoryType(typed_config)));
-      }
-    }
-  } else {
-    factory = Envoy::Config::Utility::getAndCheckFactoryByName<
-        Server::Configuration::NamedHttpFilterConfigFactory>(name, is_optional);
-    if (factory == nullptr) {
-      ENVOY_LOG(warn, "Can't find a registered implementation for http filter '{}'", name);
+  Server::Configuration::NamedHttpFilterConfigFactory* factory =
+      Envoy::Config::Utility::getFactoryByType<Server::Configuration::NamedHttpFilterConfigFactory>(
+          typed_config);
+  if (factory == nullptr) {
+    if (is_optional) {
+      ENVOY_LOG(warn,
+                "Can't find a registered implementation for http filter '{}' with type URL: '{}'",
+                name, Envoy::Config::Utility::getFactoryType(typed_config));
       return nullptr;
+    } else {
+      throw EnvoyException(
+          fmt::format("Didn't find a registered implementation for '{}' with type URL: '{}'", name,
+                      Envoy::Config::Utility::getFactoryType(typed_config)));
     }
   }
 

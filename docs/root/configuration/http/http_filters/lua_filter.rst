@@ -631,7 +631,8 @@ get()
   headers:get(key)
 
 Gets a header. *key* is a string that supplies the header key. Returns a string that is the header
-value or nil if there is no such header.
+value or nil if there is no such header. If there are multiple headers in the same case-insensitive
+key, their values will be combined with a *,* separator and returned as a string.
 
 getAtIndex()
 ^^^^^^^^^^^^

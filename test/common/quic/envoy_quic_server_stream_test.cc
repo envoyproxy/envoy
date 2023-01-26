@@ -11,9 +11,11 @@
 #include "source/server/active_listener_base.h"
 
 #include "test/common/quic/test_utils.h"
+#include "test/mocks/access_log/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/http/stream_decoder.h"
 #include "test/mocks/network/mocks.h"
+#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -52,6 +54,7 @@ public:
             envoy::config::core::v3::HttpProtocolOptions::ALLOW)),
         response_headers_{{":status", "200"}, {"response-key", "response-value"}},
         response_trailers_{{"trailer-key", "trailer-value"}} {
+    EXPECT_CALL(stream_decoder_, accessLogHandlers());
     quic_stream_->setRequestDecoder(stream_decoder_);
     quic_stream_->addCallbacks(stream_callbacks_);
     quic_stream_->getStream().setFlushTimeout(std::chrono::milliseconds(30000));
@@ -102,7 +105,7 @@ public:
   size_t receiveRequest(const std::string& payload, bool fin,
                         size_t decoder_buffer_high_watermark) {
     EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
-        .WillOnce(Invoke([this](const Http::RequestHeaderMapPtr& headers, bool) {
+        .WillOnce(Invoke([this](const Http::RequestHeaderMapSharedPtr& headers, bool) {
           EXPECT_EQ(host_, headers->getHostValue());
           EXPECT_EQ("/", headers->getPathValue());
           EXPECT_EQ(Http::Headers::get().MethodValues.Post, headers->getMethodValue());
@@ -126,7 +129,7 @@ public:
 
   size_t receiveRequestHeaders(bool end_stream) {
     EXPECT_CALL(stream_decoder_, decodeHeaders_(_, end_stream))
-        .WillOnce(Invoke([this](const Http::RequestHeaderMapPtr& headers, bool) {
+        .WillOnce(Invoke([this](const Http::RequestHeaderMapSharedPtr& headers, bool) {
           EXPECT_EQ(host_, headers->getHostValue());
           EXPECT_EQ("/", headers->getPathValue());
           EXPECT_EQ(Http::Headers::get().MethodValues.Post, headers->getMethodValue());
@@ -193,7 +196,7 @@ protected:
 
 TEST_F(EnvoyQuicServerStreamTest, GetRequestAndResponse) {
   EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
-      .WillOnce(Invoke([this](const Http::RequestHeaderMapPtr& headers, bool) {
+      .WillOnce(Invoke([this](const Http::RequestHeaderMapSharedPtr& headers, bool) {
         EXPECT_EQ(host_, headers->getHostValue());
         EXPECT_EQ("/", headers->getPathValue());
         EXPECT_EQ(Http::Headers::get().MethodValues.Get, headers->getMethodValue());
@@ -454,8 +457,9 @@ TEST_F(EnvoyQuicServerStreamTest, ReadDisableAndReEnableImmediately) {
 TEST_F(EnvoyQuicServerStreamTest, ReadDisableUponHeaders) {
   std::string payload(1024, 'a');
   EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
-      .WillOnce(Invoke(
-          [this](const Http::RequestHeaderMapPtr&, bool) { quic_stream_->readDisable(true); }));
+      .WillOnce(Invoke([this](const Http::RequestHeaderMapSharedPtr&, bool) {
+        quic_stream_->readDisable(true);
+      }));
   EXPECT_CALL(stream_decoder_, decodeData(_, _));
   std::string data = absl::StrCat(spdyHeaderToHttp3StreamPayload(spdy_request_headers_),
                                   bodyToHttp3StreamPayload(payload));
@@ -750,6 +754,30 @@ TEST_F(EnvoyQuicServerStreamTest, ConnectionCloseAfterEndStreamEncoded) {
   quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/true);
 }
 
+// Tests that when stream is cleaned up, QuicStatsGatherer executes any pending logs.
+TEST_F(EnvoyQuicServerStreamTest, StatsGathererLogsOnStreamDestruction) {
+
+  // Set up QuicStatsGatherer with required access logger, stream info, headers and trailers.
+  std::shared_ptr<AccessLog::MockInstance> mock_logger(new NiceMock<AccessLog::MockInstance>());
+  std::list<AccessLog::InstanceSharedPtr> loggers = {mock_logger};
+  Event::GlobalTimeSystem test_time_;
+  Envoy::StreamInfo::StreamInfoImpl stream_info{Http::Protocol::Http2, test_time_.timeSystem(),
+                                                nullptr};
+  quic_stream_->statsGatherer()->setAccessLogHandlers(loggers);
+  quic_stream_->setDeferredLoggingHeadersAndTrailers(nullptr, nullptr, nullptr, stream_info);
+
+  receiveRequest(request_body_, false, request_body_.size() * 2);
+  quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/true);
+  EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, _));
+  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::LocalReset, _));
+  // The stats gatherer has outstanding bytes that have not been acked.
+  EXPECT_GT(quic_stream_->statsGatherer()->bytesOutstanding(), 0);
+  // Close the stream; incoming acks will no longer invoke the stats gatherer but
+  // the stats gatherer should log on stream close despite not receiving final downstream ack.
+  EXPECT_CALL(*mock_logger, log(_, _, _, _));
+  quic_stream_->resetStream(Http::StreamResetReason::LocalRefusedStreamReset);
+}
+
 TEST_F(EnvoyQuicServerStreamTest, MetadataNotSupported) {
   Http::MetadataMap metadata_map = {{"key", "value"}};
   Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
@@ -757,7 +785,7 @@ TEST_F(EnvoyQuicServerStreamTest, MetadataNotSupported) {
   metadata_map_vector.push_back(std::move(metadata_map_ptr));
   quic_stream_->encodeMetadata(metadata_map_vector);
   EXPECT_EQ(1,
-            TestUtility::findCounter(listener_config_.scope_, "http3.metadata_not_supported_error")
+            TestUtility::findCounter(listener_config_.store_, "http3.metadata_not_supported_error")
                 ->value());
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }

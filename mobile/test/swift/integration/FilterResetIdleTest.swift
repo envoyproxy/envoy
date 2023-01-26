@@ -1,9 +1,15 @@
 import Envoy
 import EnvoyEngine
 import Foundation
+import TestExtensions
 import XCTest
 
 final class FilterResetIdleTests: XCTestCase {
+  override static func setUp() {
+    super.setUp()
+    register_test_extensions()
+  }
+
   func testFilterResetIdle() {
     let idleTimeout = "0.5s"
     let remotePort = Int.random(in: 10001...11000)
@@ -217,7 +223,7 @@ static_resources:
     )
 
     XCTAssertEqual(
-      XCTWaiter.wait(for: [cancelExpectation], timeout: 1),
+      XCTWaiter.wait(for: [cancelExpectation], timeout: 2),
       .completed
     )
 

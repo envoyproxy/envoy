@@ -23,7 +23,7 @@ using testing::Invoke;
 
 class MockDelegate : public PacketsToReadDelegate {
 public:
-  MOCK_METHOD(size_t, numPacketsExpectedPerEventLoop, ());
+  MOCK_METHOD(size_t, numPacketsExpectedPerEventLoop, (), (const));
 };
 
 class EnvoyQuicClientStreamTest : public testing::Test {

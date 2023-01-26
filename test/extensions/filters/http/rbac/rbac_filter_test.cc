@@ -57,7 +57,8 @@ public:
     config.set_shadow_rules_stat_prefix("prefix_");
 
     setupConfig(std::make_shared<RoleBasedAccessControlFilterConfig>(
-        config, "test", store_, context_, ProtobufMessage::getStrictValidationVisitor()));
+        config, "test", *store_.rootScope(), context_,
+        ProtobufMessage::getStrictValidationVisitor()));
   }
 
   void setupMatcher(std::string action, std::string on_no_match_action) {
@@ -157,7 +158,8 @@ on_no_match:
     config.set_shadow_rules_stat_prefix("prefix_");
 
     setupConfig(std::make_shared<RoleBasedAccessControlFilterConfig>(
-        config, "test", store_, context_, ProtobufMessage::getStrictValidationVisitor()));
+        config, "test", *store_.rootScope(), context_,
+        ProtobufMessage::getStrictValidationVisitor()));
   }
 
   void setupConfig(RoleBasedAccessControlFilterConfigSharedPtr config) {
@@ -619,7 +621,8 @@ public:
     (*config.mutable_rules()->mutable_policies())["foo"] = policy;
 
     auto config_ptr = std::make_shared<RoleBasedAccessControlFilterConfig>(
-        config, "test", store_, context_, ProtobufMessage::getStrictValidationVisitor());
+        config, "test", *store_.rootScope(), context_,
+        ProtobufMessage::getStrictValidationVisitor());
 
     // Setup test with the policy config.
     setupConfig(config_ptr);

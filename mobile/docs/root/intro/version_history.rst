@@ -11,6 +11,9 @@ Breaking changes:
 - kotlin: always use ``getaddrinfo`` DNS resolver. Remove ``addDNSFallbackNameservers``, ``enableDNSFilterUnroutableFamilies``, and ``enableDNSUseSystemResolver`` methods from the Kotlin engine builder. (:issue:`#2618 <2618>`)
 - Envoy Mobile's release builds compile without admin support by default. (``--define=admin_functionality=disabled``) (:issue`#2693 <2693>`)
 - swift/kotlin: remove `gauge`, `timer`, and `distribution` methods from the PulseClient.
+- swift/kotlin: add `cancel` method to `GRPCStream`` type (:issue:`#24780 <24780>`).
+- all: enable HTTP/3 by default in Engine builders.
+- api: remove ``extendKeepaliveTimeout`` method from engine builders.
 
 Bugfixes:
 

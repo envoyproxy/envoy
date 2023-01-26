@@ -3155,7 +3155,6 @@ TEST_F(HttpConnectionManagerImplTest, DirectLocalReplyCausesDisconnect) {
   EXPECT_EQ(1U, stats_.named_.rs_too_large_.value());
 }
 
-#ifdef ENVOY_ENABLE_UHV
 // Header validator rejects header map for HTTP/1.x protocols
 TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectHttp1) {
   setup(false, "");
@@ -3356,6 +3355,96 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRedirectGrpcRequest) {
   conn_manager_->onData(fake_input, false);
 }
 
+// Header validator rejects trailer map before response has started
+TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectTrailersBeforeResponseHttp1) {
+  codec_->protocol_ = Protocol::Http11;
+  setup(false, "");
+  expectUhvTrailerCheckFail();
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+        {":authority", "host"}, {":path", "/something"}, {":method", "GET"}}};
+    decoder_->decodeHeaders(std::move(headers), false);
+    RequestTrailerMapPtr trailers{
+        new TestRequestTrailerMapImpl{{"trailer1", "value1"}, {"trailer2", "value2"}}};
+    decoder_->decodeTrailers(std::move(trailers));
+    data.drain(4);
+    return Http::okStatus();
+  }));
+
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ("400", headers.getStatusValue());
+        EXPECT_EQ("bad_trailer_map", decoder_->streamInfo().responseCodeDetails().value());
+      }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
+TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectTrailersBeforeResponseHttp2) {
+  codec_->protocol_ = Protocol::Http2;
+  setup(false, "");
+  expectUhvTrailerCheckFail();
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+        {":authority", "host"}, {":path", "/something"}, {":method", "GET"}}};
+    decoder_->decodeHeaders(std::move(headers), false);
+    RequestTrailerMapPtr trailers{
+        new TestRequestTrailerMapImpl{{"trailer1", "value1"}, {"trailer2", "value2"}}};
+    decoder_->decodeTrailers(std::move(trailers));
+    data.drain(4);
+    return Http::okStatus();
+  }));
+
+  EXPECT_CALL(response_encoder_.stream_, resetStream(_));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
+// Header validator rejects trailer map after response has started
+TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectTrailersAfterResponse) {
+  codec_->protocol_ = Protocol::Http2;
+  setup(false, "");
+  setupFilterChain(1, 0, 1);
+  expectUhvTrailerCheckFail();
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+      .WillRepeatedly(Invoke([&](RequestHeaderMap&, bool) -> FilterHeadersStatus {
+        return FilterHeadersStatus::StopIteration;
+      }));
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+        {":authority", "host"}, {":path", "/something"}, {":method", "GET"}}};
+    decoder_->decodeHeaders(std::move(headers), false);
+
+    ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+    decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), false, "");
+
+    RequestTrailerMapPtr trailers{
+        new TestRequestTrailerMapImpl{{"trailer1", "value1"}, {"trailer2", "value2"}}};
+    decoder_->decodeTrailers(std::move(trailers));
+    data.drain(4);
+    return Http::okStatus();
+  }));
+
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false))
+      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ("200", headers.getStatusValue());
+      }));
+
+  EXPECT_CALL(response_encoder_.stream_, resetStream(_));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+  EXPECT_EQ("bad_trailer_map", decoder_->streamInfo().responseCodeDetails().value());
+}
+
 // Request completes normally if header validator accepts it
 TEST_F(HttpConnectionManagerImplTest, HeaderValidatorAccept) {
   setup(false, "");
@@ -3413,8 +3502,6 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorAccept) {
   EXPECT_EQ(1U, stats_.named_.downstream_rq_completed_.value());
   EXPECT_EQ(1U, listener_stats_.downstream_rq_completed_.value());
 }
-
-#endif // ENVOY_ENABLE_UHV
 
 } // namespace Http
 } // namespace Envoy

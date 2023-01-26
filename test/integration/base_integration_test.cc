@@ -62,7 +62,7 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
         return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
       }));
   ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
-  ON_CALL(factory_context_, scope()).WillByDefault(ReturnRef(stats_store_));
+  ON_CALL(factory_context_, scope()).WillByDefault(ReturnRef(*stats_store_.rootScope()));
   // Allow extension lookup by name in the integration tests.
   config_helper_.addRuntimeOverride("envoy.reloadable_features.no_extension_lookup_by_name",
                                     "false");
@@ -140,7 +140,8 @@ common_tls_context:
         tls_context, factory_context_);
     static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
     return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
-        std::move(cfg), context_manager_, *upstream_stats_store, std::vector<std::string>{});
+        std::move(cfg), context_manager_, *upstream_stats_store->rootScope(),
+        std::vector<std::string>{});
   } else {
     envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport quic_config;
     quic_config.mutable_downstream_tls_context()->MergeFrom(tls_context);
@@ -509,7 +510,9 @@ void BaseIntegrationTest::useListenerAccessLog(absl::string_view format) {
 }
 
 std::string BaseIntegrationTest::waitForAccessLog(const std::string& filename, uint32_t entry,
-                                                  bool allow_excess_entries) {
+                                                  bool allow_excess_entries,
+                                                  Network::ClientConnection* client_connection) {
+
   // Wait a max of 1s for logs to flush to disk.
   std::string contents;
   for (int i = 0; i < 1000; ++i) {
@@ -523,6 +526,11 @@ std::string BaseIntegrationTest::waitForAccessLog(const std::string& filename, u
           << entries.size() << "\n"
           << contents;
       return entries[entry];
+    }
+    if (i % 25 == 0 && client_connection != nullptr) {
+      // The QUIC default delayed ack timer is 25ms. Wait for any pending ack timers to expire,
+      // then run dispatcher to send any pending acks.
+      client_connection->dispatcher().run(Envoy::Event::Dispatcher::RunType::NonBlock);
     }
     absl::SleepFor(absl::Milliseconds(1));
   }
@@ -550,7 +558,8 @@ void BaseIntegrationTest::createXdsUpstream() {
 
     upstream_stats_store_ = std::make_unique<Stats::TestIsolatedStoreImpl>();
     auto context = std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
-        std::move(cfg), context_manager_, *upstream_stats_store_, std::vector<std::string>{});
+        std::move(cfg), context_manager_, *upstream_stats_store_->rootScope(),
+        std::vector<std::string>{});
     addFakeUpstream(std::move(context), Http::CodecType::HTTP2, /*autonomous_upstream=*/false);
   }
   xds_upstream_ = fake_upstreams_.back().get();

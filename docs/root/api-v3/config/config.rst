@@ -42,3 +42,4 @@ Extensions
   upstream/upstream
   wasm/wasm
   watchdog/watchdog
+  load_balancing_policies/load_balancing_policies

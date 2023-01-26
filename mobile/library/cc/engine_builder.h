@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+
 #include "absl/container/flat_hash_map.h"
 #include "engine.h"
 #include "engine_callbacks.h"
@@ -15,22 +17,33 @@
 namespace Envoy {
 namespace Platform {
 
+// The C++ Engine builder supports 2 ways of building Envoy Mobile config, the 'legacy mode'
+// which uses a yaml config header, blocks of well known yaml configs, and uses string manipulation
+// to glue them together, and the 'bootstrap mode' which creates a structured bootstrap proto and
+// modifies it to produce the same config. We need to retain the legacy mode even if all functions
+// become bootstrap compatible to be able to regression test that changes to the config yaml are
+// reflected in generateBootstrap, until all languages use the C++ bootstrap builder.
+//
+// Currently the default is legacy mode but worth noting bootstrap mode is 2 orders of magnitude
+// faster.
 class EngineBuilder {
 public:
+  // This constructor is not compatible with bootstrap mode.
   EngineBuilder(std::string config_template);
   EngineBuilder();
+
+  // Use the experimental non-YAML config mode which uses the bootstrap proto directly.
+  EngineBuilder& setUseBootstrap();
 
   EngineBuilder& addLogLevel(LogLevel log_level);
   EngineBuilder& setOnEngineRunning(std::function<void()> closure);
 
-  EngineBuilder& addStatsSinks(const std::vector<std::string>& stat_sinks);
   EngineBuilder& addGrpcStatsDomain(std::string stats_domain);
   EngineBuilder& addConnectTimeoutSeconds(int connect_timeout_seconds);
   EngineBuilder& addDnsRefreshSeconds(int dns_refresh_seconds);
   EngineBuilder& addDnsFailureRefreshSeconds(int base, int max);
   EngineBuilder& addDnsQueryTimeoutSeconds(int dns_query_timeout_seconds);
   EngineBuilder& addDnsMinRefreshSeconds(int dns_min_refresh_seconds);
-  EngineBuilder& addDnsPreresolveHostnames(std::string dns_preresolve_hostnames);
   EngineBuilder& addMaxConnectionsPerHost(int max_connections_per_host);
   EngineBuilder& useDnsSystemResolver(bool use_system_resolver);
   EngineBuilder& addH2ConnectionKeepaliveIdleIntervalMilliseconds(
@@ -38,13 +51,8 @@ public:
   EngineBuilder&
   addH2ConnectionKeepaliveTimeoutSeconds(int h2_connection_keepalive_timeout_seconds);
   EngineBuilder& addStatsFlushSeconds(int stats_flush_seconds);
-  EngineBuilder& addVirtualClusters(std::string virtual_clusters);
-  EngineBuilder& addKeyValueStore(std::string name, KeyValueStoreSharedPtr key_value_store);
-  EngineBuilder& addStringAccessor(std::string name, StringAccessorSharedPtr accessor);
-  EngineBuilder& addNativeFilter(std::string name, std::string typed_config);
   // Configures Envoy to use the PlatformBridge filter named `name`. An instance of
   // envoy_http_filter must be registered as a platform API with the same name.
-  EngineBuilder& addPlatformFilter(std::string name);
   EngineBuilder& setAppVersion(std::string app_version);
   EngineBuilder& setAppId(std::string app_id);
   EngineBuilder& setDeviceOs(std::string app_id);
@@ -53,17 +61,31 @@ public:
   EngineBuilder& enableGzip(bool gzip_on);
   EngineBuilder& enableBrotli(bool brotli_on);
   EngineBuilder& enableSocketTagging(bool socket_tagging_on);
-  EngineBuilder& enableAdminInterface(bool admin_interface_on);
   EngineBuilder& enableHappyEyeballs(bool happy_eyeballs_on);
   EngineBuilder& enableHttp3(bool http3_on);
   EngineBuilder& enableInterfaceBinding(bool interface_binding_on);
   EngineBuilder& enableDrainPostDnsRefresh(bool drain_post_dns_refresh_on);
-  EngineBuilder& enableH2ExtendKeepaliveTimeout(bool h2_extend_keepalive_timeout_on);
   EngineBuilder& enforceTrustChainVerification(bool trust_chain_verification_on);
   EngineBuilder& enablePlatformCertificatesValidation(bool platform_certificates_validation_on);
 
+  // These functions are not compatible with boostrap mode, see class definition for details.
+  EngineBuilder& addStatsSinks(const std::vector<std::string>& stat_sinks);
+  EngineBuilder& addDnsPreresolveHostnames(std::string dns_preresolve_hostnames);
+  EngineBuilder& addVirtualClusters(std::string virtual_clusters);
+  EngineBuilder& addKeyValueStore(std::string name, KeyValueStoreSharedPtr key_value_store);
+  EngineBuilder& addStringAccessor(std::string name, StringAccessorSharedPtr accessor);
+  EngineBuilder& addNativeFilter(std::string name, std::string typed_config);
+  EngineBuilder& addPlatformFilter(std::string name);
+  EngineBuilder& enableAdminInterface(bool admin_interface_on);
+
   // this is separated from build() for the sake of testability
   std::string generateConfigStr() const;
+  // If trim_whitespace_for_tests is set true, it will prunt whitespace from the
+  // certificates file to allow for proto equivalence testing. This is expensive
+  // and should only be done for testing purposes (in explicit unit tests or
+  // debug mode)
+  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>
+  generateBootstrap(bool trim_whitespace_for_tests = false) const;
 
   EngineSharedPtr build();
 
@@ -80,6 +102,9 @@ private:
     std::string name_;
     std::string typed_config_;
   };
+
+  // Verifies use_bootstrap_ is not true and sets config_bootstrap_incompatible_ true.
+  void bootstrapIncompatible();
 
   LogLevel log_level_ = LogLevel::info;
   EngineCallbacksSharedPtr callbacks_;
@@ -117,7 +142,7 @@ private:
   bool enable_drain_post_dns_refresh_ = false;
   bool enforce_trust_chain_verification_ = true;
   bool h2_extend_keepalive_timeout_ = false;
-  bool enable_http3_ = false;
+  bool enable_http3_ = true;
   int dns_min_refresh_seconds_ = 60;
   int max_connections_per_host_ = 7;
   std::vector<std::string> stat_sinks_;
@@ -125,6 +150,8 @@ private:
   std::vector<NativeFilterConfig> native_filter_chain_;
   std::vector<std::string> platform_filters_;
   absl::flat_hash_map<std::string, StringAccessorSharedPtr> string_accessors_;
+  bool config_bootstrap_incompatible_ = false;
+  bool use_bootstrap_ = false;
 };
 
 using EngineBuilderSharedPtr = std::shared_ptr<EngineBuilder>;

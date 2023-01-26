@@ -29,6 +29,12 @@ public:
   ResponseHeaderMapValidationResult
   validateResponseHeaderMap(::Envoy::Http::ResponseHeaderMap& header_map) override;
 
+  TrailerValidationResult
+  validateRequestTrailerMap(::Envoy::Http::RequestTrailerMap& trailer_map) override;
+
+  TrailerValidationResult
+  validateResponseTrailerMap(::Envoy::Http::ResponseTrailerMap& trailer_map) override;
+
   /*
    * Validate the TE header.
    */
@@ -41,6 +47,9 @@ public:
 
   HeaderEntryValidationResult
   validateGenericHeaderName(const ::Envoy::Http::HeaderString& name) override;
+
+private:
+  const HeaderValidatorMap request_header_validator_map_;
 };
 
 using Http2HeaderValidatorPtr = std::unique_ptr<Http2HeaderValidator>;

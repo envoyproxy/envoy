@@ -86,7 +86,7 @@ envoy_cc_test_library(
     srcs = ["http2_frame.cc"],
     hdrs = ["http2_frame.h"],
     external_deps = [
-        "nghttp2",
+        "quiche_spdy_hpack",
     ],
     deps = [
         "//envoy/http:metadata_interface_with_external_headers",
@@ -152,8 +152,8 @@ envoy_cc_test(
     name = "metadata_encoder_test",
     srcs = ["metadata_encoder_test.cc"],
     external_deps = [
-        "nghttp2",
         "quiche_http2_adapter",
+        "quiche_http2_test_tools",
     ],
     deps = [
         "//source/common/buffer:buffer_lib",

@@ -51,9 +51,10 @@ class FuzzConfig : public ConnectionManagerConfig {
 public:
   FuzzConfig(envoy::extensions::filters::network::http_connection_manager::v3::
                  HttpConnectionManager::ForwardClientCertDetails forward_client_cert)
-      : stats_({ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(fake_stats_), POOL_GAUGE(fake_stats_),
-                                        POOL_HISTOGRAM(fake_stats_))},
-               "", fake_stats_),
+      : stats_({ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(*fake_stats_.rootScope()),
+                                        POOL_GAUGE(fake_stats_),
+                                        POOL_HISTOGRAM(*fake_stats_.rootScope()))},
+               "", *fake_stats_.rootScope()),
         tracing_stats_{CONN_MAN_TRACING_STATS(POOL_COUNTER(fake_stats_))},
         listener_stats_{CONN_MAN_LISTENER_STATS(POOL_COUNTER(fake_stats_))},
         local_reply_(LocalReply::Factory::createDefault()) {
@@ -261,7 +262,7 @@ public:
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
   Network::Address::Ipv4Instance local_address_{"127.0.0.1"};
   absl::optional<std::string> user_agent_;
-  Tracing::HttpTracerSharedPtr http_tracer_{std::make_shared<NiceMock<Tracing::MockHttpTracer>>()};
+  Tracing::HttpTracerSharedPtr http_tracer_{std::make_shared<NiceMock<Tracing::MockTracer>>()};
   TracingConnectionManagerConfigPtr tracing_config_;
   bool proxy_100_continue_{true};
   bool stream_error_on_invalid_http_messaging_ = false;

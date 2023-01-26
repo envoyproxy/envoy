@@ -31,7 +31,7 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
-#include "nghttp2/nghttp2.h"
+#include "quiche/http2/adapter/http2_protocol.h"
 
 namespace Envoy {
 namespace Http2 {
@@ -39,17 +39,33 @@ namespace Utility {
 
 namespace {
 
+struct SettingsEntry {
+  uint16_t settings_id;
+  uint32_t value;
+};
+
+struct SettingsEntryHash {
+  size_t operator()(const SettingsEntry& entry) const {
+    return absl::Hash<decltype(entry.settings_id)>()(entry.settings_id);
+  }
+};
+
+struct SettingsEntryEquals {
+  bool operator()(const SettingsEntry& lhs, const SettingsEntry& rhs) const {
+    return lhs.settings_id == rhs.settings_id;
+  }
+};
+
 void validateCustomSettingsParameters(
     const envoy::config::core::v3::Http2ProtocolOptions& options) {
   std::vector<std::string> parameter_collisions, custom_parameter_collisions;
-  absl::node_hash_set<nghttp2_settings_entry, SettingsEntryHash, SettingsEntryEquals>
-      custom_parameters;
+  absl::node_hash_set<SettingsEntry, SettingsEntryHash, SettingsEntryEquals> custom_parameters;
   // User defined and named parameters with the same SETTINGS identifier can not both be set.
   for (const auto& it : options.custom_settings_parameters()) {
     ASSERT(it.identifier().value() <= std::numeric_limits<uint16_t>::max());
     // Check for custom parameter inconsistencies.
     const auto result = custom_parameters.insert(
-        {static_cast<int32_t>(it.identifier().value()), it.value().value()});
+        {static_cast<uint16_t>(it.identifier().value()), it.value().value()});
     if (!result.second) {
       if (result.first->value != it.value().value()) {
         custom_parameter_collisions.push_back(
@@ -58,28 +74,28 @@ void validateCustomSettingsParameters(
       }
     }
     switch (it.identifier().value()) {
-    case NGHTTP2_SETTINGS_ENABLE_PUSH:
+    case http2::adapter::ENABLE_PUSH:
       if (it.value().value() == 1) {
         throw EnvoyException("server push is not supported by Envoy and can not be enabled via a "
                              "SETTINGS parameter.");
       }
       break;
-    case NGHTTP2_SETTINGS_ENABLE_CONNECT_PROTOCOL:
+    case http2::adapter::ENABLE_CONNECT_PROTOCOL:
       // An exception is made for `allow_connect` which can't be checked for presence due to the
       // use of a primitive type (bool).
       throw EnvoyException("the \"allow_connect\" SETTINGS parameter must only be configured "
                            "through the named field");
-    case NGHTTP2_SETTINGS_HEADER_TABLE_SIZE:
+    case http2::adapter::HEADER_TABLE_SIZE:
       if (options.has_hpack_table_size()) {
         parameter_collisions.push_back("hpack_table_size");
       }
       break;
-    case NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS:
+    case http2::adapter::MAX_CONCURRENT_STREAMS:
       if (options.has_max_concurrent_streams()) {
         parameter_collisions.push_back("max_concurrent_streams");
       }
       break;
-    case NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE:
+    case http2::adapter::INITIAL_WINDOW_SIZE:
       if (options.has_initial_stream_window_size()) {
         parameter_collisions.push_back("initial_stream_window_size");
       }

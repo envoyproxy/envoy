@@ -26,7 +26,7 @@ public:
     pointer operator->() { return &position_->first; }
 
     const_iterator& operator++() {
-      this->position_++;
+      position_++;
       return *this;
     }
     const_iterator operator++(int) {

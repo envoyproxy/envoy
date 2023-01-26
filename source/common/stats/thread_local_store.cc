@@ -12,6 +12,7 @@
 #include "envoy/stats/stats.h"
 
 #include "source/common/common/lock_guard.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/histogram_impl.h"
 #include "source/common/stats/stats_matcher_impl.h"
 #include "source/common/stats/tag_producer_impl.h"
@@ -95,6 +96,7 @@ void ThreadLocalStoreImpl::setStatsMatcher(StatsMatcherPtr&& stats_matcher) {
     for (uint32_t i = first_histogram_index; i < deleted_histograms_.size(); ++i) {
       uint32_t erased = histogram_set_.erase(deleted_histograms_[i].get());
       ASSERT(erased == 1);
+      sinked_histograms_.erase(deleted_histograms_[i].get());
     }
   }
 }
@@ -225,6 +227,7 @@ void ThreadLocalStoreImpl::shutdownThreading() {
     histogram->setShuttingDown(true);
   }
   histogram_set_.clear();
+  sinked_histograms_.clear();
 }
 
 void ThreadLocalStoreImpl::mergeHistograms(PostMergeCb merge_complete_cb) {
@@ -678,6 +681,10 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
                                        *buckets, parent_.next_histogram_id_++);
         if (!parent_.shutting_down_) {
           parent_.histogram_set_.insert(stat.get());
+          if (parent_.sink_predicates_.has_value() &&
+              parent_.sink_predicates_->includeHistogram(*stat)) {
+            parent_.sinked_histograms_.insert(stat.get());
+          }
         }
       }
     }
@@ -877,6 +884,7 @@ bool ThreadLocalStoreImpl::decHistogramRefCount(ParentHistogramImpl& hist,
     if (!shutting_down_) {
       const size_t count = histogram_set_.erase(hist.statName());
       ASSERT(shutting_down_ || count == 1);
+      sinked_histograms_.erase(&hist);
     }
     return true;
   }
@@ -1034,11 +1042,36 @@ void ThreadLocalStoreImpl::forEachSinkedTextReadout(SizeFn f_size,
   alloc_.forEachSinkedTextReadout(f_size, f_stat);
 }
 
+void ThreadLocalStoreImpl::forEachSinkedHistogram(SizeFn f_size,
+                                                  StatFn<ParentHistogram> f_stat) const {
+  if (sink_predicates_.has_value() &&
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_include_histograms")) {
+    Thread::LockGuard lock(hist_mutex_);
+
+    if (f_size != nullptr) {
+      f_size(sinked_histograms_.size());
+    }
+    for (auto histogram : sinked_histograms_) {
+      f_stat(*histogram);
+    }
+  } else {
+    forEachHistogram(f_size, f_stat);
+  }
+}
+
 void ThreadLocalStoreImpl::setSinkPredicates(std::unique_ptr<SinkPredicates>&& sink_predicates) {
   ASSERT(sink_predicates != nullptr);
   if (sink_predicates != nullptr) {
     sink_predicates_.emplace(*sink_predicates);
     alloc_.setSinkPredicates(std::move(sink_predicates));
+    // Add histograms to the set of sinked histograms.
+    Thread::LockGuard lock(hist_mutex_);
+    sinked_histograms_.clear();
+    for (auto& histogram : histogram_set_) {
+      if (sink_predicates_->includeHistogram(*histogram)) {
+        sinked_histograms_.insert(histogram);
+      }
+    }
   }
 }
 
