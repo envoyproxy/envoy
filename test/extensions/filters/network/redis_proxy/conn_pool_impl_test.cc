@@ -1032,11 +1032,12 @@ TEST_F(RedisConnPoolImplTest, HostsAddedAndEndWithClusterRemoval) {
 
 TEST_F(RedisConnPoolImplTest, MakeRequestToRedisCluster) {
 
-  absl::optional<envoy::config::cluster::v3::Cluster::CustomClusterType> cluster_type;
-  cluster_type.emplace();
-  cluster_type->set_name("envoy.clusters.redis");
+  envoy::config::cluster::v3::Cluster::CustomClusterType cluster_type;
+  cluster_type.set_name("envoy.clusters.redis");
+
   EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, clusterType())
-      .WillOnce(ReturnRef(cluster_type));
+      .WillOnce(Return(
+          makeOptRef<const envoy::config::cluster::v3::Cluster::CustomClusterType>(cluster_type)));
   EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, lbType())
       .WillOnce(Return(Upstream::LoadBalancerType::ClusterProvided));
 
@@ -1052,11 +1053,12 @@ TEST_F(RedisConnPoolImplTest, MakeRequestToRedisCluster) {
 
 TEST_F(RedisConnPoolImplTest, MakeRequestToRedisClusterHashtag) {
 
-  absl::optional<envoy::config::cluster::v3::Cluster::CustomClusterType> cluster_type;
-  cluster_type.emplace();
-  cluster_type->set_name("envoy.clusters.redis");
+  envoy::config::cluster::v3::Cluster::CustomClusterType cluster_type;
+  cluster_type.set_name("envoy.clusters.redis");
+
   EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, clusterType())
-      .WillOnce(ReturnRef(cluster_type));
+      .WillOnce(Return(
+          makeOptRef<const envoy::config::cluster::v3::Cluster::CustomClusterType>(cluster_type)));
   EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, lbType())
       .WillOnce(Return(Upstream::LoadBalancerType::ClusterProvided));
 
