@@ -176,8 +176,8 @@ struct ResponseCodeDetailValues {
   const std::string FilterChainNotFound = "filter_chain_not_found";
   // The client disconnected unexpectedly.
   const std::string DownstreamRemoteDisconnect = "downstream_remote_disconnect";
-  // The client connection was locally closed for an unspecified reason.
-  const std::string DownstreamLocalDisconnect = "downstream_local_disconnect";
+  // The client connection was locally closed for the given reason.
+  const std::string DownstreamLocalDisconnect = "downstream_local_disconnect({})";
   // The max connection duration was exceeded.
   const std::string DurationTimeout = "duration_timeout";
   // The max request downstream header duration was exceeded.
@@ -204,6 +204,36 @@ struct ResponseCodeDetailValues {
 };
 
 using ResponseCodeDetails = ConstSingleton<ResponseCodeDetailValues>;
+
+/**
+ * Constants for the locally closing a connection. This is used in response code
+ * details field of StreamInfo for details sent by core (non-extension) code.
+ * This is incomplete as some details may be
+ *
+ * Custom extensions can define additional values provided they are appropriately
+ * scoped to avoid collisions.
+ */
+struct LocalCloseReasonValues {
+  const std::string DeferredCloseOnDrainedConnection = "deferred_close_on_drained_connection";
+  const std::string IdleTimeoutOnConnection = "on_idle_timeout";
+  const std::string CloseForConnectRequestOrTcpTunneling =
+      "close_for_connect_request_or_tcp_tunneling";
+  const std::string Http2PingTimeout = "http2_ping_timeout";
+  const std::string Http2ConnectionProtocolViolation = "http2_connection_protocol_violation";
+  const std::string TransportSocketTimeout = "transport_socket_timeout";
+  const std::string TriggeredDelayedCloseTimeout = "triggered_delayed_close_timeout";
+  const std::string TcpProxyInitializationFailure = "tcp_initializion_failure:";
+  const std::string TcpSessionIdleTimeout = "tcp_session_idle_timeout";
+  const std::string MaxConnectionDurationReached = "max_connection_duration_reached";
+  const std::string ClosingUpstreamTcpDueToDownstreamRemoteClose =
+      "closing_upstream_tcp_connection_due_to_downstream_remote_close";
+  const std::string ClosingUpstreamTcpDueToDownstreamLocalClose =
+      "closing_upstream_tcp_connection_due_to_downstream_local_close";
+  const std::string NonPooledTcpConnectionHostHealthFailure =
+      "non_pooled_tcp_connection_host_health_failure";
+};
+
+using LocalCloseReasons = ConstSingleton<LocalCloseReasonValues>;
 
 struct UpstreamTiming {
   /**
