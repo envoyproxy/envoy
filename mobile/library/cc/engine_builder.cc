@@ -238,12 +238,15 @@ EngineBuilder& EngineBuilder::enforceTrustChainVerification(bool trust_chain_ver
 }
 
 EngineBuilder& EngineBuilder::addRtdsLayer(const std::string& layer_name) {
+  bootstrapIncompatible();
+
   rtds_layer_ = fmt::format(rtds_layer_insert, layer_name, layer_name);
   return *this;
 }
 EngineBuilder& EngineBuilder::setAggregatedDiscoveryService(const std::string& api_type,
                                                             const std::string& address,
                                                             const int port) {
+  bootstrapIncompatible();
   custom_ads_ = fmt::format(ads_insert, api_type, address, port);
   return *this;
 }
