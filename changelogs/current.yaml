@@ -5,6 +5,9 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: quic
+  change: |
+    Access logging is now deferred to the QUIC ack listener, and roundtrip response time is added as a downstream timing metric. New runtime flag ``envoy.reloadable_features.quic_defer_logging_to_ack_listener`` can be used for revert this behavior.
 - area: healthcheck
   change: |
     If active HC is enabled and a host is ejected by outlier detection, a successful active health check unejects the host and consider it healthy. This also clears all the outlier detection counters. This behavior change can be reverted by setting ``envoy.reloadable_features_successful_active_health_check_uneject_host`` to ``false``.
@@ -30,6 +33,9 @@ removed_config_or_runtime:
 - area: http
   change: |
     removed ``envoy.reloadable_features.http2_delay_keepalive_timeout`` and legacy code paths.
+- area: http
+  change: |
+    removed ``envoy.reloadable_features.local_ratelimit_match_all_descriptors`` and legacy code paths.
 
 - area: http
   change: |
@@ -39,6 +45,9 @@ removed_config_or_runtime:
     removed ``envoy.reloadable_features.allow_concurrency_for_alpn_pool`` and legacy code path.
 
 new_features:
+- area: access_log
+  change: |
+    enhanced observability into local close for :ref:`%RESPONSE_CODE_DETAILS% <config_http_conn_man_details>`.
 - area: tracing
   change: |
     allow :ref:`grpc_service <envoy_v3_api_field_config.trace.v3.OpenTelemetryConfig.grpc_service>` to be optional. This enables a means to disable collection of traces.

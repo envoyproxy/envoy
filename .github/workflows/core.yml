@@ -6,26 +6,29 @@ on:
     - main
   pull_request:
 
+concurrency:
+  group: ${{ github.head_ref-github.workflow || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   unittests:
     name: unit_tests
-    runs-on: macos-12
+    runs-on: ubuntu-20.04
     timeout-minutes: 120
+    container:
+      image: envoyproxy/envoy-build-ubuntu:b0ff77ae3f25b0bf595f9b8bba46b489723ab446
     steps:
     - uses: actions/checkout@v1
-    - id: should_run
-      name: 'Check whether to run'
-      run: ./mobile/tools/should_run_ci.sh
-    - name: 'Install dependencies'
-      if: steps.should_run.outputs.run_ci_job == 'true'
-      run: cd mobile && ./ci/mac_ci_setup.sh
+    - name: Add safe directory
+      run: git config --global --add safe.directory /__w/envoy/envoy
     - name: 'Run tests'
-      if: steps.should_run.outputs.run_ci_job == 'true'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         cd mobile && ./bazelw test \
+            --action_env=LD_LIBRARY_PATH \
+            --test_env=ENVOY_IP_TEST_VERSIONS=v4only \
             --test_output=all \
-            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
+            $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //test/common/...
