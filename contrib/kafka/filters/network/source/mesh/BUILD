@@ -88,6 +88,7 @@ envoy_cc_library(
     deps = [
         "//contrib/kafka/filters/network/source:kafka_response_lib",
         "//contrib/kafka/filters/network/source:tagged_fields_lib",
+        "//envoy/event:dispatcher_interface",
     ],
 )
 
