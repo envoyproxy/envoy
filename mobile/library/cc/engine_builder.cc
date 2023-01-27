@@ -237,6 +237,17 @@ EngineBuilder& EngineBuilder::enforceTrustChainVerification(bool trust_chain_ver
   return *this;
 }
 
+EngineBuilder& EngineBuilder::addRtdsLayer(const std::string& layer_name) {
+  rtds_layer_ = fmt::format(rtds_layer_insert, layer_name, layer_name);
+  return *this;
+}
+EngineBuilder& EngineBuilder::setAggregatedDiscoveryService(const std::string& api_type,
+                                                            const std::string& address,
+                                                            const int port) {
+  custom_ads_ = fmt::format(ads_insert, api_type, address, port);
+  return *this;
+}
+
 EngineBuilder&
 EngineBuilder::enablePlatformCertificatesValidation(bool platform_certificates_validation_on) {
   platform_certificates_validation_on_ = platform_certificates_validation_on;
@@ -383,6 +394,19 @@ std::string EngineBuilder::generateConfigStr() const {
         native_filter_template, {{"{{ native_filter_name }}", filter.name_},
                                  {"{{ native_filter_typed_config }}", filter.typed_config_}});
     insertCustomFilter(filter_config, config_template);
+  }
+
+  if (!rtds_layer_.empty() && custom_ads_.empty()) {
+    throw std::runtime_error("ADS must be configured when using RTDS");
+  }
+  if (!rtds_layer_.empty()) {
+    absl::StrReplaceAll({{"#{custom_layers}", absl::StrCat("#{custom_layers}\n", rtds_layer_)}},
+                        &config_template);
+  }
+
+  if (!custom_ads_.empty()) {
+    absl::StrReplaceAll({{"#{custom_ads}", absl::StrCat("#{custom_ads}\n", custom_ads_)}},
+                        &config_template);
   }
 
   config_builder << config_template;

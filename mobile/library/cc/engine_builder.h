@@ -64,6 +64,11 @@ public:
   EngineBuilder& enableDrainPostDnsRefresh(bool drain_post_dns_refresh_on);
   EngineBuilder& enforceTrustChainVerification(bool trust_chain_verification_on);
   EngineBuilder& enablePlatformCertificatesValidation(bool platform_certificates_validation_on);
+  // Adds an RTDS layer to default config. Requires that ADS be configured
+  EngineBuilder& addRtdsLayer(const std::string& layer_name);
+  // Adds an ADS layer.
+  EngineBuilder& setAggregatedDiscoveryService(const std::string& api_type,
+                                               const std::string& address, const int port);
   EngineBuilder& enableDnsCache(bool dns_cache_on);
   EngineBuilder& setForceAlwaysUsev6(bool value);
   EngineBuilder& addDnsPreresolveHostnames(const std::vector<std::string>& hostnames);
@@ -128,6 +133,8 @@ private:
   bool brotli_filter_ = false;
   bool socket_tagging_filter_ = false;
   bool platform_certificates_validation_on_ = false;
+  std::string rtds_layer_ = "";
+  std::string custom_ads_ = "";
   bool dns_cache_on_ = false;
 
   absl::flat_hash_map<std::string, KeyValueStoreSharedPtr> key_value_stores_{};

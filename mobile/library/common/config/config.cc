@@ -367,7 +367,8 @@ const char* config_template = R"(
 typed_dns_resolver_config:
   name: *dns_resolver_name
   typed_config: *dns_resolver_config
-
+dynamic_resources:
+#{custom_ads}
 static_resources:
   listeners:
 #{custom_listeners}
@@ -506,6 +507,7 @@ stats_config:
         - prefix: http.hcm.downstream_rq_
         - prefix: http.hcm.decompressor.
         - prefix: pulse.
+        - prefix: runtime.load_success
         - safe_regex:
             regex: '^vhost\.[\w]+\.vcluster\.[\w]+?\.upstream_rq_(?:[12345]xx|[3-5][0-9][0-9]|retry|total)'
   use_all_default_tags:
@@ -538,5 +540,26 @@ layered_runtime:
 R"(
         overload:
           global_downstream_max_connections: 0xffffffff # uint32 max
+#{custom_layers}
 )";
+
+const char* rtds_layer_insert = R"(
+    - name: {}
+      rtds_layer:
+        name: {}
+        rtds_config:
+          initial_fetch_timeout:
+            seconds: 1
+          resource_api_version: V3
+          ads: {{}})";
+            
+const char* ads_insert = R"(
+  ads_config:
+    transport_api_version: V3
+    api_type: {}
+    set_node_on_first_message_only: true
+    grpc_services:
+      google_grpc:
+        target_uri: "{}:{}")";
+
 // clang-format on
