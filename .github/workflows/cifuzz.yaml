@@ -21,12 +21,14 @@ jobs:
        type: string
        default: "--flaky_test_attempts=2"
    steps:
-   - name: Build Fuzzers (${{ matrix.sanitizer }})
+   - name: Build Fuzzers test
      env:
        CFL_EXTRA_BAZEL_BUILD_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs) ${{ parameters.bazelBuildExtraOptions }}"
        CFL_EXTRA_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
        CFL_EXTRA_BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
      run: echo "$CFL_EXTRA_BAZEL_BUILD_OPTIONS"
+
+   - name: Build Fuzzers (${{ matrix.sanitizer }})
      id: build
      uses: google/oss-fuzz/infra/cifuzz/actions/build_fuzzers@master
      with:
