@@ -393,11 +393,14 @@ TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcCollectionAggregatedSubscr
   Upstream::ClusterManager::ClusterSet primary_clusters;
   primary_clusters.insert("static_cluster");
   EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
-  GrpcMuxSharedPtr ads_mux = std::make_shared<NiceMock<MockGrpcMux>>();
+  auto ads_mux = std::make_shared<NiceMock<MockGrpcMux>>();
   EXPECT_CALL(cm_, adsMux()).WillOnce(Return(ads_mux));
   EXPECT_CALL(dispatcher_, createTimer_(_));
   // onConfigUpdateFailed() should not be called for gRPC stream connection failure
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _)).Times(0);
+  // Since this is ADS, the mux's start() should not be called (which attempts to create a gRPC
+  // stream).
+  EXPECT_CALL(*ads_mux, start()).Times(0);
   collectionSubscriptionFromUrl("xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/bar",
                                 config)
       ->start({});
