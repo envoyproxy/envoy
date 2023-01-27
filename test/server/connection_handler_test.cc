@@ -968,7 +968,7 @@ TEST_F(ConnectionHandlerTest, CloseConnectionOnEmptyFilterChain) {
   auto* connection = new NiceMock<Network::MockServerConnection>();
   EXPECT_CALL(dispatcher_, createServerConnection_()).WillOnce(Return(connection));
   EXPECT_CALL(factory_, createNetworkFilterChain(_, _)).WillOnce(Return(false));
-  EXPECT_CALL(*connection, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connection, close(Network::ConnectionCloseType::NoFlush, _));
   EXPECT_CALL(*connection, addConnectionCallbacks(_)).Times(0);
   EXPECT_CALL(*access_log_, log(_, _, _, _));
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
