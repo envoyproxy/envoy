@@ -826,13 +826,14 @@ TEST_P(ProtocolIntegrationTest, Retry) {
 }
 
 // Regression test to guarantee that buffering for retries and shadows doesn't double the body size.
+// This test is actually irrelevant for QUIC, as this issue only shows up with header-only requests.
+// QUIC will always send an empty data frame with FIN.
 TEST_P(ProtocolIntegrationTest, RetryWithBuffer) {
   config_helper_.prependFilter(R"EOF(
   name: add-body-filter
   typed_config:
       "@type": type.googleapis.com/test.integration.filters.AddBodyFilterConfig
-      where_to_add_body: DECODE_HEADERS
-      body_size: 200
+      where_to_add_body: DEFAULT
   )EOF");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -846,7 +847,7 @@ TEST_P(ProtocolIntegrationTest, RetryWithBuffer) {
   waitForNextUpstreamRequest();
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(upstream_request_->receivedData());
-  EXPECT_EQ(upstream_request_->bodyLength(), 200);
+  EXPECT_EQ(upstream_request_->bodyLength(), 4);
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response->waitForEndStream());
 }
