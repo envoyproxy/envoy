@@ -1908,12 +1908,12 @@ TEST_P(XdsTpAdsIntegrationTest, Basic) {
 
 // Basic CDS/EDS/LEDS update that warms and makes active a single cluster.
 TEST_P(XdsTpAdsIntegrationTest, BasicWithLeds) {
-  initialize();
-
   if (isSotw()) {
     // LEDS only works with the Delta protocol.
     return;
   }
+
+  initialize();
 
   const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
   const auto eds_type_url =
@@ -1981,12 +1981,12 @@ TEST_P(XdsTpAdsIntegrationTest, BasicWithLeds) {
 // CDS/EDS/LEDS update that warms and makes active a single cluster. While
 // waiting for LEDS a new EDS update arrives.
 TEST_P(XdsTpAdsIntegrationTest, LedsClusterWarmingUpdatingEds) {
-  initialize();
-
   if (isSotw()) {
     // LEDS only works with the Delta protocol.
     return;
   }
+
+  initialize();
 
   const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
   const auto eds_type_url =
@@ -2091,12 +2091,12 @@ TEST_P(XdsTpAdsIntegrationTest, LedsClusterWarmingUpdatingEds) {
 // CDS/EDS/LEDS update that warms and makes active a single cluster. While
 // waiting for LEDS a new CDS update arrives.
 TEST_P(XdsTpAdsIntegrationTest, LedsClusterWarmingUpdatingCds) {
-  initialize();
-
   if (isSotw()) {
     // LEDS only works with the Delta protocol.
     return;
   }
+
+  initialize();
 
   const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
   const auto eds_type_url =
@@ -2218,12 +2218,12 @@ TEST_P(XdsTpAdsIntegrationTest, LedsClusterWarmingUpdatingCds) {
 
 // Timeout on LEDS update activates the cluster.
 TEST_P(XdsTpAdsIntegrationTest, LedsTimeout) {
-  initialize();
-
   if (isSotw()) {
     // LEDS only works with the Delta protocol.
     return;
   }
+
+  initialize();
 
   const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
   const auto eds_type_url =
@@ -2292,12 +2292,12 @@ TEST_P(XdsTpAdsIntegrationTest, LedsTimeout) {
 
 // Modifying a cluster to alternate use of EDS with and without LEDS.
 TEST_P(XdsTpAdsIntegrationTest, EdsAlternatingLedsUsage) {
-  initialize();
-
   if (isSotw()) {
     // LEDS only works with the Delta protocol.
     return;
   }
+
+  initialize();
 
   const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
   const auto eds_type_url =
