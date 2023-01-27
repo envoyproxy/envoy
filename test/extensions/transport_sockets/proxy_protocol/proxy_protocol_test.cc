@@ -41,7 +41,7 @@ public:
     inner_socket_ = inner_socket.get();
     ON_CALL(transport_callbacks_, ioHandle()).WillByDefault(ReturnRef(io_handle_));
     proxy_protocol_socket_ = std::make_unique<UpstreamProxyProtocolSocket>(
-        std::move(inner_socket), socket_options, config, stats_store_);
+        std::move(inner_socket), socket_options, config, *stats_store_.rootScope());
     proxy_protocol_socket_->setTransportSocketCallbacks(transport_callbacks_);
     proxy_protocol_socket_->onConnected();
   }
@@ -701,7 +701,7 @@ public:
     auto inner_factory = std::make_unique<NiceMock<Network::MockTransportSocketFactory>>();
     inner_factory_ = inner_factory.get();
     factory_ = std::make_unique<UpstreamProxyProtocolSocketFactory>(
-        std::move(inner_factory), ProxyProtocolConfig(), stats_store_);
+        std::move(inner_factory), ProxyProtocolConfig(), *stats_store_.rootScope());
   }
 
   NiceMock<Network::MockTransportSocketFactory>* inner_factory_;
