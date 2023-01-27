@@ -100,6 +100,7 @@ public:
   Ssl::SocketState state() const { return state_; }
   void setState(Ssl::SocketState state) { state_ = state; }
   Ssl::HandshakeCallbacks* handshakeCallbacks() { return handshake_callbacks_; }
+  bool sslSyscallErrorOccurred() {return error_syscall_;}
 
   bssl::UniquePtr<SSL> ssl_;
 
@@ -108,6 +109,7 @@ private:
 
   Ssl::SocketState state_;
   mutable SslExtendedSocketInfoImpl extended_socket_info_;
+  bool error_syscall_ = false;
 };
 
 using SslHandshakerImplSharedPtr = std::shared_ptr<SslHandshakerImpl>;

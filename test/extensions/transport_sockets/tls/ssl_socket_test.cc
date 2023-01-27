@@ -854,6 +854,9 @@ void testUtilV2(const TestUtilOptionsV2& options) {
     EXPECT_THAT(std::string(client_connection->transportFailureReason()),
                 ContainsRegex(options.expectedTransportFailureReasonContains()));
     EXPECT_NE("", server_connection->transportFailureReason());
+    // auto reason = server_connection->transportFailureReason();
+    // std::cout << reason << std::endl;
+    // EXPECT_EQ("", server_connection->transportFailureReason());
   }
 }
 
@@ -6900,6 +6903,43 @@ TEST_P(SslSocketTest, AsyncCustomCertValidatorFails) {
   revoked_test_options.setExpectedServerCloseEvent(Network::ConnectionEvent::LocalClose);
   testUtil(revoked_test_options.setExpectedServerStats("ssl.fail_verify_error")
                .setExpectedVerifyErrorCode(X509_V_ERR_CERT_REVOKED));
+}
+
+TEST_P(SslSocketTest, RsaKeyUsageVerification) {
+  envoy::config::listener::v3::Listener listener;
+  envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
+  envoy::extensions::transport_sockets::tls::v3::TlsCertificate* server_cert =
+      server_tls_context.mutable_common_tls_context()->add_tls_certificates();
+  // Bad server certificate to cause the mismatch between TLS usage and key usage.
+  server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir "
+      "}}/test/extensions/transport_sockets/tls/test_data/bad_rsa_key_usage_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir "
+      "}}/test/extensions/transport_sockets/tls/test_data/bad_rsa_key_usage_key.pem"));
+
+  updateFilterChain(server_tls_context, *filter_chain);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_tls_context;
+
+  // Disable the rsa_key_usage enforcement.
+  client_tls_context.mutable_enforce_rsa_key_usage()->set_value(false);
+  // Both server connection (Client-> Envoy) and client connection (Envoy->Backend) are expected to
+  // be successful.
+  TestUtilOptionsV2 test_options(listener, client_tls_context, true, version_);
+  testUtilV2(test_options);
+
+  // Enable the rsa_key_usage enforcement.
+  client_tls_context.mutable_enforce_rsa_key_usage()->set_value(true);
+  TestUtilOptionsV2 test_options_2(listener, client_tls_context, false, version_);
+  // Client connection is failed with key_usage_mismatch, which is expected.
+  test_options_2.setExpectedTransportFailureReasonContains("KEY_USAGE_BIT_INCORRECT");
+  // Since the underlying transport does not participate in the error
+  // queue for SSL_ERROR_SYSCALL case, no ssl stats is recorded.
+  test_options_2.setExpectedServerStats("");
+
+  testUtilV2(test_options_2);
 }
 
 } // namespace Tls

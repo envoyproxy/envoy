@@ -191,6 +191,13 @@ public:
    */
   virtual void configureInitialCongestionWindow(uint64_t bandwidth_bits_per_sec,
                                                 std::chrono::microseconds rtt) PURE;
+
+  /**
+   * @return optional bool whether the SSL_ERROR_SYSCALL has occurred on the transport socket.
+   * By default, it returns absl::nullopt. The class overrides this method will return the value
+   * based on its own implementation.
+   */
+  virtual absl::optional<bool> sslSyscallErrorOccurred() { return absl::nullopt; }
 };
 
 using TransportSocketPtr = std::unique_ptr<TransportSocket>;

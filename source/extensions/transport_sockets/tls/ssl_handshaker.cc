@@ -99,6 +99,12 @@ Network::PostIoAction SslHandshakerImpl::doHandshake() {
     case SSL_ERROR_WANT_CERTIFICATE_VERIFY:
       state_ = Ssl::SocketState::HandshakeInProgress;
       return PostIoAction::KeepOpen;
+    case SSL_ERROR_SYSCALL:
+      // When SSL_ERROR_SYSCALL occurred, the underlying transport does not participate in the error
+      // queue, which means the failure reason is not recorded in drainErrorQueue. Thus, setting
+      // flag to here to report the error.
+      error_syscall_ = true;
+      // FOLLOW THROUGH
     default:
       handshake_callbacks_->onFailure();
       return PostIoAction::Close;
