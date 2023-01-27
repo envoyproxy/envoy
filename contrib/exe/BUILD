@@ -30,11 +30,11 @@ envoy_cc_test(
     name = "example_configs_test",
     size = "large",
     data = [
-        "//examples:contrib_configs",
+        "//configs:example_contrib_configs",
         "//test/config_test:example_configs_test_setup.sh",
     ],
     env = {
-        "EXAMPLE_CONFIGS_TAR_PATH": "envoy/examples/example_configs.tar",
+        "EXAMPLE_CONFIGS_TAR_PATH": "envoy/configs/example_contrib_configs.tar",
         "DISABLE_TEST_MERGE": "true",
     },
     deps = [

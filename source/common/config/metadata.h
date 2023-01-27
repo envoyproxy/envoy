@@ -18,8 +18,9 @@
 namespace Envoy {
 namespace Config {
 
-using ConstMetadataSharedPoolSharedPtr = std::shared_ptr<
-    SharedPool::ObjectSharedPool<const envoy::config::core::v3::Metadata, MessageUtil>>;
+using ConstMetadataSharedPoolSharedPtr =
+    std::shared_ptr<SharedPool::ObjectSharedPool<const envoy::config::core::v3::Metadata,
+                                                 MessageUtil, MessageUtil>>;
 
 /**
  * MetadataKey presents the key name and path to retrieve value from metadata.
