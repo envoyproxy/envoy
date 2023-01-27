@@ -1,7 +1,5 @@
 #include "contrib/kafka/filters/network/source/mesh/command_handlers/fetch_record_converter.h"
 
-#include "source/common/buffer/buffer_impl.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
