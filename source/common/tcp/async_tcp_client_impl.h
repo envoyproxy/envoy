@@ -44,12 +44,6 @@ public:
   };
 
   /**
-   * @return true means a host is successfully picked from a Cluster.
-   * This doesn't mean the connection is established. It should be checked after
-   * calling connect().
-   */
-
-  /**
    * @return if the client connects to a peer host.
    */
   bool connected() override { return !disconnected_; }
