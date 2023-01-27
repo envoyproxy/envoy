@@ -51,7 +51,7 @@ message Config {
   // and can be used to associate :ref:`route and virtualHost plugin configuration
   // <envoy_v3_api_field_extensions.filters.http.golang.v3alpha.ConfigsPerRoute.plugins_config>`.
   //
-  string plugin_name = 3 [(validate.rules).string = {min_bytes: 1}];
+  string plugin_name = 3 [(validate.rules).string = {min_len: 1}];
 
   // Configuration for the Go plugin.
   //
