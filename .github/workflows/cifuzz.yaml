@@ -21,6 +21,7 @@ jobs:
      id: build
      uses: google/oss-fuzz/infra/cifuzz/actions/build_fuzzers@master
      env:
+       TEST_NON_CFL: abc
        CFL_EXTRA_BAZEL_BUILD_OPTIONS: "--config=remote-ci --flaky_test_attempts=2"
        CFL_EXTRA_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
        CFL_EXTRA_BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
