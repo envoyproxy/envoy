@@ -67,6 +67,7 @@ public:
   EngineBuilder& enableDrainPostDnsRefresh(bool drain_post_dns_refresh_on);
   EngineBuilder& enforceTrustChainVerification(bool trust_chain_verification_on);
   EngineBuilder& enablePlatformCertificatesValidation(bool platform_certificates_validation_on);
+  EngineBuilder& enableDnsCache(bool dns_cache_on);
 
   // These functions are not compatible with boostrap mode, see class definition for details.
   EngineBuilder& addStatsSinks(const std::vector<std::string>& stat_sinks);
@@ -133,6 +134,7 @@ private:
   bool brotli_filter_ = false;
   bool socket_tagging_filter_ = false;
   bool platform_certificates_validation_on_ = false;
+  bool dns_cache_on_ = false;
 
   absl::flat_hash_map<std::string, KeyValueStoreSharedPtr> key_value_stores_{};
 
