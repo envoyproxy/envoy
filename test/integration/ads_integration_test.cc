@@ -1772,7 +1772,7 @@ public:
       lds_config->mutable_api_config_source()->set_transport_api_version(
           envoy::config::core::v3::V3);
       auto* ads_config = bootstrap.mutable_dynamic_resources()->mutable_ads_config();
-      ads_config->set_set_node_on_first_message_only(false);
+      ads_config->set_set_node_on_first_message_only(true);
     });
     AdsIntegrationTest::initialize();
   }
@@ -1796,7 +1796,7 @@ TEST_P(XdsTpAdsIntegrationTest, Basic) {
   const std::string cluster_wildcard = "xdstp://test/envoy.config.cluster.v3.Cluster/foo-cluster/"
                                        "*?xds.node.cluster=cluster_name&xds.node.id=node_name";
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {cluster_wildcard},
-                                      {cluster_wildcard}, {}, true));
+                                      {cluster_wildcard}, {}, /*expect_node=*/true));
   const std::string cluster_name = "xdstp://test/envoy.config.cluster.v3.Cluster/foo-cluster/"
                                    "baz?xds.node.cluster=cluster_name&xds.node.id=node_name";
   auto cluster_resource = buildCluster(cluster_name);
@@ -1807,21 +1807,19 @@ TEST_P(XdsTpAdsIntegrationTest, Basic) {
       Config::TypeUrl::get().Cluster, {cluster_resource}, {cluster_resource}, {}, "1");
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",
-                                      {endpoints_name}, {endpoints_name}, {},
-                                      /*expect_node=*/isSotw()));
+                                      {endpoints_name}, {endpoints_name}, {}));
   const auto cluster_load_assignments = {buildClusterLoadAssignment(endpoints_name)};
   sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
       Config::TypeUrl::get().ClusterLoadAssignment, cluster_load_assignments,
       cluster_load_assignments, {}, "1");
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}, {}, {},
-                                      /*expect_node=*/isSotw()));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}, {}, {}));
 
   // LDS/RDS xDS initialization (LDS via xdstp:// glob collection)
   const std::string listener_wildcard =
       "xdstp://test/envoy.config.listener.v3.Listener/foo-listener/"
       "*?xds.node.cluster=cluster_name&xds.node.id=node_name";
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {listener_wildcard},
-                                      {listener_wildcard}, {}, /*expect_node=*/isSotw()));
+                                      {listener_wildcard}, {}));
   const std::string route_name_0 =
       "xdstp://test/envoy.config.route.v3.RouteConfiguration/route_config_0";
   const std::string route_name_1 =
@@ -1841,19 +1839,17 @@ TEST_P(XdsTpAdsIntegrationTest, Basic) {
   };
   sendDiscoveryResponse<envoy::config::listener::v3::Listener>(Config::TypeUrl::get().Listener,
                                                                listeners, listeners, {}, "1");
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1", {}, {}, {},
-                                      /*expect_node=*/isSotw()));
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1", {}, {}, {}));
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "", {route_name_0},
-                                      {route_name_0}, {}, /*expect_node=*/isSotw()));
+                                      {route_name_0}, {}));
   const auto route_config = buildRouteConfig(route_name_0, cluster_name);
   sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
       Config::TypeUrl::get().RouteConfiguration, {route_config}, {route_config}, {}, "1");
 
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "1", {}, {}, {},
-                                      /*expect_node=*/isSotw()));
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "1", {}, {}, {},
-                                      /*expect_node=*/isSotw()));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "1", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "1", {}, {}, {}));
 
   test_server_->waitForCounterEq("listener_manager.listener_create_success", 1);
   makeSingleRequest();
@@ -1866,17 +1862,15 @@ TEST_P(XdsTpAdsIntegrationTest, Basic) {
   sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
       Config::TypeUrl::get().Listener, {second_listener}, {second_listener}, {}, "2");
 
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "1", {},
-                                      {route_name_1}, {}, /*expect_node=*/isSotw()));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "1",
+                                      {route_name_1}, {route_name_1}, {}));
   const auto second_route_config = buildRouteConfig(route_name_1, cluster_name);
   sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
       Config::TypeUrl::get().RouteConfiguration, {second_route_config}, {second_route_config}, {},
       "2");
 
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "2", {}, {}, {},
-                                      /*expect_node=*/isSotw()));
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "2", {}, {}, {},
-                                      /*expect_node=*/isSotw()));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "2", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "2", {}, {}, {}));
 
   test_server_->waitForCounterEq("listener_manager.listener_create_success", 2);
   makeSingleRequest();
