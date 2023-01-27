@@ -8,9 +8,9 @@ click==8.0.4 \
     --hash=sha256:6a7a62563bbfabfda3a38f3023a1db4a35978c0abd76f6c9605ecd6554d6d9b1 \
     --hash=sha256:8458d7b1287c5fb128c90e23381cf99dcde74beaf6c7ff6384ce84d6fe090adb
     # via flask
-flask==2.1.3 \
-    --hash=sha256:15972e5017df0575c3d6c090ba168b6db90259e620ac8d7ea813a396bad5b6cb \
-    --hash=sha256:9013281a7402ad527f8fd56375164f3aa021ecfaff89bfe3825346c24f87e04c
+flask==2.2.2 \
+    --hash=sha256:642c450d19c4ad482f96729bd2a8f6d32554aa1e231f4f6b4e7e5264b16cca2b \
+    --hash=sha256:b9c46cc36662a7949f34b52d8ec7bb59c0d74ba08ba6cb9ce9adc1d8676d9526
     # via -r requirements.in
 itsdangerous==2.1.1 \
     --hash=sha256:7b7d3023cd35d9cb0c1fd91392f8c95c6fa02c59bf8ad64b8849be3401b95afb \
@@ -61,7 +61,9 @@ markupsafe==2.1.1 \
     --hash=sha256:efc1913fd2ca4f334418481c7e595c00aad186563bbc1ec76067848c7ca0a933 \
     --hash=sha256:f121a1420d4e173a5d96e47e9a0c0dcff965afdf1626d28de1460815f7c4ee7a \
     --hash=sha256:fc7b548b17d238737688817ab67deebb30e8073c95749d55538ed473130ec0c7
-    # via jinja2
+    # via
+    #   jinja2
+    #   werkzeug
 pyyaml==6.0 \
     --hash=sha256:0283c35a6a9fbf047493e3a0ce8d79ef5030852c51e9d911a27badfde0605293 \
     --hash=sha256:055d937d65826939cb044fc8c9b08889e8c743fdc6a32b33e2390f66013e449b \
@@ -97,7 +99,7 @@ pyyaml==6.0 \
     --hash=sha256:e61ceaab6f49fb8bdfaa0f92c4b57bcfbea54c09277b1b4f7ac376bfb7a7c174 \
     --hash=sha256:f84fbc98b019fef2ee9a1cb3ce93e3187a6df0b2538a651bfb890254ba9f90b5
     # via -r requirements.in
-werkzeug==2.0.3 \
-    --hash=sha256:1421ebfc7648a39a5c58c601b154165d05cf47a3cd0ccb70857cbdacf6c8f2b8 \
-    --hash=sha256:b863f8ff057c522164b6067c9e28b041161b4be5ba4d0daceeaa50a163822d3c
+werkzeug==2.2.2 \
+    --hash=sha256:7ea2d48322cc7c0f8b3a215ed73eabd7b5d75d0b50e31ab006286ccff9e00b8f \
+    --hash=sha256:f979ab81f58d7318e064e99c4506445d60135ac5cd2e177a2de0089bfd4c9bd5
     # via flask
