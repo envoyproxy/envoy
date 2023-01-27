@@ -15,8 +15,8 @@ public:
 
   /*
    * Invoked when data is delivered from the peer connection.
-   * @param data supplies data from the upstream
-   * @param end_stream whether the data is the last data frame
+   * @param data supplies data from the peer.
+   * @param end_stream whether the data is the last data frame.
    */
   virtual void onData(Buffer::Instance& data, bool end_stream) PURE;
 };
@@ -35,8 +35,8 @@ public:
   virtual bool connect() PURE;
 
   /**
-   * Close the client, the underlying connection will also be defer deleted when
-   * a Close event is received.
+   * Close the client. It abortively closes the connection discarding any unsent data.
+   * The underlying connection will be defer deleted when a Close event is received.
    */
   virtual void close() PURE;
 
