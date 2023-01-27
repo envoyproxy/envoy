@@ -290,7 +290,6 @@ protected:
     void decodeData();
 
     // Get MetadataEncoder for this stream.
-    MetadataEncoder& getMetadataEncoderOld();
     NewMetadataEncoder& getMetadataEncoder();
     // Get MetadataDecoder for this stream.
     MetadataDecoder& getMetadataDecoder();
@@ -328,7 +327,6 @@ protected:
     HeaderMapPtr pending_trailers_to_encode_;
     std::unique_ptr<MetadataDecoder> metadata_decoder_;
     std::unique_ptr<NewMetadataEncoder> metadata_encoder_;
-    std::unique_ptr<MetadataEncoder> metadata_encoder_old_;
     absl::optional<StreamResetReason> deferred_reset_;
     // Holds the reset reason for this stream. Useful if we have buffered data
     // to determine whether we should continue processing that data.
@@ -493,8 +491,8 @@ protected:
     void decodeHeaders() override;
     void decodeTrailers() override;
     HeaderMap& headers() override {
-      if (absl::holds_alternative<RequestHeaderMapPtr>(headers_or_trailers_)) {
-        return *absl::get<RequestHeaderMapPtr>(headers_or_trailers_);
+      if (absl::holds_alternative<RequestHeaderMapSharedPtr>(headers_or_trailers_)) {
+        return *absl::get<RequestHeaderMapSharedPtr>(headers_or_trailers_);
       } else {
         return *absl::get<RequestTrailerMapPtr>(headers_or_trailers_);
       }
@@ -514,11 +512,15 @@ protected:
       encodeTrailersBase(trailers);
     }
     void setRequestDecoder(Http::RequestDecoder& decoder) override { request_decoder_ = &decoder; }
+    void setDeferredLoggingHeadersAndTrailers(Http::RequestHeaderMapConstSharedPtr,
+                                              Http::ResponseHeaderMapConstSharedPtr,
+                                              Http::ResponseTrailerMapConstSharedPtr,
+                                              StreamInfo::StreamInfo&) override {}
 
     // ScopeTrackedObject
     void dumpState(std::ostream& os, int indent_level) const override;
 
-    absl::variant<RequestHeaderMapPtr, RequestTrailerMapPtr> headers_or_trailers_;
+    absl::variant<RequestHeaderMapSharedPtr, RequestTrailerMapPtr> headers_or_trailers_;
 
     bool streamErrorOnInvalidHttpMessage() const override {
       return parent_.stream_error_on_invalid_http_messaging_;

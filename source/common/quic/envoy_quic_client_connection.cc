@@ -153,7 +153,8 @@ void EnvoyQuicClientConnection::maybeMigratePort() {
 
   auto context = std::make_unique<EnvoyQuicPathValidationContext>(
       self_address, peer_address, std::move(writer), std::move(probing_socket));
-  ValidatePath(std::move(context), std::make_unique<EnvoyPathValidationResultDelegate>(*this));
+  ValidatePath(std::move(context), std::make_unique<EnvoyPathValidationResultDelegate>(*this),
+               quic::PathValidationReason::kPortMigration);
 }
 
 void EnvoyQuicClientConnection::onPathValidationSuccess(

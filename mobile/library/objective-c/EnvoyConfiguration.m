@@ -15,6 +15,7 @@
                            dnsPreresolveHostnames:(NSString *)dnsPreresolveHostnames
                                    enableDNSCache:(BOOL)enableDNSCache
                               enableHappyEyeballs:(BOOL)enableHappyEyeballs
+                                      enableHttp3:(BOOL)enableHttp3
                                        enableGzip:(BOOL)enableGzip
                                      enableBrotli:(BOOL)enableBrotli
                            enableInterfaceBinding:(BOOL)enableInterfaceBinding
@@ -61,6 +62,7 @@
   self.dnsPreresolveHostnames = dnsPreresolveHostnames;
   self.enableDNSCache = enableDNSCache;
   self.enableHappyEyeballs = enableHappyEyeballs;
+  self.enableHttp3 = enableHttp3;
   self.enableGzip = enableGzip;
   self.enableBrotli = enableBrotli;
   self.enableInterfaceBinding = enableInterfaceBinding;
@@ -122,6 +124,12 @@
     [customFilters appendString:brotliFilterInsert];
   }
 
+  if (self.enableHttp3) {
+    NSString *http3Insert =
+        [[NSString alloc] initWithUTF8String:alternate_protocols_cache_filter_insert];
+    [customFilters appendString:http3Insert];
+  }
+
   BOOL hasDirectResponses = self.directResponses.length > 0;
   if (hasDirectResponses) {
     templateYAML = [templateYAML stringByReplacingOccurrencesOfString:@"#{fake_remote_responses}"
@@ -159,8 +167,6 @@
   [definitions appendFormat:@"- &dns_preresolve_hostnames %@\n", self.dnsPreresolveHostnames];
   [definitions appendFormat:@"- &dns_lookup_family %@\n",
                             self.enableHappyEyeballs ? @"ALL" : @"V4_PREFERRED"];
-  [definitions appendFormat:@"- &dns_multiple_addresses %@\n",
-                            self.enableHappyEyeballs ? @"true" : @"false"];
   [definitions appendFormat:@"- &dns_refresh_rate %lus\n", (unsigned long)self.dnsRefreshSeconds];
   [definitions appendFormat:@"- &enable_drain_post_dns_refresh %@\n",
                             self.enableDrainPostDnsRefresh ? @"true" : @"false"];
