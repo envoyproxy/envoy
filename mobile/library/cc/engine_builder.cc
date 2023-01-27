@@ -248,6 +248,9 @@ EngineBuilder& EngineBuilder::setAggregatedDiscoveryService(const std::string& a
                                                             const std::string& address,
                                                             const int port) {
   bootstrapIncompatible();
+  #ifndef ENVOY_GOOGLE_GRPC
+  raise std::runtime_error("google_grpc must be enabled in bazel to use ADS")
+  #endif
   custom_ads_ = fmt::format(ads_insert, api_type, address, port);
   return *this;
 }
