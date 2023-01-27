@@ -1,3 +1,5 @@
+#include <nghttp2/nghttp2.h>
+
 #include <algorithm>
 #include <memory>
 #include <string>
@@ -1931,6 +1933,118 @@ TEST_P(Http2FrameIntegrationTest, UpstreamWindowUpdateAfterGoAway) {
       std::string(rst_stream), std::string(go_away_frame), std::string(window_update_frame))));
 
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_close_notify", 1);
+
+  // Cleanup.
+  tcp_client_->close();
+}
+
+namespace {
+// Turns all in access log string to int.
+std::vector<int> StoiAccessLogString(const std::string& s) {
+  std::vector<int> ret;
+  const std::vector<std::string> split_string = TestUtility::split(s, ' ');
+  ret.reserve(split_string.size());
+
+  for (auto& str : split_string) {
+    ret.push_back(std::stoi(str));
+  }
+
+  return ret;
+}
+} // end namespace
+
+TEST_P(Http2FrameIntegrationTest, AccessLogOfWireBytesIfResponseSizeGreaterThanWindowSize) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        // We need to increase the idle timeout to avoid connection close.
+        hcm.mutable_common_http_protocol_options()->mutable_idle_timeout()->set_seconds(10);
+      });
+  useAccessLog("%DOWNSTREAM_WIRE_BYTES_SENT% %DOWNSTREAM_HEADER_BYTES_SENT%");
+  beginSession();
+
+  // Sending a settings frame to change window to be less than the response
+  // size.
+  // Wait for Envoy to ack the renegotiated settings.
+  const Http2Frame settings_frame2 = Http2Frame::makeSettingsFrame(
+      Http2Frame::SettingsFlags::None, {{NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE, 70000}});
+  sendFrame(settings_frame2);
+
+  auto renegotiated_setting = readFrame();
+  EXPECT_EQ(Http2Frame::Type::Settings, renegotiated_setting.type());
+
+  // Start a request and wait for it to reach the upstream.
+  sendFrame(Http2Frame::makeRequest(1, "host", "/response/larger/than/window"));
+  waitForNextUpstreamRequest();
+  const Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  upstream_request_->encodeHeaders(response_headers, false);
+  upstream_request_->encodeData(60000, false);
+  upstream_request_->encodeData(50000, true);
+
+  // Wire bytes received that *ONLY* relates to this stream e.g. connection
+  // level frames are irrelevant.
+  uint32_t stream_wire_bytes_recieved = 0;
+  uint32_t stream_data_frames_recieved = 0;
+  uint32_t stream_body_payload_recieved = 0;
+  uint32_t stream_wire_header_bytes_recieved = 0;
+
+  auto updateWireByteCount = [&stream_body_payload_recieved, &stream_wire_bytes_recieved,
+                              &stream_data_frames_recieved,
+                              &stream_wire_header_bytes_recieved](const Http2Frame& frame) {
+    stream_wire_bytes_recieved += frame.size();
+    if (frame.type() == Http2Frame::Type::Data) {
+      ++stream_data_frames_recieved;
+      stream_body_payload_recieved += frame.payloadSize();
+    } else if (frame.type() == Http2Frame::Type::Headers) {
+      stream_wire_header_bytes_recieved += frame.size();
+    }
+  };
+
+  Http2Frame response = readFrame();
+  EXPECT_EQ(Http2Frame::Type::Headers, response.type());
+  updateWireByteCount(response);
+
+  response = readFrame();
+  EXPECT_EQ(Http2Frame::Type::Data, response.type());
+  updateWireByteCount(response);
+
+  response = readFrame();
+  updateWireByteCount(response);
+  EXPECT_EQ(Http2Frame::Type::Data, response.type());
+
+  // Check if HCM stream level access log occur
+  auto access_log_values = StoiAccessLogString(waitForAccessLog(access_log_name_));
+  const int hcm_logged_wire_bytes_sent = access_log_values[0];
+  const int hcm_logged_wire_header_bytes_sent = access_log_values[1];
+
+  // Grant the sender (Envoy) additional window so it can finish sending the
+  // stream.
+  const Http2Frame stream_update_frame = Http2Frame::makeWindowUpdateFrame(1, 60000);
+  const Http2Frame conn_update_frame = Http2Frame::makeWindowUpdateFrame(0, 60000);
+  sendFrame(conn_update_frame);
+  sendFrame(stream_update_frame);
+
+  auto resp_flag = std::get<Http::Http2::Http2Frame::DataFlags>(response.frameFlags());
+  while (!response.endStream() && stream_wire_bytes_recieved < 60000 + 50000) {
+    response = readFrame();
+    updateWireByteCount(response);
+    EXPECT_EQ(Http2Frame::Type::Data, response.type());
+    resp_flag = std::get<Http::Http2::Http2Frame::DataFlags>(response.frameFlags());
+    std::cerr << "Response FLAGS:" << static_cast<uint8_t>(resp_flag) << std::endl;
+  }
+
+  // Calculate from the client side the received bytes and compare it to what
+  // was access logged.
+  const int body_wire_bytes = stream_wire_bytes_recieved - stream_wire_header_bytes_recieved;
+  const int calculated_body_wire_bytes =
+      stream_body_payload_recieved + stream_data_frames_recieved * Http2Frame::HeaderSize;
+  EXPECT_EQ(body_wire_bytes, calculated_body_wire_bytes);
+
+  EXPECT_EQ(stream_wire_header_bytes_recieved, hcm_logged_wire_header_bytes_sent);
+  EXPECT_EQ(stream_wire_bytes_recieved, hcm_logged_wire_bytes_sent)
+      << "Received " << stream_wire_bytes_recieved
+      << " stream wire bytes from Envoy but access log reported " << hcm_logged_wire_bytes_sent;
+  ;
 
   // Cleanup.
   tcp_client_->close();
