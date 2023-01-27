@@ -16,13 +16,12 @@
 #include <utility>
 #include <vector>
 
-#include "absl/time/time.h"
-
 #include "source/common/tracing/null_span_impl.h"
 #include "source/extensions/tracers/datadog/span.h"
 #include "source/extensions/tracers/datadog/time_util.h"
 
 #include "test/mocks/tracing/mocks.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -77,6 +76,7 @@ struct TestSetup {
   const datadog::tracing::TracerConfig config;
   datadog::tracing::Tracer tracer;
   datadog::tracing::Span span;
+  Event::SimulatedTimeSystem time;
 
   explicit TestSetup(std::uint64_t id = 0xcafebabe)
       : id(id), collector(std::make_shared<MockCollector>()), config(makeConfig(collector)),
@@ -101,12 +101,6 @@ private:
     return config;
   }
 };
-
-std::chrono::system_clock::time_point now() {
-  // 14:45 May 6th, 2010 in New York
-  absl::CivilSecond datetime{2010, 5, 3, 14, 45};
-  return absl::ToChronoTime(absl::FromCivil(datetime, absl::FixedTimeZone(-4 * 60 * 60)));
-}
 
 TEST(DatadogTracerSpanTest, SetOperation) {
   TestSetup test;
@@ -178,7 +172,7 @@ TEST(DatadogTracerSpanTest, InjectContext) {
 
 TEST(DatadogTracerSpanTest, SpawnChild) {
   TestSetup test;
-  const auto child_start = now();
+  const auto child_start = test.time.timeSystem().systemTime();
   {
     Span parent{std::move(test.span)};
     auto child = parent.spawnChild(Tracing::MockConfig{}, "child", child_start);
@@ -209,7 +203,8 @@ TEST(DatadogTracerSpanTest, SetSampled) {
     TestSetup test;
     {
       Span local_root{std::move(test.span)};
-      auto child = local_root.spawnChild(Tracing::MockConfig{}, "child", now());
+      auto child = local_root.spawnChild(Tracing::MockConfig{}, "child",
+                                         test.time.timeSystem().systemTime());
       child->setSampled(sampled);
       child->finishSpan();
       local_root.finishSpan();
@@ -269,7 +264,7 @@ TEST(DatadogTracerSpanTest, NoOpMode) {
   span.setOperation("foo");
   span.setTag("foo", "bar");
   // `Span::log` doesn't do anything in any case.
-  span.log(now(), "ignored");
+  span.log(test.time.timeSystem().systemTime(), "ignored");
   Tracing::TestTraceContextImpl context{};
   span.injectContext(context, nullptr);
   EXPECT_EQ("", context.context_protocol_);
@@ -277,7 +272,8 @@ TEST(DatadogTracerSpanTest, NoOpMode) {
   EXPECT_EQ("", context.context_path_);
   EXPECT_EQ("", context.context_method_);
   EXPECT_EQ(0, context.context_map_.size());
-  const Tracing::SpanPtr child = span.spawnChild(Tracing::MockConfig{}, "child", now());
+  const Tracing::SpanPtr child =
+      span.spawnChild(Tracing::MockConfig{}, "child", test.time.timeSystem().systemTime());
   EXPECT_NE(nullptr, child);
   EXPECT_EQ(typeid(Tracing::NullSpan), typeid(*child));
   span.setSampled(true);
