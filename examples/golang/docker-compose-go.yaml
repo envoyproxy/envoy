@@ -6,8 +6,8 @@ services:
       context: ../shared/build
     command: >
       bash -c "
-      bazel build  //examples/golang/simple:filter.so
-      && cp -a ./bazel-bin/examples/golang/simple/filter.so /output"
+      bazel build  //examples/golang/simple:simple.so
+      && cp -a ./bazel-bin/examples/golang/simple/simple.so /output"
     environment:
     - BUILD_UID=${UID:-1000}
     - TEST_TMPDIR=${ENVOY_TEST_TMPDIR:-/tmp}
