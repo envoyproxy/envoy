@@ -456,6 +456,7 @@ private:
                                     envoy::config::core::v3::SocketOption>>>& address_opts_list);
   void createListenerFilterFactories();
   void validateFilterChains();
+  bool isFilterchainMissing();
   void buildFilterChains();
   void buildConnectionBalancer(const Network::Address::Instance& address);
   void buildSocketOptions();
@@ -531,6 +532,9 @@ private:
 
   // to access ListenerManagerImpl::factory_.
   friend class ListenerFilterChainFactoryBuilder;
+
+  // FcdsAPI object holds the fcds config class
+  FcdsApiPtr fcds_api_;
 };
 
 } // namespace Server

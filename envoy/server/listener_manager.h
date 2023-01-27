@@ -253,6 +253,12 @@ public:
    * @return TRUE if the worker has started or FALSE if not.
    */
   virtual bool isWorkerStarted() PURE;
+
+  /*
+   * Listener FCDS: This method is invoke to drain removed or modified filter chains' connections
+   */
+  virtual void startDrainingSequenceForListenerFilterChains(std::string draining_listener,
+		  std::list<Network::DrainableFilterChainSharedPtr> filter_chains) PURE;
 };
 
 // overload operator| to allow ListenerManager::listeners(ListenerState) to be called using a

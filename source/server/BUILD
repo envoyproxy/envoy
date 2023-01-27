@@ -388,6 +388,7 @@ envoy_cc_library(
         ":guarddog_lib",
         ":listener_hooks_lib",
         ":listener_manager_factory_lib",
+	"//source/extensions/listener_managers/listener_manager:filter_chain_manager_lib",
         ":regex_engine_lib",
         ":ssl_context_manager_lib",
         ":utils_lib",

@@ -28,6 +28,8 @@ public:
   MOCK_METHOD(void, endListenerUpdate, (ListenerManager::FailureStates &&));
   MOCK_METHOD(ApiListenerOptRef, apiListener, ());
   MOCK_METHOD(bool, isWorkerStarted, ());
+  MOCK_METHOD(void, startDrainingSequenceForListenerFilterChains, (std::string draining_listener,
+	      std::list<Network::DrainableFilterChainSharedPtr> filter_chains));
 };
 } // namespace Server
 } // namespace Envoy

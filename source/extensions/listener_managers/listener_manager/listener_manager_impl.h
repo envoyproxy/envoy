@@ -147,6 +147,8 @@ class DrainingFilterChainsManager {
 public:
   DrainingFilterChainsManager(ListenerImplPtr&& draining_listener,
                               uint64_t workers_pending_removal);
+  DrainingFilterChainsManager(ListenerImpl& draining_listener,
+                              uint64_t workers_pending_removal);
   uint64_t getDrainingListenerTag() const { return draining_listener_->listenerTag(); }
   const std::list<const Network::FilterChain*>& getDrainingFilterChains() const {
     return draining_filter_chains_;
@@ -216,7 +218,8 @@ public:
 
   Instance& server_;
   std::unique_ptr<ListenerComponentFactory> factory_;
-
+  void startDrainingSequenceForListenerFilterChains(std::string draining_listener,
+       std::list<Network::DrainableFilterChainSharedPtr> filter_chains) override;
 private:
   using ListenerList = std::list<ListenerImplPtr>;
   /**
