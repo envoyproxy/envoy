@@ -2202,12 +2202,7 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestTrailersRejected) {
 // This test uses an Http::HeaderMapImpl instead of an Http::TestHeaderMapImpl to avoid
 // time-consuming byte size verification that will cause this test to timeout.
 TEST_P(DownstreamProtocolIntegrationTest, ManyTrailerHeaders) {
-  if (GetParam().http1_implementation == Http1ParserImpl::BalsaParser) {
-    // TODO(#21245): Re-enable this test for BalsaParser.
-    return;
-  }
-
-  setMaxRequestHeadersKb(96);
+  setMaxRequestHeadersKb(110);
   setMaxRequestHeadersCount(20005);
 
   config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
