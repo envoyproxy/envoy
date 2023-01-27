@@ -72,8 +72,16 @@ private:
   void onData(Buffer::Instance& data, bool end_stream);
 
   void onEvent(Network::ConnectionEvent event) override;
-  void onAboveWriteBufferHighWatermark() override { callbacks_->onAboveWriteBufferHighWatermark(); }
-  void onBelowWriteBufferLowWatermark() override { callbacks_->onBelowWriteBufferLowWatermark(); }
+  void onAboveWriteBufferHighWatermark() override {
+    if (callbacks_) {
+      callbacks_->onAboveWriteBufferHighWatermark();
+    }
+  }
+  void onBelowWriteBufferLowWatermark() override {
+    if (callbacks_) {
+      callbacks_->onBelowWriteBufferLowWatermark();
+    }
+  }
 
   Event::Dispatcher& dispatcher_;
   Network::ClientConnectionPtr connection_;
