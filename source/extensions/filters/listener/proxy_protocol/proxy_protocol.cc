@@ -51,21 +51,19 @@ Config::Config(
     Stats::Scope& scope,
     const envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol& proto_config)
     : stats_{ALL_PROXY_PROTOCOL_STATS(POOL_COUNTER(scope))},
-      allow_requests_without_proxy_protocol_(proto_config.allow_requests_without_proxy_protocol()) {
+      allow_requests_without_proxy_protocol_(proto_config.allow_requests_without_proxy_protocol()),
+      pass_all_tlvs_(proto_config.has_pass_through_tlvs()
+                         ? proto_config.pass_through_tlvs().match_type() ==
+                               ProxyProtocolPassThroughTLVs::INCLUDE_ALL
+                         : false) {
   for (const auto& rule : proto_config.rules()) {
     tlv_types_[0xFF & rule.tlv_type()] = rule.on_tlv_present();
   }
 
-  if (proto_config.has_pass_through_tlvs()) {
-    if (proto_config.pass_through_tlvs().match_type() ==
-        ProxyProtocolPassThroughTLVs::INCLUDE_ALL) {
-      pass_all_tlvs_ = true;
-    } else if (proto_config.pass_through_tlvs().match_type() ==
-               ProxyProtocolPassThroughTLVs::INCLUDE) {
-      pass_all_tlvs_ = false;
-      for (const auto& tlv_type : proto_config.pass_through_tlvs().tlv_type()) {
-        pass_through_tlvs_.insert(0xFF & tlv_type);
-      }
+  if (proto_config.has_pass_through_tlvs() &&
+      proto_config.pass_through_tlvs().match_type() == ProxyProtocolPassThroughTLVs::INCLUDE) {
+    for (const auto& tlv_type : proto_config.pass_through_tlvs().tlv_type()) {
+      pass_through_tlvs_.insert(0xFF & tlv_type);
     }
   }
 }

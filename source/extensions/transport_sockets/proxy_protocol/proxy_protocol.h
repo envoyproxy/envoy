@@ -50,7 +50,7 @@ private:
   Buffer::OwnedImpl header_buffer_{};
   ProxyProtocolConfig_Version version_{ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1};
   UpstreamProxyProtocolStats stats_;
-  bool pass_all_tlvs_ = false;
+  const bool pass_all_tlvs_;
   absl::flat_hash_set<uint8_t> pass_through_tlvs_{};
 };
 

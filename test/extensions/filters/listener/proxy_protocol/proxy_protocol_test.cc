@@ -1597,9 +1597,11 @@ TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterState) {
 
   EXPECT_EQ(2, proxy_proto_data.tlv_vector_.size());
   EXPECT_EQ(0x0, proxy_proto_data.tlv_vector_[0].type);
-  EXPECT_EQ("\xff", proxy_proto_data.tlv_vector_[0].value);
+  EXPECT_EQ(0xFF, proxy_proto_data.tlv_vector_[0].value[0]);
+  EXPECT_EQ(1, proxy_proto_data.tlv_vector_[0].value.size());
   EXPECT_EQ(0x02, proxy_proto_data.tlv_vector_[1].type);
-  EXPECT_EQ("foo.com", proxy_proto_data.tlv_vector_[1].value);
+  EXPECT_EQ("foo.com", std::string(proxy_proto_data.tlv_vector_[1].value.begin(),
+                                   proxy_proto_data.tlv_vector_[1].value.end()));
 
   disconnect();
 }
@@ -1675,7 +1677,8 @@ TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterStateIncludeTlV) {
 
   EXPECT_EQ(1, proxy_proto_data.tlv_vector_.size());
   EXPECT_EQ(0x02, proxy_proto_data.tlv_vector_[0].type);
-  EXPECT_EQ("foo.com", proxy_proto_data.tlv_vector_[0].value);
+  EXPECT_EQ("foo.com", std::string(proxy_proto_data.tlv_vector_[0].value.begin(),
+                                   proxy_proto_data.tlv_vector_[0].value.end()));
   disconnect();
 }
 

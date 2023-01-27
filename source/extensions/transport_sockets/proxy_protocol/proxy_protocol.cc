@@ -31,15 +31,14 @@ UpstreamProxyProtocolSocket::UpstreamProxyProtocolSocket(
     Network::TransportSocketOptionsConstSharedPtr options, ProxyProtocolConfig config,
     Stats::Scope& scope)
     : PassthroughSocket(std::move(transport_socket)), options_(options), version_(config.version()),
-      stats_(GenerateUpstreamProxyProtocolStats(scope)) {
-  if (config.has_pass_through_tlvs()) {
-    if (config.pass_through_tlvs().match_type() == ProxyProtocolPassThroughTLVs::INCLUDE_ALL) {
-      pass_all_tlvs_ = true;
-    } else if (config.pass_through_tlvs().match_type() == ProxyProtocolPassThroughTLVs::INCLUDE) {
-      pass_all_tlvs_ = false;
-      for (const auto& tlv_type : config.pass_through_tlvs().tlv_type()) {
-        pass_through_tlvs_.insert(0xFF & tlv_type);
-      }
+      stats_(GenerateUpstreamProxyProtocolStats(scope)),
+      pass_all_tlvs_(config.has_pass_through_tlvs() ? config.pass_through_tlvs().match_type() ==
+                                                          ProxyProtocolPassThroughTLVs::INCLUDE_ALL
+                                                    : false) {
+  if (config.has_pass_through_tlvs() &&
+      config.pass_through_tlvs().match_type() == ProxyProtocolPassThroughTLVs::INCLUDE) {
+    for (const auto& tlv_type : config.pass_through_tlvs().tlv_type()) {
+      pass_through_tlvs_.insert(0xFF & tlv_type);
     }
   }
 }
