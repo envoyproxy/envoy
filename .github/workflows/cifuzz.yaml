@@ -17,16 +17,13 @@ jobs:
      matrix:
        sanitizer: [address]
    steps:
-   - name: Build Fuzzers test
-     env:
-       CFL_EXTRA_BAZEL_BUILD_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs) --flaky_test_attempts=2"
-       CFL_EXTRA_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
-       CFL_EXTRA_BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
-     run: echo "$CFL_EXTRA_BAZEL_BUILD_OPTIONS"
-
    - name: Build Fuzzers (${{ matrix.sanitizer }})
      id: build
      uses: google/oss-fuzz/infra/cifuzz/actions/build_fuzzers@master
+     env:
+       CFL_EXTRA_BAZEL_BUILD_OPTIONS: "--config=remote-ci --flaky_test_attempts=2"
+       CFL_EXTRA_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
+       CFL_EXTRA_BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
      with:
        oss-fuzz-project-name: 'envoy'
        language: c++
