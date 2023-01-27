@@ -89,7 +89,8 @@ void TcpUpstream::readDisable(bool disable) {
 
 void TcpUpstream::resetStream() {
   upstream_request_ = nullptr;
-  upstream_conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
+  upstream_conn_data_->connection().close(Network::ConnectionCloseType::NoFlush,
+                                          "tcp_upstream_reset_stream");
 }
 
 void TcpUpstream::onUpstreamData(Buffer::Instance& data, bool end_stream) {
