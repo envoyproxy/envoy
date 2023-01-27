@@ -1493,7 +1493,9 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
         break;
       }
       TcpConnectionsMap& container = it->second;
-      container.connections_.begin()->first->close(Network::ConnectionCloseType::NoFlush);
+      container.connections_.begin()->first->close(
+          Network::ConnectionCloseType::NoFlush,
+          StreamInfo::LocalCloseReasons::get().NonPooledTcpConnectionHostHealthFailure);
     }
   } else {
     drainOrCloseConnPools(host, ConnectionPool::DrainBehavior::DrainExistingConnections);
