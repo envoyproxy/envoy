@@ -4,6 +4,8 @@
 
 #include "envoy/http/header_map.h"
 
+#include "absl/strings/str_join.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
@@ -37,12 +39,12 @@ ResponseHeaderReader::lookup(datadog::tracing::StringView key) const {
   // value is the comma-separated concatenation of the multiple values.
   // I don't expect the Agent to repeat response headers, and we don't even
   // examine the Agent's response headers, but here's a solution anyway.
-  std::size_t i = 0;
-  datadog::tracing::assign(buffer_, result[i]->value().getStringView());
-  for (++i; i < result.size(); ++i) {
-    buffer_ += ", ";
-    datadog::tracing::append(buffer_, result[i]->value().getStringView());
+  std::vector<absl::string_view> values;
+  values.reserve(result.size());
+  for (std::size_t i = 0; i < result.size(); ++i) {
+    values.push_back(result[i]->value().getStringView());
   }
+  buffer_ = absl::StrJoin(values, ", ");
   return buffer_;
 }
 
