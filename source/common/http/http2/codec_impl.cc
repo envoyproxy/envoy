@@ -780,13 +780,6 @@ void ConnectionImpl::StreamImpl::resetStreamWorker(StreamResetReason reason) {
                               static_cast<http2::adapter::Http2ErrorCode>(reasonToReset(reason)));
 }
 
-MetadataEncoder& ConnectionImpl::StreamImpl::getMetadataEncoderOld() {
-  if (metadata_encoder_old_ == nullptr) {
-    metadata_encoder_old_ = std::make_unique<MetadataEncoder>();
-  }
-  return *metadata_encoder_old_;
-}
-
 NewMetadataEncoder& ConnectionImpl::StreamImpl::getMetadataEncoder() {
   if (metadata_encoder_ == nullptr) {
     metadata_encoder_ = std::make_unique<NewMetadataEncoder>();

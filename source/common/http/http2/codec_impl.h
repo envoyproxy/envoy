@@ -290,7 +290,6 @@ protected:
     void decodeData();
 
     // Get MetadataEncoder for this stream.
-    MetadataEncoder& getMetadataEncoderOld();
     NewMetadataEncoder& getMetadataEncoder();
     // Get MetadataDecoder for this stream.
     MetadataDecoder& getMetadataDecoder();
@@ -328,7 +327,6 @@ protected:
     HeaderMapPtr pending_trailers_to_encode_;
     std::unique_ptr<MetadataDecoder> metadata_decoder_;
     std::unique_ptr<NewMetadataEncoder> metadata_encoder_;
-    std::unique_ptr<MetadataEncoder> metadata_encoder_old_;
     absl::optional<StreamResetReason> deferred_reset_;
     // Holds the reset reason for this stream. Useful if we have buffered data
     // to determine whether we should continue processing that data.
