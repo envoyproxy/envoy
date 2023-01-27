@@ -54,6 +54,6 @@ message ClientSideWeightedRoundRobin {
   // blackout_period applies. Defaults to 3 minutes.
   google.protobuf.Duration weight_expiration_period = 4;
 
-  // How often endpoint weights are recalculated.  Default is 1 second.
+  // How often endpoint weights are recalculated. Default is 1 second.
   google.protobuf.Duration weight_update_period = 5;
 }

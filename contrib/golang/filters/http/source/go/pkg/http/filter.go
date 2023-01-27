@@ -32,43 +32,43 @@ package http
 */
 import "C"
 import (
-    "fmt"
-    "unsafe"
+	"fmt"
+	"unsafe"
 
-    "github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
+	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
 )
 
 type httpRequest struct {
-    req        *C.httpRequest
-    httpFilter api.StreamFilter
+	req        *C.httpRequest
+	httpFilter api.StreamFilter
 }
 
 func (r *httpRequest) Continue(status api.StatusType) {
-    if status == api.LocalReply {
-        fmt.Printf("warning: LocalReply status is useless after sendLocalReply, ignoring")
-        return
-    }
-    cAPI.HttpContinue(unsafe.Pointer(r.req), uint64(status))
+	if status == api.LocalReply {
+		fmt.Printf("warning: LocalReply status is useless after sendLocalReply, ignoring")
+		return
+	}
+	cAPI.HttpContinue(unsafe.Pointer(r.req), uint64(status))
 }
 
 func (r *httpRequest) SendLocalReply(responseCode int, bodyText string, headers map[string]string, grpcStatus int64, details string) {
-    cAPI.HttpSendLocalReply(unsafe.Pointer(r.req), responseCode, bodyText, headers, grpcStatus, details)
+	cAPI.HttpSendLocalReply(unsafe.Pointer(r.req), responseCode, bodyText, headers, grpcStatus, details)
 }
 
 func (r *httpRequest) StreamInfo() api.StreamInfo {
-    return &streamInfo{
-        request: r,
-    }
+	return &streamInfo{
+		request: r,
+	}
 }
 
 func (r *httpRequest) Finalize(reason int) {
-    cAPI.HttpFinalize(unsafe.Pointer(r.req), reason)
+	cAPI.HttpFinalize(unsafe.Pointer(r.req), reason)
 }
 
 type streamInfo struct {
-    request *httpRequest
+	request *httpRequest
 }
 
 func (s *streamInfo) GetRouteName() string {
-    return cAPI.HttpGetRouteName(unsafe.Pointer(s.request.req))
+	return cAPI.HttpGetRouteName(unsafe.Pointer(s.request.req))
 }

@@ -167,36 +167,29 @@ OptRef<const LocalRateLimiterImpl::LocalDescriptorImpl> LocalRateLimiterImpl::de
 
 bool LocalRateLimiterImpl::requestAllowed(
     absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const {
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.local_ratelimit_match_all_descriptors")) {
 
-    bool allow = requestAllowedHelper(tokens_);
-    // Global token is not enough. Since global token is not sorted, so we suggest it should be
-    // larger than other descriptors.
-    if (!allow) {
-      return allow;
-    }
+  bool allow = requestAllowedHelper(tokens_);
+  // Global token is not enough. Since global token is not sorted, so we suggest it should be
+  // larger than other descriptors.
+  if (!allow) {
+    return allow;
+  }
 
-    if (!descriptors_.empty() && !request_descriptors.empty()) {
-      for (const auto& descriptor : sorted_descriptors_) {
-        for (const auto& request_descriptor : request_descriptors) {
-          if (descriptor == request_descriptor) {
-            allow &= requestAllowedHelper(*descriptor.token_state_);
-            // Descriptor token is not enough.
-            if (!allow) {
-              return allow;
-            }
-            break;
+  if (!descriptors_.empty() && !request_descriptors.empty()) {
+    for (const auto& descriptor : sorted_descriptors_) {
+      for (const auto& request_descriptor : request_descriptors) {
+        if (descriptor == request_descriptor) {
+          allow &= requestAllowedHelper(*descriptor.token_state_);
+          // Descriptor token is not enough.
+          if (!allow) {
+            return allow;
           }
+          break;
         }
       }
     }
-    return allow;
   }
-  auto descriptor = descriptorHelper(request_descriptors);
-
-  return descriptor.has_value() ? requestAllowedHelper(*descriptor.value().get().token_state_)
-                                : requestAllowedHelper(tokens_);
+  return allow;
 }
 
 int LocalRateLimiterImpl::tokensFillPerSecond(LocalDescriptorImpl& descriptor) {
