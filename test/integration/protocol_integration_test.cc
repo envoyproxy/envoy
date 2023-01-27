@@ -1,3 +1,4 @@
+#include "protocol_integration_test.h"
 #include "test/integration/protocol_integration_test.h"
 
 #include <functional>
@@ -15,7 +16,6 @@
 #include "envoy/http/header_map.h"
 #include "envoy/registry/registry.h"
 
-#include "protocol_integration_test.h"
 #include "source/common/api/api_impl.h"
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/fmt.h"
