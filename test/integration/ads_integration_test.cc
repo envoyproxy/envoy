@@ -1791,6 +1791,7 @@ INSTANTIATE_TEST_SUITE_P(
                      testing::Values(OldDssOrNewDss::Old, OldDssOrNewDss::New)));
 
 TEST_P(XdsTpAdsIntegrationTest, Basic) {
+  std::cerr << "==> AAB Basic test: " << isSotw() << std::endl; // TODO: remove
   initialize();
   // Basic CDS/EDS xDS initialization (CDS via xdstp:// glob collection).
   const std::string cluster_wildcard = "xdstp://test/envoy.config.cluster.v3.Cluster/foo-cluster/"
@@ -1855,12 +1856,12 @@ TEST_P(XdsTpAdsIntegrationTest, Basic) {
   makeSingleRequest();
 
   // Add a second listener in the foo namespace.
-  const auto second_listener =
+  const auto baz_listener =
       buildListener("xdstp://test/envoy.config.listener.v3.Listener/foo-listener/"
                     "baz?xds.node.cluster=cluster_name&xds.node.id=node_name",
                     route_name_1);
   sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
-      Config::TypeUrl::get().Listener, {second_listener}, {second_listener}, {}, "2");
+      Config::TypeUrl::get().Listener, {baz_listener}, {baz_listener}, {}, "2");
 
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "1",
                                       {route_name_1}, {route_name_1}, {}));
@@ -1875,25 +1876,29 @@ TEST_P(XdsTpAdsIntegrationTest, Basic) {
   test_server_->waitForCounterEq("listener_manager.listener_create_success", 2);
   makeSingleRequest();
 
-  // Updates and deletions only apply to the Delta protocol, not SotW.
+  // Updates only apply to the Delta protocol, not SotW.
+  const std::string bar_listener = "xdstp://test/envoy.config.listener.v3.Listener/foo-listener/"
+                                   "bar?xds.node.cluster=cluster_name&xds.node.id=node_name";
   if (!isSotw()) {
     // Update bar listener in the foo namespace.
     sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
-        Config::TypeUrl::get().Listener, {},
-        {buildListener("xdstp://test/envoy.config.listener.v3.Listener/foo-listener/"
-                       "bar?xds.node.cluster=cluster_name&xds.node.id=node_name",
-                       route_name_1)},
-        {}, "3");
+        Config::TypeUrl::get().Listener, {}, {buildListener(bar_listener, route_name_1)}, {}, "3");
     EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "3", {}, {}, {}));
     test_server_->waitForCounterEq("listener_manager.listener_in_place_updated", 1);
     makeSingleRequest();
+  }
 
+  if (isSotw()) {
+    // In SotW, removal consists of sending the other listeners, except for the one to be removed.
+    sendDiscoveryResponse<envoy::config::listener::v3::Listener>(Config::TypeUrl::get().Listener,
+                                                                 {baz_listener}, {}, {}, "3");
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "3", {}, {}, {}));
+    test_server_->waitForCounterEq("listener_manager.listener_removed", 1);
+    makeSingleRequest();
+  } else {
     // Remove bar listener from the foo namespace.
-    sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
-        Config::TypeUrl::get().Listener, {}, {},
-        {"xdstp://test/envoy.config.listener.v3.Listener/foo-listener/"
-         "bar?xds.node.cluster=cluster_name&xds.node.id=node_name"},
-        "3");
+    sendDiscoveryResponse<envoy::config::listener::v3::Listener>(Config::TypeUrl::get().Listener,
+                                                                 {}, {}, {bar_listener}, "3");
     EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "4", {}, {}, {}));
     test_server_->waitForCounterEq("listener_manager.listener_removed", 1);
     makeSingleRequest();
