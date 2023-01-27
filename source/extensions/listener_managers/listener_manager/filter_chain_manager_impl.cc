@@ -21,7 +21,7 @@
 namespace Envoy {
 namespace Server {
 
-namespace {
+namespace FilterChain {
 
 // Return a fake address for use when either the source or destination is unix domain socket.
 // This address will only match the fallback matcher of 0.0.0.0/0, which is the default
@@ -72,7 +72,7 @@ public:
   }
 };
 
-} // namespace
+} // namespace FilterChain
 
 PerFilterChainFactoryContextImpl::PerFilterChainFactoryContextImpl(
     Configuration::FactoryContext& parent_context, Init::Manager& init_manager)
@@ -312,7 +312,7 @@ void FilterChainManagerImpl::addFilterChains(
   // Construct matcher if it is present in the listener configuration.
   if (filter_chain_matcher) {
     filter_chains_by_name_ = filter_chains_by_name;
-    FilterChainNameActionValidationVisitor validation_visitor;
+    FilterChain::FilterChainNameActionValidationVisitor validation_visitor;
     Matcher::MatchTreeFactory<Network::MatchingData, FilterChainActionFactoryContext> factory(
         parent_context_.getServerFactoryContext(), parent_context_.getServerFactoryContext(),
         validation_visitor);
@@ -601,7 +601,7 @@ const Network::FilterChain* FilterChainManagerImpl::findFilterChainForDestinatio
     const DestinationIPsTrie& destination_ips_trie, const Network::ConnectionSocket& socket) const {
   auto address = socket.connectionInfoProvider().localAddress();
   if (address->type() != Network::Address::Type::Ip) {
-    address = fakeAddress();
+    address = FilterChain::fakeAddress();
   }
 
   // Match on both: exact IP and wider CIDR ranges using LcTrie.
@@ -690,7 +690,7 @@ const Network::FilterChain* FilterChainManagerImpl::findFilterChainForDirectSour
     const Network::ConnectionSocket& socket) const {
   auto address = socket.connectionInfoProvider().directRemoteAddress();
   if (address->type() != Network::Address::Type::Ip) {
-    address = fakeAddress();
+    address = FilterChain::fakeAddress();
   }
 
   const auto& data = direct_source_ips_trie.getData(address);
@@ -740,7 +740,7 @@ const Network::FilterChain* FilterChainManagerImpl::findFilterChainForSourceIpAn
     const SourceIPsTrie& source_ips_trie, const Network::ConnectionSocket& socket) const {
   auto address = socket.connectionInfoProvider().remoteAddress();
   if (address->type() != Network::Address::Type::Ip) {
-    address = fakeAddress();
+    address = FilterChain::fakeAddress();
   }
 
   // Match on both: exact IP and wider CIDR ranges using LcTrie.

@@ -22,7 +22,6 @@ final class ViewController: UITableViewController {
       .addPlatformFilter(DemoFilter.init)
       .addPlatformFilter(BufferDemoFilter.init)
       .addPlatformFilter(AsyncDemoFilter.init)
-      .h2ExtendKeepaliveTimeout(true)
       .enableAdminInterface()
       .enableDNSCache(true)
       // required by DNS cache

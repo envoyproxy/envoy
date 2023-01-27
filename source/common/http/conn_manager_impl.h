@@ -192,7 +192,7 @@ private:
     void maybeEndDecode(bool end_stream);
 
     // Http::RequestDecoder
-    void decodeHeaders(RequestHeaderMapPtr&& headers, bool end_stream) override;
+    void decodeHeaders(RequestHeaderMapSharedPtr&& headers, bool end_stream) override;
     void decodeTrailers(RequestTrailerMapPtr&& trailers) override;
     StreamInfo::StreamInfo& streamInfo() override { return filter_manager_.streamInfo(); }
     void sendLocalReply(Code code, absl::string_view body,
@@ -200,6 +200,20 @@ private:
                         const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                         absl::string_view details) override {
       return filter_manager_.sendLocalReply(code, body, modify_headers, grpc_status, details);
+    }
+    std::list<AccessLog::InstanceSharedPtr> accessLogHandlers() override {
+      return filter_manager_.accessLogHandlers();
+    }
+    // Hand off headers/trailers and stream info to the codec's response encoder, for logging later
+    // (i.e. possibly after this stream has been destroyed).
+    //
+    // TODO(paulsohn): Investigate whether we can move the headers/trailers and stream info required
+    // for logging instead of copying them (as is currently done in the HTTP/3 implementation) or
+    // using a shared pointer. See
+    // https://github.com/envoyproxy/envoy/pull/23648#discussion_r1066095564 for more details.
+    void deferHeadersAndTrailers() {
+      response_encoder_->setDeferredLoggingHeadersAndTrailers(request_headers_, response_headers_,
+                                                              response_trailers_, streamInfo());
     }
 
     // ScopeTrackedObject
@@ -371,12 +385,12 @@ private:
     // both locations, then refer to the FM when doing stream logs.
     const uint64_t stream_id_;
 
-    RequestHeaderMapPtr request_headers_;
+    RequestHeaderMapSharedPtr request_headers_;
     RequestTrailerMapPtr request_trailers_;
 
     ResponseHeaderMapPtr informational_headers_;
-    ResponseHeaderMapPtr response_headers_;
-    ResponseTrailerMapPtr response_trailers_;
+    ResponseHeaderMapSharedPtr response_headers_;
+    ResponseTrailerMapSharedPtr response_trailers_;
 
     // Note: The FM must outlive the above headers, as they are possibly accessed during filter
     // destruction.

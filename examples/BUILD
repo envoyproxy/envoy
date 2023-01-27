@@ -27,7 +27,7 @@ filegroup(
     ),
 )
 
-genrule(
+filegroup(
     name = "contrib_configs",
     srcs = glob(
         [
@@ -39,13 +39,6 @@ genrule(
             "**/*docker-compose*.yaml",
         ],
     ),
-    outs = ["example_configs.tar"],
-    cmd = (
-        "$(location //configs:configgen.sh) NO_CONFIGGEN $(@D) $(SRCS)"
-    ),
-    tools = [
-        "//configs:configgen.sh",
-    ],
 )
 
 filegroup(

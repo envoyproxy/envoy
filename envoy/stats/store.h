@@ -152,10 +152,6 @@ public:
   virtual bool iterate(const IterateFn<Histogram>& fn) const PURE;
   virtual bool iterate(const IterateFn<TextReadout>& fn) const PURE;
 
-  // TODO(#24007): Remove this operator overload: it is not needed anymore. Once
-  // #24567, #24843, and #24861 have landed we can remove this API.
-  operator Scope&() { return *rootScope(); }
-
   // Delegate some methods to the root scope; these are exposed to make it more
   // convenient to use stats_macros.h. We may consider dropping them if desired,
   // when we resolve #24007 or in the next follow-up.
@@ -173,7 +169,7 @@ public:
   }
 
   /**
-   * @returns a scope of the given name.
+   * @return a scope of the given name.
    */
   ScopeSharedPtr createScope(const std::string& name) { return rootScope()->createScope(name); }
 };

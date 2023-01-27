@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "envoy/common/optref.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/runtime/runtime.h"
@@ -25,19 +26,35 @@ SubsetLoadBalancer::SubsetLoadBalancer(
     LoadBalancerType lb_type, PrioritySet& priority_set, const PrioritySet* local_priority_set,
     ClusterLbStats& stats, Stats::Scope& scope, Runtime::Loader& runtime,
     Random::RandomGenerator& random, const LoadBalancerSubsetInfo& subsets,
-    const absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig>&
-        lb_ring_hash_config,
-    const absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig>& lb_maglev_config,
-    const absl::optional<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>&
-        round_robin_config,
-    const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>&
-        least_request_config,
+    OptRef<const envoy::config::cluster::v3::Cluster::RingHashLbConfig> lb_ring_hash_config,
+    OptRef<const envoy::config::cluster::v3::Cluster::MaglevLbConfig> lb_maglev_config,
+    OptRef<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> round_robin_config,
+    OptRef<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig> least_request_config,
     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
     TimeSource& time_source)
-    : lb_type_(lb_type), lb_ring_hash_config_(lb_ring_hash_config),
-      lb_maglev_config_(lb_maglev_config), round_robin_config_(round_robin_config),
-      least_request_config_(least_request_config), common_config_(common_config), stats_(stats),
-      scope_(scope), runtime_(runtime), random_(random), fallback_policy_(subsets.fallbackPolicy()),
+    : lb_type_(lb_type),
+      lb_ring_hash_config_(
+          lb_ring_hash_config.has_value()
+              ? std::make_unique<const envoy::config::cluster::v3::Cluster::RingHashLbConfig>(
+                    lb_ring_hash_config.ref())
+              : nullptr),
+      lb_maglev_config_(
+          lb_maglev_config.has_value()
+              ? std::make_unique<const envoy::config::cluster::v3::Cluster::MaglevLbConfig>(
+                    lb_maglev_config.ref())
+              : nullptr),
+      round_robin_config_(
+          round_robin_config.has_value()
+              ? std::make_unique<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>(
+                    round_robin_config.ref())
+              : nullptr),
+      least_request_config_(
+          least_request_config.has_value()
+              ? std::make_unique<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>(
+                    least_request_config.ref())
+              : nullptr),
+      common_config_(common_config), stats_(stats), scope_(scope), runtime_(runtime),
+      random_(random), fallback_policy_(subsets.fallbackPolicy()),
       metadata_fallback_policy_(subsets.metadataFallbackPolicy()),
       default_subset_metadata_(subsets.defaultSubset().fields().begin(),
                                subsets.defaultSubset().fields().end()),
@@ -685,7 +702,7 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
   case LoadBalancerType::LeastRequest:
     lb_ = std::make_unique<LeastRequestLoadBalancer>(
         *this, subset_lb.original_local_priority_set_, subset_lb.stats_, subset_lb.runtime_,
-        subset_lb.random_, subset_lb.common_config_, subset_lb.least_request_config_,
+        subset_lb.random_, subset_lb.common_config_, subset_lb.lbLeastRequestConfig(),
         subset_lb.time_source_);
     break;
 
@@ -698,7 +715,7 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
   case LoadBalancerType::RoundRobin:
     lb_ = std::make_unique<RoundRobinLoadBalancer>(
         *this, subset_lb.original_local_priority_set_, subset_lb.stats_, subset_lb.runtime_,
-        subset_lb.random_, subset_lb.common_config_, subset_lb.round_robin_config_,
+        subset_lb.random_, subset_lb.common_config_, subset_lb.lbRoundRobinConfig(),
         subset_lb.time_source_);
     break;
 
@@ -708,7 +725,7 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
     // can also use a thread aware sub-LB properly. The following works fine but is not optimal.
     thread_aware_lb_ = std::make_unique<RingHashLoadBalancer>(
         *this, subset_lb.stats_, subset_lb.scope_, subset_lb.runtime_, subset_lb.random_,
-        subset_lb.lb_ring_hash_config_, subset_lb.common_config_);
+        subset_lb.lbRingHashConfig(), subset_lb.common_config_);
     thread_aware_lb_->initialize();
     lb_ = thread_aware_lb_->factory()->create();
     break;
@@ -719,7 +736,7 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
     // can also use a thread aware sub-LB properly. The following works fine but is not optimal.
     thread_aware_lb_ = std::make_unique<MaglevLoadBalancer>(
         *this, subset_lb.stats_, subset_lb.scope_, subset_lb.runtime_, subset_lb.random_,
-        subset_lb.lb_maglev_config_, subset_lb.common_config_);
+        subset_lb.lbMaglevConfig(), subset_lb.common_config_);
     thread_aware_lb_->initialize();
     lb_ = thread_aware_lb_->factory()->create();
     break;
