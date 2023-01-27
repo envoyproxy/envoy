@@ -48,11 +48,6 @@ public:
   static const uint64_t DefaultTableSize = 65537;
   static const uint64_t MaxNumberOfHostsForCompactMaglev = (static_cast<uint64_t>(1) << 32) - 1;
 
-  static MaglevTableSharedPtr
-  createMaglevTable(const NormalizedHostWeightVector& normalized_host_weights,
-                    double max_normalized_weight, uint64_t table_size,
-                    bool use_hostname_for_hashing, MaglevLoadBalancerStats& stats);
-
 protected:
   struct TableBuildEntry {
     TableBuildEntry(const HostConstSharedPtr& host, uint64_t offset, uint64_t skip, double weight)
@@ -82,8 +77,6 @@ private:
   /**
    * Implementation specific construction of data structures to represent the
    * Maglev Table.
-   * TODO(kbaichoo): make vector const?
-   * TODO(kbaichoo): make these pure
    */
   virtual void constructImplementationInternals(std::vector<TableBuildEntry>& table_build_entries,
                                                 double max_normalized_weight) PURE;
@@ -163,27 +156,13 @@ public:
                      const envoy::extensions::load_balancing_policies::maglev::v3::Maglev& config);
 
   const MaglevLoadBalancerStats& stats() const { return stats_; }
-  // TODO(kbaichoo): could remove the table size from here and rely on
-  // underlying child.
   uint64_t tableSize() const { return table_size_; }
 
 private:
   // ThreadAwareLoadBalancerBase
   HashingLoadBalancerSharedPtr
   createLoadBalancer(const NormalizedHostWeightVector& normalized_host_weights,
-                     double /* min_normalized_weight */, double max_normalized_weight) override {
-    HashingLoadBalancerSharedPtr maglev_lb =
-        MaglevTable::createMaglevTable(normalized_host_weights, max_normalized_weight, table_size_,
-                                       use_hostname_for_hashing_, stats_);
-
-    if (hash_balance_factor_ == 0) {
-      return maglev_lb;
-    }
-
-    return std::make_shared<BoundedLoadHashingLoadBalancer>(
-        maglev_lb, std::move(normalized_host_weights), hash_balance_factor_);
-  }
-
+                     double /* min_normalized_weight */, double max_normalized_weight) override;
   static MaglevLoadBalancerStats generateStats(Stats::Scope& scope);
 
   Stats::ScopeSharedPtr scope_;

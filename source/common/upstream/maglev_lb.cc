@@ -22,7 +22,54 @@ bool shouldUseCompactTable(size_t num_hosts, uint64_t table_size) {
   return compact_maglev_cost < original_maglev_cost;
 #endif
 }
+
+/**
+ * Factory for creating the optimal Maglev table instance for the given parameters.
+ */
+class MaglevFactory : private Logger::Loggable<Logger::Id::upstream> {
+public:
+  static MaglevTableSharedPtr
+  createMaglevTable(const NormalizedHostWeightVector& normalized_host_weights,
+                    double max_normalized_weight, uint64_t table_size,
+                    bool use_hostname_for_hashing, MaglevLoadBalancerStats& stats) {
+
+    MaglevTableSharedPtr maglev_table;
+    if (shouldUseCompactTable(normalized_host_weights.size(), table_size) &&
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_compact_maglev")) {
+      maglev_table =
+          std::make_shared<CompactMaglevTable>(normalized_host_weights, max_normalized_weight,
+                                               table_size, use_hostname_for_hashing, stats);
+      ENVOY_LOG(debug, "creating compact maglev table given table size {} and number of hosts {}",
+                table_size, normalized_host_weights.size());
+    } else {
+      maglev_table =
+          std::make_shared<OriginalMaglevTable>(normalized_host_weights, max_normalized_weight,
+                                                table_size, use_hostname_for_hashing, stats);
+      ENVOY_LOG(debug, "creating original maglev table given table size {} and number of hosts {}",
+                table_size, normalized_host_weights.size());
+    }
+
+    return maglev_table;
+  }
+};
+
 } // namespace
+
+ThreadAwareLoadBalancerBase::HashingLoadBalancerSharedPtr
+MaglevLoadBalancer::createLoadBalancer(const NormalizedHostWeightVector& normalized_host_weights,
+                                       double /* min_normalized_weight */,
+                                       double max_normalized_weight) {
+  HashingLoadBalancerSharedPtr maglev_lb =
+      MaglevFactory::createMaglevTable(normalized_host_weights, max_normalized_weight, table_size_,
+                                       use_hostname_for_hashing_, stats_);
+
+  if (hash_balance_factor_ == 0) {
+    return maglev_lb;
+  }
+
+  return std::make_shared<BoundedLoadHashingLoadBalancer>(
+      maglev_lb, std::move(normalized_host_weights), hash_balance_factor_);
+}
 
 void MaglevTable::constructMaglevTableInternal(
     const NormalizedHostWeightVector& normalized_host_weights, double max_normalized_weight,
@@ -62,7 +109,6 @@ void MaglevTable::constructMaglevTableInternal(
   }
 }
 
-// TODO(kbaichoo): make const
 void OriginalMaglevTable::constructImplementationInternals(
     std::vector<TableBuildEntry>& table_build_entries, double max_normalized_weight) {
   // Size internal representation for maglev table correctly.
@@ -148,29 +194,6 @@ void CompactMaglevTable::constructImplementationInternals(
       table_index++;
     }
   }
-}
-
-MaglevTableSharedPtr
-MaglevTable::createMaglevTable(const NormalizedHostWeightVector& normalized_host_weights,
-                               double max_normalized_weight, uint64_t table_size,
-                               bool use_hostname_for_hashing, MaglevLoadBalancerStats& stats) {
-  MaglevTableSharedPtr maglev_table;
-  if (shouldUseCompactTable(normalized_host_weights.size(), table_size) &&
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_compact_maglev")) {
-    maglev_table =
-        std::make_shared<CompactMaglevTable>(normalized_host_weights, max_normalized_weight,
-                                             table_size, use_hostname_for_hashing, stats);
-    ENVOY_LOG(debug, "creating compact maglev table given table size {} and number of hosts {}",
-              table_size, normalized_host_weights.size());
-  } else {
-    maglev_table =
-        std::make_shared<OriginalMaglevTable>(normalized_host_weights, max_normalized_weight,
-                                              table_size, use_hostname_for_hashing, stats);
-    ENVOY_LOG(debug, "creating original maglev table given table size {} and number of hosts {}",
-              table_size, normalized_host_weights.size());
-  }
-
-  return maglev_table;
 }
 
 void OriginalMaglevTable::logMaglevTable(bool use_hostname_for_hashing) const {
