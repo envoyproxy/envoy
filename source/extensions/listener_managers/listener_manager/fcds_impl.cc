@@ -27,10 +27,10 @@ FcdsApi::FcdsApi(const envoy::config::listener::v3::ListenerFcds& fcds,
                 FilterChainFactoryBuilder* fc_builder)
     : Envoy::Config::SubscriptionBase<envoy::config::listener::v3::FilterChain>(
           parent_context.messageValidationContext().dynamicValidationVisitor(), "name"),
-      fcds_cfg_name_(fcds.name()),
+      fcds_cfg_name_(fcds.collection_name()),
       parent_init_target_(fmt::format("FcdsConfigSubscription parent_init_target {}", fcds_cfg_name_),
                           [this]() { local_init_manager_.initialize(local_init_watcher_); }),
-      local_init_watcher_(fmt::format("Fcds local_init_watcher {}", fcds.name()),
+      local_init_watcher_(fmt::format("Fcds local_init_watcher {}", fcds.collection_name()),
                           [this]() { parent_init_target_.ready(); }),
       local_init_target_(fmt::format("FcdsConfigSubscription local_init_target {}", fcds_cfg_name_),
                         [this]() { fcds_subscription_->start({fcds_cfg_name_}); }),
