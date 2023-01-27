@@ -27,7 +27,7 @@ WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher, Filesystem::Instance& fi
         ASSERT(events == Event::FileReadyType::Read);
         onInotifyEvent();
       },
-      Event::FileTriggerType::Edge, Event::FileReadyType::Read)
+      Event::FileTriggerType::Edge, Event::FileReadyType::Read);
 }
 
 WatcherImpl::~WatcherImpl() { close(inotify_fd_); }
