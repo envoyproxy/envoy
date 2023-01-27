@@ -2,7 +2,6 @@
 #include "source/extensions/filters/network/zookeeper_proxy/decoder.h"
 #include "source/extensions/filters/network/zookeeper_proxy/filter.h"
 
-#include "test/extensions/filters/network/zookeeper_proxy/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 
@@ -32,7 +31,6 @@ public:
 
   void initialize() {
     config_ = std::make_shared<ZooKeeperFilterConfig>(stat_prefix_, 1048576, scope_);
-    decoder_ = std::make_unique<DecoderImpl>(callbacks_, 1048576, time_system_);
     filter_ = std::make_unique<ZooKeeperFilter>(config_, time_system_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
   }
@@ -604,8 +602,6 @@ public:
   Stats::TestUtil::TestStore store_;
   Stats::Scope& scope_{*store_.rootScope()};
   ZooKeeperFilterConfigSharedPtr config_;
-  NiceMock<MockDecoderCallbacks> callbacks_;
-  std::unique_ptr<DecoderImpl> decoder_;
   std::unique_ptr<ZooKeeperFilter> filter_;
   std::string stat_prefix_{"test.zookeeper"};
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
@@ -1088,21 +1084,25 @@ TEST_F(ZooKeeperFilterTest, RequestWithPartialData) {
   Buffer::OwnedImpl data =
       encodeCreateRequestWithPartialData("/foo", "bar", false, enumToSignedInt(OpCodes::Create));
 
-  EXPECT_EQ(Envoy::Network::FilterStatus::PauseAndBuffer, decoder_->onData(data));
+  EXPECT_EQ(Envoy::Network::FilterStatus::StopIteration, filter_->onData(data, false));
+  EXPECT_EQ(0UL, config_->stats().create_rq_.value());
+  EXPECT_EQ(0UL, config_->stats().request_bytes_.value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 }
 
 TEST_F(ZooKeeperFilterTest, ResponseWithPartialData) {
   initialize();
 
   Buffer::OwnedImpl rq_data = encodePathWatch("/foo", true);
-
   testRequest(rq_data,
               {{{"opname", "getdata"}, {"path", "/foo"}, {"watch", "true"}}, {{"bytes", "21"}}},
               config_->stats().getdata_rq_, 21);
 
   Buffer::OwnedImpl resp_data = encodeResponseWithPartialData(1000, 2000, 0);
-
-  EXPECT_EQ(Envoy::Network::FilterStatus::PauseAndBuffer, decoder_->onWrite(resp_data));
+  EXPECT_EQ(Envoy::Network::FilterStatus::StopIteration, filter_->onWrite(resp_data, false));
+  EXPECT_EQ(0UL, config_->stats().getdata_resp_.value());
+  EXPECT_EQ(0UL, config_->stats().response_bytes_.value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 }
 
 } // namespace ZooKeeperProxy

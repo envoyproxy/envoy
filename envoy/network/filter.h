@@ -32,9 +32,7 @@ enum class FilterStatus {
   // Continue to further filters.
   Continue,
   // Stop executing further filters.
-  StopIteration,
-  // Pause the filter execution and wait for more data append to the buffer.
-  PauseAndBuffer
+  StopIteration
 };
 
 /**

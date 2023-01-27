@@ -4,23 +4,12 @@ load(
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
-    "envoy_extension_cc_mock",
     "envoy_extension_cc_test",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
-
-envoy_extension_cc_mock(
-    name = "mocks",
-    srcs = ["mocks.cc"],
-    hdrs = ["mocks.h"],
-    extension_names = ["envoy.filters.network.zookeeper_proxy"],
-    deps = [
-        "//source/extensions/filters/network/zookeeper_proxy:proxy_lib",
-    ],
-)
 
 envoy_extension_cc_test(
     name = "filter_test",
@@ -29,7 +18,6 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.network.zookeeper_proxy"],
     deps = [
-        ":mocks",
         "//source/extensions/filters/network/zookeeper_proxy:config",
         "//test/mocks/network:network_mocks",
         "//test/test_common:simulated_time_system_lib",

@@ -497,7 +497,7 @@ Network::FilterStatus DecoderImpl::decodeAfterBuffer(Buffer::Instance& data, Dec
               "zookeeper_proxy: waiting for the full packet ({} bytes) in buffer, current buffer "
               "is {} bytes",
               INT_LENGTH + len, data.length());
-    return Network::FilterStatus::PauseAndBuffer;
+    return Network::FilterStatus::StopIteration;
   }
 }
 
