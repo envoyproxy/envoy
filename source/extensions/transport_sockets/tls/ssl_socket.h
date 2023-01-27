@@ -72,7 +72,9 @@ public:
   void onFailure() override;
   Network::TransportSocketCallbacks* transportSocketCallbacks() override { return callbacks_; }
   void onAsynchronousCertValidationComplete() override;
-  absl::optional<bool> sslSyscallErrorOccurred() override {return info_->sslSyscallErrorOccurred();}
+  absl::optional<bool> sslSyscallErrorOccurred() override {
+    return info_->sslSyscallErrorOccurred();
+  }
 
   SSL* rawSslForTest() const { return rawSsl(); }
 

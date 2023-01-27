@@ -100,7 +100,7 @@ public:
   Ssl::SocketState state() const { return state_; }
   void setState(Ssl::SocketState state) { state_ = state; }
   Ssl::HandshakeCallbacks* handshakeCallbacks() { return handshake_callbacks_; }
-  bool sslSyscallErrorOccurred() {return error_syscall_;}
+  bool sslSyscallErrorOccurred() { return error_syscall_; }
 
   bssl::UniquePtr<SSL> ssl_;
 

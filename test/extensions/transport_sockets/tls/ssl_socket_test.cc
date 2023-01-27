@@ -854,9 +854,6 @@ void testUtilV2(const TestUtilOptionsV2& options) {
     EXPECT_THAT(std::string(client_connection->transportFailureReason()),
                 ContainsRegex(options.expectedTransportFailureReasonContains()));
     EXPECT_NE("", server_connection->transportFailureReason());
-    // auto reason = server_connection->transportFailureReason();
-    // std::cout << reason << std::endl;
-    // EXPECT_EQ("", server_connection->transportFailureReason());
   }
 }
 
