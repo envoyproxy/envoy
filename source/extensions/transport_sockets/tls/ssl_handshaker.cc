@@ -104,7 +104,7 @@ Network::PostIoAction SslHandshakerImpl::doHandshake() {
       // queue, which means the failure reason is not recorded in drainErrorQueue. Thus, setting
       // flag to here to report the error.
       error_syscall_ = true;
-      // FOLLOW THROUGH
+      ABSL_FALLTHROUGH_INTENDED;
     default:
       handshake_callbacks_->onFailure();
       return PostIoAction::Close;
