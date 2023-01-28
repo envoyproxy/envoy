@@ -489,18 +489,19 @@ void Filter::sendLocalReplyInternal(
   state.sendLocalReply(response_code, body_text, modify_headers, grpc_status, details);
 }
 
-int Filter::sendLocalReply(Http::Code response_code, absl::string_view body_text,
-                           std::function<void(Http::ResponseHeaderMap& headers)> modify_headers,
-                           Grpc::Status::GrpcStatus grpc_status, absl::string_view details) {
+CAPIStatus
+Filter::sendLocalReply(Http::Code response_code, absl::string_view body_text,
+                       std::function<void(Http::ResponseHeaderMap& headers)> modify_headers,
+                       Grpc::Status::GrpcStatus grpc_status, absl::string_view details) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
-    return CAPIFilterIsDestroy;
+    return CAPIStatus::CAPIFilterIsDestroy;
   }
   auto& state = getProcessorState();
   if (!state.isProcessingInGo()) {
     ENVOY_LOG(debug, "golang filter is not processing Go");
-    return CAPINotInGo;
+    return CAPIStatus::CAPINotInGo;
   }
   ENVOY_LOG(debug, "sendLocalReply, response code: {}", int(response_code));
 
@@ -517,19 +518,19 @@ int Filter::sendLocalReply(Http::Code response_code, absl::string_view body_text
           ENVOY_LOG(debug, "golang filter has gone or destroyed in sendLocalReply");
         }
       });
-  return CAPIOK;
+  return CAPIStatus::CAPIOK;
 };
 
-int Filter::continueStatus(GolangStatus status) {
+CAPIStatus Filter::continueStatus(GolangStatus status) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
-    return CAPIFilterIsDestroy;
+    return CAPIStatus::CAPIFilterIsDestroy;
   }
   auto& state = getProcessorState();
   if (!state.isProcessingInGo()) {
     ENVOY_LOG(debug, "golang filter is not processing Go");
-    return CAPINotInGo;
+    return CAPIStatus::CAPINotInGo;
   }
   ENVOY_LOG(debug, "golang filter continue from Go, status: {}, state: {}, phase: {}", int(status),
             state.stateStr(), state.phaseStr());
@@ -548,23 +549,23 @@ int Filter::continueStatus(GolangStatus status) {
       ENVOY_LOG(debug, "golang filter has gone or destroyed in continueStatus event");
     }
   });
-  return CAPIOK;
+  return CAPIStatus::CAPIOK;
 }
 
-int Filter::getHeader(absl::string_view key, GoString* goValue) {
+CAPIStatus Filter::getHeader(absl::string_view key, GoString* goValue) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
-    return CAPIFilterIsDestroy;
+    return CAPIStatus::CAPIFilterIsDestroy;
   }
   auto& state = getProcessorState();
   if (!state.isProcessingInGo()) {
     ENVOY_LOG(debug, "golang filter is not processing Go");
-    return CAPINotInGo;
+    return CAPIStatus::CAPINotInGo;
   }
   auto m = state.isProcessingHeader() ? headers_ : trailers_;
   if (m == nullptr) {
-    return CAPIInvalidPhase;
+    return CAPIStatus::CAPIInvalidPhase;
   }
   auto result = m->get(Http::LowerCaseString(key));
 
@@ -573,7 +574,7 @@ int Filter::getHeader(absl::string_view key, GoString* goValue) {
     goValue->p = str.data();
     goValue->n = str.length();
   }
-  return CAPIOK;
+  return CAPIStatus::CAPIOK;
 }
 
 void copyHeaderMapToGo(Http::HeaderMap& m, GoString* go_strs, char* go_buf) {
@@ -603,75 +604,75 @@ void copyHeaderMapToGo(Http::HeaderMap& m, GoString* go_strs, char* go_buf) {
   });
 }
 
-int Filter::copyHeaders(GoString* go_strs, char* go_buf) {
+CAPIStatus Filter::copyHeaders(GoString* go_strs, char* go_buf) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
-    return CAPIFilterIsDestroy;
+    return CAPIStatus::CAPIFilterIsDestroy;
   }
   auto& state = getProcessorState();
   if (!state.isProcessingInGo()) {
     ENVOY_LOG(debug, "golang filter is not processing Go");
-    return CAPINotInGo;
+    return CAPIStatus::CAPINotInGo;
   }
   if (headers_ == nullptr) {
-    return CAPIInvalidPhase;
+    return CAPIStatus::CAPIInvalidPhase;
   }
   copyHeaderMapToGo(*headers_, go_strs, go_buf);
-  return CAPIOK;
+  return CAPIStatus::CAPIOK;
 }
 
-int Filter::setHeader(absl::string_view key, absl::string_view value) {
+CAPIStatus Filter::setHeader(absl::string_view key, absl::string_view value) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
-    return CAPIFilterIsDestroy;
+    return CAPIStatus::CAPIFilterIsDestroy;
   }
   auto& state = getProcessorState();
   if (!state.isProcessingInGo()) {
     ENVOY_LOG(debug, "golang filter is not processing Go");
-    return CAPINotInGo;
+    return CAPIStatus::CAPINotInGo;
   }
   if (headers_ == nullptr) {
-    return CAPIInvalidPhase;
+    return CAPIStatus::CAPIInvalidPhase;
   }
   headers_->setCopy(Http::LowerCaseString(key), value);
   onHeadersModified();
-  return CAPIOK;
+  return CAPIStatus::CAPIOK;
 }
 
-int Filter::removeHeader(absl::string_view key) {
+CAPIStatus Filter::removeHeader(absl::string_view key) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
-    return CAPIFilterIsDestroy;
+    return CAPIStatus::CAPIFilterIsDestroy;
   }
   auto& state = getProcessorState();
   if (!state.isProcessingInGo()) {
     ENVOY_LOG(debug, "golang filter is not processing Go");
-    return CAPINotInGo;
+    return CAPIStatus::CAPINotInGo;
   }
   if (headers_ == nullptr) {
-    return CAPIInvalidPhase;
+    return CAPIStatus::CAPIInvalidPhase;
   }
   headers_->remove(Http::LowerCaseString(key));
   onHeadersModified();
-  return CAPIOK;
+  return CAPIStatus::CAPIOK;
 }
 
-int Filter::copyBuffer(Buffer::Instance* buffer, char* data) {
+CAPIStatus Filter::copyBuffer(Buffer::Instance* buffer, char* data) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
-    return CAPIFilterIsDestroy;
+    return CAPIStatus::CAPIFilterIsDestroy;
   }
   auto& state = getProcessorState();
   if (!state.isProcessingInGo()) {
     ENVOY_LOG(debug, "golang filter is not processing Go");
-    return CAPINotInGo;
+    return CAPIStatus::CAPINotInGo;
   }
   if (!state.doDataList.checkExisting(buffer)) {
-    return CAPIInvalidPhase;
+    return CAPIStatus::CAPIInvalidPhase;
   }
   for (const Buffer::RawSlice& slice : buffer->getRawSlices()) {
     // data is the heap memory of go, and the length is the total length of buffer. So use memcpy is
@@ -679,23 +680,23 @@ int Filter::copyBuffer(Buffer::Instance* buffer, char* data) {
     memcpy(data, static_cast<const char*>(slice.mem_), slice.len_); // NOLINT(safe-memcpy)
     data += slice.len_;
   }
-  return CAPIOK;
+  return CAPIStatus::CAPIOK;
 }
 
-int Filter::setBufferHelper(Buffer::Instance* buffer, absl::string_view& value,
-                            bufferAction action) {
+CAPIStatus Filter::setBufferHelper(Buffer::Instance* buffer, absl::string_view& value,
+                                   bufferAction action) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
-    return CAPIFilterIsDestroy;
+    return CAPIStatus::CAPIFilterIsDestroy;
   }
   auto& state = getProcessorState();
   if (!state.isProcessingInGo()) {
     ENVOY_LOG(debug, "golang filter is not processing Go");
-    return CAPINotInGo;
+    return CAPIStatus::CAPINotInGo;
   }
   if (!state.doDataList.checkExisting(buffer)) {
-    return CAPIInvalidPhase;
+    return CAPIStatus::CAPIInvalidPhase;
   }
   if (action == bufferAction::Set) {
     buffer->drain(buffer->length());
@@ -705,55 +706,55 @@ int Filter::setBufferHelper(Buffer::Instance* buffer, absl::string_view& value,
   } else {
     buffer->add(value);
   }
-  return CAPIOK;
+  return CAPIStatus::CAPIOK;
 }
 
-int Filter::copyTrailers(GoString* go_strs, char* go_buf) {
+CAPIStatus Filter::copyTrailers(GoString* go_strs, char* go_buf) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
-    return CAPIFilterIsDestroy;
+    return CAPIStatus::CAPIFilterIsDestroy;
   }
   auto& state = getProcessorState();
   if (!state.isProcessingInGo()) {
     ENVOY_LOG(debug, "golang filter is not processing Go");
-    return CAPINotInGo;
+    return CAPIStatus::CAPINotInGo;
   }
   if (trailers_ == nullptr) {
-    return CAPIInvalidPhase;
+    return CAPIStatus::CAPIInvalidPhase;
   }
   copyHeaderMapToGo(*trailers_, go_strs, go_buf);
-  return CAPIOK;
+  return CAPIStatus::CAPIOK;
 }
 
-int Filter::setTrailer(absl::string_view key, absl::string_view value) {
+CAPIStatus Filter::setTrailer(absl::string_view key, absl::string_view value) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
-    return CAPIFilterIsDestroy;
+    return CAPIStatus::CAPIFilterIsDestroy;
   }
   auto& state = getProcessorState();
   if (!state.isProcessingInGo()) {
     ENVOY_LOG(debug, "golang filter is not processing Go");
-    return CAPINotInGo;
+    return CAPIStatus::CAPINotInGo;
   }
   if (trailers_ == nullptr) {
-    return CAPIInvalidPhase;
+    return CAPIStatus::CAPIInvalidPhase;
   }
   trailers_->setCopy(Http::LowerCaseString(key), value);
-  return CAPIOK;
+  return CAPIStatus::CAPIOK;
 }
 
-int Filter::getStringValue(int id, GoString* value_str) {
+CAPIStatus Filter::getStringValue(int id, GoString* value_str) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
-    return CAPIFilterIsDestroy;
+    return CAPIStatus::CAPIFilterIsDestroy;
   }
   auto& state = getProcessorState();
   if (!state.isProcessingInGo()) {
     ENVOY_LOG(debug, "golang filter is not processing Go");
-    return CAPINotInGo;
+    return CAPIStatus::CAPINotInGo;
   }
   switch (static_cast<StringValue>(id)) {
   case StringValue::RouteName:
@@ -766,7 +767,7 @@ int Filter::getStringValue(int id, GoString* value_str) {
 
   value_str->p = req_->strValue.data();
   value_str->n = req_->strValue.length();
-  return CAPIOK;
+  return CAPIStatus::CAPIOK;
 }
 
 /* ConfigId */

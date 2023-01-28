@@ -48,7 +48,7 @@ type httpCApiImpl struct{}
 
 // Only CAPIOK is expected, otherwise, it means unexpected stage when invoke C API,
 // panic here and it will be recover in the Go entry function (TODO).
-func handleCApiStatus(status C.int) {
+func handleCApiStatus(status C.CAPIStatus) {
 	switch status {
 	case C.CAPIOK:
 		return
