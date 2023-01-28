@@ -38,7 +38,7 @@ void BufferList::clearAll() {
 };
 
 bool BufferList::checkExisting(Buffer::Instance* data) {
-  for (auto it = queue_.begin(); it != queue_.end(); it = queue_.erase(it)) {
+  for (auto it = queue_.begin(); it != queue_.end(); ++it) {
     if ((*it).get() == data) {
       return true;
     };
