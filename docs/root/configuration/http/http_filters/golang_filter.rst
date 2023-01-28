@@ -12,6 +12,9 @@ See the `Envoy's Golang extension proposal documentation
 <https://docs.google.com/document/d/1noApyS0IfmOGmEOHdWk2-BOp0V37zgXMM4MdByr1lQk/edit?usp=sharing>`_
 for more details on the filter's implementation.
 
+.. attention::
+  It is designed to work with the `GODEBUG=cgocheck=0` ENV variable,
+  which disables the cgo pointer check.
 
 Developing a Go plugin
 ----------------------
