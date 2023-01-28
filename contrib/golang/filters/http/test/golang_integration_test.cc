@@ -59,7 +59,7 @@ TEST_P(GolangIntegrationTest, Echo) {
   registerTestServerPorts({"http"});
 
   auto path = "/echo";
-  auto body = "echo from go";
+  auto echo_body = "echo from go";
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"}, {":path", path}, {":scheme", "http"}, {":authority", "test.com"}};
@@ -75,7 +75,7 @@ TEST_P(GolangIntegrationTest, Echo) {
   EXPECT_EQ("403", response->headers().getStatusValue());
 
   // check body for echo
-  auto body = StringUtil::toUpper(absl::StrFormat("%s, path: %s\r\n", body, path));
+  auto body = StringUtil::toUpper(absl::StrFormat("%s, path: %s\r\n", echo_body, path));
   EXPECT_EQ(body, StringUtil::toUpper(response->body()));
 
   codec_client_->close();
