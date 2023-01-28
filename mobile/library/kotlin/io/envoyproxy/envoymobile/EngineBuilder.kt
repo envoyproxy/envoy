@@ -53,7 +53,7 @@ open class EngineBuilder(
   private var dnsPreresolveHostnames = "[]"
   private var enableDNSCache = false
   private var enableDrainPostDnsRefresh = false
-  private var enableHttp3 = false
+  private var enableHttp3 = true
   private var enableHappyEyeballs = true
   private var enableGzip = true
   private var enableBrotli = false

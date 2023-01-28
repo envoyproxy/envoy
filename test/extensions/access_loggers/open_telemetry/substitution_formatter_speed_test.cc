@@ -3,6 +3,7 @@
 #include "source/extensions/access_loggers/open_telemetry/substitution_formatter.h"
 
 #include "test/common/stream_info/test_util.h"
+#include "test/test_common/utility.h"
 
 #include "benchmark/benchmark.h"
 #include "opentelemetry/proto/common/v1/common.pb.h"

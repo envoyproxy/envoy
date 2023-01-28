@@ -778,9 +778,13 @@ public:
   extensionProtocolOptions(const std::string& name) const override;
   LoadBalancerType lbType() const override { return lb_type_; }
   envoy::config::cluster::v3::Cluster::DiscoveryType type() const override { return type_; }
-  const absl::optional<envoy::config::cluster::v3::Cluster::CustomClusterType>&
+
+  OptRef<const envoy::config::cluster::v3::Cluster::CustomClusterType>
   clusterType() const override {
-    return cluster_type_;
+    if (cluster_type_ == nullptr) {
+      return absl::nullopt;
+    }
+    return *cluster_type_;
   }
   OptRef<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>
   lbRoundRobinConfig() const override {
@@ -817,9 +821,11 @@ public:
     }
     return *lb_original_dst_config_;
   }
-  const absl::optional<envoy::config::core::v3::TypedExtensionConfig>&
-  upstreamConfig() const override {
-    return upstream_config_;
+  OptRef<const envoy::config::core::v3::TypedExtensionConfig> upstreamConfig() const override {
+    if (upstream_config_ == nullptr) {
+      return absl::nullopt;
+    }
+    return *upstream_config_;
   }
   bool maintenanceMode() const override;
   uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
@@ -974,7 +980,7 @@ private:
       lb_maglev_config_;
   const std::unique_ptr<const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>
       lb_original_dst_config_;
-  absl::optional<envoy::config::core::v3::TypedExtensionConfig> upstream_config_;
+  std::unique_ptr<envoy::config::core::v3::TypedExtensionConfig> upstream_config_;
   const bool added_via_api_;
   LoadBalancerSubsetInfoImpl lb_subset_;
   const envoy::config::core::v3::Metadata metadata_;
@@ -989,7 +995,7 @@ private:
   const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>
       upstream_http_protocol_options_;
   absl::optional<std::string> eds_service_name_;
-  const absl::optional<envoy::config::cluster::v3::Cluster::CustomClusterType> cluster_type_;
+  std::unique_ptr<const envoy::config::cluster::v3::Cluster::CustomClusterType> cluster_type_;
   const std::unique_ptr<Server::Configuration::CommonFactoryContext> factory_context_;
   std::vector<Network::FilterFactoryCb> filter_factories_;
   Http::FilterChainUtility::FilterFactoriesList http_filter_factories_;
