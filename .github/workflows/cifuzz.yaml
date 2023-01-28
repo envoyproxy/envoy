@@ -19,7 +19,7 @@ jobs:
    steps:
    - name: Build Fuzzers (${{ matrix.sanitizer }})
      id: build
-     uses: google/oss-fuzz/infra/cifuzz/actions/build_fuzzers@master
+     uses: krajshiva/oss-fuzz/infra/cifuzz/actions/build_fuzzers@cifuzz-rbe-integration
      env:
        TEST_NON_CFL: abc
        CFL_EXTRA_BAZEL_BUILD_OPTIONS: "--config=remote-ci --flaky_test_attempts=2"
@@ -30,7 +30,7 @@ jobs:
        language: c++
        sanitizer: ${{ matrix.sanitizer }}
    - name: Run Fuzzers (${{ matrix.sanitizer }})
-     uses: google/oss-fuzz/infra/cifuzz/actions/run_fuzzers@master
+     uses: krajshiva/oss-fuzz/infra/cifuzz/actions/run_fuzzers@cifuzz-rbe-integration
      with:
        oss-fuzz-project-name: 'envoy'
        language: c++
