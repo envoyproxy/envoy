@@ -238,10 +238,21 @@ elif [[ "$CI_TARGET" == "bazel.distribution" ]]; then
 
   setup_clang_toolchain
 
-  # By default the packages will be signed by the first available key.
-  # If there is no key available, a throwaway key is created
-  # and the packages signed with it, for the purpose of testing only.
-  if ! gpg --list-secret-keys "*"; then
+  if [[ -n "$MAINTAINER_GPG_KEY" && -n "$MAINTAINER_GPG_KEY_PASSPHRASE" ]]; then
+      # Import the maintainer key
+      echo "$MAINTAINER_GPG_KEY_PASSPHRASE" | gpg --batch --yes --passphrase-fd 0 --import "$MAINTAINER_GPG_KEY"
+
+      # Re/start gpg-agent
+      gpgconf --kill gpg-agent
+      gpg-agent --default-cache-ttl 3600 --max-cache-ttl 86400 --allow-preset-passphrase --daemon
+
+      # Set the password for the key
+      KEYGRIP=$(gpg --with-keygrip  --list-secret-key "Envoy maintainers <envoy-maintainers@googlegroups.com>" | grep -Pom1 '^ *Keygrip += +\K.*')
+      /usr/lib/gnupg/gpg-preset-passphrase -P "$MAINTAINER_GPG_KEY_PASSHPRASE" --preset "$KEYGRIP"
+  else
+      # By default the packages will be signed by the first available key.
+      # If there is no key available, a throwaway key is created
+      # and the packages signed with it, for the purpose of testing only.
       export PACKAGES_MAINTAINER_NAME="Envoy CI"
       export PACKAGES_MAINTAINER_EMAIL="envoy-ci@for.testing.only"
       BAZEL_BUILD_OPTIONS+=(
@@ -255,6 +266,10 @@ elif [[ "$CI_TARGET" == "bazel.distribution" ]]; then
       cp -a bazel-bin/distribution/packages.tar.gz "${ENVOY_BUILD_DIR}/packages.x64.tar.gz"
   else
       cp -a bazel-bin/distribution/packages.tar.gz "${ENVOY_BUILD_DIR}/packages.arm64.tar.gz"
+  fi
+
+  if [[ -n "$MAINTAINER_GPG_KEYPHRASE_PATH" ]]; then
+      rm -rf "$MAINTAINER_GPG_KEYPHRASE_PATH"
   fi
   exit 0
 elif [[ "$CI_TARGET" == "bazel.release.server_only" ]]; then

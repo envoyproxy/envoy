@@ -372,6 +372,10 @@ stages:
     - template: bazel.yml
       parameters:
         ciTarget: bazel.distribution
+      env:
+        MAINTAINER_GPG_KEY: $(MaintainerGPGKey.secureFilePath)
+        MAINTAINER_GPG_KEY_PASSPHRASE: $(MaintainerGPGKeyPassphrase)
+
   - job: package_arm64
     dependsOn: []
     condition: and(not(canceled()), succeeded(), ne(stageDependencies.env.repo.outputs['changed.mobileOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.docsOnly'], 'true'), ne(stageDependencies.env.repo.outputs['changed.examplesOnly'], 'true'))
