@@ -565,6 +565,7 @@ CAPIStatus Filter::getHeader(absl::string_view key, GoString* goValue) {
   }
   auto m = state.isProcessingHeader() ? headers_ : trailers_;
   if (m == nullptr) {
+    ENVOY_LOG(debug, "invoking cgo api at invalid phase: {}", __func__);
     return CAPIStatus::CAPIInvalidPhase;
   }
   auto result = m->get(Http::LowerCaseString(key));
@@ -616,6 +617,7 @@ CAPIStatus Filter::copyHeaders(GoString* go_strs, char* go_buf) {
     return CAPIStatus::CAPINotInGo;
   }
   if (headers_ == nullptr) {
+    ENVOY_LOG(debug, "invoking cgo api at invalid phase: {}", __func__);
     return CAPIStatus::CAPIInvalidPhase;
   }
   copyHeaderMapToGo(*headers_, go_strs, go_buf);
@@ -634,6 +636,7 @@ CAPIStatus Filter::setHeader(absl::string_view key, absl::string_view value) {
     return CAPIStatus::CAPINotInGo;
   }
   if (headers_ == nullptr) {
+    ENVOY_LOG(debug, "invoking cgo api at invalid phase: {}", __func__);
     return CAPIStatus::CAPIInvalidPhase;
   }
   headers_->setCopy(Http::LowerCaseString(key), value);
@@ -653,6 +656,7 @@ CAPIStatus Filter::removeHeader(absl::string_view key) {
     return CAPIStatus::CAPINotInGo;
   }
   if (headers_ == nullptr) {
+    ENVOY_LOG(debug, "invoking cgo api at invalid phase: {}", __func__);
     return CAPIStatus::CAPIInvalidPhase;
   }
   headers_->remove(Http::LowerCaseString(key));
@@ -672,6 +676,7 @@ CAPIStatus Filter::copyBuffer(Buffer::Instance* buffer, char* data) {
     return CAPIStatus::CAPINotInGo;
   }
   if (!state.doDataList.checkExisting(buffer)) {
+    ENVOY_LOG(debug, "invoking cgo api at invalid phase: {}", __func__);
     return CAPIStatus::CAPIInvalidPhase;
   }
   for (const Buffer::RawSlice& slice : buffer->getRawSlices()) {
@@ -696,6 +701,7 @@ CAPIStatus Filter::setBufferHelper(Buffer::Instance* buffer, absl::string_view& 
     return CAPIStatus::CAPINotInGo;
   }
   if (!state.doDataList.checkExisting(buffer)) {
+    ENVOY_LOG(debug, "invoking cgo api at invalid phase: {}", __func__);
     return CAPIStatus::CAPIInvalidPhase;
   }
   if (action == bufferAction::Set) {
@@ -721,6 +727,7 @@ CAPIStatus Filter::copyTrailers(GoString* go_strs, char* go_buf) {
     return CAPIStatus::CAPINotInGo;
   }
   if (trailers_ == nullptr) {
+    ENVOY_LOG(debug, "invoking cgo api at invalid phase: {}", __func__);
     return CAPIStatus::CAPIInvalidPhase;
   }
   copyHeaderMapToGo(*trailers_, go_strs, go_buf);
@@ -739,6 +746,7 @@ CAPIStatus Filter::setTrailer(absl::string_view key, absl::string_view value) {
     return CAPIStatus::CAPINotInGo;
   }
   if (trailers_ == nullptr) {
+    ENVOY_LOG(debug, "invoking cgo api at invalid phase: {}", __func__);
     return CAPIStatus::CAPIInvalidPhase;
   }
   trailers_->setCopy(Http::LowerCaseString(key), value);
