@@ -56,6 +56,7 @@ message UpstreamTlsContext {
   google.protobuf.UInt32Value max_session_keys = 4;
 
   // If true, the handshake will fail if the keyUsage extension is present and incompatible with the TLS usage.
+  // Currently, the default value is false, but it is expected to be changed to true by default.
   google.protobuf.BoolValue enforce_rsa_key_usage = 5;
 }
 
