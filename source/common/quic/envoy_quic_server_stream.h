@@ -1,7 +1,9 @@
 #pragma once
 
 #include "source/common/quic/envoy_quic_stream.h"
+#include "source/common/quic/quic_stats_gatherer.h"
 
+#include "quiche/common/platform/api/quiche_reference_counted.h"
 #include "quiche/quic/core/http/quic_spdy_server_stream_base.h"
 
 namespace Envoy {
@@ -18,7 +20,11 @@ public:
                         envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
                             headers_with_underscores_action);
 
-  void setRequestDecoder(Http::RequestDecoder& decoder) override { request_decoder_ = &decoder; }
+  void setRequestDecoder(Http::RequestDecoder& decoder) override {
+    request_decoder_ = &decoder;
+    stats_gatherer_->setAccessLogHandlers(request_decoder_->accessLogHandlers());
+  }
+  QuicStatsGatherer* statsGatherer() { return stats_gatherer_.get(); }
 
   // Http::StreamEncoder
   void encode1xxHeaders(const Http::ResponseHeaderMap& headers) override;
@@ -32,6 +38,23 @@ public:
   bool streamErrorOnInvalidHttpMessage() const override {
     return http3_options_.override_stream_error_on_invalid_http_message().value();
   }
+
+  // Accept headers/trailers and stream info from HCM for deferred logging. We pass on the
+  // header/trailer shared pointers, but copy the non-shared stream info to avoid lifetime issues if
+  // the stream is destroyed before logging is complete.
+  void
+  setDeferredLoggingHeadersAndTrailers(Http::RequestHeaderMapConstSharedPtr request_header_map,
+                                       Http::ResponseHeaderMapConstSharedPtr response_header_map,
+                                       Http::ResponseTrailerMapConstSharedPtr response_trailer_map,
+                                       StreamInfo::StreamInfo& stream_info) override {
+    std::unique_ptr<StreamInfo::StreamInfoImpl> new_stream_info =
+        std::make_unique<StreamInfo::StreamInfoImpl>(
+            filterManagerConnection()->dispatcher().timeSource(),
+            filterManagerConnection()->connectionInfoProviderSharedPtr());
+    new_stream_info->setFrom(stream_info, request_header_map.get());
+    stats_gatherer_->setDeferredLoggingHeadersAndTrailers(
+        request_header_map, response_header_map, response_trailer_map, std::move(new_stream_info));
+  };
 
   // Http::Stream
   void resetStream(Http::StreamResetReason reason) override;
@@ -85,6 +108,8 @@ private:
   Http::RequestDecoder* request_decoder_{nullptr};
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
+
+  quiche::QuicheReferenceCountedPointer<QuicStatsGatherer> stats_gatherer_;
 };
 
 } // namespace Quic

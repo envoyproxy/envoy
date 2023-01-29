@@ -9,7 +9,6 @@
 #include "source/common/common/utility.h"
 #include "source/common/config/api_version.h"
 #include "source/common/config/decoded_resource_impl.h"
-#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -38,23 +37,10 @@ EdsClusterImpl::EdsClusterImpl(
     initialize_phase_ = InitializePhase::Secondary;
   }
   const auto resource_name = getResourceName();
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.multiplex_eds") &&
-      (eds_config.api_config_source().api_type() ==
-           envoy::config::core::v3::ApiConfigSource::GRPC ||
-       eds_config.api_config_source().api_type() ==
-           envoy::config::core::v3::ApiConfigSource::DELTA_GRPC)) {
-    ENVOY_LOG(trace, "Multiplexing EDS updates over single stream for cluster ", cluster_name_);
-    subscription_ =
-        factory_context.clusterManager()
-            .multiplexedSubscriptionFactory()
-            .subscriptionFromConfigSource(eds_config, Grpc::Common::typeUrl(resource_name),
-                                          info_->statsScope(), *this, resource_decoder_, {});
-  } else {
-    subscription_ =
-        factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
-            eds_config, Grpc::Common::typeUrl(resource_name), info_->statsScope(), *this,
-            resource_decoder_, {});
-  }
+  subscription_ =
+      factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
+          eds_config, Grpc::Common::typeUrl(resource_name), info_->statsScope(), *this,
+          resource_decoder_, {});
 }
 
 void EdsClusterImpl::startPreInit() { subscription_->start({cluster_name_}); }

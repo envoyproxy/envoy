@@ -453,6 +453,7 @@ final class EngineBuilderTests: XCTestCase {
       dnsPreresolveHostnames: "[test]",
       enableDNSCache: false,
       enableHappyEyeballs: true,
+      enableHttp3: true,
       enableGzip: true,
       enableBrotli: false,
       enableInterfaceBinding: true,
@@ -490,7 +491,6 @@ final class EngineBuilderTests: XCTestCase {
     XCTAssertTrue(resolvedYAML.contains("&dns_min_refresh_rate 100s"))
     XCTAssertTrue(resolvedYAML.contains("&dns_preresolve_hostnames [test]"))
     XCTAssertTrue(resolvedYAML.contains("&dns_lookup_family ALL"))
-    XCTAssertTrue(resolvedYAML.contains("&dns_multiple_addresses true"))
     XCTAssertFalse(resolvedYAML.contains("&persistent_dns_cache_config"))
     XCTAssertTrue(resolvedYAML.contains("&enable_interface_binding true"))
     XCTAssertTrue(resolvedYAML.contains("&trust_chain_verification ACCEPT_UNTRUSTED"))
@@ -547,6 +547,7 @@ final class EngineBuilderTests: XCTestCase {
       dnsPreresolveHostnames: "[test]",
       enableDNSCache: true,
       enableHappyEyeballs: false,
+      enableHttp3: false,
       enableGzip: false,
       enableBrotli: true,
       enableInterfaceBinding: false,
@@ -592,7 +593,6 @@ final class EngineBuilderTests: XCTestCase {
 """
     ))
 // swiftlint:enable line_length
-    XCTAssertTrue(resolvedYAML.contains("&dns_multiple_addresses false"))
     XCTAssertTrue(resolvedYAML.contains("&enable_interface_binding false"))
     XCTAssertTrue(resolvedYAML.contains("&trust_chain_verification VERIFY_TRUST_CHAIN"))
     XCTAssertTrue(resolvedYAML.contains(
@@ -622,6 +622,7 @@ final class EngineBuilderTests: XCTestCase {
       dnsPreresolveHostnames: "[test]",
       enableDNSCache: false,
       enableHappyEyeballs: false,
+      enableHttp3: false,
       enableGzip: false,
       enableBrotli: false,
       enableInterfaceBinding: false,

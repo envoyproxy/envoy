@@ -64,7 +64,10 @@ public:
   void setConcurrency(uint32_t concurrency) { concurrency_ = concurrency; }
   void setConfigPath(const std::string& config_path) { config_path_ = config_path; }
   void setConfigProto(const envoy::config::bootstrap::v3::Bootstrap& config_proto) {
-    config_proto_ = config_proto;
+    *config_proto_ = config_proto;
+  }
+  void setConfigProto(std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>&& config_proto) {
+    config_proto_ = std::move(config_proto);
   }
   void setConfigYaml(const std::string& config_yaml) { config_yaml_ = config_yaml; }
   void setAdminAddressPath(const std::string& admin_address_path) {
@@ -123,7 +126,7 @@ public:
   uint32_t concurrency() const override { return concurrency_; }
   const std::string& configPath() const override { return config_path_; }
   const envoy::config::bootstrap::v3::Bootstrap& configProto() const override {
-    return config_proto_;
+    return *config_proto_;
   }
   const std::string& configYaml() const override { return config_yaml_; }
   bool allowUnknownStaticFields() const override { return allow_unknown_static_fields_; }
@@ -193,7 +196,8 @@ private:
   std::string base_id_path_;
   uint32_t concurrency_{1};
   std::string config_path_;
-  envoy::config::bootstrap::v3::Bootstrap config_proto_;
+  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> config_proto_{
+      new envoy::config::bootstrap::v3::Bootstrap()};
   std::string config_yaml_;
   bool allow_unknown_static_fields_{false};
   bool reject_unknown_dynamic_fields_{false};

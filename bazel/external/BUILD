@@ -13,6 +13,7 @@ cc_library(
     tags = ["skip_on_windows"],
     deps = [
         "@com_github_datadog_dd_opentracing_cpp//:dd_opentracing_cpp",
+        "@com_github_datadog_dd_trace_cpp//:dd_trace_cpp",
         "@com_google_googletest//:gtest",
         "@io_opentracing_cpp//:opentracing",
     ],

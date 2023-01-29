@@ -455,59 +455,6 @@ INSTANTIATE_TEST_SUITE_P(
         {Http::CodecType::HTTP1, Http::CodecType::HTTP2, Http::CodecType::HTTP3})),
     HttpProtocolIntegrationTest::protocolTestParamsToString);
 
-TEST_P(ProxyingConnectIntegrationTest, ProxyConnectLegacy) {
-#ifdef ENVOY_ENABLE_UHV
-  // TODO(#23286) - add web socket support for H2 UHV
-  return;
-#endif
-
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.use_rfc_connect", "false");
-
-  initialize();
-
-  Http::TestRequestHeaderMapImpl legacy_connect_headers{{":method", "CONNECT"},
-                                                        {":path", "/"},
-                                                        {":protocol", "bytestream"},
-                                                        {":scheme", "https"},
-                                                        {":authority", "foo.lyft.com:80"}};
-  // Send request headers.
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto encoder_decoder = codec_client_->startRequest(legacy_connect_headers);
-  request_encoder_ = &encoder_decoder.first;
-  response_ = std::move(encoder_decoder.second);
-
-  // Wait for them to arrive upstream.
-  AssertionResult result =
-      fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
-  RELEASE_ASSERT(result, result.message());
-  result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
-  RELEASE_ASSERT(result, result.message());
-  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Method)[0]->value(), "CONNECT");
-  if (upstreamProtocol() == Http::CodecType::HTTP1) {
-    EXPECT_TRUE(upstream_request_->headers().get(Http::Headers::get().Protocol).empty());
-  } else {
-    EXPECT_EQ(upstream_request_->headers().getProtocolValue(), "bytestream");
-  }
-
-  // Send response headers
-  upstream_request_->encodeHeaders(default_response_headers_, false);
-
-  // Wait for them to arrive downstream.
-  response_->waitForHeaders();
-  EXPECT_EQ("200", response_->headers().getStatusValue());
-
-  // Make sure that even once the response has started, that data can continue to go upstream.
-  codec_client_->sendData(*request_encoder_, "hello", false);
-  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
-
-  // Also test upstream to downstream data.
-  upstream_request_->encodeData(12, false);
-  response_->waitForBodyData(12);
-
-  cleanupUpstreamAndDownstream();
-}
-
 TEST_P(ProxyingConnectIntegrationTest, ProxyConnect) {
   initialize();
 

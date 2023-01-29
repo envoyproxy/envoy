@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/common/time.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
 
@@ -75,6 +76,7 @@ public:
   // AbstractRequestListener
   void onRequest(InFlightRequestSharedPtr request) override;
   void onRequestReadyForAnswer() override;
+  Event::Dispatcher& dispatcher() override;
 
   std::list<InFlightRequestSharedPtr>& getRequestsInFlightForTest();
 

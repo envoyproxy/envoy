@@ -315,8 +315,8 @@ TEST_P(EdsIntegrationTest, FinishWarmingIgnoreHealthCheck) {
   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
   EXPECT_EQ(0, test_server_->gauge("cluster_manager.warming_clusters")->value());
 
-  // Trigger a CDS update. This should cause a new cluster to require warming, blocked on the
-  // host being health checked.
+  // Trigger a CDS update. This should cause a new cluster to require warming, blocked on the host
+  // being health checked.
   cluster_.mutable_circuit_breakers()->add_thresholds()->mutable_max_connections()->set_value(100);
   cds_helper_.setCds({cluster_});
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
@@ -340,8 +340,8 @@ TEST_P(EdsIntegrationTest, EndpointWarmingSuccessfulHc) {
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_excluded")->value());
   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
 
-  // Wait for the first HC and verify the host is healthy and that it is no longer being
-  // excluded. The other endpoint should still be excluded.
+  // Wait for the first HC and verify the host is healthy and that it is no longer being excluded.
+  // The other endpoint should still be excluded.
   waitForNextUpstreamRequest(0);
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   test_server_->waitForGaugeEq("cluster.cluster_0.membership_excluded", 0);
@@ -362,8 +362,8 @@ TEST_P(EdsIntegrationTest, EndpointWarmingFailedHc) {
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_excluded")->value());
   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
 
-  // Wait for the first HC and verify the host is healthy and that it is no longer being
-  // excluded. The other endpoint should still be excluded.
+  // Wait for the first HC and verify the host is healthy and that it is no longer being excluded.
+  // The other endpoint should still be excluded.
   waitForNextUpstreamRequest(0);
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
   test_server_->waitForGaugeEq("cluster.cluster_0.membership_excluded", 0);
