@@ -11,6 +11,7 @@ minor_behavior_changes:
 - area: healthcheck
   change: |
     If active HC is enabled and a host is ejected by outlier detection, a successful active health check unejects the host and consider it healthy. This also clears all the outlier detection counters. This behavior change can be reverted by setting ``envoy.reloadable_features_successful_active_health_check_uneject_host`` to ``false``.
+
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: stats
@@ -23,6 +24,7 @@ bug_fixes:
 - area: router
   change: |
     fixed the bug that custom tags of the route metadata type are not set for upstream spans.
+
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 - area: config
@@ -40,12 +42,14 @@ removed_config_or_runtime:
 - area: http
   change: |
     removed ``envoy.reloadable_features.local_ratelimit_match_all_descriptors`` and legacy code paths.
+
 - area: http
   change: |
     removed ``envoy.reloadable_features.use_rfc_connect`` and legacy code path.
 - area: http
   change: |
     removed ``envoy.reloadable_features.allow_concurrency_for_alpn_pool`` and legacy code path.
+
 new_features:
 - area: access_log
   change: |
@@ -62,4 +66,5 @@ new_features:
 - area: router
   change: |
     support route info in upstream access log.
+
 deprecated:
