@@ -32,6 +32,7 @@ public:
   MOCK_METHOD(bool, startSecureTransport, ());
   MOCK_METHOD(void, configureInitialCongestionWindow,
               (uint64_t bandwidth_bits_per_sec, std::chrono::microseconds rtt));
+  MOCK_METHOD(absl::optional<bool>, sslSyscallErrorOccurred, ());
 
   TransportSocketCallbacks* callbacks_{};
 };

@@ -109,7 +109,7 @@ private:
 
   Ssl::SocketState state_;
   mutable SslExtendedSocketInfoImpl extended_socket_info_;
-  bool error_syscall_ = false;
+  bool error_syscall_{};
 };
 
 using SslHandshakerImplSharedPtr = std::shared_ptr<SslHandshakerImpl>;

@@ -51,6 +51,10 @@ void PassthroughSocket::configureInitialCongestionWindow(uint64_t bandwidth_bits
   return transport_socket_->configureInitialCongestionWindow(bandwidth_bits_per_sec, rtt);
 }
 
+absl::optional<bool> PassthroughSocket::sslSyscallErrorOccurred() {
+    return info_->sslSyscallErrorOccurred();
+  }
+
 } // namespace TransportSockets
 } // namespace Extensions
 } // namespace Envoy
