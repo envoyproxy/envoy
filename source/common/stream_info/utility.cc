@@ -130,6 +130,14 @@ absl::optional<std::chrono::nanoseconds> TimingUtility::downstreamHandshakeCompl
   return duration(timing.value().get().downstreamHandshakeComplete(), stream_info_);
 }
 
+absl::optional<std::chrono::nanoseconds> TimingUtility::lastDownstreamAckReceived() {
+  OptRef<const DownstreamTiming> timing = stream_info_.downstreamTiming();
+  if (!timing) {
+    return absl::nullopt;
+  }
+  return duration(timing.value().get().lastDownstreamAckReceived(), stream_info_);
+}
+
 const std::string&
 Utility::formatDownstreamAddressNoPort(const Network::Address::Instance& address) {
   if (address.type() == Network::Address::Type::Ip) {

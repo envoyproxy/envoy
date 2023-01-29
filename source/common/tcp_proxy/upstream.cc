@@ -55,10 +55,14 @@ TcpUpstream::onDownstreamEvent(Network::ConnectionEvent event) {
     // The close call may result in this object being deleted. Latch the
     // connection locally so it can be returned for potential draining.
     auto* conn_data = upstream_conn_data_.release();
-    conn_data->connection().close(Network::ConnectionCloseType::FlushWrite);
+    conn_data->connection().close(
+        Network::ConnectionCloseType::FlushWrite,
+        StreamInfo::LocalCloseReasons::get().ClosingUpstreamTcpDueToDownstreamRemoteClose);
     return conn_data;
   } else if (event == Network::ConnectionEvent::LocalClose) {
-    upstream_conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
+    upstream_conn_data_->connection().close(
+        Network::ConnectionCloseType::NoFlush,
+        StreamInfo::LocalCloseReasons::get().ClosingUpstreamTcpDueToDownstreamLocalClose);
   }
   return nullptr;
 }
@@ -289,11 +293,6 @@ void Http2Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, boo
   if (config_.usePost()) {
     headers->addReference(Http::Headers::get().Path, config_.postPath());
     headers->addReference(Http::Headers::get().Scheme, scheme);
-  } else if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_rfc_connect")) {
-    headers->addReference(Http::Headers::get().Path, "/");
-    headers->addReference(Http::Headers::get().Scheme, scheme);
-    headers->addReference(Http::Headers::get().Protocol,
-                          Http::Headers::get().ProtocolValues.Bytestream);
   }
 
   config_.headerEvaluator().evaluateHeaders(*headers,

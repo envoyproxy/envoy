@@ -2,6 +2,7 @@
 
 #include <limits>
 
+#include "envoy/common/optref.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/upstream/host_description.h"
 #include "envoy/upstream/upstream.h"
@@ -127,11 +128,38 @@ MockClusterInfo::MockClusterInfo()
           [this](ResourcePriority) -> Upstream::ResourceManager& { return *resource_manager_; }));
   ON_CALL(*this, lbType()).WillByDefault(ReturnPointee(&lb_type_));
   ON_CALL(*this, lbSubsetInfo()).WillByDefault(ReturnRef(lb_subset_));
-  ON_CALL(*this, lbRoundRobinConfig()).WillByDefault(ReturnRef(lb_round_robin_config_));
-  ON_CALL(*this, lbRingHashConfig()).WillByDefault(ReturnRef(lb_ring_hash_config_));
-  ON_CALL(*this, lbMaglevConfig()).WillByDefault(ReturnRef(lb_maglev_config_));
-  ON_CALL(*this, lbOriginalDstConfig()).WillByDefault(ReturnRef(lb_original_dst_config_));
-  ON_CALL(*this, upstreamConfig()).WillByDefault(ReturnRef(upstream_config_));
+  ON_CALL(*this, lbRoundRobinConfig())
+      .WillByDefault(
+          Invoke([this]() -> OptRef<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> {
+            return makeOptRefFromPtr<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>(
+                lb_round_robin_config_.get());
+          }));
+  ON_CALL(*this, lbRingHashConfig())
+      .WillByDefault(
+          Invoke([this]() -> OptRef<const envoy::config::cluster::v3::Cluster::RingHashLbConfig> {
+            return makeOptRefFromPtr<const envoy::config::cluster::v3::Cluster::RingHashLbConfig>(
+                lb_ring_hash_config_.get());
+          }));
+  ON_CALL(*this, lbMaglevConfig())
+      .WillByDefault(
+          Invoke([this]() -> OptRef<const envoy::config::cluster::v3::Cluster::MaglevLbConfig> {
+            return makeOptRefFromPtr<const envoy::config::cluster::v3::Cluster::MaglevLbConfig>(
+                lb_maglev_config_.get());
+          }));
+  ON_CALL(*this, lbOriginalDstConfig())
+      .WillByDefault(Invoke(
+          [this]() -> OptRef<const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig> {
+            return makeOptRefFromPtr<
+                const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>(
+                lb_original_dst_config_.get());
+          }));
+  ON_CALL(*this, upstreamConfig())
+      .WillByDefault(
+          Invoke([this]() -> OptRef<const envoy::config::core::v3::TypedExtensionConfig> {
+            return makeOptRefFromPtr<const envoy::config::core::v3::TypedExtensionConfig>(
+                upstream_config_.get());
+          }));
+
   ON_CALL(*this, lbConfig()).WillByDefault(ReturnRef(lb_config_));
   ON_CALL(*this, metadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(*this, upstreamHttpProtocolOptions())
@@ -147,7 +175,12 @@ MockClusterInfo::MockClusterInfo()
         }
         return *typed_metadata_;
       }));
-  ON_CALL(*this, clusterType()).WillByDefault(ReturnRef(cluster_type_));
+  ON_CALL(*this, clusterType())
+      .WillByDefault(
+          Invoke([this]() -> OptRef<const envoy::config::cluster::v3::Cluster::CustomClusterType> {
+            return makeOptRefFromPtr<const envoy::config::cluster::v3::Cluster::CustomClusterType>(
+                cluster_type_.get());
+          }));
   ON_CALL(*this, upstreamHttpProtocol(_))
       .WillByDefault(Return(std::vector<Http::Protocol>{Http::Protocol::Http11}));
   ON_CALL(*this, createFilterChain(_, _))
