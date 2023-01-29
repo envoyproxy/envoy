@@ -423,6 +423,8 @@ the supported keys are:
   If the *return_duplicate_headers* is set to false (default), the returned *headers* is table with value type of string.
   If the *return_duplicate_headers* is set to true, the returned *headers* is table with value type of string or value type
   of table.
+- *send_xff* is a boolean flag that decides whether the *x-forwarded-for* header is sent to target server.
+  The default value is true.
 
   For example, the following upstream response headers have repeated headers.
 
