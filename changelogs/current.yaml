@@ -11,7 +11,6 @@ minor_behavior_changes:
 - area: healthcheck
   change: |
     If active HC is enabled and a host is ejected by outlier detection, a successful active health check unejects the host and consider it healthy. This also clears all the outlier detection counters. This behavior change can be reverted by setting ``envoy.reloadable_features_successful_active_health_check_uneject_host`` to ``false``.
-
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: stats
@@ -19,58 +18,11 @@ bug_fixes:
     now updating upstream total connection stats as happy eyeballs connections are created.
 - area: eds
   change: |
-    fix a bug when using http2, request body has google.api.HttpBody and the size is < 16KB, it will cause EOF from the backend grpc server.
-- area: router
-  change: |
-    fixed a bug that incorrectly rewrote the path when using ``regex_rewrite`` for redirects matched on prefix.
-- area: oauth2
-  change: |
-    fixed a bug when passthrough header was matched, envoy would always remove the authorization header. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.oauth_header_passthrough_fix`` to false.
-- area: generic_proxy
-  change: |
-    fixed a bug that encoder filters and decoder filters of generic proxy will be executed in the same order. The encoder filters' execuate order should be the reverse of decoder filters' in the generic proxy.
-- area: quic
-  change: |
-    reject configs that specify require_client_certificate with QUIC since clients certificates are currently unsupported in QUIC. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.reject_require_client_certificate_with_quic`` to false.
-- area: http
-  change: |
-    fixed a bug where Utility::PercentEncoding::encode() encodes some characters incorrectly because it was treating the value as negative.
-- area: upstream
-  change: |
-    fixed a bug that only coarse health status is used for override host selection.
-- area: validation
-  change: |
-    fixed a crash which could happen when optional ``engine_type`` is not provided in regex.
-- area: upstream
-  change: |
-    fixed a bug when specify both a single address in bootstrap and cluster upstream binding config but with a different IP version. It should be allowed but it is rejected.
-- area: upstream
-  change: |
-    fixed a bug for tcp upstream where we did not count use the count the header and data to/from the upstream.
-- area: jwt_authn
-  change: |
-    fix a bug that jwt_cache breaks the :ref:`provider_and_audiences <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtRequirement.provider_and_audiences>` JWT requirement.
-- area: skywalking
-  change: |
-    fixed a crash which could happen when skywalking tracer is enabled and illegal ``sw8`` header is received.
-- area: health_checker
-  change: |
-    prevent writing pending data for health checkers by introducing ``ConnectionCloseType::Abort`` to avoid cascading handshake overhead from health checker's requests on timeout. This fix is related to `issue \#23718 <https://github.com/envoyproxy/envoy/issues/23718>`_.
-- area: router
-  change: |
-    fixed a bug that truncated query parameters from paths rewritten with a path_rewrite_policy, query parameters are now appended. ``envoy_reloadable_features_append_query_parameters_path_rewriter`` can be used to revert to truncation.
-- area: grpc_http_bridge
-  change: |
-    fixed a bug where response data could be lost for requests that were upgraded from Protobuf.
-- area: tcp_proxy
-  change: |
-    When tunneling TCP over HTTP, mark the upstream connection as done reading when upstream trailers are read. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.finish_reading_on_decode_trailers`` to false.
+    added ``envoy.reloadable_features.multiplex_eds`` to disable eds multiplexing. Eds multiplexing is enabled by default, so that all subscriptions for the same resource type and management server reuse a single channel/mux.
+    When eds multiplexing is disabled each subscription uses a dedicated channel/mux.
 - area: router
   change: |
     fixed the bug that custom tags of the route metadata type are not set for upstream spans.
-    added ``envoy.reloadable_features.multiplex_eds`` to disable eds multiplexing. Eds multiplexing is enabled by default, so that all subscriptions for the same resource type and management server reuse a single channel/mux.
-    When eds multiplexing is disabled each subscription uses a dedicated channel/mux.
-
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 - area: config
@@ -88,14 +40,12 @@ removed_config_or_runtime:
 - area: http
   change: |
     removed ``envoy.reloadable_features.local_ratelimit_match_all_descriptors`` and legacy code paths.
-
 - area: http
   change: |
     removed ``envoy.reloadable_features.use_rfc_connect`` and legacy code path.
 - area: http
   change: |
     removed ``envoy.reloadable_features.allow_concurrency_for_alpn_pool`` and legacy code path.
-
 new_features:
 - area: access_log
   change: |
@@ -108,14 +58,8 @@ new_features:
     added :ref:`ring hash extension <envoy_v3_api_msg_extensions.load_balancing_policies.ring_hash.v3.RingHash>` to suppport the :ref:`load balancer policy <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>`.
 - area: upstream
   change: |
-    added an api configuration :ref:`xds_config_tracker_extension <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.xds_config_tracker_extension>` in the bootstrap
-    to allow tracking xDS responses in external components, and provided the extension interface.
+    added :ref:`maglev extension <envoy_v3_api_msg_extensions.load_balancing_policies.maglev.v3.Maglev>` to suppport the :ref:`load balancer policy <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>`.
 - area: router
   change: |
     support route info in upstream access log.
-- area: build
-  change: |
-    added compile-time option ``--define=static_extension_registration=disabled`` to disable the automatic static registration of extension factories.
-    added :ref:`maglev extension <envoy_v3_api_msg_extensions.load_balancing_policies.maglev.v3.Maglev>` to suppport the :ref:`load balancer policy <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>`.
-
 deprecated:
