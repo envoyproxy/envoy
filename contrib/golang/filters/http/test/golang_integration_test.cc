@@ -75,8 +75,8 @@ TEST_P(GolangIntegrationTest, Echo) {
   EXPECT_EQ("403", response->headers().getStatusValue());
 
   // check body for echo
-  auto body = StringUtil::toUpper(absl::StrFormat("%s, path: %s\r\n", echo_body, path));
-  EXPECT_EQ(body, StringUtil::toUpper(response->body()));
+  auto body = absl::StrFormat("%s, path: %s\r\n", echo_body, path);
+  EXPECT_EQ(body, response->body());
 
   codec_client_->close();
 
@@ -119,8 +119,8 @@ TEST_P(GolangIntegrationTest, Passthrough) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 
   // check body for pasthrough
-  auto body = StringUtil::toUpper(absl::StrFormat("%s%s", good, bye));
-  EXPECT_EQ(body, StringUtil::toUpper(response->body()));
+  auto body = absl::StrFormat("%s%s", good, bye);
+  EXPECT_EQ(body, response->body());
 
   codec_client_->close();
 
