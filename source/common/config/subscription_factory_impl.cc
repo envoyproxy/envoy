@@ -77,14 +77,12 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
       CustomConfigValidatorsPtr custom_config_validators =
           std::make_unique<CustomConfigValidatorsImpl>(validation_visitor_, server_,
                                                        api_config_source.config_validators());
-      const std::string control_plane_id =
-          Utility::getGrpcControlPlane(api_config_source).value_or("");
 
       BackOffStrategyPtr backoff_strategy =
-          (api_config_source.grpc_services_size() > 0)
-              ? Utility::prepareBackoffStrategy(api_config_source.grpc_services()[0],
-                                                api_.randomGenerator())
-              : Utility::prepareDefaultBackoffStrategy(api_.randomGenerator());
+          Utility::prepareBackoffStrategy(api_config_source, api_.randomGenerator());
+
+      const std::string control_plane_id =
+          Utility::getGrpcControlPlane(api_config_source).value_or("");
 
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
         mux = std::make_shared<Config::XdsMux::GrpcMuxSotw>(
@@ -119,10 +117,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
           std::make_unique<CustomConfigValidatorsImpl>(validation_visitor_, server_,
                                                        api_config_source.config_validators());
       BackOffStrategyPtr backoff_strategy =
-          (api_config_source.grpc_services_size() > 0)
-              ? Utility::prepareBackoffStrategy(api_config_source.grpc_services()[0],
-                                                api_.randomGenerator())
-              : Utility::prepareDefaultBackoffStrategy(api_.randomGenerator());
+          Utility::prepareBackoffStrategy(api_config_source, api_.randomGenerator());
 
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
         mux = std::make_shared<Config::XdsMux::GrpcMuxDelta>(
@@ -192,10 +187,7 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
                                                        api_config_source.config_validators());
 
       BackOffStrategyPtr backoff_strategy =
-          (api_config_source.grpc_services_size() > 0)
-              ? Utility::prepareBackoffStrategy(api_config_source.grpc_services()[0],
-                                                api_.randomGenerator())
-              : Utility::prepareDefaultBackoffStrategy(api_.randomGenerator());
+          Utility::prepareBackoffStrategy(api_config_source, api_.randomGenerator());
 
       SubscriptionOptions options;
       // All Envoy collections currently are xDS resource graph roots and require node context
