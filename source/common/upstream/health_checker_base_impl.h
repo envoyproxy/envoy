@@ -14,7 +14,6 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/matchers.h"
 #include "source/common/network/transport_socket_options_impl.h"
-#include "source/server/backtrace.h"
 
 namespace Envoy {
 namespace Upstream {
