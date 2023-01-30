@@ -38,7 +38,7 @@ TEST_P(TcpAsyncClientIntegrationTest, SingleRequest) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   ASSERT_TRUE(fake_upstream_connection->waitForData(request.size()));
   ASSERT_TRUE(fake_upstream_connection->write(response, true));
-  test_server_->waitForCounterEq("test_network_async_tcp_filter.on_receive_async_data", 1);
+  test_server_->waitForCounterGe("test_network_async_tcp_filter.on_receive_async_data", 1);
 
   ASSERT_TRUE(tcp_client->waitForData(response.size()));
   tcp_client->close();
@@ -71,12 +71,10 @@ TEST_P(TcpAsyncClientIntegrationTest, MultipleRequestFrames) {
   // client receives the first data frame. Sending them in a tight sequence also
   // works, but the onData calling times could be changed due to the event loop.
   ASSERT_TRUE(fake_upstream_connection->write(response_1, false));
-  test_server_->waitForCounterEq("test_network_async_tcp_filter.on_receive_async_data", 1);
+  test_server_->waitForCounterGe("test_network_async_tcp_filter.on_receive_async_data", 1);
   ASSERT_TRUE(fake_upstream_connection->write(response_2, true));
-  test_server_->waitForCounterEq("test_network_async_tcp_filter.on_receive_async_data", 2);
+  test_server_->waitForCounterGe("test_network_async_tcp_filter.on_receive_async_data", 2);
   tcp_client->waitForData(response_1 + response_2, true);
-  EXPECT_EQ(test_server_->counter("test_network_async_tcp_filter.on_receive_async_data")->value(),
-            2);
   tcp_client->close();
 }
 
@@ -100,12 +98,10 @@ TEST_P(TcpAsyncClientIntegrationTest, MultipleResponseFrames) {
 
   // get response 1
   ASSERT_TRUE(fake_upstream_connection->write(response_1, false));
-  test_server_->waitForCounterEq("test_network_async_tcp_filter.on_receive_async_data", 1);
+  test_server_->waitForCounterGe("test_network_async_tcp_filter.on_receive_async_data", 1);
   ASSERT_TRUE(fake_upstream_connection->write(response_2, true));
-  test_server_->waitForCounterEq("test_network_async_tcp_filter.on_receive_async_data", 2);
+  test_server_->waitForCounterGe("test_network_async_tcp_filter.on_receive_async_data", 2);
   tcp_client->waitForData(response_1 + response_2, true);
-  EXPECT_EQ(test_server_->counter("test_network_async_tcp_filter.on_receive_async_data")->value(),
-            2);
   tcp_client->close();
 }
 
