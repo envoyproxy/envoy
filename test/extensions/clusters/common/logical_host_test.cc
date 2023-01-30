@@ -1,10 +1,11 @@
+#include <chrono>
+
 #include "source/extensions/clusters/common/logical_host.h"
 
 #include "test/mocks/upstream/host.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include <chrono>
 
 using testing::_;
 using testing::ReturnRef;
@@ -50,7 +51,7 @@ TEST_F(RealHostDescription, UnitTest) {
   description_.lastTrafficPassTimeGrpc();
 
   EXPECT_CALL(*mock_host_, setLastTrafficTimeTcpSuccess(_));
-  description_.setLastTrafficTimeTcpSuccess( std::chrono::steady_clock::now());
+  description_.setLastTrafficTimeTcpSuccess(std::chrono::steady_clock::now());
 
   EXPECT_CALL(*mock_host_, setLastTrafficTimeHttp2xx(_));
   description_.setLastTrafficTimeHttp2xx(std::chrono::steady_clock::now());
