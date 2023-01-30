@@ -28,9 +28,13 @@ struct CacheShared;
  * created only when a first cache instance is created, and destroyed only when
  * all cache instances have been destroyed.
  *
+ * The class is final, as the thread may still be running during the destructor
+ * - this is fine so long as no class members or vtable entries have yet been
+ * destroyed, which can be guaranteed if the class is final.
+ *
  * See DESIGN.md for more details of the eviction process.
  **/
-class CacheEvictionThread : public Logger::Loggable<Logger::Id::cache_filter> {
+class CacheEvictionThread final : public Logger::Loggable<Logger::Id::cache_filter> {
 public:
   CacheEvictionThread(Thread::ThreadFactory& thread_factory);
 
