@@ -51,13 +51,16 @@ TEST_F(RealHostDescription, UnitTest) {
   description_.lastTrafficPassTimeGrpc();
 
   EXPECT_CALL(*mock_host_, setLastTrafficTimeTcpSuccess(_));
-  description_.setLastTrafficTimeTcpSuccess(std::chrono::steady_clock::now());
+  description_.setLastTrafficTimeTcpSuccess(
+      std::chrono::steady_clock::now()); // NO_CHECK_FORMAT(real_time)
 
   EXPECT_CALL(*mock_host_, setLastTrafficTimeHttp2xx(_));
-  description_.setLastTrafficTimeHttp2xx(std::chrono::steady_clock::now());
+  description_.setLastTrafficTimeHttp2xx(
+      std::chrono::steady_clock::now()); // NO_CHECK_FORMAT(real_time)
 
   EXPECT_CALL(*mock_host_, setLastTrafficTimeGrpcSuccess(_));
-  description_.setLastTrafficTimeGrpcSuccess(std::chrono::steady_clock::now());
+  description_.setLastTrafficTimeGrpcSuccess(
+      std::chrono::steady_clock::now()); // NO_CHECK_FORMAT(real_time)
 
   std::vector<Network::Address::InstanceConstSharedPtr> address_list;
   EXPECT_CALL(*mock_host_, addressList()).WillOnce(ReturnRef(address_list));
