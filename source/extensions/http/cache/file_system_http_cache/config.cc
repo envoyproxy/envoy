@@ -59,7 +59,7 @@ public:
       cache = it->second.lock();
     }
     if (!cache) {
-      auto async_file_manager =
+      std::shared_ptr<Common::AsyncFiles::AsyncFileManager> async_file_manager =
           async_file_manager_factory_->getAsyncFileManager(config.manager_config());
       cache = std::make_shared<FileSystemHttpCache>(singleton, cache_eviction_thread_,
                                                     std::move(config),
