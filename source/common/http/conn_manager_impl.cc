@@ -279,6 +279,13 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
   }
 
   stream.completeRequest();
+
+  // Set roundtrip time in connectionInfoSetter before OnStreamComplete
+  absl::optional<std::chrono::milliseconds> t = read_callbacks_->connection().lastRoundTripTime();
+  if (t.has_value()) {
+    read_callbacks_->connection().connectionInfoSetter().setRoundTripTime(t.value());
+  }
+
   stream.filter_manager_.onStreamComplete();
 
   // For HTTP/3, skip access logging here and add deferred logging info
