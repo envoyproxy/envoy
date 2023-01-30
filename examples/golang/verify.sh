@@ -7,27 +7,23 @@ export MANUAL=true
 # shellcheck source=examples/verify-common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
 
-run_log "Build go plugin library"
+run_log "Compile the go plugin library"
 docker-compose -f docker-compose-go.yaml up --remove-orphans go_plugin_compile
 
+run_log "Start all of our containers"
 bring_up_example
 
-run_log "Test golang plugin for header"
+run_log "Make a request handled by the Go plugin"
 responds_with_header \
     "rsp-header-from-go: bar-test" \
     "http://localhost:8080"
 
-run_log "Test golang plugin for body"
+run_log "Make a request handled upstream and updated by the Go plugin"
 responds_with \
-    "forbidden from go, path: /forbidden" \
-    "http://localhost:8080/forbidden"
+    "updated upstream response body by the simple plugin" \
+    "http://localhost:8080/update_upstream_response"
 
-run_log "Test golang plugin for response status"
-responds_with_header \
-    "HTTP/1.1 403 Forbidden" \
-    "http://localhost:8080/forbidden"
-
-run_log "Test golang plugin for update body"
+run_log "Make a request handled by the Go plugin using custom configuration"
 responds_with \
-    "localreply forbidden by encodedata" \
-    "http://localhost:8080/localreply/forbidden"
+    "localreply from go, path: /localreply_by_config" \
+    "http://localhost:8080/localreply_by_config"

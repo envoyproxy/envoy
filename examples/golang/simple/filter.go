@@ -8,7 +8,7 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-var LOCALREPLYFORBIDDENBODY = "localreply forbidden by encodedata"
+var UpdateUpstreamBody = "updated upstream response body by the simple plugin"
 
 type filter struct {
 	callbacks api.FilterCallbackHandler
@@ -16,30 +16,28 @@ type filter struct {
 	config    *structpb.Struct
 }
 
-func (f *filter) sendLocalReplyForbidden() api.StatusType {
+func (f *filter) sendLocalReplyInternal() api.StatusType {
 	headers := make(map[string]string)
 	configBody := ""
-	v, ok := f.config.AsMap()["prefix_forbidden_body"]
+	v, ok := f.config.AsMap()["prefix_localreply_body"]
 	if ok {
 		configBody = v.(string)
 	}
 
 	body := fmt.Sprintf("%s, path: %s\r\n", configBody, f.path)
-	f.callbacks.SendLocalReply(403, body, headers, -1, "test-from-go")
+	f.callbacks.SendLocalReply(200, body, headers, -1, "test-from-go")
 	return api.LocalReply
 }
 
 func (f *filter) DecodeHeaders(header api.RequestHeaderMap, endStream bool) api.StatusType {
 	f.path, _ = header.Get(":path")
-	header.Set("rsp-header-from-go", "foo-test")
-	if f.path == "/forbidden" {
-		return f.sendLocalReplyForbidden()
+	if f.path == "/localreply_by_config" {
+		return f.sendLocalReplyInternal()
 	}
 	return api.Continue
 }
 
 func (f *filter) DecodeData(buffer api.BufferInstance, endStream bool) api.StatusType {
-	println("enter decodedata")
 	return api.Continue
 }
 
@@ -48,17 +46,17 @@ func (f *filter) DecodeTrailers(trailers api.RequestTrailerMap) api.StatusType {
 }
 
 func (f *filter) EncodeHeaders(header api.ResponseHeaderMap, endStream bool) api.StatusType {
-	if f.path == "/localreply/forbidden" {
-		header.Set("Content-Length", strconv.Itoa(len(LOCALREPLYFORBIDDENBODY)))
+	if f.path == "/update_upstream_response" {
+		header.Set("Content-Length", strconv.Itoa(len(UpdateUpstreamBody)))
 	}
 	header.Set("Rsp-Header-From-Go", "bar-test")
 	return api.Continue
 }
 
 func (f *filter) EncodeData(buffer api.BufferInstance, endStream bool) api.StatusType {
-	if f.path == "/localreply/forbidden" {
+	if f.path == "/update_upstream_response" {
 		if endStream {
-			buffer.SetString(LOCALREPLYFORBIDDENBODY)
+			buffer.SetString(UpdateUpstreamBody)
 		} else {
 			// TODO implement buffer->Drain, buffer.SetString means buffer->Drain(buffer.Len())
 			buffer.SetString("")
