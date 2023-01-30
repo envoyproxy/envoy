@@ -556,7 +556,7 @@ void ContextImpl::logHandshake(SSL* ssl) const {
   }
 
   // TODO(tyxia) Add/increment the `was_key_usage_invalid_` stats once `SSL_was_key_usage_invalid`
-  // API is abvailbe. This is used to indicate the given cert would have triggered an error but is
+  // API is available. This is used to indicate the given cert would have triggered an error but is
   // allowed becausee the enforcement that rsa key uasge and tls usage need to be matched has been
   // disabled.
 }
