@@ -551,7 +551,7 @@ const char* rtds_layer_insert = R"(
             seconds: 1
           resource_api_version: V3
           ads: {{}})";
-            
+
 const char* ads_insert = R"(
 dynamic_resources:
   ads_config:
