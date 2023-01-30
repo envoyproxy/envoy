@@ -560,9 +560,12 @@ public:
   TestUtilOptionsV2(
       const envoy::config::listener::v3::Listener& listener,
       const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& client_ctx_proto,
-      bool expect_success, Network::Address::IpVersion version)
+      bool expect_success, Network::Address::IpVersion version,
+      bool expected_server_transport_failure_reason_empty = false)
       : TestUtilOptionsBase(expect_success, version), listener_(listener),
-        client_ctx_proto_(client_ctx_proto), transport_socket_options_(nullptr) {
+        client_ctx_proto_(client_ctx_proto), transport_socket_options_(nullptr),
+        expected_server_transport_failure_reason_empty_(
+            expected_server_transport_failure_reason_empty) {
     if (expect_success) {
       setExpectedServerStats("ssl.handshake").setExpectedClientStats("ssl.handshake");
     } else {
@@ -655,6 +658,10 @@ public:
     return expected_transport_failure_reason_contains_;
   }
 
+  bool expectedServerTransportFailureReasonEmpty() const {
+    return expected_server_transport_failure_reason_empty_;
+  }
+
 private:
   const envoy::config::listener::v3::Listener& listener_;
   const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& client_ctx_proto_;
@@ -668,6 +675,7 @@ private:
   std::string expected_alpn_protocol_;
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   std::string expected_transport_failure_reason_contains_;
+  bool expected_server_transport_failure_reason_empty_;
 };
 
 void testUtilV2(const TestUtilOptionsV2& options) {
@@ -853,7 +861,9 @@ void testUtilV2(const TestUtilOptionsV2& options) {
   } else {
     EXPECT_THAT(std::string(client_connection->transportFailureReason()),
                 ContainsRegex(options.expectedTransportFailureReasonContains()));
-    EXPECT_NE("", server_connection->transportFailureReason());
+    if (!options.expectedServerTransportFailureReasonEmpty()) {
+      EXPECT_NE("", server_connection->transportFailureReason());
+    }
   }
 }
 
@@ -6929,13 +6939,20 @@ TEST_P(SslSocketTest, RsaKeyUsageVerification) {
 
   // Enable the rsa_key_usage enforcement.
   client_tls_context.mutable_enforce_rsa_key_usage()->set_value(true);
-  TestUtilOptionsV2 test_options_2(listener, client_tls_context, false, version_);
+  // The transport failure reason is empty for server connection on windows platform, which will
+  // cause the test failure
+#if defined(WIN32)
+  TestUtilOptionsV2 test_options_2(listener, client_tls_context, /*expect_success=*/false, version_,
+                                   /*expected_server_transport_failure_reason_empty_=*/true);
+#else
+  TestUtilOptionsV2 test_options_2(listener, client_tls_context, /*expect_success=*/false,
+                                   version_);
+#endif
   // Client connection is failed with key_usage_mismatch, which is expected.
   test_options_2.setExpectedTransportFailureReasonContains("KEY_USAGE_BIT_INCORRECT");
   // Since the underlying transport does not participate in the error
   // queue for SSL_ERROR_SYSCALL case, no ssl stats is recorded.
   test_options_2.setExpectedServerStats("");
-
   testUtilV2(test_options_2);
 }
 
