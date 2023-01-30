@@ -1,4 +1,4 @@
-load("@rules_python//python:pip.bzl", "pip_install", "pip_parse")
+load("@rules_python//python:pip.bzl", "pip_parse")
 load("@python3_10//:defs.bzl", "interpreter")
 
 def envoy_python_dependencies():
@@ -9,12 +9,11 @@ def envoy_python_dependencies():
         extra_pip_args = ["--require-hashes"],
     )
 
-    # TODO(phlax): switch to `pip_parse`
-    pip_install(
-        # Note: dev requirements do *not* check hashes
-        python_interpreter_target = interpreter,
+    pip_parse(
         name = "dev_pip3",
-        requirements = "@envoy//tools/dev:requirements.txt",
+        python_interpreter_target = interpreter,
+        requirements_lock = "@envoy//tools/dev:requirements.txt",
+        extra_pip_args = ["--require-hashes"],
     )
 
     pip_parse(

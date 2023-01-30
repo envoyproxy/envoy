@@ -3267,6 +3267,38 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterBidiData) {
   EXPECT_EQ("world", response_body);
 }
 
+TEST_F(HttpConnectionManagerImplTest, RoundTripTimeHasValue) {
+  setup(false, "");
+
+  // Set up the codec.
+  Buffer::OwnedImpl fake_input("input");
+  conn_manager_->createCodec(fake_input);
+
+  startRequest(true);
+
+  EXPECT_CALL(filter_callbacks_.connection_, lastRoundTripTime())
+      .WillOnce(Return(absl::optional<std::chrono::milliseconds>(300)));
+  EXPECT_CALL(filter_callbacks_.connection_, connectionInfoSetter());
+
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+TEST_F(HttpConnectionManagerImplTest, RoundTripTimeHasNoValue) {
+  setup(false, "");
+
+  // Set up the codec.
+  Buffer::OwnedImpl fake_input("input");
+  conn_manager_->createCodec(fake_input);
+
+  startRequest(true);
+
+  EXPECT_CALL(filter_callbacks_.connection_, lastRoundTripTime())
+      .WillOnce(Return(absl::optional<std::chrono::milliseconds>()));
+  EXPECT_CALL(filter_callbacks_.connection_, connectionInfoSetter()).Times(0);
+
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
 TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisabledByDefault) {
   setup(false, "");
 
