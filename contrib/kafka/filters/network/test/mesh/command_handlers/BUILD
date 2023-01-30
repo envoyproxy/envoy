@@ -29,6 +29,17 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "fetch_unit_test",
+    srcs = ["fetch_unit_test.cc"],
+    tags = ["skip_on_windows"],
+    deps = [
+        "//contrib/kafka/filters/network/source/mesh/command_handlers:fetch_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/stats:stats_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "list_offsets_unit_test",
     srcs = ["list_offsets_unit_test.cc"],
     tags = ["skip_on_windows"],

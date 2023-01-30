@@ -29,6 +29,7 @@
 #include "test/test_common/file_system_for_test.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_random_generator.h"
 #include "test/test_common/test_time_system.h"
 #include "test/test_common/thread_factory_for_test.h"
 
@@ -127,20 +128,6 @@ namespace Envoy {
 class TestEnvoyBug {
 public:
   static void callEnvoyBug() { ENVOY_BUG(false, ""); }
-};
-
-// Random number generator which logs its seed to stderr. To repeat a test run with a non-zero seed
-// one can run the test with --test_arg=--gtest_random_seed=[seed]
-class TestRandomGenerator {
-public:
-  TestRandomGenerator();
-
-  uint64_t random();
-
-private:
-  const int32_t seed_;
-  std::ranlux48 generator_;
-  RealTimeSource real_time_source_;
 };
 
 // See https://github.com/envoyproxy/envoy/issues/21245.
@@ -357,9 +344,7 @@ public:
    * @return a filename based on the process id and current time.
    */
 
-  static std::string uniqueFilename() {
-    return absl::StrCat(getpid(), "_", std::chrono::system_clock::now().time_since_epoch().count());
-  }
+  static std::string uniqueFilename();
 
   /**
    * Compare two protos of the same type for equality.

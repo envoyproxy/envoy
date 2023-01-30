@@ -194,9 +194,9 @@ TEST_F(TcpProxyTest, HalfCloseProxy) {
 TEST_F(TcpProxyTest, ExplicitFactory) {
   // Explicitly configure an HTTP upstream, to test factory creation.
   auto& info = factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_;
-  info->upstream_config_ = absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>();
+  info->upstream_config_ = std::make_unique<envoy::config::core::v3::TypedExtensionConfig>();
   envoy::extensions::upstreams::tcp::generic::v3::GenericConnectionPoolProto generic_config;
-  info->upstream_config_.value().mutable_typed_config()->PackFrom(generic_config);
+  info->upstream_config_->mutable_typed_config()->PackFrom(generic_config);
   setup(1);
 
   raiseEventUpstreamConnected(0);
@@ -216,10 +216,10 @@ TEST_F(TcpProxyTest, ExplicitFactory) {
 // Test nothing bad happens if an invalid factory is configured.
 TEST_F(TcpProxyTest, BadFactory) {
   auto& info = factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_;
-  info->upstream_config_ = absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>();
+  info->upstream_config_ = std::make_unique<envoy::config::core::v3::TypedExtensionConfig>();
   // The HTTP Generic connection pool is not a valid type for TCP upstreams.
   envoy::extensions::upstreams::http::generic::v3::GenericConnectionPoolProto generic_config;
-  info->upstream_config_.value().mutable_typed_config()->PackFrom(generic_config);
+  info->upstream_config_->mutable_typed_config()->PackFrom(generic_config);
 
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
 
