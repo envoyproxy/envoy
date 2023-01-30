@@ -559,7 +559,7 @@ public:
     unhealthy_threshold: 2
     healthy_threshold: 2
     http_health_check:
-      path: /l7-healthcheck 
+      path: /l7-healthcheck
     disable_health_check_if_active_traffic: true
     )EOF";
 
@@ -4212,7 +4212,7 @@ public:
     unhealthy_threshold: 2
     healthy_threshold: 2
     tcp_health_check: {}
-    disable_health_check_if_active_traffic: true 
+    disable_health_check_if_active_traffic: true
     )EOF";
 
     allocHealthChecker(yaml);
