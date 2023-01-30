@@ -33,6 +33,10 @@ struct CacheShared;
 class CacheEvictionThread : public Logger::Loggable<Logger::Id::cache_filter> {
 public:
   CacheEvictionThread(Thread::ThreadFactory& thread_factory);
+
+  /**
+   * The destructor may block until the cache eviction thread is joined.
+   */
   ~CacheEvictionThread();
 
   /**
@@ -48,23 +52,41 @@ public:
   void removeCache(std::shared_ptr<CacheShared>& cache);
 
   /**
-   * Signals the cache eviction thread that it's time to test things.
-   * After receiving a signal, the thread will exit if terminating_ is set.
-   * Otherwise it will call each cache's `maybeEvict` function in an arbitrary
-   * order.
+   * Signals the cache eviction thread that it's time to check the current cache
+   * state against any configured limits, and perform eviction if necessary.
    */
   void signal();
 
 private:
   /**
    * The function that runs on the thread.
+   *
+   * This thread is expected to spend most of its time blocked, waiting for either
+   * `signal` or `terminate` to be called, or a configured period.
+   *
+   * When unblocked, the thread will exit if terminating_ is set.
+   *
+   * Otherwise, each cache instance's `needsEviction` function is called, in an
+   * arbitrary order, and, if that returns true, the `evict` function is also called.
+   *
+   * If `signal` is called during the eviction process, the eviction
+   * cycle may run a second time after completion, depending on configured
+   * constraints.
    */
   void work();
 
   /**
-   * @return false if terminating.
+   * @return false if terminating, true if signalled or the run-again period
+   * has passed.
    */
   bool waitForSignal();
+
+  /**
+   * Notifies the thread to terminate. If it is currently evicting, it will
+   * complete the current eviction cycle before exiting. If it is currently
+   * idle, it will exit immediately (terminate does not wait for exiting
+   * to be complete).
+   */
   void terminate();
 
   // These two mutexes are never held at the same time. We signify this by requiring
