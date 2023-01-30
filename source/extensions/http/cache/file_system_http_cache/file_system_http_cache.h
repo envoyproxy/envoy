@@ -219,6 +219,8 @@ private:
   // them even if the cache instance has been deleted while it performed work.
   std::shared_ptr<CacheShared> shared_;
 
+  // This reference must be declared after owner_, since it can potentially be
+  // invalid after owner_ is destroyed.
   CacheEvictionThread& cache_eviction_thread_;
 
   // Allow test access to cache_eviction_thread_ for synchronization.
