@@ -367,7 +367,6 @@ const char* config_template = R"(
 typed_dns_resolver_config:
   name: *dns_resolver_name
   typed_config: *dns_resolver_config
-dynamic_resources:
 #{custom_ads}
 static_resources:
   listeners:
@@ -554,6 +553,7 @@ const char* rtds_layer_insert = R"(
           ads: {{}})";
             
 const char* ads_insert = R"(
+dynamic_resources:
   ads_config:
     transport_api_version: V3
     api_type: {}
