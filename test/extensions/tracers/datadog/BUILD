@@ -16,6 +16,7 @@ envoy_extension_cc_test(
     srcs = [
         "datadog_tracer_impl_test.cc",
         "logger_test.cc",
+        "time_util_test.cc",
     ],
     copts = [
         # Make sure that headers included from dd_trace_cpp use Abseil

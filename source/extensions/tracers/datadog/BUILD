@@ -16,10 +16,12 @@ envoy_cc_library(
     srcs = [
         "datadog_tracer_impl.cc",
         "logger.cc",
+        "time_util.cc",
     ],
     hdrs = [
         "datadog_tracer_impl.h",
         "logger.h",
+        "time_util.h",
     ],
     copts = [
         # Make sure that headers included from dd_trace_cpp use Abseil

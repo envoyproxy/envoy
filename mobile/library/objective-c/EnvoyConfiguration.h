@@ -21,6 +21,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) UInt32 dnsRefreshSeconds;
 @property (nonatomic, assign) BOOL enableDNSCache;
 @property (nonatomic, assign) BOOL enableHappyEyeballs;
+@property (nonatomic, assign) BOOL enableHttp3;
 @property (nonatomic, assign) BOOL enableGzip;
 @property (nonatomic, assign) BOOL enableBrotli;
 @property (nonatomic, assign) BOOL enableInterfaceBinding;
@@ -30,7 +31,6 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) BOOL enablePlatformCertificateValidation;
 @property (nonatomic, assign) UInt32 h2ConnectionKeepaliveIdleIntervalMilliseconds;
 @property (nonatomic, assign) UInt32 h2ConnectionKeepaliveTimeoutSeconds;
-@property (nonatomic, assign) BOOL h2ExtendKeepaliveTimeout;
 @property (nonatomic, assign) UInt32 maxConnectionsPerHost;
 @property (nonatomic, assign) UInt32 statsFlushSeconds;
 @property (nonatomic, assign) UInt32 streamIdleTimeoutSeconds;
@@ -60,6 +60,7 @@ NS_ASSUME_NONNULL_BEGIN
                            dnsPreresolveHostnames:(NSString *)dnsPreresolveHostnames
                                    enableDNSCache:(BOOL)enableDNSCache
                               enableHappyEyeballs:(BOOL)enableHappyEyeballs
+                                      enableHttp3:(BOOL)enableHttp3
                                        enableGzip:(BOOL)enableGzip
                                      enableBrotli:(BOOL)enableBrotli
                            enableInterfaceBinding:(BOOL)enableInterfaceBinding
@@ -70,7 +71,6 @@ NS_ASSUME_NONNULL_BEGIN
     h2ConnectionKeepaliveIdleIntervalMilliseconds:
         (UInt32)h2ConnectionKeepaliveIdleIntervalMilliseconds
               h2ConnectionKeepaliveTimeoutSeconds:(UInt32)h2ConnectionKeepaliveTimeoutSeconds
-                         h2ExtendKeepaliveTimeout:(BOOL)h2ExtendKeepaliveTimeout
                             maxConnectionsPerHost:(UInt32)maxConnectionsPerHost
                                 statsFlushSeconds:(UInt32)statsFlushSeconds
                          streamIdleTimeoutSeconds:(UInt32)streamIdleTimeoutSeconds
