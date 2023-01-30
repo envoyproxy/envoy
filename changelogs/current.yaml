@@ -11,10 +11,12 @@ minor_behavior_changes:
 - area: healthcheck
   change: |
     If active HC is enabled and a host is ejected by outlier detection, a successful active health check unejects the host and consider it healthy. This also clears all the outlier detection counters. This behavior change can be reverted by setting ``envoy.reloadable_features_successful_active_health_check_uneject_host`` to ``false``.
-
 - area: local_ratelimit
   change: |
     Tokens from local descriptor's token buckets are burned before tokens from the default token bucket.
+- area: http stream
+  change: |
+    Extended the lifetime of the protocol agnoistic stream object to correct discrepancies between what is access logged and what occurred with the protocol specific stream. This behavior change can be reverted by setting ``envoy_reloadable_features_expand_agnostic_stream_lifetime`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*

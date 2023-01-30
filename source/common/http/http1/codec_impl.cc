@@ -282,7 +282,7 @@ void StreamEncoderImpl::encodeTrailersBase(const HeaderMap& trailers) {
   }
 
   flushOutput();
-  connection_.onEncodeComplete();
+  notifyEncodeComplete();
 }
 
 void StreamEncoderImpl::encodeMetadata(const MetadataMapVector&) {
@@ -295,7 +295,7 @@ void StreamEncoderImpl::endEncode() {
   }
 
   flushOutput(true);
-  connection_.onEncodeComplete();
+  notifyEncodeComplete();
   // With CONNECT or TCP tunneling, half-closing the connection is used to signal end stream so
   // don't delay that signal.
   if (connect_request_ || is_tcp_tunneling_ ||
@@ -305,6 +305,13 @@ void StreamEncoderImpl::endEncode() {
         Network::ConnectionCloseType::FlushWrite,
         StreamInfo::LocalCloseReasons::get().CloseForConnectRequestOrTcpTunneling);
   }
+}
+
+void StreamEncoderImpl::notifyEncodeComplete() {
+  if (stream_adapter_) {
+    stream_adapter_->onCodecEncodeComplete();
+  }
+  connection_.onEncodeComplete();
 }
 
 void ServerConnectionImpl::maybeAddSentinelBufferFragment(Buffer::Instance& output_buffer) {
@@ -343,6 +350,11 @@ uint64_t ConnectionImpl::flushOutput(bool end_encode) {
   connection().write(*output_buffer_, false);
   ASSERT(0UL == output_buffer_->length());
   return bytes_encoded;
+}
+
+StreamAdapter* StreamEncoderImpl::registerStreamAdapter(StreamAdapter* adapter) {
+  std::swap(adapter, stream_adapter_);
+  return adapter;
 }
 
 void StreamEncoderImpl::resetStream(StreamResetReason reason) {

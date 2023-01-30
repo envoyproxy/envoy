@@ -1,5 +1,3 @@
-#include <nghttp2/nghttp2.h>
-
 #include <algorithm>
 #include <memory>
 #include <string>
@@ -2013,9 +2011,13 @@ TEST_P(Http2FrameIntegrationTest, AccessLogOfWireBytesIfResponseSizeGreaterThanW
   EXPECT_EQ(Http2Frame::Type::Data, response.type());
 
   // Check if HCM stream level access log occur
-  auto access_log_values = StoiAccessLogString(waitForAccessLog(access_log_name_));
-  const int hcm_logged_wire_bytes_sent = access_log_values[0];
-  const int hcm_logged_wire_header_bytes_sent = access_log_values[1];
+  int hcm_logged_wire_bytes_sent, hcm_logged_wire_header_bytes_sent;
+  if (!Runtime::runtimeFeatureEnabled(Runtime::expand_agnostic_stream_lifetime)) {
+    // We can access access log due to the agnostic stream lifetime.
+    auto access_log_values = StoiAccessLogString(waitForAccessLog(access_log_name_));
+    hcm_logged_wire_bytes_sent = access_log_values[0];
+    hcm_logged_wire_header_bytes_sent = access_log_values[1];
+  }
 
   // Grant the sender (Envoy) additional window so it can finish sending the
   // stream.
@@ -2024,13 +2026,10 @@ TEST_P(Http2FrameIntegrationTest, AccessLogOfWireBytesIfResponseSizeGreaterThanW
   sendFrame(conn_update_frame);
   sendFrame(stream_update_frame);
 
-  auto resp_flag = std::get<Http::Http2::Http2Frame::DataFlags>(response.frameFlags());
   while (!response.endStream() && stream_wire_bytes_recieved < 60000 + 50000) {
     response = readFrame();
     updateWireByteCount(response);
     EXPECT_EQ(Http2Frame::Type::Data, response.type());
-    resp_flag = std::get<Http::Http2::Http2Frame::DataFlags>(response.frameFlags());
-    std::cerr << "Response FLAGS:" << static_cast<uint8_t>(resp_flag) << std::endl;
   }
 
   // Calculate from the client side the received bytes and compare it to what
@@ -2040,11 +2039,17 @@ TEST_P(Http2FrameIntegrationTest, AccessLogOfWireBytesIfResponseSizeGreaterThanW
       stream_body_payload_recieved + stream_data_frames_recieved * Http2Frame::HeaderSize;
   EXPECT_EQ(body_wire_bytes, calculated_body_wire_bytes);
 
+  if (Runtime::runtimeFeatureEnabled(Runtime::expand_agnostic_stream_lifetime)) {
+    // Access logs are only available now due to the expanded agnostic stream
+    // lifetime.
+    auto access_log_values = StoiAccessLogString(waitForAccessLog(access_log_name_));
+    hcm_logged_wire_bytes_sent = access_log_values[0];
+    hcm_logged_wire_header_bytes_sent = access_log_values[1];
+  }
   EXPECT_EQ(stream_wire_header_bytes_recieved, hcm_logged_wire_header_bytes_sent);
   EXPECT_EQ(stream_wire_bytes_recieved, hcm_logged_wire_bytes_sent)
       << "Received " << stream_wire_bytes_recieved
       << " stream wire bytes from Envoy but access log reported " << hcm_logged_wire_bytes_sent;
-  ;
 
   // Cleanup.
   tcp_client_->close();

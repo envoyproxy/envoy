@@ -325,6 +325,25 @@ public:
 };
 
 /**
+ * An adapter for an HTTP Stream that is tightly coupled with both the
+ * lifetime of the stream and low-level events that can occur on the stream.
+ */
+class StreamAdapter {
+public:
+  virtual ~StreamAdapter() = default;
+  /**
+   * Called when the the underlying codec finishes encoding.
+   */
+  virtual void onCodecEncodeComplete() PURE;
+
+  /**
+   * Called when the underlying codec has serialized the response but the
+   * it has not been flushed.
+   */
+  virtual void onCodecTimeoutPendingFlush() PURE;
+};
+
+/**
  * An HTTP stream (request, response, and push).
  */
 class Stream : public StreamResetHandler {
@@ -340,6 +359,14 @@ public:
    * @param callbacks supplies the callbacks to remove.
    */
   virtual void removeCallbacks(StreamCallbacks& callbacks) PURE;
+
+  /**
+   * Register a stream adapter. The stream can only have a single adapter at a
+   * time.
+   * @param adapter the stream adapter for this stream.
+   * @return StreamAdapter* the prior registered stream adapter.
+   */
+  virtual StreamAdapter* registerStreamAdapter(StreamAdapter* adapter) PURE;
 
   /**
    * Enable/disable further data from this stream.

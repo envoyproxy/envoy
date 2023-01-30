@@ -17,6 +17,7 @@ public:
   // Http::Stream
   MOCK_METHOD(void, addCallbacks, (StreamCallbacks & callbacks));
   MOCK_METHOD(void, removeCallbacks, (StreamCallbacks & callbacks));
+  MOCK_METHOD(StreamAdapter*, registerStreamAdapter, (StreamAdapter * adapter));
   MOCK_METHOD(void, resetStream, (StreamResetReason reason));
   MOCK_METHOD(void, readDisable, (bool disable));
   MOCK_METHOD(void, setWriteBufferWatermarks, (uint32_t));

@@ -235,6 +235,8 @@ private:
     // Stream
     void addCallbacks(StreamCallbacks& callbacks) override { addCallbacksHelper(callbacks); }
     void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacksHelper(callbacks); }
+    StreamAdapter* registerStreamAdapter(StreamAdapter* /*adapter*/) override { return nullptr; }
+
     void resetStream(StreamResetReason) override;
     Network::ConnectionInfoProvider& connectionInfoProvider() override {
       return parent_.address_provider_;
