@@ -17,7 +17,6 @@
 
 #include "source/common/config/subscription_base.h"
 #include "source/common/upstream/cluster_factory_impl.h"
-#include "source/common/upstream/multiplexed_subscription_factory.h"
 #include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/clusters/eds/leds.h"
 
