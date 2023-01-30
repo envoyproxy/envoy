@@ -554,6 +554,11 @@ void ContextImpl::logHandshake(SSL* ssl) const {
   if (!cert.get()) {
     stats_.no_certificate_.inc();
   }
+
+  // TODO(tyxia) Add/increment the `was_key_usage_invalid_` stats once `SSL_was_key_usage_invalid`
+  // API is abvailbe. This is used to indicate the given cert would have triggered an error but is
+  // allowed becausee the enforcement that rsa key uasge and tls usage need to be matched has been
+  // disabled.
 }
 
 std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> ContextImpl::getPrivateKeyMethodProviders() {

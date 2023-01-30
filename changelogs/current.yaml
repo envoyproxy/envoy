@@ -66,7 +66,7 @@ new_features:
 - area: tls
   change: |
     added support to configure the new config option :ref:`enforce_rsa_key_usage <envoy_v3_api_field_extensions.transport_sockets.tls.v3.UpstreamTlsContext.enforce_rsa_key_usage>`. This can be used to override its configuration in BoringSSL.
-    It is currently default to false but expected to be changed to true by default in a future release. A warning is currently output for certificate configurations that would fail if this option were set to true.
+    It is currently default to false but expected to be changed to true by default in a future release. A warning will be output for certificate configurations that would fail if this option were set to true.
 - area: router
   change: |
     support route info in upstream access log.

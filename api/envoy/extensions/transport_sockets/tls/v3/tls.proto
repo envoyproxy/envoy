@@ -56,7 +56,7 @@ message UpstreamTlsContext {
   google.protobuf.UInt32Value max_session_keys = 4;
 
   // Currently, the default value is false, but it is expected to be changed to true by default in a future release.
-  // A warning is currently output for certificate configurations that would fail if this option were set to true.
+  // A warning will be output for certificate configurations that would fail if this option were set to true.
   google.protobuf.BoolValue enforce_rsa_key_usage = 5;
 }
 
