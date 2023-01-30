@@ -69,8 +69,10 @@ token_bucket:
 )EOF");
 
   InSequence s;
+  Buffer::OwnedImpl buffer("test");
   ActiveFilter active_filter(config_);
   EXPECT_EQ(Network::FilterStatus::Continue, active_filter.filter_.onNewConnection());
+  EXPECT_EQ(Network::FilterStatus::Continue, active_filter.filter_.onData(buffer, false));
   EXPECT_EQ(0, TestUtility::findCounter(stats_store_,
                                         "local_rate_limit.local_rate_limit_stats.rate_limited")
                    ->value());
@@ -87,15 +89,16 @@ token_bucket:
 
   // First connection is OK.
   InSequence s;
+  Buffer::OwnedImpl buffer("test");
   ActiveFilter active_filter1(config_);
   EXPECT_EQ(Network::FilterStatus::Continue, active_filter1.filter_.onNewConnection());
+  EXPECT_EQ(Network::FilterStatus::Continue, active_filter1.filter_.onData(buffer, false));
 
   // Second connection should be rate limited.
   ActiveFilter active_filter2(config_);
-  EXPECT_CALL(active_filter2.read_filter_callbacks_.connection_.stream_info_,
-              setResponseFlag(StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded));
   EXPECT_CALL(active_filter2.read_filter_callbacks_.connection_, close(_));
   EXPECT_EQ(Network::FilterStatus::StopIteration, active_filter2.filter_.onNewConnection());
+  EXPECT_EQ(Network::FilterStatus::Continue, active_filter1.filter_.onData(buffer, false));
   EXPECT_EQ(1, TestUtility::findCounter(stats_store_,
                                         "local_rate_limit.local_rate_limit_stats.rate_limited")
                    ->value());
@@ -107,6 +110,43 @@ token_bucket:
   // Third connection is OK.
   ActiveFilter active_filter3(config_);
   EXPECT_EQ(Network::FilterStatus::Continue, active_filter3.filter_.onNewConnection());
+  EXPECT_EQ(Network::FilterStatus::Continue, active_filter3.filter_.onData(buffer, false));
+}
+
+// Rate limit with delay case.
+TEST_F(LocalRateLimitFilterTest, RateLimitWithDelay) {
+  initialize(R"EOF(
+stat_prefix: local_rate_limit_stats
+token_bucket:
+  max_tokens: 1
+  fill_interval: 0.2s
+delay: 0.1s
+)EOF");
+  // First connection is OK.
+  InSequence s;
+  Buffer::OwnedImpl buffer("test");
+  ActiveFilter active_filter1(config_);
+  EXPECT_EQ(Network::FilterStatus::Continue, active_filter1.filter_.onNewConnection());
+  EXPECT_EQ(Network::FilterStatus::Continue, active_filter1.filter_.onData(buffer, false));
+  // Second connection should be rate limited after delay duration.
+  ActiveFilter active_filter2(config_);
+  Event::MockTimer* delay_timer = new NiceMock<Event::MockTimer>(
+      &active_filter2.read_filter_callbacks_.connection_.dispatcher_);
+  EXPECT_CALL(*delay_timer, enableTimer(std::chrono::milliseconds(100), _));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, active_filter2.filter_.onNewConnection());
+  EXPECT_EQ(Network::FilterStatus::StopIteration, active_filter2.filter_.onData(buffer, false));
+  EXPECT_EQ(1, TestUtility::findCounter(stats_store_,
+                                        "local_rate_limit.local_rate_limit_stats.rate_limited")
+                   ->value());
+  EXPECT_CALL(active_filter2.read_filter_callbacks_.connection_, close(_));
+  delay_timer->invokeCallback();
+  // Refill the bucket.
+  EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(200), nullptr));
+  fill_timer_->invokeCallback();
+  // Third connection is OK.
+  ActiveFilter active_filter3(config_);
+  EXPECT_EQ(Network::FilterStatus::Continue, active_filter3.filter_.onNewConnection());
+  EXPECT_EQ(Network::FilterStatus::Continue, active_filter3.filter_.onData(buffer, false));
 }
 
 // Verify the runtime disable functionality.
@@ -123,14 +163,17 @@ runtime_enabled:
 
   // First connection is OK.
   InSequence s;
+  Buffer::OwnedImpl buffer("test");
   ActiveFilter active_filter1(config_);
   EXPECT_CALL(runtime_.snapshot_, getBoolean("foo_key", true)).WillOnce(Return(true));
   EXPECT_EQ(Network::FilterStatus::Continue, active_filter1.filter_.onNewConnection());
+  EXPECT_EQ(Network::FilterStatus::Continue, active_filter1.filter_.onData(buffer, false));
 
   // Second connection should be rate limited but won't be due to filter disable.
   ActiveFilter active_filter2(config_);
   EXPECT_CALL(runtime_.snapshot_, getBoolean("foo_key", true)).WillOnce(Return(false));
   EXPECT_EQ(Network::FilterStatus::Continue, active_filter2.filter_.onNewConnection());
+  EXPECT_EQ(Network::FilterStatus::Continue, active_filter2.filter_.onData(buffer, false));
   EXPECT_EQ(0, TestUtility::findCounter(stats_store_,
                                         "local_rate_limit.local_rate_limit_stats.rate_limited")
                    ->value());

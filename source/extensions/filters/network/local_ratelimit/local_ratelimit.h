@@ -78,6 +78,7 @@ public:
   bool canCreateConnection();
   bool enabled() { return enabled_.enabled(); }
   LocalRateLimitStats& stats() { return stats_; }
+  const absl::optional<std::chrono::milliseconds> delay() const { return delay_; }
 
 private:
   static LocalRateLimitStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -85,6 +86,8 @@ private:
   LocalRateLimiterImplSharedPtr rate_limiter_;
   Runtime::FeatureFlag enabled_;
   LocalRateLimitStats stats_;
+  absl::optional<std::chrono::milliseconds> delay_;
+  std::vector<RateLimit::LocalDescriptor> descriptors_;
   const SharedRateLimitSingleton::Key* shared_bucket_key_{};
   std::shared_ptr<SharedRateLimitSingleton> shared_bucket_registry_;
 
@@ -96,22 +99,28 @@ using ConfigSharedPtr = std::shared_ptr<Config>;
 /**
  * Per-connection local rate limit filter.
  */
-class Filter : public Network::ReadFilter, Logger::Loggable<Logger::Id::filter> {
+class Filter : public Network::ReadFilter, public Network::ConnectionCallbacks, Logger::Loggable<Logger::Id::filter> {
 public:
   Filter(const ConfigSharedPtr& config) : config_(config) {}
 
   // Network::ReadFilter
-  Network::FilterStatus onData(Buffer::Instance&, bool) override {
-    return Network::FilterStatus::Continue;
-  }
+  Network::FilterStatus onData(Buffer::Instance&, bool) override;
   Network::FilterStatus onNewConnection() override;
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& read_callbacks) override {
     read_callbacks_ = &read_callbacks;
+    read_callbacks_->connection().addConnectionCallbacks(*this);
   }
 
+	// Network::ConnectionCallbacks
+  void onEvent(Network::ConnectionEvent event) override;
+  void onAboveWriteBufferHighWatermark() override {}
+  void onBelowWriteBufferLowWatermark() override {}
+
 private:
+  void resetTimerState();
   const ConfigSharedPtr config_;
   Network::ReadFilterCallbacks* read_callbacks_{};
+  Event::TimerPtr delay_timer_ = nullptr;
 };
 
 } // namespace LocalRateLimitFilter

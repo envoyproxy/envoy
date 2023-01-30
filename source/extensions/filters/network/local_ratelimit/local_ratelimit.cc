@@ -65,6 +65,7 @@ Config::Config(
     Singleton::Manager& singleton_manager)
     : enabled_(proto_config.runtime_enabled(), runtime),
       stats_(generateStats(proto_config.stat_prefix(), scope)),
+      delay_(PROTOBUF_GET_OPTIONAL_MS(proto_config, delay)),
       shared_bucket_registry_(singleton_manager.getTyped<SharedRateLimitSingleton>(
           SINGLETON_MANAGER_REGISTERED_NAME(shared_local_ratelimit),
           []() { return std::make_shared<SharedRateLimitSingleton>(); })) {
@@ -94,7 +95,22 @@ LocalRateLimitStats Config::generateStats(const std::string& prefix, Stats::Scop
   return {ALL_LOCAL_RATE_LIMIT_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
 }
 
-bool Config::canCreateConnection() { return rate_limiter_->requestAllowed({}); }
+bool Config::canCreateConnection() { return rate_limiter_->requestAllowed(descriptors_); }
+
+void Filter::resetTimerState() {
+  if (delay_timer_) {
+    delay_timer_->disableTimer();
+    delay_timer_.reset();
+  }
+}
+
+Network::FilterStatus Filter::onData(Buffer::Instance&, bool) {
+  if (delay_timer_ == nullptr) {
+    return Network::FilterStatus::Continue;
+  }
+  // If the connection in the delay rejection, stop reading new data.
+  return Network::FilterStatus::StopIteration;
+}
 
 Network::FilterStatus Filter::onNewConnection() {
   if (!config_->enabled()) {
@@ -106,13 +122,28 @@ Network::FilterStatus Filter::onNewConnection() {
     config_->stats().rate_limited_.inc();
     ENVOY_CONN_LOG(trace, "local_rate_limit: rate limiting connection",
                    read_callbacks_->connection());
-    read_callbacks_->connection().streamInfo().setResponseFlag(
-        StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded);
-    read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+	    // Delay rejection provides a better DoS protection for Envoy.
+    absl::optional<std::chrono::milliseconds> duration = config_->delay();
+    if (duration.has_value() && duration.value() > std::chrono::milliseconds(0)) {
+      delay_timer_ = read_callbacks_->connection().dispatcher().createTimer([this]() -> void {
+        resetTimerState();
+        read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+      });
+      delay_timer_->enableTimer(duration.value());
+    } else {
+      read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+    }
     return Network::FilterStatus::StopIteration;
   }
 
   return Network::FilterStatus::Continue;
+}
+
+void Filter::onEvent(Network::ConnectionEvent event) {
+  if (event == Network::ConnectionEvent::RemoteClose ||
+      event == Network::ConnectionEvent::LocalClose) {
+    resetTimerState();
+  }
 }
 
 } // namespace LocalRateLimitFilter

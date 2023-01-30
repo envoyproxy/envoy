@@ -5,6 +5,8 @@ package envoy.extensions.filters.network.local_ratelimit.v3;
 import "envoy/config/core/v3/base.proto";
 import "envoy/type/v3/token_bucket.proto";
 
+import "google/protobuf/duration.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -51,4 +53,9 @@ message LocalRateLimit {
   // and ``share_key`` configuration. All fields of ``token_bucket`` must match exactly for the token bucket to be shared. If this
   // field is empty, this filter will not share a token bucket with any other filter.
   string share_key = 4;
+
+  // The delay configuration to use for rejecting the connection after some specified time duration
+  // instead of immediately rejecting the connection. That way, a malicious user is not able to
+  // retry as fast as possible which provides a better DoS protection for Envoy.
+  google.protobuf.Duration delay = 5;
 }
