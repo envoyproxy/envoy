@@ -37,6 +37,15 @@ TEST_F(RealHostDescription, UnitTest) {
   EXPECT_CALL(*mock_host_, loadMetricStats());
   description_.loadMetricStats();
 
+  EXPECT_CALL(*mock_host_, lastTrafficPassTime());
+  description_.lastTrafficPassTime();
+
+  EXPECT_CALL(*mock_host_, lastTrafficPassTime2xx());
+  description_.lastTrafficPassTime2xx();
+
+  EXPECT_CALL(*mock_host_, lastTrafficPassTimeGrpc());
+  description_.lastTrafficPassTimeGrpc();
+
   std::vector<Network::Address::InstanceConstSharedPtr> address_list;
   EXPECT_CALL(*mock_host_, addressList()).WillOnce(ReturnRef(address_list));
   description_.addressList();
