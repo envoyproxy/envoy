@@ -70,22 +70,17 @@ struct MockCollector : public datadog::tracing::Collector {
   std::vector<std::vector<std::unique_ptr<datadog::tracing::SpanData>>> chunks;
 };
 
-struct TestSetup {
-  const std::uint64_t id;
-  const std::shared_ptr<MockCollector> collector;
-  const datadog::tracing::TracerConfig config;
-  datadog::tracing::Tracer tracer;
-  datadog::tracing::Span span;
-  Event::SimulatedTimeSystem time;
-
-  explicit TestSetup(std::uint64_t id = 0xcafebabe)
-      : id(id), collector(std::make_shared<MockCollector>()), config(makeConfig(collector)),
-        tracer(
+class DatadogTracerSpanTest : public testing::Test {
+public:
+  DatadogTracerSpanTest()
+      : id_(0xcafebabe), collector_(std::make_shared<MockCollector>()),
+        config_(makeConfig(collector_)),
+        tracer_(
             // Override the tracer's ID generator so that all trace IDs and span
-            // IDs are `id`.
-            *datadog::tracing::finalize_config(config), [id]() { return id; },
+            // IDs are 0xcafebabe.
+            *datadog::tracing::finalize_config(config_), [this]() { return id_; },
             datadog::tracing::default_clock),
-        span(tracer.create_span()) {}
+        span_(tracer_.create_span()) {}
 
 private:
   static datadog::tracing::TracerConfig
@@ -100,16 +95,23 @@ private:
     config.trace_sampler.rules.push_back(std::move(rule));
     return config;
   }
+
+protected:
+  const std::uint64_t id_;
+  const std::shared_ptr<MockCollector> collector_;
+  const datadog::tracing::TracerConfig config_;
+  datadog::tracing::Tracer tracer_;
+  datadog::tracing::Span span_;
+  Event::SimulatedTimeSystem time_;
 };
 
-TEST(DatadogTracerSpanTest, SetOperation) {
-  TestSetup test;
-  Span span{std::move(test.span)};
+TEST_F(DatadogTracerSpanTest, SetOperation) {
+  Span span{std::move(span_)};
   span.setOperation("gastric bypass");
   span.finishSpan();
 
-  ASSERT_EQ(1, test.collector->chunks.size());
-  const auto& chunk = test.collector->chunks[0];
+  ASSERT_EQ(1, collector_->chunks.size());
+  const auto& chunk = collector_->chunks[0];
   ASSERT_EQ(1, chunk.size());
   const auto& data_ptr = chunk[0];
   ASSERT_NE(nullptr, data_ptr);
@@ -118,16 +120,15 @@ TEST(DatadogTracerSpanTest, SetOperation) {
   EXPECT_EQ("gastric bypass", data.name);
 }
 
-TEST(DatadogTracerSpanTest, SetTag) {
-  TestSetup test;
-  Span span{std::move(test.span)};
+TEST_F(DatadogTracerSpanTest, SetTag) {
+  Span span{std::move(span_)};
   span.setTag("foo", "bar");
   span.setTag("boom", "bam");
   span.setTag("foo", "new");
   span.finishSpan();
 
-  ASSERT_EQ(1, test.collector->chunks.size());
-  const auto& chunk = test.collector->chunks[0];
+  ASSERT_EQ(1, collector_->chunks.size());
+  const auto& chunk = collector_->chunks[0];
   ASSERT_EQ(1, chunk.size());
   const auto& data_ptr = chunk[0];
   ASSERT_NE(nullptr, data_ptr);
@@ -142,9 +143,8 @@ TEST(DatadogTracerSpanTest, SetTag) {
   EXPECT_EQ("bam", found->second);
 }
 
-TEST(DatadogTracerSpanTest, InjectContext) {
-  TestSetup test;
-  Span span{std::move(test.span)};
+TEST_F(DatadogTracerSpanTest, InjectContext) {
+  Span span{std::move(span_)};
 
   Tracing::TestTraceContextImpl context{};
   span.injectContext(context, nullptr);
@@ -160,97 +160,112 @@ TEST(DatadogTracerSpanTest, InjectContext) {
   // headers, so we check those here.
   auto found = context.context_map_.find("x-datadog-trace-id");
   ASSERT_NE(context.context_map_.end(), found);
-  EXPECT_EQ(std::to_string(test.id), found->second);
+  EXPECT_EQ(std::to_string(id_), found->second);
   found = context.context_map_.find("x-datadog-parent-id");
   ASSERT_NE(context.context_map_.end(), found);
-  EXPECT_EQ(std::to_string(test.id), found->second);
+  EXPECT_EQ(std::to_string(id_), found->second);
   found = context.context_map_.find("x-datadog-sampling-priority");
   ASSERT_NE(context.context_map_.end(), found);
   // USER_DROP because we set a rule that keeps nothing.
   EXPECT_EQ(std::to_string(int(datadog::tracing::SamplingPriority::USER_DROP)), found->second);
 }
 
-TEST(DatadogTracerSpanTest, SpawnChild) {
-  TestSetup test;
-  const auto child_start = test.time.timeSystem().systemTime();
+TEST_F(DatadogTracerSpanTest, SpawnChild) {
+  const auto child_start = time_.timeSystem().systemTime();
   {
-    Span parent{std::move(test.span)};
+    Span parent{std::move(span_)};
     auto child = parent.spawnChild(Tracing::MockConfig{}, "child", child_start);
     child->finishSpan();
     parent.finishSpan();
   }
 
-  EXPECT_EQ(1, test.collector->chunks.size());
-  const auto& spans = test.collector->chunks[0];
+  EXPECT_EQ(1, collector_->chunks.size());
+  const auto& spans = collector_->chunks[0];
   EXPECT_EQ(2, spans.size());
   const auto& child_ptr = spans[1];
   EXPECT_NE(nullptr, child_ptr);
   const datadog::tracing::SpanData& child = *child_ptr;
   EXPECT_EQ(estimateTime(child_start).wall, child.start.wall);
   EXPECT_EQ("child", child.name);
-  EXPECT_EQ(test.id, child.trace_id);
-  EXPECT_EQ(test.id, child.span_id);
-  EXPECT_EQ(test.id, child.parent_id);
+  EXPECT_EQ(id_, child.trace_id);
+  EXPECT_EQ(id_, child.span_id);
+  EXPECT_EQ(id_, child.parent_id);
 }
 
-TEST(DatadogTracerSpanTest, SetSampled) {
+TEST_F(DatadogTracerSpanTest, SetSampledTrue) {
   // `Span::setSampled(bool)` on any span causes the entire group (chunk) of
   // spans to take that sampling override. In terms of dd-trace-cpp, this means
   // that the local root of the chunk will have its
   // `datadog::tracing::tags::internal::sampling_priority` tag set to either -1
   // (hard drop) or 2 (hard keep).
-  for (bool sampled : {true, false}) {
-    TestSetup test;
-    {
-      Span local_root{std::move(test.span)};
-      auto child = local_root.spawnChild(Tracing::MockConfig{}, "child",
-                                         test.time.timeSystem().systemTime());
-      child->setSampled(sampled);
-      child->finishSpan();
-      local_root.finishSpan();
-    }
-    EXPECT_EQ(1, test.collector->chunks.size());
-    const auto& spans = test.collector->chunks[0];
-    EXPECT_EQ(2, spans.size());
-    const auto& local_root_ptr = spans[0];
-    EXPECT_NE(nullptr, local_root_ptr);
-    const datadog::tracing::SpanData& local_root = *local_root_ptr;
-    const auto found =
-        local_root.numeric_tags.find(datadog::tracing::tags::internal::sampling_priority);
-    EXPECT_NE(local_root.numeric_tags.end(), found);
-    if (sampled) {
-      EXPECT_EQ(2, found->second);
-    } else {
-      EXPECT_EQ(-1, found->second);
-    }
+  {
+    Span local_root{std::move(span_)};
+    auto child =
+        local_root.spawnChild(Tracing::MockConfig{}, "child", time_.timeSystem().systemTime());
+    child->setSampled(true);
+    child->finishSpan();
+    local_root.finishSpan();
   }
+  EXPECT_EQ(1, collector_->chunks.size());
+  const auto& spans = collector_->chunks[0];
+  EXPECT_EQ(2, spans.size());
+  const auto& local_root_ptr = spans[0];
+  EXPECT_NE(nullptr, local_root_ptr);
+  const datadog::tracing::SpanData& local_root = *local_root_ptr;
+  const auto found =
+      local_root.numeric_tags.find(datadog::tracing::tags::internal::sampling_priority);
+  EXPECT_NE(local_root.numeric_tags.end(), found);
+  EXPECT_EQ(2, found->second);
 }
 
-TEST(DatadogTracerSpanTest, Baggage) {
+TEST_F(DatadogTracerSpanTest, SetSampledFalse) {
+  // `Span::setSampled(bool)` on any span causes the entire group (chunk) of
+  // spans to take that sampling override. In terms of dd-trace-cpp, this means
+  // that the local root of the chunk will have its
+  // `datadog::tracing::tags::internal::sampling_priority` tag set to either -1
+  // (hard drop) or 2 (hard keep).
+  {
+    Span local_root{std::move(span_)};
+    auto child =
+        local_root.spawnChild(Tracing::MockConfig{}, "child", time_.timeSystem().systemTime());
+    child->setSampled(false);
+    child->finishSpan();
+    local_root.finishSpan();
+  }
+  EXPECT_EQ(1, collector_->chunks.size());
+  const auto& spans = collector_->chunks[0];
+  EXPECT_EQ(2, spans.size());
+  const auto& local_root_ptr = spans[0];
+  EXPECT_NE(nullptr, local_root_ptr);
+  const datadog::tracing::SpanData& local_root = *local_root_ptr;
+  const auto found =
+      local_root.numeric_tags.find(datadog::tracing::tags::internal::sampling_priority);
+  EXPECT_NE(local_root.numeric_tags.end(), found);
+  EXPECT_EQ(-1, found->second);
+}
+
+TEST_F(DatadogTracerSpanTest, Baggage) {
   // Baggage is not supported by dd-trace-cpp, so `Span::getBaggage` and
   // `Span::setBaggage` do nothing.
-  TestSetup test;
-  Span span{std::move(test.span)};
+  Span span{std::move(span_)};
   EXPECT_EQ("", span.getBaggage("foo"));
   span.setBaggage("foo", "bar");
   EXPECT_EQ("", span.getBaggage("foo"));
 }
 
-TEST(DatadogTracerSpanTest, GetTraceIdAsHex) {
-  TestSetup test{0xcafebabe};
-  Span span{std::move(test.span)};
+TEST_F(DatadogTracerSpanTest, GetTraceIdAsHex) {
+  Span span{std::move(span_)};
   EXPECT_EQ("cafebabe", span.getTraceIdAsHex());
 }
 
-TEST(DatadogTracerSpanTest, NoOpMode) {
+TEST_F(DatadogTracerSpanTest, NoOpMode) {
   // `Span::finishSpan` destroys its `datadog::tracing::Span` member.
   // Subsequently, methods called on the `Span` do nothing.
   //
   // I don't expect that Envoy will call methods on a finished span, and it's
   // hard to verify that the operations are no-ops, so this test just exercises
   // the code paths to verify that they don't trip any memory violations.
-  TestSetup test;
-  Span span{std::move(test.span)};
+  Span span{std::move(span_)};
   span.finishSpan();
 
   // `Span::finishSpan` is idempotent.
@@ -264,7 +279,7 @@ TEST(DatadogTracerSpanTest, NoOpMode) {
   span.setOperation("foo");
   span.setTag("foo", "bar");
   // `Span::log` doesn't do anything in any case.
-  span.log(test.time.timeSystem().systemTime(), "ignored");
+  span.log(time_.timeSystem().systemTime(), "ignored");
   Tracing::TestTraceContextImpl context{};
   span.injectContext(context, nullptr);
   EXPECT_EQ("", context.context_protocol_);
@@ -273,7 +288,7 @@ TEST(DatadogTracerSpanTest, NoOpMode) {
   EXPECT_EQ("", context.context_method_);
   EXPECT_EQ(0, context.context_map_.size());
   const Tracing::SpanPtr child =
-      span.spawnChild(Tracing::MockConfig{}, "child", test.time.timeSystem().systemTime());
+      span.spawnChild(Tracing::MockConfig{}, "child", time_.timeSystem().systemTime());
   EXPECT_NE(nullptr, child);
   EXPECT_EQ(typeid(Tracing::NullSpan), typeid(*child));
   span.setSampled(true);
