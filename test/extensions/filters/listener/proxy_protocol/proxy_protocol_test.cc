@@ -466,6 +466,11 @@ TEST_P(ProxyProtocolTest, ErrorRecv_2) {
       .WillRepeatedly(Invoke([this](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
         return os_sys_calls_actual_.getifaddrs(vector);
       }));
+  EXPECT_CALL(os_sys_calls, socketTcpInfo(_, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t sockfd, Api::EnvoyTcpInfo* tcp_info) {
+        return os_sys_calls_actual_.socketTcpInfo(sockfd, tcp_info);
+      }));
   connect(false);
   write(buffer, sizeof(buffer));
 
@@ -540,6 +545,11 @@ TEST_P(ProxyProtocolTest, ErrorRecv_1) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
         return os_sys_calls_actual_.getifaddrs(vector);
+      }));
+  EXPECT_CALL(os_sys_calls, socketTcpInfo(_, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t sockfd, Api::EnvoyTcpInfo* tcp_info) {
+        return os_sys_calls_actual_.socketTcpInfo(sockfd, tcp_info);
       }));
   connect(false);
   write(buffer, sizeof(buffer));
@@ -822,6 +832,11 @@ TEST_P(ProxyProtocolTest, V2ParseExtensionsRecvError) {
       .WillRepeatedly(Invoke([this](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
         return os_sys_calls_actual_.getifaddrs(vector);
       }));
+  EXPECT_CALL(os_sys_calls, socketTcpInfo(_, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t sockfd, Api::EnvoyTcpInfo* tcp_info) {
+        return os_sys_calls_actual_.socketTcpInfo(sockfd, tcp_info);
+      }));
   connect(false);
   write(buffer, sizeof(buffer));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -1023,6 +1038,11 @@ TEST_P(ProxyProtocolTest, V2Fragmented4Error) {
       .WillRepeatedly(Invoke([this](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
         return os_sys_calls_actual_.getifaddrs(vector);
       }));
+  EXPECT_CALL(os_sys_calls, socketTcpInfo(_, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t sockfd, Api::EnvoyTcpInfo* tcp_info) {
+        return os_sys_calls_actual_.socketTcpInfo(sockfd, tcp_info);
+      }));
   connect(false);
   write(buffer, 17);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -1115,6 +1135,11 @@ TEST_P(ProxyProtocolTest, V2Fragmented5Error) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
         return os_sys_calls_actual_.getifaddrs(vector);
+      }));
+  EXPECT_CALL(os_sys_calls, socketTcpInfo(_, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t sockfd, Api::EnvoyTcpInfo* tcp_info) {
+        return os_sys_calls_actual_.socketTcpInfo(sockfd, tcp_info);
       }));
   connect(false);
   write(buffer, 10);
@@ -1732,6 +1757,11 @@ TEST_P(ProxyProtocolTest, DrainError) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
         return os_sys_calls_actual_.getifaddrs(vector);
+      }));
+  EXPECT_CALL(os_sys_calls, socketTcpInfo(_, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t sockfd, Api::EnvoyTcpInfo* tcp_info) {
+        return os_sys_calls_actual_.socketTcpInfo(sockfd, tcp_info);
       }));
 
   connect(false);

@@ -29,6 +29,13 @@ if [[ $branch_name == "main" ]]; then
   exit 0
 fi
 
+if [[ $GITHUB_BASE_REF == release/* ]]; then
+  # Skip mobile CI jobs on PRs targeting release branches
+  echo "Skipping $job because the PR is targeting a release branch"
+  echo "run_ci_job=false" >> "$GITHUB_OUTPUT"
+  exit 0
+fi
+
 base_commit="$(git merge-base origin/main HEAD)"
 changed_files="$(git diff "$base_commit" --name-only)"
 

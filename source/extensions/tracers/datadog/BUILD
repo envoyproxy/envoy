@@ -15,9 +15,11 @@ envoy_cc_library(
     name = "datadog_tracer_lib",
     srcs = [
         "datadog_tracer_impl.cc",
+        "time_util.cc",
     ],
     hdrs = [
         "datadog_tracer_impl.h",
+        "time_util.h",
         "tracer_stats.h",
     ],
     copts = [

@@ -34,6 +34,8 @@ public:
   void clearLatest();
   // clear all.
   void clearAll();
+  // check the buffer instance if existing
+  bool checkExisting(Buffer::Instance* data);
 
 private:
   std::deque<Buffer::InstancePtr> queue_;
