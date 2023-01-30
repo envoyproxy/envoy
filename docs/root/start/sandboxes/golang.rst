@@ -72,7 +72,7 @@ Terminal 1
 .. code-block:: console
 
    $ curl localhost:8080/update_upstream_response 2>&1 | grep "update"
-   < updated upstream response body by the simple plugin               <-- This is updated by the simple Go plugin. --<
+   updated upstream response body by the simple plugin               <-- This is updated by the simple Go plugin. --<
 
 Step 5: Make a request handled by the Go plugin using custom configuration
 **************************************************************************
@@ -84,10 +84,13 @@ Terminal 1
 .. code-block:: console
 
    $ curl localhost:8080/localreply_by_config  2>&1 | grep "localreply"
-   < localreply from go, path: /localreply_by_config           <-- This is response directly by the simple Go plugin. --<
+   localreply from go, path: /localreply_by_config           <-- This is response directly by the simple Go plugin. --<
 
 .. seealso::
 
-See here :repo:`filter.go <contrib/golang/filters/http/source/go/pkg/api/filter.go>` for an overview of Envoy's golang plugin APIs.
-:ref:`See here <config_http_filters_golang>` for an overview of Envoy's Golang filter and documentation.
-:ref:`golang API <envoy_v3_api_file_contrib/extensions/filters/http/golang/v3alpha/golang.proto>`.
+   :ref:`Envoy Go filter <config_http_filters_golang>`
+      Further information about the Envoy Go filter.
+   :ref:`Go API <envoy_v3_api_file_contrib/envoy/extensions/filters/http/golang/v3alpha/golang.proto>`.
+      The Go extension filter API.
+   :repo:`filter.go <contrib/golang/filters/http/source/go/pkg/api/filter.go>`
+      Overview of Envoy's Go plugin APIs.
