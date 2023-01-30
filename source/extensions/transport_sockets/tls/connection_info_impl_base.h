@@ -40,6 +40,7 @@ public:
   const std::string& tlsVersion() const override;
   const std::string& alpn() const override;
   const std::string& sni() const override;
+  bool sslSyscallErrorOccurred() const override { return syscall_error_occurred_; }
 
   virtual SSL* ssl() const PURE;
 
@@ -60,6 +61,7 @@ protected:
   mutable std::string cached_tls_version_;
   mutable std::string alpn_;
   mutable std::string sni_;
+  mutable bool syscall_error_occurred_{};
 };
 
 } // namespace Tls

@@ -82,7 +82,6 @@ public:
   bool startSecureTransport() override { return false; }
   void configureInitialCongestionWindow(uint64_t bandwidth_bits_per_sec,
                                         std::chrono::microseconds rtt) override;
-  absl::optional<bool> sslSyscallErrorOccurred() override;
 
 protected:
   Network::TransportSocketPtr transport_socket_;

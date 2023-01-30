@@ -147,6 +147,11 @@ public:
    * @return std::string the SNI used to establish the connection.
    **/
   virtual const std::string& sni() const PURE;
+
+  /**
+   * @return bool whether the SSL_ERROR_SYSCALL has occurred.
+   **/
+  virtual bool sslSyscallErrorOccurred() const PURE;
 };
 
 using ConnectionInfoConstSharedPtr = std::shared_ptr<const ConnectionInfo>;

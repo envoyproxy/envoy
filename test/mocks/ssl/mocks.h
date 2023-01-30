@@ -63,6 +63,7 @@ public:
   MOCK_METHOD(const std::string&, tlsVersion, (), (const));
   MOCK_METHOD(const std::string&, alpn, (), (const));
   MOCK_METHOD(const std::string&, sni, (), (const));
+  MOCK_METHOD(bool, sslSyscallErrorOccurred, (), (const));
 };
 
 class MockClientContext : public ClientContext {
