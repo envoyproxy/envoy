@@ -6940,7 +6940,7 @@ TEST_P(SslSocketTest, RsaKeyUsageVerification) {
   // Enable the rsa_key_usage enforcement.
   client_tls_context.mutable_enforce_rsa_key_usage()->set_value(true);
   // The transport failure reason is empty for server connection on windows platform, which will
-  // cause the test failure
+  // cause the test failure.
 #if defined(WIN32)
   TestUtilOptionsV2 test_options_2(listener, client_tls_context, /*expect_success=*/false, version_,
                                    /*expected_server_transport_failure_reason_empty_=*/true);
