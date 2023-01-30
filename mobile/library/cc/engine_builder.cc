@@ -40,7 +40,7 @@ void insertCustomFilter(const std::string& filter_config, std::string& config_te
                       &config_template);
 }
 
-// Note that updates to the config.cc bootstrap will require a matching update in "" as well
+// Note that updates to the config.cc bootstrap will require a matching update in generateBootstrap() below
 bool generatedStringMatchesGeneratedBoostrap(
     const std::string& config_str, const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   Thread::SkipAsserts skip;
@@ -846,10 +846,10 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   list->add_patterns()->set_exact("cluster.base.http2.keepalive_timeout");
   list->add_patterns()->set_exact("cluster.base_h2.http2.keepalive_timeout");
   list->add_patterns()->set_exact("cluster.stats.http2.keepalive_timeout");
-  list->add_patterns()->set_prefix("runtime.load_success");
   list->add_patterns()->set_prefix("http.hcm.downstream_rq_");
   list->add_patterns()->set_prefix("http.hcm.decompressor.");
   list->add_patterns()->set_prefix("pulse.");
+  list->add_patterns()->set_prefix("runtime.load_success");
   list->add_patterns()->mutable_safe_regex()->set_regex(
       "^vhost\\.[\\w]+\\.vcluster\\.[\\w]+?\\.upstream_rq_(?:[12345]xx|[3-5][0-9][0-9]|retry|"
       "total)");
