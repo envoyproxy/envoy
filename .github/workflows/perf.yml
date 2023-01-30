@@ -30,7 +30,7 @@ jobs:
       run: |
         cd mobile && ./bazelw build \
             --config=sizeopt \
-            --config=remote-ci-linux-clang \
+            --config=release-common \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //test/performance:test_binary_size
     - uses: actions/upload-artifact@v3
@@ -58,7 +58,7 @@ jobs:
         git checkout main && git pull origin main
           cd mobile && ./bazelw build \
             --config=sizeopt \
-            --config=remote-ci-linux-clang \
+            --config=release-common \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //test/performance:test_binary_size
     - uses: actions/upload-artifact@v3
@@ -90,4 +90,4 @@ jobs:
         zip -9 dist/main.zip dist/main.stripped
         zip -9 dist/current.zip dist/current.stripped
     - name: 'Test size regression'
-      run: cd mobile && ./ci/test_size_regression.sh dist/main.zip dist/current.zip
+      run: cd mobile && ./ci/test_size_regression.sh ../dist/main.zip ../dist/current.zip
