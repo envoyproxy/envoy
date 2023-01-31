@@ -1368,6 +1368,7 @@ vip
 virtualhost
 virtualize
 vptr
+vtable
 vtt
 wakeup
 wakeups

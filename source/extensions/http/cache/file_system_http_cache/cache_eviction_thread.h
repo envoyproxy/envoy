@@ -80,7 +80,7 @@ private:
   void work();
 
   /**
-   * @return false if terminating, true if signalled or the run-again period
+   * @return false if terminating, true if `signalled_` is true or the run-again period
    * has passed.
    */
   bool waitForSignal();
