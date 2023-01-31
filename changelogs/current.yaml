@@ -66,5 +66,8 @@ new_features:
 - area: router
   change: |
     support route info in upstream access log.
+- area: lua
+  change: |
+    added an new option to the options of lua ``httpCall``. This allows to skip adding ``x-forwarded-for`` by setting ``{["send_xff"] = false}`` as the ``options``.
 
 deprecated:
