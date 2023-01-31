@@ -583,6 +583,9 @@ public:
   absl::string_view ja3Hash() const override {
     return StreamInfoImpl::downstreamAddressProvider().ja3Hash();
   }
+  const absl::optional<std::chrono::milliseconds>& roundTripTime() const override {
+    return StreamInfoImpl::downstreamAddressProvider().roundTripTime();
+  }
 
 private:
   Network::Address::InstanceConstSharedPtr overridden_downstream_remote_address_;
@@ -669,6 +672,8 @@ public:
       log_handler->log(request_headers, response_headers, response_trailers, streamInfo());
     }
   }
+
+  std::list<AccessLog::InstanceSharedPtr> accessLogHandlers() { return access_log_handlers_; }
 
   void onStreamComplete() {
     for (auto& filter : decoder_filters_) {
@@ -818,6 +823,7 @@ public:
   void contextOnContinue(ScopeTrackedObjectStack& tracked_object_stack);
 
   void onDownstreamReset() { state_.saw_downstream_reset_ = true; }
+  bool sawDownstreamReset() { return state_.saw_downstream_reset_; }
 
 protected:
   struct State {
@@ -1119,6 +1125,7 @@ private:
                             bool is_head_request,
                             const absl::optional<Grpc::Status::GrpcStatus> grpc_status);
 
+private:
   OverridableRemoteConnectionInfoSetterStreamInfo stream_info_;
   const LocalReply::LocalReply& local_reply_;
   const bool avoid_reentrant_filter_invocation_during_local_reply_;

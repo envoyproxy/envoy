@@ -520,8 +520,10 @@ void DefaultCertValidator::addClientValidationContext(SSL_CTX* ctx, bool require
       BIO_new_mem_buf(const_cast<char*>(config_->caCert().data()), config_->caCert().size()));
   RELEASE_ASSERT(bio != nullptr, "");
   // Based on BoringSSL's SSL_add_file_cert_subjects_to_stack().
-  bssl::UniquePtr<STACK_OF(X509_NAME)> list(sk_X509_NAME_new(
-      [](const X509_NAME** a, const X509_NAME** b) -> int { return X509_NAME_cmp(*a, *b); }));
+  // Use a generic lambda to be compatible with BoringSSL before and after
+  // https://boringssl-review.googlesource.com/c/boringssl/+/56190
+  bssl::UniquePtr<STACK_OF(X509_NAME)> list(
+      sk_X509_NAME_new([](auto* a, auto* b) -> int { return X509_NAME_cmp(*a, *b); }));
   RELEASE_ASSERT(list != nullptr, "");
   for (;;) {
     bssl::UniquePtr<X509> cert(PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));

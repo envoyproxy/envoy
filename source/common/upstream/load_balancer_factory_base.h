@@ -13,10 +13,12 @@ namespace Upstream {
  * TODO: provide a ThreadLocalLoadBalancer construct to abstract away thread-awareness from load
  * balancing extensions that don't require it.
  */
-class TypedLoadBalancerFactoryBase : public TypedLoadBalancerFactory {
+template <class Proto> class TypedLoadBalancerFactoryBase : public TypedLoadBalancerFactory {
 public:
   // Upstream::TypedLoadBalancerFactory
   std::string name() const override { return name_; }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override { return std::make_unique<Proto>(); }
 
 protected:
   TypedLoadBalancerFactoryBase(const std::string& name) : name_(name) {}

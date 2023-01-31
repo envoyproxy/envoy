@@ -7,6 +7,7 @@ build --define=google_grpc=disabled
 build --define=hot_restart=disabled
 build --define=tcmalloc=disabled
 build --define=admin_html=disabled
+build --define=static_extension_registration=disabled
 build --define=library_autolink=disabled
 build --experimental_inmemory_dotd_files
 build --experimental_inmemory_jdeps_files
@@ -66,6 +67,11 @@ build:dbg-android --config=android
 build:dbg-ios --config=dbg-common
 build:dbg-ios --config=ios
 
+# Default flags for Android tests
+# TODO(jpsim): Explicitly register test extensions for Android tests
+# https://github.com/envoyproxy/envoy/issues/24977
+build:test-android --define=static_extension_registration=enabled
+
 # Locally-runnable ASAN config for MacOS & Linux with standard dev environment
 # See also:
 # https://github.com/bazelbuild/bazel/issues/6932
@@ -104,6 +110,9 @@ build:release-common --config=sizeopt --define=admin_functionality=disabled
 
 # Set default symbols visibility to hidden to reduce .dynstr and the symbol table size
 build:release-common --copt=-fvisibility=hidden
+
+# Enable automatic extension factory registration for release builds
+build:release-common --define=static_extension_registration=enabled
 
 # Flags for release builds targeting iOS
 build:release-ios --config=ios
