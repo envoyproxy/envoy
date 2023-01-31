@@ -49,22 +49,6 @@ using testing::GTEST_FLAG(random_seed);
 
 namespace Envoy {
 
-// The purpose of using the static seed here is to use --test_arg=--gtest_random_seed=[seed]
-// to specify the seed of the problem to replay.
-int32_t getSeed() {
-  static const int32_t seed = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                                  std::chrono::system_clock::now().time_since_epoch())
-                                  .count();
-  return seed;
-}
-
-TestRandomGenerator::TestRandomGenerator()
-    : seed_(GTEST_FLAG(random_seed) == 0 ? getSeed() : GTEST_FLAG(random_seed)), generator_(seed_) {
-  ENVOY_LOG_MISC(info, "TestRandomGenerator running with seed {}", seed_);
-}
-
-uint64_t TestRandomGenerator::random() { return generator_(); }
-
 bool TestUtility::headerMapEqualIgnoreOrder(const Http::HeaderMap& lhs,
                                             const Http::HeaderMap& rhs) {
   absl::flat_hash_set<std::string> lhs_keys;
@@ -317,6 +301,10 @@ std::vector<std::string> TestUtility::listFiles(const std::string& path, bool re
     }
   }
   return file_names;
+}
+
+std::string TestUtility::uniqueFilename() {
+  return absl::StrCat(getpid(), "_", std::chrono::system_clock::now().time_since_epoch().count());
 }
 
 std::string TestUtility::addLeftAndRightPadding(absl::string_view to_pad, int desired_length) {

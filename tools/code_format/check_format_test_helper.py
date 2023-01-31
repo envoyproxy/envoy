@@ -260,7 +260,6 @@ def run_checks():
     errors += check_unfixable_error("std_visit.cc", "Don't use std::visit; use absl::visit instead")
     errors += check_unfixable_error(
         "throw.cc", "Don't introduce throws into exception-free files, use error statuses instead.")
-    errors += check_unfixable_error("pgv_string.proto", "min_bytes is DEPRECATED, Use min_len.")
     errors += check_file_expecting_ok("commented_throw.cc")
     errors += check_unfixable_error(
         "repository_url.bzl", "Only repository_locations.bzl may contains URL references")

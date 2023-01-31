@@ -184,9 +184,6 @@ def api_proto_package(
     if has_services:
         compilers = ["@io_bazel_rules_go//proto:go_grpc", "@envoy_api//bazel:pgv_plugin_go"]
 
-    # Because RBAC proro depends on googleapis syntax.proto and checked.proto,
-    # which share the same go proto library, it causes duplicative dependencies.
-    # Thus, we use a dictionary below to simulate a set and remove duplicated dependencies.
     deps = (
         [_go_proto_mapping(dep) for dep in deps] +
         [
