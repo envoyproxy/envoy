@@ -2948,28 +2948,28 @@ envoy_cc_library(
 envoy_cc_library(
     name = "quiche_common_status_utils",
     hdrs = ["quiche/common/quiche_status_utils.h"],
-      copts = quiche_copts,
+    copts = quiche_copts,
     repository = "@envoy",
     tags = ["nofips"],
     deps = [
         "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/strings",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
     ],
 )
 
 envoy_cc_library(
     name = "quiche_common_wire_serialization",
     hdrs = ["quiche/common/wire_serialization.h"],
-      copts = quiche_copts,
+    copts = quiche_copts,
     repository = "@envoy",
     tags = ["nofips"],
     deps = [
         ":quiche_common_buffer_allocator_lib",
         ":quiche_common_lib",
+        ":quiche_common_platform_logging",
         ":quiche_common_status_utils",
         "@com_google_absl//absl/status:statusor",
-        ":quiche_common_platform_logging",
     ],
 )
 
@@ -3148,11 +3148,11 @@ envoy_cc_library(
     repository = "@envoy",
     deps = [
         ":quic_core_data_lib",
-        ":quiche_common_wire_serialization",
         ":quic_core_http_http_frames_lib",
         ":quic_core_types_lib",
         ":quic_platform_base",
         ":quiche_common_buffer_allocator_lib",
+        ":quiche_common_wire_serialization",
         ":quiche_web_transport_web_transport_lib",
     ],
 )
