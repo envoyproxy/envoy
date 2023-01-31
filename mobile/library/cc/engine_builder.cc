@@ -242,8 +242,6 @@ EngineBuilder& EngineBuilder::enforceTrustChainVerification(bool trust_chain_ver
 EngineBuilder& EngineBuilder::addRtdsLayer(const std::string& layer_name, int timeout_seconds) {
   rtds_layer_name_ = layer_name;
   rtds_timeout_seconds_ = timeout_seconds;
-  bootstrapIncompatible();
-
   return *this;
 }
 EngineBuilder& EngineBuilder::setAggregatedDiscoveryService(const std::string& api_type,
@@ -255,8 +253,6 @@ EngineBuilder& EngineBuilder::setAggregatedDiscoveryService(const std::string& a
   ads_api_type_ = api_type;
   ads_address_ = address;
   ads_port_ = port;
-  bootstrapIncompatible();
-
   return *this;
 }
 
@@ -912,6 +908,31 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     auto* sink = bootstrap->add_stats_sinks();
     sink->set_name("envoy.metrics_service");
     sink->mutable_typed_config()->PackFrom(metrics_config);
+  }
+
+  if (!rtds_layer_name_.empty() && ads_api_type_.empty()) {
+    throw std::runtime_error("ADS must be configured when using RTDS");
+  }
+  if (!rtds_layer_name_.empty()) {
+    auto* layered_runtime = bootstrap->mutable_layered_runtime();
+    auto* layer = layered_runtime->add_layers();
+    layer->set_name(rtds_layer_name_);
+    auto* rtds_layer = layer->mutable_rtds_layer();
+    rtds_layer->set_name(rtds_layer_name_);
+    auto* rtds_config = rtds_layer->mutable_rtds_config();
+    rtds_config->mutable_ads();
+    rtds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+    rtds_config->mutable_initial_fetch_timeout()->set_seconds(rtds_timeout_seconds_);
+  }
+  if (!ads_api_type_.empty()) {
+    std::string target_uri = fmt::format(R"({}:{})", ads_address_, ads_port_);
+    auto* ads_config = bootstrap->mutable_dynamic_resources()->mutable_ads_config();
+    ads_config->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+    ads_config->set_set_node_on_first_message_only(true);
+    envoy::config::core::v3::ApiConfigSource::ApiType api_type_enum;
+    envoy::config::core::v3::ApiConfigSource::ApiType_Parse(ads_api_type_, &api_type_enum);
+    ads_config->set_api_type(api_type_enum);
+    ads_config->add_grpc_services()->mutable_google_grpc()->set_target_uri(target_uri);
   }
 
   for (auto& sink_to_add : stats_sinks_) {
