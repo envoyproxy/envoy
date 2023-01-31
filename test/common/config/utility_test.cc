@@ -342,9 +342,9 @@ TEST(UtilityTest, prepareBackoffStrategyConfigFileValues) {
       grpc_services:
         envoy_grpc:
           cluster_name: some_xds_cluster
-      retry_back_off:
-        base_interval: 0.01s
-        max_interval: 10s
+          retry_back_off:
+            base_interval: 0.01s
+            max_interval: 10s
     )EOF";
 
       TestUtility::loadFromYaml(config_yaml, api_config_source);
@@ -366,15 +366,29 @@ TEST(UtilityTest, prepareBackoffStrategyCustomValues) {
   {
     // set custom values for both base and max interval
     {
-      envoy::config::core::v3::ApiConfigSource api_config_source;
-
       uint64_t test_base_interval_ms = 5000;
       uint64_t test_max_interval_ms = 20000;
 
-      api_config_source.mutable_retry_back_off()->mutable_base_interval()->set_seconds(
-          test_base_interval_ms / 1000);
-      api_config_source.mutable_retry_back_off()->mutable_max_interval()->set_seconds(
-          test_max_interval_ms / 1000);
+      // Provide config values for retry
+      envoy::config::core::v3::ApiConfigSource api_config_source;
+      const std::string config_yaml = R"EOF(
+      api_type: GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: some_xds_cluster
+    )EOF";
+      TestUtility::loadFromYaml(config_yaml, api_config_source);
+
+      api_config_source.mutable_grpc_services(0)
+          ->mutable_envoy_grpc()
+          ->mutable_retry_back_off()
+          ->mutable_base_interval()
+          ->set_seconds(test_base_interval_ms / 1000);
+      api_config_source.mutable_grpc_services(0)
+          ->mutable_envoy_grpc()
+          ->mutable_retry_back_off()
+          ->mutable_max_interval()
+          ->set_seconds(test_max_interval_ms / 1000);
 
       BackOffStrategyPtr strategy = Utility::prepareBackoffStrategy(api_config_source, random);
 
@@ -389,12 +403,23 @@ TEST(UtilityTest, prepareBackoffStrategyCustomValues) {
 
     // only set base_interval
     {
-      envoy::config::core::v3::ApiConfigSource api_config_source;
-
       uint64_t test_base_interval_ms = 5000;
 
-      api_config_source.mutable_retry_back_off()->mutable_base_interval()->set_seconds(
-          test_base_interval_ms / 1000);
+      // Provide config values for retry
+      envoy::config::core::v3::ApiConfigSource api_config_source;
+      const std::string config_yaml = R"EOF(
+      api_type: GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: some_xds_cluster
+    )EOF";
+      TestUtility::loadFromYaml(config_yaml, api_config_source);
+
+      api_config_source.mutable_grpc_services(0)
+          ->mutable_envoy_grpc()
+          ->mutable_retry_back_off()
+          ->mutable_base_interval()
+          ->set_seconds(test_base_interval_ms / 1000);
 
       BackOffStrategyPtr strategy = Utility::prepareBackoffStrategy(api_config_source, random);
 
@@ -407,15 +432,29 @@ TEST(UtilityTest, prepareBackoffStrategyCustomValues) {
 
     // set max_interval < base_interval
     {
-      envoy::config::core::v3::ApiConfigSource api_config_source;
-
       uint64_t test_base_interval_ms = 10000;
       uint64_t test_max_interval_ms = 5000;
 
-      api_config_source.mutable_retry_back_off()->mutable_base_interval()->set_seconds(
-          test_base_interval_ms);
-      api_config_source.mutable_retry_back_off()->mutable_max_interval()->set_seconds(
-          test_max_interval_ms);
+      // Provide config values for retry
+      envoy::config::core::v3::ApiConfigSource api_config_source;
+      const std::string config_yaml = R"EOF(
+      api_type: GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: some_xds_cluster
+    )EOF";
+      TestUtility::loadFromYaml(config_yaml, api_config_source);
+
+      api_config_source.mutable_grpc_services(0)
+          ->mutable_envoy_grpc()
+          ->mutable_retry_back_off()
+          ->mutable_base_interval()
+          ->set_seconds(test_base_interval_ms);
+      api_config_source.mutable_grpc_services(0)
+          ->mutable_envoy_grpc()
+          ->mutable_retry_back_off()
+          ->mutable_max_interval()
+          ->set_seconds(test_max_interval_ms);
 
       EXPECT_ANY_THROW(Utility::prepareBackoffStrategy(api_config_source, random));
     }

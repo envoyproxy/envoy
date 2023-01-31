@@ -5,7 +5,6 @@ package envoy.config.core.v3;
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/grpc_service.proto";
-import "envoy/config/core/v3/backoff.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
@@ -121,11 +120,6 @@ message ApiConfigSource {
   // the client, and a NACK will be sent.
   // [#extension-category: envoy.config.validators]
   repeated TypedExtensionConfig config_validators = 9;
-
-  // Specifies parameters that control :ref:`retry backoff strategy <envoy_api_msg_core.BackoffStrategy>`.
-  // This parameter is optional, in which case the default base interval for retry is 500 milliseconds. The
-  // default maximum interval is 30 seconds.
-  BackoffStrategy retry_back_off = 10;
 }
 
 // Aggregated Discovery Service (ADS) options. This is currently empty, but when

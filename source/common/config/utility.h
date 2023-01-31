@@ -539,9 +539,9 @@ public:
   }
 
   /**
-   * Prepares the backoff strategy given the configuration containing the retry policy.
-   * @param config configuration that contains the backoff timer values.
-   * @param random random generator.
+   * Prepares backoff strategy from envoy::config::core::v3::ApiConfigSource
+   * @param config envoy::config::core::v3::ApiConfigSource
+   * @param random random generator
    * @return BackOffStrategyPtr
    */
   static BackOffStrategyPtr
@@ -551,18 +551,26 @@ public:
     uint64_t base_interval_ms = RetryBaseIntervalMs;
     uint64_t max_interval_ms = RetryMaxIntervalMs;
 
-    if (api_config_source.has_retry_back_off()) {
-      base_interval_ms =
-          PROTOBUF_GET_MS_REQUIRED(api_config_source.retry_back_off(), base_interval);
+    const bool is_grpc =
+        (api_config_source.api_type() == envoy::config::core::v3::ApiConfigSource::GRPC);
 
-      max_interval_ms = PROTOBUF_GET_MS_OR_DEFAULT(api_config_source.retry_back_off(), max_interval,
-                                                   base_interval_ms * 10);
+    if (is_grpc && !api_config_source.grpc_services().empty() &&
+        api_config_source.grpc_services()[0].has_envoy_grpc()) {
 
-      if (max_interval_ms < base_interval_ms) {
-        ExceptionUtil::throwEnvoyException(fmt::format("Retry Backoff max_interval {} must be "
-                                                       "greater than"
-                                                       "or equal to the base_interval {}",
-                                                       max_interval_ms, base_interval_ms));
+      auto& envoy_grpc = api_config_source.grpc_services()[0].envoy_grpc();
+
+      if (envoy_grpc.has_retry_back_off()) {
+        base_interval_ms = PROTOBUF_GET_MS_REQUIRED(envoy_grpc.retry_back_off(), base_interval);
+
+        max_interval_ms = PROTOBUF_GET_MS_OR_DEFAULT(envoy_grpc.retry_back_off(), max_interval,
+                                                     base_interval_ms * 10);
+
+        if (max_interval_ms < base_interval_ms) {
+          ExceptionUtil::throwEnvoyException(fmt::format("Retry Backoff max_interval {} must be "
+                                                         "greater than"
+                                                         "or equal to the base_interval {}",
+                                                         max_interval_ms, base_interval_ms));
+        }
       }
     }
     return std::make_unique<JitteredExponentialBackOffStrategy>(base_interval_ms, max_interval_ms,
