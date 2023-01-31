@@ -1002,10 +1002,10 @@ private:
   const uint32_t per_connection_buffer_limit_bytes_;
   const uint32_t max_response_headers_count_;
   LoadBalancerType lb_type_;
-  const bool drain_connections_on_host_removal_;
-  const bool connection_pool_per_downstream_connection_;
-  const bool warm_hosts_;
-  const bool set_local_interface_name_on_upstream_connections_;
+  const bool drain_connections_on_host_removal_ : 1;
+  const bool connection_pool_per_downstream_connection_ : 1;
+  const bool warm_hosts_ : 1;
+  const bool set_local_interface_name_on_upstream_connections_ : 1;
   // true iff the cluster proto specified upstream http filters.
   bool has_configured_http_filters_{false};
 };
