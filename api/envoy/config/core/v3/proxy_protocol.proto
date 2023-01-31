@@ -18,15 +18,15 @@ message ProxyProtocolPassThroughTLVs {
     // Pass all TLVs.
     INCLUDE_ALL = 0;
 
-    // Pass specific TLVs defined in tlv_types
+    // Pass specific TLVs defined in tlv_type.
     INCLUDE = 1;
   }
 
-  // The strategy to pass through TLVs. The default is INCLUDE_ALL.
-  // If INCLUDE_ALL is set, all TLVs will be passed through no matter the tlv_types field.
+  // The strategy to pass through TLVs. Default is INCLUDE_ALL.
+  // If INCLUDE_ALL is set, all TLVs will be passed through no matter the tlv_type field.
   PassTLVsMatchType match_type = 1;
 
-  // The TLV types that are applied based on the match type.
+  // The TLV types that are applied based on match_type.
   // TLV type is defined as uint8_t in proxy protocol. See `the spec
   // <https://www.haproxy.org/download/2.1/doc/proxy-protocol.txt>`_ for details.
   repeated uint32 tlv_type = 2 [(validate.rules).repeated = {items {uint32 {lt: 256}}}];
