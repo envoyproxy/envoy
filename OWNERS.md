@@ -35,8 +35,6 @@ routing PRs, questions, etc. to the right place.
 
 * Joshua Marantz ([jmarantz](https://github.com/jmarantz)) (jmarantz@google.com)
   * Stats, abseil, scalability, and performance.
-* William A Rowe Jr ([wrowe](https://github.com/wrowe)) (wrowe@vmware.com)
-  * Windows port and CI build, `bazel/foreign_cc` build and dependencies liaison.
 * Antonio Vicente ([antoniovicente](https://github.com/antoniovicente)) (avd@google.com)
   * Event management, security, performance, data plane.
 * Adi Peleg ([adisuissa](https://github.com/adisuissa)) (adip@google.com)
@@ -75,7 +73,6 @@ without further review.
 * All senior maintainers
 * Tony Allen ([tonya11en](https://github.com/tonya11en)) (tony@allen.gg)
 * Yan Avlasov ([yanavlasov](https://github.com/yanavlasov)) (yavlasov@google.com)
-* William A Rowe Jr ([wrowe](https://github.com/wrowe)) (wrowe@vmware.com)
 * Otto van der Schaaf ([oschaaf](https://github.com/oschaaf)) (oschaaf@redhat.com)
 * Tim Walsh ([twghu](https://github.com/twghu)) (twalsh@redhat.com)
 * Ryan Northey ([phlax](https://github.com/phlax)) (ryan@synca.io)
@@ -125,3 +122,5 @@ matter expert reviews. Feel free to loop them in as needed.
   * External dependencies, Envoy's supply chain and documentation.
 * Cerek Hillen ([crockeo](https://github.com/crockeo)) (chillen@lyft.com)
   * Python and C++ platform bindings.
+* William A Rowe Jr ([wrowe](https://github.com/wrowe)) (wrowe@vmware.com)
+  * Windows port and CI build, `bazel/foreign_cc` build and dependencies liaison.
