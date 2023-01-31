@@ -891,11 +891,24 @@ TEST_F(HttpHealthCheckerImplTest, Success) {
 }
 
 TEST_F(HttpHealthCheckerImplTest, EnableIdleHC) {
+  TestSessionPtr new_test_session(new TestSession());
+  new_test_session->timeout_timer_ = new Event::MockTimer(&dispatcher_);
+  new_test_session->interval_timer_ = new Event::MockTimer(&dispatcher_);
+  test_sessions_.emplace_back(std::move(new_test_session));
+
   setupEnableIdleHC();
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
+  auto host = cluster_->prioritySet().getMockHostSet(0)->hosts_[0];
+  host->setLastSuccessfulTrafficTime(envoy::data::core::v3::HealthCheckerType::HTTP,
+                                     simTime().monotonicTime() - std::chrono::milliseconds(500));
+
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _)).Times(0);
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+
   health_checker_->start();
+
   EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.attempt").value());
 }
 
@@ -4717,10 +4730,18 @@ TEST_F(TcpHealthCheckerImplTest, EnableIdleHC) {
   InSequence s;
 
   setupEnableIdleHC();
-
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
+  expectSessionCreate();
+  auto host = cluster_->prioritySet().getMockHostSet(0)->hosts_[0];
+  host->setLastSuccessfulTrafficTime(envoy::data::core::v3::HealthCheckerType::TCP,
+                                     simTime().monotonicTime() - std::chrono::milliseconds(500));
+
+  EXPECT_CALL(*timeout_timer_, enableTimer(_, _)).Times(0);
+  EXPECT_CALL(*interval_timer_, enableTimer(_, _));
+
   health_checker_->start();
+
   EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.attempt").value());
 }
 
@@ -5370,11 +5391,23 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessWithMultipleHostSets) {
 }
 
 TEST_F(GrpcHealthCheckerImplTest, EnableIdleHC) {
+  TestSessionPtr new_test_session(new TestSession());
+  new_test_session->timeout_timer_ = new Event::MockTimer(&dispatcher_);
+  new_test_session->interval_timer_ = new Event::MockTimer(&dispatcher_);
+  test_sessions_.emplace_back(std::move(new_test_session));
   setupEnableIdleHC();
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
+  auto host = cluster_->prioritySet().getMockHostSet(0)->hosts_[0];
+  host->setLastSuccessfulTrafficTime(envoy::data::core::v3::HealthCheckerType::HTTP,
+                                     simTime().monotonicTime() - std::chrono::milliseconds(500));
+
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _)).Times(0);
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_, _));
+
   health_checker_->start();
+
   EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.attempt").value());
 }
 // Test stream-level watermarks does not interfere with health check.

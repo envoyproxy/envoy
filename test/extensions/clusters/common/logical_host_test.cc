@@ -41,20 +41,12 @@ TEST_F(RealHostDescription, UnitTest) {
   EXPECT_CALL(*mock_host_, loadMetricStats());
   description_.loadMetricStats();
 
-  EXPECT_CALL(*mock_host_, lastSuccesfulTrafficTime(_));
+  EXPECT_CALL(*mock_host_, lastSuccessfulTrafficTime(_));
   description_.lastSuccessfulTrafficTime(envoy::data::core::v3::HealthCheckerType::TCP);
-  description_.lastSuccessfulTrafficTime(envoy::data::core::v3::HealthCheckerType::HTTP);
-  description_.lastSuccessfulTrafficTime(envoy::data::core::v3::HealthCheckerType::GRPC);
 
-  EXPECT_CALL(*mock_host_, setLastSuccessfulTrafficTime(_));
+  EXPECT_CALL(*mock_host_, setLastSuccessfulTrafficTime(_, _));
   description_.setLastSuccessfulTrafficTime(
       envoy::data::core::v3::HealthCheckerType::TCP,
-      std::chrono::steady_clock::now()); // NO_CHECK_FORMAT(real_time)
-  description_.setLastSuccessfulTrafficTime(
-      envoy::data::core::v3::HealthCheckerType::HTTP,
-      std::chrono::steady_clock::now()); // NO_CHECK_FORMAT(real_time)
-  description_.setLastSuccessfulTrafficTime(
-      envoy::data::core::v3::HealthCheckerType::GRPC,
       std::chrono::steady_clock::now()); // NO_CHECK_FORMAT(real_time)
 
   std::vector<Network::Address::InstanceConstSharedPtr> address_list;
