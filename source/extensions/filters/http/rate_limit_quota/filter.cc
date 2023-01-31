@@ -16,6 +16,7 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
   if (!match_result.ok()) {
     // When the request is not matched by any matchers, it is ALLOWED by default (i.e., fail-open)
     // and its quota usage will not be reported to RLQS server.
+    // TODO(tyxia) Add stats here and other places in the filter.
     ENVOY_LOG(debug,
               "The request is not matched by any matchers: ", match_result.status().message());
     return Envoy::Http::FilterHeadersStatus::Continue;

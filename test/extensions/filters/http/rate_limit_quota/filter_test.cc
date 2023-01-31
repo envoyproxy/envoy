@@ -133,6 +133,29 @@ constexpr char OnNoMatchConfig[] = R"EOF(
         reporting_interval: 5s
 )EOF";
 
+// No matcher type (matcher_list or matcher_tree) is configure here. It will read from `on_no_match`
+// field directly.
+constexpr char OnNoMatchConfigWithNoMatcher[] = R"EOF(
+  on_no_match:
+    action:
+      name: rate_limit_quota
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
+        bucket_id_builder:
+          bucket_id_builder:
+            "on_no_match_name":
+                string_value: "on_no_match_value"
+            "on_no_match_name_2":
+                string_value: "on_no_match_value_2"
+        deny_response_settings:
+          grpc_status:
+            code: 8
+        expired_assignment_behavior:
+          fallback_rate_limit:
+            blanket_rule: ALLOW_ALL
+        reporting_interval: 5s
+)EOF";
+
 // By design, on_no_match here only supports static bucket_id generation (via string value) and
 // doesn't support dynamic way (via custom_value extension). So the configuration with
 // `custom_value` typed_config is invalid configuration that will cause the failure of generating
@@ -228,6 +251,7 @@ enum class MatcherConfigType {
   Valid,
   Invalid,
   Empty,
+  NoMatcher,
   ValidOnNoMatchConfig,
   InvalidOnNoMatchConfig
 };
@@ -260,6 +284,10 @@ public:
     }
     case MatcherConfigType::InvalidOnNoMatchConfig: {
       TestUtility::loadFromYaml(InvalidOnNoMatcherConfig, matcher);
+      break;
+    }
+    case MatcherConfigType::NoMatcher: {
+      TestUtility::loadFromYaml(OnNoMatchConfigWithNoMatcher, matcher);
       break;
     }
     case MatcherConfigType::Empty:
@@ -300,6 +328,31 @@ public:
     }
   }
 
+  void verifyRequestMatchingSucceeded(
+      const absl::flat_hash_map<std::string, std::string>& expected_bucket_ids) {
+    // Perform request matching.
+    auto match_result = filter_->requestMatching(default_headers_);
+    // Asserts that the request matching succeeded.
+    // OK status is expected to be returned even if the exact request matching failed. It is because
+    // `on_no_match` field is configured.
+    ASSERT_TRUE(match_result.ok());
+    // Retrieve the matched action.
+    const RateLimitOnMactchAction* match_action =
+        dynamic_cast<RateLimitOnMactchAction*>(match_result.value().get());
+
+    RateLimitQuotaValidationVisitor visitor = {};
+    // Generate the bucket ids.
+    auto ret = match_action->generateBucketId(filter_->matchingData(), context_, visitor);
+    // Asserts that the bucket id generation succeeded and then retrieve the bucket ids.
+    ASSERT_TRUE(ret.ok());
+    auto bucket_ids = ret.value().bucket();
+    auto serialized_bucket_ids =
+        absl::flat_hash_map<std::string, std::string>(bucket_ids.begin(), bucket_ids.end());
+    // Verifies that the expected bucket ids are generated for `on_no_match` case.
+    EXPECT_THAT(expected_bucket_ids,
+                testing::UnorderedPointwise(testing::Eq(), serialized_bucket_ids));
+  }
+
   NiceMock<MockFactoryContext> context_;
   NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
 
@@ -333,28 +386,7 @@ TEST_F(FilterTest, RequestMatchingSucceeded) {
   // from the config.
   absl::flat_hash_map<std::string, std::string> expected_bucket_ids = custom_value_pairs;
   expected_bucket_ids.insert({"name", "prod"});
-
-  // Perform request matching.
-  auto match_result = filter_->requestMatching(default_headers_);
-  // Assert that the request matching succeeded and then retrieve the matched action.
-  ASSERT_TRUE(match_result.ok());
-  const RateLimitOnMactchAction* match_action =
-      dynamic_cast<RateLimitOnMactchAction*>(match_result.value().get());
-
-  RateLimitQuotaValidationVisitor visitor = {};
-  // Generate the bucket ids.
-  auto ret = match_action->generateBucketId(filter_->matchingData(), context_, visitor);
-  // Assert that the bucket id generation succeeded and then retrieve the bucket ids.
-  ASSERT_TRUE(ret.ok());
-  auto bucket_ids = ret.value().bucket();
-
-  // Serialize the proto map to std map for comparison. We can avoid this conversion by using
-  // `EqualsProto()` directly once it is available in the Envoy code base.
-  auto serialized_bucket_ids =
-      absl::flat_hash_map<std::string, std::string>(bucket_ids.begin(), bucket_ids.end());
-
-  EXPECT_THAT(expected_bucket_ids,
-              testing::UnorderedPointwise(testing::Eq(), serialized_bucket_ids));
+  verifyRequestMatchingSucceeded(expected_bucket_ids);
 
   envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse resp;
   filter_->onQuotaResponse(resp);
@@ -388,27 +420,15 @@ TEST_F(FilterTest, RequestMatchingWithOnNoMatch) {
   createFilter();
   absl::flat_hash_map<std::string, std::string> expected_bucket_ids = {
       {"on_no_match_name", "on_no_match_value"}, {"on_no_match_name_2", "on_no_match_value_2"}};
-  // Perform request matching.
-  auto match_result = filter_->requestMatching(default_headers_);
-  // Asserts that the request matching succeeded.
-  // OK status is expected to be returned even if the exact request matching failed. It is because
-  // `on_no_match` field is configured.
-  ASSERT_TRUE(match_result.ok());
-  // Retrieve the matched action.
-  const RateLimitOnMactchAction* match_action =
-      dynamic_cast<RateLimitOnMactchAction*>(match_result.value().get());
+  verifyRequestMatchingSucceeded(expected_bucket_ids);
+}
 
-  RateLimitQuotaValidationVisitor visitor = {};
-  // Generate the bucket ids.
-  auto ret = match_action->generateBucketId(filter_->matchingData(), context_, visitor);
-  // Asserts that the bucket id generation succeeded and then retrieve the bucket ids.
-  ASSERT_TRUE(ret.ok());
-  auto bucket_ids = ret.value().bucket();
-  auto serialized_bucket_ids =
-      absl::flat_hash_map<std::string, std::string>(bucket_ids.begin(), bucket_ids.end());
-  // Verifies that the expected bucket ids are generated for `on_no_match` case.
-  EXPECT_THAT(expected_bucket_ids,
-              testing::UnorderedPointwise(testing::Eq(), serialized_bucket_ids));
+TEST_F(FilterTest, RequestMatchingOnNoMatchWithNoMatcher) {
+  addMatcherConfig(MatcherConfigType::NoMatcher);
+  createFilter();
+  absl::flat_hash_map<std::string, std::string> expected_bucket_ids = {
+      {"on_no_match_name", "on_no_match_value"}, {"on_no_match_name_2", "on_no_match_value_2"}};
+  verifyRequestMatchingSucceeded(expected_bucket_ids);
 }
 
 TEST_F(FilterTest, RequestMatchingWithInvalidOnNoMatch) {
