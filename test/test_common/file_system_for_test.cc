@@ -2,7 +2,7 @@
 
 #include "source/common/filesystem/filesystem_impl.h"
 
-#include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_time.h"
 
 namespace Envoy {
 
@@ -125,7 +125,7 @@ MemfileInstanceImpl::MemfileInstanceImpl(TimeSource& time_source)
     : file_system_{new InstanceImpl()}, use_memfiles_(false), time_source_(time_source) {}
 
 MemfileInstanceImpl& fileSystemForTest() {
-  Event::SimulatedTimeSystem sim_time;
+  Event::GlobalTimeSystem sim_time;
   static MemfileInstanceImpl* file_system = new MemfileInstanceImpl(sim_time);
   return *file_system;
 }
