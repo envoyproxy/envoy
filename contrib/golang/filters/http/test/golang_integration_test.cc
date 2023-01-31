@@ -33,13 +33,11 @@ typed_config:
   library_id: %s
   library_path: %s
   plugin_name: %s
-  merge_policy: MERGE_VIRTUALHOST_ROUTER_FILTER
   plugin_config:
-    "@type": type.googleapis.com/udpa.type.v1.TypedStruct
-    type_url: typexx
+    "@type": type.googleapis.com/xds.type.v3.TypedStruct
     value:
-      remove: x-test-header-0
-      set: foo
+     echo_body: "echo from go"
+     match_path: "/echo"
 )EOF";
 
     auto yaml_string = absl::StrFormat(yaml_fmt, lib_id, lib_path, plugin_name);
@@ -60,7 +58,8 @@ TEST_P(GolangIntegrationTest, Echo) {
   initialize();
   registerTestServerPorts({"http"});
 
-  auto path = "/localreply";
+  auto path = "/echo";
+  auto echo_body = "echo from go";
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"}, {":path", path}, {":scheme", "http"}, {":authority", "test.com"}};
@@ -76,8 +75,8 @@ TEST_P(GolangIntegrationTest, Echo) {
   EXPECT_EQ("403", response->headers().getStatusValue());
 
   // check body for echo
-  auto body = StringUtil::toUpper(absl::StrFormat("forbidden from go, path: %s\r\n", path));
-  EXPECT_EQ(body, StringUtil::toUpper(response->body()));
+  auto body = absl::StrFormat("%s, path: %s\r\n", echo_body, path);
+  EXPECT_EQ(body, response->body());
 
   codec_client_->close();
 
@@ -120,8 +119,8 @@ TEST_P(GolangIntegrationTest, Passthrough) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 
   // check body for pasthrough
-  auto body = StringUtil::toUpper(absl::StrFormat("%s%s", good, bye));
-  EXPECT_EQ(body, StringUtil::toUpper(response->body()));
+  auto body = absl::StrFormat("%s%s", good, bye);
+  EXPECT_EQ(body, response->body());
 
   codec_client_->close();
 
