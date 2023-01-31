@@ -38,8 +38,11 @@ struct TestFactory : public Envoy::Server::Configuration::NamedHttpFilterConfigF
     auto requirements = std::make_unique<
         envoy::extensions::filters::common::dependency::v3::MatchingRequirements>();
 
-    requirements->mutable_data_input_allow_list()->add_type_url(
+    auto* data_input_allow_list = requirements->mutable_data_input_allow_list();
+    data_input_allow_list->add_type_url(
         "type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput");
+    data_input_allow_list->add_type_url(
+        "type.googleapis.com/envoy.type.matcher.v3.HttpRequestQueryParamMatchInput");
 
     return requirements;
   }
@@ -147,6 +150,40 @@ matcher:
       }));
   EXPECT_CALL(factory_callbacks, addAccessLogHandler(testing::IsNull()));
   cb(factory_callbacks);
+}
+
+TEST(MatchWrapper, QueryParamMatcherYaml) {
+  TestFactory test_factory;
+  Envoy::Registry::InjectFactory<Envoy::Server::Configuration::NamedHttpFilterConfigFactory>
+      inject_factory(test_factory);
+
+  NiceMock<Envoy::Server::Configuration::MockFactoryContext> factory_context;
+
+  const auto config =
+      TestUtility::parseYaml<envoy::extensions::common::matching::v3::ExtensionWithMatcher>(R"EOF(
+extension_config:
+  name: test
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.StringValue
+xds_matcher:
+  matcher_tree:
+    input:
+      name: request-query-param
+      typed_config:
+        "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestQueryParamMatchInput
+        query_param: arg
+    exact_match_map:
+        map:
+            match:
+                action:
+                    name: skip
+                    typed_config:
+                        "@type": type.googleapis.com/envoy.extensions.filters.common.matcher.action.v3.SkipFilter
+)EOF");
+
+  MatchDelegateConfig match_delegate_config;
+  auto cb = match_delegate_config.createFilterFactoryFromProto(config, "", factory_context);
+  EXPECT_TRUE(cb);
 }
 
 TEST(MatchWrapper, WithNoMatcher) {
