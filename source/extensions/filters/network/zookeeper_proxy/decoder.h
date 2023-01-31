@@ -137,7 +137,8 @@ private:
     MonotonicTime start_time;
   };
 
-  // decodeAfterBuffer waits until the buffer contains all data for one or more packets before decoding.
+  // decodeAfterBuffer waits until the buffer contains all data for one or more packets before
+  // decoding.
   Network::FilterStatus decodeAfterBuffer(Buffer::Instance& data, DecodeType dtype);
   void decode(Buffer::Instance& data, DecodeType dtype);
   void decodeOnData(Buffer::Instance& data, uint64_t& offset);
