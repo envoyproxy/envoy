@@ -65,7 +65,7 @@ public:
   EngineBuilder& enforceTrustChainVerification(bool trust_chain_verification_on);
   EngineBuilder& enablePlatformCertificatesValidation(bool platform_certificates_validation_on);
   // Adds an RTDS layer to default config. Requires that ADS be configured
-  EngineBuilder& addRtdsLayer(const std::string& layer_name);
+  EngineBuilder& addRtdsLayer(const std::string& layer_name, int timeout_seconds = 5);
   // Adds an ADS layer.
   EngineBuilder& setAggregatedDiscoveryService(const std::string& api_type,
                                                const std::string& address, const int port);

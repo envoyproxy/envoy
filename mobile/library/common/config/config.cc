@@ -548,7 +548,7 @@ const char* rtds_layer_insert = R"(
         name: {}
         rtds_config:
           initial_fetch_timeout:
-            seconds: 1
+            seconds: {}
           resource_api_version: V3
           ads: {{}})";
 
