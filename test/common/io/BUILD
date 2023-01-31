@@ -47,8 +47,9 @@ envoy_cc_test(
         "skip_on_windows",
     ],
     deps = [
+        "//envoy/api:os_sys_calls_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/io:io_uring_worker_lib",
-        "//envoy/api:os_sys_calls_interface",
+        "//test/test_common:test_time_lib",
     ],
 )
