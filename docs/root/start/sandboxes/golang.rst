@@ -65,7 +65,7 @@ Terminal 1
 Step 4: Make a request handled upstream and updated by the Go plugin
 ********************************************************************
 
-The output from the ``curl`` command below should include the body that updated by the Go plugin.
+The output from the ``curl`` command below should include the body that updated by the simple Go plugin.
 
 Terminal 1
 
@@ -77,7 +77,8 @@ Terminal 1
 Step 5: Make a request handled by the Go plugin using custom configuration
 **************************************************************************
 
-The output from the ``curl`` command below should include the body that contains value of ``prefix_localreply_body`` by the Go plugin.
+The output from the ``curl`` command below should include the body that contains value of
+``prefix_localreply_body`` by the simple Go plugin.
 
 Terminal 1
 
@@ -90,7 +91,7 @@ Terminal 1
 
    :ref:`Envoy Go filter <config_http_filters_golang>`
       Further information about the Envoy Go filter.
-   :ref:`Go API <envoy_v3_api_file_contrib/envoy/extensions/filters/http/golang/v3alpha/golang.proto>`.
+   :ref:`Go extension API <envoy_v3_api_file_contrib/envoy/extensions/filters/http/golang/v3alpha/golang.proto>`
       The Go extension filter API.
-   :repo:`filter.go <contrib/golang/filters/http/source/go/pkg/api/filter.go>`
+   :repo:`Go plugin API <contrib/golang/filters/http/source/go/pkg/api/filter.go>`
       Overview of Envoy's Go plugin APIs.
