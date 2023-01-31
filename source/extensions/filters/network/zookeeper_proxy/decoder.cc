@@ -476,29 +476,31 @@ Network::FilterStatus DecoderImpl::onWrite(Buffer::Instance& data) {
 }
 
 Network::FilterStatus DecoderImpl::decodeAfterBuffer(Buffer::Instance& data, DecodeType dtype) {
+  uint64_t offset = 0;
   int32_t len = 0;
-  try {
-    // Peek packet length.
-    uint64_t offset = 0;
-    len = helper_.peekInt32(data, offset);
-    ensureMinLength(len, INT_LENGTH + XID_LENGTH);
-    ensureMaxLength(len);
-  } catch (const EnvoyException& e) {
-    ENVOY_LOG(debug, "zookeeper_proxy: decoding exception {}", e.what());
-    callbacks_.onDecodeError();
-    return Network::FilterStatus::Continue;
-  }
 
-  if (data.length() >= INT_LENGTH + len) {
+  while (offset < data.length()) {
+    try {
+      // Peek packet length.
+      len = helper_.peekInt32(data, offset);
+      ensureMinLength(len, INT_LENGTH + XID_LENGTH);
+      ensureMaxLength(len);
+      offset += len;
+    } catch (const EnvoyException& e) {
+      ENVOY_LOG(debug, "zookeeper_proxy: decoding exception {}", e.what());
+      callbacks_.onDecodeError();
+      return Network::FilterStatus::Continue;
+    }
+  }
+  if (offset == data.length()) {
     decode(data, dtype);
     return Network::FilterStatus::Continue;
-  } else {
-    ENVOY_LOG(trace,
-              "zookeeper_proxy: waiting for the full packet ({} bytes) in buffer, current buffer "
-              "is {} bytes",
-              INT_LENGTH + len, data.length());
-    return Network::FilterStatus::StopIteration;
   }
+  ENVOY_LOG(trace,
+            "zookeeper_proxy: waiting for entire packets in the buffer, current buffer "
+            "is {} bytes",
+            data.length());
+  return Network::FilterStatus::StopIteration;
 }
 
 void DecoderImpl::decode(Buffer::Instance& data, DecodeType dtype) {
