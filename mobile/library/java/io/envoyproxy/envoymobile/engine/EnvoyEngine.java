@@ -23,20 +23,29 @@ public interface EnvoyEngine {
   void terminate();
 
   /**
+   * Performs any registrations necessary before running Envoy.
+   *
+   * The envoyConfiguration is used to determined what to register.
+   *
+   * @param envoyConfiguration The EnvoyConfiguration used to start Envoy.
+   */
+  void performRegistration(EnvoyConfiguration envoyConfiguration);
+
+  /**
    * Run the Envoy engine with the provided yaml string and log level.
    *
-   * The envoyConfiguration is used to resolve the configurationYAML.
+   * This does not perform registration, and performRegistration() may need to be called first.
    *
    * @param configurationYAML The configuration yaml with which to start Envoy.
-   * @param envoyConfiguration The EnvoyConfiguration used to start Envoy.
    * @param logLevel          The log level to use when starting Envoy.
    * @return A status indicating if the action was successful.
    */
-  int runWithTemplate(String configurationYAML, EnvoyConfiguration envoyConfiguration,
-                      String logLevel);
+  int runWithYaml(String configurationYAML, String logLevel);
 
   /**
    * Run the Envoy engine with the provided EnvoyConfiguration and log level.
+   *
+   * This automatically performs any necessary registrations.
    *
    * @param envoyConfiguration The EnvoyConfiguration used to start Envoy.
    * @param logLevel           The log level to use when starting Envoy.
