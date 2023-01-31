@@ -118,14 +118,8 @@ void IoUringImpl::injectCompletion(os_fd_t fd, void* user_data, int32_t result) 
 void IoUringImpl::removeInjectedCompletion(os_fd_t fd) {
   ENVOY_LOG(trace, "remove injected completions for fd = {}, size = {}", fd,
             injected_completions_.size());
-  for (std::list<InjectedCompletion>::iterator it = injected_completions_.begin();
-       it != injected_completions_.end();) {
-    if (it->fd_ == fd) {
-      it = injected_completions_.erase(it);
-    } else {
-      it++;
-    }
-  }
+  injected_completions_.remove_if(
+      [fd](InjectedCompletion& completion) { return fd == completion.fd_; });
 }
 
 IoUringResult IoUringImpl::prepareAccept(os_fd_t fd, struct sockaddr* remote_addr,
