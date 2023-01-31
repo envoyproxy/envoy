@@ -492,10 +492,12 @@ Network::FilterStatus DecoderImpl::decodeAfterBuffer(Buffer::Instance& data, Dec
       return Network::FilterStatus::Continue;
     }
   }
+
   if (offset == data.length()) {
     decode(data, dtype);
     return Network::FilterStatus::Continue;
   }
+
   ENVOY_LOG(trace,
             "zookeeper_proxy: waiting for entire packets in the buffer, current buffer "
             "is {} bytes",
