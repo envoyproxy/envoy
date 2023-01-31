@@ -12,7 +12,7 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wold-style-cast"
 namespace android {
-#include "source/common/api/posix/android/ifaddrs-android.h"
+#include "third_party/android/ifaddrs-android.h"
 } // namespace android
 #pragma clang diagnostic pop
 #endif

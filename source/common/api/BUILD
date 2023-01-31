@@ -37,13 +37,6 @@ envoy_cc_library(
         ],
         "//bazel:windows_x86_64": ["win32/os_sys_calls_impl.cc"],
         "//conditions:default": ["posix/os_sys_calls_impl.cc"],
-    }) + select({
-        "//bazel:android": [
-            "posix/android/ifaddrs-android.h",
-            "posix/android/LocalArray.h",
-            "posix/android/ScopedFd.h",
-        ],
-        "//conditions:default": [],
     }) + envoy_select_hot_restart(["posix/os_sys_calls_impl_hot_restart.cc"]),
     hdrs = select({
         "//bazel:linux": [
@@ -66,5 +59,6 @@ envoy_cc_library(
         "//envoy/api:os_sys_calls_interface",
         "//source/common/network:address_lib",
         "//source/common/singleton:threadsafe_singleton",
+        "//third_party/android:android_lib",
     ],
 )
