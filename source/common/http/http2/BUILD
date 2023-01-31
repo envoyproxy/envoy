@@ -93,7 +93,6 @@ envoy_cc_library(
     srcs = ["metadata_encoder.cc"],
     hdrs = ["metadata_encoder.h"],
     external_deps = [
-        "nghttp2",
         "quiche_http2_adapter",
     ],
     deps = [

@@ -51,11 +51,6 @@ updates:
   schedule:
     interval: "daily"
 
-- package-ecosystem: "pip"
-  directory: "/tools/dependency"
-  schedule:
-    interval: "daily"
-
 - package-ecosystem: "docker"
   directory: "/.devcontainer"
   schedule:
