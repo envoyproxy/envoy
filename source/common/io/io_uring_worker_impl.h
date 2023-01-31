@@ -21,17 +21,48 @@ public:
 
   // IoUringSocket
   os_fd_t fd() const override { return fd_; }
-  void injectCompletion(RequestType type) override;
+  void injectCompletion(uint32_t type) override;
 
   // This will cleanup all the injected completions for this socket and
   // unlink itself from the worker.
   void cleanup();
+  void onAccept(int32_t, bool injected) override {
+    if (injected && (injected_completions_ & RequestType::Accept)) {
+      injected_completions_ &= ~RequestType::Accept;
+    }
+  }
+  void onClose(int32_t, bool injected) override {
+    if (injected && (injected_completions_ & RequestType::Close)) {
+      injected_completions_ &= ~RequestType::Close;
+    }
+  }
+  void onCancel(int32_t, bool injected) override {
+    if (injected && (injected_completions_ & RequestType::Cancel)) {
+      injected_completions_ &= ~RequestType::Cancel;
+    }
+  }
+  void onConnect(int32_t, bool injected) override {
+    if (injected && (injected_completions_ & RequestType::Connect)) {
+      injected_completions_ &= ~RequestType::Connect;
+    }
+  }
+  void onRead(int32_t, bool injected) override {
+    if (injected && (injected_completions_ & RequestType::Read)) {
+      injected_completions_ &= ~RequestType::Read;
+    }
+  }
+  void onWrite(int32_t, bool injected) override {
+    if (injected && (injected_completions_ & RequestType::Write)) {
+      injected_completions_ &= ~RequestType::Write;
+    }
+  }
 
 private:
   void unlink();
 
   os_fd_t fd_;
   IoUringWorkerImpl& parent_;
+  uint32_t injected_completions_;
 };
 
 class IoUringWorkerImpl : public IoUringWorker, protected Logger::Loggable<Logger::Id::io> {
@@ -63,7 +94,7 @@ public:
   // From socket from the worker.
   std::unique_ptr<IoUringSocketEntry> removeSocket(IoUringSocketEntry& socket);
   // Inject a request completion into the io_uring instance.
-  void injectCompletion(IoUringSocket& socket, RequestType type, int32_t result);
+  void injectCompletion(IoUringSocket& socket, uint32_t type, int32_t result);
   // Remove all the injected completion for the specific socket.
   void removeInjectedCompletion(IoUringSocket& socket);
 

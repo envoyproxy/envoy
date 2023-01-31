@@ -24,12 +24,6 @@ public:
   uint64_t write(Buffer::Instance&) override { PANIC("not implement"); }
   uint64_t writev(const Buffer::RawSlice*, uint64_t) override { PANIC("not implement"); }
   void connect(const Network::Address::InstanceConstSharedPtr&) override {}
-  void onAccept(int32_t) override {}
-  void onClose(int32_t) override {}
-  void onCancel(int32_t) override {}
-  void onConnect(int32_t) override {}
-  void onRead(int32_t) override {}
-  void onWrite(int32_t) override {}
 };
 
 class IoUringWorkerTestImpl : public IoUringWorkerImpl {

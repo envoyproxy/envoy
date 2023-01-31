@@ -14,8 +14,9 @@ namespace Io {
  * @param user_data is any data attached to an entry submitted to the submission
  * queue.
  * @param result is a return code of submitted system call.
+ * @param injected indicated the completion is injected or not.
  */
-using CompletionCb = std::function<void(void* user_data, int32_t result)>;
+using CompletionCb = std::function<void(void* user_data, int32_t result, bool injected)>;
 
 enum class IoUringResult { Ok, Busy, Failed };
 
@@ -121,7 +122,14 @@ public:
 /**
  * IoUring request type.
  */
-enum class RequestType { Accept, Connect, Read, Write, Close, Cancel };
+struct RequestType {
+  static constexpr uint32_t Accept = 0x1;
+  static constexpr uint32_t Connect = 0x2;
+  static constexpr uint32_t Read = 0x4;
+  static constexpr uint32_t Write = 0x8;
+  static constexpr uint32_t Close = 0x10;
+  static constexpr uint32_t Cancel = 0x20;
+};
 
 class IoUringSocket;
 
@@ -129,7 +137,7 @@ class IoUringSocket;
  * Abstract for IoUring I/O Request.
  */
 struct Request {
-  RequestType type_;
+  uint32_t type_;
   IoUringSocket& io_uring_socket_;
 };
 
@@ -190,44 +198,50 @@ public:
   /**
    * On accept request completed.
    * @param result the result of operation in the request.
+   * @param injected indicates the completion is injected or not.
    */
-  virtual void onAccept(int32_t result) PURE;
+  virtual void onAccept(int32_t result, bool injected) PURE;
 
   /**
    * On close request completed.
    * @param result the result of operation in the request.
+   * @param injected indicates the completion is injected or not.
    */
-  virtual void onClose(int32_t result) PURE;
+  virtual void onClose(int32_t result, bool injected) PURE;
 
   /**
    * On cancel request completed.
    * @param result the result of operation in the request.
+   * @param injected indicates the completion is injected or not.
    */
-  virtual void onCancel(int32_t result) PURE;
+  virtual void onCancel(int32_t result, bool injected) PURE;
 
   /**
    * On connect request completed.
    * @param result the result of operation in the request.
+   * @param injected indicates the completion is injected or not.
    */
-  virtual void onConnect(int32_t result) PURE;
+  virtual void onConnect(int32_t result, bool injected) PURE;
 
   /**
    * On read request completed.
    * @param result the result of operation in the request.
+   * @param injected indicates the completion is injected or not.
    */
-  virtual void onRead(int32_t result) PURE;
+  virtual void onRead(int32_t result, bool injected) PURE;
 
   /**
    * On write request completed.
    * @param result the result of operation in the request.
+   * @param injected indicates the completion is injected or not.
    */
-  virtual void onWrite(int32_t result) PURE;
+  virtual void onWrite(int32_t result, bool injected) PURE;
 
   /**
    * Inject a request completion to the io uring instance.
    * @param type the request type of injected completion.
    */
-  virtual void injectCompletion(RequestType type) PURE;
+  virtual void injectCompletion(uint32_t type) PURE;
 };
 
 /**

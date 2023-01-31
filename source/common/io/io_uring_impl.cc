@@ -85,13 +85,15 @@ void IoUringImpl::forEveryCompletion(CompletionCb completion_cb) {
 
   for (unsigned i = 0; i < count; ++i) {
     struct io_uring_cqe* cqe = cqes_[i];
-    completion_cb(reinterpret_cast<void*>(cqe->user_data), cqe->res);
+    completion_cb(reinterpret_cast<void*>(cqe->user_data), cqe->res, false);
   }
 
   io_uring_cq_advance(&ring_, count);
 
   ENVOY_LOG(trace, "the num of injected completion is {}", injected_completions_.size());
 
+  // TODO(soulxu): Add bound here to avoid too many completion to stuck the thread too
+  // long.
   // TODO(soulxu): We may need to only iterate the injected completions in the current
   // event loop. Any completions injected nested should be iterated in the next event
   // loop. This matches the current Envoy behavior. But let's change this when we face
@@ -99,7 +101,7 @@ void IoUringImpl::forEveryCompletion(CompletionCb completion_cb) {
   // Iterate the injected completion.
   while (!injected_completions_.empty()) {
     auto& completion = injected_completions_.front();
-    completion_cb(completion.user_data_, completion.result_);
+    completion_cb(completion.user_data_, completion.result_, true);
     // The socket may closed in the completion_cb and all the related completions are
     // removed.
     if (injected_completions_.empty()) {

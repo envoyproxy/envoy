@@ -20,7 +20,12 @@ void IoUringSocketEntry::cleanup() {
   unlink();
 }
 
-void IoUringSocketEntry::injectCompletion(RequestType type) {
+void IoUringSocketEntry::injectCompletion(uint32_t type) {
+  // Avoid injected same type completion multiple times.
+  if (injected_completions_ & type) {
+    return;
+  }
+  injected_completions_ |= type;
   parent_.injectCompletion(*this, type, -EAGAIN);
 }
 
@@ -169,7 +174,7 @@ IoUringWorkerImpl::submitConnectRequest(IoUringSocket& socket,
 void IoUringWorkerImpl::onFileEvent() {
   ENVOY_LOG(trace, "io uring worker, on file event");
   delay_submit_ = true;
-  io_uring_instance_->forEveryCompletion([](void* user_data, int32_t result) {
+  io_uring_instance_->forEveryCompletion([](void* user_data, int32_t result, bool injected) {
     auto req = static_cast<Io::Request*>(user_data);
 
     ENVOY_LOG(debug, "receive request completion, result = {}, req = {}", result, fmt::ptr(req));
@@ -177,27 +182,27 @@ void IoUringWorkerImpl::onFileEvent() {
     switch (req->type_) {
     case RequestType::Accept:
       ENVOY_LOG(trace, "receive accept request completion, fd = {}", req->io_uring_socket_.fd());
-      req->io_uring_socket_.onAccept(result);
+      req->io_uring_socket_.onAccept(result, injected);
       break;
     case RequestType::Connect:
       ENVOY_LOG(trace, "receive connect request completion, fd = {}", req->io_uring_socket_.fd());
-      req->io_uring_socket_.onConnect(result);
+      req->io_uring_socket_.onConnect(result, injected);
       break;
     case RequestType::Read:
       ENVOY_LOG(trace, "receive Read request completion, fd = {}", req->io_uring_socket_.fd());
-      req->io_uring_socket_.onRead(result);
+      req->io_uring_socket_.onRead(result, injected);
       break;
     case RequestType::Write:
       ENVOY_LOG(trace, "receive write request completion, fd = {}", req->io_uring_socket_.fd());
-      req->io_uring_socket_.onWrite(result);
+      req->io_uring_socket_.onWrite(result, injected);
       break;
     case RequestType::Close:
       ENVOY_LOG(trace, "receive close request completion, fd = {}", req->io_uring_socket_.fd());
-      req->io_uring_socket_.onClose(result);
+      req->io_uring_socket_.onClose(result, injected);
       break;
     case RequestType::Cancel:
       ENVOY_LOG(trace, "receive cancel request completion, fd = {}", req->io_uring_socket_.fd());
-      req->io_uring_socket_.onCancel(result);
+      req->io_uring_socket_.onCancel(result, injected);
       break;
     }
 
@@ -217,7 +222,7 @@ std::unique_ptr<IoUringSocketEntry> IoUringWorkerImpl::removeSocket(IoUringSocke
   return socket.removeFromList(sockets_);
 }
 
-void IoUringWorkerImpl::injectCompletion(IoUringSocket& socket, RequestType type, int32_t result) {
+void IoUringWorkerImpl::injectCompletion(IoUringSocket& socket, uint32_t type, int32_t result) {
   Request* req = new Request{type, socket};
   io_uring_instance_->injectCompletion(socket.fd(), req, result);
   file_event_->activate(Event::FileReadyType::Read);

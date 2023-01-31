@@ -22,15 +22,24 @@ public:
   uint64_t write(Buffer::Instance&) override { PANIC("not implement"); }
   uint64_t writev(const Buffer::RawSlice*, uint64_t) override { PANIC("not implement"); }
   void connect(const Network::Address::InstanceConstSharedPtr&) override {}
-  void onAccept(int32_t) override {}
-  void onClose(int32_t) override {}
-  void onCancel(int32_t) override {}
-  void onConnect(int32_t) override {}
-  void onRead(int32_t result) override { read_result_ = result; }
-  void onWrite(int32_t result) override { write_result_ = result; }
+  void onRead(int32_t result, bool injected) override {
+    IoUringSocketEntry::onRead(result, injected);
+    read_result_ = result;
+    is_read_injected_completion_ = injected;
+    nr_completion_++;
+  }
+  void onWrite(int32_t result, bool injected) override {
+    IoUringSocketEntry::onWrite(result, injected);
+    write_result_ = result;
+    is_write_injected_completion_ = injected;
+    nr_completion_++;
+  }
 
   int32_t read_result_{-1};
+  bool is_read_injected_completion_{false};
   int32_t write_result_{-1};
+  bool is_write_injected_completion_{false};
+  int32_t nr_completion_{0};
 };
 
 class IoUringWorkerTestImpl : public IoUringWorkerImpl {
@@ -167,6 +176,7 @@ TEST_F(IoUringWorkerIntegraionTest, Basic) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
+  EXPECT_FALSE(io_uring_socket.is_read_injected_completion_);
   std::string read_data(static_cast<char*>(iov.iov_base), io_uring_socket.read_result_);
   EXPECT_EQ(read_data, write_data);
 
@@ -193,6 +203,7 @@ TEST_F(IoUringWorkerIntegraionTest, Injection) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
+  EXPECT_TRUE(io_uring_socket.is_read_injected_completion_);
   EXPECT_EQ(io_uring_socket.read_result_, -EAGAIN);
 
   // Write data through client socket.
@@ -217,11 +228,36 @@ TEST_F(IoUringWorkerIntegraionTest, Injection) {
   std::string read_data(static_cast<char*>(iov.iov_base), io_uring_socket.read_result_);
   EXPECT_EQ(read_data, write_data);
 
+  EXPECT_TRUE(io_uring_socket.is_write_injected_completion_);
   EXPECT_EQ(io_uring_socket.write_result_, -EAGAIN);
 
   io_uring_socket.cleanup();
   EXPECT_EQ(io_uring_worker.getSockets().size(), 0);
   cleanup();
+}
+
+TEST_F(IoUringWorkerIntegraionTest, MergeInjection) {
+  init();
+  connect();
+  accept();
+
+  IoUringWorkerTestImpl io_uring_worker(std::make_unique<IoUringImpl>(8, false), *dispatcher_);
+  auto handler = TestIoUringHandler();
+  auto& io_uring_socket =
+      dynamic_cast<IoUringTestSocket&>(io_uring_worker.addTestSocket(server_socket_, handler));
+  EXPECT_EQ(io_uring_worker.getSockets().size(), 1);
+
+  io_uring_socket.injectCompletion(RequestType::Read);
+  io_uring_socket.injectCompletion(RequestType::Read);
+
+  // Waiting for the server socket receive the injected completion.
+  while (io_uring_socket.read_result_ == -1) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  EXPECT_TRUE(io_uring_socket.is_read_injected_completion_);
+  EXPECT_EQ(io_uring_socket.read_result_, -EAGAIN);
+  EXPECT_EQ(io_uring_socket.nr_completion_, 1);
 }
 
 } // namespace
