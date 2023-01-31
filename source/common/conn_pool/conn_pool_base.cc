@@ -205,7 +205,8 @@ void ConnPoolImplBase::attachStreamToClient(Envoy::ConnectionPool::ActiveClient&
   host_->cluster().trafficStats().upstream_rq_total_.inc();
   host_->cluster().trafficStats().upstream_rq_active_.inc();
   host_->cluster().resourceManager(priority_).requests().inc();
-  host_->setLastTrafficTimeTcpSuccess(dispatcher_.timeSource().monotonicTime());
+  host_->setLastSuccessfulTrafficTime(envoy::data::core::v3::HealthCheckerType::TCP,
+                                      dispatcher_.timeSource().monotonicTime());
 
   onPoolReady(client, context);
 }

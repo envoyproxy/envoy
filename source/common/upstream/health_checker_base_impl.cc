@@ -1,5 +1,7 @@
 #include "source/common/upstream/health_checker_base_impl.h"
 
+#include <chrono>
+
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/data/core/v3/health_check_event.pb.h"
@@ -18,7 +20,7 @@ HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
                                              Random::RandomGenerator& random,
                                              HealthCheckEventLoggerPtr&& event_logger)
     : always_log_health_check_failures_(config.always_log_health_check_failures()),
-      disable_health_check_if_active_traffic(config.disable_health_check_if_active_traffic()),
+      disable_health_check_if_active_traffic_(config.disable_health_check_if_active_traffic()),
       cluster_(cluster), dispatcher_(dispatcher),
       timeout_(PROTOBUF_GET_MS_REQUIRED(config, timeout)),
       unhealthy_threshold_(PROTOBUF_GET_WRAPPED_REQUIRED(config, unhealthy_threshold)),
@@ -419,27 +421,17 @@ HealthCheckerImplBase::ActiveHealthCheckSession::clearPendingFlag(HealthTransiti
 }
 
 void HealthCheckerImplBase::ActiveHealthCheckSession::onIntervalBase() {
-  // Only if host is healthy, check whether need disable HC if there is already business traffic
-  if (parent_.disable_health_check_if_active_traffic &&
+  // Only if host is healthy, check whether need disable HC if there was already successful
+  // non-health check traffic
+  if (parent_.disable_health_check_if_active_traffic_ &&
       !host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
-    MonotonicTime traffic_pass_time;
-    switch (parent_.healthCheckerType()) {
-    case envoy::data::core::v3::HealthCheckerType::TCP:
-      traffic_pass_time = host_->lastTrafficPassTime();
-      break;
-    case envoy::data::core::v3::HealthCheckerType::HTTP:
-      traffic_pass_time = host_->lastTrafficPassTime2xx();
-      break;
-    case envoy::data::core::v3::HealthCheckerType::GRPC:
-      traffic_pass_time = host_->lastTrafficPassTimeGrpc();
-      break;
-    default:
-      break;
-    }
-    auto duration = time_source_.monotonicTime() - traffic_pass_time;
-    if (duration.count() < std::chrono::milliseconds(parent_.interval_ * 1000000).count()) {
-      /* During the time, there is already business traffic for the host, no need to send HC packet
-       */
+    MonotonicTime traffic_successful_time =
+        host_->lastSuccessfulTrafficTime(parent_.healthCheckerType());
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+        time_source_.monotonicTime() - traffic_successful_time);
+    if (duration.count() < parent_.interval_.count()) {
+      // During the time, there was already successful non-health check traffic for the host, no
+      // need to send HC packet
       interval_timer_->enableTimer(parent_.interval_);
       return;
     }

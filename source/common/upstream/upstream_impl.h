@@ -210,20 +210,35 @@ public:
   resolveTransportSocketFactory(const Network::Address::InstanceConstSharedPtr& dest_address,
                                 const envoy::config::core::v3::Metadata* metadata) const;
   absl::optional<MonotonicTime> lastHcPassTime() const override { return last_hc_pass_time_; }
-  MonotonicTime lastTrafficPassTime() const override { return last_traffic_pass_time_; }
-  MonotonicTime lastTrafficPassTime2xx() const override { return last_traffic_pass_time_2xx_; }
-  MonotonicTime lastTrafficPassTimeGrpc() const override { return last_traffic_pass_time_grpc_; }
-
-  void setLastTrafficTimeTcpSuccess(MonotonicTime last_traffic_pass_time) const override {
-    last_traffic_pass_time_ = last_traffic_pass_time;
+  MonotonicTime lastSuccessfulTrafficTime(
+      envoy::data::core::v3::HealthCheckerType health_checker_type) const override {
+    switch (health_checker_type) {
+    case envoy::data::core::v3::HealthCheckerType::TCP:
+      return last_traffic_pass_time_;
+    case envoy::data::core::v3::HealthCheckerType::HTTP:
+      return last_traffic_pass_time_2xx_;
+    case envoy::data::core::v3::HealthCheckerType::GRPC:
+      return last_traffic_pass_time_grpc_;
+    default:
+      break;
+    }
+    return creation_time_;
   }
 
-  void setLastTrafficTimeHttp2xx(MonotonicTime last_traffic_pass_time) const override {
-    last_traffic_pass_time_2xx_ = last_traffic_pass_time;
-  }
-
-  void setLastTrafficTimeGrpcSuccess(MonotonicTime last_traffic_pass_time) const override {
-    last_traffic_pass_time_grpc_ = last_traffic_pass_time;
+  void setLastSuccessfulTrafficTime(envoy::data::core::v3::HealthCheckerType health_checker_type,
+                                    MonotonicTime last_successful_traffic_time) const override {
+    switch (health_checker_type) {
+    case envoy::data::core::v3::HealthCheckerType::TCP:
+      last_traffic_pass_time_ = last_successful_traffic_time;
+      break;
+    case envoy::data::core::v3::HealthCheckerType::HTTP:
+      last_traffic_pass_time_2xx_ = last_successful_traffic_time;
+      break;
+    case envoy::data::core::v3::HealthCheckerType::GRPC:
+      last_traffic_pass_time_grpc_ = last_successful_traffic_time;
+    default:
+      break;
+    }
   }
 
   void setAddressList(const std::vector<Network::Address::InstanceConstSharedPtr>& address_list) {

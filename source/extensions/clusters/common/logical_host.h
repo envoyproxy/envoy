@@ -122,28 +122,16 @@ public:
   absl::optional<MonotonicTime> lastHcPassTime() const override {
     return logical_host_->lastHcPassTime();
   }
-  MonotonicTime lastTrafficPassTime() const override {
-    return logical_host_->lastTrafficPassTime();
-  }
-  MonotonicTime lastTrafficPassTime2xx() const override {
-    return logical_host_->lastTrafficPassTime2xx();
-  }
-  MonotonicTime lastTrafficPassTimeGrpc() const override {
-    return logical_host_->lastTrafficPassTimeGrpc();
+  MonotonicTime lastSuccessfulTrafficTime(
+      envoy::data::core::v3::HealthCheckerType health_checker_type) const override {
+    return logical_host_->lastSuccessfulTrafficTime(health_checker_type);
   }
   uint32_t priority() const override { return logical_host_->priority(); }
   void priority(uint32_t) override {}
 
-  void setLastTrafficTimeTcpSuccess(MonotonicTime last_traffic_pass_time) const override {
-    logical_host_->setLastTrafficTimeTcpSuccess(last_traffic_pass_time);
-  }
-
-  void setLastTrafficTimeHttp2xx(MonotonicTime last_traffic_pass_time) const override {
-    logical_host_->setLastTrafficTimeHttp2xx(last_traffic_pass_time);
-  }
-
-  void setLastTrafficTimeGrpcSuccess(MonotonicTime last_traffic_pass_time) const override {
-    logical_host_->setLastTrafficTimeGrpcSuccess(last_traffic_pass_time);
+  void setLastSuccessfulTrafficTime(envoy::data::core::v3::HealthCheckerType health_checker_type,
+                                    MonotonicTime last_successful_traffic_time) const override {
+    logical_host_->setLastSuccessfulTrafficTime(health_checker_type, last_successful_traffic_time);
   }
 
 private:

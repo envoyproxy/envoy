@@ -41,25 +41,20 @@ TEST_F(RealHostDescription, UnitTest) {
   EXPECT_CALL(*mock_host_, loadMetricStats());
   description_.loadMetricStats();
 
-  EXPECT_CALL(*mock_host_, lastTrafficPassTime());
-  description_.lastTrafficPassTime();
+  EXPECT_CALL(*mock_host_, lastSuccesfulTrafficTime(_));
+  description_.lastSuccessfulTrafficTime(envoy::data::core::v3::HealthCheckerType::TCP);
+  description_.lastSuccessfulTrafficTime(envoy::data::core::v3::HealthCheckerType::HTTP);
+  description_.lastSuccessfulTrafficTime(envoy::data::core::v3::HealthCheckerType::GRPC);
 
-  EXPECT_CALL(*mock_host_, lastTrafficPassTime2xx());
-  description_.lastTrafficPassTime2xx();
-
-  EXPECT_CALL(*mock_host_, lastTrafficPassTimeGrpc());
-  description_.lastTrafficPassTimeGrpc();
-
-  EXPECT_CALL(*mock_host_, setLastTrafficTimeTcpSuccess(_));
-  description_.setLastTrafficTimeTcpSuccess(
+  EXPECT_CALL(*mock_host_, setLastSuccessfulTrafficTime(_));
+  description_.setLastSuccessfulTrafficTime(
+      envoy::data::core::v3::HealthCheckerType::TCP,
       std::chrono::steady_clock::now()); // NO_CHECK_FORMAT(real_time)
-
-  EXPECT_CALL(*mock_host_, setLastTrafficTimeHttp2xx(_));
-  description_.setLastTrafficTimeHttp2xx(
+  description_.setLastSuccessfulTrafficTime(
+      envoy::data::core::v3::HealthCheckerType::HTTP,
       std::chrono::steady_clock::now()); // NO_CHECK_FORMAT(real_time)
-
-  EXPECT_CALL(*mock_host_, setLastTrafficTimeGrpcSuccess(_));
-  description_.setLastTrafficTimeGrpcSuccess(
+  description_.setLastSuccessfulTrafficTime(
+      envoy::data::core::v3::HealthCheckerType::GRPC,
       std::chrono::steady_clock::now()); // NO_CHECK_FORMAT(real_time)
 
   std::vector<Network::Address::InstanceConstSharedPtr> address_list;

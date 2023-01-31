@@ -415,11 +415,11 @@ message HealthCheck {
   // will be used for health check socket configuration.
   google.protobuf.Struct transport_socket_match_criteria = 23;
 
-  // When the health status of a host is healthy, if this field is enabled, when envoy wants to send active health check packet to target host, it will first check whether
-  // there is already active business traffic hit the target host during the interval. If yes, no need to send health check packet.
-  // For http, if the business traffic response is 2xx, it will be considered as active traffic
-  // For tcp,  if there is any business traffic, it will be considered as active traffic
-  // For grpc, if grpc_status is non-zero, it will be considered as active traffic
+  // When the health status of a host is healthy, if this field is enabled, when envoy wants to send an active health check packet to a target host, it will first check whether
+  // there was *successful* non-health check traffic that targeted the host during the previous interval. If there was successful non-health check traffic, Envoy will not send a health check packet.
+  // For HTTP, if the traffic response is 2xx, it will be considered as successful traffic.
+  // For TCP,  if any TCP connections successfully connect, it will be considered as successful traffic.
+  // For gRPC, if *grpc_status* is non-zero, it will be considered as successful traffic.
   // The default value is false.
   bool disable_health_check_if_active_traffic = 25;
 }
