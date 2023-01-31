@@ -28,12 +28,14 @@ public:
 
   /**
    * Registers an eventfd file descriptor for the ring and returns it.
-   * It can be used for integration with event loops.
+   * It can be used for integration with event loops. The assertion is
+   * the eventfd isn't registered.
    */
   virtual os_fd_t registerEventfd() PURE;
 
   /**
-   * Resets the eventfd file descriptor for the ring.
+   * Resets the eventfd file descriptor for the ring. The assertion is
+   * the eventfd is registered.
    */
   virtual void unregisterEventfd() PURE;
 

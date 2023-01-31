@@ -57,6 +57,7 @@ os_fd_t IoUringImpl::registerEventfd() {
 }
 
 void IoUringImpl::unregisterEventfd() {
+  ASSERT(isEventfdRegistered());
   int res = io_uring_unregister_eventfd(&ring_);
   RELEASE_ASSERT(res == 0, fmt::format("unable to unregister eventfd: {}", errorDetails(-res)));
   SET_SOCKET_INVALID(event_fd_);

@@ -250,7 +250,7 @@ TEST_F(IoUringImplTest, RegisterEventfd) {
   EXPECT_TRUE(uring.isEventfdRegistered());
   uring.unregisterEventfd();
   EXPECT_FALSE(uring.isEventfdRegistered());
-  EXPECT_DEATH(uring.unregisterEventfd(), "unable to unregister eventfd");
+  EXPECT_DEATH(uring.unregisterEventfd(), "");
 }
 
 TEST_F(IoUringImplTest, PrepareReadvAllDataFitsOneChunk) {
