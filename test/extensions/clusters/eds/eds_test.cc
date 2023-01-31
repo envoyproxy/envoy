@@ -134,27 +134,11 @@ public:
     cluster_ = std::make_shared<EdsClusterImpl>(server_context_, eds_cluster_, runtime_.loader(),
                                                 factory_context, std::move(scope), false);
     EXPECT_EQ(initialize_phase, cluster_->initializePhase());
-    eds_callbacks_ =
-        edsMultiplexingEnabled()
-            ? server_context_.cluster_manager_.multiplexed_subscription_factory_.callbacks_
-            : server_context_.cluster_manager_.subscription_factory_.callbacks_;
-  }
-
-  bool edsMultiplexingEnabled() {
-    return Runtime::runtimeFeatureEnabled("envoy.reloadable_features.multiplex_eds") &&
-           (eds_cluster_.eds_cluster_config().eds_config().api_config_source().api_type() ==
-                envoy::config::core::v3::ApiConfigSource::GRPC ||
-            eds_cluster_.eds_cluster_config().eds_config().api_config_source().api_type() ==
-                envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
+    eds_callbacks_ = server_context_.cluster_manager_.subscription_factory_.callbacks_;
   }
 
   void initialize() {
-    if (edsMultiplexingEnabled()) {
-      EXPECT_CALL(*server_context_.cluster_manager_.multiplexed_subscription_factory_.subscription_,
-                  start(_));
-    } else {
-      EXPECT_CALL(*server_context_.cluster_manager_.subscription_factory_.subscription_, start(_));
-    }
+    EXPECT_CALL(*server_context_.cluster_manager_.subscription_factory_.subscription_, start(_));
     cluster_->initialize([this] { initialized_ = true; });
   }
 
@@ -2544,99 +2528,6 @@ TEST_F(EdsTest, OnConfigUpdateLedsAndEndpoints) {
                             EnvoyException,
                             "A ClusterLoadAssignment for cluster fare cannot include both LEDS "
                             "(resource: xdstp://foo/leds/collection) and a list of endpoints.");
-}
-
-TEST_F(EdsTest, MultiplexEdsEnabledViaRuntime) {
-  runtime_.mergeValues({{"envoy.reloadable_features.multiplex_eds", "true"}});
-  EXPECT_CALL(server_context_.cluster_manager_.multiplexed_subscription_factory_,
-              subscriptionFromConfigSource(_, _, _, _, _, _));
-  EXPECT_CALL(server_context_.cluster_manager_.subscription_factory_,
-              subscriptionFromConfigSource(_, _, _, _, _, _))
-      .Times(0);
-  resetCluster(R"EOF(
-      name: some_cluster
-      connect_timeout: 0.25s
-      type: EDS
-      eds_cluster_config:
-        eds_config:
-          resource_api_version: V3
-          api_config_source:
-            api_type: GRPC
-            transport_api_version: V3
-            grpc_services:
-              envoy_grpc:
-                cluster_name: eds_cluster
-    )EOF",
-               Cluster::InitializePhase::Secondary);
-}
-
-TEST_F(EdsTest, MultiplexEdsDisabledViaRuntime) {
-  runtime_.mergeValues({{"envoy.reloadable_features.multiplex_eds", "false"}});
-  EXPECT_CALL(server_context_.cluster_manager_.multiplexed_subscription_factory_,
-              subscriptionFromConfigSource(_, _, _, _, _, _))
-      .Times(0);
-  EXPECT_CALL(server_context_.cluster_manager_.subscription_factory_,
-              subscriptionFromConfigSource(_, _, _, _, _, _));
-  resetCluster(R"EOF(
-      name: some_cluster
-      connect_timeout: 0.25s
-      type: EDS
-      eds_cluster_config:
-        eds_config:
-          resource_api_version: V3
-          api_config_source:
-            api_type: GRPC
-            transport_api_version: V3
-            grpc_services:
-              envoy_grpc:
-                cluster_name: eds_cluster
-    )EOF",
-               Cluster::InitializePhase::Secondary);
-}
-
-TEST_F(EdsTest, MultiplexEdsWithUnsupportedApiTypeFallsbackToNonMultiplexedEds) {
-  runtime_.mergeValues({{"envoy.reloadable_features.multiplex_eds", "true"}});
-  EXPECT_CALL(server_context_.cluster_manager_.multiplexed_subscription_factory_,
-              subscriptionFromConfigSource(_, _, _, _, _, _))
-      .Times(0);
-  EXPECT_CALL(server_context_.cluster_manager_.subscription_factory_,
-              subscriptionFromConfigSource(_, _, _, _, _, _));
-  resetCluster(R"EOF(
-      name: some_cluster
-      connect_timeout: 0.25s
-      type: EDS
-      eds_cluster_config:
-        eds_config:
-          api_config_source:
-            api_type: REST
-            cluster_names:
-            - eds
-            refresh_delay: 1s
-    )EOF",
-               Cluster::InitializePhase::Secondary);
-}
-
-TEST_F(EdsTest, MultiplexEdsEnabledByDefault) {
-  EXPECT_CALL(server_context_.cluster_manager_.multiplexed_subscription_factory_,
-              subscriptionFromConfigSource(_, _, _, _, _, _));
-  EXPECT_CALL(server_context_.cluster_manager_.subscription_factory_,
-              subscriptionFromConfigSource(_, _, _, _, _, _))
-      .Times(0);
-  resetCluster(R"EOF(
-      name: some_cluster
-      connect_timeout: 0.25s
-      type: EDS
-      eds_cluster_config:
-        eds_config:
-          resource_api_version: V3
-          api_config_source:
-            api_type: GRPC
-            transport_api_version: V3
-            grpc_services:
-              envoy_grpc:
-                cluster_name: eds_cluster
-    )EOF",
-               Cluster::InitializePhase::Secondary);
 }
 
 } // namespace
