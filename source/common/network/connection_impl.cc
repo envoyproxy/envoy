@@ -715,7 +715,8 @@ void ConnectionImpl::onWriteReady() {
     // It is possible (though unlikely) for the connection to have already been closed during the
     // write callback. This can happen if we manage to complete the SSL handshake in the write
     // callback, raise a connected event, and close the connection.
-    if (transport_socket_->ssl()->sslSyscallErrorOccurred()) {
+    if (transport_socket_->ssl() != nullptr &&
+        transport_socket_->ssl()->sslSyscallErrorOccurred()) {
       setFailureReason(absl::StrCat("The connection has been closed during the write callback."));
     }
     closeSocket(ConnectionEvent::RemoteClose);
