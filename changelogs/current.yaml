@@ -21,6 +21,9 @@ bug_fixes:
   change: |
     added ``envoy.reloadable_features.multiplex_eds`` to disable eds multiplexing. Eds multiplexing is enabled by default, so that all subscriptions for the same resource type and management server reuse a single channel/mux.
     When eds multiplexing is disabled each subscription uses a dedicated channel/mux.
+- area: router
+  change: |
+    fixed the bug that custom tags of the route metadata type are not set for upstream spans.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -60,5 +63,11 @@ new_features:
 - area: upstream
   change: |
     added :ref:`maglev extension <envoy_v3_api_msg_extensions.load_balancing_policies.maglev.v3.Maglev>` to suppport the :ref:`load balancer policy <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>`.
+- area: router
+  change: |
+    support route info in upstream access log.
+- area: lua
+  change: |
+    added an new option to the options of lua ``httpCall``. This allows to skip adding ``x-forwarded-for`` by setting ``{["send_xff"] = false}`` as the ``options``.
 
 deprecated:
