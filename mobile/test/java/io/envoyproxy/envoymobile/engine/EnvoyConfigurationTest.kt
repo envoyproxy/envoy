@@ -109,6 +109,7 @@ class EnvoyConfigurationTest {
 
     // H3
     assertThat(resolvedTemplate).contains("http3_protocol_options:");
+    assertThat(resolvedTemplate).contains("name: alternate_protocols_cache");
 
     // Gzip
     assertThat(resolvedTemplate).contains("type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip");
@@ -146,5 +147,54 @@ class EnvoyConfigurationTest {
 
     // Proxying
     assertThat(resolvedTemplate).contains("&skip_dns_lookup_for_proxied_requests false")
+  }
+
+  @Test
+  fun `configuration resolves with alternate values`() {
+    JniLibrary.loadTestLibrary()
+    val envoyConfiguration = buildTestEnvoyConfiguration(
+      adminInterfaceEnabled = true,
+      enableDrainPostDnsRefresh = true,
+      enableDNSCache = true,
+      enableHappyEyeballs = true,
+      enableHttp3 = false,
+      enableGzip = false,
+      enableBrotli = true,
+      enableInterfaceBinding = true,
+      enableSkipDNSLookupForProxiedRequests = true,
+      enablePlatformCertificatesValidation = true
+    )
+
+    val resolvedTemplate = envoyConfiguration.createYaml()
+
+    // adminInterfaceEnabled = true
+    assertThat(resolvedTemplate).contains("admin: *admin_interface")
+
+    // enableDrainPostDnsRefresh = true
+    assertThat(resolvedTemplate).contains("&enable_drain_post_dns_refresh true")
+
+    // enableDNSCache = true
+    assertThat(resolvedTemplate).contains("key: dns_persistent_cache")
+
+    // enableHappyEyeballs = true
+    assertThat(resolvedTemplate).contains("&dns_lookup_family ALL")
+
+    // enableHttp3 = false
+    assertThat(resolvedTemplate).doesNotContain("name: alternate_protocols_cache");
+
+    // enableGzip = false
+    assertThat(resolvedTemplate).doesNotContain("type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip");
+
+    // enableBrotli = true
+    assertThat(resolvedTemplate).contains("type.googleapis.com/envoy.extensions.compression.brotli.decompressor.v3.Brotli");
+
+    // enableInterfaceBinding = true
+    assertThat(resolvedTemplate).contains("&enable_interface_binding true")
+
+    // enableSkipDNSLookupForProxiedRequests = true
+    assertThat(resolvedTemplate).contains("&skip_dns_lookup_for_proxied_requests true")
+
+    // enablePlatformCertificatesValidation = true
+    assertThat(resolvedTemplate).doesNotContain("trusted_ca:")
   }
 }

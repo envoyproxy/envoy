@@ -34,7 +34,7 @@ public interface EnvoyEngine {
   /**
    * Run the Envoy engine with the provided yaml string and log level.
    *
-   * This does not perform registration, and performRegistration may need to be called first.
+   * This does not perform registration, and performRegistration() may need to be called first.
    *
    * @param configurationYAML The configuration yaml with which to start Envoy.
    * @param logLevel          The log level to use when starting Envoy.

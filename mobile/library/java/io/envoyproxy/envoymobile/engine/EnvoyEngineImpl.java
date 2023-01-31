@@ -67,9 +67,7 @@ public class EnvoyEngineImpl implements EnvoyEngine {
   /**
    * Performs various JNI registration prior to engine running.
    *
-   * @param configurationYAML The configuration yaml with which to start Envoy.
    * @param envoyConfiguration The EnvoyConfiguration used to start Envoy.
-   * @param logLevel          The log level to use when starting Envoy.
    */
   @Override
   public void performRegistration(EnvoyConfiguration envoyConfiguration) {
@@ -99,6 +97,7 @@ public class EnvoyEngineImpl implements EnvoyEngine {
    * @param configurationYAML The configuration yaml with which to start Envoy.
    * @param logLevel          The log level to use when starting Envoy.
    * @return A status indicating if the action was successful.
+   * TODO(alyssawilk) change all the status returns to EnvoyStatus.
    */
   @Override
   public int runWithYaml(String configurationYAML, String logLevel) {
