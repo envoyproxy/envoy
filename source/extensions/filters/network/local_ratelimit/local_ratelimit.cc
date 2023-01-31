@@ -122,7 +122,7 @@ Network::FilterStatus Filter::onNewConnection() {
     config_->stats().rate_limited_.inc();
     ENVOY_CONN_LOG(trace, "local_rate_limit: rate limiting connection",
                    read_callbacks_->connection());
-	    // Delay rejection provides a better DoS protection for Envoy.
+    // Delay rejection provides a better DoS protection for Envoy.
     absl::optional<std::chrono::milliseconds> duration = config_->delay();
     if (duration.has_value() && duration.value() > std::chrono::milliseconds(0)) {
       delay_timer_ = read_callbacks_->connection().dispatcher().createTimer([this]() -> void {

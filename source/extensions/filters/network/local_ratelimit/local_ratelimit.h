@@ -99,7 +99,9 @@ using ConfigSharedPtr = std::shared_ptr<Config>;
 /**
  * Per-connection local rate limit filter.
  */
-class Filter : public Network::ReadFilter, public Network::ConnectionCallbacks, Logger::Loggable<Logger::Id::filter> {
+class Filter : public Network::ReadFilter,
+               public Network::ConnectionCallbacks,
+               Logger::Loggable<Logger::Id::filter> {
 public:
   Filter(const ConfigSharedPtr& config) : config_(config) {}
 
@@ -111,7 +113,7 @@ public:
     read_callbacks_->connection().addConnectionCallbacks(*this);
   }
 
-	// Network::ConnectionCallbacks
+  // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override;
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
