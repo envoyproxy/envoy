@@ -133,8 +133,11 @@ private:
   bool brotli_filter_ = false;
   bool socket_tagging_filter_ = false;
   bool platform_certificates_validation_on_ = false;
-  std::string rtds_layer_ = "";
-  std::string custom_ads_ = "";
+  std::string rtds_layer_name_ = "";
+  int rtds_timeout_seconds_;
+  std::string ads_api_type_ = "";
+  std::string ads_address_ = "";
+  int ads_port_;
   bool dns_cache_on_ = false;
 
   absl::flat_hash_map<std::string, KeyValueStoreSharedPtr> key_value_stores_{};

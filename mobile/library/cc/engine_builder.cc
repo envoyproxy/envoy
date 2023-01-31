@@ -240,19 +240,23 @@ EngineBuilder& EngineBuilder::enforceTrustChainVerification(bool trust_chain_ver
 }
 
 EngineBuilder& EngineBuilder::addRtdsLayer(const std::string& layer_name, int timeout_seconds) {
+  rtds_layer_name_ = layer_name;
+  rtds_timeout_seconds_ = timeout_seconds;
   bootstrapIncompatible();
 
-  rtds_layer_ = fmt::format(rtds_layer_insert, layer_name, layer_name, timeout_seconds);
   return *this;
 }
 EngineBuilder& EngineBuilder::setAggregatedDiscoveryService(const std::string& api_type,
                                                             const std::string& address,
                                                             const int port) {
-  bootstrapIncompatible();
 #ifndef ENVOY_GOOGLE_GRPC
   raise std::runtime_error("google_grpc must be enabled in bazel to use ADS");
 #endif
-  custom_ads_ = fmt::format(ads_insert, api_type, address, port);
+  ads_api_type_ = api_type;
+  ads_address_ = address;
+  ads_port_ = port;
+  bootstrapIncompatible();
+
   return *this;
 }
 
@@ -404,16 +408,24 @@ std::string EngineBuilder::generateConfigStr() const {
     insertCustomFilter(filter_config, config_template);
   }
 
-  if (!rtds_layer_.empty() && custom_ads_.empty()) {
-    throw std::runtime_error("ADS must be configured when using RTDS");
-  }
-  if (!rtds_layer_.empty()) {
-    absl::StrReplaceAll({{"#{custom_layers}", absl::StrCat("#{custom_layers}\n", rtds_layer_)}},
-                        &config_template);
+  for (const std::string& name : platform_filters_) {
+    std::string filter_config =
+        absl::StrReplaceAll(platform_filter_template, {{"{{ platform_filter_name }}", name}});
+    insertCustomFilter(filter_config, config_template);
   }
 
-  if (!custom_ads_.empty()) {
-    absl::StrReplaceAll({{"#{custom_ads}", absl::StrCat("#{custom_ads}\n", custom_ads_)}},
+  if (!rtds_layer_name_.empty() && ads_api_type_.empty()) {
+    throw std::runtime_error("ADS must be configured when using RTDS");
+  }
+  if (!rtds_layer_name_.empty()) {
+    std::string rtds_layer =
+        fmt::format(rtds_layer_insert, rtds_layer_name_, rtds_layer_name_, rtds_timeout_seconds_);
+    absl::StrReplaceAll({{"#{custom_layers}", absl::StrCat("#{custom_layers}\n", rtds_layer)}},
+                        &config_template);
+  }
+  if (!ads_api_type_.empty()) {
+    std::string custom_ads = fmt::format(ads_insert, ads_api_type_, ads_address_, ads_port_);
+    absl::StrReplaceAll({{"#{custom_ads}", absl::StrCat("#{custom_ads}\n", custom_ads)}},
                         &config_template);
   }
 
