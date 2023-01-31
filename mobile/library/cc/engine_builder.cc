@@ -276,19 +276,19 @@ std::string EngineBuilder::generateConfigStr() const {
   }
 
   std::string preresolve_hostnames = "[";
-  bool first = true;
+  std::string maybe_comma = "";
   for (auto& hostname : dns_preresolve_hostnames_) {
-    absl::StrAppend(&preresolve_hostnames, (first ? "" : ","), "{address: ", hostname,
+    absl::StrAppend(&preresolve_hostnames, maybe_comma, "{address: ", hostname,
                     ", port_value: 443}");
-    first = false;
+    maybe_comma = ",";
   }
   absl::StrAppend(&preresolve_hostnames, "]");
 
   std::string virtual_clusters = "[";
-  first = true;
+  maybe_comma = "";
   for (auto& cluster : virtual_clusters_) {
-    absl::StrAppend(&virtual_clusters, (first ? "" : ","), cluster);
-    first = false;
+    absl::StrAppend(&virtual_clusters, maybe_comma, cluster);
+    maybe_comma = ",";
   }
   absl::StrAppend(&virtual_clusters, "]");
 
@@ -321,6 +321,8 @@ std::string EngineBuilder::generateConfigStr() const {
         {"virtual_clusters", virtual_clusters},
 #if defined(__ANDROID_API__)
         {"force_ipv6", "true"},
+#else
+        {"force_ipv6", always_use_v6_ ? "true" : "false"},
 #endif
   };
   if (!stats_domain_.empty()) {
@@ -342,16 +344,16 @@ std::string EngineBuilder::generateConfigStr() const {
   if (add_stats_sinks) {
     config_builder << "- &stats_sinks [";
   }
-  first = true;
+  maybe_comma = "";
   if (!stats_domain_.empty()) {
     config_builder << "*base_metrics_service";
-    first = false;
+    maybe_comma = ",";
   }
 
   for (auto& sink_to_add : stats_sinks_) {
-    config_builder << (first ? "" : ",") << "{ name: " << sink_to_add.first
+    config_builder << maybe_comma << "{ name: " << sink_to_add.first
                    << ", typed_config: " << sink_to_add.second << "}";
-    first = false;
+    maybe_comma = ",";
   }
   if (add_stats_sinks) {
     config_builder << "] " << std::endl;

@@ -41,6 +41,7 @@ TEST(TestConfig, ConfigIsApplied) {
       .enableDnsCache(true)
       .addDnsPreresolveHostnames({"lyft.com", "google.com"})
       .enableAdminInterface(true)
+      .setForceAlwaysUsev6(true)
       .setDeviceOs("probably-ubuntu-on-CI");
   std::string config_str = engine_builder.generateConfigStr();
 
@@ -55,12 +56,14 @@ TEST(TestConfig, ConfigIsApplied) {
                                            "- &h2_connection_keepalive_timeout 333s",
                                            "- &stats_flush_interval 654s",
                                            "  key: dns_persistent_cache",
+                                           "- &force_ipv6 true",
                                            ("- &metadata { device_os: probably-ubuntu-on-CI, "
                                             "app_version: 1.2.3, app_id: 1234-1234-1234 }"),
                                            R"(- &validation_context
   trusted_ca:)"};
   for (const auto& string : must_contain) {
-    ASSERT_NE(config_str.find(string), std::string::npos) << "'" << string << "' not found";
+    ASSERT_NE(config_str.find(string), std::string::npos)
+        << "'" << string << "' not found in" << config_str;
   }
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
