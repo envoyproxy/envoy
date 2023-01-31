@@ -65,7 +65,7 @@ void IoUringImpl::unregisterEventfd() {
 
 bool IoUringImpl::isEventfdRegistered() const { return SOCKET_VALID(event_fd_); }
 
-void IoUringImpl::forEveryCompletion(CompletionCb completion_cb) {
+void IoUringImpl::forEveryCompletion(const CompletionCb& completion_cb) {
   ASSERT(SOCKET_VALID(event_fd_));
 
   eventfd_t v;

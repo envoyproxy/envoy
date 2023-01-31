@@ -31,7 +31,7 @@ public:
   os_fd_t registerEventfd() override;
   void unregisterEventfd() override;
   bool isEventfdRegistered() const override;
-  void forEveryCompletion(CompletionCb completion_cb) override;
+  void forEveryCompletion(const CompletionCb& completion_cb) override;
   IoUringResult prepareAccept(os_fd_t fd, struct sockaddr* remote_addr, socklen_t* remote_addr_len,
                               void* user_data) override;
   IoUringResult prepareConnect(os_fd_t fd, const Network::Address::InstanceConstSharedPtr& address,

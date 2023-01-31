@@ -49,7 +49,7 @@ public:
    * Iterates over entries in the completion queue, calls the given callback for
    * every entry and marks them consumed.
    */
-  virtual void forEveryCompletion(CompletionCb completion_cb) PURE;
+  virtual void forEveryCompletion(const CompletionCb& completion_cb) PURE;
 
   /**
    * Prepares an accept system call and puts it into the submission queue.

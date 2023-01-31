@@ -10,7 +10,7 @@ public:
   MOCK_METHOD(os_fd_t, registerEventfd, ());
   MOCK_METHOD(void, unregisterEventfd, ());
   MOCK_METHOD(bool, isEventfdRegistered, (), (const));
-  MOCK_METHOD(void, forEveryCompletion, (CompletionCb completion_cb));
+  MOCK_METHOD(void, forEveryCompletion, (const CompletionCb& completion_cb));
   MOCK_METHOD(IoUringResult, prepareAccept,
               (os_fd_t fd, struct sockaddr* remote_addr, socklen_t* remote_addr_len,
                void* user_data));
