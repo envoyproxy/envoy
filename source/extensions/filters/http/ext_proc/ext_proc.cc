@@ -490,6 +490,9 @@ FilterTrailersStatus Filter::decodeTrailers(RequestTrailerMap& trailers) {
 
 FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_stream) {
   ENVOY_LOG(trace, "encodeHeaders end_stream = {}", end_stream);
+  // Try to merge the route config again in case the decodeHeaders() is not called when processing
+  // local reply.
+  mergePerRouteConfig();
   if (end_stream) {
     encoding_state_.setCompleteBodyAvailable(true);
   }
@@ -742,29 +745,43 @@ static ProcessingMode allDisabledMode() {
 }
 
 void Filter::mergePerRouteConfig() {
-  auto&& merged_config = Http::Utility::getMergedPerFilterConfig<FilterConfigPerRoute>(
-      decoder_callbacks_,
-      [](FilterConfigPerRoute& dst, const FilterConfigPerRoute& src) { dst.merge(src); });
-  if (!merged_config) {
+  if (route_config_merged_) {
     return;
   }
-  if (merged_config->disabled()) {
-    // Rather than introduce yet another flag, use the processing mode
-    // structure to disable all the callbacks.
-    ENVOY_LOG(trace, "Disabling filter due to per-route configuration");
+  route_config_merged_ = true;
+
+  auto merged_config = Http::Utility::getMergedPerFilterConfig<FilterConfigPerRoute>(
+      decoder_callbacks_,
+      [](FilterConfigPerRoute& dst, const FilterConfigPerRoute& src) { dst.merge(src); });
+  if (merged_config.has_value()) {
+    if (merged_config->disabled()) {
+      // Rather than introduce yet another flag, use the processing mode
+      // structure to disable all the callbacks.
+      ENVOY_LOG(trace, "Disabling filter due to per-route configuration");
+      const auto all_disabled = allDisabledMode();
+      decoding_state_.setProcessingMode(all_disabled);
+      encoding_state_.setProcessingMode(all_disabled);
+      return;
+    }
+    if (merged_config->processingMode()) {
+      ENVOY_LOG(trace, "Setting new processing mode from per-route configuration");
+      decoding_state_.setProcessingMode(*(merged_config->processingMode()));
+      encoding_state_.setProcessingMode(*(merged_config->processingMode()));
+    }
+    if (merged_config->grpcService()) {
+      ENVOY_LOG(trace, "Setting new GrpcService from per-route configuration");
+      grpc_service_ = *merged_config->grpcService();
+    }
+  }
+
+  // Disable the filter if there is no valid GrpcService configuration to avoid possible runtime
+  // panics.
+  if (grpc_service_.target_specifier_case() ==
+      envoy::config::core::v3::GrpcService::TargetSpecifierCase::TARGET_SPECIFIER_NOT_SET) {
+    ENVOY_LOG(trace, "Disabling filter due to no valid GrpcService configuration");
     const auto all_disabled = allDisabledMode();
     decoding_state_.setProcessingMode(all_disabled);
     encoding_state_.setProcessingMode(all_disabled);
-    return;
-  }
-  if (merged_config->processingMode()) {
-    ENVOY_LOG(trace, "Setting new processing mode from per-route configuration");
-    decoding_state_.setProcessingMode(*(merged_config->processingMode()));
-    encoding_state_.setProcessingMode(*(merged_config->processingMode()));
-  }
-  if (merged_config->grpcService()) {
-    ENVOY_LOG(trace, "Setting new GrpcService from per-route configuration");
-    grpc_service_ = *merged_config->grpcService();
   }
 }
 
