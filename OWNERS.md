@@ -110,6 +110,7 @@ contributors to envoy-setec and relevant Slack channels from:
 * Michael Rebello ([rebello95](https://github.com/rebello95)) (mrebello@lyft.com)
 * Alan Chiu ([buildbreaker](https://github.com/buildbreaker)) (achiu@lyft.com)
 * Charles Le Borgne ([carloseltuerto](https://github.com/carloseltuerto)) (cleborgne@google.com)
+* William A Rowe Jr ([wrowe](https://github.com/wrowe)) (wrowe@rowe-clan.net)
 
 # Friends of Envoy
 
@@ -122,5 +123,3 @@ matter expert reviews. Feel free to loop them in as needed.
   * External dependencies, Envoy's supply chain and documentation.
 * Cerek Hillen ([crockeo](https://github.com/crockeo)) (chillen@lyft.com)
   * Python and C++ platform bindings.
-* William A Rowe Jr ([wrowe](https://github.com/wrowe)) (wrowe@vmware.com)
-  * Windows port and CI build, `bazel/foreign_cc` build and dependencies liaison.
