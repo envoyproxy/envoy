@@ -277,6 +277,7 @@ envoy_cc_library(
         ":envoy_quic_utils_lib",
         ":quic_filter_manager_connection_lib",
         ":quic_stat_names_lib",
+        ":quic_stats_gatherer",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/http:header_map_lib",
@@ -588,5 +589,17 @@ envoy_cc_library(
         "//envoy/config:typed_config_interface",
         "@com_github_google_quiche//:quic_core_connection_id_generator_interface_lib",
         "@com_github_google_quiche//:quic_load_balancer_encoder_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "quic_stats_gatherer",
+    srcs = ["quic_stats_gatherer.cc"],
+    hdrs = ["quic_stats_gatherer.h"],
+    tags = ["nofips"],
+    deps = [
+        "//envoy/access_log:access_log_interface",
+        "//source/common/http:header_map_lib",
+        "@com_github_google_quiche//:quic_core_ack_listener_interface_lib",
     ],
 )

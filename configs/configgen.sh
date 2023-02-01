@@ -22,7 +22,7 @@ for FILE in "$@"; do
   *.pem|*.der)
     cp "$FILE" "$OUT_DIR/certs"
     ;;
-  *.lua|*.wasm)
+  *.lua|*.wasm|*.so)
     cp "$FILE" "$OUT_DIR/lib"
     ;;
   *.pb)

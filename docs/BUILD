@@ -21,6 +21,7 @@ filegroup(
     srcs = glob(
         ["root/**/*.yaml"],
         exclude = [
+            "root/_configs/go/*",
             "root/**/envoy-dynamic-cds-demo.yaml",
             "root/**/envoy-dynamic-lds-demo.yaml",
             "root/**/envoy-dynamic-filesystem-demo.yaml",
@@ -39,10 +40,12 @@ filegroup(
     }),
 )
 
-# TODO(phlax): add go config examples
 filegroup(
     name = "contrib_configs",
-    srcs = [],
+    srcs = select({
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": glob(["root/_configs/go/*.yaml"]),
+    }),
 )
 
 filegroup(

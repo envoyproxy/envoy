@@ -37,6 +37,15 @@ void BufferList::clearAll() {
   queue_.clear();
 };
 
+bool BufferList::checkExisting(Buffer::Instance* data) {
+  for (auto it = queue_.begin(); it != queue_.end(); ++it) {
+    if ((*it).get() == data) {
+      return true;
+    };
+  }
+  return false;
+};
+
 // headers_ should set to nullptr when return true.
 bool ProcessorState::handleHeaderGolangStatus(const GolangStatus status) {
   ENVOY_LOG(debug, "golang filter handle header status, state: {}, phase: {}, status: {}",
