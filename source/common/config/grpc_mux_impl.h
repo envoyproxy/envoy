@@ -26,9 +26,8 @@
 #include "source/common/config/xds_context_params.h"
 #include "source/common/config/xds_resource.h"
 
-#include "xds/core/v3/resource_name.pb.h"
-
 #include "absl/container/node_hash_map.h"
+#include "xds/core/v3/resource_name.pb.h"
 
 namespace Envoy {
 namespace Config {
