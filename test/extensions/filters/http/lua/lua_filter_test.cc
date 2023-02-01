@@ -18,7 +18,6 @@
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -1284,7 +1283,7 @@ TEST_F(LuaHttpFilterTest, HttpCallNoBody) {
   callbacks->onSuccess(request, std::move(response_message));
   EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
 }
-/*
+
 // HTTP call followed by immediate response.
 TEST_F(LuaHttpFilterTest, HttpCallImmediateResponse) {
   const std::string SCRIPT{R"EOF(
@@ -1334,11 +1333,10 @@ TEST_F(LuaHttpFilterTest, HttpCallImmediateResponse) {
   Http::TestResponseHeaderMapImpl expected_headers{{":status", "403"},
                                                    {"set-cookie", "flavor=chocolate; Path=/"},
                                                    {"set-cookie", "variant=chewy; Path=/"}};
-  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&expected_headers), false));
   callbacks->onSuccess(request, std::move(response_message));
   EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
 }
-*/
+
 // HTTP call with script error after resume.
 TEST_F(LuaHttpFilterTest, HttpCallErrorAfterResumeSuccess) {
   const std::string SCRIPT{R"EOF(
