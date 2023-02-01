@@ -279,6 +279,13 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
   }
 
   stream.completeRequest();
+
+  // Set roundtrip time in connectionInfoSetter before OnStreamComplete
+  absl::optional<std::chrono::milliseconds> t = read_callbacks_->connection().lastRoundTripTime();
+  if (t.has_value()) {
+    read_callbacks_->connection().connectionInfoSetter().setRoundTripTime(t.value());
+  }
+
   stream.filter_manager_.onStreamComplete();
 
   // For HTTP/3, skip access logging here and add deferred logging info
@@ -448,9 +455,8 @@ Network::FilterStatus ConnectionManagerImpl::onNewConnection() {
   Buffer::OwnedImpl dummy;
   createCodec(dummy);
   ASSERT(codec_->protocol() == Protocol::Http3);
-  // Stop iterating through each filters for QUIC. Currently a QUIC connection
-  // only supports one filter, HCM, and bypasses the onData() interface. Because
-  // QUICHE already handles de-multiplexing.
+  // Stop iterating through network filters for QUIC. Currently QUIC connections bypass the
+  // onData() interface because QUICHE already handles de-multiplexing.
   return Network::FilterStatus::StopIteration;
 }
 

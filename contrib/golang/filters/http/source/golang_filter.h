@@ -140,21 +140,22 @@ public:
 
   void onStreamComplete() override {}
 
-  void continueStatus(GolangStatus status);
+  CAPIStatus continueStatus(GolangStatus status);
 
-  void sendLocalReply(Http::Code response_code, absl::string_view body_text,
-                      std::function<void(Http::ResponseHeaderMap& headers)> modify_headers,
-                      Grpc::Status::GrpcStatus grpc_status, absl::string_view details);
+  CAPIStatus sendLocalReply(Http::Code response_code, absl::string_view body_text,
+                            std::function<void(Http::ResponseHeaderMap& headers)> modify_headers,
+                            Grpc::Status::GrpcStatus grpc_status, absl::string_view details);
 
-  absl::optional<absl::string_view> getHeader(absl::string_view key);
-  void copyHeaders(GoString* go_strs, char* go_buf);
-  void setHeader(absl::string_view key, absl::string_view value);
-  void removeHeader(absl::string_view key);
-  void copyBuffer(Buffer::Instance* buffer, char* data);
-  void setBufferHelper(Buffer::Instance* buffer, absl::string_view& value, bufferAction action);
-  void copyTrailers(GoString* go_strs, char* go_buf);
-  void setTrailer(absl::string_view key, absl::string_view value);
-  void getStringValue(int id, GoString* value_str);
+  CAPIStatus getHeader(absl::string_view key, GoString* goValue);
+  CAPIStatus copyHeaders(GoString* go_strs, char* go_buf);
+  CAPIStatus setHeader(absl::string_view key, absl::string_view value);
+  CAPIStatus removeHeader(absl::string_view key);
+  CAPIStatus copyBuffer(Buffer::Instance* buffer, char* data);
+  CAPIStatus setBufferHelper(Buffer::Instance* buffer, absl::string_view& value,
+                             bufferAction action);
+  CAPIStatus copyTrailers(GoString* go_strs, char* go_buf);
+  CAPIStatus setTrailer(absl::string_view key, absl::string_view value);
+  CAPIStatus getStringValue(int id, GoString* value_str);
 
 private:
   ProcessorState& getProcessorState();
