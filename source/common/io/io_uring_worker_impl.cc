@@ -23,6 +23,10 @@ void IoUringSocketEntry::cleanup() {
 void IoUringSocketEntry::injectCompletion(uint32_t type) {
   // Avoid injected same type completion multiple times.
   if (injected_completions_ & type) {
+    ENVOY_LOG(trace,
+              "ignore injected completion since there already has one, injected_completions_: {}, "
+              "type: {}",
+              injected_completions_, type);
     return;
   }
   injected_completions_ |= type;

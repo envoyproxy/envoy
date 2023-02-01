@@ -15,7 +15,8 @@ class IoUringWorkerImpl;
 
 class IoUringSocketEntry : public IoUringSocket,
                            public LinkedObject<IoUringSocketEntry>,
-                           public Event::DeferredDeletable {
+                           public Event::DeferredDeletable,
+                           protected Logger::Loggable<Logger::Id::io> {
 public:
   IoUringSocketEntry(os_fd_t fd, IoUringWorkerImpl& parent);
 
@@ -62,7 +63,7 @@ private:
 
   os_fd_t fd_;
   IoUringWorkerImpl& parent_;
-  uint32_t injected_completions_;
+  uint32_t injected_completions_{0};
 };
 
 class IoUringWorkerImpl : public IoUringWorker, protected Logger::Loggable<Logger::Id::io> {
