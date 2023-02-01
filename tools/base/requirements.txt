@@ -322,9 +322,9 @@ docutils==0.19 \
     # via
     #   envoy-docs-sphinx-runner
     #   sphinx
-envoy-base-utils==0.4.0 \
-    --hash=sha256:1edb3356296b59d28e25c65683c3aa701875dd3bc13a46c3ea1d469bea17cbf7 \
-    --hash=sha256:c96b9bf4ecd28554993d0a5c5a618f093946d8532b21e2f5fb85f2a545cce990
+envoy-base-utils==0.4.1 \
+    --hash=sha256:5c1b3342c0261dd1282f142fdbbb3576b3b45012b8df3525877d2c64f6139d10 \
+    --hash=sha256:772e5805718e61e546010122ce14f28afb435a970270d26ca6f928bbe360d261
     # via
     #   -r requirements.in
     #   envoy-code-check
@@ -337,9 +337,9 @@ envoy-base-utils==0.4.0 \
     #   envoy-docs-sphinx-runner
     #   envoy-github-release
     #   envoy-gpg-sign
-envoy-code-check==0.3.6 \
-    --hash=sha256:599342c18dc94b470d417f76007472cf5dd90c2e76b8a88e284e04e0e2f3fdf5 \
-    --hash=sha256:bdd0b9f383a627c69136688597ac0eaa2e1dffa0fd0d3e7df92a5ab384374bd4
+envoy-code-check==0.4.0 \
+    --hash=sha256:2d8bce395da31f9f5cdefc2d3c18142d02a11117008878adfa81390fe0a5e063 \
+    --hash=sha256:f17f78de8f2601e7f4400cd328c22b104fd6761b9803427546d295c6f51f5a92
     # via -r requirements.in
 envoy-dependency-check==0.1.7 \
     --hash=sha256:27906f882bd3e22a9a8dc90cc6e178f702b06d30d7a39aa70d264594cd5df5ee \
@@ -392,9 +392,9 @@ envoy-gpg-sign==0.1.1 \
     --hash=sha256:5149360c2394a450ee9293d0d2a3a5d62ba8a06c5b92820c201241f61406c790 \
     --hash=sha256:533154f983b3ccbbbf085aba9d79aa7f5452563f7854a6cdc4080ce60d1f3d04
     # via -r requirements.in
-flake8==5.0.4 \
-    --hash=sha256:6fbe320aad8d6b95cec8b8e47bc933004678dc63095be98528b7bdd2a9f510db \
-    --hash=sha256:7a1cf6b73744f5806ab95e526f6f0d8c01c66d7bbe349562d22dfca20610b248
+flake8==6.0.0 \
+    --hash=sha256:3833794e27ff64ea4e9cf5d410082a8b97ff1a06c16aa3d2027339cd0f1195c7 \
+    --hash=sha256:c61007e76655af75e6785a931f452915b371dc48f56efd765247c8fe68f2b181
     # via
     #   -r requirements.in
     #   envoy-code-check
@@ -751,17 +751,17 @@ protobuf==4.21.6 \
     --hash=sha256:ba596b9ffb85c909fcfe1b1a23136224ed678af3faf9912d3fa483d5f9813c4e \
     --hash=sha256:c7c864148a237f058c739ae7a05a2b403c0dfa4ce7d1f3e5213f352ad52d57c6
     # via envoy-base-utils
-pycodestyle==2.9.1 \
-    --hash=sha256:2c9607871d58c76354b697b42f5d57e1ada7d261c261efac224b664affdc5785 \
-    --hash=sha256:d1735fc58b418fd7c5f658d28d943854f8a849b01a5d0a1e6f3f3fdd0166804b
+pycodestyle==2.10.0 \
+    --hash=sha256:347187bdb476329d98f695c213d7295a846d1152ff4fe9bacb8a9590b8ee7053 \
+    --hash=sha256:8a4eaf0d0495c7395bdab3589ac2db602797d76207242c17d470186815706610
     # via flake8
 pycparser==2.20 \
     --hash=sha256:2d475327684562c3a96cc71adf7dc8c4f0565175cf86b6d7a404ff4c771f15f0 \
     --hash=sha256:7582ad22678f0fcd81102833f60ef8d0e57288b6b5fb00323d101be910e35705
     # via cffi
-pyflakes==2.5.0 \
-    --hash=sha256:4579f67d887f804e67edb544428f264b7b24f435b263c4614f384135cea553d2 \
-    --hash=sha256:491feb020dca48ccc562a8c0cbe8df07ee13078df59813b83959cbdada312ea3
+pyflakes==3.0.1 \
+    --hash=sha256:ec55bf7fe21fff7f1ad2f7da62363d749e2a470500eab1b555334b67aa1ef8cf \
+    --hash=sha256:ec8b276a6b60bd80defed25add7e439881c19e64850afd9b346283d4165fd0fd
     # via flake8
 pygithub==1.57 \
     --hash=sha256:5822febeac2391f1306c55a99af2bc8f86c8bf82ded000030cd02c18f31b731f \
@@ -849,7 +849,6 @@ pyyaml==6.0 \
     # via
     #   -r requirements.in
     #   envoy-base-utils
-    #   envoy-code-check
     #   yamllint
 requests==2.26.0 \
     --hash=sha256:6c1246513ecd5ecd4528a0906f910e8f0f9c6b8ec72030dc9fd154dc1a6efd24 \
