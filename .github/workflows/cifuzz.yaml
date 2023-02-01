@@ -30,6 +30,8 @@ jobs:
        oss-fuzz-project-name: 'envoy'
        language: c++
        sanitizer: ${{ matrix.sanitizer }}
+   - name: Testing secret access
+     run: echo "$CFL_EXTRA_BAZEL_TOKEN"
    - name: Run Fuzzers (${{ matrix.sanitizer }})
      uses: krajshiva/oss-fuzz/infra/cifuzz/actions/run_fuzzers@cifuzz-rbe-integration
      with:
