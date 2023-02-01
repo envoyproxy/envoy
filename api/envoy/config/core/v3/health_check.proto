@@ -419,7 +419,14 @@ message HealthCheck {
   // there was *successful* non-health check traffic that targeted the host during the previous interval. If there was successful non-health check traffic, Envoy will not send a health check packet.
   // For HTTP, if the traffic response is 2xx, it will be considered as successful traffic.
   // For TCP,  if any TCP connections successfully connect, it will be considered as successful traffic.
-  // For gRPC, if *grpc_status* is non-zero, it will be considered as successful traffic.
+  // For gRPC, if *grpc_status* is not one of
+  //   - DeadlineExceeded
+  //   - Unimplemented
+  //   - Internal
+  //   - Unavailable
+  //   - Unknown
+  //   - DataLoss)
+  // it will be considered as successful traffic. Refer to UpstreamEndpointStats.
   // The default value is false.
   bool disable_health_check_if_active_traffic = 25;
 }

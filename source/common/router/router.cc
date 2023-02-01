@@ -1542,6 +1542,9 @@ void Filter::onUpstreamTrailers(Http::ResponseTrailerMapPtr&& trailers,
     if (grpc_status &&
         !Http::CodeUtility::is5xx(Grpc::Utility::grpcToHttpStatus(grpc_status.value()))) {
       upstream_request.upstreamHost()->stats().rq_success_.inc();
+      upstream_request.upstreamHost()->setLastSuccessfulTrafficTime(
+          envoy::data::core::v3::HealthCheckerType::GRPC,
+          callbacks_->dispatcher().timeSource().monotonicTime());
     } else {
       upstream_request.upstreamHost()->stats().rq_error_.inc();
     }
