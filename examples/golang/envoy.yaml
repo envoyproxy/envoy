@@ -25,7 +25,7 @@ static_resources:
               plugin_config:
                 "@type": type.googleapis.com/xds.type.v3.TypedStruct
                 value:
-                  prefix_localreply_body: "localreply from go"
+                  prefix_localreply_body: "Configured local reply from go"
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
