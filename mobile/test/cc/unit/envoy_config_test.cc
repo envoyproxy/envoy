@@ -25,7 +25,7 @@ namespace {
 
 using namespace Platform;
 
-TEST(TestConfig, BootstrapCompatibleConfigIsApplied) {
+TEST(TestConfig, ConfigIsApplied) {
   EngineBuilder engine_builder;
   engine_builder.addGrpcStatsDomain("asdf.fake.website")
       .addConnectTimeoutSeconds(123)
@@ -39,6 +39,9 @@ TEST(TestConfig, BootstrapCompatibleConfigIsApplied) {
       .setAppVersion("1.2.3")
       .setAppId("1234-1234-1234")
       .enableDnsCache(true)
+      .addDnsPreresolveHostnames({"lyft.com", "google.com"})
+      .enableAdminInterface(true)
+      .setForceAlwaysUsev6(true)
       .setDeviceOs("probably-ubuntu-on-CI");
   std::string config_str = engine_builder.generateConfigStr();
 
@@ -53,55 +56,19 @@ TEST(TestConfig, BootstrapCompatibleConfigIsApplied) {
                                            "- &h2_connection_keepalive_timeout 333s",
                                            "- &stats_flush_interval 654s",
                                            "  key: dns_persistent_cache",
+                                           "- &force_ipv6 true",
                                            ("- &metadata { device_os: probably-ubuntu-on-CI, "
                                             "app_version: 1.2.3, app_id: 1234-1234-1234 }"),
                                            R"(- &validation_context
   trusted_ca:)"};
   for (const auto& string : must_contain) {
-    ASSERT_NE(config_str.find(string), std::string::npos) << "'" << string << "' not found";
+    ASSERT_NE(config_str.find(string), std::string::npos)
+        << "'" << string << "' not found in" << config_str;
   }
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
-  EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap(true)));
-}
-
-TEST(TestConfig, ConfigIsApplied) {
-  EngineBuilder engine_builder;
-  engine_builder.addGrpcStatsDomain("asdf.fake.website")
-      .addConnectTimeoutSeconds(123)
-      .addDnsRefreshSeconds(456)
-      .addDnsMinRefreshSeconds(567)
-      .addDnsFailureRefreshSeconds(789, 987)
-      .addDnsQueryTimeoutSeconds(321)
-      .addDnsPreresolveHostnames("[hostname]")
-      .addH2ConnectionKeepaliveIdleIntervalMilliseconds(222)
-      .addH2ConnectionKeepaliveTimeoutSeconds(333)
-      .addStatsFlushSeconds(654)
-      .addVirtualClusters("[virtual-clusters]")
-      .setAppVersion("1.2.3")
-      .setAppId("1234-1234-1234")
-      .setDeviceOs("probably-ubuntu-on-CI");
-  std::string config_str = engine_builder.generateConfigStr();
-
-  std::vector<std::string> must_contain = {"- &stats_domain asdf.fake.website",
-                                           "- &connect_timeout 123s",
-                                           "- &dns_refresh_rate 456s",
-                                           "- &dns_fail_base_interval 789s",
-                                           "- &dns_fail_max_interval 987s",
-                                           "- &dns_min_refresh_rate 567s",
-                                           "- &dns_query_timeout 321s",
-                                           "- &dns_preresolve_hostnames [hostname]",
-                                           "- &h2_connection_keepalive_idle_interval 0.222s",
-                                           "- &h2_connection_keepalive_timeout 333s",
-                                           "- &stats_flush_interval 654s",
-                                           "- &virtual_clusters [virtual-clusters]",
-                                           ("- &metadata { device_os: probably-ubuntu-on-CI, "
-                                            "app_version: 1.2.3, app_id: 1234-1234-1234 }"),
-                                           R"(- &validation_context
-  trusted_ca:)"};
-  for (const auto& string : must_contain) {
-    ASSERT_NE(config_str.find(string), std::string::npos) << "'" << string << "' not found";
-  }
+  engine_builder.generateBootstrap();
+  EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap()));
 }
 
 TEST(TestConfig, ConfigIsValid) {
@@ -119,7 +86,7 @@ TEST(TestConfig, ConfigIsValid) {
   ASSERT_THAT(bootstrap.DebugString(), Not(HasSubstr("envoy.network.dns_resolver.apple")));
 #endif
 
-  EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap(true)));
+  EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap()));
 }
 
 TEST(TestConfig, SetGzip) {
@@ -130,7 +97,7 @@ TEST(TestConfig, SetGzip) {
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
   ASSERT_THAT(bootstrap.DebugString(), Not(HasSubstr("envoy.filters.http.decompressor")));
-  EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap(true)));
+  EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap()));
 
   engine_builder.enableGzip(true);
   config_str = engine_builder.generateConfigStr();
@@ -146,13 +113,13 @@ TEST(TestConfig, SetBrotli) {
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
   ASSERT_THAT(bootstrap.DebugString(), Not(HasSubstr("brotli.decompressor.v3.Brotli")));
-  EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap(true)));
+  EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap()));
 
   engine_builder.enableBrotli(true);
   config_str = engine_builder.generateConfigStr();
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
   ASSERT_THAT(bootstrap.DebugString(), HasSubstr("brotli.decompressor.v3.Brotli"));
-  EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap(true)));
+  EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap()));
 }
 
 TEST(TestConfig, SetSocketTag) {
@@ -163,13 +130,13 @@ TEST(TestConfig, SetSocketTag) {
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
   ASSERT_THAT(bootstrap.DebugString(), Not(HasSubstr("http.socket_tag.SocketTag")));
-  EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap(true)));
+  EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap()));
 
   engine_builder.enableSocketTagging(true);
   config_str = engine_builder.generateConfigStr();
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
   ASSERT_THAT(bootstrap.DebugString(), HasSubstr("http.socket_tag.SocketTag"));
-  EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap(true)));
+  EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap()));
 }
 
 TEST(TestConfig, SetAltSvcCache) {
@@ -191,13 +158,13 @@ TEST(TestConfig, StreamIdleTimeout) {
   ASSERT_THAT(config_str, HasSubstr("&stream_idle_timeout 15s"));
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
-  EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap(true)));
+  EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap()));
 
   engine_builder.setStreamIdleTimeoutSeconds(42);
   config_str = engine_builder.generateConfigStr();
   ASSERT_THAT(config_str, HasSubstr("&stream_idle_timeout 42s"));
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
-  EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap(true)));
+  EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap()));
 }
 
 TEST(TestConfig, PerTryIdleTimeout) {
@@ -207,13 +174,13 @@ TEST(TestConfig, PerTryIdleTimeout) {
   ASSERT_THAT(config_str, HasSubstr("&per_try_idle_timeout 15s"));
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
-  EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap(true)));
+  EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap()));
 
   engine_builder.setPerTryIdleTimeoutSeconds(42);
   config_str = engine_builder.generateConfigStr();
   ASSERT_THAT(config_str, HasSubstr("&per_try_idle_timeout 42s"));
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
-  EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap(true)));
+  EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap()));
 }
 
 TEST(TestConfig, EnableAdminInterface) {
@@ -237,13 +204,13 @@ TEST(TestConfig, EnableInterfaceBinding) {
   ASSERT_THAT(config_str, HasSubstr("&enable_interface_binding false"));
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
-  EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap(true)));
+  EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap()));
 
   engine_builder.enableInterfaceBinding(true);
   config_str = engine_builder.generateConfigStr();
   ASSERT_THAT(config_str, HasSubstr("&enable_interface_binding true"));
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
-  EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap(true)));
+  EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap()));
 }
 
 TEST(TestConfig, EnableDrainPostDnsRefresh) {
@@ -306,11 +273,11 @@ TEST(TestConfig, AddMaxConnectionsPerHost) {
 }
 
 std::string statsdSinkConfig(int port) {
-  std::string config = R"({ name: envoy.stat_sinks.statsd,
-      typed_config: {
+  std::string config = R"(
+      {
         "@type": type.googleapis.com/envoy.config.metrics.v3.StatsdSink,
         address: { socket_address: { address: 127.0.0.1, port_value: )" +
-                       fmt::format("{}", port) + " } } } }";
+                       fmt::format("{}", port) + " } } }";
   return config;
 }
 
@@ -322,10 +289,11 @@ TEST(TestConfig, AddStatsSinks) {
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
 
-  engine_builder.addStatsSinks({statsdSinkConfig(1), statsdSinkConfig(2)});
+  engine_builder.addStatsSink("envoy.stat_sinks.statsd", statsdSinkConfig(1));
+  engine_builder.addStatsSink("envoy.stat_sinks.statsd", statsdSinkConfig(2));
   config_str = engine_builder.generateConfigStr();
-  ASSERT_THAT(config_str,
-              HasSubstr("&stats_sinks [" + statsdSinkConfig(1) + "," + statsdSinkConfig(2) + "]"));
+  ASSERT_THAT(config_str, HasSubstr(statsdSinkConfig(1)));
+  ASSERT_THAT(config_str, HasSubstr(statsdSinkConfig(2)));
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
 }
 
@@ -450,5 +418,22 @@ TEST(TestConfig, DISABLED_StringAccessors) {
   EXPECT_EQ(data_string, Data::Utility::copyToString(data));
   release_envoy_data(data);
 }
+
+TEST(TestConfig, AddVirtualCluster) {
+  EngineBuilder engine_builder;
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  engine_builder.addVirtualCluster(
+      "{headers: [{name: ':method', string_match: {exact: POST}}], name: cluster1}");
+  std::string config_str = engine_builder.generateConfigStr();
+  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+  ASSERT_THAT(config_str, HasSubstr("cluster1"));
+
+  engine_builder.addVirtualCluster(
+      "{headers: [{name: ':method', string_match: {exact: GET}}], name: cluster2}");
+  config_str = engine_builder.generateConfigStr();
+  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+  ASSERT_THAT(config_str, HasSubstr("cluster2"));
+}
+
 } // namespace
 } // namespace Envoy
