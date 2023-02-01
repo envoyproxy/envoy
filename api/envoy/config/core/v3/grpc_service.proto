@@ -45,7 +45,7 @@ message GrpcService {
         [(validate.rules).string =
              {min_len: 0 max_bytes: 16384 well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
-    // Specifies parameters that control :ref:`retry backoff strategy <envoy_api_msg_core.BackoffStrategy>`.
+    // Specifies parameters that control :ref:`retry backoff strategy <envoy_v3_api_msg_config.core.v3.BackoffStrategy>`.
     // This parameter is optional, in which case the default base interval for retry is 500 milliseconds.
     // The Default maximum interval is 30 seconds.
     BackoffStrategy retry_back_off = 3;
