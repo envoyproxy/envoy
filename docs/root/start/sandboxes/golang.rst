@@ -1,6 +1,6 @@
 .. _install_sandboxes_golang:
 
-GoLang filter
+Golang filter
 =============
 
 .. sidebar:: Requirements
