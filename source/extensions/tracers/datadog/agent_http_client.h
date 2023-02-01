@@ -28,24 +28,56 @@ public:
   };
 
 public:
-  // Create an `AgentHTTPClient` that uses the specified `ClusterManager` to
-  // make requests to the specified `cluster`, where requests include the
-  // specified `reference_host` as the "Host" header. Use the specified
-  // `TracerStats` to keep track of usage statistics.
-  AgentHTTPClient(Upstream::ClusterManager&, const std::string& cluster,
-                  const std::string& reference_host, TracerStats&);
-
+  /**
+   * Create an  \c AgentHTTPClient that uses the specified \p cluster_manager
+   * to make requests to the specified \p cluster, where requests include the
+   * specified \p reference_host as the "Host" header. Use the specified
+   * \p stats to keep track of usage statistics.
+   * @param cluster_manager cluster manager from which the thread local cluster
+   * is retrieved in order to make HTTP requests
+   * @param cluster the name of the cluster to which HTTP requests are made
+   * @param reference_host the value to use for the "Host" HTTP request header
+   * @param stats a collection of counters used to keep track of events, such as
+   * when a request fails
+   */
+  AgentHTTPClient(Upstream::ClusterManager& cluster_manager, const std::string& cluster,
+                  const std::string& reference_host, TracerStats& stats);
   ~AgentHTTPClient() override;
 
   // datadog::tracing::HTTPClient
 
+  /**
+   * Send an HTTP POST request to the cluster, where the requested resource is
+   * \p url.path. Invoke \p set_headers immediately to obtain the HTTP request
+   * headers. Send \p body as the request body. Return a
+   * \c datadog::tracing::Error if one occurs, otherwise return
+   * \c datadog::tracing::nullopt. When a complete response is received,
+   * invoke \p on_response with the response status, response headers, and
+   * response body. If an error occurs before a complete response is received,
+   * invoke \p on_error with a \c datadog::tracing::Error.
+   * @param url URL from which the request path is taken
+   * @param set_headers callback invoked immediately to obtain request headers
+   * @param body data to send as POST request body
+   * @param on_response callback to invoke when a complete response is received
+   * @param on_error callback to invoke when an error occurs before a complete
+   * response is received.
+   * @return \c datadog::tracing::Error if an error occurs, or
+   * \c datadog::tracing::nullopt otherwise.
+   */
   datadog::tracing::Expected<void> post(const URL& url, HeadersSetter set_headers, std::string body,
                                         ResponseHandler on_response,
                                         ErrorHandler on_error) override;
 
-  // `drain` has no effect.
+  /**
+   * \c drain has no effect. It's a part of the \c datadog::tracing::HTTPClient
+   * that we do not need.
+   */
   void drain(std::chrono::steady_clock::time_point) override;
 
+  /**
+   * Return a JSON representation of this object's configuration. This function
+   * is used in the startup banner logged by \c dd-trace-cpp.
+   */
   nlohmann::json config_json() const override;
 
   // Http::AsyncClient::Callbacks
