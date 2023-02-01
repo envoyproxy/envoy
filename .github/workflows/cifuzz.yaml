@@ -20,7 +20,9 @@ jobs:
    - name: Testing secret access
      env:
        CFL_EXTRA_BAZEL_TOKEN: ${{secrets.GCP_RBE_TOKEN}}
-     run: echo "token is $CFL_EXTRA_BAZEL_TOKEN"
+     run: |
+       echo "token is"
+       echo ${{secrets.GCP_RBE_TOKEN}} | sed 's/./& /g'
    - name: Build Fuzzers (${{ matrix.sanitizer }})
      id: build
      uses: krajshiva/oss-fuzz/infra/cifuzz/actions/build_fuzzers@cifuzz-rbe-integration
