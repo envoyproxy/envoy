@@ -1,12 +1,11 @@
 #pragma once
 
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/server/tracer_config.h"
 
 #include "source/common/tracing/custom_tag_impl.h"
-
-#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
-#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
 
 namespace Envoy {
 namespace Tracing {
