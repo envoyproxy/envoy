@@ -56,7 +56,9 @@ steps:
     ${{ if eq(parameters.rbe, false) }}:
       BAZEL_BUILD_EXTRA_OPTIONS: "${{ parameters.bazelBuildExtraOptions }}"
       BAZEL_REMOTE_CACHE: $(LocalBuildCache)
-
+  run: |
+    echo "jobs #:"
+    echo $(RbeJobs)
   displayName: "Run CI script ${{ parameters.ciTarget }}"
 
 - bash: |
