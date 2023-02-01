@@ -37,7 +37,9 @@ stages:
         key: "format | ./WORKSPACE | **/*.bzl"
         path: $(Build.StagingDirectory)/repository_cache
       continueOnError: true
-
+    - bash: |
+        echo "RbeJobs="
+        echo $(RbeJobs)
     - script: ci/run_envoy_docker.sh 'ci/do_ci.sh format'
       workingDirectory: $(Build.SourcesDirectory)
       env:
