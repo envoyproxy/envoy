@@ -754,7 +754,7 @@ void ConnectionImpl::StreamImpl::resetStream(StreamResetReason reason) {
   // resources.
   if (useDeferredReset() && local_end_stream_ && !local_end_stream_sent_ &&
       reason != StreamResetReason::OverloadManager) {
-    ASSERT(parent_.getStream(stream_id_) != nullptr);
+    ASSERT(parent_.getStreamUnchecked(stream_id_) != nullptr);
     parent_.pending_deferred_reset_streams_.emplace(stream_id_, this);
     deferred_reset_ = reason;
     ENVOY_CONN_LOG(trace, "deferred reset stream", parent_.connection_);
@@ -893,7 +893,8 @@ void ConnectionImpl::onKeepaliveResponseTimeout() {
   ENVOY_CONN_LOG_EVENT(debug, "h2_ping_timeout", "Closing connection due to keepalive timeout",
                        connection_);
   stats_.keepalive_timeout_.inc();
-  connection_.close(Network::ConnectionCloseType::NoFlush);
+  connection_.close(Network::ConnectionCloseType::NoFlush,
+                    StreamInfo::LocalCloseReasons::get().Http2PingTimeout);
 }
 
 bool ConnectionImpl::slowContainsStreamId(int32_t stream_id) const {
@@ -955,14 +956,19 @@ const ConnectionImpl::StreamImpl* ConnectionImpl::getStream(int32_t stream_id) c
   return const_cast<ConnectionImpl*>(this)->getStream(stream_id);
 }
 
-ConnectionImpl::StreamImpl* ConnectionImpl::getStreamUnchecked(int32_t stream_id) {
-  return static_cast<StreamImpl*>(adapter_->GetStreamUserData(stream_id));
-}
-
 ConnectionImpl::StreamImpl* ConnectionImpl::getStream(int32_t stream_id) {
   StreamImpl* stream = getStreamUnchecked(stream_id);
   SLOW_ASSERT(stream != nullptr || !slowContainsStreamId(stream_id));
   return stream;
+}
+
+const ConnectionImpl::StreamImpl* ConnectionImpl::getStreamUnchecked(int32_t stream_id) const {
+  // Delegate to the non-const version.
+  return const_cast<ConnectionImpl*>(this)->getStreamUnchecked(stream_id);
+}
+
+ConnectionImpl::StreamImpl* ConnectionImpl::getStreamUnchecked(int32_t stream_id) {
+  return static_cast<StreamImpl*>(adapter_->GetStreamUserData(stream_id));
 }
 
 int ConnectionImpl::onData(int32_t stream_id, const uint8_t* data, size_t len) {
@@ -1084,7 +1090,7 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
     onSettings(frame->settings);
   }
 
-  StreamImpl* stream = getStream(frame->hd.stream_id);
+  StreamImpl* stream = getStreamUnchecked(frame->hd.stream_id);
   if (!stream) {
     return okStatus();
   }
@@ -1157,7 +1163,7 @@ int ConnectionImpl::onFrameSend(int32_t stream_id, size_t length, uint8_t type, 
   // an outgoing frame of this type, we will return an error code so that we can abort execution.
   ENVOY_CONN_LOG(trace, "sent frame type={}, stream_id={}, length={}", connection_,
                  static_cast<uint64_t>(type), stream_id, length);
-  StreamImpl* stream = getStream(stream_id);
+  StreamImpl* stream = getStreamUnchecked(stream_id);
   if (stream != nullptr) {
     if (type != METADATA_FRAME_TYPE) {
       stream->bytes_meter_->addWireBytesSent(length + H2_FRAME_HEADER_SIZE);
@@ -1370,8 +1376,12 @@ Status ConnectionImpl::onStreamClose(int32_t stream_id, uint32_t error_code) {
 int ConnectionImpl::onMetadataReceived(int32_t stream_id, const uint8_t* data, size_t len) {
   ENVOY_CONN_LOG(trace, "recv {} bytes METADATA", connection_, len);
 
-  StreamImpl* stream = getStream(stream_id);
+  StreamImpl* stream = getStreamUnchecked(stream_id);
   if (!stream || stream->remote_end_stream_) {
+    if (!stream) {
+      ENVOY_CONN_LOG(debug, "no stream for stream_id {} while receiving METADATA", connection_,
+                     stream_id);
+    }
     return 0;
   }
 
@@ -1383,8 +1393,12 @@ int ConnectionImpl::onMetadataFrameComplete(int32_t stream_id, bool end_metadata
   ENVOY_CONN_LOG(trace, "recv METADATA frame on stream {}, end_metadata: {}", connection_,
                  stream_id, end_metadata);
 
-  StreamImpl* stream = getStream(stream_id);
+  StreamImpl* stream = getStreamUnchecked(stream_id);
   if (!stream || stream->remote_end_stream_) {
+    if (!stream) {
+      ENVOY_CONN_LOG(debug, "no stream for stream_id {} while completing METADATA", connection_,
+                     stream_id);
+    }
     return 0;
   }
 
@@ -1394,7 +1408,7 @@ int ConnectionImpl::onMetadataFrameComplete(int32_t stream_id, bool end_metadata
 
 int ConnectionImpl::saveHeader(const nghttp2_frame* frame, HeaderString&& name,
                                HeaderString&& value) {
-  StreamImpl* stream = getStream(frame->hd.stream_id);
+  StreamImpl* stream = getStreamUnchecked(frame->hd.stream_id);
   if (!stream) {
     // We have seen 1 or 2 crashes where we get a headers callback but there is no associated
     // stream data. I honestly am not sure how this can happen. However, from reading the nghttp2
@@ -1565,7 +1579,8 @@ void ConnectionImpl::scheduleProtocolConstraintViolationCallback() {
 void ConnectionImpl::onProtocolConstraintViolation() {
   // Flooded outbound queue implies that peer is not reading and it does not
   // make sense to try to flush pending bytes.
-  connection_.close(Envoy::Network::ConnectionCloseType::NoFlush);
+  connection_.close(Envoy::Network::ConnectionCloseType::NoFlush,
+                    StreamInfo::LocalCloseReasons::get().Http2ConnectionProtocolViolation);
 }
 
 void ConnectionImpl::onUnderlyingConnectionBelowWriteBufferLowWatermark() {
@@ -1828,7 +1843,7 @@ void ClientConnectionImpl::dumpStreams(std::ostream& os, int indent_level) const
      << current_stream_id_.value() << ":\n";
 
   const ClientStreamImpl* client_stream =
-      static_cast<const ClientStreamImpl*>(getStream(current_stream_id_.value()));
+      static_cast<const ClientStreamImpl*>(getStreamUnchecked(current_stream_id_.value()));
   if (client_stream) {
     client_stream->response_decoder_.dumpState(os, indent_level + 1);
   } else {
@@ -1960,10 +1975,12 @@ Status ClientConnectionImpl::trackInboundFrames(int32_t stream_id, size_t length
     ENVOY_CONN_LOG(trace, "error reading frame: {} received in this HTTP/2 session.", connection_,
                    result.message());
     if (isInboundFramesWithEmptyPayloadError(result)) {
-      ConnectionImpl::StreamImpl* stream = getStream(stream_id);
+      ConnectionImpl::StreamImpl* stream = getStreamUnchecked(stream_id);
       if (stream) {
         stream->setDetails(Http2ResponseCodeDetails::get().inbound_empty_frame_flood);
       }
+      // Above if is defensive, because the stream has just been created and therefore always
+      // exists.
     }
   }
   return result;
@@ -2053,10 +2070,12 @@ Status ServerConnectionImpl::trackInboundFrames(int32_t stream_id, size_t length
     ENVOY_CONN_LOG(trace, "error reading frame: {} received in this HTTP/2 session.", connection_,
                    result.message());
     if (isInboundFramesWithEmptyPayloadError(result)) {
-      ConnectionImpl::StreamImpl* stream = getStream(stream_id);
+      ConnectionImpl::StreamImpl* stream = getStreamUnchecked(stream_id);
       if (stream) {
         stream->setDetails(Http2ResponseCodeDetails::get().inbound_empty_frame_flood);
       }
+      // Above if is defensive, because the stream has just been created and therefore always
+      // exists.
     }
   }
   return result;

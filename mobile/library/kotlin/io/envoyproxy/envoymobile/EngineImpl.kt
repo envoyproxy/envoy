@@ -26,7 +26,8 @@ class EngineImpl constructor(
     streamClient = StreamClientImpl(envoyEngine)
     pulseClient = PulseClientImpl(envoyEngine)
     if (configurationYAML != null) {
-      envoyEngine.runWithTemplate(configurationYAML, envoyConfiguration, logLevel.level)
+      envoyEngine.performRegistration(envoyConfiguration)
+      envoyEngine.runWithYaml(configurationYAML, logLevel.level)
     } else {
       envoyEngine.runWithConfig(envoyConfiguration, logLevel.level)
     }

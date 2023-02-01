@@ -19,17 +19,17 @@ RouterTestBase::RouterTestBase(bool start_child_span, bool suppress_envoy_header
               ShadowWriterPtr{shadow_writer_}, true, start_child_span, suppress_envoy_headers,
               false, suppress_grpc_request_failure_code_stats, std::move(strict_headers_to_check),
               test_time_.timeSystem(), http_context_, router_context_),
-      router_(config_, config_.default_stats_) {
-  router_.setDecoderFilterCallbacks(callbacks_);
+      router_(std::make_unique<RouterTestFilter>(config_, config_.default_stats_)) {
+  router_->setDecoderFilterCallbacks(callbacks_);
   upstream_locality_.set_zone("to_az");
   cm_.initializeThreadLocalClusters({"fake_cluster"});
   ON_CALL(*cm_.thread_local_cluster_.conn_pool_.host_, address())
       .WillByDefault(Return(host_address_));
   ON_CALL(*cm_.thread_local_cluster_.conn_pool_.host_, locality())
       .WillByDefault(ReturnRef(upstream_locality_));
-  router_.downstream_connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
-      host_address_);
-  router_.downstream_connection_.stream_info_.downstream_connection_info_provider_
+  router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
+      ->setLocalAddress(host_address_);
+  router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
       ->setRemoteAddress(Network::Utility::parseInternetAddressAndPort("1.2.3.4:80"));
 
   // Make the "system time" non-zero, because 0 is considered invalid by DateUtil.
@@ -140,11 +140,11 @@ void RouterTestBase::verifyMetadataMatchCriteriaFromRequest(bool route_entry_has
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
-  router_.decodeHeaders(headers, true);
+  router_->decodeHeaders(headers, true);
 
   // When the router filter gets reset we should cancel the pool request.
   EXPECT_CALL(cancellable_, cancel(_));
-  router_.onDestroy();
+  router_->onDestroy();
 }
 
 void RouterTestBase::verifyAttemptCountInRequestBasic(bool set_include_attempt_count_in_request,
@@ -161,14 +161,14 @@ void RouterTestBase::verifyAttemptCountInRequestBasic(bool set_include_attempt_c
   if (preset_count) {
     headers.setEnvoyAttemptCount(preset_count.value());
   }
-  router_.decodeHeaders(headers, true);
+  router_->decodeHeaders(headers, true);
 
   EXPECT_EQ(expected_count, atoi(std::string(headers.getEnvoyAttemptCountValue()).c_str()));
   EXPECT_EQ(1U, callbacks_.stream_info_.attemptCount().value());
 
   // When the router filter gets reset we should cancel the pool request.
   EXPECT_CALL(cancellable_, cancel(_));
-  router_.onDestroy();
+  router_->onDestroy();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(0U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
@@ -188,7 +188,7 @@ void RouterTestBase::verifyAttemptCountInResponseBasic(bool set_include_attempt_
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
-  router_.decodeHeaders(headers, true);
+  router_->decodeHeaders(headers, true);
 
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
@@ -217,7 +217,7 @@ void RouterTestBase::sendRequest(bool end_stream) {
                                       Http::Protocol::Http10);
 
   HttpTestUtility::addDefaultHeaders(default_request_headers_, false);
-  router_.decodeHeaders(default_request_headers_, end_stream);
+  router_->decodeHeaders(default_request_headers_, end_stream);
 }
 
 void RouterTestBase::enableRedirects(uint32_t max_internal_redirects) {
@@ -289,7 +289,7 @@ void RouterTestBase::testAppendCluster(absl::optional<Http::LowerCaseString> clu
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
-  router_.decodeHeaders(headers, true);
+  router_->decodeHeaders(headers, true);
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
 
@@ -334,7 +334,7 @@ void RouterTestBase::testAppendUpstreamHost(
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
-  router_.decodeHeaders(headers, true);
+  router_->decodeHeaders(headers, true);
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
 
@@ -382,7 +382,7 @@ void RouterTestBase::testDoNotForward(
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
-  router_.decodeHeaders(headers, true);
+  router_->decodeHeaders(headers, true);
   EXPECT_EQ(0U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
