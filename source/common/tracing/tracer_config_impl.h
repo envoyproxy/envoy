@@ -56,18 +56,18 @@ public:
 
     client_sampling_.set_numerator(
         tracing_config.has_client_sampling() ? tracing_config.client_sampling().value() : 100);
-    envoy::type::v3::FractionalPercent random_sampling;
+
     // TODO: Random sampling historically was an integer and default to out of 10,000. We should
     // deprecate that and move to a straight fractional percent config.
     uint64_t random_sampling_numerator{PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
         tracing_config, random_sampling, 10000, 10000)};
-    random_sampling.set_numerator(random_sampling_numerator);
-    random_sampling.set_denominator(envoy::type::v3::FractionalPercent::TEN_THOUSAND);
-    envoy::type::v3::FractionalPercent overall_sampling;
+    random_sampling_.set_numerator(random_sampling_numerator);
+    random_sampling_.set_denominator(envoy::type::v3::FractionalPercent::TEN_THOUSAND);
+
     uint64_t overall_sampling_numerator{PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
         tracing_config, overall_sampling, 10000, 10000)};
-    overall_sampling.set_numerator(overall_sampling_numerator);
-    overall_sampling.set_denominator(envoy::type::v3::FractionalPercent::TEN_THOUSAND);
+    overall_sampling_.set_numerator(overall_sampling_numerator);
+    overall_sampling_.set_denominator(envoy::type::v3::FractionalPercent::TEN_THOUSAND);
 
     verbose_ = tracing_config.verbose();
     max_path_tag_length_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(tracing_config, max_path_tag_length,
