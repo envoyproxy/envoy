@@ -13,7 +13,9 @@ GoLang filter
 In this example, we show how the `Golang <https://go.dev/>`_ filter can be used with the Envoy
 proxy.
 
-The example Envoy proxy configuration a golang http filter that could modify request/response's header or body.
+The example demonstrates a Go plugin that can respond directly to requests and also update responses provided by an upstream server.
+
+ It also shows how Go plugins can be independently configured at runtime.
 
 Step 1: Compile the go plugin library
 *************************************
