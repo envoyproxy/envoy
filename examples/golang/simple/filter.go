@@ -8,7 +8,7 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-var UpdateUpstreamBody = "updated upstream response body by the simple plugin"
+var UpdateUpstreamBody = "upstream response body updated by the simple plugin"
 
 type filter struct {
 	callbacks api.FilterCallbackHandler
