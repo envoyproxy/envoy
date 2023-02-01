@@ -70,10 +70,10 @@ Besides `http_proxy` and `https_proxy`, maybe you need to set `go_proxy` to repl
 IMAGE_NAME=envoyproxy/envoy-build-ubuntu go_proxy=https://goproxy.cn,direct http_proxy=http://proxy.foo.com:8080 https_proxy=http://proxy.bar.com:8080 ./ci/run_envoy_docker.sh <build_script_args>
 ```
 
-The script will always pull the docker image. If you want to skip this action, you can specify `ENVOY_DOCKER_SKIP_PULL=true`.
+To force the Envoy build image to be refreshed by Docker you can set `ENVOY_DOCKER_PULL=true`.
 
 ```bash
-ENVOY_DOCKER_SKIP_PULL=true ./ci/run_envoy_docker.sh <build_script_args>
+ENVOY_DOCKER_PULL=true ./ci/run_envoy_docker.sh <build_script_args>
 ```
 
 ## On Linux
