@@ -28,8 +28,8 @@ TEST(RandomConfigTest, ValidateFail) {
   auto& factory = Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(config);
   EXPECT_EQ("envoy.load_balancing_policies.random", factory.name());
 
-  auto messsage_ptr = factory.createEmptyConfigProto();
-  EXPECT_CALL(cluster_info, loadBalancingPolicy()).WillOnce(testing::ReturnRef(messsage_ptr));
+  auto message_ptr = factory.createEmptyConfigProto();
+  EXPECT_CALL(cluster_info, loadBalancingPolicy()).WillOnce(testing::ReturnRef(message_ptr));
 
   auto thread_aware_lb =
       factory.create(cluster_info, main_thread_priority_set, context.runtime_loader_,

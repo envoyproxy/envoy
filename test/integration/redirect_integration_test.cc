@@ -219,8 +219,7 @@ TEST_P(RedirectIntegrationTest, BasicInternalRedirectDownstreamBytesCount) {
   upstream_request_->encodeHeaders(redirect_response_, true);
   expectDownstreamBytesSentAndReceived(BytesCountExpectation(0, 63, 0, 31),
                                        BytesCountExpectation(0, 42, 0, 42),
-                                       BytesCountExpectation(0, 42, 0, 42), 0);
-
+                                       BytesCountExpectation(0, 8, 0, 6), 0);
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
@@ -228,7 +227,7 @@ TEST_P(RedirectIntegrationTest, BasicInternalRedirectDownstreamBytesCount) {
   ASSERT_TRUE(response->complete());
   expectDownstreamBytesSentAndReceived(BytesCountExpectation(140, 63, 121, 31),
                                        BytesCountExpectation(77, 42, 77, 42),
-                                       BytesCountExpectation(77, 42, 77, 42), 1);
+                                       BytesCountExpectation(9, 8, 9, 6), 1);
 }
 
 TEST_P(RedirectIntegrationTest, BasicInternalRedirectUpstreamBytesCount) {
@@ -611,9 +610,15 @@ TEST_P(RedirectIntegrationTest, InternalRedirectToDestinationWithResponseBody) {
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) { hcm.set_via("via_value"); });
-  config_helper_.prependFilter(R"EOF(
+  if (downstreamProtocol() == Http::CodecType::HTTP3) {
+    config_helper_.prependFilter(R"EOF(
+  name: pause-filter-for-quic
+  )EOF");
+  } else {
+    config_helper_.prependFilter(R"EOF(
   name: pause-filter
   )EOF");
+  }
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -707,7 +712,10 @@ TEST_P(RedirectIntegrationTest, InternalRedirectHandledByDirectResponse) {
 }
 
 INSTANTIATE_TEST_SUITE_P(Protocols, RedirectIntegrationTest,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             {Http::CodecType::HTTP1, Http::CodecType::HTTP2,
+                              Http::CodecType::HTTP3},
+                             {Http::CodecType::HTTP1, Http::CodecType::HTTP2})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 } // namespace Envoy

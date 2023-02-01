@@ -65,6 +65,7 @@ envoy_cc_test(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/secret/v3:pkg_cc_proto",
+        "@envoy_build_config//:extension_registry",
     ],
 )
 
@@ -127,6 +128,7 @@ envoy_cc_test_library(
         "@envoy//test/config:utility_lib",
         "@envoy//test/mocks/server:transport_socket_factory_context_mocks",
         "@envoy//test/test_common:environment_lib",
+        "@envoy_build_config//:extension_registry",
     ] + select({
         "@envoy//bazel:disable_signal_trace": [],
         "//conditions:default": [

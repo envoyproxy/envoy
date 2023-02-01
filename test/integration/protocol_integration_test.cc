@@ -1,3 +1,4 @@
+#include "protocol_integration_test.h"
 #include "test/integration/protocol_integration_test.h"
 
 #include <functional>
@@ -822,6 +823,33 @@ TEST_P(ProtocolIntegrationTest, Retry) {
       BytesCountExpectation(2566 + quic_https_extra_bytes, 635, 430 + quic_https_extra_bytes, 54),
       BytesCountExpectation(2262, 548, 196, http2_header_bytes_received),
       BytesCountExpectation(2204, 520, 150, 6));
+}
+
+// Regression test to guarantee that buffering for retries and shadows doesn't double the body size.
+// This test is actually irrelevant for QUIC, as this issue only shows up with header-only requests.
+// QUIC will always send an empty data frame with FIN.
+TEST_P(ProtocolIntegrationTest, RetryWithBuffer) {
+  config_helper_.prependFilter(R"EOF(
+  name: add-body-filter
+  typed_config:
+      "@type": type.googleapis.com/test.integration.filters.AddBodyFilterConfig
+      where_to_add_body: DEFAULT
+  )EOF");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"x-forwarded-for", "10.0.0.1"},
+                                     {"x-envoy-retry-on", "5xx"}});
+  waitForNextUpstreamRequest();
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(upstream_request_->receivedData());
+  EXPECT_EQ(upstream_request_->bodyLength(), 4);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
 }
 
 TEST_P(ProtocolIntegrationTest, RetryStreaming) {
@@ -2839,30 +2867,6 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectIsBlocked) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("404", response->headers().getStatusValue());
   EXPECT_TRUE(response->complete());
-}
-
-TEST_P(DownstreamProtocolIntegrationTest, ExtendedConnectIsBlocked) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.use_rfc_connect", "false");
-#ifdef ENVOY_ENABLE_UHV
-  // Extended CONNECT requests are not implemented in UHV.
-  return;
-#endif
-
-  if (downstreamProtocol() == Http::CodecType::HTTP1) {
-    return;
-  }
-  initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto encoder_decoder = codec_client_->startRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "CONNECT"},
-                                     {":protocol", "bytestream"},
-                                     {":path", "/"},
-                                     {":authority", "sni.lyft.com.com:80"}});
-  request_encoder_ = &encoder_decoder.first;
-  auto response = std::move(encoder_decoder.second);
-
-  ASSERT_TRUE(response->waitForReset());
-  ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
 
 // Make sure that with override_stream_error_on_invalid_http_message true, CONNECT

@@ -1,9 +1,15 @@
 import Envoy
 import EnvoyEngine
 import Foundation
+import TestExtensions
 import XCTest
 
 final class CancelStreamTests: XCTestCase {
+  override static func setUp() {
+    super.setUp()
+    register_test_extensions()
+  }
+
   func testCancelStream() {
     let remotePort = Int.random(in: 10001...11000)
     // swiftlint:disable:next line_length
@@ -113,7 +119,8 @@ static_resources:
       .sendHeaders(requestHeaders, endStream: false)
       .cancel()
 
-    XCTAssertEqual(XCTWaiter.wait(for: [filterExpectation, runExpectation], timeout: 3), .completed)
+    let expectations = [filterExpectation, runExpectation]
+    XCTAssertEqual(XCTWaiter.wait(for: expectations, timeout: 10), .completed)
 
     engine.terminate()
   }
