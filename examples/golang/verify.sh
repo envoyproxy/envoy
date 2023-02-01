@@ -17,7 +17,7 @@ bring_up_example
 run_log "Make a request handled by the Go plugin"
 responds_with_header \
     "rsp-header-from-go: bar-test" \
-    "http://localhost:8080"
+    "http://localhost:${PORT_PROXY}"
 
 run_log "Make a request handled upstream and updated by the Go plugin"
 responds_with \
