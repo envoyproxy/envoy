@@ -6,8 +6,7 @@ services:
       context: .
       dockerfile: Dockerfile-proxy
     depends_on:
-      web_service:
-        condition: service_healthy
+    - web_service
     ports:
     - "${PORT_PROXY:-10000}:10000"
 
