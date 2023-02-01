@@ -75,6 +75,17 @@ public:
                                                            Tracing::DefaultMaxPathTagLength);
   }
 
+  explicit ConnectionManagerTracingConfigImpl(Tracing::OperationName operation_name,
+                                              Tracing::CustomTagMap custom_tags,
+                                              envoy::type::v3::FractionalPercent client_sampling,
+                                              envoy::type::v3::FractionalPercent random_sampling,
+                                              envoy::type::v3::FractionalPercent overall_sampling,
+                                              bool verbose, uint32_t max_path_tag_length)
+      : operation_name_(operation_name), custom_tags_(custom_tags),
+        client_sampling_(client_sampling), random_sampling_(random_sampling),
+        overall_sampling_(overall_sampling), verbose_(verbose),
+        max_path_tag_length_(max_path_tag_length) {}
+
   const envoy::type::v3::FractionalPercent& getClientSampling() const override {
     return client_sampling_;
   }
