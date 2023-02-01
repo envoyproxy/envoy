@@ -199,8 +199,8 @@ new_features:
     added :ref:`CompressorPerRoute proto <envoy_v3_api_msg_extensions.filters.http.compressor.v3.CompressorPerRoute>` for per-route configuration.
 - area: config
   change: |
-- area: generic_proxy
     added :ref:`retry backoff strategy <envoy_v3_api_msg_config.core.v3.BackoffStrategy>` to :ref:`EnvoyGrpc <envoy_v3_api_msg_config.core.v3.GrpcService.EnvoyGrpc>` to make EnvoyGrpc channel retry backoff timing values configurable.
+- area: generic_proxy
   change: |
     added :ref:`dubbo codec support <envoy_v3_api_msg_extensions.filters.network.generic_proxy.codecs.dubbo.v3.DubboCodecConfig>` to the
     :ref:`generic_proxy filter <envoy_v3_api_msg_extensions.filters.network.generic_proxy.v3.GenericProxy>`.
