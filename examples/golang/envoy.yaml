@@ -35,17 +35,17 @@ static_resources:
               - match:
                   prefix: "/"
                 route:
-                  cluster: web_service
+                  cluster: helloworld_service_cluster
   clusters:
-  - name: web_service
+  - name: helloworld_service_cluster
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:
-      cluster_name: service1
+      cluster_name: helloworld_service_cluster
       endpoints:
       - lb_endpoints:
         - endpoint:
             address:
               socket_address:
-                address: web_service
-                port_value: 9000
+                address: helloworld_service
+                port_value: 8080

@@ -6,12 +6,13 @@ services:
       context: .
       dockerfile: Dockerfile-proxy
     depends_on:
-    - web_service
+      helloworld_service:
+        condition: service_healthy
     ports:
     - "${PORT_PROXY:-10000}:10000"
 
-  web_service:
-    environment:
-    - PORT=9000
+  helloworld_service:
     build:
-      context: ../shared/echo
+      context: ../shared/flask
+    volumes:
+    - ./service.py:/code/service.py
