@@ -67,6 +67,12 @@ public:
   }
   absl::string_view ja3Hash() const override { return ja3_hash_; }
   void setJA3Hash(const absl::string_view ja3_hash) override { ja3_hash_ = std::string(ja3_hash); }
+  const absl::optional<std::chrono::milliseconds>& roundTripTime() const override {
+    return round_trip_time_;
+  }
+  void setRoundTripTime(std::chrono::milliseconds round_trip_time) override {
+    round_trip_time_ = round_trip_time;
+  }
 
 private:
   Address::InstanceConstSharedPtr local_address_;
@@ -79,6 +85,7 @@ private:
   absl::optional<std::string> interface_name_;
   Ssl::ConnectionInfoConstSharedPtr ssl_info_;
   std::string ja3_hash_;
+  absl::optional<std::chrono::milliseconds> round_trip_time_;
 };
 
 class SocketImpl : public virtual Socket {
