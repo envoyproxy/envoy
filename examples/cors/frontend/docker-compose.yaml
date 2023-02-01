@@ -13,8 +13,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile-frontenvoy
+    depends_on:
+      frontend-service:
+        condition: service_healthy
     ports:
-    - "${PORT_PROXY:-8000}:8000"
+    - "${PORT_PROXY:-8000}:10000"
 
   frontend-service:
     build:
