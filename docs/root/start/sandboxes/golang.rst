@@ -70,7 +70,7 @@ The output from the ``curl`` command below should include the body that updated 
 .. code-block:: console
 
    $ curl localhost:${GOLANG_PORT_PROXY}/update_upstream_response 2>&1 | grep "update"
-   updated upstream response body by the simple plugin               <-- This is updated by the simple Go plugin. --<
+   updated upstream response body by the simple plugin
 
 Step 5: Make a request handled by the Go plugin using custom configuration
 **************************************************************************
