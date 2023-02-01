@@ -3,13 +3,12 @@ version: "3.8"
 services:
   wasm_compile_update:
     build:
-      context: .
-      dockerfile: Dockerfile-envoy-build
+      context: ../shared/build
     command: >
       bash -c "
       bazel build //examples/wasm-cc:envoy_filter_http_wasm_updated_example.wasm
       && cp -a bazel-bin/examples/wasm-cc/*updated*.wasm /output"
-    entrypoint: /source/examples/wasm-cc/build-entrypoint.sh
+    entrypoint: /source/examples/shared/build/build-entrypoint.sh
     environment:
     - BUILD_UID=${UID:-1000}
     - TEST_TMPDIR=${ENVOY_TEST_TMPDIR:-/tmp}
@@ -21,13 +20,12 @@ services:
 
   wasm_compile:
     build:
-      context: .
-      dockerfile: Dockerfile-envoy-build
+      context: ../shared/build
     command: >
       bash -c "
       bazel build //examples/wasm-cc:envoy_filter_http_wasm_example.wasm
       && cp -a bazel-bin/examples/wasm-cc/* /output"
-    entrypoint: /source/examples/wasm-cc/build-entrypoint.sh
+    entrypoint: /source/examples/shared/build/build-entrypoint.sh
     environment:
     - BUILD_UID=${UID:-1000}
     - TEST_TMPDIR=${ENVOY_TEST_TMPDIR:-/tmp}

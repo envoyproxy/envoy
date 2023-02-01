@@ -510,7 +510,9 @@ void BaseIntegrationTest::useListenerAccessLog(absl::string_view format) {
 }
 
 std::string BaseIntegrationTest::waitForAccessLog(const std::string& filename, uint32_t entry,
-                                                  bool allow_excess_entries) {
+                                                  bool allow_excess_entries,
+                                                  Network::ClientConnection* client_connection) {
+
   // Wait a max of 1s for logs to flush to disk.
   std::string contents;
   for (int i = 0; i < 1000; ++i) {
@@ -524,6 +526,11 @@ std::string BaseIntegrationTest::waitForAccessLog(const std::string& filename, u
           << entries.size() << "\n"
           << contents;
       return entries[entry];
+    }
+    if (i % 25 == 0 && client_connection != nullptr) {
+      // The QUIC default delayed ack timer is 25ms. Wait for any pending ack timers to expire,
+      // then run dispatcher to send any pending acks.
+      client_connection->dispatcher().run(Envoy::Event::Dispatcher::RunType::NonBlock);
     }
     absl::SleepFor(absl::Milliseconds(1));
   }

@@ -80,7 +80,9 @@ if ! is_windows; then
     VOLUMES+=(-v "${SHARED_TMP_DIR}":"${SHARED_TMP_DIR}")
 fi
 
-time docker pull "${ENVOY_BUILD_IMAGE}"
+if [[ -n "${ENVOY_DOCKER_PULL}" ]]; then
+    time docker pull "${ENVOY_BUILD_IMAGE}"
+fi
 
 
 # Since we specify an explicit hash, docker-run will pull from the remote repo if missing.
