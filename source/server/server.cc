@@ -615,20 +615,15 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   if (!bootstrap_.default_socket_interface().empty()) {
     auto& sock_name = bootstrap_.default_socket_interface();
     sock = const_cast<Network::SocketInterface*>(Network::socketInterface(sock_name));
-  }
-
-  if (bootstrap_.default_socket_interface().empty() || sock == nullptr) {
-    auto factory =
-        Registry::FactoryRegistry<Server::Configuration::BootstrapExtensionFactory>::getFactory(
-            "envoy.extensions.network.socket_interface.default_socket_interface");
+    ASSERT(sock != nullptr);
+    Network::SocketInterfaceSingleton::clear();
+    Network::SocketInterfaceSingleton::initialize(sock);
+  } else {
+    auto factory = dynamic_cast<Server::Configuration::BootstrapExtensionFactory*>(
+        Network::SocketInterfaceSingleton::getExisting());
     bootstrap_extensions_.push_back(factory->createBootstrapExtension(
         *factory->createEmptyConfigProto(), serverFactoryContext()));
-    sock = dynamic_cast<Network::SocketInterface*>(factory);
   }
-
-  ASSERT(sock != nullptr);
-  Network::SocketInterfaceSingleton::clear();
-  Network::SocketInterfaceSingleton::initialize(sock);
 
   // Workers get created first so they register for thread local updates.
   listener_manager_ =
