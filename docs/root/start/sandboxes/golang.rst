@@ -81,7 +81,7 @@ The output from the ``curl`` command below should include the body that contains
 .. code-block:: console
 
    $ curl localhost:${GOLANG_PORT_PROXY}/localreply_by_config  2>&1 | grep "localreply"
-   Configured local reply from go, path: /localreply_by_config           <-- This is response directly by the simple Go plugin. --<
+   Configured local reply from go, path: /localreply_by_config
 
 .. seealso::
 
