@@ -8,6 +8,7 @@ services:
       bash -c "
       bazel build  //examples/golang/simple:simple.so
       && cp -a ./bazel-bin/examples/golang/simple/simple.so /output"
+    entrypoint: /source/examples/shared/build/build-entrypoint.sh
     environment:
     - BUILD_UID=${UID:-1000}
     - TEST_TMPDIR=/tmp
