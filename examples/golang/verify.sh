@@ -3,6 +3,7 @@
 export NAME=golang
 export UID
 export MANUAL=true
+export PORT_PROXY="${GOLANG_PORT_PROXY:-10710}"
 
 # shellcheck source=examples/verify-common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"
