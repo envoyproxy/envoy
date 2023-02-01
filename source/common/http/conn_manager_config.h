@@ -16,7 +16,7 @@
 #include "source/common/local_reply/local_reply.h"
 #include "source/common/network/utility.h"
 #include "source/common/stats/symbol_table.h"
-#include "source/common/tracing/tracing_config_impl.h"
+#include "source/common/tracing/tracer_config_impl.h"
 
 namespace Envoy {
 namespace Http {
