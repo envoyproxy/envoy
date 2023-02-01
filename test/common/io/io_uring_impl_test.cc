@@ -83,7 +83,7 @@ TEST_P(IoUringImplParamTest, InvalidParams) {
   auto file_event = dispatcher->createFileEvent(
       event_fd,
       [&uring, &completions_nr](uint32_t) {
-        uring.forEveryCompletion([&completions_nr](void*, int32_t res) {
+        uring.forEveryCompletion([&completions_nr](void*, int32_t res, bool) {
           EXPECT_TRUE(res < 0);
           completions_nr++;
         });
@@ -124,7 +124,7 @@ TEST_F(IoUringImplTest, InjectCompletion) {
   auto file_event = dispatcher->createFileEvent(
       event_fd,
       [&uring, &fd, &completions_nr](uint32_t) {
-        uring.forEveryCompletion([&fd, &completions_nr](void* user_data, int32_t res) {
+        uring.forEveryCompletion([&fd, &completions_nr](void* user_data, int32_t res, bool) {
           EXPECT_EQ(&fd, user_data);
           EXPECT_EQ(-11, res);
           completions_nr++;
@@ -154,7 +154,7 @@ TEST_F(IoUringImplTest, NestInjectCompletion) {
       event_fd,
       [&uring, &fd, &fd2, &completions_nr](uint32_t) {
         uring.forEveryCompletion(
-            [&uring, &fd, &fd2, &completions_nr](void* user_data, int32_t res) {
+            [&uring, &fd, &fd2, &completions_nr](void* user_data, int32_t res, bool) {
               if (completions_nr == 0) {
                 EXPECT_EQ(&fd, user_data);
                 EXPECT_EQ(-11, res);
@@ -190,7 +190,7 @@ TEST_F(IoUringImplTest, RemoveInjectCompletion) {
   auto file_event = dispatcher->createFileEvent(
       event_fd,
       [&uring, &fd, &completions_nr](uint32_t) {
-        uring.forEveryCompletion([&fd, &completions_nr](void* user_data, int32_t res) {
+        uring.forEveryCompletion([&fd, &completions_nr](void* user_data, int32_t res, bool) {
           EXPECT_EQ(&fd, user_data);
           EXPECT_EQ(-11, res);
           completions_nr++;
@@ -221,7 +221,7 @@ TEST_F(IoUringImplTest, NestRemoveInjectCompletion) {
       event_fd,
       [&uring, &fd, &fd2, &completions_nr](uint32_t) {
         uring.forEveryCompletion(
-            [&uring, &fd, &fd2, &completions_nr](void* user_data, int32_t res) {
+            [&uring, &fd, &fd2, &completions_nr](void* user_data, int32_t res, bool) {
               if (completions_nr == 0) {
                 EXPECT_EQ(&fd, user_data);
                 EXPECT_EQ(-11, res);
@@ -274,7 +274,7 @@ TEST_F(IoUringImplTest, PrepareReadvAllDataFitsOneChunk) {
   auto file_event = dispatcher->createFileEvent(
       event_fd,
       [&uring, &completions_nr, d = dispatcher.get()](uint32_t) {
-        uring.forEveryCompletion([&completions_nr](void*, int32_t res) {
+        uring.forEveryCompletion([&completions_nr](void*, int32_t res, bool) {
           completions_nr++;
           EXPECT_EQ(res, strlen("test text"));
         });
@@ -323,7 +323,7 @@ TEST_F(IoUringImplTest, PrepareReadvQueueOverflow) {
   auto file_event = dispatcher->createFileEvent(
       event_fd,
       [&uring, &completions_nr](uint32_t) {
-        uring.forEveryCompletion([&completions_nr](void* user_data, int32_t res) {
+        uring.forEveryCompletion([&completions_nr](void* user_data, int32_t res, bool) {
           EXPECT_TRUE(user_data != nullptr);
           EXPECT_EQ(res, 2);
           completions_nr++;
