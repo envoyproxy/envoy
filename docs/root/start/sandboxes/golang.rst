@@ -60,7 +60,7 @@ The output from the ``curl`` command below should include the header added by th
 .. code-block:: console
 
    $ curl -v localhost:${GOLANG_PORT_PROXY} 2>&1 | grep rsp-header-from-go
-   < rsp-header-from-go: bar-test                              <-- This is added by the simple Go plugin. --<
+   < rsp-header-from-go: bar-test
 
 Step 4: Make a request handled upstream and updated by the Go plugin
 ********************************************************************
