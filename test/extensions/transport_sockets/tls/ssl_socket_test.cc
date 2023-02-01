@@ -6943,7 +6943,7 @@ TEST_P(SslSocketTest, RsaKeyUsageVerification) {
   // windows platform, which will cause the test failure.
 #if defined(WIN32)
   TestUtilOptionsV2 test_options_2(listener, client_tls_context, /*expect_success=*/false, version_,
-                                   /*expected_server_transport_failure_reason_empty_=*/true);
+                                   /*expected_server_transport_failure_reason_empty_=*/false);
 #else
   TestUtilOptionsV2 test_options_2(listener, client_tls_context, /*expect_success=*/false,
                                    version_);
