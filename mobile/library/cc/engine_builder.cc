@@ -404,12 +404,6 @@ std::string EngineBuilder::generateConfigStr() const {
     insertCustomFilter(filter_config, config_template);
   }
 
-  for (const std::string& name : platform_filters_) {
-    std::string filter_config =
-        absl::StrReplaceAll(platform_filter_template, {{"{{ platform_filter_name }}", name}});
-    insertCustomFilter(filter_config, config_template);
-  }
-
   if (!rtds_layer_name_.empty() && ads_api_type_.empty()) {
     throw std::runtime_error("ADS must be configured when using RTDS");
   }
