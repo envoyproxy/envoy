@@ -73,7 +73,8 @@ public:
   testing::NiceMock<Server::MockOptions> options_;
   Singleton::ManagerPtr singleton_manager_;
   testing::NiceMock<MockAdmin> admin_;
-  Stats::IsolatedStoreImpl listener_scope_;
+  Stats::IsolatedStoreImpl listener_store_;
+  Stats::Scope& listener_scope_{*listener_store_.rootScope()};
   Event::GlobalTimeSystem time_system_;
   testing::NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
   testing::NiceMock<MockOverloadManager> overload_manager_;

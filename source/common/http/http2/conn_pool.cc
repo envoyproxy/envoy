@@ -18,10 +18,6 @@ uint32_t ActiveClient::calculateInitialStreamsLimit(
     absl::optional<HttpServerPropertiesCache::Origin>& origin,
     Upstream::HostDescriptionConstSharedPtr host) {
   uint32_t initial_streams = host->cluster().http2Options().max_concurrent_streams().value();
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.allow_concurrency_for_alpn_pool")) {
-    return initial_streams;
-  }
   if (http_server_properties_cache && origin.has_value()) {
     uint32_t cached_concurrency =
         http_server_properties_cache->getConcurrentStreams(origin.value());

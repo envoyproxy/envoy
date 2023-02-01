@@ -59,6 +59,8 @@ public:
   std::string name() const override { return "envoy.regex_engines.google_re2"; };
 };
 
+DECLARE_FACTORY(GoogleReEngineFactory);
+
 using EngineSingleton = InjectableSingleton<Engine>;
 
 enum class Type { Re2, StdRegex };

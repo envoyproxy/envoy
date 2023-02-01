@@ -12,6 +12,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/singleton/manager_impl.h"
 #include "source/common/version/version.h"
+#include "source/server/listener_manager_factory.h"
 #include "source/server/regex_engine.h"
 #include "source/server/ssl_context_manager.h"
 
@@ -98,16 +99,14 @@ void ValidationInstance::initialize(const Options& options,
       options.serviceZone(), options.serviceClusterName(), options.serviceNodeName());
 
   overload_manager_ = std::make_unique<OverloadManagerImpl>(
-      dispatcher(), stats(), threadLocal(), bootstrap_.overload_manager(),
+      dispatcher(), *stats().rootScope(), threadLocal(), bootstrap_.overload_manager(),
       messageValidationContext().staticValidationVisitor(), *api_, options_);
   Configuration::InitialImpl initial_config(bootstrap_);
   initial_config.initAdminAccessLog(bootstrap_, *this);
   admin_ = std::make_unique<Server::ValidationAdmin>(initial_config.admin().address());
-  listener_manager_ =
-      Config::Utility::getAndCheckFactoryByName<ListenerManagerFactory>(
-          Config::ServerExtensionValues::get().DEFAULT_LISTENER)
-          .createListenerManager(*this, std::make_unique<ValidationListenerComponentFactory>(*this),
-                                 *this, false, quic_stat_names_);
+  listener_manager_ = Config::Utility::getAndCheckFactoryByName<ListenerManagerFactory>(
+                          Config::ServerExtensionValues::get().VALIDATION_LISTENER)
+                          .createListenerManager(*this, nullptr, *this, false, quic_stat_names_);
   thread_local_.registerThread(*dispatcher_, true);
 
   Runtime::LoaderPtr runtime_ptr = component_factory.createRuntime(*this, initial_config);

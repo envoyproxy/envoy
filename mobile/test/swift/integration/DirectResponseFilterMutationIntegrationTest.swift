@@ -1,4 +1,5 @@
 import Envoy
+import TestExtensions
 import XCTest
 
 private final class MockHeaderMutationFilter: RequestFilter {
@@ -32,6 +33,11 @@ private final class MockHeaderMutationFilter: RequestFilter {
 }
 
 final class DirectResponseFilterMutationIntegrationTest: XCTestCase {
+  override static func setUp() {
+    super.setUp()
+    register_test_extensions()
+  }
+
   func testDirectResponseThatOnlyMatchesWhenUsingHeadersAddedByFilter() {
     let headersExpectation = self.expectation(description: "Response headers received")
     let dataExpectation = self.expectation(description: "Response data received")

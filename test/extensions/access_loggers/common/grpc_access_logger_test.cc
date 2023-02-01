@@ -120,7 +120,7 @@ public:
         std::chrono::duration_cast<std::chrono::nanoseconds>(buffer_flush_interval_msec).count());
 
     logger_ = std::make_unique<MockGrpcAccessLoggerImpl>(
-        Grpc::RawAsyncClientPtr{async_client_}, config_, dispatcher_, stats_store_,
+        Grpc::RawAsyncClientPtr{async_client_}, config_, dispatcher_, *stats_store_.rootScope(),
         "mock_access_log_prefix.", mockMethodDescriptor(), true);
   }
 
@@ -354,7 +354,7 @@ public:
         std::chrono::duration_cast<std::chrono::nanoseconds>(buffer_flush_interval_msec).count());
 
     logger_ = std::make_unique<MockGrpcAccessLoggerImpl>(
-        Grpc::RawAsyncClientPtr{async_client_}, config_, dispatcher_, stats_store_,
+        Grpc::RawAsyncClientPtr{async_client_}, config_, dispatcher_, *stats_store_.rootScope(),
         "mock_access_log_prefix.", mockMethodDescriptor(), false);
   }
 
@@ -494,7 +494,7 @@ private:
 
 class GrpcAccessLoggerCacheTest : public testing::Test {
 public:
-  GrpcAccessLoggerCacheTest() : logger_cache_(async_client_manager_, scope_, tls_) {}
+  GrpcAccessLoggerCacheTest() : logger_cache_(async_client_manager_, *scope_.rootScope(), tls_) {}
 
   void expectClientCreation() {
     factory_ = new Grpc::MockAsyncClientFactory;

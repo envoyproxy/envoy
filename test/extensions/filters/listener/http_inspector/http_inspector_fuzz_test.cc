@@ -18,7 +18,7 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::listener::FilterFuzzWithDat
   }
 
   Stats::IsolatedStoreImpl store;
-  ConfigSharedPtr cfg = std::make_shared<Config>(store);
+  ConfigSharedPtr cfg = std::make_shared<Config>(*store.rootScope());
   auto filter = std::make_unique<Filter>(cfg);
 
   ListenerFilterWithDataFuzzer fuzzer;

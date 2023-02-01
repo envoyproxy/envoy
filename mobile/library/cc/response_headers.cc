@@ -4,7 +4,7 @@ namespace Envoy {
 namespace Platform {
 
 int ResponseHeaders::httpStatus() const {
-  if (!this->contains(":status")) {
+  if (!contains(":status")) {
     throw std::logic_error("ResponseHeaders does not contain :status");
   }
   return stoi((*this)[":status"][0]);
@@ -12,10 +12,10 @@ int ResponseHeaders::httpStatus() const {
 
 ResponseHeadersBuilder ResponseHeaders::toResponseHeadersBuilder() {
   ResponseHeadersBuilder builder;
-  if (this->contains(":status")) {
-    builder.addHttpStatus(this->httpStatus());
+  if (contains(":status")) {
+    builder.addHttpStatus(httpStatus());
   }
-  for (const auto& pair : this->allHeaders()) {
+  for (const auto& pair : allHeaders()) {
     builder.set(pair.first, pair.second);
   }
   return builder;
