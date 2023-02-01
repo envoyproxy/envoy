@@ -262,7 +262,6 @@ TEST_P(AdsIntegrationTest, ClusterSharingSecretWarming) {
 // Make sure two clusters with different secrets send only a single SDS request.
 // This is a regression test of #21518.
 TEST_P(AdsIntegrationTest, SecretsPausedDuringCDS) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.combine_sds_requests", "true");
   initialize();
   const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
   const auto sds_type_url =
@@ -298,71 +297,6 @@ TEST_P(AdsIntegrationTest, SecretsPausedDuringCDS) {
   EXPECT_TRUE(compareDiscoveryRequest(sds_type_url, "",
                                       {"validation_context_0", "validation_context_1"},
                                       {"validation_context_0", "validation_context_1"}, {}));
-  test_server_->waitForGaugeGe("cluster_manager.warming_clusters", 2);
-
-  std::vector<envoy::extensions::transport_sockets::tls::v3::Secret> validation_contexts;
-  for (int i = 0; i < 2; ++i) {
-    envoy::extensions::transport_sockets::tls::v3::Secret validation_context;
-    TestUtility::loadFromYaml(
-        fmt::format(
-            R"EOF(
-      name: validation_context_{}
-      validation_context:
-        trusted_ca:
-          filename: {}
-    )EOF",
-            i, TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem")),
-        validation_context);
-    validation_contexts.push_back(std::move(validation_context));
-  }
-
-  sendDiscoveryResponse<envoy::extensions::transport_sockets::tls::v3::Secret>(
-      sds_type_url, validation_contexts, validation_contexts, {}, "1");
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
-}
-
-// Two clusters with different secrets send two SDS requests.
-// This is a test that validates the behavior prior to #21518.
-// The test will be removed one envoy.reloadable_features.combine_sds_requests
-// is removed.
-TEST_P(AdsIntegrationTest, SecretsNonPausedDuringCDS) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.combine_sds_requests", "false");
-  initialize();
-  const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
-  const auto sds_type_url =
-      Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>();
-
-  std::vector<envoy::config::cluster::v3::Cluster> clusters;
-  for (int i = 0; i < 2; ++i) {
-    envoy::config::core::v3::TransportSocket sds_transport_socket;
-    TestUtility::loadFromYaml(fmt::format(R"EOF(
-        name: envoy.transport_sockets.tls
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
-          common_tls_context:
-            validation_context_sds_secret_config:
-              name: validation_context_{}
-              sds_config:
-                resource_api_version: V3
-                ads: {{}}
-    )EOF",
-                                          i),
-                              sds_transport_socket);
-    auto cluster = ConfigHelper::buildStaticCluster("cluster", 8000, "127.0.0.1");
-    cluster.set_name(absl::StrCat("cluster_", i));
-    *cluster.mutable_transport_socket() = sds_transport_socket;
-    clusters.push_back(std::move(cluster));
-  }
-
-  EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "", {}, {}, {}, true));
-  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cds_type_url, clusters, clusters, {},
-                                                             "1");
-
-  // Expect two different SDS requests.
-  EXPECT_TRUE(compareDiscoveryRequest(sds_type_url, "", {"validation_context_0"},
-                                      {"validation_context_0"}, {}));
-  EXPECT_TRUE(compareDiscoveryRequest(sds_type_url, "", {"validation_context_1"},
-                                      {"validation_context_1"}, {}));
   test_server_->waitForGaugeGe("cluster_manager.warming_clusters", 2);
 
   std::vector<envoy::extensions::transport_sockets::tls::v3::Secret> validation_contexts;

@@ -370,15 +370,6 @@ public:
   virtual Config::SubscriptionFactory& subscriptionFactory() PURE;
 
   /**
-   * Obtain multiplexed subscription factory for the cluster manager.
-   * This factory shares mux per management server per xds resource type which reduces number of
-   * concurrent active grpc streams.
-   *
-   * @return Config::SubscriptionFactory& multiplexed subscription factory.
-   */
-  virtual Config::SubscriptionFactory& multiplexedSubscriptionFactory() PURE;
-
-  /**
    * Returns a struct with all the Stats::StatName objects needed by
    * Clusters. This helps factor out some relatively heavy name
    * construction which occur when there is a large CDS update during operation,

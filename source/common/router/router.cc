@@ -761,10 +761,10 @@ Filter::createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster) {
   GenericConnPoolFactory* factory = nullptr;
   if (cluster_->upstreamConfig().has_value()) {
     factory = Envoy::Config::Utility::getFactory<GenericConnPoolFactory>(
-        cluster_->upstreamConfig().value());
+        cluster_->upstreamConfig().ref());
     ENVOY_BUG(factory != nullptr,
               fmt::format("invalid factory type '{}', failing over to default upstream",
-                          cluster_->upstreamConfig().value().DebugString()));
+                          cluster_->upstreamConfig().ref().DebugString()));
   }
   if (!factory) {
     factory = &config_.router_context_.genericConnPoolFactory();
@@ -845,10 +845,19 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     shadow_streams_.clear();
   }
   if (buffering) {
-    Buffer::OwnedImpl copy(data);
-    callbacks_->addDecodedData(copy, true);
-  }
-  if (!upstream_requests_.empty()) {
+    if (!upstream_requests_.empty()) {
+      Buffer::OwnedImpl copy(data);
+      upstream_requests_.front()->acceptDataFromRouter(copy, end_stream);
+    }
+
+    // If we are potentially going to retry or buffer shadow this request we need to buffer.
+    // This will not cause the connection manager to 413 because before we hit the
+    // buffer limit we give up on retries and buffering. We must buffer using addDecodedData()
+    // so that all buffered data is available by the time we do request complete processing and
+    // potentially shadow. Additionally, we can't do a copy here because there's a check down
+    // this stack for whether `data` is the same buffer as already buffered data.
+    callbacks_->addDecodedData(data, true);
+  } else {
     upstream_requests_.front()->acceptDataFromRouter(data, end_stream);
   }
 

@@ -925,7 +925,6 @@ mutator
 mutex
 mutexes
 mux
-muxes
 muxed
 mysql
 namelen
@@ -1137,6 +1136,7 @@ responder
 restarter
 resync
 ret
+retransmitted
 retransmitting
 retriable
 retriggers
