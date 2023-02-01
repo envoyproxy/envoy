@@ -41,3 +41,19 @@ envoy_cc_library(
         "//source/common/common:linked_object",
     ],
 )
+
+envoy_cc_library(
+    name = "io_uring_factory_impl_lib",
+    srcs = [
+        "io_uring_factory_impl.cc",
+    ],
+    hdrs = [
+        "io_uring_factory_impl.h",
+    ],
+    tags = ["nocompdb"],
+    deps = [
+        ":io_uring_worker_lib",
+        "//envoy/common/io:io_uring_interface",
+        "//envoy/thread_local:thread_local_interface",
+    ],
+)

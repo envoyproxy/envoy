@@ -38,7 +38,6 @@ public:
   }
 
   Api::ApiPtr api_;
-  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   std::unique_ptr<IoUringImpl> io_uring_{};
   bool should_skip_{};
 };

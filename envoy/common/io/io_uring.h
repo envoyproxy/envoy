@@ -328,16 +328,21 @@ public:
   virtual ~IoUringFactory() = default;
 
   /**
-   * Returns an instance of IoUring and creates it if needed for the current
-   * thread.
+   * Returns the current thread's IoUringWorker. If it isn't register a worker yet,
+   * absl::nullopt returned.
    */
-  virtual IoUring& getOrCreate() const PURE;
+  virtual OptRef<IoUringWorker> getIoUringWorker() const PURE;
 
   /**
    * Initializes a factory upon server readiness. For example this method can be
    * used to set TLS.
    */
   virtual void onServerInitialized() PURE;
+
+  /**
+   * Indicates whether the IoUringWorker is registered to the current thread.
+   */
+  virtual bool currentThreadRegistered() PURE;
 };
 
 } // namespace Io

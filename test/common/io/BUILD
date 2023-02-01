@@ -9,6 +9,22 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_test(
+    name = "io_uring_factory_impl_test",
+    srcs = ["io_uring_factory_impl_test.cc"],
+    tags = [
+        "nocompdb",
+        "skip_on_windows",
+    ],
+    deps = [
+        "//source/common/io:io_uring_factory_impl_lib",
+        "//source/common/io:io_uring_impl_lib",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "io_uring_impl_test",
     srcs = ["io_uring_impl_test.cc"],
     tags = [
