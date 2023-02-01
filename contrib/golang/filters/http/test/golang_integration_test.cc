@@ -120,12 +120,12 @@ typed_config:
                       set: bar
               )EOF";
           auto yaml = absl::StrFormat(yaml_fmt, so_id);
-          Protobuf::Any value;
+          ProtobufWkt::Any value;
           TestUtility::loadFromYaml(yaml, value);
           hcm.mutable_route_config()
               ->mutable_virtual_hosts(0)
               ->mutable_typed_per_filter_config()
-              ->insert(Protobuf::MapPair<std::string, Protobuf::Any>(key, value));
+              ->insert(Protobuf::MapPair<std::string, ProtobufWkt::Any>(key, value));
 
           // route level per route config
           const auto yaml_fmt2 =
@@ -141,13 +141,13 @@ typed_config:
                       set: baz
               )EOF";
           auto yaml2 = absl::StrFormat(yaml_fmt2, so_id);
-          Protobuf::Any value2;
+          ProtobufWkt::Any value2;
           TestUtility::loadFromYaml(yaml2, value2);
 
           auto* new_route2 = hcm.mutable_route_config()->mutable_virtual_hosts(0)->add_routes();
           new_route2->mutable_match()->set_prefix("/route-config-test");
           new_route2->mutable_typed_per_filter_config()->insert(
-              Protobuf::MapPair<std::string, Protobuf::Any>(key, value2));
+              Protobuf::MapPair<std::string, ProtobufWkt::Any>(key, value2));
           new_route2->mutable_route()->set_cluster("cluster_0");
         });
 
