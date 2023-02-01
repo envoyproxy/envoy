@@ -1,37 +1,28 @@
 diff --git a/BUILD b/BUILD
-index 1ec2bdf18..50fe0f050 100644
+index a855aa5a9..65cfb4267 100644
 --- a/BUILD
 +++ b/BUILD
-@@ -96,12 +96,19 @@ linux_copts = posix_copts + [
-     # it should not be set on Apple platforms, where it instead disables APIs
-     # we use. See compat(5) and sys/cdefs.h.
-     "-D_XOPEN_SOURCE=700",
-+    # TODO(keith): Remove https://bugs.chromium.org/p/boringssl/issues/detail?id=492
-+    "-Wno-array-bounds",
-+    "-Wno-stringop-overflow",
-+    "-Wno-unknown-warning-option",
- ]
- 
- boringssl_copts = select({
-     "@platforms//os:linux": linux_copts,
-     "@platforms//os:macos": posix_copts,
+@@ -114,7 +114,10 @@ boringssl_copts = select({
+     "@platforms//os:linux": ["-D_XOPEN_SOURCE=700"],
+     # Without WIN32_LEAN_AND_MEAN, <windows.h> pulls in wincrypt.h, which
+     # conflicts with our <openssl/x509.h>.
 -    "@platforms//os:windows": ["-DWIN32_LEAN_AND_MEAN"],
 +    "@platforms//os:windows": [
 +        "-DWIN32_LEAN_AND_MEAN",
-+        "-DBORINGSSL_IMPLEMENTATION",
++        "-DDBORINGSSL_IMPLEMENTATION",
 +    ],
      "//conditions:default": [],
- })
- 
-@@ -163,6 +170,7 @@ cc_library(
+ }) + asm_copts
+
+@@ -138,6 +141,7 @@ cc_library(
          "@platforms//os:windows": ["-defaultlib:advapi32.lib"],
-         "//conditions:default": ["-lpthread"],
+         "//conditions:default": ["-pthread"],
      }),
 +    linkstatic = True,
      visibility = ["//visibility:public"],
  )
- 
-@@ -172,6 +180,7 @@ cc_library(
+
+@@ -147,6 +151,7 @@ cc_library(
      hdrs = ssl_headers,
      copts = boringssl_copts_cxx,
      includes = ["src/include"],
