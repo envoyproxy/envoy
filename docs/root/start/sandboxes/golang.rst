@@ -24,7 +24,7 @@ Build the go plugin library.
 
 .. code-block:: console
 
-   $ docker-compose -f docker-compose-go.yaml up --remove-orphans go_plugin_compile
+   $ docker-compose -f docker-compose-go.yaml run --rm go_plugin_compile
 
 The compiled library should now be in the ``lib`` folder.
 
