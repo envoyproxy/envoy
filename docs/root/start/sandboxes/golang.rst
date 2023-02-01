@@ -30,9 +30,8 @@ The compiled library should now be in the ``lib`` folder.
 
 .. code-block:: console
 
-   $ ls -l lib
-   total 5256
-   -r-xr-xr-x 1 root root 5305111 Jan 10 16:49 simple.so
+   $ ls lib
+   simple.so
 
 Step 2: Start all of our containers
 ***********************************
