@@ -32,9 +32,8 @@ private:
 
 class ConnectionManagerTracingConfigImpl : public ConnectionManagerTracingConfig {
 public:
-  explicit ConnectionManagerTracingConfigImpl(
-      envoy::config::core::v3::TrafficDirection traffic_direction,
-      const ConnectionManagerTracingConfigProto& tracing_config) {
+  ConnectionManagerTracingConfigImpl(envoy::config::core::v3::TrafficDirection traffic_direction,
+                                     const ConnectionManagerTracingConfigProto& tracing_config) {
 
     // Listener level traffic direction overrides the operation name
     switch (traffic_direction) {
@@ -75,16 +74,18 @@ public:
                                                            Tracing::DefaultMaxPathTagLength);
   }
 
-  explicit ConnectionManagerTracingConfigImpl(Tracing::OperationName operation_name,
-                                              Tracing::CustomTagMap custom_tags,
-                                              envoy::type::v3::FractionalPercent client_sampling,
-                                              envoy::type::v3::FractionalPercent random_sampling,
-                                              envoy::type::v3::FractionalPercent overall_sampling,
-                                              bool verbose, uint32_t max_path_tag_length)
+  ConnectionManagerTracingConfigImpl(Tracing::OperationName operation_name,
+                                     Tracing::CustomTagMap custom_tags,
+                                     envoy::type::v3::FractionalPercent client_sampling,
+                                     envoy::type::v3::FractionalPercent random_sampling,
+                                     envoy::type::v3::FractionalPercent overall_sampling,
+                                     bool verbose, uint32_t max_path_tag_length)
       : operation_name_(operation_name), custom_tags_(custom_tags),
         client_sampling_(client_sampling), random_sampling_(random_sampling),
         overall_sampling_(overall_sampling), verbose_(verbose),
         max_path_tag_length_(max_path_tag_length) {}
+
+  ConnectionManagerTracingConfigImpl() = default;
 
   const envoy::type::v3::FractionalPercent& getClientSampling() const override {
     return client_sampling_;
@@ -103,13 +104,13 @@ public:
 
   // TODO(wbpcode): keep this field be public for compatibility. Then the HCM needn't change much
   // code to use this config.
-  Tracing::OperationName operation_name_;
+  Tracing::OperationName operation_name_{};
   Tracing::CustomTagMap custom_tags_;
   envoy::type::v3::FractionalPercent client_sampling_;
   envoy::type::v3::FractionalPercent random_sampling_;
   envoy::type::v3::FractionalPercent overall_sampling_;
-  bool verbose_;
-  uint32_t max_path_tag_length_;
+  bool verbose_{};
+  uint32_t max_path_tag_length_{};
 };
 
 } // namespace Tracing
