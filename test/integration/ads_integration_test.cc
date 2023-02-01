@@ -1777,7 +1777,10 @@ public:
     AdsIntegrationTest::initialize();
   }
 
-  bool isSotw() const { return sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw; }
+  bool isSotw() const {
+    return sotwOrDelta() == Grpc::SotwOrDelta::Sotw ||
+           sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw;
+  }
 };
 
 INSTANTIATE_TEST_SUITE_P(
@@ -1785,13 +1788,11 @@ INSTANTIATE_TEST_SUITE_P(
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                      // There should be no variation across clients.
                      testing::Values(Grpc::ClientType::EnvoyGrpc),
-                     // Grpc::SotwOrDelta::Sotw is not supported for xdstp.
-                     testing::Values(Grpc::SotwOrDelta::UnifiedSotw, Grpc::SotwOrDelta::Delta,
-                                     Grpc::SotwOrDelta::UnifiedDelta),
+                     testing::Values(Grpc::SotwOrDelta::Sotw, Grpc::SotwOrDelta::UnifiedSotw,
+                                     Grpc::SotwOrDelta::Delta, Grpc::SotwOrDelta::UnifiedDelta),
                      testing::Values(OldDssOrNewDss::Old, OldDssOrNewDss::New)));
 
 TEST_P(XdsTpAdsIntegrationTest, Basic) {
-  std::cerr << "==> AAB Basic test: " << isSotw() << std::endl; // TODO: remove
   initialize();
   // Basic CDS/EDS xDS initialization (CDS via xdstp:// glob collection).
   const std::string cluster_wildcard = "xdstp://test/envoy.config.cluster.v3.Cluster/foo-cluster/"
@@ -1806,9 +1807,9 @@ TEST_P(XdsTpAdsIntegrationTest, Basic) {
   cluster_resource.mutable_eds_cluster_config()->set_service_name(endpoints_name);
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       Config::TypeUrl::get().Cluster, {cluster_resource}, {cluster_resource}, {}, "1");
-
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",
                                       {endpoints_name}, {endpoints_name}, {}));
+
   const auto cluster_load_assignments = {buildClusterLoadAssignment(endpoints_name)};
   sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
       Config::TypeUrl::get().ClusterLoadAssignment, cluster_load_assignments,
@@ -1888,6 +1889,7 @@ TEST_P(XdsTpAdsIntegrationTest, Basic) {
     makeSingleRequest();
   }
 
+  // Remove bar listener from the foo namespace.
   if (isSotw()) {
     // In SotW, removal consists of sending the other listeners, except for the one to be removed.
     sendDiscoveryResponse<envoy::config::listener::v3::Listener>(Config::TypeUrl::get().Listener,
@@ -1896,7 +1898,6 @@ TEST_P(XdsTpAdsIntegrationTest, Basic) {
     test_server_->waitForCounterEq("listener_manager.listener_removed", 1);
     makeSingleRequest();
   } else {
-    // Remove bar listener from the foo namespace.
     sendDiscoveryResponse<envoy::config::listener::v3::Listener>(Config::TypeUrl::get().Listener,
                                                                  {}, {}, {bar_listener}, "3");
     EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "4", {}, {}, {}));

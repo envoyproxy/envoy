@@ -437,13 +437,6 @@ TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcCollectionAggregatedSotwSu
   EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
   const std::string xds_url = "xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/bar";
 
-  if (GetParam() == LegacyOrUnified::Legacy) {
-    // AGGREGATED_GRPC not supported for legacy State-of-the-World, .
-    EXPECT_THROW_WITH_MESSAGE(collectionSubscriptionFromUrl(xds_url, config), EnvoyException,
-                              "AGGREGATED_GRPC only supported for unified_mux");
-    return;
-  }
-
   GrpcMuxSharedPtr ads_mux = std::make_shared<NiceMock<MockGrpcMux>>();
   EXPECT_CALL(cm_, adsMux()).WillOnce(Return(ads_mux));
   EXPECT_CALL(dispatcher_, createTimer_(_));

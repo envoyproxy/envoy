@@ -147,9 +147,6 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
             Utility::configSourceInitialFetchTimeout(config), false, options);
       }
       case envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC: {
-        if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
-          throw EnvoyException("AGGREGATED_GRPC only supported for unified_mux");
-        }
         return std::make_unique<GrpcCollectionSubscriptionImpl>(
             collection_locator, cm_.adsMux(), callbacks, resource_decoder, stats, dispatcher_,
             Utility::configSourceInitialFetchTimeout(config), /*is_aggregated=*/true, options);

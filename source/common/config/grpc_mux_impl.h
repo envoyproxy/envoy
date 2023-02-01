@@ -23,6 +23,10 @@
 #include "source/common/config/grpc_stream.h"
 #include "source/common/config/ttl.h"
 #include "source/common/config/utility.h"
+#include "source/common/config/xds_context_params.h"
+#include "source/common/config/xds_resource.h"
+
+#include "xds/core/v3/resource_name.pb.h"
 
 #include "absl/container/node_hash_map.h"
 
@@ -96,11 +100,12 @@ private:
     GrpcMuxWatchImpl(const absl::flat_hash_set<std::string>& resources,
                      SubscriptionCallbacks& callbacks,
                      OpaqueResourceDecoderSharedPtr resource_decoder, const std::string& type_url,
-                     GrpcMuxImpl& parent)
+                     GrpcMuxImpl& parent, const SubscriptionOptions& options,
+                     const LocalInfo::LocalInfo& local_info)
         : callbacks_(callbacks), resource_decoder_(resource_decoder), type_url_(type_url),
-          parent_(parent), watches_(parent.apiStateFor(type_url).watches_) {
-      std::copy(resources.begin(), resources.end(), std::inserter(resources_, resources_.begin()));
-      iter_ = watches_.emplace(watches_.begin(), this);
+          parent_(parent), subscription_options_(options), local_info_(local_info),
+          watches_(parent.apiStateFor(type_url).watches_) {
+      updateResources(resources);
     }
 
     ~GrpcMuxWatchImpl() override {
@@ -110,15 +115,33 @@ private:
       }
     }
 
+    void updateResources(const absl::flat_hash_set<std::string>& resources) {
+      resources_.clear();
+      for (const std::string& resource : resources) {
+        if (XdsResourceIdentifier::hasXdsTpScheme(resource)) {
+          auto xdstp_resource = XdsResourceIdentifier::decodeUrn(resource);
+          if (subscription_options_.add_xdstp_node_context_params_) {
+            const auto context = XdsContextParams::encodeResource(
+                local_info_.contextProvider().nodeContext(), xdstp_resource.context(), {}, {});
+            xdstp_resource.mutable_context()->CopyFrom(context);
+          }
+          XdsResourceIdentifier::EncodeOptions encode_options;
+          encode_options.sort_context_params_ = true;
+          resources_.insert(XdsResourceIdentifier::encodeUrn(xdstp_resource, encode_options));
+        } else {
+          resources_.insert(resource);
+        }
+      }
+      // move this watch to the beginning of the list
+      iter_ = watches_.emplace(watches_.begin(), this);
+    }
+
     void update(const absl::flat_hash_set<std::string>& resources) override {
       watches_.erase(iter_);
       if (!resources_.empty()) {
         parent_.queueDiscoveryRequest(type_url_);
       }
-      resources_.clear();
-      std::copy(resources.begin(), resources.end(), std::inserter(resources_, resources_.begin()));
-      // move this watch to the beginning of the list
-      iter_ = watches_.emplace(watches_.begin(), this);
+      updateResources(resources);
       parent_.queueDiscoveryRequest(type_url_);
     }
 
@@ -131,6 +154,8 @@ private:
 
   private:
     using WatchList = std::list<GrpcMuxWatchImpl*>;
+    const SubscriptionOptions& subscription_options_;
+    const LocalInfo::LocalInfo& local_info_;
     WatchList& watches_;
     WatchList::iterator iter_;
   };
