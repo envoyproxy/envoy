@@ -394,7 +394,7 @@ void GrpcMuxImpl::processDiscoveryResources(const std::vector<DecodedResourcePtr
         added_resources.insert(watched_resource_name);
       } else if (isXdstpWildcard(watched_resource_name)) {
         // See if the resources match the xdstp wildcard entry.
-        // TODO(abeyad): This could be made more efficient, e.g. by precomputing the wildcard
+        // TODO(abeyad): This could be made more efficient, e.g. by pre-computing the wildcard
         // equivalents up front.
         for (const auto& resource_ref_it : resource_ref_map) {
           if (!added_resources.contains(resource_ref_it.first) &&
