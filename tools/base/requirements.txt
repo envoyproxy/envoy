@@ -394,9 +394,9 @@ envoy-gpg-sign==0.1.1 \
     --hash=sha256:5149360c2394a450ee9293d0d2a3a5d62ba8a06c5b92820c201241f61406c790 \
     --hash=sha256:533154f983b3ccbbbf085aba9d79aa7f5452563f7854a6cdc4080ce60d1f3d04
     # via -r requirements.in
-flake8==5.0.4 \
-    --hash=sha256:6fbe320aad8d6b95cec8b8e47bc933004678dc63095be98528b7bdd2a9f510db \
-    --hash=sha256:7a1cf6b73744f5806ab95e526f6f0d8c01c66d7bbe349562d22dfca20610b248
+flake8==6.0.0 \
+    --hash=sha256:3833794e27ff64ea4e9cf5d410082a8b97ff1a06c16aa3d2027339cd0f1195c7 \
+    --hash=sha256:c61007e76655af75e6785a931f452915b371dc48f56efd765247c8fe68f2b181
     # via
     #   -r requirements.in
     #   envoy-code-check
@@ -755,17 +755,17 @@ protobuf==4.21.6 \
     # via
     #   envoy-base-utils
     #   envoy-docs-sphinx-runner
-pycodestyle==2.9.1 \
-    --hash=sha256:2c9607871d58c76354b697b42f5d57e1ada7d261c261efac224b664affdc5785 \
-    --hash=sha256:d1735fc58b418fd7c5f658d28d943854f8a849b01a5d0a1e6f3f3fdd0166804b
+pycodestyle==2.10.0 \
+    --hash=sha256:347187bdb476329d98f695c213d7295a846d1152ff4fe9bacb8a9590b8ee7053 \
+    --hash=sha256:8a4eaf0d0495c7395bdab3589ac2db602797d76207242c17d470186815706610
     # via flake8
 pycparser==2.20 \
     --hash=sha256:2d475327684562c3a96cc71adf7dc8c4f0565175cf86b6d7a404ff4c771f15f0 \
     --hash=sha256:7582ad22678f0fcd81102833f60ef8d0e57288b6b5fb00323d101be910e35705
     # via cffi
-pyflakes==2.5.0 \
-    --hash=sha256:4579f67d887f804e67edb544428f264b7b24f435b263c4614f384135cea553d2 \
-    --hash=sha256:491feb020dca48ccc562a8c0cbe8df07ee13078df59813b83959cbdada312ea3
+pyflakes==3.0.1 \
+    --hash=sha256:ec55bf7fe21fff7f1ad2f7da62363d749e2a470500eab1b555334b67aa1ef8cf \
+    --hash=sha256:ec8b276a6b60bd80defed25add7e439881c19e64850afd9b346283d4165fd0fd
     # via flake8
 pygithub==1.57 \
     --hash=sha256:5822febeac2391f1306c55a99af2bc8f86c8bf82ded000030cd02c18f31b731f \
@@ -862,12 +862,6 @@ requests==2.26.0 \
     # via
     #   pygithub
     #   sphinx
-setuptools==67.0.0 \
-    --hash=sha256:883131c5b6efa70b9101c7ef30b2b7b780a4283d5fc1616383cdf22c83cbefe6 \
-    --hash=sha256:9d790961ba6219e9ff7d9557622d2fe136816a264dd01d5997cfc057d804853d
-    # via
-    #   -r requirements.in
-    #   yamllint
 six==1.16.0 \
     --hash=sha256:1e61c37477a1626458e36f7b1d82aa5c9b094fa4802892072e49de9c60c4c926 \
     --hash=sha256:8abb2f1d86890a2dfb989f9a77cfcfd3e47c2a354b01111771326f8aa26e0254
