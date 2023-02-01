@@ -455,9 +455,8 @@ Network::FilterStatus ConnectionManagerImpl::onNewConnection() {
   Buffer::OwnedImpl dummy;
   createCodec(dummy);
   ASSERT(codec_->protocol() == Protocol::Http3);
-  // Stop iterating through each filters for QUIC. Currently a QUIC connection
-  // only supports one filter, HCM, and bypasses the onData() interface. Because
-  // QUICHE already handles de-multiplexing.
+  // Stop iterating through network filters for QUIC. Currently QUIC connections bypass the
+  // onData() interface because QUICHE already handles de-multiplexing.
   return Network::FilterStatus::StopIteration;
 }
 
