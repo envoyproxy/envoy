@@ -1007,7 +1007,7 @@ private:
   const bool warm_hosts_ : 1;
   const bool set_local_interface_name_on_upstream_connections_ : 1;
   // true iff the cluster proto specified upstream http filters.
-  bool has_configured_http_filters_{false};
+  bool has_configured_http_filters_ : 1;
 };
 
 /**
