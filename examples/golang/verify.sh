@@ -22,9 +22,9 @@ responds_with_header \
 run_log "Make a request handled upstream and updated by the Go plugin"
 responds_with \
     "updated upstream response body by the simple plugin" \
-    "http://localhost:8080/update_upstream_response"
+    "http://localhost:${PORT_PROXY}/update_upstream_response"
 
 run_log "Make a request handled by the Go plugin using custom configuration"
 responds_with \
-    "localreply from go, path: /localreply_by_config" \
-    "http://localhost:8080/localreply_by_config"
+    "Configured local reply from go, path: /localreply_by_config" \
+    "http://localhost:${PORT_PROXY}/localreply_by_config"
