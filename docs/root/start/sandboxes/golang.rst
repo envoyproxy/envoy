@@ -65,7 +65,7 @@ The output from the ``curl`` command below should include the header added by th
 Step 4: Make a request handled upstream and updated by the Go plugin
 ********************************************************************
 
-The output from the ``curl`` command below should include the body that updated by the simple Go plugin.
+The output from the ``curl`` command below should include the body that has been updated by the simple Go plugin.
 
 .. code-block:: console
 
