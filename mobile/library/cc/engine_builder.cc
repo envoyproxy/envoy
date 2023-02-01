@@ -248,7 +248,7 @@ EngineBuilder& EngineBuilder::setAggregatedDiscoveryService(const std::string& a
                                                             const std::string& address,
                                                             const int port) {
 #ifndef ENVOY_GOOGLE_GRPC
-  raise std::runtime_error("google_grpc must be enabled in bazel to use ADS");
+  throw std::runtime_error("google_grpc must be enabled in bazel to use ADS");
 #endif
   ads_api_type_ = api_type;
   ads_address_ = address;
