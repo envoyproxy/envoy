@@ -96,22 +96,20 @@ HostConstSharedPtr RingHashLoadBalancer::Ring::chooseHost(uint64_t h, uint32_t a
   // (instead of a lookup of all hosts). Hence fewer lookups/ accesses and faster execution.
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.shard_ringhash")) {
 
-    // Given a hash 'h', find the shard index by shifting it to right (by rightShift).
-    uint64_t shard_index = (h >> (rightShift - 1)) >> 1;
+    // Given a hash 'h', find the shard index by shifting it to right (by `rshift_to_shard`).
+    // Shifting right by 64 of a 64-bit unsigned int doesn't seem to work! Hence the split.
+    uint64_t shard_index = (h >> (rshift_to_shard - 1)) >> 1;
 
     // Right shift of a 64-bit unsigned int doesn't work if MSB (bit 63) is set.
     // Below code is needed to compute a right shift of such a number.
     uint64_t h_msb = h & 0x8000000000000000;
     if (h_msb != 0UL) {
-      uint64_t h_msb0 = h & 0x7FFFFFFFFFFFFFFF;
-      uint64_t h_r1 = h_msb0 >> 1;
-      uint64_t h_r1_msb1 = h_r1 | 0x4000000000000000;
-      shard_index = h_r1_msb1 >> (rightShift - 1);
+      shard_index = (((h & 0x7FFFFFFFFFFFFFFF) >> 1) | 0x4000000000000000) >> (rshift_to_shard - 1);
     }
 
     // 'lowp' and 'highp' are the lower and upper indices of the shard.
     lowp = ring_shard_[shard_index];
-    highp = ring_shard_[shard_index + 1] - 1;
+    highp = ring_shard_[shard_index + 1];
 
   } else {
 
@@ -262,11 +260,9 @@ RingHashLoadBalancer::Ring::Ring(const NormalizedHostWeightVector& normalized_ho
       n = n / 2;
       msb++;
     }
-    // Arbitrarily choosing MSB + 10 bits to shift hash to right for creating shards. The larger the
-    // shift to right, the fewer the shards. Experiment with values 9, 10, ... 30, the SHARD_SHIFT
-    // parameter.
-    rightShift += msb;
-    rightShift = (rightShift > 64) ? 64 : rightShift;
+    // Arbitrarily choose MSB + 'N' bits to shift hash to right for creating shards. A larger shift
+    // to right creates fewer shards. Experiment w values 9, 10,... for `rshift_to_shard` parameter.
+    rshift_to_shard = ((rshift_to_shard + msb) > 64) ? 64 : (rshift_to_shard + msb);
 
     // Reserve memory for shard indices. Worst-case, every hash belongs to a different shard!
     // The ring_shard_ container stores the start indices of the shards.
@@ -283,8 +279,8 @@ RingHashLoadBalancer::Ring::Ring(const NormalizedHostWeightVector& normalized_ho
     }
 
     for (const auto& entry : ring_) {
-      // shifting right by 64 as 64-bit unsigned int doesn't seem to work! So, I split it.
-      current_shard = (entry.hash_ >> (rightShift - 1)) >> 1;
+      // Shifting right by 64 of a 64-bit unsigned int doesn't seem to work! Hence the split.
+      current_shard = (entry.hash_ >> (rshift_to_shard - 1)) >> 1;
 
       // If new shard found, push the index to ring_shard_ and update current_shard.
       if (current_shard != prev_shard) {

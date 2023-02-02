@@ -74,7 +74,7 @@ private:
     std::vector<RingEntry> ring_;
 
     std::vector<uint64_t> ring_shard_;
-    uint64_t rightShift = 9; // SHARD_SHIFT parameter
+    uint64_t rshift_to_shard = 9; // parameter to right shift hashes for creating shards of hosts.
 
     RingHashLoadBalancerStats& stats_;
   };

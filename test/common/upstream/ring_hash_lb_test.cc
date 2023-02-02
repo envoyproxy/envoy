@@ -627,9 +627,14 @@ TEST_P(RingHashLoadBalancerTest, HostWeightedLargeRing) {
     ++counts[port - 90];
   }
 
-  EXPECT_EQ(987, counts[0]);        // :90 | ~1000 expected hits
-  EXPECT_NEAR(1932, counts[1], 10); // :91 | ~2000 expected hits
-  EXPECT_NEAR(3081, counts[2], 10); // :92 | ~3000 expected hits
+  EXPECT_EQ(987, counts[0]);          // :90 | ~1000 expected hits
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.shard_ringhash")) {
+    EXPECT_NEAR(1932, counts[1], 10); // :91 | ~2000 expected hits
+    EXPECT_NEAR(3081, counts[2], 10); // :92 | ~3000 expected hits
+  } else {
+    EXPECT_EQ(1932, counts[1]);       // :91 | ~2000 expected hits
+    EXPECT_EQ(3081, counts[2]);       // :92 | ~3000 expected hits
+  }
 }
 
 // Given locality weights all 0, expect the same behavior as if no hosts were provided at all.
@@ -712,10 +717,15 @@ TEST_P(RingHashLoadBalancerTest, LocalityWeightedLargeRing) {
     ++counts[port - 90];
   }
 
-  EXPECT_EQ(987, counts[0]);        // :90 | ~1000 expected hits
-  EXPECT_NEAR(1932, counts[1], 10); // :91 | ~2000 expected hits
-  EXPECT_NEAR(3081, counts[2], 10); // :92 | ~3000 expected hits
-  EXPECT_EQ(0, counts[3]);          // :93 |    =0 expected hits
+  EXPECT_EQ(987, counts[0]);          // :90 | ~1000 expected hits
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.shard_ringhash")) {
+    EXPECT_NEAR(1932, counts[1], 10); // :91 | ~2000 expected hits
+    EXPECT_NEAR(3081, counts[2], 10); // :92 | ~3000 expected hits
+  } else {
+    EXPECT_EQ(1932, counts[1]);       // :91 | ~2000 expected hits
+    EXPECT_EQ(3081, counts[2]);       // :92 | ~3000 expected hits
+  }
+  EXPECT_EQ(0, counts[3]);            // :93 |    =0 expected hits
 }
 
 // Given both host weights and locality weights, expect the correct number of hashes for each host.
@@ -787,10 +797,17 @@ TEST_P(RingHashLoadBalancerTest, HostAndLocalityWeightedLargeRing) {
     ++counts[port - 90];
   }
 
-  EXPECT_NEAR(924, counts[0], 10);  // :90 | ~1000 expected hits
-  EXPECT_NEAR(2009, counts[1], 10); // :91 | ~2000 expected hits
-  EXPECT_NEAR(2053, counts[2], 10); // :92 | ~2000 expected hits
-  EXPECT_NEAR(4014, counts[3], 10); // :93 | ~4000 expected hits
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.shard_ringhash")) {
+    EXPECT_NEAR(924, counts[0], 10);  // :90 | ~1000 expected hits
+    EXPECT_NEAR(2009, counts[1], 10); // :91 | ~2000 expected hits
+    EXPECT_NEAR(2053, counts[2], 10); // :92 | ~2000 expected hits
+    EXPECT_NEAR(4014, counts[3], 10); // :93 | ~4000 expected hits
+  } else {
+    EXPECT_EQ(924, counts[0]);        // :90 | ~1000 expected hits
+    EXPECT_EQ(2009, counts[1]);       // :91 | ~2000 expected hits
+    EXPECT_EQ(2053, counts[2]);       // :92 | ~2000 expected hits
+    EXPECT_EQ(4014, counts[3]);       // :93 | ~4000 expected hits
+  }
 }
 
 // Given 4 hosts and a ring size of exactly 2, expect that 2 hosts will be present in the ring and
