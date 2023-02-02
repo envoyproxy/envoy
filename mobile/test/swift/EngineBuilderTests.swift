@@ -473,7 +473,7 @@ final class EngineBuilderTests: XCTestCase {
       directResponseMatchers: "",
       directResponses: "",
       nativeFilterChain: [
-        EnvoyNativeFilterConfig(name: "filter_name", typedConfig: "test_config"),
+        EnvoyNativeConfig(name: "filter_name", typedConfig: "test_config"),
       ],
       platformFilterChain: [
         EnvoyHTTPFilterFactory(filterName: "TestFilter", factory: TestFilter.init),
@@ -567,7 +567,7 @@ final class EngineBuilderTests: XCTestCase {
       directResponseMatchers: "",
       directResponses: "",
       nativeFilterChain: [
-        EnvoyNativeFilterConfig(name: "filter_name", typedConfig: "test_config"),
+        EnvoyNativeConfig(name: "filter_name", typedConfig: "test_config"),
       ],
       platformFilterChain: [
         EnvoyHTTPFilterFactory(filterName: "TestFilter", factory: TestFilter.init),

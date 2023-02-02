@@ -35,8 +35,7 @@
                                   virtualClusters:(NSString *)virtualClusters
                            directResponseMatchers:(NSString *)directResponseMatchers
                                   directResponses:(NSString *)directResponses
-                                nativeFilterChain:
-                                    (NSArray<EnvoyNativeFilterConfig *> *)nativeFilterChain
+                                nativeFilterChain:(NSArray<EnvoyNativeConfig *> *)nativeFilterChain
                               platformFilterChain:
                                   (NSArray<EnvoyHTTPFilterFactory *> *)httpPlatformFilterFactories
                                   stringAccessors:
@@ -105,7 +104,7 @@
   }
 
   NSString *nativeFilterTemplate = [[NSString alloc] initWithUTF8String:native_filter_template];
-  for (EnvoyNativeFilterConfig *nativeFilterConfig in self.nativeFilterChain) {
+  for (EnvoyNativeConfig *nativeFilterConfig in self.nativeFilterChain) {
     NSString *filterConfig =
         [[nativeFilterTemplate stringByReplacingOccurrencesOfString:@"{{ native_filter_name }}"
                                                          withString:nativeFilterConfig.name]

@@ -53,7 +53,7 @@ public class EnvoyConfiguration {
   public final String appId;
   public final TrustChainVerification trustChainVerification;
   public final String virtualClusters;
-  public final List<EnvoyNativeFilterConfig> nativeFilterChain;
+  public final List<EnvoyNativeConfig> nativeFilterChain;
   public final Map<String, EnvoyStringAccessor> stringAccessors;
   public final Map<String, EnvoyKeyValueStore> keyValueStores;
   public final List<String> statSinks;
@@ -128,7 +128,7 @@ public class EnvoyConfiguration {
       int maxConnectionsPerHost, int statsFlushSeconds, int streamIdleTimeoutSeconds,
       int perTryIdleTimeoutSeconds, String appVersion, String appId,
       TrustChainVerification trustChainVerification, String virtualClusters,
-      List<EnvoyNativeFilterConfig> nativeFilterChain,
+      List<EnvoyNativeConfig> nativeFilterChain,
       List<EnvoyHTTPFilterFactory> httpPlatformFilterFactories,
       Map<String, EnvoyStringAccessor> stringAccessors,
       Map<String, EnvoyKeyValueStore> keyValueStores, List<String> statSinks,
@@ -201,7 +201,7 @@ public class EnvoyConfiguration {
       customFiltersBuilder.append(filterConfig);
     }
 
-    for (EnvoyNativeFilterConfig filter : nativeFilterChain) {
+    for (EnvoyNativeConfig filter : nativeFilterChain) {
       String filterConfig = nativeFilterTemplate.replace("{{ native_filter_name }}", filter.name)
                                 .replace("{{ native_filter_typed_config }}", filter.typedConfig);
       customFiltersBuilder.append(filterConfig);

@@ -46,7 +46,7 @@ open class EngineBuilder: NSObject {
   private var logger: ((String) -> Void)?
   private var eventTracker: (([String: String]) -> Void)?
   private(set) var monitoringMode: NetworkMonitoringMode = .pathMonitor
-  private var nativeFilterChain: [EnvoyNativeFilterConfig] = []
+  private var nativeFilterChain: [EnvoyNativeConfig] = []
   private var platformFilterChain: [EnvoyHTTPFilterFactory] = []
   private var stringAccessors: [String: EnvoyStringAccessor] = [:]
   private var keyValueStores: [String: EnvoyKeyValueStore] = [:]
@@ -406,7 +406,7 @@ open class EngineBuilder: NSObject {
   /// - returns: This builder.
   @discardableResult
   public func addNativeFilter(name: String = UUID().uuidString, typedConfig: String) -> Self {
-    self.nativeFilterChain.append(EnvoyNativeFilterConfig(name: name, typedConfig: typedConfig))
+    self.nativeFilterChain.append(EnvoyNativeConfig(name: name, typedConfig: typedConfig))
     return self
   }
 

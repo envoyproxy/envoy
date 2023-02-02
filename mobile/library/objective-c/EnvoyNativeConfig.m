@@ -1,6 +1,6 @@
 #import "library/objective-c/EnvoyEngine.h"
 
-@implementation EnvoyNativeFilterConfig
+@implementation EnvoyNativeConfig
 
 - (instancetype)initWithName:(NSString *)name typedConfig:(NSString *)typedConfig {
   self = [super init];

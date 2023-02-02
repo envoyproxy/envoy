@@ -10,7 +10,7 @@ import io.envoyproxy.envoymobile.engine.AndroidNetworkMonitor;
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration;
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification;
 import io.envoyproxy.envoymobile.engine.EnvoyEngine;
-import io.envoyproxy.envoymobile.engine.EnvoyNativeFilterConfig;
+import io.envoyproxy.envoymobile.engine.EnvoyNativeConfig;
 import io.envoyproxy.envoymobile.engine.types.EnvoyEventTracker;
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory;
 import io.envoyproxy.envoymobile.engine.types.EnvoyLogger;
@@ -30,7 +30,7 @@ import org.chromium.net.ICronetEngineBuilder;
 public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
 
   // TODO(refactor) move unshared variables into their specific methods.
-  private final List<EnvoyNativeFilterConfig> nativeFilterChain = new ArrayList<>();
+  private final List<EnvoyNativeConfig> nativeFilterChain = new ArrayList<>();
   private final EnvoyLogger mEnvoyLogger = null;
   private final EnvoyEventTracker mEnvoyEventTracker = null;
   private boolean mAdminInterfaceEnabled = false;
@@ -90,7 +90,7 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
    */
   @VisibleForTesting
   public CronetEngineBuilderImpl addUrlInterceptorsForTesting() {
-    nativeFilterChain.add(new EnvoyNativeFilterConfig(
+    nativeFilterChain.add(new EnvoyNativeConfig(
         "envoy.filters.http.test_read",
         "{\"@type\": type.googleapis.com/envoymobile.test.integration.filters.http.test_read.TestRead}"));
     return this;

@@ -1,7 +1,7 @@
 #import <Foundation/Foundation.h>
 
 @class EnvoyHTTPFilterFactory;
-@class EnvoyNativeFilterConfig;
+@class EnvoyNativeConfig;
 @class EnvoyStringAccessor;
 @protocol EnvoyKeyValueStore;
 
@@ -40,7 +40,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong) NSString *virtualClusters;
 @property (nonatomic, strong) NSString *directResponseMatchers;
 @property (nonatomic, strong) NSString *directResponses;
-@property (nonatomic, strong) NSArray<EnvoyNativeFilterConfig *> *nativeFilterChain;
+@property (nonatomic, strong) NSArray<EnvoyNativeConfig *> *nativeFilterChain;
 @property (nonatomic, strong) NSArray<EnvoyHTTPFilterFactory *> *httpPlatformFilterFactories;
 @property (nonatomic, strong) NSDictionary<NSString *, EnvoyStringAccessor *> *stringAccessors;
 @property (nonatomic, strong) NSDictionary<NSString *, id<EnvoyKeyValueStore>> *keyValueStores;
@@ -80,8 +80,7 @@ NS_ASSUME_NONNULL_BEGIN
                                   virtualClusters:(NSString *)virtualClusters
                            directResponseMatchers:(NSString *)directResponseMatchers
                                   directResponses:(NSString *)directResponses
-                                nativeFilterChain:
-                                    (NSArray<EnvoyNativeFilterConfig *> *)nativeFilterChain
+                                nativeFilterChain:(NSArray<EnvoyNativeConfig *> *)nativeFilterChain
                               platformFilterChain:
                                   (NSArray<EnvoyHTTPFilterFactory *> *)httpPlatformFilterFactories
                                   stringAccessors:

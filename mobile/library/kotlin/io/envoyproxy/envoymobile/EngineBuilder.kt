@@ -4,7 +4,7 @@ import io.envoyproxy.envoymobile.engine.EnvoyConfiguration
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification
 import io.envoyproxy.envoymobile.engine.EnvoyEngine
 import io.envoyproxy.envoymobile.engine.EnvoyEngineImpl
-import io.envoyproxy.envoymobile.engine.EnvoyNativeFilterConfig
+import io.envoyproxy.envoymobile.engine.EnvoyNativeConfig
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory
 import io.envoyproxy.envoymobile.engine.types.EnvoyKeyValueStore
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor
@@ -70,7 +70,7 @@ open class EngineBuilder(
   private var trustChainVerification = TrustChainVerification.VERIFY_TRUST_CHAIN
   private var virtualClusters = "[]"
   private var platformFilterChain = mutableListOf<EnvoyHTTPFilterFactory>()
-  private var nativeFilterChain = mutableListOf<EnvoyNativeFilterConfig>()
+  private var nativeFilterChain = mutableListOf<EnvoyNativeConfig>()
   private var stringAccessors = mutableMapOf<String, EnvoyStringAccessor>()
   private var keyValueStores = mutableMapOf<String, EnvoyKeyValueStore>()
   private var statsSinks = listOf<String>()
@@ -449,7 +449,7 @@ open class EngineBuilder(
    */
   fun addNativeFilter(name: String = UUID.randomUUID().toString(), typedConfig: String):
     EngineBuilder {
-      this.nativeFilterChain.add(EnvoyNativeFilterConfig(name, typedConfig))
+      this.nativeFilterChain.add(EnvoyNativeConfig(name, typedConfig))
       return this
     }
 

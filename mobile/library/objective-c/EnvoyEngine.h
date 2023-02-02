@@ -9,7 +9,7 @@
 #import "library/objective-c/EnvoyHTTPStream.h"
 #import "library/objective-c/EnvoyKeyValueStore.h"
 #import "library/objective-c/EnvoyLogger.h"
-#import "library/objective-c/EnvoyNativeFilterConfig.h"
+#import "library/objective-c/EnvoyNativeConfig.h"
 #import "library/objective-c/EnvoyNetworkMonitor.h"
 #import "library/objective-c/EnvoyStringAccessor.h"
 

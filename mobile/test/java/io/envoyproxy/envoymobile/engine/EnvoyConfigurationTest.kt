@@ -116,7 +116,7 @@ class EnvoyConfigurationTest {
       appId,
       trustChainVerification,
       virtualClusters,
-      listOf(EnvoyNativeFilterConfig("filter_name", "test_config")),
+      listOf(EnvoyNativeConfig("filter_name", "test_config")),
       emptyList(),
       emptyMap(),
       emptyMap(),

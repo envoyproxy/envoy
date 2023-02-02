@@ -33,7 +33,7 @@ java_library(
         "EnvoyFinalStreamIntelImpl.java",
         "EnvoyHTTPFilterCallbacksImpl.java",
         "EnvoyHTTPStream.java",
-        "EnvoyNativeFilterConfig.java",
+        "EnvoyNativeConfig.java",
         "EnvoyNativeResourceRegistry.java",
         "EnvoyNativeResourceReleaser.java",
         "EnvoyNativeResourceWrapper.java",

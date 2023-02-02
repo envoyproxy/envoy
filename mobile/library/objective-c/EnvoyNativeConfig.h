@@ -2,7 +2,7 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-@interface EnvoyNativeFilterConfig : NSObject
+@interface EnvoyNativeConfig : NSObject
 
 @property (nonatomic, strong) NSString *name;
 @property (nonatomic, strong) NSString *typedConfig;
