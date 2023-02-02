@@ -21,38 +21,38 @@ package api
 type StatusType int
 
 const (
-    Running                StatusType = 0
-    LocalReply             StatusType = 1
-    Continue               StatusType = 2
-    StopAndBuffer          StatusType = 3
-    StopAndBufferWatermark StatusType = 4
-    StopNoBuffer           StatusType = 5
+	Running                StatusType = 0
+	LocalReply             StatusType = 1
+	Continue               StatusType = 2
+	StopAndBuffer          StatusType = 3
+	StopAndBufferWatermark StatusType = 4
+	StopNoBuffer           StatusType = 5
 )
 
 // header status
 // refer https://github.com/envoyproxy/envoy/blob/main/envoy/http/filter.h
 const (
-    HeaderContinue                     StatusType = 100
-    HeaderStopIteration                StatusType = 101
-    HeaderContinueAndDontEndStream     StatusType = 102
-    HeaderStopAllIterationAndBuffer    StatusType = 103
-    HeaderStopAllIterationAndWatermark StatusType = 104
+	HeaderContinue                     StatusType = 100
+	HeaderStopIteration                StatusType = 101
+	HeaderContinueAndDontEndStream     StatusType = 102
+	HeaderStopAllIterationAndBuffer    StatusType = 103
+	HeaderStopAllIterationAndWatermark StatusType = 104
 )
 
 // data status
 // refer https://github.com/envoyproxy/envoy/blob/main/envoy/http/filter.h
 const (
-    DataContinue                  StatusType = 200
-    DataStopIterationAndBuffer    StatusType = 201
-    DataStopIterationAndWatermark StatusType = 202
-    DataStopIterationNoBuffer     StatusType = 203
+	DataContinue                  StatusType = 200
+	DataStopIterationAndBuffer    StatusType = 201
+	DataStopIterationAndWatermark StatusType = 202
+	DataStopIterationNoBuffer     StatusType = 203
 )
 
 // Trailer status
 // refer https://github.com/envoyproxy/envoy/blob/main/envoy/http/filter.h
 const (
-    TrailerContinue      StatusType = 300
-    TrailerStopIteration StatusType = 301
+	TrailerContinue      StatusType = 300
+	TrailerStopIteration StatusType = 301
 )
 
 //****************** filter status end ******************//
@@ -62,12 +62,12 @@ type LogType int
 
 // refer https://github.com/envoyproxy/envoy/blob/main/source/common/common/base_logger.h
 const (
-    Trace    LogType = 0
-    Debug    LogType = 1
-    Info     LogType = 2
-    Warn     LogType = 3
-    Error    LogType = 4
-    Critical LogType = 5
+	Trace    LogType = 0
+	Debug    LogType = 1
+	Info     LogType = 2
+	Warn     LogType = 3
+	Error    LogType = 4
+	Critical LogType = 5
 )
 
 //******************* log level end *******************//
@@ -76,50 +76,50 @@ const (
 
 // refer https://github.com/envoyproxy/envoy/blob/main/envoy/http/header_map.h
 type HeaderMap interface {
-    // GetRaw is unsafe, reuse the memory from Envoy
-    GetRaw(name string) string
+	// GetRaw is unsafe, reuse the memory from Envoy
+	GetRaw(name string) string
 
-    // Get value of key
-    // If multiple values associated with this key, first one will be returned.
-    Get(key string) (string, bool)
+	// Get value of key
+	// If multiple values associated with this key, first one will be returned.
+	Get(key string) (string, bool)
 
-    // Set key-value pair in header map, the previous pair will be replaced if exists
-    Set(key, value string)
+	// Set key-value pair in header map, the previous pair will be replaced if exists
+	Set(key, value string)
 
-    // Add value for given key.
-    // Multiple headers with the same key may be added with this function.
-    // Use Set for setting a single header for the given key.
-    Add(key, value string)
+	// Add value for given key.
+	// Multiple headers with the same key may be added with this function.
+	// Use Set for setting a single header for the given key.
+	Add(key, value string)
 
-    // Del delete pair of specified key
-    Del(key string)
+	// Del delete pair of specified key
+	Del(key string)
 
-    // Range calls f sequentially for each key and value present in the map.
-    // If f returns false, range stops the iteration.
-    Range(f func(key, value string) bool)
+	// Range calls f sequentially for each key and value present in the map.
+	// If f returns false, range stops the iteration.
+	Range(f func(key, value string) bool)
 
-    // ByteSize return size of HeaderMap
-    ByteSize() uint64
+	// ByteSize return size of HeaderMap
+	ByteSize() uint64
 }
 
 type RequestHeaderMap interface {
-    HeaderMap
-    // others
+	HeaderMap
+	// others
 }
 
 type RequestTrailerMap interface {
-    HeaderMap
-    // others
+	HeaderMap
+	// others
 }
 
 type ResponseHeaderMap interface {
-    HeaderMap
-    // others
+	HeaderMap
+	// others
 }
 
 type ResponseTrailerMap interface {
-    HeaderMap
-    // others
+	HeaderMap
+	// others
 }
 
 type MetadataMap interface {
@@ -131,88 +131,88 @@ type MetadataMap interface {
 type BufferAction int
 
 const (
-    SetBuffer     BufferAction = 0
-    AppendBuffer  BufferAction = 1
-    PrependBuffer BufferAction = 2
+	SetBuffer     BufferAction = 0
+	AppendBuffer  BufferAction = 1
+	PrependBuffer BufferAction = 2
 )
 
 type DataBufferBase interface {
-    // Write appends the contents of p to the buffer, growing the buffer as
-    // needed. The return value n is the length of p; err is always nil. If the
-    // buffer becomes too large, Write will panic with ErrTooLarge.
-    Write(p []byte) (n int, err error)
+	// Write appends the contents of p to the buffer, growing the buffer as
+	// needed. The return value n is the length of p; err is always nil. If the
+	// buffer becomes too large, Write will panic with ErrTooLarge.
+	Write(p []byte) (n int, err error)
 
-    // WriteString appends the string to the buffer, growing the buffer as
-    // needed. The return value n is the length of s; err is always nil. If the
-    // buffer becomes too large, Write will panic with ErrTooLarge.
-    WriteString(s string) (n int, err error)
+	// WriteString appends the string to the buffer, growing the buffer as
+	// needed. The return value n is the length of s; err is always nil. If the
+	// buffer becomes too large, Write will panic with ErrTooLarge.
+	WriteString(s string) (n int, err error)
 
-    // WriteByte appends the byte to the buffer, growing the buffer as
-    // needed. The return value n is the length of s; err is always nil. If the
-    // buffer becomes too large, Write will panic with ErrTooLarge.
-    WriteByte(p byte) error
+	// WriteByte appends the byte to the buffer, growing the buffer as
+	// needed. The return value n is the length of s; err is always nil. If the
+	// buffer becomes too large, Write will panic with ErrTooLarge.
+	WriteByte(p byte) error
 
-    // WriteUint16 appends the uint16 to the buffer, growing the buffer as
-    // needed. The return value n is the length of s; err is always nil. If the
-    // buffer becomes too large, Write will panic with ErrTooLarge.
-    WriteUint16(p uint16) error
+	// WriteUint16 appends the uint16 to the buffer, growing the buffer as
+	// needed. The return value n is the length of s; err is always nil. If the
+	// buffer becomes too large, Write will panic with ErrTooLarge.
+	WriteUint16(p uint16) error
 
-    // WriteUint32 appends the uint32 to the buffer, growing the buffer as
-    // needed. The return value n is the length of s; err is always nil. If the
-    // buffer becomes too large, Write will panic with ErrTooLarge.
-    WriteUint32(p uint32) error
+	// WriteUint32 appends the uint32 to the buffer, growing the buffer as
+	// needed. The return value n is the length of s; err is always nil. If the
+	// buffer becomes too large, Write will panic with ErrTooLarge.
+	WriteUint32(p uint32) error
 
-    // WriteUint64 appends the uint64 to the buffer, growing the buffer as
-    // needed. The return value n is the length of s; err is always nil. If the
-    // buffer becomes too large, Write will panic with ErrTooLarge.
-    WriteUint64(p uint64) error
+	// WriteUint64 appends the uint64 to the buffer, growing the buffer as
+	// needed. The return value n is the length of s; err is always nil. If the
+	// buffer becomes too large, Write will panic with ErrTooLarge.
+	WriteUint64(p uint64) error
 
-    // Peek returns n bytes from buffer, without draining any buffered data.
-    // If n > readable buffer, nil will be returned.
-    // It can be used in codec to check first-n-bytes magic bytes
-    // Note: do not change content in return bytes, use write instead
-    Peek(n int) []byte
+	// Peek returns n bytes from buffer, without draining any buffered data.
+	// If n > readable buffer, nil will be returned.
+	// It can be used in codec to check first-n-bytes magic bytes
+	// Note: do not change content in return bytes, use write instead
+	Peek(n int) []byte
 
-    // Bytes returns all bytes from buffer, without draining any buffered data.
-    // It can be used to get fixed-length content, such as headers, body.
-    // Note: do not change content in return bytes, use write instead
-    Bytes() []byte
+	// Bytes returns all bytes from buffer, without draining any buffered data.
+	// It can be used to get fixed-length content, such as headers, body.
+	// Note: do not change content in return bytes, use write instead
+	Bytes() []byte
 
-    // Drain drains a offset length of bytes in buffer.
-    // It can be used with Bytes(), after consuming a fixed-length of data
-    Drain(offset int)
+	// Drain drains a offset length of bytes in buffer.
+	// It can be used with Bytes(), after consuming a fixed-length of data
+	Drain(offset int)
 
-    // Len returns the number of bytes of the unread portion of the buffer;
-    // b.Len() == len(b.Bytes()).
-    Len() int
+	// Len returns the number of bytes of the unread portion of the buffer;
+	// b.Len() == len(b.Bytes()).
+	Len() int
 
-    // Reset resets the buffer to be empty.
-    Reset()
+	// Reset resets the buffer to be empty.
+	Reset()
 
-    // String returns the contents of the buffer as a string.
-    String() string
+	// String returns the contents of the buffer as a string.
+	String() string
 
-    // Append append the contents of the slice data to the buffer.
-    Append(data []byte) error
+	// Append append the contents of the slice data to the buffer.
+	Append(data []byte) error
 }
 
 type BufferInstance interface {
-    DataBufferBase
+	DataBufferBase
 
-    // Set overwrite the whole buffer content with byte slice.
-    Set([]byte) error
+	// Set overwrite the whole buffer content with byte slice.
+	Set([]byte) error
 
-    // SetString overwrite the whole buffer content with string.
-    SetString(string) error
+	// SetString overwrite the whole buffer content with string.
+	SetString(string) error
 
-    // Prepend prepend the contents of the slice data to the buffer.
-    Prepend(data []byte) error
+	// Prepend prepend the contents of the slice data to the buffer.
+	Prepend(data []byte) error
 
-    // Prepend prepend the contents of the string data to the buffer.
-    PrependString(s string) error
+	// Prepend prepend the contents of the string data to the buffer.
+	PrependString(s string) error
 
-    // Append append the contents of the string data to the buffer.
-    AppendString(s string) error
+	// Append append the contents of the string data to the buffer.
+	AppendString(s string) error
 }
 
 //*************** BufferInstance end **************//
@@ -220,40 +220,40 @@ type BufferInstance interface {
 type DestroyReason int
 
 const (
-    Normal    DestroyReason = 0
-    Terminate DestroyReason = 1
+	Normal    DestroyReason = 0
+	Terminate DestroyReason = 1
 )
 
 const (
-    NormalFinalize int = 0 // normal, finalize on destroy
-    GCFinalize     int = 1 // finalize in GC sweep
+	NormalFinalize int = 0 // normal, finalize on destroy
+	GCFinalize     int = 1 // finalize in GC sweep
 )
 
 type EnvoyRequestPhase int
 
 const (
-    DecodeHeaderPhase EnvoyRequestPhase = iota + 1
-    DecodeDataPhase
-    DecodeTrailerPhase
-    EncodeHeaderPhase
-    EncodeDataPhase
-    EncodeTrailerPhase
+	DecodeHeaderPhase EnvoyRequestPhase = iota + 1
+	DecodeDataPhase
+	DecodeTrailerPhase
+	EncodeHeaderPhase
+	EncodeDataPhase
+	EncodeTrailerPhase
 )
 
 func (e EnvoyRequestPhase) String() string {
-    switch e {
-    case DecodeHeaderPhase:
-        return "DecodeHeader"
-    case DecodeDataPhase:
-        return "DecodeData"
-    case DecodeTrailerPhase:
-        return "DecodeTrailer"
-    case EncodeHeaderPhase:
-        return "EncodeHeader"
-    case EncodeDataPhase:
-        return "EncodeData"
-    case EncodeTrailerPhase:
-        return "EncodeTrailer"
-    }
-    return "unknown phase"
+	switch e {
+	case DecodeHeaderPhase:
+		return "DecodeHeader"
+	case DecodeDataPhase:
+		return "DecodeData"
+	case DecodeTrailerPhase:
+		return "DecodeTrailer"
+	case EncodeHeaderPhase:
+		return "EncodeHeader"
+	case EncodeDataPhase:
+		return "EncodeData"
+	case EncodeTrailerPhase:
+		return "EncodeTrailer"
+	}
+	return "unknown phase"
 }

@@ -22,7 +22,7 @@ namespace Envoy {
  */
 class EngineCommon {
 public:
-  EngineCommon(int argc, const char* const* argv);
+  EngineCommon(std::unique_ptr<Envoy::OptionsImpl>&& options);
   bool run() {
     base_->runServer();
     return true;
@@ -41,8 +41,7 @@ private:
   Envoy::SignalAction handle_sigs_;
   Envoy::TerminateHandler log_on_terminate_;
 #endif
-  Thread::MainThread register_main_thread_;
-  Envoy::OptionsImpl options_;
+  std::unique_ptr<Envoy::OptionsImpl> options_;
   Event::RealTimeSystem real_time_system_; // NO_CHECK_FORMAT(real_time)
   DefaultListenerHooks default_listener_hooks_;
   ProdComponentFactory prod_component_factory_;

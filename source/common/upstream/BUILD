@@ -64,25 +64,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "multiplexed_subscription_factory_lib",
-    srcs = ["multiplexed_subscription_factory.cc"],
-    hdrs = ["multiplexed_subscription_factory.h"],
-    deps = [
-        "//envoy/config:subscription_interface",
-        "//envoy/event:dispatcher_interface",
-        "//envoy/local_info:local_info_interface",
-        "//source/common/common:hash_lib",
-        "//source/common/config:custom_config_validators_lib",
-        "//source/common/config:grpc_mux_lib",
-        "//source/common/config:grpc_subscription_lib",
-        "//source/common/config:subscription_factory_lib",
-        "//source/common/config:utility_lib",
-        "//source/server:transport_socket_config_lib",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
     name = "cluster_discovery_manager_lib",
     srcs = ["cluster_discovery_manager.cc"],
     hdrs = ["cluster_discovery_manager.h"],
@@ -103,7 +84,6 @@ envoy_cc_library(
         ":cluster_discovery_manager_lib",
         ":load_balancer_lib",
         ":load_stats_reporter_lib",
-        ":multiplexed_subscription_factory_lib",
         ":od_cds_api_lib",
         ":ring_hash_lb_lib",
         ":subset_lb_lib",
@@ -360,6 +340,7 @@ envoy_cc_library(
     srcs = ["outlier_detection_impl.cc"],
     hdrs = ["outlier_detection_impl.h"],
     deps = [
+        ":upstream_includes",
         "//envoy/access_log:access_log_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:timer_interface",
@@ -409,6 +390,7 @@ envoy_cc_library(
         ":thread_aware_lb_lib",
         ":upstream_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/load_balancing_policies/maglev/v3:pkg_cc_proto",
     ],
 )
 
@@ -423,6 +405,7 @@ envoy_cc_library(
         ":thread_aware_lb_lib",
         "//source/common/common:minimal_logger_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/load_balancing_policies/ring_hash/v3:pkg_cc_proto",
     ],
 )
 
@@ -510,7 +493,6 @@ envoy_cc_library(
     external_deps = ["abseil_synchronization"],
     deps = [
         ":load_balancer_lib",
-        ":outlier_detection_lib",
         ":resource_manager_lib",
         "//envoy/event:timer_interface",
         "//envoy/local_info:local_info_interface",
@@ -524,6 +506,7 @@ envoy_cc_library(
         "//envoy/upstream:health_checker_interface",
         "//envoy/upstream:load_balancer_interface",
         "//envoy/upstream:locality_lib",
+        "//envoy/upstream:outlier_detection_interface",
         "//envoy/upstream:upstream_interface",
         "//source/common/common:callback_impl_lib",
         "//source/common/common:enum_to_int",

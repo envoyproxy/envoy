@@ -153,7 +153,13 @@ MockClusterInfo::MockClusterInfo()
                 const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>(
                 lb_original_dst_config_.get());
           }));
-  ON_CALL(*this, upstreamConfig()).WillByDefault(ReturnRef(upstream_config_));
+  ON_CALL(*this, upstreamConfig())
+      .WillByDefault(
+          Invoke([this]() -> OptRef<const envoy::config::core::v3::TypedExtensionConfig> {
+            return makeOptRefFromPtr<const envoy::config::core::v3::TypedExtensionConfig>(
+                upstream_config_.get());
+          }));
+
   ON_CALL(*this, lbConfig()).WillByDefault(ReturnRef(lb_config_));
   ON_CALL(*this, metadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(*this, upstreamHttpProtocolOptions())
@@ -169,7 +175,12 @@ MockClusterInfo::MockClusterInfo()
         }
         return *typed_metadata_;
       }));
-  ON_CALL(*this, clusterType()).WillByDefault(ReturnRef(cluster_type_));
+  ON_CALL(*this, clusterType())
+      .WillByDefault(
+          Invoke([this]() -> OptRef<const envoy::config::cluster::v3::Cluster::CustomClusterType> {
+            return makeOptRefFromPtr<const envoy::config::cluster::v3::Cluster::CustomClusterType>(
+                cluster_type_.get());
+          }));
   ON_CALL(*this, upstreamHttpProtocol(_))
       .WillByDefault(Return(std::vector<Http::Protocol>{Http::Protocol::Http11}));
   ON_CALL(*this, createFilterChain(_, _))
