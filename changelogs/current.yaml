@@ -11,7 +11,7 @@ minor_behavior_changes:
 - area: healthcheck
   change: |
     If active HC is enabled and a host is ejected by outlier detection, a successful active health check unejects the host and consider it healthy. This also clears all the outlier detection counters. This behavior change can be reverted by setting ``envoy.reloadable_features_successful_active_health_check_uneject_host`` to ``false``.
-- area: network 
+- area: network
   change: |
     Added optinal :ref:`delay <envoy_v3_api_field_extensions.filters.network.local_ratelimit.v3.LocalRateLimit.delay>` before rejection configuration in network local rate limit filter for better DoS protection.
 
