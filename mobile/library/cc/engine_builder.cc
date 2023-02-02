@@ -49,7 +49,7 @@ bool generatedStringMatchesGeneratedBoostrap(
 
   Protobuf::util::MessageDifferencer differencer;
   differencer.set_message_field_comparison(Protobuf::util::MessageDifferencer::EQUIVALENT);
-  differencer.set_repeated_field_comparison(Protobuf::util::MessageDifferencer::AS_SET);
+  differencer.set_repeated_field_comparison(Protobuf::util::MessageDifferencer::AS_LIST);
 
   bool same = differencer.Compare(config_bootstrap, bootstrap);
 
@@ -222,6 +222,11 @@ EngineBuilder& EngineBuilder::setForceAlwaysUsev6(bool value) {
   return *this;
 }
 
+EngineBuilder& EngineBuilder::setSkipDnsLookupForProxiedRequests(bool value) {
+  skip_dns_lookups_for_proxied_requests_ = value;
+  return *this;
+}
+
 EngineBuilder& EngineBuilder::enableInterfaceBinding(bool interface_binding_on) {
   enable_interface_binding_ = interface_binding_on;
   return *this;
@@ -319,6 +324,8 @@ std::string EngineBuilder::generateConfigStr() const {
          enforce_trust_chain_verification_ ? "VERIFY_TRUST_CHAIN" : "ACCEPT_UNTRUSTED"},
         {"per_try_idle_timeout", fmt::format("{}s", per_try_idle_timeout_seconds_)},
         {"virtual_clusters", virtual_clusters},
+        {"skip_dns_lookup_for_proxied_requests",
+         skip_dns_lookups_for_proxied_requests_ ? "true" : "false"},
 #if defined(__ANDROID_API__)
         {"force_ipv6", "true"},
 #else
@@ -402,7 +409,8 @@ std::string EngineBuilder::generateConfigStr() const {
 std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>
 EngineBuilder::generateBootstrapAndCompareForTests(std::string yaml) const {
   auto bootstrap = generateBootstrap();
-  RELEASE_ASSERT(generatedStringMatchesGeneratedBoostrap(yaml, *generateBootstrap()), "asd");
+  RELEASE_ASSERT(generatedStringMatchesGeneratedBoostrap(yaml, *generateBootstrap()),
+                 "Failed equivalence");
   return bootstrap;
 }
 
@@ -456,10 +464,11 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   backoff->mutable_base_interval()->set_nanos(250000000);
   backoff->mutable_max_interval()->set_seconds(60);
 
-  for (const NativeFilterConfig& filter : native_filter_chain_) {
+  for (auto filter = native_filter_chain_.rbegin(); filter != native_filter_chain_.rend();
+       ++filter) {
     auto* native_filter = hcm->add_http_filters();
-    native_filter->set_name(filter.name_);
-    MessageUtil::loadFromYaml(filter.typed_config_, *native_filter->mutable_typed_config(),
+    native_filter->set_name((*filter).name_);
+    MessageUtil::loadFromYaml((*filter).typed_config_, *native_filter->mutable_typed_config(),
                               ProtobufMessage::getStrictValidationVisitor());
   }
 
@@ -848,7 +857,8 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   ProtobufWkt::Struct& flags =
       *(*runtime_values.mutable_fields())["reloadable_features"].mutable_struct_value();
   (*flags.mutable_fields())["always_use_v6"].set_bool_value(always_use_v6_);
-  (*flags.mutable_fields())["skip_dns_lookup_for_proxied_requests"].set_bool_value(false);
+  (*flags.mutable_fields())["skip_dns_lookup_for_proxied_requests"].set_bool_value(
+      skip_dns_lookups_for_proxied_requests_);
   (*runtime_values.mutable_fields())["disallow_global_stats"].set_bool_value("true");
   ProtobufWkt::Struct& overload_values =
       *(*envoy_layer.mutable_fields())["overload"].mutable_struct_value();
@@ -885,7 +895,8 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   }
 
   // Check equivalence in debug mode.
-  ASSERT(generatedStringMatchesGeneratedBoostrap(generateConfigStr(), *bootstrap));
+  RELEASE_ASSERT(generatedStringMatchesGeneratedBoostrap(generateConfigStr(), *bootstrap),
+                 "Native C++ checks failed");
 
   return bootstrap;
 }
