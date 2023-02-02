@@ -1194,7 +1194,7 @@ TEST_P(QuicHttpIntegrationTest, DeferredLogging) {
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   sendRequestAndWaitForResponse(default_request_headers_, /*request_size=*/0,
                                 default_response_headers_,
-                                /*response_size=*/0,
+                                /*response_size=*/1024 * 1024,
                                 /*upstream_index=*/0, TestUtility::DefaultTimeout);
   codec_client_->close();
 
@@ -1203,7 +1203,7 @@ TEST_P(QuicHttpIntegrationTest, DeferredLogging) {
   std::vector<std::string> metrics = absl::StrSplit(log, ",");
   ASSERT_EQ(metrics.size(), 21);
   EXPECT_EQ(/* PROTOCOL */ metrics.at(0), "HTTP/3");
-  EXPECT_GE(/* ROUNDTRIP_DURATION */ std::stoi(metrics.at(1)), 0);
+  EXPECT_GT(/* ROUNDTRIP_DURATION */ std::stoi(metrics.at(1)), 0);
   EXPECT_GE(/* REQUEST_DURATION */ std::stoi(metrics.at(2)), 0);
   EXPECT_GE(/* RESPONSE_DURATION */ std::stoi(metrics.at(3)), 0);
   EXPECT_EQ(/* RESPONSE_CODE */ metrics.at(4), "200");
