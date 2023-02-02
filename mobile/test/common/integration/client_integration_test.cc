@@ -23,9 +23,7 @@ public:
     // TODO(abeyad): Add paramaterized tests for HTTP1, HTTP2, and HTTP3.
     setUpstreamProtocol(Http::CodecType::HTTP1);
   }
-
-  void TearDown() override {
-    cleanup();
+  void TearDown() {
     BaseClientIntegrationTest::TearDown();
   }
 
@@ -75,7 +73,6 @@ void ClientIntegrationTest::basicTest() {
 
 TEST_P(ClientIntegrationTest, Basic) {
   basicTest();
-  TearDown();
 }
 
 TEST_P(ClientIntegrationTest, BasicNon2xx) {
@@ -351,7 +348,6 @@ TEST_P(ClientIntegrationTest, ForceAdmin) {
   override_builder_config_ = true;
   config_helper_.addRuntimeOverride("envoy.reloadable_features.use_api_listener", "true");
   basicTest();
-  TearDown();
 }
 
 TEST_P(ClientIntegrationTest, ForceAdminViaBootstrap) {

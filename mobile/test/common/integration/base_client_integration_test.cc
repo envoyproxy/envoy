@@ -178,6 +178,9 @@ void BaseClientIntegrationTest::threadRoutine(absl::Notification& engine_running
 }
 
 void BaseClientIntegrationTest::TearDown() {
+  if (xds_connection_ != nullptr) {
+    cleanUpXdsConnection();
+  }
   test_server_.reset();
   fake_upstreams_.clear();
   if (engine_) {
@@ -247,14 +250,6 @@ testing::AssertionResult BaseClientIntegrationTest::waitForCounterGe(const std::
     }
   }
   return testing::AssertionSuccess();
-}
-
-void BaseClientIntegrationTest::cleanup() {
-  if (xds_connection_ != nullptr) {
-    cleanUpXdsConnection();
-  }
-  test_server_.reset();
-  fake_upstreams_.clear();
 }
 
 } // namespace Envoy

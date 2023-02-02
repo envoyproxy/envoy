@@ -24,7 +24,6 @@ public:
 
 protected:
   void SetUp() override;
-  void TearDown() override;
 
   void createEnvoy() override;
 

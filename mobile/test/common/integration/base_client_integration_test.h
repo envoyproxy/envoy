@@ -45,7 +45,6 @@ public:
 protected:
   envoy_engine_t& rawEngine() { return engine_->engine_; }
   virtual void initialize() override;
-  virtual void cleanup();
   void createEnvoy() override;
   void threadRoutine(absl::Notification& engine_running);
   // Must be called manually by subclasses in their TearDown();
