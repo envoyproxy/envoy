@@ -14,11 +14,12 @@ bool shouldUseCompactTable(size_t num_hosts, uint64_t table_size) {
     return false;
   }
 
-  const uint64_t original_maglev_cost = 8 * table_size;
+  const size_t shared_ptr_size = sizeof(HostConstSharedPtr);
+  const uint64_t original_maglev_cost = shared_ptr_size * table_size;
   // We might be off by a byte e.g. due to rounding down when going from bits to
   // bytes.
   const uint64_t compact_maglev_cost =
-      8 * num_hosts + ((absl::bit_width(num_hosts) * table_size) / 8);
+      shared_ptr_size * num_hosts + ((absl::bit_width(num_hosts) * table_size) / 8);
   return compact_maglev_cost < original_maglev_cost;
 #endif
 }

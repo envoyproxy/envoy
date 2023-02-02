@@ -45,8 +45,8 @@ public:
   virtual ~MaglevTable() = default;
 
   // Recommended table size in section 5.3 of the paper.
-  static const uint64_t DefaultTableSize = 65537;
-  static const uint64_t MaxNumberOfHostsForCompactMaglev = (static_cast<uint64_t>(1) << 32) - 1;
+  static constexpr uint64_t DefaultTableSize = 65537;
+  static constexpr uint64_t MaxNumberOfHostsForCompactMaglev = (static_cast<uint64_t>(1) << 32) - 1;
 
 protected:
   struct TableBuildEntry {
@@ -116,6 +116,8 @@ private:
 /**
  * This maglev implementation leverages the number of hosts to more efficiently
  * populate the maglev table.
+ * TODO(kbaichoo): Re-evaluate whether we should have the abstraction on the
+ * table representation.
  */
 class CompactMaglevTable : public MaglevTable {
 public:
