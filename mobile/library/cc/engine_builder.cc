@@ -84,8 +84,8 @@ EngineBuilder& EngineBuilder::setOnEngineRunning(std::function<void()> closure) 
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addStatsSink(std::string name, std::string typed_config) {
-  stats_sinks_.push_back(std::make_pair(name, typed_config));
+EngineBuilder& EngineBuilder::addStatsSinks(std::vector<std::string> stats_sinks) {
+  stats_sinks_ = std::move(stats_sinks);
   return *this;
 }
 
@@ -366,22 +366,13 @@ std::string EngineBuilder::generateConfigStr() const {
     config_builder << "- &" << key << " " << value << std::endl;
   }
 
-  bool add_stats_sinks = !stats_sinks_.empty() || !stats_domain_.empty();
-  if (add_stats_sinks) {
-    config_builder << "- &stats_sinks [";
-  }
-  maybe_comma = "";
+  std::vector<std::string> stat_sinks = stats_sinks_;
   if (!stats_domain_.empty()) {
-    config_builder << "*base_metrics_service";
-    maybe_comma = ",";
+    stat_sinks.push_back("*base_metrics_service");
   }
-
-  for (auto& sink_to_add : stats_sinks_) {
-    config_builder << maybe_comma << "{ name: " << sink_to_add.first
-                   << ", typed_config: " << sink_to_add.second << "}";
-    maybe_comma = ",";
-  }
-  if (add_stats_sinks) {
+  if (!stat_sinks.empty()) {
+    config_builder << "- &stats_sinks [";
+    config_builder << absl::StrJoin(stat_sinks, ",");
     config_builder << "] " << std::endl;
   }
 
@@ -903,6 +894,11 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 
   bootstrap->mutable_typed_dns_resolver_config()->CopyFrom(
       *dns_cache_config->mutable_typed_dns_resolver_config());
+
+  for (const std::string& sink_yaml : stats_sinks_) {
+    auto* sink = bootstrap->add_stats_sinks();
+    MessageUtil::loadFromYaml(sink_yaml, *sink, ProtobufMessage::getStrictValidationVisitor());
+  }
   if (!stats_domain_.empty()) {
     envoy::config::metrics::v3::MetricsServiceConfig metrics_config;
     metrics_config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("stats");
@@ -937,13 +933,6 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     envoy::config::core::v3::ApiConfigSource::ApiType_Parse(ads_api_type_, &api_type_enum);
     ads_config->set_api_type(api_type_enum);
     ads_config->add_grpc_services()->mutable_google_grpc()->set_target_uri(target_uri);
-  }
-
-  for (auto& sink_to_add : stats_sinks_) {
-    auto* sink = bootstrap->add_stats_sinks();
-    sink->set_name(sink_to_add.first);
-    MessageUtil::loadFromYaml(sink_to_add.second, *sink->mutable_typed_config(),
-                              ProtobufMessage::getStrictValidationVisitor());
   }
 
   // Admin
