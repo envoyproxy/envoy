@@ -387,11 +387,12 @@ void GrpcMuxImpl::processDiscoveryResources(const std::vector<DecodedResourcePtr
     }
     std::vector<DecodedResourceRef> found_resources;
     for (const auto& watched_resource_name : watch->resources_) {
+      // Look for a singleton subscription.
       auto it = resource_ref_map.find(watched_resource_name);
       if (it != resource_ref_map.end()) {
         found_resources.emplace_back(it->second);
       } else if (isXdstpWildcard(watched_resource_name)) {
-        // See if the resources match the xdstp wildcard entry.
+        // See if the resources match the xdstp wildcard subscription.
         // Note: the assumption is that we don't have singleton and collection subscriptions in the
         // same watch. For that reason, we do not need to check for duplicates in adding to
         // `found_resources`.
