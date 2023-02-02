@@ -372,24 +372,27 @@ private:
   mutable int count_ = 0;
 };
 
-TEST(TestConfig, AddNativeFilter) {
+TEST(TestConfig, AddNativeFilters) {
   EngineBuilder engine_builder;
 
-  std::string filter_name = "envoy.filters.http.buffer";
+  std::string filter_name1 = "envoy.filters.http.buffer1";
+  std::string filter_name2 = "envoy.filters.http.buffer2";
   std::string filter_config =
       "{\"@type\":\"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer\","
       "\"max_request_bytes\":5242880}";
 
   std::string config_str = engine_builder.generateConfigStr();
-  ASSERT_THAT(config_str, Not(HasSubstr("- name: " + filter_name)));
+  ASSERT_THAT(config_str, Not(HasSubstr("- name: " + filter_name1)));
   ASSERT_THAT(config_str, Not(HasSubstr("  typed_config: " + filter_config)));
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
 
-  engine_builder.addNativeFilter(filter_name, filter_config);
+  engine_builder.addNativeFilter(filter_name1, filter_config);
+  engine_builder.addNativeFilter(filter_name2, filter_config);
 
   config_str = engine_builder.generateConfigStr();
-  ASSERT_THAT(config_str, HasSubstr("- name: " + filter_name));
+  ASSERT_THAT(config_str, HasSubstr("- name: " + filter_name1));
+  ASSERT_THAT(config_str, HasSubstr("- name: " + filter_name2));
   ASSERT_THAT(config_str, HasSubstr("  typed_config: " + filter_config));
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
 }

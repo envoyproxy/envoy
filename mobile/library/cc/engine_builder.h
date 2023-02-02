@@ -71,6 +71,7 @@ public:
                                                const std::string& address, const int port);
   EngineBuilder& enableDnsCache(bool dns_cache_on);
   EngineBuilder& setForceAlwaysUsev6(bool value);
+  EngineBuilder& setSkipDnsLookupForProxiedRequests(bool value);
   EngineBuilder& addDnsPreresolveHostnames(const std::vector<std::string>& hostnames);
   EngineBuilder& addNativeFilter(std::string name, std::string typed_config);
   EngineBuilder& enableAdminInterface(bool admin_interface_on);
@@ -160,6 +161,7 @@ private:
 
   absl::flat_hash_map<std::string, StringAccessorSharedPtr> string_accessors_;
   bool config_bootstrap_incompatible_ = false;
+  bool skip_dns_lookups_for_proxied_requests_ = false;
 };
 
 using EngineBuilderSharedPtr = std::shared_ptr<EngineBuilder>;
