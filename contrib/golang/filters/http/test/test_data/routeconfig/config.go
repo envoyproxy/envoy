@@ -15,7 +15,10 @@ func init() {
 }
 
 func configFactory(c interface{}) api.StreamFilterFactory {
-	conf := c.(*config)
+	conf, ok := c.(*config)
+	if !ok {
+		panic("unexpected config type")
+	}
 	return func(callbacks api.FilterCallbackHandler) api.StreamFilter {
 		return &filter{
 			config:    conf,
