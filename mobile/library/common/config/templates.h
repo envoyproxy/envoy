@@ -102,3 +102,13 @@ extern const char* default_cert_validation_context_template;
  * chain.
  */
 extern const char* platform_cert_validation_context_template;
+
+/**
+ * Config template for an RTDS layer
+ */
+extern const char* rtds_layer_insert;
+
+/**
+ * ADS config
+ */
+extern const char* ads_insert;
