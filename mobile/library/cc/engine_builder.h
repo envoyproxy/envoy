@@ -75,7 +75,7 @@ public:
   EngineBuilder& addDnsPreresolveHostnames(const std::vector<std::string>& hostnames);
   EngineBuilder& addNativeFilter(std::string name, std::string typed_config);
   EngineBuilder& enableAdminInterface(bool admin_interface_on);
-  EngineBuilder& addStatsSinks(const std::vector<std::string>& stat_sinks);
+  EngineBuilder& addStatsSinks(std::vector<std::string> stat_sinks);
   EngineBuilder& addPlatformFilter(std::string name);
   EngineBuilder& addVirtualCluster(std::string virtual_cluster);
 

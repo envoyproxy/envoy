@@ -84,8 +84,8 @@ EngineBuilder& EngineBuilder::setOnEngineRunning(std::function<void()> closure) 
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addStatsSinks(const std::vector<std::string>& stats_sinks) {
-  stats_sinks_ = stats_sinks;
+EngineBuilder& EngineBuilder::addStatsSinks(std::vector<std::string> stats_sinks) {
+  stats_sinks_ = std::move(stats_sinks);
   return *this;
 }
 
