@@ -117,7 +117,6 @@ const std::string config_header = R"(
 - &dns_fail_max_interval 10s
 - &dns_lookup_family ALL
 - &dns_min_refresh_rate 60s
-- &dns_multiple_addresses true
 - &dns_preresolve_hostnames []
 - &dns_query_timeout 25s
 - &dns_refresh_rate 60s
@@ -535,7 +534,6 @@ layered_runtime:
           # Global stats do not play well with engines with limited lifetimes
           disallow_global_stats: true
           reloadable_features:
-            allow_multiple_dns_addresses: *dns_multiple_addresses
             always_use_v6: *force_ipv6
             skip_dns_lookup_for_proxied_requests: *skip_dns_lookup_for_proxied_requests
 )"
@@ -553,19 +551,19 @@ const char* rtds_layer_insert = R"(
         name: {}
         rtds_config:
           initial_fetch_timeout:
-            seconds: 1
+            seconds: {}
           resource_api_version: V3
           ads: {{}})";
-            
+
 const char* ads_insert = R"(
+dynamic_resources:
   ads_config:
     transport_api_version: V3
     api_type: {}
     set_node_on_first_message_only: true
     grpc_services:
       google_grpc:
-        target_uri: "{}:{}")";
-
+        target_uri: '{}:{}')";
 
 const char* cds_layer_insert = R"(
   cds_config:

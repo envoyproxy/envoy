@@ -114,6 +114,15 @@ void Http2Frame::appendEmptyHeader() {
   data_.push_back(0x00);
 }
 
+Http2Frame Http2Frame::makeRawFrame(Type type, uint8_t flags, uint32_t stream_id,
+                                    absl::string_view payload) {
+  Http2Frame frame;
+  frame.buildHeader(type, 0, flags, makeNetworkOrderStreamId(stream_id));
+  frame.appendData(payload);
+  frame.adjustPayloadSize();
+  return frame;
+}
+
 Http2Frame Http2Frame::makePingFrame(absl::string_view data) {
   static constexpr size_t kPingPayloadSize = 8;
   Http2Frame frame;

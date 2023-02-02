@@ -476,7 +476,7 @@ public:
 
   // Tracing::TraceContext
   absl::string_view protocol() const override;
-  absl::string_view authority() const override;
+  absl::string_view host() const override;
   absl::string_view path() const override;
   absl::string_view method() const override;
   void forEach(Tracing::TraceContext::IterateCallback callback) const override;

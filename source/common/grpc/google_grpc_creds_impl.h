@@ -66,7 +66,7 @@ public:
   defaultChannelCredentials(const envoy::config::core::v3::GrpcService& grpc_service_config,
                             Api::Api& api);
 };
- DECLARE_FACTORY(DefaultGoogleGrpcCredentialsFactory);
+DECLARE_FACTORY(DefaultGoogleGrpcCredentialsFactory);
 
 } // namespace Grpc
 } // namespace Envoy

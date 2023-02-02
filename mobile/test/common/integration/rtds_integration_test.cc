@@ -23,7 +23,7 @@ public:
                                          sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedSotw
                                      ? "GRPC"
                                      : "DELTA_GRPC";
-    builder_.addRtdsLayer("some_rtds_layer");
+    builder_.addRtdsLayer("some_rtds_layer", 1);
 
     builder_.setAggregatedDiscoveryService(api_type,
                                            Network::Test::getLoopbackAddressUrlString(ipVersion()),
@@ -56,8 +56,6 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
   // Check that the Runtime config is from the static layer.
   EXPECT_FALSE(Runtime::runtimeFeatureEnabled(
       "envoy.reloadable_features.skip_dns_lookup_for_proxied_requests"));
-  EXPECT_FALSE(Runtime::runtimeFeatureEnabled(
-      "envoy.reloadable_features.skip_dns_lookup_for_proxied_requests"));
 
   const std::string load_success_counter = "runtime.load_success";
   uint64_t load_success_value = getCounterValue(load_success_counter);
@@ -75,8 +73,6 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
   ASSERT_TRUE(waitForCounterGe(load_success_counter, load_success_value + 1));
 
   // Verify that the Runtime config values are from the RTDS response.
-  EXPECT_TRUE(Runtime::runtimeFeatureEnabled(
-      "envoy.reloadable_features.skip_dns_lookup_for_proxied_requests"));
   EXPECT_TRUE(Runtime::runtimeFeatureEnabled(
       "envoy.reloadable_features.skip_dns_lookup_for_proxied_requests"));
 }
