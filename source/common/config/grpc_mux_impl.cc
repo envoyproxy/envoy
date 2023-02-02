@@ -390,19 +390,17 @@ void GrpcMuxImpl::processDiscoveryResources(const std::vector<DecodedResourcePtr
       auto it = resource_ref_map.find(watched_resource_name);
       if (it != resource_ref_map.end()) {
         found_resources.emplace_back(it->second);
-        resource_ref_map.erase(it);
       } else if (isXdstpWildcard(watched_resource_name)) {
         // See if the resources match the xdstp wildcard entry.
+        // Note: the assumption is that we don't have singleton and collection subscriptions in the
+        // same watch. For that reason, we do not need to check for duplicates in adding to
+        // `found_resources`.
         // TODO(abeyad): This could be made more efficient, e.g. by pre-computing and having a map
         // entry for each wildcard watch.
-        for (auto resource_ref_it = resource_ref_map.begin();
-             resource_ref_it != resource_ref_map.end();) {
-          if (XdsResourceIdentifier::hasXdsTpScheme(resource_ref_it->first) &&
-              convertToWildcard(resource_ref_it->first) == watched_resource_name) {
-            found_resources.emplace_back(resource_ref_it->second);
-            resource_ref_it = resource_ref_map.erase(resource_ref_it);
-          } else {
-            ++resource_ref_it;
+        for (const auto& resource_ref_it : resource_ref_map) {
+          if (XdsResourceIdentifier::hasXdsTpScheme(resource_ref_it.first) &&
+              convertToWildcard(resource_ref_it.first) == watched_resource_name) {
+            found_resources.emplace_back(resource_ref_it.second);
           }
         }
       }
