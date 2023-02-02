@@ -12,6 +12,7 @@ on:
 jobs:
  Fuzzing:
    runs-on: ubuntu-latest
+   environment: test
    strategy:
      fail-fast: false
      matrix:
