@@ -433,7 +433,7 @@ std::string EngineBuilder::generateConfigStr() const {
                         &config_template);
   }
   if (enable_cds_) {
-    std::string custom_cds = fmt::format(cds_layer_insert);
+    std::string custom_cds = fmt::format(cds_layer_insert, cds_timeout_seconds_);
     absl::StrReplaceAll({{"#{custom_dynamic_resources}",
                           absl::StrCat("#{custom_dynamic_resources}\n", custom_cds)}},
                         &config_template);

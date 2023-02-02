@@ -567,7 +567,7 @@ const char* ads_insert = R"(
 const char* cds_layer_insert = R"(
   cds_config:
     initial_fetch_timeout:
-      seconds: 1
+      seconds: {}
     resource_api_version: V3
     ads: {{}})";
 
