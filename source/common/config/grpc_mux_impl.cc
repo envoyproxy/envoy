@@ -393,9 +393,8 @@ void GrpcMuxImpl::processDiscoveryResources(const std::vector<DecodedResourcePtr
         found_resources.emplace_back(it->second);
       } else if (isXdstpWildcard(watched_resource_name)) {
         // See if the resources match the xdstp wildcard subscription.
-        // Note: the assumption is that we don't have singleton and collection subscriptions in the
-        // same watch. For that reason, we do not need to check for duplicates in adding to
-        // `found_resources`.
+        // Note: although it is unlikely that Envoy will need to support a resource that is mapped
+        // to both a singleton and collection watch, this code still supports this use case.
         // TODO(abeyad): This could be made more efficient, e.g. by pre-computing and having a map
         // entry for each wildcard watch.
         for (const auto& resource_ref_it : resource_ref_map) {
