@@ -1112,19 +1112,23 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_registerStringAccessor(JNIEnv* 
   return result;
 }
 
+//  Takes a jstring from Java, converts it to a C++ string, calls the supplied
+//  setter on it.
 void setString(JNIEnv* env, jstring java_string, EngineBuilder* builder,
                EngineBuilder& (EngineBuilder::*setter)(std::string)) {
-  if (java_string) {
-    const char* native_java_string = env->GetStringUTFChars(java_string, nullptr);
-    std::string java_string_str = std::string(native_java_string);
-    if (!java_string_str.empty()) {
-      (builder->*setter)(java_string_str);
-      env->ReleaseStringUTFChars(java_string, native_java_string);
-    }
+  if (!java_string) {
+    return;
+  }
+  const char* native_java_string = env->GetStringUTFChars(java_string, nullptr);
+  std::string java_string_str = std::string(native_java_string);
+  if (!java_string_str.empty()) {
+    (builder->*setter)(java_string_str);
+    env->ReleaseStringUTFChars(java_string, native_java_string);
   }
 }
 
-std::string to_string(JNIEnv* env, jbyteArray j_data) {
+// Converts a java byte array to a C++ string.
+std::string javaByteArrayToString(JNIEnv* env, jbyteArray j_data) {
   size_t data_length = static_cast<size_t>(env->GetArrayLength(j_data));
   char* critical_data = static_cast<char*>(env->GetPrimitiveArrayCritical(j_data, 0));
   std::string ret(critical_data, data_length);
@@ -1132,7 +1136,8 @@ std::string to_string(JNIEnv* env, jbyteArray j_data) {
   return ret;
 }
 
-std::vector<std::string> to_vector(JNIEnv* env, jobjectArray entries) {
+// Converts a java object array to C++ vector of of strings.
+std::vector<std::string> javaObjectArrayToStringVector(JNIEnv* env, jobjectArray entries) {
   std::vector<std::string> ret;
   // Note that headers is a flattened array of key/value pairs.
   // Therefore, the length of the native header array is n envoy_data or n/2 envoy_map_entry.
@@ -1144,15 +1149,17 @@ std::vector<std::string> to_vector(JNIEnv* env, jobjectArray entries) {
   for (envoy_map_size_t i = 0; i < length; ++i) {
     // Copy native byte array for header key
     jbyteArray j_str = static_cast<jbyteArray>(env->GetObjectArrayElement(entries, i));
-    std::string str = to_string(env, j_str);
-    ret.push_back(to_string(env, j_str));
+    std::string str = javaByteArrayToString(env, j_str);
+    ret.push_back(javaByteArrayToString(env, j_str));
     env->DeleteLocalRef(j_str);
   }
 
   return ret;
 }
 
-std::vector<std::pair<std::string, std::string>> to_vector_pair(JNIEnv* env, jobjectArray entries) {
+// Converts a java object array to C++ vector of pairs of strings.
+std::vector<std::pair<std::string, std::string>>
+javaObjectArrayToStringPairVector(JNIEnv* env, jobjectArray entries) {
   std::vector<std::pair<std::string, std::string>> ret;
   // Note that headers is a flattened array of key/value pairs.
   // Therefore, the length of the native header array is n envoy_data or n/2 envoy_map_entry.
@@ -1165,8 +1172,8 @@ std::vector<std::pair<std::string, std::string>> to_vector_pair(JNIEnv* env, job
     // Copy native byte array for header key
     jbyteArray j_key = static_cast<jbyteArray>(env->GetObjectArrayElement(entries, i));
     jbyteArray j_value = static_cast<jbyteArray>(env->GetObjectArrayElement(entries, i + 1));
-    std::string first = to_string(env, j_key);
-    std::string second = to_string(env, j_value);
+    std::string first = javaByteArrayToString(env, j_key);
+    std::string second = javaByteArrayToString(env, j_value);
     ret.push_back(std::make_pair(first, second));
 
     env->DeleteLocalRef(j_key);
@@ -1228,18 +1235,18 @@ extern "C" JNIEXPORT jstring JNICALL Java_io_envoyproxy_envoymobile_engine_JniLi
 
   const char* native_yaml = env->GetStringUTFChars(yaml, nullptr);
 
-  auto filters = to_vector_pair(env, native_filters);
-  for (auto& filter : filters) {
+  auto filters = javaObjectArrayToStringPairVector(env, native_filters);
+  for (std::pair<std::string, std::string>& filter : filters) {
     builder.addNativeFilter(filter.first, filter.second);
   }
-  auto clusters = to_vector(env, native_clusters);
-  for (auto& cluster : clusters) {
+  std::vector<std::string> clusters = javaObjectArrayToStringVector(env, native_clusters);
+  for (std::string& cluster : clusters) {
     builder.addVirtualCluster(cluster);
   }
-  auto sinks = to_vector(env, native_stats_sinks);
-  builder.addStatsSinks(sinks);
+  std::vector<std::string> sinks = javaObjectArrayToStringVector(env, native_stats_sinks);
+  builder.addStatsSinks(std::move(sinks));
 
-  auto hostnames = to_vector(env, dns_preresolve_hostnames);
+  std::vector<std::string> hostnames = javaObjectArrayToStringVector(env, dns_preresolve_hostnames);
   builder.addDnsPreresolveHostnames(hostnames);
 
   builder.generateBootstrapAndCompareForTests(native_yaml);
