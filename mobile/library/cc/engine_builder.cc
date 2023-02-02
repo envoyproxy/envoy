@@ -40,6 +40,8 @@ void insertCustomFilter(const std::string& filter_config, std::string& config_te
                       &config_template);
 }
 
+// Note that updates to the config.cc bootstrap will require a matching update in
+// generateBootstrap() below
 bool generatedStringMatchesGeneratedBoostrap(
     const std::string& config_str, const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   Thread::SkipAsserts skip;
@@ -237,6 +239,23 @@ EngineBuilder& EngineBuilder::enforceTrustChainVerification(bool trust_chain_ver
   return *this;
 }
 
+EngineBuilder& EngineBuilder::addRtdsLayer(const std::string& layer_name, int timeout_seconds) {
+  rtds_layer_name_ = layer_name;
+  rtds_timeout_seconds_ = timeout_seconds;
+  return *this;
+}
+EngineBuilder& EngineBuilder::setAggregatedDiscoveryService(const std::string& api_type,
+                                                            const std::string& address,
+                                                            const int port) {
+#ifndef ENVOY_GOOGLE_GRPC
+  throw std::runtime_error("google_grpc must be enabled in bazel to use ADS");
+#endif
+  ads_api_type_ = api_type;
+  ads_address_ = address;
+  ads_port_ = port;
+  return *this;
+}
+
 EngineBuilder&
 EngineBuilder::enablePlatformCertificatesValidation(bool platform_certificates_validation_on) {
   platform_certificates_validation_on_ = platform_certificates_validation_on;
@@ -383,6 +402,21 @@ std::string EngineBuilder::generateConfigStr() const {
         native_filter_template, {{"{{ native_filter_name }}", filter.name_},
                                  {"{{ native_filter_typed_config }}", filter.typed_config_}});
     insertCustomFilter(filter_config, config_template);
+  }
+
+  if (!rtds_layer_name_.empty() && ads_api_type_.empty()) {
+    throw std::runtime_error("ADS must be configured when using RTDS");
+  }
+  if (!rtds_layer_name_.empty()) {
+    std::string rtds_layer =
+        fmt::format(rtds_layer_insert, rtds_layer_name_, rtds_layer_name_, rtds_timeout_seconds_);
+    absl::StrReplaceAll({{"#{custom_layers}", absl::StrCat("#{custom_layers}\n", rtds_layer)}},
+                        &config_template);
+  }
+  if (!ads_api_type_.empty()) {
+    std::string custom_ads = fmt::format(ads_insert, ads_api_type_, ads_address_, ads_port_);
+    absl::StrReplaceAll({{"#{custom_ads}", absl::StrCat("#{custom_ads}\n", custom_ads)}},
+                        &config_template);
   }
 
   config_builder << config_template;
@@ -818,6 +852,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   list->add_patterns()->set_prefix("http.hcm.downstream_rq_");
   list->add_patterns()->set_prefix("http.hcm.decompressor.");
   list->add_patterns()->set_prefix("pulse.");
+  list->add_patterns()->set_prefix("runtime.load_success");
   list->add_patterns()->mutable_safe_regex()->set_regex(
       "^vhost\\.[\\w]+\\.vcluster\\.[\\w]+?\\.upstream_rq_(?:[12345]xx|[3-5][0-9][0-9]|retry|"
       "total)");
@@ -858,7 +893,6 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 
   bootstrap->mutable_typed_dns_resolver_config()->CopyFrom(
       *dns_cache_config->mutable_typed_dns_resolver_config());
-
   if (!stats_domain_.empty()) {
     envoy::config::metrics::v3::MetricsServiceConfig metrics_config;
     metrics_config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("stats");
@@ -868,6 +902,31 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     auto* sink = bootstrap->add_stats_sinks();
     sink->set_name("envoy.metrics_service");
     sink->mutable_typed_config()->PackFrom(metrics_config);
+  }
+
+  if (!rtds_layer_name_.empty() && ads_api_type_.empty()) {
+    throw std::runtime_error("ADS must be configured when using RTDS");
+  }
+  if (!rtds_layer_name_.empty()) {
+    auto* layered_runtime = bootstrap->mutable_layered_runtime();
+    auto* layer = layered_runtime->add_layers();
+    layer->set_name(rtds_layer_name_);
+    auto* rtds_layer = layer->mutable_rtds_layer();
+    rtds_layer->set_name(rtds_layer_name_);
+    auto* rtds_config = rtds_layer->mutable_rtds_config();
+    rtds_config->mutable_ads();
+    rtds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+    rtds_config->mutable_initial_fetch_timeout()->set_seconds(rtds_timeout_seconds_);
+  }
+  if (!ads_api_type_.empty()) {
+    std::string target_uri = fmt::format(R"({}:{})", ads_address_, ads_port_);
+    auto* ads_config = bootstrap->mutable_dynamic_resources()->mutable_ads_config();
+    ads_config->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+    ads_config->set_set_node_on_first_message_only(true);
+    envoy::config::core::v3::ApiConfigSource::ApiType api_type_enum;
+    envoy::config::core::v3::ApiConfigSource::ApiType_Parse(ads_api_type_, &api_type_enum);
+    ads_config->set_api_type(api_type_enum);
+    ads_config->add_grpc_services()->mutable_google_grpc()->set_target_uri(target_uri);
   }
 
   for (auto& sink_to_add : stats_sinks_) {
