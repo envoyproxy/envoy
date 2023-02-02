@@ -591,7 +591,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   if (dns_cache_on_) {
     envoymobile::extensions::key_value::platform::PlatformKeyValueStoreConfig kv_config;
     kv_config.set_key("dns_persistent_cache");
-    kv_config.mutable_save_interval()->set_seconds(0);
+    kv_config.mutable_save_interval()->set_seconds(1);
     kv_config.set_max_entries(100);
     dns_cache_config->mutable_key_value_config()->mutable_config()->set_name(
         "envoy.key_value.platform");
