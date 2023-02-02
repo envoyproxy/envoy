@@ -30,7 +30,7 @@ public:
   // Log this stream using available stream info and access loggers.
   void maybeDoDeferredLog(bool record_ack_timing = true);
   // Set list of pointers to access loggers.
-  void setAccessLogHandlers(std::list<AccessLog::InstanceSharedPtr> handlers) {
+  void setAccessLogHandlers(const std::list<AccessLog::InstanceSharedPtr>& handlers) {
     access_log_handlers_ = handlers;
   }
   // Set headers, trailers, and stream info used for deferred logging.

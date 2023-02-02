@@ -257,7 +257,7 @@ public:
   /**
    * @return List of shared pointers to access loggers for this stream.
    */
-  virtual std::list<AccessLog::InstanceSharedPtr> accessLogHandlers() PURE;
+  virtual const std::list<AccessLog::InstanceSharedPtr>& accessLogHandlers() PURE;
 };
 
 /**

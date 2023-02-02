@@ -673,7 +673,9 @@ public:
     }
   }
 
-  std::list<AccessLog::InstanceSharedPtr> accessLogHandlers() { return access_log_handlers_; }
+  const std::list<AccessLog::InstanceSharedPtr>& accessLogHandlers() {
+    return access_log_handlers_;
+  }
 
   void onStreamComplete() {
     for (auto& filter : decoder_filters_) {

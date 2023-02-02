@@ -201,7 +201,7 @@ private:
                         absl::string_view details) override {
       return filter_manager_.sendLocalReply(code, body, modify_headers, grpc_status, details);
     }
-    std::list<AccessLog::InstanceSharedPtr> accessLogHandlers() override {
+    const std::list<AccessLog::InstanceSharedPtr>& accessLogHandlers() override {
       return filter_manager_.accessLogHandlers();
     }
     // Hand off headers/trailers and stream info to the codec's response encoder, for logging later
