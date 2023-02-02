@@ -895,7 +895,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   bootstrap->mutable_typed_dns_resolver_config()->CopyFrom(
       *dns_cache_config->mutable_typed_dns_resolver_config());
 
-  for (auto& sink_yaml : stats_sinks_) {
+  for (const std::string& sink_yaml : stats_sinks_) {
     auto* sink = bootstrap->add_stats_sinks();
     MessageUtil::loadFromYaml(sink_yaml, *sink, ProtobufMessage::getStrictValidationVisitor());
   }
