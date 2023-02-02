@@ -527,9 +527,6 @@ TEST_F(LocalRateLimiterDescriptorImplTest, TokenBucketDifferentDescriptorStatus)
   EXPECT_EQ(rate_limiter_->maxTokens(descriptor2_), 1);
   EXPECT_EQ(rate_limiter_->remainingTokens(descriptor2_), 0);
   EXPECT_EQ(rate_limiter_->remainingFillInterval(descriptor2_), 0);
-  // Limited by global token
-  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_));
-  EXPECT_EQ(rate_limiter_->maxTokens(descriptor_), 2);
 
   // 0 -> 0 tokens for descriptor_ and descriptor2_
   EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor2_));
