@@ -23,9 +23,7 @@ public:
     // TODO(abeyad): Add paramaterized tests for HTTP1, HTTP2, and HTTP3.
     setUpstreamProtocol(Http::CodecType::HTTP1);
   }
-  void TearDown() {
-    BaseClientIntegrationTest::TearDown();
-  }
+  void TearDown() { BaseClientIntegrationTest::TearDown(); }
 
   void basicTest();
 };
@@ -71,9 +69,7 @@ void ClientIntegrationTest::basicTest() {
   ASSERT_EQ(cc_.on_complete_received_byte_count, 67);
 }
 
-TEST_P(ClientIntegrationTest, Basic) {
-  basicTest();
-}
+TEST_P(ClientIntegrationTest, Basic) { basicTest(); }
 
 TEST_P(ClientIntegrationTest, BasicNon2xx) {
   initialize();
