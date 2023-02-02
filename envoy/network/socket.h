@@ -112,6 +112,12 @@ public:
    * @return roundTripTime of the connection
    */
   virtual const absl::optional<std::chrono::milliseconds>& roundTripTime() const PURE;
+
+  /**
+   * @return absl::string_view the upstream transport failure reason,
+   *         e.g. certificate validation failed.
+   */
+  virtual absl::string_view downstreamTransportFailureReason() const PURE;
 };
 
 class ConnectionInfoSetter : public ConnectionInfoProvider {
@@ -178,6 +184,11 @@ public:
    * @param  milliseconds of round trip time of previous connection
    */
   virtual void setRoundTripTime(std::chrono::milliseconds roundTripTime) PURE;
+
+  /**
+   * @param failure_reason the downstream transport failure reason.
+   */
+  virtual void setDownstreamTransportFailureReason(const absl::string_view failure_reason) PURE;
 };
 
 using ConnectionInfoSetterSharedPtr = std::shared_ptr<ConnectionInfoSetter>;

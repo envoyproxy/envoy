@@ -1466,6 +1466,24 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                                     return connection_info.urlEncodedPemEncodedPeerCertificate();
                                   });
                             }}},
+                          {"DOWNSTREAM_TRANSPORT_FAILURE_REASON",
+                           {CommandSyntaxChecker::COMMAND_ONLY,
+                            [](const std::string&, const absl::optional<size_t>&) {
+                              return std::make_unique<StreamInfoStringFieldExtractor>(
+                                  [](const StreamInfo::StreamInfo& stream_info) {
+                                    absl::optional<std::string> result;
+                                    if (!stream_info.downstreamAddressProvider()
+                                             .downstreamTransportFailureReason()
+                                             .empty()) {
+                                      result = std::string(stream_info.downstreamAddressProvider()
+                                                               .downstreamTransportFailureReason());
+                                    }
+                                    if (result) {
+                                      std::replace(result->begin(), result->end(), ' ', '_');
+                                    }
+                                    return result;
+                                  });
+                            }}},
                           {"UPSTREAM_TRANSPORT_FAILURE_REASON",
                            {CommandSyntaxChecker::COMMAND_ONLY,
                             [](const std::string&, const absl::optional<size_t>&) {
