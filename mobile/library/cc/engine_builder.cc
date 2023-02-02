@@ -184,6 +184,22 @@ EngineBuilder& EngineBuilder::enforceTrustChainVerification(bool trust_chain_ver
   return *this;
 }
 
+EngineBuilder& EngineBuilder::addRtdsLayer(const std::string& layer_name) {
+  rtds_layer_ = fmt::format(rtds_layer_insert, layer_name, layer_name);
+  return *this;
+}
+EngineBuilder& EngineBuilder::setAggregatedDiscoveryService(const std::string& api_type,
+                                                            const std::string& address,
+                                                            const int port) {
+  custom_ads_ = fmt::format(ads_insert, api_type, address, port);
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::addCdsLayer() {
+  cds_layer_ = fmt::format(cds_layer_insert);
+  return *this;
+}
+
 EngineBuilder&
 EngineBuilder::enablePlatformCertificatesValidation(bool platform_certificates_validation_on) {
   platform_certificates_validation_on_ = platform_certificates_validation_on;
@@ -292,6 +308,25 @@ std::string EngineBuilder::generateConfigStr() const {
     insertCustomFilter(filter_config, config_template);
   }
 
+  if ((!rtds_layer_.empty() || !cds_layer_.empty()) && custom_ads_.empty()) {
+    throw std::runtime_error("ADS must be configured when using RTDS or CDS");
+  }
+  if (!rtds_layer_.empty()) {
+    absl::StrReplaceAll({{"#{custom_layers}", absl::StrCat("#{custom_layers}\n", rtds_layer_)}},
+                        &config_template);
+  }
+
+  if (!custom_ads_.empty()) {
+    absl::StrReplaceAll({{"#{custom_ads}", absl::StrCat("#{custom_ads}\n", custom_ads_)}},
+                        &config_template);
+  }
+
+  if (!cds_layer_.empty()) {
+    absl::StrReplaceAll({{"#{custom_dynamic_resources}",
+                          absl::StrCat("#{custom_dynamic_resources}\n", cds_layer_)}},
+                        &config_template);
+  }
+
   config_builder << config_template;
 
   if (admin_interface_enabled_) {
@@ -302,6 +337,7 @@ std::string EngineBuilder::generateConfigStr() const {
   if (config_str.find("{{") != std::string::npos) {
     throw std::runtime_error("could not resolve all template keys in config");
   }
+  std::cout << config_str;
   return config_str;
 }
 

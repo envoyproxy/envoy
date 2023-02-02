@@ -307,6 +307,17 @@ TEST(TestConfig, RemainingTemplatesThrows) {
   }
 }
 
+TEST(TestConfig, RtdsWithoutAds) {
+  EngineBuilder engine_builder;
+  engine_builder.addRtdsLayer("some rtds layer");
+  try {
+    engine_builder.generateConfigStr();
+    FAIL() << "Expected std::runtime_error";
+  } catch (std::runtime_error& err) {
+    EXPECT_EQ(err.what(), std::string("ADS must be configured when using RTDS"));
+  }
+}
+
 TEST(TestConfig, EnablePlatformCertificatesValidation) {
   EngineBuilder engine_builder;
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
