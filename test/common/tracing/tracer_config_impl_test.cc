@@ -1,6 +1,7 @@
+#include "source/common/tracing/tracer_config_impl.h"
+
 #include "test/test_common/utility.h"
 
-#include "/source/common/tracing/tracer_config_impl.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
