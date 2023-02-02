@@ -251,7 +251,7 @@ envoy_cluster_test_cluster_1_upstream_cx_total{another_tag_name="another_tag-val
 # TYPE envoy_cluster_test_cluster_2_upstream_cx_total gauge
 envoy_cluster_test_cluster_2_upstream_cx_total{another_tag_name_3="another_tag_3-value"} 0
 envoy_cluster_test_cluster_2_upstream_cx_total{another_tag_name_4="another_tag_4-value"} 0
-// )EOF";
+)EOF";
 
   EXPECT_EQ(expected_output, response(*makeRequest(false)));
 }
@@ -525,12 +525,12 @@ envoy_invalid_tag_values{tag1="\\",tag2="\n",tag3="\"",text_value="test"} 0
   EXPECT_EQ(expected_output, response(*makeRequest(false, true)));
 }
 
-Test that output groups all metrics of the same name(with different tags) together,
-    as required by the Prometheus exposition format spec.Additionally,
-    groups of metrics should be sorted by their tags;
-the format specifies that it is preferred that metrics are always grouped in the same order,
-    and sorting is an easy way to ensure this.TEST_F(PrometheusStatsRenderingTest,
-                                                     OutputSortedByMetricName) {
+// Test that output groups all metrics of the same name(with different tags) together,
+//     as required by the Prometheus exposition format spec.Additionally,
+//     groups of metrics should be sorted by their tags;
+// the format specifies that it is preferred that metrics are always grouped in the same order,
+// and sorting is an easy way to ensure this.
+TEST_F(PrometheusStatsRenderingTest, OutputSortedByMetricName) {
   const std::vector<uint64_t> h1_values = {50, 20, 30, 70, 100, 5000, 200};
   HistogramWrapper h1_cumulative;
   h1_cumulative.setHistogramValues(h1_values);

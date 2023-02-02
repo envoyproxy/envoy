@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 #include "envoy/server/admin.h"
 #include "envoy/stats/stats.h"
 
@@ -109,10 +111,13 @@ public:
 
   // these methods are specific to the Prometheus rendering
   void generate(Buffer::Instance& response, const std::string& prefixed_tag_extracted_name,
-                const Stats::Gauge& gauge);
+                const std::vector<Stats::HistogramSharedPtr>& histogram);
 
   void generate(Buffer::Instance& response, const std::string& prefixed_tag_extracted_name,
-                const Stats::Counter& counter);
+                const std::vector<Stats::GaugeSharedPtr>& gauge);
+
+  void generate(Buffer::Instance& response, const std::string& prefixed_tag_extracted_name,
+                const std::vector<Stats::CounterSharedPtr>& counter);
 
   /*
    * Generates the prometheus output for a TextReadout in gauge format.
@@ -122,7 +127,7 @@ public:
    * tag {"text_value":"textReadout.value"}.
    */
   void generate(Buffer::Instance& response, const std::string& prefixed_tag_extracted_name,
-                const Stats::TextReadout& text_readout);
+                const std::vector<Stats::TextReadoutSharedPtr>& text_readout);
 
   /**
    * Format the given tags, returning a string as a comma-separated list

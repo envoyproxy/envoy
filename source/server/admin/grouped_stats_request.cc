@@ -89,15 +89,7 @@ void GroupedStatsRequest::renderStat(const std::string& name, Buffer::Instance& 
               });
 
     // render group
-    StatOrScopesIndex index = static_cast<StatOrScopesIndex>(variant.index());
-    // This code renders stats of type counter, gauge or text-readout: text readout
-    // stats are returned in gauge format, so "gauge" type is set intentionally.
-    std::string type = (index == StatOrScopesIndex::Counter) ? "counter" : "gauge";
-
-    response.add(fmt::format("# TYPE {0} {1}\n", prefixed_tag_extracted_name.value(), type));
-    for (SharedStatType metric : group) {
-      prometheus_render->generate(response, prefixed_tag_extracted_name.value(), *metric.get());
-    }
+    prometheus_render->generate(response, prefixed_tag_extracted_name.value(), group);
   }
 }
 
@@ -118,28 +110,7 @@ void GroupedStatsRequest::processGauge(const std::string& name, Buffer::Instance
 
 void GroupedStatsRequest::processHistogram(const std::string& name, Buffer::Instance& response,
                                            const StatOrScopes& variant) {
-  auto histogram = absl::get<std::vector<Stats::HistogramSharedPtr>>(variant);
-  auto prefixed_tag_extracted_name = prefixedTagExtractedName<Stats::HistogramSharedPtr>(name);
-
-  if (prefixed_tag_extracted_name.has_value()) {
-    phase_stat_count_++;
-
-    // sort group
-    std::sort(histogram.begin(), histogram.end(),
-              [this](const Stats::RefcountPtr<Stats::Metric>& stat1,
-                     const Stats::RefcountPtr<Stats::Metric>& stat2) -> bool {
-                return global_symbol_table_.lessThan(stat1->statName(), stat2->statName());
-              });
-
-    // render group
-    response.add(fmt::format("# TYPE {0} {1}\n", prefixed_tag_extracted_name.value(), "histogram"));
-    for (const auto& metric : histogram) {
-      auto parent_histogram = dynamic_cast<Stats::ParentHistogram*>(metric.get());
-      if (parent_histogram != nullptr) {
-        render_->generate(response, prefixed_tag_extracted_name.value(), *parent_histogram);
-      }
-    }
-  }
+  renderStat<Stats::HistogramSharedPtr>(name, response, variant);
 }
 
 template <class SharedStatType>

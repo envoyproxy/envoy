@@ -1,5 +1,7 @@
 #include "source/server/admin/stats_render.h"
 
+#include <vector>
+
 #include "source/common/common/empty_string.h"
 #include "source/common/common/regex.h"
 #include "source/common/json/json_sanitizer.h"
@@ -297,62 +299,79 @@ void StatsJsonRender::collectBuckets(const std::string& name,
   *histogram_array_->add_values() = ValueUtil::structValue(histogram_obj);
 }
 
+// Writes output for a Prometheus stat of type Gauge.
 void PrometheusStatsRender::generate(Buffer::Instance& response,
                                      const std::string& prefixed_tag_extracted_name,
-                                     const Stats::Gauge& gauge) {
-  const std::string tags = formattedTags(gauge.tags());
-  response.add(absl::StrCat(prefixed_tag_extracted_name, "{", tags, "} ", gauge.value(), "\n"));
-}
-
-// Writes a counter value.
-void PrometheusStatsRender::generate(Buffer::Instance& response,
-                                     const std::string& prefixed_tag_extracted_name,
-                                     const Stats::Counter& counter) {
-  const std::string tags = formattedTags(counter.tags());
-  response.add(absl::StrCat(prefixed_tag_extracted_name, "{", tags, "} ", counter.value(), "\n"));
-}
-
-// Writes a text readout value.
-void PrometheusStatsRender::generate(Buffer::Instance& response,
-                                     const std::string& prefixed_tag_extracted_name,
-                                     const Stats::TextReadout& text_readout) {
-  auto tags = text_readout.tags();
-  tags.push_back(Stats::Tag{"text_value", text_readout.value()});
-  const std::string formTags = formattedTags(tags);
-  response.add(absl::StrCat(prefixed_tag_extracted_name, "{", formTags, "} 0\n"));
-}
-
-// Writes a histogram value.
-void PrometheusStatsRender::generate(Buffer::Instance& response,
-                                     const std::string& prefixed_tag_extracted_name,
-                                     const Stats::ParentHistogram& histogram) {
-  // TODO(rulex123): support for the 3 histogram "bucket modes" offered in other
-  // stats formats hasn't been ported to Prometheus yet (see Utility::HistogramBucketsMode in
-  // source/server/admin/utils.h).
-  const std::string tags = formattedTags(histogram.tags());
-  const std::string hist_tags = histogram.tags().empty() ? EMPTY_STRING : (tags + ",");
-
-  const Stats::HistogramStatistics& stats = histogram.cumulativeStatistics();
-  Stats::ConstSupportedBuckets& supported_buckets = stats.supportedBuckets();
-  const std::vector<uint64_t>& computed_buckets = stats.computedBuckets();
-  for (size_t i = 0; i < supported_buckets.size(); ++i) {
-    double bucket = supported_buckets[i];
-    uint64_t value = computed_buckets[i];
-    // We want to print the bucket in a fixed point (non-scientific) format. The fmt library
-    // doesn't have a specific modifier to format as a fixed-point value only so we use the
-    // 'g' operator which prints the number in general fixed point format or scientific format
-    // with precision 50 to round the number up to 32 significant digits in fixed point format
-    // which should cover pretty much all cases
-    response.add(absl::StrCat(prefixed_tag_extracted_name, "_bucket{", hist_tags, "le=\"",
-                              fmt::format("{0:.32g}", bucket), "\"} ", value, "\n"));
+                                     const std::vector<Stats::GaugeSharedPtr>& gauge) {
+  response.add(fmt::format("# TYPE {0} {1}\n", prefixed_tag_extracted_name, "gauge"));
+  for (const Stats::GaugeSharedPtr& metric : gauge) {
+    const std::string tags = formattedTags(metric->tags());
+    response.add(absl::StrCat(prefixed_tag_extracted_name, "{", tags, "} ", metric->value(), "\n"));
   }
+}
 
-  response.add(absl::StrCat(prefixed_tag_extracted_name, "_bucket{", hist_tags, "le=\"+Inf\"} ",
-                            stats.sampleCount(), "\n"));
-  response.add(absl::StrCat(prefixed_tag_extracted_name, "_sum{", tags, "} ",
-                            fmt::format("{0:.32g}", stats.sampleSum()), "\n"));
-  response.add(
-      absl::StrCat(prefixed_tag_extracted_name, "_count{", tags, "} ", stats.sampleCount(), "\n"));
+// Writes output for a Prometheus stat of type Counter.
+void PrometheusStatsRender::generate(Buffer::Instance& response,
+                                     const std::string& prefixed_tag_extracted_name,
+                                     const std::vector<Stats::CounterSharedPtr>& counter) {
+  response.add(fmt::format("# TYPE {0} {1}\n", prefixed_tag_extracted_name, "counter"));
+  for (const Stats::CounterSharedPtr& metric : counter) {
+    const std::string tags = formattedTags(metric->tags());
+    response.add(absl::StrCat(prefixed_tag_extracted_name, "{", tags, "} ", metric->value(), "\n"));
+  }
+}
+
+// Writes output for a Prometheus stat of type Text Readout.
+void PrometheusStatsRender::generate(Buffer::Instance& response,
+                                     const std::string& prefixed_tag_extracted_name,
+                                     const std::vector<Stats::TextReadoutSharedPtr>& text_readout) {
+  // text readout stats are returned in gauge format, so "gauge" type is set intentionally.
+  response.add(fmt::format("# TYPE {0} {1}\n", prefixed_tag_extracted_name, "gauge"));
+  for (const Stats::TextReadoutSharedPtr& metric : text_readout) {
+    auto tags = metric->tags();
+    tags.push_back(Stats::Tag{"text_value", metric->value()});
+    const std::string formTags = formattedTags(tags);
+    response.add(absl::StrCat(prefixed_tag_extracted_name, "{", formTags, "} 0\n"));
+  }
+}
+
+// Writes output for a Prometheus stat of type Histogram.
+void PrometheusStatsRender::generate(Buffer::Instance& response,
+                                     const std::string& prefixed_tag_extracted_name,
+                                     const std::vector<Stats::HistogramSharedPtr>& histogram) {
+  response.add(fmt::format("# TYPE {0} {1}\n", prefixed_tag_extracted_name, "histogram"));
+  for (const auto& metric : histogram) {
+    auto parent_histogram = dynamic_cast<Stats::ParentHistogram*>(metric.get());
+    if (parent_histogram != nullptr) {
+      // TODO(rulex123): support for the 3 histogram "bucket modes" offered in other
+      // stats formats hasn't been ported to Prometheus yet (see Utility::HistogramBucketsMode in
+      // source/server/admin/utils.h).
+      const std::string tags = formattedTags(parent_histogram->tags());
+      const std::string hist_tags = parent_histogram->tags().empty() ? EMPTY_STRING : (tags + ",");
+
+      const Stats::HistogramStatistics& stats = parent_histogram->cumulativeStatistics();
+      Stats::ConstSupportedBuckets& supported_buckets = stats.supportedBuckets();
+      const std::vector<uint64_t>& computed_buckets = stats.computedBuckets();
+      for (size_t i = 0; i < supported_buckets.size(); ++i) {
+        double bucket = supported_buckets[i];
+        uint64_t value = computed_buckets[i];
+        // We want to print the bucket in a fixed point (non-scientific) format. The fmt library
+        // doesn't have a specific modifier to format as a fixed-point value only so we use the
+        // 'g' operator which prints the number in general fixed point format or scientific format
+        // with precision 50 to round the number up to 32 significant digits in fixed point format
+        // which should cover pretty much all cases
+        response.add(absl::StrCat(prefixed_tag_extracted_name, "_bucket{", hist_tags, "le=\"",
+                                  fmt::format("{0:.32g}", bucket), "\"} ", value, "\n"));
+      }
+
+      response.add(absl::StrCat(prefixed_tag_extracted_name, "_bucket{", hist_tags, "le=\"+Inf\"} ",
+                                stats.sampleCount(), "\n"));
+      response.add(absl::StrCat(prefixed_tag_extracted_name, "_sum{", tags, "} ",
+                                fmt::format("{0:.32g}", stats.sampleSum()), "\n"));
+      response.add(absl::StrCat(prefixed_tag_extracted_name, "_count{", tags, "} ",
+                                stats.sampleCount(), "\n"));
+    }
+  }
 }
 
 void PrometheusStatsRender::finalize(Buffer::Instance&) {}
@@ -360,6 +379,9 @@ void PrometheusStatsRender::finalize(Buffer::Instance&) {}
 void PrometheusStatsRender::generate(Buffer::Instance&, const std::string&, const std::string&) {}
 
 void PrometheusStatsRender::generate(Buffer::Instance&, const std::string&, uint64_t) {}
+
+void PrometheusStatsRender::generate(Buffer::Instance&, const std::string&,
+                                     const Stats::ParentHistogram&) {}
 
 std::string PrometheusStatsRender::formattedTags(const std::vector<Stats::Tag>& tags) {
   std::vector<std::string> buf;
