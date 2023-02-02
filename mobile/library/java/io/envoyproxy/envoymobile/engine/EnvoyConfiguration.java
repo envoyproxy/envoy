@@ -261,8 +261,8 @@ public class EnvoyConfiguration {
       configBuilder.append(
           String.format("- &persistent_dns_cache_config %s\n", persistentDNSCacheConfigInsert));
       // TODO: Wire this through
-      configBuilder.append(String.format("- &persistent_dns_cache_save_interval %s\n",
-                                         dnsCacheSaveIntervalSeconds))
+      configBuilder.append(
+          String.format("- &persistent_dns_cache_save_interval %s\n", dnsCacheSaveIntervalSeconds))
     }
 
     configBuilder.append(String.format("- &stats_flush_interval %ss\n", statsFlushSeconds));
