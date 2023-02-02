@@ -68,8 +68,8 @@ The output from the ``curl`` command below should include the body that has been
 
 .. code-block:: console
 
-   $ curl localhost:10000/update_upstream_response 2>&1 | grep "update"
-   updated upstream response body by the simple plugin
+   $ curl localhost:10000/update_upstream_response 2>&1 | grep "updated"
+   upstream response body updated by the simple plugin
 
 Step 5: Make a request handled by the Go plugin using custom configuration
 **************************************************************************

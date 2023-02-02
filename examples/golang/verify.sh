@@ -21,7 +21,7 @@ responds_with_header \
 
 run_log "Make a request handled upstream and updated by the Go plugin"
 responds_with \
-    "updated upstream response body by the simple plugin" \
+    "upstream response body updated by the simple plugin" \
     "http://localhost:${PORT_PROXY}/update_upstream_response"
 
 run_log "Make a request handled by the Go plugin using custom configuration"
