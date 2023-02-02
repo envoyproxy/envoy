@@ -95,7 +95,8 @@ private:
   std::string value_buffer_; // Used for Json::sanitize for text-readout values.
 };
 
-// Implements the Render interface for textual representation of Prometheus stats.
+// Implements the Render interface for textual representation of Prometheus stats
+// (see: https://prometheus.io/docs/concepts/data_model)
 class PrometheusStatsRender : public StatsRender {
 public:
   // StatsRender
@@ -113,8 +114,31 @@ public:
   void generate(Buffer::Instance& response, const std::string& prefixed_tag_extracted_name,
                 const Stats::Counter& counter);
 
+  /*
+   * Generates the prometheus output for a TextReadout in gauge format.
+   * It is a workaround of a limitation of prometheus which stores only numeric metrics.
+   * The output is a gauge named the same as a given text-readout. The value of returned gauge is
+   * always equal to 0. Returned gauge contains all tags of a given text-readout and one additional
+   * tag {"text_value":"textReadout.value"}.
+   */
   void generate(Buffer::Instance& response, const std::string& prefixed_tag_extracted_name,
                 const Stats::TextReadout& text_readout);
+
+  /**
+   * Format the given tags, returning a string as a comma-separated list
+   * of <tag_name>="<tag_value>" pairs.
+   */
+  static std::string formattedTags(const std::vector<Stats::Tag>& tags);
+
+  /**
+   * Format the given metric name, and prefixed with "envoy_" if it does not have a custom
+   * stat namespace. If it has a custom stat namespace AND the name without the custom namespace
+   * has a valid prometheus namespace, the trimmed name is returned.
+   * Otherwise, return nullopt.
+   */
+  static absl::optional<std::string>
+  metricName(const std::string& extracted_name,
+             const Stats::CustomStatNamespaces& custom_namespace_factory);
 };
 
 } // namespace Server

@@ -15,6 +15,9 @@
 namespace Envoy {
 namespace Server {
 
+// Renders stats grouped by tag-extracted name: this is currently used for Prometheus stats only
+// (and has some Prometheus-specific logic in it), but if needed could be generalized for other
+// formats.
 class GroupedStatsRequest
     : public StatsRequest<std::vector<Stats::TextReadoutSharedPtr>,
                           std::vector<Stats::CounterSharedPtr>, std::vector<Stats::GaugeSharedPtr>,

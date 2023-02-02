@@ -1,9 +1,11 @@
 #include "source/server/admin/stats_render.h"
 
 #include "source/common/common/empty_string.h"
+#include "source/common/common/regex.h"
 #include "source/common/json/json_sanitizer.h"
 #include "source/common/stats/histogram_impl.h"
-#include "source/server/admin/prometheus_stats_formatter.h"
+
+#include "absl/strings/str_replace.h"
 
 namespace {
 constexpr absl::string_view JsonNameTag = "{\"name\":\"";
@@ -11,6 +13,37 @@ constexpr absl::string_view JsonValueTag = "\",\"value\":";
 constexpr absl::string_view JsonValueTagQuote = "\",\"value\":\"";
 constexpr absl::string_view JsonCloseBrace = "}";
 constexpr absl::string_view JsonQuoteCloseBrace = "\"}";
+
+const Envoy::Regex::CompiledGoogleReMatcher& promRegex() {
+  CONSTRUCT_ON_FIRST_USE(Envoy::Regex::CompiledGoogleReMatcher, "[^a-zA-Z0-9_]", false);
+}
+
+/**
+ * Take a string and sanitize it according to Prometheus conventions.
+ */
+std::string sanitizeName(const absl::string_view name) {
+  // The name must match the regex [a-zA-Z_][a-zA-Z0-9_]* as required by
+  // prometheus. Refer to https://prometheus.io/docs/concepts/data_model/.
+  // The initial [a-zA-Z_] constraint is always satisfied by the namespace prefix.
+  return promRegex().replaceAll(name, "_");
+}
+
+/**
+ * Take tag values and sanitize it for text serialization, according to
+ * Prometheus conventions.
+ */
+std::string sanitizeValue(const absl::string_view value) {
+  // Removes problematic characters from Prometheus tag values to prevent
+  // text serialization issues. This matches the prometheus text formatting code:
+  // https://github.com/prometheus/common/blob/88f1636b699ae4fb949d292ffb904c205bf542c9/expfmt/text_create.go#L419-L420.
+  // The goal is to replace '\' with "\\", newline with "\n", and '"' with "\"".
+  return absl::StrReplaceAll(value, {
+                                        {R"(\)", R"(\\)"},
+                                        {"\n", R"(\n)"},
+                                        {R"(")", R"(\")"},
+                                    });
+}
+
 } // namespace
 
 namespace Envoy {
@@ -267,7 +300,7 @@ void StatsJsonRender::collectBuckets(const std::string& name,
 void PrometheusStatsRender::generate(Buffer::Instance& response,
                                      const std::string& prefixed_tag_extracted_name,
                                      const Stats::Gauge& gauge) {
-  const std::string tags = PrometheusStatsFormatter::formattedTags(gauge.tags());
+  const std::string tags = formattedTags(gauge.tags());
   response.add(absl::StrCat(prefixed_tag_extracted_name, "{", tags, "} ", gauge.value(), "\n"));
 }
 
@@ -275,7 +308,7 @@ void PrometheusStatsRender::generate(Buffer::Instance& response,
 void PrometheusStatsRender::generate(Buffer::Instance& response,
                                      const std::string& prefixed_tag_extracted_name,
                                      const Stats::Counter& counter) {
-  const std::string tags = PrometheusStatsFormatter::formattedTags(counter.tags());
+  const std::string tags = formattedTags(counter.tags());
   response.add(absl::StrCat(prefixed_tag_extracted_name, "{", tags, "} ", counter.value(), "\n"));
 }
 
@@ -285,8 +318,8 @@ void PrometheusStatsRender::generate(Buffer::Instance& response,
                                      const Stats::TextReadout& text_readout) {
   auto tags = text_readout.tags();
   tags.push_back(Stats::Tag{"text_value", text_readout.value()});
-  const std::string formattedTags = PrometheusStatsFormatter::formattedTags(tags);
-  response.add(absl::StrCat(prefixed_tag_extracted_name, "{", formattedTags, "} 0\n"));
+  const std::string formTags = formattedTags(tags);
+  response.add(absl::StrCat(prefixed_tag_extracted_name, "{", formTags, "} 0\n"));
 }
 
 // Writes a histogram value.
@@ -296,7 +329,7 @@ void PrometheusStatsRender::generate(Buffer::Instance& response,
   // TODO(rulex123): support for the 3 histogram "bucket modes" offered in other
   // stats formats hasn't been ported to Prometheus yet (see Utility::HistogramBucketsMode in
   // source/server/admin/utils.h).
-  const std::string tags = PrometheusStatsFormatter::formattedTags(histogram.tags());
+  const std::string tags = formattedTags(histogram.tags());
   const std::string hist_tags = histogram.tags().empty() ? EMPTY_STRING : (tags + ",");
 
   const Stats::HistogramStatistics& stats = histogram.cumulativeStatistics();
@@ -327,6 +360,41 @@ void PrometheusStatsRender::finalize(Buffer::Instance&) {}
 void PrometheusStatsRender::generate(Buffer::Instance&, const std::string&, const std::string&) {}
 
 void PrometheusStatsRender::generate(Buffer::Instance&, const std::string&, uint64_t) {}
+
+std::string PrometheusStatsRender::formattedTags(const std::vector<Stats::Tag>& tags) {
+  std::vector<std::string> buf;
+  buf.reserve(tags.size());
+  for (const Stats::Tag& tag : tags) {
+    buf.push_back(fmt::format("{}=\"{}\"", sanitizeName(tag.name_), sanitizeValue(tag.value_)));
+  }
+  return absl::StrJoin(buf, ",");
+}
+
+absl::optional<std::string>
+PrometheusStatsRender::metricName(const std::string& extracted_name,
+                                  const Stats::CustomStatNamespaces& custom_namespaces) {
+  const absl::optional<absl::string_view> custom_namespace_stripped =
+      custom_namespaces.stripRegisteredPrefix(extracted_name);
+  if (custom_namespace_stripped.has_value()) {
+    // This case the name has a custom namespace, and it is a custom metric.
+    const std::string sanitized_name = sanitizeName(custom_namespace_stripped.value());
+    // We expose these metrics without modifying (e.g. without "envoy_"),
+    // so we have to check the "user-defined" stat name complies with the Prometheus naming
+    // convention. Specifically the name must start with the "[a-zA-Z_]" pattern.
+    // All the characters in sanitized_name are already in "[a-zA-Z0-9_]" pattern
+    // thanks to sanitizeName above, so the only thing we have to do is check
+    // if it does not start with digits.
+    if (sanitized_name.empty() || absl::ascii_isdigit(sanitized_name.front())) {
+      return absl::nullopt;
+    }
+    return sanitized_name;
+  }
+
+  // If it does not have a custom namespace, add namespacing prefix to avoid conflicts, as per best
+  // practice: https://prometheus.io/docs/practices/naming/#metric-names Also, naming conventions on
+  // https://prometheus.io/docs/concepts/data_model/
+  return absl::StrCat("envoy_", sanitizeName(extracted_name));
+}
 
 } // namespace Server
 } // namespace Envoy

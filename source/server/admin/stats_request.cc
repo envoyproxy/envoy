@@ -138,6 +138,7 @@ void StatsRequest<TextReadoutTyoe, CounterType, GaugeType, HistogramType>::start
     // The operator[] of btree_map runs a try_emplace behind the scenes,
     // inserting the variant into the map when the lookup key does not exist.
     StatOrScopes& variant = stat_map_[stats_.symbolTable().toString(scope->prefix())];
+    ASSERT(static_cast<StatOrScopesIndex>(variant.index()) == StatOrScopesIndex::Scopes);
     absl::get<ScopeVec>(variant).emplace_back(scope);
   }
 }

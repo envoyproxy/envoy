@@ -41,7 +41,6 @@ protected:
   };
 
   struct Phase {
-  public:
     PhaseName phase;
     std::string phase_label;
   };
@@ -143,7 +142,7 @@ protected:
 
   // phase-related state
   uint64_t phase_stat_count_{0};
-  uint32_t phase_index_;
+  uint32_t phase_index_{0};
   std::vector<Phase> phases_;
 };
 

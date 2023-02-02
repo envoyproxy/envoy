@@ -3,13 +3,15 @@
 #include <string>
 #include <vector>
 
-#include "source/server/admin/prometheus_stats_formatter.h"
 #include "source/server/admin/stats_params.h"
 #include "source/server/admin/stats_render.h"
 
 namespace Envoy {
 namespace Server {
 
+// TODO(rulex123): this is currently used for Prometheus stats only, and
+// contains some Prometheus-specific logic (e.g. text-readouts policy). We should
+// remove any format-specific logic if we decide to have a grouped view for HTML or JSON stats.
 GroupedStatsRequest::GroupedStatsRequest(Stats::Store& stats, const StatsParams& params,
                                          Stats::CustomStatNamespaces& custom_namespaces,
                                          UrlHandlerFn url_handler_fn)
@@ -81,19 +83,20 @@ void GroupedStatsRequest::renderStat(const std::string& name, Buffer::Instance& 
   if (prefixed_tag_extracted_name.has_value()) {
     PrometheusStatsRender* const prometheus_render =
         dynamic_cast<PrometheusStatsRender*>(render_.get());
-    // increment stats count
     ++phase_stat_count_;
 
     // sort group
     std::vector<SharedStatType> group = absl::get<std::vector<SharedStatType>>(variant);
-    std::sort(group.begin(), group.end(),
-              [this](const Stats::RefcountPtr<Stats::Metric>& stat1,
-                     const Stats::RefcountPtr<Stats::Metric>& stat2) -> bool {
-                return global_symbol_table_.lessThan(stat1->statName(), stat2->statName());
-              });
+    global_symbol_table_.sortByStatNames<Stats::RefcountPtr<Stats::Metric>>(
+        group.begin(), group.end(),
+        [](const Stats::RefcountPtr<Stats::Metric>& stat) -> Stats::StatName {
+          return stat->statName();
+        });
 
     // render group
     StatOrScopesIndex index = static_cast<StatOrScopesIndex>(variant.index());
+    // This code renders stats of type counter, gauge or text-readout: text readout
+    // stats are returned in gauge format, so "gauge" type is set intentionally.
     std::string type = (index == StatOrScopesIndex::Counter) ? "counter" : "gauge";
 
     response.add(fmt::format("# TYPE {0} {1}\n", prefixed_tag_extracted_name.value(), type));
@@ -128,11 +131,11 @@ void GroupedStatsRequest::processHistogram(const std::string& name, Buffer::Inst
     phase_stat_count_++;
 
     // sort group
-    std::sort(histogram.begin(), histogram.end(),
-              [this](const Stats::RefcountPtr<Stats::Metric>& stat1,
-                     const Stats::RefcountPtr<Stats::Metric>& stat2) -> bool {
-                return global_symbol_table_.lessThan(stat1->statName(), stat2->statName());
-              });
+    global_symbol_table_.sortByStatNames<Stats::RefcountPtr<Stats::Metric>>(
+        histogram.begin(), histogram.end(),
+        [](const Stats::RefcountPtr<Stats::Metric>& stat) -> Stats::StatName {
+          return stat->statName();
+        });
 
     // render group
     response.add(fmt::format("# TYPE {0} {1}\n", prefixed_tag_extracted_name.value(), "histogram"));
@@ -148,8 +151,7 @@ void GroupedStatsRequest::processHistogram(const std::string& name, Buffer::Inst
 template <class SharedStatType>
 absl::optional<std::string>
 GroupedStatsRequest::prefixedTagExtractedName(const std::string& tag_extracted_name) {
-  return Envoy::Server::PrometheusStatsFormatter::metricName(tag_extracted_name,
-                                                             custom_namespaces_);
+  return Envoy::Server::PrometheusStatsRender::metricName(tag_extracted_name, custom_namespaces_);
 }
 
 } // namespace Server
