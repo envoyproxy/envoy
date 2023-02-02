@@ -23,7 +23,7 @@ public:
                                          sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedSotw
                                      ? "GRPC"
                                      : "DELTA_GRPC";
-    builder_.addCdsLayer();
+    builder_.addCdsLayer(1);
     builder_.setAggregatedDiscoveryService(api_type,
                                            Network::Test::getLoopbackAddressUrlString(ipVersion()),
                                            fake_upstreams_[1]->localAddress()->ip()->port());

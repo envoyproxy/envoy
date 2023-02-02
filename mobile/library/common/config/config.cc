@@ -556,7 +556,6 @@ const char* rtds_layer_insert = R"(
           ads: {{}})";
 
 const char* ads_insert = R"(
-dynamic_resources:
   ads_config:
     transport_api_version: V3
     api_type: {}

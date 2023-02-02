@@ -244,7 +244,8 @@ EngineBuilder& EngineBuilder::enforceTrustChainVerification(bool trust_chain_ver
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addRtdsLayer(const std::string& layer_name, int timeout_seconds) {
+EngineBuilder& EngineBuilder::addRtdsLayer(const std::string& layer_name,
+                                           const int timeout_seconds) {
   rtds_layer_name_ = layer_name;
   rtds_timeout_seconds_ = timeout_seconds;
   return *this;
@@ -261,8 +262,9 @@ EngineBuilder& EngineBuilder::setAggregatedDiscoveryService(const std::string& a
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addCdsLayer() {
-  cds_layer_ = fmt::format(cds_layer_insert);
+EngineBuilder& EngineBuilder::addCdsLayer(const int timeout_seconds) {
+  enable_cds_ = true;
+  cds_timeout_seconds_ = timeout_seconds;
   return *this;
 }
 
@@ -416,7 +418,7 @@ std::string EngineBuilder::generateConfigStr() const {
     insertCustomFilter(filter_config, config_template);
   }
 
-  if (!rtds_layer_name_.empty() && ads_api_type_.empty()) {
+  if ((!rtds_layer_name_.empty() || enable_cds_) && ads_api_type_.empty()) {
     throw std::runtime_error("ADS must be configured when using RTDS");
   }
   if (!rtds_layer_name_.empty()) {
@@ -430,28 +432,10 @@ std::string EngineBuilder::generateConfigStr() const {
     absl::StrReplaceAll({{"#{custom_ads}", absl::StrCat("#{custom_ads}\n", custom_ads)}},
                         &config_template);
   }
-
-  if ((!rtds_layer_.empty() || !cds_layer_.empty()) && custom_ads_.empty()) {
-    throw std::runtime_error("ADS must be configured when using RTDS or CDS");
-  }
-
-  if (!custom_ads_.empty()) {
-    absl::StrReplaceAll({{"#{custom_ads}", absl::StrCat("#{custom_ads}\n", custom_ads_)}},
-                        &config_template);
-  }
-  if (!rtds_layer_.empty()) {
-    absl::StrReplaceAll({{"#{custom_layers}", absl::StrCat("#{custom_layers}\n", rtds_layer_)}},
-                        &config_template);
-  }
-
-  if (!custom_ads_.empty()) {
-    absl::StrReplaceAll({{"#{custom_ads}", absl::StrCat("#{custom_ads}\n", custom_ads_)}},
-                        &config_template);
-  }
-
-  if (!cds_layer_.empty()) {
+  if (enable_cds_) {
+    std::string custom_cds = fmt::format(cds_layer_insert);
     absl::StrReplaceAll({{"#{custom_dynamic_resources}",
-                          absl::StrCat("#{custom_dynamic_resources}\n", cds_layer_)}},
+                          absl::StrCat("#{custom_dynamic_resources}\n", custom_cds)}},
                         &config_template);
   }
 
@@ -465,7 +449,6 @@ std::string EngineBuilder::generateConfigStr() const {
   if (config_str.find("{{") != std::string::npos) {
     throw std::runtime_error("could not resolve all template keys in config");
   }
-  std::cout << config_str;
 
   return config_str;
 }
@@ -890,6 +873,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   list->add_patterns()->set_exact("cluster.stats.http2.keepalive_timeout");
   list->add_patterns()->set_prefix("http.hcm.downstream_rq_");
   list->add_patterns()->set_prefix("http.hcm.decompressor.");
+  list->add_patterns()->set_prefix("cluster_manager.");
   list->add_patterns()->set_prefix("pulse.");
   list->add_patterns()->set_prefix("runtime.load_success");
   list->add_patterns()->mutable_safe_regex()->set_regex(
@@ -944,7 +928,8 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     sink->mutable_typed_config()->PackFrom(metrics_config);
   }
 
-  if (!rtds_layer_name_.empty() && ads_api_type_.empty()) {
+  bootstrap->mutable_dynamic_resources();
+  if ((!rtds_layer_name_.empty() || enable_cds_) && ads_api_type_.empty()) {
     throw std::runtime_error("ADS must be configured when using RTDS");
   }
   if (!rtds_layer_name_.empty()) {
@@ -967,6 +952,12 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     envoy::config::core::v3::ApiConfigSource::ApiType_Parse(ads_api_type_, &api_type_enum);
     ads_config->set_api_type(api_type_enum);
     ads_config->add_grpc_services()->mutable_google_grpc()->set_target_uri(target_uri);
+  }
+  if (enable_cds_) {
+    auto* cds_config = bootstrap->mutable_dynamic_resources()->mutable_cds_config();
+    cds_config->mutable_initial_fetch_timeout()->set_seconds(cds_timeout_seconds_);
+    cds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+    cds_config->mutable_ads();
   }
 
   for (auto& sink_to_add : stats_sinks_) {

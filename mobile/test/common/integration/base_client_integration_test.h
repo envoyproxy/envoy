@@ -66,7 +66,6 @@ protected:
   // Wait until the Counter specified by `name` is >= `value`.
   ABSL_MUST_USE_RESULT testing::AssertionResult waitForCounterGe(const std::string& name,
                                                                  uint64_t value);
-  // Same idea but for gauges
   uint64_t getGaugeValue(const std::string& name);
   ABSL_MUST_USE_RESULT testing::AssertionResult waitForGaugeGe(const std::string& name,
                                                                uint64_t value);

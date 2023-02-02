@@ -65,11 +65,12 @@ public:
   EngineBuilder& enforceTrustChainVerification(bool trust_chain_verification_on);
   EngineBuilder& enablePlatformCertificatesValidation(bool platform_certificates_validation_on);
   // Adds an RTDS layer to default config. Requires that ADS be configured
-  EngineBuilder& addRtdsLayer(const std::string& layer_name, int timeout_seconds = 5);
+  EngineBuilder& addRtdsLayer(const std::string& layer_name, const int timeout_seconds = 5);
+  // Adds a CDS layer to default config. Requires that ADS be configured
+  EngineBuilder& addCdsLayer(const int timeout_seconds = 5);
   // Adds an ADS layer.
   EngineBuilder& setAggregatedDiscoveryService(const std::string& api_type,
                                                const std::string& address, const int port);
-  EngineBuilder& addCdsLayer();
   EngineBuilder& enableDnsCache(bool dns_cache_on);
   EngineBuilder& setForceAlwaysUsev6(bool value);
   EngineBuilder& setSkipDnsLookupForProxiedRequests(bool value);
@@ -139,9 +140,10 @@ private:
   int rtds_timeout_seconds_;
   std::string ads_api_type_ = "";
   std::string ads_address_ = "";
+  bool enable_cds_ = false;
+  int cds_timeout_seconds_;
   int ads_port_;
   bool dns_cache_on_ = false;
-  std::string cds_layer_ = "";
 
   absl::flat_hash_map<std::string, KeyValueStoreSharedPtr> key_value_stores_{};
 
