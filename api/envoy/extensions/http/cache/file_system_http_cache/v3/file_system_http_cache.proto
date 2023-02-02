@@ -25,6 +25,8 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // Configuration for a cache implementation that caches in the local file system.
 //
 // By default this cache uses a least-recently-used eviction strategy.
+//
+// For implementation details, see `DESIGN.md <https://github.com/envoyproxy/envoy/blob/main/test/extensions/http/cache/file_system_http_cache/DESIGN.md>`_.
 // [#next-free-field: 11]
 message FileSystemHttpCacheConfig {
   // Configuration of a manager for how the file system is used asynchronously.
@@ -92,7 +94,9 @@ message FileSystemHttpCacheConfig {
   // The longest amount of time to wait before running a cache eviction pass. An eviction
   // pass may not necessarily remove any files, but it will update the cache state to match
   // the on-disk state. This can be important if multiple instances are accessing the same
-  // cache in parallel.
+  // cache in parallel. (e.g. if two instances each independently added non-overlapping 10MB
+  // of content to a cache with a 15MB limit, neither instance would be aware that the limit
+  // was exceeded without this synchronizing pass.)
   //
   // If an eviction pass has not happened within this duration, the eviction thread will
   // be awoken and perform an eviction pass.
