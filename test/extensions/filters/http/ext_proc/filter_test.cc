@@ -1,23 +1,33 @@
 #include <algorithm>
 
 #include "envoy/config/core/v3/grpc_service.pb.h"
+#include "envoy/http/filter.h"
+#include "test/common/http/conn_manager_impl_test_base.h"
+#include "envoy/network/filter.h"
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 
+#include "source/common/http/conn_manager_impl.h"
+#include "source/common/http/context_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
 #include "test/common/http/common.h"
+#include "source/common/network/address_impl.h"
 #include "test/extensions/filters/http/ext_proc/mock_server.h"
 #include "test/extensions/filters/http/ext_proc/utils.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/http/stream_encoder.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
+#include "envoy/network/connection.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -273,7 +283,7 @@ protected:
   bool server_closed_stream_ = false;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   FilterConfigSharedPtr config_;
-  std::unique_ptr<Filter> filter_;
+  std::shared_ptr<Filter> filter_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   testing::NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   testing::NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
@@ -2260,6 +2270,87 @@ TEST_F(HttpFilterTest, FailOnInvalidHeaderMutations) {
   stream_callbacks_->onGrpcClose();
 
   filter_->onDestroy();
+}
+
+class HttpFilter2Test : public HttpFilterTest, public Http::HttpConnectionManagerImplMixin {};
+
+// Test proves that when headers response is not
+TEST_F(HttpFilter2Test, LastOnDataCallExceedsStreamBufferLimitWouldJustRaiseHighWatermark2) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  )EOF");
+  HttpConnectionManagerImplMixin::setup(false, "fake-server");
+  HttpConnectionManagerImplMixin::initial_buffer_limit_ = 10;
+  HttpConnectionManagerImplMixin::setUpBufferLimits();
+
+  std::shared_ptr<Http::MockStreamDecoderFilter> mock_filter(
+      new NiceMock<Http::MockStreamDecoderFilter>());
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](Http::FilterChainManager& manager) -> bool {
+        // Add ext_proc filter.
+        Http::FilterFactoryCb cb = [&](Http::FilterChainFactoryCallbacks& callbacks) {
+          callbacks.addStreamDecoderFilter(filter_);
+        };
+        manager.applyFilterFactoryCb({}, cb);
+        // Add the mock-decoder filter.
+        Http::FilterFactoryCb mock_filter_cb = [&](Http::FilterChainFactoryCallbacks& callbacks) {
+          callbacks.addStreamDecoderFilter(mock_filter);
+        };
+        manager.applyFilterFactoryCb({}, mock_filter_cb);
+
+        return true;
+      }));
+  EXPECT_CALL(*mock_filter, decodeHeaders(_, false))
+      .WillOnce(Invoke([&](Http::RequestHeaderMap& headers, bool end_stream) {
+        // The next decoder filter should be able to see the mutations made by the external server.
+        EXPECT_FALSE(end_stream);
+        EXPECT_EQ(headers.Path()->value().getStringView(), "/mutated_path/bluh");
+        EXPECT_EQ(headers.get(Envoy::Http::LowerCaseString("foo"))[0]->value().getStringView(),
+                  "gift-from-external-server");
+        mock_filter->callbacks_->sendLocalReply(Http::Code::OK, "Direct response from mock filter.",
+                                                nullptr, absl::nullopt, "");
+        return Http::FilterHeadersStatus::StopIteration;
+      }));
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, _))
+      .WillOnce(Invoke([&](const Http::ResponseHeaderMap& headers, bool end_stream) -> void {
+        EXPECT_FALSE(end_stream);
+        EXPECT_EQ(headers.Status()->value().getStringView(), "200");
+      }));
+  EXPECT_CALL(response_encoder_, encodeData(_, _))
+      .WillOnce(Invoke([&](Buffer::Instance& data, bool end_stream) -> void {
+        EXPECT_TRUE(end_stream);
+        EXPECT_EQ(data.toString(), "Direct response from mock filter.");
+      }));
+  // Start the request.
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
+    EXPECT_EQ(data.length(), 5);
+    data.drain(5);
+
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    Http::RequestHeaderMapPtr headers{new Http::TestRequestHeaderMapImpl{
+        {":authority", "host"}, {":path", "/bluh"}, {":method", "GET"}}};
+    decoder_->decodeHeaders(std::move(headers), false);
+    Buffer::OwnedImpl resp_body("Definitely more than 10 bytes data.");
+    decoder_->decodeData(resp_body, true);
+    // Now external server returns the header response.
+    auto response = std::make_unique<ProcessingResponse>();
+    auto* headers_response = response->mutable_request_headers();
+    auto* hdr = headers_response->mutable_response()->mutable_header_mutation()->add_set_headers();
+    hdr->mutable_header()->set_key("foo");
+    hdr->mutable_header()->set_value("gift-from-external-server");
+    hdr = headers_response->mutable_response()->mutable_header_mutation()->add_set_headers();
+    hdr->mutable_header()->set_key(":path");
+    hdr->mutable_header()->set_value("/mutated_path/bluh");
+    HttpFilterTest::stream_callbacks_->onReceiveMessage(std::move(response));
+
+    ENVOY_LOG_MISC(error, "DISPATH DONE!");
+    return Http::okStatus();
+  }));
+
+  Buffer::OwnedImpl fake_input("hello");
+  conn_manager_->onData(fake_input, false);
 }
 
 } // namespace

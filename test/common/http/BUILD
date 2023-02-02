@@ -217,19 +217,47 @@ envoy_cc_fuzz_test(
     ],
 )
 
+envoy_cc_test_library(
+        name = "conn_manager_impl_test_base_lib",
+    srcs = ["conn_manager_impl_test_base.cc"],
+    hdrs = ["conn_manager_impl_test_base.h"],
+    deps = [
+        "//source/common/http:conn_manager_lib",
+        "//source/common/http:context_lib",
+        "//source/common/tracing:custom_tag_lib",
+        ":xff_extension_lib",
+
+        "//source/extensions/access_loggers/common:file_access_log_lib",
+        "//source/extensions/request_id/uuid:config",
+        "//test/mocks/access_log:access_log_mocks",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/http:early_header_mutation_mock",
+        "//test/mocks/http:header_validator_mocks",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/router:router_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/ssl:ssl_mocks",
+        "//test/test_common:delegating_route_utility_lib",
+        "//test/test_common:logging_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
+    ],
+)
+
 envoy_cc_test(
     name = "conn_manager_impl_test",
     srcs = [
         # Split to avoid compiler OOM, especially on ASAN.
         "conn_manager_impl_test.cc",
         "conn_manager_impl_test_2.cc",
-        "conn_manager_impl_test_base.cc",
-        "conn_manager_impl_test_base.h",
     ],
     shard_count = 3,
     deps = [
+        ":conn_manager_impl_test_base_lib",
         ":custom_header_extension_lib",
-        ":xff_extension_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:context_lib",
         "//source/common/tracing:custom_tag_lib",
