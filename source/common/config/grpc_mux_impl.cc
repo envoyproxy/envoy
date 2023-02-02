@@ -386,22 +386,23 @@ void GrpcMuxImpl::processDiscoveryResources(const std::vector<DecodedResourcePtr
       continue;
     }
     std::vector<DecodedResourceRef> found_resources;
-    absl::flat_hash_set<std::string> added_resources;
     for (const auto& watched_resource_name : watch->resources_) {
       auto it = resource_ref_map.find(watched_resource_name);
       if (it != resource_ref_map.end()) {
         found_resources.emplace_back(it->second);
-        added_resources.insert(watched_resource_name);
+        resource_ref_map.erase(it);
       } else if (isXdstpWildcard(watched_resource_name)) {
         // See if the resources match the xdstp wildcard entry.
-        // TODO(abeyad): This could be made more efficient, e.g. by pre-computing the wildcard
-        // equivalents up front.
-        for (const auto& resource_ref_it : resource_ref_map) {
-          if (!added_resources.contains(resource_ref_it.first) &&
-              XdsResourceIdentifier::hasXdsTpScheme(resource_ref_it.first) &&
-              convertToWildcard(resource_ref_it.first) == watched_resource_name) {
-            found_resources.emplace_back(resource_ref_it.second);
-            added_resources.insert(resource_ref_it.first);
+        // TODO(abeyad): This could be made more efficient, e.g. by pre-computing and having a map
+        // entry for each wildcard watch.
+        for (auto resource_ref_it = resource_ref_map.begin();
+             resource_ref_it != resource_ref_map.end();) {
+          if (XdsResourceIdentifier::hasXdsTpScheme(resource_ref_it->first) &&
+              convertToWildcard(resource_ref_it->first) == watched_resource_name) {
+            found_resources.emplace_back(resource_ref_it->second);
+            resource_ref_it = resource_ref_map.erase(resource_ref_it);
+          } else {
+            ++resource_ref_it;
           }
         }
       }

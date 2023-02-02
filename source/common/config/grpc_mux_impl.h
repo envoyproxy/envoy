@@ -114,27 +114,6 @@ private:
       }
     }
 
-    void updateResources(const absl::flat_hash_set<std::string>& resources) {
-      resources_.clear();
-      for (const std::string& resource : resources) {
-        if (XdsResourceIdentifier::hasXdsTpScheme(resource)) {
-          auto xdstp_resource = XdsResourceIdentifier::decodeUrn(resource);
-          if (subscription_options_.add_xdstp_node_context_params_) {
-            const auto context = XdsContextParams::encodeResource(
-                local_info_.contextProvider().nodeContext(), xdstp_resource.context(), {}, {});
-            xdstp_resource.mutable_context()->CopyFrom(context);
-          }
-          XdsResourceIdentifier::EncodeOptions encode_options;
-          encode_options.sort_context_params_ = true;
-          resources_.insert(XdsResourceIdentifier::encodeUrn(xdstp_resource, encode_options));
-        } else {
-          resources_.insert(resource);
-        }
-      }
-      // move this watch to the beginning of the list
-      iter_ = watches_.emplace(watches_.begin(), this);
-    }
-
     void update(const absl::flat_hash_set<std::string>& resources) override {
       watches_.erase(iter_);
       if (!resources_.empty()) {
@@ -152,6 +131,28 @@ private:
     GrpcMuxImpl& parent_;
 
   private:
+    void updateResources(const absl::flat_hash_set<std::string>& resources) {
+      resources_.clear();
+      std::transform(
+          resources.begin(), resources.end(), std::inserter(resources_, resources_.begin()),
+          [this](const std::string& resource_name) -> std::string {
+            if (XdsResourceIdentifier::hasXdsTpScheme(resource_name)) {
+              auto xdstp_resource = XdsResourceIdentifier::decodeUrn(resource_name);
+              if (subscription_options_.add_xdstp_node_context_params_) {
+                const auto context = XdsContextParams::encodeResource(
+                    local_info_.contextProvider().nodeContext(), xdstp_resource.context(), {}, {});
+                xdstp_resource.mutable_context()->CopyFrom(context);
+              }
+              XdsResourceIdentifier::EncodeOptions encode_options;
+              encode_options.sort_context_params_ = true;
+              return XdsResourceIdentifier::encodeUrn(xdstp_resource, encode_options);
+            }
+            return resource_name;
+          });
+      // move this watch to the beginning of the list
+      iter_ = watches_.emplace(watches_.begin(), this);
+    }
+
     using WatchList = std::list<GrpcMuxWatchImpl*>;
     const SubscriptionOptions& subscription_options_;
     const LocalInfo::LocalInfo& local_info_;
