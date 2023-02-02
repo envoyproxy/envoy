@@ -173,5 +173,5 @@ message HttpProtocolOptions {
   //
   // [#not-implemented-hide:]
   // [#extension-category: envoy.http.header_validators]
-  config.core.v3.TypedExtensionConfig typed_header_validation_config = 7;
+  config.core.v3.TypedExtensionConfig header_validation_config = 7;
 }

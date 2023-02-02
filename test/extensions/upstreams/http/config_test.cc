@@ -149,7 +149,7 @@ TEST_F(ConfigTest, HeaderValidatorConfig) {
   const std::string yaml_string = R"EOF(
   use_downstream_protocol_config:
     http3_protocol_options: {}
-  typed_header_validation_config:
+  header_validation_config:
     name: custom_header_validator
     typed_config:
       "@type": type.googleapis.com/test.upstreams.http.CustomHeaderValidator

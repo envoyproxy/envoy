@@ -101,7 +101,7 @@ Envoy::Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
   Envoy::Http::HeaderValidatorFactoryPtr header_validator_factory;
 #ifdef ENVOY_ENABLE_UHV
   ::envoy::config::core::v3::TypedExtensionConfig legacy_header_validator_config;
-  if (!options.has_typed_header_validation_config()) {
+  if (!options.has_header_validation_config()) {
     // If header validator is not configured ensure that the defaults match Envoy's original
     // behavior.
     ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
@@ -113,8 +113,8 @@ Envoy::Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
   }
 
   const ::envoy::config::core::v3::TypedExtensionConfig& header_validator_config =
-      options.has_typed_header_validation_config() ? options.typed_header_validation_config()
-                                                   : legacy_header_validator_config;
+      options.has_header_validation_config() ? options.header_validation_config()
+                                             : legacy_header_validator_config;
 
   auto* factory = Envoy::Config::Utility::getFactory<Envoy::Http::HeaderValidatorFactoryConfig>(
       header_validator_config);
@@ -130,10 +130,10 @@ Envoy::Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
                                      header_validator_config.name()));
   }
 #else
-  if (options.has_typed_header_validation_config()) {
+  if (options.has_header_validation_config()) {
     throw EnvoyException(
         fmt::format("This Envoy binary does not support header validator extensions: '{}'",
-                    options.typed_header_validation_config().name()));
+                    options.header_validation_config().name()));
   }
 #endif
   return header_validator_factory;
