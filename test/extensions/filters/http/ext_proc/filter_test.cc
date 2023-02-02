@@ -2,17 +2,18 @@
 
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/http/filter.h"
-#include "test/common/http/conn_manager_impl_test_base.h"
+#include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 
 #include "source/common/http/conn_manager_impl.h"
 #include "source/common/http/context_impl.h"
+#include "source/common/network/address_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
 #include "test/common/http/common.h"
-#include "source/common/network/address_impl.h"
+#include "test/common/http/conn_manager_impl_test_base.h"
 #include "test/extensions/filters/http/ext_proc/mock_server.h"
 #include "test/extensions/filters/http/ext_proc/utils.h"
 #include "test/mocks/event/mocks.h"
@@ -27,7 +28,6 @@
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
-#include "envoy/network/connection.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -2274,7 +2274,10 @@ TEST_F(HttpFilterTest, FailOnInvalidHeaderMutations) {
 
 class HttpFilter2Test : public HttpFilterTest, public Http::HttpConnectionManagerImplMixin {};
 
-// Test proves that when headers response is not
+// Test proves that when onData(data, end_stream) is called before headers response is returned,
+// ext_proc filter will make the data buffered in ActiveStream buffer without triggering a buffer
+// over high watermark call, which ends in an 413 error return on request path, or a 500 error on
+// response path.
 TEST_F(HttpFilter2Test, LastOnDataCallExceedsStreamBufferLimitWouldJustRaiseHighWatermark2) {
   initialize(R"EOF(
   grpc_service:

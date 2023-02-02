@@ -218,15 +218,14 @@ envoy_cc_fuzz_test(
 )
 
 envoy_cc_test_library(
-        name = "conn_manager_impl_test_base_lib",
+    name = "conn_manager_impl_test_base_lib",
     srcs = ["conn_manager_impl_test_base.cc"],
     hdrs = ["conn_manager_impl_test_base.h"],
     deps = [
+        ":xff_extension_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:context_lib",
         "//source/common/tracing:custom_tag_lib",
-        ":xff_extension_lib",
-
         "//source/extensions/access_loggers/common:file_access_log_lib",
         "//source/extensions/request_id/uuid:config",
         "//test/mocks/access_log:access_log_mocks",
