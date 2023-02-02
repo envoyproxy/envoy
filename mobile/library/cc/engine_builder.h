@@ -75,7 +75,7 @@ public:
   EngineBuilder& addDnsPreresolveHostnames(const std::vector<std::string>& hostnames);
   EngineBuilder& addNativeFilter(std::string name, std::string typed_config);
   EngineBuilder& enableAdminInterface(bool admin_interface_on);
-  EngineBuilder& addStatsSink(std::string name, std::string typed_config);
+  EngineBuilder& addStatsSinks(const std::vector<std::string>& stat_sinks);
   EngineBuilder& addPlatformFilter(std::string name);
   EngineBuilder& addVirtualCluster(std::string virtual_cluster);
 
@@ -153,7 +153,7 @@ private:
   bool always_use_v6_ = false;
   int dns_min_refresh_seconds_ = 60;
   int max_connections_per_host_ = 7;
-  std::vector<std::pair<std::string, std::string>> stats_sinks_;
+  std::vector<std::string> stats_sinks_;
 
   std::vector<NativeFilterConfig> native_filter_chain_;
   std::vector<std::string> dns_preresolve_hostnames_;
