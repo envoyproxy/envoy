@@ -18,6 +18,8 @@ namespace Server {
 // Renders stats grouped by tag-extracted name: this is currently used for Prometheus stats only
 // (and has some Prometheus-specific logic in it), but if needed could be generalized for other
 // formats.
+// TODO(rulex123): cleanup any format-specific logic if we decide to have a grouped view
+// for HTML or JSON stats.
 class GroupedStatsRequest
     : public StatsRequest<std::vector<Stats::TextReadoutSharedPtr>,
                           std::vector<Stats::CounterSharedPtr>, std::vector<Stats::GaugeSharedPtr>,

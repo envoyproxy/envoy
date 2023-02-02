@@ -9,9 +9,6 @@
 namespace Envoy {
 namespace Server {
 
-// TODO(rulex123): this is currently used for Prometheus stats only, and
-// contains some Prometheus-specific logic (e.g. text-readouts policy). We should
-// remove any format-specific logic if we decide to have a grouped view for HTML or JSON stats.
 GroupedStatsRequest::GroupedStatsRequest(Stats::Store& stats, const StatsParams& params,
                                          Stats::CustomStatNamespaces& custom_namespaces,
                                          UrlHandlerFn url_handler_fn)
@@ -49,13 +46,11 @@ template <class StatType> Stats::IterateFn<StatType> GroupedStatsRequest::saveMa
       return true;
     }
 
-    // capture stat by either adding to a pre-existing variant or by creating a new variant
+    // capture stat
     std::string tag_extracted_name = global_symbol_table_.toString(stat->tagExtractedStatName());
-    auto [iterator, inserted] = stat_map_.try_emplace(
-        tag_extracted_name, std::vector<Stats::RefcountPtr<StatType>>({stat}));
-    if (!inserted) {
-      absl::get<std::vector<Stats::RefcountPtr<StatType>>>(iterator->second).emplace_back(stat);
-    }
+    stat_map_.insert({tag_extracted_name, std::vector<Stats::RefcountPtr<StatType>>({})});
+    absl::get<std::vector<Stats::RefcountPtr<StatType>>>(stat_map_[tag_extracted_name])
+        .emplace_back(stat);
     return true;
   };
 }
@@ -87,11 +82,11 @@ void GroupedStatsRequest::renderStat(const std::string& name, Buffer::Instance& 
 
     // sort group
     std::vector<SharedStatType> group = absl::get<std::vector<SharedStatType>>(variant);
-    global_symbol_table_.sortByStatNames<Stats::RefcountPtr<Stats::Metric>>(
-        group.begin(), group.end(),
-        [](const Stats::RefcountPtr<Stats::Metric>& stat) -> Stats::StatName {
-          return stat->statName();
-        });
+    std::sort(group.begin(), group.end(),
+              [this](const Stats::RefcountPtr<Stats::Metric>& stat1,
+                     const Stats::RefcountPtr<Stats::Metric>& stat2) -> bool {
+                return global_symbol_table_.lessThan(stat1->statName(), stat2->statName());
+              });
 
     // render group
     StatOrScopesIndex index = static_cast<StatOrScopesIndex>(variant.index());
@@ -127,15 +122,14 @@ void GroupedStatsRequest::processHistogram(const std::string& name, Buffer::Inst
   auto prefixed_tag_extracted_name = prefixedTagExtractedName<Stats::HistogramSharedPtr>(name);
 
   if (prefixed_tag_extracted_name.has_value()) {
-    // increment stats count
     phase_stat_count_++;
 
     // sort group
-    global_symbol_table_.sortByStatNames<Stats::RefcountPtr<Stats::Metric>>(
-        histogram.begin(), histogram.end(),
-        [](const Stats::RefcountPtr<Stats::Metric>& stat) -> Stats::StatName {
-          return stat->statName();
-        });
+    std::sort(histogram.begin(), histogram.end(),
+              [this](const Stats::RefcountPtr<Stats::Metric>& stat1,
+                     const Stats::RefcountPtr<Stats::Metric>& stat2) -> bool {
+                return global_symbol_table_.lessThan(stat1->statName(), stat2->statName());
+              });
 
     // render group
     response.add(fmt::format("# TYPE {0} {1}\n", prefixed_tag_extracted_name.value(), "histogram"));
