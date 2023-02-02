@@ -55,7 +55,7 @@ message LocalRateLimit {
   // field is empty, this filter will not share a token bucket with any other filter.
   string share_key = 4;
 
-  // The delay configuration to use for rejecting the connection after some specified time duration
+  // Optional delay configuration for rejecting the connection after some specified time duration
   // instead of immediately rejecting the connection. That way, a malicious user is not able to
   // retry as fast as possible which provides a better DoS protection for Envoy.
   google.protobuf.Duration delay = 5;

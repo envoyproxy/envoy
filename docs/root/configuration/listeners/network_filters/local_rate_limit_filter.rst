@@ -24,6 +24,8 @@ limit to incoming connections that are processed by the filter's filter chain. E
 processed by the filter utilizes a single token, and if no tokens are available, the connection will
 be immediately closed without further filter iteration.
 
+Optional delay can be configured to reject connection after some duration. This provides better protection against malicious retires and DoS attacks for Envoy.
+
 .. note::
   In the current implementation each filter and filter chain has an independent rate limit.
 
