@@ -64,7 +64,7 @@ public:
       return Network::FilterStatus::StopIteration;
     }
     request_callbacks_ = std::make_unique<RequestAsyncCallbacks>(*this);
-    client_->addAsyncTcpClientCallbacks(*request_callbacks_);
+    client_->setAsyncTcpClientCallbacks(*request_callbacks_);
     return Network::FilterStatus::Continue;
   }
 
