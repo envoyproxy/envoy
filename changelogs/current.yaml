@@ -71,8 +71,8 @@ new_features:
     added an new option to the options of lua ``httpCall``. This allows to skip adding ``x-forwarded-for`` by setting ``{["send_xff"] = false}`` as the ``options``.
 - area: proxy_protocol
   change: |
-    added the support :ref:`pass_through_tlvs for listener <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.pass_through_tlvs>` and
-    :ref:`pass_through_tlvs for upsteam <envoy_v3_api_field_config.core.v3.ProxyProtocolConfig.pass_through_tlvs>`. They can control which Proxy Protocol V2 TLVs can be passed through
-    by listener and upstream separately.
+    added the support :ref:`pass_through_tlvs for listener <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.pass_through_tlvs>`
+    and :ref:`pass_through_tlvs for upsteam <envoy_v3_api_field_config.core.v3.ProxyProtocolConfig.pass_through_tlvs>`.
+    They can control which Proxy Protocol V2 TLVs can be passed through by listener and upstream separately.
 
 deprecated:
