@@ -21,9 +21,10 @@ run_log "Query healthy instances for envoy: World"
 curl -s "http://localhost:${PORT_ADMIN_WORLD}/stats" | grep -q "cluster.world.health_check.healthy: 2"
 
 run_log "Render an instance of Hello unhealthy"
+docker-compose ps
 docker-compose exec -ti --index 1 hello kill -SIGUSR1 1
 # TODO remove this if possible
-sleep 1
+sleep 5
 
 docker-compose logs hello
 docker-compose logs hello | grep hello-1 |  grep -q "Marking service Hello as unhealthy"
