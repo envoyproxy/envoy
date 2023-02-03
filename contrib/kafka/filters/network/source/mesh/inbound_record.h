@@ -4,6 +4,8 @@
 #include <string>
 
 #include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
+#include "contrib/kafka/filters/network/source/kafka_types.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -20,10 +22,28 @@ struct InboundRecord {
   const int32_t partition_;
   const int64_t offset_;
 
-  // TODO (adam.kotwasinski) Get data in here in the next commits.
+  const NullableBytes key_;
+  const NullableBytes value_;
 
-  InboundRecord(std::string topic, int32_t partition, int64_t offset)
-      : topic_{topic}, partition_{partition}, offset_{offset} {};
+  InboundRecord(std::string topic, int32_t partition, int64_t offset, NullableBytes key,
+                NullableBytes value)
+      : topic_{topic}, partition_{partition}, offset_{offset}, key_{key}, value_{value} {};
+
+  absl::string_view key() const {
+    if (key_) {
+      return {reinterpret_cast<const char*>(key_->data()), key_->size()};
+    } else {
+      return {};
+    }
+  }
+
+  absl::string_view value() const {
+    if (value_) {
+      return {reinterpret_cast<const char*>(value_->data()), value_->size()};
+    } else {
+      return {};
+    }
+  }
 
   // Used in logging.
   std::string toString() const {

@@ -123,18 +123,24 @@ void FetchRecordConverterImpl::appendRecord(const InboundRecord& record, Bytes& 
   Statics::writeVarint(offset_delta, buffer);
 
   // keyLength: varint
-  const int32_t key_length = 0;
-  Statics::writeVarint(key_length, buffer);
-
   // key: byte[]
-  // ???
+  const absl::string_view key = record.key();
+  if (!key.empty()) {
+    Statics::writeVarint(key.size(), buffer);
+    buffer.add(key);
+  } else {
+    Statics::writeVarint(-1, buffer);
+  }
 
   // valueLen: varint
-  const int32_t value_length = 0;
-  Statics::writeVarint(value_length, buffer);
-
   // value: byte[]
-  // ???
+  const absl::string_view value = record.value();
+  if (!value.empty()) {
+    Statics::writeVarint(value.size(), buffer);
+    buffer.add(record.value());
+  } else {
+    Statics::writeVarint(-1, buffer);
+  }
 
   // TODO (adam.kotwasinski) Headers are not supported yet.
   const int32_t header_count = 0;
