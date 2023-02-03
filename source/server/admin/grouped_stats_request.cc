@@ -82,11 +82,9 @@ void GroupedStatsRequest::renderStat(const std::string& name, Buffer::Instance& 
 
     // sort group
     std::vector<SharedStatType> group = absl::get<std::vector<SharedStatType>>(variant);
-    std::sort(group.begin(), group.end(),
-              [this](const Stats::RefcountPtr<Stats::Metric>& stat1,
-                     const Stats::RefcountPtr<Stats::Metric>& stat2) -> bool {
-                return global_symbol_table_.lessThan(stat1->statName(), stat2->statName());
-              });
+    global_symbol_table_.sortByStatNames<SharedStatType>(
+        group.begin(), group.end(),
+        [](const SharedStatType& stat_ptr) -> Stats::StatName { return stat_ptr->statName(); });
 
     // render group
     prometheus_render->generate(response, prefixed_tag_extracted_name.value(), group);

@@ -22,22 +22,6 @@ protected:
     return std::make_unique<GroupedStatsRequest>(store_, params, custom_namespaces_);
   }
 
-  void addCounter(const std::string& name, Stats::StatNameTagVector cluster_tags) {
-    store_.rootScope()->counterFromStatNameWithTags(makeStatName(name), cluster_tags);
-  }
-
-  void addGauge(const std::string& name, Stats::StatNameTagVector cluster_tags) {
-    store_.rootScope()->gaugeFromStatNameWithTags(makeStatName(name), cluster_tags,
-                                                  Stats::Gauge::ImportMode::Accumulate);
-  }
-
-  void addTextReadout(const std::string& name, const std::string& value,
-                      Stats::StatNameTagVector cluster_tags) {
-    Stats::TextReadout& textReadout =
-        store_.rootScope()->textReadoutFromStatNameWithTags(makeStatName(name), cluster_tags);
-    textReadout.set(value);
-  }
-
   Stats::CustomStatNamespacesImpl custom_namespaces_;
 };
 
@@ -231,7 +215,7 @@ TEST_F(GroupedStatsRequestTest, OneStatUsedOnly) {
   EXPECT_EQ(0, iterateChunks(*makeRequest(true)));
 }
 
-TEST_F(GroupedStatsRequestTest, MetricNameCollision) {
+TEST_F(PrometheusStatsRenderingTest, MetricNameCollision) {
   // Create two counters and two gauges with each pair having the same name,
   // but having different tag names and values. 2 groups should be rendered.
 
@@ -243,6 +227,8 @@ TEST_F(GroupedStatsRequestTest, MetricNameCollision) {
            {{makeStatName("another_tag_name_3"), makeStatName("another_tag_3-value")}});
   addGauge("cluster.test_cluster_2.upstream_cx_total",
            {{makeStatName("another_tag_name_4"), makeStatName("another_tag_4-value")}});
+
+  ON_CALL(mock_store_, rootScope()).WillByDefault(testing::Return(test_scope_ptr_));
 
   const std::string expected_output =
       R"EOF(# TYPE envoy_cluster_test_cluster_1_upstream_cx_total counter
@@ -256,7 +242,7 @@ envoy_cluster_test_cluster_2_upstream_cx_total{another_tag_name_4="another_tag_4
   EXPECT_EQ(expected_output, response(*makeRequest(false)));
 }
 
-TEST_F(GroupedStatsRequestTest, UniqueMetricName) {
+TEST_F(PrometheusStatsRenderingTest, UniqueMetricName) {
   // Create two counters and two gauges, all with unique names.
   // 4 groups should be rendered.
 
@@ -268,6 +254,8 @@ TEST_F(GroupedStatsRequestTest, UniqueMetricName) {
            {{makeStatName("another_tag_name_3"), makeStatName("another_tag_3-value")}});
   addGauge("cluster.test_cluster_4.upstream_cx_total",
            {{makeStatName("another_tag_name_4"), makeStatName("another_tag_4-value")}});
+
+  ON_CALL(mock_store_, rootScope()).WillByDefault(testing::Return(test_scope_ptr_));
 
   const std::string expected_output =
       R"EOF(# TYPE envoy_cluster_test_cluster_1_upstream_cx_total counter
