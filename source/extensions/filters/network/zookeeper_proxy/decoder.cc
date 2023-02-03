@@ -48,6 +48,7 @@ void DecoderImpl::decodeOnData(Buffer::Instance& data, uint64_t& offset) {
 
   // Check message length.
   const int32_t len = helper_.peekInt32(data, offset);
+  ENVOY_LOG(trace, "zookeeper_proxy: decoding request with len {} at offset {}", len, offset);
   ensureMinLength(len, INT_LENGTH + XID_LENGTH);
   ensureMaxLength(len);
 
@@ -64,6 +65,7 @@ void DecoderImpl::decodeOnData(Buffer::Instance& data, uint64_t& offset) {
   //       However, some client implementations might expose setWatches
   //       as a regular data request, so we support that as well.
   const int32_t xid = helper_.peekInt32(data, offset);
+  ENVOY_LOG(trace, "zookeeper_proxy: decoding request with xid {} at offset {}", xid, offset);
   switch (static_cast<XidCodes>(xid)) {
   case XidCodes::ConnectXid:
     parseConnect(data, offset, len);
@@ -95,7 +97,9 @@ void DecoderImpl::decodeOnData(Buffer::Instance& data, uint64_t& offset) {
   // for two cases: auth requests can happen at any time and ping requests
   // must happen every 1/3 of the negotiated session timeout, to keep
   // the session alive.
-  const auto opcode = static_cast<OpCodes>(helper_.peekInt32(data, offset));
+  const int32_t oc = helper_.peekInt32(data, offset);
+  ENVOY_LOG(trace, "zookeeper_proxy: decoding request with opcode {} at offset {}", oc, offset);
+  const auto opcode = static_cast<OpCodes>(oc);
   switch (opcode) {
   case OpCodes::GetData:
     parseGetDataRequest(data, offset, len);
@@ -170,10 +174,12 @@ void DecoderImpl::decodeOnWrite(Buffer::Instance& data, uint64_t& offset) {
 
   // Check message length.
   const int32_t len = helper_.peekInt32(data, offset);
+  ENVOY_LOG(trace, "zookeeper_proxy: decoding response with len {} at offset {}", len, offset);
   ensureMinLength(len, INT_LENGTH + XID_LENGTH);
   ensureMaxLength(len);
 
   const auto xid = helper_.peekInt32(data, offset);
+  ENVOY_LOG(trace, "zookeeper_proxy: decoding response with xid {} at offset {}", xid, offset);
   const auto xid_code = static_cast<XidCodes>(xid);
 
   std::chrono::milliseconds latency;
@@ -204,7 +210,9 @@ void DecoderImpl::decodeOnWrite(Buffer::Instance& data, uint64_t& offset) {
 
   // Control responses that aren't connect, with XIDs <= 0.
   const auto zxid = helper_.peekInt64(data, offset);
+  ENVOY_LOG(trace, "zookeeper_proxy: decoding response with zxid {} at offset {}", zxid, offset);
   const auto error = helper_.peekInt32(data, offset);
+  ENVOY_LOG(trace, "zookeeper_proxy: decoding response with error {} at offset {}", error, offset);
   switch (xid_code) {
   case XidCodes::PingXid:
     callbacks_.onResponse(OpCodes::Ping, xid, zxid, error, latency);
