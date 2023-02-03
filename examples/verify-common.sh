@@ -55,7 +55,7 @@ bring_up_example () {
 
 cleanup_stack () {
     local path
-    path="$?"
+    path="$1"
     run_log "Cleanup ($path)"
     "$DOCKER_COMPOSE" down --remove-orphans
 }
@@ -71,8 +71,7 @@ debug_failure () {
 }
 
 cleanup () {
-    local code
-    code="$1"
+    local code="$?"
 
     if [[ "$code" -ne 0 ]]; then
         debug_failure
