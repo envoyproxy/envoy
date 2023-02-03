@@ -22,6 +22,7 @@ envoy_cc_library(
         "datadog_tracer_impl.h",
         "dict_util.h",
         "time_util.h",
+        "tracer_stats.h",
     ],
     copts = [
         # Make sure that headers included from dd_trace_cpp use Abseil

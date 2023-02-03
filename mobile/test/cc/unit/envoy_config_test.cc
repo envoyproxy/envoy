@@ -273,11 +273,11 @@ TEST(TestConfig, AddMaxConnectionsPerHost) {
 }
 
 std::string statsdSinkConfig(int port) {
-  std::string config = R"(
-      {
+  std::string config = R"({ name: envoy.stat_sinks.statsd,
+      typed_config: {
         "@type": type.googleapis.com/envoy.config.metrics.v3.StatsdSink,
         address: { socket_address: { address: 127.0.0.1, port_value: )" +
-                       fmt::format("{}", port) + " } } }";
+                       fmt::format("{}", port) + " } } } }";
   return config;
 }
 
@@ -289,8 +289,7 @@ TEST(TestConfig, AddStatsSinks) {
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
 
-  engine_builder.addStatsSink("envoy.stat_sinks.statsd", statsdSinkConfig(1));
-  engine_builder.addStatsSink("envoy.stat_sinks.statsd", statsdSinkConfig(2));
+  engine_builder.addStatsSinks({statsdSinkConfig(1), statsdSinkConfig(2)});
   config_str = engine_builder.generateConfigStr();
   ASSERT_THAT(config_str, HasSubstr(statsdSinkConfig(1)));
   ASSERT_THAT(config_str, HasSubstr(statsdSinkConfig(2)));
@@ -321,6 +320,17 @@ TEST(TestConfig, RemainingTemplatesThrows) {
     FAIL() << "Expected std::runtime_error";
   } catch (std::runtime_error& err) {
     EXPECT_EQ(err.what(), std::string("could not resolve all template keys in config"));
+  }
+}
+
+TEST(TestConfig, RtdsWithoutAds) {
+  EngineBuilder engine_builder;
+  engine_builder.addRtdsLayer("some rtds layer");
+  try {
+    engine_builder.generateConfigStr();
+    FAIL() << "Expected std::runtime_error";
+  } catch (std::runtime_error& err) {
+    EXPECT_EQ(err.what(), std::string("ADS must be configured when using RTDS"));
   }
 }
 
@@ -361,24 +371,27 @@ private:
   mutable int count_ = 0;
 };
 
-TEST(TestConfig, AddNativeFilter) {
+TEST(TestConfig, AddNativeFilters) {
   EngineBuilder engine_builder;
 
-  std::string filter_name = "envoy.filters.http.buffer";
+  std::string filter_name1 = "envoy.filters.http.buffer1";
+  std::string filter_name2 = "envoy.filters.http.buffer2";
   std::string filter_config =
       "{\"@type\":\"type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer\","
       "\"max_request_bytes\":5242880}";
 
   std::string config_str = engine_builder.generateConfigStr();
-  ASSERT_THAT(config_str, Not(HasSubstr("- name: " + filter_name)));
+  ASSERT_THAT(config_str, Not(HasSubstr("- name: " + filter_name1)));
   ASSERT_THAT(config_str, Not(HasSubstr("  typed_config: " + filter_config)));
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
 
-  engine_builder.addNativeFilter(filter_name, filter_config);
+  engine_builder.addNativeFilter(filter_name1, filter_config);
+  engine_builder.addNativeFilter(filter_name2, filter_config);
 
   config_str = engine_builder.generateConfigStr();
-  ASSERT_THAT(config_str, HasSubstr("- name: " + filter_name));
+  ASSERT_THAT(config_str, HasSubstr("- name: " + filter_name1));
+  ASSERT_THAT(config_str, HasSubstr("- name: " + filter_name2));
   ASSERT_THAT(config_str, HasSubstr("  typed_config: " + filter_config));
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
 }

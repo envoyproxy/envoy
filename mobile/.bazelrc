@@ -3,7 +3,6 @@ try-import ../.bazelrc
 
 # Common flags for all builds
 build --platform_mappings=bazel/platform_mappings
-build --define=google_grpc=disabled
 build --define=hot_restart=disabled
 build --define=tcmalloc=disabled
 build --define=admin_html=disabled
@@ -57,7 +56,7 @@ build:dbg-common --copt="-fdebug-compilation-dir" --copt="/proc/self/cwd"
 build:ios --define=manual_stamp=manual_stamp
 
 # Default flags for builds targeting Android
-build:android --define=logger=android --define=include_ifaddrs=true
+build:android --define=logger=android
 
 # Default flags for Android debug builds
 build:dbg-android --config=dbg-common
@@ -111,6 +110,9 @@ build:release-common --config=sizeopt --define=admin_functionality=disabled
 # Set default symbols visibility to hidden to reduce .dynstr and the symbol table size
 build:release-common --copt=-fvisibility=hidden
 
+# Disable google_grpc in production by default
+build:release-common --define=google_grpc=disabled
+
 # Enable automatic extension factory registration for release builds
 build:release-common --define=static_extension_registration=enabled
 
@@ -121,7 +123,6 @@ build:release-ios --compilation_mode=opt
 
 # Flags for release builds targeting Android or the JVM
 # Release does not use the option --define=logger=android
-build:release-android --define=include_ifaddrs=true
 build:release-android --config=release-common
 build:release-android --compilation_mode=opt
 
