@@ -343,8 +343,7 @@ public:
    *
    * @return a filename based on the process id and current time.
    */
-
-  static std::string uniqueFilename();
+  static std::string uniqueFilename(absl::string_view prefix = "");
 
   /**
    * Compare two protos of the same type for equality.
