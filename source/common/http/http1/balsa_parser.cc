@@ -126,6 +126,13 @@ BalsaParser::BalsaParser(MessageType type, ParserCallbacks* connection, size_t m
     : message_type_(type), connection_(connection) {
   ASSERT(connection_ != nullptr);
 
+  quiche::HttpValidationPolicy http_validation_policy;
+  http_validation_policy.disallow_header_continuation_lines = false;
+  http_validation_policy.require_header_colon = true;
+  http_validation_policy.disallow_multiple_content_length = false;
+  http_validation_policy.disallow_transfer_encoding_with_content_length = false;
+  framer_.set_http_validation_policy(http_validation_policy);
+
   framer_.set_balsa_headers(&headers_);
   if (enable_trailers) {
     framer_.set_balsa_trailer(&trailers_);
