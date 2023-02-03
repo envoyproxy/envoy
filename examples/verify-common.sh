@@ -60,7 +60,24 @@ cleanup_stack () {
     "$DOCKER_COMPOSE" down --remove-orphans
 }
 
+debug_failure () {
+    >&2 echo "FAILURE DEBUG"
+    >&2 echo "DISK SPACE"
+    df -h
+    >&2 echo "DOCKER COMPOSE LOGS"
+    "$DOCKER_COMPOSE" logs
+    >&2 echo "DOCKER COMPOSE PS"
+    "$DOCKER_COMPOSE" ps
+}
+
 cleanup () {
+    local code
+    code="$1"
+
+    if [[ "$code" -ne 0 ]]; then
+        debug_failure
+    fi
+
     local path paths
     read -ra paths <<< "$(echo "$PATHS" | tr ',' ' ')"
     for path in "${paths[@]}"; do
