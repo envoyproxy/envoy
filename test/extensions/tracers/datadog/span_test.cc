@@ -150,7 +150,7 @@ TEST_F(DatadogTracerSpanTest, InjectContext) {
   span.injectContext(context, nullptr);
   // Span::injectContext doesn't modify any of named fields.
   EXPECT_EQ("", context.context_protocol_);
-  EXPECT_EQ("", context.context_authority_);
+  EXPECT_EQ("", context.context_host_);
   EXPECT_EQ("", context.context_path_);
   EXPECT_EQ("", context.context_method_);
 
@@ -283,7 +283,7 @@ TEST_F(DatadogTracerSpanTest, NoOpMode) {
   Tracing::TestTraceContextImpl context{};
   span.injectContext(context, nullptr);
   EXPECT_EQ("", context.context_protocol_);
-  EXPECT_EQ("", context.context_authority_);
+  EXPECT_EQ("", context.context_host_);
   EXPECT_EQ("", context.context_path_);
   EXPECT_EQ("", context.context_method_);
   EXPECT_EQ(0, context.context_map_.size());
