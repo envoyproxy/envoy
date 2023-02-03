@@ -44,7 +44,7 @@ public:
   // Note: This class does not inherit from testing::Test and so this TearDown() method
   // does not override testing::Test::TearDown(). As a result, it will not be called
   // automatically by gtest during shutdown and must be called manually.
-  virtual void TearDown();
+  void TearDown();
 
 protected:
   envoy_engine_t& rawEngine() { return engine_->engine_; }
