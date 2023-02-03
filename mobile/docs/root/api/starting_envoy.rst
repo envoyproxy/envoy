@@ -421,22 +421,6 @@ Specify whether sockets may attempt to bind to a specific interface, based on ne
   // Swift
   builder.enableInterfaceBinding(true)
 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-``h2ExtendKeepaliveTimeout``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Extend the keepalive timeout when *any* frame is received on the owning HTTP/2 connection.
-
-This can help negate the effect of head-of-line (HOL) blocking for slow connections.
-
-**Example**::
-
-  // Kotlin
-  builder.h2ExtendKeepaliveTimeout(true)
-
-  // Swift
-  builder.h2ExtendKeepaliveTimeout(true)
-
 
 ~~~~~~~~~~~~~~~~~~~~
 ``addKeyValueStore``
@@ -505,6 +489,27 @@ Available on Android only.
 
     // Kotlin
     builder.enableProxying(true)
+
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+``enableDNSCache``
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Specify whether to enable DNS cache. Note that DNS cache requires an addition of
+a key value store named 'reserved.platform_store'.
+
+The interval at which results are saved to the key value store defaults to 1s
+but can also be set explicitly.
+
+A maximum of 100 entries will be stored.
+
+**Example**::
+
+  // Kotlin
+  builder.enableDNSCache(true, saveInterval: 60)
+
+  // Swift
+  builder.enableDNSCache(true, saveInterval: 60)
 
 
 ----------------------

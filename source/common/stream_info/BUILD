@@ -13,6 +13,7 @@ envoy_cc_library(
     hdrs = ["stream_info_impl.h"],
     deps = [
         ":filter_state_lib",
+        ":stream_id_provider_lib",
         "//envoy/http:request_id_extension_interface",
         "//envoy/stream_info:stream_info_interface",
         "//source/common/common:assert_lib",

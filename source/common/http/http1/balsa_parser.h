@@ -71,6 +71,7 @@ private:
   bool first_byte_processed_ = false;
   bool headers_done_ = false;
   ParserStatus status_ = ParserStatus::Ok;
+  // An error message, often seemingly arbitrary to match http-parser behavior.
   absl::string_view error_message_;
 };
 

@@ -180,9 +180,17 @@ void BaseClientIntegrationTest::threadRoutine(absl::Notification& engine_running
 void BaseClientIntegrationTest::TearDown() {
   test_server_.reset();
   fake_upstreams_.clear();
-  engine_.reset();
+  if (engine_) {
+    engine_->terminate();
+    engine_.reset();
+  }
+  stream_.reset();
+  stream_prototype_.reset();
   full_dispatcher_->exit();
-  envoy_thread_->join();
+  if (envoy_thread_) {
+    envoy_thread_->join();
+    envoy_thread_.reset();
+  }
 }
 
 void BaseClientIntegrationTest::createEnvoy() {
@@ -193,9 +201,8 @@ void BaseClientIntegrationTest::createEnvoy() {
     }
   }
 
-  finalizeConfigWithPorts(config_helper_, ports, use_lds_);
-
   if (override_builder_config_) {
+    finalizeConfigWithPorts(config_helper_, ports, use_lds_);
     ASSERT_FALSE(config_helper_.bootstrap().has_admin())
         << "Bootstrap config should not have `admin` configured in Envoy Mobile";
     builder_.setOverrideConfigForTests(

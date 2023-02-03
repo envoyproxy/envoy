@@ -46,6 +46,25 @@ TEST(DatadogTracerTimeUtilTest, EstimateTime) {
   EXPECT_EQ(result.tick, clock_result.tick);
 }
 
+TEST(DatadogTracerTimeUtilTest, DefaultClock) {
+  // The one-parameter overload of `estimateTime` uses the system clock.
+  // We can at least check that the steady (monotonic, `.tick`) portion is
+  // approximately non-decreasing along "before," "during," and "after."
+  // Only "approximately," because the `datadog::tracing::default_clock` can't
+  // measure both clocks exactly simultaneously, so its correction to the
+  // steady time might actually set it back in time some tiny amount.
+  const datadog::tracing::Clock clock = datadog::tracing::default_clock;
+  const datadog::tracing::TimePoint before = clock();
+  const datadog::tracing::TimePoint estimated_before = estimateTime(before.wall);
+  const datadog::tracing::TimePoint after = clock();
+
+  const auto tolerance = std::chrono::microseconds(100);
+
+  EXPECT_LE(before.tick, after.tick);
+  EXPECT_LE(estimated_before.tick - before.tick, tolerance);
+  EXPECT_LE(after.tick - estimated_before.tick, tolerance);
+}
+
 } // namespace
 } // namespace Datadog
 } // namespace Tracers

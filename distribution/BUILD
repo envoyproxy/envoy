@@ -10,9 +10,9 @@ MAINTAINER = "Envoy maintainers <envoy-maintainers@googlegroups.com>"
 
 genrule(
     name = "envoy-bin",
-    srcs = ["//source/exe:envoy-static.stripped"],
+    srcs = ["//source/exe:envoy-static"],
     outs = ["envoy"],
-    cmd = "cp -L $< $@",
+    cmd = "strip $(location //source/exe:envoy-static) -o $@",
 )
 
 envoy_pkg_distros(
