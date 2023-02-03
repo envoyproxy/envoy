@@ -882,10 +882,11 @@ sphinxcontrib-httpdomain==1.8.0 \
     --hash=sha256:2059cfabd0cca8fcc3455cc8ffad92f0915a7d3bb03bfddba078a6a0f35beec5 \
     --hash=sha256:a3396d6350728d574f52458b400f0ac848f8b6913bd41fed95d391d3ffbbade3
     # via envoy-docs-sphinx-runner
-sphinxcontrib-jquery==3.0.0 \
-    --hash=sha256:72f201e55d8430bc3aaec7718a6c0d82a7b7c63d750428525e3d1c10d20aa437 \
-    --hash=sha256:f3f8af2f1d344a2525f8a29d7a88ff2ee47ae25192a8de35748348ad3104ffd2
-    # via envoy-docs-sphinx-runner
+sphinxcontrib.jquery @ https://github.com/sphinx-contrib/jquery/archive/refs/tags/v3.0.0.zip \
+    --hash=sha256:562ad9ac0ac3d8f04a363eb3507ae4b2b856aa04aabab6df7543530fafb849ca
+    # via
+    #   -r requirements.in
+    #   envoy-docs-sphinx-runner
 sphinxcontrib-jsmath==1.0.1 \
     --hash=sha256:2ec2eaebfb78f3f2078e73666b1415417a116cc848b72e5172e596c871103178 \
     --hash=sha256:a9925e4a4587247ed2191a22df5f6970656cb8ca2bd6284309578f2153e0c4b8
