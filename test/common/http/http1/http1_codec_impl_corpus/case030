@@ -1,0 +1,11 @@
+PUT / HTTP/3
+transfer-encoding: deflate
+grpc-timeout: empty
+transfer-encoding: deflate
+-force-trace: empty
+early-data: empty
+:scheme: https
+-original-path: empty
+content-length: 9
+
+AAAAAAAAA

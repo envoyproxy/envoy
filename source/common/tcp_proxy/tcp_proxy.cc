@@ -235,6 +235,13 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
   }
 }
 
+void Filter::onInitFailure(UpstreamFailureReason reason) {
+  read_callbacks_->connection().close(
+      Network::ConnectionCloseType::NoFlush,
+      absl::StrCat(StreamInfo::LocalCloseReasons::get().TcpProxyInitializationFailure,
+                   enumToInt(reason)));
+}
+
 void Filter::readDisableUpstream(bool disable) {
   bool success = false;
   if (upstream_) {
@@ -471,7 +478,7 @@ bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster) {
   GenericConnPoolFactory* factory = nullptr;
   if (cluster.info()->upstreamConfig().has_value()) {
     factory = Envoy::Config::Utility::getFactory<GenericConnPoolFactory>(
-        cluster.info()->upstreamConfig().value());
+        cluster.info()->upstreamConfig().ref());
   } else {
     factory = Envoy::Config::Utility::getFactoryByName<GenericConnPoolFactory>(
         "envoy.filters.connection_pools.tcp.generic");
@@ -667,7 +674,7 @@ void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
   }
 
   ENVOY_CONN_LOG(trace, "on downstream event {}, has upstream = {}", read_callbacks_->connection(),
-                 static_cast<int>(event), upstream_ == nullptr);
+                 static_cast<int>(event), upstream_ != nullptr);
 
   if (upstream_) {
     Tcp::ConnectionPool::ConnectionDataPtr conn_data(upstream_->onDownstreamEvent(event));
@@ -772,14 +779,17 @@ void Filter::onIdleTimeout() {
   config_->stats().idle_timeout_.inc();
 
   // This results in also closing the upstream connection.
-  read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+  read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush,
+                                      StreamInfo::LocalCloseReasons::get().TcpSessionIdleTimeout);
 }
 
 void Filter::onMaxDownstreamConnectionDuration() {
   ENVOY_CONN_LOG(debug, "max connection duration reached", read_callbacks_->connection());
   getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::DurationTimeout);
   config_->stats().max_downstream_connection_duration_.inc();
-  read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+  read_callbacks_->connection().close(
+      Network::ConnectionCloseType::NoFlush,
+      StreamInfo::LocalCloseReasons::get().MaxConnectionDurationReached);
 }
 
 void Filter::onAccessLogFlushInterval() {

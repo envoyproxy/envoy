@@ -45,7 +45,7 @@ public:
 class SipConnectionManagerTest : public testing::Test {
 public:
   SipConnectionManagerTest()
-      : stats_(SipFilterStats::generateStats("test.", store_)),
+      : stats_(SipFilterStats::generateStats("test.", *store_.rootScope())),
         transaction_infos_(std::make_shared<Router::TransactionInfos>()) {}
   ~SipConnectionManagerTest() override {
     filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();

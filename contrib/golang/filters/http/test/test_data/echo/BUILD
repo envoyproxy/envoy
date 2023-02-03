@@ -5,9 +5,7 @@ licenses(["notice"])  # Apache 2
 go_binary(
     name = "filter.so",
     srcs = [
-        "api.h",
         "config.go",
-        "export.go",
         "filter.go",
     ],
     out = "filter.so",
@@ -19,7 +17,8 @@ go_binary(
         "//contrib/golang/filters/http/source/go/pkg/api",
         "//contrib/golang/filters/http/source/go/pkg/http",
         "//contrib/golang/filters/http/source/go/pkg/utils",
-        "@com_github_cncf_xds_go//udpa/type/v1:type",
+        "@com_github_cncf_xds_go//xds/type/v3:type",
         "@org_golang_google_protobuf//types/known/anypb",
+        "@org_golang_google_protobuf//types/known/structpb",
     ],
 )

@@ -40,6 +40,7 @@ ar
 btree
 CAS
 CB
+cartid
 cbor
 CDN
 CDS
@@ -60,6 +61,7 @@ ESC
 ETB
 ETX
 FS
+FIXME
 HEXDIG
 HEXDIGIT
 HPE
@@ -157,6 +159,7 @@ FIPS
 FIRSTHDR
 FQDN
 FREEBIND
+freeifaddrs
 FUZZER
 FUZZERS
 delims
@@ -200,6 +203,7 @@ IAM
 IANA
 IDL
 IETF
+IFADDRS
 INADDR
 INET
 INVAL
@@ -280,12 +284,14 @@ Oauth
 OCSP
 OD
 ODCDS
+middlewildcard
 mpd
 oghttp
 OID
 OK
 OOM
 OOMs
+ORCA
 OS
 OSI
 OSS
@@ -937,6 +943,9 @@ negative
 netblock
 netblocks
 netfilter
+netlink
+netmask
+NLMSG
 nonblocking
 noncopyable
 nonresponsive
@@ -958,6 +967,7 @@ ocagent
 offsetof
 oneof
 oneway
+oob
 opcode
 opencensus
 openssl
@@ -1063,6 +1073,7 @@ qdtext
 qps
 quantile
 quantiles
+querydetails
 quiesce
 quitquitquit
 qvalue
@@ -1130,6 +1141,7 @@ responder
 restarter
 resync
 ret
+retransmitted
 retransmitting
 retriable
 retriggers
@@ -1387,6 +1399,8 @@ xid
 xmodem
 xxhash
 xxs
+xyz
+xyzwebservices
 zag
 zig
 zipkin

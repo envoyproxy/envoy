@@ -270,6 +270,7 @@ public:
   MOCK_METHOD(bool, includeCounter, (const Counter&));
   MOCK_METHOD(bool, includeGauge, (const Gauge&));
   MOCK_METHOD(bool, includeTextReadout, (const TextReadout&));
+  MOCK_METHOD(bool, includeHistogram, (const Histogram&));
 };
 
 class MockStore;
@@ -315,6 +316,7 @@ public:
   MOCK_METHOD(void, forEachGauge, (SizeFn, StatFn<Gauge>), (const));
   MOCK_METHOD(void, forEachTextReadout, (SizeFn, StatFn<TextReadout>), (const));
   MOCK_METHOD(void, forEachHistogram, (SizeFn, StatFn<ParentHistogram>), (const));
+  MOCK_METHOD(void, forEachSinkedHistogram, (SizeFn, StatFn<ParentHistogram>), (const));
   MOCK_METHOD(Counter&, counter, (const std::string&));
   MOCK_METHOD(Gauge&, gauge, (const std::string&, Gauge::ImportMode));
   MOCK_METHOD(Histogram&, histogram, (const std::string&, Histogram::Unit));

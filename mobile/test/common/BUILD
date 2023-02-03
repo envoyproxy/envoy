@@ -10,6 +10,7 @@ envoy_cc_test(
     repository = "@envoy",
     deps = [
         "//library/common:engine_common_lib",
+        "@envoy_build_config//:extension_registry",
     ],
 )
 

@@ -117,7 +117,6 @@ const std::string config_header = R"(
 - &dns_fail_max_interval 10s
 - &dns_lookup_family ALL
 - &dns_min_refresh_rate 60s
-- &dns_multiple_addresses true
 - &dns_preresolve_hostnames []
 - &dns_query_timeout 25s
 - &dns_refresh_rate 60s
@@ -137,7 +136,6 @@ R"(- &enable_drain_post_dns_refresh false
 - &enable_interface_binding false
 - &h2_connection_keepalive_idle_interval 100000s
 - &h2_connection_keepalive_timeout 10s
-- &h2_delay_keepalive_timeout false
 - &max_connections_per_host 7
 - &metadata {}
 - &stats_domain 127.0.0.1
@@ -369,7 +367,7 @@ const char* config_template = R"(
 typed_dns_resolver_config:
   name: *dns_resolver_name
   typed_config: *dns_resolver_config
-
+#{custom_ads}
 static_resources:
   listeners:
 #{custom_listeners}
@@ -496,14 +494,19 @@ stats_config:
   stats_matcher:
     inclusion_list:
       patterns:
-        - prefix: cluster.base.
-        - prefix: cluster.base_h2.
-        - prefix: cluster.stats.
-        - prefix: http.client.
-        - prefix: http.dispatcher.
-        - prefix: http.hcm.
-        - prefix: pbf_filter.
+        - prefix: cluster.base.upstream_rq_
+        - prefix: cluster.base_h2.upstream_rq_
+        - prefix: cluster.stats.upstream_rq_
+        - prefix: cluster.base.upstream_cx_
+        - prefix: cluster.base_h2.upstream_cx_
+        - prefix: cluster.stats.upstream_cx_
+        - exact: cluster.base.http2.keepalive_timeout
+        - exact: cluster.base_h2.http2.keepalive_timeout
+        - exact: cluster.stats.http2.keepalive_timeout
+        - prefix: http.hcm.downstream_rq_
+        - prefix: http.hcm.decompressor.
         - prefix: pulse.
+        - prefix: runtime.load_success
         - safe_regex:
             regex: '^vhost\.[\w]+\.vcluster\.[\w]+?\.upstream_rq_(?:[12345]xx|[3-5][0-9][0-9]|retry|total)'
   use_all_default_tags:
@@ -528,9 +531,7 @@ layered_runtime:
           # Global stats do not play well with engines with limited lifetimes
           disallow_global_stats: true
           reloadable_features:
-            allow_multiple_dns_addresses: *dns_multiple_addresses
             always_use_v6: *force_ipv6
-            http2_delay_keepalive_timeout: *h2_delay_keepalive_timeout
             skip_dns_lookup_for_proxied_requests: *skip_dns_lookup_for_proxied_requests
 )"
 // Needed due to warning in
@@ -538,5 +539,27 @@ layered_runtime:
 R"(
         overload:
           global_downstream_max_connections: 0xffffffff # uint32 max
+#{custom_layers}
 )";
+
+const char* rtds_layer_insert = R"(
+    - name: {}
+      rtds_layer:
+        name: {}
+        rtds_config:
+          initial_fetch_timeout:
+            seconds: {}
+          resource_api_version: V3
+          ads: {{}})";
+
+const char* ads_insert = R"(
+dynamic_resources:
+  ads_config:
+    transport_api_version: V3
+    api_type: {}
+    set_node_on_first_message_only: true
+    grpc_services:
+      google_grpc:
+        target_uri: '{}:{}')";
+
 // clang-format on

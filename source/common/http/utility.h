@@ -20,7 +20,6 @@
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
-#include "nghttp2/nghttp2.h"
 
 namespace Envoy {
 namespace Http {
@@ -45,18 +44,6 @@ using AlpnNames = ConstSingleton<AlpnNameValues>;
 
 namespace Http2 {
 namespace Utility {
-
-struct SettingsEntryHash {
-  size_t operator()(const nghttp2_settings_entry& entry) const {
-    return absl::Hash<decltype(entry.settings_id)>()(entry.settings_id);
-  }
-};
-
-struct SettingsEntryEquals {
-  bool operator()(const nghttp2_settings_entry& lhs, const nghttp2_settings_entry& rhs) const {
-    return lhs.settings_id == rhs.settings_id;
-  }
-};
 
 // Limits and defaults for `envoy::config::core::v3::Http2ProtocolOptions` protos.
 struct OptionsLimits {

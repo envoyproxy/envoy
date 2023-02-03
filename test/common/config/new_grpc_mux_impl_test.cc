@@ -55,7 +55,7 @@ public:
         config_validators_(std::make_unique<NiceMock<MockCustomConfigValidators>>()),
         resource_decoder_(std::make_shared<TestUtility::TestOpaqueResourceDecoderImpl<
                               envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name")),
-        control_plane_stats_(Utility::generateControlPlaneStats(stats_)),
+        control_plane_stats_(Utility::generateControlPlaneStats(*stats_.rootScope())),
         control_plane_connected_state_(
             stats_.gauge("control_plane.connected_state", Stats::Gauge::ImportMode::NeverImport)),
         should_use_unified_(legacy_or_unified == LegacyOrUnified::Unified) {}
@@ -66,7 +66,8 @@ public:
           std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-          random_, stats_, rate_limit_settings_, local_info_, false, std::move(config_validators_),
+          random_, *stats_.rootScope(), rate_limit_settings_, local_info_, false,
+          std::move(config_validators_),
           /*xds_config_tracker=*/XdsConfigTrackerOptRef());
       return;
     }
@@ -74,7 +75,8 @@ public:
         std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
-        random_, stats_, rate_limit_settings_, local_info_, std::move(config_validators_),
+        random_, *stats_.rootScope(), rate_limit_settings_, local_info_,
+        std::move(config_validators_),
         /*xds_config_tracker=*/XdsConfigTrackerOptRef());
   }
 

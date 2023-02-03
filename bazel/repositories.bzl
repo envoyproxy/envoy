@@ -164,6 +164,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_circonus_labs_libcircllhist()
     _com_github_cyan4973_xxhash()
     _com_github_datadog_dd_opentracing_cpp()
+    _com_github_datadog_dd_trace_cpp()
     _com_github_mirror_tclap()
     _com_github_envoyproxy_sqlparser()
     _com_github_fmtlib_fmt()
@@ -252,7 +253,7 @@ def envoy_dependencies(skip_targets = []):
         go = True,
         grpc = True,
         rules_override = {
-            "py_proto_library": "@envoy_api//bazel:api_build_system.bzl",
+            "py_proto_library": ["@envoy_api//bazel:api_build_system.bzl", ""],
         },
     )
     native.bind(
@@ -572,6 +573,13 @@ def _com_github_datadog_dd_opentracing_cpp():
     native.bind(
         name = "dd_opentracing_cpp",
         actual = "@com_github_datadog_dd_opentracing_cpp//:dd_opentracing_cpp",
+    )
+
+def _com_github_datadog_dd_trace_cpp():
+    external_http_archive("com_github_datadog_dd_trace_cpp")
+    native.bind(
+        name = "dd_trace_cpp",
+        actual = "@com_github_datadog_dd_trace_cpp//:dd_trace_cpp",
     )
 
 def _com_github_skyapm_cpp2sky():
@@ -898,12 +906,24 @@ def _com_github_google_quiche():
         actual = "@com_github_google_quiche//:http2_adapter",
     )
     native.bind(
+        name = "quiche_http2_protocol",
+        actual = "@com_github_google_quiche//:http2_adapter_http2_protocol",
+    )
+    native.bind(
+        name = "quiche_http2_test_tools",
+        actual = "@com_github_google_quiche//:http2_adapter_mock_http2_visitor",
+    )
+    native.bind(
         name = "quiche_quic_platform",
         actual = "@com_github_google_quiche//:quic_platform",
     )
     native.bind(
         name = "quiche_quic_platform_base",
         actual = "@com_github_google_quiche//:quic_platform_base",
+    )
+    native.bind(
+        name = "quiche_spdy_hpack",
+        actual = "@com_github_google_quiche//:spdy_core_hpack_hpack_lib",
     )
 
 def _com_googlesource_googleurl():
