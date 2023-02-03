@@ -30,7 +30,7 @@ public:
 
   /**
    * Connect to a remote host. Errors or connection events are reported via the
-   * event callback registered via addAsyncTcpClientCallbacks().
+   * event callback registered via setAsyncTcpClientCallbacks().
    */
   virtual bool connect() PURE;
 
@@ -59,7 +59,7 @@ public:
    * Add AsyncTcpClientCallbacks to the client
    * @param callbacks the client callbacks.
    */
-  virtual void addAsyncTcpClientCallbacks(AsyncTcpClientCallbacks& callbacks) PURE;
+  virtual void setAsyncTcpClientCallbacks(AsyncTcpClientCallbacks& callbacks) PURE;
 
   /**
    * @return Event::Dispatcher& the dispatcher backing this client.

@@ -33,7 +33,7 @@ public:
    */
   bool connect() override;
 
-  void addAsyncTcpClientCallbacks(AsyncTcpClientCallbacks& callbacks) override;
+  void setAsyncTcpClientCallbacks(AsyncTcpClientCallbacks& callbacks) override;
 
   void write(Buffer::Instance& data, bool end_stream) override;
 

@@ -24,7 +24,7 @@ public:
     cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
     client_ = std::make_unique<AsyncTcpClientImpl>(
         dispatcher_, cluster_manager_.thread_local_cluster_, nullptr, false);
-    client_->addAsyncTcpClientCallbacks(callbacks_);
+    client_->setAsyncTcpClientCallbacks(callbacks_);
   }
 
   void expectCreateConnection() {

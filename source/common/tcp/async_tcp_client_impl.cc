@@ -42,7 +42,7 @@ void AsyncTcpClientImpl::close() {
   }
 }
 
-void AsyncTcpClientImpl::addAsyncTcpClientCallbacks(AsyncTcpClientCallbacks& callbacks) {
+void AsyncTcpClientImpl::setAsyncTcpClientCallbacks(AsyncTcpClientCallbacks& callbacks) {
   callbacks_ = &callbacks;
 }
 
