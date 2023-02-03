@@ -41,8 +41,9 @@ public:
   BaseClientIntegrationTest(Network::Address::IpVersion ip_version,
                             const std::string& bootstrap_config = defaultConfig());
   virtual ~BaseClientIntegrationTest() = default;
-  // Note that due to multiple inheritance,
-  // classes inheriting this may need to override and directly call this TearDown()
+  // Note: This class does not inherit from testing::Test and so this TearDown() method
+  // does not override testing::Test::TearDown(). As a result, it will not be called
+  // automatically by gtest during shutdown and must be called manually.
   void TearDown();
 
 protected:
