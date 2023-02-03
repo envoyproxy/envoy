@@ -419,7 +419,7 @@ TEST_F(OAuth2Test, PreservesQueryParametersInAuthorizationEndpoint) {
 TEST_F(OAuth2Test, PreservesQueryParametersInAuthorizationEndpointWithUrlEncoding) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues({
-      {"envoy.reloadable_features.oauth_new_resource_coding", "true"},
+      {"envoy.reloadable_features.oauth_use_url_encoding", "true"},
   });
   // Create a filter config with an authorization_endpoint URL with query parameters.
   envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
@@ -640,7 +640,7 @@ TEST_F(OAuth2Test, OAuthErrorNonOAuthHttpCallbackLegacyEncoding) {
 TEST_F(OAuth2Test, OAuthErrorNonOAuthHttpCallback) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues({
-      {"envoy.reloadable_features.oauth_new_resource_coding", "true"},
+      {"envoy.reloadable_features.oauth_use_url_encoding", "true"},
   });
   init();
   Http::TestRequestHeaderMapImpl request_headers{
@@ -914,7 +914,7 @@ TEST_F(OAuth2Test, OAuthTestCallbackUrlInStateQueryParam) {
 TEST_F(OAuth2Test, OAuthTestUpdatePathAfterSuccessLegacyEncoding) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues({
-      {"envoy.reloadable_features.oauth_new_resource_coding", "false"},
+      {"envoy.reloadable_features.oauth_use_url_encoding", "false"},
   });
   init();
   Http::TestRequestHeaderMapImpl request_headers{
@@ -968,7 +968,7 @@ TEST_F(OAuth2Test, OAuthTestUpdatePathAfterSuccessLegacyEncoding) {
 TEST_F(OAuth2Test, OAuthTestUpdatePathAfterSuccess) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues({
-      {"envoy.reloadable_features.oauth_new_resource_coding", "true"},
+      {"envoy.reloadable_features.oauth_use_url_encoding", "true"},
   });
   init();
   Http::TestRequestHeaderMapImpl request_headers{
@@ -1117,7 +1117,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParametersLegacyEncoding) {
 TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues({
-      {"envoy.reloadable_features.oauth_new_resource_coding", "true"},
+      {"envoy.reloadable_features.oauth_use_url_encoding", "true"},
   });
   init();
   // First construct the initial request to the oauth filter with URI parameters.
