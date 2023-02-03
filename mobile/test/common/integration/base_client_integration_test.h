@@ -41,6 +41,8 @@ public:
   BaseClientIntegrationTest(Network::Address::IpVersion ip_version,
                             const std::string& bootstrap_config = defaultConfig());
   virtual ~BaseClientIntegrationTest() = default;
+  // Note that due to multiple inheritance,
+  // classes inheriting this may need to override and directly call this TearDown()
   void TearDown();
 
 protected:
