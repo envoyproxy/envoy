@@ -21,6 +21,7 @@ public:
   XdsIntegrationTest();
   virtual ~XdsIntegrationTest() = default;
   void initialize() override;
+  void TearDown() override { BaseClientIntegrationTest::TearDown(); }
 
 protected:
   void SetUp() override;
