@@ -24,8 +24,6 @@
 #include "contrib/generic_proxy/filters/network/source/rds_impl.h"
 #include "contrib/generic_proxy/filters/network/source/route.h"
 
-#include "envoy/tracing/trace_driver.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -45,10 +43,13 @@ struct NamedFilterFactoryCb {
 
 class FilterConfigImpl : public FilterConfig {
 public:
-  FilterConfigImpl(const ProxyConfig& proto_config, const std::string& stat_prefix,
-                   CodecFactoryPtr codec, Rds::RouteConfigProviderSharedPtr route_config_provider,
+  FilterConfigImpl(const std::string& stat_prefix, CodecFactoryPtr codec,
+                   Rds::RouteConfigProviderSharedPtr route_config_provider,
                    std::vector<NamedFilterFactoryCb> factories,
-                   Envoy::Server::Configuration::FactoryContext& context);
+                   Envoy::Server::Configuration::FactoryContext& context)
+      : stat_prefix_(stat_prefix), codec_factory_(std::move(codec)),
+        route_config_provider_(std::move(route_config_provider)), factories_(std::move(factories)),
+        drain_decision_(context.drainDecision()) {}
 
   // FilterConfig
   RouteEntryConstSharedPtr routeEntry(const Request& request) const override {
@@ -76,9 +77,6 @@ private:
   Rds::RouteConfigProviderSharedPtr route_config_provider_;
 
   std::vector<NamedFilterFactoryCb> factories_;
-
-  Tracing::DriverSharedPtr tracing_driver_;
-  TracingConnectionManagerConfigPtr tracing_config_;
 
   const Network::DrainDecision& drain_decision_;
 };
