@@ -86,6 +86,11 @@ message ClientStatusRequest {
 
   // The node making the csds request.
   config.core.v3.Node node = 2;
+
+  // The flag to indicate whether xDS server needs to propagate the detailed
+  // per_xds_config.
+  // [#not-implemented-hide:]
+  bool exclude_detailed_config = 3;
 }
 
 // Detailed config (per xDS) with status.
