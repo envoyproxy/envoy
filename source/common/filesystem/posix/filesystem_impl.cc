@@ -129,13 +129,11 @@ static FileType typeFromStat(struct stat s) {
   return FileType::Other;
 }
 
-static absl::optional<SystemTime> systemTimeFromTimespec(struct timespec t) {
+static constexpr absl::optional<SystemTime> systemTimeFromTimespec(struct timespec t) {
   if (t.tv_sec == 0) {
     return absl::nullopt;
   }
-  // TODO(once #24642 is landed): return timespecToChrono(t);
-  return SystemTime{} + std::chrono::duration_cast<std::chrono::microseconds>(
-                            std::chrono::seconds{t.tv_sec} + std::chrono::nanoseconds{t.tv_nsec});
+  return timespecToChrono(t);
 }
 
 static FileInfo infoFromStat(absl::string_view path, struct stat s) {

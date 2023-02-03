@@ -118,12 +118,12 @@ static uint64_t fileSizeFromAttributeData(const WIN32_FILE_ATTRIBUTE_DATA& data)
   return static_cast<uint64_t>(file_size.QuadPart);
 }
 
-static absl::optional<SystemTime> systemTimeFromFileTime(FILETIME t) {
-  // FILETIME is a 64 bit value representing the number of 100-nanosecond
+static constexpr absl::optional<SystemTime> systemTimeFromFileTime(FILETIME t) {
+  // `FILETIME` is a 64 bit value representing the number of 100-nanosecond
   // intervals since January 1, 1601 (UTC).
   // https://learn.microsoft.com/en-us/windows/win32/api/minwinbase/ns-minwinbase-filetime
   // So we set a SystemTime to that moment, and add that many 100-nanosecond units to that
-  // time, to get a SystemTime representing the same moment as the FILETIME, in microsecond
+  // time, to get a SystemTime representing the same moment as the `FILETIME`, in microsecond
   // precision.
   // For timestamps earlier than the unix epoch (1970, `SystemTime{0}`), we assume it's an
   // invalid value and return nullopt.
@@ -141,7 +141,7 @@ static absl::optional<SystemTime> systemTimeFromFileTime(FILETIME t) {
   return ret;
 }
 
-static FileType fileTypeFromAttributeData(const WIN32_FILE_ATTRIBUTE_DATA& data) {
+static constexpr FileType fileTypeFromAttributeData(const WIN32_FILE_ATTRIBUTE_DATA& data) {
   if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
     return FileType::Directory;
   }
@@ -151,8 +151,8 @@ static FileType fileTypeFromAttributeData(const WIN32_FILE_ATTRIBUTE_DATA& data)
   return FileType::Regular;
 }
 
-static FileInfo fileInfoFromAttributeData(absl::string_view path,
-                                          const WIN32_FILE_ATTRIBUTE_DATA& data) {
+static constexpr FileInfo fileInfoFromAttributeData(absl::string_view path,
+                                                    const WIN32_FILE_ATTRIBUTE_DATA& data) {
   absl::optional<uint64_t> sz;
   FileType type = fileTypeFromAttributeData(data);
   if (type == FileType::Regular) {
