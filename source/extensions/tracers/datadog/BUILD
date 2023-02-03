@@ -17,11 +17,13 @@ envoy_cc_library(
         "agent_http_client.cc",
         "datadog_tracer_impl.cc",
         "dict_util.cc",
+        "time_util.cc",
     ],
     hdrs = [
         "agent_http_client.h",
         "datadog_tracer_impl.h",
         "dict_util.h",
+        "time_util.h",
         "tracer_stats.h",
     ],
     copts = [

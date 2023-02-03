@@ -264,20 +264,6 @@ final class EngineBuilderTests: XCTestCase {
     self.waitForExpectations(timeout: 0.01)
   }
 
-  func testAddingH2ExtendKeepaliveTimeoutAddsToConfigurationWhenRunningEnvoy() {
-    let expectation = self.expectation(description: "Run called with h2ExtendKeepaliveTimeout")
-    MockEnvoyEngine.onRunWithConfig = { config, _ in
-      XCTAssertTrue(config.h2ExtendKeepaliveTimeout)
-      expectation.fulfill()
-    }
-
-    _ = EngineBuilder()
-      .addEngineType(MockEnvoyEngine.self)
-      .h2ExtendKeepaliveTimeout(true)
-      .build()
-    self.waitForExpectations(timeout: 0.01)
-  }
-
   func testSettingMaxConnectionsPerHostAddsToConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with expected data")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
@@ -466,7 +452,9 @@ final class EngineBuilderTests: XCTestCase {
       dnsMinRefreshSeconds: 100,
       dnsPreresolveHostnames: "[test]",
       enableDNSCache: false,
+      dnsCacheSaveIntervalSeconds: 0,
       enableHappyEyeballs: true,
+      enableHttp3: true,
       enableGzip: true,
       enableBrotli: false,
       enableInterfaceBinding: true,
@@ -476,7 +464,6 @@ final class EngineBuilderTests: XCTestCase {
       enablePlatformCertificateValidation: false,
       h2ConnectionKeepaliveIdleIntervalMilliseconds: 1,
       h2ConnectionKeepaliveTimeoutSeconds: 333,
-      h2ExtendKeepaliveTimeout: true,
       maxConnectionsPerHost: 100,
       statsFlushSeconds: 600,
       streamIdleTimeoutSeconds: 700,
@@ -505,7 +492,6 @@ final class EngineBuilderTests: XCTestCase {
     XCTAssertTrue(resolvedYAML.contains("&dns_min_refresh_rate 100s"))
     XCTAssertTrue(resolvedYAML.contains("&dns_preresolve_hostnames [test]"))
     XCTAssertTrue(resolvedYAML.contains("&dns_lookup_family ALL"))
-    XCTAssertTrue(resolvedYAML.contains("&dns_multiple_addresses true"))
     XCTAssertFalse(resolvedYAML.contains("&persistent_dns_cache_config"))
     XCTAssertTrue(resolvedYAML.contains("&enable_interface_binding true"))
     XCTAssertTrue(resolvedYAML.contains("&trust_chain_verification ACCEPT_UNTRUSTED"))
@@ -520,7 +506,6 @@ final class EngineBuilderTests: XCTestCase {
     // HTTP/2
     XCTAssertTrue(resolvedYAML.contains("&h2_connection_keepalive_idle_interval 0.001s"))
     XCTAssertTrue(resolvedYAML.contains("&h2_connection_keepalive_timeout 333s"))
-    XCTAssertTrue(resolvedYAML.contains("&h2_delay_keepalive_timeout true"))
 
     XCTAssertTrue(resolvedYAML.contains("&max_connections_per_host 100"))
 
@@ -562,7 +547,9 @@ final class EngineBuilderTests: XCTestCase {
       dnsMinRefreshSeconds: 100,
       dnsPreresolveHostnames: "[test]",
       enableDNSCache: true,
+      dnsCacheSaveIntervalSeconds: 10,
       enableHappyEyeballs: false,
+      enableHttp3: false,
       enableGzip: false,
       enableBrotli: true,
       enableInterfaceBinding: false,
@@ -572,7 +559,6 @@ final class EngineBuilderTests: XCTestCase {
       enablePlatformCertificateValidation: true,
       h2ConnectionKeepaliveIdleIntervalMilliseconds: 1,
       h2ConnectionKeepaliveTimeoutSeconds: 333,
-      h2ExtendKeepaliveTimeout: false,
       maxConnectionsPerHost: 100,
       statsFlushSeconds: 600,
       streamIdleTimeoutSeconds: 700,
@@ -604,12 +590,12 @@ final class EngineBuilderTests: XCTestCase {
       "@type": type.googleapis.com/envoymobile.extensions.key_value.platform.PlatformKeyValueStoreConfig
       key: dns_persistent_cache
       save_interval:
-        seconds: 0
+        seconds: *persistent_dns_cache_save_interval
       max_entries: 100
 """
     ))
+    XCTAssertTrue(resolvedYAML.contains("&persistent_dns_cache_save_interval 10"))
 // swiftlint:enable line_length
-    XCTAssertTrue(resolvedYAML.contains("&dns_multiple_addresses false"))
     XCTAssertTrue(resolvedYAML.contains("&enable_interface_binding false"))
     XCTAssertTrue(resolvedYAML.contains("&trust_chain_verification VERIFY_TRUST_CHAIN"))
     XCTAssertTrue(resolvedYAML.contains(
@@ -619,7 +605,6 @@ final class EngineBuilderTests: XCTestCase {
     name: "envoy_mobile.cert_validator.platform_bridge_cert_validator"
 """
     ))
-    XCTAssertTrue(resolvedYAML.contains("&h2_delay_keepalive_timeout false"))
     XCTAssertTrue(resolvedYAML.contains("&enable_drain_post_dns_refresh true"))
 
     // Decompression
@@ -639,7 +624,9 @@ final class EngineBuilderTests: XCTestCase {
       dnsMinRefreshSeconds: 100,
       dnsPreresolveHostnames: "[test]",
       enableDNSCache: false,
+      dnsCacheSaveIntervalSeconds: 0,
       enableHappyEyeballs: false,
+      enableHttp3: false,
       enableGzip: false,
       enableBrotli: false,
       enableInterfaceBinding: false,
@@ -649,7 +636,6 @@ final class EngineBuilderTests: XCTestCase {
       enablePlatformCertificateValidation: true,
       h2ConnectionKeepaliveIdleIntervalMilliseconds: 222,
       h2ConnectionKeepaliveTimeoutSeconds: 333,
-      h2ExtendKeepaliveTimeout: false,
       maxConnectionsPerHost: 100,
       statsFlushSeconds: 600,
       streamIdleTimeoutSeconds: 700,

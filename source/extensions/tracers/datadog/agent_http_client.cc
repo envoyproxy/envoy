@@ -1,13 +1,8 @@
 #include "source/extensions/tracers/datadog/agent_http_client.h"
 
-#include <datadog/dict_reader.h>
-#include <datadog/dict_writer.h>
-#include <datadog/error.h>
-
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
-#include <datadog/json.hpp>
 #include <memory>
 #include <string>
 
@@ -17,6 +12,10 @@
 #include "source/extensions/tracers/datadog/tracer_stats.h"
 
 #include "absl/strings/str_format.h"
+#include "datadog/dict_reader.h"
+#include "datadog/dict_writer.h"
+#include "datadog/error.h"
+#include "datadog/json.hpp"
 
 namespace Envoy {
 namespace Extensions {

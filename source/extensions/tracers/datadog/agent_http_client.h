@@ -1,7 +1,5 @@
 #pragma once
 
-#include <datadog/http_client.h>
-
 #include <string>
 
 #include "envoy/http/async_client.h"
@@ -10,6 +8,7 @@
 #include "source/common/upstream/cluster_update_tracker.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "datadog/http_client.h"
 
 namespace Envoy {
 namespace Extensions {

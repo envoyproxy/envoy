@@ -248,18 +248,8 @@ void ConnectionImpl::ServerStreamImpl::encode1xxHeaders(const ResponseHeaderMap&
 }
 
 void ConnectionImpl::StreamImpl::encodeHeadersBase(const HeaderMap& headers, bool end_stream) {
-  nghttp2_data_provider provider;
-  if (!end_stream) {
-    provider.source.ptr = this;
-    provider.read_callback = [](nghttp2_session*, int32_t, uint8_t*, size_t length,
-                                uint32_t* data_flags, nghttp2_data_source* source,
-                                void*) -> ssize_t {
-      return static_cast<StreamImpl*>(source->ptr)->onDataSourceRead(length, data_flags);
-    };
-  }
-
   local_end_stream_ = end_stream;
-  submitHeaders(headers, end_stream ? nullptr : &provider);
+  submitHeaders(headers, end_stream);
   if (parent_.sendPendingFramesAndHandleError()) {
     // Intended to check through coverage that this error case is tested
     return;
@@ -281,23 +271,10 @@ Status ConnectionImpl::ClientStreamImpl::encodeHeaders(const RequestHeaderMap& h
     Http::Utility::transformUpgradeRequestFromH1toH2(*modified_headers);
     encodeHeadersBase(*modified_headers, end_stream);
   } else if (headers.Method() && headers.Method()->value() == "CONNECT") {
-    // If this is not an upgrade style connect (above branch) it is a bytestream
-    // connect and should have :path and :protocol set accordingly
-    // As HTTP/1.1 does not require a path for CONNECT, we may have to add one
-    // if shifting codecs. For now, default to "/" - this can be made
-    // configurable if necessary.
-    // https://tools.ietf.org/html/draft-kinnear-httpbis-http2-transport-02
     modified_headers = createHeaderMap<RequestHeaderMapImpl>(headers);
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_rfc_connect")) {
-      modified_headers->removeScheme();
-      modified_headers->removePath();
-      modified_headers->removeProtocol();
-    } else {
-      modified_headers->setProtocol(Headers::get().ProtocolValues.Bytestream);
-      if (!headers.Path()) {
-        modified_headers->setPath("/");
-      }
-    }
+    modified_headers->removeScheme();
+    modified_headers->removePath();
+    modified_headers->removeProtocol();
     encodeHeadersBase(*modified_headers, end_stream);
   } else {
     encodeHeadersBase(headers, end_stream);
@@ -583,7 +560,7 @@ void ConnectionImpl::ClientStreamImpl::decodeTrailers() {
 }
 
 void ConnectionImpl::ServerStreamImpl::decodeHeaders() {
-  auto& headers = absl::get<RequestHeaderMapPtr>(headers_or_trailers_);
+  auto& headers = absl::get<RequestHeaderMapSharedPtr>(headers_or_trailers_);
   if (Http::Utility::isH2UpgradeRequest(*headers)) {
     Http::Utility::transformUpgradeRequestFromH2toH1(*headers);
   }
@@ -638,83 +615,59 @@ void ConnectionImpl::StreamImpl::submitTrailers(const HeaderMap& trailers) {
   parent_.adapter_->SubmitTrailer(stream_id_, final_headers);
 }
 
-ssize_t ConnectionImpl::StreamImpl::onDataSourceRead(uint64_t length, uint32_t* data_flags) {
-  if (pending_send_data_->length() == 0 && !local_end_stream_) {
-    ASSERT(!data_deferred_);
-    data_deferred_ = true;
-    return NGHTTP2_ERR_DEFERRED;
+std::pair<int64_t, bool>
+ConnectionImpl::StreamDataFrameSource::SelectPayloadLength(size_t max_length) {
+  if (stream_.pending_send_data_->length() == 0 && !stream_.local_end_stream_) {
+    ASSERT(!stream_.data_deferred_);
+    stream_.data_deferred_ = true;
+    return {kBlocked, false};
   } else {
-    *data_flags |= NGHTTP2_DATA_FLAG_NO_COPY;
-    if (local_end_stream_ && pending_send_data_->length() <= length) {
-      *data_flags |= NGHTTP2_DATA_FLAG_EOF;
-      if (pending_trailers_to_encode_) {
-        // We need to tell the library to not set end stream so that we can emit the trailers.
-        *data_flags |= NGHTTP2_DATA_FLAG_NO_END_STREAM;
-        submitTrailers(*pending_trailers_to_encode_);
-        pending_trailers_to_encode_.reset();
+    const size_t length = std::min<size_t>(max_length, stream_.pending_send_data_->length());
+    bool end_data = false;
+    if (stream_.local_end_stream_ && length == stream_.pending_send_data_->length()) {
+      end_data = true;
+      if (stream_.pending_trailers_to_encode_) {
+        send_fin_ = false;
+        stream_.submitTrailers(*stream_.pending_trailers_to_encode_);
+        stream_.pending_trailers_to_encode_.reset();
       }
     }
-
-    return std::min(length, pending_send_data_->length());
+    return {static_cast<int64_t>(length), end_data};
   }
 }
 
-void ConnectionImpl::StreamImpl::onDataSourceSend(const uint8_t* framehd, size_t length) {
-  // In this callback we are writing out a raw DATA frame without copying. nghttp2 assumes that we
-  // "just know" that the frame header is 9 bytes.
-  // https://nghttp2.org/documentation/types.html#c.nghttp2_send_data_callback
-
-  parent_.protocol_constraints_.incrementOutboundDataFrameCount();
+bool ConnectionImpl::StreamDataFrameSource::Send(absl::string_view frame_header,
+                                                 size_t payload_length) {
+  stream_.parent_.protocol_constraints_.incrementOutboundDataFrameCount();
 
   Buffer::OwnedImpl output;
-  parent_.addOutboundFrameFragment(output, framehd, H2_FRAME_HEADER_SIZE);
-  if (!parent_.protocol_constraints_.checkOutboundFrameLimits().ok()) {
+  stream_.parent_.addOutboundFrameFragment(
+      output, reinterpret_cast<const uint8_t*>(frame_header.data()), frame_header.size());
+  if (!stream_.parent_.protocol_constraints_.checkOutboundFrameLimits().ok()) {
     ENVOY_CONN_LOG(debug, "error sending data frame: Too many frames in the outbound queue",
-                   parent_.connection_);
-    setDetails(Http2ResponseCodeDetails::get().outbound_frame_flood);
+                   stream_.parent_.connection_);
+    stream_.setDetails(Http2ResponseCodeDetails::get().outbound_frame_flood);
   }
 
-  parent_.stats_.pending_send_bytes_.sub(length);
-  output.move(*pending_send_data_, length);
-  parent_.connection_.write(output, false);
+  stream_.parent_.stats_.pending_send_bytes_.sub(payload_length);
+  output.move(*stream_.pending_send_data_, payload_length);
+  stream_.parent_.connection_.write(output, false);
+  return true;
 }
 
-void ConnectionImpl::ClientStreamImpl::submitHeaders(const HeaderMap& headers,
-                                                     nghttp2_data_provider* provider) {
+void ConnectionImpl::ClientStreamImpl::submitHeaders(const HeaderMap& headers, bool end_stream) {
   ASSERT(stream_id_ == -1);
-  // TODO(birenroy): Once using the new wrapper, migrate callers from nghttp2_data_provider to
-  // DataFrameSource.
-  std::unique_ptr<http2::adapter::DataFrameSource> data_frame_source;
-  if (provider) {
-    data_frame_source = http2::adapter::MakeZeroCopyDataFrameSource(
-        *provider, &parent_.connection_,
-        [](nghttp2_session*, nghttp2_frame* frame, const uint8_t* framehd, size_t length,
-           nghttp2_data_source* source, void*) -> int {
-          ASSERT(frame->data.padlen == 0);
-          static_cast<StreamImpl*>(source->ptr)->onDataSourceSend(framehd, length);
-          return 0;
-        });
-  }
-  stream_id_ =
-      parent_.adapter_->SubmitRequest(buildHeaders(headers), std::move(data_frame_source), base());
+  stream_id_ = parent_.adapter_->SubmitRequest(
+      buildHeaders(headers), end_stream ? nullptr : std::make_unique<StreamDataFrameSource>(*this),
+      base());
   ASSERT(stream_id_ > 0);
 }
 
-void ConnectionImpl::ServerStreamImpl::submitHeaders(const HeaderMap& headers,
-                                                     nghttp2_data_provider* provider) {
+void ConnectionImpl::ServerStreamImpl::submitHeaders(const HeaderMap& headers, bool end_stream) {
   ASSERT(stream_id_ != -1);
-  std::unique_ptr<http2::adapter::DataFrameSource> data_frame_source;
-  if (provider) {
-    data_frame_source = http2::adapter::MakeZeroCopyDataFrameSource(
-        *provider, &parent_.connection_,
-        [](nghttp2_session*, nghttp2_frame* frame, const uint8_t* framehd, size_t length,
-           nghttp2_data_source* source, void*) -> int {
-          ASSERT(frame->data.padlen == 0);
-          static_cast<StreamImpl*>(source->ptr)->onDataSourceSend(framehd, length);
-          return 0;
-        });
-  }
-  parent_.adapter_->SubmitResponse(stream_id_, buildHeaders(headers), std::move(data_frame_source));
+  parent_.adapter_->SubmitResponse(stream_id_, buildHeaders(headers),
+                                   end_stream ? nullptr
+                                              : std::make_unique<StreamDataFrameSource>(*this));
 }
 
 void ConnectionImpl::StreamImpl::onPendingFlushTimer() {
@@ -801,7 +754,7 @@ void ConnectionImpl::StreamImpl::resetStream(StreamResetReason reason) {
   // resources.
   if (useDeferredReset() && local_end_stream_ && !local_end_stream_sent_ &&
       reason != StreamResetReason::OverloadManager) {
-    ASSERT(parent_.getStream(stream_id_) != nullptr);
+    ASSERT(parent_.getStreamUnchecked(stream_id_) != nullptr);
     parent_.pending_deferred_reset_streams_.emplace(stream_id_, this);
     deferred_reset_ = reason;
     ENVOY_CONN_LOG(trace, "deferred reset stream", parent_.connection_);
@@ -825,13 +778,6 @@ void ConnectionImpl::StreamImpl::resetStreamWorker(StreamResetReason reason) {
   }
   parent_.adapter_->SubmitRst(stream_id_,
                               static_cast<http2::adapter::Http2ErrorCode>(reasonToReset(reason)));
-}
-
-MetadataEncoder& ConnectionImpl::StreamImpl::getMetadataEncoderOld() {
-  if (metadata_encoder_old_ == nullptr) {
-    metadata_encoder_old_ = std::make_unique<MetadataEncoder>();
-  }
-  return *metadata_encoder_old_;
 }
 
 NewMetadataEncoder& ConnectionImpl::StreamImpl::getMetadataEncoder() {
@@ -879,8 +825,6 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       stream_error_on_invalid_http_messaging_(
           http2_options.override_stream_error_on_invalid_http_message().value()),
       protocol_constraints_(stats, http2_options), dispatching_(false), raised_goaway_(false),
-      delay_keepalive_timeout_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.http2_delay_keepalive_timeout")),
       random_(random_generator),
       last_received_data_time_(connection_.dispatcher().timeSource().monotonicTime()) {
   if (http2_options.has_connection_keepalive()) {
@@ -949,7 +893,8 @@ void ConnectionImpl::onKeepaliveResponseTimeout() {
   ENVOY_CONN_LOG_EVENT(debug, "h2_ping_timeout", "Closing connection due to keepalive timeout",
                        connection_);
   stats_.keepalive_timeout_.inc();
-  connection_.close(Network::ConnectionCloseType::NoFlush);
+  connection_.close(Network::ConnectionCloseType::NoFlush,
+                    StreamInfo::LocalCloseReasons::get().Http2PingTimeout);
 }
 
 bool ConnectionImpl::slowContainsStreamId(int32_t stream_id) const {
@@ -1011,14 +956,19 @@ const ConnectionImpl::StreamImpl* ConnectionImpl::getStream(int32_t stream_id) c
   return const_cast<ConnectionImpl*>(this)->getStream(stream_id);
 }
 
-ConnectionImpl::StreamImpl* ConnectionImpl::getStreamUnchecked(int32_t stream_id) {
-  return static_cast<StreamImpl*>(adapter_->GetStreamUserData(stream_id));
-}
-
 ConnectionImpl::StreamImpl* ConnectionImpl::getStream(int32_t stream_id) {
   StreamImpl* stream = getStreamUnchecked(stream_id);
   SLOW_ASSERT(stream != nullptr || !slowContainsStreamId(stream_id));
   return stream;
+}
+
+const ConnectionImpl::StreamImpl* ConnectionImpl::getStreamUnchecked(int32_t stream_id) const {
+  // Delegate to the non-const version.
+  return const_cast<ConnectionImpl*>(this)->getStreamUnchecked(stream_id);
+}
+
+ConnectionImpl::StreamImpl* ConnectionImpl::getStreamUnchecked(int32_t stream_id) {
+  return static_cast<StreamImpl*>(adapter_->GetStreamUserData(stream_id));
 }
 
 int ConnectionImpl::onData(int32_t stream_id, const uint8_t* data, size_t len) {
@@ -1117,8 +1067,7 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
   // timeout for another timeout period. This will still timeout the connection if there is no
   // activity, but if there is frame activity we assume the connection is still healthy and the
   // PING ACK may be delayed behind other frames.
-  if (delay_keepalive_timeout_ && keepalive_timeout_timer_ != nullptr &&
-      keepalive_timeout_timer_->enabled()) {
+  if (keepalive_timeout_timer_ != nullptr && keepalive_timeout_timer_->enabled()) {
     keepalive_timeout_timer_->enableTimer(keepalive_timeout_);
   }
 
@@ -1141,7 +1090,7 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
     onSettings(frame->settings);
   }
 
-  StreamImpl* stream = getStream(frame->hd.stream_id);
+  StreamImpl* stream = getStreamUnchecked(frame->hd.stream_id);
   if (!stream) {
     return okStatus();
   }
@@ -1214,7 +1163,7 @@ int ConnectionImpl::onFrameSend(int32_t stream_id, size_t length, uint8_t type, 
   // an outgoing frame of this type, we will return an error code so that we can abort execution.
   ENVOY_CONN_LOG(trace, "sent frame type={}, stream_id={}, length={}", connection_,
                  static_cast<uint64_t>(type), stream_id, length);
-  StreamImpl* stream = getStream(stream_id);
+  StreamImpl* stream = getStreamUnchecked(stream_id);
   if (stream != nullptr) {
     if (type != METADATA_FRAME_TYPE) {
       stream->bytes_meter_->addWireBytesSent(length + H2_FRAME_HEADER_SIZE);
@@ -1427,8 +1376,12 @@ Status ConnectionImpl::onStreamClose(int32_t stream_id, uint32_t error_code) {
 int ConnectionImpl::onMetadataReceived(int32_t stream_id, const uint8_t* data, size_t len) {
   ENVOY_CONN_LOG(trace, "recv {} bytes METADATA", connection_, len);
 
-  StreamImpl* stream = getStream(stream_id);
+  StreamImpl* stream = getStreamUnchecked(stream_id);
   if (!stream || stream->remote_end_stream_) {
+    if (!stream) {
+      ENVOY_CONN_LOG(debug, "no stream for stream_id {} while receiving METADATA", connection_,
+                     stream_id);
+    }
     return 0;
   }
 
@@ -1440,8 +1393,12 @@ int ConnectionImpl::onMetadataFrameComplete(int32_t stream_id, bool end_metadata
   ENVOY_CONN_LOG(trace, "recv METADATA frame on stream {}, end_metadata: {}", connection_,
                  stream_id, end_metadata);
 
-  StreamImpl* stream = getStream(stream_id);
+  StreamImpl* stream = getStreamUnchecked(stream_id);
   if (!stream || stream->remote_end_stream_) {
+    if (!stream) {
+      ENVOY_CONN_LOG(debug, "no stream for stream_id {} while completing METADATA", connection_,
+                     stream_id);
+    }
     return 0;
   }
 
@@ -1451,7 +1408,7 @@ int ConnectionImpl::onMetadataFrameComplete(int32_t stream_id, bool end_metadata
 
 int ConnectionImpl::saveHeader(const nghttp2_frame* frame, HeaderString&& name,
                                HeaderString&& value) {
-  StreamImpl* stream = getStream(frame->hd.stream_id);
+  StreamImpl* stream = getStreamUnchecked(frame->hd.stream_id);
   if (!stream) {
     // We have seen 1 or 2 crashes where we get a headers callback but there is no associated
     // stream data. I honestly am not sure how this can happen. However, from reading the nghttp2
@@ -1622,7 +1579,8 @@ void ConnectionImpl::scheduleProtocolConstraintViolationCallback() {
 void ConnectionImpl::onProtocolConstraintViolation() {
   // Flooded outbound queue implies that peer is not reading and it does not
   // make sense to try to flush pending bytes.
-  connection_.close(Envoy::Network::ConnectionCloseType::NoFlush);
+  connection_.close(Envoy::Network::ConnectionCloseType::NoFlush,
+                    StreamInfo::LocalCloseReasons::get().Http2ConnectionProtocolViolation);
 }
 
 void ConnectionImpl::onUnderlyingConnectionBelowWriteBufferLowWatermark() {
@@ -1644,15 +1602,6 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks() {
       callbacks_,
       [](nghttp2_session*, const uint8_t* data, size_t length, int, void* user_data) -> ssize_t {
         return static_cast<ConnectionImpl*>(user_data)->onSend(data, length);
-      });
-
-  nghttp2_session_callbacks_set_send_data_callback(
-      callbacks_,
-      [](nghttp2_session*, nghttp2_frame* frame, const uint8_t* framehd, size_t length,
-         nghttp2_data_source* source, void*) -> int {
-        ASSERT(frame->data.padlen == 0);
-        static_cast<StreamImpl*>(source->ptr)->onDataSourceSend(framehd, length);
-        return 0;
       });
 
   nghttp2_session_callbacks_set_on_begin_headers_callback(
@@ -1894,7 +1843,7 @@ void ClientConnectionImpl::dumpStreams(std::ostream& os, int indent_level) const
      << current_stream_id_.value() << ":\n";
 
   const ClientStreamImpl* client_stream =
-      static_cast<const ClientStreamImpl*>(getStream(current_stream_id_.value()));
+      static_cast<const ClientStreamImpl*>(getStreamUnchecked(current_stream_id_.value()));
   if (client_stream) {
     client_stream->response_decoder_.dumpState(os, indent_level + 1);
   } else {
@@ -1936,8 +1885,8 @@ void ConnectionImpl::ServerStreamImpl::dumpState(std::ostream& os, int indent_le
   StreamImpl::dumpState(os, indent_level);
 
   // Dump header map
-  if (absl::holds_alternative<RequestHeaderMapPtr>(headers_or_trailers_)) {
-    DUMP_DETAILS(absl::get<RequestHeaderMapPtr>(headers_or_trailers_));
+  if (absl::holds_alternative<RequestHeaderMapSharedPtr>(headers_or_trailers_)) {
+    DUMP_DETAILS(absl::get<RequestHeaderMapSharedPtr>(headers_or_trailers_));
   } else {
     DUMP_DETAILS(absl::get<RequestTrailerMapPtr>(headers_or_trailers_));
   }
@@ -2026,10 +1975,12 @@ Status ClientConnectionImpl::trackInboundFrames(int32_t stream_id, size_t length
     ENVOY_CONN_LOG(trace, "error reading frame: {} received in this HTTP/2 session.", connection_,
                    result.message());
     if (isInboundFramesWithEmptyPayloadError(result)) {
-      ConnectionImpl::StreamImpl* stream = getStream(stream_id);
+      ConnectionImpl::StreamImpl* stream = getStreamUnchecked(stream_id);
       if (stream) {
         stream->setDetails(Http2ResponseCodeDetails::get().inbound_empty_frame_flood);
       }
+      // Above if is defensive, because the stream has just been created and therefore always
+      // exists.
     }
   }
   return result;
@@ -2119,10 +2070,12 @@ Status ServerConnectionImpl::trackInboundFrames(int32_t stream_id, size_t length
     ENVOY_CONN_LOG(trace, "error reading frame: {} received in this HTTP/2 session.", connection_,
                    result.message());
     if (isInboundFramesWithEmptyPayloadError(result)) {
-      ConnectionImpl::StreamImpl* stream = getStream(stream_id);
+      ConnectionImpl::StreamImpl* stream = getStreamUnchecked(stream_id);
       if (stream) {
         stream->setDetails(Http2ResponseCodeDetails::get().inbound_empty_frame_flood);
       }
+      // Above if is defensive, because the stream has just been created and therefore always
+      // exists.
     }
   }
   return result;
