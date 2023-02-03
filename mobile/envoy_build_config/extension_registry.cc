@@ -1,5 +1,11 @@
 #include "extension_registry.h"
 
+#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
+#include "source/extensions/compression/brotli/compressor/config.h"
+#include "source/extensions/compression/gzip/compressor/config.h"
+#include "source/extensions/filters/http/compressor/config.h"
+#endif
+
 #include "source/common/http/match_delegate/config.h"
 #include "source/common/http/matching/inputs.h"
 #include "source/common/network/default_client_connection_factory.h"
@@ -10,21 +16,11 @@
 #include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
 #include "source/extensions/clusters/logical_dns/logical_dns_cluster.h"
 #include "source/extensions/clusters/static/static_cluster.h"
-
-#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
-#include "source/extensions/compression/brotli/compressor/config.h"
-#endif
 #include "source/extensions/compression/brotli/decompressor/config.h"
-#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
-#include "source/extensions/compression/gzip/compressor/config.h"
-#endif
 #include "source/extensions/compression/gzip/decompressor/config.h"
 #include "source/extensions/early_data/default_early_data_policy.h"
 #include "source/extensions/filters/http/alternate_protocols_cache/config.h"
 #include "source/extensions/filters/http/buffer/config.h"
-#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
-#include "source/extensions/filters/http/compressor/config.h"
-#endif
 #include "source/extensions/filters/http/decompressor/config.h"
 #include "source/extensions/filters/http/dynamic_forward_proxy/config.h"
 #include "source/extensions/filters/http/router/config.h"
