@@ -38,7 +38,7 @@ TEST(TestConfig, ConfigIsApplied) {
       .addStatsFlushSeconds(654)
       .setAppVersion("1.2.3")
       .setAppId("1234-1234-1234")
-      .enableDnsCache(true)
+      .enableDnsCache(true, /* save_interval_seconds */ 101)
       .addDnsPreresolveHostnames({"lyft.com", "google.com"})
       .enableAdminInterface(true)
       .setForceAlwaysUsev6(true)
@@ -57,6 +57,7 @@ TEST(TestConfig, ConfigIsApplied) {
                                            "- &stats_flush_interval 654s",
                                            "  key: dns_persistent_cache",
                                            "- &force_ipv6 true",
+                                           "- &persistent_dns_cache_save_interval 101",
                                            ("- &metadata { device_os: probably-ubuntu-on-CI, "
                                             "app_version: 1.2.3, app_id: 1234-1234-1234 }"),
                                            R"(- &validation_context
@@ -273,11 +274,11 @@ TEST(TestConfig, AddMaxConnectionsPerHost) {
 }
 
 std::string statsdSinkConfig(int port) {
-  std::string config = R"(
-      {
+  std::string config = R"({ name: envoy.stat_sinks.statsd,
+      typed_config: {
         "@type": type.googleapis.com/envoy.config.metrics.v3.StatsdSink,
         address: { socket_address: { address: 127.0.0.1, port_value: )" +
-                       fmt::format("{}", port) + " } } }";
+                       fmt::format("{}", port) + " } } } }";
   return config;
 }
 
@@ -289,8 +290,7 @@ TEST(TestConfig, AddStatsSinks) {
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
 
-  engine_builder.addStatsSink("envoy.stat_sinks.statsd", statsdSinkConfig(1));
-  engine_builder.addStatsSink("envoy.stat_sinks.statsd", statsdSinkConfig(2));
+  engine_builder.addStatsSinks({statsdSinkConfig(1), statsdSinkConfig(2)});
   config_str = engine_builder.generateConfigStr();
   ASSERT_THAT(config_str, HasSubstr(statsdSinkConfig(1)));
   ASSERT_THAT(config_str, HasSubstr(statsdSinkConfig(2)));

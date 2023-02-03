@@ -56,9 +56,11 @@ bool generatedStringMatchesGeneratedBoostrap(
   bool same = differencer.Compare(config_bootstrap, bootstrap);
 
   if (!same) {
+    std::cerr << "\n=========== Config bootstrap yaml ============\n";
     std::cerr << MessageUtil::getYamlStringFromMessage(config_bootstrap);
-    std::cerr << "============================================";
+    std::cerr << "\n=============== Bootstrap yaml ===============\n";
     std::cerr << MessageUtil::getYamlStringFromMessage(bootstrap);
+    std::cerr << "\n==============================================\n";
   }
   return same;
 }
@@ -84,8 +86,8 @@ EngineBuilder& EngineBuilder::setOnEngineRunning(std::function<void()> closure) 
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addStatsSink(std::string name, std::string typed_config) {
-  stats_sinks_.push_back(std::make_pair(name, typed_config));
+EngineBuilder& EngineBuilder::addStatsSinks(std::vector<std::string> stats_sinks) {
+  stats_sinks_ = std::move(stats_sinks);
   return *this;
 }
 
@@ -267,8 +269,9 @@ EngineBuilder::enablePlatformCertificatesValidation(bool platform_certificates_v
   return *this;
 }
 
-EngineBuilder& EngineBuilder::enableDnsCache(bool dns_cache_on) {
+EngineBuilder& EngineBuilder::enableDnsCache(bool dns_cache_on, int save_interval_seconds) {
   dns_cache_on_ = dns_cache_on;
+  dns_cache_save_interval_seconds_ = save_interval_seconds;
   return *this;
 }
 
@@ -355,6 +358,8 @@ std::string EngineBuilder::generateConfigStr() const {
     replacements.push_back({"stats_domain", stats_domain_});
   }
   if (dns_cache_on_) {
+    replacements.push_back({"persistent_dns_cache_save_interval",
+                            fmt::format("{}", dns_cache_save_interval_seconds_)});
     replacements.push_back({"persistent_dns_cache_config", persistent_dns_cache_config_insert});
   }
 
@@ -366,22 +371,13 @@ std::string EngineBuilder::generateConfigStr() const {
     config_builder << "- &" << key << " " << value << std::endl;
   }
 
-  bool add_stats_sinks = !stats_sinks_.empty() || !stats_domain_.empty();
-  if (add_stats_sinks) {
-    config_builder << "- &stats_sinks [";
-  }
-  maybe_comma = "";
+  std::vector<std::string> stat_sinks = stats_sinks_;
   if (!stats_domain_.empty()) {
-    config_builder << "*base_metrics_service";
-    maybe_comma = ",";
+    stat_sinks.push_back("*base_metrics_service");
   }
-
-  for (auto& sink_to_add : stats_sinks_) {
-    config_builder << maybe_comma << "{ name: " << sink_to_add.first
-                   << ", typed_config: " << sink_to_add.second << "}";
-    maybe_comma = ",";
-  }
-  if (add_stats_sinks) {
+  if (!stat_sinks.empty()) {
+    config_builder << "- &stats_sinks [";
+    config_builder << absl::StrJoin(stat_sinks, ",");
     config_builder << "] " << std::endl;
   }
 
@@ -591,7 +587,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   if (dns_cache_on_) {
     envoymobile::extensions::key_value::platform::PlatformKeyValueStoreConfig kv_config;
     kv_config.set_key("dns_persistent_cache");
-    kv_config.mutable_save_interval()->set_seconds(0);
+    kv_config.mutable_save_interval()->set_seconds(dns_cache_save_interval_seconds_);
     kv_config.set_max_entries(100);
     dns_cache_config->mutable_key_value_config()->mutable_config()->set_name(
         "envoy.key_value.platform");
@@ -903,6 +899,11 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 
   bootstrap->mutable_typed_dns_resolver_config()->CopyFrom(
       *dns_cache_config->mutable_typed_dns_resolver_config());
+
+  for (const std::string& sink_yaml : stats_sinks_) {
+    auto* sink = bootstrap->add_stats_sinks();
+    MessageUtil::loadFromYaml(sink_yaml, *sink, ProtobufMessage::getStrictValidationVisitor());
+  }
   if (!stats_domain_.empty()) {
     envoy::config::metrics::v3::MetricsServiceConfig metrics_config;
     metrics_config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("stats");
@@ -937,13 +938,6 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     envoy::config::core::v3::ApiConfigSource::ApiType_Parse(ads_api_type_, &api_type_enum);
     ads_config->set_api_type(api_type_enum);
     ads_config->add_grpc_services()->mutable_google_grpc()->set_target_uri(target_uri);
-  }
-
-  for (auto& sink_to_add : stats_sinks_) {
-    auto* sink = bootstrap->add_stats_sinks();
-    sink->set_name(sink_to_add.first);
-    MessageUtil::loadFromYaml(sink_to_add.second, *sink->mutable_typed_config(),
-                              ProtobufMessage::getStrictValidationVisitor());
   }
 
   // Admin
