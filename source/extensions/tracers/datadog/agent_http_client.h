@@ -17,6 +17,13 @@ namespace Datadog {
 
 struct TracerStats;
 
+/**
+ * \c datadog::tracing::HTTPClient implementation that uses Envoy's
+ * \c Http::AsyncClient. The class is called \c AgentHTTPClient because it is
+ * not a general-purpose HTTP client. Instead, it sends requests to a specified
+ * cluster only. The idea is that the cluster is configured to point to a
+ * Datadog Agent instance.
+ */
 class AgentHTTPClient : public datadog::tracing::HTTPClient,
                         public Http::AsyncClient::Callbacks,
                         private Logger::Loggable<Logger::Id::tracing> {
