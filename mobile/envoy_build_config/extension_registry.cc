@@ -10,6 +10,7 @@
 #include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
 #include "source/extensions/clusters/logical_dns/logical_dns_cluster.h"
 #include "source/extensions/clusters/static/static_cluster.h"
+
 #ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
 #include "source/extensions/compression/brotli/compressor/config.h"
 #endif
