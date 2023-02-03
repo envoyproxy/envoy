@@ -56,9 +56,11 @@ bool generatedStringMatchesGeneratedBoostrap(
   bool same = differencer.Compare(config_bootstrap, bootstrap);
 
   if (!same) {
+    std::cerr << "\n=========== Config bootstrap yaml ============\n";
     std::cerr << MessageUtil::getYamlStringFromMessage(config_bootstrap);
-    std::cerr << "============================================";
+    std::cerr << "\n=============== Bootstrap yaml ===============\n";
     std::cerr << MessageUtil::getYamlStringFromMessage(bootstrap);
+    std::cerr << "\n==============================================\n";
   }
   return same;
 }
