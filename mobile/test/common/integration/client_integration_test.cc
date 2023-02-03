@@ -23,7 +23,7 @@ public:
     // TODO(abeyad): Add paramaterized tests for HTTP1, HTTP2, and HTTP3.
     setUpstreamProtocol(Http::CodecType::HTTP1);
   }
-  void TearDown() { BaseClientIntegrationTest::TearDown(); }
+  void TearDown() override { BaseClientIntegrationTest::TearDown(); }
 
   void basicTest();
 };

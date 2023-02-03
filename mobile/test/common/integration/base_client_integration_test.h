@@ -41,14 +41,13 @@ public:
   BaseClientIntegrationTest(Network::Address::IpVersion ip_version,
                             const std::string& bootstrap_config = defaultConfig());
   virtual ~BaseClientIntegrationTest() = default;
+  void TearDown();
 
 protected:
   envoy_engine_t& rawEngine() { return engine_->engine_; }
   virtual void initialize() override;
   void createEnvoy() override;
   void threadRoutine(absl::Notification& engine_running);
-  // Must be called manually by subclasses in their TearDown();
-  void TearDown();
   // helpers to access protected functions in the friend class
   void setOverrideConfigForTests(Platform::EngineBuilder builder, std::string config) {
     builder.setOverrideConfigForTests(config);
