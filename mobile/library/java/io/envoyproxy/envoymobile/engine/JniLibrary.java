@@ -248,12 +248,22 @@ public class JniLibrary {
   /**
    * Provides a configuration insert that may be used to enable gzip decompression.
    */
-  public static native String gzipConfigInsert();
+  public static native String gzipDecompressorConfigInsert();
+
+  /**
+   * Provides a configuration insert that may be used to enable gzip compression.
+   */
+  public static native String gzipCompressorConfigInsert();
 
   /**
    * Provides a configuration insert that may be used to enable brotli decompression.
    */
-  public static native String brotliConfigInsert();
+  public static native String brotliDecompressorConfigInsert();
+
+  /**
+   * Provides a configuration insert that may be used to enable brotli compression.
+   */
+  public static native String brotliCompressorConfigInsert();
 
   /**
    * Provides a configuration that may be used to enable a persistent DNS cache.

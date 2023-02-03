@@ -368,33 +368,61 @@ Specify whether to use Happy Eyeballs when multiple IP stacks may be supported. 
   // Swift
   builder.enableHappyEyeballs(true)
 
-~~~~~~~~~~~~~~~~~~~~~~~
-``enableGzip``
-~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``enableGzipDecompression``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Specify whether to enable transparent response Gzip decompression. Defaults to true.
 
 **Example**::
 
   // Kotlin
-  builder.enableGzip(false)
+  builder.enableGzipDecompression(false)
 
   // Swift
-  builder.enableGzip(false)
+  builder.enableGzipDecompression(false)
 
-~~~~~~~~~~~~~~~~~~~~~~~
-``enableBrotli``
-~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``enableGzipCompression``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Specify whether to enable transparent request Gzip compression. Defaults to false.
+
+**Example**::
+
+  // Kotlin
+  builder.enableGzipCompression(true)
+
+  // Swift
+  builder.enableGzipCompression(true)
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``enableBrotliDecompression``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Specify whether to enable transparent response Brotli decompression. Defaults to false.
 
 **Example**::
 
   // Kotlin
-  builder.enableBrotli(true)
+  builder.enableBrotliDecompression(true)
 
   // Swift
-  builder.enableBrotli(true)
+  builder.enableBrotliDecompression(true)
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``enableBrotliCompression``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Specify whether to enable transparent request Brotli compression. Defaults to false.
+
+**Example**::
+
+  // Kotlin
+  builder.enableBrotliCompression(true)
+
+  // Swift
+  builder.enableBrotliCompression(true)
 
 ~~~~~~~~~~~~~~~~~~~~~~~
 ``enableSocketTagging``

@@ -67,11 +67,19 @@ extern const char* alternate_protocols_cache_filter_insert;
 
 /* Insert that enables a decompressor filter with gzip
  */
-extern const char* gzip_config_insert;
+extern const char* gzip_decompressor_config_insert;
+
+/* Insert that enables a compressor filter with gzip
+ */
+extern const char* gzip_compressor_config_insert;
 
 /* Insert that enables a decompressor filter with brotli
  */
-extern const char* brotli_config_insert;
+extern const char* brotli_decompressor_config_insert;
+
+/* Insert that enables a compressor filter with brotli
+ */
+extern const char* brotli_compressor_config_insert;
 
 /* Insert that enables a socket tagging filter.
  */

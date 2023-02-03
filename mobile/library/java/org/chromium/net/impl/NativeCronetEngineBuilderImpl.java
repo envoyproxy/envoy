@@ -48,7 +48,9 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
   private boolean mEnableDnsFilterUnroutableFamilies = true;
   private boolean mDnsUseSystemResolver = true;
   private boolean mEnableDrainPostDnsRefresh = false;
-  private boolean mEnableGzip = true;
+  private boolean mEnableGzipDecompression = true;
+  private boolean mEnableGzipCompression = false;
+  private boolean mEnableBrotliCompression = false;
   private boolean mEnableSocketTag = true;
   private boolean mEnableHappyEyeballs = true;
   private boolean mEnableInterfaceBinding = false;
@@ -124,8 +126,9 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
         mAdminInterfaceEnabled, mGrpcStatsDomain, mConnectTimeoutSeconds, mDnsRefreshSeconds,
         mDnsFailureRefreshSecondsBase, mDnsFailureRefreshSecondsMax, mDnsQueryTimeoutSeconds,
         mDnsMinRefreshSeconds, mDnsPreresolveHostnames, mEnableDNSCache,
-        mDnsCacheSaveIntervalSeconds, mEnableDrainPostDnsRefresh, quicEnabled(), mEnableGzip,
-        brotliEnabled(), mEnableSocketTag, mEnableHappyEyeballs, mEnableInterfaceBinding,
+        mDnsCacheSaveIntervalSeconds, mEnableDrainPostDnsRefresh, quicEnabled(),
+        mEnableGzipDecompression, mEnableGzipCompression, brotliEnabled(), mEnableBrotliCompression,
+        mEnableSocketTag, mEnableHappyEyeballs, mEnableInterfaceBinding,
         mH2ConnectionKeepaliveIdleIntervalMilliseconds, mH2ConnectionKeepaliveTimeoutSeconds,
         mMaxConnectionsPerHost, mStatsFlushSeconds, mStreamIdleTimeoutSeconds,
         mPerTryIdleTimeoutSeconds, mAppVersion, mAppId, mTrustChainVerification, mVirtualClusters,

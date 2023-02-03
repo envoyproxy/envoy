@@ -10,11 +10,14 @@
 #include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
 #include "source/extensions/clusters/logical_dns/logical_dns_cluster.h"
 #include "source/extensions/clusters/static/static_cluster.h"
+#include "source/extensions/compression/brotli/compressor/config.h"
 #include "source/extensions/compression/brotli/decompressor/config.h"
+#include "source/extensions/compression/gzip/compressor/config.h"
 #include "source/extensions/compression/gzip/decompressor/config.h"
 #include "source/extensions/early_data/default_early_data_policy.h"
 #include "source/extensions/filters/http/alternate_protocols_cache/config.h"
 #include "source/extensions/filters/http/buffer/config.h"
+#include "source/extensions/filters/http/compressor/config.h"
 #include "source/extensions/filters/http/decompressor/config.h"
 #include "source/extensions/filters/http/dynamic_forward_proxy/config.h"
 #include "source/extensions/filters/http/router/config.h"
@@ -64,7 +67,9 @@ void ExtensionRegistry::registerFactories() {
   Common::Http::MatchDelegate::forceRegisterMatchDelegateConfig();
   ExtensionRegistryPlatformAdditions::registerFactories();
   Extensions::Clusters::DynamicForwardProxy::forceRegisterClusterFactory();
+  Extensions::Compression::Brotli::Compressor::forceRegisterBrotliCompressorLibraryFactory();
   Extensions::Compression::Brotli::Decompressor::forceRegisterBrotliDecompressorLibraryFactory();
+  Extensions::Compression::Gzip::Compressor::forceRegisterGzipCompressorLibraryFactory();
   Extensions::Compression::Gzip::Decompressor::forceRegisterGzipDecompressorLibraryFactory();
   Extensions::Http::HeaderFormatters::PreserveCase::
       forceRegisterPreserveCaseFormatterFactoryConfig();
@@ -74,6 +79,7 @@ void ExtensionRegistry::registerFactories() {
       forceRegisterAlternateProtocolsCacheFilterFactory();
   Extensions::HttpFilters::Assertion::forceRegisterAssertionFilterFactory();
   Extensions::HttpFilters::BufferFilter::forceRegisterBufferFilterFactory();
+  Extensions::HttpFilters::Compressor::forceRegisterCompressorFilterFactory();
   Extensions::HttpFilters::Decompressor::forceRegisterDecompressorFilterFactory();
   Extensions::HttpFilters::DynamicForwardProxy::forceRegisterDynamicForwardProxyFilterFactory();
   Extensions::HttpFilters::LocalError::forceRegisterLocalErrorFilterFactory();

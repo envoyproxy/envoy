@@ -156,14 +156,27 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_altProtocolCacheFilterInsert(JN
 }
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_io_envoyproxy_envoymobile_engine_JniLibrary_gzipConfigInsert(JNIEnv* env, jclass) {
-  jstring result = env->NewStringUTF(gzip_config_insert);
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_gzipDecompressorConfigInsert(JNIEnv* env, jclass) {
+  jstring result = env->NewStringUTF(gzip_decompressor_config_insert);
   return result;
 }
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_io_envoyproxy_envoymobile_engine_JniLibrary_brotliConfigInsert(JNIEnv* env, jclass) {
-  jstring result = env->NewStringUTF(brotli_config_insert);
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_gzipCompressorConfigInsert(JNIEnv* env, jclass) {
+  jstring result = env->NewStringUTF(gzip_compressor_config_insert);
+  return result;
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_brotliDecompressorConfigInsert(JNIEnv* env,
+                                                                                jclass) {
+  jstring result = env->NewStringUTF(brotli_decompressor_config_insert);
+  return result;
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_brotliCompressorConfigInsert(JNIEnv* env, jclass) {
+  jstring result = env->NewStringUTF(brotli_compressor_config_insert);
   return result;
 }
 
