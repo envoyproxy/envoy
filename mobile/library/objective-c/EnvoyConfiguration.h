@@ -20,6 +20,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong) NSString *dnsPreresolveHostnames;
 @property (nonatomic, assign) UInt32 dnsRefreshSeconds;
 @property (nonatomic, assign) BOOL enableDNSCache;
+@property (nonatomic, assign) UInt32 dnsCacheSaveIntervalSeconds;
 @property (nonatomic, assign) BOOL enableHappyEyeballs;
 @property (nonatomic, assign) BOOL enableHttp3;
 @property (nonatomic, assign) BOOL enableGzip;
@@ -59,6 +60,7 @@ NS_ASSUME_NONNULL_BEGIN
                              dnsMinRefreshSeconds:(UInt32)dnsMinRefreshSeconds
                            dnsPreresolveHostnames:(NSString *)dnsPreresolveHostnames
                                    enableDNSCache:(BOOL)enableDNSCache
+                      dnsCacheSaveIntervalSeconds:(UInt32)dnsCacheSaveIntervalSeconds
                               enableHappyEyeballs:(BOOL)enableHappyEyeballs
                                       enableHttp3:(BOOL)enableHttp3
                                        enableGzip:(BOOL)enableGzip

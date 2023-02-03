@@ -491,6 +491,27 @@ Available on Android only.
     builder.enableProxying(true)
 
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+``enableDNSCache``
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Specify whether to enable DNS cache. Note that DNS cache requires an addition of
+a key value store named 'reserved.platform_store'.
+
+The interval at which results are saved to the key value store defaults to 1s
+but can also be set explicitly.
+
+A maximum of 100 entries will be stored.
+
+**Example**::
+
+  // Kotlin
+  builder.enableDNSCache(true, saveInterval: 60)
+
+  // Swift
+  builder.enableDNSCache(true, saveInterval: 60)
+
+
 ----------------------
 Advanced configuration
 ----------------------

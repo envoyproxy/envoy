@@ -46,8 +46,26 @@ const (
 
 type httpCApiImpl struct{}
 
+// Only CAPIOK is expected, otherwise, it means unexpected stage when invoke C API,
+// panic here and it will be recover in the Go entry function (TODO).
+func handleCApiStatus(status C.CAPIStatus) {
+	switch status {
+	case C.CAPIOK:
+		return
+	case C.CAPIFilterIsGone:
+		panic("request has been finished")
+	case C.CAPIFilterIsDestroy:
+		panic("golang filter has been destroyed")
+	case C.CAPINotInGo:
+		panic("not proccessing Go")
+	case C.CAPIInvalidPhase:
+		panic("invalid phase, maybe headers/buffer already continued")
+	}
+}
+
 func (c *httpCApiImpl) HttpContinue(r unsafe.Pointer, status uint64) {
-	C.envoyGoFilterHttpContinue(r, C.int(status))
+	res := C.envoyGoFilterHttpContinue(r, C.int(status))
+	handleCApiStatus(res)
 }
 
 func (c *httpCApiImpl) HttpSendLocalReply(r unsafe.Pointer, response_code int, body_text string, headers map[string]string, grpc_status int64, details string) {
@@ -56,11 +74,13 @@ func (c *httpCApiImpl) HttpSendLocalReply(r unsafe.Pointer, response_code int, b
 	for k, v := range headers {
 		strs = append(strs, k, v)
 	}
-	C.envoyGoFilterHttpSendLocalReply(r, C.int(response_code), unsafe.Pointer(&body_text), unsafe.Pointer(&strs), C.longlong(grpc_status), unsafe.Pointer(&details))
+	res := C.envoyGoFilterHttpSendLocalReply(r, C.int(response_code), unsafe.Pointer(&body_text), unsafe.Pointer(&strs), C.longlong(grpc_status), unsafe.Pointer(&details))
+	handleCApiStatus(res)
 }
 
 func (c *httpCApiImpl) HttpGetHeader(r unsafe.Pointer, key *string, value *string) {
-	C.envoyGoFilterHttpGetHeader(r, unsafe.Pointer(key), unsafe.Pointer(value))
+	res := C.envoyGoFilterHttpGetHeader(r, unsafe.Pointer(key), unsafe.Pointer(value))
+	handleCApiStatus(res)
 }
 
 func (c *httpCApiImpl) HttpCopyHeaders(r unsafe.Pointer, num uint64, bytes uint64) map[string]string {
@@ -75,7 +95,8 @@ func (c *httpCApiImpl) HttpCopyHeaders(r unsafe.Pointer, num uint64, bytes uint6
 	sHeader := (*reflect.SliceHeader)(unsafe.Pointer(&strs))
 	bHeader := (*reflect.SliceHeader)(unsafe.Pointer(&buf))
 
-	C.envoyGoFilterHttpCopyHeaders(r, unsafe.Pointer(sHeader.Data), unsafe.Pointer(bHeader.Data))
+	res := C.envoyGoFilterHttpCopyHeaders(r, unsafe.Pointer(sHeader.Data), unsafe.Pointer(bHeader.Data))
+	handleCApiStatus(res)
 
 	m := make(map[string]string, num)
 	for i := uint64(0); i < num*2; i += 2 {
@@ -88,11 +109,13 @@ func (c *httpCApiImpl) HttpCopyHeaders(r unsafe.Pointer, num uint64, bytes uint6
 }
 
 func (c *httpCApiImpl) HttpSetHeader(r unsafe.Pointer, key *string, value *string) {
-	C.envoyGoFilterHttpSetHeader(r, unsafe.Pointer(key), unsafe.Pointer(value))
+	res := C.envoyGoFilterHttpSetHeader(r, unsafe.Pointer(key), unsafe.Pointer(value))
+	handleCApiStatus(res)
 }
 
 func (c *httpCApiImpl) HttpRemoveHeader(r unsafe.Pointer, key *string) {
-	C.envoyGoFilterHttpRemoveHeader(r, unsafe.Pointer(key))
+	res := C.envoyGoFilterHttpRemoveHeader(r, unsafe.Pointer(key))
+	handleCApiStatus(res)
 }
 
 func (c *httpCApiImpl) HttpGetBuffer(r unsafe.Pointer, bufferPtr uint64, value *string, length uint64) {
@@ -101,7 +124,8 @@ func (c *httpCApiImpl) HttpGetBuffer(r unsafe.Pointer, bufferPtr uint64, value *
 	sHeader := (*reflect.StringHeader)(unsafe.Pointer(value))
 	sHeader.Data = bHeader.Data
 	sHeader.Len = int(length)
-	C.envoyGoFilterHttpGetBuffer(r, C.ulonglong(bufferPtr), unsafe.Pointer(bHeader.Data))
+	res := C.envoyGoFilterHttpGetBuffer(r, C.ulonglong(bufferPtr), unsafe.Pointer(bHeader.Data))
+	handleCApiStatus(res)
 }
 
 func (c *httpCApiImpl) HttpSetBufferHelper(r unsafe.Pointer, bufferPtr uint64, value string, action api.BufferAction) {
@@ -115,7 +139,8 @@ func (c *httpCApiImpl) HttpSetBufferHelper(r unsafe.Pointer, bufferPtr uint64, v
 	case api.PrependBuffer:
 		act = C.Prepend
 	}
-	C.envoyGoFilterHttpSetBufferHelper(r, C.ulonglong(bufferPtr), unsafe.Pointer(sHeader.Data), C.int(sHeader.Len), act)
+	res := C.envoyGoFilterHttpSetBufferHelper(r, C.ulonglong(bufferPtr), unsafe.Pointer(sHeader.Data), C.int(sHeader.Len), act)
+	handleCApiStatus(res)
 }
 
 func (c *httpCApiImpl) HttpCopyTrailers(r unsafe.Pointer, num uint64, bytes uint64) map[string]string {
@@ -128,7 +153,8 @@ func (c *httpCApiImpl) HttpCopyTrailers(r unsafe.Pointer, num uint64, bytes uint
 	sHeader := (*reflect.SliceHeader)(unsafe.Pointer(&strs))
 	bHeader := (*reflect.SliceHeader)(unsafe.Pointer(&buf))
 
-	C.envoyGoFilterHttpCopyTrailers(r, unsafe.Pointer(sHeader.Data), unsafe.Pointer(bHeader.Data))
+	res := C.envoyGoFilterHttpCopyTrailers(r, unsafe.Pointer(sHeader.Data), unsafe.Pointer(bHeader.Data))
+	handleCApiStatus(res)
 
 	m := make(map[string]string, num)
 	for i := uint64(0); i < num*2; i += 2 {
@@ -140,12 +166,14 @@ func (c *httpCApiImpl) HttpCopyTrailers(r unsafe.Pointer, num uint64, bytes uint
 }
 
 func (c *httpCApiImpl) HttpSetTrailer(r unsafe.Pointer, key *string, value *string) {
-	C.envoyGoFilterHttpSetTrailer(r, unsafe.Pointer(key), unsafe.Pointer(value))
+	res := C.envoyGoFilterHttpSetTrailer(r, unsafe.Pointer(key), unsafe.Pointer(value))
+	handleCApiStatus(res)
 }
 
 func (c *httpCApiImpl) HttpGetRouteName(r unsafe.Pointer) string {
 	var value string
-	C.envoyGoFilterHttpGetStringValue(r, ValueRouteName, unsafe.Pointer(&value))
+	res := C.envoyGoFilterHttpGetStringValue(r, ValueRouteName, unsafe.Pointer(&value))
+	handleCApiStatus(res)
 	// copy the memory from c to Go.
 	return strings.Clone(value)
 }
