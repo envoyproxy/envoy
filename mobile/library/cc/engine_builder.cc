@@ -3,12 +3,9 @@
 #include <sstream>
 
 #include "envoy/config/metrics/v3/metrics_service.pb.h"
-#include "envoy/extensions/compression/brotli/compressor/v3/brotli.pb.h"
 #include "envoy/extensions/compression/brotli/decompressor/v3/brotli.pb.h"
-#include "envoy/extensions/compression/gzip/compressor/v3/gzip.pb.h"
 #include "envoy/extensions/compression/gzip/decompressor/v3/gzip.pb.h"
 #include "envoy/extensions/filters/http/alternate_protocols_cache/v3/alternate_protocols_cache.pb.h"
-#include "envoy/extensions/filters/http/compressor/v3/compressor.pb.h"
 #include "envoy/extensions/filters/http/decompressor/v3/decompressor.pb.h"
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
 #include "envoy/extensions/http/header_formatters/preserve_case/v3/preserve_case.pb.h"
@@ -17,6 +14,12 @@
 #include "envoy/extensions/transport_sockets/http_11_proxy/v3/upstream_http_11_connect.pb.h"
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 #include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
+
+#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
+#include "envoy/extensions/compression/brotli/compressor/v3/brotli.pb.h"
+#include "envoy/extensions/compression/gzip/compressor/v3/gzip.pb.h"
+#include "envoy/extensions/filters/http/compressor/v3/compressor.pb.h"
+#endif
 
 #include "source/common/common/assert.h"
 #include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
@@ -199,20 +202,24 @@ EngineBuilder& EngineBuilder::enableGzipDecompression(bool gzip_decompression_on
   return *this;
 }
 
+#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
 EngineBuilder& EngineBuilder::enableGzipCompression(bool gzip_compression_on) {
   gzip_compression_filter_ = gzip_compression_on;
   return *this;
 }
+#endif
 
 EngineBuilder& EngineBuilder::enableBrotliDecompression(bool brotli_decompression_on) {
   brotli_decompression_filter_ = brotli_decompression_on;
   return *this;
 }
 
+#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
 EngineBuilder& EngineBuilder::enableBrotliCompression(bool brotli_compression_on) {
   brotli_compression_filter_ = brotli_compression_on;
   return *this;
 }
+#endif
 
 EngineBuilder& EngineBuilder::enableSocketTagging(bool socket_tagging_on) {
   socket_tagging_filter_ = socket_tagging_on;
@@ -548,6 +555,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     brotli_filter->set_name("envoy.filters.http.decompressor");
     brotli_filter->mutable_typed_config()->PackFrom(decompressor_config);
   }
+#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
   if (brotli_compression_filter_) {
     envoy::extensions::compression::brotli::compressor::v3::Brotli brotli_config;
     envoy::extensions::filters::http::compressor::v3::Compressor compressor_config;
@@ -560,6 +568,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     brotli_filter->set_name("envoy.filters.http.compressor");
     brotli_filter->mutable_typed_config()->PackFrom(compressor_config);
   }
+#endif
   if (gzip_decompression_filter_) {
     envoy::extensions::compression::gzip::decompressor::v3::Gzip gzip_config;
     gzip_config.mutable_window_bits()->set_value(15);
@@ -578,6 +587,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     gzip_filter->set_name("envoy.filters.http.decompressor");
     gzip_filter->mutable_typed_config()->PackFrom(decompressor_config);
   }
+#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
   if (gzip_compression_filter_) {
     envoy::extensions::compression::gzip::compressor::v3::Gzip gzip_config;
     gzip_config.mutable_window_bits()->set_value(15);
@@ -588,6 +598,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     gzip_filter->set_name("envoy.filters.http.compressor");
     gzip_filter->mutable_typed_config()->PackFrom(compressor_config);
   }
+#endif
   if (socket_tagging_filter_) {
     envoymobile::extensions::filters::http::socket_tag::SocketTag tag_config;
     auto* tag_filter = hcm->add_http_filters();

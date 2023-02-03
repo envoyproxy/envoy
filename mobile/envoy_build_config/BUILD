@@ -1,4 +1,4 @@
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_package", "envoy_select_enable_http3")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_package", "envoy_select_enable_http3", "envoy_select_envoy_mobile_request_compression")
 
 licenses(["notice"])  # Apache 2
 
@@ -21,13 +21,10 @@ envoy_cc_library(
         "@envoy//source/extensions/clusters/dynamic_forward_proxy:cluster",
         "@envoy//source/extensions/clusters/logical_dns:logical_dns_cluster_lib",
         "@envoy//source/extensions/clusters/static:static_cluster_lib",
-        "@envoy//source/extensions/compression/brotli/compressor:config",
         "@envoy//source/extensions/compression/brotli/decompressor:config",
-        "@envoy//source/extensions/compression/gzip/compressor:config",
         "@envoy//source/extensions/compression/gzip/decompressor:config",
         "@envoy//source/extensions/filters/http/alternate_protocols_cache:config",
         "@envoy//source/extensions/filters/http/buffer:config",
-        "@envoy//source/extensions/filters/http/compressor:config",
         "@envoy//source/extensions/filters/http/decompressor:config",
         "@envoy//source/extensions/filters/http/dynamic_forward_proxy:config",
         "@envoy//source/extensions/filters/http/router:config",
@@ -59,6 +56,13 @@ envoy_cc_library(
     ] + envoy_select_enable_http3(
         [
             "@envoy//source/common/quic:quic_transport_socket_factory_lib",
+        ],
+        "@envoy",
+    ) + envoy_select_envoy_mobile_request_compression(
+        [
+            "@envoy//source/extensions/compression/brotli/compressor:config",
+            "@envoy//source/extensions/compression/gzip/compressor:config",
+            "@envoy//source/extensions/filters/http/compressor:config",
         ],
         "@envoy",
     ),

@@ -106,6 +106,7 @@ TEST(TestConfig, SetGzipDecompression) {
   ASSERT_THAT(bootstrap.DebugString(), HasSubstr("envoy.filters.http.decompressor"));
 }
 
+#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
 TEST(TestConfig, SetGzipCompression) {
   EngineBuilder engine_builder;
 
@@ -121,6 +122,7 @@ TEST(TestConfig, SetGzipCompression) {
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
   ASSERT_THAT(bootstrap.DebugString(), HasSubstr("envoy.filters.http.compressor"));
 }
+#endif
 
 TEST(TestConfig, SetBrotliDecompression) {
   EngineBuilder engine_builder;
@@ -139,6 +141,7 @@ TEST(TestConfig, SetBrotliDecompression) {
   EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap()));
 }
 
+#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
 TEST(TestConfig, SetBrotliCompression) {
   EngineBuilder engine_builder;
 
@@ -155,6 +158,7 @@ TEST(TestConfig, SetBrotliCompression) {
   ASSERT_THAT(bootstrap.DebugString(), HasSubstr("brotli.compressor.v3.Brotli"));
   EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap()));
 }
+#endif
 
 TEST(TestConfig, SetSocketTag) {
   EngineBuilder engine_builder;
