@@ -1,8 +1,10 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_fuzz_test",
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
+    "envoy_proto_library",
 )
 
 licenses(["notice"])  # Apache 2
@@ -366,3 +368,16 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_proto_library(
+  name = "envoy_quic_h3_fuzz_proto",
+  srcs = ["envoy_quic_h3_fuzz.proto"],
+  deps = ["//test/fuzz:common_proto"],
+)
+
+envoy_cc_test(
+  name = "envoy_quic_h3_fuzz_test",
+  srcs = ["envoy_quic_h3_fuzz_test"],
+  corpus = "envoy_quic_h3_fuzz_test_corpus",
+  deps = [
+    ":envoy_quic_h3_fuzz_proto_cc_proto",
