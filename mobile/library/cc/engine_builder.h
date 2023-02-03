@@ -140,7 +140,7 @@ private:
   std::string ads_address_ = "";
   int ads_port_;
   bool dns_cache_on_ = false;
-  bool dns_cache_save_interval_seconds_ = 1;
+  int dns_cache_save_interval_seconds_ = 1;
 
   absl::flat_hash_map<std::string, KeyValueStoreSharedPtr> key_value_stores_{};
 
