@@ -257,11 +257,11 @@ public class EnvoyConfiguration {
         .append("\n");
 
     if (enableDNSCache) {
+      configBuilder.append(
+          String.format("- &persistent_dns_cache_save_interval %s\n", dnsCacheSaveIntervalSeconds));
       final String persistentDNSCacheConfigInsert = JniLibrary.persistentDNSCacheConfigInsert();
       configBuilder.append(
           String.format("- &persistent_dns_cache_config %s\n", persistentDNSCacheConfigInsert));
-      configBuilder.append(
-          String.format("- &persistent_dns_cache_save_interval %s\n", dnsCacheSaveIntervalSeconds));
     }
 
     configBuilder.append(String.format("- &stats_flush_interval %ss\n", statsFlushSeconds));

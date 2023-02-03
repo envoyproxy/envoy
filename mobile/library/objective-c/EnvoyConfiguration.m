@@ -202,10 +202,10 @@
   [definitions appendFormat:@"%@\n", cert_validator_template];
 
   if (self.enableDNSCache) {
-    NSString *persistent_dns_cache_config = @(persistent_dns_cache_config_insert);
-    [definitions appendFormat:@"- &persistent_dns_cache_config %@\n", persistent_dns_cache_config];
     [definitions appendFormat:@"- &persistent_dns_cache_save_interval %lu\n",
                               (unsigned long)self.dnsCacheSaveIntervalSeconds];
+    NSString *persistent_dns_cache_config = @(persistent_dns_cache_config_insert);
+    [definitions appendFormat:@"- &persistent_dns_cache_config %@\n", persistent_dns_cache_config];
   }
 
   NSMutableArray *stat_sinks_config = [self.statsSinks mutableCopy];

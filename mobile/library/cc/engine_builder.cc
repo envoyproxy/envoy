@@ -356,9 +356,9 @@ std::string EngineBuilder::generateConfigStr() const {
     replacements.push_back({"stats_domain", stats_domain_});
   }
   if (dns_cache_on_) {
-    replacements.push_back({"persistent_dns_cache_config", persistent_dns_cache_config_insert});
     replacements.push_back({"persistent_dns_cache_save_interval",
                             fmt::format("{}", dns_cache_save_interval_seconds_)});
+    replacements.push_back({"persistent_dns_cache_config", persistent_dns_cache_config_insert});
   }
 
   // NOTE: this does not include support for custom filters
