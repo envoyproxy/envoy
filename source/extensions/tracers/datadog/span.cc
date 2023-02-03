@@ -1,10 +1,5 @@
 #include "source/extensions/tracers/datadog/span.h"
 
-#include <datadog/dict_writer.h>
-#include <datadog/sampling_priority.h>
-#include <datadog/span_config.h>
-#include <datadog/trace_segment.h>
-
 #include <utility>
 
 #include "source/common/tracing/null_span_impl.h"
@@ -12,6 +7,10 @@
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
+#include "datadog/dict_writer.h"
+#include "datadog/sampling_priority.h"
+#include "datadog/span_config.h"
+#include "datadog/trace_segment.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -91,8 +90,8 @@ void Span::setSampled(bool sampled) {
     return;
   }
 
-  auto priority = int(sampled ? datadog::tracing::SamplingPriority::USER_KEEP
-                              : datadog::tracing::SamplingPriority::USER_DROP);
+  auto priority = static_cast<int>(sampled ? datadog::tracing::SamplingPriority::USER_KEEP
+                                           : datadog::tracing::SamplingPriority::USER_DROP);
   span_->trace_segment().override_sampling_priority(priority);
 }
 

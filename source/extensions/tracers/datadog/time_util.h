@@ -19,9 +19,9 @@
  * estimateTime function.
  */
 
-#include <datadog/clock.h>
-
 #include "envoy/common/time.h"
+
+#include "datadog/clock.h"
 
 namespace Envoy {
 namespace Extensions {

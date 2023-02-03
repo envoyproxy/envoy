@@ -1,15 +1,4 @@
-#include <datadog/clock.h>
-#include <datadog/collector.h>
-#include <datadog/expected.h>
-#include <datadog/id_generator.h>
-#include <datadog/logger.h>
-#include <datadog/sampling_priority.h>
-#include <datadog/span_data.h>
-#include <datadog/tags.h>
-#include <datadog/tracer.h>
-
 #include <cstdint>
-#include <datadog/json.hpp>
 #include <iomanip>
 #include <memory>
 #include <typeinfo>
@@ -24,6 +13,16 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
+#include "datadog/clock.h"
+#include "datadog/collector.h"
+#include "datadog/expected.h"
+#include "datadog/id_generator.h"
+#include "datadog/json.hpp"
+#include "datadog/logger.h"
+#include "datadog/sampling_priority.h"
+#include "datadog/span_data.h"
+#include "datadog/tags.h"
+#include "datadog/tracer.h"
 #include "gtest/gtest.h"
 
 namespace datadog {

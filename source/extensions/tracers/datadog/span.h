@@ -1,11 +1,11 @@
 #pragma once
 
-#include <datadog/span.h>
-
 #include <optional>
 
 #include "envoy/common/time.h"
 #include "envoy/tracing/trace_driver.h"
+
+#include "datadog/span.h"
 
 namespace Envoy {
 namespace Extensions {
