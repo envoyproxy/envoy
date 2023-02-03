@@ -125,7 +125,7 @@ MemfileInstanceImpl::MemfileInstanceImpl(TimeSource& time_source)
     : file_system_{new InstanceImpl()}, use_memfiles_(false), time_source_(time_source) {}
 
 MemfileInstanceImpl& fileSystemForTest() {
-  Event::GlobalTimeSystem sim_time;
+  static Event::GlobalTimeSystem sim_time;
   static MemfileInstanceImpl* file_system = new MemfileInstanceImpl(sim_time);
   return *file_system;
 }
