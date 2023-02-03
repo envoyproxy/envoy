@@ -358,6 +358,28 @@ TEST(UtilityTest, prepareBackoffStrategyConfigFileValues) {
       EXPECT_EQ(true, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get())
                           ->isOverTimeLimit(10001));
     }
+
+    // Test for non envoy_grpc config
+    {
+      envoy::config::core::v3::ApiConfigSource api_config_source;
+      const std::string config_yaml = R"EOF(
+      api_type: GRPC
+      grpc_services:
+        google_grpc:
+          target_uri: trafficdirector.googleapis.com
+    )EOF";
+
+      TestUtility::loadFromYaml(config_yaml, api_config_source);
+
+      BackOffStrategyPtr strategy = Utility::prepareBackoffStrategy(api_config_source, random);
+      EXPECT_NE(nullptr, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get()));
+
+      EXPECT_EQ(false, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get())
+                           ->isOverTimeLimit(Envoy::Config::RetryMaxIntervalMs));
+
+      EXPECT_EQ(true, dynamic_cast<JitteredExponentialBackOffStrategy*>(strategy.get())
+                          ->isOverTimeLimit(Envoy::Config::RetryMaxIntervalMs + 1));
+    }
   }
 }
 
