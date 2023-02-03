@@ -28,6 +28,7 @@
 #include "test/extensions/transport_sockets/tls/cert_validator/timed_cert_validator.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/ssl_utility.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -1628,6 +1629,89 @@ TEST_P(QuicInplaceLdsIntegrationTest, StatelessResetOldConnection) {
   } else {
     test_server_->waitForCounterGe("listener.[__1]_0.quic.dispatcher.stateless_reset_packets_sent",
                                    1u);
+  }
+}
+
+class TestServerPreferredAddressConfig : public EnvoyQuicServerPreferredAddressConfig {
+public:
+  std::pair<quic::QuicSocketAddress, quic::QuicSocketAddress> getServerPreferredAddresses(
+      const Network::Address::InstanceConstSharedPtr& local_address) override {
+    int32_t port = local_address->ip()->port();
+    quic::QuicIpAddress ip_v4;
+    ip_v4.FromString("127.0.0.2");
+    quic::QuicIpAddress ip_v6;
+    ip_v6.FromString("::2");
+    return {quic::QuicSocketAddress(ip_v4, port), quic::QuicSocketAddress(ip_v6, port)};
+  }
+};
+
+class TestServerPreferredAddressConfigFactory
+    : public EnvoyQuicServerPreferredAddressConfigFactory {
+public:
+  std::string name() const override { return "quic.server_preferred_address.test"; }
+
+  EnvoyQuicServerPreferredAddressConfigPtr
+  createServerPreferredAddressConfig(const Protobuf::Message&) override {
+    return std::make_unique<TestServerPreferredAddressConfig>();
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+  }
+};
+
+TEST_P(QuicHttpIntegrationTest, UsesPreferredAddress) {
+  autonomous_upstream_ = true;
+  config_helper_.addConfigModifier([=](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listen_address = bootstrap.mutable_static_resources()
+                               ->mutable_listeners(0)
+                               ->mutable_address()
+                               ->mutable_socket_address();
+    // Change listening address to Any.
+    listen_address->set_address(version_ == Network::Address::IpVersion::v4 ? "0.0.0.0" : "::");
+    auto* preferred_address_config = bootstrap.mutable_static_resources()
+                                         ->mutable_listeners(0)
+                                         ->mutable_udp_listener_config()
+                                         ->mutable_quic_options()
+                                         ->mutable_server_preferred_address_config();
+    preferred_address_config->set_name("quic.server_preferred_address.test");
+    preferred_address_config->mutable_typed_config()->PackFrom(Envoy::ProtobufWkt::Struct());
+  });
+
+  TestServerPreferredAddressConfigFactory factory;
+  Envoy::Registry::InjectFactory<EnvoyQuicServerPreferredAddressConfigFactory> registration(
+      factory);
+  initialize();
+  quic::QuicTagVector connection_options{quic::kRVCM, quic::kSPAD};
+  dynamic_cast<Quic::PersistentQuicInfoImpl&>(*quic_connection_persistent_info_)
+      .quic_config_.SetConnectionOptionsToSend(connection_options);
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  EnvoyQuicClientSession* quic_session =
+      static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
+  EXPECT_EQ(Network::Test::getLoopbackAddressString(version_),
+            quic_connection_->peer_address().host().ToString());
+  ASSERT_TRUE(version_ == Network::Address::IpVersion::v4 &&
+                  quic_session->config()->HasReceivedIPv4AlternateServerAddress() ||
+              version_ == Network::Address::IpVersion::v6 &&
+                  quic_session->config()->HasReceivedIPv6AlternateServerAddress());
+  ASSERT_TRUE(quic_connection_->waitForHandshakeDone());
+  EXPECT_TRUE(quic_connection_->IsValidatingServerPreferredAddress());
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"},
+      {":path", "/test/long/url"},
+      {":authority", "sni.lyft.com"},
+      {":scheme", "http"},
+      {AutonomousStream::RESPONSE_SIZE_BYTES, std::to_string(1024 * 1024)}};
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  EXPECT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+
+  if (version_ == Network::Address::IpVersion::v4) {
+    // Most v6 platform doesn't support two loopback interfaces.
+    EXPECT_EQ("127.0.0.2", quic_connection_->peer_address().host().ToString());
+    test_server_->waitForCounterGe(
+        "listener.0.0.0.0_0.quic.connection.num_packets_rx_on_preferred_address", 2u);
   }
 }
 

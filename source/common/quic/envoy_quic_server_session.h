@@ -17,6 +17,14 @@
 namespace Envoy {
 namespace Quic {
 
+#define QUIC_CONNECTION_STATS(COUNTER)                                                             \
+  COUNTER(num_server_migration_detected)                                                           \
+  COUNTER(num_packets_rx_on_preferred_address)
+
+struct QuicConnectionStats {
+  QUIC_CONNECTION_STATS(GENERATE_COUNTER_STRUCT)
+};
+
 using FilterChainToConnectionMap =
     absl::flat_hash_map<const Network::FilterChain*,
                         std::list<std::reference_wrapper<Network::Connection>>>;
@@ -131,6 +139,7 @@ private:
 
   EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory_;
   absl::optional<ConnectionMapPosition> position_;
+  QuicConnectionStats connection_stats_;
 };
 
 } // namespace Quic

@@ -84,6 +84,7 @@ categories:
 - envoy.quic.connection_id_generator
 - envoy.quic.proof_source
 - envoy.quic.server.crypto_stream
+- envoy.quic.server_preferred_address
 - envoy.rate_limit_descriptors
 - envoy.regex_engines
 - envoy.request_id

@@ -127,6 +127,11 @@ void EnvoyQuicClientConnection::maybeMigratePort() {
     return;
   }
 
+  probeWithNewPort(peer_address(), quic::PathValidationReason::kPortMigration);
+}
+
+void EnvoyQuicClientConnection::probeWithNewPort(const quic::QuicSocketAddress& peer_address,
+                                                 quic::PathValidationReason reason) {
   const Network::Address::InstanceConstSharedPtr& current_local_address =
       connectionSocket()->connectionInfoProvider().localAddress();
   // Creates an IP address with unset port. The port will be set when the new socket is created.
@@ -148,23 +153,30 @@ void EnvoyQuicClientConnection::maybeMigratePort() {
       std::make_unique<Network::UdpDefaultWriter>(probing_socket->ioHandle()));
   quic::QuicSocketAddress self_address = envoyIpAddressToQuicSocketAddress(
       probing_socket->connectionInfoProvider().localAddress()->ip());
-  quic::QuicSocketAddress peer_address = envoyIpAddressToQuicSocketAddress(
-      probing_socket->connectionInfoProvider().remoteAddress()->ip());
 
   auto context = std::make_unique<EnvoyQuicPathValidationContext>(
       self_address, peer_address, std::move(writer), std::move(probing_socket));
   ValidatePath(std::move(context), std::make_unique<EnvoyPathValidationResultDelegate>(*this),
-               quic::PathValidationReason::kPortMigration);
+               reason);
 }
 
 void EnvoyQuicClientConnection::onPathValidationSuccess(
     std::unique_ptr<quic::QuicPathValidationContext> context) {
+  ENVOY_CONN_LOG(trace, "===== onPathValidationSuccess", *this);
   auto envoy_context =
       static_cast<EnvoyQuicClientConnection::EnvoyQuicPathValidationContext*>(context.get());
 
   auto probing_socket = envoy_context->releaseSocket();
-  if (MigratePath(envoy_context->self_address(), envoy_context->peer_address(),
-                  envoy_context->releaseWriter(), true)) {
+  if (envoy_context->peer_address() != peer_address()) {
+    OnServerPreferredAddressValidated(*envoy_context, true);
+    envoy_context->releaseWriter();
+  } else {
+    MigratePath(envoy_context->self_address(), envoy_context->peer_address(),
+                envoy_context->releaseWriter(), true);
+  }
+
+  if (self_address() == envoy_context->self_address() &&
+      peer_address() == envoy_context->peer_address()) {
     // probing_socket will be set as the new default socket. But old sockets are still able to
     // receive packets.
     setConnectionSocket(std::move(probing_socket));
@@ -177,6 +189,7 @@ void EnvoyQuicClientConnection::onPathValidationSuccess(
 
 void EnvoyQuicClientConnection::onPathValidationFailure(
     std::unique_ptr<quic::QuicPathValidationContext> context) {
+  ENVOY_CONN_LOG(trace, "======= onPathValidationFailure", *this);
   // Note that the probing socket and probing writer will be deleted once context goes out of
   // scope.
   OnPathValidationFailureAtClient(/*is_multi_port=*/false, *context);
@@ -231,7 +244,7 @@ void EnvoyQuicClientConnection::setNumPtosForPortMigration(uint32_t num_ptos_for
 }
 
 EnvoyQuicClientConnection::EnvoyQuicPathValidationContext::EnvoyQuicPathValidationContext(
-    quic::QuicSocketAddress& self_address, quic::QuicSocketAddress& peer_address,
+    const quic::QuicSocketAddress& self_address, const quic::QuicSocketAddress& peer_address,
     std::unique_ptr<EnvoyQuicPacketWriter> writer,
     std::unique_ptr<Network::ConnectionSocket> probing_socket)
     : QuicPathValidationContext(self_address, peer_address), writer_(std::move(writer)),
@@ -275,6 +288,14 @@ void EnvoyQuicClientConnection::EnvoyPathValidationResultDelegate::OnPathValidat
 void EnvoyQuicClientConnection::OnCanWrite() {
   quic::QuicConnection::OnCanWrite();
   onWriteEventDone();
+}
+
+void EnvoyQuicClientConnection::probeAndMigrateToServerPreferredAddress(
+    const quic::QuicSocketAddress& server_preferred_address) {
+  std::cerr << "========= probeAndMigrateToServerPreferredAddress " << server_preferred_address
+            << "\n";
+  probeWithNewPort(server_preferred_address,
+                   quic::PathValidationReason::kServerPreferredAddressMigration);
 }
 
 } // namespace Quic

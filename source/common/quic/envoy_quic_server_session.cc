@@ -26,8 +26,9 @@ EnvoyQuicServerSession::EnvoyQuicServerSession(
           *connection, connection->connection_id(), dispatcher, send_buffer_limit,
           std::make_shared<QuicSslConnectionInfo>(*this), std::move(stream_info)),
       quic_connection_(std::move(connection)), quic_stat_names_(quic_stat_names),
-      listener_scope_(listener_scope), crypto_server_stream_factory_(crypto_server_stream_factory) {
-}
+      listener_scope_(listener_scope), crypto_server_stream_factory_(crypto_server_stream_factory),
+      connection_stats_(
+          {QUIC_CONNECTION_STATS(POOL_COUNTER_PREFIX(listener_scope_, "quic.connection"))}) {}
 
 EnvoyQuicServerSession::~EnvoyQuicServerSession() {
   ASSERT(!quic_connection_->connected());
@@ -205,6 +206,9 @@ void EnvoyQuicServerSession::ProcessUdpPacket(const quic::QuicSocketAddress& sel
     maybeHandleCloseDuringInitialize();
   }
   quic::QuicServerSessionBase::ProcessUdpPacket(self_address, peer_address, packet);
+  if (self_address != connection()->self_address()) {
+    connection_stats_.num_packets_rx_on_preferred_address_.inc();
+  }
 }
 
 } // namespace Quic
