@@ -60,8 +60,8 @@ public:
                                    static_resources->mutable_clusters()->Add());
 
       // Emit metadata to access logs.
-      access_log_name_ = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
-      access_log2_name_ = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+      access_log_name_ = TestEnvironment::temporaryPath(TestUtility::uniqueFilename("1"));
+      access_log2_name_ = TestEnvironment::temporaryPath(TestUtility::uniqueFilename("2"));
 
       // Insert internal listeners.
       TestUtility::loadFromYaml(

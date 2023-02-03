@@ -1594,7 +1594,7 @@ TEST_F(LuaHttpFilterTest, HttpCallInvalidCluster) {
   EXPECT_EQ(1, stats_store_.counter("test.lua.errors").value());
 }
 
-// HTTP request flow with timeout and sampled flag in options.
+// HTTP request flow with timeout, sampled and send_xff flag in options.
 TEST_F(LuaHttpFilterTest, HttpCallWithTimeoutAndSampledInOptions) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
@@ -1609,6 +1609,7 @@ TEST_F(LuaHttpFilterTest, HttpCallWithTimeoutAndSampledInOptions) {
         {
           ["timeout_ms"] = 5000,
           ["trace_sampled"] = false,
+          ["send_xff"] = false,
         })
     end
   )EOF"};
@@ -1627,6 +1628,7 @@ TEST_F(LuaHttpFilterTest, HttpCallWithTimeoutAndSampledInOptions) {
               const Http::AsyncClient::RequestOptions& options) -> Http::AsyncClient::Request* {
             EXPECT_EQ(options.timeout->count(), 5000);
             EXPECT_EQ(options.sampled_.value(), false);
+            EXPECT_EQ(options.send_xff, false);
             callbacks = &cb;
             return &request;
           }));

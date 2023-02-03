@@ -1040,9 +1040,9 @@ ClusterInfoImpl::ClusterInfoImpl(
                     config.original_dst_lb_config())
               : nullptr),
       upstream_config_(config.has_upstream_config()
-                           ? absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>(
+                           ? std::make_unique<envoy::config::core::v3::TypedExtensionConfig>(
                                  config.upstream_config())
-                           : absl::nullopt),
+                           : nullptr),
       added_via_api_(added_via_api),
       lb_subset_(LoadBalancerSubsetInfoImpl(config.lb_subset_config())),
       metadata_(config.metadata()), typed_metadata_(config.metadata()),
@@ -1054,11 +1054,10 @@ ClusterInfoImpl::ClusterInfoImpl(
                   common_lb_config_.ignore_new_hosts_until_first_hc()),
       set_local_interface_name_on_upstream_connections_(
           config.upstream_connection_options().set_local_interface_name_on_upstream_connections()),
-      cluster_type_(
-          config.has_cluster_type()
-              ? absl::make_optional<envoy::config::cluster::v3::Cluster::CustomClusterType>(
-                    config.cluster_type())
-              : absl::nullopt),
+      cluster_type_(config.has_cluster_type()
+                        ? std::make_unique<envoy::config::cluster::v3::Cluster::CustomClusterType>(
+                              config.cluster_type())
+                        : nullptr),
       factory_context_(
           std::make_unique<FactoryContextImpl>(*stats_scope_, runtime, factory_context)),
       upstream_context_(server_context, init_manager, *stats_scope_) {
