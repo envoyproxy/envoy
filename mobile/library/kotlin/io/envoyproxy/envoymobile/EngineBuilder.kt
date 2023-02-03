@@ -52,6 +52,7 @@ open class EngineBuilder(
   private var dnsMinRefreshSeconds = 60
   private var dnsPreresolveHostnames = "[]"
   private var enableDNSCache = false
+  private var dnsCacheSaveIntervalSeconds = 1
   private var enableDrainPostDnsRefresh = false
   private var enableHttp3 = true
   private var enableHappyEyeballs = true
@@ -215,11 +216,13 @@ open class EngineBuilder(
    * 'reserved.platform_store'.
    *
    * @param enableDNSCache whether to enable DNS cache. Disabled by default.
+   * @param saveInterval   the interval at which to save results to the configured key value store.
    *
    * @return This builder.
    */
-  fun enableDNSCache(enableDNSCache: Boolean): EngineBuilder {
+  fun enableDNSCache(enableDNSCache: Boolean, saveInterval: Int = 1): EngineBuilder {
     this.enableDNSCache = enableDNSCache
+    this.dnsCacheSaveIntervalSeconds = saveInterval
     return this
   }
 
@@ -591,6 +594,7 @@ open class EngineBuilder(
       dnsMinRefreshSeconds,
       dnsPreresolveHostnames,
       enableDNSCache,
+      dnsCacheSaveIntervalSeconds,
       enableDrainPostDnsRefresh,
       enableHttp3,
       enableGzip,

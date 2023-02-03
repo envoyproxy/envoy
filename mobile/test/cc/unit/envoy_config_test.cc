@@ -38,7 +38,7 @@ TEST(TestConfig, ConfigIsApplied) {
       .addStatsFlushSeconds(654)
       .setAppVersion("1.2.3")
       .setAppId("1234-1234-1234")
-      .enableDnsCache(true)
+      .enableDnsCache(true, /* save_interval_seconds */ 101)
       .addDnsPreresolveHostnames({"lyft.com", "google.com"})
       .enableAdminInterface(true)
       .setForceAlwaysUsev6(true)
@@ -57,6 +57,7 @@ TEST(TestConfig, ConfigIsApplied) {
                                            "- &stats_flush_interval 654s",
                                            "  key: dns_persistent_cache",
                                            "- &force_ipv6 true",
+                                           "- &persistent_dns_cache_save_interval 101",
                                            ("- &metadata { device_os: probably-ubuntu-on-CI, "
                                             "app_version: 1.2.3, app_id: 1234-1234-1234 }"),
                                            R"(- &validation_context

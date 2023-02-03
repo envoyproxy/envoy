@@ -69,7 +69,7 @@ public:
   // Adds an ADS layer.
   EngineBuilder& setAggregatedDiscoveryService(const std::string& api_type,
                                                const std::string& address, const int port);
-  EngineBuilder& enableDnsCache(bool dns_cache_on);
+  EngineBuilder& enableDnsCache(bool dns_cache_on, int save_interval_seconds = 1);
   EngineBuilder& setForceAlwaysUsev6(bool value);
   EngineBuilder& setSkipDnsLookupForProxiedRequests(bool value);
   EngineBuilder& addDnsPreresolveHostnames(const std::vector<std::string>& hostnames);
@@ -140,6 +140,7 @@ private:
   std::string ads_address_ = "";
   int ads_port_;
   bool dns_cache_on_ = false;
+  int dns_cache_save_interval_seconds_ = 1;
 
   absl::flat_hash_map<std::string, KeyValueStoreSharedPtr> key_value_stores_{};
 
