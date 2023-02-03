@@ -344,6 +344,11 @@ config_setting(
 )
 
 config_setting(
+    name = "disable_static_extension_registration",
+    values = {"define": "static_extension_registration=disabled"},
+)
+
+config_setting(
     name = "disable_logging",
     values = {"define": "enable_logging=disabled"},
 )

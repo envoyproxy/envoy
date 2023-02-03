@@ -14,7 +14,9 @@
                              dnsMinRefreshSeconds:(UInt32)dnsMinRefreshSeconds
                            dnsPreresolveHostnames:(NSString *)dnsPreresolveHostnames
                                    enableDNSCache:(BOOL)enableDNSCache
+                      dnsCacheSaveIntervalSeconds:(UInt32)dnsCacheSaveIntervalSeconds
                               enableHappyEyeballs:(BOOL)enableHappyEyeballs
+                                      enableHttp3:(BOOL)enableHttp3
                                        enableGzip:(BOOL)enableGzip
                                      enableBrotli:(BOOL)enableBrotli
                            enableInterfaceBinding:(BOOL)enableInterfaceBinding
@@ -25,7 +27,6 @@
     h2ConnectionKeepaliveIdleIntervalMilliseconds:
         (UInt32)h2ConnectionKeepaliveIdleIntervalMilliseconds
               h2ConnectionKeepaliveTimeoutSeconds:(UInt32)h2ConnectionKeepaliveTimeoutSeconds
-                         h2ExtendKeepaliveTimeout:(BOOL)h2ExtendKeepaliveTimeout
                             maxConnectionsPerHost:(UInt32)maxConnectionsPerHost
                                 statsFlushSeconds:(UInt32)statsFlushSeconds
                          streamIdleTimeoutSeconds:(UInt32)streamIdleTimeoutSeconds
@@ -61,7 +62,9 @@
   self.dnsMinRefreshSeconds = dnsMinRefreshSeconds;
   self.dnsPreresolveHostnames = dnsPreresolveHostnames;
   self.enableDNSCache = enableDNSCache;
+  self.dnsCacheSaveIntervalSeconds = dnsCacheSaveIntervalSeconds;
   self.enableHappyEyeballs = enableHappyEyeballs;
+  self.enableHttp3 = enableHttp3;
   self.enableGzip = enableGzip;
   self.enableBrotli = enableBrotli;
   self.enableInterfaceBinding = enableInterfaceBinding;
@@ -72,7 +75,6 @@
   self.h2ConnectionKeepaliveIdleIntervalMilliseconds =
       h2ConnectionKeepaliveIdleIntervalMilliseconds;
   self.h2ConnectionKeepaliveTimeoutSeconds = h2ConnectionKeepaliveTimeoutSeconds;
-  self.h2ExtendKeepaliveTimeout = h2ExtendKeepaliveTimeout;
   self.maxConnectionsPerHost = maxConnectionsPerHost;
   self.statsFlushSeconds = statsFlushSeconds;
   self.streamIdleTimeoutSeconds = streamIdleTimeoutSeconds;
@@ -124,6 +126,12 @@
     [customFilters appendString:brotliFilterInsert];
   }
 
+  if (self.enableHttp3) {
+    NSString *http3Insert =
+        [[NSString alloc] initWithUTF8String:alternate_protocols_cache_filter_insert];
+    [customFilters appendString:http3Insert];
+  }
+
   BOOL hasDirectResponses = self.directResponses.length > 0;
   if (hasDirectResponses) {
     templateYAML = [templateYAML stringByReplacingOccurrencesOfString:@"#{fake_remote_responses}"
@@ -161,10 +169,6 @@
   [definitions appendFormat:@"- &dns_preresolve_hostnames %@\n", self.dnsPreresolveHostnames];
   [definitions appendFormat:@"- &dns_lookup_family %@\n",
                             self.enableHappyEyeballs ? @"ALL" : @"V4_PREFERRED"];
-  [definitions appendFormat:@"- &dns_multiple_addresses %@\n",
-                            self.enableHappyEyeballs ? @"true" : @"false"];
-  [definitions appendFormat:@"- &h2_delay_keepalive_timeout %@\n",
-                            self.h2ExtendKeepaliveTimeout ? @"true" : @"false"];
   [definitions appendFormat:@"- &dns_refresh_rate %lus\n", (unsigned long)self.dnsRefreshSeconds];
   [definitions appendFormat:@"- &enable_drain_post_dns_refresh %@\n",
                             self.enableDrainPostDnsRefresh ? @"true" : @"false"];
@@ -198,6 +202,8 @@
   [definitions appendFormat:@"%@\n", cert_validator_template];
 
   if (self.enableDNSCache) {
+    [definitions appendFormat:@"- &persistent_dns_cache_save_interval %lu\n",
+                              (unsigned long)self.dnsCacheSaveIntervalSeconds];
     NSString *persistent_dns_cache_config = @(persistent_dns_cache_config_insert);
     [definitions appendFormat:@"- &persistent_dns_cache_config %@\n", persistent_dns_cache_config];
   }

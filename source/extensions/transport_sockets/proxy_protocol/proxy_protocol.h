@@ -3,6 +3,7 @@
 #include "envoy/config/core/v3/proxy_protocol.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
+#include "envoy/stats/stats.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
@@ -16,12 +17,23 @@ namespace Extensions {
 namespace TransportSockets {
 namespace ProxyProtocol {
 
+#define ALL_PROXY_PROTOCOL_TRANSPORT_SOCKET_STATS(COUNTER)                                         \
+  /* Upstream events counter. */                                                                   \
+  COUNTER(v2_tlvs_exceed_max_length)
+
+/**
+ * Wrapper struct for upstream ProxyProtocol stats. @see stats_macros.h
+ */
+struct UpstreamProxyProtocolStats {
+  ALL_PROXY_PROTOCOL_TRANSPORT_SOCKET_STATS(GENERATE_COUNTER_STRUCT)
+};
+
 class UpstreamProxyProtocolSocket : public TransportSockets::PassthroughSocket,
                                     public Logger::Loggable<Logger::Id::connection> {
 public:
   UpstreamProxyProtocolSocket(Network::TransportSocketPtr&& transport_socket,
                               Network::TransportSocketOptionsConstSharedPtr options,
-                              ProxyProtocolConfig_Version version);
+                              ProxyProtocolConfig config, Stats::Scope& scope);
 
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
   Network::IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
@@ -37,13 +49,16 @@ private:
   Network::TransportSocketCallbacks* callbacks_{};
   Buffer::OwnedImpl header_buffer_{};
   ProxyProtocolConfig_Version version_{ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1};
+  UpstreamProxyProtocolStats stats_;
+  const bool pass_all_tlvs_;
+  absl::flat_hash_set<uint8_t> pass_through_tlvs_{};
 };
 
 class UpstreamProxyProtocolSocketFactory : public PassthroughFactory {
 public:
   UpstreamProxyProtocolSocketFactory(
       Network::UpstreamTransportSocketFactoryPtr transport_socket_factory,
-      ProxyProtocolConfig config);
+      ProxyProtocolConfig config, Stats::Scope& scope);
 
   // Network::UpstreamTransportSocketFactory
   Network::TransportSocketPtr
@@ -54,6 +69,7 @@ public:
 
 private:
   ProxyProtocolConfig config_;
+  Stats::Scope& scope_;
 };
 
 } // namespace ProxyProtocol

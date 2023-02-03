@@ -55,7 +55,7 @@
 namespace Envoy {
 namespace Http {
 
-bool requestWasConnect(const RequestHeaderMapPtr& headers, Protocol protocol) {
+bool requestWasConnect(const RequestHeaderMapSharedPtr& headers, Protocol protocol) {
   if (!headers) {
     return false;
   }
@@ -190,7 +190,8 @@ void ConnectionManagerImpl::checkForDeferredClose(bool skip_delay_close) {
   if (drain_state_ == DrainState::Closing && streams_.empty() && !codec_->wantsToWrite()) {
     // We are closing a draining connection with no active streams and the codec has
     // nothing to write.
-    doConnectionClose(close, absl::nullopt, "deferred_close_on_drained_connection");
+    doConnectionClose(close, absl::nullopt,
+                      StreamInfo::LocalCloseReasons::get().DeferredCloseOnDrainedConnection);
   }
 }
 
@@ -278,8 +279,29 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
   }
 
   stream.completeRequest();
+
+  // Set roundtrip time in connectionInfoSetter before OnStreamComplete
+  absl::optional<std::chrono::milliseconds> t = read_callbacks_->connection().lastRoundTripTime();
+  if (t.has_value()) {
+    read_callbacks_->connection().connectionInfoSetter().setRoundTripTime(t.value());
+  }
+
   stream.filter_manager_.onStreamComplete();
-  stream.filter_manager_.log();
+
+  // For HTTP/3, skip access logging here and add deferred logging info
+  // to stream info for QuicStatsGatherer to use later.
+  if (codec_ && codec_->protocol() == Protocol::Http3 &&
+      // There was a downstream reset, log immediately.
+      !stream.filter_manager_.sawDownstreamReset() &&
+      // On recreate stream, log immediately.
+      stream.response_encoder_ != nullptr &&
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.quic_defer_logging_to_ack_listener")) {
+    stream.deferHeadersAndTrailers();
+  } else {
+    // For HTTP/1 and HTTP/2, log here as usual.
+    stream.filter_manager_.log();
+  }
 
   stream.filter_manager_.destroyFilters();
 
@@ -433,9 +455,8 @@ Network::FilterStatus ConnectionManagerImpl::onNewConnection() {
   Buffer::OwnedImpl dummy;
   createCodec(dummy);
   ASSERT(codec_->protocol() == Protocol::Http3);
-  // Stop iterating through each filters for QUIC. Currently a QUIC connection
-  // only supports one filter, HCM, and bypasses the onData() interface. Because
-  // QUICHE already handles de-multiplexing.
+  // Stop iterating through network filters for QUIC. Currently QUIC connections bypass the
+  // onData() interface because QUICHE already handles de-multiplexing.
   return Network::FilterStatus::StopIteration;
 }
 
@@ -551,7 +572,8 @@ void ConnectionManagerImpl::onIdleTimeout() {
   if (!codec_) {
     // No need to delay close after flushing since an idle timeout has already fired. Attempt to
     // write out buffered data one last time and issue a local close if successful.
-    doConnectionClose(Network::ConnectionCloseType::FlushWrite, absl::nullopt, "on_idle_timeout");
+    doConnectionClose(Network::ConnectionCloseType::FlushWrite, absl::nullopt,
+                      StreamInfo::LocalCloseReasons::get().IdleTimeoutOnConnection);
   } else if (drain_state_ == DrainState::NotDraining) {
     startDrainSequence();
   }
@@ -972,7 +994,7 @@ void ConnectionManagerImpl::ActiveStream::maybeEndDecode(bool end_stream) {
 // can't route select properly without full headers), checking state required to
 // serve error responses (connection close, head requests, etc), and
 // modifications which may themselves affect route selection.
-void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& headers,
+void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPtr&& headers,
                                                         bool end_stream) {
   ENVOY_STREAM_LOG(debug, "request headers complete (end_stream={}):\n{}", *this, end_stream,
                    *headers);
@@ -1192,7 +1214,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
 
 void ConnectionManagerImpl::ActiveStream::traceRequest() {
   const Tracing::Decision tracing_decision =
-      Tracing::HttpTracerUtility::shouldTraceRequest(filter_manager_.streamInfo());
+      Tracing::TracerUtility::shouldTraceRequest(filter_manager_.streamInfo());
   ConnectionManagerImpl::chargeTracingStats(tracing_decision.reason,
                                             connection_manager_.config_.tracingStats());
 

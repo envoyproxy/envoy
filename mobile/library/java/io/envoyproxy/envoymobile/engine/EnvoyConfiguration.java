@@ -11,6 +11,7 @@ import javax.annotation.Nullable;
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory;
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor;
 import io.envoyproxy.envoymobile.engine.types.EnvoyKeyValueStore;
+import io.envoyproxy.envoymobile.engine.JniLibrary;
 
 /* Typed configuration that may be used for starting Envoy. */
 public class EnvoyConfiguration {
@@ -35,6 +36,7 @@ public class EnvoyConfiguration {
   public final Integer dnsMinRefreshSeconds;
   public final String dnsPreresolveHostnames;
   public final Boolean enableDNSCache;
+  public final Integer dnsCacheSaveIntervalSeconds;
   public final Boolean enableDrainPostDnsRefresh;
   public final Boolean enableHttp3;
   public final Boolean enableGzip;
@@ -44,7 +46,6 @@ public class EnvoyConfiguration {
   public final Boolean enableInterfaceBinding;
   public final Integer h2ConnectionKeepaliveIdleIntervalMilliseconds;
   public final Integer h2ConnectionKeepaliveTimeoutSeconds;
-  public final Boolean h2ExtendKeepaliveTimeout;
   public final Integer maxConnectionsPerHost;
   public final List<EnvoyHTTPFilterFactory> httpPlatformFilterFactories;
   public final Integer statsFlushSeconds;
@@ -84,6 +85,8 @@ public class EnvoyConfiguration {
    * @param dnsPreresolveHostnames                        hostnames to preresolve on Envoy Client
    *     construction.
    * @param enableDNSCache                                whether to enable DNS cache.
+   * @param dnsCacheSaveIntervalSeconds                   the interval at which to save results to
+   *     the configured key value store.
    * @param enableDrainPostDnsRefresh                     whether to drain connections after soft
    *     DNS refresh.
    * @param enableHttp3                                   whether to enable experimental support for
@@ -99,9 +102,6 @@ public class EnvoyConfiguration {
    * @param h2ConnectionKeepaliveIdleIntervalMilliseconds rate in milliseconds seconds to send h2
    *                                                      pings on stream creation.
    * @param h2ConnectionKeepaliveTimeoutSeconds           rate in seconds to timeout h2 pings.
-   * @param h2ExtendKeepaliveTimeout                      Extend the keepalive timeout when *any*
-   *                                                      frame is received
-   *                                                      on the owning HTTP/2 connection.
    * @param maxConnectionsPerHost                         maximum number of connections to open to a
    *                                                      single host.
    * @param statsFlushSeconds                             interval at which to flush Envoy stats.
@@ -125,18 +125,19 @@ public class EnvoyConfiguration {
       boolean adminInterfaceEnabled, String grpcStatsDomain, int connectTimeoutSeconds,
       int dnsRefreshSeconds, int dnsFailureRefreshSecondsBase, int dnsFailureRefreshSecondsMax,
       int dnsQueryTimeoutSeconds, int dnsMinRefreshSeconds, String dnsPreresolveHostnames,
-      boolean enableDNSCache, boolean enableDrainPostDnsRefresh, boolean enableHttp3,
-      boolean enableGzip, boolean enableBrotli, boolean enableSocketTagging,
+      boolean enableDNSCache, int dnsCacheSaveIntervalSeconds, boolean enableDrainPostDnsRefresh,
+      boolean enableHttp3, boolean enableGzip, boolean enableBrotli, boolean enableSocketTagging,
       boolean enableHappyEyeballs, boolean enableInterfaceBinding,
       int h2ConnectionKeepaliveIdleIntervalMilliseconds, int h2ConnectionKeepaliveTimeoutSeconds,
-      boolean h2ExtendKeepaliveTimeout, int maxConnectionsPerHost, int statsFlushSeconds,
-      int streamIdleTimeoutSeconds, int perTryIdleTimeoutSeconds, String appVersion, String appId,
+      int maxConnectionsPerHost, int statsFlushSeconds, int streamIdleTimeoutSeconds,
+      int perTryIdleTimeoutSeconds, String appVersion, String appId,
       TrustChainVerification trustChainVerification, String virtualClusters,
       List<EnvoyNativeFilterConfig> nativeFilterChain,
       List<EnvoyHTTPFilterFactory> httpPlatformFilterFactories,
       Map<String, EnvoyStringAccessor> stringAccessors,
       Map<String, EnvoyKeyValueStore> keyValueStores, List<String> statSinks,
       Boolean enableSkipDNSLookupForProxiedRequests, boolean enablePlatformCertificatesValidation) {
+    JniLibrary.load();
     this.adminInterfaceEnabled = adminInterfaceEnabled;
     this.grpcStatsDomain = grpcStatsDomain;
     this.connectTimeoutSeconds = connectTimeoutSeconds;
@@ -147,6 +148,7 @@ public class EnvoyConfiguration {
     this.dnsMinRefreshSeconds = dnsMinRefreshSeconds;
     this.dnsPreresolveHostnames = dnsPreresolveHostnames;
     this.enableDNSCache = enableDNSCache;
+    this.dnsCacheSaveIntervalSeconds = dnsCacheSaveIntervalSeconds;
     this.enableDrainPostDnsRefresh = enableDrainPostDnsRefresh;
     this.enableHttp3 = enableHttp3;
     this.enableGzip = enableGzip;
@@ -157,7 +159,6 @@ public class EnvoyConfiguration {
     this.h2ConnectionKeepaliveIdleIntervalMilliseconds =
         h2ConnectionKeepaliveIdleIntervalMilliseconds;
     this.h2ConnectionKeepaliveTimeoutSeconds = h2ConnectionKeepaliveTimeoutSeconds;
-    this.h2ExtendKeepaliveTimeout = h2ExtendKeepaliveTimeout;
     this.maxConnectionsPerHost = maxConnectionsPerHost;
     this.statsFlushSeconds = statsFlushSeconds;
     this.streamIdleTimeoutSeconds = streamIdleTimeoutSeconds;
@@ -174,30 +175,20 @@ public class EnvoyConfiguration {
     this.enablePlatformCertificatesValidation = enablePlatformCertificatesValidation;
     this.enableSkipDNSLookupForProxiedRequests = enableSkipDNSLookupForProxiedRequests;
   }
-
   /**
-   * Resolves the provided configuration template using properties on this
-   * configuration.
+   * Creates configuration YAML based on the configuration of the class
    *
-   * @param configTemplate the template configuration to resolve.
-   * @param platformFilterTemplate helper template to build platform http filters.
-   * @param nativeFilterTemplate helper template to build native http filters.
-   * @param altProtocolCacheFilterInsert helper insert to include the alt protocol cache filter.
-   * @param gzipFilterInsert helper to include to enable gzip compression.
-   * @param brotliFilterInsert helper to include to enable brotli compression.
-   * @param socketTagFilterInsert helper to include to enable socket tagging.
-   * @param persistentDNSCacheConfigInsert helper to include to enable DNS cache.
-   * @param certValidationTemplate helper template to enable cert validation.
-   * @return String, the resolved template.
-   * @throws ConfigurationException, when the template provided is not fully
+   * @return String, the resolved yaml.
+   * @throws ConfigurationException, when the yaml provided is not fully
    *                                 resolved.
    */
-  String resolveTemplate(final String configTemplate, final String platformFilterTemplate,
-                         final String nativeFilterTemplate,
-                         final String altProtocolCacheFilterInsert, final String gzipFilterInsert,
-                         final String brotliFilterInsert, final String socketTagFilterInsert,
-                         final String persistentDNSCacheConfigInsert,
-                         final String certValidationTemplate) {
+  String createYaml() {
+    final String configTemplate = JniLibrary.configTemplate();
+    final String certValidationTemplate =
+        JniLibrary.certValidationTemplate(enablePlatformCertificatesValidation);
+    final String platformFilterTemplate = JniLibrary.platformFilterTemplate();
+    final String nativeFilterTemplate = JniLibrary.nativeFilterTemplate();
+
     final StringBuilder customFiltersBuilder = new StringBuilder();
 
     for (EnvoyHTTPFilterFactory filterFactory : httpPlatformFilterFactories) {
@@ -213,17 +204,21 @@ public class EnvoyConfiguration {
     }
 
     if (enableHttp3) {
+      final String altProtocolCacheFilterInsert = JniLibrary.altProtocolCacheFilterInsert();
       customFiltersBuilder.append(altProtocolCacheFilterInsert);
     }
 
     if (enableGzip) {
+      final String gzipFilterInsert = JniLibrary.gzipConfigInsert();
       customFiltersBuilder.append(gzipFilterInsert);
     }
 
     if (enableBrotli) {
+      final String brotliFilterInsert = JniLibrary.brotliConfigInsert();
       customFiltersBuilder.append(brotliFilterInsert);
     }
     if (enableSocketTagging) {
+      final String socketTagFilterInsert = JniLibrary.socketTagConfigInsert();
       customFiltersBuilder.append(socketTagFilterInsert);
     }
 
@@ -239,10 +234,6 @@ public class EnvoyConfiguration {
         .append(String.format("- &dns_preresolve_hostnames %s\n", dnsPreresolveHostnames))
         .append(String.format("- &dns_lookup_family %s\n",
                               enableHappyEyeballs ? "ALL" : "V4_PREFERRED"))
-        .append(
-            String.format("- &dns_multiple_addresses %s\n", enableHappyEyeballs ? "true" : "false"))
-        .append(String.format("- &h2_delay_keepalive_timeout %s\n",
-                              h2ExtendKeepaliveTimeout ? "true" : "false"))
         .append(String.format("- &dns_refresh_rate %ss\n", dnsRefreshSeconds))
         .append(String.format("- &enable_drain_post_dns_refresh %s\n",
                               enableDrainPostDnsRefresh ? "true" : "false"))
@@ -266,6 +257,9 @@ public class EnvoyConfiguration {
         .append("\n");
 
     if (enableDNSCache) {
+      configBuilder.append(
+          String.format("- &persistent_dns_cache_save_interval %s\n", dnsCacheSaveIntervalSeconds));
+      final String persistentDNSCacheConfigInsert = JniLibrary.persistentDNSCacheConfigInsert();
       configBuilder.append(
           String.format("- &persistent_dns_cache_config %s\n", persistentDNSCacheConfigInsert));
     }

@@ -55,13 +55,10 @@ private:
   const Upstream::HostSharedPtr host_;
 };
 
-class CustomLbFactory : public Upstream::TypedLoadBalancerFactoryBase {
+class CustomLbFactory : public Upstream::TypedLoadBalancerFactoryBase<
+                            ::test::integration::custom_lb::CustomLbConfig> {
 public:
   CustomLbFactory() : TypedLoadBalancerFactoryBase("envoy.load_balancers.custom_lb") {}
-
-  Envoy::ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return Envoy::ProtobufTypes::MessagePtr{new ::test::integration::custom_lb::CustomLbConfig()};
-  }
 
   Upstream::ThreadAwareLoadBalancerPtr create(const Upstream::ClusterInfo&,
                                               const Upstream::PrioritySet&, Runtime::Loader&,

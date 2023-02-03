@@ -163,6 +163,8 @@ protected:
 INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientSessionTests, EnvoyQuicClientSessionTest,
                          testing::ValuesIn(quic::CurrentSupportedHttp3Versions()));
 
+TEST_P(EnvoyQuicClientSessionTest, ShutdownNoOp) { http_connection_.shutdownNotice(); }
+
 TEST_P(EnvoyQuicClientSessionTest, NewStream) {
   Http::MockResponseDecoder response_decoder;
   Http::MockStreamCallbacks stream_callbacks;
