@@ -11,6 +11,7 @@
 #include "absl/container/btree_map.h"
 #include "absl/container/node_hash_set.h"
 #include "absl/strings/match.h"
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Config {
@@ -33,21 +34,22 @@ private:
 };
 using AllMuxes = ThreadSafeSingleton<AllMuxesState>;
 
-// Returns true if `resource_name` contains the wildcard xdstp resource, for example:
+// Returns true if `resource_name` contains the wildcard XdsTp resource, for example:
 // xdstp://test/envoy.config.cluster.v3.Cluster/foo-cluster/*
 // xdstp://test/envoy.config.cluster.v3.Cluster/foo-cluster/*?node.name=my_node
-bool isXdstpWildcard(const std::string& resource_name) {
+bool isXdsTpWildcard(const std::string& resource_name) {
   return XdsResourceIdentifier::hasXdsTpScheme(resource_name) &&
          (absl::EndsWith(resource_name, "/*") || absl::StrContains(resource_name, "/*?"));
 }
 
-// Converts the xdstp resource name to its wildcard equivalent.
-// Must only be called on xdstp resource names.
+// Converts the XdsTp resource name to its wildcard equivalent.
+// Must only be called on XdsTp resource names.
 std::string convertToWildcard(const std::string& resource_name) {
   ASSERT(XdsResourceIdentifier::hasXdsTpScheme(resource_name));
   xds::core::v3::ResourceName xdstp_resource = XdsResourceIdentifier::decodeUrn(resource_name);
   const auto pos = xdstp_resource.id().find_last_of('/');
-  xdstp_resource.set_id(pos == std::string::npos ? "*" : xdstp_resource.id().substr(0, pos) + "/*");
+  xdstp_resource.set_id(
+      pos == std::string::npos ? "*" : absl::StrCat(xdstp_resource.id().substr(0, pos), "/*"));
   XdsResourceIdentifier::EncodeOptions options;
   options.sort_context_params_ = true;
   return XdsResourceIdentifier::encodeUrn(xdstp_resource, options);
@@ -391,7 +393,7 @@ void GrpcMuxImpl::processDiscoveryResources(const std::vector<DecodedResourcePtr
       auto it = resource_ref_map.find(watched_resource_name);
       if (it != resource_ref_map.end()) {
         found_resources.emplace_back(it->second);
-      } else if (isXdstpWildcard(watched_resource_name)) {
+      } else if (isXdsTpWildcard(watched_resource_name)) {
         // See if the resources match the xdstp wildcard subscription.
         // Note: although it is unlikely that Envoy will need to support a resource that is mapped
         // to both a singleton and collection watch, this code still supports this use case.
