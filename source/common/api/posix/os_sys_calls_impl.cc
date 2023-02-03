@@ -8,7 +8,7 @@
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/network/address_impl.h"
 
-#if defined(__ANDROID_API__) && __ANDROID_API__ < 24
+#if defined(__ANDROID_API__)
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wold-style-cast"
 namespace android {
@@ -358,7 +358,7 @@ SysCallBoolResult OsSysCallsImpl::socketTcpInfo([[maybe_unused]] os_fd_t sockfd,
 bool OsSysCallsImpl::supportsGetifaddrs() const { return true; }
 
 SysCallIntResult OsSysCallsImpl::getifaddrs([[maybe_unused]] InterfaceAddressVector& interfaces) {
-#if defined(__ANDROID_API__) && __ANDROID_API__ < 24
+#if defined(__ANDROID_API__)
   struct android::ifaddrs* ifaddr;
   struct android::ifaddrs* ifa;
 
