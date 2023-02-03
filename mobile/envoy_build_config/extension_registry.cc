@@ -10,11 +10,20 @@
 #include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
 #include "source/extensions/clusters/logical_dns/logical_dns_cluster.h"
 #include "source/extensions/clusters/static/static_cluster.h"
+#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
+#include "source/extensions/compression/brotli/compressor/config.h"
+#endif
 #include "source/extensions/compression/brotli/decompressor/config.h"
+#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
+#include "source/extensions/compression/gzip/compressor/config.h"
+#endif
 #include "source/extensions/compression/gzip/decompressor/config.h"
 #include "source/extensions/early_data/default_early_data_policy.h"
 #include "source/extensions/filters/http/alternate_protocols_cache/config.h"
 #include "source/extensions/filters/http/buffer/config.h"
+#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
+#include "source/extensions/filters/http/compressor/config.h"
+#endif
 #include "source/extensions/filters/http/decompressor/config.h"
 #include "source/extensions/filters/http/dynamic_forward_proxy/config.h"
 #include "source/extensions/filters/http/router/config.h"
@@ -43,12 +52,6 @@
 #include "source/extensions/quic/connection_id_generator/envoy_deterministic_connection_id_generator_config.h"
 #include "source/extensions/quic/crypto_stream/envoy_quic_crypto_server_stream.h"
 #include "source/extensions/quic/proof_source/envoy_quic_proof_source_factory_impl.h"
-#endif
-
-#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
-#include "source/extensions/compression/brotli/compressor/config.h"
-#include "source/extensions/compression/gzip/compressor/config.h"
-#include "source/extensions/filters/http/compressor/config.h"
 #endif
 
 #include "extension_registry_platform_additions.h"
