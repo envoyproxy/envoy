@@ -110,7 +110,7 @@ void CacheShared::evict() {
     struct stat s;
     if (os_sys_calls.stat(absl::StrCat(cachePath(), entry.name_).c_str(), &s).return_value_ != -1) {
       Envoy::SystemTime last_touch =
-          std::max(timespecToChrono(s.st_atim), timespecToChrono(s.st_ctim));
+          std::max(timespecToChrono(s.st_atimespec), timespecToChrono(s.st_ctimespec));
 
       cache_files.push_back(CacheFile{entry.name_, entry.size_bytes_.value_or(0), last_touch});
     }
