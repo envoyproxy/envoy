@@ -47,11 +47,10 @@ public:
 
   void setFilterStateHost(const std::string& host) {
     connection_.streamInfo().filterState()->setData(
-      Upstream::DynamicHostFilterState::key(),
-      std::make_shared<Upstream::DynamicHostFilterState>(host),
-      StreamInfo::FilterState::StateType::Mutable,
-      StreamInfo::FilterState::LifeSpan::Connection,
-      StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection);
+        Upstream::DynamicHostFilterState::key(),
+        std::make_shared<Upstream::DynamicHostFilterState>(host),
+        StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection,
+        StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection);
   }
 
   ~SniDynamicProxyFilterTest() override {

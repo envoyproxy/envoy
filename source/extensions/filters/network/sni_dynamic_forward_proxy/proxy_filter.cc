@@ -26,8 +26,12 @@ ProxyFilter::ProxyFilter(ProxyFilterConfigSharedPtr config) : config_(std::move(
 using LoadDnsCacheEntryStatus = Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus;
 
 Network::FilterStatus ProxyFilter::onNewConnection() {
-  const Upstream::DynamicHostFilterState* dynamic_host_filter_state = read_callbacks_->connection().streamInfo()
-      .filterState()->getDataReadOnly<Upstream::DynamicHostFilterState>(Upstream::DynamicHostFilterState::key());
+  const Upstream::DynamicHostFilterState* dynamic_host_filter_state =
+      read_callbacks_->connection()
+          .streamInfo()
+          .filterState()
+          ->getDataReadOnly<Upstream::DynamicHostFilterState>(
+              Upstream::DynamicHostFilterState::key());
 
   absl::string_view host;
   if (dynamic_host_filter_state) {

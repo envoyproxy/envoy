@@ -156,8 +156,11 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
 
   const Upstream::DynamicHostFilterState* dynamic_host_filter_state = nullptr;
   if (context->downstreamConnection()) {
-    dynamic_host_filter_state = context->downstreamConnection()->streamInfo()
-      .filterState().getDataReadOnly<Upstream::DynamicHostFilterState>(Upstream::DynamicHostFilterState::key());
+    dynamic_host_filter_state = context->downstreamConnection()
+                                    ->streamInfo()
+                                    .filterState()
+                                    .getDataReadOnly<Upstream::DynamicHostFilterState>(
+                                        Upstream::DynamicHostFilterState::key());
   }
 
   absl::string_view host;

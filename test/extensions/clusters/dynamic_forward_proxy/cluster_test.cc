@@ -115,15 +115,14 @@ public:
   }
 
   Upstream::MockLoadBalancerContext* setFilterStateHostAndReturnContext(const std::string& host) {
-    StreamInfo::FilterState& filter_state =
-      const_cast<StreamInfo::FilterState&>(lb_context_.downstreamConnection()->streamInfo().filterState());
+    StreamInfo::FilterState& filter_state = const_cast<StreamInfo::FilterState&>(
+        lb_context_.downstreamConnection()->streamInfo().filterState());
 
-    filter_state.setData(
-      Upstream::DynamicHostFilterState::key(),
-      std::make_shared<Upstream::DynamicHostFilterState>(host),
-      StreamInfo::FilterState::StateType::Mutable,
-      StreamInfo::FilterState::LifeSpan::Connection,
-      StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection);
+    filter_state.setData(Upstream::DynamicHostFilterState::key(),
+                         std::make_shared<Upstream::DynamicHostFilterState>(host),
+                         StreamInfo::FilterState::StateType::Mutable,
+                         StreamInfo::FilterState::LifeSpan::Connection,
+                         StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection);
 
     return &lb_context_;
   }
@@ -278,7 +277,8 @@ TEST_F(ClusterTest, FilterStateHostOverride) {
   EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
   update_callbacks_->onDnsHostAddOrUpdate("host1", host_map_["host1"]);
   EXPECT_CALL(*host_map_["host1"], touch());
-  EXPECT_EQ("1.2.3.4:0", lb_->chooseHost(setFilterStateHostAndReturnContext("host1"))->address()->asString());
+  EXPECT_EQ("1.2.3.4:0",
+            lb_->chooseHost(setFilterStateHostAndReturnContext("host1"))->address()->asString());
 }
 
 // Verify cluster attaches to a populated cache.
