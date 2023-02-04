@@ -6,6 +6,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/tcp_proxy/tcp_proxy.h"
+#include "source/common/upstream/dynamic_host_filter_state.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -25,11 +26,20 @@ ProxyFilter::ProxyFilter(ProxyFilterConfigSharedPtr config) : config_(std::move(
 using LoadDnsCacheEntryStatus = Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus;
 
 Network::FilterStatus ProxyFilter::onNewConnection() {
-  absl::string_view sni = read_callbacks_->connection().requestedServerName();
-  ENVOY_CONN_LOG(trace, "sni_dynamic_forward_proxy: new connection with server name '{}'",
-                 read_callbacks_->connection(), sni);
+  const Upstream::DynamicHostFilterState* dynamic_host_filter_state = read_callbacks_->connection().streamInfo()
+      .filterState()->getDataReadOnly<Upstream::DynamicHostFilterState>(Upstream::DynamicHostFilterState::key());
 
-  if (sni.empty()) {
+  absl::string_view host;
+  if (dynamic_host_filter_state) {
+    host = dynamic_host_filter_state->value();
+  } else {
+    host = read_callbacks_->connection().requestedServerName();
+  }
+
+  ENVOY_CONN_LOG(trace, "sni_dynamic_forward_proxy: new connection with server name '{}'",
+                 read_callbacks_->connection(), host);
+
+  if (host.empty()) {
     return Network::FilterStatus::Continue;
   }
 
@@ -43,7 +53,7 @@ Network::FilterStatus ProxyFilter::onNewConnection() {
 
   uint32_t default_port = config_->port();
 
-  auto result = config_->cache().loadDnsCacheEntry(sni, default_port, false, *this);
+  auto result = config_->cache().loadDnsCacheEntry(host, default_port, false, *this);
 
   cache_load_handle_ = std::move(result.handle_);
   if (cache_load_handle_ == nullptr) {
