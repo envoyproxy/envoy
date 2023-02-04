@@ -40,8 +40,10 @@ void insertCustomFilter(const std::string& filter_config, std::string& config_te
                       &config_template);
 }
 
+// Note that updates to the config.cc bootstrap will require a matching update in
+// generateBootstrap() below
 bool generatedStringMatchesGeneratedBoostrap(
-    std::string& config_str, std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap) {
+    const std::string& config_str, const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   Thread::SkipAsserts skip;
   ProtobufMessage::StrictValidationVisitorImpl visitor;
   envoy::config::bootstrap::v3::Bootstrap config_bootstrap;
@@ -49,14 +51,16 @@ bool generatedStringMatchesGeneratedBoostrap(
 
   Protobuf::util::MessageDifferencer differencer;
   differencer.set_message_field_comparison(Protobuf::util::MessageDifferencer::EQUIVALENT);
-  differencer.set_repeated_field_comparison(Protobuf::util::MessageDifferencer::AS_SET);
+  differencer.set_repeated_field_comparison(Protobuf::util::MessageDifferencer::AS_LIST);
 
-  bool same = differencer.Compare(config_bootstrap, *bootstrap);
+  bool same = differencer.Compare(config_bootstrap, bootstrap);
 
   if (!same) {
-    std::cerr << config_bootstrap.DebugString();
-    std::cerr << "============================================";
-    std::cerr << bootstrap->DebugString();
+    std::cerr << "\n=========== Config bootstrap yaml ============\n";
+    std::cerr << MessageUtil::getYamlStringFromMessage(config_bootstrap);
+    std::cerr << "\n=============== Bootstrap yaml ===============\n";
+    std::cerr << MessageUtil::getYamlStringFromMessage(bootstrap);
+    std::cerr << "\n==============================================\n";
   }
   return same;
 }
@@ -82,14 +86,8 @@ EngineBuilder& EngineBuilder::setOnEngineRunning(std::function<void()> closure) 
   return *this;
 }
 
-void EngineBuilder::bootstrapIncompatible() {
-  ENVOY_BUG(!use_bootstrap_, "Function not compatible with bootstrap builder");
-  config_bootstrap_incompatible_ = true;
-}
-
-EngineBuilder& EngineBuilder::addStatsSinks(const std::vector<std::string>& stat_sinks) {
-  bootstrapIncompatible();
-  stat_sinks_ = stat_sinks;
+EngineBuilder& EngineBuilder::addStatsSinks(std::vector<std::string> stats_sinks) {
+  stats_sinks_ = std::move(stats_sinks);
   return *this;
 }
 
@@ -124,9 +122,8 @@ EngineBuilder& EngineBuilder::addDnsQueryTimeoutSeconds(int dns_query_timeout_se
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addDnsPreresolveHostnames(std::string dns_preresolve_hostnames) {
-  bootstrapIncompatible();
-  dns_preresolve_hostnames_ = std::move(dns_preresolve_hostnames);
+EngineBuilder& EngineBuilder::addDnsPreresolveHostnames(const std::vector<std::string>& hostnames) {
+  dns_preresolve_hostnames_ = std::move(hostnames);
   return *this;
 }
 
@@ -158,15 +155,13 @@ EngineBuilder& EngineBuilder::addStatsFlushSeconds(int stats_flush_seconds) {
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addVirtualClusters(std::string virtual_clusters) {
-  bootstrapIncompatible();
-  virtual_clusters_ = std::move(virtual_clusters);
+EngineBuilder& EngineBuilder::addVirtualCluster(std::string virtual_cluster) {
+  virtual_clusters_.push_back(std::move(virtual_cluster));
   return *this;
 }
 
 EngineBuilder& EngineBuilder::addKeyValueStore(std::string name,
                                                KeyValueStoreSharedPtr key_value_store) {
-  bootstrapIncompatible();
   key_value_stores_[std::move(name)] = std::move(key_value_store);
   return *this;
 }
@@ -212,7 +207,6 @@ EngineBuilder& EngineBuilder::enableSocketTagging(bool socket_tagging_on) {
 }
 
 EngineBuilder& EngineBuilder::enableAdminInterface(bool admin_interface_on) {
-  bootstrapIncompatible();
   admin_interface_enabled_ = admin_interface_on;
   return *this;
 }
@@ -224,6 +218,16 @@ EngineBuilder& EngineBuilder::enableHappyEyeballs(bool happy_eyeballs_on) {
 
 EngineBuilder& EngineBuilder::enableHttp3(bool http3_on) {
   enable_http3_ = http3_on;
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::setForceAlwaysUsev6(bool value) {
+  always_use_v6_ = value;
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::setSkipDnsLookupForProxiedRequests(bool value) {
+  skip_dns_lookups_for_proxied_requests_ = value;
   return *this;
 }
 
@@ -242,50 +246,86 @@ EngineBuilder& EngineBuilder::enforceTrustChainVerification(bool trust_chain_ver
   return *this;
 }
 
+EngineBuilder& EngineBuilder::addRtdsLayer(const std::string& layer_name, int timeout_seconds) {
+  rtds_layer_name_ = layer_name;
+  rtds_timeout_seconds_ = timeout_seconds;
+  return *this;
+}
+EngineBuilder& EngineBuilder::setAggregatedDiscoveryService(const std::string& api_type,
+                                                            const std::string& address,
+                                                            const int port) {
+#ifndef ENVOY_GOOGLE_GRPC
+  throw std::runtime_error("google_grpc must be enabled in bazel to use ADS");
+#endif
+  ads_api_type_ = api_type;
+  ads_address_ = address;
+  ads_port_ = port;
+  return *this;
+}
+
 EngineBuilder&
 EngineBuilder::enablePlatformCertificatesValidation(bool platform_certificates_validation_on) {
   platform_certificates_validation_on_ = platform_certificates_validation_on;
   return *this;
 }
 
-EngineBuilder& EngineBuilder::enableDnsCache(bool dns_cache_on) {
+EngineBuilder& EngineBuilder::enableDnsCache(bool dns_cache_on, int save_interval_seconds) {
   dns_cache_on_ = dns_cache_on;
+  dns_cache_save_interval_seconds_ = save_interval_seconds;
   return *this;
 }
 
 EngineBuilder& EngineBuilder::addStringAccessor(std::string name,
                                                 StringAccessorSharedPtr accessor) {
-  bootstrapIncompatible();
   string_accessors_[std::move(name)] = std::move(accessor);
   return *this;
 }
 
 EngineBuilder& EngineBuilder::addNativeFilter(std::string name, std::string typed_config) {
-  bootstrapIncompatible();
   native_filter_chain_.emplace_back(std::move(name), std::move(typed_config));
   return *this;
 }
 
 EngineBuilder& EngineBuilder::addPlatformFilter(std::string name) {
-  bootstrapIncompatible();
-  platform_filters_.push_back(std::move(name));
-  return *this;
-}
-
-EngineBuilder& EngineBuilder::setUseBootstrap() {
-  ENVOY_BUG(!config_bootstrap_incompatible_, "Config not compatible with bootstrap builder");
-  use_bootstrap_ = true;
+  addNativeFilter(
+      "envoy.filters.http.platform_bridge",
+      absl::StrCat(
+          "{'@type': "
+          "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge, "
+          "platform_filter_name: ",
+          name, "}"));
   return *this;
 }
 
 std::string EngineBuilder::generateConfigStr() const {
+  if (!config_override_for_tests_.empty()) {
+    return config_override_for_tests_;
+  }
+
+  std::string preresolve_hostnames = "[";
+  std::string maybe_comma = "";
+  for (auto& hostname : dns_preresolve_hostnames_) {
+    absl::StrAppend(&preresolve_hostnames, maybe_comma, "{address: ", hostname,
+                    ", port_value: 443}");
+    maybe_comma = ",";
+  }
+  absl::StrAppend(&preresolve_hostnames, "]");
+
+  std::string virtual_clusters = "[";
+  maybe_comma = "";
+  for (auto& cluster : virtual_clusters_) {
+    absl::StrAppend(&virtual_clusters, maybe_comma, cluster);
+    maybe_comma = ",";
+  }
+  absl::StrAppend(&virtual_clusters, "]");
+
   std::vector<std::pair<std::string, std::string>> replacements {
     {"connect_timeout", fmt::format("{}s", connect_timeout_seconds_)},
         {"dns_fail_base_interval", fmt::format("{}s", dns_failure_refresh_seconds_base_)},
         {"dns_fail_max_interval", fmt::format("{}s", dns_failure_refresh_seconds_max_)},
         {"dns_lookup_family", enable_happy_eyeballs_ ? "ALL" : "V4_PREFERRED"},
         {"dns_min_refresh_rate", fmt::format("{}s", dns_min_refresh_seconds_)},
-        {"dns_preresolve_hostnames", dns_preresolve_hostnames_},
+        {"dns_preresolve_hostnames", preresolve_hostnames},
         {"dns_refresh_rate", fmt::format("{}s", dns_refresh_seconds_)},
         {"dns_query_timeout", fmt::format("{}s", dns_query_timeout_seconds_)},
         {"enable_drain_post_dns_refresh", enable_drain_post_dns_refresh_ ? "true" : "false"},
@@ -305,15 +345,21 @@ std::string EngineBuilder::generateConfigStr() const {
         {"trust_chain_verification",
          enforce_trust_chain_verification_ ? "VERIFY_TRUST_CHAIN" : "ACCEPT_UNTRUSTED"},
         {"per_try_idle_timeout", fmt::format("{}s", per_try_idle_timeout_seconds_)},
-        {"virtual_clusters", virtual_clusters_},
+        {"virtual_clusters", virtual_clusters},
+        {"skip_dns_lookup_for_proxied_requests",
+         skip_dns_lookups_for_proxied_requests_ ? "true" : "false"},
 #if defined(__ANDROID_API__)
         {"force_ipv6", "true"},
+#else
+        {"force_ipv6", always_use_v6_ ? "true" : "false"},
 #endif
   };
   if (!stats_domain_.empty()) {
     replacements.push_back({"stats_domain", stats_domain_});
   }
   if (dns_cache_on_) {
+    replacements.push_back({"persistent_dns_cache_save_interval",
+                            fmt::format("{}", dns_cache_save_interval_seconds_)});
     replacements.push_back({"persistent_dns_cache_config", persistent_dns_cache_config_insert});
   }
 
@@ -324,7 +370,8 @@ std::string EngineBuilder::generateConfigStr() const {
   for (const auto& [key, value] : replacements) {
     config_builder << "- &" << key << " " << value << std::endl;
   }
-  std::vector<std::string> stat_sinks = stat_sinks_;
+
+  std::vector<std::string> stat_sinks = stats_sinks_;
   if (!stats_domain_.empty()) {
     stat_sinks.push_back("*base_metrics_service");
   }
@@ -340,14 +387,14 @@ std::string EngineBuilder::generateConfigStr() const {
   config_builder << cert_validation_template << std::endl;
 
   std::string config_template = config_template_;
+  if (socket_tagging_filter_) {
+    insertCustomFilter(socket_tag_config_insert, config_template);
+  }
   if (gzip_filter_) {
     insertCustomFilter(gzip_config_insert, config_template);
   }
   if (brotli_filter_) {
     insertCustomFilter(brotli_config_insert, config_template);
-  }
-  if (socket_tagging_filter_) {
-    insertCustomFilter(socket_tag_config_insert, config_template);
   }
   if (enable_http3_) {
     insertCustomFilter(alternate_protocols_cache_filter_insert, config_template);
@@ -360,10 +407,19 @@ std::string EngineBuilder::generateConfigStr() const {
     insertCustomFilter(filter_config, config_template);
   }
 
-  for (const std::string& name : platform_filters_) {
-    std::string filter_config =
-        absl::StrReplaceAll(platform_filter_template, {{"{{ platform_filter_name }}", name}});
-    insertCustomFilter(filter_config, config_template);
+  if (!rtds_layer_name_.empty() && ads_api_type_.empty()) {
+    throw std::runtime_error("ADS must be configured when using RTDS");
+  }
+  if (!rtds_layer_name_.empty()) {
+    std::string rtds_layer =
+        fmt::format(rtds_layer_insert, rtds_layer_name_, rtds_layer_name_, rtds_timeout_seconds_);
+    absl::StrReplaceAll({{"#{custom_layers}", absl::StrCat("#{custom_layers}\n", rtds_layer)}},
+                        &config_template);
+  }
+  if (!ads_api_type_.empty()) {
+    std::string custom_ads = fmt::format(ads_insert, ads_api_type_, ads_address_, ads_port_);
+    absl::StrReplaceAll({{"#{custom_ads}", absl::StrCat("#{custom_ads}\n", custom_ads)}},
+                        &config_template);
   }
 
   config_builder << config_template;
@@ -377,17 +433,22 @@ std::string EngineBuilder::generateConfigStr() const {
     throw std::runtime_error("could not resolve all template keys in config");
   }
 
-  if (!config_bootstrap_incompatible_) {
-    // In debug mode, unless the config is known to be bootstrap incompatible,
-    // check equivalence.
-    ASSERT(generatedStringMatchesGeneratedBoostrap(config_str, generateBootstrap(true)));
-  }
-
   return config_str;
 }
 
 std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>
-EngineBuilder::generateBootstrap(bool trim_whitespace_for_tests) const {
+EngineBuilder::generateBootstrapAndCompareForTests(std::string yaml) const {
+  auto bootstrap = generateBootstrap();
+  RELEASE_ASSERT(generatedStringMatchesGeneratedBoostrap(yaml, *generateBootstrap()),
+                 "Failed equivalence");
+  return bootstrap;
+}
+
+std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generateBootstrap() const {
+  // The yaml utilities have non-relevant thread asserts.
+  Thread::SkipAsserts skip;
+  ASSERT(!config_bootstrap_incompatible_);
+
   auto bootstrap = std::make_unique<envoy::config::bootstrap::v3::Bootstrap>();
 
   // Set up the HCM
@@ -414,6 +475,12 @@ EngineBuilder::generateBootstrap(bool trim_whitespace_for_tests) const {
   api_service->set_name("api");
   api_service->set_include_attempt_count_in_response(true);
   api_service->add_domains("*");
+  // Virtual clusters
+  for (auto& cluster : virtual_clusters_) {
+    MessageUtil::loadFromYaml(cluster, *api_service->add_virtual_clusters(),
+                              ProtobufMessage::getStrictValidationVisitor());
+  }
+
   route = api_service->add_routes();
   route->mutable_match()->set_prefix("/");
   route->add_request_headers_to_remove("x-forwarded-proto");
@@ -427,6 +494,14 @@ EngineBuilder::generateBootstrap(bool trim_whitespace_for_tests) const {
   backoff->mutable_base_interval()->set_nanos(250000000);
   backoff->mutable_max_interval()->set_seconds(60);
 
+  for (auto filter = native_filter_chain_.rbegin(); filter != native_filter_chain_.rend();
+       ++filter) {
+    auto* native_filter = hcm->add_http_filters();
+    native_filter->set_name((*filter).name_);
+    MessageUtil::loadFromYaml((*filter).typed_config_, *native_filter->mutable_typed_config(),
+                              ProtobufMessage::getStrictValidationVisitor());
+  }
+
   // Set up the optional filters
   if (enable_http3_) {
     envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig cache_config;
@@ -437,12 +512,6 @@ EngineBuilder::generateBootstrap(bool trim_whitespace_for_tests) const {
     cache_filter->mutable_typed_config()->PackFrom(cache_config);
   }
 
-  if (socket_tagging_filter_) {
-    envoymobile::extensions::filters::http::socket_tag::SocketTag tag_config;
-    auto* tag_filter = hcm->add_http_filters();
-    tag_filter->set_name("envoy.filters.http.socket_tag");
-    tag_filter->mutable_typed_config()->PackFrom(tag_config);
-  }
   if (brotli_filter_) {
     envoy::extensions::compression::brotli::decompressor::v3::Brotli brotli_config;
     envoy::extensions::filters::http::decompressor::v3::Decompressor decompressor_config;
@@ -478,6 +547,12 @@ EngineBuilder::generateBootstrap(bool trim_whitespace_for_tests) const {
     gzip_filter->set_name("envoy.filters.http.decompressor");
     gzip_filter->mutable_typed_config()->PackFrom(decompressor_config);
   }
+  if (socket_tagging_filter_) {
+    envoymobile::extensions::filters::http::socket_tag::SocketTag tag_config;
+    auto* tag_filter = hcm->add_http_filters();
+    tag_filter->set_name("envoy.filters.http.socket_tag");
+    tag_filter->mutable_typed_config()->PackFrom(tag_config);
+  }
 
   // Set up the always-present filters
   envoymobile::extensions::filters::http::network_configuration::NetworkConfiguration
@@ -512,7 +587,7 @@ EngineBuilder::generateBootstrap(bool trim_whitespace_for_tests) const {
   if (dns_cache_on_) {
     envoymobile::extensions::key_value::platform::PlatformKeyValueStoreConfig kv_config;
     kv_config.set_key("dns_persistent_cache");
-    kv_config.mutable_save_interval()->set_seconds(0);
+    kv_config.mutable_save_interval()->set_seconds(dns_cache_save_interval_seconds_);
     kv_config.set_max_entries(100);
     dns_cache_config->mutable_key_value_config()->mutable_config()->set_name(
         "envoy.key_value.platform");
@@ -534,6 +609,12 @@ EngineBuilder::generateBootstrap(bool trim_whitespace_for_tests) const {
 #endif
   dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
       resolver_config);
+
+  for (auto& hostname : dns_preresolve_hostnames_) {
+    envoy::config::core::v3::SocketAddress* address = dns_cache_config->add_preresolve_hostnames();
+    address->set_address(hostname);
+    address->set_port_value(443);
+  }
 
   auto* dfp_filter = hcm->add_http_filters();
   dfp_filter->set_name("envoy.filters.http.dynamic_forward_proxy");
@@ -581,16 +662,11 @@ EngineBuilder::generateBootstrap(bool trim_whitespace_for_tests) const {
 #include "library/common/config/certificates.inc"
 #endif
                                "";
-    if (trim_whitespace_for_tests) {
-      // The certificates in certificates.inc are prefixed with 2 spaces per
-      // line to be ingressed into YAML. This loads fine but fails proto diff checks,
-      // so for comparison testing (done in tests and debug builds) we strip the whitepsace.
-      std::string certs = inline_certs;
-      absl::StrReplaceAll({{"\n  ", "\n"}}, &certs);
-      validation->mutable_trusted_ca()->set_inline_string(certs);
-    } else {
-      validation->mutable_trusted_ca()->set_inline_string(inline_certs);
-    }
+    // The certificates in certificates.inc are prefixed with 2 spaces per
+    // line to be ingressed into YAML.
+    std::string certs = inline_certs;
+    absl::StrReplaceAll({{"\n  ", "\n"}}, &certs);
+    validation->mutable_trusted_ca()->set_inline_string(certs);
   }
   envoy::extensions::transport_sockets::http_11_proxy::v3::Http11ProxyUpstreamTransport
       ssl_proxy_socket;
@@ -781,6 +857,7 @@ EngineBuilder::generateBootstrap(bool trim_whitespace_for_tests) const {
   list->add_patterns()->set_prefix("http.hcm.downstream_rq_");
   list->add_patterns()->set_prefix("http.hcm.decompressor.");
   list->add_patterns()->set_prefix("pulse.");
+  list->add_patterns()->set_prefix("runtime.load_success");
   list->add_patterns()->mutable_safe_regex()->set_regex(
       "^vhost\\.[\\w]+\\.vcluster\\.[\\w]+?\\.upstream_rq_(?:[12345]xx|[3-5][0-9][0-9]|retry|"
       "total)");
@@ -810,8 +887,9 @@ EngineBuilder::generateBootstrap(bool trim_whitespace_for_tests) const {
       *(*envoy_layer.mutable_fields())["envoy"].mutable_struct_value();
   ProtobufWkt::Struct& flags =
       *(*runtime_values.mutable_fields())["reloadable_features"].mutable_struct_value();
-  (*flags.mutable_fields())["always_use_v6"].set_bool_value(false);
-  (*flags.mutable_fields())["skip_dns_lookup_for_proxied_requests"].set_bool_value(false);
+  (*flags.mutable_fields())["always_use_v6"].set_bool_value(always_use_v6_);
+  (*flags.mutable_fields())["skip_dns_lookup_for_proxied_requests"].set_bool_value(
+      skip_dns_lookups_for_proxied_requests_);
   (*runtime_values.mutable_fields())["disallow_global_stats"].set_bool_value("true");
   ProtobufWkt::Struct& overload_values =
       *(*envoy_layer.mutable_fields())["overload"].mutable_struct_value();
@@ -822,6 +900,10 @@ EngineBuilder::generateBootstrap(bool trim_whitespace_for_tests) const {
   bootstrap->mutable_typed_dns_resolver_config()->CopyFrom(
       *dns_cache_config->mutable_typed_dns_resolver_config());
 
+  for (const std::string& sink_yaml : stats_sinks_) {
+    auto* sink = bootstrap->add_stats_sinks();
+    MessageUtil::loadFromYaml(sink_yaml, *sink, ProtobufMessage::getStrictValidationVisitor());
+  }
   if (!stats_domain_.empty()) {
     envoy::config::metrics::v3::MetricsServiceConfig metrics_config;
     metrics_config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("stats");
@@ -832,6 +914,42 @@ EngineBuilder::generateBootstrap(bool trim_whitespace_for_tests) const {
     sink->set_name("envoy.metrics_service");
     sink->mutable_typed_config()->PackFrom(metrics_config);
   }
+
+  if (!rtds_layer_name_.empty() && ads_api_type_.empty()) {
+    throw std::runtime_error("ADS must be configured when using RTDS");
+  }
+  if (!rtds_layer_name_.empty()) {
+    auto* layered_runtime = bootstrap->mutable_layered_runtime();
+    auto* layer = layered_runtime->add_layers();
+    layer->set_name(rtds_layer_name_);
+    auto* rtds_layer = layer->mutable_rtds_layer();
+    rtds_layer->set_name(rtds_layer_name_);
+    auto* rtds_config = rtds_layer->mutable_rtds_config();
+    rtds_config->mutable_ads();
+    rtds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+    rtds_config->mutable_initial_fetch_timeout()->set_seconds(rtds_timeout_seconds_);
+  }
+  if (!ads_api_type_.empty()) {
+    std::string target_uri = fmt::format(R"({}:{})", ads_address_, ads_port_);
+    auto* ads_config = bootstrap->mutable_dynamic_resources()->mutable_ads_config();
+    ads_config->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+    ads_config->set_set_node_on_first_message_only(true);
+    envoy::config::core::v3::ApiConfigSource::ApiType api_type_enum;
+    envoy::config::core::v3::ApiConfigSource::ApiType_Parse(ads_api_type_, &api_type_enum);
+    ads_config->set_api_type(api_type_enum);
+    ads_config->add_grpc_services()->mutable_google_grpc()->set_target_uri(target_uri);
+  }
+
+  // Admin
+  if (admin_interface_enabled_) {
+    auto* admin_address = bootstrap->mutable_admin()->mutable_address()->mutable_socket_address();
+    admin_address->set_address("::1");
+    admin_address->set_port_value(9901);
+  }
+
+  // Check equivalence in debug mode.
+  RELEASE_ASSERT(generatedStringMatchesGeneratedBoostrap(generateConfigStr(), *bootstrap),
+                 "Native C++ checks failed");
 
   return bootstrap;
 }
@@ -846,15 +964,12 @@ EngineSharedPtr EngineBuilder::build() {
 
   std::string config_str;
   std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap;
-  if (use_bootstrap_) {
+  if (!config_bootstrap_incompatible_) {
     bootstrap = generateBootstrap();
   } else {
-    if (config_override_for_tests_.empty()) {
-      config_str = generateConfigStr();
-    } else {
-      config_str = config_override_for_tests_;
-    }
+    config_str = generateConfigStr();
   }
+
   envoy_engine_t envoy_engine =
       init_engine(callbacks_->asEnvoyEngineCallbacks(), null_logger, null_tracker);
 

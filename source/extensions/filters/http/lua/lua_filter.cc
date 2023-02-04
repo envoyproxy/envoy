@@ -62,6 +62,12 @@ const OptionHandlers& optionHandlers() {
                                 // = <boolean>} entry.
                                 options.return_duplicate_headers_ = lua_toboolean(state, -1);
                               }},
+                             {"send_xff",
+                              [](lua_State* state, StreamHandleWrapper::HttpCallOptions& options) {
+                                // Handle the case when the table has: {["send_xff"] =
+                                // <boolean>} entry.
+                                options.request_options_.setSendXff(lua_toboolean(state, -1));
+                              }},
                          });
 }
 

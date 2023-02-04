@@ -20,21 +20,18 @@ namespace Platform {
 // The C++ Engine builder supports 2 ways of building Envoy Mobile config, the 'legacy mode'
 // which uses a yaml config header, blocks of well known yaml configs, and uses string manipulation
 // to glue them together, and the 'bootstrap mode' which creates a structured bootstrap proto and
-// modifies it to produce the same config. We need to retain the legacy mode even if all functions
-// become bootstrap compatible to be able to regression test that changes to the config yaml are
-// reflected in generateBootstrap, until all languages use the C++ bootstrap builder.
+// modifies it to produce the same config. We retain the legacy mode to be able to regression
+// test that changes to the config yaml are reflected in generateBootstrap, until all languages use
+// the C++ bootstrap builder.
 //
-// Currently the default is legacy mode but worth noting bootstrap mode is 2 orders of magnitude
-// faster.
+// Bootstrap mode will be used unless the config_template constructor is used.
 class EngineBuilder {
 public:
+  EngineBuilder();
   // This constructor is not compatible with bootstrap mode.
   EngineBuilder(std::string config_template);
-  EngineBuilder();
 
   // Use the experimental non-YAML config mode which uses the bootstrap proto directly.
-  EngineBuilder& setUseBootstrap();
-
   EngineBuilder& addLogLevel(LogLevel log_level);
   EngineBuilder& setOnEngineRunning(std::function<void()> closure);
 
@@ -67,31 +64,39 @@ public:
   EngineBuilder& enableDrainPostDnsRefresh(bool drain_post_dns_refresh_on);
   EngineBuilder& enforceTrustChainVerification(bool trust_chain_verification_on);
   EngineBuilder& enablePlatformCertificatesValidation(bool platform_certificates_validation_on);
-  EngineBuilder& enableDnsCache(bool dns_cache_on);
+  // Adds an RTDS layer to default config. Requires that ADS be configured
+  EngineBuilder& addRtdsLayer(const std::string& layer_name, int timeout_seconds = 5);
+  // Adds an ADS layer.
+  EngineBuilder& setAggregatedDiscoveryService(const std::string& api_type,
+                                               const std::string& address, const int port);
+  EngineBuilder& enableDnsCache(bool dns_cache_on, int save_interval_seconds = 1);
+  EngineBuilder& setForceAlwaysUsev6(bool value);
+  EngineBuilder& setSkipDnsLookupForProxiedRequests(bool value);
+  EngineBuilder& addDnsPreresolveHostnames(const std::vector<std::string>& hostnames);
+  EngineBuilder& addNativeFilter(std::string name, std::string typed_config);
+  EngineBuilder& enableAdminInterface(bool admin_interface_on);
+  EngineBuilder& addStatsSinks(std::vector<std::string> stat_sinks);
+  EngineBuilder& addPlatformFilter(std::string name);
+  EngineBuilder& addVirtualCluster(std::string virtual_cluster);
 
-  // These functions are not compatible with boostrap mode, see class definition for details.
-  EngineBuilder& addStatsSinks(const std::vector<std::string>& stat_sinks);
-  EngineBuilder& addDnsPreresolveHostnames(std::string dns_preresolve_hostnames);
-  EngineBuilder& addVirtualClusters(std::string virtual_clusters);
+  // These functions don't affect YAML but instead perform registrations.
   EngineBuilder& addKeyValueStore(std::string name, KeyValueStoreSharedPtr key_value_store);
   EngineBuilder& addStringAccessor(std::string name, StringAccessorSharedPtr accessor);
-  EngineBuilder& addNativeFilter(std::string name, std::string typed_config);
-  EngineBuilder& addPlatformFilter(std::string name);
-  EngineBuilder& enableAdminInterface(bool admin_interface_on);
 
-  // this is separated from build() for the sake of testability
+  // This is separated from build() for the sake of testability
   std::string generateConfigStr() const;
-  // If trim_whitespace_for_tests is set true, it will prunt whitespace from the
-  // certificates file to allow for proto equivalence testing. This is expensive
-  // and should only be done for testing purposes (in explicit unit tests or
-  // debug mode)
-  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>
-  generateBootstrap(bool trim_whitespace_for_tests = false) const;
+  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> generateBootstrap() const;
 
   EngineSharedPtr build();
 
+  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>
+  generateBootstrapAndCompareForTests(std::string yaml) const;
+
 protected:
-  void setOverrideConfigForTests(std::string config) { config_override_for_tests_ = config; }
+  void setOverrideConfigForTests(std::string config) {
+    config_bootstrap_incompatible_ = true;
+    config_override_for_tests_ = config;
+  }
   void setAdminAddressPathForTests(std::string admin) { admin_address_path_for_tests_ = admin; }
 
 private:
@@ -104,9 +109,6 @@ private:
     std::string typed_config_;
   };
 
-  // Verifies use_bootstrap_ is not true and sets config_bootstrap_incompatible_ true.
-  void bootstrapIncompatible();
-
   LogLevel log_level_ = LogLevel::info;
   EngineCallbacksSharedPtr callbacks_;
 
@@ -117,7 +119,6 @@ private:
   int dns_failure_refresh_seconds_base_ = 2;
   int dns_failure_refresh_seconds_max_ = 10;
   int dns_query_timeout_seconds_ = 25;
-  std::string dns_preresolve_hostnames_ = "[]";
   bool use_system_resolver_ = true;
   int h2_connection_keepalive_idle_interval_milliseconds_ = 100000000;
   int h2_connection_keepalive_timeout_seconds_ = 10;
@@ -125,7 +126,6 @@ private:
   std::string app_version_ = "unspecified";
   std::string app_id_ = "unspecified";
   std::string device_os_ = "unspecified";
-  std::string virtual_clusters_ = "[]";
   std::string config_override_for_tests_ = "";
   std::string admin_address_path_for_tests_ = "";
   int stream_idle_timeout_seconds_ = 15;
@@ -134,7 +134,13 @@ private:
   bool brotli_filter_ = false;
   bool socket_tagging_filter_ = false;
   bool platform_certificates_validation_on_ = false;
+  std::string rtds_layer_name_ = "";
+  int rtds_timeout_seconds_;
+  std::string ads_api_type_ = "";
+  std::string ads_address_ = "";
+  int ads_port_;
   bool dns_cache_on_ = false;
+  int dns_cache_save_interval_seconds_ = 1;
 
   absl::flat_hash_map<std::string, KeyValueStoreSharedPtr> key_value_stores_{};
 
@@ -145,15 +151,18 @@ private:
   bool enforce_trust_chain_verification_ = true;
   bool h2_extend_keepalive_timeout_ = false;
   bool enable_http3_ = true;
+  bool always_use_v6_ = false;
   int dns_min_refresh_seconds_ = 60;
   int max_connections_per_host_ = 7;
-  std::vector<std::string> stat_sinks_;
+  std::vector<std::string> stats_sinks_;
 
   std::vector<NativeFilterConfig> native_filter_chain_;
-  std::vector<std::string> platform_filters_;
+  std::vector<std::string> dns_preresolve_hostnames_;
+  std::vector<std::string> virtual_clusters_;
+
   absl::flat_hash_map<std::string, StringAccessorSharedPtr> string_accessors_;
   bool config_bootstrap_incompatible_ = false;
-  bool use_bootstrap_ = false;
+  bool skip_dns_lookups_for_proxied_requests_ = false;
 };
 
 using EngineBuilderSharedPtr = std::shared_ptr<EngineBuilder>;
