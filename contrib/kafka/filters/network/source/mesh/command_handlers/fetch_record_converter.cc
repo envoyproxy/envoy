@@ -122,6 +122,9 @@ void FetchRecordConverterImpl::appendRecord(const InboundRecord& record, Bytes& 
   const int32_t offset_delta = record.offset_;
   Statics::writeVarint(offset_delta, buffer);
 
+  // Impl note: compared to requests/responses, records serialize byte arrays as varint length +
+  // bytes (and not length + 1, then bytes). So we cannot use EncodingContext from serialization.h.
+
   // keyLength: varint
   // key: byte[]
   const absl::string_view key = record.key();
