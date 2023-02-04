@@ -5,6 +5,8 @@ import os
 import subprocess as sp
 import sys
 
+sys.path += [os.path.dirname(__file__)]
+
 import tap2pcap
 
 # Validate that the tapped trace when run through tap2cap | tshark matches

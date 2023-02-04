@@ -1,6 +1,6 @@
 # 1. Use already imported python dependencies
 # 2. Disable pointer compression (limits the maximum number of WasmVMs).
-# 3. Add support for --define=no_debug_info=1. 
+# 3. Add support for --define=no_debug_info=1.
 # 4. Allow compiling v8 on macOS 10.15 to 13.0. TODO(dio): Will remove this patch when https://bugs.chromium.org/p/v8/issues/detail?id=13428 is fixed.
 # 5. Don't expose Wasm C API (only Wasm C++ API).
 
@@ -9,7 +9,7 @@ index 4e89f90e7e..ced403d5aa 100644
 --- a/BUILD.bazel
 +++ b/BUILD.bazel
 @@ -4,7 +4,7 @@
- 
+
  load("@bazel_skylib//lib:selects.bzl", "selects")
  load("@rules_python//python:defs.bzl", "py_binary")
 -load("@v8_python_deps//:requirements.bzl", "requirement")
@@ -28,7 +28,7 @@ index 4e89f90e7e..3fcb38b3f3 100644
 -    default = "none",
 +    default = "False",
  )
- 
+
  # Default setting for v8_enable_pointer_compression.
 diff --git a/bazel/defs.bzl b/bazel/defs.bzl
 index e957c0fad3..a6de50e6ab 100644
@@ -79,17 +79,30 @@ index ce3f569fd5..dc8a4c4f6a 100644
 --- a/src/wasm/c-api.cc
 +++ b/src/wasm/c-api.cc
 @@ -2238,6 +2238,8 @@ auto Instance::exports() const -> ownvec<Extern> {
- 
+
  }  // namespace wasm
- 
+
 +#if 0
 +
  // BEGIN FILE wasm-c.cc
- 
+
  extern "C" {
 @@ -3257,3 +3259,5 @@ wasm_instance_t* wasm_frame_instance(const wasm_frame_t* frame) {
  #undef WASM_DEFINE_SHARABLE_REF
- 
+
  }  // extern "C"
 +
 +#endif
+diff --git a/third_party/inspector_protocol/code_generator.py b/third_party/inspector_protocol/code_generator.py
+index c3768b8..d4a1dda 100644
+--- a/third_party/inspector_protocol/code_generator.py
++++ b/third_party/inspector_protocol/code_generator.py
+@@ -16,6 +16,8 @@ try:
+ except ImportError:
+   import simplejson as json
+
++sys.path += [os.path.dirname(__file__)]
++
+ import pdl
+
+ try:

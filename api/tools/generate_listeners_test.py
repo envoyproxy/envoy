@@ -1,6 +1,9 @@
 """Tests for generate_listeners."""
 
 import os
+import sys
+
+sys.path += [os.path.dirname(__file__)]
 
 import generate_listeners
 
