@@ -289,7 +289,8 @@ TEST_F(DatadogTracerSpanTest, NoOpMode) {
   const Tracing::SpanPtr child =
       span.spawnChild(Tracing::MockConfig{}, "child", time_.timeSystem().systemTime());
   EXPECT_NE(nullptr, child);
-  EXPECT_EQ(typeid(Tracing::NullSpan), typeid(*child));
+  const Tracing::Span& child_span = *child;
+  EXPECT_EQ(typeid(Tracing::NullSpan), typeid(child_span));
   span.setSampled(true);
   span.setSampled(false);
   EXPECT_EQ("", span.getBaggage("foo"));
