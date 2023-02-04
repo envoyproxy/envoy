@@ -2,6 +2,7 @@
 
 #include "envoy/config/route/v3/route_components.pb.h"
 
+#include "source/common/common/json_escape_string.h"
 #include "source/common/common/matchers.h"
 #include "source/common/common/regex.h"
 #include "source/common/common/utility.h"
@@ -194,6 +195,70 @@ bool HeaderUtility::headerValueIsValid(const absl::string_view header_value) {
                                     header_value.size()) != 0;
 }
 
+namespace {
+// TODO(yanavlasov): This code is copied from the default UHV. As the transition to UHV is
+// completed, replace it with the call to UHV.
+constexpr bool testChar(const std::array<uint32_t, 8>& table, char c) {
+  // CPU cache friendly version of a lookup in a bit table of size 256.
+  // The table is organized as 8 32 bit words.
+  // This function looks up a bit from the `table` at the index `c`.
+  // This function is used to test whether a character `c` is allowed
+  // or not based on the value of a bit at index `c`.
+  uint8_t tmp = static_cast<uint8_t>(c);
+  // The `tmp >> 5` determines which of the 8 uint32_t words has the bit at index `uc`.
+  // The `0x80000000 >> (tmp & 0x1f)` determines the index of the bit within the 32 bit word.
+  return (table[tmp >> 5] & (0x80000000 >> (tmp & 0x1f))) != 0;
+}
+
+// Header name character table.
+// From RFC 9110, https://www.rfc-editor.org/rfc/rfc9110.html#section-5.1:
+//
+// SPELLCHECKER(off)
+// header-field   = field-name ":" OWS field-value OWS
+// field-name     = token
+// token          = 1*tchar
+//
+// tchar          = "!" / "#" / "$" / "%" / "&" / "'" / "*"
+//                / "+" / "-" / "." / "^" / "_" / "`" / "|" / "~"
+//                / DIGIT / ALPHA
+// SPELLCHECKER(on)
+constexpr std::array<uint32_t, 8> kGenericHeaderNameCharTable = {
+    // control characters
+    0b00000000000000000000000000000000,
+    // !"#$%&'()*+,-./0123456789:;<=>?
+    0b01011111001101101111111111000000,
+    //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
+    0b01111111111111111111111111100011,
+    //`abcdefghijklmnopqrstuvwxyz{|}~
+    0b11111111111111111111111111101010,
+    // extended ascii
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+};
+
+} // namespace
+
+bool HeaderUtility::headerNameIsValid(const absl::string_view header_key) {
+  if (!header_key.empty() && header_key[0] == ':') {
+    // For HTTP/2 pseudo header, use the HTTP/2 semantics for checking validity
+    return nghttp2_check_header_name(reinterpret_cast<const uint8_t*>(header_key.data()),
+                                     header_key.size()) != 0;
+  }
+  // For all other header use HTTP/1 semantics. The only difference from HTTP/2 is that
+  // uppercase characters are allowed. This allows HTTP filters to add header with mixed
+  // case names. The HTTP/1 codec will send as is, as uppercase characters are allowed.
+  // However the HTTP/2 codec will NOT convert these to lowercase when serializing the
+  // header map, thus producing an invalid request.
+  // TODO(yanavlasov): make validation in HTTP/2 case stricter.
+  bool is_valid = true;
+  for (auto iter = header_key.begin(); iter != header_key.end() && is_valid; ++iter) {
+    is_valid &= testChar(kGenericHeaderNameCharTable, *iter);
+  }
+  return is_valid;
+}
+
 bool HeaderUtility::headerNameContainsUnderscore(const absl::string_view header_name) {
   return header_name.find('_') != absl::string_view::npos;
 }
@@ -356,6 +421,42 @@ Http::Status HeaderUtility::checkRequiredRequestHeaders(const Http::RequestHeade
       return absl::InvalidArgumentError(
           absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Path.get()));
     }
+  }
+  return Http::okStatus();
+}
+
+Http::Status HeaderUtility::checkValidRequestHeaders(const Http::RequestHeaderMap& headers) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.validate_upstream_headers")) {
+    return Http::okStatus();
+  }
+
+  const HeaderEntry* invalid_entry = nullptr;
+  bool invalid_key = false;
+  headers.iterate([&invalid_entry, &invalid_key](const HeaderEntry& header) -> HeaderMap::Iterate {
+    if (!HeaderUtility::headerNameIsValid(header.key().getStringView())) {
+      invalid_entry = &header;
+      invalid_key = true;
+      return HeaderMap::Iterate::Break;
+    }
+
+    if (!HeaderUtility::headerValueIsValid(header.value().getStringView())) {
+      invalid_entry = &header;
+      invalid_key = false;
+      return HeaderMap::Iterate::Break;
+    }
+
+    return HeaderMap::Iterate::Continue;
+  });
+
+  if (invalid_entry) {
+    // The header key may contain non-printable characters. Escape the key so that the error
+    // details can be safely presented.
+    const absl::string_view key = invalid_entry->key().getStringView();
+    uint64_t extra_length = JsonEscaper::extraSpace(key);
+    const std::string escaped_key = JsonEscaper::escapeString(key, extra_length);
+
+    return absl::InvalidArgumentError(
+        absl::StrCat("invalid header ", invalid_key ? "name: " : "value for: ", escaped_key));
   }
   return Http::okStatus();
 }

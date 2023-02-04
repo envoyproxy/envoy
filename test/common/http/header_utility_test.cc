@@ -1290,6 +1290,43 @@ TEST(ValidateHeaders, ContentLength) {
   EXPECT_TRUE(should_close_connection);
 }
 
+#ifdef NDEBUG
+// These tests send invalid request and response header names which violate ASSERT while creating
+// such request/response headers. So they can only be run in NDEBUG mode.
+TEST(ValidateHeaders, ForbiddenCharacters) {
+  {
+    // Valid headers
+    TestRequestHeaderMapImpl headers{
+        {":method", "CONNECT"}, {":authority", "foo.com:80"}, {"x-foo", "hello world"}};
+    EXPECT_EQ(Http::okStatus(), HeaderUtility::checkValidRequestHeaders(headers));
+  }
+
+  {
+    // Mixed case header key is ok
+    TestRequestHeaderMapImpl headers{{":method", "CONNECT"}, {":authority", "foo.com:80"}};
+    Http::HeaderString invalid_key(absl::string_view("x-MiXeD-CaSe"));
+    headers.addViaMove(std::move(invalid_key),
+                       Http::HeaderString(absl::string_view("hello world")));
+    EXPECT_TRUE(HeaderUtility::checkValidRequestHeaders(headers).ok());
+  }
+
+  {
+    // Invalid key
+    TestRequestHeaderMapImpl headers{
+        {":method", "CONNECT"}, {":authority", "foo.com:80"}, {"x-foo\r\n", "hello world"}};
+    EXPECT_NE(Http::okStatus(), HeaderUtility::checkValidRequestHeaders(headers));
+  }
+
+  {
+    // Invalid value
+    TestRequestHeaderMapImpl headers{{":method", "CONNECT"},
+                                     {":authority", "foo.com:80"},
+                                     {"x-foo", "hello\r\n\r\nGET /evil HTTP/1.1"}};
+    EXPECT_NE(Http::okStatus(), HeaderUtility::checkValidRequestHeaders(headers));
+  }
+}
+#endif
+
 TEST(ValidateHeaders, ParseCommaDelimitedHeader) {
   // Basic case
   EXPECT_THAT(HeaderUtility::parseCommaDelimitedHeader("one,two,three"),
