@@ -602,3 +602,11 @@ envoy_cc_library(
         "//envoy/stats:stats_interface",
     ],
 )
+
+envoy_cc_library(
+    name = "dynamic_host_filter_state",
+    hdrs = ["dynamic_host_filter_state.h"],
+    deps = [
+        "//envoy/stream_info:filter_state_interface",
+    ],
+)

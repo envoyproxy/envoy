@@ -21,6 +21,7 @@ envoy_extension_cc_test(
     data = ["//test/extensions/transport_sockets/tls/test_data:certs"],
     extension_names = ["envoy.filters.http.dynamic_forward_proxy"],
     deps = [
+        "//source/common/upstream:dynamic_host_filter_state",
         "//source/extensions/clusters/dynamic_forward_proxy:cluster",
         "//source/extensions/network/dns_resolver/cares:config",
         "//source/extensions/transport_sockets/raw_buffer:config",

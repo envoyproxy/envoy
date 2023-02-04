@@ -8,6 +8,7 @@
 
 #include "source/common/http/utility.h"
 #include "source/common/network/transport_socket_options_impl.h"
+#include "source/common/upstream/dynamic_host_filter_state.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/default_validator.h"
 #include "source/extensions/transport_sockets/tls/utility.h"
@@ -153,8 +154,16 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
     return nullptr;
   }
 
+  const Upstream::DynamicHostFilterState* dynamic_host_filter_state = nullptr;
+  if (context->downstreamConnection()) {
+    dynamic_host_filter_state = context->downstreamConnection()->streamInfo()
+      .filterState().getDataReadOnly<Upstream::DynamicHostFilterState>(Upstream::DynamicHostFilterState::key());
+  }
+
   absl::string_view host;
-  if (context->downstreamHeaders()) {
+  if (dynamic_host_filter_state) {
+    host = dynamic_host_filter_state->value();
+  } else if (context->downstreamHeaders()) {
     host = context->downstreamHeaders()->getHostValue();
   } else if (context->downstreamConnection()) {
     host = context->downstreamConnection()->requestedServerName();
