@@ -55,10 +55,14 @@ TcpUpstream::onDownstreamEvent(Network::ConnectionEvent event) {
     // The close call may result in this object being deleted. Latch the
     // connection locally so it can be returned for potential draining.
     auto* conn_data = upstream_conn_data_.release();
-    conn_data->connection().close(Network::ConnectionCloseType::FlushWrite);
+    conn_data->connection().close(
+        Network::ConnectionCloseType::FlushWrite,
+        StreamInfo::LocalCloseReasons::get().ClosingUpstreamTcpDueToDownstreamRemoteClose);
     return conn_data;
   } else if (event == Network::ConnectionEvent::LocalClose) {
-    upstream_conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
+    upstream_conn_data_->connection().close(
+        Network::ConnectionCloseType::NoFlush,
+        StreamInfo::LocalCloseReasons::get().ClosingUpstreamTcpDueToDownstreamLocalClose);
   }
   return nullptr;
 }

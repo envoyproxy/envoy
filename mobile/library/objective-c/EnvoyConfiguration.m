@@ -14,6 +14,7 @@
                              dnsMinRefreshSeconds:(UInt32)dnsMinRefreshSeconds
                            dnsPreresolveHostnames:(NSString *)dnsPreresolveHostnames
                                    enableDNSCache:(BOOL)enableDNSCache
+                      dnsCacheSaveIntervalSeconds:(UInt32)dnsCacheSaveIntervalSeconds
                               enableHappyEyeballs:(BOOL)enableHappyEyeballs
                                       enableHttp3:(BOOL)enableHttp3
                                        enableGzip:(BOOL)enableGzip
@@ -61,6 +62,7 @@
   self.dnsMinRefreshSeconds = dnsMinRefreshSeconds;
   self.dnsPreresolveHostnames = dnsPreresolveHostnames;
   self.enableDNSCache = enableDNSCache;
+  self.dnsCacheSaveIntervalSeconds = dnsCacheSaveIntervalSeconds;
   self.enableHappyEyeballs = enableHappyEyeballs;
   self.enableHttp3 = enableHttp3;
   self.enableGzip = enableGzip;
@@ -167,8 +169,6 @@
   [definitions appendFormat:@"- &dns_preresolve_hostnames %@\n", self.dnsPreresolveHostnames];
   [definitions appendFormat:@"- &dns_lookup_family %@\n",
                             self.enableHappyEyeballs ? @"ALL" : @"V4_PREFERRED"];
-  [definitions appendFormat:@"- &dns_multiple_addresses %@\n",
-                            self.enableHappyEyeballs ? @"true" : @"false"];
   [definitions appendFormat:@"- &dns_refresh_rate %lus\n", (unsigned long)self.dnsRefreshSeconds];
   [definitions appendFormat:@"- &enable_drain_post_dns_refresh %@\n",
                             self.enableDrainPostDnsRefresh ? @"true" : @"false"];
@@ -202,6 +202,8 @@
   [definitions appendFormat:@"%@\n", cert_validator_template];
 
   if (self.enableDNSCache) {
+    [definitions appendFormat:@"- &persistent_dns_cache_save_interval %lu\n",
+                              (unsigned long)self.dnsCacheSaveIntervalSeconds];
     NSString *persistent_dns_cache_config = @(persistent_dns_cache_config_insert);
     [definitions appendFormat:@"- &persistent_dns_cache_config %@\n", persistent_dns_cache_config];
   }

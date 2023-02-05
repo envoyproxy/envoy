@@ -61,6 +61,7 @@ ESC
 ETB
 ETX
 FS
+FIXME
 HEXDIG
 HEXDIGIT
 HPE
@@ -158,6 +159,7 @@ FIPS
 FIRSTHDR
 FQDN
 FREEBIND
+freeifaddrs
 FUZZER
 FUZZERS
 delims
@@ -201,6 +203,7 @@ IAM
 IANA
 IDL
 IETF
+IFADDRS
 INADDR
 INET
 INVAL
@@ -924,7 +927,6 @@ mutator
 mutex
 mutexes
 mux
-muxes
 muxed
 mysql
 namelen
@@ -941,6 +943,9 @@ negative
 netblock
 netblocks
 netfilter
+netlink
+netmask
+NLMSG
 nonblocking
 noncopyable
 nonresponsive
@@ -1136,6 +1141,7 @@ responder
 restarter
 resync
 ret
+retransmitted
 retransmitting
 retriable
 retriggers
@@ -1368,6 +1374,7 @@ vip
 virtualhost
 virtualize
 vptr
+vtable
 vtt
 wakeup
 wakeups
