@@ -8,6 +8,7 @@ on:
 
 jobs:
   sizecurrent:
+    if: github.repository == 'envoyproxy/envoy'
     name: size_current
     runs-on: ubuntu-20.04
     timeout-minutes: 120
@@ -34,6 +35,7 @@ jobs:
         name: sizecurrent
         path: mobile/bazel-bin/test/performance/test_binary_size
   sizemain:
+    if: github.repository == 'envoyproxy/envoy'
     name: size_main
     runs-on: ubuntu-20.04
     timeout-minutes: 90
@@ -62,6 +64,7 @@ jobs:
         name: sizemain
         path: mobile/bazel-bin/test/performance/test_binary_size
   sizecompare:
+    if: github.repository == 'envoyproxy/envoy'
     name: size_compare
     needs: [sizecurrent, sizemain]
     runs-on: ubuntu-20.04

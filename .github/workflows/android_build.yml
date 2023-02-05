@@ -8,6 +8,7 @@ on:
 
 jobs:
   androidbuild:
+    if: github.repository == 'envoyproxy/envoy'
     name: android_build
     runs-on: macos-12
     timeout-minutes: 90
@@ -37,6 +38,7 @@ jobs:
           --fat_apk_cpu=x86_64 \
           //:android_dist
   javahelloworld:
+    if: github.repository == 'envoyproxy/envoy'
     name: java_helloworld
     needs: androidbuild
     runs-on: macos-12
@@ -82,6 +84,7 @@ jobs:
       if: steps.should_run.outputs.run_ci_job == 'true'
       run: adb logcat -e "received headers with status 200" -m 1
   kotlinhelloworld:
+    if: github.repository == 'envoyproxy/envoy'
     name: kotlin_helloworld
     needs: androidbuild
     runs-on: macos-12
@@ -127,6 +130,7 @@ jobs:
       if: steps.should_run.outputs.run_ci_job == 'true'
       run: adb logcat -e "received headers with status 200" -m 1
   kotlinbaselineapp:
+    if: github.repository == 'envoyproxy/envoy'
     name: kotlin_baseline_app
     needs: androidbuild
     runs-on: macos-12
@@ -172,6 +176,7 @@ jobs:
       if: steps.should_run.outputs.run_ci_job == 'true'
       run: adb logcat -e "received headers with status 301" -m 1
   kotlinexperimentalapp:
+    if: github.repository == 'envoyproxy/envoy'
     name: kotlin_experimental_app
     needs: androidbuild
     runs-on: macos-12
