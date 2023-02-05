@@ -11,6 +11,9 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: oauth2
+  change: |
+    fixed a bug where the oauth2 filter would crash if it received a redirect URL without a state query param set.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
