@@ -475,50 +475,49 @@ void OAuth2Filter::finishGetAccessTokenFlow() {
   // Now, we construct a redirect request to return the user to their
   // previous state and additionally set the OAuth cookies in browser.
   // The redirection should result in successfully passing this filter.
-  Http::ResponseHeaderMapPtr response_headers = fillResponseHeader(getEncodedToken());
-  response_headers->setStatus(std::to_string(enumToInt(Http::Code::Found)));
+  Http::ResponseHeaderMapPtr response_headers{Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
+      {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Found))}})};
+
+  addResponseCookies(*response_headers, getEncodedToken());
   response_headers->setLocation(state_);
 
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_LOGGED_IN);
   config_->stats().oauth_success_.inc();
 }
 
-Http::ResponseHeaderMapPtr
-OAuth2Filter::fillResponseHeader(const std::string& encoded_token) const {
+void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
+                                      const std::string& encoded_token) const {
   // We use HTTP Only cookies for the HMAC and Expiry.
   const std::string cookie_tail = fmt::format(CookieTailFormatString, new_expires_);
   const std::string cookie_tail_http_only =
       fmt::format(CookieTailHttpOnlyFormatString, new_expires_);
 
-  Http::ResponseHeaderMapPtr response_headers = Http::ResponseHeaderMapImpl::create();
   const CookieNames& cookie_names = config_->cookieNames();
 
-  response_headers->addReferenceKey(
+  headers.addReferenceKey(
       Http::Headers::get().SetCookie,
       absl::StrCat(cookie_names.oauth_hmac_, "=", encoded_token, cookie_tail_http_only));
-  response_headers->addReferenceKey(
+  headers.addReferenceKey(
       Http::Headers::get().SetCookie,
       absl::StrCat(cookie_names.oauth_expires_, "=", new_expires_, cookie_tail_http_only));
 
   // If opted-in, we also create a new Bearer cookie for the authorization token provided by the
   // auth server.
   if (config_->forwardBearerToken()) {
-    response_headers->addReferenceKey(
+    headers.addReferenceKey(
         Http::Headers::get().SetCookie,
         absl::StrCat(cookie_names.bearer_token_, "=", access_token_, cookie_tail));
     if (id_token_ != EMPTY_STRING) {
-      response_headers->addReferenceKey(
-          Http::Headers::get().SetCookie,
-          absl::StrCat(cookie_names.id_token_, "=", id_token_, cookie_tail));
+      headers.addReferenceKey(Http::Headers::get().SetCookie,
+                              absl::StrCat(cookie_names.id_token_, "=", id_token_, cookie_tail));
     }
 
     if (refresh_token_ != EMPTY_STRING) {
-      response_headers->addReferenceKey(
+      headers.addReferenceKey(
           Http::Headers::get().SetCookie,
           absl::StrCat(cookie_names.refresh_token_, "=", refresh_token_, cookie_tail));
     }
   }
-  return response_headers;
 }
 void OAuth2Filter::sendUnauthorizedResponse() {
   config_->stats().oauth_failure_.inc();

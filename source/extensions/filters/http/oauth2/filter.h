@@ -108,14 +108,17 @@ struct CookieNames {
               const std::string& oauth_expires)
       : bearer_token_(bearer_token.empty() ? "BearerToken" : bearer_token),
         oauth_hmac_(oauth_hmac.empty() ? "OauthHMAC" : oauth_hmac),
-        oauth_expires_(oauth_expires.empty() ? "OauthExpires" : oauth_expires),
-        id_token_("IdToken"), refresh_token_("RefreshToken") {}
+        oauth_expires_(oauth_expires.empty() ? "OauthExpires" : oauth_expires), id_token_(IdToken),
+        refresh_token_(RefreshToken) {}
 
   const std::string bearer_token_;
   const std::string oauth_hmac_;
   const std::string oauth_expires_;
   const std::string id_token_;
   const std::string refresh_token_;
+
+  static constexpr absl::string_view IdToken = "IdToken";
+  static constexpr absl::string_view RefreshToken = "RefreshToken";
 };
 
 /**
@@ -273,7 +276,7 @@ private:
   Http::FilterHeadersStatus signOutUser(const Http::RequestHeaderMap& headers);
 
   std::string getEncodedToken() const;
-  Http::ResponseHeaderMapPtr fillResponseHeader(const std::string& encoded_token) const;
+  void addResponseCookies(Http::ResponseHeaderMap& headers, const std::string& encoded_token) const;
   const std::string& bearerPrefix() const;
 };
 
