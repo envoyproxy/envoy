@@ -210,9 +210,8 @@ void DecoderImpl::decodeOnWrite(Buffer::Instance& data, uint64_t& offset) {
 
   // Control responses that aren't connect, with XIDs <= 0.
   const auto zxid = helper_.peekInt64(data, offset);
-  ENVOY_LOG(trace, "zookeeper_proxy: decoding response with zxid {} at offset {}", zxid, offset);
   const auto error = helper_.peekInt32(data, offset);
-  ENVOY_LOG(trace, "zookeeper_proxy: decoding response with error {} at offset {}", error, offset);
+  ENVOY_LOG(trace, "zookeeper_proxy: decoding response with zxid {} and error {} at offset {}", zxid, error, offset);
   switch (xid_code) {
   case XidCodes::PingXid:
     callbacks_.onResponse(OpCodes::Ping, xid, zxid, error, latency);
