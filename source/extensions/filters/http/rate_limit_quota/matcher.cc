@@ -13,8 +13,8 @@ using ValueSpecifierCase = ::envoy::extensions::filters::http::rate_limit_quota:
 
 absl::StatusOr<BucketId>
 RateLimitOnMatchAction::generateBucketId(const Http::Matching::HttpMatchingDataImpl& data,
-                                          Server::Configuration::FactoryContext& factory_context,
-                                          RateLimitQuotaValidationVisitor& visitor) const {
+                                         Server::Configuration::FactoryContext& factory_context,
+                                         RateLimitQuotaValidationVisitor& visitor) const {
   BucketId bucket_id;
   std::unique_ptr<Matcher::MatchInputFactory<Http::HttpMatchingData>> input_factory_ptr = nullptr;
   // Generate the `BucketId` based on the bucked id builder from the configuration.
