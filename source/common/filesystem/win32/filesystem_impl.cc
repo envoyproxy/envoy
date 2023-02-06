@@ -141,7 +141,7 @@ static constexpr absl::optional<SystemTime> systemTimeFromFileTime(FILETIME t) {
   return ret;
 }
 
-static constexpr FileType fileTypeFromAttributeData(const WIN32_FILE_ATTRIBUTE_DATA& data) {
+static FileType fileTypeFromAttributeData(const WIN32_FILE_ATTRIBUTE_DATA& data) {
   if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
     return FileType::Directory;
   }
@@ -151,8 +151,8 @@ static constexpr FileType fileTypeFromAttributeData(const WIN32_FILE_ATTRIBUTE_D
   return FileType::Regular;
 }
 
-static constexpr FileInfo fileInfoFromAttributeData(absl::string_view path,
-                                                    const WIN32_FILE_ATTRIBUTE_DATA& data) {
+static FileInfo fileInfoFromAttributeData(absl::string_view path,
+                                          const WIN32_FILE_ATTRIBUTE_DATA& data) {
   absl::optional<uint64_t> sz;
   FileType type = fileTypeFromAttributeData(data);
   if (type == FileType::Regular) {
