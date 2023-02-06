@@ -405,6 +405,22 @@ TEST_F(FileSystemImplTest, StatOnFileOpenOrClosedMeasuresTheExpectedValues) {
   }
 }
 
+#ifndef WIN32
+// We can't make a broken symlink the same way in Windows.
+TEST_F(FileSystemImplTest, StatOnBrokenSymlinkReturnsRegularFile) {
+  const std::string file_path =
+      TestEnvironment::writeStringToFileForTest("test_envoy", "0123456789");
+  const std::string link_path = absl::StrCat(file_path, "_link");
+  EXPECT_EQ(0, ::symlink(file_path.c_str(), link_path.c_str())) << errno;
+  EXPECT_EQ(0, ::unlink(file_path.c_str())) << errno;
+  const Api::IoCallResult<FileInfo> info_result = file_system_.stat(link_path);
+  EXPECT_THAT(info_result.err_, ::testing::IsNull()) << info_result.err_->getErrorDetails();
+  EXPECT_EQ(info_result.return_value_.file_type_, FileType::Regular);
+  EXPECT_EQ(info_result.return_value_.name_, "test_envoy_link");
+  EXPECT_EQ(0, ::unlink(link_path.c_str())) << errno;
+}
+#endif
+
 TEST_F(FileSystemImplTest, PwriteFailureReturnsError) {
   const std::string file_path =
       TestEnvironment::writeStringToFileForTest("test_envoy", "0123456789");

@@ -119,7 +119,7 @@ Api::IoCallSizeResult FileImplPosix::pwrite(const void* buf, uint64_t count, uin
   return (rc == -1) ? resultFailure(rc, errno) : resultSuccess(rc);
 }
 
-static FileType typeFromStat(struct stat s) {
+static FileType typeFromStat(const struct stat& s) {
   if (S_ISDIR(s.st_mode)) {
     return FileType::Directory;
   }
@@ -129,18 +129,18 @@ static FileType typeFromStat(struct stat s) {
   return FileType::Other;
 }
 
-static constexpr absl::optional<SystemTime> systemTimeFromTimespec(struct timespec t) {
+static constexpr absl::optional<SystemTime> systemTimeFromTimespec(const struct timespec& t) {
   if (t.tv_sec == 0) {
     return absl::nullopt;
   }
   return timespecToChrono(t);
 }
 
-static FileInfo infoFromStat(absl::string_view path, struct stat s) {
+static FileInfo infoFromStat(absl::string_view path, const struct stat& s, FileType type) {
   return {
       std::string{InstanceImplPosix().splitPathFromFilename(path).file_},
       s.st_size,
-      typeFromStat(s),
+      type,
 #ifdef _DARWIN_FEATURE_64_BIT_INODE
       systemTimeFromTimespec(s.st_ctimespec),
       systemTimeFromTimespec(s.st_atimespec),
@@ -151,6 +151,10 @@ static FileInfo infoFromStat(absl::string_view path, struct stat s) {
       systemTimeFromTimespec(s.st_mtim),
 #endif
   };
+}
+
+static FileInfo infoFromStat(absl::string_view path, const struct stat& s) {
+  return infoFromStat(path, s, typeFromStat(s));
 }
 
 Api::IoCallResult<FileInfo> FileImplPosix::info() {
@@ -172,14 +176,7 @@ Api::IoCallResult<FileInfo> InstanceImplPosix::stat(absl::string_view path) {
         // but the reference is broken as the target could not be stat()'ed.
         // After confirming this with an lstat, treat this file entity as
         // a regular file, which may be unlink()'ed.
-        return resultSuccess<FileInfo>({
-            std::string{InstanceImplPosix().splitPathFromFilename(path).file_},
-            s.st_size,
-            FileType::Regular,
-            systemTimeFromTimespec(s.st_ctim),
-            systemTimeFromTimespec(s.st_atim),
-            systemTimeFromTimespec(s.st_mtim),
-        });
+        return resultSuccess(infoFromStat(path, s, FileType::Regular));
       }
     }
     return resultFailure<FileInfo>({}, errno);
