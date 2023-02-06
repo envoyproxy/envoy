@@ -55,15 +55,15 @@ Bytes FetchRecordConverterImpl::renderRecordBatch(
 
   Bytes result = {};
 
-  // Base offset.
+  // Base offset (bytes 0..7).
   const int64_t base_offset = htobe64(0);
   const unsigned char* base_offset_b = reinterpret_cast<const unsigned char*>(&base_offset);
   result.insert(result.end(), base_offset_b, base_offset_b + sizeof(base_offset));
 
-  // Batch length placeholder.
+  // Batch length placeholder (bytes 8..11).
   result.insert(result.end(), {0, 0, 0, 0});
 
-  // All other attributes (spans partitionLeaderEpoch .. baseSequence).
+  // All other attributes (spans partitionLeaderEpoch .. baseSequence) (bytes 12..56).
   const std::vector zeros(45, 0);
   result.insert(result.end(), zeros.begin(), zeros.end());
 
@@ -76,12 +76,12 @@ Bytes FetchRecordConverterImpl::renderRecordBatch(
   std::copy(last_offset_delta_bytes, last_offset_delta_bytes + sizeof(last_offset_delta),
             last_offset_delta_pos);
 
-  // Records (count).
+  // Records (count) (bytes 57..60).
   const int32_t record_count = htobe32(records.size());
   const unsigned char* record_count_b = reinterpret_cast<const unsigned char*>(&record_count);
   result.insert(result.end(), record_count_b, record_count_b + sizeof(record_count));
 
-  // Records (data).
+  // Records (data) (bytes 61+).
   for (const auto& record : records) {
     appendRecord(*record, result);
   }
@@ -100,7 +100,7 @@ Bytes FetchRecordConverterImpl::renderRecordBatch(
   constexpr uint32_t crc_offset = magic_offset + 1;
   const auto crc_data_start = result.data() + crc_offset + sizeof(int32_t);
   const auto crc_data_len = result.size() - (crc_offset + sizeof(int32_t));
-  const Bytes crc = renderCrc(crc_data_start, crc_data_len);
+  const Bytes crc = renderCrc32c(crc_data_start, crc_data_len);
   std::copy(crc.begin(), crc.end(), result.begin() + crc_offset);
 
   return result;
@@ -161,7 +161,10 @@ void FetchRecordConverterImpl::appendRecord(const InboundRecord& record, Bytes& 
   out.insert(out.end(), raw, raw + buf_len);
 }
 
-Bytes FetchRecordConverterImpl::renderCrc(const unsigned char* data, const size_t len) const {
+// XXX (adam.kotwasinski) Instead of computing it naively, either link against librdkafka's
+// implementation or generate it.
+// https://github.com/confluentinc/librdkafka/blob/v1.8.0/src/crc32c.c#L1
+uint32_t FetchRecordConverterImpl::computeCrc32c(const unsigned char* data, const size_t len) {
   uint32_t crc = 0xFFFFFFFF;
   for (size_t i = 0; i < len; i++) {
     char ch = data[i];
@@ -174,9 +177,16 @@ Bytes FetchRecordConverterImpl::renderCrc(const unsigned char* data, const size_
       ch >>= 1;
     }
   }
-  crc = ~crc;
-  crc = htobe32(crc);
+  return ~crc;
+}
 
+uint32_t FetchRecordConverterImpl::computeCrc32cForTest(const unsigned char* data,
+                                                        const size_t len) {
+  return computeCrc32c(data, len);
+}
+
+Bytes FetchRecordConverterImpl::renderCrc32c(const unsigned char* data, const size_t len) const {
+  uint32_t crc = htobe32(computeCrc32c(data, len));
   Bytes result;
   unsigned char* raw = reinterpret_cast<unsigned char*>(&crc);
   result.insert(result.end(), raw, raw + sizeof(crc));

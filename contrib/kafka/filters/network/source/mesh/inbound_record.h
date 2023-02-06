@@ -25,6 +25,7 @@ struct InboundRecord {
   const NullableBytes key_;
   const NullableBytes value_;
 
+  // XXX (adam.kotwasinski) const&
   InboundRecord(std::string topic, int32_t partition, int64_t offset, NullableBytes key,
                 NullableBytes value)
       : topic_{topic}, partition_{partition}, offset_{offset}, key_{key}, value_{value} {};
