@@ -141,9 +141,15 @@ static FileInfo infoFromStat(absl::string_view path, struct stat s) {
       std::string{InstanceImplPosix().splitPathFromFilename(path).file_},
       s.st_size,
       typeFromStat(s),
+#ifdef _DARWIN_FEATURE_64_BIT_INODE
+      systemTimeFromTimespec(s.st_ctimespec),
+      systemTimeFromTimespec(s.st_atimespec),
+      systemTimeFromTimespec(s.st_mtimespec),
+#else
       systemTimeFromTimespec(s.st_ctim),
       systemTimeFromTimespec(s.st_atim),
       systemTimeFromTimespec(s.st_mtim),
+#endif
   };
 }
 
