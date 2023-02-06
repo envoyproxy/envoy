@@ -5,6 +5,7 @@
 #include "envoy/extensions/quic/connection_id_generator/v3/envoy_deterministic_connection_id_generator.pb.h"
 #include "envoy/extensions/quic/crypto_stream/v3/crypto_stream.pb.h"
 #include "envoy/extensions/quic/proof_source/v3/proof_source.pb.h"
+#include "envoy/extensions/quic/server_preferred_address/v3/empty_server_preferred_address_config.pb.h"
 #include "envoy/network/exception.h"
 
 #include "source/common/config/utility.h"
@@ -287,16 +288,23 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
       *Config::Utility::translateToFactoryConfig(cid_generator_config, validation_visitor,
                                                  cid_generator_config_factory));
 
-  if (config.has_server_preferred_address_config()) {
-    auto& server_preferred_address_config_factory =
-        Config::Utility::getAndCheckFactory<EnvoyQuicServerPreferredAddressConfigFactory>(
-            config.server_preferred_address_config());
-    server_preferred_address_config_ =
-        server_preferred_address_config_factory.createServerPreferredAddressConfig(
-            *Config::Utility::translateToFactoryConfig(config.server_preferred_address_config(),
-                                                       validation_visitor,
-                                                       server_preferred_address_config_factory));
+  envoy::config::core::v3::TypedExtensionConfig server_preferred_address_config;
+  if (!config.has_server_preferred_address_config()) {
+    server_preferred_address_config.set_name("envoy.quic.server_preferred_address.empty");
+    envoy::extensions::quic::server_preferred_address::v3::EmptyServerPreferredAddressConfig
+        empty_config;
+    server_preferred_address_config.mutable_typed_config()->PackFrom(empty_config);
+  } else {
+    server_preferred_address_config = config.server_preferred_address_config();
   }
+  auto& server_preferred_address_config_factory =
+      Config::Utility::getAndCheckFactory<EnvoyQuicServerPreferredAddressConfigFactory>(
+          server_preferred_address_config);
+  server_preferred_address_config_ =
+      server_preferred_address_config_factory.createServerPreferredAddressConfig(
+          *Config::Utility::translateToFactoryConfig(config.server_preferred_address_config(),
+                                                     validation_visitor,
+                                                     server_preferred_address_config_factory));
 
 #if defined(SO_ATTACH_REUSEPORT_CBPF) && defined(__linux__)
   if (!disable_kernel_bpf_packet_routing_for_test_) {
