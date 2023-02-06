@@ -410,17 +410,17 @@ std::string EngineBuilder::generateConfigStr() const {
   if (socket_tagging_filter_) {
     insertCustomFilter(socket_tag_config_insert, config_template);
   }
-  if (gzip_decompression_filter_) {
-    insertCustomFilter(gzip_decompressor_config_insert, config_template);
-  }
-  if (gzip_compression_filter_) {
-    insertCustomFilter(gzip_compressor_config_insert, config_template);
-  }
   if (brotli_decompression_filter_) {
     insertCustomFilter(brotli_decompressor_config_insert, config_template);
   }
   if (brotli_compression_filter_) {
     insertCustomFilter(brotli_compressor_config_insert, config_template);
+  }
+  if (gzip_decompression_filter_) {
+    insertCustomFilter(gzip_decompressor_config_insert, config_template);
+  }
+  if (gzip_compression_filter_) {
+    insertCustomFilter(gzip_compressor_config_insert, config_template);
   }
   if (enable_http3_) {
     insertCustomFilter(alternate_protocols_cache_filter_insert, config_template);
@@ -538,6 +538,36 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     cache_filter->mutable_typed_config()->PackFrom(cache_config);
   }
 
+  if (gzip_decompression_filter_) {
+    envoy::extensions::compression::gzip::decompressor::v3::Gzip gzip_config;
+    gzip_config.mutable_window_bits()->set_value(15);
+    envoy::extensions::filters::http::decompressor::v3::Decompressor decompressor_config;
+    decompressor_config.mutable_decompressor_library()->set_name("gzip");
+    decompressor_config.mutable_decompressor_library()->mutable_typed_config()->PackFrom(
+        gzip_config);
+    auto* common_request =
+        decompressor_config.mutable_request_direction_config()->mutable_common_config();
+    common_request->mutable_enabled()->mutable_default_value();
+    common_request->mutable_enabled()->set_runtime_key("request_decompressor_enabled");
+    decompressor_config.mutable_response_direction_config()
+        ->mutable_common_config()
+        ->set_ignore_no_transform_header(true);
+    auto* gzip_filter = hcm->add_http_filters();
+    gzip_filter->set_name("envoy.filters.http.decompressor");
+    gzip_filter->mutable_typed_config()->PackFrom(decompressor_config);
+  }
+#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
+  if (gzip_compression_filter_) {
+    envoy::extensions::compression::gzip::compressor::v3::Gzip gzip_config;
+    gzip_config.mutable_window_bits()->set_value(15);
+    envoy::extensions::filters::http::compressor::v3::Compressor compressor_config;
+    compressor_config.mutable_compressor_library()->set_name("gzip");
+    compressor_config.mutable_compressor_library()->mutable_typed_config()->PackFrom(gzip_config);
+    auto* gzip_filter = hcm->add_http_filters();
+    gzip_filter->set_name("envoy.filters.http.compressor");
+    gzip_filter->mutable_typed_config()->PackFrom(compressor_config);
+  }
+#endif
   if (brotli_decompression_filter_) {
     envoy::extensions::compression::brotli::decompressor::v3::Brotli brotli_config;
     envoy::extensions::filters::http::decompressor::v3::Decompressor decompressor_config;
@@ -567,36 +597,6 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     auto* brotli_filter = hcm->add_http_filters();
     brotli_filter->set_name("envoy.filters.http.compressor");
     brotli_filter->mutable_typed_config()->PackFrom(compressor_config);
-  }
-#endif
-  if (gzip_decompression_filter_) {
-    envoy::extensions::compression::gzip::decompressor::v3::Gzip gzip_config;
-    gzip_config.mutable_window_bits()->set_value(15);
-    envoy::extensions::filters::http::decompressor::v3::Decompressor decompressor_config;
-    decompressor_config.mutable_decompressor_library()->set_name("gzip");
-    decompressor_config.mutable_decompressor_library()->mutable_typed_config()->PackFrom(
-        gzip_config);
-    auto* common_request =
-        decompressor_config.mutable_request_direction_config()->mutable_common_config();
-    common_request->mutable_enabled()->mutable_default_value();
-    common_request->mutable_enabled()->set_runtime_key("request_decompressor_enabled");
-    decompressor_config.mutable_response_direction_config()
-        ->mutable_common_config()
-        ->set_ignore_no_transform_header(true);
-    auto* gzip_filter = hcm->add_http_filters();
-    gzip_filter->set_name("envoy.filters.http.decompressor");
-    gzip_filter->mutable_typed_config()->PackFrom(decompressor_config);
-  }
-#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
-  if (gzip_compression_filter_) {
-    envoy::extensions::compression::gzip::compressor::v3::Gzip gzip_config;
-    gzip_config.mutable_window_bits()->set_value(15);
-    envoy::extensions::filters::http::compressor::v3::Compressor compressor_config;
-    compressor_config.mutable_compressor_library()->set_name("gzip");
-    compressor_config.mutable_compressor_library()->mutable_typed_config()->PackFrom(gzip_config);
-    auto* gzip_filter = hcm->add_http_filters();
-    gzip_filter->set_name("envoy.filters.http.compressor");
-    gzip_filter->mutable_typed_config()->PackFrom(compressor_config);
   }
 #endif
   if (socket_tagging_filter_) {
