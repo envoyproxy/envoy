@@ -13,6 +13,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile-frontenvoy
+    depends_on:
+      upstream-service:
+        condition: service_healthy
     environment:
     - FRONT_ENVOY_YAML
     ports:
