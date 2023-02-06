@@ -1,4 +1,4 @@
-date: Pending
+date: February 7, 2023
 
 bug_fixes:
 - area: validation
@@ -6,12 +6,6 @@ bug_fixes:
     fixed a crash which could happen when optional ``engine_type`` is not provided in regex.
 
 new_features:
-- area: attributes
-  change: |
-    added :ref:`attributes <arch_overview_attributes>` for looking up xDS configuration information.
 - area: docker
   change: |
     use new ``nossl`` images for ``distroless`` Docker build.
-- area: bazel
-  change: |
-    updated to version 6.0.0.
