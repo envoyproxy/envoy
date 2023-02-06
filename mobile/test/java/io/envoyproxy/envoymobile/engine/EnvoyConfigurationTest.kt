@@ -74,6 +74,7 @@ class EnvoyConfigurationTest {
     dnsMinRefreshSeconds: Int = 12,
     dnsPreresolveHostnames: String = "[{address: hostname, port_value: 443}]",
     enableDNSCache: Boolean = false,
+    dnsCacheSaveIntervalSeconds: Int = 101,
     enableDrainPostDnsRefresh: Boolean = false,
     enableHttp3: Boolean = true,
     enableGzip: Boolean = true,
@@ -108,6 +109,7 @@ class EnvoyConfigurationTest {
       dnsMinRefreshSeconds,
       dnsPreresolveHostnames,
       enableDNSCache,
+      dnsCacheSaveIntervalSeconds,
       enableDrainPostDnsRefresh,
       enableHttp3,
       enableGzip,
@@ -219,6 +221,7 @@ class EnvoyConfigurationTest {
       grpcStatsDomain = "",
       enableDrainPostDnsRefresh = true,
       enableDNSCache = true,
+      dnsCacheSaveIntervalSeconds = 101,
       enableHappyEyeballs = true,
       enableHttp3 = false,
       enableGzip = false,
@@ -243,6 +246,8 @@ class EnvoyConfigurationTest {
 
     // enableDNSCache = true
     assertThat(resolvedTemplate).contains("key: dns_persistent_cache")
+    // dnsCacheSaveIntervalSeconds = 101
+    assertThat(resolvedTemplate).contains("&persistent_dns_cache_save_interval 101")
 
     // enableHappyEyeballs = true
     assertThat(resolvedTemplate).contains("&dns_lookup_family ALL")

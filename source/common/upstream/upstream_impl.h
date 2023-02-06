@@ -948,14 +948,12 @@ private:
   const std::shared_ptr<const HttpProtocolOptionsConfigImpl> http_protocol_options_;
   const std::shared_ptr<const TcpProtocolOptionsConfigImpl> tcp_protocol_options_;
   const uint64_t max_requests_per_connection_;
-  const uint32_t max_response_headers_count_;
   const std::chrono::milliseconds connect_timeout_;
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   absl::optional<std::chrono::milliseconds> tcp_pool_idle_timeout_;
   absl::optional<std::chrono::milliseconds> max_connection_duration_;
   const float per_upstream_preconnect_ratio_;
   const float peekahead_ratio_;
-  const uint32_t per_connection_buffer_limit_bytes_;
   TransportSocketMatcherPtr socket_matcher_;
   Stats::ScopeSharedPtr stats_scope_;
   mutable LazyClusterTrafficStats traffic_stats_;
@@ -969,7 +967,6 @@ private:
   mutable ResourceManagers resource_managers_;
   const std::string maintenance_mode_runtime_key_;
   std::shared_ptr<UpstreamLocalAddressSelector> upstream_local_address_selector_;
-  LoadBalancerType lb_type_;
   const std::unique_ptr<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>
       lb_round_robin_config_;
   const std::unique_ptr<const envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
@@ -988,10 +985,6 @@ private:
   ProtobufTypes::MessagePtr load_balancing_policy_;
   TypedLoadBalancerFactory* load_balancer_factory_ = nullptr;
   const envoy::config::cluster::v3::Cluster::CommonLbConfig common_lb_config_;
-  const bool drain_connections_on_host_removal_;
-  const bool connection_pool_per_downstream_connection_;
-  const bool warm_hosts_;
-  const bool set_local_interface_name_on_upstream_connections_;
   const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>
       upstream_http_protocol_options_;
   absl::optional<std::string> eds_service_name_;
@@ -999,12 +992,22 @@ private:
   const std::unique_ptr<Server::Configuration::CommonFactoryContext> factory_context_;
   std::vector<Network::FilterFactoryCb> filter_factories_;
   Http::FilterChainUtility::FilterFactoriesList http_filter_factories_;
-  // true iff the cluster proto specified upstream http filters.
-  bool has_configured_http_filters_{false};
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   mutable Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
   UpstreamHttpFactoryContextImpl upstream_context_;
+
+  // Keep small values like bools and enums at the end of the class to reduce
+  // overhead via alignment
+  const uint32_t per_connection_buffer_limit_bytes_;
+  const uint32_t max_response_headers_count_;
+  LoadBalancerType lb_type_;
+  const bool drain_connections_on_host_removal_ : 1;
+  const bool connection_pool_per_downstream_connection_ : 1;
+  const bool warm_hosts_ : 1;
+  const bool set_local_interface_name_on_upstream_connections_ : 1;
+  // true iff the cluster proto specified upstream http filters.
+  bool has_configured_http_filters_ : 1;
 };
 
 /**

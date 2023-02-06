@@ -105,7 +105,7 @@ const char* persistent_dns_cache_config_insert = R"(
       "@type": type.googleapis.com/envoymobile.extensions.key_value.platform.PlatformKeyValueStoreConfig
       key: dns_persistent_cache
       save_interval:
-        seconds: 0
+        seconds: *persistent_dns_cache_save_interval
       max_entries: 100
 )";
 
@@ -121,6 +121,7 @@ const std::string config_header = R"(
 - &dns_query_timeout 25s
 - &dns_refresh_rate 60s
 - &persistent_dns_cache_config NULL
+- &persistent_dns_cache_save_interval 1
 - &force_ipv6 false
 )"
 #if defined(__APPLE__)
