@@ -27,6 +27,9 @@ struct FileInfo {
   // the size of the file in bytes, or `nullopt` if the size could not be determined
   //         (e.g. for directories, or windows symlinks.)
   const absl::optional<uint64_t> size_;
+  // Note that if the file represented by name_ is a symlink, type_ will be the file type of the
+  // target. For example, if name_ is a symlink to a directory, its file type will be Directory.
+  // A broken symlink on posix will have `FileType::Regular`.
   const FileType file_type_;
   const absl::optional<SystemTime> time_created_;
   const absl::optional<SystemTime> time_last_accessed_;
