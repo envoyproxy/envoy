@@ -191,7 +191,6 @@ Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
 SINGLETON_MANAGER_REGISTRATION(date_provider);
 SINGLETON_MANAGER_REGISTRATION(route_config_provider_manager);
 SINGLETON_MANAGER_REGISTRATION(scoped_routes_config_provider_manager);
-SINGLETON_MANAGER_REGISTRATION(tracer_manager);
 
 Utility::Singletons Utility::createSingletons(Server::Configuration::FactoryContext& context) {
   std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider =
@@ -215,12 +214,7 @@ Utility::Singletons Utility::createSingletons(Server::Configuration::FactoryCont
                 context.admin(), *route_config_provider_manager);
           });
 
-  auto tracer_manager = context.singletonManager().getTyped<Tracing::TracerManagerImpl>(
-      SINGLETON_MANAGER_REGISTERED_NAME(tracer_manager), [&context] {
-        return std::make_shared<Tracing::TracerManagerImpl>(
-            std::make_unique<Tracing::TracerFactoryContextImpl>(
-                context.getServerFactoryContext(), context.messageValidationVisitor()));
-      });
+  auto tracer_manager = Tracing::TracerManagerImpl::singleton(context);
 
   std::shared_ptr<Http::DownstreamFilterConfigProviderManager> filter_config_provider_manager =
       Http::FilterChainUtility::createSingletonDownstreamFilterConfigProviderManager(
