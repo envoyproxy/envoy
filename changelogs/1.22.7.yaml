@@ -1,0 +1,6 @@
+date: February 7, 2022
+
+new_features:
+- area: docker
+  change: |
+    use new ``nossl`` images for ``distroless`` Docker build.
