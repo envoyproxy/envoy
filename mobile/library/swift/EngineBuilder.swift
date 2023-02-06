@@ -28,7 +28,11 @@ open class EngineBuilder: NSObject {
   private var enableHappyEyeballs: Bool = true
   private var enableGzip: Bool = true
   private var enableBrotli: Bool = false
+#if ENVOY_ENABLE_QUIC
   private var enableHttp3: Bool = true
+#else
+  private var enableHttp3: Bool = false
+#endif
   private var enableInterfaceBinding: Bool = false
   private var enforceTrustChainVerification: Bool = true
   private var enablePlatformCertificateValidation: Bool = false
