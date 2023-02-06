@@ -226,6 +226,7 @@ open class EngineBuilder: NSObject {
     return self
   }
 
+#if ENVOY_ENABLE_QUIC
   /// Specify whether to enable support for HTTP/3 or not.  Defaults to true.
   ///
   /// - parameter enableHttp3: whether or not to enable HTTP/3.
@@ -236,6 +237,7 @@ open class EngineBuilder: NSObject {
     self.enableHttp3 = enableHttp3
     return self
   }
+#endif
 
   /// Specify whether sockets may attempt to bind to a specific interface, based on network
   /// conditions.
@@ -516,6 +518,7 @@ open class EngineBuilder: NSObject {
     return self
   }
 
+#if ENVOY_ADMIN_FUNCTIONALITY
   /// Enable admin interface on 127.0.0.1:9901 address. Admin interface is intended to be
   /// used for development/debugging purposes only. Enabling it in production may open
   /// your app to security vulnerabilities.
@@ -529,6 +532,7 @@ open class EngineBuilder: NSObject {
     self.adminInterfaceEnabled = true
     return self
   }
+#endif
 
   /// Builds and runs a new `Engine` instance with the provided configuration.
   ///
