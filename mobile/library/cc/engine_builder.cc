@@ -433,6 +433,12 @@ std::string EngineBuilder::generateConfigStr() const {
     absl::StrReplaceAll({{"#{custom_dynamic_resources}",
                           absl::StrCat("#{custom_dynamic_resources}\n", custom_cds)}},
                         &config_template);
+
+    std::string custom_node_context = R"(node_context_params:
+  - cluster)";
+    absl::StrReplaceAll(
+        {{"#{custom_node_context}", absl::StrCat("#{custom_node_context}\n", custom_node_context)}},
+        &config_template);
   }
 
   config_builder << config_template;
