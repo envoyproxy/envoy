@@ -115,6 +115,13 @@ func envoyGoFilterOnHttpHeader(r *C.httpRequest, endStream, headerNum, headerByt
 			req = createRequest(r)
 		}
 	}
+	if req.paniced {
+		req.safeReplyPanic()
+		// only may hit it when filter is just destroyed
+		// status is meaningless then.
+		return uint64(api.Continue)
+	}
+	defer req.RecoverPanic()
 	f := req.httpFilter
 
 	header := &httpHeaderMap{
@@ -141,6 +148,13 @@ func envoyGoFilterOnHttpHeader(r *C.httpRequest, endStream, headerNum, headerByt
 //export envoyGoFilterOnHttpData
 func envoyGoFilterOnHttpData(r *C.httpRequest, endStream, buffer, length uint64) uint64 {
 	req := getRequest(r)
+	if req.paniced {
+		req.safeReplyPanic()
+		// only may hit it when filter is just destroyed
+		// status is meaningless then.
+		return uint64(api.Continue)
+	}
+	defer req.RecoverPanic()
 
 	f := req.httpFilter
 	isDecode := api.EnvoyRequestPhase(r.phase) == api.DecodeDataPhase
@@ -163,6 +177,8 @@ func envoyGoFilterOnHttpData(r *C.httpRequest, endStream, buffer, length uint64)
 //export envoyGoFilterOnHttpDestroy
 func envoyGoFilterOnHttpDestroy(r *C.httpRequest, reason uint64) {
 	req := getRequest(r)
+	// do nothing even when req.panic is true, since filter is already destroying.
+	defer req.RecoverPanic()
 
 	v := api.DestroyReason(reason)
 

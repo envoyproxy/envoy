@@ -24,6 +24,14 @@ import (
 	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/api"
 )
 
+// panic error messages when C API return not ok
+var (
+	ErrRequestFinished = "request has been finished"
+	ErrFilterDestroyed = "golang filter has been destroyed"
+	ErrNotInGo         = "not proccessing Go"
+	ErrInvalidPhase    = "invalid phase, maybe headers/buffer already continued"
+)
+
 type httpHeaderMap struct {
 	request     *httpRequest
 	headers     map[string]string

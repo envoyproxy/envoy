@@ -53,13 +53,13 @@ func handleCApiStatus(status C.CAPIStatus) {
 	case C.CAPIOK:
 		return
 	case C.CAPIFilterIsGone:
-		panic("request has been finished")
+		panic(ErrRequestFinished)
 	case C.CAPIFilterIsDestroy:
-		panic("golang filter has been destroyed")
+		panic(ErrFilterDestroyed)
 	case C.CAPINotInGo:
-		panic("not proccessing Go")
+		panic(ErrNotInGo)
 	case C.CAPIInvalidPhase:
-		panic("invalid phase, maybe headers/buffer already continued")
+		panic(ErrInvalidPhase)
 	}
 }
 
