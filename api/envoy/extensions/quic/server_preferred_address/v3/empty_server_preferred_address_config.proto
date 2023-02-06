@@ -11,7 +11,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/qui
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: QUIC server preferred address config]
-// [#extension: envoy.quic.server_preferred_address]
+// [#extension: envoy.quic.server_preferred_address.empty]
 
 // Configuration for a server's preferred address config implementation which doesn't provide any preferred addresses.
 message EmptyServerPreferredAddressConfig {
