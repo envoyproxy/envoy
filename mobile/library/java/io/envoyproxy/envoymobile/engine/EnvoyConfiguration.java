@@ -204,6 +204,7 @@ public class EnvoyConfiguration {
     final StringBuilder customFiltersBuilder = new StringBuilder();
 
     for (EnvoyNativeFilterConfig filter : nativeFilterChain) {
+      System.err.println("Adding native filter " + filter.name);
       String filterConfig = nativeFilterTemplate.replace("{{ native_filter_name }}", filter.name)
                                 .replace("{{ native_filter_typed_config }}", filter.typedConfig);
       customFiltersBuilder.append(filterConfig);
@@ -322,12 +323,12 @@ public class EnvoyConfiguration {
 
     for (StackTraceElement element : Thread.currentThread().getStackTrace()) {
       if (element.getClassName().startsWith("org.junit.")) {
-        List<EnvoyNativeFilterConfig> reverseFilterChain = nativeFilterChain;
+        List<EnvoyNativeFilterConfig> reverseFilterChain = new ArrayList<>(nativeFilterChain);
         Collections.reverse(reverseFilterChain);
         Boolean enforceTrustChainVerification =
             trustChainVerification == EnvoyConfiguration.TrustChainVerification.VERIFY_TRUST_CHAIN;
 
-        byte[][] filter_chain = JniBridgeUtility.toJniBytes(nativeFilterChain);
+        byte[][] filter_chain = JniBridgeUtility.toJniBytes(reverseFilterChain);
         byte[][] clusters = JniBridgeUtility.stringsToJniBytes(virtualClusters);
         byte[][] stats_sinks = JniBridgeUtility.stringsToJniBytes(statSinks);
         byte[][] dns_preresolve = JniBridgeUtility.stringsToJniBytes(dnsPreresolveHostnames);
@@ -348,6 +349,29 @@ public class EnvoyConfiguration {
     }
 
     return resolvedConfiguration;
+  }
+
+  long createBootstrap() {
+    Boolean enforceTrustChainVerification =
+        trustChainVerification == EnvoyConfiguration.TrustChainVerification.VERIFY_TRUST_CHAIN;
+    List<EnvoyNativeFilterConfig> reverseFilterChain = new ArrayList<>(nativeFilterChain);
+    Collections.reverse(reverseFilterChain);
+
+    byte[][] filter_chain = JniBridgeUtility.toJniBytes(reverseFilterChain);
+    byte[][] clusters = JniBridgeUtility.stringsToJniBytes(virtualClusters);
+    byte[][] stats_sinks = JniBridgeUtility.stringsToJniBytes(statSinks);
+    byte[][] dns_preresolve = JniBridgeUtility.stringsToJniBytes(dnsPreresolveHostnames);
+    System.err.println("Creating bootstrap");
+    return JniLibrary.createBootstrap(
+        grpcStatsDomain, adminInterfaceEnabled, connectTimeoutSeconds, dnsRefreshSeconds,
+        dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax, dnsQueryTimeoutSeconds,
+        dnsMinRefreshSeconds, dns_preresolve, enableDNSCache, dnsCacheSaveIntervalSeconds,
+        enableDrainPostDnsRefresh, enableHttp3, enableGzip, enableBrotli, enableSocketTagging,
+        enableHappyEyeballs, enableInterfaceBinding, h2ConnectionKeepaliveIdleIntervalMilliseconds,
+        h2ConnectionKeepaliveTimeoutSeconds, maxConnectionsPerHost, statsFlushSeconds,
+        streamIdleTimeoutSeconds, perTryIdleTimeoutSeconds, appVersion, appId,
+        enforceTrustChainVerification, clusters, filter_chain, stats_sinks,
+        enablePlatformCertificatesValidation, enableSkipDNSLookupForProxiedRequests);
   }
 
   static class ConfigurationException extends RuntimeException {

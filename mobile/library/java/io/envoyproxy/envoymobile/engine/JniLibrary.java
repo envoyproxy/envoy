@@ -173,7 +173,8 @@ public class JniLibrary {
    * @param logLevel,        the logging level to run envoy with.
    * @return int, the resulting status of the operation.
    */
-  protected static native int runEngine(long engine, String config, String logLevel);
+  protected static native int runEngine(long engine, String config, long bootstrap,
+                                        String logLevel);
 
   /**
    * Terminate the engine.
@@ -362,6 +363,26 @@ public class JniLibrary {
       boolean enableInterfaceBinding, long h2ConnectionKeepaliveIdleIntervalMilliseconds,
       long h2ConnectionKeepaliveTimeoutSeconds, long maxConnectionsPerHost, long statsFlushSeconds,
       long streamIdleTimeoutSeconds, long perTryIdleTimeoutSeconds, String appVersion, String appId,
+      boolean trustChainVerification, byte[][] virtualClusters, byte[][] filterChain,
+      byte[][] statSinks, boolean enablePlatformCertificatesValidation,
+      boolean enableSkipDNSLookupForProxiedRequests);
+
+  /**
+   * Uses the provided fields to generate an Envoy bootstrap proto.
+   *
+   * Returns a pointer to the bootstrap that can be used to run the engine.
+   *
+   */
+  public static native long createBootstrap(
+      String grpcStatsDomain, boolean adminInterfaceEnabled, long connectTimeoutSeconds,
+      long dnsRefreshSeconds, long dnsFailureRefreshSecondsBase, long dnsFailureRefreshSecondsMax,
+      long dnsQueryTimeoutSeconds, long dnsMinRefreshSeconds, byte[][] dnsPreresolveHostnames,
+      boolean enableDNSCache, long dnsCacheSaveIntervalSeconds, boolean enableDrainPostDnsRefresh,
+      boolean enableHttp3, boolean enableGzip, boolean enableBrotli, boolean enableSocketTagging,
+      boolean enableHappyEyeballs, boolean enableInterfaceBinding,
+      long h2ConnectionKeepaliveIdleIntervalMilliseconds, long h2ConnectionKeepaliveTimeoutSeconds,
+      long maxConnectionsPerHost, long statsFlushSeconds, long streamIdleTimeoutSeconds,
+      long perTryIdleTimeoutSeconds, String appVersion, String appId,
       boolean trustChainVerification, byte[][] virtualClusters, byte[][] filterChain,
       byte[][] statSinks, boolean enablePlatformCertificatesValidation,
       boolean enableSkipDNSLookupForProxiedRequests);

@@ -16,6 +16,7 @@ Breaking changes:
 - api: remove ``extendKeepaliveTimeout`` method from engine builders.
 - api: move Java and C++ addVirtualClusters taking concatenated cluster YAML to addVirtualCluster with one cluster config at a time (:issue: `#25297 <25297>`, :issue: `#25259 <25259>`)
 - api: move Java and C++ dnsPreresolveHostnames from taking concatenated cluster YAML to taking a list of String hostnames (:issue: `#25297 <25297>`, :issue: `#25259 <25259>`)
+- java: moved the Java builder to use the C++ builder's generated bootstrap, rather than doing YAML string manipulation (:issue: `#25392 <25392>`)
 
 Bugfixes:
 
