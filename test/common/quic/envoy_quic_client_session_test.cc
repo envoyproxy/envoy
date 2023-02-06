@@ -47,7 +47,7 @@ public:
                                   supported_versions, dispatcher, std::move(connection_socket),
                                   generator) {
     SetEncrypter(quic::ENCRYPTION_FORWARD_SECURE,
-                 std::make_unique<quic::NullEncrypter>(quic::Perspective::IS_CLIENT));
+                 std::make_unique<quic::test::TaggingEncrypter>(quic::ENCRYPTION_FORWARD_SECURE));
     SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
   }
 
