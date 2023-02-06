@@ -162,7 +162,6 @@ void EnvoyQuicClientConnection::probeWithNewPort(const quic::QuicSocketAddress& 
 
 void EnvoyQuicClientConnection::onPathValidationSuccess(
     std::unique_ptr<quic::QuicPathValidationContext> context) {
-  ENVOY_CONN_LOG(trace, "===== onPathValidationSuccess", *this);
   auto envoy_context =
       static_cast<EnvoyQuicClientConnection::EnvoyQuicPathValidationContext*>(context.get());
 
@@ -189,7 +188,6 @@ void EnvoyQuicClientConnection::onPathValidationSuccess(
 
 void EnvoyQuicClientConnection::onPathValidationFailure(
     std::unique_ptr<quic::QuicPathValidationContext> context) {
-  ENVOY_CONN_LOG(trace, "======= onPathValidationFailure", *this);
   // Note that the probing socket and probing writer will be deleted once context goes out of
   // scope.
   OnPathValidationFailureAtClient(/*is_multi_port=*/false, *context);
@@ -292,8 +290,6 @@ void EnvoyQuicClientConnection::OnCanWrite() {
 
 void EnvoyQuicClientConnection::probeAndMigrateToServerPreferredAddress(
     const quic::QuicSocketAddress& server_preferred_address) {
-  std::cerr << "========= probeAndMigrateToServerPreferredAddress " << server_preferred_address
-            << "\n";
   probeWithNewPort(server_preferred_address,
                    quic::PathValidationReason::kServerPreferredAddressMigration);
 }
