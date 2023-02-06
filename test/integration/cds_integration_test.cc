@@ -48,6 +48,12 @@ public:
     sotw_or_delta_ = sotwOrDelta();
   }
 
+  void TearDown() override {
+    if (!test_skipped_) {
+      cleanUpXdsConnection();
+    }
+  }
+
   // Overridden to insert this stuff into the initialize() at the very beginning of
   // HttpIntegrationTest::testRouterHeaderOnlyRequestAndResponse().
   void initialize() override {
