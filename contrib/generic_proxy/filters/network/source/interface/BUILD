@@ -94,5 +94,7 @@ envoy_cc_library(
         ":codec_interface",
         ":filter_interface",
         ":route_interface",
+        "//envoy/tracing:trace_config_interface",
+        "//envoy/tracing:tracer_interface",
     ],
 )

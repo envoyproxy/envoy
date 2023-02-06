@@ -5,6 +5,7 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/linked_object.h"
+#include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/upstream/load_balancer_impl.h"
 
 #include "contrib/generic_proxy/filters/network/source/interface/codec.h"
@@ -38,6 +39,7 @@ class UpstreamRequest : public Tcp::ConnectionPool::Callbacks,
                         public Tcp::ConnectionPool::UpstreamCallbacks,
                         public LinkedObject<UpstreamRequest>,
                         public Envoy::Event::DeferredDeletable,
+                        public RequestEncoderCallback,
                         public ResponseDecoderCallback,
                         Logger::Loggable<Envoy::Logger::Id::filter> {
 public:
@@ -63,6 +65,9 @@ public:
   void onDecodingSuccess(ResponsePtr response) override;
   void onDecodingFailure() override;
 
+  // RequestEncoderCallback
+  void onEncodingSuccess(Buffer::Instance& buffer, bool expect_response) override;
+
   void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host);
   void encodeBufferToUpstream(Buffer::Instance& buffer);
 
@@ -81,12 +86,17 @@ public:
   bool response_started_{};
   bool response_complete_{};
   ResponseDecoderPtr response_decoder_;
+
+  Buffer::OwnedImpl upstream_request_buffer_;
+  bool expect_response_{};
+
+  StreamInfo::StreamInfoImpl stream_info_;
+  Tracing::SpanPtr span_;
 };
 using UpstreamRequestPtr = std::unique_ptr<UpstreamRequest>;
 
 class RouterFilter : public DecoderFilter,
                      public Upstream::LoadBalancerContextBase,
-                     public RequestEncoderCallback,
                      Logger::Loggable<Envoy::Logger::Id::filter> {
 public:
   RouterFilter(Server::Configuration::FactoryContext& context) : context_(context) {}
@@ -98,9 +108,6 @@ public:
     callbacks_ = &callbacks;
   }
   FilterStatus onStreamDecoded(Request& request) override;
-
-  // RequestEncoderCallback
-  void onEncodingSuccess(Buffer::Instance& buffer, bool expect_response) override;
 
   void onUpstreamResponse(ResponsePtr response);
   void completeDirectly();
@@ -118,12 +125,11 @@ private:
   void kickOffNewUpstreamRequest();
   void resetStream(StreamResetReason reason);
 
-  bool expect_response_{};
   bool filter_complete_{};
 
   const RouteEntry* route_entry_{};
-
-  Buffer::OwnedImpl upstream_request_buffer_;
+  Upstream::ClusterInfoConstSharedPtr cluster_;
+  Request* request_{};
 
   RequestEncoderPtr request_encoder_;
 

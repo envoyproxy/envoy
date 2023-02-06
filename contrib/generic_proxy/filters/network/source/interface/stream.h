@@ -75,38 +75,15 @@ public:
   static constexpr absl::string_view name() { return "generic_proxy"; }
 };
 
-class Request : public StreamBase, public Tracing::TraceContext {
+/**
+ * Using interface that provided by the TraceContext as the interface of generic request.
+ */
+class Request : public Tracing::TraceContext {
 public:
-  /**
-   * Get request host.
-   *
-   * @return The host of generic request. The meaning of the return value may be different For
-   * different application protocols. It typically should be domain, VIP, or service name that
-   * used to represents target service instances.
-   */
-  virtual absl::string_view host() const PURE;
-
-  /**
-   * Get request path.
-   *
-   * @return The path of generic request. The meaning of the return value may be different For
-   * different application protocols. It typically should be RPC service name that used to
-   * represents set of method or functionality provided by target service.
-   */
-  virtual absl::string_view path() const PURE; // NOLINT
-
-  /**
-   * Get request method.
-   *
-   * @return The method of generic request. The meaning of the return value may be different For
-   * different application protocols.
-   */
-  virtual absl::string_view method() const PURE; // NOLINT
-
-  // TODO(wbpcode): remove this method after we update the authority() in the TraceContext to
-  // host().
-  absl::string_view authority() const final { return host(); }
+  // Used for matcher.
+  static constexpr absl::string_view name() { return "generic_proxy"; }
 };
+
 using RequestPtr = std::unique_ptr<Request>;
 using RequestSharedPtr = std::shared_ptr<Request>;
 

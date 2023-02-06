@@ -4,6 +4,7 @@
 #include "envoy/network/connection.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/tracing/tracer_impl.h"
 
 #include "contrib/generic_proxy/filters/network/source/interface/filter.h"
 
@@ -22,7 +23,26 @@ absl::string_view resetReasonToStringView(StreamResetReason reason) {
 } // namespace
 
 UpstreamRequest::UpstreamRequest(RouterFilter& parent, Upstream::TcpPoolData tcp_data)
-    : parent_(parent), tcp_data_(std::move(tcp_data)) {}
+    : parent_(parent), tcp_data_(std::move(tcp_data)),
+      stream_info_(parent.context_.mainThreadDispatcher().timeSource(), nullptr) {
+
+  stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
+  parent_.callbacks_->streamInfo().setUpstreamInfo(stream_info_.upstreamInfo());
+
+  stream_info_.healthCheck(parent_.callbacks_->streamInfo().healthCheck());
+  absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info =
+      parent_.callbacks_->streamInfo().upstreamClusterInfo();
+  if (cluster_info.has_value()) {
+    stream_info_.setUpstreamClusterInfo(*cluster_info);
+  }
+
+  if (auto tracing_config = parent_.callbacks_->tracingConfig(); tracing_config.has_value()) {
+    span_ = parent_.callbacks_->activeSpan().spawnChild(
+        tracing_config.value().get(),
+        absl::StrCat("router ", parent_.cluster_->observabilityName(), " egress"),
+        parent.context_.mainThreadDispatcher().timeSource().systemTime());
+  }
+}
 
 void UpstreamRequest::startStream() {
   Tcp::ConnectionPool::Cancellable* handle = tcp_data_.newConnection(*this);
@@ -48,10 +68,22 @@ void UpstreamRequest::resetStream(StreamResetReason reason) {
     conn_data_.reset();
   }
 
+  if (span_ != nullptr) {
+    span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+    span_->setTag(Tracing::Tags::get().ErrorReason, resetReasonToStringView(reason));
+    Tracing::TracerUtility::finalizeSpan(*span_, *parent_.request_, stream_info_,
+                                         parent_.callbacks_->tracingConfig().value(), true);
+  }
+
   parent_.onUpstreamRequestReset(*this, reason);
 }
 
 void UpstreamRequest::completeUpstreamRequest() {
+  if (span_ != nullptr) {
+    Tracing::TracerUtility::finalizeSpan(*span_, *parent_.request_, stream_info_,
+                                         parent_.callbacks_->tracingConfig().value(), true);
+  }
+
   response_complete_ = true;
   ASSERT(conn_pool_handle_ == nullptr);
   ASSERT(conn_data_ != nullptr);
@@ -73,6 +105,15 @@ void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason, ab
   resetStream(StreamResetReason::ConnectionFailure);
 }
 
+void UpstreamRequest::onEncodingSuccess(Buffer::Instance& buffer, bool expect_response) {
+  ENVOY_LOG(debug, "upstream request encoding success");
+  encodeBufferToUpstream(buffer);
+  if (!expect_response) {
+    completeUpstreamRequest();
+    parent_.completeDirectly();
+  }
+}
+
 void UpstreamRequest::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn,
                                   Upstream::HostDescriptionConstSharedPtr host) {
   ENVOY_LOG(debug, "upstream request: tcp connection has ready");
@@ -82,12 +123,11 @@ void UpstreamRequest::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn,
   conn_data_->addUpstreamCallbacks(*this);
   conn_pool_handle_ = nullptr;
 
-  encodeBufferToUpstream(parent_.upstream_request_buffer_);
-
-  if (parent_.expect_response_ == false) {
-    completeUpstreamRequest();
-    parent_.completeDirectly();
+  if (span_ != nullptr) {
+    span_->injectContext(*parent_.request_, upstream_host_);
   }
+
+  parent_.request_encoder_->encode(*parent_.request_, *this);
 }
 
 void UpstreamRequest::onUpstreamData(Buffer::Instance& data, bool end_stream) {
@@ -208,13 +248,6 @@ void RouterFilter::resetStream(StreamResetReason reason) {
   filter_complete_ = true;
 }
 
-void RouterFilter::onEncodingSuccess(Buffer::Instance& buffer, bool expect_response) {
-  ENVOY_LOG(debug, "upstream request encoding success");
-  upstream_request_buffer_.move(buffer);
-  kickOffNewUpstreamRequest();
-  expect_response_ = expect_response;
-}
-
 void RouterFilter::kickOffNewUpstreamRequest() {
   const auto& cluster_name = route_entry_->clusterName();
 
@@ -224,6 +257,8 @@ void RouterFilter::kickOffNewUpstreamRequest() {
     filter_complete_ = true;
     return;
   }
+
+  cluster_ = thread_local_cluster->info();
 
   auto cluster_info = thread_local_cluster->info();
   if (cluster_info->maintenanceMode()) {
@@ -250,6 +285,7 @@ FilterStatus RouterFilter::onStreamDecoded(Request& request) {
   ENVOY_LOG(debug, "Try route request to the upstream based on the route entry");
 
   setRouteEntry(callbacks_->routeEntry());
+  request_ = &request;
 
   if (route_entry_ == nullptr) {
     ENVOY_LOG(debug, "No route for current request and send local reply");
@@ -258,8 +294,7 @@ FilterStatus RouterFilter::onStreamDecoded(Request& request) {
   }
 
   request_encoder_ = callbacks_->downstreamCodec().requestEncoder();
-  request_encoder_->encode(request, *this);
-
+  kickOffNewUpstreamRequest();
   return FilterStatus::StopIteration;
 }
 
