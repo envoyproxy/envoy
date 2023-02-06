@@ -552,7 +552,7 @@ open class EngineBuilder(
   /**
    * Add virtual cluster configuration.
    *
-   * @param virtualCluster the JSON configuration string for a virtual cluster.
+   * @param cluster the JSON configuration string for a virtual cluster.
    *
    * @return this builder.
    */
