@@ -1202,7 +1202,8 @@ extern "C" JNIEXPORT jstring JNICALL Java_io_envoyproxy_envoymobile_engine_JniLi
     jint dns_failure_refresh_seconds_max, jint dns_query_timeout_seconds,
     jint dns_min_refresh_seconds, jobjectArray dns_preresolve_hostnames, jboolean enable_dns_cache,
     jint dns_cache_drain_interval_seconds, jboolean drain_post_dns_refresh_on, jboolean http3_on,
-    jboolean gzip_on, jboolean brotli_on, jboolean socket_tagging_on, jboolean happy_eyeballs_on,
+    jboolean gzip_decompression_on, jboolean gzip_compression_on, jboolean brotli_decompression_on,
+    jboolean brotli_compression_on, jboolean socket_tagging_on, jboolean happy_eyeballs_on,
     jboolean interface_binding_on, jint h2_connection_keepalive_idle_interval_milliseconds,
     jint h2_connection_keepalive_timeout_seconds, jint max_connections_per_host,
     jint stats_flush_seconds, jint stream_idle_timeout_seconds, jint per_try_idle_timeout_seconds,
@@ -1234,8 +1235,14 @@ extern "C" JNIEXPORT jstring JNICALL Java_io_envoyproxy_envoymobile_engine_JniLi
   builder.setStreamIdleTimeoutSeconds((stream_idle_timeout_seconds));
   builder.setPerTryIdleTimeoutSeconds((per_try_idle_timeout_seconds));
   builder.enableAdminInterface(admin_interface_enabled == JNI_TRUE);
-  builder.enableGzip(gzip_on == JNI_TRUE);
-  builder.enableBrotli(brotli_on == JNI_TRUE);
+  builder.enableGzipDecompression(gzip_decompression_on == JNI_TRUE);
+#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
+  builder.enableGzipCompression(gzip_compression_on == JNI_TRUE);
+#endif
+  builder.enableBrotliDecompression(brotli_decompression_on == JNI_TRUE);
+#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
+  builder.enableBrotliCompression(brotli_compression_on == JNI_TRUE);
+#endif
   builder.enableSocketTagging(socket_tagging_on == JNI_TRUE);
   builder.enableHappyEyeballs(happy_eyeballs_on == JNI_TRUE);
   builder.enableHttp3(http3_on == JNI_TRUE);

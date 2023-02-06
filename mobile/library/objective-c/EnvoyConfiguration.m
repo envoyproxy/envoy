@@ -130,7 +130,8 @@
     NSString *insert = [[NSString alloc] initWithUTF8String:gzip_compressor_config_insert];
     [customFilters appendString:insert];
 #else
-    NSLog(@"[Envoy] error: request compression functionality was not compiled in this build of Envoy Mobile");
+    NSLog(@"[Envoy] error: request compression functionality was not compiled in this build of "
+          @"Envoy Mobile");
     return nil;
 #endif
   }
@@ -145,7 +146,8 @@
     NSString *insert = [[NSString alloc] initWithUTF8String:brotli_compressor_config_insert];
     [customFilters appendString:insert];
 #else
-    NSLog(@"[Envoy] error: request compression functionality was not compiled in this build of Envoy Mobile");
+    NSLog(@"[Envoy] error: request compression functionality was not compiled in this build of "
+          @"Envoy Mobile");
     return nil;
 #endif
   }

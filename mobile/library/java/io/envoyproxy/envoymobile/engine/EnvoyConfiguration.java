@@ -356,13 +356,14 @@ public class EnvoyConfiguration {
             resolvedConfiguration, grpcStatsDomain, adminInterfaceEnabled, connectTimeoutSeconds,
             dnsRefreshSeconds, dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax,
             dnsQueryTimeoutSeconds, dnsMinRefreshSeconds, dns_preresolve, enableDNSCache,
-            dnsCacheSaveIntervalSeconds, enableDrainPostDnsRefresh, enableHttp3, enableGzip,
-            enableBrotli, enableSocketTagging, enableHappyEyeballs, enableInterfaceBinding,
-            h2ConnectionKeepaliveIdleIntervalMilliseconds, h2ConnectionKeepaliveTimeoutSeconds,
-            maxConnectionsPerHost, statsFlushSeconds, streamIdleTimeoutSeconds,
-            perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, clusters,
-            filter_chain, stats_sinks, enablePlatformCertificatesValidation,
-            enableSkipDNSLookupForProxiedRequests);
+            dnsCacheSaveIntervalSeconds, enableDrainPostDnsRefresh, enableHttp3,
+            enableGzipDecompression, enableGzipCompression, enableBrotliDecompression,
+            enableBrotliCompression, enableSocketTagging, enableHappyEyeballs,
+            enableInterfaceBinding, h2ConnectionKeepaliveIdleIntervalMilliseconds,
+            h2ConnectionKeepaliveTimeoutSeconds, maxConnectionsPerHost, statsFlushSeconds,
+            streamIdleTimeoutSeconds, perTryIdleTimeoutSeconds, appVersion, appId,
+            enforceTrustChainVerification, clusters, filter_chain, stats_sinks,
+            enablePlatformCertificatesValidation, enableSkipDNSLookupForProxiedRequests);
         break;
       }
     }
