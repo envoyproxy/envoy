@@ -8,6 +8,7 @@
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -187,6 +188,41 @@ TEST_F(StatsIsolatedStoreImplTest, AllWithSymbolTable) {
   EXPECT_EQ(4UL, store_->counters().size());
   EXPECT_EQ(2UL, store_->gauges().size());
   EXPECT_EQ(2UL, store_->textReadouts().size());
+}
+
+TEST_F(StatsIsolatedStoreImplTest, CounterWithTag) {
+  StatNameTagVector tags{{makeStatName("tag1"), makeStatName("tag1Value")}};
+  Counter& c1 = scope_->counterFromStatNameWithTags(makeStatName("c1"), tags);
+  EXPECT_EQ("c1.tag1.tag1Value", c1.name());
+  EXPECT_EQ("c1", c1.tagExtractedName());
+  EXPECT_THAT(c1.tags(), testing::ElementsAre(Tag{"tag1", "tag1Value"}));
+}
+
+TEST_F(StatsIsolatedStoreImplTest, GaugeWithTags) {
+  StatNameTagVector tags{{makeStatName("tag1"), makeStatName("tag1Value")},
+                         {makeStatName("tag2"), makeStatName("tag2Value")}};
+  Gauge& g1 =
+      scope_->gaugeFromStatNameWithTags(makeStatName("g1"), tags, Gauge::ImportMode::Accumulate);
+  EXPECT_EQ("g1.tag1.tag1Value.tag2.tag2Value", g1.name());
+  EXPECT_EQ("g1", g1.tagExtractedName());
+  EXPECT_THAT(g1.tags(), testing::ElementsAre(Tag{"tag1", "tag1Value"}, Tag{"tag2", "tag2Value"}));
+}
+
+TEST_F(StatsIsolatedStoreImplTest, TextReadoutWithTag) {
+  StatNameTagVector tags{{makeStatName("tag1"), makeStatName("tag1Value")}};
+  TextReadout& b1 = scope_->textReadoutFromStatNameWithTags(makeStatName("b1"), tags);
+  EXPECT_EQ("b1.tag1.tag1Value", b1.name());
+  EXPECT_EQ("b1", b1.tagExtractedName());
+  EXPECT_THAT(b1.tags(), testing::ElementsAre(Tag{"tag1", "tag1Value"}));
+}
+
+TEST_F(StatsIsolatedStoreImplTest, HistogramWithTag) {
+  StatNameTagVector tags{{makeStatName("tag1"), makeStatName("tag1Value")}};
+  Histogram& h1 = scope_->histogramFromStatNameWithTags(makeStatName("h1"), tags,
+                                                        Stats::Histogram::Unit::Unspecified);
+  EXPECT_EQ("h1.tag1.tag1Value", h1.name());
+  EXPECT_EQ("h1", h1.tagExtractedName());
+  EXPECT_THAT(h1.tags(), testing::ElementsAre(Tag{"tag1", "tag1Value"}));
 }
 
 TEST_F(StatsIsolatedStoreImplTest, ConstSymtabAccessor) {
