@@ -4096,4 +4096,73 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidResponseHeaderName) {
 }
 #endif
 
+TEST_P(DownstreamProtocolIntegrationTest, DuplicatedSchemeHeaders) {
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
+    // send_fully_qualified_url_ is not enabled, so :scheme header isn't used.
+    return;
+  }
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Start the request.
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {":scheme", "http"}});
+  ASSERT_TRUE(response->waitForReset());
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("invalid"));
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, DuplicatedMethodHeaders) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Start the request.
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {":method", "POST"}});
+  ASSERT_TRUE(response->waitForReset());
+  EXPECT_THAT(
+      waitForAccessLog(access_log_name_),
+      HasSubstr(downstreamProtocol() == Http::CodecType::HTTP1 ? "codec_error" : "invalid"));
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, MethodHeaderWithWhitespace) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Start the request.
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET /admin"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}});
+  ASSERT_TRUE(response->waitForReset());
+  EXPECT_THAT(
+      waitForAccessLog(access_log_name_),
+      HasSubstr(downstreamProtocol() == Http::CodecType::HTTP1 ? "codec_error" : "invalid"));
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, EmptyMethodHeader) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Start the request.
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", ""}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}});
+  ASSERT_TRUE(response->waitForReset());
+  EXPECT_THAT(
+      waitForAccessLog(access_log_name_),
+      HasSubstr(downstreamProtocol() == Http::CodecType::HTTP1 ? "codec_error" : "invalid"));
+}
+
 } // namespace Envoy
