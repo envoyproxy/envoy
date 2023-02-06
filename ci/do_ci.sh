@@ -190,6 +190,7 @@ function run_ci_verify () {
   sudo apt-get update -y
   sudo apt-get install -y -qq --no-install-recommends expect redis-tools
   export DOCKER_NO_PULL=1
+  export DOCKER_RMI_CLEANUP=1
   umask 027
   chmod -R o-rwx examples/
   "${ENVOY_SRCDIR}"/ci/verify_examples.sh "${@}" || exit
