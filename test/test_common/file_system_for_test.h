@@ -14,7 +14,7 @@ struct MemFileInfo;
 
 class MemfileInstanceImpl : public Instance {
 public:
-  MemfileInstanceImpl(TimeSource& time_source);
+  MemfileInstanceImpl();
 
   FilePtr createFile(const FilePathAndType& file_info) override;
 
@@ -59,7 +59,6 @@ private:
   absl::Mutex lock_;
   bool use_memfiles_ ABSL_GUARDED_BY(lock_);
   absl::flat_hash_map<std::string, std::shared_ptr<MemFileInfo>> files_ ABSL_GUARDED_BY(lock_);
-  TimeSource& time_source_;
 };
 
 MemfileInstanceImpl& fileSystemForTest();

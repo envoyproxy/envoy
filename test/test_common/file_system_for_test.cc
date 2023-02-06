@@ -121,12 +121,11 @@ Api::IoCallResult<FileInfo> MemfileInstanceImpl::stat(absl::string_view path) {
   return file_system_->stat(path);
 }
 
-MemfileInstanceImpl::MemfileInstanceImpl(TimeSource& time_source)
-    : file_system_{new InstanceImpl()}, use_memfiles_(false), time_source_(time_source) {}
+MemfileInstanceImpl::MemfileInstanceImpl()
+    : file_system_{new InstanceImpl()}, use_memfiles_(false) {}
 
 MemfileInstanceImpl& fileSystemForTest() {
-  static Event::GlobalTimeSystem sim_time;
-  static MemfileInstanceImpl* file_system = new MemfileInstanceImpl(sim_time);
+  static MemfileInstanceImpl* file_system = new MemfileInstanceImpl();
   return *file_system;
 }
 
@@ -136,18 +135,19 @@ FilePtr MemfileInstanceImpl::createFile(const FilePathAndType& file_info) {
   if (!use_memfiles_) {
     return file_system_->createFile(file_info);
   }
+  Event::GlobalTimeSystem time_source;
   if (file_info.file_type_ == DestinationType::TmpFile) {
     // tmp files ideally should have no filename, so we create an info
     // without adding it to files_.
     return std::make_unique<MemfileImpl>(file_info,
-                                         std::make_shared<MemFileInfo>(time_source_.systemTime()));
+                                         std::make_shared<MemFileInfo>(time_source.systemTime()));
   }
   if (file_system_->fileExists(path)) {
     return file_system_->createFile(file_info);
   }
   std::shared_ptr<MemFileInfo>& info = files_[path];
   if (info == nullptr) {
-    info = std::make_shared<MemFileInfo>(time_source_.systemTime());
+    info = std::make_shared<MemFileInfo>(time_source.systemTime());
   }
   return std::make_unique<MemfileImpl>(file_info, info);
 }
