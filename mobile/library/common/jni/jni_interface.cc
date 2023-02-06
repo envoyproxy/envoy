@@ -1188,9 +1188,9 @@ extern "C" JNIEXPORT jstring JNICALL Java_io_envoyproxy_envoymobile_engine_JniLi
     jint connect_timeout_seconds, jint dns_refresh_seconds, jint dns_failure_refresh_seconds_base,
     jint dns_failure_refresh_seconds_max, jint dns_query_timeout_seconds,
     jint dns_min_refresh_seconds, jobjectArray dns_preresolve_hostnames, jboolean enable_dns_cache,
-    jboolean drain_post_dns_refresh_on, jboolean http3_on, jboolean gzip_on, jboolean brotli_on,
-    jboolean socket_tagging_on, jboolean happy_eyeballs_on, jboolean interface_binding_on,
-    jint h2_connection_keepalive_idle_interval_milliseconds,
+    jint dns_cache_drain_interval_seconds, jboolean drain_post_dns_refresh_on, jboolean http3_on,
+    jboolean gzip_on, jboolean brotli_on, jboolean socket_tagging_on, jboolean happy_eyeballs_on,
+    jboolean interface_binding_on, jint h2_connection_keepalive_idle_interval_milliseconds,
     jint h2_connection_keepalive_timeout_seconds, jint max_connections_per_host,
     jint stats_flush_seconds, jint stream_idle_timeout_seconds, jint per_try_idle_timeout_seconds,
     jstring app_version, jstring app_id, jboolean enforce_trust_chain_verification,
@@ -1206,7 +1206,7 @@ extern "C" JNIEXPORT jstring JNICALL Java_io_envoyproxy_envoymobile_engine_JniLi
                                       (dns_failure_refresh_seconds_max));
   builder.addDnsQueryTimeoutSeconds((dns_query_timeout_seconds));
   builder.addDnsMinRefreshSeconds((dns_min_refresh_seconds));
-  builder.enableDnsCache(enable_dns_cache == JNI_TRUE);
+  builder.enableDnsCache(enable_dns_cache == JNI_TRUE, dns_cache_drain_interval_seconds);
   builder.addMaxConnectionsPerHost((max_connections_per_host));
   builder.addH2ConnectionKeepaliveIdleIntervalMilliseconds(
       (h2_connection_keepalive_idle_interval_milliseconds));

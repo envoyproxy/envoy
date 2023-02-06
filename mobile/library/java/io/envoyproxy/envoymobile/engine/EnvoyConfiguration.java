@@ -39,6 +39,7 @@ public class EnvoyConfiguration {
   public final Integer dnsMinRefreshSeconds;
   public final List<String> dnsPreresolveHostnames;
   public final Boolean enableDNSCache;
+  public final Integer dnsCacheSaveIntervalSeconds;
   public final Boolean enableDrainPostDnsRefresh;
   public final Boolean enableHttp3;
   public final Boolean enableGzip;
@@ -87,6 +88,8 @@ public class EnvoyConfiguration {
    * @param dnsPreresolveHostnames                        hostnames to preresolve on Envoy Client
    *     construction.
    * @param enableDNSCache                                whether to enable DNS cache.
+   * @param dnsCacheSaveIntervalSeconds                   the interval at which to save results to
+   *     the configured key value store.
    * @param enableDrainPostDnsRefresh                     whether to drain connections after soft
    *     DNS refresh.
    * @param enableHttp3                                   whether to enable experimental support for
@@ -125,8 +128,8 @@ public class EnvoyConfiguration {
       boolean adminInterfaceEnabled, String grpcStatsDomain, int connectTimeoutSeconds,
       int dnsRefreshSeconds, int dnsFailureRefreshSecondsBase, int dnsFailureRefreshSecondsMax,
       int dnsQueryTimeoutSeconds, int dnsMinRefreshSeconds, List<String> dnsPreresolveHostnames,
-      boolean enableDNSCache, boolean enableDrainPostDnsRefresh, boolean enableHttp3,
-      boolean enableGzip, boolean enableBrotli, boolean enableSocketTagging,
+      boolean enableDNSCache, int dnsCacheSaveIntervalSeconds, boolean enableDrainPostDnsRefresh,
+      boolean enableHttp3, boolean enableGzip, boolean enableBrotli, boolean enableSocketTagging,
       boolean enableHappyEyeballs, boolean enableInterfaceBinding,
       int h2ConnectionKeepaliveIdleIntervalMilliseconds, int h2ConnectionKeepaliveTimeoutSeconds,
       int maxConnectionsPerHost, int statsFlushSeconds, int streamIdleTimeoutSeconds,
@@ -148,6 +151,7 @@ public class EnvoyConfiguration {
     this.dnsMinRefreshSeconds = dnsMinRefreshSeconds;
     this.dnsPreresolveHostnames = dnsPreresolveHostnames;
     this.enableDNSCache = enableDNSCache;
+    this.dnsCacheSaveIntervalSeconds = dnsCacheSaveIntervalSeconds;
     this.enableDrainPostDnsRefresh = enableDrainPostDnsRefresh;
     this.enableHttp3 = enableHttp3;
     this.enableGzip = enableGzip;
@@ -272,6 +276,8 @@ public class EnvoyConfiguration {
         .append("\n");
 
     if (enableDNSCache) {
+      configBuilder.append(
+          String.format("- &persistent_dns_cache_save_interval %s\n", dnsCacheSaveIntervalSeconds));
       final String persistentDNSCacheConfigInsert = JniLibrary.persistentDNSCacheConfigInsert();
       configBuilder.append(
           String.format("- &persistent_dns_cache_config %s\n", persistentDNSCacheConfigInsert));
@@ -329,8 +335,8 @@ public class EnvoyConfiguration {
             resolvedConfiguration, grpcStatsDomain, adminInterfaceEnabled, connectTimeoutSeconds,
             dnsRefreshSeconds, dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax,
             dnsQueryTimeoutSeconds, dnsMinRefreshSeconds, dns_preresolve, enableDNSCache,
-            enableDrainPostDnsRefresh, enableHttp3, enableGzip, enableBrotli, enableSocketTagging,
-            enableHappyEyeballs, enableInterfaceBinding,
+            dnsCacheSaveIntervalSeconds, enableDrainPostDnsRefresh, enableHttp3, enableGzip,
+            enableBrotli, enableSocketTagging, enableHappyEyeballs, enableInterfaceBinding,
             h2ConnectionKeepaliveIdleIntervalMilliseconds, h2ConnectionKeepaliveTimeoutSeconds,
             maxConnectionsPerHost, statsFlushSeconds, streamIdleTimeoutSeconds,
             perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, clusters,

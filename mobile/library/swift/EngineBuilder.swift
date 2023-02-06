@@ -24,6 +24,7 @@ open class EngineBuilder: NSObject {
   private var dnsPreresolveHostnames: String = "[]"
   private var dnsRefreshSeconds: UInt32 = 60
   private var enableDNSCache: Bool = false
+  private var dnsCacheSaveIntervalSeconds: UInt32 = 1
   private var enableHappyEyeballs: Bool = true
   private var enableGzip: Bool = true
   private var enableBrotli: Bool = false
@@ -180,11 +181,14 @@ open class EngineBuilder: NSObject {
   /// 'reserved.platform_store'.
   ///
   /// - parameter enableDNSCache: whether to enable DNS cache. Disabled by default.
+  /// - parameter saveInterval:   the interval at which to save results to the configured
+  ///                             key value store.
   ///
   /// - returns: This builder.
   @discardableResult
-  public func enableDNSCache(_ enableDNSCache: Bool) -> Self {
+  public func enableDNSCache(_ enableDNSCache: Bool, saveInterval: UInt32 = 1) -> Self {
     self.enableDNSCache = enableDNSCache
+    self.dnsCacheSaveIntervalSeconds = saveInterval
     return self
   }
 
@@ -546,6 +550,7 @@ open class EngineBuilder: NSObject {
       dnsMinRefreshSeconds: self.dnsMinRefreshSeconds,
       dnsPreresolveHostnames: self.dnsPreresolveHostnames,
       enableDNSCache: self.enableDNSCache,
+      dnsCacheSaveIntervalSeconds: self.dnsCacheSaveIntervalSeconds,
       enableHappyEyeballs: self.enableHappyEyeballs,
       enableHttp3: self.enableHttp3,
       enableGzip: self.enableGzip,
