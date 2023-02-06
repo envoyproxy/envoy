@@ -13,6 +13,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile-brotli
+    depends_on:
+      service:
+        condition: service_healthy
     ports:
     - "${PORT_PROXY:-10000}:10000"
     - "${PORT_STATS0:-9901}:9901"
