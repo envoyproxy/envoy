@@ -28,13 +28,13 @@ public:
 
 // Contextual information used to construct the onMatch actions for a match tree.
 // Currently it is empty struct.
-struct RateLimitOnMactchActionContext {};
+struct RateLimitOnMatchActionContext {};
 
 // This class implements the on_match action behavior.
-class RateLimitOnMactchAction : public Matcher::ActionBase<BucketId>,
-                                public Logger::Loggable<Logger::Id::filter> {
+class RateLimitOnMatchAction : public Matcher::ActionBase<BucketId>,
+                               public Logger::Loggable<Logger::Id::filter> {
 public:
-  explicit RateLimitOnMactchAction(RateLimitQuotaBucketSettings settings)
+  explicit RateLimitOnMatchAction(RateLimitQuotaBucketSettings settings)
       : setting_(std::move(settings)) {}
 
   absl::StatusOr<BucketId> generateBucketId(const Http::Matching::HttpMatchingDataImpl& data,
@@ -46,13 +46,12 @@ private:
   RateLimitQuotaBucketSettings setting_;
 };
 
-class RateLimitOnMactchActionFactory
-    : public Matcher::ActionFactory<RateLimitOnMactchActionContext> {
+class RateLimitOnMatchActionFactory : public Matcher::ActionFactory<RateLimitOnMatchActionContext> {
 public:
   std::string name() const override { return "rate_limit_quota"; }
 
   Matcher::ActionFactoryCb
-  createActionFactoryCb(const Protobuf::Message& config, RateLimitOnMactchActionContext&,
+  createActionFactoryCb(const Protobuf::Message& config, RateLimitOnMatchActionContext&,
                         ProtobufMessage::ValidationVisitor& validation_visitor) override {
     // Validate and then retrieve the bucket settings from config.
     const auto bucket_settings =
@@ -60,7 +59,7 @@ public:
                                              v3::RateLimitQuotaBucketSettings&>(config,
                                                                                 validation_visitor);
     return [bucket_settings = std::move(bucket_settings)]() {
-      return std::make_unique<RateLimitOnMactchAction>(std::move(bucket_settings));
+      return std::make_unique<RateLimitOnMatchAction>(std::move(bucket_settings));
     };
   }
 

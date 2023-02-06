@@ -16,6 +16,11 @@ services:
     ports:
     - "${PORT_PROXY0:-80}-${PORT_PROXY0:-81}:80"
     - "${PORT_ADMIN:-8081}:8081"
+    depends_on:
+      http_service:
+        condition: service_healthy
+      lrs_server:
+        condition: service_started
 
   http_service:
     build:
