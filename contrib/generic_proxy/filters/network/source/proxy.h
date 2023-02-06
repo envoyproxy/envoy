@@ -46,21 +46,15 @@ struct NamedFilterFactoryCb {
 
 class FilterConfigImpl : public FilterConfig {
 public:
-  FilterConfigImpl(const ProxyConfig& config, const std::string& stat_prefix, CodecFactoryPtr codec,
+  FilterConfigImpl(const std::string& stat_prefix, CodecFactoryPtr codec,
                    Rds::RouteConfigProviderSharedPtr route_config_provider,
-                   std::vector<NamedFilterFactoryCb> factories,
-                   Tracing::TracerManager& tracer_manager,
+                   std::vector<NamedFilterFactoryCb> factories, Tracing::TracerSharedPtr tracer,
+                   Tracing::ConnectionManagerTracingConfigPtr tracing_config,
                    Envoy::Server::Configuration::FactoryContext& context)
       : stat_prefix_(stat_prefix), codec_factory_(std::move(codec)),
         route_config_provider_(std::move(route_config_provider)), factories_(std::move(factories)),
-        drain_decision_(context.drainDecision()) {
-    if (config.has_tracing()) {
-      tracer_ = tracer_manager.getOrCreateTracer(
-          config.tracing().has_provider() ? &config.tracing().provider() : nullptr);
-      tracing_config_ = std::make_unique<Tracing::ConnectionManagerTracingConfigImpl>(
-          context.direction(), config.tracing());
-    }
-  }
+        drain_decision_(context.drainDecision()), tracer_(std::move(tracer)),
+        tracing_config_(std::move(tracing_config)) {}
 
   // FilterConfig
   RouteEntryConstSharedPtr routeEntry(const Request& request) const override {
@@ -97,7 +91,7 @@ private:
 
   const Network::DrainDecision& drain_decision_;
 
-  Tracing::TracerSharedPtr tracer_{std::make_shared<Tracing::NullTracer>()};
+  Tracing::TracerSharedPtr tracer_;
   Tracing::ConnectionManagerTracingConfigPtr tracing_config_;
 };
 

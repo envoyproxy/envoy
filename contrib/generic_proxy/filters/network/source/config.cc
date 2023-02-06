@@ -96,11 +96,21 @@ Factory::createFilterFactoryFromProtoTyped(const ProxyConfig& proto_config,
   auto factories = factoriesFromProto(proto_config.codec_config(), context);
   std::shared_ptr<ProxyFactory> custom_proxy_factory = std::move(factories.second);
 
+  Tracing::TracerSharedPtr tracer;
+  Tracing::ConnectionManagerTracingConfigPtr tracing_config;
+  if (proto_config.has_tracing()) {
+    if (proto_config.tracing().has_provider()) {
+      tracer = tracer_manager->getOrCreateTracer(&proto_config.tracing().provider());
+    }
+    tracing_config = std::make_unique<Tracing::ConnectionManagerTracingConfigImpl>(
+        context.direction(), proto_config.tracing());
+  }
+
   const FilterConfigSharedPtr config = std::make_shared<FilterConfigImpl>(
-      proto_config, proto_config.stat_prefix(), std::move(factories.first),
+      proto_config.stat_prefix(), std::move(factories.first),
       routeConfigProviderFromProto(proto_config, context, *route_config_provider_manager),
       filtersFactoryFromProto(proto_config.filters(), proto_config.stat_prefix(), context),
-      *tracer_manager, context);
+      std::move(tracer), std::move(tracing_config), context);
 
   return [route_config_provider_manager, tracer_manager, config, &context,
           custom_proxy_factory](Envoy::Network::FilterManager& filter_manager) -> void {
