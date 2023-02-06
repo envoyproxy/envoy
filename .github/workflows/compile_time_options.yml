@@ -34,6 +34,7 @@ jobs:
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-linux") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             --define=admin_html=enabled \
+            --define=envoy_mobile_request_compression=disabled \
             --@envoy//bazel:http3=False \
             //library/cc/...
   swift_build:
@@ -60,6 +61,7 @@ jobs:
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             --define=admin_html=enabled \
+            --define=envoy_mobile_request_compression=disabled \
             --@envoy//bazel:http3=False \
             //library/swift:ios_framework
   kotlin_build:
@@ -92,5 +94,6 @@ jobs:
           --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
           --fat_apk_cpu=x86_64 \
           --define=admin_html=enabled \
+          --define=envoy_mobile_request_compression=disabled \
           --@envoy//bazel:http3=False \
           //:android_dist
