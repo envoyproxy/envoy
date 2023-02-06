@@ -105,14 +105,13 @@ Specify the interval at which Envoy should timeout a DNS query.
 
   This API is non-ideal as it exposes lower-level internals of Envoy than desired by this
   project.
+  :issue:`#1581 <1581>` tracks enhancing this API.
 
 Add a list of hostnames to preresolve on Engine startup.
-For Swift, the configuration is expected as a JSON list.
-:issue:`#1581 <1581>` tracks enhancing this API.
-For Kotlin, the configuration is expected as a list of hostnames
+The configuration is expected as a JSON list.
 
   // Kotlin
-  builder.addDNSPreresolveHostnames("{"lyft.com", "google.com"}")
+  builder.addDNSPreresolveHostnames("[{\"address\": \"foo.com", \"port_value\": 443}]")
 
   // Swift
   builder.addDNSPreresolveHostnames("[{\"address\": \"foo.com", \"port_value\": 443}]")
@@ -249,10 +248,10 @@ This functionality is used for stat segmentation.
 **Example**::
 
   // Kotlin
-  builder.addVirtualCluster("{\"name\":\"vcluster\",\"headers\":[{\"name\":\":path\",\"exact_match\":\"/v1/vcluster\"}]}")
+  builder.addVirtualClusters("[{\"name\":\"vcluster\",\"headers\":[{\"name\":\":path\",\"exact_match\":\"/v1/vcluster\"}]}]")
 
   // Swift
-  builder.addVirtualCluster("{\"name\":\"vcluster\",\"headers\":[{\"name\":\":path\",\"exact_match\":\"/v1/vcluster\"}]}")
+  builder.addVirtualClusters("[{\"name\":\"vcluster\",\"headers\":[{\"name\":\":path\",\"exact_match\":\"/v1/vcluster\"}]}]")
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 ``enableAdminInterface``

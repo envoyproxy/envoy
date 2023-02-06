@@ -56,7 +56,6 @@ cc_library(
     deps = [
         ":android_network_utility_lib",
         ":jni_utility_lib",
-        "//library/cc:engine_builder_lib",
         "//library/common:envoy_main_interface_lib",
         "//library/common/api:c_types",
         "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
