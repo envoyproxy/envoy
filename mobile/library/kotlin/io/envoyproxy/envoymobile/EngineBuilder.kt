@@ -1,4 +1,4 @@
- package io.envoyproxy.envoymobile
+package io.envoyproxy.envoymobile
 
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification
@@ -57,9 +57,9 @@ open class EngineBuilder(
   private var enableHttp3 = true
   private var enableHappyEyeballs = true
   private var enableGzipDecompression = true
-  private var enableGzipCompression = false
+  internal var enableGzipCompression = false
   private var enableBrotliDecompression = false
-  private var enableBrotliCompression = false
+  internal var enableBrotliCompression = false
   private var enableSocketTagging = false
   private var enableInterfaceBinding = false
   private var h2ConnectionKeepaliveIdleIntervalMilliseconds = 1
@@ -268,18 +268,6 @@ open class EngineBuilder(
   }
 
   /**
-   * Specify whether to do gzip request compression or not.  Defaults to false.
-   *
-   * @param enableGzipCompression whether or not to gunzip requests.
-   *
-   * @return This builder.
-   */
-  fun enableGzipCompression(enableGzipCompression: Boolean): EngineBuilder {
-    this.enableGzipCompression = enableGzipCompression
-    return this
-  }
-
-  /**
    * Specify whether to do brotli response decompression or not.  Defaults to false.
    *
    * @param enableBrotliDecompression whether or not to brotli decompress responses.
@@ -288,18 +276,6 @@ open class EngineBuilder(
    */
   fun enableBrotliDecompression(enableBrotliDecompression: Boolean): EngineBuilder {
     this.enableBrotliDecompression = enableBrotliDecompression
-    return this
-  }
-
-  /**
-   * Specify whether to do brotli request compression or not.  Defaults to false.
-   *
-   * @param enableBrotliCompression whether or not to brotli compress requests.
-   *
-   * @return This builder.
-   */
-  fun enableBrotliCompression(enableBrotliCompression: Boolean): EngineBuilder {
-    this.enableBrotliCompression = enableBrotliCompression
     return this
   }
 

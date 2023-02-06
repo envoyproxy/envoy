@@ -217,6 +217,7 @@ open class EngineBuilder: NSObject {
     return self
   }
 
+#if ENVOY_MOBILE_REQUEST_COMPRESSION
   /// Specify whether to do gzip request compression or not.  Defaults to false.
   ///
   /// - parameter enableGzipCompression: whether or not to gunzip requests.
@@ -227,6 +228,7 @@ open class EngineBuilder: NSObject {
     self.enableGzipCompression = enableGzipCompression
     return self
   }
+#endif
 
   /// Specify whether to do brotli response decompression or not.  Defaults to false.
   ///
@@ -239,6 +241,7 @@ open class EngineBuilder: NSObject {
     return self
   }
 
+#if ENVOY_MOBILE_REQUEST_COMPRESSION
   /// Specify whether to do brotli request compression or not.  Defaults to false.
   ///
   /// - parameter enableBrotliCompression: whether or not to brotli compress requests.
@@ -249,6 +252,7 @@ open class EngineBuilder: NSObject {
     self.enableBrotliCompression = enableBrotliCompression
     return self
   }
+#endif
 
   /// Specify whether to enable support for HTTP/3 or not.  Defaults to true.
   ///
