@@ -1029,8 +1029,16 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
     return;
   }
 
-  // Verify header sanity checks which should have been performed by the codec.
-  ASSERT(HeaderUtility::requestHeadersValid(*request_headers_).has_value() == false);
+  // Apply header sanity checks.
+  absl::optional<std::reference_wrapper<const absl::string_view>> error =
+      HeaderUtility::requestHeadersValid(*request_headers_);
+  if (error != absl::nullopt) {
+    sendLocalReply(Code::BadRequest, "", nullptr, absl::nullopt, error.value().get());
+    if (!response_encoder_->streamErrorOnInvalidHttpMessage()) {
+      connection_manager_.handleCodecError(error.value().get());
+    }
+    return;
+  }
 
   // Check for the existence of the :path header for non-CONNECT requests, or present-but-empty
   // :path header for CONNECT requests. We expect the codec to have broken the path into pieces if
