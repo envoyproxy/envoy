@@ -61,7 +61,7 @@ cleanup_stack () {
 }
 
 cleanup () {
-    local path paths
+    local path paths image rmi
     read -ra paths <<< "$(echo "$PATHS" | tr ',' ' ')"
     for path in "${paths[@]}"; do
         pushd "$path" > /dev/null || return 1
@@ -71,6 +71,16 @@ cleanup () {
         }
         popd > /dev/null
     done
+
+    read -ra rmi <<< "$(echo "$RMI" | tr ',' ' ')"
+
+    if [[ -n "$DOCKER_RMI_CLEANUP" ]]; then
+        for image in "${rmi[@]}"; do
+            docker rmi -f "$image"
+        done
+        docker image prune -f
+    fi
+
 }
 
 _curl () {
