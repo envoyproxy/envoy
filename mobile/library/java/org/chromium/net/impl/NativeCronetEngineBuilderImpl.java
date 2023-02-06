@@ -41,7 +41,7 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
   private int mDnsFailureRefreshSecondsMax = 10;
   private int mDnsQueryTimeoutSeconds = 25;
   private int mDnsMinRefreshSeconds = 60;
-  private String mDnsPreresolveHostnames = "[]";
+  private List<String> mDnsPreresolveHostnames = Collections.emptyList();
   private boolean mEnableDNSCache = false;
   private int mDnsCacheSaveIntervalSeconds = 1;
   private List<String> mDnsFallbackNameservers = Collections.emptyList();
@@ -63,7 +63,8 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
   private String mAppVersion = "unspecified";
   private String mAppId = "unspecified";
   private TrustChainVerification mTrustChainVerification = VERIFY_TRUST_CHAIN;
-  private String mVirtualClusters = "[]";
+  private List<String> mVirtualClusters = Collections.emptyList();
+  ;
   private boolean mEnablePlatformCertificatesValidation = true;
 
   /**
