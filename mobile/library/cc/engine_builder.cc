@@ -959,6 +959,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     cds_config->mutable_initial_fetch_timeout()->set_seconds(cds_timeout_seconds_);
     cds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
     cds_config->mutable_ads();
+    bootstrap->add_node_context_params("cluster");
   }
 
   // Admin

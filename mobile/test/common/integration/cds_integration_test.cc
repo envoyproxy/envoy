@@ -23,7 +23,7 @@ public:
                                          sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedSotw
                                      ? "GRPC"
                                      : "DELTA_GRPC";
-    builder_.addCdsLayer(1);
+    builder_.addCdsLayer(/*timeout_seconds=*/1);
     builder_.setAggregatedDiscoveryService(api_type,
                                            Network::Test::getLoopbackAddressUrlString(ipVersion()),
                                            fake_upstreams_[1]->localAddress()->ip()->port());
@@ -41,7 +41,7 @@ TEST_P(CdsIntegrationTest, Basic) {
       ClusterName, fake_upstreams_[0]->localAddress()->ip()->port(),
       Network::Test::getLoopbackAddressString(ipVersion()), "ROUND_ROBIN");
   initializeXdsStream();
-  auto cluster_count = getGaugeValue("cluster_manager.active_clusters");
+  int cluster_count = getGaugeValue("cluster_manager.active_clusters");
   // Do the initial compareDiscoveryRequest / sendDiscoveryResponse for cluster_1.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,

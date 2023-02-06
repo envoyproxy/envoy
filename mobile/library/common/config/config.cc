@@ -515,6 +515,8 @@ stats_config:
             regex: '^vhost\.[\w]+\.vcluster\.[\w]+?\.upstream_rq_(?:[12345]xx|[3-5][0-9][0-9]|retry|total)'
   use_all_default_tags:
     false
+node_context_params:
+  - cluster
 watchdogs:
   main_thread_watchdog:
     megamiss_timeout: 60s
