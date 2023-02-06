@@ -192,6 +192,16 @@ class FileSystemHttpCacheTest : public FileSystemCacheTestContext, public ::test
   void SetUp() override { initCache(); }
 };
 
+TEST_F(FileSystemHttpCacheTest, StatsAreConstructedCorrectly) {
+  Stats::Tag cache_path_tag{"cache_path", cache_path_};
+  // Validate that a gauge has appropriate name and tags.
+  EXPECT_EQ(cache_->stats().size_bytes_.tagExtractedName(), "cache.size_bytes");
+  EXPECT_THAT(cache_->stats().size_bytes_.tags(), ::testing::ElementsAre(cache_path_tag));
+  // Validate that a counter has appropriate name and tags.
+  EXPECT_EQ(cache_->stats().eviction_runs_.tagExtractedName(), "cache.eviction_runs");
+  EXPECT_THAT(cache_->stats().eviction_runs_.tags(), ::testing::ElementsAre(cache_path_tag));
+}
+
 TEST_F(FileSystemHttpCacheTest, TrackFileRemovedClampsAtZero) {
   cache_->trackFileAdded(1);
   EXPECT_EQ(cache_->stats().size_bytes_.value(), 1);
