@@ -415,7 +415,7 @@ std::string EngineBuilder::generateConfigStr() const {
   }
 
   if ((!rtds_layer_name_.empty() || enable_cds_) && ads_api_type_.empty()) {
-    throw std::runtime_error("ADS must be configured when using RTDS");
+    throw std::runtime_error("ADS must be configured when using XDS");
   }
   if (!rtds_layer_name_.empty()) {
     std::string rtds_layer =
@@ -937,7 +937,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 
   bootstrap->mutable_dynamic_resources();
   if ((!rtds_layer_name_.empty() || enable_cds_) && ads_api_type_.empty()) {
-    throw std::runtime_error("ADS must be configured when using RTDS");
+    throw std::runtime_error("ADS must be configured when using XDS");
   }
   if (!rtds_layer_name_.empty()) {
     auto* layered_runtime = bootstrap->mutable_layered_runtime();
