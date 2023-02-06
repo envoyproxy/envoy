@@ -6,7 +6,6 @@ import java.util.ArrayList;
 import java.util.Map;
 import java.util.regex.Pattern;
 import java.util.regex.Matcher;
-import java.util.StringJoiner;
 import java.lang.StringBuilder;
 import javax.annotation.Nullable;
 
@@ -14,7 +13,6 @@ import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory;
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor;
 import io.envoyproxy.envoymobile.engine.types.EnvoyKeyValueStore;
 import io.envoyproxy.envoymobile.engine.JniLibrary;
-import java.util.Collections;
 
 /* Typed configuration that may be used for starting Envoy. */
 public class EnvoyConfiguration {
@@ -232,17 +230,20 @@ public class EnvoyConfiguration {
 
     String processedTemplate =
         configTemplate.replace("#{custom_filters}", customFiltersBuilder.toString());
-    StringJoiner clusterJoiner = new StringJoiner(",");
+    String maybeComma = "";
+    StringBuilder virtualClustersBuilder = new StringBuilder("[");
     for (String cluster : virtualClusters) {
-      clusterJoiner.add(cluster);
+      virtualClustersBuilder.append(cluster);
+      virtualClustersBuilder.append(maybeComma);
+      maybeComma = ",";
     }
-    String virtualClustersStr = "[" + clusterJoiner.toString() + "]";
+    virtualClustersBuilder.append("]");
 
-    StringJoiner dnsJoiner = new StringJoiner(",");
+    StringBuilder dnsBuilder = new StringBuilder("[");
     for (String dns : dnsPreresolveHostnames) {
-      dnsJoiner.add("{address: " + dns + ", port_value: 443}");
+      dnsBuilder.append("{address: " + dns + ", port_value: 443}");
     }
-    String dnsStr = "[" + dnsJoiner.toString() + "]";
+    dnsBuilder.append("]");
 
     StringBuilder configBuilder = new StringBuilder("!ignore platform_defs:\n");
     configBuilder.append(String.format("- &connect_timeout %ss\n", connectTimeoutSeconds))
@@ -250,7 +251,7 @@ public class EnvoyConfiguration {
         .append(String.format("- &dns_fail_max_interval %ss\n", dnsFailureRefreshSecondsMax))
         .append(String.format("- &dns_query_timeout %ss\n", dnsQueryTimeoutSeconds))
         .append(String.format("- &dns_min_refresh_rate %ss\n", dnsMinRefreshSeconds))
-        .append(String.format("- &dns_preresolve_hostnames %s\n", dnsStr))
+        .append(String.format("- &dns_preresolve_hostnames %s\n", dnsBuilder.toString()))
         .append(String.format("- &dns_lookup_family %s\n",
                               enableHappyEyeballs ? "ALL" : "V4_PREFERRED"))
         .append(String.format("- &dns_refresh_rate %ss\n", dnsRefreshSeconds))
@@ -272,7 +273,7 @@ public class EnvoyConfiguration {
         .append(String.format("- &skip_dns_lookup_for_proxied_requests %s\n",
                               enableSkipDNSLookupForProxiedRequests ? "true" : "false"))
         .append("- &virtual_clusters ")
-        .append(virtualClustersStr)
+        .append(virtualClustersBuilder.toString())
         .append("\n");
 
     if (enableDNSCache) {

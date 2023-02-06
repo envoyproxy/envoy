@@ -1112,8 +1112,8 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_registerStringAccessor(JNIEnv* 
   return result;
 }
 
-//  Takes a jstring from Java, converts it to a C++ string, calls the supplied
-//  setter on it.
+// Takes a jstring from Java, converts it to a C++ string, calls the supplied
+// setter on it.
 void setString(JNIEnv* env, jstring java_string, EngineBuilder* builder,
                EngineBuilder& (EngineBuilder::*setter)(std::string)) {
   if (!java_string) {
