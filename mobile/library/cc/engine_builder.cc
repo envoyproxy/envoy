@@ -439,6 +439,12 @@ std::string EngineBuilder::generateConfigStr() const {
     absl::StrReplaceAll(
         {{"#{custom_node_context}", absl::StrCat("#{custom_node_context}\n", custom_node_context)}},
         &config_template);
+
+    std::string custom_stats_patterns = R"(        - exact: cluster_manager.active_clusters
+        - exact: cluster_manager.cluster_added)";
+    absl::StrReplaceAll(
+        {{"#{custom_stats}", absl::StrCat("#{custom_stats}\n", custom_stats_patterns)}},
+        &config_template);
   }
 
   config_builder << config_template;
@@ -875,7 +881,6 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   list->add_patterns()->set_exact("cluster.stats.http2.keepalive_timeout");
   list->add_patterns()->set_prefix("http.hcm.downstream_rq_");
   list->add_patterns()->set_prefix("http.hcm.decompressor.");
-  list->add_patterns()->set_prefix("cluster_manager.");
   list->add_patterns()->set_prefix("pulse.");
   list->add_patterns()->set_prefix("runtime.load_success");
   list->add_patterns()->mutable_safe_regex()->set_regex(
@@ -966,6 +971,9 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     cds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
     cds_config->mutable_ads();
     bootstrap->add_node_context_params("cluster");
+    // add a stat prefix we use in test
+    list->add_patterns()->set_exact("cluster_manager.active_clusters");
+    list->add_patterns()->set_exact("cluster_manager.cluster_added");
   }
 
   // Admin

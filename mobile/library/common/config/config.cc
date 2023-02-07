@@ -508,11 +508,11 @@ stats_config:
         - exact: cluster.stats.http2.keepalive_timeout
         - prefix: http.hcm.downstream_rq_
         - prefix: http.hcm.decompressor.
-        - prefix: cluster_manager.
         - prefix: pulse.
         - prefix: runtime.load_success
         - safe_regex:
             regex: '^vhost\.[\w]+\.vcluster\.[\w]+?\.upstream_rq_(?:[12345]xx|[3-5][0-9][0-9]|retry|total)'
+#{custom_stats}
   use_all_default_tags:
     false
 #{custom_node_context}
