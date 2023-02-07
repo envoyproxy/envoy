@@ -25,7 +25,7 @@ private:
   createFilterFactoryFromProtoTyped(const envoy::extensions::filters::network::echo::v3::Echo&,
                                     Server::Configuration::FactoryContext&) override {
     return [](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addReadFilter(std::make_shared<EchoFilter>());
+      filter_manager.addReadFilter(std::make_shared<Filter>());
     };
   }
 

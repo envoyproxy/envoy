@@ -3,6 +3,8 @@ load(
     "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_extension_package",
+    "envoy_rust_cxx_bridge",
+    "envoy_rust_library",
 )
 
 licenses(["notice"])  # Apache 2
@@ -17,11 +19,14 @@ envoy_cc_library(
     srcs = ["echo.cc"],
     hdrs = ["echo.h"],
     deps = [
+        ":bridge",
+        ":echo_rs",
         "//envoy/buffer:buffer_interface",
         "//envoy/network:connection_interface",
         "//envoy/network:filter_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
+        "@cxx.rs//:core",
     ],
 )
 
@@ -39,5 +44,35 @@ envoy_cc_extension(
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/network/echo/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_rust_library(
+    name = "echo_rs",
+    srcs = ["echo.rs"],
+    deps = [
+        ":bridge",
+        "@cxx.rs//:cxx",
+    ],
+)
+
+envoy_rust_cxx_bridge(
+    name = "bridge",
+    src = "echo.rs",
+    deps = [
+        ":rust_support_lib",
+        "//envoy/network:filter_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "rust_support_lib",
+    srcs = ["rust_support.cc"],
+    hdrs = ["rust_support.h"],
+    deps = [
+        "//envoy/buffer:buffer_interface",
+        "//envoy/network:connection_interface",
+        "//envoy/network:filter_interface",
+        "@cxx.rs//:core",
     ],
 )
