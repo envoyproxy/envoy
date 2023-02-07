@@ -8,8 +8,8 @@ gRPC Service to Service
    .. include:: _include/docker-env-setup-link.rst
 
 This example demonstrates Envoy's support for routing
-`gRPC traffic <https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/route/v3/route_components.proto#config-route-v3-routematch>`__ and integrating
-`gRPC health checks <https://github.com/grpc/grpc/blob/master/doc/health-checking.md>`__
+`gRPC traffic <https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/route/v3/route_components.proto#config-route-v3-routematch>`__
+and integrating `gRPC health checks <https://github.com/grpc/grpc/blob/master/doc/health-checking.md>`__
 with Envoy's active health checking for upstream clusters using
 `GrpcHealthCheck <https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/core/v3/health_check.proto#envoy-v3-api-msg-config-core-v3-healthcheck-grpchealthcheck>`__.
 
@@ -36,7 +36,7 @@ We define a route to match any gRPC request and forward it to the ``hello`` clus
    :lines: 9-25
    :linenos:
    :emphasize-lines: 12-16
-   :caption: Forward all gRPC requests to the ``hello`` cluster:download:`envoy-proxy.yaml <_include/grpc-s2s/hello/envoy-proxy.yaml>`
+   :caption: Forward all gRPC requests to the ``hello`` cluster :download:`envoy-proxy.yaml <_include/grpc-s2s/hello/envoy-proxy.yaml>`
 
 The cluster definition for ``hello`` must specify the ``http2_protocol_options`` to
 be able to accept gRPC traffic:
@@ -48,20 +48,46 @@ be able to accept gRPC traffic:
    :emphasize-lines: 1-3
    :caption: Accept gRPC traffic in the ``hello`` cluster :download:`envoy-proxy.yaml <_include/grpc-s2s/hello/envoy-proxy.yaml>`
 
+We configure the gRPC health check by configuring the ``health_checks`` object in the cluster
+definition:
+
 .. literalinclude:: _include/grpc-s2s/hello/envoy-proxy.yaml
    :language: yaml
-   :lines: 30-38
+   :lines: 30-46
    :linenos:
-   :emphasize-lines: 1-6
-   :caption: Forward all gRPC requests to the ``hello`` cluster:download:`envoy-proxy.yaml <_include/grpc-s2s/hello/envoy-proxy.yaml>`
+   :emphasize-lines: 9-16
+   :caption: Cluster health check configuration configured to check the health of ``Hello`` gRPC service :download:`envoy-proxy.yaml <_include/grpc-s2s/hello/envoy-proxy.yaml>`
 
+``timeout`` specifies the maximum time to wait to recieve a health check response.
+
+``interval`` specifies the interval between health checks.
+
+``no_traffic_inteval`` specifies the interval between health checks when no traffic has been forwarded
+to the cluster. We set this explicitly to a very low value so that the health checks
+are carried out at more frequent intervals when there is no traffic, as in the case of this
+sandbox and helps with the demo.
+
+``unhealthy_threshold`` specifies the number of unhealthy health checks before a host is marked
+unhealthy.
+
+``unhealthy_threshold`` specifies the number of healthy health checks before a host is marked
+healthy.
+
+``grpc_health_check`` specifies that ``service_name`` as we are interested in the health
+of the ``Hello`` gRPC service and **not** the gRPC server.
 
 .. note::
+   A cluster can also specify :ref:`panic_threshold <arch_overview_load_balancing_panic_threshold>`.
 
-   Mention the stuff about specifying the configuration specifically for the sandbox
-   also mention `panic threshold <https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/load_balancing/panic_threshold#arch-overview-load-balancing-panic-threshold>`__
-   and it's impact on the traffic being forwarded
+   It allows configuration of Envoy behavior when the number of unhealthy hosts
+   go beyond a certain threshold.
 
+   For this sandbox, the default threshold of 50% doesn't affect the demo. We will run 2 replicas
+   and we will only have one unhealthy host.
+
+   Thus, envoy will not forward traffic to the unhealthy host which is what we want.
+
+The ``envoy-world`` envoy instance is configured similarly :download:`envoy-proxy.yaml <_include/grpc-s2s/world/envoy-proxy.yaml>`.
 
 Step 1: Build the sandbox
 *************************
@@ -133,17 +159,20 @@ so that it marks itself unhealthy:
 
    $ docker-compose exec -ti --index 1 hello kill -SIGUSR1 1
 
-Let's verify that from the logs:
-
-.. code-block:: console
-
-   $ docker-compose logs hello | grep hello-1
-   grpc-s2s-hello-1  | 2022/12/29 21:50:09 starting grpc on :8081
-   grpc-s2s-hello-1  | 2022/12/29 21:51:20 Marking service Hello as unhealthy
-
 The ``Hello`` gRPC service instance will now have the status of the service to
 be ``NOT_SERVING`` as per the `gRPC Health checking
 protocol <https://github.com/grpc/grpc/blob/master/doc/health-checking.md>`__.
+
+Let's verify that we now only have one healthy instance of ``Hello``
+from the stats of ``envoy-hello``:
+
+.. code-block:: console
+
+   $ curl -s "http://localhost:12800/stats" | grep "cluster.hello.health_check.healthy"
+   cluster.hello.health_check.healthy: 1
+
+The number of healthy instances for the ``Hello`` gRPC service is now 1, as
+Envoy has detected one instance of the service as unhealthy.
 
 Step 6: Mark an instance of World unhealthy
 *******************************************
@@ -155,47 +184,22 @@ so that it marks itself unhealthy:
 
    $ docker-compose exec -ti --index 1 world kill -SIGUSR1 1
 
-Let's verify that from the logs:
-
-.. code-block:: console
-
-   $ docker-compose logs world | grep world-1
-   grpc-s2s-world-1  | 2022/12/29 21:50:09 starting grpc on :8082
-   grpc-s2s-world-1  | 2022/12/29 21:51:20 Marking service World as unhealthy
-
 The ``World`` gRPC service instance will now have the status of the service to
 be ``NOT_SERVING`` as per the `gRPC Health checking
 protocol <https://github.com/grpc/grpc/blob/master/doc/health-checking.md>`__.
 
-Step 7: Query number of healthy instances of Hello service
-**********************************************************
-
-Let's query the stats from ``envoy-hello`` service to check the number of healthy
-instances for ``hello``:
+Let's verify that we now only have one healthy instance of ``World``
+from the stats of ``envoy-world``:
 
 .. code-block:: console
 
-   $ curl -s http://localhost:12800/stats | grep "cluster.hello.health_check.healthy"
-   cluster.hello.health_check.healthy: 1
-
-The number of healthy instances for the ``Hello`` gRPC service is now 1, as
-Envoy has detected one instance of the service as unhealthy.
-
-Step 8: Query number of healthy instances of World service
-**********************************************************
-
-Let's query the stats from ``envoy-world`` service to check the number of healthy
-instances for ``world``:
-
-.. code-block:: console
-
-   $ curl -s http://localhost:12801/stats | grep "cluster.world.health_check.healthy"
+   $ curl -s "http://localhost:12801/stats" | grep "cluster.world.health_check.healthy"
    cluster.world.health_check.healthy: 1
 
 The number of healthy instances for the ``World`` gRPC service is now 1, as
 Envoy has detected one instance of the service as unhealthy.
 
-Step 9: Make an example request to Hello
+Step 7: Make an example request to Hello
 ****************************************
 
 Let's send a request to the ``envoy-hello`` service which forwards the request to
@@ -221,5 +225,5 @@ services:
 
 .. seealso::
 
-   :ref:`Envoy request mirror policy <envoy_v3_api_msg_config.route.v3.RouteAction.RequestMirrorPolicy>`
-    Learn more Envoy's request mirroring policy.
+   :ref:`Health checking <arch_overview_health_checking>`
+    Learn more Envoy's health checking.
