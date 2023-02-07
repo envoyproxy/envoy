@@ -1505,7 +1505,7 @@ uint32_t EncodingContext::encodeCompact(const NullableArray<T>& arg, Buffer::Ins
 class Statics {
 public:
   // org.apache.kafka.common.utils.ByteUtils.writeUnsignedVarint(int, ByteBuffer)
-  static uint32_t writeUnsignedVarint(const uint32_t& arg, Buffer::Instance& dst) {
+  static uint32_t writeUnsignedVarint(const uint32_t& arg, Bytes& dst) {
     uint32_t value = arg;
 
     uint32_t elements_with_1 = 0;
@@ -1513,25 +1513,25 @@ public:
     while ((value & ~(0x7f)) != 0) {
       // Save next 7-bit batch with highest bit set.
       const uint8_t el = (value & 0x7f) | 0x80;
-      dst.add(&el, sizeof(uint8_t));
+      dst.push_back(el);
       value >>= 7;
       elements_with_1++;
     }
 
     // After the loop has finished, we are certain that bit 8 = 0, so we can just add final element.
     const uint8_t el = value;
-    dst.add(&el, sizeof(uint8_t));
+    dst.push_back(el);
 
     return elements_with_1 + 1;
   }
 
   // org.apache.kafka.common.utils.ByteUtils.writeVarint(int, ByteBuffer)
-  static uint32_t writeVarint(const int32_t arg, Buffer::Instance& dst) {
+  static uint32_t writeVarint(const int32_t arg, Bytes& dst) {
     return writeUnsignedVarint((arg << 1) ^ (arg >> 31), dst);
   }
 
   // org.apache.kafka.common.utils.ByteUtils.writeVarlong(long, ByteBuffer)
-  static uint32_t writeVarlong(const int64_t& arg, Buffer::Instance& dst) {
+  static uint32_t writeVarlong(const int64_t& arg, Bytes& dst) {
     int64_t value = (arg << 1) ^ (arg >> 63);
 
     uint32_t elements_with_1 = 0;
@@ -1539,14 +1539,14 @@ public:
     while ((value & ~(0x7f)) != 0) {
       // Save next 7-bit batch with highest bit set.
       const uint8_t el = (value & 0x7f) | 0x80;
-      dst.add(&el, sizeof(uint8_t));
+      dst.push_back(el);
       value >>= 7;
       elements_with_1++;
     }
 
     // After the loop has finished, we are certain that bit 8 = 0, so we can just add final element.
     const uint8_t el = value;
-    dst.add(&el, sizeof(uint8_t));
+    dst.push_back(el);
 
     return elements_with_1 + 1;
   }

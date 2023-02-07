@@ -1,7 +1,5 @@
 #include "contrib/kafka/filters/network/source/mesh/command_handlers/fetch_record_converter.h"
 
-#include "source/common/buffer/buffer_impl.h"
-
 #include "contrib/kafka/filters/network/source/serialization.h"
 
 namespace Envoy {
@@ -109,62 +107,56 @@ Bytes FetchRecordConverterImpl::renderRecordBatch(
   return result;
 }
 
-// Helper method.
-static void putBufferIntoBytes(Buffer::Instance& buffer, Bytes& out) {
-  const auto buf_len = buffer.length();
-  void* linearized = buffer.linearize(buf_len);
-  unsigned char* raw = static_cast<unsigned char*>(linearized);
-  out.insert(out.end(), raw, raw + buf_len);
-}
-
 void FetchRecordConverterImpl::appendRecord(const InboundRecord& record, Bytes& out) const {
 
-  Buffer::OwnedImpl buffer;
+  Bytes tmp = {};
+  // This is not precise maths, as we could be over-reserving a little due to var-length fields.
+  tmp.reserve(sizeof(int8_t) + sizeof(int64_t) + sizeof(int32_t) + record.dataLengthEstimate());
 
   // attributes: int8
   constexpr int8_t attributes = 0;
-  buffer.add(&attributes, sizeof(int8_t));
+  tmp.push_back(static_cast<unsigned char>(attributes));
 
   // timestampDelta: varlong
   constexpr int64_t timestamp_delta = 0;
-  Statics::writeVarlong(timestamp_delta, buffer);
+  Statics::writeVarlong(timestamp_delta, tmp);
 
   // offsetDelta: varint
   const int32_t offset_delta = record.offset_;
-  Statics::writeVarint(offset_delta, buffer);
+  Statics::writeVarint(offset_delta, tmp);
 
   // Impl note: compared to requests/responses, records serialize byte arrays as varint length +
   // bytes (and not length + 1, then bytes). So we cannot use EncodingContext from serialization.h.
 
   // keyLength: varint
   // key: byte[]
-  const absl::string_view key = record.key();
-  if (!key.empty()) {
-    Statics::writeVarint(key.size(), buffer);
-    buffer.add(key);
+  const NullableBytes& key = record.key_;
+  if (key.has_value()) {
+    Statics::writeVarint(key->size(), tmp);
+    tmp.insert(tmp.end(), key->begin(), key->end());
   } else {
-    Statics::writeVarint(-1, buffer);
+    Statics::writeVarint(-1, tmp);
   }
 
   // valueLen: varint
   // value: byte[]
-  const absl::string_view value = record.value();
-  if (!value.empty()) {
-    Statics::writeVarint(value.size(), buffer);
-    buffer.add(record.value());
+  const NullableBytes& value = record.value_;
+  if (value.has_value()) {
+    Statics::writeVarint(value->size(), tmp);
+    tmp.insert(tmp.end(), value->begin(), value->end());
   } else {
-    Statics::writeVarint(-1, buffer);
+    Statics::writeVarint(-1, tmp);
   }
 
   // TODO (adam.kotwasinski) Headers are not supported yet.
   const int32_t header_count = 0;
-  Statics::writeVarint(header_count, buffer);
+  Statics::writeVarint(header_count, tmp);
 
-  // Put length and contents of 'buffer' of into 'out'.
-  Buffer::OwnedImpl length_buffer;
-  Statics::writeVarint(buffer.length(), length_buffer);
-  putBufferIntoBytes(length_buffer, out);
-  putBufferIntoBytes(buffer, out);
+  // Put tmp's length into 'out'.
+  Statics::writeVarint(tmp.size(), out);
+
+  // Put tmp's contents into 'out'.
+  out.insert(out.end(), tmp.begin(), tmp.end());
 }
 
 // XXX (adam.kotwasinski) Instead of computing it naively, either link against librdkafka's

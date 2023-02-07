@@ -4,7 +4,6 @@
 #include <string>
 
 #include "absl/strings/str_cat.h"
-#include "absl/strings/string_view.h"
 #include "contrib/kafka/filters/network/source/kafka_types.h"
 
 namespace Envoy {
@@ -29,20 +28,12 @@ struct InboundRecord {
                 const NullableBytes& key, const NullableBytes& value)
       : topic_{topic}, partition_{partition}, offset_{offset}, key_{key}, value_{value} {};
 
-  absl::string_view key() const {
-    if (key_) {
-      return {reinterpret_cast<const char*>(key_->data()), key_->size()};
-    } else {
-      return {};
-    }
-  }
-
-  absl::string_view value() const {
-    if (value_) {
-      return {reinterpret_cast<const char*>(value_->data()), value_->size()};
-    } else {
-      return {};
-    }
+  // Estimates how many bytes this record would take.
+  uint32_t dataLengthEstimate() const {
+    uint32_t result = 12; // Max key length, value lenght, header count (right now 0).
+    result += key_ ? key_->size() : 0;
+    result += value_ ? value_->size() : 0;
+    return result;
   }
 
   // Used in logging.

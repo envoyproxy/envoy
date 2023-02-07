@@ -77,7 +77,6 @@ envoy_cc_library(
         "//contrib/kafka/filters/network/source:kafka_response_parser_lib",
         "//contrib/kafka/filters/network/source:serialization_lib",
         "//contrib/kafka/filters/network/source/mesh:inbound_record_lib",
-        "//source/common/buffer:buffer_lib",
     ],
 )
 
