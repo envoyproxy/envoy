@@ -10,6 +10,7 @@
 #include "source/common/common/fmt.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/extensions/listener_managers/listener_manager/listener_manager_impl.h"
 #include "source/server/config_validation/server.h"
 #include "source/server/configuration_impl.h"
 #include "source/server/options_impl.h"
@@ -56,8 +57,7 @@ static std::vector<absl::string_view> unsuported_win32_configs = {
 
 class ConfigTest {
 public:
-  ConfigTest(const OptionsImpl& options)
-      : api_(Api::createApiForTest(time_system_)), options_(options) {
+  ConfigTest(OptionsImpl& options) : api_(Api::createApiForTest(time_system_)), options_(options) {
     ON_CALL(*server_.server_factory_context_, api()).WillByDefault(ReturnRef(server_.api_));
     ON_CALL(server_, options()).WillByDefault(ReturnRef(options_));
     ON_CALL(server_, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
@@ -168,7 +168,7 @@ public:
   NiceMock<Server::MockInstance> server_;
   Server::ServerFactoryContextImpl server_factory_context_{server_};
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;
-  OptionsImpl options_;
+  OptionsImpl& options_;
   std::unique_ptr<Upstream::ProdClusterManagerFactory> cluster_manager_factory_;
   std::unique_ptr<NiceMock<Server::MockListenerComponentFactory>> component_factory_ptr_{
       std::make_unique<NiceMock<Server::MockListenerComponentFactory>>()};
@@ -241,7 +241,8 @@ uint32_t run(const std::string& directory) {
       Server::InstanceUtil::loadBootstrapConfig(
           bootstrap, options, ProtobufMessage::getStrictValidationVisitor(), *api);
       ENVOY_LOG_MISC(info, "testing {} as yaml.", filename);
-      ConfigTest test2(asConfigYaml(options, *api));
+      OptionsImpl config = asConfigYaml(options, *api);
+      ConfigTest test2(config);
     }
     num_tested++;
   }

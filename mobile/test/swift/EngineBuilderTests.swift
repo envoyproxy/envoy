@@ -452,9 +452,13 @@ final class EngineBuilderTests: XCTestCase {
       dnsMinRefreshSeconds: 100,
       dnsPreresolveHostnames: "[test]",
       enableDNSCache: false,
+      dnsCacheSaveIntervalSeconds: 0,
       enableHappyEyeballs: true,
-      enableGzip: true,
-      enableBrotli: false,
+      enableHttp3: true,
+      enableGzipDecompression: true,
+      enableGzipCompression: false,
+      enableBrotliDecompression: false,
+      enableBrotliCompression: false,
       enableInterfaceBinding: true,
       enableDrainPostDnsRefresh: false,
       enforceTrustChainVerification: false,
@@ -490,7 +494,6 @@ final class EngineBuilderTests: XCTestCase {
     XCTAssertTrue(resolvedYAML.contains("&dns_min_refresh_rate 100s"))
     XCTAssertTrue(resolvedYAML.contains("&dns_preresolve_hostnames [test]"))
     XCTAssertTrue(resolvedYAML.contains("&dns_lookup_family ALL"))
-    XCTAssertTrue(resolvedYAML.contains("&dns_multiple_addresses true"))
     XCTAssertFalse(resolvedYAML.contains("&persistent_dns_cache_config"))
     XCTAssertTrue(resolvedYAML.contains("&enable_interface_binding true"))
     XCTAssertTrue(resolvedYAML.contains("&trust_chain_verification ACCEPT_UNTRUSTED"))
@@ -513,9 +516,11 @@ final class EngineBuilderTests: XCTestCase {
 
     XCTAssertFalse(resolvedYAML.contains("admin: *admin_interface"))
 
-    // Decompression
-    XCTAssertTrue(resolvedYAML.contains("decompressor.v3.Gzip"))
-    XCTAssertFalse(resolvedYAML.contains("decompressor.v3.Brotli"))
+    // Compression
+    XCTAssertTrue(resolvedYAML.contains(".decompressor.v3.Gzip"))
+    XCTAssertFalse(resolvedYAML.contains(".compressor.v3.Gzip"))
+    XCTAssertFalse(resolvedYAML.contains(".decompressor.v3.Brotli"))
+    XCTAssertFalse(resolvedYAML.contains(".compressor.v3.Brotli"))
 
     // Metadata
     XCTAssertTrue(resolvedYAML.contains("device_os: iOS"))
@@ -546,9 +551,13 @@ final class EngineBuilderTests: XCTestCase {
       dnsMinRefreshSeconds: 100,
       dnsPreresolveHostnames: "[test]",
       enableDNSCache: true,
+      dnsCacheSaveIntervalSeconds: 10,
       enableHappyEyeballs: false,
-      enableGzip: false,
-      enableBrotli: true,
+      enableHttp3: false,
+      enableGzipDecompression: false,
+      enableGzipCompression: true,
+      enableBrotliDecompression: true,
+      enableBrotliCompression: true,
       enableInterfaceBinding: false,
       enableDrainPostDnsRefresh: true,
       enforceTrustChainVerification: true,
@@ -587,12 +596,12 @@ final class EngineBuilderTests: XCTestCase {
       "@type": type.googleapis.com/envoymobile.extensions.key_value.platform.PlatformKeyValueStoreConfig
       key: dns_persistent_cache
       save_interval:
-        seconds: 0
+        seconds: *persistent_dns_cache_save_interval
       max_entries: 100
 """
     ))
+    XCTAssertTrue(resolvedYAML.contains("&persistent_dns_cache_save_interval 10"))
 // swiftlint:enable line_length
-    XCTAssertTrue(resolvedYAML.contains("&dns_multiple_addresses false"))
     XCTAssertTrue(resolvedYAML.contains("&enable_interface_binding false"))
     XCTAssertTrue(resolvedYAML.contains("&trust_chain_verification VERIFY_TRUST_CHAIN"))
     XCTAssertTrue(resolvedYAML.contains(
@@ -604,9 +613,11 @@ final class EngineBuilderTests: XCTestCase {
     ))
     XCTAssertTrue(resolvedYAML.contains("&enable_drain_post_dns_refresh true"))
 
-    // Decompression
-    XCTAssertFalse(resolvedYAML.contains("decompressor.v3.Gzip"))
-    XCTAssertTrue(resolvedYAML.contains("decompressor.v3.Brotli"))
+    // Compression
+    XCTAssertFalse(resolvedYAML.contains(".decompressor.v3.Gzip"))
+    XCTAssertTrue(resolvedYAML.contains(".compressor.v3.Gzip"))
+    XCTAssertTrue(resolvedYAML.contains(".decompressor.v3.Brotli"))
+    XCTAssertTrue(resolvedYAML.contains(".compressor.v3.Brotli"))
   }
 
   func testReturnsNilWhenUnresolvedValueInTemplate() {
@@ -621,9 +632,13 @@ final class EngineBuilderTests: XCTestCase {
       dnsMinRefreshSeconds: 100,
       dnsPreresolveHostnames: "[test]",
       enableDNSCache: false,
+      dnsCacheSaveIntervalSeconds: 0,
       enableHappyEyeballs: false,
-      enableGzip: false,
-      enableBrotli: false,
+      enableHttp3: false,
+      enableGzipDecompression: false,
+      enableGzipCompression: false,
+      enableBrotliDecompression: false,
+      enableBrotliCompression: false,
       enableInterfaceBinding: false,
       enableDrainPostDnsRefresh: false,
       enforceTrustChainVerification: true,

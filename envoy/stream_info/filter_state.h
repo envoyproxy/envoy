@@ -60,7 +60,7 @@ public:
   enum LifeSpan { FilterChain, Request, Connection, TopSpan = Connection };
 
   // Objects stored in the filter state can optionally be shared between the
-  // upstrean and downstream filter state.
+  // upstream and downstream filter state.
   enum class StreamSharing {
     // None implies the object is exclusive to the stream.
     None,
@@ -75,6 +75,11 @@ public:
     // upstream connections. Note that this affects connection pooling,
     // preventing any re-use of the upstream connections in the worst case.
     SharedWithUpstreamConnection,
+
+    // Same as SharedWithUpstreamConnection, except that the filter state is
+    // not transitively shared. The filter state is imported into the upstream
+    // connection filter state as exclusive to the upstream connection.
+    SharedWithUpstreamConnectionOnce,
   };
 
   class Object {

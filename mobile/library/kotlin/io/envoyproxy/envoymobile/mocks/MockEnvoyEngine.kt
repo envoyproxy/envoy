@@ -13,9 +13,10 @@ import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor
 internal class MockEnvoyEngine : EnvoyEngine {
   override fun runWithConfig(envoyConfiguration: EnvoyConfiguration?, logLevel: String?): Int = 0
 
-  override fun runWithTemplate(
+  override fun performRegistration(envoyConfiguration: EnvoyConfiguration) = Unit
+
+  override fun runWithYaml(
     configurationYAML: String,
-    envoyConfiguration: EnvoyConfiguration,
     logLevel: String
   ): Int = 0
 

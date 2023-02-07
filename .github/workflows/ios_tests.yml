@@ -6,8 +6,13 @@ on:
     - main
   pull_request:
 
+concurrency:
+  group: ${{ github.head_ref-github.workflow || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   swifttests:
+    if: github.repository == 'envoyproxy/envoy'
     name: swift_tests
     runs-on: macos-12
     timeout-minutes: 120
@@ -33,6 +38,7 @@ jobs:
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //test/swift/...
   objctests:
+    if: github.repository == 'envoyproxy/envoy'
     name: c_and_objc_tests
     runs-on: macos-12
     timeout-minutes: 120

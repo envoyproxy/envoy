@@ -199,14 +199,10 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
       // avoid double pause ClusterLoadAssignment.
       Config::ScopedResume maybe_resume_eds_leds_sds;
       if (cm_.adsMux()) {
-
-        std::vector<std::string> paused_xds_types{
+        const std::vector<std::string> paused_xds_types{
             Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(),
-            Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>()};
-        if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.combine_sds_requests")) {
-          paused_xds_types.push_back(
-              Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>());
-        }
+            Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>(),
+            Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>()};
         maybe_resume_eds_leds_sds = cm_.adsMux()->pause(paused_xds_types);
       }
       initializeSecondaryClusters();
@@ -345,11 +341,6 @@ ClusterManagerImpl::ClusterManagerImpl(
   }
 
   subscription_factory_ = std::make_unique<Config::SubscriptionFactoryImpl>(
-      local_info, main_thread_dispatcher, *this, validation_context.dynamicValidationVisitor(), api,
-      server, makeOptRefFromPtr(xds_resources_delegate_.get()),
-      makeOptRefFromPtr(xds_config_tracker_.get()));
-
-  multiplexed_subscription_factory_ = std::make_unique<MultiplexedSubscriptionFactory>(
       local_info, main_thread_dispatcher, *this, validation_context.dynamicValidationVisitor(), api,
       server, makeOptRefFromPtr(xds_resources_delegate_.get()),
       makeOptRefFromPtr(xds_config_tracker_.get()));
@@ -1498,7 +1489,9 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
         break;
       }
       TcpConnectionsMap& container = it->second;
-      container.connections_.begin()->first->close(Network::ConnectionCloseType::NoFlush);
+      container.connections_.begin()->first->close(
+          Network::ConnectionCloseType::NoFlush,
+          StreamInfo::LocalCloseReasons::get().NonPooledTcpConnectionHostHealthFailure);
     }
   } else {
     drainOrCloseConnPools(host, ConnectionPool::DrainBehavior::DrainExistingConnections);
@@ -1875,9 +1868,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
         alternate_protocol_options.value(), dispatcher);
   } else if (!alternate_protocol_options.has_value() &&
              (protocols.size() == 2 ||
-              (protocols.size() == 1 && protocols[0] == Http::Protocol::Http2)) &&
-             Runtime::runtimeFeatureEnabled(
-                 "envoy.reloadable_features.allow_concurrency_for_alpn_pool")) {
+              (protocols.size() == 1 && protocols[0] == Http::Protocol::Http2))) {
     // If there is no configuration for an alternate protocols cache, still
     // create one if there's an HTTP/2 upstream (either explicitly, or for mixed
     // HTTP/1.1 and HTTP/2 pools) to track the max concurrent streams across
@@ -1912,10 +1903,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
 #endif
   }
   if (protocols.size() >= 2) {
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.allow_concurrency_for_alpn_pool") &&
-        origin.has_value()) {
-      ENVOY_BUG(origin.has_value(), "Unable to determine origin for host ");
+    if (origin.has_value()) {
       envoy::config::core::v3::AlternateProtocolsCacheOptions default_options;
       default_options.set_name(host->cluster().name());
       alternate_protocols_cache =
