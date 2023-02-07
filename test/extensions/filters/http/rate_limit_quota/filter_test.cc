@@ -303,7 +303,7 @@ public:
 
   void createFilter(bool set_callback = true) {
     filter_config_ = std::make_shared<FilterConfig>(config_);
-    filter_ = std::make_unique<RateLimitQuotaFilter>(filter_config_, context_);
+    filter_ = std::make_unique<RateLimitQuotaFilter>(filter_config_, context_, &bucket_cache_);
     if (set_callback) {
       filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     }
@@ -337,8 +337,8 @@ public:
     // `on_no_match` field is configured.
     ASSERT_TRUE(match_result.ok());
     // Retrieve the matched action.
-    const RateLimitOnMactchAction* match_action =
-        dynamic_cast<RateLimitOnMactchAction*>(match_result.value().get());
+    const RateLimitOnMatchAction* match_action =
+        dynamic_cast<RateLimitOnMatchAction*>(match_result.value().get());
 
     RateLimitQuotaValidationVisitor visitor = {};
     // Generate the bucket ids.
@@ -361,6 +361,9 @@ public:
   FilterConfig config_;
   Http::TestRequestHeaderMapImpl default_headers_{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
+
+  // TODO(tyxia) No need for TLS storage???
+  BucketsMap bucket_cache_;
 };
 
 TEST_F(FilterTest, EmptyMatcherConfig) {
@@ -442,8 +445,8 @@ TEST_F(FilterTest, RequestMatchingWithInvalidOnNoMatch) {
   // `on_no_match` field is configured.
   ASSERT_TRUE(match_result.ok());
   // Retrieve the matched action.
-  const RateLimitOnMactchAction* match_action =
-      dynamic_cast<RateLimitOnMactchAction*>(match_result.value().get());
+  const RateLimitOnMatchAction* match_action =
+      dynamic_cast<RateLimitOnMatchAction*>(match_result.value().get());
 
   RateLimitQuotaValidationVisitor visitor = {};
   // Generate the bucket ids.

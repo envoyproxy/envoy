@@ -20,8 +20,11 @@ class RateLimitQuotaCallbacks {
 public:
   virtual ~RateLimitQuotaCallbacks() = default;
 
-  virtual void
-  onQuotaResponse(envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse& response) PURE;
+  // virtual void
+  // onQuotaResponse(envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse& response) PURE;
+
+  // Change from abstract class to just virtual base class
+  virtual void onQuotaResponse(envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse&) {}
 };
 
 /**

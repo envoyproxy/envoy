@@ -16,6 +16,7 @@
 #include "source/extensions/filters/http/rate_limit_quota/client.h"
 #include "source/extensions/filters/http/rate_limit_quota/client_impl.h"
 #include "source/extensions/filters/http/rate_limit_quota/matcher.h"
+#include "source/extensions/filters/http/rate_limit_quota/quota_bucket_cache.h"
 
 #include "absl/status/statusor.h"
 
@@ -26,6 +27,7 @@ namespace RateLimitQuota {
 
 using ::envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaBucketSettings;
 using ::envoy::service::rate_limit_quota::v3::BucketId;
+using ::envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse;
 using FilterConfig =
     envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaFilterConfig;
 using FilterConfigConstSharedPtr = std::shared_ptr<const FilterConfig>;
@@ -48,9 +50,13 @@ class RateLimitQuotaFilter : public Http::PassThroughFilter,
                              public RateLimitQuotaCallbacks,
                              public Logger::Loggable<Logger::Id::filter> {
 public:
+  // TODO(tyxia) Remove the default nullptr arg
   RateLimitQuotaFilter(FilterConfigConstSharedPtr config,
-                       Server::Configuration::FactoryContext& factory_context)
-      : config_(std::move(config)), factory_context_(factory_context) {
+                       Server::Configuration::FactoryContext& factory_context,
+                       BucketsMap* const quota_buckets = nullptr,
+                       RateLimitQuotaUsageReports* const quota_usage_reports = nullptr)
+      : config_(std::move(config)), factory_context_(factory_context),
+        quota_buckets_(quota_buckets), quota_usage_reports_(quota_usage_reports) {
     createMatcher();
   }
 
@@ -62,7 +68,7 @@ public:
   }
 
   // RateLimitQuota::RateLimitQuotaCallbacks
-  void onQuotaResponse(envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse&) override {}
+  void onQuotaResponse(RateLimitQuotaResponse& response) override;
 
   // Perform request matching. It returns the generated bucket ids if the matching succeeded,
   // error status otherwise.
@@ -86,6 +92,13 @@ private:
   RateLimitQuotaValidationVisitor visitor_ = {};
   Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher_ = nullptr;
   std::unique_ptr<Http::Matching::HttpMatchingDataImpl> data_ptr_ = nullptr;
+
+  // TODO(tyxia) const pointer i.e., always points to same object.
+  BucketsMap* const quota_buckets_ = nullptr;
+  // TODO(tyxia) This is forward passed to client
+  RateLimitQuotaUsageReports* const quota_usage_reports_ = nullptr;
+
+  bool initiating_call_{};
 };
 
 } // namespace RateLimitQuota
