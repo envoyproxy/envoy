@@ -10,7 +10,7 @@ stream_info {
       key: "|"
       value {
         fields {
-          key: "test"
+          key: "test_key"
           value {
             number_value: inf
           }
