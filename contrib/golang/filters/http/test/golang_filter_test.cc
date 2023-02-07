@@ -39,6 +39,9 @@ namespace {
 class TestFilter : public Filter {
 public:
   using Filter::Filter;
+  void onDestroy() override {
+    // do nothing
+  }
 };
 
 class GolangHttpFilterTest : public testing::Test {
@@ -159,6 +162,14 @@ TEST_F(GolangHttpFilterTest, ScriptHeadersOnlyRequestHeadersOnly) {
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
   EXPECT_EQ(0, stats_store_.counter("test.golang.errors").value());
+}
+
+// setHeader at wrong stage
+TEST_F(GolangHttpFilterTest, SetHeaderAtWrongStage) {
+  InSequence s;
+  setup(PASSTHROUGH, genSoPath(PASSTHROUGH), PASSTHROUGH);
+
+  EXPECT_EQ(CAPINotInGo, filter_->setHeader("foo", "bar"));
 }
 
 } // namespace

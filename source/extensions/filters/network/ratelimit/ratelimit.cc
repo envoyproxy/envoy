@@ -131,7 +131,8 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
   if (status == Filters::Common::RateLimit::LimitStatus::OverLimit &&
       config_->runtime().snapshot().featureEnabled("ratelimit.tcp_filter_enforcing", 100)) {
     config_->stats().cx_closed_.inc();
-    filter_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+    filter_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush,
+                                          "ratelimit_close_over_limit");
   } else if (status == Filters::Common::RateLimit::LimitStatus::Error) {
     if (config_->failureModeAllow()) {
       config_->stats().failure_mode_allowed_.inc();
@@ -140,7 +141,8 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
       }
     } else {
       config_->stats().cx_closed_.inc();
-      filter_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+      filter_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush,
+                                            "ratelimit_error_failure_mode_connection_close");
     }
   } else {
     // We can get completion inline, so only call continue if that isn't happening.

@@ -55,7 +55,6 @@ class MainActivity : Activity() {
       .addPlatformFilter(::DemoFilter)
       .addPlatformFilter(::BufferDemoFilter)
       .addPlatformFilter(::AsyncDemoFilter)
-      .h2ExtendKeepaliveTimeout(true)
       .enableAdminInterface()
       .enableDNSCache(true)
       // required by DNS cache

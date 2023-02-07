@@ -377,7 +377,7 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
   const std::string& config_yaml = options.configYaml();
   const envoy::config::bootstrap::v3::Bootstrap& config_proto = options.configProto();
 
-  // Exactly one of config_path and config_yaml should be specified.
+  // One of config_path and config_yaml or bootstrap should be specified.
   if (config_path.empty() && config_yaml.empty() && config_proto.ByteSizeLong() == 0) {
     throw EnvoyException("At least one of --config-path or --config-yaml or Options::configProto() "
                          "should be non-empty");
@@ -619,11 +619,19 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
       Network::SocketInterfaceSingleton::initialize(sock);
     }
   }
+
+  ListenerManagerFactory* listener_manager_factory_ = nullptr;
+  if (bootstrap_.has_listener_manager()) {
+    listener_manager_factory_ = Config::Utility::getAndCheckFactory<ListenerManagerFactory>(
+        bootstrap_.listener_manager(), false);
+  } else {
+    listener_manager_factory_ = &Config::Utility::getAndCheckFactoryByName<ListenerManagerFactory>(
+        options_.listenerManager());
+  }
+
   // Workers get created first so they register for thread local updates.
-  listener_manager_ =
-      Config::Utility::getAndCheckFactoryByName<ListenerManagerFactory>(options_.listenerManager())
-          .createListenerManager(*this, nullptr, worker_factory_,
-                                 bootstrap_.enable_dispatcher_stats(), quic_stat_names_);
+  listener_manager_ = listener_manager_factory_->createListenerManager(
+      *this, nullptr, worker_factory_, bootstrap_.enable_dispatcher_stats(), quic_stat_names_);
 
   // The main thread is also registered for thread local updates so that code that does not care
   // whether it runs on the main thread or on workers can still use TLS.

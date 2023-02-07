@@ -1,59 +1,10 @@
 package io.envoyproxy.envoymobile.engine
 
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification
+import io.envoyproxy.envoymobile.engine.JniLibrary
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Assert.fail
 import org.junit.Test
-
-private const val TEST_CONFIG =
-"""
-fixture_template:
-- name: mock
-  filters:
-#{custom_filters}
-"""
-
-private const val PLATFORM_FILTER_CONFIG =
-"""
-  - platform_filter_name: {{ platform_filter_name }}
-"""
-
-private const val NATIVE_FILTER_CONFIG =
-"""
-  - name: {{ native_filter_name }}
-    typed_config: {{ native_filter_typed_config }}
-"""
-
-private const val APCF_INSERT =
-"""
-  - name: AlternateProtocolsCacheFilter
-"""
-
-private const val GZIP_INSERT =
-"""
-  - name: GzipFilter
-"""
-
-private const val BROTLI_INSERT =
-"""
-  - name: BrotliFilter
-"""
-
-private const val SOCKET_TAG_INSERT =
-"""
-  - name: SocketTag
-"""
-
-private const val CERT_VALIDATION_TEMPLATE =
-"""
-  custom_validator_config:
-    name: "dumb_validator"
-"""
-
-private const val PERSISTENT_DNS_CACHE_INSERT =
-"""
-  config: persistent_dns_cache
-"""
 
 class EnvoyConfigurationTest {
 
@@ -69,7 +20,7 @@ class EnvoyConfigurationTest {
     dnsPreresolveHostnames: String = "[hostname]",
     enableDNSCache: Boolean = false,
     enableDrainPostDnsRefresh: Boolean = false,
-    enableHttp3: Boolean = false,
+    enableHttp3: Boolean = true,
     enableGzip: Boolean = true,
     enableBrotli: Boolean = false,
     enableSocketTagging: Boolean = false,
@@ -77,7 +28,6 @@ class EnvoyConfigurationTest {
     enableInterfaceBinding: Boolean = false,
     h2ConnectionKeepaliveIdleIntervalMilliseconds: Int = 222,
     h2ConnectionKeepaliveTimeoutSeconds: Int = 333,
-    h2ExtendKeepaliveTimeout: Boolean = false,
     maxConnectionsPerHost: Int = 543,
     statsFlushSeconds: Int = 567,
     streamIdleTimeoutSeconds: Int = 678,
@@ -109,7 +59,6 @@ class EnvoyConfigurationTest {
       enableInterfaceBinding,
       h2ConnectionKeepaliveIdleIntervalMilliseconds,
       h2ConnectionKeepaliveTimeoutSeconds,
-      h2ExtendKeepaliveTimeout,
       maxConnectionsPerHost,
       statsFlushSeconds,
       streamIdleTimeoutSeconds,
@@ -129,13 +78,11 @@ class EnvoyConfigurationTest {
   }
 
   @Test
-  fun `configuration resolves with values`() {
+  fun `configuration default values`() {
+    JniLibrary.loadTestLibrary()
     val envoyConfiguration = buildTestEnvoyConfiguration()
 
-    val resolvedTemplate = envoyConfiguration.resolveTemplate(
-      TEST_CONFIG, PLATFORM_FILTER_CONFIG, NATIVE_FILTER_CONFIG, APCF_INSERT, GZIP_INSERT, BROTLI_INSERT, SOCKET_TAG_INSERT, PERSISTENT_DNS_CACHE_INSERT,
-      CERT_VALIDATION_TEMPLATE
-    )
+    val resolvedTemplate = envoyConfiguration.createYaml()
     assertThat(resolvedTemplate).contains("&connect_timeout 123s")
 
     assertThat(resolvedTemplate).doesNotContain("admin: *admin_interface")
@@ -146,11 +93,9 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("&dns_fail_max_interval 456s")
     assertThat(resolvedTemplate).contains("&dns_query_timeout 321s")
     assertThat(resolvedTemplate).contains("&dns_lookup_family V4_PREFERRED")
-    assertThat(resolvedTemplate).contains("&dns_multiple_addresses false")
     assertThat(resolvedTemplate).contains("&dns_min_refresh_rate 12s")
     assertThat(resolvedTemplate).contains("&dns_preresolve_hostnames [hostname]")
     assertThat(resolvedTemplate).contains("&enable_drain_post_dns_refresh false")
-    assertThat(resolvedTemplate).doesNotContain(PERSISTENT_DNS_CACHE_INSERT);
 
     // Interface Binding
     assertThat(resolvedTemplate).contains("&enable_interface_binding false")
@@ -163,13 +108,14 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("&h2_connection_keepalive_timeout 333s")
 
     // H3
-    assertThat(resolvedTemplate).doesNotContain(APCF_INSERT);
+    assertThat(resolvedTemplate).contains("http3_protocol_options:");
+    assertThat(resolvedTemplate).contains("name: alternate_protocols_cache");
 
     // Gzip
-    assertThat(resolvedTemplate).contains(GZIP_INSERT);
+    assertThat(resolvedTemplate).contains("type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip");
 
     // Brotli
-    assertThat(resolvedTemplate).doesNotContain(BROTLI_INSERT);
+    assertThat(resolvedTemplate).doesNotContain("type.googleapis.com/envoy.extensions.compression.brotli.decompressor.v3.Brotli");
 
     // Per Host Limits
     assertThat(resolvedTemplate).contains("&max_connections_per_host 543")
@@ -197,7 +143,7 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("test_config")
 
     // Cert Validation
-    assertThat(resolvedTemplate).contains("custom_validator_config")
+    assertThat(resolvedTemplate).contains("trusted_ca:")
 
     // Proxying
     assertThat(resolvedTemplate).contains("&skip_dns_lookup_for_proxied_requests false")
@@ -205,61 +151,50 @@ class EnvoyConfigurationTest {
 
   @Test
   fun `configuration resolves with alternate values`() {
+    JniLibrary.loadTestLibrary()
     val envoyConfiguration = buildTestEnvoyConfiguration(
+      adminInterfaceEnabled = true,
       enableDrainPostDnsRefresh = true,
       enableDNSCache = true,
       enableHappyEyeballs = true,
-      enableHttp3 = true,
+      enableHttp3 = false,
       enableGzip = false,
       enableBrotli = true,
       enableInterfaceBinding = true,
-      h2ExtendKeepaliveTimeout = true,
       enableSkipDNSLookupForProxiedRequests = true,
       enablePlatformCertificatesValidation = true
     )
 
-    val resolvedTemplate = envoyConfiguration.resolveTemplate(
-      TEST_CONFIG, PLATFORM_FILTER_CONFIG, NATIVE_FILTER_CONFIG, APCF_INSERT, GZIP_INSERT, BROTLI_INSERT, SOCKET_TAG_INSERT, PERSISTENT_DNS_CACHE_INSERT,
-CERT_VALIDATION_TEMPLATE
-    )
+    val resolvedTemplate = envoyConfiguration.createYaml()
 
-    // DNS
-    assertThat(resolvedTemplate).contains("&dns_lookup_family ALL")
-    assertThat(resolvedTemplate).contains("&dns_multiple_addresses true")
+    // adminInterfaceEnabled = true
+    assertThat(resolvedTemplate).contains("admin: *admin_interface")
+
+    // enableDrainPostDnsRefresh = true
     assertThat(resolvedTemplate).contains("&enable_drain_post_dns_refresh true")
-    assertThat(resolvedTemplate).contains("config: persistent_dns_cache")
 
-    // H2
-    assertThat(resolvedTemplate).contains("&h2_delay_keepalive_timeout true")
+    // enableDNSCache = true
+    assertThat(resolvedTemplate).contains("key: dns_persistent_cache")
 
-    // H3
-    assertThat(resolvedTemplate).contains(APCF_INSERT);
+    // enableHappyEyeballs = true
+    assertThat(resolvedTemplate).contains("&dns_lookup_family ALL")
 
-    // Gzip
-    assertThat(resolvedTemplate).doesNotContain(GZIP_INSERT);
+    // enableHttp3 = false
+    assertThat(resolvedTemplate).doesNotContain("name: alternate_protocols_cache");
 
-    // Brotli
-    assertThat(resolvedTemplate).contains(BROTLI_INSERT);
+    // enableGzip = false
+    assertThat(resolvedTemplate).doesNotContain("type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip");
 
-    // Interface Binding
+    // enableBrotli = true
+    assertThat(resolvedTemplate).contains("type.googleapis.com/envoy.extensions.compression.brotli.decompressor.v3.Brotli");
+
+    // enableInterfaceBinding = true
     assertThat(resolvedTemplate).contains("&enable_interface_binding true")
 
-    // Cert Validation
-    assertThat(resolvedTemplate).contains("custom_validator_config")
-
-    // Proxying
+    // enableSkipDNSLookupForProxiedRequests = true
     assertThat(resolvedTemplate).contains("&skip_dns_lookup_for_proxied_requests true")
-  }
 
-  @Test
-  fun `resolve templates with invalid templates will throw on build`() {
-    val envoyConfiguration = buildTestEnvoyConfiguration()
-
-    try {
-      envoyConfiguration.resolveTemplate("{{ missing }}", "", "", "", "", "", "", "", "")
-      fail("Unresolved configuration keys should trigger exception.")
-    } catch (e: EnvoyConfiguration.ConfigurationException) {
-      assertThat(e.message).contains("missing")
-    }
+    // enablePlatformCertificatesValidation = true
+    assertThat(resolvedTemplate).doesNotContain("trusted_ca:")
   }
 }
