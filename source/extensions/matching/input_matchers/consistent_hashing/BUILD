@@ -3,8 +3,6 @@ load(
     "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_extension_package",
-    "envoy_rust_cxx_bridge",
-    "envoy_rust_library",
 )
 
 licenses(["notice"])  # Apache 2
@@ -15,11 +13,9 @@ envoy_cc_library(
     name = "consistent_hashing_lib",
     hdrs = ["matcher.h"],
     deps = [
-        "bridge",
-        ":matcher_rs",
         "//envoy/matcher:matcher_interface",
         "//envoy/upstream:retry_interface",
-        "@cxx.rs//:core",
+        "//source/common/common:hash_lib",
     ],
 )
 
@@ -33,30 +29,5 @@ envoy_cc_extension(
         "//envoy/registry",
         "//envoy/server:factory_context_interface",
         "@envoy_api//envoy/extensions/matching/input_matchers/consistent_hashing/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_rust_library(
-    name = "matcher_rs",
-    srcs = ["matcher.rs"],
-    deps = [
-        ":bridge",
-        "@cxx.rs//:cxx",
-    ],
-)
-
-envoy_rust_cxx_bridge(
-    name = "bridge",
-    src = "matcher.rs",
-    deps = ["hash_lib"],
-)
-
-envoy_cc_library(
-    name = "hash_lib",
-    srcs = ["hash.cc"],
-    hdrs = ["hash.h"],
-    deps = [
-        "//source/common/common:hash_lib",
-        "@cxx.rs//:core",
     ],
 )
