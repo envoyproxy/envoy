@@ -14,12 +14,6 @@ docker-compose -f docker-compose-go.yaml up --remove-orphans go_plugin_compile
 run_log "Start all of our containers"
 bring_up_example
 
-# remove compile image of go plugin
-go_plugin_image_id=$(docker images --filter=reference='golang-go_plugin_compile:*' --quiet)
-if [[ -n "$go_plugin_image_id" ]]; then
-    docker rmi --force $go_plugin_image_id
-fi
-
 run_log "Make a request handled by the Go plugin"
 responds_with_header \
     "rsp-header-from-go: bar-test" \
