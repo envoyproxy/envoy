@@ -128,6 +128,8 @@ envoy_cc_library(
     hdrs = ["happy_eyeballs_connection_impl.h"],
     deps = [
         ":connection_base_lib",
+          "//source/common/stats:lazy_init",
+
         ":connection_lib",
         ":multi_connection_base_impl_lib",
         "//envoy/upstream:upstream_interface",
