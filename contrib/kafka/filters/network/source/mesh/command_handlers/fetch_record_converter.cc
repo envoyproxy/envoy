@@ -94,11 +94,11 @@ Bytes FetchRecordConverterImpl::renderRecordBatch(
             result.begin() + sizeof(base_offset));
 
   // Set magic.
-  constexpr uint32_t magic_offset = sizeof(base_offset) + sizeof(batch_len) + sizeof(int32_t);
+  const uint32_t magic_offset = sizeof(base_offset) + sizeof(batch_len) + sizeof(int32_t);
   result[magic_offset] = MAGIC;
 
   // Compute and set CRC.
-  constexpr uint32_t crc_offset = magic_offset + 1;
+  const uint32_t crc_offset = magic_offset + 1;
   const auto crc_data_start = result.data() + crc_offset + sizeof(int32_t);
   const auto crc_data_len = result.size() - (crc_offset + sizeof(int32_t));
   const Bytes crc = renderCrc32c(crc_data_start, crc_data_len);
@@ -114,16 +114,16 @@ void FetchRecordConverterImpl::appendRecord(const InboundRecord& record, Bytes& 
   tmp.reserve(sizeof(int8_t) + sizeof(int64_t) + sizeof(int32_t) + record.dataLengthEstimate());
 
   // attributes: int8
-  constexpr int8_t attributes = 0;
+  const int8_t attributes = 0;
   tmp.push_back(static_cast<unsigned char>(attributes));
 
   // timestampDelta: varlong
-  constexpr int64_t timestamp_delta = 0;
-  Statics::writeVarlong(timestamp_delta, tmp);
+  const int64_t timestamp_delta = 0;
+  VarlenUtils::writeVarlong(timestamp_delta, tmp);
 
   // offsetDelta: varint
   const int32_t offset_delta = record.offset_;
-  Statics::writeVarint(offset_delta, tmp);
+  VarlenUtils::writeVarint(offset_delta, tmp);
 
   // Impl note: compared to requests/responses, records serialize byte arrays as varint length +
   // bytes (and not length + 1, then bytes). So we cannot use EncodingContext from serialization.h.
@@ -132,28 +132,28 @@ void FetchRecordConverterImpl::appendRecord(const InboundRecord& record, Bytes& 
   // key: byte[]
   const NullableBytes& key = record.key_;
   if (key.has_value()) {
-    Statics::writeVarint(key->size(), tmp);
+    VarlenUtils::writeVarint(key->size(), tmp);
     tmp.insert(tmp.end(), key->begin(), key->end());
   } else {
-    Statics::writeVarint(-1, tmp);
+    VarlenUtils::writeVarint(-1, tmp);
   }
 
   // valueLen: varint
   // value: byte[]
   const NullableBytes& value = record.value_;
   if (value.has_value()) {
-    Statics::writeVarint(value->size(), tmp);
+    VarlenUtils::writeVarint(value->size(), tmp);
     tmp.insert(tmp.end(), value->begin(), value->end());
   } else {
-    Statics::writeVarint(-1, tmp);
+    VarlenUtils::writeVarint(-1, tmp);
   }
 
   // TODO (adam.kotwasinski) Headers are not supported yet.
   const int32_t header_count = 0;
-  Statics::writeVarint(header_count, tmp);
+  VarlenUtils::writeVarint(header_count, tmp);
 
   // Put tmp's length into 'out'.
-  Statics::writeVarint(tmp.size(), out);
+  VarlenUtils::writeVarint(tmp.size(), out);
 
   // Put tmp's contents into 'out'.
   out.insert(out.end(), tmp.begin(), tmp.end());
