@@ -17,7 +17,7 @@ bring_up_example
 # remove compile image of go plugin
 go_plugin_image_id=$(docker images --filter=reference='golang-go_plugin_compile:*' --quiet)
 if [[ -n "$go_plugin_image_id" ]]; then
-    docker rmi --force "$go_plugin_image_id"
+    docker rmi --force $go_plugin_image_id
 fi
 
 run_log "Make a request handled by the Go plugin"
