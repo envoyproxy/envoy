@@ -1198,19 +1198,21 @@ javaObjectArrayToStringPairVector(JNIEnv* env, jobjectArray entries) {
 
 extern "C" JNIEXPORT jstring JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_compareYaml(
     JNIEnv* env, jclass, jstring yaml, jstring grpc_stats_domain, jboolean admin_interface_enabled,
-    jint connect_timeout_seconds, jint dns_refresh_seconds, jint dns_failure_refresh_seconds_base,
-    jint dns_failure_refresh_seconds_max, jint dns_query_timeout_seconds,
-    jint dns_min_refresh_seconds, jobjectArray dns_preresolve_hostnames, jboolean enable_dns_cache,
-    jint dns_cache_drain_interval_seconds, jboolean drain_post_dns_refresh_on, jboolean http3_on,
-    jboolean gzip_decompression_on, jboolean gzip_compression_on, jboolean brotli_decompression_on,
-    jboolean brotli_compression_on, jboolean socket_tagging_on, jboolean happy_eyeballs_on,
-    jboolean interface_binding_on, jint h2_connection_keepalive_idle_interval_milliseconds,
-    jint h2_connection_keepalive_timeout_seconds, jint max_connections_per_host,
-    jint stats_flush_seconds, jint stream_idle_timeout_seconds, jint per_try_idle_timeout_seconds,
-    jstring app_version, jstring app_id, jboolean enforce_trust_chain_verification,
-    jobjectArray native_clusters, jobjectArray native_filters, jobjectArray native_stats_sinks,
-    jboolean platform_certificates_validation_on,
-    jboolean skip_dns_lLookup_for_proxied_requests_on) {
+    jlong connect_timeout_seconds, jlong dns_refresh_seconds,
+    jlong dns_failure_refresh_seconds_base, jlong dns_failure_refresh_seconds_max,
+    jlong dns_query_timeout_seconds, jlong dns_min_refresh_seconds,
+    jobjectArray dns_preresolve_hostnames, jboolean enable_dns_cache,
+    jlong dns_cache_save_interval_seconds, jboolean enable_drain_post_dns_refresh,
+    jboolean enable_http3, jboolean enable_gzip_decompression, jboolean enable_gzip_compression,
+    jboolean enable_brotli_decompression, jboolean enable_brotli_compression,
+    jboolean enable_socket_tagging, jboolean enable_happy_eyeballs,
+    jboolean enable_interface_binding, jlong h2_connection_keepalive_idle_interval_milliseconds,
+    jlong h2_connection_keepalive_timeout_seconds, jlong max_connections_per_host,
+    jlong stats_flush_seconds, jlong stream_idle_timeout_seconds,
+    jlong per_try_idle_timeout_seconds, jstring app_version, jstring app_id,
+    jboolean trust_chain_verification, jobjectArray virtual_clusters, jobjectArray filter_chain,
+    jobjectArray stat_sinks, jboolean enable_platform_certificates_validation,
+    jboolean enable_skip_dns_lookup_for_proxied_requests) {
   Envoy::Platform::EngineBuilder builder;
 
   setString(env, grpc_stats_domain, &builder, &EngineBuilder::addGrpcStatsDomain);
@@ -1220,7 +1222,7 @@ extern "C" JNIEXPORT jstring JNICALL Java_io_envoyproxy_envoymobile_engine_JniLi
                                       (dns_failure_refresh_seconds_max));
   builder.addDnsQueryTimeoutSeconds((dns_query_timeout_seconds));
   builder.addDnsMinRefreshSeconds((dns_min_refresh_seconds));
-  builder.enableDnsCache(enable_dns_cache == JNI_TRUE, dns_cache_drain_interval_seconds);
+  builder.enableDnsCache(enable_dns_cache == JNI_TRUE, dns_cache_save_interval_seconds);
   builder.addMaxConnectionsPerHost((max_connections_per_host));
   builder.addH2ConnectionKeepaliveIdleIntervalMilliseconds(
       (h2_connection_keepalive_idle_interval_milliseconds));
@@ -1235,35 +1237,36 @@ extern "C" JNIEXPORT jstring JNICALL Java_io_envoyproxy_envoymobile_engine_JniLi
   builder.setStreamIdleTimeoutSeconds((stream_idle_timeout_seconds));
   builder.setPerTryIdleTimeoutSeconds((per_try_idle_timeout_seconds));
   builder.enableAdminInterface(admin_interface_enabled == JNI_TRUE);
-  builder.enableGzipDecompression(gzip_decompression_on == JNI_TRUE);
+  builder.enableGzipDecompression(enable_gzip_decompression == JNI_TRUE);
 #ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
-  builder.enableGzipCompression(gzip_compression_on == JNI_TRUE);
+  builder.enableGzipCompression(enable_gzip_compression == JNI_TRUE);
 #endif
-  builder.enableBrotliDecompression(brotli_decompression_on == JNI_TRUE);
+  builder.enableBrotliDecompression(enable_brotli_decompression == JNI_TRUE);
 #ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
-  builder.enableBrotliCompression(brotli_compression_on == JNI_TRUE);
+  builder.enableBrotliCompression(enable_brotli_compression == JNI_TRUE);
 #endif
-  builder.enableSocketTagging(socket_tagging_on == JNI_TRUE);
-  builder.enableHappyEyeballs(happy_eyeballs_on == JNI_TRUE);
-  builder.enableHttp3(http3_on == JNI_TRUE);
-  builder.enableInterfaceBinding(interface_binding_on == JNI_TRUE);
-  builder.enableDrainPostDnsRefresh(drain_post_dns_refresh_on == JNI_TRUE);
-  builder.enforceTrustChainVerification(enforce_trust_chain_verification == JNI_TRUE);
-  builder.enablePlatformCertificatesValidation(platform_certificates_validation_on == JNI_TRUE);
+  builder.enableSocketTagging(enable_socket_tagging == JNI_TRUE);
+  builder.enableHappyEyeballs(enable_happy_eyeballs == JNI_TRUE);
+  builder.enableHttp3(enable_http3 == JNI_TRUE);
+  builder.enableInterfaceBinding(enable_interface_binding == JNI_TRUE);
+  builder.enableDrainPostDnsRefresh(enable_drain_post_dns_refresh == JNI_TRUE);
+  builder.enforceTrustChainVerification(trust_chain_verification == JNI_TRUE);
+  builder.enablePlatformCertificatesValidation(enable_platform_certificates_validation == JNI_TRUE);
   builder.setForceAlwaysUsev6(true);
-  builder.setSkipDnsLookupForProxiedRequests(skip_dns_lLookup_for_proxied_requests_on == JNI_TRUE);
+  builder.setSkipDnsLookupForProxiedRequests(enable_skip_dns_lookup_for_proxied_requests ==
+                                             JNI_TRUE);
 
   const char* native_yaml = env->GetStringUTFChars(yaml, nullptr);
 
-  auto filters = javaObjectArrayToStringPairVector(env, native_filters);
+  auto filters = javaObjectArrayToStringPairVector(env, filter_chain);
   for (std::pair<std::string, std::string>& filter : filters) {
     builder.addNativeFilter(filter.first, filter.second);
   }
-  std::vector<std::string> clusters = javaObjectArrayToStringVector(env, native_clusters);
+  std::vector<std::string> clusters = javaObjectArrayToStringVector(env, virtual_clusters);
   for (std::string& cluster : clusters) {
     builder.addVirtualCluster(cluster);
   }
-  std::vector<std::string> sinks = javaObjectArrayToStringVector(env, native_stats_sinks);
+  std::vector<std::string> sinks = javaObjectArrayToStringVector(env, stat_sinks);
   builder.addStatsSinks(std::move(sinks));
 
   std::vector<std::string> hostnames = javaObjectArrayToStringVector(env, dns_preresolve_hostnames);
