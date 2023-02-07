@@ -20,8 +20,9 @@ class EmptyServerPreferredAddressConfigFactory
 public:
   // EnvoyQuicConnectionIdGeneratorConfigFactory.
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
-  EnvoyQuicServerPreferredAddressConfigPtr
-  createServerPreferredAddressConfig(const Protobuf::Message& config) override;
+  EnvoyQuicServerPreferredAddressConfigPtr createServerPreferredAddressConfig(
+      const Protobuf::Message& config,
+      ProtobufMessage::ValidationVisitor& validation_visitor) override;
 
   std::string name() const override { return "envoy.quic.empty_server_preferred_address"; }
 };

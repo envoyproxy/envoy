@@ -12,7 +12,7 @@ ProtobufTypes::MessagePtr EmptyServerPreferredAddressConfigFactory::createEmptyC
 
 EnvoyQuicServerPreferredAddressConfigPtr
 EmptyServerPreferredAddressConfigFactory::createServerPreferredAddressConfig(
-    const Protobuf::Message&) {
+    const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) {
   return std::make_unique<EmptyServerPreferredAddressConfig>();
 }
 

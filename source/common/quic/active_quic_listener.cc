@@ -304,7 +304,8 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
       server_preferred_address_config_factory.createServerPreferredAddressConfig(
           *Config::Utility::translateToFactoryConfig(config.server_preferred_address_config(),
                                                      validation_visitor,
-                                                     server_preferred_address_config_factory));
+                                                     server_preferred_address_config_factory),
+          validation_visitor);
 
 #if defined(SO_ATTACH_REUSEPORT_CBPF) && defined(__linux__)
   if (!disable_kernel_bpf_packet_routing_for_test_) {

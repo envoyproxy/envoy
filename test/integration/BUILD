@@ -1974,6 +1974,7 @@ envoy_cc_test(
         "nofips",
     ],
     deps = envoy_select_enable_http3([
+        ":testing_server_preferred_address_config_lib",
         "//test/common/config:dummy_config_proto_cc_proto",
         "//test/extensions/transport_sockets/tls/cert_validator:timed_cert_validator",
         ":http_integration_lib",
@@ -2109,4 +2110,20 @@ envoy_cc_test(
 envoy_proto_library(
     name = "xds_config_tracker_test_proto",
     srcs = ["xds_config_tracker_test.proto"],
+)
+
+envoy_proto_library(
+    name = "testing_server_preferred_address_config_proto",
+    srcs = ["testing_server_preferred_address_config.proto"],
+)
+
+envoy_cc_test_library(
+    name = "testing_server_preferred_address_config_lib",
+    srcs = [
+        "testing_server_preferred_address_config.h",
+    ],
+    deps = [
+        ":testing_server_preferred_address_config_proto_cc_proto",
+        "//source/common/quic:envoy_quic_server_preferred_address_config_factory_interface",
+    ],
 )

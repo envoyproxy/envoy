@@ -28,6 +28,8 @@
 #include "test/extensions/transport_sockets/tls/cert_validator/timed_cert_validator.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/ssl_utility.h"
+#include "test/integration/testing_server_preferred_address_config.h"
+#include "test/integration/testing_server_preferred_address_config.pb.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
@@ -1632,34 +1634,6 @@ TEST_P(QuicInplaceLdsIntegrationTest, StatelessResetOldConnection) {
   }
 }
 
-class TestServerPreferredAddressConfig : public EnvoyQuicServerPreferredAddressConfig {
-public:
-  std::pair<quic::QuicSocketAddress, quic::QuicSocketAddress> getServerPreferredAddresses(
-      const Network::Address::InstanceConstSharedPtr& local_address) override {
-    int32_t port = local_address->ip()->port();
-    quic::QuicIpAddress ip_v4;
-    ip_v4.FromString("127.0.0.2");
-    quic::QuicIpAddress ip_v6;
-    ip_v6.FromString("::2");
-    return {quic::QuicSocketAddress(ip_v4, port), quic::QuicSocketAddress(ip_v6, port)};
-  }
-};
-
-class TestServerPreferredAddressConfigFactory
-    : public EnvoyQuicServerPreferredAddressConfigFactory {
-public:
-  std::string name() const override { return "quic.server_preferred_address.test"; }
-
-  EnvoyQuicServerPreferredAddressConfigPtr
-  createServerPreferredAddressConfig(const Protobuf::Message&) override {
-    return std::make_unique<TestServerPreferredAddressConfig>();
-  }
-
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
-  }
-};
-
 TEST_P(QuicHttpIntegrationTest, UsesPreferredAddress) {
   autonomous_upstream_ = true;
   config_helper_.addConfigModifier([=](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
@@ -1674,11 +1648,15 @@ TEST_P(QuicHttpIntegrationTest, UsesPreferredAddress) {
                                          ->mutable_udp_listener_config()
                                          ->mutable_quic_options()
                                          ->mutable_server_preferred_address_config();
+    // Configure a loopback interface as the server's preferred address.
     preferred_address_config->set_name("quic.server_preferred_address.test");
-    preferred_address_config->mutable_typed_config()->PackFrom(Envoy::ProtobufWkt::Struct());
+    test::integration::TestingServerPreferredAddressConfig server_preferred_address;
+    server_preferred_address.set_ipv4_address("127.0.0.2");
+    server_preferred_address.set_ipv6_address("::2");
+    preferred_address_config->mutable_typed_config()->PackFrom(server_preferred_address);
   });
 
-  TestServerPreferredAddressConfigFactory factory;
+  TestingServerPreferredAddressConfigFactory factory;
   Envoy::Registry::InjectFactory<EnvoyQuicServerPreferredAddressConfigFactory> registration(
       factory);
   initialize();
@@ -1690,10 +1668,10 @@ TEST_P(QuicHttpIntegrationTest, UsesPreferredAddress) {
       static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
   EXPECT_EQ(Network::Test::getLoopbackAddressString(version_),
             quic_connection_->peer_address().host().ToString());
-  ASSERT_TRUE(version_ == Network::Address::IpVersion::v4 &&
-                  quic_session->config()->HasReceivedIPv4AlternateServerAddress() ||
-              version_ == Network::Address::IpVersion::v6 &&
-                  quic_session->config()->HasReceivedIPv6AlternateServerAddress());
+  ASSERT_TRUE((version_ == Network::Address::IpVersion::v4 &&
+               quic_session->config()->HasReceivedIPv4AlternateServerAddress()) ||
+              (version_ == Network::Address::IpVersion::v6 &&
+               quic_session->config()->HasReceivedIPv6AlternateServerAddress()));
   ASSERT_TRUE(quic_connection_->waitForHandshakeDone());
   EXPECT_TRUE(quic_connection_->IsValidatingServerPreferredAddress());
   Http::TestRequestHeaderMapImpl request_headers{
