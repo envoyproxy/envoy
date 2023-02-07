@@ -562,6 +562,12 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     envoy::extensions::filters::http::compressor::v3::Compressor compressor_config;
     compressor_config.mutable_compressor_library()->set_name("gzip");
     compressor_config.mutable_compressor_library()->mutable_typed_config()->PackFrom(gzip_config);
+    auto* common_request =
+        compressor_config.mutable_request_direction_config()->mutable_common_config();
+    common_request->mutable_enabled()->mutable_default_value()->set_value(true);
+    auto* common_response =
+        compressor_config.mutable_response_direction_config()->mutable_common_config();
+    common_response->mutable_enabled()->mutable_default_value()->set_value(false);
     auto* gzip_filter = hcm->add_http_filters();
     gzip_filter->set_name("envoy.filters.http.compressor");
     gzip_filter->mutable_typed_config()->PackFrom(compressor_config);
@@ -593,6 +599,9 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     auto* common_request =
         compressor_config.mutable_request_direction_config()->mutable_common_config();
     common_request->mutable_enabled()->mutable_default_value()->set_value(true);
+    auto* common_response =
+        compressor_config.mutable_response_direction_config()->mutable_common_config();
+    common_response->mutable_enabled()->mutable_default_value()->set_value(false);
     auto* brotli_filter = hcm->add_http_filters();
     brotli_filter->set_name("envoy.filters.http.compressor");
     brotli_filter->mutable_typed_config()->PackFrom(compressor_config);

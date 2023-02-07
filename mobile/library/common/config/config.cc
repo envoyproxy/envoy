@@ -65,6 +65,7 @@ const char* gzip_compressor_config_insert = R"(
         name: gzip
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip
+          window_bits: 15
       request_direction_config:
         common_config:
           enabled:
