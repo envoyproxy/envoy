@@ -4,6 +4,7 @@
 #include <string>
 
 #include "source/common/common/assert.h"
+#include "source/common/common/cleanup.h"
 #include "source/common/common/utility.h"
 #include "source/common/filesystem/directory.h"
 #include "source/common/filesystem/filesystem_impl.h"
@@ -349,6 +350,16 @@ TEST_F(FileSystemImplTest, PwriteWritesTheSpecifiedRange) {
   EXPECT_EQ(contents, "01BOOPS789");
 }
 
+TEST_F(FileSystemImplTest, StatOnDirectoryReturnsDirectoryType) {
+  const std::string new_dir_path = TestEnvironment::temporaryPath("envoy_test_dir");
+  TestEnvironment::createPath(new_dir_path);
+  Cleanup cleanup{[new_dir_path]() { TestEnvironment::removePath(new_dir_path); }};
+  const Api::IoCallResult<FileInfo> info_result = file_system_.stat(new_dir_path);
+  EXPECT_THAT(info_result.err_, ::testing::IsNull()) << info_result.err_->getErrorDetails();
+  EXPECT_EQ(info_result.return_value_.name_, "envoy_test_dir");
+  EXPECT_EQ(info_result.return_value_.file_type_, FileType::Directory);
+}
+
 TEST_F(FileSystemImplTest, StatOnFileOpenOrClosedMeasuresTheExpectedValues) {
   const std::string file_path =
       TestEnvironment::writeStringToFileForTest("test_envoy", "0123456789");
@@ -420,6 +431,46 @@ TEST_F(FileSystemImplTest, StatOnBrokenSymlinkReturnsRegularFile) {
   EXPECT_EQ(0, ::unlink(link_path.c_str())) << errno;
 }
 #endif
+
+#ifndef WIN32
+// No mkfifo on Windows.
+TEST_F(FileSystemImplTest, StatOnFifoReturnsOtherFileType) {
+  const std::string fifo_path = TestEnvironment::temporaryPath("test_envoy_fifo");
+  ::mkfifo(fifo_path.c_str(), 0666);
+  const Api::IoCallResult<FileInfo> info_result = file_system_.stat(fifo_path);
+  if (info_result.err_ != nullptr) {
+    // Only do this test if we created a fifo successfully. If the test env can't
+    // do it then we can't test this behavior.
+    Cleanup cleanup{[fifo_path]() { ::unlink(fifo_path.c_str()); }};
+    EXPECT_EQ(info_result.return_value_.file_type_, FileType::Other);
+    EXPECT_EQ(info_result.return_value_.name_, "test_envoy_fifo");
+  }
+}
+#endif
+
+TEST_F(FileSystemImplTest, InfoOnInvalidedFileDescriptorReturnsError) {
+  const std::string file_path =
+      TestEnvironment::writeStringToFileForTest("test_envoy", "0123456789");
+  FilePathAndType file_info{Filesystem::DestinationType::File, file_path};
+  FilePtr file = file_system_.createFile(file_info);
+  const Api::IoCallBoolResult open_result = file->open(
+      FlagSet{(1 << Filesystem::File::Operation::Write) | (1 << Filesystem::File::Operation::Read) |
+              (1 << Filesystem::File::Operation::KeepExistingData)});
+  EXPECT_TRUE(open_result.return_value_) << open_result.err_->getErrorDetails();
+  // Close the file descriptor to make it invalid.
+  EXPECT_EQ(0, ::close(getFd(file.get())));
+  const Api::IoCallResult<FileInfo> info_result = file->info();
+  EXPECT_THAT(info_result.err_, testing::NotNull());
+  // Close the file even though it's already closed, so we don't assert in the destructor.
+  file->close();
+}
+
+TEST_F(FileSystemImplTest, StatOnNonexistentFileReturnsError) {
+  const std::string nonexistent_path =
+      TestEnvironment::temporaryPath("test_envoy_nonexistent_file");
+  const Api::IoCallResult<FileInfo> stat_result = file_system_.stat(nonexistent_path);
+  EXPECT_THAT(stat_result.err_, testing::NotNull());
+}
 
 TEST_F(FileSystemImplTest, PwriteFailureReturnsError) {
   const std::string file_path =
