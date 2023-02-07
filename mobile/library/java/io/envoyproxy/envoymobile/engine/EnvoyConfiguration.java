@@ -342,12 +342,12 @@ public class EnvoyConfiguration {
 
     for (StackTraceElement element : Thread.currentThread().getStackTrace()) {
       if (element.getClassName().startsWith("org.junit.")) {
-        List<EnvoyNativeFilterConfig> reverseFilterChain = nativeFilterChain;
+        List<EnvoyNativeFilterConfig> reverseFilterChain = new ArrayList<>(nativeFilterChain);
         Collections.reverse(reverseFilterChain);
         Boolean enforceTrustChainVerification =
             trustChainVerification == EnvoyConfiguration.TrustChainVerification.VERIFY_TRUST_CHAIN;
 
-        byte[][] filter_chain = JniBridgeUtility.toJniBytes(nativeFilterChain);
+        byte[][] filter_chain = JniBridgeUtility.toJniBytes(reverseFilterChain);
         byte[][] clusters = JniBridgeUtility.stringsToJniBytes(virtualClusters);
         byte[][] stats_sinks = JniBridgeUtility.stringsToJniBytes(statSinks);
         byte[][] dns_preresolve = JniBridgeUtility.stringsToJniBytes(dnsPreresolveHostnames);
