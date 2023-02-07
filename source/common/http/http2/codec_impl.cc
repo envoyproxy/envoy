@@ -779,7 +779,7 @@ void ConnectionImpl::StreamImpl::resetStreamWorker(StreamResetReason reason) {
   }
   if (stream_adapter_) {
     // TODO(kbaichoo): probably either push this downward or rename reason?:
-    stream_adapter_->onCodecTimeoutPendingFlush();
+    stream_adapter_->onCodecLowLevelReset();
   }
   parent_.adapter_->SubmitRst(stream_id_,
                               static_cast<http2::adapter::Http2ErrorCode>(reasonToReset(reason)));

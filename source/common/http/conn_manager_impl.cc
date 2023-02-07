@@ -1737,17 +1737,12 @@ void ConnectionManagerImpl::ActiveStream::onCodecEncodeComplete() {
   }
 }
 
-void ConnectionManagerImpl::ActiveStream::onCodecTimeoutPendingFlush() {
+void ConnectionManagerImpl::ActiveStream::onCodecLowLevelReset() {
   ASSERT(!state_.codec_encode_complete_);
   state_.on_reset_stream_called_ = true;
-  // Can be other reasons e.g. this is a low-level reset.
   ENVOY_STREAM_LOG(debug, "Codec timed out flushing stream", *this);
 
-  // TODO(kbaichoo): update to reflect failure
-  // Update timing
-  filter_manager_.streamInfo().downstreamTiming().onLastDownstreamTxByteSent(
-      connection_manager_.time_source_);
-  request_response_timespan_->complete();
+  // TODO(kbaichoo): Update streamInfo to account for the reset.
 
   // Only reap stream once.
   if (state_.is_zombie_stream_) {

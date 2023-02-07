@@ -337,10 +337,10 @@ public:
   virtual void onCodecEncodeComplete() PURE;
 
   /**
-   * Called when the underlying codec has serialized the response but the
-   * it has not been flushed.
+   * Called when the underlying codec has a low level reset.
+   * e.g. Envoy serialized the response but it has not been flushed.
    */
-  virtual void onCodecTimeoutPendingFlush() PURE;
+  virtual void onCodecLowLevelReset() PURE;
 };
 
 /**

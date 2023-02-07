@@ -235,7 +235,10 @@ private:
     // Stream
     void addCallbacks(StreamCallbacks& callbacks) override { addCallbacksHelper(callbacks); }
     void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacksHelper(callbacks); }
-    StreamAdapter* registerStreamAdapter(StreamAdapter* /*adapter*/) override { return nullptr; }
+    StreamAdapter* registerStreamAdapter(StreamAdapter* adapter) override {
+      std::swap(adapter, adapter_);
+      return adapter;
+    }
 
     void resetStream(StreamResetReason) override;
     Network::ConnectionInfoProvider& connectionInfoProvider() override {
@@ -276,6 +279,27 @@ private:
     // Latches latency info from stream info before it goes away.
     void saveFinalStreamIntel();
 
+    // Various signals to propagate to the adapter.
+    enum class AdapterSignal { EncodeComplete, Error, Cancel };
+
+    // Used to notify adapter of stream's completion.
+    void notifyAdapter(AdapterSignal signal) {
+      if (adapter_) {
+        switch (signal) {
+        case AdapterSignal::EncodeComplete:
+          adapter_->onCodecEncodeComplete();
+          break;
+        case AdapterSignal::Error:
+          FALLTHRU;
+        case AdapterSignal::Cancel:
+          // TODO(kbaichoo): use better argument here...
+          // e.g. ErrorForReason or something?
+          adapter_->onCodecLowLevelReset();
+        }
+        registerStreamAdapter(nullptr);
+      }
+    }
+
     const envoy_stream_t stream_handle_;
 
     // Used to issue outgoing HTTP stream operations.
@@ -283,6 +307,9 @@ private:
     // Used to receive incoming HTTP stream operations.
     DirectStreamCallbacksPtr callbacks_;
     Client& parent_;
+    // Used to communicate with the HTTP Connection Manager that
+    // it can destroy the active stream.
+    StreamAdapter* adapter_{nullptr};
     // Response details used by the connection manager.
     absl::string_view response_details_;
     // Tracks read disable calls. Different buffers can call read disable, and

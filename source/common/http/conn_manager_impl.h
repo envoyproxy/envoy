@@ -187,7 +187,7 @@ private:
 
     // Http::StreamAdapter
     void onCodecEncodeComplete() override;
-    void onCodecTimeoutPendingFlush() override;
+    void onCodecLowLevelReset() override;
 
     // Http::StreamDecoder
     void decodeData(Buffer::Instance& data, bool end_stream) override;

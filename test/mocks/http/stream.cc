@@ -36,6 +36,12 @@ MockStream::MockStream() : connection_info_provider_(nullptr, nullptr) {
   ON_CALL(*this, setAccount(_))
       .WillByDefault(Invoke(
           [this](Buffer::BufferMemoryAccountSharedPtr account) -> void { account_ = account; }));
+
+  ON_CALL(*this, registerStreamAdapter(_))
+      .WillByDefault(Invoke([this](StreamAdapter* adapter) -> StreamAdapter* {
+        std::swap(adapter, adapter_);
+        return adapter;
+      }));
 }
 
 MockStream::~MockStream() {
