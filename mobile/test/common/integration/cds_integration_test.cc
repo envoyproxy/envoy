@@ -8,7 +8,7 @@
 
 namespace Envoy {
 namespace {
-const char ClusterName[] = "newcluster";
+constexpr char ClusterName[] = "newcluster";
 
 class CdsIntegrationTest : public XdsIntegrationTest {
 public:
