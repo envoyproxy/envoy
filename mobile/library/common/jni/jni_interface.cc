@@ -1197,20 +1197,26 @@ javaObjectArrayToStringPairVector(JNIEnv* env, jobjectArray entries) {
 
   return ret;
 }
-void configureBuilder(
-    JNIEnv* env, jstring grpc_stats_domain, jboolean admin_interface_enabled,
-    jint connect_timeout_seconds, jint dns_refresh_seconds, jint dns_failure_refresh_seconds_base,
-    jint dns_failure_refresh_seconds_max, jint dns_query_timeout_seconds,
-    jint dns_min_refresh_seconds, jobjectArray dns_preresolve_hostnames, jboolean enable_dns_cache,
-    jint dns_cache_flush_interval_seconds, jboolean drain_post_dns_refresh_on, jboolean http3_on,
-    jboolean gzip_on, jboolean brotli_on, jboolean socket_tagging_on, jboolean happy_eyeballs_on,
-    jboolean interface_binding_on, jint h2_connection_keepalive_idle_interval_milliseconds,
-    jint h2_connection_keepalive_timeout_seconds, jint max_connections_per_host,
-    jint stats_flush_seconds, jint stream_idle_timeout_seconds, jint per_try_idle_timeout_seconds,
-    jstring app_version, jstring app_id, jboolean enforce_trust_chain_verification,
-    jobjectArray native_clusters, jobjectArray native_filters, jobjectArray native_stats_sinks,
-    jboolean platform_certificates_validation_on, jboolean skip_dns_lookup_for_proxied_requests_on,
-    Envoy::Platform::EngineBuilder& builder) {
+
+void configureBuilder(JNIEnv* env, jstring grpc_stats_domain, jboolean admin_interface_enabled,
+                      jlong connect_timeout_seconds, jlong dns_refresh_seconds,
+                      jlong dns_failure_refresh_seconds_base, jlong dns_failure_refresh_seconds_max,
+                      jlong dns_query_timeout_seconds, jlong dns_min_refresh_seconds,
+                      jobjectArray dns_preresolve_hostnames, jboolean enable_dns_cache,
+                      jlong dns_cache_save_interval_seconds, jboolean enable_drain_post_dns_refresh,
+                      jboolean enable_http3, jboolean enable_gzip, jboolean enable_brotli,
+                      jboolean enable_socket_tagging, jboolean enable_happy_eyeballs,
+                      jboolean enable_interface_binding,
+                      jlong h2_connection_keepalive_idle_interval_milliseconds,
+                      jlong h2_connection_keepalive_timeout_seconds, jlong max_connections_per_host,
+                      jlong stats_flush_seconds, jlong stream_idle_timeout_seconds,
+                      jlong per_try_idle_timeout_seconds, jstring app_version, jstring app_id,
+                      jboolean trust_chain_verification, jobjectArray virtual_clusters,
+                      jobjectArray filter_chain, jobjectArray stat_sinks,
+                      jboolean enable_platform_certificates_validation,
+                      jboolean enable_skip_dns_lookup_for_proxied_requests,
+                      Envoy::Platform::EngineBuilder& builder) {
+
   setString(env, grpc_stats_domain, &builder, &EngineBuilder::addGrpcStatsDomain);
   builder.addConnectTimeoutSeconds((connect_timeout_seconds));
   builder.addDnsRefreshSeconds((dns_refresh_seconds));
@@ -1218,7 +1224,7 @@ void configureBuilder(
                                       (dns_failure_refresh_seconds_max));
   builder.addDnsQueryTimeoutSeconds((dns_query_timeout_seconds));
   builder.addDnsMinRefreshSeconds((dns_min_refresh_seconds));
-  builder.enableDnsCache(enable_dns_cache == JNI_TRUE, dns_cache_flush_interval_seconds);
+  builder.enableDnsCache(enable_dns_cache == JNI_TRUE, dns_cache_save_interval_seconds);
   builder.addMaxConnectionsPerHost((max_connections_per_host));
   builder.addH2ConnectionKeepaliveIdleIntervalMilliseconds(
       (h2_connection_keepalive_idle_interval_milliseconds));
@@ -1233,95 +1239,98 @@ void configureBuilder(
   builder.setStreamIdleTimeoutSeconds((stream_idle_timeout_seconds));
   builder.setPerTryIdleTimeoutSeconds((per_try_idle_timeout_seconds));
   builder.enableAdminInterface(admin_interface_enabled == JNI_TRUE);
-  builder.enableGzip(gzip_on == JNI_TRUE);
-  builder.enableBrotli(brotli_on == JNI_TRUE);
-  builder.enableSocketTagging(socket_tagging_on == JNI_TRUE);
-  builder.enableHappyEyeballs(happy_eyeballs_on == JNI_TRUE);
-  builder.enableHttp3(http3_on == JNI_TRUE);
-  builder.enableInterfaceBinding(interface_binding_on == JNI_TRUE);
-  builder.enableDrainPostDnsRefresh(drain_post_dns_refresh_on == JNI_TRUE);
-  builder.enforceTrustChainVerification(enforce_trust_chain_verification == JNI_TRUE);
-  builder.enablePlatformCertificatesValidation(platform_certificates_validation_on == JNI_TRUE);
+  builder.enableGzip(enable_gzip == JNI_TRUE);
+  builder.enableBrotli(enable_brotli == JNI_TRUE);
+  builder.enableSocketTagging(enable_socket_tagging == JNI_TRUE);
+  builder.enableHappyEyeballs(enable_happy_eyeballs == JNI_TRUE);
+  builder.enableHttp3(enable_http3 == JNI_TRUE);
+  builder.enableInterfaceBinding(enable_interface_binding == JNI_TRUE);
+  builder.enableDrainPostDnsRefresh(enable_drain_post_dns_refresh == JNI_TRUE);
+  builder.enforceTrustChainVerification(trust_chain_verification == JNI_TRUE);
+  builder.enablePlatformCertificatesValidation(enable_platform_certificates_validation == JNI_TRUE);
   builder.setForceAlwaysUsev6(true);
-  builder.setSkipDnsLookupForProxiedRequests(skip_dns_lookup_for_proxied_requests_on == JNI_TRUE);
+  builder.setSkipDnsLookupForProxiedRequests(enable_skip_dns_lookup_for_proxied_requests ==
+                                             JNI_TRUE);
 
-  auto filters = javaObjectArrayToStringPairVector(env, native_filters);
+  auto filters = javaObjectArrayToStringPairVector(env, filter_chain);
   for (std::pair<std::string, std::string>& filter : filters) {
     builder.addNativeFilter(filter.first, filter.second);
   }
-  std::vector<std::string> clusters = javaObjectArrayToStringVector(env, native_clusters);
+  std::vector<std::string> clusters = javaObjectArrayToStringVector(env, virtual_clusters);
   for (std::string& cluster : clusters) {
     builder.addVirtualCluster(cluster);
   }
-  std::vector<std::string> sinks = javaObjectArrayToStringVector(env, native_stats_sinks);
+  std::vector<std::string> sinks = javaObjectArrayToStringVector(env, stat_sinks);
   builder.addStatsSinks(std::move(sinks));
 
   std::vector<std::string> hostnames = javaObjectArrayToStringVector(env, dns_preresolve_hostnames);
   builder.addDnsPreresolveHostnames(hostnames);
 }
 
-extern "C" JNIEXPORT jstring JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_compareYaml(
+extern "C" JNIEXPORT void JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_compareYaml(
     JNIEnv* env, jclass, jstring yaml, jstring grpc_stats_domain, jboolean admin_interface_enabled,
-    jint connect_timeout_seconds, jint dns_refresh_seconds, jint dns_failure_refresh_seconds_base,
-    jint dns_failure_refresh_seconds_max, jint dns_query_timeout_seconds,
-    jint dns_min_refresh_seconds, jobjectArray dns_preresolve_hostnames, jboolean enable_dns_cache,
-    jint dns_cache_flush_interval_seconds, jboolean drain_post_dns_refresh_on, jboolean http3_on,
-    jboolean gzip_on, jboolean brotli_on, jboolean socket_tagging_on, jboolean happy_eyeballs_on,
-    jboolean interface_binding_on, jint h2_connection_keepalive_idle_interval_milliseconds,
-    jint h2_connection_keepalive_timeout_seconds, jint max_connections_per_host,
-    jint stats_flush_seconds, jint stream_idle_timeout_seconds, jint per_try_idle_timeout_seconds,
-    jstring app_version, jstring app_id, jboolean enforce_trust_chain_verification,
-    jobjectArray native_clusters, jobjectArray native_filters, jobjectArray native_stats_sinks,
-    jboolean platform_certificates_validation_on,
-    jboolean skip_dns_lookup_for_proxied_requests_on) {
-  Envoy::Platform::EngineBuilder builder;
+    jlong connect_timeout_seconds, jlong dns_refresh_seconds,
+    jlong dns_failure_refresh_seconds_base, jlong dns_failure_refresh_seconds_max,
+    jlong dns_query_timeout_seconds, jlong dns_min_refresh_seconds,
+    jobjectArray dns_preresolve_hostnames, jboolean enable_dns_cache,
+    jlong dns_cache_save_interval_seconds, jboolean enable_drain_post_dns_refresh,
+    jboolean enable_http3, jboolean enable_gzip, jboolean enable_brotli,
+    jboolean enable_socket_tagging, jboolean enable_happy_eyeballs,
+    jboolean enable_interface_binding, jlong h2_connection_keepalive_idle_interval_milliseconds,
+    jlong h2_connection_keepalive_timeout_seconds, jlong max_connections_per_host,
+    jlong stats_flush_seconds, jlong stream_idle_timeout_seconds,
+    jlong per_try_idle_timeout_seconds, jstring app_version, jstring app_id,
+    jboolean trust_chain_verification, jobjectArray virtual_clusters, jobjectArray filter_chain,
+    jobjectArray stat_sinks, jboolean enable_platform_certificates_validation,
+    jboolean enable_skip_dns_lookup_for_proxied_requests) {
 
+  Envoy::Platform::EngineBuilder builder;
   configureBuilder(
       env, grpc_stats_domain, admin_interface_enabled, connect_timeout_seconds, dns_refresh_seconds,
       dns_failure_refresh_seconds_base, dns_failure_refresh_seconds_max, dns_query_timeout_seconds,
       dns_min_refresh_seconds, dns_preresolve_hostnames, enable_dns_cache,
-      dns_cache_flush_interval_seconds, drain_post_dns_refresh_on, http3_on, gzip_on, brotli_on,
-      socket_tagging_on, happy_eyeballs_on, interface_binding_on,
+      dns_cache_save_interval_seconds, enable_drain_post_dns_refresh, enable_http3, enable_gzip,
+      enable_brotli, enable_socket_tagging, enable_happy_eyeballs, enable_interface_binding,
       h2_connection_keepalive_idle_interval_milliseconds, h2_connection_keepalive_timeout_seconds,
       max_connections_per_host, stats_flush_seconds, stream_idle_timeout_seconds,
-      per_try_idle_timeout_seconds, app_version, app_id, enforce_trust_chain_verification,
-      native_clusters, native_filters, native_stats_sinks, platform_certificates_validation_on,
-      skip_dns_lookup_for_proxied_requests_on, builder);
+      per_try_idle_timeout_seconds, app_version, app_id, trust_chain_verification, virtual_clusters,
+      filter_chain, stat_sinks, enable_platform_certificates_validation,
+      enable_skip_dns_lookup_for_proxied_requests, builder);
 
   const char* native_yaml = env->GetStringUTFChars(yaml, nullptr);
   builder.generateBootstrapAndCompareForTests(native_yaml);
   env->ReleaseStringUTFChars(yaml, native_yaml);
-  jstring result = env->NewStringUTF(config_template);
-  return result;
 }
 
 extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_createBootstrap(
     JNIEnv* env, jclass, jstring grpc_stats_domain, jboolean admin_interface_enabled,
-    jint connect_timeout_seconds, jint dns_refresh_seconds, jint dns_failure_refresh_seconds_base,
-    jint dns_failure_refresh_seconds_max, jint dns_query_timeout_seconds,
-    jint dns_min_refresh_seconds, jobjectArray dns_preresolve_hostnames, jboolean enable_dns_cache,
-    jint dns_cache_flush_interval_seconds, jboolean drain_post_dns_refresh_on, jboolean http3_on,
-    jboolean gzip_on, jboolean brotli_on, jboolean socket_tagging_on, jboolean happy_eyeballs_on,
-    jboolean interface_binding_on, jint h2_connection_keepalive_idle_interval_milliseconds,
-    jint h2_connection_keepalive_timeout_seconds, jint max_connections_per_host,
-    jint stats_flush_seconds, jint stream_idle_timeout_seconds, jint per_try_idle_timeout_seconds,
-    jstring app_version, jstring app_id, jboolean enforce_trust_chain_verification,
-    jobjectArray native_clusters, jobjectArray native_filters, jobjectArray native_stats_sinks,
-    jboolean platform_certificates_validation_on,
-    jboolean skip_dns_lookup_for_proxied_requests_on) {
+    jlong connect_timeout_seconds, jlong dns_refresh_seconds,
+    jlong dns_failure_refresh_seconds_base, jlong dns_failure_refresh_seconds_max,
+    jlong dns_query_timeout_seconds, jlong dns_min_refresh_seconds,
+    jobjectArray dns_preresolve_hostnames, jboolean enable_dns_cache,
+    jlong dns_cache_save_interval_seconds, jboolean enable_drain_post_dns_refresh,
+    jboolean enable_http3, jboolean enable_gzip, jboolean enable_brotli,
+    jboolean enable_socket_tagging, jboolean enable_happy_eyeballs,
+    jboolean enable_interface_binding, jlong h2_connection_keepalive_idle_interval_milliseconds,
+    jlong h2_connection_keepalive_timeout_seconds, jlong max_connections_per_host,
+    jlong stats_flush_seconds, jlong stream_idle_timeout_seconds,
+    jlong per_try_idle_timeout_seconds, jstring app_version, jstring app_id,
+    jboolean trust_chain_verification, jobjectArray virtual_clusters, jobjectArray filter_chain,
+    jobjectArray stat_sinks, jboolean enable_platform_certificates_validation,
+    jboolean enable_skip_dns_lookup_for_proxied_requests) {
   Envoy::Platform::EngineBuilder builder;
 
   configureBuilder(
       env, grpc_stats_domain, admin_interface_enabled, connect_timeout_seconds, dns_refresh_seconds,
       dns_failure_refresh_seconds_base, dns_failure_refresh_seconds_max, dns_query_timeout_seconds,
       dns_min_refresh_seconds, dns_preresolve_hostnames, enable_dns_cache,
-      dns_cache_flush_interval_seconds, drain_post_dns_refresh_on, http3_on, gzip_on, brotli_on,
-      socket_tagging_on, happy_eyeballs_on, interface_binding_on,
+      dns_cache_save_interval_seconds, enable_drain_post_dns_refresh, enable_http3, enable_gzip,
+      enable_brotli, enable_socket_tagging, enable_happy_eyeballs, enable_interface_binding,
       h2_connection_keepalive_idle_interval_milliseconds, h2_connection_keepalive_timeout_seconds,
       max_connections_per_host, stats_flush_seconds, stream_idle_timeout_seconds,
-      per_try_idle_timeout_seconds, app_version, app_id, enforce_trust_chain_verification,
-      native_clusters, native_filters, native_stats_sinks, platform_certificates_validation_on,
-      skip_dns_lookup_for_proxied_requests_on, builder);
+      per_try_idle_timeout_seconds, app_version, app_id, trust_chain_verification, virtual_clusters,
+      filter_chain, stat_sinks, enable_platform_certificates_validation,
+      enable_skip_dns_lookup_for_proxied_requests, builder);
 
   return reinterpret_cast<intptr_t>(builder.generateBootstrap().release());
 }

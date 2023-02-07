@@ -353,7 +353,7 @@ public class JniLibrary {
    * To be used for testing.
    *
    */
-  public static native String compareYaml(
+  public static native void compareYaml(
       String yaml, String grpcStatsDomain, boolean adminInterfaceEnabled,
       long connectTimeoutSeconds, long dnsRefreshSeconds, long dnsFailureRefreshSecondsBase,
       long dnsFailureRefreshSecondsMax, long dnsQueryTimeoutSeconds, long dnsMinRefreshSeconds,
