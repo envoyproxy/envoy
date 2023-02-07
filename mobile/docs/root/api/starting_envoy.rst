@@ -383,7 +383,7 @@ Specify whether to enable transparent response Gzip decompression. Defaults to t
   // Swift
   builder.enableGzipDecompression(false)
 
-Default values from the `proto <https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/compression/gzip/decompressor/v3/gzip.proto>`_
+Default values from the `gzip decompressor proto <https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/compression/gzip/decompressor/v3/gzip.proto>`_
 are used.
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -400,7 +400,7 @@ Specify whether to enable transparent request Gzip compression. Defaults to fals
   // Swift
   builder.enableGzipCompression(true)
 
-Default values from the `proto <https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/compression/gzip/compressor/v3/gzip.proto>`_
+Default values from the `gzip compressor proto <https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/compression/gzip/compressor/v3/gzip.proto>`_
 are used.
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -417,7 +417,7 @@ Specify whether to enable transparent response Brotli decompression. Defaults to
   // Swift
   builder.enableBrotliDecompression(true)
 
-Default values from the `proto <https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/compression/brotli/decompressor/v3/brotli.proto>`_
+Default values from the `brotli decompressor proto <https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/compression/brotli/decompressor/v3/brotli.proto>`_
 are used.
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -434,7 +434,7 @@ Specify whether to enable transparent request Brotli compression. Defaults to fa
   // Swift
   builder.enableBrotliCompression(true)
 
-Default values from the `proto <https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/compression/brotli/compressor/v3/brotli.proto>`_
+Default values from the `brotli compressor proto <https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/compression/brotli/compressor/v3/brotli.proto>`_
 are used.
 
 ~~~~~~~~~~~~~~~~~~~~~~~
