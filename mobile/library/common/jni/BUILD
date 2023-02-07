@@ -1,5 +1,5 @@
 load("//bazel:android_debug_info.bzl", "android_debug_info")
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_package")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_package", "envoy_select_envoy_mobile_request_compression")
 
 licenses(["notice"])  # Apache 2
 
@@ -53,9 +53,14 @@ cc_library(
     srcs = [
         "jni_interface.cc",
     ],
+    copts = envoy_select_envoy_mobile_request_compression(
+        ["-DENVOY_MOBILE_REQUEST_COMPRESSION"],
+        "@envoy",
+    ),
     deps = [
         ":android_network_utility_lib",
         ":jni_utility_lib",
+        "//library/cc:engine_builder_lib",
         "//library/common:envoy_main_interface_lib",
         "//library/common/api:c_types",
         "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",

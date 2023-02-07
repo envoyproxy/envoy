@@ -26,8 +26,10 @@ open class EngineBuilder: NSObject {
   private var enableDNSCache: Bool = false
   private var dnsCacheSaveIntervalSeconds: UInt32 = 1
   private var enableHappyEyeballs: Bool = true
-  private var enableGzip: Bool = true
-  private var enableBrotli: Bool = false
+  private var enableGzipDecompression: Bool = true
+  private var enableGzipCompression: Bool = false
+  private var enableBrotliDecompression: Bool = false
+  private var enableBrotliCompression: Bool = false
   private var enableHttp3: Bool = true
   private var enableInterfaceBinding: Bool = false
   private var enforceTrustChainVerification: Bool = true
@@ -206,25 +208,51 @@ open class EngineBuilder: NSObject {
 
   /// Specify whether to do gzip response decompression or not.  Defaults to true.
   ///
-  /// - parameter enableGzip: whether or not to gunzip responses.
+  /// - parameter enableGzipDecompression: whether or not to gunzip responses.
   ///
   /// - returns: This builder.
   @discardableResult
-  public func enableGzip(_ enableGzip: Bool) -> Self {
-    self.enableGzip = enableGzip
+  public func enableGzipDecompression(_ enableGzipDecompression: Bool) -> Self {
+    self.enableGzipDecompression = enableGzipDecompression
     return self
   }
 
-  /// Specify whether to do brotli response decompression or not.  Defaults to false.
+#if ENVOY_MOBILE_REQUEST_COMPRESSION
+  /// Specify whether to do gzip request compression or not.  Defaults to false.
   ///
-  /// - parameter enableBrotli: whether or not to brotli decompress responses.
+  /// - parameter enableGzipCompression: whether or not to gunzip requests.
   ///
   /// - returns: This builder.
   @discardableResult
-  public func enableBrotli(_ enableBrotli: Bool) -> Self {
-    self.enableBrotli = enableBrotli
+  public func enableGzipCompression(_ enableGzipCompression: Bool) -> Self {
+    self.enableGzipCompression = enableGzipCompression
     return self
   }
+#endif
+
+  /// Specify whether to do brotli response decompression or not.  Defaults to false.
+  ///
+  /// - parameter enableBrotliDecompression: whether or not to brotli decompress responses.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func enableBrotliDecompression(_ enableBrotliDecompression: Bool) -> Self {
+    self.enableBrotliDecompression = enableBrotliDecompression
+    return self
+  }
+
+#if ENVOY_MOBILE_REQUEST_COMPRESSION
+  /// Specify whether to do brotli request compression or not.  Defaults to false.
+  ///
+  /// - parameter enableBrotliCompression: whether or not to brotli compress requests.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func enableBrotliCompression(_ enableBrotliCompression: Bool) -> Self {
+    self.enableBrotliCompression = enableBrotliCompression
+    return self
+  }
+#endif
 
   /// Specify whether to enable support for HTTP/3 or not.  Defaults to true.
   ///
@@ -553,8 +581,10 @@ open class EngineBuilder: NSObject {
       dnsCacheSaveIntervalSeconds: self.dnsCacheSaveIntervalSeconds,
       enableHappyEyeballs: self.enableHappyEyeballs,
       enableHttp3: self.enableHttp3,
-      enableGzip: self.enableGzip,
-      enableBrotli: self.enableBrotli,
+      enableGzipDecompression: self.enableGzipDecompression,
+      enableGzipCompression: self.enableGzipCompression,
+      enableBrotliDecompression: self.enableBrotliDecompression,
+      enableBrotliCompression: self.enableBrotliCompression,
       enableInterfaceBinding: self.enableInterfaceBinding,
       enableDrainPostDnsRefresh: self.enableDrainPostDnsRefresh,
       enforceTrustChainVerification: self.enforceTrustChainVerification,

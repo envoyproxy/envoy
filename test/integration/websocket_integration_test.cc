@@ -178,10 +178,8 @@ void WebsocketIntegrationTest::sendBidirectionalData() {
 
 TEST_P(WebsocketIntegrationTest, WebSocketConnectionDownstreamDisconnect) {
 #ifdef ENVOY_ENABLE_UHV
-  if (downstreamProtocol() == Http::CodecType::HTTP2) {
-    // TODO(#23286) - add web socket support for H2 UHV
-    return;
-  }
+  // TODO(#23286) - add web socket support for H2 UHV
+  return;
 #endif
 
   config_helper_.addConfigModifier(setRouteUsingWebsocket());
@@ -277,10 +275,8 @@ TEST_P(WebsocketIntegrationTest, EarlyData) {
 
 TEST_P(WebsocketIntegrationTest, WebSocketConnectionIdleTimeout) {
 #ifdef ENVOY_ENABLE_UHV
-  if (downstreamProtocol() == Http::CodecType::HTTP2) {
-    // TODO(#23286) - add web socket support for H2 UHV
-    return;
-  }
+  // TODO(#23286) - add web socket support for H2 UHV
+  return;
 #endif
 
   config_helper_.addConfigModifier(setRouteUsingWebsocket());
@@ -308,10 +304,8 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionIdleTimeout) {
 // with websocket upgrades
 TEST_P(WebsocketIntegrationTest, NonWebsocketUpgrade) {
 #ifdef ENVOY_ENABLE_UHV
-  if (downstreamProtocol() == Http::CodecType::HTTP2) {
-    // TODO(#23286) - add web socket support for H2 UHV
-    return;
-  }
+  // TODO(#23286) - add web socket support for H2 UHV
+  return;
 #endif
 
   config_helper_.addConfigModifier(
@@ -343,10 +337,8 @@ TEST_P(WebsocketIntegrationTest, NonWebsocketUpgrade) {
 
 TEST_P(WebsocketIntegrationTest, RouteSpecificUpgrade) {
 #ifdef ENVOY_ENABLE_UHV
-  if (downstreamProtocol() == Http::CodecType::HTTP2) {
-    // TODO(#23286) - add web socket support for H2 UHV
-    return;
-  }
+  // TODO(#23286) - add web socket support for H2 UHV
+  return;
 #endif
 
   config_helper_.addConfigModifier(
@@ -380,10 +372,8 @@ TEST_P(WebsocketIntegrationTest, RouteSpecificUpgrade) {
 
 TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
 #ifdef ENVOY_ENABLE_UHV
-  if (downstreamProtocol() == Http::CodecType::HTTP2) {
-    // TODO(#23286) - add web socket support for H2 UHV
-    return;
-  }
+  // TODO(#23286) - add web socket support for H2 UHV
+  return;
 #endif
 
   config_helper_.addConfigModifier(setRouteUsingWebsocket());

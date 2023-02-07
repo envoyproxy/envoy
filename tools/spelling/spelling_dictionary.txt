@@ -6,6 +6,7 @@ ABI
 ACK
 ACL
 AES
+AllMuxes
 ALPN
 ALS
 AMZ
@@ -1374,6 +1375,7 @@ vip
 virtualhost
 virtualize
 vptr
+vtable
 vtt
 wakeup
 wakeups
