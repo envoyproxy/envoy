@@ -467,9 +467,43 @@ void DecoderImpl::skipStrings(Buffer::Instance& data, uint64_t& offset) {
   }
 }
 
-void DecoderImpl::onData(Buffer::Instance& data) { decode(data, DecodeType::READ); }
+Network::FilterStatus DecoderImpl::onData(Buffer::Instance& data) {
+  return decodeAfterBuffer(data, DecodeType::READ);
+}
 
-void DecoderImpl::onWrite(Buffer::Instance& data) { decode(data, DecodeType::WRITE); }
+Network::FilterStatus DecoderImpl::onWrite(Buffer::Instance& data) {
+  return decodeAfterBuffer(data, DecodeType::WRITE);
+}
+
+Network::FilterStatus DecoderImpl::decodeAfterBuffer(Buffer::Instance& data, DecodeType dtype) {
+  uint64_t offset = 0;
+  int32_t len = 0;
+
+  while (offset < data.length()) {
+    try {
+      // Peek packet length.
+      len = helper_.peekInt32(data, offset);
+      ensureMinLength(len, INT_LENGTH + XID_LENGTH);
+      ensureMaxLength(len);
+      offset += len;
+    } catch (const EnvoyException& e) {
+      ENVOY_LOG(debug, "zookeeper_proxy: decoding exception {}", e.what());
+      callbacks_.onDecodeError();
+      return Network::FilterStatus::Continue;
+    }
+  }
+
+  if (offset == data.length()) {
+    decode(data, dtype);
+    return Network::FilterStatus::Continue;
+  }
+
+  ENVOY_LOG(trace,
+            "zookeeper_proxy: waiting for entire packets in the buffer, current buffer "
+            "is {} bytes",
+            data.length());
+  return Network::FilterStatus::StopIteration;
+}
 
 void DecoderImpl::decode(Buffer::Instance& data, DecodeType dtype) {
   uint64_t offset = 0;

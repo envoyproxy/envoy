@@ -156,6 +156,7 @@ envoy_cc_library(
         "//envoy/config:typed_metadata_interface",
         "//envoy/http:codec_interface",
         "//envoy/http:filter_factory_interface",
+        "//envoy/http:header_validator_interface",
         "//envoy/network:connection_interface",
         "//envoy/network:transport_socket_interface",
         "//envoy/runtime:runtime_interface",

@@ -12,6 +12,7 @@ concurrency:
 
 jobs:
   unittests:
+    if: github.repository == 'envoyproxy/envoy'
     name: unit_tests
     runs-on: ubuntu-20.04
     timeout-minutes: 120
