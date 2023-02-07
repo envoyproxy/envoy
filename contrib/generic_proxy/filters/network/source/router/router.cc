@@ -30,15 +30,12 @@ UpstreamRequest::UpstreamRequest(RouterFilter& parent, Upstream::TcpPoolData tcp
   parent_.callbacks_->streamInfo().setUpstreamInfo(stream_info_.upstreamInfo());
 
   stream_info_.healthCheck(parent_.callbacks_->streamInfo().healthCheck());
-  absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info =
-      parent_.callbacks_->streamInfo().upstreamClusterInfo();
-  if (cluster_info.has_value()) {
-    stream_info_.setUpstreamClusterInfo(*cluster_info);
-  }
+  stream_info_.setUpstreamClusterInfo(parent_.cluster_);
 
-  if (auto tracing_config = parent_.callbacks_->tracingConfig(); tracing_config.has_value()) {
+  tracing_config_ = parent_.callbacks_->tracingConfig();
+  if (tracing_config_.has_value()) {
     span_ = parent_.callbacks_->activeSpan().spawnChild(
-        tracing_config.value().get(),
+        tracing_config_.value().get(),
         absl::StrCat("router ", parent_.cluster_->observabilityName(), " egress"),
         parent.context_.mainThreadDispatcher().timeSource().systemTime());
   }
@@ -72,7 +69,7 @@ void UpstreamRequest::resetStream(StreamResetReason reason) {
     span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
     span_->setTag(Tracing::Tags::get().ErrorReason, resetReasonToStringView(reason));
     Tracing::TracerUtility::finalizeSpan(*span_, *parent_.request_, stream_info_,
-                                         parent_.callbacks_->tracingConfig().value(), true);
+                                         tracing_config_.value().get(), true);
   }
 
   parent_.onUpstreamRequestReset(*this, reason);
@@ -81,7 +78,7 @@ void UpstreamRequest::resetStream(StreamResetReason reason) {
 void UpstreamRequest::completeUpstreamRequest() {
   if (span_ != nullptr) {
     Tracing::TracerUtility::finalizeSpan(*span_, *parent_.request_, stream_info_,
-                                         parent_.callbacks_->tracingConfig().value(), true);
+                                         tracing_config_.value().get(), true);
   }
 
   response_complete_ = true;
@@ -259,9 +256,9 @@ void RouterFilter::kickOffNewUpstreamRequest() {
   }
 
   cluster_ = thread_local_cluster->info();
+  callbacks_->streamInfo().setUpstreamClusterInfo(cluster_);
 
-  auto cluster_info = thread_local_cluster->info();
-  if (cluster_info->maintenanceMode()) {
+  if (cluster_->maintenanceMode()) {
     callbacks_->sendLocalReply(Status(StatusCode::kUnavailable, "cluster_maintain_mode"));
     filter_complete_ = true;
     return;

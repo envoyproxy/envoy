@@ -357,24 +357,27 @@ TEST(BasicFilterConfigTest, TestConfigurationWithTracing) {
           collector_endpoint_version: HTTP_JSON
     )EOF";
 
-  MockStreamCodecFactoryConfig codec_factory_config;
+  NiceMock<MockStreamCodecFactoryConfig> codec_factory_config;
   Registry::InjectFactory<CodecFactoryConfig> registration(codec_factory_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  factory_context.server_factory_context_.cluster_manager_.initializeClusters({"zipkin"}, {});
+  factory_context.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
+      {"zipkin"});
 
   Factory factory;
 
   envoy::extensions::filters::network::generic_proxy::v3::GenericProxy config;
   TestUtility::loadFromYaml(config_yaml, config);
 
-  auto mock_codec_factory = std::make_unique<MockCodecFactory>();
+  auto mock_codec_factory = std::make_unique<NiceMock<MockCodecFactory>>();
 
   EXPECT_CALL(codec_factory_config, createCodecFactory(_, _))
       .WillOnce(Return(testing::ByMove(std::move(mock_codec_factory))));
 
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, factory_context);
   EXPECT_NE(nullptr, cb);
-  Network::MockFilterManager filter_manager;
+  NiceMock<Network::MockFilterManager> filter_manager;
   cb(filter_manager);
 }
 

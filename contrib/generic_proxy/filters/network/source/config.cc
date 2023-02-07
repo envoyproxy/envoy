@@ -120,8 +120,8 @@ Factory::createFilterFactoryFromProtoTyped(const ProxyConfig& proto_config,
       return;
     }
 
-    filter_manager.addReadFilter(
-        std::make_shared<Filter>(config, context.mainThreadDispatcher().timeSource()));
+    filter_manager.addReadFilter(std::make_shared<Filter>(
+        config, context.mainThreadDispatcher().timeSource(), context.runtime()));
   };
 }
 

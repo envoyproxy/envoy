@@ -91,6 +91,8 @@ public:
   bool expect_response_{};
 
   StreamInfo::StreamInfoImpl stream_info_;
+
+  OptRef<const Tracing::Config> tracing_config_;
   Tracing::SpanPtr span_;
 };
 using UpstreamRequestPtr = std::unique_ptr<UpstreamRequest>;

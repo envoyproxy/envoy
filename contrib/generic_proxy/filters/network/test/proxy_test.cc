@@ -173,7 +173,8 @@ public:
         .WillOnce(
             Invoke([this](RequestDecoderCallback& callback) { decoder_callback_ = &callback; }));
 
-    filter_ = std::make_shared<Filter>(filter_config_);
+    filter_ = std::make_shared<Filter>(filter_config_, factory_context_.time_system_,
+                                       factory_context_.runtime_loader_);
 
     EXPECT_EQ(filter_.get(), decoder_callback_);
 
@@ -716,8 +717,7 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithTracing) {
       .WillOnce(
           Invoke([&](const Tracing::Config& config, Tracing::TraceContext&,
                      const StreamInfo::StreamInfo&, const Tracing::Decision) -> Tracing::Span* {
-            EXPECT_EQ(Tracing::OperationName::Ingress, config.operationName());
-
+            EXPECT_EQ(Tracing::OperationName::Egress, config.operationName());
             return span;
           }));
 
