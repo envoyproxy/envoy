@@ -3,6 +3,21 @@
 #include "rust/cxx.h"
 #include "envoy/network/connection.h"
 
-Envoy::Network::Connection& connection(Envoy::Network::ReadFilterCallbacks& callbacks);
+struct FutureHandle;
 
-void write(Envoy::Network::Connection& connection, Envoy::Buffer::Instance& data, bool end_stream);
+struct PollHandle {
+  rust::Box<FutureHandle> future_;
+};
+
+// Per thread future execution context.
+class Executor {
+public:
+  explicit Executor(Envoy::Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
+
+  Envoy::Event::Dispatcher& dispatcher_;
+  std::vector<PollHandle> pending_poll_handles_;
+};
+
+void register_future_with_executor(Executor& executor, rust::Box<FutureHandle> future) {
+  executor.pending_poll_handles_.push_back(PollHandle{std::move(future)});
+}

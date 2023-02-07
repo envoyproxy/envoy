@@ -4,21 +4,21 @@
 #include "envoy/server/filter_config.h"
 
 #include "source/extensions/filters/network/common/factory_base.h"
-#include "source/extensions/filters/network/echo/echo.h"
+#include "source/extensions/filters/network/rust_executor/echo.h"
 #include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace Echo {
+namespace RustExecutor {
 
 /**
  * Config registration for the echo filter. @see NamedNetworkFilterConfigFactory.
  */
-class EchoConfigFactory
+class RustExecutorFactory
     : public Common::FactoryBase<envoy::extensions::filters::network::echo::v3::Echo> {
 public:
-  EchoConfigFactory() : FactoryBase(NetworkFilterNames::get().Echo) {}
+  RustExecutorFactory() : FactoryBase(NetworkFilterNames::get().Echo) {}
 
 private:
   Network::FilterFactoryCb
@@ -38,10 +38,10 @@ private:
 /**
  * Static registration for the echo filter. @see RegisterFactory.
  */
-LEGACY_REGISTER_FACTORY(EchoConfigFactory, Server::Configuration::NamedNetworkFilterConfigFactory,
+LEGACY_REGISTER_FACTORY(RustExecutorFactory, Server::Configuration::NamedNetworkFilterConfigFactory,
                         "envoy.echo");
 
-} // namespace Echo
+} // namespace RustExecutor
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

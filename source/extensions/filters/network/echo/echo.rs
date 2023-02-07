@@ -1,12 +1,5 @@
 #[cxx::bridge]
 mod ffi {
-    #[namespace = "Envoy::Network"]
-    #[repr(u32)]
-    enum FilterStatus {
-        Continue,
-        StopIteration,
-    }
-
     unsafe extern "C++" {
         include!("envoy/network/filter.h");
         include!("envoy/buffer/buffer.h");
@@ -18,16 +11,17 @@ mod ffi {
         type Instance;
 
         #[namespace = "Envoy::Network"]
-        type FilterStatus;
-
-        #[namespace = "Envoy::Network"]
         type Connection;
 
         include!("source/extensions/filters/network/echo/rust_support.h");
 
-        fn connection(read_callbacks: Pin<&mut ReadFilterCallbacks>) -> Pin<&mut Connection>;
+        type Executor;
 
-        fn write(connection: Pin<&mut Connection>, data: Pin<&mut Instance>, end_stream: bool);
+        fn register_future_with_executor(executor: Pin<&mut Executor>, future: Box<FutureHandle>);
+
+        type WaitForDataHandle;
+
+        fn notify_waiting_for_data(executor: Pin<&mut Executor>) -> Pin<&WaitForDataHandle>;
     }
 
     extern "Rust" {
@@ -35,18 +29,16 @@ mod ffi {
 
         fn create_filter(read_callbacks: Pin<&mut ReadFilterCallbacks>) -> Box<EchoFilter<'_>>;
 
-        fn on_new_connection(filter: &mut EchoFilter) -> FilterStatus;
+        fn on_new_connection(filter: &mut EchoFilter, executor: Pin<&mut Executor>);
 
-        fn on_data(
-            filter: &mut EchoFilter,
-            buffer: Pin<&mut Instance>,
-            end_stream: bool,
-        ) -> FilterStatus;
+        type FutureHandle;
     }
 }
 
-use crate::ffi::{connection, write, FilterStatus, Instance, ReadFilterCallbacks};
+use crate::ffi::{ReadFilterCallbacks, Executor};
 use std::pin::Pin;
+use std::future::Future;
+use std::task::{Context, Poll};
 
 struct EchoFilter<'a> {
     read_callbacks: Pin<&'a mut ReadFilterCallbacks>,
@@ -56,16 +48,39 @@ fn create_filter(read_callbacks: Pin<&mut ReadFilterCallbacks>) -> Box<EchoFilte
     Box::new(EchoFilter { read_callbacks })
 }
 
-fn on_new_connection(_filter: &mut EchoFilter) -> FilterStatus {
-    FilterStatus::Continue
+fn register_future<'a>(executor: Pin<&'a mut Executor>, future: impl Future<Output = ()> + 'a) {
+    ffi::register_future_with_executor(executor, Box::new(FutureHandle { future: Box::new(future) }))
 }
 
-fn on_data(filter: &mut EchoFilter, buffer: Pin<&mut Instance>, end_stream: bool) -> FilterStatus {
-    write(
-        connection(filter.read_callbacks.as_mut()),
-        buffer,
-        end_stream,
-    );
+fn on_new_connection(_filter: &mut EchoFilter, mut executor: Pin<&mut Executor>) {
+   register_future(executor.as_mut(), on_new_connection_async(FilterApi { executor }))
+}
 
-    FilterStatus::Continue
+struct FilterApi<'a> {
+    executor: Pin<&'a mut Executor>
+}
+
+impl<'a> FilterApi<'a> {
+    fn data(&mut self) -> DataFuture<'a> {
+        let handle = ffi::notify_waiting_for_data(self.executor.as_mut());
+
+        DataFuture { handle }
+    }
+}
+
+struct DataFuture<'a> {
+    handle: Pin<&'a ffi::WaitForDataHandle>
+}
+
+impl<'a> Future for DataFuture<'a> {
+    type Output = (&'a[u8], bool);
+fn poll(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<<Self as Future>::Output> { todo!() }
+}
+
+async fn on_new_connection_async(mut api: FilterApi<'_>) {
+    let (data, end_stream) = api.data().await;
+}
+
+pub struct FutureHandle {
+    future: Box<dyn Future<Output = ()>>,
 }

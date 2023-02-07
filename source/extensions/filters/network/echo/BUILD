@@ -22,6 +22,7 @@ envoy_cc_library(
         ":bridge",
         ":echo_rs",
         "//envoy/buffer:buffer_interface",
+        "//envoy/event:dispatcher_interface",
         "//envoy/network:connection_interface",
         "//envoy/network:filter_interface",
         "//source/common/common:assert_lib",
