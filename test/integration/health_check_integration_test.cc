@@ -669,6 +669,15 @@ TEST_P(TcpHealthCheckIntegrationTest, DisableHCForActiveTraffic) {
 
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.health_check.success")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
+
+  timeSystem().advanceTimeWait(std::chrono::seconds(10));
+
+  test_server_->waitForCounterEq("cluster.cluster_1.health_check.attempt", 3);
+  result = clusters_[cluster_idx].host_fake_raw_connection_->write("Pong");
+  RELEASE_ASSERT(result, result.message());
+
+  EXPECT_EQ(2, test_server_->counter("cluster.cluster_1.health_check.success")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.health_check.failure")->value());
 }
 
 // Tests that an invalid response fails the health check.
