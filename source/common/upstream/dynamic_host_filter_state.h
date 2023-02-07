@@ -10,7 +10,7 @@ public:
   DynamicHostFilterState(absl::string_view host) : host_(host) {}
   const std::string& value() const { return host_; }
   static const std::string& key() {
-    CONSTRUCT_ON_FIRST_USE(std::string, "envoy.clusters.dynamic_host_filter_state");
+    CONSTRUCT_ON_FIRST_USE(std::string, "envoy.upstream.dynamic_host");
   }
 
 private:
