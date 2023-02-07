@@ -297,7 +297,7 @@ stages:
         AZP_BRANCH: $(Build.SourceBranch)
 
 - stage: linux_x64
-  dependsOn: ["env", "precheck"]
+  dependsOn: ["env"]  # , "precheck"]
   # For post-submit builds, continue even if precheck fails
   condition: and(not(canceled()), or(succeeded(), eq(variables['PostSubmit'], true)))
   jobs:
@@ -328,7 +328,7 @@ stages:
         echo "linux_x64 released"
 
 - stage: linux_arm64
-  dependsOn: ["env", "precheck"]
+  dependsOn: ["env"]  # , "precheck"]
   # For post-submit builds, continue even if precheck fails
   condition: and(not(canceled()), or(succeeded(), eq(variables['PostSubmit'], true)))
   jobs:
