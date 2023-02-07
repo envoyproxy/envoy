@@ -409,17 +409,17 @@ std::string EngineBuilder::generateConfigStr() const {
   if (socket_tagging_filter_) {
     insertCustomFilter(socket_tag_config_insert, config_template);
   }
-  if (brotli_decompression_filter_) {
-    insertCustomFilter(brotli_decompressor_config_insert, config_template);
-  }
   if (brotli_compression_filter_) {
     insertCustomFilter(brotli_compressor_config_insert, config_template);
   }
-  if (gzip_decompression_filter_) {
-    insertCustomFilter(gzip_decompressor_config_insert, config_template);
+  if (brotli_decompression_filter_) {
+    insertCustomFilter(brotli_decompressor_config_insert, config_template);
   }
   if (gzip_compression_filter_) {
     insertCustomFilter(gzip_compressor_config_insert, config_template);
+  }
+  if (gzip_decompression_filter_) {
+    insertCustomFilter(gzip_decompressor_config_insert, config_template);
   }
   if (enable_http3_) {
     insertCustomFilter(alternate_protocols_cache_filter_insert, config_template);
