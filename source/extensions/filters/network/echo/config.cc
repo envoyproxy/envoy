@@ -4,7 +4,7 @@
 #include "envoy/server/filter_config.h"
 
 #include "source/extensions/filters/network/common/factory_base.h"
-#include "source/extensions/filters/network/rust_executor/echo.h"
+#include "source/extensions/filters/network/echo/echo.h"
 #include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
