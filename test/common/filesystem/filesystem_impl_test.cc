@@ -433,13 +433,13 @@ TEST_F(FileSystemImplTest, StatOnBrokenSymlinkReturnsRegularFile) {
 #endif
 
 #ifndef WIN32
-// No mkfifo on Windows.
+// There's no `mkfifo` on Windows.
 TEST_F(FileSystemImplTest, StatOnFifoReturnsOtherFileType) {
   const std::string fifo_path = TestEnvironment::temporaryPath("test_envoy_fifo");
   ::mkfifo(fifo_path.c_str(), 0666);
   const Api::IoCallResult<FileInfo> info_result = file_system_.stat(fifo_path);
   if (info_result.err_ != nullptr) {
-    // Only do this test if we created a fifo successfully. If the test env can't
+    // Only do this test if we created a pipe successfully. If the test env can't
     // do it then we can't test this behavior.
     Cleanup cleanup{[fifo_path]() { ::unlink(fifo_path.c_str()); }};
     EXPECT_EQ(info_result.return_value_.file_type_, FileType::Other);
