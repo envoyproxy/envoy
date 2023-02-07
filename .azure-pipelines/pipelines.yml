@@ -195,6 +195,7 @@ stages:
         ENVOY_RBE: "true"
         BAZEL_BUILD_EXTRA_OPTIONS: "--config=remote-ci --jobs=$(RbeJobs)"
         AZP_BRANCH: $(Build.SourceBranch)
+        AZP_COMMIT_SHA: $(system.pullRequest.sourceCommitId)
         ENVOY_DOCKER_BUILD_DIR: $(Build.StagingDirectory)
         BAZEL_REMOTE_CACHE: grpcs://remotebuildexecution.googleapis.com
         BAZEL_REMOTE_INSTANCE: projects/envoy-ci/instances/default_instance
@@ -687,6 +688,7 @@ stages:
       workingDirectory: $(Build.SourcesDirectory)
       condition: eq(variables['isDev'], 'false')
       env:
+        AZP_BRANCH: $(Build.SourceBranch)
         GITHUB_TOKEN: $(GitHubPublicRepoOnlyAccessToken)
 
   - job: assets

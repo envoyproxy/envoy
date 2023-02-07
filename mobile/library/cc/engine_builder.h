@@ -64,12 +64,18 @@ public:
   EngineBuilder& enableDrainPostDnsRefresh(bool drain_post_dns_refresh_on);
   EngineBuilder& enforceTrustChainVerification(bool trust_chain_verification_on);
   EngineBuilder& enablePlatformCertificatesValidation(bool platform_certificates_validation_on);
-  EngineBuilder& enableDnsCache(bool dns_cache_on);
+  // Adds an RTDS layer to default config. Requires that ADS be configured
+  EngineBuilder& addRtdsLayer(const std::string& layer_name, int timeout_seconds = 5);
+  // Adds an ADS layer.
+  EngineBuilder& setAggregatedDiscoveryService(const std::string& api_type,
+                                               const std::string& address, const int port);
+  EngineBuilder& enableDnsCache(bool dns_cache_on, int save_interval_seconds = 1);
   EngineBuilder& setForceAlwaysUsev6(bool value);
+  EngineBuilder& setSkipDnsLookupForProxiedRequests(bool value);
   EngineBuilder& addDnsPreresolveHostnames(const std::vector<std::string>& hostnames);
   EngineBuilder& addNativeFilter(std::string name, std::string typed_config);
   EngineBuilder& enableAdminInterface(bool admin_interface_on);
-  EngineBuilder& addStatsSink(std::string name, std::string typed_config);
+  EngineBuilder& addStatsSinks(std::vector<std::string> stat_sinks);
   EngineBuilder& addPlatformFilter(std::string name);
   EngineBuilder& addVirtualCluster(std::string virtual_cluster);
 
@@ -128,7 +134,13 @@ private:
   bool brotli_filter_ = false;
   bool socket_tagging_filter_ = false;
   bool platform_certificates_validation_on_ = false;
+  std::string rtds_layer_name_ = "";
+  int rtds_timeout_seconds_;
+  std::string ads_api_type_ = "";
+  std::string ads_address_ = "";
+  int ads_port_;
   bool dns_cache_on_ = false;
+  int dns_cache_save_interval_seconds_ = 1;
 
   absl::flat_hash_map<std::string, KeyValueStoreSharedPtr> key_value_stores_{};
 
@@ -142,7 +154,7 @@ private:
   bool always_use_v6_ = false;
   int dns_min_refresh_seconds_ = 60;
   int max_connections_per_host_ = 7;
-  std::vector<std::pair<std::string, std::string>> stats_sinks_;
+  std::vector<std::string> stats_sinks_;
 
   std::vector<NativeFilterConfig> native_filter_chain_;
   std::vector<std::string> dns_preresolve_hostnames_;
@@ -150,6 +162,7 @@ private:
 
   absl::flat_hash_map<std::string, StringAccessorSharedPtr> string_accessors_;
   bool config_bootstrap_incompatible_ = false;
+  bool skip_dns_lookups_for_proxied_requests_ = false;
 };
 
 using EngineBuilderSharedPtr = std::shared_ptr<EngineBuilder>;

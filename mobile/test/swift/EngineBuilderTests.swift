@@ -452,6 +452,7 @@ final class EngineBuilderTests: XCTestCase {
       dnsMinRefreshSeconds: 100,
       dnsPreresolveHostnames: "[test]",
       enableDNSCache: false,
+      dnsCacheSaveIntervalSeconds: 0,
       enableHappyEyeballs: true,
       enableHttp3: true,
       enableGzip: true,
@@ -546,6 +547,7 @@ final class EngineBuilderTests: XCTestCase {
       dnsMinRefreshSeconds: 100,
       dnsPreresolveHostnames: "[test]",
       enableDNSCache: true,
+      dnsCacheSaveIntervalSeconds: 10,
       enableHappyEyeballs: false,
       enableHttp3: false,
       enableGzip: false,
@@ -588,10 +590,11 @@ final class EngineBuilderTests: XCTestCase {
       "@type": type.googleapis.com/envoymobile.extensions.key_value.platform.PlatformKeyValueStoreConfig
       key: dns_persistent_cache
       save_interval:
-        seconds: 0
+        seconds: *persistent_dns_cache_save_interval
       max_entries: 100
 """
     ))
+    XCTAssertTrue(resolvedYAML.contains("&persistent_dns_cache_save_interval 10"))
 // swiftlint:enable line_length
     XCTAssertTrue(resolvedYAML.contains("&enable_interface_binding false"))
     XCTAssertTrue(resolvedYAML.contains("&trust_chain_verification VERIFY_TRUST_CHAIN"))
@@ -621,6 +624,7 @@ final class EngineBuilderTests: XCTestCase {
       dnsMinRefreshSeconds: 100,
       dnsPreresolveHostnames: "[test]",
       enableDNSCache: false,
+      dnsCacheSaveIntervalSeconds: 0,
       enableHappyEyeballs: false,
       enableHttp3: false,
       enableGzip: false,
