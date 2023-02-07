@@ -159,14 +159,27 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_altProtocolCacheFilterInsert(JN
 }
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_io_envoyproxy_envoymobile_engine_JniLibrary_gzipConfigInsert(JNIEnv* env, jclass) {
-  jstring result = env->NewStringUTF(gzip_config_insert);
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_gzipDecompressorConfigInsert(JNIEnv* env, jclass) {
+  jstring result = env->NewStringUTF(gzip_decompressor_config_insert);
   return result;
 }
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_io_envoyproxy_envoymobile_engine_JniLibrary_brotliConfigInsert(JNIEnv* env, jclass) {
-  jstring result = env->NewStringUTF(brotli_config_insert);
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_gzipCompressorConfigInsert(JNIEnv* env, jclass) {
+  jstring result = env->NewStringUTF(gzip_compressor_config_insert);
+  return result;
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_brotliDecompressorConfigInsert(JNIEnv* env,
+                                                                                jclass) {
+  jstring result = env->NewStringUTF(brotli_decompressor_config_insert);
+  return result;
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_brotliCompressorConfigInsert(JNIEnv* env, jclass) {
+  jstring result = env->NewStringUTF(brotli_compressor_config_insert);
   return result;
 }
 
@@ -1190,7 +1203,8 @@ extern "C" JNIEXPORT jstring JNICALL Java_io_envoyproxy_envoymobile_engine_JniLi
     jlong dns_query_timeout_seconds, jlong dns_min_refresh_seconds,
     jobjectArray dns_preresolve_hostnames, jboolean enable_dns_cache,
     jlong dns_cache_save_interval_seconds, jboolean enable_drain_post_dns_refresh,
-    jboolean enable_http3, jboolean enable_gzip, jboolean enable_brotli,
+    jboolean enable_http3, jboolean enable_gzip_decompression, jboolean enable_gzip_compression,
+    jboolean enable_brotli_decompression, jboolean enable_brotli_compression,
     jboolean enable_socket_tagging, jboolean enable_happy_eyeballs,
     jboolean enable_interface_binding, jlong h2_connection_keepalive_idle_interval_milliseconds,
     jlong h2_connection_keepalive_timeout_seconds, jlong max_connections_per_host,
@@ -1223,8 +1237,14 @@ extern "C" JNIEXPORT jstring JNICALL Java_io_envoyproxy_envoymobile_engine_JniLi
   builder.setStreamIdleTimeoutSeconds((stream_idle_timeout_seconds));
   builder.setPerTryIdleTimeoutSeconds((per_try_idle_timeout_seconds));
   builder.enableAdminInterface(admin_interface_enabled == JNI_TRUE);
-  builder.enableGzip(enable_gzip == JNI_TRUE);
-  builder.enableBrotli(enable_brotli == JNI_TRUE);
+  builder.enableGzipDecompression(enable_gzip_decompression == JNI_TRUE);
+#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
+  builder.enableGzipCompression(enable_gzip_compression == JNI_TRUE);
+#endif
+  builder.enableBrotliDecompression(enable_brotli_decompression == JNI_TRUE);
+#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
+  builder.enableBrotliCompression(enable_brotli_compression == JNI_TRUE);
+#endif
   builder.enableSocketTagging(enable_socket_tagging == JNI_TRUE);
   builder.enableHappyEyeballs(enable_happy_eyeballs == JNI_TRUE);
   builder.enableHttp3(enable_http3 == JNI_TRUE);

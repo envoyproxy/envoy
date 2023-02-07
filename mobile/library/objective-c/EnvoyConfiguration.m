@@ -17,8 +17,10 @@
                       dnsCacheSaveIntervalSeconds:(UInt32)dnsCacheSaveIntervalSeconds
                               enableHappyEyeballs:(BOOL)enableHappyEyeballs
                                       enableHttp3:(BOOL)enableHttp3
-                                       enableGzip:(BOOL)enableGzip
-                                     enableBrotli:(BOOL)enableBrotli
+                          enableGzipDecompression:(BOOL)enableGzipDecompression
+                            enableGzipCompression:(BOOL)enableGzipCompression
+                        enableBrotliDecompression:(BOOL)enableBrotliDecompression
+                          enableBrotliCompression:(BOOL)enableBrotliCompression
                            enableInterfaceBinding:(BOOL)enableInterfaceBinding
                         enableDrainPostDnsRefresh:(BOOL)enableDrainPostDnsRefresh
                     enforceTrustChainVerification:(BOOL)enforceTrustChainVerification
@@ -65,8 +67,10 @@
   self.dnsCacheSaveIntervalSeconds = dnsCacheSaveIntervalSeconds;
   self.enableHappyEyeballs = enableHappyEyeballs;
   self.enableHttp3 = enableHttp3;
-  self.enableGzip = enableGzip;
-  self.enableBrotli = enableBrotli;
+  self.enableGzipDecompression = enableGzipDecompression;
+  self.enableGzipCompression = enableGzipCompression;
+  self.enableBrotliDecompression = enableBrotliDecompression;
+  self.enableBrotliCompression = enableBrotliCompression;
   self.enableInterfaceBinding = enableInterfaceBinding;
   self.enableDrainPostDnsRefresh = enableDrainPostDnsRefresh;
   self.enforceTrustChainVerification = enforceTrustChainVerification;
@@ -116,14 +120,36 @@
     [customFilters appendString:filterConfig];
   }
 
-  if (self.enableGzip) {
-    NSString *gzipFilterInsert = [[NSString alloc] initWithUTF8String:gzip_config_insert];
-    [customFilters appendString:gzipFilterInsert];
+  if (self.enableGzipDecompression) {
+    NSString *insert = [[NSString alloc] initWithUTF8String:gzip_decompressor_config_insert];
+    [customFilters appendString:insert];
   }
 
-  if (self.enableBrotli) {
-    NSString *brotliFilterInsert = [[NSString alloc] initWithUTF8String:brotli_config_insert];
-    [customFilters appendString:brotliFilterInsert];
+  if (self.enableGzipCompression) {
+#if ENVOY_MOBILE_REQUEST_COMPRESSION
+    NSString *insert = [[NSString alloc] initWithUTF8String:gzip_compressor_config_insert];
+    [customFilters appendString:insert];
+#else
+    NSLog(@"[Envoy] error: request compression functionality was not compiled in this build of "
+          @"Envoy Mobile");
+    return nil;
+#endif
+  }
+
+  if (self.enableBrotliDecompression) {
+    NSString *insert = [[NSString alloc] initWithUTF8String:brotli_decompressor_config_insert];
+    [customFilters appendString:insert];
+  }
+
+  if (self.enableBrotliCompression) {
+#if ENVOY_MOBILE_REQUEST_COMPRESSION
+    NSString *insert = [[NSString alloc] initWithUTF8String:brotli_compressor_config_insert];
+    [customFilters appendString:insert];
+#else
+    NSLog(@"[Envoy] error: request compression functionality was not compiled in this build of "
+          @"Envoy Mobile");
+    return nil;
+#endif
   }
 
   if (self.enableHttp3) {
