@@ -1870,7 +1870,7 @@ MetadataFormatter::formatMetadata(const envoy::config::core::v3::Metadata& metad
   if (value.kind_case() == ProtobufWkt::Value::kStringValue) {
     str = value.string_value();
   } else {
-    str = MessageUtil::getJsonStringFromMessageOrDie(value, false, true);
+    str = MessageUtil::getJsonStringFromMessageOrError(value, false, true);
   }
   truncate(str, max_length_);
   return str;

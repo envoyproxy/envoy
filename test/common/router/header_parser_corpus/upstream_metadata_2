@@ -1,0 +1,22 @@
+headers_to_add {
+  header {
+    key: "d"
+    value: "%START_TIME()%%DYNAMIC_METADATA(|)%"
+  }
+}
+stream_info {
+  dynamic_metadata {
+    filter_metadata {
+      key: "|"
+      value {
+        fields {
+          key: "test"
+          value {
+            number_value: inf
+          }
+        }
+      }
+    }
+  }
+  start_time: 3
+}
