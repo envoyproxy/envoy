@@ -8,5 +8,6 @@ if [[ $(id -u envoybuild) != "${BUILD_UID}" ]]; then
 fi
 
 chown envoybuild /output
+chmod 1777 /tmp
 
 exec gosu envoybuild "$@"

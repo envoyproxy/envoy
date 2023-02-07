@@ -105,13 +105,14 @@ Specify the interval at which Envoy should timeout a DNS query.
 
   This API is non-ideal as it exposes lower-level internals of Envoy than desired by this
   project.
-  :issue:`#1581 <1581>` tracks enhancing this API.
 
 Add a list of hostnames to preresolve on Engine startup.
-The configuration is expected as a JSON list.
+For Swift, the configuration is expected as a JSON list.
+:issue:`#1581 <1581>` tracks enhancing this API.
+For Kotlin, the configuration is expected as a list of hostnames
 
   // Kotlin
-  builder.addDNSPreresolveHostnames("[{\"address\": \"foo.com", \"port_value\": 443}]")
+  builder.addDNSPreresolveHostnames("{"lyft.com", "google.com"}")
 
   // Swift
   builder.addDNSPreresolveHostnames("[{\"address\": \"foo.com", \"port_value\": 443}]")
@@ -248,10 +249,10 @@ This functionality is used for stat segmentation.
 **Example**::
 
   // Kotlin
-  builder.addVirtualClusters("[{\"name\":\"vcluster\",\"headers\":[{\"name\":\":path\",\"exact_match\":\"/v1/vcluster\"}]}]")
+  builder.addVirtualCluster("{\"name\":\"vcluster\",\"headers\":[{\"name\":\":path\",\"exact_match\":\"/v1/vcluster\"}]}")
 
   // Swift
-  builder.addVirtualClusters("[{\"name\":\"vcluster\",\"headers\":[{\"name\":\":path\",\"exact_match\":\"/v1/vcluster\"}]}]")
+  builder.addVirtualCluster("{\"name\":\"vcluster\",\"headers\":[{\"name\":\":path\",\"exact_match\":\"/v1/vcluster\"}]}")
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 ``enableAdminInterface``
@@ -489,6 +490,27 @@ Available on Android only.
 
     // Kotlin
     builder.enableProxying(true)
+
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+``enableDNSCache``
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Specify whether to enable DNS cache. Note that DNS cache requires an addition of
+a key value store named 'reserved.platform_store'.
+
+The interval at which results are saved to the key value store defaults to 1s
+but can also be set explicitly.
+
+A maximum of 100 entries will be stored.
+
+**Example**::
+
+  // Kotlin
+  builder.enableDNSCache(true, saveInterval: 60)
+
+  // Swift
+  builder.enableDNSCache(true, saveInterval: 60)
 
 
 ----------------------

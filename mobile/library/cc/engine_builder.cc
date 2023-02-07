@@ -54,11 +54,12 @@ bool generatedStringMatchesGeneratedBoostrap(
   differencer.set_repeated_field_comparison(Protobuf::util::MessageDifferencer::AS_LIST);
 
   bool same = differencer.Compare(config_bootstrap, bootstrap);
-
   if (!same) {
+    std::cerr << "\n=========== Config bootstrap yaml ============\n";
     std::cerr << MessageUtil::getYamlStringFromMessage(config_bootstrap);
-    std::cerr << "============================================";
+    std::cerr << "\n=============== Bootstrap yaml ===============\n";
     std::cerr << MessageUtil::getYamlStringFromMessage(bootstrap);
+    std::cerr << "\n==============================================\n";
   }
   return same;
 }
@@ -267,8 +268,9 @@ EngineBuilder::enablePlatformCertificatesValidation(bool platform_certificates_v
   return *this;
 }
 
-EngineBuilder& EngineBuilder::enableDnsCache(bool dns_cache_on) {
+EngineBuilder& EngineBuilder::enableDnsCache(bool dns_cache_on, int save_interval_seconds) {
   dns_cache_on_ = dns_cache_on;
+  dns_cache_save_interval_seconds_ = save_interval_seconds;
   return *this;
 }
 
@@ -355,6 +357,8 @@ std::string EngineBuilder::generateConfigStr() const {
     replacements.push_back({"stats_domain", stats_domain_});
   }
   if (dns_cache_on_) {
+    replacements.push_back({"persistent_dns_cache_save_interval",
+                            fmt::format("{}", dns_cache_save_interval_seconds_)});
     replacements.push_back({"persistent_dns_cache_config", persistent_dns_cache_config_insert});
   }
 
@@ -385,11 +389,11 @@ std::string EngineBuilder::generateConfigStr() const {
   if (socket_tagging_filter_) {
     insertCustomFilter(socket_tag_config_insert, config_template);
   }
-  if (gzip_filter_) {
-    insertCustomFilter(gzip_config_insert, config_template);
-  }
   if (brotli_filter_) {
     insertCustomFilter(brotli_config_insert, config_template);
+  }
+  if (gzip_filter_) {
+    insertCustomFilter(gzip_config_insert, config_template);
   }
   if (enable_http3_) {
     insertCustomFilter(alternate_protocols_cache_filter_insert, config_template);
@@ -507,23 +511,6 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     cache_filter->mutable_typed_config()->PackFrom(cache_config);
   }
 
-  if (brotli_filter_) {
-    envoy::extensions::compression::brotli::decompressor::v3::Brotli brotli_config;
-    envoy::extensions::filters::http::decompressor::v3::Decompressor decompressor_config;
-    decompressor_config.mutable_decompressor_library()->set_name("text_optimized");
-    decompressor_config.mutable_decompressor_library()->mutable_typed_config()->PackFrom(
-        brotli_config);
-    auto* common_request =
-        decompressor_config.mutable_request_direction_config()->mutable_common_config();
-    common_request->mutable_enabled()->mutable_default_value();
-    common_request->mutable_enabled()->set_runtime_key("request_decompressor_enabled");
-    decompressor_config.mutable_response_direction_config()
-        ->mutable_common_config()
-        ->set_ignore_no_transform_header(true);
-    auto* brotli_filter = hcm->add_http_filters();
-    brotli_filter->set_name("envoy.filters.http.decompressor");
-    brotli_filter->mutable_typed_config()->PackFrom(decompressor_config);
-  }
   if (gzip_filter_) {
     envoy::extensions::compression::gzip::decompressor::v3::Gzip gzip_config;
     gzip_config.mutable_window_bits()->set_value(15);
@@ -541,6 +528,23 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     auto* gzip_filter = hcm->add_http_filters();
     gzip_filter->set_name("envoy.filters.http.decompressor");
     gzip_filter->mutable_typed_config()->PackFrom(decompressor_config);
+  }
+  if (brotli_filter_) {
+    envoy::extensions::compression::brotli::decompressor::v3::Brotli brotli_config;
+    envoy::extensions::filters::http::decompressor::v3::Decompressor decompressor_config;
+    decompressor_config.mutable_decompressor_library()->set_name("text_optimized");
+    decompressor_config.mutable_decompressor_library()->mutable_typed_config()->PackFrom(
+        brotli_config);
+    auto* common_request =
+        decompressor_config.mutable_request_direction_config()->mutable_common_config();
+    common_request->mutable_enabled()->mutable_default_value();
+    common_request->mutable_enabled()->set_runtime_key("request_decompressor_enabled");
+    decompressor_config.mutable_response_direction_config()
+        ->mutable_common_config()
+        ->set_ignore_no_transform_header(true);
+    auto* brotli_filter = hcm->add_http_filters();
+    brotli_filter->set_name("envoy.filters.http.decompressor");
+    brotli_filter->mutable_typed_config()->PackFrom(decompressor_config);
   }
   if (socket_tagging_filter_) {
     envoymobile::extensions::filters::http::socket_tag::SocketTag tag_config;
@@ -582,7 +586,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   if (dns_cache_on_) {
     envoymobile::extensions::key_value::platform::PlatformKeyValueStoreConfig kv_config;
     kv_config.set_key("dns_persistent_cache");
-    kv_config.mutable_save_interval()->set_seconds(0);
+    kv_config.mutable_save_interval()->set_seconds(dns_cache_save_interval_seconds_);
     kv_config.set_max_entries(100);
     dns_cache_config->mutable_key_value_config()->mutable_config()->set_name(
         "envoy.key_value.platform");

@@ -12,6 +12,7 @@ concurrency:
 
 jobs:
   validate_swiftpm_example:
+    if: github.repository == 'envoyproxy/envoy'
     name: validate_swiftpm_example
     runs-on: macos-12
     timeout-minutes: 120
