@@ -7,6 +7,16 @@ namespace Envoy {
 namespace Tcp {
 
 /*
+ * AsyncTcpClientOptions for the creation of async tcp client;
+ */
+struct AsyncTcpClientOptions {
+  AsyncTcpClientOptions(bool enable_half_close) : enable_half_close(enable_half_close){};
+  bool enable_half_close;
+};
+
+using AsyncTcpClientOptionsConstSharedPtr = std::shared_ptr<const AsyncTcpClientOptions>;
+
+/*
  * AsyncTcpClientCallbacks for peer connection callbacks and data.
  */
 class AsyncTcpClientCallbacks : public Network::ConnectionCallbacks {

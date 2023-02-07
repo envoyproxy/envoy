@@ -144,10 +144,13 @@ public:
   virtual Http::AsyncClient& httpAsyncClient() PURE;
 
   /**
+   * @param context the optional load balancer context.
+   * @param options the tcp client creation config options.
    * @return a client that can be used to make async Tcp calls against the given cluster.
    */
-  virtual Tcp::AsyncTcpClientPtr tcpAsyncClient(LoadBalancerContext* context,
-                                                bool enable_half_close) PURE;
+  virtual Tcp::AsyncTcpClientPtr
+  tcpAsyncClient(LoadBalancerContext* context,
+                 Tcp::AsyncTcpClientOptionsConstSharedPtr options) PURE;
 };
 
 using ThreadLocalClusterOptRef = absl::optional<std::reference_wrapper<ThreadLocalCluster>>;

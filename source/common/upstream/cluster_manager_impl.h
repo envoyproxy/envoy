@@ -525,8 +525,9 @@ private:
                                               LoadBalancerContext* context) override;
       Host::CreateConnectionData tcpConn(LoadBalancerContext* context) override;
       Http::AsyncClient& httpAsyncClient() override;
-      Tcp::AsyncTcpClientPtr tcpAsyncClient(LoadBalancerContext* context,
-                                            bool enable_half_close) override;
+      Tcp::AsyncTcpClientPtr
+      tcpAsyncClient(LoadBalancerContext* context,
+                     Tcp::AsyncTcpClientOptionsConstSharedPtr options) override;
 
       // Updates the hosts in the priority set.
       void updateHosts(const std::string& name, uint32_t priority,

@@ -43,8 +43,9 @@ public:
       : stats_(generateStats("test_network_async_tcp_filter", scope)),
         cluster_name_(config.cluster_name()), cluster_manager_(cluster_manager) {
     const auto thread_local_cluster = cluster_manager_.getThreadLocalCluster(cluster_name_);
+    options_ = std::make_shared<Tcp::AsyncTcpClientOptions>(true);
     if (thread_local_cluster != nullptr) {
-      client_ = thread_local_cluster->tcpAsyncClient(nullptr, true);
+      client_ = thread_local_cluster->tcpAsyncClient(nullptr, options_);
     }
   }
 
@@ -110,6 +111,7 @@ private:
   absl::string_view cluster_name_;
   std::unique_ptr<RequestAsyncCallbacks> request_callbacks_;
   Upstream::ClusterManager& cluster_manager_;
+  Tcp::AsyncTcpClientOptionsConstSharedPtr options_
 };
 
 class TestNetworkAsyncTcpFilterConfigFactory
