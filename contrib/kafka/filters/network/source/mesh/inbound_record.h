@@ -25,9 +25,8 @@ struct InboundRecord {
   const NullableBytes key_;
   const NullableBytes value_;
 
-  // XXX (adam.kotwasinski) const&
-  InboundRecord(std::string topic, int32_t partition, int64_t offset, NullableBytes key,
-                NullableBytes value)
+  InboundRecord(const std::string& topic, const int32_t partition, const int64_t offset,
+                const NullableBytes& key, const NullableBytes& value)
       : topic_{topic}, partition_{partition}, offset_{offset}, key_{key}, value_{value} {};
 
   absl::string_view key() const {

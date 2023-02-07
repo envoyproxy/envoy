@@ -50,6 +50,9 @@ FetchRecordConverterImpl::convert(const InboundRecordsMap& arg) const {
   return result;
 }
 
+// Magic format introduced around Kafka 1.0.0 and still used with Kafka 3.3.
+constexpr int8_t MAGIC = 2;
+
 Bytes FetchRecordConverterImpl::renderRecordBatch(
     const std::vector<InboundRecordSharedPtr>& records) const {
 
@@ -94,7 +97,7 @@ Bytes FetchRecordConverterImpl::renderRecordBatch(
 
   // Set magic.
   constexpr uint32_t magic_offset = sizeof(base_offset) + sizeof(batch_len) + sizeof(int32_t);
-  result[magic_offset] = 2;
+  result[magic_offset] = MAGIC;
 
   // Compute and set CRC.
   constexpr uint32_t crc_offset = magic_offset + 1;
@@ -104,6 +107,14 @@ Bytes FetchRecordConverterImpl::renderRecordBatch(
   std::copy(crc.begin(), crc.end(), result.begin() + crc_offset);
 
   return result;
+}
+
+// Helper method.
+static void putBufferIntoBytes(Buffer::Instance& buffer, Bytes& out) {
+  const auto buf_len = buffer.length();
+  void* linearized = buffer.linearize(buf_len);
+  unsigned char* raw = static_cast<unsigned char*>(linearized);
+  out.insert(out.end(), raw, raw + buf_len);
 }
 
 void FetchRecordConverterImpl::appendRecord(const InboundRecord& record, Bytes& out) const {
@@ -149,16 +160,11 @@ void FetchRecordConverterImpl::appendRecord(const InboundRecord& record, Bytes& 
   const int32_t header_count = 0;
   Statics::writeVarint(header_count, buffer);
 
-  // XXX (adam.kotwasinski) This might be less than efficient. Improve it later.
+  // Put length and contents of 'buffer' of into 'out'.
   Buffer::OwnedImpl length_buffer;
   Statics::writeVarint(buffer.length(), length_buffer);
-  buffer.prepend(length_buffer);
-
-  // Finish: put buffer's contents into the 'out' variable.
-  const auto buf_len = buffer.length();
-  void* linearized = buffer.linearize(buf_len);
-  unsigned char* raw = static_cast<unsigned char*>(linearized);
-  out.insert(out.end(), raw, raw + buf_len);
+  putBufferIntoBytes(length_buffer, out);
+  putBufferIntoBytes(buffer, out);
 }
 
 // XXX (adam.kotwasinski) Instead of computing it naively, either link against librdkafka's
