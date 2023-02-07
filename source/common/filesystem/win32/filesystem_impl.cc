@@ -118,7 +118,7 @@ static uint64_t fileSizeFromAttributeData(const WIN32_FILE_ATTRIBUTE_DATA& data)
   return static_cast<uint64_t>(file_size.QuadPart);
 }
 
-static constexpr absl::optional<SystemTime> systemTimeFromFileTime(const FILETIME& t) {
+static absl::optional<SystemTime> systemTimeFromFileTime(const FILETIME& t) {
   // `FILETIME` is a 64 bit value representing the number of 100-nanosecond
   // intervals since January 1, 1601 (UTC).
   // https://learn.microsoft.com/en-us/windows/win32/api/minwinbase/ns-minwinbase-filetime
