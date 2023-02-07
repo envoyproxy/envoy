@@ -17,7 +17,7 @@
 namespace Envoy {
 namespace Platform {
 
-constexpr int default_xds_timeout = 5;
+constexpr int DefaultxDSTimeout = 5;
 
 // The C++ Engine builder supports 2 ways of building Envoy Mobile config, the 'legacy mode'
 // which uses a yaml config header, blocks of well known yaml configs, and uses string manipulation
@@ -68,9 +68,9 @@ public:
   EngineBuilder& enablePlatformCertificatesValidation(bool platform_certificates_validation_on);
   // Adds an RTDS layer to default config. Requires that ADS be configured.
   EngineBuilder& addRtdsLayer(const std::string& layer_name,
-                              const int timeout_seconds = default_xds_timeout);
+                              const int timeout_seconds = DefaultxDSTimeout);
   // Adds a CDS layer to default config. Requires that ADS be configured.
-  EngineBuilder& addCdsLayer(const int timeout_seconds = default_xds_timeout);
+  EngineBuilder& addCdsLayer(const int timeout_seconds = DefaultxDSTimeout);
   // Adds an ADS layer.
   EngineBuilder& setAggregatedDiscoveryService(const std::string& api_type,
                                                const std::string& address, const int port);
