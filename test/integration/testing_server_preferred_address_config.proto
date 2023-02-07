@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package test.integration;
+
+// [#protodoc-title: QUIC server preferred address config for test]
+// [#extension: envoy.quic.server_preferred_address.test]
+
+// Configuration for TestingServerPreferredAddressConfig.
+// [#next-free-field: 3]
+message TestingServerPreferredAddressConfig {
+  // String representation of ipv(4|6) address.
+  // If not specified, none will be configured.
+  string ipv4_address = 1;
+  string ipv6_address = 2;
+}
