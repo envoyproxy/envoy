@@ -213,7 +213,6 @@ public class EnvoyConfiguration {
     final StringBuilder customFiltersBuilder = new StringBuilder();
 
     for (EnvoyNativeFilterConfig filter : nativeFilterChain) {
-      System.err.println("Adding native filter " + filter.name);
       String filterConfig = nativeFilterTemplate.replace("{{ native_filter_name }}", filter.name)
                                 .replace("{{ native_filter_typed_config }}", filter.typedConfig);
       customFiltersBuilder.append(filterConfig);
@@ -382,7 +381,6 @@ public class EnvoyConfiguration {
     byte[][] clusters = JniBridgeUtility.stringsToJniBytes(virtualClusters);
     byte[][] stats_sinks = JniBridgeUtility.stringsToJniBytes(statSinks);
     byte[][] dns_preresolve = JniBridgeUtility.stringsToJniBytes(dnsPreresolveHostnames);
-    System.err.println("Creating bootstrap");
     return JniLibrary.createBootstrap(
         grpcStatsDomain, adminInterfaceEnabled, connectTimeoutSeconds, dnsRefreshSeconds,
         dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax, dnsQueryTimeoutSeconds,
