@@ -1,5 +1,11 @@
 #include "extension_registry.h"
 
+#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
+#include "source/extensions/compression/brotli/compressor/config.h"
+#include "source/extensions/compression/gzip/compressor/config.h"
+#include "source/extensions/filters/http/compressor/config.h"
+#endif
+
 #include "source/common/http/match_delegate/config.h"
 #include "source/common/http/matching/inputs.h"
 #include "source/common/network/default_client_connection_factory.h"
@@ -148,6 +154,12 @@ void ExtensionRegistry::registerFactories() {
   Quic::forceRegisterQuicClientTransportSocketConfigFactory();
   Quic::forceRegisterQuicHttpServerConnectionFactoryImpl();
   Quic::forceRegisterQuicServerTransportSocketConfigFactory();
+#endif
+
+#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
+  Extensions::Compression::Brotli::Compressor::forceRegisterBrotliCompressorLibraryFactory();
+  Extensions::Compression::Gzip::Compressor::forceRegisterGzipCompressorLibraryFactory();
+  Extensions::HttpFilters::Compressor::forceRegisterCompressorFilterFactory();
 #endif
 }
 
