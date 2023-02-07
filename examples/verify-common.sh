@@ -94,7 +94,7 @@ cleanup () {
         for image in "${rmi[@]}"; do
             docker rmi -f "$image"
         done
-        docker image prune -f
+        # docker image prune -f
     fi
 
 }
