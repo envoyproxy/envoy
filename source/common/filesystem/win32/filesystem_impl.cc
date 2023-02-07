@@ -118,7 +118,7 @@ static uint64_t fileSizeFromAttributeData(const WIN32_FILE_ATTRIBUTE_DATA& data)
   return static_cast<uint64_t>(file_size.QuadPart);
 }
 
-static constexpr absl::optional<SystemTime> systemTimeFromFileTime(FILETIME t) {
+static constexpr absl::optional<SystemTime> systemTimeFromFileTime(const FILETIME& t) {
   // `FILETIME` is a 64 bit value representing the number of 100-nanosecond
   // intervals since January 1, 1601 (UTC).
   // https://learn.microsoft.com/en-us/windows/win32/api/minwinbase/ns-minwinbase-filetime
@@ -128,10 +128,8 @@ static constexpr absl::optional<SystemTime> systemTimeFromFileTime(FILETIME t) {
   // For timestamps earlier than the unix epoch (1970, `SystemTime{0}`), we assume it's an
   // invalid value and return nullopt.
   static const SystemTime windows_file_time_epoch =
-      absl::ToChronoTime(absl::FromCivil(absl::CivilYear(1601)));
-  ULARGE_INTEGER tenths_of_microseconds;
-  tenths_of_microseconds.LowPart = t.dwLowDateTime;
-  tenths_of_microseconds.HighPart = t.dwHighDateTime;
+      absl::ToChronoTime(absl::FromCivil(absl::CivilYear(1601), absl::UTCTimeZone()));
+  ULARGE_INTEGER tenths_of_microseconds{t.dwLowDateTime, t.dwHighDateTime};
   uint64_t v = static_cast<uint64_t>(tenths_of_microseconds.QuadPart);
   SystemTime ret = windows_file_time_epoch + std::chrono::microseconds{v / 10};
   if (ret <= SystemTime{}) {
