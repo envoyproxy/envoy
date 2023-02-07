@@ -13,6 +13,8 @@ Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
+* dependency: Add boringssl patch to resolve CVE-2023-0286. Note that the FIPS build is not patched/fixed.
+
 Removed Config or Runtime
 -------------------------
 *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
