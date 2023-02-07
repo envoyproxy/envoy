@@ -28,6 +28,9 @@ bug_fixes:
 - area: router
   change: |
     fixed the bug that custom tags of the route metadata type are not set for upstream spans.
+- area: dependency
+  change: |
+    Add boringssl patch to resolve CVE-2023-0286. Note that the FIPS build is not patched/fixed.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`

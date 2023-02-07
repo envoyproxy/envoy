@@ -8,6 +8,7 @@
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/codec.h"
+#include "envoy/http/header_validator.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/upstream/upstream.h"
@@ -223,7 +224,9 @@ private:
                          public ResponseDecoderWrapper,
                          public RequestEncoderWrapper {
     ActiveRequest(CodecClient& parent, ResponseDecoder& inner)
-        : ResponseDecoderWrapper(inner), RequestEncoderWrapper(nullptr), parent_(parent) {
+        : ResponseDecoderWrapper(inner), RequestEncoderWrapper(nullptr), parent_(parent),
+          header_validator_(
+              parent.host_->cluster().makeHeaderValidator(parent.codec_->protocol())) {
       switch (parent.protocol()) {
       case Protocol::Http10:
       case Protocol::Http11:
@@ -237,6 +240,8 @@ private:
         break;
       }
     }
+
+    void decodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) override;
 
     // StreamCallbacks
     void onResetStream(StreamResetReason reason, absl::string_view) override {
@@ -260,6 +265,7 @@ private:
     void removeEncoderCallbacks() { inner_encoder_->getStream().removeCallbacks(*this); }
 
     CodecClient& parent_;
+    Http::HeaderValidatorPtr header_validator_;
     bool wait_encode_complete_{true};
     bool encode_complete_{false};
     bool decode_complete_{false};

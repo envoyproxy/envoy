@@ -55,8 +55,14 @@ public:
   EngineBuilder& setDeviceOs(std::string app_id);
   EngineBuilder& setStreamIdleTimeoutSeconds(int stream_idle_timeout_seconds);
   EngineBuilder& setPerTryIdleTimeoutSeconds(int per_try_idle_timeout_seconds);
-  EngineBuilder& enableGzip(bool gzip_on);
-  EngineBuilder& enableBrotli(bool brotli_on);
+  EngineBuilder& enableGzipDecompression(bool gzip_decompression_on);
+#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
+  EngineBuilder& enableGzipCompression(bool gzip_compression_on);
+#endif
+  EngineBuilder& enableBrotliDecompression(bool brotli_decompression_on);
+#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
+  EngineBuilder& enableBrotliCompression(bool brotli_compression_on);
+#endif
   EngineBuilder& enableSocketTagging(bool socket_tagging_on);
   EngineBuilder& enableHappyEyeballs(bool happy_eyeballs_on);
 #ifdef ENVOY_ENABLE_QUIC
@@ -134,8 +140,10 @@ private:
   std::string admin_address_path_for_tests_ = "";
   int stream_idle_timeout_seconds_ = 15;
   int per_try_idle_timeout_seconds_ = 15;
-  bool gzip_filter_ = true;
-  bool brotli_filter_ = false;
+  bool gzip_decompression_filter_ = true;
+  bool gzip_compression_filter_ = false;
+  bool brotli_decompression_filter_ = false;
+  bool brotli_compression_filter_ = false;
   bool socket_tagging_filter_ = false;
   bool platform_certificates_validation_on_ = false;
   std::string rtds_layer_name_ = "";
