@@ -271,15 +271,13 @@ TEST_F(AuthenticatorTest, TestSetExpiredJwtToGetStatus) {
                                                .at("jwt-failure-reason")
                                                .struct_value()
                                                .fields()
-                                               .find("code")
-                                               ->second.number_value());
+                                               .at("code").number_value());
 
   EXPECT_EQ(google::jwt_verify::getStatusString(Status::JwtExpired), out_extracted_data_.fields()
                                                                          .at("jwt-failure-reason")
                                                                          .struct_value()
                                                                          .fields()
-                                                                         .find("message")
-                                                                         ->second.string_value());
+                                                                         .at("message").string_value());
 }
 
 // This test verifies writing InvalidAudience status into metadata
@@ -305,16 +303,14 @@ TEST_F(AuthenticatorTest, TestSetInvalidJwtInvalidAudienceToGetStatus) {
                                                           .at("jwt-failure-reason")
                                                           .struct_value()
                                                           .fields()
-                                                          .find("code")
-                                                          ->second.number_value());
+                                                          .at("code").number_value());
 
   EXPECT_EQ(google::jwt_verify::getStatusString(Status::JwtAudienceNotAllowed),
             out_extracted_data_.fields()
                 .at("jwt-failure-reason")
                 .struct_value()
                 .fields()
-                .find("message")
-                ->second.string_value());
+                .at("message").string_value());
 }
 
 // This test verifies jwt missing status in failed status in metadata with allow missing or failed
@@ -338,15 +334,13 @@ TEST_F(AuthenticatorTest, TestSetMissingJwtToGetStatus) {
                                               .at("jwt-failure-reason")
                                               .struct_value()
                                               .fields()
-                                              .find("code")
-                                              ->second.number_value());
+                                              .at("code").number_value());
 
   EXPECT_EQ(google::jwt_verify::getStatusString(Status::JwtMissed), out_extracted_data_.fields()
                                                                         .at("jwt-failure-reason")
                                                                         .struct_value()
                                                                         .fields()
-                                                                        .find("message")
-                                                                        ->second.string_value());
+                                                                        .at("message").string_value());
 }
 
 // This test verifies two tokens, one is good another is with invalidAudience
@@ -378,16 +372,14 @@ TEST_F(AuthenticatorTest, TestSetInvalidAndValidJwtToGetStatus) {
                                                           .at("jwt-failure-reason")
                                                           .struct_value()
                                                           .fields()
-                                                          .find("code")
-                                                          ->second.number_value());
+                                                          .at("code").number_value());
 
   EXPECT_EQ(google::jwt_verify::getStatusString(Status::JwtAudienceNotAllowed),
             out_extracted_data_.fields()
                 .at("jwt-failure-reason")
                 .struct_value()
                 .fields()
-                .find("message")
-                ->second.string_value());
+                .at("message").string_value());
 }
 
 // This test verifies two bad tokens, one is expired and another is with invalidAudience
@@ -416,15 +408,13 @@ TEST_F(AuthenticatorTest, TestSetTwoInvalidJwtToGetStatus) {
                                                .at("jwt-failure-reason")
                                                .struct_value()
                                                .fields()
-                                               .find("code")
-                                               ->second.number_value());
+                                               .at("code").number_value());
 
   EXPECT_EQ(google::jwt_verify::getStatusString(Status::JwtExpired), out_extracted_data_.fields()
                                                                          .at("jwt-failure-reason")
                                                                          .struct_value()
                                                                          .fields()
-                                                                         .find("message")
-                                                                         ->second.string_value());
+                                                                         .at("message").string_value());
 }
 
 // This test set two providers and send request without jwt
