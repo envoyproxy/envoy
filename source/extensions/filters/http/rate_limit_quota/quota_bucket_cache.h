@@ -19,14 +19,13 @@ namespace RateLimitQuota {
 
 using ::envoy::service::rate_limit_quota::v3::BucketId;
 using ::envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports;
-class RateLimitClientImpl;
 
-// TODO(tyxia) Why needs =
 using BucketAction = ::envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse::BucketAction;
-using QuotaAssignmentAction = ::envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse::
-    BucketAction::QuotaAssignmentAction;
 using BucketQuotaUsage =
     ::envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports::BucketQuotaUsage;
+
+// Forward declaration
+class RateLimitClientImpl;
 
 // Customized hash and equal struct for `BucketId` hash key.
 struct BucketIdHash {

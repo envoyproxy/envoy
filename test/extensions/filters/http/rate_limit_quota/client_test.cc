@@ -49,7 +49,7 @@ public:
     EXPECT_CALL(context_.cluster_manager_.async_client_manager_, getOrCreateRawAsyncClient(_, _, _))
         .WillOnce(Invoke(this, &RateLimitStreamTest::mockCreateAsyncClient));
 
-    client_ = createRateLimitClient(context_, grpc_service_, callbacks_, &reports_, nullptr);
+    client_ = createRateLimitClient(context_, grpc_service_, callbacks_, bucket_cache_, reports_);
   }
 
   Grpc::RawAsyncClientSharedPtr mockCreateAsyncClient(Unused, Unused, Unused) {
@@ -80,6 +80,7 @@ public:
   MockRateLimitQuotaCallbacks callbacks_;
   bool grpc_closed_ = false;
   RateLimitQuotaUsageReports reports_;
+  BucketsMap bucket_cache_;
 };
 
 TEST_F(RateLimitStreamTest, OpenAndCloseStream) {

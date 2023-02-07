@@ -10,16 +10,16 @@ namespace RateLimitQuota {
 // Helper function to build the usage report.
 RateLimitQuotaUsageReports RateLimitClientImpl::buildUsageReport(absl::string_view domain,
                                                                  const BucketId& bucket_id) {
-  ASSERT(reports_ != nullptr);
+  // ASSERT(reports_ != nullptr);
   // TODO(tyxia) Domain is provided by filter configuration whose lifetime is tied with HCM. This
   // means that domain name has same lifetime as TLS because TLS is created by factory context. In
   // other words, there is only one domain name throughout the whole lifetime of `reports_`. (i.e.,
   // no need for container/map).
-  if (reports_->domain().empty()) {
+  if (reports_.domain().empty()) {
     // Set the domain name in the first report.
-    reports_->set_domain(std::string(domain));
+    reports_.set_domain(std::string(domain));
     // Add the usage report.
-    auto* usage = reports_->add_bucket_quota_usages();
+    auto* usage = reports_.add_bucket_quota_usages();
     *usage->mutable_bucket_id() = bucket_id;
     // TODO(tyxia) 1) Keep track of the time
     usage->mutable_time_elapsed()->set_seconds(0);
@@ -30,7 +30,7 @@ RateLimitQuotaUsageReports RateLimitClientImpl::buildUsageReport(absl::string_vi
     usage->set_num_requests_allowed(1);
     usage->set_num_requests_denied(0);
   } else {
-    RateLimitQuotaUsageReports& cached_report = *reports_;
+    RateLimitQuotaUsageReports& cached_report = reports_;
     bool updated = false;
     // TODO(tyxia) That will be better if it can be a map
     for (int idx = 0; idx < cached_report.bucket_quota_usages_size(); ++idx) {
@@ -48,13 +48,13 @@ RateLimitQuotaUsageReports RateLimitClientImpl::buildUsageReport(absl::string_vi
     }
     // New bucket in this report(i.e., No updates has been performed.)
     if (updated == false) {
-      auto* usage = reports_->add_bucket_quota_usages();
+      auto* usage = reports_.add_bucket_quota_usages();
       *usage->mutable_bucket_id() = bucket_id;
       usage->mutable_time_elapsed()->set_seconds(0);
       usage->set_num_requests_allowed(1);
     }
   }
-  return *reports_;
+  return reports_;
 }
 
 void RateLimitClientImpl::sendUsageReport(absl::string_view domain,
@@ -62,7 +62,7 @@ void RateLimitClientImpl::sendUsageReport(absl::string_view domain,
   ASSERT(stream_ != nullptr);
   // There is no bucked id provided in periodical sending behavior.
   stream_->sendMessage(bucket_id.has_value() ? buildUsageReport(domain, bucket_id.value())
-                                             : *reports_,
+                                             : reports_,
                        /*end_stream=*/true);
 }
 
@@ -78,7 +78,7 @@ void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response)
     // TODO(tyxia) Lifetime issue, here response is the reference but i need to store it in to
     // cache. So we need to pass by reference??? or build it here.
     // There is no update here!!!
-    (*quota_buckets_)[action.bucket_id()].bucket_action = BucketAction(action);
+    quota_buckets_[action.bucket_id()].bucket_action = BucketAction(action);
   }
 
   // TODO(tyxia) Keep this async callback interface here to do other post-processing.

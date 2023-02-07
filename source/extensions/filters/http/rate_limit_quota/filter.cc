@@ -37,9 +37,9 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
   }
 
   BucketId bucket_id = ret.value();
-  ASSERT(quota_buckets_ != nullptr);
+  // ASSERT(quota_buckets_ != nullptr);
 
-  if (quota_buckets_->find(bucket_id) == quota_buckets_->end()) {
+  if (quota_buckets_.find(bucket_id) == quota_buckets_.end()) {
     // The request has been matched to the quota bucket for the first time.
     auto bucket_settings = match_action->bucketSettings();
     // The first matched request that doesn't have quota assignment from the RLQS server yet, so the
@@ -61,7 +61,7 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
     Bucket new_bucket = {};
     // Create the gRPC client.
     new_bucket.rate_limit_client_ = createRateLimitClient(
-        factory_context_, config_->rlqs_server(), *this, quota_usage_reports_, quota_buckets_);
+        factory_context_, config_->rlqs_server(), *this, quota_buckets_, quota_usage_reports_);
 
     // Start the streaming on the first request.
     auto status = new_bucket.rate_limit_client_->startStream(callbacks_->streamInfo());
@@ -92,7 +92,7 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
     new_bucket.send_reports_timer->enableTimer(std::chrono::milliseconds(reporting_interval));
 
     // Store the bucket into the buckets map.
-    (*quota_buckets_)[bucket_id] = std::move(new_bucket);
+    quota_buckets_[bucket_id] = std::move(new_bucket);
     initiating_call_ = false;
     // TODO(tyxia) Do we need to stop here???
     // Stop the iteration for headers as well as data and trailers for the current filter and the

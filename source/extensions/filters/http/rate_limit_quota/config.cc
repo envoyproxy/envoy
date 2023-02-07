@@ -27,9 +27,9 @@ Http::FilterFactoryCb RateLimitQuotaFilterFactory::createFilterFactoryFromProtoT
 
   return [config = std::move(config), &context, bucket_cache = std::move(bucket_cache)](
              Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<RateLimitQuotaFilter>(
-        config, context, &(bucket_cache->tls.get()->buckets()),
-        &(bucket_cache->tls.get()->quotaUsageReports())));
+    callbacks.addStreamFilter(
+        std::make_shared<RateLimitQuotaFilter>(config, context, bucket_cache->tls.get()->buckets(),
+                                               bucket_cache->tls.get()->quotaUsageReports()));
   };
 }
 

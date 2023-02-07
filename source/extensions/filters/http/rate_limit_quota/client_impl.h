@@ -32,14 +32,12 @@ class RateLimitClientImpl : public RateLimitClient,
                                 envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse>,
                             public Logger::Loggable<Logger::Id::rate_limit_quota> {
 public:
-  // TODO(tyxia) Removed default nullptr arg.
   RateLimitClientImpl(const envoy::config::core::v3::GrpcService& grpc_service,
                       Server::Configuration::FactoryContext& context,
                       // TODO(tyxia) life time, filter itself destroyed but client is
                       // stored in the cached. need to outlived filter object!!
-                      // TODO(tyxia) modified??? but why passed by reference???)
-                      RateLimitQuotaCallbacks& callbacks, BucketsMap* const quota_buckets = nullptr,
-                      RateLimitQuotaUsageReports* const usage_reports = nullptr)
+                      RateLimitQuotaCallbacks& callbacks, BucketsMap& quota_buckets,
+                      RateLimitQuotaUsageReports& usage_reports)
       : aync_client_(context.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
             grpc_service, context.scope(), true)),
         callbacks_(callbacks), quota_buckets_(quota_buckets), reports_(usage_reports) {}
@@ -75,20 +73,20 @@ private:
   // TODO(tyxia) Further look at the use of this flag later.
   bool stream_closed_ = false;
 
-  BucketsMap* const quota_buckets_ = nullptr;
-  // The pointer to usage report object which is stored as thread local storage. i.e., It is
-  // not stored in the filter here.
-  RateLimitQuotaUsageReports* const reports_ = nullptr;
+  // Don't take ownership here and these objects are stored in TLS.
+  BucketsMap& quota_buckets_;
+  RateLimitQuotaUsageReports& reports_;
 };
 
 using RateLimitClientPtr = std::unique_ptr<RateLimitClientImpl>;
 /**
  * Create the rate limit client. It is uniquely owned by each worker thread.
  */
-inline RateLimitClientPtr createRateLimitClient(
-    Server::Configuration::FactoryContext& context,
-    const envoy::config::core::v3::GrpcService& grpc_service, RateLimitQuotaCallbacks& callbacks,
-    RateLimitQuotaUsageReports* const quota_usage_reports, BucketsMap* const quota_buckets) {
+inline RateLimitClientPtr
+createRateLimitClient(Server::Configuration::FactoryContext& context,
+                      const envoy::config::core::v3::GrpcService& grpc_service,
+                      RateLimitQuotaCallbacks& callbacks, BucketsMap& quota_buckets,
+                      RateLimitQuotaUsageReports& quota_usage_reports) {
   return std::make_unique<RateLimitClientImpl>(grpc_service, context, callbacks, quota_buckets,
                                                quota_usage_reports);
 }
