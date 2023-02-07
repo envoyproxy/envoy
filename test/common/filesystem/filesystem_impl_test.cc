@@ -448,6 +448,8 @@ TEST_F(FileSystemImplTest, StatOnFifoReturnsOtherFileType) {
 }
 #endif
 
+#ifndef WIN32
+// ::close doesn't work with WIN32
 TEST_F(FileSystemImplTest, InfoOnInvalidedFileDescriptorReturnsError) {
   const std::string file_path =
       TestEnvironment::writeStringToFileForTest("test_envoy", "0123456789");
@@ -464,6 +466,7 @@ TEST_F(FileSystemImplTest, InfoOnInvalidedFileDescriptorReturnsError) {
   // Close the file even though it's already closed, so we don't assert in the destructor.
   file->close();
 }
+#endif
 
 TEST_F(FileSystemImplTest, StatOnNonexistentFileReturnsError) {
   const std::string nonexistent_path =
