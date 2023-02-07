@@ -40,8 +40,10 @@ public class EnvoyConfiguration {
   public final Integer dnsCacheSaveIntervalSeconds;
   public final Boolean enableDrainPostDnsRefresh;
   public final Boolean enableHttp3;
-  public final Boolean enableGzip;
-  public final Boolean enableBrotli;
+  public final Boolean enableGzipDecompression;
+  public final Boolean enableGzipCompression;
+  public final Boolean enableBrotliDecompression;
+  public final Boolean enableBrotliCompression;
   public final Boolean enableSocketTagging;
   public final Boolean enableHappyEyeballs;
   public final Boolean enableInterfaceBinding;
@@ -92,10 +94,14 @@ public class EnvoyConfiguration {
    *     DNS refresh.
    * @param enableHttp3                                   whether to enable experimental support for
    *     HTTP/3 (QUIC).
-   * @param enableGzip                                    whether to enable response gzip
+   * @param enableGzipDecompression                       whether to enable response gzip
    *     decompression.
-   * @param enableBrotli                                  whether to enable response brotli
+   * @param enableGzipCompression                         whether to enable request gzip
+   *     compression.
+   * @param enableBrotliDecompression                     whether to enable response brotli
    *     decompression.
+   * @param enableBrotliCompression                       whether to enable request brotli
+   *     compression.
    * @param enableSocketTagging                           whether to enable socket tagging.
    * @param enableHappyEyeballs                           whether to enable RFC 6555 handling for
    *     IPv4/IPv6.
@@ -127,8 +133,9 @@ public class EnvoyConfiguration {
       int dnsRefreshSeconds, int dnsFailureRefreshSecondsBase, int dnsFailureRefreshSecondsMax,
       int dnsQueryTimeoutSeconds, int dnsMinRefreshSeconds, List<String> dnsPreresolveHostnames,
       boolean enableDNSCache, int dnsCacheSaveIntervalSeconds, boolean enableDrainPostDnsRefresh,
-      boolean enableHttp3, boolean enableGzip, boolean enableBrotli, boolean enableSocketTagging,
-      boolean enableHappyEyeballs, boolean enableInterfaceBinding,
+      boolean enableHttp3, boolean enableGzipDecompression, boolean enableGzipCompression,
+      boolean enableBrotliDecompression, boolean enableBrotliCompression,
+      boolean enableSocketTagging, boolean enableHappyEyeballs, boolean enableInterfaceBinding,
       int h2ConnectionKeepaliveIdleIntervalMilliseconds, int h2ConnectionKeepaliveTimeoutSeconds,
       int maxConnectionsPerHost, int statsFlushSeconds, int streamIdleTimeoutSeconds,
       int perTryIdleTimeoutSeconds, String appVersion, String appId,
@@ -152,8 +159,10 @@ public class EnvoyConfiguration {
     this.dnsCacheSaveIntervalSeconds = dnsCacheSaveIntervalSeconds;
     this.enableDrainPostDnsRefresh = enableDrainPostDnsRefresh;
     this.enableHttp3 = enableHttp3;
-    this.enableGzip = enableGzip;
-    this.enableBrotli = enableBrotli;
+    this.enableGzipDecompression = enableGzipDecompression;
+    this.enableGzipCompression = enableGzipCompression;
+    this.enableBrotliDecompression = enableBrotliDecompression;
+    this.enableBrotliCompression = enableBrotliCompression;
     this.enableSocketTagging = enableSocketTagging;
     this.enableHappyEyeballs = enableHappyEyeballs;
     this.enableInterfaceBinding = enableInterfaceBinding;
@@ -215,15 +224,26 @@ public class EnvoyConfiguration {
       customFiltersBuilder.append(altProtocolCacheFilterInsert);
     }
 
-    if (enableGzip) {
-      final String gzipFilterInsert = JniLibrary.gzipConfigInsert();
+    if (enableGzipDecompression) {
+      final String gzipFilterInsert = JniLibrary.gzipDecompressorConfigInsert();
       customFiltersBuilder.append(gzipFilterInsert);
     }
 
-    if (enableBrotli) {
-      final String brotliFilterInsert = JniLibrary.brotliConfigInsert();
+    if (enableGzipCompression) {
+      final String gzipFilterInsert = JniLibrary.gzipCompressorConfigInsert();
+      customFiltersBuilder.append(gzipFilterInsert);
+    }
+
+    if (enableBrotliDecompression) {
+      final String brotliFilterInsert = JniLibrary.brotliDecompressorConfigInsert();
       customFiltersBuilder.append(brotliFilterInsert);
     }
+
+    if (enableBrotliCompression) {
+      final String brotliFilterInsert = JniLibrary.brotliCompressorConfigInsert();
+      customFiltersBuilder.append(brotliFilterInsert);
+    }
+
     if (enableSocketTagging) {
       final String socketTagFilterInsert = JniLibrary.socketTagConfigInsert();
       customFiltersBuilder.append(socketTagFilterInsert);
@@ -337,13 +357,14 @@ public class EnvoyConfiguration {
             resolvedConfiguration, grpcStatsDomain, adminInterfaceEnabled, connectTimeoutSeconds,
             dnsRefreshSeconds, dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax,
             dnsQueryTimeoutSeconds, dnsMinRefreshSeconds, dns_preresolve, enableDNSCache,
-            dnsCacheSaveIntervalSeconds, enableDrainPostDnsRefresh, enableHttp3, enableGzip,
-            enableBrotli, enableSocketTagging, enableHappyEyeballs, enableInterfaceBinding,
-            h2ConnectionKeepaliveIdleIntervalMilliseconds, h2ConnectionKeepaliveTimeoutSeconds,
-            maxConnectionsPerHost, statsFlushSeconds, streamIdleTimeoutSeconds,
-            perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, clusters,
-            filter_chain, stats_sinks, enablePlatformCertificatesValidation,
-            enableSkipDNSLookupForProxiedRequests);
+            dnsCacheSaveIntervalSeconds, enableDrainPostDnsRefresh, enableHttp3,
+            enableGzipDecompression, enableGzipCompression, enableBrotliDecompression,
+            enableBrotliCompression, enableSocketTagging, enableHappyEyeballs,
+            enableInterfaceBinding, h2ConnectionKeepaliveIdleIntervalMilliseconds,
+            h2ConnectionKeepaliveTimeoutSeconds, maxConnectionsPerHost, statsFlushSeconds,
+            streamIdleTimeoutSeconds, perTryIdleTimeoutSeconds, appVersion, appId,
+            enforceTrustChainVerification, clusters, filter_chain, stats_sinks,
+            enablePlatformCertificatesValidation, enableSkipDNSLookupForProxiedRequests);
         break;
       }
     }
@@ -366,7 +387,8 @@ public class EnvoyConfiguration {
         grpcStatsDomain, adminInterfaceEnabled, connectTimeoutSeconds, dnsRefreshSeconds,
         dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax, dnsQueryTimeoutSeconds,
         dnsMinRefreshSeconds, dns_preresolve, enableDNSCache, dnsCacheSaveIntervalSeconds,
-        enableDrainPostDnsRefresh, enableHttp3, enableGzip, enableBrotli, enableSocketTagging,
+        enableDrainPostDnsRefresh, enableHttp3, enableGzipDecompression, enableGzipCompression,
+        enableBrotliDecompression, enableBrotliCompression, enableSocketTagging,
         enableHappyEyeballs, enableInterfaceBinding, h2ConnectionKeepaliveIdleIntervalMilliseconds,
         h2ConnectionKeepaliveTimeoutSeconds, maxConnectionsPerHost, statsFlushSeconds,
         streamIdleTimeoutSeconds, perTryIdleTimeoutSeconds, appVersion, appId,

@@ -78,8 +78,10 @@ class EnvoyConfigurationTest {
     dnsCacheSaveIntervalSeconds: Int = 101,
     enableDrainPostDnsRefresh: Boolean = false,
     enableHttp3: Boolean = true,
-    enableGzip: Boolean = true,
-    enableBrotli: Boolean = false,
+    enableGzipDecompression: Boolean = true,
+    enableGzipCompression: Boolean = false,
+    enableBrotliDecompression: Boolean = false,
+    enableBrotliCompression: Boolean = false,
     enableSocketTagging: Boolean = false,
     enableHappyEyeballs: Boolean = false,
     enableInterfaceBinding: Boolean = false,
@@ -113,8 +115,10 @@ class EnvoyConfigurationTest {
       dnsCacheSaveIntervalSeconds,
       enableDrainPostDnsRefresh,
       enableHttp3,
-      enableGzip,
-      enableBrotli,
+      enableGzipDecompression,
+      enableGzipCompression,
+      enableBrotliDecompression,
+      enableBrotliCompression,
       enableSocketTagging,
       enableHappyEyeballs,
       enableInterfaceBinding,
@@ -219,7 +223,7 @@ class EnvoyConfigurationTest {
     // This may leak memory as the boostrap isn't used.
     envoyConfiguration.createBootstrap()
     val resolvedTemplate3 = envoyConfiguration.createYaml()
-    assertThat(resolvedTemplate2).matches(Pattern.compile(".*name1.*name2.*buffer_filter_1.*buffer_filter_2.*", Pattern.DOTALL));
+    assertThat(resolvedTemplate3).matches(Pattern.compile(".*name1.*name2.*buffer_filter_1.*buffer_filter_2.*", Pattern.DOTALL));
   }
 
   @Test
@@ -233,8 +237,10 @@ class EnvoyConfigurationTest {
       dnsCacheSaveIntervalSeconds = 101,
       enableHappyEyeballs = true,
       enableHttp3 = false,
-      enableGzip = false,
-      enableBrotli = true,
+      enableGzipDecompression = false,
+      enableGzipCompression = true,
+      enableBrotliDecompression = true,
+      enableBrotliCompression = true,
       enableSocketTagging = true,
       enableInterfaceBinding = true,
       enableSkipDNSLookupForProxiedRequests = true,
@@ -265,11 +271,17 @@ class EnvoyConfigurationTest {
     // enableHttp3 = false
     assertThat(resolvedTemplate).doesNotContain("name: alternate_protocols_cache");
 
-    // enableGzip = false
+    // enableGzipDecompression = false
     assertThat(resolvedTemplate).doesNotContain("type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip");
 
-    // enableBrotli = true
+    // enableGzipCompression = true
+    assertThat(resolvedTemplate).contains("type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip");
+
+    // enableBrotliDecompression = true
     assertThat(resolvedTemplate).contains("type.googleapis.com/envoy.extensions.compression.brotli.decompressor.v3.Brotli");
+
+    // enableBrotliCompression = true
+    assertThat(resolvedTemplate).contains("type.googleapis.com/envoy.extensions.compression.brotli.compressor.v3.Brotli");
 
     // enableInterfaceBinding = true
     assertThat(resolvedTemplate).contains("&enable_interface_binding true")
