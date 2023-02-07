@@ -7,7 +7,8 @@ services:
     command: >
       bash -c "
       bazel build  //examples/golang/simple:simple.so
-      && cp -a ./bazel-bin/examples/golang/simple/simple.so /output"
+      && cp -a ./bazel-bin/examples/golang/simple/simple.so /output
+      && bazel clean --expunge"
     entrypoint: /source/examples/shared/build/build-entrypoint.sh
     environment:
     - BUILD_UID=${UID:-1000}
