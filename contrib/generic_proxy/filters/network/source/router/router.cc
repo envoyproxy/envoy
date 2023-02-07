@@ -46,10 +46,13 @@ void UpstreamRequest::startStream() {
   conn_pool_handle_ = handle;
 }
 
-// TODO(wbpcode): To support stream reset reason.
 void UpstreamRequest::resetStream(StreamResetReason reason) {
-  ENVOY_LOG(debug, "generic proxy upstream request: reset upstream request");
+  if (stream_reset_) {
+    return;
+  }
   stream_reset_ = true;
+
+  ENVOY_LOG(debug, "generic proxy upstream request: reset upstream request");
 
   if (conn_pool_handle_) {
     ASSERT(!conn_data_);
@@ -182,14 +185,13 @@ void UpstreamRequest::encodeBufferToUpstream(Buffer::Instance& buffer) {
 }
 
 void RouterFilter::onUpstreamResponse(ResponsePtr response) {
-  // TODO(wbpcode): To support retry policy.
-  callbacks_->upstreamResponse(std::move(response));
   filter_complete_ = true;
+  callbacks_->upstreamResponse(std::move(response));
 }
 
 void RouterFilter::completeDirectly() {
-  callbacks_->completeDirectly();
   filter_complete_ = true;
+  callbacks_->completeDirectly();
 }
 
 void RouterFilter::onUpstreamRequestReset(UpstreamRequest& upstream_request,
@@ -223,6 +225,11 @@ void RouterFilter::onDestroy() {
 }
 
 void RouterFilter::resetStream(StreamResetReason reason) {
+  if (filter_complete_) {
+    return;
+  }
+  filter_complete_ = true;
+
   ASSERT(upstream_requests_.empty());
   switch (reason) {
   case StreamResetReason::LocalReset:
@@ -241,8 +248,6 @@ void RouterFilter::resetStream(StreamResetReason reason) {
     callbacks_->sendLocalReply(Status(StatusCode::kUnavailable, resetReasonToStringView(reason)));
     break;
   }
-
-  filter_complete_ = true;
 }
 
 void RouterFilter::kickOffNewUpstreamRequest() {
@@ -250,8 +255,8 @@ void RouterFilter::kickOffNewUpstreamRequest() {
 
   auto thread_local_cluster = context_.clusterManager().getThreadLocalCluster(cluster_name);
   if (thread_local_cluster == nullptr) {
-    callbacks_->sendLocalReply(Status(StatusCode::kNotFound, "cluster_not_found"));
     filter_complete_ = true;
+    callbacks_->sendLocalReply(Status(StatusCode::kNotFound, "cluster_not_found"));
     return;
   }
 
@@ -259,8 +264,8 @@ void RouterFilter::kickOffNewUpstreamRequest() {
   callbacks_->streamInfo().setUpstreamClusterInfo(cluster_);
 
   if (cluster_->maintenanceMode()) {
-    callbacks_->sendLocalReply(Status(StatusCode::kUnavailable, "cluster_maintain_mode"));
     filter_complete_ = true;
+    callbacks_->sendLocalReply(Status(StatusCode::kUnavailable, "cluster_maintain_mode"));
     return;
   }
 

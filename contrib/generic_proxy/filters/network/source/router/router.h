@@ -127,6 +127,10 @@ private:
   void kickOffNewUpstreamRequest();
   void resetStream(StreamResetReason reason);
 
+  // Set filter_complete_ to true before any local or upstream response. Because the
+  // response processing may complete and destroy the L7 filter chain directly and cause the
+  // onDestory() of RouterFilter to be called. The filter_complete_ will be used to block
+  // unnecessary clearUpstreamRequests() in the onDestory() of RouterFilter.
   bool filter_complete_{};
 
   const RouteEntry* route_entry_{};

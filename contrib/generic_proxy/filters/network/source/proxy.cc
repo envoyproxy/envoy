@@ -48,7 +48,7 @@ ActiveStream::ActiveStream(Filter& parent, RequestPtr request)
   if (decision.traced) {
     stream_info_.setTraceReason(decision.reason);
   }
-  active_span_ = tracer->startSpan(*this, *request, stream_info_, decision);
+  active_span_ = tracer->startSpan(*this, *downstream_request_stream_, stream_info_, decision);
 }
 
 Tracing::OperationName ActiveStream::operationName() const {
