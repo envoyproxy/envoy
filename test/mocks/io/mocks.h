@@ -30,5 +30,12 @@ public:
   MOCK_METHOD(void, removeInjectedCompletion, (os_fd_t fd));
 };
 
+class MockIoUringFactory : public IoUringFactory {
+public:
+  MOCK_METHOD(OptRef<IoUringWorker>, getIoUringWorker, (), (const));
+  MOCK_METHOD(void, onServerInitialized, ());
+  MOCK_METHOD(bool, currentThreadRegistered, ());
+};
+
 } // namespace Io
 } // namespace Envoy

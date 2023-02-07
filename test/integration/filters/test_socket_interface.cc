@@ -64,5 +64,7 @@ IoHandlePtr TestSocketInterface::makeSocket(int socket_fd, bool socket_v6only,
                                               domain);
 }
 
+bool TestSocketInterface::isBlockingSocket() const { return false; }
+
 } // namespace Network
 } // namespace Envoy
