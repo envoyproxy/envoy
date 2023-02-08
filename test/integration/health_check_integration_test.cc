@@ -646,6 +646,7 @@ TEST_P(TcpHealthCheckIntegrationTest, SingleEndpointHealthyTcp) {
 
 TEST_P(TcpHealthCheckIntegrationTest, DisableHCForActiveTraffic) {
   const uint32_t cluster_idx = 0;
+  auto& cluster_data = clusters_[cluster_idx];
   initialize();
   initTcpHealthCheck(cluster_idx, true);
 
@@ -673,6 +674,9 @@ TEST_P(TcpHealthCheckIntegrationTest, DisableHCForActiveTraffic) {
   timeSystem().advanceTimeWait(std::chrono::seconds(10));
 
   test_server_->waitForCounterEq("cluster.cluster_1.health_check.attempt", 3);
+
+  ASSERT_TRUE(cluster_data.host_fake_raw_connection_->waitForData(
+      FakeRawConnection::waitForInexactMatch("Ping")));
   result = clusters_[cluster_idx].host_fake_raw_connection_->write("Pong");
   RELEASE_ASSERT(result, result.message());
 
