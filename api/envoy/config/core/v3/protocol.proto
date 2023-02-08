@@ -259,7 +259,7 @@ message HttpProtocolOptions {
   google.protobuf.UInt32Value max_requests_per_connection = 6;
 }
 
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message Http1ProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.Http1ProtocolOptions";
@@ -350,6 +350,11 @@ message Http1ProtocolOptions {
   // (inferred if not present), host (from the host/:authority header) and path
   // (from first line or :path header).
   bool send_fully_qualified_url = 8;
+
+  // If set, force HTTP/1 parser: BalsaParser if true, http-parser if false.
+  // If unset, HTTP/1 parser is selected based on
+  // envoy.reloadable_features.http1_use_balsa_parser.
+  optional bool use_balsa_parser = 9;
 }
 
 message KeepaliveSettings {
