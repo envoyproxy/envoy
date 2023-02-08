@@ -292,8 +292,6 @@ private:
         case AdapterSignal::Error:
           FALLTHRU;
         case AdapterSignal::Cancel:
-          // TODO(kbaichoo): use better argument here...
-          // e.g. ErrorForReason or something?
           adapter_->onCodecLowLevelReset();
         }
         registerStreamAdapter(nullptr);

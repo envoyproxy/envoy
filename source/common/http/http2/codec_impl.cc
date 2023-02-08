@@ -778,7 +778,6 @@ void ConnectionImpl::StreamImpl::resetStreamWorker(StreamResetReason reason) {
     return;
   }
   if (stream_adapter_) {
-    // TODO(kbaichoo): probably either push this downward or rename reason?:
     stream_adapter_->onCodecLowLevelReset();
   }
   parent_.adapter_->SubmitRst(stream_id_,
@@ -1319,8 +1318,9 @@ Status ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
 
     ENVOY_CONN_LOG(debug, "stream {} closed: {}", connection_, stream_id, error_code);
 
-    // Even if we have the data to encode full stream to downstream and remote
-    // sent end stream but later sends rst we should rst the stream.
+    // Even if we have received both the remote_end_stream and the
+    // local_end_stream (e.g. we have all the data for the response), if we've
+    // received a remote reset we should reset the stream.
     if (!stream->remote_end_stream_ || !stream->local_end_stream_ || stream->remote_rst_) {
       StreamResetReason reason;
       if (stream->reset_due_to_messaging_error_) {

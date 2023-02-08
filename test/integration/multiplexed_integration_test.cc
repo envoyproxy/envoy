@@ -32,6 +32,46 @@ using ::testing::HasSubstr;
 using ::testing::MatchesRegex;
 
 namespace Envoy {
+namespace {
+std::vector<int> StoiAccessLogString(const std::string& access_log_entry_of_ints) {
+  std::vector<int> ret;
+  const std::vector<std::string> split_string = TestUtility::split(access_log_entry_of_ints, ' ');
+  ret.reserve(split_string.size());
+
+  for (auto& str : split_string) {
+    ret.push_back(std::stoi(str));
+  }
+
+  return ret;
+}
+
+// Helper class that tabulates the bytes of a given stream by consuming the raw HTTP2 frames.
+struct StreamByteAccumulator {
+  uint32_t stream_wire_bytes_recieved_ = 0;
+  uint32_t stream_data_frames_recieved_ = 0;
+  uint32_t stream_body_payload_recieved_ = 0;
+  uint32_t stream_wire_header_bytes_recieved_ = 0;
+
+  void countFrame(const Http2Frame& frame) {
+    stream_wire_bytes_recieved_ += frame.size();
+    if (frame.type() == Http2Frame::Type::Data) {
+      ++stream_data_frames_recieved_;
+      stream_body_payload_recieved_ += frame.payloadSize();
+    } else if (frame.type() == Http2Frame::Type::Headers) {
+      stream_wire_header_bytes_recieved_ += frame.size();
+    }
+  }
+
+  int bodyWireBytesReceivedDiscountingHeaders() const {
+    return stream_wire_bytes_recieved_ - stream_wire_header_bytes_recieved_;
+  }
+
+  int bodyWireBytesReceivedGivenPayloadAndFrames() const {
+    return stream_body_payload_recieved_ + stream_data_frames_recieved_ * Http2Frame::HeaderSize;
+  }
+};
+
+} // end namespace
 
 #define EXCLUDE_DOWNSTREAM_HTTP3                                                                   \
   if (downstreamProtocol() == Http::CodecType::HTTP3) {                                            \
@@ -1936,21 +1976,6 @@ TEST_P(Http2FrameIntegrationTest, UpstreamWindowUpdateAfterGoAway) {
   tcp_client_->close();
 }
 
-namespace {
-// Turns all in access log string to int.
-std::vector<int> StoiAccessLogString(const std::string& s) {
-  std::vector<int> ret;
-  const std::vector<std::string> split_string = TestUtility::split(s, ' ');
-  ret.reserve(split_string.size());
-
-  for (auto& str : split_string) {
-    ret.push_back(std::stoi(str));
-  }
-
-  return ret;
-}
-} // end namespace
-
 TEST_P(Http2FrameIntegrationTest, AccessLogOfWireBytesIfResponseSizeGreaterThanWindowSize) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -1979,41 +2004,26 @@ TEST_P(Http2FrameIntegrationTest, AccessLogOfWireBytesIfResponseSizeGreaterThanW
   upstream_request_->encodeData(60000, false);
   upstream_request_->encodeData(50000, true);
 
-  // Wire bytes received that *ONLY* relates to this stream e.g. connection
+  // Wire bytes received *ONLY* relates to wire bytes for this stream e.g. connection
   // level frames are irrelevant.
-  uint32_t stream_wire_bytes_recieved = 0;
-  uint32_t stream_data_frames_recieved = 0;
-  uint32_t stream_body_payload_recieved = 0;
-  uint32_t stream_wire_header_bytes_recieved = 0;
-
-  auto updateWireByteCount = [&stream_body_payload_recieved, &stream_wire_bytes_recieved,
-                              &stream_data_frames_recieved,
-                              &stream_wire_header_bytes_recieved](const Http2Frame& frame) {
-    stream_wire_bytes_recieved += frame.size();
-    if (frame.type() == Http2Frame::Type::Data) {
-      ++stream_data_frames_recieved;
-      stream_body_payload_recieved += frame.payloadSize();
-    } else if (frame.type() == Http2Frame::Type::Headers) {
-      stream_wire_header_bytes_recieved += frame.size();
-    }
-  };
+  StreamByteAccumulator accumulator;
 
   Http2Frame response = readFrame();
   EXPECT_EQ(Http2Frame::Type::Headers, response.type());
-  updateWireByteCount(response);
+  accumulator.countFrame(response);
 
   response = readFrame();
   EXPECT_EQ(Http2Frame::Type::Data, response.type());
-  updateWireByteCount(response);
+  accumulator.countFrame(response);
 
   response = readFrame();
-  updateWireByteCount(response);
+  accumulator.countFrame(response);
   EXPECT_EQ(Http2Frame::Type::Data, response.type());
 
-  // Check if HCM stream level access log occur
+  // Check access log if the agnostic stream lifetime is not extended.
+  // It should have access logged since it has received the entire response.
   int hcm_logged_wire_bytes_sent, hcm_logged_wire_header_bytes_sent;
   if (!Runtime::runtimeFeatureEnabled(Runtime::expand_agnostic_stream_lifetime)) {
-    // We can access access log due to the agnostic stream lifetime.
     auto access_log_values = StoiAccessLogString(waitForAccessLog(access_log_name_));
     hcm_logged_wire_bytes_sent = access_log_values[0];
     hcm_logged_wire_header_bytes_sent = access_log_values[1];
@@ -2026,18 +2036,14 @@ TEST_P(Http2FrameIntegrationTest, AccessLogOfWireBytesIfResponseSizeGreaterThanW
   sendFrame(conn_update_frame);
   sendFrame(stream_update_frame);
 
-  while (!response.endStream() && stream_wire_bytes_recieved < 60000 + 50000) {
+  while (!response.endStream() && accumulator.stream_wire_bytes_recieved_ < 60000 + 50000) {
     response = readFrame();
-    updateWireByteCount(response);
+    accumulator.countFrame(response);
     EXPECT_EQ(Http2Frame::Type::Data, response.type());
   }
 
-  // Calculate from the client side the received bytes and compare it to what
-  // was access logged.
-  const int body_wire_bytes = stream_wire_bytes_recieved - stream_wire_header_bytes_recieved;
-  const int calculated_body_wire_bytes =
-      stream_body_payload_recieved + stream_data_frames_recieved * Http2Frame::HeaderSize;
-  EXPECT_EQ(body_wire_bytes, calculated_body_wire_bytes);
+  EXPECT_EQ(accumulator.bodyWireBytesReceivedDiscountingHeaders(),
+            accumulator.bodyWireBytesReceivedGivenPayloadAndFrames());
 
   if (Runtime::runtimeFeatureEnabled(Runtime::expand_agnostic_stream_lifetime)) {
     // Access logs are only available now due to the expanded agnostic stream
@@ -2046,9 +2052,9 @@ TEST_P(Http2FrameIntegrationTest, AccessLogOfWireBytesIfResponseSizeGreaterThanW
     hcm_logged_wire_bytes_sent = access_log_values[0];
     hcm_logged_wire_header_bytes_sent = access_log_values[1];
   }
-  EXPECT_EQ(stream_wire_header_bytes_recieved, hcm_logged_wire_header_bytes_sent);
-  EXPECT_EQ(stream_wire_bytes_recieved, hcm_logged_wire_bytes_sent)
-      << "Received " << stream_wire_bytes_recieved
+  EXPECT_EQ(accumulator.stream_wire_header_bytes_recieved_, hcm_logged_wire_header_bytes_sent);
+  EXPECT_EQ(accumulator.stream_wire_bytes_recieved_, hcm_logged_wire_bytes_sent)
+      << "Received " << accumulator.stream_wire_bytes_recieved_
       << " stream wire bytes from Envoy but access log reported " << hcm_logged_wire_bytes_sent;
 
   // Cleanup.
