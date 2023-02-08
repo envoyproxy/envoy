@@ -155,9 +155,9 @@ std::unique_ptr<ModifyRequestHeadersAction> RedirectPolicy::createModifyRequestH
       });
 
   ::Envoy::Http::Utility::Url absolute_url;
-  if (!absolute_url.initialize(
-          uri_ ? *uri_ : ::Envoy::Http::Utility::newPath(*redirect_action_, *downstream_headers),
-          false)) {
+  std::string uri(uri_ ? *uri_
+                       : ::Envoy::Http::Utility::newPath(*redirect_action_, *downstream_headers));
+  if (!absolute_url.initialize(uri, false)) {
     stats_.custom_response_invalid_uri_.inc();
     RELEASE_ASSERT(!static_cast<bool>(uri_),
                    "uri should not be invalid as this was already validated during config load");
