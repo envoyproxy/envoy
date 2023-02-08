@@ -129,7 +129,7 @@ class TunnelResponseHeaders : public TunnelResponseHeadersOrTrailers {
 public:
   TunnelResponseHeaders(Http::ResponseHeaderMapPtr&& response_headers)
       : response_headers_(std::move(response_headers)) {}
-  const Http::ResponseHeaderMap& value() const override { return *response_headers_; }
+  const Http::HeaderMap& value() const override { return *response_headers_; }
   static const std::string& key();
 
 private:
