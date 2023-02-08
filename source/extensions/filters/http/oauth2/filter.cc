@@ -405,9 +405,9 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
   const std::string base_path = absl::StrCat(scheme, "://", host_);
   const std::string state_path = absl::StrCat(base_path, headers.Path()->value().getStringView());
   const std::string escaped_state =
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth_use_url_encoding")
-            ? Http::Utility::PercentEncoding::urlEncodeQueryParameter(state_path)
-            : Http::Utility::PercentEncoding::encode(state_path, ":/=&?");
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth_use_url_encoding")
+          ? Http::Utility::PercentEncoding::urlEncodeQueryParameter(state_path)
+          : Http::Utility::PercentEncoding::encode(state_path, ":/=&?");
 
   Formatter::FormatterImpl formatter(config_->redirectUri());
   const auto redirect_uri = formatter.format(headers, *Http::ResponseHeaderMapImpl::create(),
@@ -415,8 +415,8 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
                                              decoder_callbacks_->streamInfo(), "");
   const std::string escaped_redirect_uri =
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth_use_url_encoding")
-            ? Http::Utility::PercentEncoding::urlEncodeQueryParameter(redirect_uri)
-            : Http::Utility::PercentEncoding::encode(redirect_uri, ":/=&?");
+          ? Http::Utility::PercentEncoding::urlEncodeQueryParameter(redirect_uri)
+          : Http::Utility::PercentEncoding::encode(redirect_uri, ":/=&?");
 
   auto query_params = config_->authorizationQueryParams();
   query_params["redirect_uri"] = escaped_redirect_uri;
