@@ -1,20 +1,17 @@
-date: February 7, 2023
+date: Pending
+
+behavior_changes:
+# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+
+minor_behavior_changes:
+# *Changes that may cause incompatibilities for some users, but should not for most*
 
 bug_fixes:
-- area: validation
-  change: |
-    fixed a crash which could happen when optional ``engine_type`` is not provided in regex.
-- area: dependency
-  change: |
-    Add boringssl patch to resolve CVE-2023-0286. Note that the FIPS build is not patched/fixed.
+# *Changes expected to improve the state of the world and are unlikely to have negative effects*
+
+removed_config_or_runtime:
+# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
-- area: attributes
-  change: |
-    added :ref:`attributes <arch_overview_attributes>` for looking up xDS configuration information.
-- area: docker
-  change: |
-    use new ``nossl`` images for ``distroless`` Docker build.
-- area: bazel
-  change: |
-    updated to version 6.0.0.
+
+deprecated:
