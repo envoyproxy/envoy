@@ -6,6 +6,7 @@ Pending Release
 
 Breaking changes:
 
+- api: The ``enableGzip`` and ``enableBrotli`` APIs were renamed to ``enableGzipDecompression`` and ``enableBrotliDecompression`` (:issue:`#25352 <25352>`)
 - ios/android: remove ``addH2RawDomains`` method. (:issue: `#2590 <2590>`)
 - build: building on macOS now requires Xcode 14.1. (:issue:`#2664 <2664>`)
 - kotlin: always use ``getaddrinfo`` DNS resolver. Remove ``addDNSFallbackNameservers``, ``enableDNSFilterUnroutableFamilies``, and ``enableDNSUseSystemResolver`` methods from the Kotlin engine builder. (:issue:`#2618 <2618>`)
@@ -24,6 +25,7 @@ Bugfixes:
 
 Features:
 
+- api: Add support for brotli and gzip request compression.  (:issue:`#25352 <25352>`)
 - api: Add a constructor which takes a URL to C++ RequestEngineBuilder.
 - api: add option to support platform provided certificates validation interfaces on iOS and Android. (:issue `#2144 <2144>`)
 - api: Add a ``setPerTryIdleTimeoutSeconds()`` method to C++ EngineBuilder.

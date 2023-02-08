@@ -1,4 +1,4 @@
- package io.envoyproxy.envoymobile
+package io.envoyproxy.envoymobile
 
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification
@@ -56,8 +56,10 @@ open class EngineBuilder(
   private var enableDrainPostDnsRefresh = false
   private var enableHttp3 = true
   private var enableHappyEyeballs = true
-  private var enableGzip = true
-  private var enableBrotli = false
+  private var enableGzipDecompression = true
+  internal var enableGzipCompression = false
+  private var enableBrotliDecompression = false
+  internal var enableBrotliCompression = false
   private var enableSocketTagging = false
   private var enableInterfaceBinding = false
   private var h2ConnectionKeepaliveIdleIntervalMilliseconds = 1
@@ -256,24 +258,24 @@ open class EngineBuilder(
   /**
    * Specify whether to do gzip response decompression or not.  Defaults to true.
    *
-   * @param enableGzip whether or not to gunzip responses.
+   * @param enableGzipDecompression whether or not to gunzip responses.
    *
    * @return This builder.
    */
-  fun enableGzip(enableGzip: Boolean): EngineBuilder {
-    this.enableGzip = enableGzip
+  fun enableGzipDecompression(enableGzipDecompression: Boolean): EngineBuilder {
+    this.enableGzipDecompression = enableGzipDecompression
     return this
   }
 
   /**
    * Specify whether to do brotli response decompression or not.  Defaults to false.
    *
-   * @param enableBrotli whether or not to brotli decompress responses.
+   * @param enableBrotliDecompression whether or not to brotli decompress responses.
    *
    * @return This builder.
    */
-  fun enableBrotli(enableBrotli: Boolean): EngineBuilder {
-    this.enableBrotli = enableBrotli
+  fun enableBrotliDecompression(enableBrotliDecompression: Boolean): EngineBuilder {
+    this.enableBrotliDecompression = enableBrotliDecompression
     return this
   }
 
@@ -597,8 +599,10 @@ open class EngineBuilder(
       dnsCacheSaveIntervalSeconds,
       enableDrainPostDnsRefresh,
       enableHttp3,
-      enableGzip,
-      enableBrotli,
+      enableGzipDecompression,
+      enableGzipCompression,
+      enableBrotliDecompression,
+      enableBrotliCompression,
       enableSocketTagging,
       enableHappyEyeballs,
       enableInterfaceBinding,
