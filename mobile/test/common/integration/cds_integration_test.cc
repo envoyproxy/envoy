@@ -41,12 +41,14 @@ TEST_P(CdsIntegrationTest, Basic) {
       ClusterName, fake_upstreams_[0]->localAddress()->ip()->port(),
       Network::Test::getLoopbackAddressString(ipVersion()), "ROUND_ROBIN");
   initializeXdsStream();
+  int cluster_count = getGaugeValue("cluster_manager.active_clusters");
   // Do the initial compareDiscoveryRequest / sendDiscoveryResponse for cluster_1.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
                                                              {cluster1}, {cluster1}, {}, "55");
   // Wait for cluster to be added
   ASSERT_TRUE(waitForCounterGe("cluster_manager.cluster_added", 1));
+  ASSERT_TRUE(waitForGaugeGe("cluster_manager.active_clusters", cluster_count + 1));
 }
 
 } // namespace
