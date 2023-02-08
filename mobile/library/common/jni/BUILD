@@ -5,6 +5,8 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+# TODO(jpsim): Migrate these to use `envoy_cc_library`
+
 # Support for JNI, using NDK on Android and Java otherwise, since the JNI APIs
 # differ a bit between the two.
 cc_library(
