@@ -219,7 +219,6 @@ jobs:
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             --fat_apk_cpu=x86_64 \
-            --define=admin_functionality=enabled \
             //test/kotlin/apps/experimental:hello_envoy_kt
           adb install -r --no-incremental bazel-bin/test/kotlin/apps/experimental/hello_envoy_kt.apk
           adb shell am start -n io.envoyproxy.envoymobile.helloenvoyexperimentaltest/.MainActivity

@@ -76,13 +76,13 @@ envoy_mobile_kt_library(
         "mocks/*.kt",
         "stats/*.kt",
     ]) + envoy_select_envoy_mobile_request_compression(
-        ["EngineBuilder+Compression.kt"],
+        ["EngineBuilderCompressionUtil.kt"],
         "@envoy",
     ) + envoy_select_enable_http3(
-        ["EngineBuilder+HTTP3.kt"],
+        ["EngineBuilderHTTP3Util.kt"],
         "@envoy",
     ) + envoy_select_admin_functionality(
-        ["EngineBuilder+Admin.kt"],
+        ["EngineBuilderAdminUtil.kt"],
         "@envoy",
     ),
     visibility = ["//visibility:public"],
