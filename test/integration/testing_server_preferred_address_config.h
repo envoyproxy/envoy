@@ -18,8 +18,8 @@ public:
   }
 
 private:
-  quic::QuicIpAddress ip_v4_;
-  quic::QuicIpAddress ip_v6_;
+  const quic::QuicIpAddress ip_v4_;
+  const quic::QuicIpAddress ip_v6_;
 };
 
 class TestingServerPreferredAddressConfigFactory

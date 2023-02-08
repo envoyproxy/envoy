@@ -9,13 +9,15 @@
 namespace Envoy {
 namespace Quic {
 
+// An interface to provide the server's preferred addresses at runtime.
 class EnvoyQuicServerPreferredAddressConfig {
 public:
   virtual ~EnvoyQuicServerPreferredAddressConfig() = default;
 
   /**
    * @param local_address the configured default listening address.
-   * Returns a pair of the server preferred addresses in form of {IPv4, IPv6}.
+   * Returns a pair of the server preferred addresses in form of {IPv4, IPv6}. An uninitialized
+   * address value means no preferred address for that address family.
    */
   virtual std::pair<quic::QuicSocketAddress, quic::QuicSocketAddress>
   getServerPreferredAddresses(const Network::Address::InstanceConstSharedPtr& local_address) PURE;
