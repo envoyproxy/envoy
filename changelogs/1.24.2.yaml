@@ -9,6 +9,12 @@ bug_fixes:
     add boringssl patch to resolve CVE-2023-0286. Note that the FIPS build is not patched/fixed.
 
 new_features:
+- area: attributes
+  change: |
+    added :ref:`attributes <arch_overview_attributes>` for looking up xDS configuration information.
 - area: docker
   change: |
     use new ``nossl`` images for ``distroless`` Docker build.
+- area: bazel
+  change: |
+    updated to version 6.0.0.
