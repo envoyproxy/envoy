@@ -7,6 +7,7 @@
 
 #include "envoy/common/time.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/data/core/v3/health_check_event.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/stats/primitive_stats_macros.h"
@@ -202,6 +203,19 @@ public:
    *         healthy state via an active healthchecking.
    */
   virtual absl::optional<MonotonicTime> lastHcPassTime() const PURE;
+
+  /**
+   * @return last successful non-health check traffic time
+   */
+  virtual MonotonicTime lastSuccessfulTrafficTime(
+      envoy::data::core::v3::HealthCheckerType health_checker_type) const PURE;
+
+  /**
+   * set last successful non-health check traffic time
+   */
+  virtual void
+  setLastSuccessfulTrafficTime(envoy::data::core::v3::HealthCheckerType health_checker_type,
+                               MonotonicTime last_successful_traffic_time) const PURE;
 };
 
 using HostDescriptionConstSharedPtr = std::shared_ptr<const HostDescription>;

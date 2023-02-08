@@ -38,7 +38,7 @@ static_resources:
             address:
               socket_address:
                 address: http_service
-                port_value: 8082
+                port_value: 8080
   - name: load_reporting_cluster
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
