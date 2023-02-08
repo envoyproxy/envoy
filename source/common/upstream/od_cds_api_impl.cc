@@ -80,10 +80,10 @@ void OdCdsApiImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason
 
 void OdCdsApiImpl::sendAwaiting() {
   // skip it when there is only the init fetch cluster.
-  if (watched_resources_.size() > 1) {
+  if (registered_cluster_names_.size() > 1) {
     ENVOY_LOG(debug, "odcds: updating watched cluster names {}",
-              fmt::join(watched_resources_, ", "));
-    subscription_->updateResourceInterest(watched_resources_);
+              fmt::join(registered_cluster_names_, ", "));
+    subscription_->updateResourceInterest(registered_cluster_names_);
   }
 }
 
@@ -92,22 +92,22 @@ void OdCdsApiImpl::updateOnDemand(std::string cluster_name) {
   case StartStatus::NotStarted:
     ENVOY_LOG(trace, "odcds: starting a subscription with cluster name {}", cluster_name);
     status_ = StartStatus::Started;
-    watched_resources_.insert(cluster_name);
+    registered_cluster_names_.insert(cluster_name);
     subscription_->start({std::move(cluster_name)});
     return;
 
   case StartStatus::Started:
     ENVOY_LOG(trace, "odcds: putting cluster name {} on awaiting list", cluster_name);
-    watched_resources_.insert(std::move(cluster_name));
+    registered_cluster_names_.insert(std::move(cluster_name));
     return;
 
   case StartStatus::InitialFetchDone:
-    auto old_size = watched_resources_.size();
-    watched_resources_.insert(cluster_name);
-    if (watched_resources_.size() != old_size) {
+    auto old_size = registered_cluster_names_.size();
+    registered_cluster_names_.insert(cluster_name);
+    if (registered_cluster_names_.size() != old_size) {
       ENVOY_LOG(debug, "odcds: updating watched cluster names {}",
-                fmt::join(watched_resources_, ", "));
-      subscription_->updateResourceInterest(watched_resources_);
+                fmt::join(registered_cluster_names_, ", "));
+      subscription_->updateResourceInterest(registered_cluster_names_);
     } else {
       ENVOY_LOG(trace, "odcds: requesting for cluster name {}", cluster_name);
       subscription_->requestOnDemandUpdate({std::move(cluster_name)});
