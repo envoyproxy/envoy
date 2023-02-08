@@ -227,5 +227,8 @@ new_features:
     :ref:`source_address <envoy_v3_api_field_config.core.v3.BindConfig.source_address>`. This allows setting
     :ref:`socket options <envoy_v3_api_field_config.core.v3.BindConfig.socket_options>` when using the default unspecified bind address
     is desired.
+- area: jwt_authn
+  change: |
+    added :ref:`failed_status_in_metadata <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.failed_status_in_metadata>` to support setting the JWT authentication failure status code and message in dynamic metadata.   
 
 deprecated:
