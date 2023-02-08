@@ -6,7 +6,7 @@ bug_fixes:
     fixed a crash which could happen when optional ``engine_type`` is not provided in regex.
 - area: dependency
   change: |
-    Add boringssl patch to resolve CVE-2023-0286. Note that the FIPS build is not patched/fixed.
+    add boringssl patch to resolve CVE-2023-0286. Note that the FIPS build is not patched/fixed.
 
 new_features:
 - area: attributes
