@@ -38,6 +38,7 @@ struct ConnectHeaderPartsValues {
   const Http::LowerCaseString GrpcHeaderPrefix{"grpc-"};
   const std::string TrailerHeaderPrefix = "trailer-";
   const std::string UnaryContentTypePrefix = "application/";
+  const std::string UnaryProtobufContentType = "application/proto";
 };
 using ConnectHeaderParts = ConstSingleton<ConnectHeaderPartsValues>;
 
@@ -341,6 +342,20 @@ Http::FilterHeadersStatus ConnectGrpcBridgeFilter::encodeHeaders(Http::ResponseH
       headers.removePrefix(Http::LowerCaseString{ConnectHeaderParts::get().GrpcHeaderPrefix});
     }
   } else if (is_connect_unary_) {
+    // Rewrite Content-Type header.
+    std::string content_type{headers.getContentTypeValue()};
+    if (absl::StartsWith(content_type, Http::Headers::get().ContentTypeValues.Grpc) &&
+        content_type.size() > Http::Headers::get().ContentTypeValues.Grpc.size() &&
+        content_type[Http::Headers::get().ContentTypeValues.Grpc.size()] == '+') {
+      content_type =
+          absl::StrCat(ConnectHeaderParts::get().UnaryContentTypePrefix,
+                       content_type.substr(Http::Headers::get().ContentTypeValues.Grpc.size() + 1));
+    } else {
+      // Default to proto if no suffix is present on gRPC content-type.
+      content_type = ConnectHeaderParts::get().UnaryProtobufContentType;
+    }
+    headers.setContentType(content_type);
+
     if (!end_stream) {
       return Http::FilterHeadersStatus::StopIteration;
     }
