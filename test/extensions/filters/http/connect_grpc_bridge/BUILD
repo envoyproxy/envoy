@@ -49,6 +49,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/connect_grpc_bridge:config",
         "//source/extensions/filters/http/health_check:config",
         "//test/integration:http_integration_lib",
+        "//test/proto:helloworld_proto_cc_proto",
     ],
 )
 
