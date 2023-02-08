@@ -150,7 +150,8 @@ HeaderValidator::validateStatusHeader(const HeaderString& value) {
   // Convert the status to an integer.
   std::uint32_t status_value{};
   auto result = fromChars(value_string_view, status_value);
-  if (result.ec != std::errc() || result.ptr != value_string_view.end()) {
+  if (result.ec != std::errc() ||
+      result.ptr != (value_string_view.data() + value_string_view.size())) {
     return {HeaderValueValidationResult::Action::Reject,
             UhvResponseCodeDetail::get().InvalidStatus};
   }
@@ -264,7 +265,8 @@ HeaderValidator::validateContentLengthHeader(const HeaderString& value) {
 
   std::uint64_t int_value{};
   auto result = fromChars(value_string_view, int_value);
-  if (result.ec != std::errc() || result.ptr != value_string_view.end()) {
+  if (result.ec != std::errc() ||
+      result.ptr != (value_string_view.data() + value_string_view.size())) {
     return {HeaderValueValidationResult::Action::Reject,
             UhvResponseCodeDetail::get().InvalidContentLength};
   }
@@ -316,8 +318,8 @@ HeaderValidator::validateHostHeader(const HeaderString& value) {
       // parse the port number
       std::uint16_t port_int{};
       auto result = fromChars(port_string.substr(1), port_int);
-
-      if (result.ec != std::errc() || result.ptr != port_string.end() || port_int == 0) {
+      if (result.ec != std::errc() || result.ptr != (port_string.data() + port_string.size()) ||
+          port_int == 0) {
         is_valid = false;
       }
     }
