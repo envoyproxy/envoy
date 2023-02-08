@@ -516,6 +516,17 @@ The following command operators are supported:
   TCP/UDP
     Not implemented ("-")
 
+.. _config_access_log_format_downstream_transport_failure_reason:
+
+%DOWNSTREAM_TRANSPORT_FAILURE_REASON%
+  HTTP/TCP
+    If downstream connection failed due to transport socket (e.g. TLS handshake), provides the failure
+    reason from the transport socket. The format of this field depends on the configured upstream
+    transport socket. Common TLS failures are in :ref:`TLS trouble shooting <arch_overview_ssl_trouble_shooting>`.
+
+  UDP
+    Not implemented ("-")
+
 %DOWNSTREAM_REMOTE_ADDRESS%
   Remote address of the downstream connection. If the address is an IP address it includes both
   address and port.
