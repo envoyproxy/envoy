@@ -49,7 +49,6 @@ public:
 
 protected:
   InitializedMockClusterManager cluster_manager_;
-  int dummy_;
   Http::MockAsyncClientRequest request_;
   Stats::TestUtil::TestStore store_;
   TracerStats stats_;
@@ -369,7 +368,7 @@ TEST_F(DatadogAgentHttpClientTest, OnErrorOther) {
 
 TEST_F(DatadogAgentHttpClientTest, OnErrorBogusRequest) {
   // When `onFailure` is invoked with a request that's not registered with the
-  // HTTP client, no callbacks are invoked and no stats are incremented.
+  // HTTP client, no callbacks are invoked.
 
   EXPECT_CALL(cluster_manager_.instance_.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillOnce(
