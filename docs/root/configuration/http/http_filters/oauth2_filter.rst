@@ -38,7 +38,7 @@ cookie named ``BearerToken`` to the upstream. Additionally, the ``Authorization`
 with the same value.
 
 The OAuth filer encodes URLs in query parameters using the
-`URL encoding alogirthm. <https://www.w3.org/TR/html5/forms.html#application/x-www-form-urlencoded-encoding-algorithm>`_
+`URL encoding algorithm. <https://www.w3.org/TR/html5/forms.html#application/x-www-form-urlencoded-encoding-algorithm>`_
 
 When receiving request redirected from the authorization service the Oauth filer decodes URLs from query parameters.
 However the encoded character sequences that represent ASCII control characters or extended ASCII codepoints are not
