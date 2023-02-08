@@ -23,6 +23,8 @@ using LocalResponsePolicyProto =
     envoy::extensions::http::custom_response::local_response_policy::v3::LocalResponsePolicy;
 using RedirectPolicyProto =
     envoy::extensions::http::custom_response::redirect_policy::v3::RedirectPolicy;
+using RedirectActionProto =
+    envoy::extensions::http::custom_response::redirect_policy::v3::RedirectPolicy::RedirectAction;
 using Envoy::Protobuf::MapPair;
 using Envoy::ProtobufWkt::Any;
 
@@ -246,7 +248,7 @@ TEST_P(CustomResponseIntegrationTest, RouteNotFound) {
   // table for the internal redirect.
   modifyPolicy<RedirectPolicyProto>(
       custom_response_filter_config_, "gateway_error_action",
-      [](RedirectPolicyProto& policy) { policy.set_host("https://fo1.example"); });
+      [](RedirectPolicyProto& policy) { policy.set_uri("https://fo1.example"); });
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -344,7 +346,7 @@ TEST_P(CustomResponseIntegrationTest, NoRecursion) {
 
   modifyPolicy<RedirectPolicyProto>(
       custom_response_filter_config_, "gateway_error_action",
-      [](RedirectPolicyProto& policy) { policy.set_host("https://fo1.example"); });
+      [](RedirectPolicyProto& policy) { policy.set_uri("https://fo1.example"); });
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -583,6 +585,11 @@ TEST_P(CustomResponseIntegrationTest, ModifyRequestHeaders) {
         auto action = policy.mutable_modify_request_headers_action();
         action->set_name("modify-request-headers-action");
         action->mutable_typed_config()->set_type_url("type.googleapis.com/google.protobuf.Struct");
+        *policy.mutable_redirect_action() = TestUtility::parseYaml<RedirectActionProto>(R"EOF(
+    host_redirect: "global"
+    path_redirect: "/storage/internal_server_error"
+    https_redirect: true
+    )EOF");
       });
 
   // Add TestModifyRequestHeaders extension that will add the

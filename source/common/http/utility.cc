@@ -34,6 +34,50 @@
 #include "quiche/http2/adapter/http2_protocol.h"
 
 namespace Envoy {
+namespace {
+
+absl::string_view processRequestHost(const Http::RequestHeaderMap& headers,
+                                     absl::string_view new_scheme, absl::string_view new_port) {
+
+  absl::string_view request_host = headers.getHostValue();
+  size_t host_end;
+  if (request_host.empty()) {
+    return request_host;
+  }
+  // Detect if IPv6 URI
+  if (request_host[0] == '[') {
+    host_end = request_host.rfind("]:");
+    if (host_end != absl::string_view::npos) {
+      host_end += 1; // advance to :
+    }
+  } else {
+    host_end = request_host.rfind(':');
+  }
+
+  if (host_end != absl::string_view::npos) {
+    absl::string_view request_port = request_host.substr(host_end);
+    // In the rare case that X-Forwarded-Proto and scheme disagree (say http URL over an HTTPS
+    // connection), do port stripping based on X-Forwarded-Proto so http://foo.com:80 won't
+    // have the port stripped when served over TLS.
+    absl::string_view request_protocol = headers.getForwardedProtoValue();
+    bool remove_port = !new_port.empty();
+
+    if (new_scheme != request_protocol) {
+      remove_port |= (request_protocol == Http::Headers::get().SchemeValues.Https.c_str()) &&
+                     request_port == ":443";
+      remove_port |= (request_protocol == Http::Headers::get().SchemeValues.Http.c_str()) &&
+                     request_port == ":80";
+    }
+
+    if (remove_port) {
+      return request_host.substr(0, host_end);
+    }
+  }
+
+  return request_host;
+}
+
+} // namespace
 namespace Http2 {
 namespace Utility {
 
@@ -1184,6 +1228,74 @@ Http::Code Utility::maybeRequestTimeoutCode(bool remote_decode_complete) {
                                 // Http::Code::RequestTimeout is more expensive because HTTP1 client
                                 // cannot use the connection any more.
                                 : Http::Code::RequestTimeout;
+}
+
+std::string Utility::newPath(::Envoy::OptRef<const Utility::RedirectConfig> redirect_config,
+                             const Http::RequestHeaderMap& headers) {
+  absl::string_view final_scheme;
+  absl::string_view final_host;
+  absl::string_view final_port;
+  absl::string_view final_path;
+
+  if (redirect_config.has_value() && !redirect_config->scheme_redirect_.empty()) {
+    final_scheme = redirect_config->scheme_redirect_.c_str();
+  } else if (redirect_config.has_value() && redirect_config->https_redirect_) {
+    final_scheme = Http::Headers::get().SchemeValues.Https;
+  } else {
+    // Serve the redirect URL based on the scheme of the original URL, not the
+    // security of the underlying connection.
+    final_scheme = headers.getSchemeValue();
+  }
+
+  if (redirect_config.has_value() && !redirect_config->port_redirect_.empty()) {
+    final_port = redirect_config->port_redirect_.c_str();
+  } else {
+    final_port = "";
+  }
+
+  if (redirect_config.has_value() && !redirect_config->host_redirect_.empty()) {
+    final_host = redirect_config->host_redirect_.c_str();
+  } else {
+    ASSERT(headers.Host());
+    final_host = processRequestHost(headers, final_scheme, final_port);
+  }
+
+  std::string final_path_value;
+  if (redirect_config.has_value() && !redirect_config->path_redirect_.empty()) {
+    // The path_redirect query string, if any, takes precedence over the request's query string,
+    // and it will not be stripped regardless of `strip_query`.
+    if (redirect_config->path_redirect_has_query_) {
+      final_path = redirect_config->path_redirect_.c_str();
+    } else {
+      const absl::string_view current_path = headers.getPathValue();
+      const size_t path_end = current_path.find('?');
+      const bool current_path_has_query = path_end != absl::string_view::npos;
+      if (current_path_has_query) {
+        final_path_value = redirect_config->path_redirect_;
+        final_path_value.append(current_path.data() + path_end, current_path.length() - path_end);
+        final_path = final_path_value;
+      } else {
+        final_path = redirect_config->path_redirect_.c_str();
+      }
+    }
+  } else {
+    final_path = headers.getPathValue();
+  }
+
+  if (!absl::StartsWith(final_path, "/")) {
+    final_path_value = absl::StrCat("/", final_path);
+    final_path = final_path_value;
+  }
+
+  if (redirect_config.has_value() && !redirect_config->path_redirect_has_query_ &&
+      redirect_config->strip_query_) {
+    const size_t path_end = final_path.find('?');
+    if (path_end != absl::string_view::npos) {
+      final_path = final_path.substr(0, path_end);
+    }
+  }
+
+  return fmt::format("{}://{}{}{}", final_scheme, final_host, final_port, final_path);
 }
 
 } // namespace Http

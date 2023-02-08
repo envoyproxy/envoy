@@ -8,6 +8,7 @@ import "envoy/config/core/v3/extension.proto";
 import "google/protobuf/wrappers.proto";
 
 import "xds/annotations/v3/status.proto";
+import "xds/annotations/v3/versioning.proto";
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
@@ -26,28 +27,78 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // upstream.
 // [#next-free-field: 7]
 message RedirectPolicy {
-  // [#comment: TODO(pradeepcrao): Add the ability to specify the full uri, or just host or
-  // path rewrite for the redirection in the same vein as
-  // config.route.v3.RedirectAction]
-  // The host that will serve the custom response.
-  //
-  // Example:
-  //
-  // .. code-block:: yaml
-  //
-  //    uri: https://www.mydomain.com
-  //
-  string host = 1 [(validate.rules).string = {min_len: 1}];
+  // [#next-free-field: 8]
+  message RedirectAction {
+    // When the scheme redirection take place, the following rules apply:
+    //  1. If the source URI scheme is ``http`` and the port is explicitly
+    //     set to ``:80``, the port will be removed after the redirection
+    //  2. If the source URI scheme is ``https`` and the port is explicitly
+    //     set to ``:443``, the port will be removed after the redirection
+    oneof scheme_rewrite_specifier {
+      // The scheme portion of the URL will be swapped with "https".
+      bool https_redirect = 1;
 
-  // The path for the custom response.
-  //
-  // Example:
-  //
-  //  .. code-block:: yaml
-  //
-  //    path: /path/to/503_response.txt
-  //
-  string path = 2 [(validate.rules).string = {min_len: 1}];
+      // The scheme portion of the URL will be swapped with this value.
+      string scheme_redirect = 2;
+    }
+
+    // The host portion of the URL will be swapped with this value.
+    // Note that at least one of host_redirect and path_redirect has to be
+    // specified.
+    string host_redirect = 3
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+
+    // The port value of the URL will be swapped with this value.
+    google.protobuf.UInt32Value port_redirect = 4;
+
+    // The path portion of the URL will be swapped with this value.
+    // Please note that query string in path_redirect will override the
+    // request's query string and will not be stripped.
+    //
+    // For example, let's say we have the following routes:
+    //
+    // - match: { path: "/old-path-1" }
+    //   redirect: { path_redirect: "/new-path-1" }
+    // - match: { path: "/old-path-2" }
+    //   redirect: { path_redirect: "/new-path-2", strip-query: "true" }
+    // - match: { path: "/old-path-3" }
+    //   redirect: { path_redirect: "/new-path-3?foo=1", strip_query: "true" }
+    //
+    // 1. if request uri is "/old-path-1?bar=1", users will be redirected to "/new-path-1?bar=1"
+    // 2. if request uri is "/old-path-2?bar=1", users will be redirected to "/new-path-2"
+    // 3. if request uri is "/old-path-3?bar=1", users will be redirected to "/new-path-3?foo=1"
+    //
+    // Note that at least one of host_redirect and path_redirect has to be
+    // specified.
+    string path_redirect = 5
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+
+    // Indicates that during redirection, the query portion of the URL will
+    // be removed. Default value is false.
+    oneof query_specifier {
+      bool strip_query = 6;
+
+      string query = 7;
+    }
+  }
+
+  oneof redirect_action_specifier {
+    option (validate.required) = true;
+
+    // The Http URI to redirect the original request to, to get the custom
+    // response.
+    // It should be a full FQDN with protocol, host and path.
+    //
+    // Example:
+    //
+    // .. code-block:: yaml
+    //
+    //    uri: https://www.mydomain.com/path/to/404.txt
+    //
+    string uri = 1 [(validate.rules).string = {min_len: 1}];
+
+    RedirectAction redirect_action = 2;
+  }
 
   // The new response status code if specified. This is used to override the
   // status code of the response from the new upstream if it is not an error status.

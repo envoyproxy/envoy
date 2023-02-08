@@ -24,6 +24,7 @@ envoy_cc_extension(
         "//envoy/stream_info:stream_info_interface",
         "//source/common/common:enum_to_int",
         "//source/common/http:header_map_lib",
+        "//source/common/http:utility_lib",
         "//source/common/router:header_parser_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
