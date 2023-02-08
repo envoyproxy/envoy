@@ -127,6 +127,7 @@ TEST_P(ConnectIntegrationTest, ConnectFilterUnaryRequestE2E) {
 }
 
 TEST_P(ConnectIntegrationTest, ConnectFilterStreamingRequestE2E) {
+  setUpstreamProtocol(Http::CodecType::HTTP2);
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -179,6 +180,12 @@ TEST_P(ConnectIntegrationTest, ConnectFilterStreamingRequestE2E) {
   ASSERT_TRUE(connect_response.ParseFromString(response_body.toString().substr(0, len)));
   EXPECT_THAT(connect_response, ProtoEq(grpc_response));
   response_body.drain(len);
+
+  // Connect end-of-stream frame
+  ASSERT_THAT(response_body.length(), testing::Gt(5));
+  EXPECT_EQ('\2', response_body.drainInt<uint8_t>());
+  EXPECT_EQ(2U, response_body.drainBEInt<uint32_t>());
+  EXPECT_EQ(response_body.toString(), "{}");
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ConnectIntegrationTest,
