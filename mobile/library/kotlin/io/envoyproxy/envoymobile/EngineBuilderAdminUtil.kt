@@ -1,5 +1,8 @@
 package io.envoyproxy.envoymobile
 
+/**
+ * Utility to enable admin interface.
+ */
 object EngineBuilderAdminUtil {
   /**
    * Enable admin interface on 127.0.0.1:9901 address. Admin interface is intended to be

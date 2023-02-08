@@ -1,5 +1,8 @@
 package io.envoyproxy.envoymobile
 
+/**
+ * Utility to enable HTTP/3.
+ */
 object EngineBuilderHTTP3Util {
   /**
    * Specify whether to enable experimental HTTP/3 (QUIC) support. Note the actual protocol will

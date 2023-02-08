@@ -1,5 +1,8 @@
 package io.envoyproxy.envoymobile
 
+/**
+ * Utility to enable request compression.
+ */
 object EngineBuilderCompressionUtil {
   /**
    * Specify whether to do gzip request compression or not.  Defaults to false.
