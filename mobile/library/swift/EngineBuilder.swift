@@ -57,6 +57,7 @@ open class EngineBuilder: NSObject {
   private var platformFilterChain: [EnvoyHTTPFilterFactory] = []
   private var stringAccessors: [String: EnvoyStringAccessor] = [:]
   private var keyValueStores: [String: EnvoyKeyValueStore] = [:]
+  private var runtimeGuards: [String: String] = [:]
   private var directResponses: [DirectResponse] = []
   private var statsSinks: [String] = []
 
@@ -472,6 +473,18 @@ open class EngineBuilder: NSObject {
     return self
   }
 
+  /// Set a runtime guard with the provided value.
+  ///
+  /// - parameter name:  the name of the runtime guard, e.g. test_feature_false.
+  /// - parameter value: the value fo the runtime guard.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func addRuntimeGuard(name: String, value: String) -> Self {
+    self.runtimeGuards[name] = value
+    return self
+  }
+
   /// Set a closure to be called when the engine finishes its async startup and begins running.
   ///
   /// - parameter closure: The closure to be called.
@@ -625,6 +638,7 @@ open class EngineBuilder: NSObject {
       directResponses: self.directResponses
         .map { $0.resolvedDirectResponseYAML() }
         .joined(separator: "\n"),
+      runtimeGuards: self.runtimeGuards,
       nativeFilterChain: self.nativeFilterChain,
       platformFilterChain: self.platformFilterChain,
       stringAccessors: self.stringAccessors,

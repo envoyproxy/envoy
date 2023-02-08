@@ -82,7 +82,11 @@ static_resources:
       .addKeyValueStore(
         name: "envoy.key_value.platform_test",
         keyValueStore: testStore
+      ).addRuntimeGuard(
+        name: "test_feature_false",
+        value: "true"
       )
+
       .build()
 
     let client = engine.streamClient()

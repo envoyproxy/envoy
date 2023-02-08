@@ -15,6 +15,8 @@ fixture_template:
 #{custom_listeners}
   filters:
 #{custom_filters}
+  runtime:
+#{custom_runtime}
   routes:
 #{custom_routes}
 """
@@ -483,6 +485,7 @@ final class EngineBuilderTests: XCTestCase {
       virtualClusters: ["test"],
       directResponseMatchers: "",
       directResponses: "",
+      runtimeGuards: ["test_feature_false": "true"],
       nativeFilterChain: [
         EnvoyNativeFilterConfig(name: "filter_name", typedConfig: "test_config"),
       ],
@@ -552,6 +555,7 @@ final class EngineBuilderTests: XCTestCase {
     XCTAssertTrue(resolvedYAML.contains("filter_name: TestFilter"))
     XCTAssertTrue(resolvedYAML.contains("name: filter_name"))
     XCTAssertTrue(resolvedYAML.contains("typed_config: test_config"))
+    XCTAssertTrue(resolvedYAML.contains("test_feature_false: true"))
   }
 
   func testResolvesYAMLWithAlternateValues() throws {
@@ -589,6 +593,7 @@ final class EngineBuilderTests: XCTestCase {
       virtualClusters: ["test"],
       directResponseMatchers: "",
       directResponses: "",
+      runtimeGuards: [:],
       nativeFilterChain: [
         EnvoyNativeFilterConfig(name: "filter_name", typedConfig: "test_config"),
       ],
@@ -670,6 +675,7 @@ final class EngineBuilderTests: XCTestCase {
       virtualClusters: ["test"],
       directResponseMatchers: "",
       directResponses: "",
+      runtimeGuards: [:],
       nativeFilterChain: [],
       platformFilterChain: [],
       stringAccessors: [:],

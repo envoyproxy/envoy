@@ -1212,7 +1212,7 @@ extern "C" JNIEXPORT jstring JNICALL Java_io_envoyproxy_envoymobile_engine_JniLi
     jlong per_try_idle_timeout_seconds, jstring app_version, jstring app_id,
     jboolean trust_chain_verification, jobjectArray virtual_clusters, jobjectArray filter_chain,
     jobjectArray stat_sinks, jboolean enable_platform_certificates_validation,
-    jboolean enable_skip_dns_lookup_for_proxied_requests) {
+    jboolean enable_skip_dns_lookup_for_proxied_requests, jobjectArray runtime_guards) {
   Envoy::Platform::EngineBuilder builder;
 
   setString(env, grpc_stats_domain, &builder, &EngineBuilder::addGrpcStatsDomain);
@@ -1274,6 +1274,11 @@ extern "C" JNIEXPORT jstring JNICALL Java_io_envoyproxy_envoymobile_engine_JniLi
 
   std::vector<std::string> hostnames = javaObjectArrayToStringVector(env, dns_preresolve_hostnames);
   builder.addDnsPreresolveHostnames(hostnames);
+
+  auto guards = javaObjectArrayToStringPairVector(env, runtime_guards);
+  for (std::pair<std::string, std::string>& entry : guards) {
+    builder.addRuntimeGuard(entry.first, entry.second == "true");
+  }
 
   builder.generateBootstrapAndCompareForTests(native_yaml);
   env->ReleaseStringUTFChars(yaml, native_yaml);

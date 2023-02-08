@@ -375,5 +375,5 @@ public class JniLibrary {
       long streamIdleTimeoutSeconds, long perTryIdleTimeoutSeconds, String appVersion, String appId,
       boolean trustChainVerification, byte[][] virtualClusters, byte[][] filterChain,
       byte[][] statSinks, boolean enablePlatformCertificatesValidation,
-      boolean enableSkipDNSLookupForProxiedRequests);
+      boolean enableSkipDNSLookupForProxiedRequests, byte[][] runtimeGuards);
 }

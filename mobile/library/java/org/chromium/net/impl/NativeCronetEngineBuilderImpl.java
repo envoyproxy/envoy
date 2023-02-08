@@ -122,6 +122,7 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
     Map<String, EnvoyStringAccessor> stringAccessors = Collections.emptyMap();
     Map<String, EnvoyKeyValueStore> keyValueStores = Collections.emptyMap();
     List<String> statSinks = Collections.emptyList();
+    Map<String, String> runtimeGuards = Collections.emptyMap();
 
     return new EnvoyConfiguration(
         mAdminInterfaceEnabled, mGrpcStatsDomain, mConnectTimeoutSeconds, mDnsRefreshSeconds,
@@ -134,6 +135,7 @@ public class NativeCronetEngineBuilderImpl extends CronetEngineBuilderImpl {
         mMaxConnectionsPerHost, mStatsFlushSeconds, mStreamIdleTimeoutSeconds,
         mPerTryIdleTimeoutSeconds, mAppVersion, mAppId, mTrustChainVerification, mVirtualClusters,
         nativeFilterChain, platformFilterChain, stringAccessors, keyValueStores, statSinks,
-        mEnableSkipDNSLookupForProxiedRequests, mEnablePlatformCertificatesValidation);
+        runtimeGuards, mEnableSkipDNSLookupForProxiedRequests,
+        mEnablePlatformCertificatesValidation);
   }
 }

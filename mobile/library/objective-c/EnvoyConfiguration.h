@@ -43,6 +43,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong) NSArray<NSString *> *virtualClusters;
 @property (nonatomic, strong) NSString *directResponseMatchers;
 @property (nonatomic, strong) NSString *directResponses;
+@property (nonatomic, strong) NSDictionary<NSString *, NSString *> *runtimeGuards;
 @property (nonatomic, strong) NSArray<EnvoyNativeFilterConfig *> *nativeFilterChain;
 @property (nonatomic, strong) NSArray<EnvoyHTTPFilterFactory *> *httpPlatformFilterFactories;
 @property (nonatomic, strong) NSDictionary<NSString *, EnvoyStringAccessor *> *stringAccessors;
@@ -86,6 +87,8 @@ NS_ASSUME_NONNULL_BEGIN
                                   virtualClusters:(NSArray<NSString *> *)virtualClusters
                            directResponseMatchers:(NSString *)directResponseMatchers
                                   directResponses:(NSString *)directResponses
+                                    runtimeGuards:
+                                        (NSDictionary<NSString *, NSString *> *)runtimeGuards
                                 nativeFilterChain:
                                     (NSArray<EnvoyNativeFilterConfig *> *)nativeFilterChain
                               platformFilterChain:

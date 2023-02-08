@@ -62,6 +62,7 @@ public class EnvoyConfiguration {
   public final Map<String, EnvoyStringAccessor> stringAccessors;
   public final Map<String, EnvoyKeyValueStore> keyValueStores;
   public final List<String> statSinks;
+  Map<String, String> runtimeGuards;
   public final Boolean enablePlatformCertificatesValidation;
   public final Boolean enableSkipDNSLookupForProxiedRequests;
 
@@ -144,7 +145,8 @@ public class EnvoyConfiguration {
       List<EnvoyHTTPFilterFactory> httpPlatformFilterFactories,
       Map<String, EnvoyStringAccessor> stringAccessors,
       Map<String, EnvoyKeyValueStore> keyValueStores, List<String> statSinks,
-      Boolean enableSkipDNSLookupForProxiedRequests, boolean enablePlatformCertificatesValidation) {
+      Map<String, String> runtimeGuards, Boolean enableSkipDNSLookupForProxiedRequests,
+      boolean enablePlatformCertificatesValidation) {
     JniLibrary.load();
     this.adminInterfaceEnabled = adminInterfaceEnabled;
     this.grpcStatsDomain = grpcStatsDomain;
@@ -193,6 +195,7 @@ public class EnvoyConfiguration {
     this.stringAccessors = stringAccessors;
     this.keyValueStores = keyValueStores;
     this.statSinks = statSinks;
+    this.runtimeGuards = runtimeGuards;
     this.enablePlatformCertificatesValidation = enablePlatformCertificatesValidation;
     this.enableSkipDNSLookupForProxiedRequests = enableSkipDNSLookupForProxiedRequests;
   }
@@ -267,6 +270,14 @@ public class EnvoyConfiguration {
       maybeComma = ",";
     }
     dnsBuilder.append("]");
+
+    StringBuilder runtimeGuardBuilder = new StringBuilder("");
+    for (Map.Entry<String, String> guardAndValue : runtimeGuards.entrySet()) {
+      runtimeGuardBuilder.append("            " + guardAndValue.getKey() + ": " +
+                                 guardAndValue.getValue() + "\n");
+    }
+    processedTemplate =
+        processedTemplate.replace("#{custom_runtime}\n", runtimeGuardBuilder.toString());
 
     StringBuilder configBuilder = new StringBuilder("!ignore platform_defs:\n");
     configBuilder.append(String.format("- &connect_timeout %ss\n", connectTimeoutSeconds))
@@ -354,6 +365,7 @@ public class EnvoyConfiguration {
         byte[][] clusters = JniBridgeUtility.stringsToJniBytes(virtualClusters);
         byte[][] stats_sinks = JniBridgeUtility.stringsToJniBytes(statSinks);
         byte[][] dns_preresolve = JniBridgeUtility.stringsToJniBytes(dnsPreresolveHostnames);
+        byte[][] runtime_guards = JniBridgeUtility.mapToJniBytes(runtimeGuards);
 
         JniLibrary.compareYaml(
             resolvedConfiguration, grpcStatsDomain, adminInterfaceEnabled, connectTimeoutSeconds,
@@ -366,7 +378,8 @@ public class EnvoyConfiguration {
             h2ConnectionKeepaliveTimeoutSeconds, maxConnectionsPerHost, statsFlushSeconds,
             streamIdleTimeoutSeconds, perTryIdleTimeoutSeconds, appVersion, appId,
             enforceTrustChainVerification, clusters, filter_chain, stats_sinks,
-            enablePlatformCertificatesValidation, enableSkipDNSLookupForProxiedRequests);
+            enablePlatformCertificatesValidation, enableSkipDNSLookupForProxiedRequests,
+            runtime_guards);
         break;
       }
     }

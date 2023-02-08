@@ -93,6 +93,7 @@ public:
   EngineBuilder& addStatsSinks(std::vector<std::string> stat_sinks);
   EngineBuilder& addPlatformFilter(std::string name);
   EngineBuilder& addVirtualCluster(std::string virtual_cluster);
+  EngineBuilder& addRuntimeGuard(std::string guard, bool value);
 
   // These functions don't affect YAML but instead perform registrations.
   EngineBuilder& addKeyValueStore(std::string name, KeyValueStoreSharedPtr key_value_store);
@@ -179,6 +180,7 @@ private:
   std::vector<std::string> dns_preresolve_hostnames_;
   std::vector<std::string> virtual_clusters_;
 
+  std::vector<std::pair<std::string, bool>> runtime_guards_;
   absl::flat_hash_map<std::string, StringAccessorSharedPtr> string_accessors_;
   bool config_bootstrap_incompatible_ = false;
   bool skip_dns_lookups_for_proxied_requests_ = false;
