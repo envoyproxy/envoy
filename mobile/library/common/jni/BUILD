@@ -7,7 +7,7 @@ envoy_package()
 
 # Support for JNI, using NDK on Android and Java otherwise, since the JNI APIs
 # differ a bit between the two.
-cc_library(
+envoy_cc_library(
     name = "jni_support_lib",
     srcs = select({
         "@envoy//bazel:android": ["ndk_jni_support.cc"],
@@ -24,7 +24,7 @@ cc_library(
 )
 
 # Various JNI helper libraries.
-cc_library(
+envoy_cc_library(
     name = "jni_utility_lib",
     srcs = [
         "jni_utility.cc",
@@ -68,7 +68,7 @@ envoy_cc_library(
 )
 
 # Cert verification related functions which call into AndroidNetworkLibrary.
-cc_library(
+envoy_cc_library(
     name = "android_network_utility_lib",
     srcs = [
         "android_network_utility.cc",
@@ -88,7 +88,7 @@ cc_library(
 )
 
 # Implementations of the "native" Java methods for AndroidJniLibrary.java
-cc_library(
+envoy_cc_library(
     name = "android_jni_interface_lib",
     srcs = [
         "android_jni_interface.cc",
@@ -106,7 +106,7 @@ cc_library(
 )
 
 # Library which contains all the JNI related targets.
-cc_library(
+envoy_cc_library(
     name = "envoy_jni_lib",
     linkopts = select({
         "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
@@ -154,7 +154,7 @@ android_debug_info(
     dep = "libenvoy_jni.so",
 )
 
-cc_library(
+envoy_cc_library(
     name = "android_jni_utility_lib",
     srcs = [
         "android_jni_utility.cc",
