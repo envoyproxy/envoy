@@ -111,7 +111,7 @@ private:
   absl::string_view cluster_name_;
   std::unique_ptr<RequestAsyncCallbacks> request_callbacks_;
   Upstream::ClusterManager& cluster_manager_;
-  Tcp::AsyncTcpClientOptionsConstSharedPtr options_
+  Tcp::AsyncTcpClientOptionsConstSharedPtr options_;
 };
 
 class TestNetworkAsyncTcpFilterConfigFactory
