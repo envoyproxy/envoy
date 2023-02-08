@@ -40,7 +40,9 @@ TEST(TestConfig, ConfigIsApplied) {
       .setAppId("1234-1234-1234")
       .enableDnsCache(true, /* save_interval_seconds */ 101)
       .addDnsPreresolveHostnames({"lyft.com", "google.com"})
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
       .enableAdminInterface(true)
+#endif
       .setForceAlwaysUsev6(true)
       .setDeviceOs("probably-ubuntu-on-CI");
   std::string config_str = engine_builder.generateConfigStr();
@@ -221,6 +223,7 @@ TEST(TestConfig, PerTryIdleTimeout) {
   EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap()));
 }
 
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
 TEST(TestConfig, EnableAdminInterface) {
   EngineBuilder engine_builder;
 
@@ -234,6 +237,7 @@ TEST(TestConfig, EnableAdminInterface) {
   ASSERT_THAT(config_str, HasSubstr("admin: *admin_interface"));
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
 }
+#endif
 
 TEST(TestConfig, EnableInterfaceBinding) {
   EngineBuilder engine_builder;
