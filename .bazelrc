@@ -74,8 +74,8 @@ build:clang --linkopt=-fuse-ld=lld
 build:clang-pch --spawn_strategy=local
 build:clang-pch --define=ENVOY_CLANG_PCH=1
 
-# Use ld linker for gcc compiler.
-build:gcc --linkopt=-fuse-ld=lld
+# Use gold linker for gcc compiler.
+build:gcc --linkopt=-fuse-ld=gold
 
 # Basic ASAN/UBSAN that works for gcc
 build:asan --action_env=ENVOY_ASAN=1

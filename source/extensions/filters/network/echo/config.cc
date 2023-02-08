@@ -15,17 +15,17 @@ namespace Echo {
 /**
  * Config registration for the echo filter. @see NamedNetworkFilterConfigFactory.
  */
-class EchoFactory
+class EchoConfigFactory
     : public Common::FactoryBase<envoy::extensions::filters::network::echo::v3::Echo> {
 public:
-  RustExecutorFactory() : FactoryBase(NetworkFilterNames::get().Echo) {}
+  EchoConfigFactory() : FactoryBase(NetworkFilterNames::get().Echo) {}
 
 private:
   Network::FilterFactoryCb
   createFilterFactoryFromProtoTyped(const envoy::extensions::filters::network::echo::v3::Echo&,
                                     Server::Configuration::FactoryContext&) override {
     return [](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addReadFilter(std::make_shared<Filter>());
+      filter_manager.addReadFilter(std::make_shared<EchoFilter>());
     };
   }
 
@@ -38,7 +38,7 @@ private:
 /**
  * Static registration for the echo filter. @see RegisterFactory.
  */
-LEGACY_REGISTER_FACTORY(EchoFactory, Server::Configuration::NamedNetworkFilterConfigFactory,
+LEGACY_REGISTER_FACTORY(EchoConfigFactory, Server::Configuration::NamedNetworkFilterConfigFactory,
                         "envoy.echo");
 
 } // namespace Echo
