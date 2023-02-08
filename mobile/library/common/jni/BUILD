@@ -1,5 +1,5 @@
 load("//bazel:android_debug_info.bzl", "android_debug_info")
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_copts", "envoy_package")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_package")
 
 licenses(["notice"])  # Apache 2
 
@@ -48,12 +48,11 @@ cc_library(
 # TODO(RyanTheOptimist): Is there a better name for this? I'm not sure what
 #     "interface" refers to in this file/lib. Maybe we should have a convention
 #     where the name of the java classes are part of the file name?
-cc_library(
+envoy_cc_library(
     name = "jni_interface_lib",
     srcs = [
         "jni_interface.cc",
     ],
-    copts = envoy_mobile_copts("@envoy"),
     deps = [
         ":android_network_utility_lib",
         ":jni_utility_lib",
