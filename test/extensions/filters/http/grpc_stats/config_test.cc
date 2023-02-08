@@ -118,28 +118,8 @@ TEST_F(GrpcStatsFilterConfigTest, StatsHttp2NormalResponse) {
   EXPECT_FALSE(stream_info_.filterState()->hasDataWithName("envoy.filters.http.grpc_stats"));
 }
 
-TEST_F(GrpcStatsFilterConfigTest, StatsConnectUnaryDisabled) {
-  config_.mutable_stats_for_all_methods()->set_value(true);
-  config_.set_enable_buf_connect_support(false);
-  initialize();
-
-  Http::TestRequestHeaderMapImpl request_headers{
-      {"content-type", "application/proto"},
-      {"connect-protocol-version", "1"},
-      {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
-  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
-
-  EXPECT_EQ(0UL, decoder_callbacks_.clusterInfo()
-                     ->statsScope()
-                     .counterFromString("grpc.lyft.users.BadCompanions.GetBadCompanions.total")
-                     .value());
-}
-
 TEST_F(GrpcStatsFilterConfigTest, StatsConnectUnaryHeaderOnly) {
   config_.mutable_stats_for_all_methods()->set_value(true);
-  config_.set_enable_buf_connect_support(true);
   initialize();
 
   Http::TestRequestHeaderMapImpl request_headers{
@@ -173,7 +153,6 @@ TEST_F(GrpcStatsFilterConfigTest, StatsConnectUnaryHeaderOnly) {
 
 TEST_F(GrpcStatsFilterConfigTest, StatsConnectUnaryBodies) {
   config_.mutable_stats_for_all_methods()->set_value(true);
-  config_.set_enable_buf_connect_support(true);
   config_.set_emit_filter_state(true);
   initialize();
 
@@ -222,7 +201,6 @@ TEST_F(GrpcStatsFilterConfigTest, StatsConnectUnaryBodies) {
 
 TEST_F(GrpcStatsFilterConfigTest, StatsConnectStreamingOk) {
   config_.mutable_stats_for_all_methods()->set_value(true);
-  config_.set_enable_buf_connect_support(true);
   initialize();
 
   Http::TestRequestHeaderMapImpl request_headers{
@@ -247,7 +225,6 @@ TEST_F(GrpcStatsFilterConfigTest, StatsConnectStreamingOk) {
 
 TEST_F(GrpcStatsFilterConfigTest, StatsConnectStreamingError) {
   config_.mutable_stats_for_all_methods()->set_value(true);
-  config_.set_enable_buf_connect_support(true);
   initialize();
 
   Http::TestRequestHeaderMapImpl request_headers{
@@ -272,7 +249,6 @@ TEST_F(GrpcStatsFilterConfigTest, StatsConnectStreamingError) {
 
 TEST_F(GrpcStatsFilterConfigTest, StatsConnectStreamingBrokenError) {
   config_.mutable_stats_for_all_methods()->set_value(true);
-  config_.set_enable_buf_connect_support(true);
   initialize();
 
   Http::TestRequestHeaderMapImpl request_headers{
@@ -297,7 +273,6 @@ TEST_F(GrpcStatsFilterConfigTest, StatsConnectStreamingBrokenError) {
 
 TEST_F(GrpcStatsFilterConfigTest, StatsConnectStreamingInvalidJSON) {
   config_.mutable_stats_for_all_methods()->set_value(true);
-  config_.set_enable_buf_connect_support(true);
   initialize();
 
   Http::TestRequestHeaderMapImpl request_headers{
@@ -322,7 +297,6 @@ TEST_F(GrpcStatsFilterConfigTest, StatsConnectStreamingInvalidJSON) {
 
 TEST_F(GrpcStatsFilterConfigTest, StatsConnectStreamingFrameAfterEOS) {
   config_.mutable_stats_for_all_methods()->set_value(true);
-  config_.set_enable_buf_connect_support(true);
   initialize();
 
   Http::TestRequestHeaderMapImpl request_headers{

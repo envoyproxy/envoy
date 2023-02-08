@@ -95,8 +95,7 @@ struct Config {
          Server::Configuration::FactoryContext& context)
       : context_(context.grpcContext()), emit_filter_state_(proto_config.emit_filter_state()),
         enable_upstream_stats_(proto_config.enable_upstream_stats()),
-        replace_dots_in_grpc_service_name_(proto_config.replace_dots_in_grpc_service_name()),
-        enable_buf_connect_support_(proto_config.enable_buf_connect_support()) {
+        replace_dots_in_grpc_service_name_(proto_config.replace_dots_in_grpc_service_name()) {
 
     switch (proto_config.per_method_stat_specifier_case()) {
     case envoy::extensions::filters::http::grpc_stats::v3::FilterConfig::
@@ -141,7 +140,6 @@ struct Config {
   const bool emit_filter_state_;
   const bool enable_upstream_stats_;
   const bool replace_dots_in_grpc_service_name_;
-  const bool enable_buf_connect_support_;
   bool stats_for_all_methods_{false};
   absl::optional<GrpcServiceMethodToRequestNamesMap> allowlist_;
 };
@@ -153,10 +151,8 @@ public:
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override {
     grpc_request_ = Grpc::Common::isGrpcRequestHeaders(headers);
-    if (config_->enable_buf_connect_support_) {
-      connect_unary_ = Grpc::Common::isConnectRequestHeaders(headers);
-      connect_streaming_request_ = Grpc::Common::isConnectStreamingRequestHeaders(headers);
-    }
+    connect_unary_ = Grpc::Common::isConnectRequestHeaders(headers);
+    connect_streaming_request_ = Grpc::Common::isConnectStreamingRequestHeaders(headers);
     if (grpc_request_ || connect_streaming_request_ || connect_unary_) {
       cluster_ = decoder_callbacks_->clusterInfo();
       if (cluster_) {
@@ -229,9 +225,7 @@ public:
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override {
     grpc_response_ = Grpc::Common::isGrpcResponseHeaders(headers, end_stream);
-    if (config_->enable_buf_connect_support_) {
-      connect_streaming_response_ = Grpc::Common::isConnectStreamingResponseHeaders(headers);
-    }
+    connect_streaming_response_ = Grpc::Common::isConnectStreamingResponseHeaders(headers);
     if (doStatTracking()) {
       if (connect_unary_) {
         config_->context_.chargeStat(*cluster_, Grpc::Context::Protocol::Grpc, request_names_,

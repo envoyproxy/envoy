@@ -20,7 +20,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.http.grpc_stats]
 
 // gRPC statistics filter configuration
-// [#next-free-field: 7]
+// [#next-free-field: 6]
 message FilterConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.grpc_stats.v2alpha.FilterConfig";
@@ -70,10 +70,6 @@ message FilterConfig {
   // This config can fix incorrect gRPC metrics with dots because the existing stats tag extractor
   // assumes no dots in the gRPC service name. By default this is set as false.
   bool replace_dots_in_grpc_service_name = 5;
-
-  // If true, the filter will instrument `Buf Connect <https://connect.build/>` protocol messages in
-  // addition to gRPC.
-  bool enable_buf_connect_support = 6;
 }
 
 // gRPC statistics filter state object in protobuf form.
