@@ -1201,7 +1201,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
   EXPECT_CALL(decoder_callbacks_,
               encodeHeaders_(HeaderMapEqualRef(&second_response_headers), true));
 
-  filter_->finishFlow();
+  filter_->finishGetAccessTokenFlow();
 }
 
 TEST_F(OAuth2Test, OAuthBearerTokenFlowFromHeader) {
