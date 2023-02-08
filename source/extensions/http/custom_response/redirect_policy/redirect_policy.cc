@@ -163,9 +163,7 @@ std::unique_ptr<ModifyRequestHeadersAction> RedirectPolicy::createModifyRequestH
                    "uri should not be invalid as this was already validated during config load");
     return ::Envoy::Http::FilterHeadersStatus::Continue;
   }
-  if (!absolute_url.scheme().empty()) {
-    downstream_headers->setScheme(absolute_url.scheme());
-  }
+  downstream_headers->setScheme(absolute_url.scheme());
   downstream_headers->setHost(absolute_url.hostAndPort());
 
   auto path_and_query = absolute_url.pathAndQueryParams();

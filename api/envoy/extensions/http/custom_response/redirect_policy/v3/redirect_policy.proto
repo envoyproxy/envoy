@@ -27,7 +27,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // upstream.
 // [#next-free-field: 7]
 message RedirectPolicy {
-  // [#next-free-field: 8]
+  // [#next-free-field: 7]
   message RedirectAction {
     // When the scheme redirection take place, the following rules apply:
     //  1. If the source URI scheme is ``http`` and the port is explicitly
@@ -75,11 +75,7 @@ message RedirectPolicy {
 
     // Indicates that during redirection, the query portion of the URL will
     // be removed. Default value is false.
-    oneof query_specifier {
-      bool strip_query = 6;
-
-      string query = 7;
-    }
+    bool strip_query = 6;
   }
 
   oneof redirect_action_specifier {
@@ -97,6 +93,7 @@ message RedirectPolicy {
     //
     string uri = 1 [(validate.rules).string = {min_len: 1}];
 
+    // Specify elements of the redirect url individually.
     RedirectAction redirect_action = 2;
   }
 

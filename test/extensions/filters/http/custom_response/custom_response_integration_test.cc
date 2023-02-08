@@ -586,8 +586,8 @@ TEST_P(CustomResponseIntegrationTest, ModifyRequestHeaders) {
         action->set_name("modify-request-headers-action");
         action->mutable_typed_config()->set_type_url("type.googleapis.com/google.protobuf.Struct");
         *policy.mutable_redirect_action() = TestUtility::parseYaml<RedirectActionProto>(R"EOF(
-    host_redirect: "global"
-    path_redirect: "/storage/internal_server_error"
+    host_redirect: "global.storage"
+    path_redirect: "/internal_server_error"
     https_redirect: true
     )EOF");
       });
@@ -610,7 +610,7 @@ TEST_P(CustomResponseIntegrationTest, ModifyRequestHeaders) {
         route->mutable_match()->set_prefix("/internal_server_error");
         auto header = route->mutable_match()->mutable_headers()->Add();
         header->set_name("x-envoy-cer-backend");
-        header->mutable_string_match()->set_exact("global/storage");
+        header->mutable_string_match()->set_exact("global.storage");
         route->mutable_direct_response()->set_status(static_cast<uint32_t>(220));
         // Use inline bytes rather than a filename to avoid using a path that may look illegal
         // to Envoy.

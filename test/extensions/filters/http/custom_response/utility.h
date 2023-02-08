@@ -116,7 +116,7 @@ constexpr absl::string_view kDefaultConfig = R"EOF(
             name: 520_action
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.http.custom_response.redirect_policy.v3.RedirectPolicy
-              uri: "https://global/storage/internal_server_error"
+              uri: "https://global.storage/internal_server_error"
               response_headers_to_add:
               - header:
                   key: "foo3"
