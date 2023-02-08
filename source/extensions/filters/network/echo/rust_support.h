@@ -1,7 +1,13 @@
 #include "envoy/buffer/buffer.h"
-#include "envoy/network/filter.h"
-#include "rust/cxx.h"
 #include "envoy/network/connection.h"
+#include "envoy/network/filter.h"
+
+#include "rust/cxx.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace NetworkFilters {
+namespace Echo {
 
 struct FutureHandle;
 
@@ -63,3 +69,7 @@ void drop_executor(const Executor*);
 Envoy::Network::Connection* connection(Envoy::Network::ReadFilterCallbacks* cbs);
 void write_to(Envoy::Network::Connection* connection, Envoy::Buffer::Instance* buffer,
               bool end_stream);
+} // namespace Echo
+} // namespace NetworkFilters
+} // namespace Extensions
+} // namespace Envoy

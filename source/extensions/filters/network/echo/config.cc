@@ -10,12 +10,12 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace RustExecutor {
+namespace Echo {
 
 /**
  * Config registration for the echo filter. @see NamedNetworkFilterConfigFactory.
  */
-class RustExecutorFactory
+class EchoFactory
     : public Common::FactoryBase<envoy::extensions::filters::network::echo::v3::Echo> {
 public:
   RustExecutorFactory() : FactoryBase(NetworkFilterNames::get().Echo) {}
@@ -38,10 +38,10 @@ private:
 /**
  * Static registration for the echo filter. @see RegisterFactory.
  */
-LEGACY_REGISTER_FACTORY(RustExecutorFactory, Server::Configuration::NamedNetworkFilterConfigFactory,
+LEGACY_REGISTER_FACTORY(EchoFactory, Server::Configuration::NamedNetworkFilterConfigFactory,
                         "envoy.echo");
 
-} // namespace RustExecutor
+} // namespace Echo
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

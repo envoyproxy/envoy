@@ -1,16 +1,17 @@
 #pragma once
 
-#include "envoy/network/filter.h"
-#include "rust/cxx.h"
-#include "source/extensions/filters/network/echo/echo.rs.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/network/filter.h"
 
 #include "source/common/common/logger.h"
+#include "source/extensions/filters/network/echo/echo.rs.h"
+
+#include "rust/cxx.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace RustExecutor {
+namespace Echo {
 
 /**
  * Implementation of a basic echo filter.
@@ -38,7 +39,7 @@ private:
   Network::ReadFilterCallbacks* callbacks_;
 };
 
-} // namespace RustExecutor
+} // namespace Echo
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

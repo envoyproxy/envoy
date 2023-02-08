@@ -1,5 +1,10 @@
 #include "source/extensions/filters/network/echo/rust_support.h"
 
+namespace Envoy {
+namespace Extensions {
+namespace NetworkFilters {
+namespace Echo {
+
 bool data_available(const WaitForDataHandle* handle) { return handle->ready_; }
 
 bool is_end_stream(const WaitForDataHandle* handle) { return handle->end_stream_; }
@@ -30,3 +35,7 @@ void write_to(Envoy::Network::Connection* connection, Envoy::Buffer::Instance* b
               bool end_stream) {
   connection->write(*buffer, end_stream);
 }
+} // namespace Echo
+} // namespace NetworkFilters
+} // namespace Extensions
+} // namespace Envoy
