@@ -1,5 +1,5 @@
-1.22.8 (Pending)
-================
+1.22.7 (February 7, 2022)
+=========================
 
 Incompatible Behavior Changes
 -----------------------------
@@ -13,12 +13,16 @@ Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
+* dependency: add boringssl patch to resolve CVE-2023-0286. Note that the FIPS build is not patched/fixed.
+
 Removed Config or Runtime
 -------------------------
 *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 New Features
 ------------
+
+* docker: use new ``nossl`` images for ``distroless`` Docker build.
 
 Deprecated
 ----------
