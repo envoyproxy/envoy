@@ -3,6 +3,7 @@
 #include "envoy/http/header_map.h"
 
 #include "source/common/http/message_impl.h"
+#include "source/common/tracing/null_span_impl.h"
 #include "source/extensions/tracers/datadog/agent_http_client.h"
 #include "source/extensions/tracers/datadog/dict_util.h"
 #include "source/extensions/tracers/datadog/tracer_stats.h"
@@ -286,7 +287,7 @@ TEST_F(DatadogAgentHttpClientTest, OnResponseBogusRequest) {
       Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
   msg->body().add("{}");
 
-  // The first argument to `onSuccess` should be `request`, but instead we pass
+  // The first argument to `onSuccess` should be `request_`, but instead we pass
   // `bogus_request`.
   Http::MockAsyncClientRequest bogus_request(
       &cluster_manager_.instance_.thread_local_cluster_.async_client_);
@@ -314,7 +315,7 @@ TEST_F(DatadogAgentHttpClientTest, OnErrorStreamReset) {
   EXPECT_CALL(on_response_, Call(_, _, _)).Times(0);
 
   // The request will not be canceled; neither explicitly nor in
-  // `~AgentHTTPClient`, because it will have been successfully fulfilled.
+  // `~AgentHTTPClient`, because it will have been fulfilled.
   EXPECT_CALL(request_, cancel()).Times(0);
 
   const auto ignore = [](auto&&...) {};
@@ -350,7 +351,7 @@ TEST_F(DatadogAgentHttpClientTest, OnErrorOther) {
   EXPECT_CALL(on_response_, Call(_, _, _)).Times(0);
 
   // The request will not be canceled; neither explicitly nor in
-  // `~AgentHTTPClient`, because it will have been successfully fulfilled.
+  // `~AgentHTTPClient`, because it will have been fulfilled.
   EXPECT_CALL(request_, cancel()).Times(0);
 
   const auto ignore = [](auto&&...) {};
@@ -364,6 +365,42 @@ TEST_F(DatadogAgentHttpClientTest, OnErrorOther) {
 
   const auto bogus_value = static_cast<Http::AsyncClient::FailureReason>(-1);
   callbacks_->onFailure(request_, bogus_value);
+}
+
+TEST_F(DatadogAgentHttpClientTest, OnErrorBogusRequest) {
+  // When `onFailure` is invoked with a request that's not registered with the
+  // HTTP client, no callbacks are invoked and no stats are incremented.
+
+  EXPECT_CALL(cluster_manager_.instance_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(
+          Invoke([this](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks_arg,
+                        const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            callbacks_ = &callbacks_arg;
+            return &request_;
+          }));
+
+  EXPECT_CALL(on_error_, Call(_)).Times(0);
+  EXPECT_CALL(on_response_, Call(_, _, _)).Times(0);
+
+  // The request will will canceled by `~AgentHTTPClient` because `onFailure`
+  // was passed the wrong request, and so the real request is never removed from
+  // the HTTP client's registry.
+  EXPECT_CALL(request_, cancel());
+
+  const auto ignore = [](auto&&...) {};
+  datadog::tracing::Expected<void> result =
+      client_.post(url_, ignore, "{}", on_response_.AsStdFunction(), on_error_.AsStdFunction());
+  EXPECT_TRUE(result) << result.error();
+
+  Http::ResponseMessagePtr msg(new Http::ResponseMessageImpl(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+  msg->body().add("{}");
+
+  // The first argument to `onFailure` should be `request_`, but instead we pass
+  // `bogus_request`.
+  Http::MockAsyncClientRequest bogus_request(
+      &cluster_manager_.instance_.thread_local_cluster_.async_client_);
+  callbacks_->onFailure(bogus_request, Http::AsyncClient::FailureReason::Reset);
 }
 
 TEST_F(DatadogAgentHttpClientTest, SendFailReturnsError) {
@@ -399,6 +436,13 @@ TEST_F(DatadogAgentHttpClientTest, DrainIsANoOp) {
 TEST_F(DatadogAgentHttpClientTest, ConfigJSONContainsTypeName) {
   nlohmann::json config = client_.config_json();
   EXPECT_EQ("Envoy::Extensions::Tracers::Datadog::AgentHTTPClient", config["type"]);
+}
+
+TEST_F(DatadogAgentHttpClientTest, OnBeforeFinalizeUpstreamSpanIsANoOp) {
+  // `AgentHTTPClient::onBeforeFinalizeUpstreamSpan` doesn't do anything.
+  // This test is for the sake of coverage.
+  Tracing::NullSpan null_span;
+  client_.onBeforeFinalizeUpstreamSpan(null_span, nullptr);
 }
 
 } // namespace
