@@ -265,8 +265,7 @@ EngineBuilder& EngineBuilder::enforceTrustChainVerification(bool trust_chain_ver
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addRtdsLayer(const std::string& layer_name,
-                                           const int timeout_seconds) {
+EngineBuilder& EngineBuilder::addRtdsLayer(const std::string& layer_name, int timeout_seconds) {
   rtds_layer_name_ = layer_name;
   rtds_timeout_seconds_ = timeout_seconds;
   return *this;
@@ -280,12 +279,6 @@ EngineBuilder& EngineBuilder::setAggregatedDiscoveryService(const std::string& a
   ads_api_type_ = api_type;
   ads_address_ = address;
   ads_port_ = port;
-  return *this;
-}
-
-EngineBuilder& EngineBuilder::addCdsLayer(const int timeout_seconds) {
-  enable_cds_ = true;
-  cds_timeout_seconds_ = timeout_seconds;
   return *this;
 }
 
@@ -439,8 +432,8 @@ std::string EngineBuilder::generateConfigStr() const {
     insertCustomFilter(filter_config, config_template);
   }
 
-  if ((!rtds_layer_name_.empty() || enable_cds_) && ads_api_type_.empty()) {
-    throw std::runtime_error("ADS must be configured when using xDS");
+  if (!rtds_layer_name_.empty() && ads_api_type_.empty()) {
+    throw std::runtime_error("ADS must be configured when using RTDS");
   }
   if (!rtds_layer_name_.empty()) {
     std::string rtds_layer =
@@ -452,24 +445,6 @@ std::string EngineBuilder::generateConfigStr() const {
     std::string custom_ads = fmt::format(ads_insert, ads_api_type_, ads_address_, ads_port_);
     absl::StrReplaceAll({{"#{custom_ads}", absl::StrCat("#{custom_ads}\n", custom_ads)}},
                         &config_template);
-  }
-  if (enable_cds_) {
-    std::string custom_cds = fmt::format(cds_layer_insert, cds_timeout_seconds_);
-    absl::StrReplaceAll({{"#{custom_dynamic_resources}",
-                          absl::StrCat("#{custom_dynamic_resources}\n", custom_cds)}},
-                        &config_template);
-
-    std::string custom_node_context = R"(node_context_params:
-  - cluster)";
-    absl::StrReplaceAll(
-        {{"#{custom_node_context}", absl::StrCat("#{custom_node_context}\n", custom_node_context)}},
-        &config_template);
-
-    std::string custom_stats_patterns = R"(        - exact: cluster_manager.active_clusters
-        - exact: cluster_manager.cluster_added)";
-    absl::StrReplaceAll(
-        {{"#{custom_stats}", absl::StrCat("#{custom_stats}\n", custom_stats_patterns)}},
-        &config_template);
   }
 
   config_builder << config_template;
@@ -1000,9 +975,8 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     sink->mutable_typed_config()->PackFrom(metrics_config);
   }
 
-  bootstrap->mutable_dynamic_resources();
-  if ((!rtds_layer_name_.empty() || enable_cds_) && ads_api_type_.empty()) {
-    throw std::runtime_error("ADS must be configured when using xDS");
+  if (!rtds_layer_name_.empty() && ads_api_type_.empty()) {
+    throw std::runtime_error("ADS must be configured when using RTDS");
   }
   if (!rtds_layer_name_.empty()) {
     auto* layered_runtime = bootstrap->mutable_layered_runtime();
@@ -1024,16 +998,6 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     envoy::config::core::v3::ApiConfigSource::ApiType_Parse(ads_api_type_, &api_type_enum);
     ads_config->set_api_type(api_type_enum);
     ads_config->add_grpc_services()->mutable_google_grpc()->set_target_uri(target_uri);
-  }
-  if (enable_cds_) {
-    auto* cds_config = bootstrap->mutable_dynamic_resources()->mutable_cds_config();
-    cds_config->mutable_initial_fetch_timeout()->set_seconds(cds_timeout_seconds_);
-    cds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
-    cds_config->mutable_ads();
-    bootstrap->add_node_context_params("cluster");
-    // add a stat prefix we use in test
-    list->add_patterns()->set_exact("cluster_manager.active_clusters");
-    list->add_patterns()->set_exact("cluster_manager.cluster_added");
   }
 
   // Admin

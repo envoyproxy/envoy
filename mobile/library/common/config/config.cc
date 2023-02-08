@@ -405,8 +405,6 @@ const char* config_template = R"(
 typed_dns_resolver_config:
   name: *dns_resolver_name
   typed_config: *dns_resolver_config
-dynamic_resources:
-#{custom_dynamic_resources}
 #{custom_ads}
 static_resources:
   listeners:
@@ -549,10 +547,8 @@ stats_config:
         - prefix: runtime.load_success
         - safe_regex:
             regex: '^vhost\.[\w]+\.vcluster\.[\w]+?\.upstream_rq_(?:[12345]xx|[3-5][0-9][0-9]|retry|total)'
-#{custom_stats}
   use_all_default_tags:
     false
-#{custom_node_context}
 watchdogs:
   main_thread_watchdog:
     megamiss_timeout: 60s
@@ -595,6 +591,7 @@ const char* rtds_layer_insert = R"(
           ads: {{}})";
 
 const char* ads_insert = R"(
+dynamic_resources:
   ads_config:
     transport_api_version: V3
     api_type: {}
@@ -602,12 +599,5 @@ const char* ads_insert = R"(
     grpc_services:
       google_grpc:
         target_uri: '{}:{}')";
-
-const char* cds_layer_insert = R"(
-  cds_config:
-    initial_fetch_timeout:
-      seconds: {}
-    resource_api_version: V3
-    ads: {{}})";
 
 // clang-format on

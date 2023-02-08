@@ -368,7 +368,7 @@ TEST(TestConfig, RtdsWithoutAds) {
     engine_builder.generateConfigStr();
     FAIL() << "Expected std::runtime_error";
   } catch (std::runtime_error& err) {
-    EXPECT_EQ(err.what(), std::string("ADS must be configured when using xDS"));
+    EXPECT_EQ(err.what(), std::string("ADS must be configured when using RTDS"));
   }
 }
 
