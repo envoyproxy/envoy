@@ -548,6 +548,19 @@ open class EngineBuilder(
     return this
   }
 
+  fun addRtdsLayer(layerName: String, timeoutSeconds: Int = 5): EngineBuilder {
+  this.rtdslayerName = layerName
+  this.rtdsTimeoutSeconds = timeoutSeconds
+  return this
+  }
+
+  fun setAggregatedDiscoveryService(apiType: String, address: String, port: Int): EngineBuilder {
+  this.adsApiType = apiType
+  this.adsAddress = address
+  this.adsPort = port
+  return this
+  }
+
   /**
    * Builds and runs a new Engine instance with the provided configuration.
    *
@@ -556,6 +569,11 @@ open class EngineBuilder(
   @Suppress("LongMethod")
   fun build(): Engine {
     val engineConfiguration = EnvoyConfiguration(
+      rtdslayerName,
+      rtdsTimeoutSeconds,
+      adsApiType,
+      adsAddress,
+      adsPort,
       adminInterfaceEnabled,
       grpcStatsDomain,
       connectTimeoutSeconds,

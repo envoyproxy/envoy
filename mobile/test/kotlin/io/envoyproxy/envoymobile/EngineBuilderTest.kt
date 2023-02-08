@@ -223,4 +223,16 @@ class EngineBuilderTest {
     val engine = engineBuilder.build() as EngineImpl
     assertThat(engine.envoyConfiguration.nativeFilterChain.size).isEqualTo(1)
   }
+
+  @Test
+  fun `specifying RTDS and ADS works `() {
+    engineBuilder = EngineBuilder(Standard())
+    engineBuilder.addEngineType { envoyEngine }
+    engineBuilder.addRtdsLayer("rtds_layer_name")
+    engineBuilder.setAggregatedDiscoveryService("GRPC", "192.168.1.1", "0")
+    val engine = engineBuilder.build() as EngineImpl
+    assertThat(engine.envoyConfiguration.rtdslayerName).isEqualTo("rtds_layer_name")
+    assertThat(engine.envoyConfiguration.adsApiType).isEqualTo("GRPC")
+  }
+
 }
