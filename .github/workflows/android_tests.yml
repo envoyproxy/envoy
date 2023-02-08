@@ -12,6 +12,7 @@ concurrency:
 
 jobs:
   kotlintestsmac:
+    if: github.repository == 'envoyproxy/envoy'
     # revert to //test/kotlin/... once fixed
     # https://github.com/envoyproxy/envoy-mobile/issues/1932
     name: kotlin_tests_mac
@@ -45,6 +46,7 @@ jobs:
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //test/kotlin/io/...
   javatestsmac:
+    if: github.repository == 'envoyproxy/envoy'
     name: java_tests_mac
     runs-on: macos-12
     timeout-minutes: 120
@@ -78,6 +80,7 @@ jobs:
             --define=signal_trace=disabled \
             //test/java/...
   kotlintestslinux:
+    if: github.repository == 'envoyproxy/envoy'
     # Only kotlin tests are executed since with linux:
     # https://github.com/envoyproxy/envoy-mobile/issues/1418.
     name: kotlin_tests_linux

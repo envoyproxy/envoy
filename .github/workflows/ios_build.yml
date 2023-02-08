@@ -12,6 +12,7 @@ concurrency:
 
 jobs:
   iosbuild:
+    if: github.repository == 'envoyproxy/envoy'
     name: ios_build
     runs-on: macos-12
     timeout-minutes: 120
@@ -35,6 +36,7 @@ jobs:
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //library/swift:ios_framework
   swifthelloworld:
+    if: github.repository == 'envoyproxy/envoy'
     name: swift_helloworld
     needs: iosbuild
     runs-on: macos-12
@@ -82,6 +84,7 @@ jobs:
       if: ${{ failure() || cancelled() }}
       name: 'Log app run'
   swiftbaselineapp:
+    if: github.repository == 'envoyproxy/envoy'
     name: swift_baseline_app
     needs: iosbuild
     runs-on: macos-12
@@ -129,6 +132,7 @@ jobs:
       if: ${{ failure() || cancelled() }}
       name: 'Log app run'
   swiftexperimentalapp:
+    if: github.repository == 'envoyproxy/envoy'
     name: swift_experimental_app
     needs: iosbuild
     runs-on: macos-12
@@ -150,6 +154,7 @@ jobs:
             --config=ios \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
+            --define=admin_functionality=enabled \
             //test/swift/apps/experimental:app
     - uses: nick-fields/retry@943e742917ac94714d2f408a0e8320f2d1fcafcd
       if: steps.should_run.outputs.run_ci_job == 'true'
@@ -168,6 +173,7 @@ jobs:
             --config=ios \
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
+            --define=admin_functionality=enabled \
             //test/swift/apps/experimental:app &> /tmp/envoy.log &
     - run: sed '/received headers with status 200/q' <(touch /tmp/envoy.log && tail -F /tmp/envoy.log)
       if: steps.should_run.outputs.run_ci_job == 'true'
@@ -176,6 +182,7 @@ jobs:
       if: ${{ failure() || cancelled() }}
       name: 'Log app run'
   swiftasyncawait:
+    if: github.repository == 'envoyproxy/envoy'
     name: swift_async_await
     needs: iosbuild
     runs-on: macos-12
@@ -223,6 +230,7 @@ jobs:
       if: ${{ failure() || cancelled() }}
       name: 'Log app run'
   objchelloworld:
+    if: github.repository == 'envoyproxy/envoy'
     name: objc_helloworld
     needs: iosbuild
     runs-on: macos-12

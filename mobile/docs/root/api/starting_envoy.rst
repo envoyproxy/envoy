@@ -105,13 +105,14 @@ Specify the interval at which Envoy should timeout a DNS query.
 
   This API is non-ideal as it exposes lower-level internals of Envoy than desired by this
   project.
-  :issue:`#1581 <1581>` tracks enhancing this API.
 
 Add a list of hostnames to preresolve on Engine startup.
-The configuration is expected as a JSON list.
+For Swift, the configuration is expected as a JSON list.
+:issue:`#1581 <1581>` tracks enhancing this API.
+For Kotlin, the configuration is expected as a list of hostnames
 
   // Kotlin
-  builder.addDNSPreresolveHostnames("[{\"address\": \"foo.com", \"port_value\": 443}]")
+  builder.addDNSPreresolveHostnames("{"lyft.com", "google.com"}")
 
   // Swift
   builder.addDNSPreresolveHostnames("[{\"address\": \"foo.com", \"port_value\": 443}]")
@@ -248,10 +249,10 @@ This functionality is used for stat segmentation.
 **Example**::
 
   // Kotlin
-  builder.addVirtualClusters("[{\"name\":\"vcluster\",\"headers\":[{\"name\":\":path\",\"exact_match\":\"/v1/vcluster\"}]}]")
+  builder.addVirtualCluster("{\"name\":\"vcluster\",\"headers\":[{\"name\":\":path\",\"exact_match\":\"/v1/vcluster\"}]}")
 
   // Swift
-  builder.addVirtualClusters("[{\"name\":\"vcluster\",\"headers\":[{\"name\":\":path\",\"exact_match\":\"/v1/vcluster\"}]}]")
+  builder.addVirtualCluster("{\"name\":\"vcluster\",\"headers\":[{\"name\":\":path\",\"exact_match\":\"/v1/vcluster\"}]}")
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 ``enableAdminInterface``
@@ -368,33 +369,73 @@ Specify whether to use Happy Eyeballs when multiple IP stacks may be supported. 
   // Swift
   builder.enableHappyEyeballs(true)
 
-~~~~~~~~~~~~~~~~~~~~~~~
-``enableGzip``
-~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``enableGzipDecompression``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Specify whether to enable transparent response Gzip decompression. Defaults to true.
 
 **Example**::
 
   // Kotlin
-  builder.enableGzip(false)
+  builder.enableGzipDecompression(false)
 
   // Swift
-  builder.enableGzip(false)
+  builder.enableGzipDecompression(false)
 
-~~~~~~~~~~~~~~~~~~~~~~~
-``enableBrotli``
-~~~~~~~~~~~~~~~~~~~~~~~
+Default values from the `gzip decompressor proto <https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/compression/gzip/decompressor/v3/gzip.proto>`_
+are used.
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``enableGzipCompression``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Specify whether to enable transparent request Gzip compression. Defaults to false.
+
+**Example**::
+
+  // Kotlin
+  builder.enableGzipCompression(true)
+
+  // Swift
+  builder.enableGzipCompression(true)
+
+Default values from the `gzip compressor proto <https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/compression/gzip/compressor/v3/gzip.proto>`_
+are used.
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``enableBrotliDecompression``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Specify whether to enable transparent response Brotli decompression. Defaults to false.
 
 **Example**::
 
   // Kotlin
-  builder.enableBrotli(true)
+  builder.enableBrotliDecompression(true)
 
   // Swift
-  builder.enableBrotli(true)
+  builder.enableBrotliDecompression(true)
+
+Default values from the `brotli decompressor proto <https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/compression/brotli/decompressor/v3/brotli.proto>`_
+are used.
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``enableBrotliCompression``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Specify whether to enable transparent request Brotli compression. Defaults to false.
+
+**Example**::
+
+  // Kotlin
+  builder.enableBrotliCompression(true)
+
+  // Swift
+  builder.enableBrotliCompression(true)
+
+Default values from the `brotli compressor proto <https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/compression/brotli/compressor/v3/brotli.proto>`_
+are used.
 
 ~~~~~~~~~~~~~~~~~~~~~~~
 ``enableSocketTagging``
