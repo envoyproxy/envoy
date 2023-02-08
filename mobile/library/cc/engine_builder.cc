@@ -225,20 +225,24 @@ EngineBuilder& EngineBuilder::enableSocketTagging(bool socket_tagging_on) {
   return *this;
 }
 
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
 EngineBuilder& EngineBuilder::enableAdminInterface(bool admin_interface_on) {
   admin_interface_enabled_ = admin_interface_on;
   return *this;
 }
+#endif
 
 EngineBuilder& EngineBuilder::enableHappyEyeballs(bool happy_eyeballs_on) {
   enable_happy_eyeballs_ = happy_eyeballs_on;
   return *this;
 }
 
+#ifdef ENVOY_ENABLE_QUIC
 EngineBuilder& EngineBuilder::enableHttp3(bool http3_on) {
   enable_http3_ = http3_on;
   return *this;
 }
+#endif
 
 EngineBuilder& EngineBuilder::setForceAlwaysUsev6(bool value) {
   always_use_v6_ = value;
@@ -422,7 +426,11 @@ std::string EngineBuilder::generateConfigStr() const {
     insertCustomFilter(gzip_decompressor_config_insert, config_template);
   }
   if (enable_http3_) {
+#ifdef ENVOY_ENABLE_QUIC
     insertCustomFilter(alternate_protocols_cache_filter_insert, config_template);
+#else
+    throw std::runtime_error("http3 functionality was not compiled in this build of Envoy Mobile");
+#endif
   }
 
   for (const NativeFilterConfig& filter : native_filter_chain_) {
@@ -450,7 +458,11 @@ std::string EngineBuilder::generateConfigStr() const {
   config_builder << config_template;
 
   if (admin_interface_enabled_) {
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
     config_builder << "admin: *admin_interface" << std::endl;
+#else
+    throw std::runtime_error("Admin functionality was not compiled in this build of Envoy Mobile");
+#endif
   }
 
   auto config_str = config_builder.str();
@@ -529,12 +541,16 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 
   // Set up the optional filters
   if (enable_http3_) {
+#ifdef ENVOY_ENABLE_QUIC
     envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig cache_config;
     cache_config.mutable_alternate_protocols_cache_options()->set_name(
         "default_alternate_protocols_cache");
     auto* cache_filter = hcm->add_http_filters();
     cache_filter->set_name("alternate_protocols_cache");
     cache_filter->mutable_typed_config()->PackFrom(cache_config);
+#else
+    throw std::runtime_error("http3 functionality was not compiled in this build of Envoy Mobile");
+#endif
   }
 
   if (gzip_decompression_filter_) {
@@ -1002,9 +1018,13 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 
   // Admin
   if (admin_interface_enabled_) {
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
     auto* admin_address = bootstrap->mutable_admin()->mutable_address()->mutable_socket_address();
     admin_address->set_address("::1");
     admin_address->set_port_value(9901);
+#else
+    throw std::runtime_error("Admin functionality was not compiled in this build of Envoy Mobile");
+#endif
   }
 
   // Check equivalence in debug mode.
@@ -1058,9 +1078,11 @@ EngineSharedPtr EngineBuilder::build() {
     }
     options->setLogLevel(options->parseAndValidateLogLevel(logLevelToString(log_level_).c_str()));
     options->setConcurrency(1);
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
     if (!admin_address_path_for_tests_.empty()) {
       options->setAdminAddressPath(admin_address_path_for_tests_);
     }
+#endif
     cast_engine->run(std::move(options));
   }
 
