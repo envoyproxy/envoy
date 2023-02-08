@@ -1,4 +1,4 @@
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_package")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_package", "envoy_select_envoy_mobile_request_compression")
 
 licenses(["notice"])  # Apache 2
 
@@ -39,7 +39,14 @@ envoy_cc_library(
         "@envoy_mobile//library/common/extensions/filters/http/local_error:filter_cc_proto",
         "@envoy_mobile//library/common/extensions/filters/http/network_configuration:filter_cc_proto",
         "@envoy_mobile//library/common/extensions/filters/http/socket_tag:filter_cc_proto",
-    ],
+    ] + envoy_select_envoy_mobile_request_compression(
+        [
+            "@envoy_api//envoy/extensions/compression/brotli/compressor/v3:pkg_cc_proto",
+            "@envoy_api//envoy/extensions/compression/gzip/compressor/v3:pkg_cc_proto",
+            "@envoy_api//envoy/extensions/filters/http/compressor/v3:pkg_cc_proto",
+        ],
+        "@envoy",
+    ),
 )
 
 envoy_cc_library(

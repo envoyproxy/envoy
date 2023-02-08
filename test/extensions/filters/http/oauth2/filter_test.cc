@@ -58,6 +58,7 @@ class MockOAuth2CookieValidator : public CookieValidator {
 public:
   MOCK_METHOD(std::string&, username, (), (const));
   MOCK_METHOD(std::string&, token, (), (const));
+  MOCK_METHOD(std::string&, refreshToken, (), (const));
   MOCK_METHOD(bool, isValid, (), (const));
   MOCK_METHOD(void, setParams, (const Http::RequestHeaderMap& headers, const std::string& secret));
 };
@@ -1109,7 +1110,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParametersLegacyEncoding) {
   EXPECT_CALL(decoder_callbacks_,
               encodeHeaders_(HeaderMapEqualRef(&second_response_headers), true));
 
-  filter_->finishFlow();
+  filter_->finishGetAccessTokenFlow();
 }
 
 // This test adds %-encoded UTF-8 characters to the URL and shows that

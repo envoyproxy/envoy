@@ -6,6 +6,7 @@ ABI
 ACK
 ACL
 AES
+AllMuxes
 ALPN
 ALS
 AMZ
@@ -61,6 +62,7 @@ ESC
 ETB
 ETX
 FS
+FIXME
 HEXDIG
 HEXDIGIT
 HPE
@@ -158,6 +160,7 @@ FIPS
 FIRSTHDR
 FQDN
 FREEBIND
+freeifaddrs
 FUZZER
 FUZZERS
 delims
@@ -201,6 +204,7 @@ IAM
 IANA
 IDL
 IETF
+IFADDRS
 INADDR
 INET
 INVAL
@@ -941,6 +945,9 @@ negative
 netblock
 netblocks
 netfilter
+netlink
+netmask
+NLMSG
 nonblocking
 noncopyable
 nonresponsive
@@ -1370,6 +1377,7 @@ vip
 virtualhost
 virtualize
 vptr
+vtable
 vtt
 wakeup
 wakeups
