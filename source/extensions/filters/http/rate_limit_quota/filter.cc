@@ -24,8 +24,8 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
 
   // Second, generate the bucket id for this request based on match action when the request matching
   // succeeds.
-  const RateLimitOnMactchAction* match_action =
-      dynamic_cast<RateLimitOnMactchAction*>(match_result.value().get());
+  const RateLimitOnMatchAction* match_action =
+      dynamic_cast<RateLimitOnMatchAction*>(match_result.value().get());
   auto ret = match_action->generateBucketId(*data_ptr_, factory_context_, visitor_);
   if (!ret.ok()) {
     // When it failed to generate the bucket id for this specific request, the request is ALLOWED by
@@ -40,8 +40,8 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
 }
 
 void RateLimitQuotaFilter::createMatcher() {
-  RateLimitOnMactchActionContext context;
-  Matcher::MatchTreeFactory<Http::HttpMatchingData, RateLimitOnMactchActionContext> factory(
+  RateLimitOnMatchActionContext context;
+  Matcher::MatchTreeFactory<Http::HttpMatchingData, RateLimitOnMatchActionContext> factory(
       context, factory_context_.getServerFactoryContext(), visitor_);
   if (config_->has_bucket_matchers()) {
     matcher_ = factory.create(config_->bucket_matchers())();

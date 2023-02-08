@@ -12,6 +12,7 @@ concurrency:
 
 jobs:
   cctests:
+    if: github.repository == 'envoyproxy/envoy'
     name: cc_tests
     runs-on: ubuntu-20.04
     timeout-minutes: 120

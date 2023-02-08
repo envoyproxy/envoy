@@ -90,38 +90,75 @@ TEST(TestConfig, ConfigIsValid) {
   EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap()));
 }
 
-TEST(TestConfig, SetGzip) {
+TEST(TestConfig, SetGzipDecompression) {
   EngineBuilder engine_builder;
 
-  engine_builder.enableGzip(false);
+  engine_builder.enableGzipDecompression(false);
   std::string config_str = engine_builder.generateConfigStr();
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
   ASSERT_THAT(bootstrap.DebugString(), Not(HasSubstr("envoy.filters.http.decompressor")));
   EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap()));
 
-  engine_builder.enableGzip(true);
+  engine_builder.enableGzipDecompression(true);
   config_str = engine_builder.generateConfigStr();
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
   ASSERT_THAT(bootstrap.DebugString(), HasSubstr("envoy.filters.http.decompressor"));
 }
 
-TEST(TestConfig, SetBrotli) {
+#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
+TEST(TestConfig, SetGzipCompression) {
   EngineBuilder engine_builder;
 
-  engine_builder.enableBrotli(false);
+  engine_builder.enableGzipCompression(false);
+  std::string config_str = engine_builder.generateConfigStr();
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+  ASSERT_THAT(bootstrap.DebugString(), Not(HasSubstr("envoy.filters.http.compressor")));
+  EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap()));
+
+  engine_builder.enableGzipCompression(true);
+  config_str = engine_builder.generateConfigStr();
+  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+  ASSERT_THAT(bootstrap.DebugString(), HasSubstr("envoy.filters.http.compressor"));
+}
+#endif
+
+TEST(TestConfig, SetBrotliDecompression) {
+  EngineBuilder engine_builder;
+
+  engine_builder.enableBrotliDecompression(false);
   std::string config_str = engine_builder.generateConfigStr();
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
   ASSERT_THAT(bootstrap.DebugString(), Not(HasSubstr("brotli.decompressor.v3.Brotli")));
   EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap()));
 
-  engine_builder.enableBrotli(true);
+  engine_builder.enableBrotliDecompression(true);
   config_str = engine_builder.generateConfigStr();
   TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
   ASSERT_THAT(bootstrap.DebugString(), HasSubstr("brotli.decompressor.v3.Brotli"));
   EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap()));
 }
+
+#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
+TEST(TestConfig, SetBrotliCompression) {
+  EngineBuilder engine_builder;
+
+  engine_builder.enableBrotliCompression(false);
+  std::string config_str = engine_builder.generateConfigStr();
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+  ASSERT_THAT(bootstrap.DebugString(), Not(HasSubstr("brotli.compressor.v3.Brotli")));
+  EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap()));
+
+  engine_builder.enableBrotliCompression(true);
+  config_str = engine_builder.generateConfigStr();
+  TestUtility::loadFromYaml(absl::StrCat(config_header, config_str), bootstrap);
+  ASSERT_THAT(bootstrap.DebugString(), HasSubstr("brotli.compressor.v3.Brotli"));
+  EXPECT_TRUE(TestUtility::protoEqual(bootstrap, *engine_builder.generateBootstrap()));
+}
+#endif
 
 TEST(TestConfig, SetSocketTag) {
   EngineBuilder engine_builder;
