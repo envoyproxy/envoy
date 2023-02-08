@@ -75,6 +75,10 @@ void UpstreamRequest::resetStream(StreamResetReason reason) {
                                          tracing_config_.value().get(), true);
   }
 
+  // Remove this stream form the parent's list because this upstream request is reset.
+  deferredDelete();
+
+  // Notify the parent filter that the upstream request has been reset.
   parent_.onUpstreamRequestReset(*this, reason);
 }
 
@@ -88,6 +92,17 @@ void UpstreamRequest::completeUpstreamRequest() {
   ASSERT(conn_pool_handle_ == nullptr);
   ASSERT(conn_data_ != nullptr);
   conn_data_.reset();
+
+  // Remove this stream form the parent's list because this upstream request is complete.
+  deferredDelete();
+}
+
+void UpstreamRequest::deferredDelete() {
+  if (inserted()) {
+    // Remove this stream from the parent's list of upstream requests and delete it at
+    // next event loop iteration.
+    parent_.callbacks_->dispatcher().deferredDelete(removeFromList(parent_.upstream_requests_));
+  }
 }
 
 void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason, absl::string_view,
@@ -194,11 +209,7 @@ void RouterFilter::completeDirectly() {
   callbacks_->completeDirectly();
 }
 
-void RouterFilter::onUpstreamRequestReset(UpstreamRequest& upstream_request,
-                                          StreamResetReason reason) {
-  // Remove upstream request from router filter and move it to the deferred-delete list.
-  callbacks_->dispatcher().deferredDelete(upstream_request.removeFromList(upstream_requests_));
-
+void RouterFilter::onUpstreamRequestReset(UpstreamRequest&, StreamResetReason reason) {
   if (filter_complete_) {
     return;
   }

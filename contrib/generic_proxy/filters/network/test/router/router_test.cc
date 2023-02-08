@@ -178,7 +178,8 @@ TEST_F(RouterFilterTest, UpstreamRequestResetBeforePoolCallback) {
       factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.handles_.back(),
       cancel(_));
   EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _))
-      .WillOnce(Invoke([](Status status, ResponseUpdateFunction&&) {
+      .WillOnce(Invoke([this](Status status, ResponseUpdateFunction&&) {
+        EXPECT_EQ(0, filter_->upstreamRequestsForTest().size());
         EXPECT_EQ(status.message(), "local_reset");
       }));
 
@@ -202,7 +203,8 @@ TEST_F(RouterFilterTest, UpstreamRequestResetBeforePoolCallbackWithTracing) {
       factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.handles_.back(),
       cancel(_));
   EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _))
-      .WillOnce(Invoke([](Status status, ResponseUpdateFunction&&) {
+      .WillOnce(Invoke([this](Status status, ResponseUpdateFunction&&) {
+        EXPECT_EQ(0, filter_->upstreamRequestsForTest().size());
         EXPECT_EQ(status.message(), "local_reset");
       }));
 
@@ -305,7 +307,9 @@ TEST_F(RouterFilterTest, UpstreamRequestPoolReadyAndExpectNoResponseWithTracing)
   NiceMock<Network::MockClientConnection> mock_conn;
 
   EXPECT_CALL(mock_conn, write(_, _));
-  EXPECT_CALL(mock_filter_callback_, completeDirectly());
+  EXPECT_CALL(mock_filter_callback_, completeDirectly()).WillOnce(Invoke([this]() -> void {
+    EXPECT_EQ(0, filter_->upstreamRequestsForTest().size());
+  }));
 
   EXPECT_CALL(*mock_request_encoder_, encode(_, _))
       .WillOnce(Invoke([&](const Request&, RequestEncoderCallback& callback) -> void {
@@ -349,7 +353,8 @@ TEST_F(RouterFilterTest, UpstreamRequestPoolReadyButConnectionErrorBeforeRespons
   EXPECT_EQ(upstream_request->conn_pool_handle_, nullptr);
 
   EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _))
-      .WillOnce(Invoke([](Status status, ResponseUpdateFunction&&) {
+      .WillOnce(Invoke([this](Status status, ResponseUpdateFunction&&) {
+        EXPECT_EQ(0, filter_->upstreamRequestsForTest().size());
         EXPECT_EQ(status.message(), "local_reset");
       }));
 
@@ -383,7 +388,8 @@ TEST_F(RouterFilterTest, UpstreamRequestPoolReadyButConnectionTerminationBeforeR
   EXPECT_EQ(upstream_request->conn_pool_handle_, nullptr);
 
   EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _))
-      .WillOnce(Invoke([](Status status, ResponseUpdateFunction&&) {
+      .WillOnce(Invoke([this](Status status, ResponseUpdateFunction&&) {
+        EXPECT_EQ(0, filter_->upstreamRequestsForTest().size());
         EXPECT_EQ(status.message(), "connection_termination");
       }));
 
@@ -474,7 +480,10 @@ TEST_F(RouterFilterTest, UpstreamRequestPoolReadyAndResponse) {
 
   auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
 
-  EXPECT_CALL(mock_filter_callback_, upstreamResponse(_));
+  EXPECT_CALL(mock_filter_callback_, upstreamResponse(_)).WillOnce(Invoke([this](ResponsePtr) {
+    // When the response is sent to callback, the upstream request should be removed.
+    EXPECT_EQ(0, filter_->upstreamRequestsForTest().size());
+  }));
 
   upstream_request->onDecodingSuccess(std::move(response));
 }
@@ -529,7 +538,10 @@ TEST_F(RouterFilterTest, UpstreamRequestPoolReadyAndResponseWithTracing) {
   EXPECT_CALL(*child_span_, setTag(_, _)).Times(testing::AnyNumber());
   EXPECT_CALL(*child_span_, finishSpan());
 
-  EXPECT_CALL(mock_filter_callback_, upstreamResponse(_));
+  EXPECT_CALL(mock_filter_callback_, upstreamResponse(_)).WillOnce(Invoke([this](ResponsePtr) {
+    // When the response is sent to callback, the upstream request should be removed.
+    EXPECT_EQ(0, filter_->upstreamRequestsForTest().size());
+  }));
 
   auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
   upstream_request->onDecodingSuccess(std::move(response));
@@ -584,7 +596,8 @@ TEST_F(RouterFilterTest, UpstreamRequestPoolReadyAndEndStreamBeforeResponseWithT
       .WillOnce(Invoke([&](Buffer::Instance& buffer) { buffer.drain(buffer.length()); }));
 
   EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _))
-      .WillOnce(Invoke([](Status status, ResponseUpdateFunction&&) {
+      .WillOnce(Invoke([this](Status status, ResponseUpdateFunction&&) {
+        EXPECT_EQ(0, filter_->upstreamRequestsForTest().size());
         EXPECT_EQ(status.message(), "protocol_error");
       }));
 
@@ -646,7 +659,8 @@ TEST_F(RouterFilterTest, UpstreamRequestPoolReadyAndResponseDecodingFailure) {
   upstream_request->onUpstreamData(test_buffer, false);
 
   EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, _))
-      .WillOnce(Invoke([](Status status, ResponseUpdateFunction&&) {
+      .WillOnce(Invoke([this](Status status, ResponseUpdateFunction&&) {
+        EXPECT_EQ(0, filter_->upstreamRequestsForTest().size());
         EXPECT_EQ(status.message(), "protocol_error");
       }));
 

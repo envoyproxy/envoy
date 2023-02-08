@@ -47,6 +47,10 @@ public:
 
   void startStream();
   void resetStream(StreamResetReason reason);
+  void completeUpstreamRequest();
+
+  // Called when the stream has been reset or completed.
+  void deferredDelete();
 
   // Tcp::ConnectionPool::Callbacks
   void onPoolFailure(ConnectionPool::PoolFailureReason reason,
@@ -70,8 +74,6 @@ public:
 
   void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host);
   void encodeBufferToUpstream(Buffer::Instance& buffer);
-
-  void completeUpstreamRequest();
 
   bool stream_reset_{};
 
