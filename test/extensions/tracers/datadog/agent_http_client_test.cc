@@ -25,81 +25,86 @@ namespace Tracers {
 namespace Datadog {
 namespace {
 
-TEST(DatadogAgentHttpClientTest, PathFromURL) {
+struct InitializedMockClusterManager {
+  InitializedMockClusterManager() {
+    instance_.initializeClusters({"fake_cluster"}, {});
+    instance_.thread_local_cluster_.cluster_.info_->name_ = "fake_cluster";
+    instance_.initializeThreadLocalClusters({"fake_cluster"});
+  }
+
+  NiceMock<Upstream::MockClusterManager> instance_;
+};
+
+class DatadogAgentHttpClientTest : public testing::Test {
+public:
+  DatadogAgentHttpClientTest()
+      : request_(&cluster_manager_.instance_.thread_local_cluster_.async_client_),
+        stats_(makeTracerStats(*store_.rootScope())),
+        client_(cluster_manager_.instance_, "fake_cluster", "test_host", stats_) {
+    url_.scheme = "http";
+    url_.authority = "localhost:8126";
+    url_.path = "/foo/bar";
+  }
+
+protected:
+  InitializedMockClusterManager cluster_manager_;
+  int dummy_;
+  Http::MockAsyncClientRequest request_;
+  Stats::TestUtil::TestStore store_;
+  TracerStats stats_;
+  AgentHTTPClient client_;
+  datadog::tracing::HTTPClient::URL url_;
+  Http::AsyncClient::Callbacks* callbacks_;
+  testing::MockFunction<void(int status, const datadog::tracing::DictReader& headers,
+                             std::string body)>
+      on_response_;
+  testing::MockFunction<void(datadog::tracing::Error)> on_error_;
+};
+
+TEST_F(DatadogAgentHttpClientTest, PathFromURL) {
   // The `.path` portion of the `URL` argument to `AgentHTTPClient::post` ends
   // up as the "reference path" of the `Http::RequestHeaderMap`.
   // That is, the URL "http://foobar.com/trace/v04" results in "/trace/v04".
 
-  NiceMock<Upstream::MockClusterManager> cluster_manager;
-  cluster_manager.initializeClusters({"fake_cluster"}, {});
-  cluster_manager.thread_local_cluster_.cluster_.info_->name_ = "fake_cluster";
-  cluster_manager.initializeThreadLocalClusters({"fake_cluster"});
-  Http::MockAsyncClientRequest request(&cluster_manager.thread_local_cluster_.async_client_);
-  Stats::TestUtil::TestStore store;
-  TracerStats stats = makeTracerStats(*store.rootScope());
-  AgentHTTPClient client(cluster_manager, "fake_cluster", "test_host", stats);
-  datadog::tracing::HTTPClient::URL url;
-  url.scheme = "http";
-  url.authority = "localhost:8126";
-  url.path = "/foo/bar";
-
-  EXPECT_CALL(cluster_manager.thread_local_cluster_.async_client_, send_(_, _, _))
+  EXPECT_CALL(cluster_manager_.instance_.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillOnce(
-          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            EXPECT_EQ(url.path, message->headers().path());
-            return &request;
+          Invoke([this](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
+                        const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            EXPECT_EQ(url_.path, message->headers().path());
+            return &request_;
           }));
 
   // `~AgentHTTPClient()` will cancel the request since we don't finish it here.
-  EXPECT_CALL(request, cancel());
+  EXPECT_CALL(request_, cancel());
 
   const auto ignore = [](auto&&...) {};
-  datadog::tracing::Expected<void> result = client.post(url, ignore, "", ignore, ignore);
+  datadog::tracing::Expected<void> result = client_.post(url_, ignore, "", ignore, ignore);
   EXPECT_TRUE(result) << result.error();
-  EXPECT_EQ(0, stats.reports_skipped_no_cluster_.value());
-  EXPECT_EQ(0, stats.reports_failed_.value());
+  EXPECT_EQ(0, stats_.reports_skipped_no_cluster_.value());
+  EXPECT_EQ(0, stats_.reports_failed_.value());
 }
 
-TEST(DatadogAgentHttpClientTest, MissingThreadLocalCluster) {
+TEST_F(DatadogAgentHttpClientTest, MissingThreadLocalCluster) {
   // If ...`threadLocalCluster().has_value()` is false, then `post` cannot
   // create a request and so will immediately return successfully but increment
   // the "reports skipped no cluster" counter.
 
   NiceMock<Upstream::MockClusterManager> cluster_manager;
-  Stats::TestUtil::TestStore store;
-  TracerStats stats = makeTracerStats(*store.rootScope());
-  AgentHTTPClient client(cluster_manager, "fake_cluster", "test_host", stats);
-  datadog::tracing::HTTPClient::URL url;
-  url.scheme = "http";
-  url.authority = "localhost:8126";
-  url.path = "/foo/bar";
+  AgentHTTPClient client(cluster_manager, "fake_cluster", "test_host", stats_);
 
   const auto ignore = [](auto&&...) {};
-  datadog::tracing::Expected<void> result = client.post(url, ignore, "", ignore, ignore);
+  datadog::tracing::Expected<void> result = client.post(url_, ignore, "", ignore, ignore);
   EXPECT_TRUE(result) << result.error();
-  EXPECT_EQ(1, stats.reports_skipped_no_cluster_.value());
-  EXPECT_EQ(0, stats.reports_failed_.value());
+  EXPECT_EQ(1, stats_.reports_skipped_no_cluster_.value());
+  EXPECT_EQ(0, stats_.reports_failed_.value());
 }
 
-TEST(DatadogAgentHttpClientTest, RequestHeaders) {
+TEST_F(DatadogAgentHttpClientTest, RequestHeaders) {
   // The `set_headers` argument to `post(...)` results in the corresponding
   // headers being set in `Http::RequestMessage::headers()`.
   // Additionally, the "Host" header will always be the same as the
   // corresponding parameter of `AgentHTTPClient`'s constructor.
 
-  NiceMock<Upstream::MockClusterManager> cluster_manager;
-  cluster_manager.initializeClusters({"fake_cluster"}, {});
-  cluster_manager.thread_local_cluster_.cluster_.info_->name_ = "fake_cluster";
-  cluster_manager.initializeThreadLocalClusters({"fake_cluster"});
-  Http::MockAsyncClientRequest request(&cluster_manager.thread_local_cluster_.async_client_);
-  Stats::TestUtil::TestStore store;
-  TracerStats stats = makeTracerStats(*store.rootScope());
-  AgentHTTPClient client(cluster_manager, "fake_cluster", "test_host", stats);
-  datadog::tracing::HTTPClient::URL url;
-  url.scheme = "http";
-  url.authority = "localhost:8126";
-  url.path = "/foo/bar";
   const auto set_headers = [&](datadog::tracing::DictWriter& headers) {
     headers.set("foo", "bar");
     headers.set("baz-boing", "boing boing");
@@ -107,173 +112,133 @@ TEST(DatadogAgentHttpClientTest, RequestHeaders) {
     headers.set("boing-boing", "boing boing boing");
   };
 
-  EXPECT_CALL(cluster_manager.thread_local_cluster_.async_client_, send_(_, _, _))
+  EXPECT_CALL(cluster_manager_.instance_.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillOnce(
-          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+          Invoke([this](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
+                        const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
             EXPECT_EQ("test_host", message->headers().getHostValue());
 
             EXPECT_EQ("bar", message->headers().getByKey("foo"));
             EXPECT_EQ("boing boing", message->headers().getByKey("baz-boing"));
             EXPECT_EQ("boing boing boing", message->headers().getByKey("boing-boing"));
 
-            return &request;
+            return &request_;
           }));
 
   // `~AgentHTTPClient()` will cancel the request since we don't finish it here.
-  EXPECT_CALL(request, cancel());
+  EXPECT_CALL(request_, cancel());
 
   const auto ignore = [](auto&&...) {};
-  datadog::tracing::Expected<void> result = client.post(url, set_headers, "", ignore, ignore);
+  datadog::tracing::Expected<void> result = client_.post(url_, set_headers, "", ignore, ignore);
   EXPECT_TRUE(result) << result.error();
-  EXPECT_EQ(0, stats.reports_skipped_no_cluster_.value());
-  EXPECT_EQ(0, stats.reports_failed_.value());
+  EXPECT_EQ(0, stats_.reports_skipped_no_cluster_.value());
+  EXPECT_EQ(0, stats_.reports_failed_.value());
 }
 
-TEST(DatadogAgentHttpClientTest, RequestBody) {
+TEST_F(DatadogAgentHttpClientTest, RequestBody) {
   // The `body` parameter to `AgentHTTPClient::post` corresponds to the
   // resulting `Http::RequestMessage::body()`.
 
-  NiceMock<Upstream::MockClusterManager> cluster_manager;
-  cluster_manager.initializeClusters({"fake_cluster"}, {});
-  cluster_manager.thread_local_cluster_.cluster_.info_->name_ = "fake_cluster";
-  cluster_manager.initializeThreadLocalClusters({"fake_cluster"});
-  Http::MockAsyncClientRequest request(&cluster_manager.thread_local_cluster_.async_client_);
-  Stats::TestUtil::TestStore store;
-  TracerStats stats = makeTracerStats(*store.rootScope());
-  AgentHTTPClient client(cluster_manager, "fake_cluster", "test_host", stats);
-  datadog::tracing::HTTPClient::URL url;
-  url.scheme = "http";
-  url.authority = "localhost:8126";
-  url.path = "/foo/bar";
-  const std::string body = R"latin(
-    Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod
-    tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam,
-    quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo
-    consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse
-    cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat
-    non proident, sunt in culpa qui officia deserunt mollit anim id est
-    laborum.)latin";
+  const std::string body = R"body(
+    Butterfly in the sky
+    I can go twice as high
+    Take a look
+    It's in a book
+    A reading rainbow
 
-  EXPECT_CALL(cluster_manager.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+    I can go anywhere
+    Friends to know
+    And ways to grow
+    A reading rainbow
+
+    I can be anything
+    Take a look
+    It's in a book
+    A reading rainbow)body";
+
+  EXPECT_CALL(cluster_manager_.instance_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(Invoke(
+          [this, &body](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
+                        const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
             EXPECT_EQ(body, message->body().toString());
-            return &request;
+            return &request_;
           }));
 
   // `~AgentHTTPClient()` will cancel the request since we don't finish it here.
-  EXPECT_CALL(request, cancel());
+  EXPECT_CALL(request_, cancel());
 
   const auto ignore = [](auto&&...) {};
-  datadog::tracing::Expected<void> result = client.post(url, ignore, body, ignore, ignore);
+  datadog::tracing::Expected<void> result = client_.post(url_, ignore, body, ignore, ignore);
   EXPECT_TRUE(result) << result.error();
-  EXPECT_EQ(0, stats.reports_skipped_no_cluster_.value());
-  EXPECT_EQ(0, stats.reports_failed_.value());
+  EXPECT_EQ(0, stats_.reports_skipped_no_cluster_.value());
+  EXPECT_EQ(0, stats_.reports_failed_.value());
 }
 
-TEST(DatadogAgentHttpClientTest, OnResponse200) {
+TEST_F(DatadogAgentHttpClientTest, OnResponse200) {
   // When `onSuccess` is invoked on the `Http::AsyncClient::Callbacks`, the
   // associated `on_response` callback is invoked with corresponding arguments.
   // Additionally, if the HTTP response status is 200, `stats_.reports_sent_` is
   // incremented.
 
-  NiceMock<Upstream::MockClusterManager> cluster_manager;
-  cluster_manager.initializeClusters({"fake_cluster"}, {});
-  cluster_manager.thread_local_cluster_.cluster_.info_->name_ = "fake_cluster";
-  cluster_manager.initializeThreadLocalClusters({"fake_cluster"});
-  Http::MockAsyncClientRequest request(&cluster_manager.thread_local_cluster_.async_client_);
-  Stats::TestUtil::TestStore store;
-  TracerStats stats = makeTracerStats(*store.rootScope());
-  AgentHTTPClient client(cluster_manager, "fake_cluster", "test_host", stats);
-  datadog::tracing::HTTPClient::URL url;
-  url.scheme = "http";
-  url.authority = "localhost:8126";
-  url.path = "/foo/bar";
-  Http::AsyncClient::Callbacks* callbacks;
-  testing::MockFunction<void(int status, const datadog::tracing::DictReader& headers,
-                             std::string body)>
-      on_response;
-  testing::MockFunction<void(datadog::tracing::Error)> on_error;
-
-  EXPECT_CALL(cluster_manager.thread_local_cluster_.async_client_, send_(_, _, _))
+  EXPECT_CALL(cluster_manager_.instance_.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks_arg,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks = &callbacks_arg;
-            return &request;
+          Invoke([this](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks_arg,
+                        const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            callbacks_ = &callbacks_arg;
+            return &request_;
           }));
 
-  // `callbacks->onSuccess(...)` will cause `on_response` to be called.
-  // `on_error` will not be called.
-  EXPECT_CALL(on_response, Call(200, _, "{}"));
-  EXPECT_CALL(on_error, Call(_)).Times(0);
+  // `callbacks_->onSuccess(...)` will cause `on_response_` to be called.
+  // `on_error_` will not be called.
+  EXPECT_CALL(on_response_, Call(200, _, "{}"));
+  EXPECT_CALL(on_error_, Call(_)).Times(0);
 
   // The request will not be canceled; neither explicitly nor in
   // `~AgentHTTPClient`, because it will have been successfully fulfilled.
-  EXPECT_CALL(request, cancel()).Times(0);
+  EXPECT_CALL(request_, cancel()).Times(0);
 
   const auto ignore = [](auto&&...) {};
   datadog::tracing::Expected<void> result =
-      client.post(url, ignore, "{}", on_response.AsStdFunction(), on_error.AsStdFunction());
+      client_.post(url_, ignore, "{}", on_response_.AsStdFunction(), on_error_.AsStdFunction());
   EXPECT_TRUE(result) << result.error();
 
   Http::ResponseMessagePtr msg(new Http::ResponseMessageImpl(
       Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
   msg->body().add("{}");
 
-  callbacks->onSuccess(request, std::move(msg));
-  EXPECT_EQ(1, stats.reports_sent_.value());
-  EXPECT_EQ(0, stats.reports_failed_.value());
-  EXPECT_EQ(0, stats.reports_skipped_no_cluster_.value());
+  callbacks_->onSuccess(request_, std::move(msg));
+  EXPECT_EQ(1, stats_.reports_sent_.value());
+  EXPECT_EQ(0, stats_.reports_failed_.value());
+  EXPECT_EQ(0, stats_.reports_skipped_no_cluster_.value());
 }
 
-TEST(DatadogAgentHttpClientTest, OnResponseNot200) {
+TEST_F(DatadogAgentHttpClientTest, OnResponseNot200) {
   // When `onSuccess` is invoked on the `Http::AsyncClient::Callbacks`, the
   // associated `on_response` callback is invoked with corresponding arguments.
   // Additionally, if the HTTP response status is not 200,
   // `stats_.reports_dropped_` is incremented.
 
-  NiceMock<Upstream::MockClusterManager> cluster_manager;
-  cluster_manager.initializeClusters({"fake_cluster"}, {});
-  cluster_manager.thread_local_cluster_.cluster_.info_->name_ = "fake_cluster";
-  cluster_manager.initializeThreadLocalClusters({"fake_cluster"});
-  Http::MockAsyncClientRequest request(&cluster_manager.thread_local_cluster_.async_client_);
-  Stats::TestUtil::TestStore store;
-  TracerStats stats = makeTracerStats(*store.rootScope());
-  AgentHTTPClient client(cluster_manager, "fake_cluster", "test_host", stats);
-  datadog::tracing::HTTPClient::URL url;
-  url.scheme = "http";
-  url.authority = "localhost:8126";
-  url.path = "/foo/bar";
-  Http::AsyncClient::Callbacks* callbacks;
-  testing::MockFunction<void(int status, const datadog::tracing::DictReader& headers,
-                             std::string body)>
-      on_response;
-  testing::MockFunction<void(datadog::tracing::Error)> on_error;
-
-  EXPECT_CALL(cluster_manager.thread_local_cluster_.async_client_, send_(_, _, _))
+  EXPECT_CALL(cluster_manager_.instance_.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks_arg,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks = &callbacks_arg;
-            return &request;
+          Invoke([this](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks_arg,
+                        const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            callbacks_ = &callbacks_arg;
+            return &request_;
           }));
 
-  // `callbacks->onSuccess(...)` will cause `on_response` to be called.
+  // `callbacks_->onSuccess(...)` will cause `on_response_` to be called.
   // The `404` value corresponds to the response sent below.
-  // `on_error` will not be called.
-  EXPECT_CALL(on_response, Call(404, _, "{}"));
-  EXPECT_CALL(on_error, Call(_)).Times(0);
+  // `on_error_` will not be called.
+  EXPECT_CALL(on_response_, Call(404, _, "{}"));
+  EXPECT_CALL(on_error_, Call(_)).Times(0);
 
   // The request will not be canceled; neither explicitly nor in
   // `~AgentHTTPClient`, because it will have been successfully fulfilled.
-  EXPECT_CALL(request, cancel()).Times(0);
+  EXPECT_CALL(request_, cancel()).Times(0);
 
   const auto ignore = [](auto&&...) {};
   datadog::tracing::Expected<void> result =
-      client.post(url, ignore, "{}", on_response.AsStdFunction(), on_error.AsStdFunction());
+      client_.post(url_, ignore, "{}", on_response_.AsStdFunction(), on_error_.AsStdFunction());
   EXPECT_TRUE(result) << result.error();
 
   // The "404" below is what causes `stats.reports_failed_` to be incremented
@@ -282,57 +247,39 @@ TEST(DatadogAgentHttpClientTest, OnResponseNot200) {
       Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "404"}}}));
   msg->body().add("{}");
 
-  callbacks->onSuccess(request, std::move(msg));
-  EXPECT_EQ(1, stats.reports_dropped_.value());
-  EXPECT_EQ(0, stats.reports_sent_.value());
-  EXPECT_EQ(0, stats.reports_failed_.value());
-  EXPECT_EQ(0, stats.reports_skipped_no_cluster_.value());
+  callbacks_->onSuccess(request_, std::move(msg));
+  EXPECT_EQ(1, stats_.reports_dropped_.value());
+  EXPECT_EQ(0, stats_.reports_sent_.value());
+  EXPECT_EQ(0, stats_.reports_failed_.value());
+  EXPECT_EQ(0, stats_.reports_skipped_no_cluster_.value());
 }
 
-TEST(DatadogAgentHttpClientTest, OnResponseBogusRequest) {
+TEST_F(DatadogAgentHttpClientTest, OnResponseBogusRequest) {
   // When `onSuccess` is invoked on the `Http::AsyncClient::Callbacks` with a
   // request that is not registered with the HTTP client, then no callback is
   // invoked (how would we look it up?).
 
-  NiceMock<Upstream::MockClusterManager> cluster_manager;
-  cluster_manager.initializeClusters({"fake_cluster"}, {});
-  cluster_manager.thread_local_cluster_.cluster_.info_->name_ = "fake_cluster";
-  cluster_manager.initializeThreadLocalClusters({"fake_cluster"});
-  Http::MockAsyncClientRequest request(&cluster_manager.thread_local_cluster_.async_client_);
-  Stats::TestUtil::TestStore store;
-  TracerStats stats = makeTracerStats(*store.rootScope());
-  AgentHTTPClient client(cluster_manager, "fake_cluster", "test_host", stats);
-  datadog::tracing::HTTPClient::URL url;
-  url.scheme = "http";
-  url.authority = "localhost:8126";
-  url.path = "/foo/bar";
-  Http::AsyncClient::Callbacks* callbacks;
-  testing::MockFunction<void(int status, const datadog::tracing::DictReader& headers,
-                             std::string body)>
-      on_response;
-  testing::MockFunction<void(datadog::tracing::Error)> on_error;
-
-  EXPECT_CALL(cluster_manager.thread_local_cluster_.async_client_, send_(_, _, _))
+  EXPECT_CALL(cluster_manager_.instance_.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks_arg,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks = &callbacks_arg;
-            return &request;
+          Invoke([this](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks_arg,
+                        const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            callbacks_ = &callbacks_arg;
+            return &request_;
           }));
 
-  // `callbacks->onSuccess(...)` will not invoke any callbacks, because the
+  // `callbacks_->onSuccess(...)` will not invoke any callbacks, because the
   // request argument passed in is not registered with the HTTP client.
-  EXPECT_CALL(on_response, Call(_, _, _)).Times(0);
-  EXPECT_CALL(on_error, Call(_)).Times(0);
+  EXPECT_CALL(on_response_, Call(_, _, _)).Times(0);
+  EXPECT_CALL(on_error_, Call(_)).Times(0);
 
   // The request will will canceled by `~AgentHTTPClient` because `onSuccess`
   // was passed the wrong request, and so the real request is never removed from
   // the HTTP client's registry.
-  EXPECT_CALL(request, cancel());
+  EXPECT_CALL(request_, cancel());
 
   const auto ignore = [](auto&&...) {};
   datadog::tracing::Expected<void> result =
-      client.post(url, ignore, "{}", on_response.AsStdFunction(), on_error.AsStdFunction());
+      client_.post(url_, ignore, "{}", on_response_.AsStdFunction(), on_error_.AsStdFunction());
   EXPECT_TRUE(result) << result.error();
 
   Http::ResponseMessagePtr msg(new Http::ResponseMessageImpl(
@@ -341,109 +288,74 @@ TEST(DatadogAgentHttpClientTest, OnResponseBogusRequest) {
 
   // The first argument to `onSuccess` should be `request`, but instead we pass
   // `bogus_request`.
-  Http::MockAsyncClientRequest bogus_request(&cluster_manager.thread_local_cluster_.async_client_);
-  callbacks->onSuccess(bogus_request, std::move(msg));
+  Http::MockAsyncClientRequest bogus_request(
+      &cluster_manager_.instance_.thread_local_cluster_.async_client_);
+  callbacks_->onSuccess(bogus_request, std::move(msg));
 }
 
-TEST(DatadogAgentHttpClientTest, OnErrorStreamReset) {
+TEST_F(DatadogAgentHttpClientTest, OnErrorStreamReset) {
   // When `onFailure` is invoked on the `Http::AsyncClient::Callbacks` with
   // `FailureReason::Reset`, the associated `on_error` callback is invoked with
   // a corresponding `datadog::tracing::Error`.
 
-  NiceMock<Upstream::MockClusterManager> cluster_manager;
-  cluster_manager.initializeClusters({"fake_cluster"}, {});
-  cluster_manager.thread_local_cluster_.cluster_.info_->name_ = "fake_cluster";
-  cluster_manager.initializeThreadLocalClusters({"fake_cluster"});
-  Http::MockAsyncClientRequest request(&cluster_manager.thread_local_cluster_.async_client_);
-  Stats::TestUtil::TestStore store;
-  TracerStats stats = makeTracerStats(*store.rootScope());
-  AgentHTTPClient client(cluster_manager, "fake_cluster", "test_host", stats);
-  datadog::tracing::HTTPClient::URL url;
-  url.scheme = "http";
-  url.authority = "localhost:8126";
-  url.path = "/foo/bar";
-  Http::AsyncClient::Callbacks* callbacks;
-  testing::MockFunction<void(int status, const datadog::tracing::DictReader& headers,
-                             std::string body)>
-      on_response;
-  testing::MockFunction<void(datadog::tracing::Error)> on_error;
-
-  EXPECT_CALL(cluster_manager.thread_local_cluster_.async_client_, send_(_, _, _))
+  EXPECT_CALL(cluster_manager_.instance_.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks_arg,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks = &callbacks_arg;
-            return &request;
+          Invoke([this](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks_arg,
+                        const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            callbacks_ = &callbacks_arg;
+            return &request_;
           }));
 
-  // `callbacks->onFailure(...)` will cause `on_error` to be called.
-  // `on_response` will not be called.
-  EXPECT_CALL(on_error, Call(_)).WillOnce(Invoke([](datadog::tracing::Error error) {
+  // `callbacks_->onFailure(...)` will cause `on_error_` to be called.
+  // `on_response_` will not be called.
+  EXPECT_CALL(on_error_, Call(_)).WillOnce(Invoke([](datadog::tracing::Error error) {
     EXPECT_EQ(error.code, datadog::tracing::Error::ENVOY_HTTP_CLIENT_FAILURE);
   }));
-  EXPECT_CALL(on_response, Call(_, _, _)).Times(0);
+  EXPECT_CALL(on_response_, Call(_, _, _)).Times(0);
 
   // The request will not be canceled; neither explicitly nor in
   // `~AgentHTTPClient`, because it will have been successfully fulfilled.
-  EXPECT_CALL(request, cancel()).Times(0);
+  EXPECT_CALL(request_, cancel()).Times(0);
 
   const auto ignore = [](auto&&...) {};
   datadog::tracing::Expected<void> result =
-      client.post(url, ignore, "{}", on_response.AsStdFunction(), on_error.AsStdFunction());
+      client_.post(url_, ignore, "{}", on_response_.AsStdFunction(), on_error_.AsStdFunction());
   EXPECT_TRUE(result) << result.error();
 
   Http::ResponseMessagePtr msg(new Http::ResponseMessageImpl(
       Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
   msg->body().add("{}");
 
-  callbacks->onFailure(request, Http::AsyncClient::FailureReason::Reset);
+  callbacks_->onFailure(request_, Http::AsyncClient::FailureReason::Reset);
 }
 
-TEST(DatadogAgentHttpClientTest, OnErrorOther) {
+TEST_F(DatadogAgentHttpClientTest, OnErrorOther) {
   // When `onFailure` is invoked on the `Http::AsyncClient::Callbacks` with any
   // value other than `FailureReason::Reset`, the associated `on_error` callback
   // is invoked with a corresponding `datadog::tracing::Error`.
 
-  NiceMock<Upstream::MockClusterManager> cluster_manager;
-  cluster_manager.initializeClusters({"fake_cluster"}, {});
-  cluster_manager.thread_local_cluster_.cluster_.info_->name_ = "fake_cluster";
-  cluster_manager.initializeThreadLocalClusters({"fake_cluster"});
-  Http::MockAsyncClientRequest request(&cluster_manager.thread_local_cluster_.async_client_);
-  Stats::TestUtil::TestStore store;
-  TracerStats stats = makeTracerStats(*store.rootScope());
-  AgentHTTPClient client(cluster_manager, "fake_cluster", "test_host", stats);
-  datadog::tracing::HTTPClient::URL url;
-  url.scheme = "http";
-  url.authority = "localhost:8126";
-  url.path = "/foo/bar";
-  Http::AsyncClient::Callbacks* callbacks;
-  testing::MockFunction<void(int status, const datadog::tracing::DictReader& headers,
-                             std::string body)>
-      on_response;
-  testing::MockFunction<void(datadog::tracing::Error)> on_error;
-
-  EXPECT_CALL(cluster_manager.thread_local_cluster_.async_client_, send_(_, _, _))
+  EXPECT_CALL(cluster_manager_.instance_.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks_arg,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks = &callbacks_arg;
-            return &request;
+          Invoke([this](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks_arg,
+                        const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            callbacks_ = &callbacks_arg;
+            return &request_;
           }));
 
-  // `callbacks->onFailure(...)` will cause `on_error` to be called.
-  // `on_response` will not be called.
-  EXPECT_CALL(on_error, Call(_)).WillOnce(Invoke([](datadog::tracing::Error error) {
+  // `callbacks->onFailure(...)` will cause `on_error_` to be called.
+  // `on_response_` will not be called.
+  EXPECT_CALL(on_error_, Call(_)).WillOnce(Invoke([](datadog::tracing::Error error) {
     EXPECT_EQ(error.code, datadog::tracing::Error::ENVOY_HTTP_CLIENT_FAILURE);
   }));
-  EXPECT_CALL(on_response, Call(_, _, _)).Times(0);
+  EXPECT_CALL(on_response_, Call(_, _, _)).Times(0);
 
   // The request will not be canceled; neither explicitly nor in
   // `~AgentHTTPClient`, because it will have been successfully fulfilled.
-  EXPECT_CALL(request, cancel()).Times(0);
+  EXPECT_CALL(request_, cancel()).Times(0);
 
   const auto ignore = [](auto&&...) {};
   datadog::tracing::Expected<void> result =
-      client.post(url, ignore, "{}", on_response.AsStdFunction(), on_error.AsStdFunction());
+      client_.post(url_, ignore, "{}", on_response_.AsStdFunction(), on_error_.AsStdFunction());
   EXPECT_TRUE(result) << result.error();
 
   Http::ResponseMessagePtr msg(new Http::ResponseMessageImpl(
@@ -451,71 +363,41 @@ TEST(DatadogAgentHttpClientTest, OnErrorOther) {
   msg->body().add("{}");
 
   const auto bogus_value = static_cast<Http::AsyncClient::FailureReason>(-1);
-  callbacks->onFailure(request, bogus_value);
+  callbacks_->onFailure(request_, bogus_value);
 }
 
-TEST(DatadogAgentHttpClientTest, SendFailReturnsError) {
+TEST_F(DatadogAgentHttpClientTest, SendFailReturnsError) {
   // If the underlying call to `httpAsyncClient().send(...)` returns an error,
   // then the enclosing call to `AgentHTTPClient::post(...)` returns an error.
 
-  NiceMock<Upstream::MockClusterManager> cluster_manager;
-  cluster_manager.initializeClusters({"fake_cluster"}, {});
-  cluster_manager.thread_local_cluster_.cluster_.info_->name_ = "fake_cluster";
-  cluster_manager.initializeThreadLocalClusters({"fake_cluster"});
-  Http::MockAsyncClientRequest request(&cluster_manager.thread_local_cluster_.async_client_);
-  Stats::TestUtil::TestStore store;
-  TracerStats stats = makeTracerStats(*store.rootScope());
-  AgentHTTPClient client(cluster_manager, "fake_cluster", "test_host", stats);
-  datadog::tracing::HTTPClient::URL url;
-  url.scheme = "http";
-  url.authority = "localhost:8126";
-  url.path = "/foo/bar";
-  Http::AsyncClient::Callbacks* callbacks;
-
-  EXPECT_CALL(cluster_manager.thread_local_cluster_.async_client_, send_(_, _, _))
+  EXPECT_CALL(cluster_manager_.instance_.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks_arg,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks = &callbacks_arg;
+          Invoke([this](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks_arg,
+                        const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            callbacks_ = &callbacks_arg;
             return nullptr; // indicates error
           }));
 
   const auto ignore = [](auto&&...) {};
-  datadog::tracing::Expected<void> result = client.post(url, ignore, "", ignore, ignore);
+  datadog::tracing::Expected<void> result = client_.post(url_, ignore, "", ignore, ignore);
   ASSERT_FALSE(result);
   EXPECT_EQ(datadog::tracing::Error::ENVOY_HTTP_CLIENT_FAILURE, result.error().code);
-  EXPECT_EQ(1, stats.reports_failed_.value());
-  EXPECT_EQ(0, stats.reports_skipped_no_cluster_.value());
+  EXPECT_EQ(1, stats_.reports_failed_.value());
+  EXPECT_EQ(0, stats_.reports_skipped_no_cluster_.value());
 }
 
-TEST(DatadogAgentHttpClientTest, DrainIsANoOp) {
+TEST_F(DatadogAgentHttpClientTest, DrainIsANoOp) {
   // `AgentHTTPClient::drain` doesn't do anything. It only makes sense in
   // multi-threaded contexts.
   // This test is for the sake of coverage.
 
-  NiceMock<Upstream::MockClusterManager> cluster_manager;
-  cluster_manager.initializeClusters({"fake_cluster"}, {});
-  cluster_manager.thread_local_cluster_.cluster_.info_->name_ = "fake_cluster";
-  cluster_manager.initializeThreadLocalClusters({"fake_cluster"});
-  Stats::TestUtil::TestStore store;
-  TracerStats stats = makeTracerStats(*store.rootScope());
-  AgentHTTPClient client(cluster_manager, "fake_cluster", "test_host", stats);
-
   // `deadline` value doesn't matter; `drain` ignores it.
   const auto deadline = std::chrono::steady_clock::time_point::min();
-  client.drain(deadline);
+  client_.drain(deadline);
 }
 
-TEST(DatadogAgentHttpClientTest, ConfigJSONContainsTypeName) {
-  NiceMock<Upstream::MockClusterManager> cluster_manager;
-  cluster_manager.initializeClusters({"fake_cluster"}, {});
-  cluster_manager.thread_local_cluster_.cluster_.info_->name_ = "fake_cluster";
-  cluster_manager.initializeThreadLocalClusters({"fake_cluster"});
-  Stats::TestUtil::TestStore store;
-  TracerStats stats = makeTracerStats(*store.rootScope());
-  AgentHTTPClient client(cluster_manager, "fake_cluster", "test_host", stats);
-
-  nlohmann::json config = client.config_json();
+TEST_F(DatadogAgentHttpClientTest, ConfigJSONContainsTypeName) {
+  nlohmann::json config = client_.config_json();
   EXPECT_EQ("Envoy::Extensions::Tracers::Datadog::AgentHTTPClient", config["type"]);
 }
 
