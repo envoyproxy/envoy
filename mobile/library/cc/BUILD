@@ -78,6 +78,7 @@ envoy_cc_library(
     ],
     hdrs = [
         "bridge_utility.h",
+        "direct_response_testing.h",
         "engine.h",
         "engine_callbacks.h",
         "envoy_error.h",

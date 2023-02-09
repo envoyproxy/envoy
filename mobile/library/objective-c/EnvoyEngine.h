@@ -1,5 +1,6 @@
 #import <Foundation/Foundation.h>
 
+#import "library/objective-c/EMODirectResponse.h"
 #import "library/objective-c/EnvoyAliases.h"
 #import "library/objective-c/EnvoyConfiguration.h"
 #import "library/objective-c/EnvoyEventTracker.h"

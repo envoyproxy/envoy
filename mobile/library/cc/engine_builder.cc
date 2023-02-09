@@ -31,6 +31,7 @@
 #include "library/common/engine.h"
 #include "library/common/extensions/cert_validator/platform_bridge/platform_bridge.pb.h"
 #include "library/common/extensions/filters/http/local_error/filter.pb.h"
+#include "library/common/extensions/filters/http/route_cache_reset/filter.pb.h"
 #include "library/common/extensions/filters/http/network_configuration/filter.pb.h"
 #include "library/common/extensions/filters/http/socket_tag/filter.pb.h"
 #include "library/common/extensions/key_value/platform/platform.pb.h"
@@ -327,6 +328,12 @@ EngineBuilder& EngineBuilder::addPlatformFilter(std::string name) {
   return *this;
 }
 
+EngineBuilder&
+EngineBuilder::addDirectResponse(DirectResponseTesting::DirectResponse direct_response) {
+  direct_responses_.push_back(direct_response);
+  return *this;
+}
+
 std::string EngineBuilder::generateConfigStr() const {
   if (!config_override_for_tests_.empty()) {
     return config_override_for_tests_;
@@ -531,6 +538,47 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   auto* remote_service = route_config->add_virtual_hosts();
   remote_service->set_name("remote_service");
   remote_service->add_domains("127.0.0.1");
+
+  for (auto& direct_response_in : direct_responses_) {
+    auto* direct_response_route = remote_service->add_routes();
+    auto* direct_response = direct_response_route->mutable_direct_response();
+    direct_response->set_status(direct_response_in.status);
+    direct_response->mutable_body()->set_inline_string(direct_response_in.body);
+    auto* direct_response_route_match = direct_response_route->mutable_match();
+    auto matcher = direct_response_in.matcher;
+    if (!matcher.fullPath.empty()) {
+      direct_response_route_match->set_path(matcher.fullPath);
+    } else if (!matcher.pathPrefix.empty()) {
+      direct_response_route_match->set_prefix(matcher.pathPrefix);
+    }
+
+    for (auto& header : matcher.headers) {
+      auto* direct_response_headers = direct_response_route_match->add_headers();
+      direct_response_headers->set_name(header.name);
+      switch (header.mode) {
+      case DirectResponseTesting::contains:
+        direct_response_headers->set_contains_match(header.value);
+        break;
+      case DirectResponseTesting::exact:
+        direct_response_headers->set_exact_match(header.value);
+        break;
+      case DirectResponseTesting::prefix:
+        direct_response_headers->set_prefix_match(header.value);
+        break;
+      case DirectResponseTesting::suffix:
+        direct_response_headers->set_suffix_match(header.value);
+        break;
+      }
+    }
+
+    for (auto& header_in : direct_response_in.headers) {
+      auto* resp_header = direct_response_route->add_response_headers_to_add();
+      auto* header = resp_header->mutable_header();
+      header->set_key(header_in.first);
+      header->set_value(header_in.second);
+    }
+  }
+
   auto* route = remote_service->add_routes();
   route->mutable_match()->set_prefix("/");
   route->mutable_direct_response()->set_status(404);
@@ -545,6 +593,38 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   for (auto& cluster : virtual_clusters_) {
     MessageUtil::loadFromYaml(cluster, *api_service->add_virtual_clusters(),
                               ProtobufMessage::getStrictValidationVisitor());
+  }
+
+  for (auto& direct_response_in : direct_responses_) {
+    auto* this_route = api_service->add_routes();
+    auto* mutable_route = this_route->mutable_route();
+    mutable_route->set_cluster("fake_remote");
+    auto* direct_response_route_match = this_route->mutable_match();
+    auto matcher = direct_response_in.matcher;
+    if (!matcher.fullPath.empty()) {
+      direct_response_route_match->set_path(matcher.fullPath);
+    } else if (!matcher.pathPrefix.empty()) {
+      direct_response_route_match->set_prefix(matcher.pathPrefix);
+    }
+
+    for (auto& header : matcher.headers) {
+      auto* direct_response_headers = direct_response_route_match->add_headers();
+      direct_response_headers->set_name(header.name);
+      switch (header.mode) {
+      case DirectResponseTesting::contains:
+        direct_response_headers->set_contains_match(header.value);
+        break;
+      case DirectResponseTesting::exact:
+        direct_response_headers->set_exact_match(header.value);
+        break;
+      case DirectResponseTesting::prefix:
+        direct_response_headers->set_prefix_match(header.value);
+        break;
+      case DirectResponseTesting::suffix:
+        direct_response_headers->set_suffix_match(header.value);
+        break;
+      }
+    }
   }
 
   route = api_service->add_routes();
@@ -659,6 +739,13 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     tag_filter->mutable_typed_config()->PackFrom(tag_config);
   }
 
+  if (!direct_responses_.empty()) {
+    envoymobile::extensions::filters::http::route_cache_reset::RouteCacheReset cache_reset;
+    auto* cache_reset_filter = hcm->add_http_filters();
+    cache_reset_filter->set_name("envoy.filters.http.route_cache_reset");
+    cache_reset_filter->mutable_typed_config()->PackFrom(cache_reset);
+  }
+
   // Set up the always-present filters
   envoymobile::extensions::filters::http::network_configuration::NetworkConfiguration
       network_config;
@@ -732,6 +819,35 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 
   auto* static_resources = bootstrap->mutable_static_resources();
 
+  if (!direct_responses_.empty()) {
+    auto* fake_remote_listener = static_resources->add_listeners();
+    fake_remote_listener->set_name("fake_remote_listener");
+    auto* base_address = fake_remote_listener->mutable_address();
+    base_address->mutable_socket_address()->set_address("127.0.0.1");
+    base_address->mutable_socket_address()->set_port_value(10101);
+    auto* filter = fake_remote_listener->add_filter_chains()->add_filters();
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
+        fake_remote_listener_config;
+    filter->set_name("envoy.filters.network.http_connection_manager");
+    fake_remote_listener_config.set_stat_prefix("remote_hcm");
+    auto* route_config = fake_remote_listener_config.mutable_route_config();
+    route_config->set_name("remote_route");
+    auto* virtual_host = route_config->add_virtual_hosts();
+    virtual_host->add_domains("*");
+    virtual_host->set_name("remote_service");
+    auto* route = virtual_host->add_routes();
+    route->mutable_match()->set_prefix("/");
+    route->mutable_direct_response()->set_status(404);
+    route->mutable_direct_response()->mutable_body()->set_inline_string("not found");
+    route->add_request_headers_to_remove("x-forwarded-proto");
+    route->add_request_headers_to_remove("x-envoy-mobile-cluster");
+    auto* router_filter = fake_remote_listener_config.add_http_filters();
+    envoy::extensions::filters::http::router::v3::Router router_config;
+    router_filter->set_name("envoy.router");
+    router_filter->mutable_typed_config()->PackFrom(router_config);
+    filter->mutable_typed_config()->PackFrom(fake_remote_listener_config);
+  }
+
   // Finally create the base listener, and point it at the HCM.
   auto* base_listener = static_resources->add_listeners();
   base_listener->set_name("base_api_listener");
@@ -781,6 +897,22 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   envoy::config::core::v3::TransportSocket base_tls_socket;
   base_tls_socket.set_name("envoy.transport_sockets.http_11_proxy");
   base_tls_socket.mutable_typed_config()->PackFrom(ssl_proxy_socket);
+
+  if (!direct_responses_.empty()) {
+    // fake remote cluster
+    auto* fake_remote_cluster = static_resources->add_clusters();
+    fake_remote_cluster->set_name("fake_remote");
+    fake_remote_cluster->set_type(envoy::config::cluster::v3::Cluster::LOGICAL_DNS);
+    fake_remote_cluster->mutable_connect_timeout()->set_seconds(30);
+    fake_remote_cluster->mutable_load_assignment()->set_cluster_name("fake_remote");
+    auto* address = fake_remote_cluster->mutable_load_assignment()
+                        ->add_endpoints()
+                        ->add_lb_endpoints()
+                        ->mutable_endpoint()
+                        ->mutable_address();
+    address->mutable_socket_address()->set_address("127.0.0.1");
+    address->mutable_socket_address()->set_port_value(10101);
+  }
 
   // Stats cluster
   auto* stats_cluster = static_resources->add_clusters();
@@ -1067,8 +1199,10 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 #endif
   }
 
-  // Check equivalence in debug mode.
-  ASSERT(generatedStringMatchesGeneratedBoostrap(generateConfigStr(), *bootstrap));
+  if (direct_responses_.empty()) {
+    // Check equivalence in debug mode. Not supported if direct responses are configured.
+    ASSERT(generatedStringMatchesGeneratedBoostrap(generateConfigStr(), *bootstrap));
+  }
 
   return bootstrap;
 }

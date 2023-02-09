@@ -1,3 +1,4 @@
+@_spi(YAMLValidation)
 import Envoy
 import TestExtensions
 import XCTest
@@ -16,8 +17,7 @@ final class DirectResponseExactPathMatchIntegrationTest: XCTestCase {
       method: .get, authority: "127.0.0.1", path: "/v1/abc"
     ).build()
 
-    let engine = TestEngineBuilder()
-      .useLegacyBuilder(true)
+    let engine = YAMLValidatingTestEngineBuilder()
       .addDirectResponse(
         .init(
           matcher: RouteMatcher(fullPath: "/v1/abc"),
