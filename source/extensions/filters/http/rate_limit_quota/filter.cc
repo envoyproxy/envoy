@@ -37,7 +37,6 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
   }
 
   BucketId bucket_id = ret.value();
-  // ASSERT(quota_buckets_ != nullptr);
 
   if (quota_buckets_.find(bucket_id) == quota_buckets_.end()) {
     // The request has been matched to the quota bucket for the first time.
@@ -55,16 +54,20 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
       // TODO(tyxia) Change it to error, debug for testing
       ENVOY_LOG(debug, "No assignment behavior is not configured.");
       // We just use fail-open (i.e. ALLOW_ALL) here.
-      return Envoy::Http::FilterHeadersStatus::Continue;
+      // return Envoy::Http::FilterHeadersStatus::Continue;
     }
 
     Bucket new_bucket = {};
     // Create the gRPC client.
     new_bucket.rate_limit_client_ = createRateLimitClient(
         factory_context_, config_->rlqs_server(), *this, quota_buckets_, quota_usage_reports_);
-
+    std::cout << "hahaha1" << std::endl;
+    if (new_bucket.rate_limit_client_ == nullptr) {
+      std::cout << "nullptr" << std::endl;
+    }
     // Start the streaming on the first request.
     auto status = new_bucket.rate_limit_client_->startStream(callbacks_->streamInfo());
+    std::cout << "hahaha2" << std::endl;
     if (!status.ok()) {
       ENVOY_LOG(error, "Failed to start the gRPC stream: ", status.message());
       return Envoy::Http::FilterHeadersStatus::Continue;

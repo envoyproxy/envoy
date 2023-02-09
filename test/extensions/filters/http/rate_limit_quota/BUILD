@@ -6,6 +6,7 @@ load(
     "//test/extensions:extensions_build_system.bzl",
     "envoy_extension_cc_mock",
     "envoy_extension_cc_test",
+    "envoy_extension_cc_test_library",
 )
 
 licenses(["notice"])  # Apache 2
@@ -42,6 +43,7 @@ envoy_extension_cc_test(
     srcs = ["filter_test.cc"],
     extension_names = ["envoy.filters.http.rate_limit_quota"],
     deps = [
+        ":client_test_utils",
         "//source/common/http:message_lib",
         "//source/extensions/filters/http/rate_limit_quota",
         "//test/common/http:common_lib",
@@ -54,10 +56,38 @@ envoy_extension_cc_test(
     ],
 )
 
+# envoy_extension_cc_test(
+#     name = "client_test",
+#     size = "small",
+#     srcs = ["client_test.cc"],
+#     extension_names = ["envoy.filters.http.rate_limit_quota"],
+#     deps = [
+#         ":mocks",
+#         "//source/common/http:header_map_lib",
+#         "//source/extensions/filters/http/rate_limit_quota:client_interface",
+#         "//source/extensions/filters/http/rate_limit_quota:client_lib",
+#         "//test/mocks/grpc:grpc_mocks",
+#         "//test/mocks/server:factory_context_mocks",
+#         "//test/mocks/server:server_mocks",
+#         "//test/test_common:status_utility_lib",
+#         "//test/test_common:test_runtime_lib",
+#         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+#     ],
+# )
+
 envoy_extension_cc_test(
     name = "client_test",
     size = "small",
     srcs = ["client_test.cc"],
+    extension_names = ["envoy.filters.http.rate_limit_quota"],
+    deps = [
+        ":client_test_utils",
+    ],
+)
+
+envoy_extension_cc_test_library(
+    name = "client_test_utils",
+    hdrs = ["client_test_utils.h"],
     extension_names = ["envoy.filters.http.rate_limit_quota"],
     deps = [
         ":mocks",

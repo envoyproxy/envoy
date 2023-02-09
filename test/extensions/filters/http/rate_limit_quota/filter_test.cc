@@ -7,6 +7,7 @@
 #include "source/extensions/filters/http/rate_limit_quota/filter.h"
 
 #include "test/common/http/common.h"
+#include "test/extensions/filters/http/rate_limit_quota/client_test_utils.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/init/mocks.h"
@@ -470,8 +471,17 @@ TEST_F(FilterTest, DecodeHeaderWithValidConfig) {
 
   buildCustomHeader(custom_value_pairs);
 
+  RateLimitTestClient test_client(context_, *config_.mutable_rlqs_server());
+  // test_client.init(context_, *config_.mutable_rlqs_server());
+  EXPECT_OK(test_client.client_->startStream(decoder_callbacks_.stream_info_));
+  // Send quota usage report and ensure that we get it.
+  EXPECT_CALL(test_client.stream_, sendMessageRaw_(_, true));
+  EXPECT_CALL(test_client.stream_, closeStream());
+  EXPECT_CALL(test_client.stream_, resetStream());
+  test_client.client_->closeStream();
+
   Http::FilterHeadersStatus status = filter_->decodeHeaders(default_headers_, false);
-  EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::Continue);
+  EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::StopAllIterationAndWatermark);
 }
 
 TEST_F(FilterTest, DecodeHeaderWithInValidConfig) {
@@ -491,8 +501,17 @@ TEST_F(FilterTest, DecodeHeaderWithOnNoMatchConfigured) {
   addMatcherConfig(MatcherConfigType::ValidOnNoMatchConfig);
   createFilter();
 
+  RateLimitTestClient test_client(context_, *config_.mutable_rlqs_server());
+  // TODO(tyxia) Invest, two in parallel??
+  EXPECT_OK(test_client.client_->startStream(decoder_callbacks_.stream_info_));
+  // Send quota usage report and ensure that we get it.
+  EXPECT_CALL(test_client.stream_, sendMessageRaw_(_, true));
+  EXPECT_CALL(test_client.stream_, closeStream());
+  EXPECT_CALL(test_client.stream_, resetStream());
+  test_client.client_->closeStream();
+
   Http::FilterHeadersStatus status = filter_->decodeHeaders(default_headers_, false);
-  EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::Continue);
+  EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::StopAllIterationAndWatermark);
 }
 
 TEST_F(FilterTest, DecodeHeaderWithEmptyConfig) {

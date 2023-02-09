@@ -61,6 +61,7 @@ void RateLimitClientImpl::sendUsageReport(absl::string_view domain,
                                           absl::optional<BucketId> bucket_id) {
   ASSERT(stream_ != nullptr);
   // There is no bucked id provided in periodical sending behavior.
+  // TODO(tyxia) end_stream should be
   stream_->sendMessage(bucket_id.has_value() ? buildUsageReport(domain, bucket_id.value())
                                              : reports_,
                        /*end_stream=*/true);
