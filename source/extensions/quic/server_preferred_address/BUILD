@@ -31,7 +31,6 @@ envoy_cc_library(
 envoy_cc_extension(
     name = "basic_server_preferred_address_config_factory_config",
     extra_visibility = [
-        "//source/common/quic:__subpackages__",
         "//test:__subpackages__",
     ],
     tags = ["nofips"],
