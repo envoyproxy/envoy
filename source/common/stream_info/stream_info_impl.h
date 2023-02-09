@@ -375,6 +375,14 @@ struct StreamInfoImpl : public StreamInfo {
   void setIsShadow(bool is_shadow) { is_shadow_ = is_shadow; }
   bool isShadow() const override { return is_shadow_; }
 
+  void setDownstreamTransportFailureReason(absl::string_view failure_reason) override {
+    downstream_transport_failure_reason_ = std::string(failure_reason);
+  }
+
+  absl::string_view downstreamTransportFailureReason() const override {
+    return downstream_transport_failure_reason_;
+  }
+
   TimeSource& time_source_;
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
@@ -428,6 +436,7 @@ private:
   BytesMeterSharedPtr upstream_bytes_meter_{std::make_shared<BytesMeter>()};
   BytesMeterSharedPtr downstream_bytes_meter_;
   bool is_shadow_{false};
+  std::string downstream_transport_failure_reason_;
 };
 
 } // namespace StreamInfo

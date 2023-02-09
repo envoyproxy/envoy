@@ -890,8 +890,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_TRANSPORT_FAILURE_REASON");
     std::string downstream_transport_failure_reason = "TLS error";
-    stream_info.downstream_connection_info_provider_->setDownstreamTransportFailureReason(
-        downstream_transport_failure_reason);
+    stream_info.setDownstreamTransportFailureReason(downstream_transport_failure_reason);
     EXPECT_EQ("TLS_error", upstream_format.format(request_headers, response_headers,
                                                   response_trailers, stream_info, body));
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
@@ -901,8 +900,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_TRANSPORT_FAILURE_REASON");
     std::string downstream_transport_failure_reason;
-    stream_info.downstream_connection_info_provider_->setDownstreamTransportFailureReason(
-        downstream_transport_failure_reason);
+    stream_info.setDownstreamTransportFailureReason(downstream_transport_failure_reason);
     EXPECT_EQ(absl::nullopt, upstream_format.format(request_headers, response_headers,
                                                     response_trailers, stream_info, body));
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,

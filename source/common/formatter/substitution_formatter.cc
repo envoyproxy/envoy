@@ -1472,11 +1472,9 @@ const StreamInfoFormatter::FieldExtractorLookupTbl& StreamInfoFormatter::getKnow
                               return std::make_unique<StreamInfoStringFieldExtractor>(
                                   [](const StreamInfo::StreamInfo& stream_info) {
                                     absl::optional<std::string> result;
-                                    if (!stream_info.downstreamAddressProvider()
-                                             .downstreamTransportFailureReason()
-                                             .empty()) {
-                                      result = std::string(stream_info.downstreamAddressProvider()
-                                                               .downstreamTransportFailureReason());
+                                    if (!stream_info.downstreamTransportFailureReason().empty()) {
+                                      result = std::string(
+                                          stream_info.downstreamTransportFailureReason());
                                     }
                                     if (result) {
                                       std::replace(result->begin(), result->end(), ' ', '_');

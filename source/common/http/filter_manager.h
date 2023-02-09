@@ -587,10 +587,6 @@ public:
     return StreamInfoImpl::downstreamAddressProvider().roundTripTime();
   }
 
-  absl::string_view downstreamTransportFailureReason() const override {
-    return StreamInfoImpl::downstreamAddressProvider().downstreamTransportFailureReason();
-  }
-
 private:
   Network::Address::InstanceConstSharedPtr overridden_downstream_remote_address_;
 };

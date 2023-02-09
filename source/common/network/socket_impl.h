@@ -74,14 +74,6 @@ public:
     round_trip_time_ = round_trip_time;
   }
 
-  void setDownstreamTransportFailureReason(absl::string_view failure_reason) override {
-    downstream_transport_failure_reason_ = std::string(failure_reason);
-  }
-
-  absl::string_view downstreamTransportFailureReason() const override {
-    return downstream_transport_failure_reason_;
-  }
-
 private:
   Address::InstanceConstSharedPtr local_address_;
   bool local_address_restored_{false};
@@ -94,7 +86,6 @@ private:
   Ssl::ConnectionInfoConstSharedPtr ssl_info_;
   std::string ja3_hash_;
   absl::optional<std::chrono::milliseconds> round_trip_time_;
-  std::string downstream_transport_failure_reason_;
 };
 
 class SocketImpl : public virtual Socket {
