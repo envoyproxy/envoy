@@ -342,7 +342,9 @@
   builder.enableBrotliCompression(self.enableBrotliCompression);
 #endif
   builder.enableHappyEyeballs(self.enableHappyEyeballs);
+#ifdef ENVOY_ENABLE_QUIC
   builder.enableHttp3(self.enableHttp3);
+#endif
   builder.enableInterfaceBinding(self.enableInterfaceBinding);
   builder.enableDrainPostDnsRefresh(self.enableDrainPostDnsRefresh);
   builder.enforceTrustChainVerification(self.enforceTrustChainVerification);
