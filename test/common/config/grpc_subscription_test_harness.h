@@ -49,8 +49,8 @@ public:
         resource_decoder_(std::make_shared<TestUtility::TestOpaqueResourceDecoderImpl<
                               envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name")),
         config_validators_(std::make_unique<NiceMock<MockCustomConfigValidators>>()),
-        backoff_strategy_(std::make_unique<JitteredExponentialBackOffStrategy>(
-            Envoy::Config::RetryBaseIntervalMs, Envoy::Config::RetryMaxIntervalMs, random_)),
+        backoff_strategy_(
+            Envoy::Config::Utility::prepareDefaultJitteredExponentialBackOffStrategy(random_)),
         should_use_unified_(legacy_or_unified == Envoy::Config::LegacyOrUnified::Unified) {
     node_.set_id("fo0");
     EXPECT_CALL(local_info_, node()).WillRepeatedly(testing::ReturnRef(node_));
@@ -235,7 +235,7 @@ public:
   OpaqueResourceDecoderSharedPtr resource_decoder_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   CustomConfigValidatorsPtr config_validators_;
-  BackOffStrategyPtr backoff_strategy_;
+  JitteredExponentialBackOffStrategyPtr backoff_strategy_;
   NiceMock<Grpc::MockAsyncStream> async_stream_;
   GrpcMuxSharedPtr mux_;
   GrpcSubscriptionImplPtr subscription_;

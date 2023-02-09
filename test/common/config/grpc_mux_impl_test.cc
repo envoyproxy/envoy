@@ -51,8 +51,8 @@ public:
   GrpcMuxImplTestBase()
       : async_client_(new Grpc::MockAsyncClient()),
         config_validators_(std::make_unique<NiceMock<MockCustomConfigValidators>>()),
-        backoff_strategy_(std::make_unique<JitteredExponentialBackOffStrategy>(
-            Envoy::Config::RetryBaseIntervalMs, Envoy::Config::RetryMaxIntervalMs, random_)),
+        backoff_strategy_(
+            Envoy::Config::Utility::prepareDefaultJitteredExponentialBackOffStrategy(random_)),
         resource_decoder_(std::make_shared<NiceMock<MockOpaqueResourceDecoder>>()),
         control_plane_connected_state_(
             stats_.gauge("control_plane.connected_state", Stats::Gauge::ImportMode::NeverImport)),
@@ -114,7 +114,7 @@ public:
   Grpc::MockAsyncClient* async_client_;
   Grpc::MockAsyncStream async_stream_;
   CustomConfigValidatorsPtr config_validators_;
-  BackOffStrategyPtr backoff_strategy_;
+  JitteredExponentialBackOffStrategyPtr backoff_strategy_;
   GrpcMuxImplPtr grpc_mux_;
   NiceMock<MockSubscriptionCallbacks> callbacks_;
   OpaqueResourceDecoderSharedPtr resource_decoder_;

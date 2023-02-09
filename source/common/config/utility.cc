@@ -308,5 +308,32 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
   }
 }
 
+JitteredExponentialBackOffStrategyPtr Utility::prepareJitteredExponentialBackOffStrategy(
+    const envoy::config::core::v3::RetryPolicy& retry_policy, Random::RandomGenerator& random) {
+  if (retry_policy.has_retry_back_off()) {
+    uint32_t base_interval_ms =
+        PROTOBUF_GET_MS_REQUIRED(retry_policy.retry_back_off(), base_interval);
+
+    uint32_t max_interval_ms = PROTOBUF_GET_MS_OR_DEFAULT(retry_policy.retry_back_off(),
+                                                          max_interval, base_interval_ms * 10);
+
+    if (max_interval_ms < base_interval_ms) {
+      throw EnvoyException("max_interval must be greater than or equal to the base_interval");
+    }
+    return std::make_unique<JitteredExponentialBackOffStrategy>(base_interval_ms, max_interval_ms,
+                                                                random);
+  }
+  return prepareDefaultJitteredExponentialBackOffStrategy(random);
+}
+
+JitteredExponentialBackOffStrategyPtr
+Utility::prepareDefaultJitteredExponentialBackOffStrategy(Random::RandomGenerator& random) {
+  constexpr uint32_t RetryInitialDelayMilliseconds = 1000;
+  constexpr uint32_t RetryMaxDelayMilliseconds = 10 * 1000;
+
+  return std::make_unique<JitteredExponentialBackOffStrategy>(RetryInitialDelayMilliseconds,
+                                                              RetryMaxDelayMilliseconds, random);
+}
+
 } // namespace Config
 } // namespace Envoy

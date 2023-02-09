@@ -41,7 +41,8 @@ GrpcMuxImpl<S, F, RQ, RS>::GrpcMuxImpl(
     const LocalInfo::LocalInfo& local_info, Grpc::RawAsyncClientPtr&& async_client,
     Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
     Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
-    CustomConfigValidatorsPtr&& config_validators, BackOffStrategyPtr backoff_strategy,
+    CustomConfigValidatorsPtr&& config_validators,
+    JitteredExponentialBackOffStrategyPtr backoff_strategy,
     XdsConfigTrackerOptRef xds_config_tracker, XdsResourcesDelegateOptRef xds_resources_delegate,
     const std::string& target_xds_authority)
     : grpc_stream_(this, std::move(async_client), service_method, dispatcher, scope,
@@ -366,7 +367,7 @@ GrpcMuxDelta::GrpcMuxDelta(Grpc::RawAsyncClientPtr&& async_client, Event::Dispat
                            const RateLimitSettings& rate_limit_settings,
                            const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node,
                            CustomConfigValidatorsPtr&& config_validators,
-                           BackOffStrategyPtr backoff_strategy,
+                           JitteredExponentialBackOffStrategyPtr backoff_strategy,
                            XdsConfigTrackerOptRef xds_config_tracker)
     : GrpcMuxImpl(std::make_unique<DeltaSubscriptionStateFactory>(dispatcher), skip_subsequent_node,
                   local_info, std::move(async_client), dispatcher, service_method, scope,
@@ -389,7 +390,7 @@ GrpcMuxSotw::GrpcMuxSotw(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatch
                          const RateLimitSettings& rate_limit_settings,
                          const LocalInfo::LocalInfo& local_info, bool skip_subsequent_node,
                          CustomConfigValidatorsPtr&& config_validators,
-                         BackOffStrategyPtr backoff_strategy,
+                         JitteredExponentialBackOffStrategyPtr backoff_strategy,
                          XdsConfigTrackerOptRef xds_config_tracker,
                          XdsResourcesDelegateOptRef xds_resources_delegate,
                          const std::string& target_xds_authority)

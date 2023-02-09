@@ -39,7 +39,8 @@ public:
               Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
               Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
               bool skip_subsequent_node, CustomConfigValidatorsPtr&& config_validators,
-              BackOffStrategyPtr backoff_strategy, XdsConfigTrackerOptRef xds_config_tracker,
+              JitteredExponentialBackOffStrategyPtr backoff_strategy,
+              XdsConfigTrackerOptRef xds_config_tracker,
               XdsResourcesDelegateOptRef xds_resources_delegate,
               const std::string& target_xds_authority);
 

@@ -42,12 +42,6 @@ namespace Config {
 constexpr absl::string_view Wildcard = "*";
 
 /**
- * Default Parameters for the retry backoff strategy.
- */
-static constexpr uint64_t RetryBaseIntervalMs = 500;
-static constexpr uint64_t RetryMaxIntervalMs = 30000;
-
-/**
  * Constant Api Type Values, used by envoy::config::core::v3::ApiConfigSource.
  */
 class ApiTypeValues {
@@ -539,44 +533,21 @@ public:
   }
 
   /**
-   * Prepares backoff strategy from envoy::config::core::v3::ApiConfigSource
-   * @param config envoy::config::core::v3::ApiConfigSource
+   * Prepares Jittered Exponential BackOff Strategy from Retry Policy config
+   * @param config retry policy config
    * @param random random generator
-   * @return BackOffStrategyPtr
+   * @return JitteredExponentialBackOffStrategyPtr
    */
-  static BackOffStrategyPtr
-  prepareBackoffStrategy(const envoy::config::core::v3::ApiConfigSource& api_config_source,
-                         Random::RandomGenerator& random) {
+  static JitteredExponentialBackOffStrategyPtr prepareJitteredExponentialBackOffStrategy(
+      const envoy::config::core::v3::RetryPolicy& retry_policy, Random::RandomGenerator& random);
 
-    uint64_t base_interval_ms = RetryBaseIntervalMs;
-    uint64_t max_interval_ms = RetryMaxIntervalMs;
-
-    const bool is_grpc =
-        (api_config_source.api_type() == envoy::config::core::v3::ApiConfigSource::GRPC);
-
-    if (is_grpc && !api_config_source.grpc_services().empty() &&
-        api_config_source.grpc_services()[0].has_envoy_grpc()) {
-
-      auto& envoy_grpc = api_config_source.grpc_services()[0].envoy_grpc();
-
-      if (envoy_grpc.has_retry_back_off()) {
-        base_interval_ms = PROTOBUF_GET_MS_REQUIRED(envoy_grpc.retry_back_off(), base_interval);
-
-        max_interval_ms = PROTOBUF_GET_MS_OR_DEFAULT(envoy_grpc.retry_back_off(), max_interval,
-                                                     base_interval_ms * 10);
-
-        if (max_interval_ms < base_interval_ms) {
-          ExceptionUtil::throwEnvoyException(fmt::format("Retry Backoff max_interval {} must be "
-                                                         "greater than"
-                                                         "or equal to the base_interval {}",
-                                                         max_interval_ms, base_interval_ms));
-        }
-      }
-    }
-    return std::make_unique<JitteredExponentialBackOffStrategy>(base_interval_ms, max_interval_ms,
-                                                                random);
-  }
+  /**
+   * Prepares Jittered Exponential BackOff Strategy with default timer values
+   * @param random random generator
+   * @return JitteredExponentialBackOffStrategyPtr
+   */
+  static JitteredExponentialBackOffStrategyPtr
+  prepareDefaultJitteredExponentialBackOffStrategy(Random::RandomGenerator& random);
 };
-
 } // namespace Config
 } // namespace Envoy

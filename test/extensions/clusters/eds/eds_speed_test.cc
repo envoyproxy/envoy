@@ -49,8 +49,8 @@ public:
         subscription_stats_(Config::Utility::generateStats(scope_)),
         async_client_(new Grpc::MockAsyncClient()),
         config_validators_(std::make_unique<NiceMock<Config::MockCustomConfigValidators>>()),
-        backoff_strategy_(std::make_unique<JitteredExponentialBackOffStrategy>(
-            Envoy::Config::RetryBaseIntervalMs, Envoy::Config::RetryMaxIntervalMs, random_)) {
+        backoff_strategy_(
+            Envoy::Config::Utility::prepareDefaultJitteredExponentialBackOffStrategy(random_)) {
     if (use_unified_mux_) {
       grpc_mux_.reset(new Config::XdsMux::GrpcMuxSotw(
           std::unique_ptr<Grpc::MockAsyncClient>(async_client_), server_context_.dispatcher_,
@@ -185,7 +185,7 @@ public:
   ProtobufMessage::MockValidationVisitor validation_visitor_;
   Grpc::MockAsyncClient* async_client_;
   Config::CustomConfigValidatorsPtr config_validators_;
-  BackOffStrategyPtr backoff_strategy_;
+  JitteredExponentialBackOffStrategyPtr backoff_strategy_;
   NiceMock<Grpc::MockAsyncStream> async_stream_;
   Config::GrpcMuxSharedPtr grpc_mux_;
   Config::GrpcSubscriptionImplPtr subscription_;

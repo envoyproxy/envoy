@@ -53,8 +53,8 @@ public:
   NewGrpcMuxImplTestBase(LegacyOrUnified legacy_or_unified)
       : async_client_(new Grpc::MockAsyncClient()),
         config_validators_(std::make_unique<NiceMock<MockCustomConfigValidators>>()),
-        backoff_strategy_(std::make_unique<JitteredExponentialBackOffStrategy>(
-            Envoy::Config::RetryBaseIntervalMs, Envoy::Config::RetryMaxIntervalMs, random_)),
+        backoff_strategy_(
+            Envoy::Config::Utility::prepareDefaultJitteredExponentialBackOffStrategy(random_)),
         resource_decoder_(std::make_shared<TestUtility::TestOpaqueResourceDecoderImpl<
                               envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name")),
         control_plane_stats_(Utility::generateControlPlaneStats(*stats_.rootScope())),
@@ -163,7 +163,7 @@ public:
   Grpc::MockAsyncClient* async_client_;
   NiceMock<Grpc::MockAsyncStream> async_stream_;
   CustomConfigValidatorsPtr config_validators_;
-  BackOffStrategyPtr backoff_strategy_;
+  JitteredExponentialBackOffStrategyPtr backoff_strategy_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   std::unique_ptr<GrpcMux> grpc_mux_;
   NiceMock<Config::MockSubscriptionCallbacks> callbacks_;

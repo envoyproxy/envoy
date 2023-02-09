@@ -40,7 +40,7 @@ NewGrpcMuxImpl::NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client,
                                Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
                                const LocalInfo::LocalInfo& local_info,
                                CustomConfigValidatorsPtr&& config_validators,
-                               BackOffStrategyPtr backoff_strategy,
+                               JitteredExponentialBackOffStrategyPtr backoff_strategy,
                                XdsConfigTrackerOptRef xds_config_tracker)
     : grpc_stream_(this, std::move(async_client), service_method, dispatcher, scope,
                    std::move(backoff_strategy), rate_limit_settings),
