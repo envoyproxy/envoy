@@ -14,10 +14,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.quic.server_preferred_address.basic]
 
 // Configuration for BasicServerPreferredAddressConfig.
-// [#next-free-field: 3]
 message BasicServerPreferredAddressConfig {
   // String representation of ipv(4|6) address, i.e. "127.0.0.2".
   // If not specified, none will be configured.
   string ipv4_address = 1;
+
   string ipv6_address = 2;
 }
