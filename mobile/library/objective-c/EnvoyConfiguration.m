@@ -120,6 +120,17 @@
     [customFilters appendString:filterConfig];
   }
 
+  if (self.enableHttp3) {
+#ifdef ENVOY_ENABLE_QUIC
+    NSString *http3Insert =
+        [[NSString alloc] initWithUTF8String:alternate_protocols_cache_filter_insert];
+    [customFilters appendString:http3Insert];
+#else
+    NSLog(@"[Envoy] error: http3 functionality was not compiled in this build of Envoy Mobile");
+    return nil;
+#endif
+  }
+
   if (self.enableGzipDecompression) {
     NSString *insert = [[NSString alloc] initWithUTF8String:gzip_decompressor_config_insert];
     [customFilters appendString:insert];
@@ -148,17 +159,6 @@
 #else
     NSLog(@"[Envoy] error: request compression functionality was not compiled in this build of "
           @"Envoy Mobile");
-    return nil;
-#endif
-  }
-
-  if (self.enableHttp3) {
-#ifdef ENVOY_ENABLE_QUIC
-    NSString *http3Insert =
-        [[NSString alloc] initWithUTF8String:alternate_protocols_cache_filter_insert];
-    [customFilters appendString:http3Insert];
-#else
-    NSLog(@"[Envoy] error: http3 functionality was not compiled in this build of Envoy Mobile");
     return nil;
 #endif
   }
