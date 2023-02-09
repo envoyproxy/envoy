@@ -30,8 +30,7 @@ Network::FilterStatus ProxyFilter::onNewConnection() {
       read_callbacks_->connection()
           .streamInfo()
           .filterState()
-          ->getDataReadOnly<Router::StringAccessor>(
-              "envoy.upstream.dynamic_host");
+          ->getDataReadOnly<Router::StringAccessor>("envoy.upstream.dynamic_host");
 
   absl::string_view host;
   if (dynamic_host_filter_state) {

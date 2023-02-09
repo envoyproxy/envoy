@@ -118,11 +118,10 @@ public:
     StreamInfo::FilterState& filter_state = const_cast<StreamInfo::FilterState&>(
         lb_context_.downstreamConnection()->streamInfo().filterState());
 
-    filter_state.setData("envoy.upstream.dynamic_host",
-                         std::make_shared<Router::StringAccessorImpl>(host),
-                         StreamInfo::FilterState::StateType::Mutable,
-                         StreamInfo::FilterState::LifeSpan::Connection,
-                         StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection);
+    filter_state.setData(
+        "envoy.upstream.dynamic_host", std::make_shared<Router::StringAccessorImpl>(host),
+        StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection,
+        StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection);
 
     return &lb_context_;
   }

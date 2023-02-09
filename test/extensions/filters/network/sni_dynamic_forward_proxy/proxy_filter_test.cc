@@ -47,8 +47,7 @@ public:
 
   void setFilterStateHost(const std::string& host) {
     connection_.streamInfo().filterState()->setData(
-        "envoy.upstream.dynamic_host",
-        std::make_shared<Router::StringAccessorImpl>(host),
+        "envoy.upstream.dynamic_host", std::make_shared<Router::StringAccessorImpl>(host),
         StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection,
         StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection);
   }

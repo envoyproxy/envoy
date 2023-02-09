@@ -156,11 +156,11 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
 
   const Router::StringAccessor* dynamic_host_filter_state = nullptr;
   if (context->downstreamConnection()) {
-    dynamic_host_filter_state = context->downstreamConnection()
-                                    ->streamInfo()
-                                    .filterState()
-                                    .getDataReadOnly<Router::StringAccessor>(
-                                        "envoy.upstream.dynamic_host");
+    dynamic_host_filter_state =
+        context->downstreamConnection()
+            ->streamInfo()
+            .filterState()
+            .getDataReadOnly<Router::StringAccessor>("envoy.upstream.dynamic_host");
   }
 
   absl::string_view host;
