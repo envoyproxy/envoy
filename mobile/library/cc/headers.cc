@@ -9,7 +9,7 @@ Headers::const_iterator Headers::begin() const {
 
 Headers::const_iterator Headers::end() const { return Headers::const_iterator(allHeaders().end()); }
 
-const std::vector<std::string>& Headers::operator[](absl::string_view key) const {
+const std::vector<std::string>& Headers::operator[](std::string key) const {
   return headers_.at(key);
 }
 
