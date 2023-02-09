@@ -1,9 +1,11 @@
 load("//bazel:android_debug_info.bzl", "android_debug_info")
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_package", "envoy_select_envoy_mobile_request_compression")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_copts", "envoy_package")
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
+
+# TODO(jpsim): Migrate these to use `envoy_cc_library`
 
 # Support for JNI, using NDK on Android and Java otherwise, since the JNI APIs
 # differ a bit between the two.
@@ -53,10 +55,7 @@ cc_library(
     srcs = [
         "jni_interface.cc",
     ],
-    copts = envoy_select_envoy_mobile_request_compression(
-        ["-DENVOY_MOBILE_REQUEST_COMPRESSION"],
-        "@envoy",
-    ),
+    copts = envoy_mobile_copts("@envoy"),
     deps = [
         ":android_network_utility_lib",
         ":jni_utility_lib",
