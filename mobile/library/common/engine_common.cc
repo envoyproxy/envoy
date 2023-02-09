@@ -6,7 +6,7 @@
 namespace Envoy {
 namespace {
 
-bool hasApiBootstrap(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+bool useApiListener(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   if (bootstrap.layered_runtime().layers().size() == 0) {
     return false;
   }
@@ -31,7 +31,7 @@ bool hasApiBootstrap(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
 EngineCommon::EngineCommon(std::unique_ptr<Envoy::OptionsImpl>&& options)
     : options_(std::move(options)) {
   // TODO(alyssar) when this defaults true, move E-M default config over to boostrap config.
-  if (hasApiBootstrap(options_->configProto()) ||
+  if (useApiListener(options_->configProto()) ||
       absl::StrContains(options_->configYaml(), "use_api_listener: true")) {
     options_->setListenerManager("envoy.listener_manager_impl.api");
   }
