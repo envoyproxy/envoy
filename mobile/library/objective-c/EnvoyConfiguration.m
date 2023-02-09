@@ -153,9 +153,14 @@
   }
 
   if (self.enableHttp3) {
+#ifdef ENVOY_ENABLE_QUIC
     NSString *http3Insert =
         [[NSString alloc] initWithUTF8String:alternate_protocols_cache_filter_insert];
     [customFilters appendString:http3Insert];
+#else
+    NSLog(@"[Envoy] error: http3 functionality was not compiled in this build of Envoy Mobile");
+    return nil;
+#endif
   }
 
   BOOL hasDirectResponses = self.directResponses.length > 0;
@@ -248,7 +253,12 @@
   }
 
   if (self.adminInterfaceEnabled) {
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
     [definitions appendString:@"admin: *admin_interface\n"];
+#else
+    NSLog(@"[Envoy] error: admin functionality was not compiled in this build of Envoy Mobile");
+    return nil;
+#endif
   }
 
   [definitions appendString:templateYAML];
