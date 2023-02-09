@@ -768,7 +768,7 @@ void ListenerManagerImpl::startDrainingSequenceForListenerFilterChains(std::stri
     return;
   }
 
-  (*existing_active_listener)->debugLog("fcds: execute listener filter chain update");
+  (*existing_active_listener_it)->debugLog("fcds: execute listener filter chain update");
   ENVOY_LOG(debug, "fcds: filter chain draining request for {} filter chains, accepted for listener name={}",
             filter_chains.size(), draining_listener);
 

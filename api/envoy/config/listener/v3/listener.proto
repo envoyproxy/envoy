@@ -150,7 +150,7 @@ message Listener {
 
   // Listener FCDS: Listener Filter Chain Discovery Service config block. filter_chains and fcds are mutually exclusive
   // TBD: filter_chains and fcds_config to be made oneof in future major release
-  ListenerFcds fcds_cconfig = 34;
+  ListenerFcds fcds_config = 34;
 
   // :ref:`Matcher API <arch_overview_matching_listener>` resolving the filter chain name from the
   // network properties. This matcher is used as a replacement for the filter chain match condition
