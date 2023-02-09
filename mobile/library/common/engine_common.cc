@@ -7,6 +7,9 @@ namespace Envoy {
 namespace {
 
 bool useApiListener(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+#ifndef ENVOY_MOBILE_ENABLE_LISTENER
+  return true;
+#endif
   if (bootstrap.layered_runtime().layers().size() == 0) {
     return false;
   }

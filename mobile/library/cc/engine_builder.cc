@@ -991,9 +991,6 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   (*flags.mutable_fields())["always_use_v6"].set_bool_value(always_use_v6_);
   (*flags.mutable_fields())["skip_dns_lookup_for_proxied_requests"].set_bool_value(
       skip_dns_lookups_for_proxied_requests_);
-#ifndef ENVOY_MOBILE_ENABLE_LISTENER
-  (*flags.mutable_fields())["use_api_listener"].set_bool_value(true);
-#endif
   (*runtime_values.mutable_fields())["disallow_global_stats"].set_bool_value("true");
   ProtobufWkt::Struct& overload_values =
       *(*envoy_layer.mutable_fields())["overload"].mutable_struct_value();

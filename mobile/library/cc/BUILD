@@ -1,4 +1,4 @@
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_mobile_copts", "envoy_package", "envoy_select_envoy_mobile_request_compression")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_package", "envoy_select_envoy_mobile_request_compression")
 
 licenses(["notice"])  # Apache 2
 
@@ -12,7 +12,7 @@ envoy_cc_library(
     hdrs = [
         "engine_builder.h",
     ],
-    copts = envoy_mobile_copts("@envoy") + select({
+    copts = select({
         "//bazel:exclude_certificates": ["-DEXCLUDE_CERTIFICATES"],
         "//conditions:default": [],
     }),
