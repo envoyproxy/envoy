@@ -358,8 +358,8 @@ bool Utility::Url::initialize(absl::string_view absolute_url, bool is_connect) {
       (u.field_set & (1 << UF_SCHEMA)) != (1 << UF_SCHEMA)) {
     return false;
   }
-  scheme_ = absl::string_view(absolute_url.data() + u.field_data[UF_SCHEMA].off,
-                              u.field_data[UF_SCHEMA].len);
+  scheme_ = absl::ascii_tolower(absl::string_view(absolute_url.data() + u.field_data[UF_SCHEMA].off,
+                                                  u.field_data[UF_SCHEMA].len));
 
   uint64_t authority_len = u.field_data[UF_HOST].len;
   if ((u.field_set & (1 << UF_PORT)) == (1 << UF_PORT)) {

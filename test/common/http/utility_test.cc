@@ -1565,6 +1565,14 @@ TEST(Url, ParsingTest) {
   // Test https scheme
   validateUrl("https://www.host.com", "https", "www.host.com", "/");
 
+  // Test https scheme with case-insensitive
+  validateUrl("HTTPS://www.host.com", "https", "www.host.com", "/");
+  validateUrl("HTTPS://www.host.com:443", "https", "www.host.com:443", "/");
+
+  // Test http scheme with case-insensitive
+  validateUrl("HTTP://www.host.com", "http", "www.host.com", "/");
+  validateUrl("HTTP://www.host.com:80", "http", "www.host.com:80", "/");
+
   // Test url with query parameter
   validateUrl("http://www.host.com:80/?query=param", "http", "www.host.com:80", "/?query=param");
   validateUrl("http://www.host.com/?query=param", "http", "www.host.com", "/?query=param");
