@@ -2,11 +2,11 @@
 
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
+#include "envoy/router/string_accessor.h"
 #include "envoy/upstream/thread_local_cluster.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/tcp_proxy/tcp_proxy.h"
-#include "source/common/upstream/dynamic_host_filter_state.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -26,16 +26,16 @@ ProxyFilter::ProxyFilter(ProxyFilterConfigSharedPtr config) : config_(std::move(
 using LoadDnsCacheEntryStatus = Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus;
 
 Network::FilterStatus ProxyFilter::onNewConnection() {
-  const Upstream::DynamicHostFilterState* dynamic_host_filter_state =
+  const Router::StringAccessor* dynamic_host_filter_state =
       read_callbacks_->connection()
           .streamInfo()
           .filterState()
-          ->getDataReadOnly<Upstream::DynamicHostFilterState>(
-              Upstream::DynamicHostFilterState::key());
+          ->getDataReadOnly<Router::StringAccessor>(
+              "envoy.upstream.dynamic_host");
 
   absl::string_view host;
   if (dynamic_host_filter_state) {
-    host = dynamic_host_filter_state->value();
+    host = dynamic_host_filter_state->asString();
   } else {
     host = read_callbacks_->connection().requestedServerName();
   }

@@ -16,10 +16,10 @@ envoy_cc_library(
     deps = [
         "//envoy/network:connection_interface",
         "//envoy/network:filter_interface",
+        "//envoy/router:string_accessor_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/tcp_proxy",
-        "//source/common/upstream:dynamic_host_filter_state",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_interface",
         "@envoy_api//envoy/extensions/filters/network/sni_dynamic_forward_proxy/v3:pkg_cc_proto",
     ],

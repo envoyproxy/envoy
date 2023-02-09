@@ -1,7 +1,7 @@
 #include "envoy/extensions/filters/network/sni_dynamic_forward_proxy/v3/sni_dynamic_forward_proxy.pb.h"
 #include "envoy/network/connection.h"
 
-#include "source/common/upstream/dynamic_host_filter_state.h"
+#include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/filters/network/sni_dynamic_forward_proxy/proxy_filter.h"
 #include "source/extensions/filters/network/well_known_names.h"
 
@@ -47,8 +47,8 @@ public:
 
   void setFilterStateHost(const std::string& host) {
     connection_.streamInfo().filterState()->setData(
-        Upstream::DynamicHostFilterState::key(),
-        std::make_shared<Upstream::DynamicHostFilterState>(host),
+        "envoy.upstream.dynamic_host",
+        std::make_shared<Router::StringAccessorImpl>(host),
         StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection,
         StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection);
   }

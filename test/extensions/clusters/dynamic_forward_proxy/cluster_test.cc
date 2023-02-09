@@ -2,9 +2,9 @@
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.validate.h"
 
+#include "source/common/router/string_accessor_impl.h"
 #include "source/common/singleton/manager_impl.h"
 #include "source/common/upstream/cluster_factory_impl.h"
-#include "source/common/upstream/dynamic_host_filter_state.h"
 #include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
 
 #include "test/common/upstream/utility.h"
@@ -118,8 +118,8 @@ public:
     StreamInfo::FilterState& filter_state = const_cast<StreamInfo::FilterState&>(
         lb_context_.downstreamConnection()->streamInfo().filterState());
 
-    filter_state.setData(Upstream::DynamicHostFilterState::key(),
-                         std::make_shared<Upstream::DynamicHostFilterState>(host),
+    filter_state.setData("envoy.upstream.dynamic_host",
+                         std::make_shared<Router::StringAccessorImpl>(host),
                          StreamInfo::FilterState::StateType::Mutable,
                          StreamInfo::FilterState::LifeSpan::Connection,
                          StreamInfo::FilterState::StreamSharing::SharedWithUpstreamConnection);
