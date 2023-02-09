@@ -56,7 +56,7 @@ new_features:
     enhanced observability into local close for :ref:`%RESPONSE_CODE_DETAILS% <config_http_conn_man_details>`.
 - area: config
   change: |
-    added :ref:`retry backoff strategy <envoy_v3_api_msg_config.core.v3.BackoffStrategy>` to :ref:`EnvoyGrpc <envoy_v3_api_msg_config.core.v3.GrpcService.EnvoyGrpc>` to make EnvoyGrpc channel retry backoff timing values configurable.
+    added :ref:`RetryPolicy <envoy_v3_api_msg_config.core.v3.RetryPolicy>` to :ref:`EnvoyGrpc <envoy_v3_api_msg_config.core.v3.GrpcService.EnvoyGrpc>` to make EnvoyGrpc channel retry backoff timing values configurable.
 - area: tracing
   change: |
     allow :ref:`grpc_service <envoy_v3_api_field_config.trace.v3.OpenTelemetryConfig.grpc_service>` to be optional. This enables a means to disable collection of traces.
