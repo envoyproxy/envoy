@@ -335,8 +335,8 @@ std::string EngineBuilder::generateConfigStr() const {
   std::string preresolve_hostnames = "[";
   std::string maybe_comma = "";
   for (auto& hostname : dns_preresolve_hostnames_) {
-    absl::StrAppend(&preresolve_hostnames, maybe_comma, "{address: ", hostname,
-                    ", port_value: 443}");
+    absl::StrAppend(&preresolve_hostnames, maybe_comma, "{address: \"", hostname,
+                    "\", port_value: 443}");
     maybe_comma = ",";
   }
   absl::StrAppend(&preresolve_hostnames, "]");
