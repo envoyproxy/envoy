@@ -8,7 +8,6 @@ import "envoy/config/core/v3/extension.proto";
 import "google/protobuf/wrappers.proto";
 
 import "xds/annotations/v3/status.proto";
-import "xds/annotations/v3/versioning.proto";
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
