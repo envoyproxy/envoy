@@ -22,7 +22,7 @@ jobs:
         CC: /opt/llvm/bin/clang
         CXX: /opt/llvm/bin/clang++
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v3
     - name: Add safe directory
       run: git config --global --add safe.directory /__w/envoy/envoy
     - name: 'Build test binary'
@@ -50,7 +50,7 @@ jobs:
         CC: /opt/llvm/bin/clang
         CXX: /opt/llvm/bin/clang++
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v3
     - name: Add safe directory
       run: |
         git config --global --add safe.directory /__w/envoy/envoy
@@ -78,7 +78,7 @@ jobs:
     container:
       image: envoyproxy/envoy-build-ubuntu:7304f974de2724617b7492ccb4c9c58cd420353a
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v3
     - uses: actions/download-artifact@v3
       with:
         name: sizecurrent
