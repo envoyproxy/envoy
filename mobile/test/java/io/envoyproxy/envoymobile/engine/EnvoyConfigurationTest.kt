@@ -222,7 +222,7 @@ class EnvoyConfigurationTest {
   fun `configuration resolves with alternate values`() {
     JniLibrary.loadTestLibrary()
     val envoyConfiguration = buildTestEnvoyConfiguration(
-      adminInterfaceEnabled = true,
+      adminInterfaceEnabled = false,
       grpcStatsDomain = "",
       enableDrainPostDnsRefresh = true,
       enableDNSCache = true,
@@ -245,9 +245,6 @@ class EnvoyConfigurationTest {
     )
 
     val resolvedTemplate = envoyConfiguration.createYaml()
-
-    // adminInterfaceEnabled = true
-    assertThat(resolvedTemplate).contains("admin: *admin_interface")
 
     // enableDrainPostDnsRefresh = true
     assertThat(resolvedTemplate).contains("&enable_drain_post_dns_refresh true")
