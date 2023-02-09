@@ -2,6 +2,9 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+- area: oauth2
+  change: |
+    OAuth filter now URL-encodes URL in query parameters. These query parameters are decoded, leaving intact character sequences that must remain encoded in URLs. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.oauth_use_url_encoding`` to false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -28,6 +31,9 @@ bug_fixes:
 - area: router
   change: |
     fixed the bug that custom tags of the route metadata type are not set for upstream spans.
+- area: dependency
+  change: |
+    Add boringssl patch to resolve CVE-2023-0286. Note that the FIPS build is not patched/fixed.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -73,5 +79,8 @@ new_features:
 - area: lua
   change: |
     added an new option to the options of lua ``httpCall``. This allows to skip adding ``x-forwarded-for`` by setting ``{["send_xff"] = false}`` as the ``options``.
+- area: tcp_proxy
+  change: |
+    added support for propagating the response trailers in :ref:`TunnelingConfig <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.propagate_response_trailers>` to the downstream info filter state.
 
 deprecated:

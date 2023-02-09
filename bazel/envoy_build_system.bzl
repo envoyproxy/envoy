@@ -49,6 +49,10 @@ load(
     _envoy_sh_test = "envoy_sh_test",
 )
 load(
+    ":envoy_mobile_copts.bzl",
+    _envoy_mobile_copts = "envoy_mobile_copts",
+)
+load(
     "@envoy_build_config//:extensions_build_config.bzl",
     "CONTRIB_EXTENSION_PACKAGE_VISIBILITY",
     "EXTENSION_PACKAGE_VISIBILITY",
@@ -261,3 +265,6 @@ envoy_benchmark_test = _envoy_benchmark_test
 envoy_py_test = _envoy_py_test
 envoy_py_test_binary = _envoy_py_test_binary
 envoy_sh_test = _envoy_sh_test
+
+# Envoy Mobile copts (from envoy_mobile_copts.bz)
+envoy_mobile_copts = _envoy_mobile_copts

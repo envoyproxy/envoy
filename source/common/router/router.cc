@@ -7,6 +7,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/data/core/v3/health_check_event.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/grpc/status.h"
@@ -366,6 +367,11 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
     }
     if (upstream_host && Http::CodeUtility::is5xx(response_status_code)) {
       upstream_host->stats().rq_error_.inc();
+    }
+    if (upstream_host && Http::CodeUtility::is2xx(response_status_code)) {
+      upstream_host->setLastSuccessfulTrafficTime(
+          envoy::data::core::v3::HealthCheckerType::HTTP,
+          callbacks_->dispatcher().timeSource().monotonicTime());
     }
   }
 }
@@ -1362,6 +1368,9 @@ void Filter::handleNon5xxResponseHeaders(absl::optional<Grpc::Status::GrpcStatus
     if (end_stream) {
       if (grpc_status && !Http::CodeUtility::is5xx(grpc_to_http_status)) {
         upstream_request.upstreamHost()->stats().rq_success_.inc();
+        upstream_request.upstreamHost()->setLastSuccessfulTrafficTime(
+            envoy::data::core::v3::HealthCheckerType::GRPC,
+            callbacks_->dispatcher().timeSource().monotonicTime());
       } else {
         upstream_request.upstreamHost()->stats().rq_error_.inc();
       }
@@ -1610,6 +1619,9 @@ void Filter::onUpstreamTrailers(Http::ResponseTrailerMapPtr&& trailers,
     if (grpc_status &&
         !Http::CodeUtility::is5xx(Grpc::Utility::grpcToHttpStatus(grpc_status.value()))) {
       upstream_request.upstreamHost()->stats().rq_success_.inc();
+      upstream_request.upstreamHost()->setLastSuccessfulTrafficTime(
+          envoy::data::core::v3::HealthCheckerType::GRPC,
+          callbacks_->dispatcher().timeSource().monotonicTime());
     } else {
       upstream_request.upstreamHost()->stats().rq_error_.inc();
     }

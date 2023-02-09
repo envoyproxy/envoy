@@ -1247,12 +1247,13 @@ void configureBuilder(JNIEnv* env, jstring grpc_stats_domain, jboolean admin_int
 
   setString(env, app_version, &builder, &EngineBuilder::setAppVersion);
   setString(env, app_id, &builder, &EngineBuilder::setAppId);
-  setString(env, app_id, &builder, &EngineBuilder::setAppId);
   builder.setDeviceOs("Android");
 
   builder.setStreamIdleTimeoutSeconds((stream_idle_timeout_seconds));
   builder.setPerTryIdleTimeoutSeconds((per_try_idle_timeout_seconds));
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
   builder.enableAdminInterface(admin_interface_enabled == JNI_TRUE);
+#endif
   builder.enableGzipDecompression(enable_gzip_decompression == JNI_TRUE);
 #ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
   builder.enableGzipCompression(enable_gzip_compression == JNI_TRUE);
@@ -1263,7 +1264,9 @@ void configureBuilder(JNIEnv* env, jstring grpc_stats_domain, jboolean admin_int
 #endif
   builder.enableSocketTagging(enable_socket_tagging == JNI_TRUE);
   builder.enableHappyEyeballs(enable_happy_eyeballs == JNI_TRUE);
+#ifdef ENVOY_ENABLE_QUIC
   builder.enableHttp3(enable_http3 == JNI_TRUE);
+#endif
   builder.enableInterfaceBinding(enable_interface_binding == JNI_TRUE);
   builder.enableDrainPostDnsRefresh(enable_drain_post_dns_refresh == JNI_TRUE);
   builder.enforceTrustChainVerification(trust_chain_verification == JNI_TRUE);

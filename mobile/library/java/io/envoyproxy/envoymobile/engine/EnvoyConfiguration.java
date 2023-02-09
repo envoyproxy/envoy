@@ -253,15 +253,18 @@ public class EnvoyConfiguration {
     String maybeComma = "";
     StringBuilder virtualClustersBuilder = new StringBuilder("[");
     for (String cluster : virtualClusters) {
-      virtualClustersBuilder.append(cluster);
       virtualClustersBuilder.append(maybeComma);
+      virtualClustersBuilder.append(cluster);
       maybeComma = ",";
     }
     virtualClustersBuilder.append("]");
 
+    maybeComma = "";
     StringBuilder dnsBuilder = new StringBuilder("[");
     for (String dns : dnsPreresolveHostnames) {
+      dnsBuilder.append(maybeComma);
       dnsBuilder.append("{address: " + dns + ", port_value: 443}");
+      maybeComma = ",";
     }
     dnsBuilder.append("]");
 

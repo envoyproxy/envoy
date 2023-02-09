@@ -35,16 +35,6 @@ class EngineBuilderTest {
   }
 
   @Test
-  fun `enabling admin interface overrides default`() {
-    engineBuilder = EngineBuilder(Standard())
-    engineBuilder.addEngineType { envoyEngine }
-    engineBuilder.enableAdminInterface()
-
-    val engine = engineBuilder.build() as EngineImpl
-    assertThat(engine.envoyConfiguration.adminInterfaceEnabled).isTrue()
-  }
-
-  @Test
   fun `enabling happy eyeballs overrides default`() {
     engineBuilder = EngineBuilder(Standard())
     engineBuilder.addEngineType { envoyEngine }

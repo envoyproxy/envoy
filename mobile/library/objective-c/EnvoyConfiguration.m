@@ -5,14 +5,14 @@
 @implementation EnvoyConfiguration
 
 - (instancetype)initWithAdminInterfaceEnabled:(BOOL)adminInterfaceEnabled
-                                  GrpcStatsDomain:(nullable NSString *)grpcStatsDomain
+                                  grpcStatsDomain:(nullable NSString *)grpcStatsDomain
                             connectTimeoutSeconds:(UInt32)connectTimeoutSeconds
                                 dnsRefreshSeconds:(UInt32)dnsRefreshSeconds
                      dnsFailureRefreshSecondsBase:(UInt32)dnsFailureRefreshSecondsBase
                       dnsFailureRefreshSecondsMax:(UInt32)dnsFailureRefreshSecondsMax
                            dnsQueryTimeoutSeconds:(UInt32)dnsQueryTimeoutSeconds
                              dnsMinRefreshSeconds:(UInt32)dnsMinRefreshSeconds
-                           dnsPreresolveHostnames:(NSString *)dnsPreresolveHostnames
+                           dnsPreresolveHostnames:(NSArray<NSString *> *)dnsPreresolveHostnames
                                    enableDNSCache:(BOOL)enableDNSCache
                       dnsCacheSaveIntervalSeconds:(UInt32)dnsCacheSaveIntervalSeconds
                               enableHappyEyeballs:(BOOL)enableHappyEyeballs
@@ -35,7 +35,7 @@
                          perTryIdleTimeoutSeconds:(UInt32)perTryIdleTimeoutSeconds
                                        appVersion:(NSString *)appVersion
                                             appId:(NSString *)appId
-                                  virtualClusters:(NSString *)virtualClusters
+                                  virtualClusters:(NSArray<NSString *> *)virtualClusters
                            directResponseMatchers:(NSString *)directResponseMatchers
                                   directResponses:(NSString *)directResponses
                                 nativeFilterChain:
@@ -153,9 +153,14 @@
   }
 
   if (self.enableHttp3) {
+#ifdef ENVOY_ENABLE_QUIC
     NSString *http3Insert =
         [[NSString alloc] initWithUTF8String:alternate_protocols_cache_filter_insert];
     [customFilters appendString:http3Insert];
+#else
+    NSLog(@"[Envoy] error: http3 functionality was not compiled in this build of Envoy Mobile");
+    return nil;
+#endif
   }
 
   BOOL hasDirectResponses = self.directResponses.length > 0;
@@ -192,7 +197,17 @@
       appendFormat:@"- &dns_query_timeout %lus\n", (unsigned long)self.dnsQueryTimeoutSeconds];
   [definitions
       appendFormat:@"- &dns_min_refresh_rate %lus\n", (unsigned long)self.dnsMinRefreshSeconds];
-  [definitions appendFormat:@"- &dns_preresolve_hostnames %@\n", self.dnsPreresolveHostnames];
+  if (self.dnsPreresolveHostnames.count > 0) {
+    NSMutableString *hostnamesYAML = [[NSMutableString alloc] initWithString:@"["];
+    NSString *maybeComma = @"";
+    for (NSString *hostname in self.dnsPreresolveHostnames) {
+      [hostnamesYAML appendString:maybeComma];
+      [hostnamesYAML appendFormat:@"{\"address\": \"%@\", \"port_value\": 443}", hostname];
+      maybeComma = @",";
+    }
+    [hostnamesYAML appendString:@"]"];
+    [definitions appendFormat:@"- &dns_preresolve_hostnames %@\n", hostnamesYAML];
+  }
   [definitions appendFormat:@"- &dns_lookup_family %@\n",
                             self.enableHappyEyeballs ? @"ALL" : @"V4_PREFERRED"];
   [definitions appendFormat:@"- &dns_refresh_rate %lus\n", (unsigned long)self.dnsRefreshSeconds];
@@ -216,7 +231,8 @@
       appendFormat:@"- &per_try_idle_timeout %lus\n", (unsigned long)self.perTryIdleTimeoutSeconds];
   [definitions appendFormat:@"- &metadata { device_os: %@, app_version: %@, app_id: %@ }\n", @"iOS",
                             self.appVersion, self.appId];
-  [definitions appendFormat:@"- &virtual_clusters %@\n", self.virtualClusters];
+  [definitions appendFormat:@"- &virtual_clusters [%@]\n",
+                            [self.virtualClusters componentsJoinedByString:@","]];
 
   [definitions
       appendFormat:@"- &stats_flush_interval %lus\n", (unsigned long)self.statsFlushSeconds];
@@ -248,7 +264,12 @@
   }
 
   if (self.adminInterfaceEnabled) {
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
     [definitions appendString:@"admin: *admin_interface\n"];
+#else
+    NSLog(@"[Envoy] error: admin functionality was not compiled in this build of Envoy Mobile");
+    return nil;
+#endif
   }
 
   [definitions appendString:templateYAML];
