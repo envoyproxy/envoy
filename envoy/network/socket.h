@@ -188,7 +188,7 @@ public:
   /**
    * @param failure_reason the downstream transport failure reason.
    */
-  virtual void setDownstreamTransportFailureReason(const absl::string_view failure_reason) PURE;
+  virtual void setDownstreamTransportFailureReason(absl::string_view failure_reason) PURE;
 };
 
 using ConnectionInfoSetterSharedPtr = std::shared_ptr<ConnectionInfoSetter>;
