@@ -1,4 +1,4 @@
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_copts")
+load("//bazel:apple.bzl", "envoy_objc_library")
 
 licenses(["notice"])  # Apache 2
 
@@ -6,7 +6,7 @@ exports_files([
     "EnvoyEngine.h",
 ])
 
-objc_library(
+envoy_objc_library(
     name = "envoy_engine_objc_lib",
     srcs = [
         "EnvoyConfiguration.h",
@@ -36,7 +36,6 @@ objc_library(
     hdrs = [
         "EnvoyEngine.h",
     ],
-    copts = envoy_mobile_copts("@envoy"),
     module_name = "EnvoyEngine",
     sdk_frameworks = [
         "Network",
@@ -59,7 +58,7 @@ objc_library(
     ],
 )
 
-objc_library(
+envoy_objc_library(
     name = "envoy_objc_bridge_lib",
     hdrs = ["EnvoyBridgeUtility.h"],
     visibility = ["//visibility:public"],
@@ -69,13 +68,13 @@ objc_library(
     ],
 )
 
-objc_library(
+envoy_objc_library(
     name = "envoy_aliases_lib",
     hdrs = ["EnvoyAliases.h"],
     visibility = ["//visibility:public"],
 )
 
-objc_library(
+envoy_objc_library(
     name = "envoy_key_value_store_bridge_impl_lib",
     srcs = ["EnvoyKeyValueStoreBridgeImpl.m"],
     hdrs = ["EnvoyKeyValueStoreBridgeImpl.h"],
@@ -86,7 +85,7 @@ objc_library(
     ],
 )
 
-objc_library(
+envoy_objc_library(
     name = "envoy_key_value_store_lib",
     hdrs = ["EnvoyKeyValueStore.h"],
     visibility = ["//visibility:public"],

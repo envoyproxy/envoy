@@ -1,15 +1,28 @@
 load("@build_bazel_rules_apple//apple:ios.bzl", "ios_unit_test")
 load("@build_bazel_rules_swift//swift:swift.bzl", "swift_library")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_copts")
 load("//bazel:config.bzl", "MINIMUM_IOS_VERSION")
 
-# Macro providing a way to easily/consistently define Swift unit test targets.
+def envoy_objc_library(name, hdrs, visibility, deps = [], module_name = None, sdk_frameworks = [], srcs = []):
+    native.objc_library(
+        name = name,
+        srcs = srcs,
+        hdrs = hdrs,
+        copts = envoy_mobile_copts("@envoy"),
+        module_name = module_name,
+        sdk_frameworks = sdk_frameworks,
+        visibility = visibility,
+        deps = deps,
+    )
+
+# Macros providing a way to easily/consistently define Swift/ObjC unit test targets.
 #
 # - Prevents consumers from having to define both swift_library and ios_unit_test targets
 # - Provides a set of linker options that is required to properly run tests
 # - Sets default visibility and OS requirements
 #
 # Usage example:
-# load("@envoy_mobile//bazel:apple_test.bzl", "envoy_mobile_swift_test")
+# load("@envoy_mobile//bazel:apple.bzl", "envoy_mobile_swift_test")
 #
 # envoy_mobile_swift_test(
 #     name = "sample_test",
