@@ -498,11 +498,14 @@ std::string EngineBuilder::generateConfigStr() const {
   return config_str;
 }
 
+bool EngineBuilder::generateBootstrapAndCompare(std::string yaml) const {
+  return generatedStringMatchesGeneratedBoostrap(yaml, *generateBootstrap());
+}
+
 std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>
 EngineBuilder::generateBootstrapAndCompareForTests(std::string yaml) const {
   auto bootstrap = generateBootstrap();
-  RELEASE_ASSERT(generatedStringMatchesGeneratedBoostrap(yaml, *generateBootstrap()),
-                 "Failed equivalence");
+  RELEASE_ASSERT(generateBootstrapAndCompare(yaml), "Failed equivalence");
   return bootstrap;
 }
 

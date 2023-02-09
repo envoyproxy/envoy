@@ -104,6 +104,7 @@ public:
 
   EngineSharedPtr build();
 
+  bool generateBootstrapAndCompare(std::string yaml) const;
   std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>
   generateBootstrapAndCompareForTests(std::string yaml) const;
 
