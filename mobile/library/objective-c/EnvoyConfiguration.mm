@@ -330,7 +330,9 @@
 
   builder.setStreamIdleTimeoutSeconds(self.streamIdleTimeoutSeconds);
   builder.setPerTryIdleTimeoutSeconds(self.perTryIdleTimeoutSeconds);
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
   builder.enableAdminInterface(self.adminInterfaceEnabled);
+#endif
   builder.enableGzipDecompression(self.enableGzipDecompression);
 #ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
   builder.enableGzipCompression(self.enableGzipCompression);
