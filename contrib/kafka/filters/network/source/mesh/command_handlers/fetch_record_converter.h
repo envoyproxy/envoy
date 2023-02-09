@@ -31,8 +31,7 @@ public:
 /**
  * Proper implementation.
  */
-class FetchRecordConverterImpl : public FetchRecordConverter,
-                                 private Logger::Loggable<Logger::Id::kafka> {
+class FetchRecordConverterImpl : public FetchRecordConverter {
 public:
   // FetchRecordConverter
   std::vector<FetchableTopicResponse> convert(const InboundRecordsMap& arg) const override;
