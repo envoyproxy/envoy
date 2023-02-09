@@ -1,4 +1,4 @@
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_select_envoy_mobile_request_compression")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_copts")
 
 licenses(["notice"])  # Apache 2
 
@@ -36,10 +36,7 @@ objc_library(
     hdrs = [
         "EnvoyEngine.h",
     ],
-    copts = envoy_select_envoy_mobile_request_compression(
-        ["-DENVOY_MOBILE_REQUEST_COMPRESSION"],
-        "@envoy",
-    ),
+    copts = envoy_mobile_copts("@envoy"),
     module_name = "EnvoyEngine",
     sdk_frameworks = [
         "Network",

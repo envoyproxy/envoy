@@ -30,7 +30,11 @@ open class EngineBuilder: NSObject {
   private var enableGzipCompression: Bool = false
   private var enableBrotliDecompression: Bool = false
   private var enableBrotliCompression: Bool = false
+#if ENVOY_ENABLE_QUIC
   private var enableHttp3: Bool = true
+#else
+  private var enableHttp3: Bool = false
+#endif
   private var enableInterfaceBinding: Bool = false
   private var enforceTrustChainVerification: Bool = true
   private var enablePlatformCertificateValidation: Bool = false
@@ -254,6 +258,7 @@ open class EngineBuilder: NSObject {
   }
 #endif
 
+#if ENVOY_ENABLE_QUIC
   /// Specify whether to enable support for HTTP/3 or not.  Defaults to true.
   ///
   /// - parameter enableHttp3: whether or not to enable HTTP/3.
@@ -264,6 +269,7 @@ open class EngineBuilder: NSObject {
     self.enableHttp3 = enableHttp3
     return self
   }
+#endif
 
   /// Specify whether sockets may attempt to bind to a specific interface, based on network
   /// conditions.
@@ -544,6 +550,7 @@ open class EngineBuilder: NSObject {
     return self
   }
 
+#if ENVOY_ADMIN_FUNCTIONALITY
   /// Enable admin interface on 127.0.0.1:9901 address. Admin interface is intended to be
   /// used for development/debugging purposes only. Enabling it in production may open
   /// your app to security vulnerabilities.
@@ -557,6 +564,7 @@ open class EngineBuilder: NSObject {
     self.adminInterfaceEnabled = true
     return self
   }
+#endif
 
   /// Builds and runs a new `Engine` instance with the provided configuration.
   ///

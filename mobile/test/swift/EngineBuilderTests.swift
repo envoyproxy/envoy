@@ -81,6 +81,7 @@ final class EngineBuilderTests: XCTestCase {
     self.waitForExpectations(timeout: 0.01)
   }
 
+#if ENVOY_ADMIN_FUNCTIONALITY
   func testEnablingAdminInterfaceAddsToConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with enabled admin interface")
     MockEnvoyEngine.onRunWithConfig = { config, _ in
@@ -94,6 +95,7 @@ final class EngineBuilderTests: XCTestCase {
       .build()
     self.waitForExpectations(timeout: 0.01)
   }
+#endif
 
   func testEnablingHappyEyeballsAddsToConfigurationWhenRunningEnvoy() {
     let expectation = self.expectation(description: "Run called with enabled happy eyeballs")
@@ -441,6 +443,12 @@ final class EngineBuilderTests: XCTestCase {
   }
 
   func testResolvesYAMLWithIndividuallySetValues() throws {
+#if ENVOY_ENABLE_QUIC
+    let http3 = true
+#else
+    let http3 = false
+#endif
+
     let config = EnvoyConfiguration(
       adminInterfaceEnabled: false,
       grpcStatsDomain: "stats.envoyproxy.io",
@@ -454,7 +462,7 @@ final class EngineBuilderTests: XCTestCase {
       enableDNSCache: false,
       dnsCacheSaveIntervalSeconds: 0,
       enableHappyEyeballs: true,
-      enableHttp3: true,
+      enableHttp3: http3,
       enableGzipDecompression: true,
       enableGzipCompression: false,
       enableBrotliDecompression: false,
