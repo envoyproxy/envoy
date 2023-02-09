@@ -46,6 +46,29 @@ TEST(CustomResponseFilterConfigTest, InvalidURI) {
                             "%#?*s://foo.example/gateway_error");
 }
 
+TEST(CustomResponseFilterConfigTest, NoHostAndPathRedirect) {
+  envoy::extensions::filters::http::custom_response::v3::CustomResponse filter_config;
+  std::string config(R"EOF(
+  custom_response_matcher:
+    on_no_match:
+      action:
+        name: action
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.http.custom_response.redirect_policy.v3.RedirectPolicy
+          redirect_action:
+            https_redirect: true
+          status_code: 292
+)EOF");
+
+  TestUtility::loadFromYaml(config, filter_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_CALL(context, messageValidationVisitor());
+  CustomResponseFilterFactory factory;
+  EXPECT_THROW_WITH_MESSAGE(
+      factory.createFilterFactoryFromProto(filter_config, "stats", context), EnvoyException,
+      "At least one of host_redirect and path_redirect needs to be specified");
+}
+
 } // namespace
 } // namespace CustomResponse
 } // namespace HttpFilters

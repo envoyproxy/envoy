@@ -18,6 +18,9 @@ minor_behavior_changes:
 - area: local_ratelimit
   change: |
     Tokens from local descriptor's token buckets are burned before tokens from the default token bucket.
+- area: custom response
+  change: |
+    Changed how the uri for redirect policy is specified. It can now be specified either as a single fully qualified string, or by specifying individual components of the uri.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
