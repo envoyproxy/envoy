@@ -168,7 +168,43 @@ public:
    * @param encoded supplies string to be decoded.
    * @return std::string decoded string https://tools.ietf.org/html/rfc3986#section-2.1.
    */
-  static std::string decode(absl::string_view value);
+  static std::string decode(absl::string_view encoded);
+
+  /**
+   * Encodes string view for storing it as a query parameter according to the
+   * x-www-form-urlencoded spec:
+   * https://www.w3.org/TR/html5/forms.html#application/x-www-form-urlencoded-encoding-algorithm
+   * @param value supplies string to be encoded.
+   * @return std::string encoded string according to
+   * https://www.w3.org/TR/html5/forms.html#application/x-www-form-urlencoded-encoding-algorithm
+   *
+   * Summary:
+   * The x-www-form-urlencoded spec mandates that all ASCII codepoints are %-encoded except the
+   * following: ALPHA | DIGIT | * | - | . | _
+   *
+   * NOTE: the space character is encoded as %20, NOT as the + character
+   */
+  static std::string urlEncodeQueryParameter(absl::string_view value);
+
+  /**
+   * Decodes string view that represents URL in x-www-form-urlencoded query parameter.
+   * @param encoded supplies string to be decoded.
+   * @return std::string decoded string compliant with https://datatracker.ietf.org/doc/html/rfc3986
+   *
+   * This function decodes a query parameter assuming it is a URL. It only decodes characters
+   * permitted in the URL - the unreserved and reserved character sets.
+   * unreserved-set := ALPHA | DIGIT | - | . | _ | ~
+   * reserved-set := sub-delims | gen-delims
+   * sub-delims := ! | $ | & | ` | ( | ) | * | + | , | ; | =
+   * gen-delims := : | / | ? | # | [ | ] | @
+   *
+   * The following characters are not decoded:
+   * ASCII controls <= 0x1F, space, DEL (0x7F), extended ASCII > 0x7F
+   * As well as the following characters without defined meaning in URL
+   * " | < | > | \ | ^ | { | }
+   * and the "pipe" `|` character
+   */
+  static std::string urlDecodeQueryParameter(absl::string_view encoded);
 
 private:
   // Encodes string view to its percent encoded representation, with start index.

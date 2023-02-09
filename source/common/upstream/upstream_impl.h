@@ -229,6 +229,36 @@ public:
   resolveTransportSocketFactory(const Network::Address::InstanceConstSharedPtr& dest_address,
                                 const envoy::config::core::v3::Metadata* metadata) const;
   absl::optional<MonotonicTime> lastHcPassTime() const override { return last_hc_pass_time_; }
+  MonotonicTime lastSuccessfulTrafficTime(
+      envoy::data::core::v3::HealthCheckerType health_checker_type) const override {
+    switch (health_checker_type) {
+    case envoy::data::core::v3::HealthCheckerType::TCP:
+      return last_traffic_pass_time_;
+    case envoy::data::core::v3::HealthCheckerType::HTTP:
+      return last_traffic_pass_time_2xx_;
+    case envoy::data::core::v3::HealthCheckerType::GRPC:
+      return last_traffic_pass_time_grpc_;
+    default:
+      break;
+    }
+    return creation_time_;
+  }
+
+  void setLastSuccessfulTrafficTime(envoy::data::core::v3::HealthCheckerType health_checker_type,
+                                    MonotonicTime last_successful_traffic_time) const override {
+    switch (health_checker_type) {
+    case envoy::data::core::v3::HealthCheckerType::TCP:
+      last_traffic_pass_time_ = last_successful_traffic_time;
+      break;
+    case envoy::data::core::v3::HealthCheckerType::HTTP:
+      last_traffic_pass_time_2xx_ = last_successful_traffic_time;
+      break;
+    case envoy::data::core::v3::HealthCheckerType::GRPC:
+      last_traffic_pass_time_grpc_ = last_successful_traffic_time;
+    default:
+      break;
+    }
+  }
 
   void setAddressList(const std::vector<Network::Address::InstanceConstSharedPtr>& address_list) {
     address_list_ = address_list;
@@ -274,6 +304,9 @@ private:
       socket_factory_ ABSL_GUARDED_BY(metadata_mutex_);
   const MonotonicTime creation_time_;
   absl::optional<MonotonicTime> last_hc_pass_time_;
+  mutable MonotonicTime last_traffic_pass_time_;
+  mutable MonotonicTime last_traffic_pass_time_2xx_;
+  mutable MonotonicTime last_traffic_pass_time_grpc_;
 };
 
 /**
@@ -909,6 +942,7 @@ public:
   Http::Http1::CodecStats& http1CodecStats() const override;
   Http::Http2::CodecStats& http2CodecStats() const override;
   Http::Http3::CodecStats& http3CodecStats() const override;
+  Http::HeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol) const override;
 
 protected:
   // Gets the retry budget percent/concurrency from the circuit breaker thresholds. If the retry
@@ -938,6 +972,10 @@ private:
     const ClusterTimeoutBudgetStatsPtr timeout_budget_stats_;
     const ClusterRequestResponseSizeStatsPtr request_response_size_stats_;
   };
+
+#ifdef ENVOY_ENABLE_UHV
+  ::Envoy::Http::HeaderValidatorStats& getHeaderValidatorStats(Http::Protocol protocol) const;
+#endif
 
   Runtime::Loader& runtime_;
   const std::string name_;
