@@ -1073,6 +1073,107 @@ std::string Utility::PercentEncoding::decode(absl::string_view encoded) {
   return decoded;
 }
 
+namespace {
+// %-encode all ASCII character codepoints, EXCEPT:
+// ALPHA | DIGIT | * | - | . | _
+// SPACE is encoded as %20, NOT as the + character
+constexpr uint32_t kUrlEncodedCharTable[] = {
+    // control characters
+    0b11111111111111111111111111111111,
+    // !"#$%&'()*+,-./0123456789:;<=>?
+    0b11111111110110010000000000111111,
+    //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
+    0b10000000000000000000000000011110,
+    //`abcdefghijklmnopqrstuvwxyz{|}~
+    0b10000000000000000000000000011111,
+    // extended ascii
+    0b11111111111111111111111111111111,
+    0b11111111111111111111111111111111,
+    0b11111111111111111111111111111111,
+    0b11111111111111111111111111111111,
+};
+
+constexpr uint32_t kUrlDecodedCharTable[] = {
+    // control characters
+    0b00000000000000000000000000000000,
+    // !"#$%&'()*+,-./0123456789:;<=>?
+    0b01011111111111111111111111110101,
+    //@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_
+    0b11111111111111111111111111110101,
+    //`abcdefghijklmnopqrstuvwxyz{|}~
+    0b11111111111111111111111111100010,
+    // extended ascii
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+    0b00000000000000000000000000000000,
+};
+
+bool testChar(const uint32_t table[8], char c) {
+  uint8_t uc = static_cast<uint8_t>(c);
+  return (table[uc >> 5] & (0x80000000 >> (uc & 0x1f))) != 0;
+}
+
+bool shouldPercentEncodeChar(char c) { return testChar(kUrlEncodedCharTable, c); }
+
+bool shouldPercentDecodeChar(char c) { return testChar(kUrlDecodedCharTable, c); }
+} // namespace
+
+std::string Utility::PercentEncoding::urlEncodeQueryParameter(absl::string_view value) {
+  std::string encoded;
+  encoded.reserve(value.size());
+  for (size_t i = 0; i < value.size(); ++i) {
+    const char ch = value[i];
+    if (shouldPercentEncodeChar(ch)) {
+      // For consistency, URI producers should use uppercase hexadecimal digits for all
+      // percent-encodings. https://tools.ietf.org/html/rfc3986#section-2.1.
+      absl::StrAppend(&encoded, fmt::format("%{:02X}", static_cast<const unsigned char&>(ch)));
+    } else {
+      encoded.push_back(ch);
+    }
+  }
+  return encoded;
+}
+
+std::string Utility::PercentEncoding::urlDecodeQueryParameter(absl::string_view encoded) {
+  std::string decoded;
+  decoded.reserve(encoded.size());
+  for (size_t i = 0; i < encoded.size(); ++i) {
+    char ch = encoded[i];
+    if (ch == '%' && i + 2 < encoded.size()) {
+      const char& hi = encoded[i + 1];
+      const char& lo = encoded[i + 2];
+      if (absl::ascii_isxdigit(hi) && absl::ascii_isxdigit(lo)) {
+        if (absl::ascii_isdigit(hi)) {
+          ch = hi - '0';
+        } else {
+          ch = absl::ascii_toupper(hi) - 'A' + 10;
+        }
+
+        ch *= 16;
+        if (absl::ascii_isdigit(lo)) {
+          ch += lo - '0';
+        } else {
+          ch += absl::ascii_toupper(lo) - 'A' + 10;
+        }
+        if (shouldPercentDecodeChar(ch)) {
+          // Decode the character only if it is present in the characters_to_decode
+          decoded.push_back(ch);
+        } else {
+          // Otherwise keep it as is.
+          decoded.push_back('%');
+          decoded.push_back(hi);
+          decoded.push_back(lo);
+        }
+        i += 2;
+      }
+    } else {
+      decoded.push_back(ch);
+    }
+  }
+  return decoded;
+}
+
 Utility::AuthorityAttributes Utility::parseAuthority(absl::string_view host) {
   // First try to see if there is a port included. This also checks to see that there is not a ']'
   // as the last character which is indicative of an IPv6 address without a port. This is a best

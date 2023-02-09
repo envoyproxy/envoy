@@ -5,6 +5,8 @@
 namespace Envoy {
 namespace Tracing {
 
+SINGLETON_MANAGER_REGISTRATION(tracer_manager);
+
 TracerManagerImpl::TracerManagerImpl(Server::Configuration::TracerFactoryContextPtr factory_context)
     : factory_context_(std::move(factory_context)) {}
 
@@ -57,6 +59,16 @@ void TracerManagerImpl::removeExpiredCacheEntries() {
                  [](const std::pair<const std::size_t, std::weak_ptr<HttpTracer>>& entry) {
                    return entry.second.expired();
                  });
+}
+
+std::shared_ptr<TracerManager>
+TracerManagerImpl::singleton(Server::Configuration::FactoryContext& context) {
+  return context.singletonManager().getTyped<Tracing::TracerManagerImpl>(
+      SINGLETON_MANAGER_REGISTERED_NAME(tracer_manager), [&context] {
+        return std::make_shared<Tracing::TracerManagerImpl>(
+            std::make_unique<Tracing::TracerFactoryContextImpl>(
+                context.getServerFactoryContext(), context.messageValidationVisitor()));
+      });
 }
 
 } // namespace Tracing

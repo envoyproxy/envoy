@@ -67,6 +67,7 @@ envoy_cc_library(
         "//envoy/stats:primitive_stats_macros",
         "//envoy/stats:stats_macros",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/data/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -131,6 +132,7 @@ envoy_cc_library(
         ":load_balancer_interface",
         ":upstream_interface",
         "//envoy/http:async_client_interface",
+        "//envoy/tcp:async_tcp_client_interface",
     ],
 )
 

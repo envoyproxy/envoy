@@ -225,20 +225,24 @@ EngineBuilder& EngineBuilder::enableSocketTagging(bool socket_tagging_on) {
   return *this;
 }
 
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
 EngineBuilder& EngineBuilder::enableAdminInterface(bool admin_interface_on) {
   admin_interface_enabled_ = admin_interface_on;
   return *this;
 }
+#endif
 
 EngineBuilder& EngineBuilder::enableHappyEyeballs(bool happy_eyeballs_on) {
   enable_happy_eyeballs_ = happy_eyeballs_on;
   return *this;
 }
 
+#ifdef ENVOY_ENABLE_QUIC
 EngineBuilder& EngineBuilder::enableHttp3(bool http3_on) {
   enable_http3_ = http3_on;
   return *this;
 }
+#endif
 
 EngineBuilder& EngineBuilder::setForceAlwaysUsev6(bool value) {
   always_use_v6_ = value;
@@ -265,7 +269,8 @@ EngineBuilder& EngineBuilder::enforceTrustChainVerification(bool trust_chain_ver
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addRtdsLayer(const std::string& layer_name, int timeout_seconds) {
+EngineBuilder& EngineBuilder::addRtdsLayer(const std::string& layer_name,
+                                           const int timeout_seconds) {
   rtds_layer_name_ = layer_name;
   rtds_timeout_seconds_ = timeout_seconds;
   return *this;
@@ -279,6 +284,12 @@ EngineBuilder& EngineBuilder::setAggregatedDiscoveryService(const std::string& a
   ads_api_type_ = api_type;
   ads_address_ = address;
   ads_port_ = port;
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::addCdsLayer(const int timeout_seconds) {
+  enable_cds_ = true;
+  cds_timeout_seconds_ = timeout_seconds;
   return *this;
 }
 
@@ -422,7 +433,11 @@ std::string EngineBuilder::generateConfigStr() const {
     insertCustomFilter(gzip_decompressor_config_insert, config_template);
   }
   if (enable_http3_) {
+#ifdef ENVOY_ENABLE_QUIC
     insertCustomFilter(alternate_protocols_cache_filter_insert, config_template);
+#else
+    throw std::runtime_error("http3 functionality was not compiled in this build of Envoy Mobile");
+#endif
   }
 
   for (const NativeFilterConfig& filter : native_filter_chain_) {
@@ -432,8 +447,8 @@ std::string EngineBuilder::generateConfigStr() const {
     insertCustomFilter(filter_config, config_template);
   }
 
-  if (!rtds_layer_name_.empty() && ads_api_type_.empty()) {
-    throw std::runtime_error("ADS must be configured when using RTDS");
+  if ((!rtds_layer_name_.empty() || enable_cds_) && ads_api_type_.empty()) {
+    throw std::runtime_error("ADS must be configured when using xDS");
   }
   if (!rtds_layer_name_.empty()) {
     std::string rtds_layer =
@@ -446,11 +461,33 @@ std::string EngineBuilder::generateConfigStr() const {
     absl::StrReplaceAll({{"#{custom_ads}", absl::StrCat("#{custom_ads}\n", custom_ads)}},
                         &config_template);
   }
+  if (enable_cds_) {
+    std::string custom_cds = fmt::format(cds_layer_insert, cds_timeout_seconds_);
+    absl::StrReplaceAll({{"#{custom_dynamic_resources}",
+                          absl::StrCat("#{custom_dynamic_resources}\n", custom_cds)}},
+                        &config_template);
+
+    std::string custom_node_context = R"(node_context_params:
+  - cluster)";
+    absl::StrReplaceAll(
+        {{"#{custom_node_context}", absl::StrCat("#{custom_node_context}\n", custom_node_context)}},
+        &config_template);
+
+    std::string custom_stats_patterns = R"(        - exact: cluster_manager.active_clusters
+        - exact: cluster_manager.cluster_added)";
+    absl::StrReplaceAll(
+        {{"#{custom_stats}", absl::StrCat("#{custom_stats}\n", custom_stats_patterns)}},
+        &config_template);
+  }
 
   config_builder << config_template;
 
   if (admin_interface_enabled_) {
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
     config_builder << "admin: *admin_interface" << std::endl;
+#else
+    throw std::runtime_error("Admin functionality was not compiled in this build of Envoy Mobile");
+#endif
   }
 
   auto config_str = config_builder.str();
@@ -529,12 +566,16 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 
   // Set up the optional filters
   if (enable_http3_) {
+#ifdef ENVOY_ENABLE_QUIC
     envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig cache_config;
     cache_config.mutable_alternate_protocols_cache_options()->set_name(
         "default_alternate_protocols_cache");
     auto* cache_filter = hcm->add_http_filters();
     cache_filter->set_name("alternate_protocols_cache");
     cache_filter->mutable_typed_config()->PackFrom(cache_config);
+#else
+    throw std::runtime_error("http3 functionality was not compiled in this build of Envoy Mobile");
+#endif
   }
 
   if (gzip_decompression_filter_) {
@@ -975,8 +1016,9 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     sink->mutable_typed_config()->PackFrom(metrics_config);
   }
 
-  if (!rtds_layer_name_.empty() && ads_api_type_.empty()) {
-    throw std::runtime_error("ADS must be configured when using RTDS");
+  bootstrap->mutable_dynamic_resources();
+  if ((!rtds_layer_name_.empty() || enable_cds_) && ads_api_type_.empty()) {
+    throw std::runtime_error("ADS must be configured when using xDS");
   }
   if (!rtds_layer_name_.empty()) {
     auto* layered_runtime = bootstrap->mutable_layered_runtime();
@@ -999,12 +1041,26 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     ads_config->set_api_type(api_type_enum);
     ads_config->add_grpc_services()->mutable_google_grpc()->set_target_uri(target_uri);
   }
+  if (enable_cds_) {
+    auto* cds_config = bootstrap->mutable_dynamic_resources()->mutable_cds_config();
+    cds_config->mutable_initial_fetch_timeout()->set_seconds(cds_timeout_seconds_);
+    cds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+    cds_config->mutable_ads();
+    bootstrap->add_node_context_params("cluster");
+    // add a stat prefix we use in test
+    list->add_patterns()->set_exact("cluster_manager.active_clusters");
+    list->add_patterns()->set_exact("cluster_manager.cluster_added");
+  }
 
   // Admin
   if (admin_interface_enabled_) {
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
     auto* admin_address = bootstrap->mutable_admin()->mutable_address()->mutable_socket_address();
     admin_address->set_address("::1");
     admin_address->set_port_value(9901);
+#else
+    throw std::runtime_error("Admin functionality was not compiled in this build of Envoy Mobile");
+#endif
   }
 
   // Check equivalence in debug mode.
@@ -1058,9 +1114,11 @@ EngineSharedPtr EngineBuilder::build() {
     }
     options->setLogLevel(options->parseAndValidateLogLevel(logLevelToString(log_level_).c_str()));
     options->setConcurrency(1);
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
     if (!admin_address_path_for_tests_.empty()) {
       options->setAdminAddressPath(admin_address_path_for_tests_);
     }
+#endif
     cast_engine->run(std::move(options));
   }
 
