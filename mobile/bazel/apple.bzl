@@ -3,7 +3,7 @@ load("@build_bazel_rules_swift//swift:swift.bzl", "swift_library")
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_copts")
 load("//bazel:config.bzl", "MINIMUM_IOS_VERSION")
 
-def envoy_objc_library(name, hdrs, visibility, deps = [], module_name = None, sdk_frameworks = [], srcs = []):
+def envoy_objc_library(name, hdrs = [], visibility = [], data = [], deps = [], module_name = None, sdk_frameworks = [], srcs = []):
     native.objc_library(
         name = name,
         srcs = srcs,
@@ -12,6 +12,7 @@ def envoy_objc_library(name, hdrs, visibility, deps = [], module_name = None, sd
         module_name = module_name,
         sdk_frameworks = sdk_frameworks,
         visibility = visibility,
+        data = data,
         deps = deps,
     )
 
@@ -57,7 +58,7 @@ def envoy_mobile_swift_test(name, srcs, data = [], deps = [], tags = [], reposit
 
 def envoy_mobile_objc_test(name, srcs, data = [], deps = [], tags = [], visibility = [], flaky = False):
     test_lib_name = name + "_lib"
-    native.objc_library(
+    envoy_objc_library(
         name = test_lib_name,
         srcs = srcs,
         data = data,
