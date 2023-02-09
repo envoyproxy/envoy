@@ -12,6 +12,7 @@ concurrency:
 
 jobs:
   androidbuild:
+    if: github.repository == 'envoyproxy/envoy'
     name: android_build
     runs-on: macos-12
     timeout-minutes: 90
@@ -41,6 +42,7 @@ jobs:
           --fat_apk_cpu=x86_64 \
           //:android_dist
   javahelloworld:
+    if: github.repository == 'envoyproxy/envoy'
     name: java_helloworld
     needs: androidbuild
     runs-on: macos-12
@@ -86,6 +88,7 @@ jobs:
       if: steps.should_run.outputs.run_ci_job == 'true'
       run: adb logcat -e "received headers with status 200" -m 1
   kotlinhelloworld:
+    if: github.repository == 'envoyproxy/envoy'
     name: kotlin_helloworld
     needs: androidbuild
     runs-on: macos-12
@@ -131,6 +134,7 @@ jobs:
       if: steps.should_run.outputs.run_ci_job == 'true'
       run: adb logcat -e "received headers with status 200" -m 1
   kotlinbaselineapp:
+    if: github.repository == 'envoyproxy/envoy'
     name: kotlin_baseline_app
     needs: androidbuild
     runs-on: macos-12
@@ -176,6 +180,7 @@ jobs:
       if: steps.should_run.outputs.run_ci_job == 'true'
       run: adb logcat -e "received headers with status 301" -m 1
   kotlinexperimentalapp:
+    if: github.repository == 'envoyproxy/envoy'
     name: kotlin_experimental_app
     needs: androidbuild
     runs-on: macos-12
@@ -214,6 +219,7 @@ jobs:
             $([ -z $GITHUB_TOKEN ] || echo "--config=remote-ci-macos") \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             --fat_apk_cpu=x86_64 \
+            --define=admin_functionality=enabled \
             //test/kotlin/apps/experimental:hello_envoy_kt
           adb install -r --no-incremental bazel-bin/test/kotlin/apps/experimental/hello_envoy_kt.apk
           adb shell am start -n io.envoyproxy.envoymobile.helloenvoyexperimentaltest/.MainActivity

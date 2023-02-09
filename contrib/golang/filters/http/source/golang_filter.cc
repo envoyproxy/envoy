@@ -825,6 +825,7 @@ uint64_t FilterConfig::getConfigId() {
   auto len = str.length();
   config_id_ = dlib->envoyGoFilterNewHttpPluginConfig(ptr, len);
   ASSERT(config_id_, "config id is always grows");
+  ENVOY_LOG(debug, "golang filter new plugin config, id: {}", config_id_);
 
   return config_id_;
 }
@@ -872,7 +873,7 @@ uint64_t RoutePluginConfig::getMergedConfigId(uint64_t parent_id, std::string so
     auto len = str.length();
     config_id_ = dlib->envoyGoFilterNewHttpPluginConfig(ptr, len);
     ASSERT(config_id_, "config id is always grows");
-    ENVOY_LOG(debug, "golang filter new plugin config, id: {}", config_id_);
+    ENVOY_LOG(debug, "golang filter new per route plugin config, id: {}", config_id_);
   }
 
   merged_config_id_ = dlib->envoyGoFilterMergeHttpPluginConfig(parent_id, config_id_);
