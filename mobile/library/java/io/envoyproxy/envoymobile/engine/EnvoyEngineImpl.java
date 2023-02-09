@@ -125,17 +125,23 @@ public class EnvoyEngineImpl implements EnvoyEngine {
   public EnvoyStatus runWithConfig(EnvoyConfiguration envoyConfiguration, String logLevel) {
     performRegistration(envoyConfiguration);
     try {
-      return JniLibrary.runEngine(this.engineHandle, envoyConfiguration.createYaml(),
-                                  envoyConfiguration.createBootstrap(), logLevel);
+      int status = JniLibrary.runEngine(this.engineHandle, envoyConfiguration.createYaml(),
+                                        envoyConfiguration.createBootstrap(), logLevel);
+      if (status == 0) {
+        return EnvoyStatus.ENVOY_SUCCESS;
+      }
     } catch (Throwable throwable) {
       // TODO: Need to have a way to log the exception somewhere.
-      return ENVOY_FAILURE;
     }
+    return EnvoyStatus.ENVOY_FAILURE;
   }
 
   private EnvoyStatus runWithResolvedYAML(String configurationYAML, String logLevel) {
     try {
-      return JniLibrary.runEngine(this.engineHandle, configurationYAML, 0, logLevel);
+      int status = JniLibrary.runEngine(this.engineHandle, configurationYAML, 0, logLevel);
+      if (status == 0) {
+        return EnvoyStatus.ENVOY_SUCCESS;
+      }
     } catch (Throwable throwable) {
       // TODO: Need to have a way to log the exception somewhere.
     }
