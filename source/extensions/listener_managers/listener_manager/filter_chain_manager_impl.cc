@@ -913,29 +913,27 @@ Configuration::FilterChainFactoryContextPtr FilterChainManagerImpl::createFilter
   return std::make_unique<PerFilterChainFactoryContextImpl>(parent_context_, init_manager_);
 }
 
-FcdsApiPtr FilterChainManagerImpl::createFcdsApi(const envoy::config::listener::v3::ListenerFcds& fcds_config,
-		                                 FilterChainFactoryBuilder* fc_builder,
-						                         ListenerManager* listener_mgr,
-						                         std::string listener_name) {
-	listener_manager_ = listener_mgr;
-	listener_name_ = listener_name;
-	return std::make_shared<FcdsApi>(fcds_config, parent_context_, init_manager_, *this, fc_builder);
+FcdsApiPtr FilterChainManagerImpl::createFcdsApi(
+     const envoy::config::listener::v3::ListenerFcds& fcds_config,
+     FilterChainFactoryBuilder* fc_builder,
+     ListenerManager* listener_mgr,
+     std::string listener_name) {
+  listener_manager_ = listener_mgr;
+  listener_name_ = listener_name;
+  return std::make_shared<FcdsApi>(fcds_config, parent_context_, init_manager_, *this, fc_builder);
 }
 
 void FilterChainManagerImpl::addFcToDrainingList(Network::DrainableFilterChainSharedPtr fc) {
-	this->draining_fc_list_.push_back(fc);
+  this->draining_fc_list_.push_back(fc);
 }
 
-void FilterChainManagerImpl::removeFcFromFcdsDrainingList(Network::DrainableFilterChainSharedPtr fc) {
-	this->draining_fc_list_.remove(fc);
-}
 
 void FilterChainManagerImpl::startDrainingSequenceForListenerFilterChains() {
-	if (this->draining_fc_list_.size()) {
-		ENVOY_LOG(debug, "fcds: {} filter chains to be drained", this->draining_fc_list_.size());
-		listener_manager_->startDrainingSequenceForListenerFilterChains(listener_name_, this->draining_fc_list_);
-		this->draining_fc_list_.clear();
-	}
+  if (this->draining_fc_list_.size()) {
+    ENVOY_LOG(debug, "fcds: {} filter chains to be drained", this->draining_fc_list_.size());
+    listener_manager_->startDrainingSequenceForListenerFilterChains(listener_name_, this->draining_fc_list_);
+    this->draining_fc_list_.clear();
+  }
 }
 
 } // namespace Server

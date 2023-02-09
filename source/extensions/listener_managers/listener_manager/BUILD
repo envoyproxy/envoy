@@ -126,7 +126,6 @@ envoy_cc_library(
         "//source/common/config:subscription_base_interface",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
-        "@envoy_api//envoy/service/filter_chain/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )

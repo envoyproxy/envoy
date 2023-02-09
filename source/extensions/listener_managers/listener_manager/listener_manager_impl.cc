@@ -752,15 +752,19 @@ void ListenerManagerImpl::inPlaceFilterChainUpdate(ListenerImpl& listener) {
   updateWarmingActiveGauges();
 }
 
+// This method is specific to Listener FCDS
+// This method ensures that just the provided list of filter chains are drained
+// Unlike drainFilterChains method, this method would not delete the listener
+// that is holding these filter chains
 void ListenerManagerImpl::startDrainingSequenceForListenerFilterChains(std::string draining_listener,
     std::list<Network::DrainableFilterChainSharedPtr> filter_chains) {
   ASSERT(!active_listeners_.empty());
 
-  auto existing_active_listener = getListenerByName(active_listeners_, draining_listener);
+  auto existing_active_listener_it = getListenerByName(active_listeners_, draining_listener);
 
-  if ((existing_active_listener == active_listeners_.end()) || 
-      (*existing_active_listener == nullptr)) {
-    ENVOY_LOG(error, "fcds: filter chain draining request rejected.Listener not in active state, listener name={}",draining_listener);
+  if ((existing_active_listener_it == active_listeners_.end()) || 
+      (*existing_active_listener_it == nullptr)) {
+    ENVOY_LOG(error, "fcds: filter chain draining request rejected. Listener not in active state, listener name={}",draining_listener);
     return;
   }
 
@@ -768,7 +772,7 @@ void ListenerManagerImpl::startDrainingSequenceForListenerFilterChains(std::stri
   ENVOY_LOG(debug, "fcds: filter chain draining request for {} filter chains, accepted for listener name={}",
             filter_chains.size(), draining_listener);
 
-  ListenerImpl& current_listener = **existing_active_listener;
+  ListenerImpl& current_listener = **existing_active_listener_it;
   std::list<DrainingFilterChainsManager>::iterator draining_group =
       draining_filter_chains_manager_.emplace(draining_filter_chains_manager_.begin(),
                                               current_listener, workers_.size());
@@ -777,7 +781,7 @@ void ListenerManagerImpl::startDrainingSequenceForListenerFilterChains(std::stri
     draining_group->addFilterChainToDrain(*fc);
   }
 
-  auto filter_chain_size = draining_group->numDrainingFilterChains();
+  const auto filter_chain_size = draining_group->numDrainingFilterChains();
   stats_.total_filter_chains_draining_.add(filter_chain_size);
 
   // Start the drain sequence which completes when the listener's drain manager has completed

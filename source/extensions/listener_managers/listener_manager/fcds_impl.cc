@@ -176,7 +176,7 @@ void FcdsApi::processAddedOrUpdatedFilterChains(const std::vector<Envoy::Config:
     }
 
     // If there are two filter chains with the same name, reject the update
-    std::string new_filter_chain_name = new_filter_chain.name();
+    const std::string new_filter_chain_name = new_filter_chain.name();
     if (std::find(seen_filter_chains.begin(), seen_filter_chains.end(), new_filter_chain_name)
         != seen_filter_chains.end()) {
       throw EnvoyException(fmt::format("duplicate filter chain = {}", new_filter_chain_name));
@@ -185,7 +185,7 @@ void FcdsApi::processAddedOrUpdatedFilterChains(const std::vector<Envoy::Config:
     seen_filter_chains.push_back(new_filter_chain_name);
 
     // Ignore the config update if the old and new configs are same
-    auto hash = MessageUtil::hash(new_filter_chain);
+    const auto hash = MessageUtil::hash(new_filter_chain);
     if (hash == filter_chain_manager_.getFilterChainMessageHash(new_filter_chain_name)) {
         ENVOY_LOG(debug, "fcds: new and old filter chain config are same. Ignoring update for fc={}",
                 new_filter_chain_name);

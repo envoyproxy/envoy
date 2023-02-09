@@ -178,8 +178,6 @@ public:
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket& socket,
                                               const StreamInfo::StreamInfo& info) const override;
 
-  void removeFcFromFcdsDrainingList(Network::DrainableFilterChainSharedPtr);
-
   // Add all filter chains into this manager. During the lifetime of FilterChainManagerImpl this
   // should be called at most once.
   void addFilterChains(
@@ -194,8 +192,7 @@ public:
       absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chain_span);
   
   const FilterChainsMessageByName& getExistingFilterChainMessages() {return filter_chains_message_by_name_;}
-  const FilterChainsMessageHashByName& getExistingFiterChainsMessageHash() {return filter_chains_message_hash_by_name_;}
-  uint64_t getFilterChainMessageHash(std::string fc_name) {
+  const uint64_t getFilterChainMessageHash(std::string fc_name) {
       auto iter = filter_chains_message_hash_by_name_.find(fc_name);
       if (iter != filter_chains_message_hash_by_name_.end()) {
      	  return iter->second;
