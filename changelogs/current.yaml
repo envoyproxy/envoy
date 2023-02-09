@@ -88,6 +88,6 @@ new_features:
 - area: access_log
     added support for :ref:`%DOWNSTREAM_TRANSPORT_FAILURE_REASON% <config_access_log_format_downstream_transport_failure_reason>` as a log command operator about why listener may have failed due to a transport socket error,
     including TLS handshake failures.
-    added a the field :ref:`downstream_transport_failure_reason <envoy_v3_api_field_data.accesslog.v3.AccessLogCommon.downstream_transport_failure_reason>` for common usage as well.
+    added the field :ref:`downstream_transport_failure_reason <envoy_v3_api_field_data.accesslog.v3.AccessLogCommon.downstream_transport_failure_reason>` for common usage as well.
 
 deprecated:
