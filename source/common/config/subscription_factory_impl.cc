@@ -196,6 +196,11 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
             callbacks, resource_decoder, stats, dispatcher_,
             Utility::configSourceInitialFetchTimeout(config), /*is_aggregated=*/false, options);
       }
+      case envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC: {
+        return std::make_unique<GrpcCollectionSubscriptionImpl>(
+            collection_locator, cm_.adsMux(), callbacks, resource_decoder, stats, dispatcher_,
+            Utility::configSourceInitialFetchTimeout(config), /*is_aggregated=*/true, options);
+      }
       case envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC: {
         return std::make_unique<GrpcCollectionSubscriptionImpl>(
             collection_locator, cm_.adsMux(), callbacks, resource_decoder, stats, dispatcher_,

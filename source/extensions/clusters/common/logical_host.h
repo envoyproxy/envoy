@@ -122,8 +122,17 @@ public:
   absl::optional<MonotonicTime> lastHcPassTime() const override {
     return logical_host_->lastHcPassTime();
   }
+  MonotonicTime lastSuccessfulTrafficTime(
+      envoy::data::core::v3::HealthCheckerType health_checker_type) const override {
+    return logical_host_->lastSuccessfulTrafficTime(health_checker_type);
+  }
   uint32_t priority() const override { return logical_host_->priority(); }
   void priority(uint32_t) override {}
+
+  void setLastSuccessfulTrafficTime(envoy::data::core::v3::HealthCheckerType health_checker_type,
+                                    MonotonicTime last_successful_traffic_time) const override {
+    logical_host_->setLastSuccessfulTrafficTime(health_checker_type, last_successful_traffic_time);
+  }
 
 private:
   const Network::Address::InstanceConstSharedPtr address_;

@@ -15,6 +15,12 @@
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 #include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
 
+#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
+#include "envoy/extensions/compression/brotli/compressor/v3/brotli.pb.h"
+#include "envoy/extensions/compression/gzip/compressor/v3/gzip.pb.h"
+#include "envoy/extensions/filters/http/compressor/v3/compressor.pb.h"
+#endif
+
 #include "source/common/common/assert.h"
 #include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
 
@@ -40,6 +46,8 @@ void insertCustomFilter(const std::string& filter_config, std::string& config_te
                       &config_template);
 }
 
+// Note that updates to the config.cc bootstrap will require a matching update in
+// generateBootstrap() below
 bool generatedStringMatchesGeneratedBoostrap(
     const std::string& config_str, const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   Thread::SkipAsserts skip;
@@ -49,14 +57,15 @@ bool generatedStringMatchesGeneratedBoostrap(
 
   Protobuf::util::MessageDifferencer differencer;
   differencer.set_message_field_comparison(Protobuf::util::MessageDifferencer::EQUIVALENT);
-  differencer.set_repeated_field_comparison(Protobuf::util::MessageDifferencer::AS_SET);
+  differencer.set_repeated_field_comparison(Protobuf::util::MessageDifferencer::AS_LIST);
 
   bool same = differencer.Compare(config_bootstrap, bootstrap);
-
   if (!same) {
+    std::cerr << "\n=========== Config bootstrap yaml ============\n";
     std::cerr << MessageUtil::getYamlStringFromMessage(config_bootstrap);
-    std::cerr << "============================================";
+    std::cerr << "\n=============== Bootstrap yaml ===============\n";
     std::cerr << MessageUtil::getYamlStringFromMessage(bootstrap);
+    std::cerr << "\n==============================================\n";
   }
   return same;
 }
@@ -82,8 +91,8 @@ EngineBuilder& EngineBuilder::setOnEngineRunning(std::function<void()> closure) 
   return *this;
 }
 
-EngineBuilder& EngineBuilder::addStatsSink(std::string name, std::string typed_config) {
-  stats_sinks_.push_back(std::make_pair(name, typed_config));
+EngineBuilder& EngineBuilder::addStatsSinks(std::vector<std::string> stats_sinks) {
+  stats_sinks_ = std::move(stats_sinks);
   return *this;
 }
 
@@ -187,15 +196,29 @@ EngineBuilder& EngineBuilder::setPerTryIdleTimeoutSeconds(int per_try_idle_timeo
   return *this;
 }
 
-EngineBuilder& EngineBuilder::enableGzip(bool gzip_on) {
-  gzip_filter_ = gzip_on;
+EngineBuilder& EngineBuilder::enableGzipDecompression(bool gzip_decompression_on) {
+  gzip_decompression_filter_ = gzip_decompression_on;
   return *this;
 }
 
-EngineBuilder& EngineBuilder::enableBrotli(bool brotli_on) {
-  brotli_filter_ = brotli_on;
+#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
+EngineBuilder& EngineBuilder::enableGzipCompression(bool gzip_compression_on) {
+  gzip_compression_filter_ = gzip_compression_on;
   return *this;
 }
+#endif
+
+EngineBuilder& EngineBuilder::enableBrotliDecompression(bool brotli_decompression_on) {
+  brotli_decompression_filter_ = brotli_decompression_on;
+  return *this;
+}
+
+#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
+EngineBuilder& EngineBuilder::enableBrotliCompression(bool brotli_compression_on) {
+  brotli_compression_filter_ = brotli_compression_on;
+  return *this;
+}
+#endif
 
 EngineBuilder& EngineBuilder::enableSocketTagging(bool socket_tagging_on) {
   socket_tagging_filter_ = socket_tagging_on;
@@ -222,6 +245,11 @@ EngineBuilder& EngineBuilder::setForceAlwaysUsev6(bool value) {
   return *this;
 }
 
+EngineBuilder& EngineBuilder::setSkipDnsLookupForProxiedRequests(bool value) {
+  skip_dns_lookups_for_proxied_requests_ = value;
+  return *this;
+}
+
 EngineBuilder& EngineBuilder::enableInterfaceBinding(bool interface_binding_on) {
   enable_interface_binding_ = interface_binding_on;
   return *this;
@@ -237,14 +265,39 @@ EngineBuilder& EngineBuilder::enforceTrustChainVerification(bool trust_chain_ver
   return *this;
 }
 
+EngineBuilder& EngineBuilder::addRtdsLayer(const std::string& layer_name,
+                                           const int timeout_seconds) {
+  rtds_layer_name_ = layer_name;
+  rtds_timeout_seconds_ = timeout_seconds;
+  return *this;
+}
+EngineBuilder& EngineBuilder::setAggregatedDiscoveryService(const std::string& api_type,
+                                                            const std::string& address,
+                                                            const int port) {
+#ifndef ENVOY_GOOGLE_GRPC
+  throw std::runtime_error("google_grpc must be enabled in bazel to use ADS");
+#endif
+  ads_api_type_ = api_type;
+  ads_address_ = address;
+  ads_port_ = port;
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::addCdsLayer(const int timeout_seconds) {
+  enable_cds_ = true;
+  cds_timeout_seconds_ = timeout_seconds;
+  return *this;
+}
+
 EngineBuilder&
 EngineBuilder::enablePlatformCertificatesValidation(bool platform_certificates_validation_on) {
   platform_certificates_validation_on_ = platform_certificates_validation_on;
   return *this;
 }
 
-EngineBuilder& EngineBuilder::enableDnsCache(bool dns_cache_on) {
+EngineBuilder& EngineBuilder::enableDnsCache(bool dns_cache_on, int save_interval_seconds) {
   dns_cache_on_ = dns_cache_on;
+  dns_cache_save_interval_seconds_ = save_interval_seconds;
   return *this;
 }
 
@@ -319,6 +372,8 @@ std::string EngineBuilder::generateConfigStr() const {
          enforce_trust_chain_verification_ ? "VERIFY_TRUST_CHAIN" : "ACCEPT_UNTRUSTED"},
         {"per_try_idle_timeout", fmt::format("{}s", per_try_idle_timeout_seconds_)},
         {"virtual_clusters", virtual_clusters},
+        {"skip_dns_lookup_for_proxied_requests",
+         skip_dns_lookups_for_proxied_requests_ ? "true" : "false"},
 #if defined(__ANDROID_API__)
         {"force_ipv6", "true"},
 #else
@@ -329,6 +384,8 @@ std::string EngineBuilder::generateConfigStr() const {
     replacements.push_back({"stats_domain", stats_domain_});
   }
   if (dns_cache_on_) {
+    replacements.push_back({"persistent_dns_cache_save_interval",
+                            fmt::format("{}", dns_cache_save_interval_seconds_)});
     replacements.push_back({"persistent_dns_cache_config", persistent_dns_cache_config_insert});
   }
 
@@ -340,22 +397,13 @@ std::string EngineBuilder::generateConfigStr() const {
     config_builder << "- &" << key << " " << value << std::endl;
   }
 
-  bool add_stats_sinks = !stats_sinks_.empty() || !stats_domain_.empty();
-  if (add_stats_sinks) {
-    config_builder << "- &stats_sinks [";
-  }
-  maybe_comma = "";
+  std::vector<std::string> stat_sinks = stats_sinks_;
   if (!stats_domain_.empty()) {
-    config_builder << "*base_metrics_service";
-    maybe_comma = ",";
+    stat_sinks.push_back("*base_metrics_service");
   }
-
-  for (auto& sink_to_add : stats_sinks_) {
-    config_builder << maybe_comma << "{ name: " << sink_to_add.first
-                   << ", typed_config: " << sink_to_add.second << "}";
-    maybe_comma = ",";
-  }
-  if (add_stats_sinks) {
+  if (!stat_sinks.empty()) {
+    config_builder << "- &stats_sinks [";
+    config_builder << absl::StrJoin(stat_sinks, ",");
     config_builder << "] " << std::endl;
   }
 
@@ -368,11 +416,17 @@ std::string EngineBuilder::generateConfigStr() const {
   if (socket_tagging_filter_) {
     insertCustomFilter(socket_tag_config_insert, config_template);
   }
-  if (gzip_filter_) {
-    insertCustomFilter(gzip_config_insert, config_template);
+  if (brotli_compression_filter_) {
+    insertCustomFilter(brotli_compressor_config_insert, config_template);
   }
-  if (brotli_filter_) {
-    insertCustomFilter(brotli_config_insert, config_template);
+  if (brotli_decompression_filter_) {
+    insertCustomFilter(brotli_decompressor_config_insert, config_template);
+  }
+  if (gzip_compression_filter_) {
+    insertCustomFilter(gzip_compressor_config_insert, config_template);
+  }
+  if (gzip_decompression_filter_) {
+    insertCustomFilter(gzip_decompressor_config_insert, config_template);
   }
   if (enable_http3_) {
     insertCustomFilter(alternate_protocols_cache_filter_insert, config_template);
@@ -383,6 +437,39 @@ std::string EngineBuilder::generateConfigStr() const {
         native_filter_template, {{"{{ native_filter_name }}", filter.name_},
                                  {"{{ native_filter_typed_config }}", filter.typed_config_}});
     insertCustomFilter(filter_config, config_template);
+  }
+
+  if ((!rtds_layer_name_.empty() || enable_cds_) && ads_api_type_.empty()) {
+    throw std::runtime_error("ADS must be configured when using xDS");
+  }
+  if (!rtds_layer_name_.empty()) {
+    std::string rtds_layer =
+        fmt::format(rtds_layer_insert, rtds_layer_name_, rtds_layer_name_, rtds_timeout_seconds_);
+    absl::StrReplaceAll({{"#{custom_layers}", absl::StrCat("#{custom_layers}\n", rtds_layer)}},
+                        &config_template);
+  }
+  if (!ads_api_type_.empty()) {
+    std::string custom_ads = fmt::format(ads_insert, ads_api_type_, ads_address_, ads_port_);
+    absl::StrReplaceAll({{"#{custom_ads}", absl::StrCat("#{custom_ads}\n", custom_ads)}},
+                        &config_template);
+  }
+  if (enable_cds_) {
+    std::string custom_cds = fmt::format(cds_layer_insert, cds_timeout_seconds_);
+    absl::StrReplaceAll({{"#{custom_dynamic_resources}",
+                          absl::StrCat("#{custom_dynamic_resources}\n", custom_cds)}},
+                        &config_template);
+
+    std::string custom_node_context = R"(node_context_params:
+  - cluster)";
+    absl::StrReplaceAll(
+        {{"#{custom_node_context}", absl::StrCat("#{custom_node_context}\n", custom_node_context)}},
+        &config_template);
+
+    std::string custom_stats_patterns = R"(        - exact: cluster_manager.active_clusters
+        - exact: cluster_manager.cluster_added)";
+    absl::StrReplaceAll(
+        {{"#{custom_stats}", absl::StrCat("#{custom_stats}\n", custom_stats_patterns)}},
+        &config_template);
   }
 
   config_builder << config_template;
@@ -402,7 +489,8 @@ std::string EngineBuilder::generateConfigStr() const {
 std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>
 EngineBuilder::generateBootstrapAndCompareForTests(std::string yaml) const {
   auto bootstrap = generateBootstrap();
-  RELEASE_ASSERT(generatedStringMatchesGeneratedBoostrap(yaml, *generateBootstrap()), "asd");
+  RELEASE_ASSERT(generatedStringMatchesGeneratedBoostrap(yaml, *generateBootstrap()),
+                 "Failed equivalence");
   return bootstrap;
 }
 
@@ -456,10 +544,11 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   backoff->mutable_base_interval()->set_nanos(250000000);
   backoff->mutable_max_interval()->set_seconds(60);
 
-  for (const NativeFilterConfig& filter : native_filter_chain_) {
+  for (auto filter = native_filter_chain_.rbegin(); filter != native_filter_chain_.rend();
+       ++filter) {
     auto* native_filter = hcm->add_http_filters();
-    native_filter->set_name(filter.name_);
-    MessageUtil::loadFromYaml(filter.typed_config_, *native_filter->mutable_typed_config(),
+    native_filter->set_name((*filter).name_);
+    MessageUtil::loadFromYaml((*filter).typed_config_, *native_filter->mutable_typed_config(),
                               ProtobufMessage::getStrictValidationVisitor());
   }
 
@@ -473,24 +562,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     cache_filter->mutable_typed_config()->PackFrom(cache_config);
   }
 
-  if (brotli_filter_) {
-    envoy::extensions::compression::brotli::decompressor::v3::Brotli brotli_config;
-    envoy::extensions::filters::http::decompressor::v3::Decompressor decompressor_config;
-    decompressor_config.mutable_decompressor_library()->set_name("text_optimized");
-    decompressor_config.mutable_decompressor_library()->mutable_typed_config()->PackFrom(
-        brotli_config);
-    auto* common_request =
-        decompressor_config.mutable_request_direction_config()->mutable_common_config();
-    common_request->mutable_enabled()->mutable_default_value();
-    common_request->mutable_enabled()->set_runtime_key("request_decompressor_enabled");
-    decompressor_config.mutable_response_direction_config()
-        ->mutable_common_config()
-        ->set_ignore_no_transform_header(true);
-    auto* brotli_filter = hcm->add_http_filters();
-    brotli_filter->set_name("envoy.filters.http.decompressor");
-    brotli_filter->mutable_typed_config()->PackFrom(decompressor_config);
-  }
-  if (gzip_filter_) {
+  if (gzip_decompression_filter_) {
     envoy::extensions::compression::gzip::decompressor::v3::Gzip gzip_config;
     gzip_config.mutable_window_bits()->set_value(15);
     envoy::extensions::filters::http::decompressor::v3::Decompressor decompressor_config;
@@ -508,6 +580,58 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     gzip_filter->set_name("envoy.filters.http.decompressor");
     gzip_filter->mutable_typed_config()->PackFrom(decompressor_config);
   }
+#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
+  if (gzip_compression_filter_) {
+    envoy::extensions::compression::gzip::compressor::v3::Gzip gzip_config;
+    gzip_config.mutable_window_bits()->set_value(15);
+    envoy::extensions::filters::http::compressor::v3::Compressor compressor_config;
+    compressor_config.mutable_compressor_library()->set_name("gzip");
+    compressor_config.mutable_compressor_library()->mutable_typed_config()->PackFrom(gzip_config);
+    auto* common_request =
+        compressor_config.mutable_request_direction_config()->mutable_common_config();
+    common_request->mutable_enabled()->mutable_default_value()->set_value(true);
+    auto* common_response =
+        compressor_config.mutable_response_direction_config()->mutable_common_config();
+    common_response->mutable_enabled()->mutable_default_value()->set_value(false);
+    auto* gzip_filter = hcm->add_http_filters();
+    gzip_filter->set_name("envoy.filters.http.compressor");
+    gzip_filter->mutable_typed_config()->PackFrom(compressor_config);
+  }
+#endif
+  if (brotli_decompression_filter_) {
+    envoy::extensions::compression::brotli::decompressor::v3::Brotli brotli_config;
+    envoy::extensions::filters::http::decompressor::v3::Decompressor decompressor_config;
+    decompressor_config.mutable_decompressor_library()->set_name("text_optimized");
+    decompressor_config.mutable_decompressor_library()->mutable_typed_config()->PackFrom(
+        brotli_config);
+    auto* common_request =
+        decompressor_config.mutable_request_direction_config()->mutable_common_config();
+    common_request->mutable_enabled()->mutable_default_value();
+    common_request->mutable_enabled()->set_runtime_key("request_decompressor_enabled");
+    decompressor_config.mutable_response_direction_config()
+        ->mutable_common_config()
+        ->set_ignore_no_transform_header(true);
+    auto* brotli_filter = hcm->add_http_filters();
+    brotli_filter->set_name("envoy.filters.http.decompressor");
+    brotli_filter->mutable_typed_config()->PackFrom(decompressor_config);
+  }
+#ifdef ENVOY_MOBILE_REQUEST_COMPRESSION
+  if (brotli_compression_filter_) {
+    envoy::extensions::compression::brotli::compressor::v3::Brotli brotli_config;
+    envoy::extensions::filters::http::compressor::v3::Compressor compressor_config;
+    compressor_config.mutable_compressor_library()->set_name("text_optimized");
+    compressor_config.mutable_compressor_library()->mutable_typed_config()->PackFrom(brotli_config);
+    auto* common_request =
+        compressor_config.mutable_request_direction_config()->mutable_common_config();
+    common_request->mutable_enabled()->mutable_default_value()->set_value(true);
+    auto* common_response =
+        compressor_config.mutable_response_direction_config()->mutable_common_config();
+    common_response->mutable_enabled()->mutable_default_value()->set_value(false);
+    auto* brotli_filter = hcm->add_http_filters();
+    brotli_filter->set_name("envoy.filters.http.compressor");
+    brotli_filter->mutable_typed_config()->PackFrom(compressor_config);
+  }
+#endif
   if (socket_tagging_filter_) {
     envoymobile::extensions::filters::http::socket_tag::SocketTag tag_config;
     auto* tag_filter = hcm->add_http_filters();
@@ -548,7 +672,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   if (dns_cache_on_) {
     envoymobile::extensions::key_value::platform::PlatformKeyValueStoreConfig kv_config;
     kv_config.set_key("dns_persistent_cache");
-    kv_config.mutable_save_interval()->set_seconds(0);
+    kv_config.mutable_save_interval()->set_seconds(dns_cache_save_interval_seconds_);
     kv_config.set_max_entries(100);
     dns_cache_config->mutable_key_value_config()->mutable_config()->set_name(
         "envoy.key_value.platform");
@@ -818,6 +942,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   list->add_patterns()->set_prefix("http.hcm.downstream_rq_");
   list->add_patterns()->set_prefix("http.hcm.decompressor.");
   list->add_patterns()->set_prefix("pulse.");
+  list->add_patterns()->set_prefix("runtime.load_success");
   list->add_patterns()->mutable_safe_regex()->set_regex(
       "^vhost\\.[\\w]+\\.vcluster\\.[\\w]+?\\.upstream_rq_(?:[12345]xx|[3-5][0-9][0-9]|retry|"
       "total)");
@@ -848,7 +973,8 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   ProtobufWkt::Struct& flags =
       *(*runtime_values.mutable_fields())["reloadable_features"].mutable_struct_value();
   (*flags.mutable_fields())["always_use_v6"].set_bool_value(always_use_v6_);
-  (*flags.mutable_fields())["skip_dns_lookup_for_proxied_requests"].set_bool_value(false);
+  (*flags.mutable_fields())["skip_dns_lookup_for_proxied_requests"].set_bool_value(
+      skip_dns_lookups_for_proxied_requests_);
   (*runtime_values.mutable_fields())["disallow_global_stats"].set_bool_value("true");
   ProtobufWkt::Struct& overload_values =
       *(*envoy_layer.mutable_fields())["overload"].mutable_struct_value();
@@ -859,6 +985,10 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   bootstrap->mutable_typed_dns_resolver_config()->CopyFrom(
       *dns_cache_config->mutable_typed_dns_resolver_config());
 
+  for (const std::string& sink_yaml : stats_sinks_) {
+    auto* sink = bootstrap->add_stats_sinks();
+    MessageUtil::loadFromYaml(sink_yaml, *sink, ProtobufMessage::getStrictValidationVisitor());
+  }
   if (!stats_domain_.empty()) {
     envoy::config::metrics::v3::MetricsServiceConfig metrics_config;
     metrics_config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("stats");
@@ -870,11 +1000,40 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     sink->mutable_typed_config()->PackFrom(metrics_config);
   }
 
-  for (auto& sink_to_add : stats_sinks_) {
-    auto* sink = bootstrap->add_stats_sinks();
-    sink->set_name(sink_to_add.first);
-    MessageUtil::loadFromYaml(sink_to_add.second, *sink->mutable_typed_config(),
-                              ProtobufMessage::getStrictValidationVisitor());
+  bootstrap->mutable_dynamic_resources();
+  if ((!rtds_layer_name_.empty() || enable_cds_) && ads_api_type_.empty()) {
+    throw std::runtime_error("ADS must be configured when using xDS");
+  }
+  if (!rtds_layer_name_.empty()) {
+    auto* layered_runtime = bootstrap->mutable_layered_runtime();
+    auto* layer = layered_runtime->add_layers();
+    layer->set_name(rtds_layer_name_);
+    auto* rtds_layer = layer->mutable_rtds_layer();
+    rtds_layer->set_name(rtds_layer_name_);
+    auto* rtds_config = rtds_layer->mutable_rtds_config();
+    rtds_config->mutable_ads();
+    rtds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+    rtds_config->mutable_initial_fetch_timeout()->set_seconds(rtds_timeout_seconds_);
+  }
+  if (!ads_api_type_.empty()) {
+    std::string target_uri = fmt::format(R"({}:{})", ads_address_, ads_port_);
+    auto* ads_config = bootstrap->mutable_dynamic_resources()->mutable_ads_config();
+    ads_config->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+    ads_config->set_set_node_on_first_message_only(true);
+    envoy::config::core::v3::ApiConfigSource::ApiType api_type_enum;
+    envoy::config::core::v3::ApiConfigSource::ApiType_Parse(ads_api_type_, &api_type_enum);
+    ads_config->set_api_type(api_type_enum);
+    ads_config->add_grpc_services()->mutable_google_grpc()->set_target_uri(target_uri);
+  }
+  if (enable_cds_) {
+    auto* cds_config = bootstrap->mutable_dynamic_resources()->mutable_cds_config();
+    cds_config->mutable_initial_fetch_timeout()->set_seconds(cds_timeout_seconds_);
+    cds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+    cds_config->mutable_ads();
+    bootstrap->add_node_context_params("cluster");
+    // add a stat prefix we use in test
+    list->add_patterns()->set_exact("cluster_manager.active_clusters");
+    list->add_patterns()->set_exact("cluster_manager.cluster_added");
   }
 
   // Admin
@@ -885,7 +1044,8 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   }
 
   // Check equivalence in debug mode.
-  ASSERT(generatedStringMatchesGeneratedBoostrap(generateConfigStr(), *bootstrap));
+  RELEASE_ASSERT(generatedStringMatchesGeneratedBoostrap(generateConfigStr(), *bootstrap),
+                 "Native C++ checks failed");
 
   return bootstrap;
 }

@@ -79,7 +79,7 @@ public:
     setQuicConfigWithDefaultValues(quic_session_.config());
     quic_connection_.SetEncrypter(
         quic::ENCRYPTION_FORWARD_SECURE,
-        std::make_unique<quic::NullEncrypter>(quic::Perspective::IS_SERVER));
+        std::make_unique<quic::test::TaggingEncrypter>(quic::ENCRYPTION_FORWARD_SECURE));
     quic_connection_.SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
 
     quic_session_.OnConfigNegotiated();
