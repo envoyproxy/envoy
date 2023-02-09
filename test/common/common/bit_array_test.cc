@@ -6,11 +6,10 @@
 
 #include "gtest/gtest.h"
 
+#if ABSL_IS_LITTLE_ENDIAN
+
 namespace Envoy {
 namespace {
-
-// BitArray does not support windows.
-#ifndef WIN32
 
 TEST(BitArray, ShouldAssertIfInvalidBitWidth) {
   {
@@ -38,11 +37,11 @@ public:
     vec.reserve(num_items_);
 
     Random::RandomGeneratorImpl gen;
-    uint64_t max_given_bit_width = static_cast<uint64_t>(1) << bit_width_;
+    const uint64_t max_given_bit_width = static_cast<uint64_t>(1) << bit_width_;
 
     // Populate both with the same value
     for (size_t i = 0; i < num_items_; ++i) {
-      uint32_t value = static_cast<uint32_t>(gen.random() % max_given_bit_width);
+      const uint32_t value = static_cast<uint32_t>(gen.random() % max_given_bit_width);
       vec.push_back(value);
       bit_array.set(i, value);
     }
@@ -73,7 +72,6 @@ INSTANTIATE_TEST_SUITE_P(GetAndSetTests, BitArrayTest,
 
 TEST_P(BitArrayTest, CanSetAndGetAllBits) { populateBitArrayAndCheckValuesStoredCorrectly(); }
 
-#endif
-
 } // namespace
 } // namespace Envoy
+#endif

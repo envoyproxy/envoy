@@ -6,10 +6,7 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 bool shouldUseCompactTable(size_t num_hosts, uint64_t table_size) {
-#if defined(WIN32)
-  // BitArray does not support Windows.
-  return false;
-#else
+#if ABSL_IS_LITTLE_ENDIAN
   if (num_hosts > MaglevTable::MaxNumberOfHostsForCompactMaglev) {
     return false;
   }
@@ -21,6 +18,9 @@ bool shouldUseCompactTable(size_t num_hosts, uint64_t table_size) {
   const uint64_t compact_maglev_cost =
       shared_ptr_size * num_hosts + ((absl::bit_width(num_hosts) * table_size) / 8);
   return compact_maglev_cost < original_maglev_cost;
+#else
+  // BitArray is not supported.
+  return false;
 #endif
 }
 

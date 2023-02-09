@@ -6,6 +6,10 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/safe_memcpy.h"
 
+#include "absl/base/config.h"
+
+#if ABSL_IS_LITTLE_ENDIAN
+
 namespace Envoy {
 
 /**
@@ -43,14 +47,13 @@ public:
     static_assert(
         sizeof(uint8_t*) == 8,
         "Pointer underlying size is not 8 bytes, are we running on a 64-bit architecture?");
-
     // Init padding to avoid sanitizer complaints if reading the last elements.
     uint8_t* padding_start = array_start_.get() + (bytesNeeded(width, num_items) - WordSize);
-    StoreUnsignedWord(padding_start, 0);
+    storeUnsignedWord(padding_start, 0);
   }
 
-  static const int MaxBitWidth = 32;
-  static const int WordSize = sizeof(uint8_t*);
+  static constexpr int MaxBitWidth = 32;
+  static constexpr int WordSize = sizeof(uint8_t*);
 
   /**
    * Gets the fixed width bit at the given index.
@@ -106,7 +109,7 @@ public:
     // element.
     const uint64_t value_to_store =
         ((LoadUnsignedWord(byte0) & mask_to_preserve) | (shifted_value & mask_to_write));
-    StoreUnsignedWord(byte0, value_to_store);
+    storeUnsignedWord(byte0, value_to_store);
   }
 
   size_t size() const { return num_items_; }
@@ -124,7 +127,7 @@ private:
     return std::max(bytes_required, minimum_bytes_required_without_padding) + padding;
   }
 
-  static inline void StoreUnsignedWord(void* destination, uint64_t value) {
+  static inline void storeUnsignedWord(void* destination, uint64_t value) {
     safeMemcpyUnsafeDst(destination, &value);
   }
 
@@ -146,3 +149,4 @@ private:
 };
 
 } // namespace Envoy
+#endif
