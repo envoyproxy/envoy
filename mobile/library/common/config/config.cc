@@ -575,6 +575,9 @@ layered_runtime:
           reloadable_features:
             always_use_v6: *force_ipv6
             skip_dns_lookup_for_proxied_requests: *skip_dns_lookup_for_proxied_requests
+#ifndef ENVOY_MOBILE_ENABLE_LISTENER
+            use_api_listener: true
+#endif
 )"
 // Needed due to warning in
 // https://github.com/envoyproxy/envoy/blob/6eb7e642d33f5a55b63c367188f09819925fca34/source/server/server.cc#L546
