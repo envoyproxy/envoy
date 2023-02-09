@@ -21,7 +21,7 @@ open class EngineBuilder: NSObject {
   private var dnsFailureRefreshSecondsMax: UInt32 = 10
   private var dnsQueryTimeoutSeconds: UInt32 = 25
   private var dnsMinRefreshSeconds: UInt32 = 60
-  private var dnsPreresolveHostnames: String = "[]"
+  private var dnsPreresolveHostnames: [String] = []
   private var dnsRefreshSeconds: UInt32 = 60
   private var enableDNSCache: Bool = false
   private var dnsCacheSaveIntervalSeconds: UInt32 = 1
@@ -48,7 +48,7 @@ open class EngineBuilder: NSObject {
   private var perTryIdleTimeoutSeconds: UInt32 = 15
   private var appVersion: String = "unspecified"
   private var appId: String = "unspecified"
-  private var virtualClusters: String = "[]"
+  private var virtualClusters: [String] = []
   private var onEngineRunning: (() -> Void)?
   private var logger: ((String) -> Void)?
   private var eventTracker: (([String: String]) -> Void)?
@@ -165,7 +165,7 @@ open class EngineBuilder: NSObject {
   ///
   /// - returns: This builder.
   @discardableResult
-  public func addDNSPreresolveHostnames(dnsPreresolveHostnames: String) -> Self {
+  public func addDNSPreresolveHostnames(dnsPreresolveHostnames: [String]) -> Self {
     self.dnsPreresolveHostnames = dnsPreresolveHostnames
     return self
   }
@@ -541,12 +541,23 @@ open class EngineBuilder: NSObject {
 
   /// Add virtual cluster configuration.
   ///
-  /// - parameter virtualClusters: The JSON configuration string for virtual clusters.
+  /// - parameter virtualCluster: The JSON configuration string for a virtual cluster.
   ///
   /// - returns: This builder.
   @discardableResult
-  public func addVirtualClusters(_ virtualClusters: String) -> Self {
-    self.virtualClusters = virtualClusters
+  public func addVirtualCluster(_ virtualCluster: String) -> Self {
+    self.virtualClusters.append(virtualCluster)
+    return self
+  }
+
+  /// Add virtual cluster configurations.
+  ///
+  /// - parameter virtualClusters: The JSON configuration strings for virtual clusters.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func addVirtualClusters(_ virtualClusters: [String]) -> Self {
+    self.virtualClusters.append(contentsOf: virtualClusters)
     return self
   }
 
