@@ -406,13 +406,11 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_lib",
         "//source/extensions/quic/connection_id_generator:envoy_deterministic_connection_id_generator_config",
-        "//source/extensions/quic/server_preferred_address:empty_server_preferred_address_config_factory_config",
         "//source/server:active_udp_listener",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/quic/connection_id_generator/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/quic/crypto_stream/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/quic/proof_source/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/quic/server_preferred_address/v3:pkg_cc_proto",
     ],
 )
 

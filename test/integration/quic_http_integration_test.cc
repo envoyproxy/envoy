@@ -7,6 +7,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/overload/v3/overload.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/quic/server_preferred_address/v3/basic_server_preferred_address_config.pb.h"
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 
 #include "source/common/quic/active_quic_listener.h"
@@ -28,8 +29,6 @@
 #include "test/extensions/transport_sockets/tls/cert_validator/timed_cert_validator.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/ssl_utility.h"
-#include "test/integration/testing_server_preferred_address_config.h"
-#include "test/integration/testing_server_preferred_address_config.pb.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
@@ -1649,16 +1648,14 @@ TEST_P(QuicHttpIntegrationTest, UsesPreferredAddress) {
                                          ->mutable_quic_options()
                                          ->mutable_server_preferred_address_config();
     // Configure a loopback interface as the server's preferred address.
-    preferred_address_config->set_name("quic.server_preferred_address.test");
-    test::integration::TestingServerPreferredAddressConfig server_preferred_address;
+    preferred_address_config->set_name("quic.server_preferred_address.basic");
+    envoy::extensions::quic::server_preferred_address::v3::BasicServerPreferredAddressConfig
+        server_preferred_address;
     server_preferred_address.set_ipv4_address("127.0.0.2");
     server_preferred_address.set_ipv6_address("::2");
     preferred_address_config->mutable_typed_config()->PackFrom(server_preferred_address);
   });
 
-  TestingServerPreferredAddressConfigFactory factory;
-  Envoy::Registry::InjectFactory<EnvoyQuicServerPreferredAddressConfigFactory> registration(
-      factory);
   initialize();
   quic::QuicTagVector connection_options{quic::kRVCM, quic::kSPAD};
   dynamic_cast<Quic::PersistentQuicInfoImpl&>(*quic_connection_persistent_info_)
