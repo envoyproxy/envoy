@@ -10,7 +10,7 @@ envoy_objc_library(
     name = "envoy_engine_objc_lib",
     srcs = [
         "EnvoyConfiguration.h",
-        "EnvoyConfiguration.m",
+        "EnvoyConfiguration.mm",
         "EnvoyEngineImpl.m",
         "EnvoyEventTracker.h",
         "EnvoyEventTracker.m",
