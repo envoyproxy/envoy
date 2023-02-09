@@ -252,7 +252,7 @@ When Envoy originates TLS when making connections to upstream clusters, any erro
 :ref:`AccessLogCommon.upstream_transport_failure_reason<envoy_v3_api_field_data.accesslog.v3.AccessLogCommon.upstream_transport_failure_reason>` field.
 
 When Envoy listener gets connection and perform TLS with downstream, any errors will be logged into
-:ref:`UPSTREAM_TRANSPORT_FAILURE_REASON<config_access_log_format_downstream_transport_failure_reason>` field or
+:ref:`DOWNSTREAM_TRANSPORT_FAILURE_REASON<config_access_log_format_downstream_transport_failure_reason>` field or
 :ref:`AccessLogCommon.downstream_transport_failure_reason<envoy_v3_api_field_data.accesslog.v3.AccessLogCommon.downstream_transport_failure_reason>` field.
 
 Common errors are:
