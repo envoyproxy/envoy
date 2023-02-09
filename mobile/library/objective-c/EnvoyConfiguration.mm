@@ -346,7 +346,8 @@
   builder.enforceTrustChainVerification(self.enforceTrustChainVerification);
   builder.enablePlatformCertificatesValidation(self.enablePlatformCertificateValidation);
   builder.setForceAlwaysUsev6(self.forceIPv6);
-  for (EnvoyHTTPFilterFactory *filterFactory in [self.httpPlatformFilterFactories reverseObjectEnumerator]) {
+  for (EnvoyHTTPFilterFactory *filterFactory in
+       [self.httpPlatformFilterFactories reverseObjectEnumerator]) {
     builder.addPlatformFilter([filterFactory.filterName toCXXString]);
   }
   for (EnvoyNativeFilterConfig *nativeFilterConfig in self.nativeFilterChain) {
@@ -379,8 +380,7 @@
 
   try {
     return builder.generateBootstrapAndCompare([yaml toCXXString]);
-  }
-  catch (const std::exception & e) {
+  } catch (const std::exception &e) {
     NSLog(@"[Envoy] error comparing YAML: %@", @(e.what()));
     return FALSE;
   }
