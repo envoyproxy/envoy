@@ -191,8 +191,8 @@ def envoy_proto_descriptor(name, out, srcs = [], external_deps = []):
         srcs.append("@com_google_googleapis//google/api:http.proto")
         include_paths.append("external/com_google_googleapis")
 
-    if "well_known_protos" in external_deps:
-        srcs.append("@com_google_protobuf//:well_known_protos")
+    if "well_known_type_protos" in external_deps:
+        srcs.append("@com_google_protobuf//:well_known_type_protos")
         include_paths.append("external/com_google_protobuf/src")
 
     options = ["--include_imports"]

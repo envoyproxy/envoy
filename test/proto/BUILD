@@ -39,7 +39,7 @@ envoy_proto_descriptor(
     external_deps = [
         "api_httpbody_protos",
         "http_api_protos",
-        "well_known_protos",
+        "well_known_type_protos",
     ],
 )
 
