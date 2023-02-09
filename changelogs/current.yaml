@@ -85,6 +85,9 @@ new_features:
 - area: tcp_proxy
   change: |
     added support for propagating the response trailers in :ref:`TunnelingConfig <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.propagate_response_trailers>` to the downstream info filter state.
+- area: sni_dynamic_forward_proxy
+  change: |
+    added an option to dynamically set the host used by the SNI dynamic forward proxy filter, by setting a filter state object under the key ``envoy.upstream.dynamic_host``.
 - area: access_log
     added support for :ref:`%DOWNSTREAM_TRANSPORT_FAILURE_REASON% <config_access_log_format_downstream_transport_failure_reason>` as a log command operator about why listener may have failed due to a transport socket error,
     including TLS handshake failures.
