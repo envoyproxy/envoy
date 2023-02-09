@@ -48,6 +48,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong) NSDictionary<NSString *, EnvoyStringAccessor *> *stringAccessors;
 @property (nonatomic, strong) NSDictionary<NSString *, id<EnvoyKeyValueStore>> *keyValueStores;
 @property (nonatomic, strong) NSArray<NSString *> *statsSinks;
+@property (nonatomic, copy, nullable) void (^experimentalValidateYAMLCallback)(BOOL);
 
 /**
  Create a new instance of the configuration.
@@ -96,7 +97,9 @@ NS_ASSUME_NONNULL_BEGIN
                                    keyValueStores:
                                        (NSDictionary<NSString *, id<EnvoyKeyValueStore>> *)
                                            keyValueStores
-                                       statsSinks:(NSArray<NSString *> *)statsSinks;
+                                       statsSinks:(NSArray<NSString *> *)statsSinks
+                 experimentalValidateYAMLCallback:
+                     (nullable void (^)(BOOL))experimentalValidateYAMLCallback;
 
 /**
  Resolves the provided configuration template using properties on this configuration.

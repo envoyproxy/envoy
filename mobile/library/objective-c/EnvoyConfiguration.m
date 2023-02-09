@@ -48,7 +48,9 @@
                                    keyValueStores:
                                        (NSDictionary<NSString *, id<EnvoyKeyValueStore>> *)
                                            keyValueStores
-                                       statsSinks:(NSArray<NSString *> *)statsSinks {
+                                       statsSinks:(NSArray<NSString *> *)statsSinks
+                 experimentalValidateYAMLCallback:
+                     (nullable void (^)(BOOL))experimentalValidateYAMLCallback {
   self = [super init];
   if (!self) {
     return nil;
@@ -93,6 +95,7 @@
   self.stringAccessors = stringAccessors;
   self.keyValueStores = keyValueStores;
   self.statsSinks = statsSinks;
+  self.experimentalValidateYAMLCallback = experimentalValidateYAMLCallback;
   return self;
 }
 
