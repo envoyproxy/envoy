@@ -981,18 +981,12 @@ ClusterInfoImpl::ClusterInfoImpl(
       max_requests_per_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           http_protocol_options_->common_http_protocol_options_, max_requests_per_connection,
           config.max_requests_per_connection().value())),
-      max_response_headers_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          http_protocol_options_->common_http_protocol_options_, max_headers_count,
-          runtime_.snapshot().getInteger(Http::MaxResponseHeadersCountOverrideKey,
-                                         Http::DEFAULT_MAX_HEADERS_COUNT))),
       connect_timeout_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, connect_timeout, 5000))),
       per_upstream_preconnect_ratio_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config.preconnect_policy(), per_upstream_preconnect_ratio, 1.0)),
       peekahead_ratio_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.preconnect_policy(),
                                                        predictive_preconnect_ratio, 0)),
-      per_connection_buffer_limit_bytes_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       socket_matcher_(std::move(socket_matcher)), stats_scope_(std::move(stats_scope)),
       traffic_stats_(
           generateStats(*stats_scope_, factory_context.clusterManager().clusterStatNames())),
@@ -1040,13 +1034,26 @@ ClusterInfoImpl::ClusterInfoImpl(
                     config.original_dst_lb_config())
               : nullptr),
       upstream_config_(config.has_upstream_config()
-                           ? absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>(
+                           ? std::make_unique<envoy::config::core::v3::TypedExtensionConfig>(
                                  config.upstream_config())
-                           : absl::nullopt),
+                           : nullptr),
       added_via_api_(added_via_api),
       lb_subset_(LoadBalancerSubsetInfoImpl(config.lb_subset_config())),
       metadata_(config.metadata()), typed_metadata_(config.metadata()),
       common_lb_config_(config.common_lb_config()),
+      cluster_type_(config.has_cluster_type()
+                        ? std::make_unique<envoy::config::cluster::v3::Cluster::CustomClusterType>(
+                              config.cluster_type())
+                        : nullptr),
+      factory_context_(
+          std::make_unique<FactoryContextImpl>(*stats_scope_, runtime, factory_context)),
+      upstream_context_(server_context, init_manager, *stats_scope_),
+      per_connection_buffer_limit_bytes_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
+      max_response_headers_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          http_protocol_options_->common_http_protocol_options_, max_headers_count,
+          runtime_.snapshot().getInteger(Http::MaxResponseHeadersCountOverrideKey,
+                                         Http::DEFAULT_MAX_HEADERS_COUNT))),
       drain_connections_on_host_removal_(config.ignore_health_on_host_removal()),
       connection_pool_per_downstream_connection_(
           config.connection_pool_per_downstream_connection()),
@@ -1054,14 +1061,7 @@ ClusterInfoImpl::ClusterInfoImpl(
                   common_lb_config_.ignore_new_hosts_until_first_hc()),
       set_local_interface_name_on_upstream_connections_(
           config.upstream_connection_options().set_local_interface_name_on_upstream_connections()),
-      cluster_type_(
-          config.has_cluster_type()
-              ? absl::make_optional<envoy::config::cluster::v3::Cluster::CustomClusterType>(
-                    config.cluster_type())
-              : absl::nullopt),
-      factory_context_(
-          std::make_unique<FactoryContextImpl>(*stats_scope_, runtime, factory_context)),
-      upstream_context_(server_context, init_manager, *stats_scope_) {
+      has_configured_http_filters_(false) {
 #ifdef WIN32
   if (set_local_interface_name_on_upstream_connections_) {
     throw EnvoyException("set_local_interface_name_on_upstream_connections_ cannot be set to true "
@@ -1658,6 +1658,34 @@ Http::Http2::CodecStats& ClusterInfoImpl::http2CodecStats() const {
 
 Http::Http3::CodecStats& ClusterInfoImpl::http3CodecStats() const {
   return Http::Http3::CodecStats::atomicGet(http3_codec_stats_, *stats_scope_);
+}
+
+#ifdef ENVOY_ENABLE_UHV
+::Envoy::Http::HeaderValidatorStats&
+ClusterInfoImpl::getHeaderValidatorStats(Http::Protocol protocol) const {
+  switch (protocol) {
+  case Http::Protocol::Http10:
+  case Http::Protocol::Http11:
+    return http1CodecStats();
+  case Http::Protocol::Http2:
+    return http2CodecStats();
+  case Http::Protocol::Http3:
+    return http2CodecStats();
+  }
+  PANIC_DUE_TO_CORRUPT_ENUM;
+}
+#endif
+
+Http::HeaderValidatorPtr
+ClusterInfoImpl::makeHeaderValidator([[maybe_unused]] Http::Protocol protocol) const {
+#ifdef ENVOY_ENABLE_UHV
+  return http_protocol_options_->header_validator_factory_
+             ? http_protocol_options_->header_validator_factory_->create(
+                   protocol, getHeaderValidatorStats(protocol))
+             : nullptr;
+#else
+  return nullptr;
+#endif
 }
 
 std::pair<absl::optional<double>, absl::optional<uint32_t>> ClusterInfoImpl::getRetryBudgetParams(

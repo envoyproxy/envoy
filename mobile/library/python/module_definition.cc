@@ -62,7 +62,7 @@ PYBIND11_MODULE(envoy_engine, m) {
       .def("add_stats_flush_seconds", &EngineBuilder::addStatsFlushSeconds)
       .def("set_app_version", &EngineBuilder::setAppVersion)
       .def("set_app_id", &EngineBuilder::setAppId)
-      .def("add_virtual_clusters", &EngineBuilder::addVirtualClusters)
+      .def("add_virtual_cluster", &EngineBuilder::addVirtualCluster)
       // TODO(crockeo): add after filter integration
       // .def("add_platform_filter", &EngineBuilder::addPlatformFilter)
       // .def("add_native_filter", &EngineBuilder::addNativeFilter)

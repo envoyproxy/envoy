@@ -5,9 +5,11 @@ load("@build_bazel_rules_apple//apple:repositories.bzl", "apple_rules_dependenci
 load("@rules_fuzzing//fuzzing:repositories.bzl", "rules_fuzzing_dependencies")
 load("@upb//bazel:workspace_deps.bzl", "upb_deps")
 load("@rules_pkg//:deps.bzl", "rules_pkg_dependencies")
-load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies", "rust_register_toolchains")
+load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies", "rust_register_toolchains", "rust_repository_set")
+load("@rules_rust//rust:defs.bzl", "rust_common")
 load("@proxy_wasm_rust_sdk//bazel:dependencies.bzl", "proxy_wasm_rust_sdk_dependencies")
 load("@base_pip3//:requirements.bzl", pip_dependencies = "install_deps")
+load("@dev_pip3//:requirements.bzl", pip_dev_dependencies = "install_deps")
 load("@fuzzing_pip3//:requirements.bzl", pip_fuzzing_dependencies = "install_deps")
 load("@emsdk//:emscripten_deps.bzl", "emscripten_deps")
 load("@com_github_aignas_rules_shellcheck//:deps.bzl", "shellcheck_dependencies")
@@ -29,8 +31,18 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
     gazelle_dependencies(go_sdk = "go_sdk")
     apple_rules_dependencies()
     pip_dependencies()
+    pip_dev_dependencies()
     pip_fuzzing_dependencies()
     rules_pkg_dependencies()
+    rust_repository_set(
+        name = "rust_linux_s390x",
+        exec_triple = "s390x-unknown-linux-gnu",
+        extra_target_triples = [
+            "wasm32-unknown-unknown",
+            "wasm32-wasi",
+        ],
+        versions = [rust_common.default_version],
+    )
     rules_rust_dependencies()
     rust_register_toolchains(
         extra_target_triples = [

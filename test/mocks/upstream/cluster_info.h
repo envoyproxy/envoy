@@ -131,8 +131,8 @@ public:
   MOCK_METHOD(const envoy::config::cluster::v3::Cluster::CommonLbConfig&, lbConfig, (), (const));
   MOCK_METHOD(LoadBalancerType, lbType, (), (const));
   MOCK_METHOD(envoy::config::cluster::v3::Cluster::DiscoveryType, type, (), (const));
-  MOCK_METHOD(const absl::optional<envoy::config::cluster::v3::Cluster::CustomClusterType>&,
-              clusterType, (), (const));
+  MOCK_METHOD(OptRef<const envoy::config::cluster::v3::Cluster::CustomClusterType>, clusterType, (),
+              (const));
   MOCK_METHOD(OptRef<const envoy::config::cluster::v3::Cluster::RingHashLbConfig>, lbRingHashConfig,
               (), (const));
   MOCK_METHOD(OptRef<const envoy::config::cluster::v3::Cluster::MaglevLbConfig>, lbMaglevConfig, (),
@@ -143,8 +143,8 @@ public:
               lbLeastRequestConfig, (), (const));
   MOCK_METHOD(OptRef<const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>,
               lbOriginalDstConfig, (), (const));
-  MOCK_METHOD(const absl::optional<envoy::config::core::v3::TypedExtensionConfig>&, upstreamConfig,
-              (), (const));
+  MOCK_METHOD(OptRef<const envoy::config::core::v3::TypedExtensionConfig>, upstreamConfig, (),
+              (const));
   MOCK_METHOD(bool, maintenanceMode, (), (const));
   MOCK_METHOD(uint32_t, maxResponseHeadersCount, (), (const));
   MOCK_METHOD(uint64_t, maxRequestsPerConnection, (), (const));
@@ -186,6 +186,7 @@ public:
                const Http::FilterChainFactory::UpgradeMap* upgrade_map,
                Http::FilterChainManager& manager),
               (const));
+  MOCK_METHOD(Http::HeaderValidatorPtr, makeHeaderValidator, (Http::Protocol), (const));
 
   Http::Http1::CodecStats& http1CodecStats() const override;
   Http::Http2::CodecStats& http2CodecStats() const override;
@@ -229,7 +230,7 @@ public:
   LoadBalancerType lb_type_{LoadBalancerType::RoundRobin};
   envoy::config::cluster::v3::Cluster::DiscoveryType type_{
       envoy::config::cluster::v3::Cluster::STRICT_DNS};
-  absl::optional<envoy::config::cluster::v3::Cluster::CustomClusterType> cluster_type_;
+  std::unique_ptr<const envoy::config::cluster::v3::Cluster::CustomClusterType> cluster_type_;
   NiceMock<MockLoadBalancerSubsetInfo> lb_subset_;
   absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>
       upstream_http_protocol_options_;
@@ -241,7 +242,7 @@ public:
   std::unique_ptr<const envoy::config::cluster::v3::Cluster::MaglevLbConfig> lb_maglev_config_;
   std::unique_ptr<const envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>
       lb_original_dst_config_;
-  absl::optional<envoy::config::core::v3::TypedExtensionConfig> upstream_config_;
+  std::unique_ptr<envoy::config::core::v3::TypedExtensionConfig> upstream_config_;
   Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
   envoy::config::cluster::v3::Cluster::CommonLbConfig lb_config_;
   envoy::config::core::v3::Metadata metadata_;

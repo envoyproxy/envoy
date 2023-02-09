@@ -2,12 +2,22 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+- area: oauth2
+  change: |
+    OAuth filter now URL-encodes URL in query parameters. These query parameters are decoded, leaving intact character sequences that must remain encoded in URLs. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.oauth_use_url_encoding`` to false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: quic
+  change: |
+    Access logging is now deferred to the QUIC ack listener, and roundtrip response time is added as a downstream timing metric. New runtime flag ``envoy.reloadable_features.quic_defer_logging_to_ack_listener`` can be used for revert this behavior.
 - area: healthcheck
   change: |
     If active HC is enabled and a host is ejected by outlier detection, a successful active health check unejects the host and consider it healthy. This also clears all the outlier detection counters. This behavior change can be reverted by setting ``envoy.reloadable_features_successful_active_health_check_uneject_host`` to ``false``.
+
+- area: local_ratelimit
+  change: |
+    Tokens from local descriptor's token buckets are burned before tokens from the default token bucket.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -18,9 +28,18 @@ bug_fixes:
   change: |
     added ``envoy.reloadable_features.multiplex_eds`` to disable eds multiplexing. Eds multiplexing is enabled by default, so that all subscriptions for the same resource type and management server reuse a single channel/mux.
     When eds multiplexing is disabled each subscription uses a dedicated channel/mux.
+- area: router
+  change: |
+    fixed the bug that custom tags of the route metadata type are not set for upstream spans.
+- area: dependency
+  change: |
+    Add boringssl patch to resolve CVE-2023-0286. Note that the FIPS build is not patched/fixed.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: config
+  change: |
+    removed ``envoy.reloadable_features.combine_sds_requests`` and legacy code paths.
 - area: dns
   change: |
     removed ``envoy.reloadable_features.dns_multiple_addresses`` runtime flag and legacy code paths.
@@ -40,8 +59,14 @@ removed_config_or_runtime:
 - area: http
   change: |
     removed ``envoy.reloadable_features.allow_concurrency_for_alpn_pool`` and legacy code path.
+- area: http3
+  change: |
+    removed ``envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_http3`` and legacy code paths.
 
 new_features:
+- area: access_log
+  change: |
+    enhanced observability into local close for :ref:`%RESPONSE_CODE_DETAILS% <config_http_conn_man_details>`.
 - area: tracing
   change: |
     allow :ref:`grpc_service <envoy_v3_api_field_config.trace.v3.OpenTelemetryConfig.grpc_service>` to be optional. This enables a means to disable collection of traces.
@@ -51,5 +76,14 @@ new_features:
 - area: upstream
   change: |
     added :ref:`maglev extension <envoy_v3_api_msg_extensions.load_balancing_policies.maglev.v3.Maglev>` to suppport the :ref:`load balancer policy <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>`.
+- area: router
+  change: |
+    support route info in upstream access log.
+- area: lua
+  change: |
+    added an new option to the options of lua ``httpCall``. This allows to skip adding ``x-forwarded-for`` by setting ``{["send_xff"] = false}`` as the ``options``.
+- area: tcp_proxy
+  change: |
+    added support for propagating the response trailers in :ref:`TunnelingConfig <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.propagate_response_trailers>` to the downstream info filter state.
 
 deprecated:

@@ -3,6 +3,7 @@ package io.envoyproxy.envoymobile.engine;
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks;
 import io.envoyproxy.envoymobile.engine.types.EnvoyNetworkType;
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor;
+import io.envoyproxy.envoymobile.engine.types.EnvoyStatus;
 
 import java.util.Map;
 
@@ -23,26 +24,35 @@ public interface EnvoyEngine {
   void terminate();
 
   /**
+   * Performs any registrations necessary before running Envoy.
+   *
+   * The envoyConfiguration is used to determined what to register.
+   *
+   * @param envoyConfiguration The EnvoyConfiguration used to start Envoy.
+   */
+  void performRegistration(EnvoyConfiguration envoyConfiguration);
+
+  /**
    * Run the Envoy engine with the provided yaml string and log level.
    *
-   * The envoyConfiguration is used to resolve the configurationYAML.
+   * This does not perform registration, and performRegistration() may need to be called first.
    *
    * @param configurationYAML The configuration yaml with which to start Envoy.
-   * @param envoyConfiguration The EnvoyConfiguration used to start Envoy.
    * @param logLevel          The log level to use when starting Envoy.
    * @return A status indicating if the action was successful.
    */
-  int runWithTemplate(String configurationYAML, EnvoyConfiguration envoyConfiguration,
-                      String logLevel);
+  EnvoyStatus runWithYaml(String configurationYAML, String logLevel);
 
   /**
    * Run the Envoy engine with the provided EnvoyConfiguration and log level.
+   *
+   * This automatically performs any necessary registrations.
    *
    * @param envoyConfiguration The EnvoyConfiguration used to start Envoy.
    * @param logLevel           The log level to use when starting Envoy.
    * @return A status indicating if the action was successful.
    */
-  int runWithConfig(EnvoyConfiguration envoyConfiguration, String logLevel);
+  EnvoyStatus runWithConfig(EnvoyConfiguration envoyConfiguration, String logLevel);
 
   /**
    * Increments a counter with the given count.

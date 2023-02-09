@@ -327,6 +327,31 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
+    StreamInfoFormatter roundtrip_duration_format("ROUNDTRIP_DURATION");
+
+    EXPECT_EQ(absl::nullopt,
+              roundtrip_duration_format.format(request_headers, response_headers, response_trailers,
+                                               stream_info, body));
+    EXPECT_THAT(roundtrip_duration_format.formatValue(request_headers, response_headers,
+                                                      response_trailers, stream_info, body),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+
+  {
+    StreamInfoFormatter roundtrip_duration_format("ROUNDTRIP_DURATION");
+
+    EXPECT_CALL(time_system, monotonicTime)
+        .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(25000000))));
+    stream_info.downstream_timing_.onLastDownstreamAckReceived(time_system);
+
+    EXPECT_EQ("25", roundtrip_duration_format.format(request_headers, response_headers,
+                                                     response_trailers, stream_info, body));
+    EXPECT_THAT(roundtrip_duration_format.formatValue(request_headers, response_headers,
+                                                      response_trailers, stream_info, body),
+                ProtoEq(ValueUtil::numberValue(25.0)));
+  }
+
+  {
     StreamInfoFormatter bytes_received_format("BYTES_RECEIVED");
     EXPECT_CALL(stream_info, bytesReceived()).WillRepeatedly(Return(1));
     EXPECT_EQ("1", bytes_received_format.format(request_headers, response_headers,

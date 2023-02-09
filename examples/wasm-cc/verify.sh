@@ -2,6 +2,8 @@
 
 export NAME=wasm-cc
 export UID
+export RMI="wasm-cc_wasm_compile_update:latest"
+
 
 # shellcheck source=examples/verify-common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../verify-common.sh"

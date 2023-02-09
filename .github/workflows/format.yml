@@ -12,11 +12,12 @@ concurrency:
 
 jobs:
   formatall:
+    if: github.repository == 'envoyproxy/envoy'
     name: format_all
     runs-on: ubuntu-20.04
     timeout-minutes: 45
     container:
-      image: envoyproxy/envoy-build-ubuntu:b0ff77ae3f25b0bf595f9b8bba46b489723ab446
+      image: envoyproxy/envoy-build-ubuntu:7304f974de2724617b7492ccb4c9c58cd420353a
       env:
         CLANG_FORMAT: /opt/llvm/bin/clang-format
         BUILDIFIER_BIN: /usr/local/bin/buildifier
@@ -33,6 +34,7 @@ jobs:
       if: steps.should_run.outputs.run_ci_job == 'true'
       run: cd mobile && ./tools/check_format.sh
   precommit:
+    if: github.repository == 'envoyproxy/envoy'
     name: precommit
     runs-on: macos-12
     timeout-minutes: 45
@@ -48,6 +50,7 @@ jobs:
       if: steps.should_run.outputs.run_ci_job == 'true'
       run: cd mobile && find mobile/* | pre-commit run --files
   swiftlint:
+    if: github.repository == 'envoyproxy/envoy'
     name: swift_lint
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -59,6 +62,7 @@ jobs:
       run: swiftlint lint --strict
       working-directory: mobile
   drstring:
+    if: github.repository == 'envoyproxy/envoy'
     name: drstring
     runs-on: macos-12
     timeout-minutes: 10
@@ -73,6 +77,7 @@ jobs:
         DEVELOPER_DIR: /Applications/Xcode_14.1.app
       run: cd mobile && ./bazelw run @DrString//:drstring check
   kotlinlint:
+    if: github.repository == 'envoyproxy/envoy'
     name: kotlin_lint
     runs-on: macos-12
     timeout-minutes: 45

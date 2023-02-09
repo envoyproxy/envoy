@@ -115,6 +115,7 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/common/rbac/matchers @conqerAtapple @ggreenway @alyssawilk
 /*/extensions/filters/http/grpc_web @fengli79 @lizan
 /*/extensions/filters/http/grpc_stats @kyessenov @lizan
+/*/extensions/filters/http/connect_grpc_bridge @UNOWNED @UNOWNED
 /*/extensions/filters/common/original_src @klarose @snowp
 /*/extensions/filters/listener/tls_inspector @ggreenway @KBaichoo
 /*/extensions/grpc_credentials/example @wozz @htuch
@@ -319,6 +320,7 @@ extensions/filters/http/oauth2 @derekargueta @snowp
 /contrib/client_ssl_auth/ @UNOWNED @UNOWNED
 /contrib/common/sqlutils/ @cpakulski @cpakulski
 /contrib/dynamo/ @UNOWNED @UNOWNED
+/contrib/golang/ @doujiang24 @wangfakang
 /contrib/squash/ @yuval-k @alyssawilk
 /contrib/kafka/ @mattklein123 @adamkotwasinski
 /contrib/rocketmq_proxy/ @aaron-ai @lizhanhui @lizan

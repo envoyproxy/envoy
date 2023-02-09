@@ -1180,7 +1180,7 @@ TEST_P(Http2CodecImplTest, ConnectionKeepalive) {
   EXPECT_CALL(*timeout_timer, disableTimer()).Times(0); // This indicates that no ACK was received.
   send_timer->invokeCallback();
   driveClient();
-  EXPECT_CALL(client_connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(client_connection_, close(Network::ConnectionCloseType::NoFlush, _));
   timeout_timer->invokeCallback();
 }
 
@@ -1364,7 +1364,7 @@ TEST_P(Http2CodecImplTest, ShouldDumpActiveStreamsWithoutAllocatingMemory) {
     EXPECT_THAT(ostream.contents(), HasSubstr("local_end_stream_: 1"));
     EXPECT_THAT(ostream.contents(),
                 HasSubstr("pending_trailers_to_encode_:     null\n"
-                          "    absl::get<RequestHeaderMapPtr>(headers_or_trailers_): \n"
+                          "    absl::get<RequestHeaderMapSharedPtr>(headers_or_trailers_): \n"
                           "      ':scheme', 'http'\n"
                           "      ':method', 'GET'\n"
                           "      ':authority', 'host'\n"
@@ -2247,7 +2247,7 @@ TEST_P(Http2CodecImplFlowControlTest, WindowUpdateOnReadResumingFlood) {
   if (defer_processing_backedup_streams_) {
     EXPECT_TRUE(process_buffered_data_callback->enabled_);
   }
-  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush, _));
   violation_callback->invokeCallback();
 
   EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
@@ -2304,7 +2304,7 @@ TEST_P(Http2CodecImplFlowControlTest, RstStreamOnPendingFlushTimeoutFlood) {
   driveToCompletion();
 
   EXPECT_TRUE(violation_callback->enabled_);
-  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush, _));
   violation_callback->invokeCallback();
 
   EXPECT_EQ(1, server_stats_store_.counter("http2.tx_flush_timeout").value());
@@ -2685,7 +2685,7 @@ TEST_P(Http2CodecImplTest, HeaderNameWithUnderscoreAreDropped) {
 #ifdef ENVOY_ENABLE_UHV
   // Header validation is done by the HCM when header map is fully parsed.
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, _))
-      .WillOnce(Invoke([this, &expected_headers](RequestHeaderMapPtr& headers, bool) -> void {
+      .WillOnce(Invoke([this, &expected_headers](RequestHeaderMapSharedPtr& headers, bool) -> void {
         auto result = header_validator_->validateRequestHeaderMap(*headers);
         EXPECT_THAT(headers, HeaderMapEqualIgnoreOrder(&expected_headers));
         ASSERT_TRUE(result.ok());
@@ -2714,7 +2714,7 @@ TEST_P(Http2CodecImplTest, HeaderNameWithUnderscoreAreRejected) {
   // sendLocalReply and closes network connection (based on the
   // stream_error_on_invalid_http_message flag, which in this test is assumed to equal false).
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, _))
-      .WillOnce(Invoke([this](RequestHeaderMapPtr& headers, bool) -> void {
+      .WillOnce(Invoke([this](RequestHeaderMapSharedPtr& headers, bool) -> void {
         auto result = header_validator_->validateRequestHeaderMap(*headers);
         ASSERT_FALSE(result.ok());
         response_encoder_->encodeHeaders(TestResponseHeaderMapImpl{{":status", "400"},
@@ -2748,7 +2748,7 @@ TEST_P(Http2CodecImplTest, HeaderNameWithUnderscoreAllowed) {
 #ifdef ENVOY_ENABLE_UHV
   // Header validation is done by the HCM when header map is fully parsed.
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, _))
-      .WillOnce(Invoke([this, &expected_headers](RequestHeaderMapPtr& headers, bool) -> void {
+      .WillOnce(Invoke([this, &expected_headers](RequestHeaderMapSharedPtr& headers, bool) -> void {
         auto result = header_validator_->validateRequestHeaderMap(*headers);
         EXPECT_THAT(headers, HeaderMapEqualIgnoreOrder(&expected_headers));
         ASSERT_TRUE(result.ok());
@@ -3098,7 +3098,7 @@ TEST_P(Http2CodecImplTest, ResponseHeadersFlood) {
   EXPECT_NO_THROW(driveToCompletion());
 
   EXPECT_TRUE(violation_callback->enabled_);
-  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush, _));
   violation_callback->invokeCallback();
 
   EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
@@ -3136,7 +3136,7 @@ TEST_P(Http2CodecImplTest, ResponseDataFlood) {
   EXPECT_NO_THROW(driveToCompletion());
 
   EXPECT_TRUE(violation_callback->enabled_);
-  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush, _));
   violation_callback->invokeCallback();
 
   EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
@@ -3217,7 +3217,7 @@ TEST_P(Http2CodecImplTest, ResponseDataFloodCounterReset) {
   EXPECT_NO_THROW(driveToCompletion());
 
   EXPECT_TRUE(violation_callback->enabled_);
-  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush, _));
   violation_callback->invokeCallback();
 }
 
@@ -3293,7 +3293,7 @@ TEST_P(Http2CodecImplTest, ResponseTrailersFlood) {
   EXPECT_NO_THROW(driveToCompletion());
 
   EXPECT_TRUE(violation_callback->enabled_);
-  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush, _));
   violation_callback->invokeCallback();
 
   EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
@@ -3345,7 +3345,7 @@ TEST_P(Http2CodecImplTest, MetadataFlood) {
   driveToCompletion();
 
   EXPECT_TRUE(violation_callback->enabled_);
-  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush, _));
   violation_callback->invokeCallback();
 
   EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
@@ -3447,7 +3447,7 @@ TEST_P(Http2CodecImplTest, GoAwayCausesOutboundFlood) {
   driveToCompletion();
 
   EXPECT_TRUE(violation_callback->enabled_);
-  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush, _));
   violation_callback->invokeCallback();
 
   EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
@@ -3455,7 +3455,7 @@ TEST_P(Http2CodecImplTest, GoAwayCausesOutboundFlood) {
 }
 
 // Verify that codec detects flood of outbound frames caused by shutdownNotice() method
-TEST_P(Http2CodecImplTest, ShudowNoticeCausesOutboundFlood) {
+TEST_P(Http2CodecImplTest, ShutdownNoticeCausesOutboundFlood) {
   initialize();
 
   TestRequestHeaderMapImpl request_headers;
@@ -3490,7 +3490,7 @@ TEST_P(Http2CodecImplTest, ShudowNoticeCausesOutboundFlood) {
   driveToCompletion();
 
   EXPECT_TRUE(violation_callback->enabled_);
-  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush, _));
   violation_callback->invokeCallback();
 
   EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
@@ -3547,7 +3547,7 @@ TEST_P(Http2CodecImplTest, KeepAliveCausesOutboundFlood) {
   send_timer->invokeCallback();
 
   EXPECT_TRUE(violation_callback->enabled_);
-  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush, _));
   violation_callback->invokeCallback();
 
   EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
@@ -3590,7 +3590,7 @@ TEST_P(Http2CodecImplTest, ResetStreamCausesOutboundFlood) {
   server_->getStream(1)->resetStream(StreamResetReason::RemoteReset);
 
   EXPECT_TRUE(violation_callback->enabled_);
-  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush, _));
   violation_callback->invokeCallback();
 
   EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
@@ -4348,6 +4348,60 @@ TEST_P(Http2CodecImplTest, CheckHeaderValueValidation) {
     EXPECT_TRUE(request_encoder->encodeHeaders(request_headers, true).ok());
     driveToCompletion();
   }
+}
+
+TEST_P(Http2CodecImplTest, BadResponseHeader) {
+  initialize();
+#ifdef ENVOY_ENABLE_UHV
+  // UHV mode makes no effect on nghttp2
+  if (http2_implementation_ != Http2Impl::Oghttp2) {
+    return;
+  }
+#endif
+
+  InSequence s;
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  request_headers.setMethod("POST");
+
+  // Encode request headers.
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
+  driveToCompletion();
+
+  // { is illegal in header name
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"foo{bar", "baz"}};
+
+  // Encode response headers.
+#ifdef ENVOY_ENABLE_UHV
+  // Header validation is done by the CodecClient after header map is fully parsed.
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, _))
+      .WillOnce(Invoke([this](ResponseHeaderMapPtr& headers, bool) -> void {
+        auto result = header_validator_->validateResponseHeaderMap(*headers);
+        ASSERT_FALSE(result.ok());
+      }));
+#else
+  // The decodeHeaders on the client side will not be called due to protocol error
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, _)).Times(0);
+  // Since the client coded will trigger a protocol error, its buffer
+  // will not be fully drained
+  expect_buffered_data_on_teardown_ = true;
+#endif
+  response_encoder_->encodeHeaders(response_headers, true);
+
+  driveToCompletion();
+
+#ifdef ENVOY_ENABLE_UHV
+  // In case of UHV dispatching frames will be successful and connection is closed
+  // by the codec client.
+  EXPECT_TRUE(client_wrapper_->status_.ok());
+  EXPECT_EQ(1, server_stats_store_.counter("http2.rx_messaging_error").value());
+#else
+  EXPECT_FALSE(client_wrapper_->status_.ok());
+  EXPECT_TRUE(isCodecProtocolError(client_wrapper_->status_));
+  EXPECT_EQ(1, client_stats_store_.counter("http2.rx_messaging_error").value());
+#endif
+  EXPECT_TRUE(server_wrapper_->status_.ok());
 }
 
 class TestNghttp2SessionFactory;

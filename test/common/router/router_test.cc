@@ -105,11 +105,10 @@ public:
             }));
 
     cm_.thread_local_cluster_.cluster_.info_->upstream_config_ =
-        absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>();
+        std::make_unique<envoy::config::core::v3::TypedExtensionConfig>();
     envoy::extensions::upstreams::http::generic::v3::GenericConnectionPoolProto generic_config;
-    cm_.thread_local_cluster_.cluster_.info_->upstream_config_.value()
-        .mutable_typed_config()
-        ->PackFrom(generic_config);
+    cm_.thread_local_cluster_.cluster_.info_->upstream_config_->mutable_typed_config()->PackFrom(
+        generic_config);
     callbacks_.route_->route_entry_.connect_config_ =
         absl::make_optional<RouteEntry::ConnectConfig>();
 
@@ -5968,12 +5967,11 @@ TEST_F(RouterTest, ConnectPauseAndResume) {
 TEST_F(RouterTest, InvalidUpstream) {
   // Explicitly configure an HTTP upstream, to test factory creation.
   cm_.thread_local_cluster_.cluster_.info_->upstream_config_ =
-      absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>();
+      std::make_unique<envoy::config::core::v3::TypedExtensionConfig>();
   // Configure a TCP upstream rather than an HTTP upstream.
   envoy::extensions::upstreams::tcp::generic::v3::GenericConnectionPoolProto generic_config;
-  cm_.thread_local_cluster_.cluster_.info_->upstream_config_.value()
-      .mutable_typed_config()
-      ->PackFrom(generic_config);
+  cm_.thread_local_cluster_.cluster_.info_->upstream_config_->mutable_typed_config()->PackFrom(
+      generic_config);
 
   NiceMock<Http::MockRequestEncoder> encoder;
   Http::ResponseDecoder* response_decoder = nullptr;
@@ -6001,11 +5999,10 @@ TEST_F(RouterTest, InvalidUpstream) {
 TEST_F(RouterTest, ConnectPauseNoResume) {
   // Explicitly configure an HTTP upstream, to test factory creation.
   cm_.thread_local_cluster_.cluster_.info_->upstream_config_ =
-      absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>();
+      std::make_unique<envoy::config::core::v3::TypedExtensionConfig>();
   envoy::extensions::upstreams::http::http::v3::HttpConnectionPoolProto http_config;
-  cm_.thread_local_cluster_.cluster_.info_->upstream_config_.value()
-      .mutable_typed_config()
-      ->PackFrom(http_config);
+  cm_.thread_local_cluster_.cluster_.info_->upstream_config_->mutable_typed_config()->PackFrom(
+      http_config);
 
   NiceMock<Http::MockRequestEncoder> encoder;
   Http::ResponseDecoder* response_decoder = nullptr;
@@ -6035,11 +6032,10 @@ TEST_F(RouterTest, ConnectPauseNoResume) {
 TEST_F(RouterTest, ConnectExplicitTcpUpstream) {
   // Explicitly configure a TCP upstream, to test factory creation.
   cm_.thread_local_cluster_.cluster_.info_->upstream_config_ =
-      absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>();
+      std::make_unique<envoy::config::core::v3::TypedExtensionConfig>();
   envoy::extensions::upstreams::http::tcp::v3::TcpConnectionPoolProto tcp_config;
-  cm_.thread_local_cluster_.cluster_.info_->upstream_config_.value()
-      .mutable_typed_config()
-      ->PackFrom(tcp_config);
+  cm_.thread_local_cluster_.cluster_.info_->upstream_config_->mutable_typed_config()->PackFrom(
+      tcp_config);
   callbacks_.route_->route_entry_.connect_config_ =
       absl::make_optional<RouteEntry::ConnectConfig>();
 
@@ -6057,11 +6053,10 @@ TEST_F(RouterTest, ConnectExplicitTcpUpstream) {
 TEST_F(RouterTest, PostExplicitTcpUpstream) {
   // Explicitly configure a generic upstream, to test factory creation.
   cm_.thread_local_cluster_.cluster_.info_->upstream_config_ =
-      absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>();
+      std::make_unique<envoy::config::core::v3::TypedExtensionConfig>();
   envoy::extensions::upstreams::http::generic::v3::GenericConnectionPoolProto generic_config;
-  cm_.thread_local_cluster_.cluster_.info_->upstream_config_.value()
-      .mutable_typed_config()
-      ->PackFrom(generic_config);
+  cm_.thread_local_cluster_.cluster_.info_->upstream_config_->mutable_typed_config()->PackFrom(
+      generic_config);
   callbacks_.route_->route_entry_.connect_config_ =
       absl::make_optional<RouteEntry::ConnectConfig>();
   callbacks_.route_->route_entry_.connect_config_.value().set_allow_post(true);
@@ -6079,11 +6074,10 @@ TEST_F(RouterTest, PostExplicitTcpUpstream) {
 TEST_F(RouterTest, PostHttpUpstream) {
   // Explicitly configure a generic upstream, to test factory creation.
   cm_.thread_local_cluster_.cluster_.info_->upstream_config_ =
-      absl::make_optional<envoy::config::core::v3::TypedExtensionConfig>();
+      std::make_unique<envoy::config::core::v3::TypedExtensionConfig>();
   envoy::extensions::upstreams::http::generic::v3::GenericConnectionPoolProto generic_config;
-  cm_.thread_local_cluster_.cluster_.info_->upstream_config_.value()
-      .mutable_typed_config()
-      ->PackFrom(generic_config);
+  cm_.thread_local_cluster_.cluster_.info_->upstream_config_->mutable_typed_config()->PackFrom(
+      generic_config);
   callbacks_.route_->route_entry_.connect_config_ =
       absl::make_optional<RouteEntry::ConnectConfig>();
 

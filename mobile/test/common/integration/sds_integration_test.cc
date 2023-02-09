@@ -20,9 +20,25 @@ const envoy::service::secret::v3::SdsDummy _sds_dummy;
 class SdsIntegrationTest : public XdsIntegrationTest {
 public:
   SdsIntegrationTest() {
+    override_builder_config_ = true;
     ExtensionRegistry::registerFactories();
     skip_tag_extraction_rule_check_ = true;
     upstream_tls_ = true;
+
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      // The default stats config has overenthusiastic filters.
+      bootstrap.clear_stats_config();
+
+      // Add two clusters by default:
+      //  - base_h2: An HTTP2 cluster with one fake upstream endpoint, for accepting requests from
+      //  EM.
+      //  - xds_cluster.lyft.com: An xDS management server cluster, with one fake upstream endpoint.
+      bootstrap.mutable_static_resources()->clear_clusters();
+      bootstrap.mutable_static_resources()->add_clusters()->MergeFrom(
+          createSingleEndpointClusterConfig("base_h2"));
+      bootstrap.mutable_static_resources()->add_clusters()->MergeFrom(
+          createSingleEndpointClusterConfig(std::string(XDS_CLUSTER)));
+    });
 
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Change the base_h2 cluster to use SSL and SDS.

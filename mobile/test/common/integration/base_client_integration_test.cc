@@ -201,9 +201,8 @@ void BaseClientIntegrationTest::createEnvoy() {
     }
   }
 
-  finalizeConfigWithPorts(config_helper_, ports, use_lds_);
-
   if (override_builder_config_) {
+    finalizeConfigWithPorts(config_helper_, ports, use_lds_);
     ASSERT_FALSE(config_helper_.bootstrap().has_admin())
         << "Bootstrap config should not have `admin` configured in Envoy Mobile";
     builder_.setOverrideConfigForTests(
@@ -241,6 +240,38 @@ testing::AssertionResult BaseClientIntegrationTest::waitForCounterGe(const std::
   constexpr std::chrono::milliseconds timeout = TestUtility::DefaultTimeout;
   Event::TestTimeSystem::RealTimeBound bound(timeout);
   while (getCounterValue(name) < value) {
+    timeSystem().advanceTimeWait(std::chrono::milliseconds(10));
+    if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
+      return testing::AssertionFailure()
+             << fmt::format("timed out waiting for {} to be {}", name, value);
+    }
+  }
+  return testing::AssertionSuccess();
+}
+
+uint64_t BaseClientIntegrationTest::getGaugeValue(const std::string& name) {
+  uint64_t gauge_value = 0UL;
+  uint64_t* gauge_value_ptr = &gauge_value;
+  absl::Notification gauge_value_set;
+  EXPECT_EQ(ENVOY_SUCCESS,
+            EngineHandle::runOnEngineDispatcher(
+                rawEngine(), [gauge_value_ptr, &name, &gauge_value_set](Envoy::Engine& engine) {
+                  Stats::GaugeSharedPtr gauge =
+                      TestUtility::findGauge(engine.getStatsStore(), name);
+                  if (gauge != nullptr) {
+                    *gauge_value_ptr = gauge->value();
+                  }
+                  gauge_value_set.Notify();
+                }));
+  EXPECT_TRUE(gauge_value_set.WaitForNotificationWithTimeout(absl::Seconds(5)));
+  return gauge_value;
+}
+
+testing::AssertionResult BaseClientIntegrationTest::waitForGaugeGe(const std::string& name,
+                                                                   uint64_t value) {
+  constexpr std::chrono::milliseconds timeout = TestUtility::DefaultTimeout;
+  Event::TestTimeSystem::RealTimeBound bound(timeout);
+  while (getGaugeValue(name) < value) {
     timeSystem().advanceTimeWait(std::chrono::milliseconds(10));
     if (timeout != std::chrono::milliseconds::zero() && !bound.withinBound()) {
       return testing::AssertionFailure()

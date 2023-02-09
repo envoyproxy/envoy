@@ -12,11 +12,12 @@ concurrency:
 
 jobs:
   sizecurrent:
+    if: github.repository == 'envoyproxy/envoy'
     name: size_current
     runs-on: ubuntu-20.04
     timeout-minutes: 120
     container:
-      image: envoyproxy/envoy-build-ubuntu:b0ff77ae3f25b0bf595f9b8bba46b489723ab446
+      image: envoyproxy/envoy-build-ubuntu:7304f974de2724617b7492ccb4c9c58cd420353a
       env:
         CC: /opt/llvm/bin/clang
         CXX: /opt/llvm/bin/clang++
@@ -30,6 +31,7 @@ jobs:
       run: |
         cd mobile && ./bazelw build \
             --config=sizeopt \
+            --config=release-common \
             --config=remote-ci-linux-clang \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //test/performance:test_binary_size
@@ -38,11 +40,12 @@ jobs:
         name: sizecurrent
         path: mobile/bazel-bin/test/performance/test_binary_size
   sizemain:
+    if: github.repository == 'envoyproxy/envoy'
     name: size_main
     runs-on: ubuntu-20.04
     timeout-minutes: 90
     container:
-      image: envoyproxy/envoy-build-ubuntu:b0ff77ae3f25b0bf595f9b8bba46b489723ab446
+      image: envoyproxy/envoy-build-ubuntu:7304f974de2724617b7492ccb4c9c58cd420353a
       env:
         CC: /opt/llvm/bin/clang
         CXX: /opt/llvm/bin/clang++
@@ -58,6 +61,7 @@ jobs:
         git checkout main && git pull origin main
           cd mobile && ./bazelw build \
             --config=sizeopt \
+            --config=release-common \
             --config=remote-ci-linux-clang \
             --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
             //test/performance:test_binary_size
@@ -66,12 +70,13 @@ jobs:
         name: sizemain
         path: mobile/bazel-bin/test/performance/test_binary_size
   sizecompare:
+    if: github.repository == 'envoyproxy/envoy'
     name: size_compare
     needs: [sizecurrent, sizemain]
     runs-on: ubuntu-20.04
     timeout-minutes: 30
     container:
-      image: envoyproxy/envoy-build-ubuntu:b0ff77ae3f25b0bf595f9b8bba46b489723ab446
+      image: envoyproxy/envoy-build-ubuntu:7304f974de2724617b7492ccb4c9c58cd420353a
     steps:
     - uses: actions/checkout@v1
     - uses: actions/download-artifact@v3
@@ -90,4 +95,4 @@ jobs:
         zip -9 dist/main.zip dist/main.stripped
         zip -9 dist/current.zip dist/current.stripped
     - name: 'Test size regression'
-      run: cd mobile && ./ci/test_size_regression.sh dist/main.zip dist/current.zip
+      run: cd mobile && ./ci/test_size_regression.sh ../dist/main.zip ../dist/current.zip

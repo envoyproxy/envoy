@@ -164,6 +164,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_circonus_labs_libcircllhist()
     _com_github_cyan4973_xxhash()
     _com_github_datadog_dd_opentracing_cpp()
+    _com_github_datadog_dd_trace_cpp()
     _com_github_mirror_tclap()
     _com_github_envoyproxy_sqlparser()
     _com_github_fmtlib_fmt()
@@ -264,7 +265,10 @@ def _boringssl():
     external_http_archive(
         name = "boringssl",
         patch_args = ["-p1"],
-        patches = ["@envoy//bazel:boringssl_static.patch"],
+        patches = [
+            "@envoy//bazel:boringssl_static.patch",
+            "@envoy//bazel:boringssl_CVE-2023-0286.patch",
+        ],
     )
 
 def _boringssl_fips():
@@ -572,6 +576,13 @@ def _com_github_datadog_dd_opentracing_cpp():
     native.bind(
         name = "dd_opentracing_cpp",
         actual = "@com_github_datadog_dd_opentracing_cpp//:dd_opentracing_cpp",
+    )
+
+def _com_github_datadog_dd_trace_cpp():
+    external_http_archive("com_github_datadog_dd_trace_cpp")
+    native.bind(
+        name = "dd_trace_cpp",
+        actual = "@com_github_datadog_dd_trace_cpp//:dd_trace_cpp",
     )
 
 def _com_github_skyapm_cpp2sky():

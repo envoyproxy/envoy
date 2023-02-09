@@ -7,6 +7,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/data/core/v3/health_check_event.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/grpc/status.h"
@@ -367,6 +368,11 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
     if (upstream_host && Http::CodeUtility::is5xx(response_status_code)) {
       upstream_host->stats().rq_error_.inc();
     }
+    if (upstream_host && Http::CodeUtility::is2xx(response_status_code)) {
+      upstream_host->setLastSuccessfulTrafficTime(
+          envoy::data::core::v3::HealthCheckerType::HTTP,
+          callbacks_->dispatcher().timeSource().monotonicTime());
+    }
   }
 }
 
@@ -688,10 +694,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // Hang onto the modify_headers function for later use in handling upstream responses.
   modify_headers_ = modify_headers;
 
-  conn_pool_new_stream_with_early_data_and_http3_ =
-      Runtime::runtimeFeatureEnabled(Runtime::conn_pool_new_stream_with_early_data_and_http3);
   const bool can_send_early_data =
-      conn_pool_new_stream_with_early_data_and_http3_ &&
       route_entry_->earlyDataPolicy().allowsEarlyDataForRequest(*downstream_headers_);
 
   include_timeout_retry_header_in_request_ =
@@ -761,10 +764,10 @@ Filter::createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster) {
   GenericConnPoolFactory* factory = nullptr;
   if (cluster_->upstreamConfig().has_value()) {
     factory = Envoy::Config::Utility::getFactory<GenericConnPoolFactory>(
-        cluster_->upstreamConfig().value());
+        cluster_->upstreamConfig().ref());
     ENVOY_BUG(factory != nullptr,
               fmt::format("invalid factory type '{}', failing over to default upstream",
-                          cluster_->upstreamConfig().value().DebugString()));
+                          cluster_->upstreamConfig().ref().DebugString()));
   }
   if (!factory) {
     factory = &config_.router_context_.genericConnPoolFactory();
@@ -845,10 +848,19 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     shadow_streams_.clear();
   }
   if (buffering) {
-    Buffer::OwnedImpl copy(data);
-    callbacks_->addDecodedData(copy, true);
-  }
-  if (!upstream_requests_.empty()) {
+    if (!upstream_requests_.empty()) {
+      Buffer::OwnedImpl copy(data);
+      upstream_requests_.front()->acceptDataFromRouter(copy, end_stream);
+    }
+
+    // If we are potentially going to retry or buffer shadow this request we need to buffer.
+    // This will not cause the connection manager to 413 because before we hit the
+    // buffer limit we give up on retries and buffering. We must buffer using addDecodedData()
+    // so that all buffered data is available by the time we do request complete processing and
+    // potentially shadow. Additionally, we can't do a copy here because there's a check down
+    // this stack for whether `data` is the same buffer as already buffered data.
+    callbacks_->addDecodedData(data, true);
+  } else {
     upstream_requests_.front()->acceptDataFromRouter(data, end_stream);
   }
 
@@ -1228,7 +1240,7 @@ bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
     return false;
   }
   RetryState::Http3Used was_using_http3 = RetryState::Http3Used::Unknown;
-  if (conn_pool_new_stream_with_early_data_and_http3_ && upstream_request.hadUpstream()) {
+  if (upstream_request.hadUpstream()) {
     was_using_http3 = (upstream_request.streamInfo().protocol().has_value() &&
                        upstream_request.streamInfo().protocol().value() == Http::Protocol::Http3)
                           ? RetryState::Http3Used::Yes
@@ -1353,6 +1365,9 @@ void Filter::handleNon5xxResponseHeaders(absl::optional<Grpc::Status::GrpcStatus
     if (end_stream) {
       if (grpc_status && !Http::CodeUtility::is5xx(grpc_to_http_status)) {
         upstream_request.upstreamHost()->stats().rq_success_.inc();
+        upstream_request.upstreamHost()->setLastSuccessfulTrafficTime(
+            envoy::data::core::v3::HealthCheckerType::GRPC,
+            callbacks_->dispatcher().timeSource().monotonicTime());
       } else {
         upstream_request.upstreamHost()->stats().rq_error_.inc();
       }
@@ -1601,6 +1616,9 @@ void Filter::onUpstreamTrailers(Http::ResponseTrailerMapPtr&& trailers,
     if (grpc_status &&
         !Http::CodeUtility::is5xx(Grpc::Utility::grpcToHttpStatus(grpc_status.value()))) {
       upstream_request.upstreamHost()->stats().rq_success_.inc();
+      upstream_request.upstreamHost()->setLastSuccessfulTrafficTime(
+          envoy::data::core::v3::HealthCheckerType::GRPC,
+          callbacks_->dispatcher().timeSource().monotonicTime());
     } else {
       upstream_request.upstreamHost()->stats().rq_error_.inc();
     }

@@ -163,13 +163,13 @@ This will load the required keys and certificates into the frontend and backend 
    $ docker-compose up --build -d
    $ docker-compose ps
 
-          Name                                      Command                State         Ports
-   --------------------------------------------------------------------------------------------------------
-   double-proxy_app_1                       python3 /code/service.py       Up
-   double-proxy_postgres_1                  docker-entrypoint.sh postgres  Up      5432/tcp
-   double-proxy_proxy-frontend_1            /docker-entrypoint.sh /usr ... Up      0.0.0.0:10000->10000/tcp
-   double-proxy_proxy-postgres-backend_1    /docker-entrypoint.sh /usr ... Up      10000/tcp
-   double-proxy_proxy-postgres-frontend_1   /docker-entrypoint.sh /usr ... Up      10000/tcp
+          Name                                      Command                State              Ports
+   -------------------------------------------------------------------------------------------------------------
+   double-proxy_app_1                       python3 /code/service.py       Up (healthy)
+   double-proxy_postgres_1                  docker-entrypoint.sh postgres  Up           5432/tcp
+   double-proxy_proxy-frontend_1            /docker-entrypoint.sh /usr ... Up           0.0.0.0:10000->10000/tcp
+   double-proxy_proxy-postgres-backend_1    /docker-entrypoint.sh /usr ... Up           10000/tcp
+   double-proxy_proxy-postgres-frontend_1   /docker-entrypoint.sh /usr ... Up           10000/tcp
 
 Step 6: Check the flask app can connect to the database
 *******************************************************

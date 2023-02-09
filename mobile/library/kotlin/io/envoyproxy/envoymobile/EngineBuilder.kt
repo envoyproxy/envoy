@@ -1,4 +1,4 @@
- package io.envoyproxy.envoymobile
+package io.envoyproxy.envoymobile
 
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification
@@ -42,7 +42,7 @@ open class EngineBuilder(
     EnvoyEngineImpl(onEngineRunning, logger, eventTracker)
   }
   private var logLevel = LogLevel.INFO
-  private var adminInterfaceEnabled = false
+  internal var adminInterfaceEnabled = false
   private var grpcStatsDomain: String? = null
   private var connectTimeoutSeconds = 30
   private var dnsRefreshSeconds = 60
@@ -50,13 +50,16 @@ open class EngineBuilder(
   private var dnsFailureRefreshSecondsMax = 10
   private var dnsQueryTimeoutSeconds = 25
   private var dnsMinRefreshSeconds = 60
-  private var dnsPreresolveHostnames = "[]"
+  private var dnsPreresolveHostnames = listOf<String>()
   private var enableDNSCache = false
+  private var dnsCacheSaveIntervalSeconds = 1
   private var enableDrainPostDnsRefresh = false
-  private var enableHttp3 = true
+  internal var enableHttp3 = true
   private var enableHappyEyeballs = true
-  private var enableGzip = true
-  private var enableBrotli = false
+  private var enableGzipDecompression = true
+  internal var enableGzipCompression = false
+  private var enableBrotliDecompression = false
+  internal var enableBrotliCompression = false
   private var enableSocketTagging = false
   private var enableInterfaceBinding = false
   private var h2ConnectionKeepaliveIdleIntervalMilliseconds = 1
@@ -68,7 +71,7 @@ open class EngineBuilder(
   private var appVersion = "unspecified"
   private var appId = "unspecified"
   private var trustChainVerification = TrustChainVerification.VERIFY_TRUST_CHAIN
-  private var virtualClusters = "[]"
+  private var virtualClusters = mutableListOf<String>()
   private var platformFilterChain = mutableListOf<EnvoyHTTPFilterFactory>()
   private var nativeFilterChain = mutableListOf<EnvoyNativeFilterConfig>()
   private var stringAccessors = mutableMapOf<String, EnvoyStringAccessor>()
@@ -188,7 +191,7 @@ open class EngineBuilder(
    *
    * @return this builder.
    */
-  fun addDNSPreresolveHostnames(dnsPreresolveHostnames: String): EngineBuilder {
+  fun addDNSPreresolveHostnames(dnsPreresolveHostnames: List<String>): EngineBuilder {
     this.dnsPreresolveHostnames = dnsPreresolveHostnames
     return this
   }
@@ -215,25 +218,13 @@ open class EngineBuilder(
    * 'reserved.platform_store'.
    *
    * @param enableDNSCache whether to enable DNS cache. Disabled by default.
+   * @param saveInterval   the interval at which to save results to the configured key value store.
    *
    * @return This builder.
    */
-  fun enableDNSCache(enableDNSCache: Boolean): EngineBuilder {
+  fun enableDNSCache(enableDNSCache: Boolean, saveInterval: Int = 1): EngineBuilder {
     this.enableDNSCache = enableDNSCache
-    return this
-  }
-
-  /**
-   * Specify whether to enable experimental HTTP/3 (QUIC) support. Note the actual protocol will
-   * be negotiated with the upstream endpoint and so upstream support is still required for HTTP/3
-   * to be utilized.
-   *
-   * @param enableHttp3 whether to enable HTTP/3.
-   *
-   * @return This builder.
-   */
-  fun enableHttp3(enableHttp3: Boolean): EngineBuilder {
-    this.enableHttp3 = enableHttp3
+    this.dnsCacheSaveIntervalSeconds = saveInterval
     return this
   }
 
@@ -253,24 +244,24 @@ open class EngineBuilder(
   /**
    * Specify whether to do gzip response decompression or not.  Defaults to true.
    *
-   * @param enableGzip whether or not to gunzip responses.
+   * @param enableGzipDecompression whether or not to gunzip responses.
    *
    * @return This builder.
    */
-  fun enableGzip(enableGzip: Boolean): EngineBuilder {
-    this.enableGzip = enableGzip
+  fun enableGzipDecompression(enableGzipDecompression: Boolean): EngineBuilder {
+    this.enableGzipDecompression = enableGzipDecompression
     return this
   }
 
   /**
    * Specify whether to do brotli response decompression or not.  Defaults to false.
    *
-   * @param enableBrotli whether or not to brotli decompress responses.
+   * @param enableBrotliDecompression whether or not to brotli decompress responses.
    *
    * @return This builder.
    */
-  fun enableBrotli(enableBrotli: Boolean): EngineBuilder {
-    this.enableBrotli = enableBrotli
+  fun enableBrotliDecompression(enableBrotliDecompression: Boolean): EngineBuilder {
+    this.enableBrotliDecompression = enableBrotliDecompression
     return this
   }
 
@@ -549,27 +540,12 @@ open class EngineBuilder(
   /**
    * Add virtual cluster configuration.
    *
-   * @param virtualClusters the JSON configuration string for virtual clusters.
+   * @param cluster the JSON configuration string for a virtual cluster.
    *
    * @return this builder.
    */
-  fun addVirtualClusters(virtualClusters: String): EngineBuilder {
-    this.virtualClusters = virtualClusters
-    return this
-  }
-
-  /**
-   * Enable admin interface on 127.0.0.1:9901 address. Admin interface is intended to be
-   * used for development/debugging purposes only. Enabling it in production may open
-   * your app to security vulnerabilities.
-   *
-   * Note this will not work with the default production build, as it builds with admin
-   * functionality disabled via --define=admin_functionality=disabled
-   *
-   * @return this builder.
-   */
-  fun enableAdminInterface(): EngineBuilder {
-    this.adminInterfaceEnabled = true
+  fun addVirtualCluster(cluster: String): EngineBuilder {
+    this.virtualClusters.add(cluster)
     return this
   }
 
@@ -591,10 +567,13 @@ open class EngineBuilder(
       dnsMinRefreshSeconds,
       dnsPreresolveHostnames,
       enableDNSCache,
+      dnsCacheSaveIntervalSeconds,
       enableDrainPostDnsRefresh,
       enableHttp3,
-      enableGzip,
-      enableBrotli,
+      enableGzipDecompression,
+      enableGzipCompression,
+      enableBrotliDecompression,
+      enableBrotliCompression,
       enableSocketTagging,
       enableHappyEyeballs,
       enableInterfaceBinding,
