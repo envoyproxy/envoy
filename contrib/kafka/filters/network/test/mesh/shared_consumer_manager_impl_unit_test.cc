@@ -148,7 +148,7 @@ protected:
   }
 
   InboundRecordSharedPtr makeRecord(const std::string& topic, const int32_t partition) {
-    return std::make_shared<InboundRecord>(topic, partition, 0);
+    return std::make_shared<InboundRecord>(topic, partition, 0, absl::nullopt, absl::nullopt);
   }
 };
 
