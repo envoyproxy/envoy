@@ -1286,18 +1286,21 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
                    *callbacks_, Http::Utility::resetReasonToString(reset_reason),
                    transport_failure_reason);
 
-  // TODO: The reset may also come from upstream over the wire. In this case it should be
-  // treated as external origin error and distinguished from local origin error.
-  // This matters only when running OutlierDetection with split_external_local_origin_errors
-  // config param set to true.
-  updateOutlierDetection(Upstream::Outlier::Result::LocalOriginConnectFailed, upstream_request,
-                         absl::nullopt);
+  const bool dropped = reset_reason == Http::StreamResetReason::Overflow;
+
+  if (!dropped) {
+    // TODO: The reset may also come from upstream over the wire. In this case it should be
+    // treated as external origin error and distinguished from local origin error.
+    // This matters only when running OutlierDetection with split_external_local_origin_errors
+    // config param set to true.
+    updateOutlierDetection(Upstream::Outlier::Result::LocalOriginConnectFailed, upstream_request,
+                           absl::nullopt);
+  }
 
   if (maybeRetryReset(reset_reason, upstream_request, TimeoutRetry::No)) {
     return;
   }
 
-  const bool dropped = reset_reason == Http::StreamResetReason::Overflow;
   const Http::Code error_code = (reset_reason == Http::StreamResetReason::ProtocolError)
                                     ? Http::Code::BadGateway
                                     : Http::Code::ServiceUnavailable;
