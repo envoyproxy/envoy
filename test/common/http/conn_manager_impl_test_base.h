@@ -28,6 +28,8 @@ using testing::NiceMock;
 namespace Envoy {
 namespace Http {
 
+// Base class for HttpConnectionManagerImpl related tests. This base class is used by tests under
+// common/http as well as test/extensions/filters/http/ext_proc/.
 class HttpConnectionManagerImplMixin : public ConnectionManagerConfig {
 public:
   HttpConnectionManagerImplMixin();

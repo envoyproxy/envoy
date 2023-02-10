@@ -26,9 +26,8 @@ SdsApi::SdsApi(envoy::config::core::v3::ConfigSource sds_config, absl::string_vi
       scope_(stats.createScope(absl::StrCat("sds.", sds_config_name, "."))),
       sds_api_stats_(generateStats(*scope_)), sds_config_(std::move(sds_config)),
       sds_config_name_(sds_config_name), secret_hash_(0), clean_up_(std::move(destructor_cb)),
-      subscription_factory_(subscription_factory),
-      time_source_(time_source), secret_data_{sds_config_name_, "uninitialized",
-                                              time_source_.systemTime()} {
+      subscription_factory_(subscription_factory), time_source_(time_source),
+      secret_data_{sds_config_name_, "uninitialized", time_source_.systemTime()} {
   const auto resource_name = getResourceName();
   // This has to happen here (rather than in initialize()) as it can throw exceptions.
   subscription_ = subscription_factory_.subscriptionFromConfigSource(

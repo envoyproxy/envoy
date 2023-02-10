@@ -109,8 +109,8 @@ public:
    */
   ResponseHeaderParser(ExpectedResponsesSharedPtr expected_responses,
                        const ResponseParserResolver& parser_resolver)
-      : expected_responses_{expected_responses},
-        parser_resolver_{parser_resolver}, context_{std::make_shared<ResponseContext>()} {};
+      : expected_responses_{expected_responses}, parser_resolver_{parser_resolver},
+        context_{std::make_shared<ResponseContext>()} {};
 
   /**
    * Consumes 8 bytes (2 x INT32) as response length and correlation id.

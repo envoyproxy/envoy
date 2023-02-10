@@ -2275,10 +2275,10 @@ TEST_F(HttpFilterTest, FailOnInvalidHeaderMutations) {
 class HttpFilter2Test : public HttpFilterTest, public Http::HttpConnectionManagerImplMixin {};
 
 // Test proves that when onData(data, end_stream) is called before headers response is returned,
-// ext_proc filter will make the data buffered in ActiveStream buffer without triggering a buffer
+// ext_proc filter will buffer the data in the ActiveStream buffer without triggering a buffer
 // over high watermark call, which ends in an 413 error return on request path, or a 500 error on
 // response path.
-TEST_F(HttpFilter2Test, LastOnDataCallExceedsStreamBufferLimitWouldJustRaiseHighWatermark2) {
+TEST_F(HttpFilter2Test, LastOnDataCallExceedsStreamBufferLimitWouldJustRaiseHighWatermark) {
   initialize(R"EOF(
   grpc_service:
     envoy_grpc:
@@ -2337,7 +2337,7 @@ TEST_F(HttpFilter2Test, LastOnDataCallExceedsStreamBufferLimitWouldJustRaiseHigh
     decoder_->decodeHeaders(std::move(headers), false);
     Buffer::OwnedImpl resp_body("Definitely more than 10 bytes data.");
     decoder_->decodeData(resp_body, true);
-    // Now external server returns the header response.
+    // Now external server returns the request header response.
     auto response = std::make_unique<ProcessingResponse>();
     auto* headers_response = response->mutable_request_headers();
     auto* hdr = headers_response->mutable_response()->mutable_header_mutation()->add_set_headers();
