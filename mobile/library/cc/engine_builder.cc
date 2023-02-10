@@ -49,7 +49,7 @@ void insertCustomFilter(const std::string& filter_config, std::string& config_te
 // Note that updates to the config.cc bootstrap will require a matching update in
 // generateBootstrap() below
 bool generatedStringMatchesGeneratedBoostrap(
-    const std::string& config_str, const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    const absl::string_view& config_str, const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   Thread::SkipAsserts skip;
   ProtobufMessage::StrictValidationVisitorImpl visitor;
   envoy::config::bootstrap::v3::Bootstrap config_bootstrap;
@@ -498,13 +498,13 @@ std::string EngineBuilder::generateConfigStr() const {
   return config_str;
 }
 
-bool EngineBuilder::generateBootstrapAndCompare(std::string yaml) const {
+bool EngineBuilder::generateBootstrapAndCompare(absl::string_view yaml) const {
   return generatedStringMatchesGeneratedBoostrap(yaml, *generateBootstrap());
 }
 
 std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>
-EngineBuilder::generateBootstrapAndCompareForTests(std::string yaml) const {
-  auto bootstrap = generateBootstrap();
+EngineBuilder::generateBootstrapAndCompareForTests(absl::string_view yaml) const {
+  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap = generateBootstrap();
   RELEASE_ASSERT(generateBootstrapAndCompare(yaml), "Failed equivalence");
   return bootstrap;
 }
@@ -514,7 +514,8 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   Thread::SkipAsserts skip;
   ASSERT(!config_bootstrap_incompatible_);
 
-  auto bootstrap = std::make_unique<envoy::config::bootstrap::v3::Bootstrap>();
+  std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap =
+      std::make_unique<envoy::config::bootstrap::v3::Bootstrap>();
 
   // Set up the HCM
   envoy::extensions::filters::network::http_connection_manager::v3::EnvoyMobileHttpConnectionManager
